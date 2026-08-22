@@ -29,6 +29,7 @@ namespace Orleans.Runtime
         private readonly IOptions<LoadSheddingOptions> _loadSheddingOptions;
         private readonly IServiceProvider _serviceProvider;
         private readonly ConcurrentDictionary<SiloAddress, SiloRuntimeStatistics> _periodicStats;
+        private readonly object _statisticsUpdateLock = new();
         private readonly TimeSpan _statisticsRefreshTime;
         private readonly List<ISiloStatisticsChangeListener> _siloStatisticsChangeListeners;
         private readonly ILogger _logger;
@@ -114,10 +115,10 @@ namespace Orleans.Runtime
 
                 // Inform other cluster members about our refreshed statistics.
                 var members = _siloStatusOracle.GetApproximateSiloStatuses(true).Keys.ToArray();
-                if (!await TryPublishStatisticsViaDissemination(myStats))
-                {
-                    await PublishStatisticsDirectly(myStats, members);
-                }
+                await TryPublishStatisticsViaDissemination(myStats);
+
+                // Direct publication keeps runtime statistics available to every silo during rolling upgrades.
+                await PublishStatisticsDirectly(myStats, members);
 
                 DeploymentLoadPublisherEvents.EmitClusterRefreshed(_siloDetails.SiloAddress, _periodicStats);
             }
@@ -134,7 +135,7 @@ namespace Orleans.Runtime
         }
 
         internal DisseminationApplyResult ApplyDisseminatedRuntimeStatistics(SiloAddress siloAddress, SiloRuntimeStatistics siloStats) =>
-            UpdateRuntimeStatisticsInternal(siloAddress, siloStats, rejectEqualTimestamp: true);
+            UpdateRuntimeStatisticsInternal(siloAddress, siloStats);
 
         internal bool IsRuntimeStatisticsObsolete(SiloAddress siloAddress, long timestampTicks)
         {
@@ -149,7 +150,7 @@ namespace Orleans.Runtime
         internal IReadOnlyCollection<SiloAddress> GetActiveSilosForStatisticsDigest() =>
             _siloStatusOracle.GetApproximateSiloStatuses(onlyActive: true).Keys;
 
-        private async Task<bool> TryPublishStatisticsViaDissemination(SiloRuntimeStatistics myStats)
+        private async Task TryPublishStatisticsViaDissemination(SiloRuntimeStatistics myStats)
         {
             try
             {
@@ -157,10 +158,10 @@ namespace Orleans.Runtime
                 var disseminationNamespace = _serviceProvider.GetService<DeploymentLoadStatisticsDisseminationNamespace>();
                 if (dissemination is null || disseminationNamespace is null || !disseminationNamespace.Options.Enabled)
                 {
-                    return false;
+                    return;
                 }
 
-                return await dissemination.Publish(
+                await dissemination.Publish(
                     disseminationNamespace,
                     _siloDetails.SiloAddress,
                     myStats.DateTime.Ticks,
@@ -169,7 +170,6 @@ namespace Orleans.Runtime
             catch (Exception exception)
             {
                 LogWarningRuntimeStatisticsUpdateFailure1(_logger, exception);
-                return false;
             }
         }
 
@@ -198,29 +198,34 @@ namespace Orleans.Runtime
             await Task.WhenAll(tasks);
         }
 
-        private DisseminationApplyResult UpdateRuntimeStatisticsInternal(SiloAddress siloAddress, SiloRuntimeStatistics siloStats, bool rejectEqualTimestamp = false)
+        private DisseminationApplyResult UpdateRuntimeStatisticsInternal(SiloAddress siloAddress, SiloRuntimeStatistics siloStats)
         {
             LogTraceUpdateRuntimeStatistics(_logger, siloAddress);
-            if (_siloStatusOracle.GetApproximateSiloStatus(siloAddress) != SiloStatus.Active)
+            lock (_statisticsUpdateLock)
             {
-                return DisseminationApplyResult.Rejected;
-            }
+                if (_siloStatusOracle.GetApproximateSiloStatus(siloAddress) != SiloStatus.Active)
+                {
+                    return DisseminationApplyResult.Rejected;
+                }
 
-            // Take only if newer.
-            if (_periodicStats.TryGetValue(siloAddress, out var old) && old.DateTime > siloStats.DateTime)
-            {
-                return DisseminationApplyResult.Obsolete;
-            }
+                if (_periodicStats.TryGetValue(siloAddress, out var old))
+                {
+                    if (old.DateTime > siloStats.DateTime)
+                    {
+                        return DisseminationApplyResult.Obsolete;
+                    }
 
-            if (rejectEqualTimestamp && old is not null && old.DateTime == siloStats.DateTime)
-            {
-                return DisseminationApplyResult.Duplicate;
-            }
+                    if (old.DateTime == siloStats.DateTime)
+                    {
+                        return DisseminationApplyResult.Duplicate;
+                    }
+                }
 
-            _periodicStats[siloAddress] = siloStats;
-            NotifyAllStatisticsChangeEventsSubscribers(siloAddress, siloStats);
-            DeploymentLoadPublisherEvents.EmitReceived(siloAddress, _siloDetails.SiloAddress, siloStats);
-            return DisseminationApplyResult.Applied;
+                _periodicStats[siloAddress] = siloStats;
+                NotifyAllStatisticsChangeEventsSubscribers(siloAddress, siloStats);
+                DeploymentLoadPublisherEvents.EmitReceived(siloAddress, _siloDetails.SiloAddress, siloStats);
+                return DisseminationApplyResult.Applied;
+            }
         }
 
         internal async Task RefreshClusterStatistics()
@@ -301,9 +306,12 @@ namespace Orleans.Runtime
         {
             if (!status.IsTerminating()) return;
 
-            DeploymentLoadPublisherEvents.EmitRemoved(updatedSilo, _siloDetails.SiloAddress);
-            _periodicStats.TryRemove(updatedSilo, out _);
-            NotifyAllStatisticsChangeEventsSubscribers(updatedSilo, null);
+            lock (_statisticsUpdateLock)
+            {
+                DeploymentLoadPublisherEvents.EmitRemoved(updatedSilo, _siloDetails.SiloAddress);
+                _periodicStats.TryRemove(updatedSilo, out _);
+                NotifyAllStatisticsChangeEventsSubscribers(updatedSilo, null);
+            }
         }
 
         void ILifecycleParticipant<ISiloLifecycle>.Participate(ISiloLifecycle observer)

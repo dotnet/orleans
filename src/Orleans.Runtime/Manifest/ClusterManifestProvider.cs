@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Diagnostics;
@@ -33,7 +34,7 @@ namespace Orleans.Runtime.Metadata
         private ClusterManifest _current;
         private IInternalGrainFactory? _grainFactory;
         private Task? _runTask;
-        private readonly Dictionary<ManifestHash, GrainManifest> _manifestCache = new();
+        private readonly ConcurrentDictionary<ManifestHash, GrainManifest> _manifestCache = new();
 
         public ClusterManifestProvider(
             ILocalSiloDetails localSiloDetails,
@@ -282,7 +283,7 @@ namespace Orleans.Runtime.Metadata
             {
                 if (!live.Contains(hash))
                 {
-                    _manifestCache.Remove(hash);
+                    _manifestCache.TryRemove(hash, out _);
                 }
             }
         }

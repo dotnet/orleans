@@ -52,6 +52,26 @@ public class WakeTimerTests
     }
 
     [Fact]
+    public async Task StaleCallbackDoesNotWakeRearmedTimer()
+    {
+        var timeProvider = new ControllableTimeProvider();
+        using var timer = new WakeTimer(timeProvider);
+        var wait = timer.WaitAsync(CancellationToken.None).AsTask();
+
+        timer.Change(TimeSpan.FromSeconds(1));
+        timeProvider.Advance(TimeSpan.FromMilliseconds(500));
+        timer.Change(TimeSpan.FromSeconds(1));
+        timeProvider.FireTimer();
+
+        Assert.False(wait.IsCompleted);
+
+        timeProvider.Advance(TimeSpan.FromSeconds(1));
+        timeProvider.FireTimer();
+
+        Assert.True(await wait);
+    }
+
+    [Fact]
     public async Task CancellingWaitDoesNotDisarmTimer()
     {
         var timeProvider = new FakeTimeProvider();
@@ -120,6 +140,57 @@ public class WakeTimerTests
             while (_workItems.TryDequeue(out var workItem))
             {
                 workItem.Callback(workItem.State);
+            }
+        }
+    }
+
+    private sealed class ControllableTimeProvider : TimeProvider
+    {
+        private DateTimeOffset _utcNow;
+        private long _timestamp;
+        private ControllableTimer? _timer;
+
+        public override DateTimeOffset GetUtcNow() => _utcNow;
+
+        public override long GetTimestamp() => _timestamp;
+
+        public override long TimestampFrequency => TimeSpan.TicksPerSecond;
+
+        public override ITimer CreateTimer(TimerCallback callback, object? state, TimeSpan dueTime, TimeSpan period)
+        {
+            _timer = new ControllableTimer(callback, state);
+            _timer.Change(dueTime, period);
+            return _timer;
+        }
+
+        public void Advance(TimeSpan duration)
+        {
+            _utcNow += duration;
+            _timestamp += duration.Ticks;
+        }
+
+        public void FireTimer() => _timer!.Fire();
+
+        private sealed class ControllableTimer(TimerCallback callback, object? state) : ITimer
+        {
+            private bool _disposed;
+
+            public bool Change(TimeSpan dueTime, TimeSpan period) => !_disposed;
+
+            public void Dispose() => _disposed = true;
+
+            public ValueTask DisposeAsync()
+            {
+                Dispose();
+                return ValueTask.CompletedTask;
+            }
+
+            public void Fire()
+            {
+                if (!_disposed)
+                {
+                    callback(state);
+                }
             }
         }
     }

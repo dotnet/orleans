@@ -66,6 +66,7 @@ public sealed class DisseminationOverlayOptions
     /// <summary>
     /// Gets or sets the interval between anti-entropy repair rounds.
     /// </summary>
+    /// <value>The interval is 5 seconds by default and must be between 1 millisecond and approximately 49.7 days.</value>
     public TimeSpan AntiEntropyInterval { get; set; } = TimeSpan.FromSeconds(5);
 
     /// <summary>
@@ -130,6 +131,7 @@ public sealed class DisseminationNamespaceOptions
     /// enabled namespaces. High-priority namespaces (see <see cref="Priority"/>) do not coalesce and are excluded
     /// from this calculation.
     /// </remarks>
+    /// <value>The delay is 100 milliseconds by default and must be between 1 millisecond and approximately 49.7 days.</value>
     public TimeSpan MaxCoalescingDelay { get; set; } = TimeSpan.FromMilliseconds(100);
 
     /// <summary>

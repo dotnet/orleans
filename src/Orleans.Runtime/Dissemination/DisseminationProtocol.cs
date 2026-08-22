@@ -794,7 +794,7 @@ internal sealed partial class DisseminationProtocol
         new()
         {
             Value = value,
-            ExpiresAt = _timeProvider.GetUtcNow() + disseminationNamespace.Options.StaleItemTtl,
+            ExpiresAt = DisseminationExpiration.Get(_timeProvider, disseminationNamespace.Options.StaleItemTtl),
         };
 
     private void EmitApplyResult(DisseminationNamespace namespaceName, DisseminationBroadcastValue item, SiloAddress sender, DisseminationApplyResult result)

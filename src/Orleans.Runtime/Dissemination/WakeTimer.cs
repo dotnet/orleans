@@ -11,8 +11,12 @@ namespace Orleans.Runtime.Dissemination;
 internal sealed class WakeTimer : IDisposable
 {
     private readonly object _lock = new();
+    private readonly TimeProvider _timeProvider;
     private readonly ITimer _timer;
     private TaskCompletionSource<bool>? _waiter;
+    private long _armedAtTimestamp;
+    private TimeSpan _dueTime;
+    private bool _armed;
     private bool _signaled;
     private bool _disposed;
 
@@ -22,8 +26,9 @@ internal sealed class WakeTimer : IDisposable
     /// <param name="timeProvider">The time provider used to create the underlying timer.</param>
     public WakeTimer(TimeProvider timeProvider)
     {
+        _timeProvider = timeProvider;
         _timer = timeProvider.CreateTimer(
-            static state => ((WakeTimer)state!).Wake(),
+            static state => ((WakeTimer)state!).OnTimer(),
             this,
             Timeout.InfiniteTimeSpan,
             Timeout.InfiniteTimeSpan);
@@ -49,6 +54,9 @@ internal sealed class WakeTimer : IDisposable
                 return;
             }
 
+            _armed = dueTime != Timeout.InfiniteTimeSpan;
+            _armedAtTimestamp = _armed ? _timeProvider.GetTimestamp() : 0;
+            _dueTime = dueTime;
             _timer.Change(dueTime, Timeout.InfiniteTimeSpan);
         }
     }
@@ -151,8 +159,36 @@ internal sealed class WakeTimer : IDisposable
     {
         var waiter = _waiter;
         _waiter = null;
+        _armed = false;
         _timer.Change(Timeout.InfiniteTimeSpan, Timeout.InfiniteTimeSpan);
         return waiter;
+    }
+
+    private void OnTimer()
+    {
+        TaskCompletionSource<bool>? waiter;
+        lock (_lock)
+        {
+            if (_disposed || !_armed)
+            {
+                return;
+            }
+
+            var remaining = _dueTime - _timeProvider.GetElapsedTime(_armedAtTimestamp);
+            if (remaining > TimeSpan.Zero)
+            {
+                _timer.Change(remaining, Timeout.InfiniteTimeSpan);
+                return;
+            }
+
+            waiter = CompleteWaitUnsafe();
+            if (waiter is null)
+            {
+                _signaled = true;
+            }
+        }
+
+        waiter?.TrySetResult(true);
     }
 
     private void CancelWait(TaskCompletionSource<bool> waiter, CancellationToken cancellationToken)

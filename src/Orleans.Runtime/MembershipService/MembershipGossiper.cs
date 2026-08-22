@@ -22,16 +22,14 @@ internal partial class MembershipGossiper(IServiceProvider serviceProvider, ILog
 
         LogDebugGossipingStatusToPartners(logger, updatedSilo, updatedStatus, gossipPartners.Count);
 
-        if (await TryGossipViaDissemination(snapshot))
-        {
-            return;
-        }
+        await TryGossipViaDissemination(snapshot);
 
+        // Direct gossip preserves prompt delivery to every cluster member during rolling upgrades.
         var systemTarget = _membershipSystemTarget ??= serviceProvider.GetRequiredService<MembershipSystemTarget>();
         await systemTarget.GossipToRemoteSilos(gossipPartners, snapshot, updatedSilo, updatedStatus);
     }
 
-    private async Task<bool> TryGossipViaDissemination(MembershipTableSnapshot snapshot)
+    private async Task TryGossipViaDissemination(MembershipTableSnapshot snapshot)
     {
         try
         {
@@ -39,15 +37,14 @@ internal partial class MembershipGossiper(IServiceProvider serviceProvider, ILog
             var disseminationNamespace = serviceProvider.GetService<MembershipDisseminationNamespace>();
             if (dissemination is null || disseminationNamespace is null || !disseminationNamespace.Options.Enabled)
             {
-                return false;
+                return;
             }
 
-            return await disseminationNamespace.PublishAsync(dissemination, snapshot, CancellationToken.None);
+            await disseminationNamespace.PublishAsync(dissemination, snapshot, CancellationToken.None);
         }
         catch (Exception exception)
         {
             LogDebugMembershipDisseminationFailed(logger, exception);
-            return false;
         }
     }
 
@@ -59,6 +56,6 @@ internal partial class MembershipGossiper(IServiceProvider serviceProvider, ILog
 
     [LoggerMessage(
         Level = LogLevel.Debug,
-        Message = "Membership dissemination failed. Falling back to legacy membership gossip.")]
+        Message = "Membership dissemination failed. Direct membership gossip continues delivery.")]
     private static partial void LogDebugMembershipDisseminationFailed(ILogger logger, Exception exception);
 }

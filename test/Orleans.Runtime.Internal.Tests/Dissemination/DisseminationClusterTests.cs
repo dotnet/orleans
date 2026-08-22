@@ -4,10 +4,12 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using Microsoft.Extensions.DependencyInjection;
 using Orleans.Configuration;
 using Orleans.Hosting;
 using Orleans.Runtime;
 using Orleans.Runtime.Dissemination;
+using Orleans.Runtime.MembershipService;
 using Orleans.TestingHost;
 using Xunit;
 
@@ -23,16 +25,9 @@ namespace UnitTests.Dissemination;
 public sealed class DisseminationClusterTests
 {
     [Fact]
-    public async Task MembershipUpdatesAreDisseminatedAndAppliedAcrossRealCluster()
+    public async Task MembershipUpdatesAreDisseminatedAcrossRealCluster()
     {
         using var cancellation = new CancellationTokenSource(TimeSpan.FromSeconds(120));
-
-        // Observe membership updates that were applied on remote silos; require at least two distinct silos
-        // to prove that updates propagated across the cluster rather than only being applied locally.
-        var observer = new ValueApplyObserver(targetDistinctSilos: 2);
-        using var subscription = DisseminationEvents.Listener.Subscribe(
-            observer,
-            static name => name == "Dissemination.ValueApply");
 
         var builder = new InProcessTestClusterBuilder(3);
         builder.ConfigureSilo((_, siloBuilder) =>
@@ -46,6 +41,18 @@ public sealed class DisseminationClusterTests
         await cluster.DeployAsync();
         await cluster.WaitForLivenessToStabilizeAsync();
 
+        var existingSilos = cluster.GetActiveSilos().Select(static silo => silo.SiloAddress).ToHashSet();
+        var baselineVersion = cluster.Silos[0].ServiceProvider
+            .GetRequiredService<IMembershipManager>()
+            .CurrentSnapshot.Version.Value;
+
+        // Arm the observer after initial stabilization and accept only a later membership version applied by
+        // pre-existing silos, so cluster startup or unrelated parallel tests cannot satisfy the assertion.
+        var observer = new ValueApplyObserver(targetDistinctSilos: 2, existingSilos, baselineVersion);
+        using var subscription = DisseminationEvents.Listener.Subscribe(
+            observer,
+            static name => name == "Dissemination.ValueApply");
+
         // Adding a silo produces new membership updates that must propagate to the existing silos.
         await cluster.StartAdditionalSiloAsync();
         await cluster.WaitForLivenessToStabilizeAsync();
@@ -58,7 +65,10 @@ public sealed class DisseminationClusterTests
                 + string.Join(", ", observer.AppliedSilos.Select(static silo => silo.ToString())));
     }
 
-    private sealed class ValueApplyObserver(int targetDistinctSilos) : IObserver<KeyValuePair<string, object?>>
+    private sealed class ValueApplyObserver(
+        int targetDistinctSilos,
+        IReadOnlySet<SiloAddress> expectedSilos,
+        long baselineVersion) : IObserver<KeyValuePair<string, object?>>
     {
         private readonly object _lock = new();
         private readonly HashSet<SiloAddress> _appliedSilos = [];
@@ -81,7 +91,10 @@ public sealed class DisseminationClusterTests
         {
             if (value.Value is not DisseminationValueEvent evt
                 || evt.Namespace != DisseminationNamespaceNames.Membership
-                || evt.Result != DisseminationApplyResult.Applied.ToString()
+                || evt.Key != DisseminationKey.Default
+                || evt.ToVersion <= baselineVersion
+                || !expectedSilos.Contains(evt.LocalSilo)
+                || evt.Result is not (nameof(DisseminationApplyResult.Applied) or nameof(DisseminationApplyResult.Duplicate))
                 || evt.PayloadBytes <= 0)
             {
                 return;
