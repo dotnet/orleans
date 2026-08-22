@@ -32,6 +32,9 @@ namespace Orleans.Streams
         [Id(2)]
         public string? High { get; private set; }
 
+        [field: NonSerialized]
+        internal StreamSequenceToken? LowToken { get; }
+
         /// <summary>
         /// Initializes a new instance of the <see cref="QueueCacheMissException"/> class.
         /// </summary>
@@ -59,6 +62,7 @@ namespace Orleans.Streams
         public QueueCacheMissException(StreamSequenceToken requested, StreamSequenceToken low, StreamSequenceToken high)
             : this(requested.ToString(), low.ToString(), high.ToString())
         {
+            LowToken = low;
         }
 
         /// <summary>

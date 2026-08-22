@@ -12,8 +12,8 @@ using Orleans.Runtime;
 using Orleans.Runtime.Internal;
 using Orleans.Runtime.Scheduler;
 using Orleans.Streaming;
-using StreamingEvents = Orleans.Streaming.Diagnostics.StreamingEvents;
 using Orleans.Streams.Filtering;
+using StreamingEvents = Orleans.Streaming.Diagnostics.StreamingEvents;
 using TagList = System.Diagnostics.TagList;
 
 namespace Orleans.Streams
@@ -858,6 +858,12 @@ namespace Orleans.Streams
                                 StreamingEvents.EmitConsumerCursorDrained(streamProviderName, consumerData.StreamId.StreamId, consumerData.SubscriptionId.Guid, Silo);
                             break;
                         }
+                    }
+                    catch (QueueCacheMissException exc)
+                    {
+                        exceptionOccured = exc;
+                        consumerData.SafeDisposeCursor(logger);
+                        consumerData.Cursor = queueCache!.GetCacheCursor(consumerData.StreamId, exc.LowToken);
                     }
                     catch (Exception exc)
                     {
