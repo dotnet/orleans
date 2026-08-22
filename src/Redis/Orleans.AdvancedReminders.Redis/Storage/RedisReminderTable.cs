@@ -177,6 +177,7 @@ internal partial class RedisReminderTable : IReminderTable, IDisposable, IAsyncD
             {
                 RedisValue from;
                 RedisValue to;
+                var exclude = lastValue is null ? Exclude.None : Exclude.Start;
                 if (!wraps)
                 {
                     if (phase != 0)
@@ -184,17 +185,17 @@ internal partial class RedisReminderTable : IReminderTable, IDisposable, IAsyncD
                         break;
                     }
 
-                    from = lastValue is null ? beginFrom : $"({lastValue}";
+                    from = lastValue is null ? beginFrom : lastValue;
                     to = endTo;
                 }
                 else if (phase == 0)
                 {
-                    from = lastValue is null ? beginFrom : $"({lastValue}";
+                    from = lastValue is null ? beginFrom : lastValue;
                     to = "\"FFFFFFFF\",#";
                 }
                 else if (phase == 1)
                 {
-                    from = lastValue is null ? "\"00000000\",\"" : $"({lastValue}";
+                    from = lastValue is null ? "\"00000000\",\"" : lastValue;
                     to = endTo;
                 }
                 else
@@ -207,7 +208,7 @@ internal partial class RedisReminderTable : IReminderTable, IDisposable, IAsyncD
                     _hashSetKey,
                     from,
                     to,
-                    Exclude.None,
+                    exclude,
                     Order.Ascending,
                     skip: 0,
                     remaining);

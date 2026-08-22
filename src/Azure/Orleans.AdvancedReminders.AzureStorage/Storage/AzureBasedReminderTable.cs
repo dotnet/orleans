@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Globalization;
+using System.Net;
 using System.Threading;
 using System.Threading.Tasks;
 using Azure;
@@ -329,6 +330,13 @@ public sealed partial class AzureBasedReminderTable : IReminderTable
                 LogWarningOnReminderDeleteRetry(entry);
             }
             return result;
+        }
+        catch (RequestFailedException exc) when (
+            exc.Status == (int)HttpStatusCode.BadRequest
+            && string.Equals(exc.ErrorCode, "InvalidInput", StringComparison.OrdinalIgnoreCase))
+        {
+            LogWarningOnReminderDeleteRetry(entry);
+            return false;
         }
         catch (Exception exc)
         {
