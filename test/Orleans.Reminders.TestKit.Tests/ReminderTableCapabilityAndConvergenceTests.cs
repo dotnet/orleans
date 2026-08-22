@@ -9,21 +9,21 @@ public sealed class ReminderTableCapabilityAndConvergenceTests
     [Fact]
     public static void BuiltInProviderProfiles_DeclareOnlyProvenGuarantees()
     {
-        AssertProfile(ReminderTableProviderProfiles.AzureStorage("Azure"), sameIdentity: false, rotation: true, unsignedRanges: true);
+        AssertProfile(ReminderTableProviderProfiles.AzureStorage("Azure"), sameIdentity: false, parallelDistinctRows: true, rotation: true, unsignedRanges: true);
         var cosmos = ReminderTableProviderProfiles.Cosmos("Cosmos");
-        AssertProfile(cosmos, sameIdentity: false, rotation: true, unsignedRanges: true, restart: true);
+        AssertProfile(cosmos, sameIdentity: false, parallelDistinctRows: true, rotation: true, unsignedRanges: true, restart: true);
         Assert.True(cosmos.SupportsConditionalUpsert);
-        AssertProfile(ReminderTableProviderProfiles.AdoNet("ADO.NET"), sameIdentity: false, rotation: true, unsignedRanges: false, restart: true);
+        AssertProfile(ReminderTableProviderProfiles.AdoNet("ADO.NET"), sameIdentity: false, parallelDistinctRows: false, rotation: true, unsignedRanges: false, restart: true);
         var firestore = ReminderTableProviderProfiles.Firestore("Firestore");
-        AssertProfile(firestore, sameIdentity: false, rotation: false, unsignedRanges: true);
+        AssertProfile(firestore, sameIdentity: false, parallelDistinctRows: true, rotation: false, unsignedRanges: true);
         Assert.True(firestore.SupportsConditionalUpsert);
         Assert.Equal(TimeSpan.FromSeconds(2), firestore.ReadConvergenceTimeout);
         Assert.Equal(TimeSpan.FromMilliseconds(25), firestore.ReadConvergenceDelay);
-        AssertProfile(ReminderTableProviderProfiles.DynamoDB("DynamoDB"), sameIdentity: true, rotation: true, unsignedRanges: true, restart: true);
-        AssertProfile(ReminderTableProviderProfiles.Redis("Redis"), sameIdentity: true, rotation: true, unsignedRanges: true, restart: true);
+        AssertProfile(ReminderTableProviderProfiles.DynamoDB("DynamoDB"), sameIdentity: true, parallelDistinctRows: true, rotation: true, unsignedRanges: true, restart: true);
+        AssertProfile(ReminderTableProviderProfiles.Redis("Redis"), sameIdentity: true, parallelDistinctRows: true, rotation: true, unsignedRanges: true, restart: true);
 
         var inMemory = ReminderTableProviderProfiles.InMemory("InMemory");
-        AssertProfile(inMemory, sameIdentity: true, rotation: true, unsignedRanges: true, restart: true);
+        AssertProfile(inMemory, sameIdentity: true, parallelDistinctRows: true, rotation: true, unsignedRanges: true, restart: true);
         Assert.True(inMemory.SupportsRestartAfterStop);
         Assert.True(inMemory.SupportsSubSecondPrecision);
 
@@ -52,13 +52,14 @@ public sealed class ReminderTableCapabilityAndConvergenceTests
         static void AssertProfile(
             ReminderTableCapabilities profile,
             bool sameIdentity,
+            bool parallelDistinctRows,
             bool rotation,
             bool unsignedRanges,
             bool restart = false)
         {
             Assert.Equal(restart, profile.SupportsRestartAfterStop);
             Assert.Equal(sameIdentity, profile.SupportsSameIdentityConcurrentUpserts);
-            Assert.True(profile.SupportsParallelDistinctRows);
+            Assert.Equal(parallelDistinctRows, profile.SupportsParallelDistinctRows);
             Assert.Equal(rotation, profile.SupportsETagRotation);
             Assert.Equal(unsignedRanges, profile.SupportsUnsignedHashRangeBoundaries);
         }
@@ -108,6 +109,31 @@ public sealed class ReminderTableCapabilityAndConvergenceTests
         Assert.Contains(
             nameof(ReminderTableTestRunner.ReminderTable_ReadRows_WrapAroundRange_ReturnsWrappedSegment),
             runner.SkippedGuarantees.Keys);
+    }
+
+    [Fact]
+    public static async Task AdoNetProfile_DisablesParallelDistinctRowsAndBothInvocationPathsSkip()
+    {
+        var table = new IdealizedReminderTable("ADO.NET");
+        var runner = new TestRunner(table, ReminderTableProviderProfiles.AdoNet("ADO.NET"));
+        var guarantee = nameof(ReminderTableTestRunner.ReminderTable_ParallelUpserts_AcrossGrains_RemainIsolated);
+        var expectedReason =
+            $"ADO.NET does not declare {nameof(ReminderTableCapabilities)}.{nameof(ReminderTableCapabilities.SupportsParallelDistinctRows)}.";
+
+        Assert.False(runner.Capabilities.SupportsParallelDistinctRows);
+        Assert.Equal(expectedReason, runner.SkippedGuarantees[guarantee]);
+
+        await runner.ReminderTable_ParallelUpserts_AcrossGrains_RemainIsolated();
+        Assert.Empty(table.Operations);
+        Assert.Empty(table.Snapshot());
+
+        var exception = await Assert.ThrowsAsync<Xunit.Sdk.SkipException>(
+            () => XunitReminderTableTestAdapter.RunAsync(
+                runner,
+                guarantee,
+                runner.ReminderTable_ParallelUpserts_AcrossGrains_RemainIsolated));
+        Assert.Equal(expectedReason, exception.Message);
+        Assert.Empty(table.Operations);
     }
 
     [Fact]
@@ -211,12 +237,89 @@ public sealed class ReminderTableCapabilityAndConvergenceTests
     }
 
     [Fact, TestCategory("ModelBased")]
+    public static async Task ModelRunner_ConditionalUpsertsUseResolvedETagsAndPreserveStateOnStaleRejection()
+    {
+        var nullRejecting = new ConditionalUpsertReminderTable(throwOnStale: false);
+        var throwing = new ConditionalUpsertReminderTable(throwOnStale: true);
+
+        await RunAsync(nullRejecting, "conditional-null");
+        await RunAsync(throwing, "conditional-throw");
+
+        AssertConditionalCoverage(nullRejecting, expectExceptions: false);
+        AssertConditionalCoverage(throwing, expectExceptions: true);
+
+        static Task RunAsync(ConditionalUpsertReminderTable table, string prefix)
+        {
+            var options = new ReminderTableModelBasedConformanceOptions
+            {
+                Capabilities = ReminderTableCapabilities.Strict(prefix),
+                KeyPrefix = prefix,
+                MaxDepth = 3,
+                MaxSequenceLength = 3
+            };
+            return new ReminderTableModelBasedTestRunner(table, options).RunGeneratedConformanceTests();
+        }
+
+        static void AssertConditionalCoverage(ConditionalUpsertReminderTable table, bool expectExceptions)
+        {
+            Assert.True(table.CurrentConditionalUpsertCount > 0);
+            Assert.True(table.StaleConditionalUpsertCount > 0);
+            Assert.Equal(table.StaleConditionalUpsertCount, table.VerifiedUnchangedReadbackCount);
+            Assert.Equal(expectExceptions ? table.StaleConditionalUpsertCount : 0, table.StaleExceptionCount);
+            Assert.All(table.CurrentSuppliedETags, etag => Assert.Contains(etag, table.IssuedETags));
+            Assert.All(table.StaleSuppliedETags, etag => Assert.Contains(etag, table.IssuedETags));
+            Assert.Contains(table.OperationTrace, operation => operation.StartsWith("Current:", StringComparison.Ordinal));
+            Assert.Contains(table.OperationTrace, operation => operation.StartsWith("Stale:", StringComparison.Ordinal));
+        }
+    }
+
+    [Fact, TestCategory("ModelBased")]
+    public static async Task ModelRunner_BlindProfileNeverSuppliesETagOnUpsert()
+    {
+        var table = new BlindUpsertTrackingReminderTable();
+        var options = new ReminderTableModelBasedConformanceOptions
+        {
+            Capabilities = ReminderTableProviderProfiles.Oracle("Blind"),
+            KeyPrefix = "blind",
+            MaxDepth = 3,
+            MaxSequenceLength = 3
+        };
+
+        await new ReminderTableModelBasedTestRunner(table, options).RunGeneratedConformanceTests();
+
+        Assert.NotEmpty(table.SuppliedETags);
+        Assert.All(table.SuppliedETags, Assert.Null);
+    }
+
+    [Fact, TestCategory("ModelBased")]
+    public static async Task AdoNetProfile_ModelRunnerExecutesOnlyFullRangeMode()
+    {
+        var table = new RangeTrackingReminderTable();
+        var options = new ReminderTableModelBasedConformanceOptions
+        {
+            Capabilities = ReminderTableProviderProfiles.AdoNet("ADO.NET"),
+            KeyPrefix = "ado-range-model",
+            MaxDepth = 3,
+            MaxSequenceLength = 3
+        };
+
+        await new ReminderTableModelBasedTestRunner(table, options).RunGeneratedConformanceTests();
+
+        Assert.NotEmpty(table.RangeReads);
+        Assert.All(table.RangeReads, range => Assert.Equal((0u, 0u), range));
+        Assert.Empty(table.Snapshot());
+    }
+
+    [Fact, TestCategory("ModelBased")]
     public static async Task ModelRunner_ClearsRowsAfterTheFinalGeneratedCase()
     {
         var table = new IdealizedReminderTable("FinalCleanup");
+        var capabilities = ReminderTableProviderProfiles.Oracle("FinalCleanup");
+        capabilities.ReadConvergenceTimeout = TimeSpan.FromMilliseconds(100);
+        capabilities.ReadConvergenceDelay = TimeSpan.FromMilliseconds(1);
         var options = new ReminderTableModelBasedConformanceOptions
         {
-            Capabilities = ReminderTableProviderProfiles.Oracle("FinalCleanup"),
+            Capabilities = capabilities,
             KeyPrefix = "final-cleanup",
             MaxDepth = 3,
             MaxSequenceLength = 3
@@ -225,6 +328,17 @@ public sealed class ReminderTableCapabilityAndConvergenceTests
         await new ReminderTableModelBasedTestRunner(table, options).RunGeneratedConformanceTests();
 
         Assert.Empty(table.Snapshot());
+        var finalOperations = table.Operations.TakeLast(2).ToArray();
+        Assert.Collection(
+            finalOperations,
+            operation => Assert.Equal(ReminderTableOperationKind.ClearTable, operation.Kind),
+            operation =>
+            {
+                Assert.Equal(ReminderTableOperationKind.ReadRange, operation.Kind);
+                Assert.Equal(0u, operation.Begin);
+                Assert.Equal(0u, operation.End);
+                Assert.Equal(0, operation.ResultCount);
+            });
     }
 
     private sealed class TestRunner(IReminderTable table, ReminderTableCapabilities capabilities)
@@ -397,6 +511,7 @@ public sealed class ReminderTableCapabilityAndConvergenceTests
             {
                 Interlocked.Decrement(ref _activeMutations);
             }
+
         }
 
         public async Task<bool> RemoveRow(GrainId grainId, string reminderName, string eTag)
@@ -429,5 +544,158 @@ public sealed class ReminderTableCapabilityAndConvergenceTests
             }
             while (Interlocked.CompareExchange(ref _maximumConcurrentMutations, active, observed) != observed);
         }
+    }
+
+    private sealed class ConditionalUpsertReminderTable(bool throwOnStale) : IReminderTable
+    {
+        private readonly IdealizedReminderTable _inner = new("ConditionalUpsert");
+        private (GrainId GrainId, string ReminderName, DateTime StartAt, TimeSpan Period, string? ETag)? _expectedAfterRejection;
+
+        public int CurrentConditionalUpsertCount { get; private set; }
+
+        public int StaleConditionalUpsertCount { get; private set; }
+
+        public int StaleExceptionCount { get; private set; }
+
+        public int VerifiedUnchangedReadbackCount { get; private set; }
+
+        public List<string> CurrentSuppliedETags { get; } = [];
+
+        public List<string> StaleSuppliedETags { get; } = [];
+
+        public HashSet<string> IssuedETags { get; } = new(StringComparer.Ordinal);
+
+        public List<string> OperationTrace { get; } = [];
+
+        public Task StartAsync(CancellationToken cancellationToken = default) => _inner.StartAsync(cancellationToken);
+
+        public Task StopAsync(CancellationToken cancellationToken = default) => _inner.StopAsync(cancellationToken);
+
+        public async Task<ReminderEntry?> ReadRow(GrainId grainId, string reminderName)
+        {
+            var result = await _inner.ReadRow(grainId, reminderName);
+            if (_expectedAfterRejection is { } expected)
+            {
+                Assert.NotNull(result);
+                Assert.Equal(expected.GrainId, result.GrainId);
+                Assert.Equal(expected.ReminderName, result.ReminderName);
+                Assert.Equal(expected.StartAt, result.StartAt);
+                Assert.Equal(expected.Period, result.Period);
+                Assert.Equal(expected.ETag, result.ETag);
+                VerifiedUnchangedReadbackCount++;
+                _expectedAfterRejection = null;
+            }
+
+            return result;
+        }
+
+        public Task<ReminderTableData> ReadRows(GrainId grainId) => _inner.ReadRows(grainId);
+
+        public Task<ReminderTableData> ReadRows(uint begin, uint end) => _inner.ReadRows(begin, end);
+
+        public async Task<string?> UpsertRow(ReminderEntry entry)
+        {
+            var current = await _inner.ReadRow(entry.GrainId, entry.ReminderName);
+            if (current is null || string.IsNullOrEmpty(entry.ETag))
+            {
+                OperationTrace.Add($"Blind:{entry.ReminderName}:{entry.Period}");
+                return RecordIssuedETag(await _inner.UpsertRow(entry));
+            }
+
+            if (string.Equals(entry.ETag, current.ETag, StringComparison.Ordinal))
+            {
+                CurrentConditionalUpsertCount++;
+                CurrentSuppliedETags.Add(entry.ETag);
+                OperationTrace.Add($"Current:{entry.ReminderName}:{entry.ETag}:{entry.Period}");
+                return RecordIssuedETag(await _inner.UpsertRow(entry));
+            }
+
+            Assert.Contains(entry.ETag, IssuedETags);
+            StaleConditionalUpsertCount++;
+            StaleSuppliedETags.Add(entry.ETag);
+            OperationTrace.Add($"Stale:{entry.ReminderName}:{entry.ETag}:{entry.Period}");
+            _expectedAfterRejection = (current.GrainId, current.ReminderName, current.StartAt, current.Period, current.ETag);
+            if (throwOnStale)
+            {
+                StaleExceptionCount++;
+                throw new InvalidOperationException("The conditional ETag is stale.");
+            }
+
+            return null;
+        }
+
+        private string? RecordIssuedETag(string? etag)
+        {
+            Assert.False(string.IsNullOrEmpty(etag));
+            IssuedETags.Add(etag!);
+            return etag;
+        }
+
+        public Task<bool> RemoveRow(GrainId grainId, string reminderName, string eTag)
+            => _inner.RemoveRow(grainId, reminderName, eTag);
+
+        public async Task TestOnlyClearTable()
+        {
+            _expectedAfterRejection = null;
+            await _inner.TestOnlyClearTable();
+        }
+    }
+
+    private sealed class BlindUpsertTrackingReminderTable : IReminderTable
+    {
+        private readonly IdealizedReminderTable _inner = new("BlindUpsertTracking");
+
+        public List<string?> SuppliedETags { get; } = [];
+
+        public Task StartAsync(CancellationToken cancellationToken = default) => _inner.StartAsync(cancellationToken);
+
+        public Task StopAsync(CancellationToken cancellationToken = default) => _inner.StopAsync(cancellationToken);
+
+        public Task<ReminderEntry?> ReadRow(GrainId grainId, string reminderName) => _inner.ReadRow(grainId, reminderName);
+
+        public Task<ReminderTableData> ReadRows(GrainId grainId) => _inner.ReadRows(grainId);
+
+        public Task<ReminderTableData> ReadRows(uint begin, uint end) => _inner.ReadRows(begin, end);
+
+        public Task<string?> UpsertRow(ReminderEntry entry)
+        {
+            SuppliedETags.Add(entry.ETag);
+            return _inner.UpsertRow(entry);
+        }
+
+        public Task<bool> RemoveRow(GrainId grainId, string reminderName, string eTag)
+            => _inner.RemoveRow(grainId, reminderName, eTag);
+
+        public Task TestOnlyClearTable() => _inner.TestOnlyClearTable();
+    }
+
+    private sealed class RangeTrackingReminderTable : IReminderTable
+    {
+        private readonly IdealizedReminderTable _inner = new("RangeTracking");
+
+        public List<(uint Begin, uint End)> RangeReads { get; } = [];
+
+        public IReadOnlyList<ReminderTableRecord> Snapshot() => _inner.Snapshot();
+
+        public Task StartAsync(CancellationToken cancellationToken = default) => _inner.StartAsync(cancellationToken);
+
+        public Task StopAsync(CancellationToken cancellationToken = default) => _inner.StopAsync(cancellationToken);
+
+        public Task<ReminderEntry?> ReadRow(GrainId grainId, string reminderName) => _inner.ReadRow(grainId, reminderName);
+
+        public Task<ReminderTableData> ReadRows(GrainId grainId) => _inner.ReadRows(grainId);
+
+        public Task<ReminderTableData> ReadRows(uint begin, uint end)
+        {
+            RangeReads.Add((begin, end));
+            return _inner.ReadRows(begin, end);
+        }
+
+        public Task<string?> UpsertRow(ReminderEntry entry) => _inner.UpsertRow(entry);
+
+        public Task<bool> RemoveRow(GrainId grainId, string reminderName, string eTag)
+            => _inner.RemoveRow(grainId, reminderName, eTag);
+
+        public Task TestOnlyClearTable() => _inner.TestOnlyClearTable();
     }
 }

@@ -126,6 +126,14 @@ public sealed class ReminderTableModelBasedTestRunner
     /// <exception cref="ReminderConformanceException">One or more generated test cases failed.</exception>
     public async Task RunGeneratedConformanceTests()
     {
+        if (_options.Capabilities.SupportsConditionalUpsert)
+        {
+            await ReminderTableModelBasedConformance.RunConditionalUpsertScenario(
+                _reminderTable,
+                _options,
+                _output);
+        }
+
         var results = await ReminderTableModelBasedConformance.RunGeneratedTests(_reminderTable, _options, _output);
         var failures = results
             .Where(result => !result.Success)
@@ -141,6 +149,103 @@ public sealed class ReminderTableModelBasedTestRunner
 
 internal static class ReminderTableModelBasedConformance
 {
+    public static async Task RunConditionalUpsertScenario(
+        IReminderTable reminderTable,
+        ReminderTableModelBasedConformanceOptions options,
+        Action<string>? output)
+    {
+        var prefix = options.KeyPrefix ?? $"{Sanitize(options.ProviderName)}-{options.Seed.ToString("X8", CultureInfo.InvariantCulture)}";
+        var grainType = GrainType.Create(options.GrainType);
+        var key = $"{prefix}/conditional-upsert";
+        var grainId = GrainId.Create(grainType, GrainIdKeyExtensions.CreateGuidKey(ReminderTestData.CreateGuid(options.Seed, key), key));
+        const string ReminderName = "conditional-upsert";
+        var first = CreateEntry(ScheduleId.One);
+        string? firstETag = null;
+        string? currentETag = null;
+
+        try
+        {
+            await reminderTable.TestOnlyClearTable();
+            firstETag = await reminderTable.UpsertRow(first);
+            if (string.IsNullOrEmpty(firstETag))
+            {
+                Fail("Current", "the initial upsert returned no ETag");
+            }
+
+            var current = CreateEntry(ScheduleId.Two);
+            current.ETag = firstETag;
+            currentETag = await ReminderTableConvergence.ReadUntilAsync(
+                () => reminderTable.UpsertRow(current),
+                etag => !string.IsNullOrEmpty(etag) && !string.Equals(etag, firstETag, StringComparison.Ordinal),
+                options.Capabilities,
+                nameof(ReminderTableModelBasedTestRunner),
+                "UpsertCurrentETag",
+                "a successful conditional replacement with a new provider-issued ETag",
+                etag => etag ?? "<null>");
+
+            if (string.IsNullOrEmpty(currentETag) || string.Equals(currentETag, firstETag, StringComparison.Ordinal))
+            {
+                Fail("Current", $"the conditional replacement returned ETag '{currentETag ?? "<null>"}'");
+            }
+
+            var stale = CreateEntry(ScheduleId.One);
+            stale.ETag = firstETag;
+            string? staleResult = null;
+            try
+            {
+                staleResult = await reminderTable.UpsertRow(stale);
+            }
+            catch
+            {
+                // Providers may reject stale conditional writes by throwing.
+            }
+
+            if (!string.IsNullOrEmpty(staleResult))
+            {
+                Fail("Stale", $"the stale conditional upsert returned ETag '{staleResult}'");
+            }
+
+            var expected = ReminderTableEntrySnapshot.Create(current, currentETag!, options.Capabilities.SupportsSubSecondPrecision);
+            var observed = await ReminderTableConvergence.ReadUntilAsync(
+                () => reminderTable.ReadRow(grainId, ReminderName),
+                entry => entry is not null
+                    && ReminderTableEntrySnapshotComparer.CompareExact(
+                        [expected],
+                        [ReminderTableEntrySnapshot.Observe(entry, options.Capabilities.SupportsSubSecondPrecision)]) is null,
+                options.Capabilities,
+                nameof(ReminderTableModelBasedTestRunner),
+                "UpsertStaleETag/ReadRow",
+                "the current row to remain unchanged after stale conditional rejection",
+                entry => entry is null ? "null" : ReminderTableEntrySnapshot.Observe(entry, options.Capabilities.SupportsSubSecondPrecision).ToString());
+
+            if (observed is null)
+            {
+                Fail("Stale", "the current row was absent after stale conditional rejection");
+            }
+        }
+        finally
+        {
+            await reminderTable.TestOnlyClearTable();
+        }
+
+        ReminderEntry CreateEntry(int schedule) => new()
+        {
+            GrainId = grainId,
+            ReminderName = ReminderName,
+            StartAt = ReminderExecutionContext.StartAtFor(schedule),
+            Period = ReminderExecutionContext.PeriodFor(schedule)
+        };
+
+        void Fail(string mode, string observation)
+        {
+            var message = string.Create(
+                CultureInfo.InvariantCulture,
+                $"Model-based reminder table conformance test failed [provider={options.ProviderName}, seed={options.Seed}]. operation=Upsert etag={mode} schedule=2: {observation}.");
+            output?.Invoke(message);
+            throw new ReminderConformanceException(message);
+        }
+    }
+
     public static async Task<IList<TestCaseExecutionResult>> RunGeneratedTests(
         IReminderTable reminderTable,
         ReminderTableModelBasedConformanceOptions options,
@@ -162,7 +267,7 @@ internal static class ReminderTableModelBasedConformance
             new TestGenerationOptions
             {
                 MaxDepth = options.MaxDepth,
-                SequentialTestCaseAlgorithm = SequentialTestCaseAlgorithms.CreateTransitionCoverage(maxSequenceLength: options.MaxSequenceLength),
+                SequentialTestCaseAlgorithm = SequentialTestCaseAlgorithms.CreateTransitionCoverage(options.MaxSequenceLength),
                 ShouldApply = (input, state) => ReminderTableBehavioralSpec.CanApply((ReminderRequest)input.Request, (ReminderTableModelState)state)
             });
 
@@ -201,6 +306,21 @@ internal static class ReminderTableModelBasedConformance
         try
         {
             await reminderTable.TestOnlyClearTable();
+            var finalRows = await ReminderTableConvergence.ReadUntilAsync(
+                () => reminderTable.ReadRows(0, 0),
+                rows => rows is not null && rows.Reminders.Count == 0,
+                options.Capabilities,
+                nameof(ReminderTableModelBasedTestRunner),
+                "FinalCleanup/ReadRows(0, 0)",
+                "an empty reminder table after final cleanup",
+                rows => rows is null
+                    ? "null"
+                    : $"{rows.Reminders.Count.ToString(CultureInfo.InvariantCulture)} rows");
+            if (finalRows is null || finalRows.Reminders.Count != 0)
+            {
+                throw new ReminderConformanceException(
+                    $"Final reminder table cleanup left {finalRows?.Reminders.Count.ToString(CultureInfo.InvariantCulture) ?? "null"} rows; expected an empty table.");
+            }
         }
         catch when (results.Any(result => !result.Success))
         {
@@ -238,6 +358,8 @@ internal static class ReminderTableModelBasedConformance
 
     private sealed class ReminderTableBehavioralSpec : Spec<ReminderTableModelState>
     {
+        private readonly bool _supportsUnsignedHashRangeBoundaries;
+
         public readonly UpsertOperation Upsert;
         public readonly ReadRowOperation ReadRow;
         public readonly ReadGrainRowsOperation ReadGrainRows;
@@ -247,7 +369,8 @@ internal static class ReminderTableModelBasedConformance
 
         public ReminderTableBehavioralSpec(ReminderTableCapabilities capabilities)
         {
-            Upsert = new UpsertOperation(capabilities.SupportsETagRotation);
+            _supportsUnsignedHashRangeBoundaries = capabilities.SupportsUnsignedHashRangeBoundaries;
+            Upsert = new UpsertOperation("Upsert", capabilities.SupportsETagRotation);
             ReadRow = new ReadRowOperation();
             ReadGrainRows = new ReadGrainRowsOperation();
             ReadRange = new ReadRangeOperation();
@@ -263,7 +386,7 @@ internal static class ReminderTableModelBasedConformance
 
         public InputSet CreateInputSet()
         {
-            return new InputSet
+            var result = new InputSet
             {
                 Upsert.With(new ReminderRequest(ReminderOperation.Upsert, ReminderKey.First, ScheduleId.One), "Upsert first reminder with schedule 1"),
                 Upsert.With(new ReminderRequest(ReminderOperation.Upsert, ReminderKey.First, ScheduleId.Two), "Upsert first reminder with schedule 2"),
@@ -274,14 +397,24 @@ internal static class ReminderTableModelBasedConformance
                 ReadGrainRows.With(new ReminderRequest(ReminderOperation.ReadGrainRows, ReminderKey.First), "Grain read for the first grain"),
                 ReadGrainRows.With(new ReminderRequest(ReminderOperation.ReadGrainRows, ReminderKey.OtherGrain), "Grain read for the other grain"),
                 ReadRange.With(new ReminderRequest(ReminderOperation.ReadRange, ReminderKey.First, range: RangeMode.Full), "Range read over the whole ring"),
-                ReadRange.With(new ReminderRequest(ReminderOperation.ReadRange, ReminderKey.First, range: RangeMode.OtherGrainOnly), "Range read owning only the other grain"),
-                ReadRange.With(new ReminderRequest(ReminderOperation.ReadRange, ReminderKey.First, range: RangeMode.ExcludingOtherGrain), "Wrap-around range read excluding the other grain"),
                 Remove.With(new ReminderRequest(ReminderOperation.Remove, ReminderKey.First, etagMode: ETagMode.Current), "Remove first reminder with the current ETag"),
                 Remove.With(new ReminderRequest(ReminderOperation.Remove, ReminderKey.First, etagMode: ETagMode.Stale), "Remove first reminder with a stale ETag"),
                 Remove.With(new ReminderRequest(ReminderOperation.Remove, ReminderKey.First, etagMode: ETagMode.Missing), "Remove a reminder which does not exist"),
                 Remove.With(new ReminderRequest(ReminderOperation.Remove, ReminderKey.OtherGrain, etagMode: ETagMode.Current), "Remove other grain reminder with the current ETag"),
                 Clear.With(new ReminderRequest(ReminderOperation.Clear, ReminderKey.First), "Clear the table")
             };
+
+            if (_supportsUnsignedHashRangeBoundaries)
+            {
+                result.Add(ReadRange.With(
+                    new ReminderRequest(ReminderOperation.ReadRange, ReminderKey.First, range: RangeMode.OtherGrainOnly),
+                    "Range read owning only the other grain"));
+                result.Add(ReadRange.With(
+                    new ReminderRequest(ReminderOperation.ReadRange, ReminderKey.First, range: RangeMode.ExcludingOtherGrain),
+                    "Wrap-around range read excluding the other grain"));
+            }
+
+            return result;
         }
 
         public static bool CanApply(ReminderRequest? request, ReminderTableModelState state)
@@ -294,7 +427,16 @@ internal static class ReminderTableModelBasedConformance
             var hasRecord = state.Records.TryGetValue(request.Key, out var record) && record is { Exists: true };
             return request.Operation switch
             {
-                ReminderOperation.Upsert => true,
+                ReminderOperation.Upsert => request.ETagMode switch
+                {
+                    ETagMode.None => true,
+                    ETagMode.Current => hasRecord && !string.IsNullOrEmpty(record?.ETag),
+                    ETagMode.Stale => hasRecord
+                        && record is not null
+                        && !string.IsNullOrEmpty(record.PreviousETag)
+                        && !string.Equals(record.PreviousETag, record.ETag, StringComparison.Ordinal),
+                    _ => false
+                },
                 ReminderOperation.ReadRow => true,
                 ReminderOperation.ReadGrainRows => true,
                 ReminderOperation.ReadRange => true,
@@ -320,7 +462,7 @@ internal static class ReminderTableModelBasedConformance
     {
         private readonly bool _requiresETagRotation;
 
-        public UpsertOperation(bool requiresETagRotation) : base("Upsert")
+        public UpsertOperation(string name, bool requiresETagRotation) : base(name)
         {
             _requiresETagRotation = requiresETagRotation;
         }
@@ -328,6 +470,11 @@ internal static class ReminderTableModelBasedConformance
         public override ExpectedOutcomes Apply(ReminderRequest request, ReminderTableModelState state)
         {
             state.Records.TryGetValue(request.Key, out var record);
+            if (request.ETagMode == ETagMode.Stale)
+            {
+                return Expect.That(result => ValidateStaleConditionalUpsert(request, record, result)).SameState();
+            }
+
             var previousETag = record is { Exists: true } ? record.ETag : null;
             var version = (record?.Version ?? 0) + 1;
 
@@ -492,6 +639,27 @@ internal static class ReminderTableModelBasedConformance
         }
 
         return ValidateEntries(request, "ReadRow", [record], result);
+    }
+
+    private static ValidationResult ValidateStaleConditionalUpsert(
+        ReminderRequest request,
+        ReminderModelRecord? record,
+        ReminderOperationResult result)
+    {
+        if (record is not { Exists: true })
+        {
+            return ValidationResult.Invalid(Describe(request, "A stale conditional upsert requires an existing model row."));
+        }
+
+        if (result.Succeeded && result.ETag is not null)
+        {
+            return ValidationResult.Invalid(Describe(
+                request,
+                $"The stale conditional upsert returned ETag '{result.ETag}'; expected null or an exception. observed={result}"));
+        }
+
+        var observedState = ReminderOperationResult.Success(null, removed: false, result.Entries);
+        return ValidateEntries(request, "UpsertRow(stale)/ReadRow", [record], observedState);
     }
 
     private static ValidationResult ValidateEntries(
@@ -714,6 +882,41 @@ internal static class ReminderTableModelBasedConformance
         {
             var (grainId, reminderName) = _identities[request.Key];
             var entry = CreateEntry(grainId, reminderName, request.Schedule);
+            var suppliedETag = ResolveETag(request);
+            entry.ETag = suppliedETag;
+
+            if (request.ETagMode == ETagMode.Stale)
+            {
+                string? etag = null;
+                Exception? rejection = null;
+                try
+                {
+                    etag = await _reminderTable.UpsertRow(entry);
+                }
+                catch (Exception exception)
+                {
+                    rejection = exception;
+                }
+
+                try
+                {
+                    var expected = _currentEntries[request.Key];
+                    var readBack = await ReadUntilAsync(
+                        () => _reminderTable.ReadRow(grainId, reminderName),
+                        value => value is not null && Matches(expected, value),
+                        "UpsertRow(stale)/ReadRow",
+                        $"the unchanged row '{request.Key}' after stale conditional upsert rejection");
+                    return ReminderOperationResult.ConditionalUpsert(
+                        etag,
+                        rejection,
+                        ToObservedEntries(readBack is null ? [] : [readBack]));
+                }
+                catch (Exception exception)
+                {
+                    return ReminderOperationResult.Failure(exception);
+                }
+            }
+
             try
             {
                 var etag = await _reminderTable.UpsertRow(entry);
@@ -1035,6 +1238,17 @@ internal static class ReminderTableModelBasedConformance
                 ? aggregate.InnerExceptions[0].GetType()
                 : exception.GetType();
             return new ReminderOperationResult(false, type.FullName, null, false, []);
+        }
+
+        public static ReminderOperationResult ConditionalUpsert(
+            string? etag,
+            Exception? exception,
+            IReadOnlyList<ReminderObservedEntry> entries)
+        {
+            var type = exception is AggregateException { InnerExceptions.Count: 1 } aggregate
+                ? aggregate.InnerExceptions[0].GetType()
+                : exception?.GetType();
+            return new ReminderOperationResult(exception is null, type?.FullName, etag, false, entries);
         }
 
         public override string ToString()

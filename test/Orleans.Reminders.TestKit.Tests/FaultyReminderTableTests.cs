@@ -141,7 +141,9 @@ public sealed class FaultyReminderTableTests
     public async Task RemovalWhichDoesNotDelete_IsDetectedBy_ModelBasedSequences()
     {
         string? failureOutput = null;
-        var runner = new ReminderTableModelBasedTestRunner(new ResurrectingReminderTable(), "Resurrecting", message => failureOutput = message);
+        var capabilities = ReminderTableCapabilities.Strict("Resurrecting");
+        capabilities.SupportsConditionalUpsert = false;
+        var runner = new ReminderTableModelBasedTestRunner(new ResurrectingReminderTable(), capabilities, message => failureOutput = message);
 
         var exception = await Assert.ThrowsAsync<ReminderConformanceException>(runner.RunGeneratedConformanceTests);
 
@@ -155,7 +157,9 @@ public sealed class FaultyReminderTableTests
     public async Task ConstantETag_IsDetectedBy_ModelBasedSequences()
     {
         string? failureOutput = null;
-        var runner = new ReminderTableModelBasedTestRunner(new ConstantETagReminderTable(), "ConstantETag", message => failureOutput = message);
+        var capabilities = ReminderTableCapabilities.Strict("ConstantETag");
+        capabilities.SupportsConditionalUpsert = false;
+        var runner = new ReminderTableModelBasedTestRunner(new ConstantETagReminderTable(), capabilities, message => failureOutput = message);
 
         var exception = await Assert.ThrowsAsync<ReminderConformanceException>(runner.RunGeneratedConformanceTests);
 
@@ -168,6 +172,7 @@ public sealed class FaultyReminderTableTests
     public async Task ConstantETag_IsAcceptedOnlyWhenRotationCapabilityIsNotDeclared()
     {
         var capabilities = ReminderTableProviderProfiles.Firestore("TimestampETag");
+        capabilities.SupportsConditionalUpsert = false;
         var runner = new ReminderTableModelBasedTestRunner(new ConstantETagReminderTable(), capabilities);
 
         await runner.RunGeneratedConformanceTests();
@@ -177,9 +182,55 @@ public sealed class FaultyReminderTableTests
     public async Task CorrectImplementation_PassesTheSameGeneratedSequences()
     {
         // The negative tests above are only meaningful if the identical generated sequences pass for a correct table.
-        var runner = new ReminderTableModelBasedTestRunner(new IdealizedReminderTable("Control"), "Control");
+        var runner = new ReminderTableModelBasedTestRunner(
+            new IdealizedReminderTable("Control"),
+            ReminderTableProviderProfiles.Oracle("Control"));
 
         await runner.RunGeneratedConformanceTests();
+    }
+
+    [Fact, TestCategory("ModelBased")]
+    public async Task IgnoredStaleConditionalUpsert_IsDetectedBy_ModelBasedSequences()
+    {
+        string? failureOutput = null;
+        var capabilities = ReminderTableCapabilities.Strict("ETagIgnoringUpsert");
+        var runner = new ReminderTableModelBasedTestRunner(
+            new ETagIgnoringUpsertReminderTable(),
+            capabilities,
+            message => failureOutput = message);
+
+        var exception = await Assert.ThrowsAsync<ReminderConformanceException>(runner.RunGeneratedConformanceTests);
+
+        Assert.Contains(
+            "Model-based reminder table conformance test failed [provider=ETagIgnoringUpsert, seed=0]",
+            exception.Message,
+            StringComparison.Ordinal);
+        Assert.NotNull(failureOutput);
+        Assert.Contains("operation=Upsert", failureOutput, StringComparison.Ordinal);
+        Assert.Contains("etag=Stale", failureOutput, StringComparison.Ordinal);
+        Assert.Contains("stale conditional upsert returned ETag", failureOutput, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("schedule=2", failureOutput, StringComparison.Ordinal);
+    }
+
+    [Fact, TestCategory("ModelBased")]
+    public async Task UnsignedRangeFault_IsDetectedBy_ModelBasedSequencesWhenCapabilityDeclared()
+    {
+        string? failureOutput = null;
+        var runner = new ReminderTableModelBasedTestRunner(
+            new NoWrapAroundRangeReminderTable(),
+            ReminderTableProviderProfiles.Oracle("NoWrapAroundModel"),
+            message => failureOutput = message);
+
+        var exception = await Assert.ThrowsAsync<ReminderConformanceException>(runner.RunGeneratedConformanceTests);
+
+        Assert.Contains(
+            "Model-based reminder table conformance test failed [provider=NoWrapAroundModel, seed=0]",
+            exception.Message,
+            StringComparison.Ordinal);
+        Assert.NotNull(failureOutput);
+        Assert.Contains("operation=ReadRange", failureOutput, StringComparison.Ordinal);
+        Assert.Contains("range=ExcludingOtherGrain", failureOutput, StringComparison.Ordinal);
+        Assert.Contains("ReadRows(ExcludingOtherGrain)", failureOutput, StringComparison.Ordinal);
     }
 
     private static ReminderTableTestRunner CreateRunner(IReminderTable table, string providerName)
@@ -288,6 +339,9 @@ public sealed class FaultyReminderTableTests
             return current is not null && await Inner.RemoveRow(grainId, reminderName, current.ETag);
         }
     }
+
+    /// <summary>Fault: upsert ignores a stale supplied ETag and overwrites the current row.</summary>
+    private sealed class ETagIgnoringUpsertReminderTable() : DecoratedReminderTable("ETagIgnoringUpsert");
 
     /// <summary>Fault: range reads treat <c>begin</c> as inclusive.</summary>
     private sealed class InclusiveBeginRangeReminderTable() : DecoratedReminderTable("InclusiveBeginRange")

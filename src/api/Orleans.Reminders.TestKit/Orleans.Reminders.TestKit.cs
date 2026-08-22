@@ -111,7 +111,11 @@ namespace Orleans.Reminders.TestKit
 
     public abstract partial class ReminderServiceTestRunner
     {
+        protected ReminderServiceTestRunner(IGrainFactory grainFactory, ReminderTableCapabilities capabilities, IReminderTable reminderTable, int seed = 0) { }
+
         protected ReminderServiceTestRunner(IGrainFactory grainFactory, IReminderTable reminderTable, string providerName, int seed = 0) { }
+
+        protected ReminderTableCapabilities Capabilities { get { throw null; } }
 
         protected IGrainFactory GrainFactory { get { throw null; } }
 

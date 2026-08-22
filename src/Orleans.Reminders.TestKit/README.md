@@ -103,7 +103,18 @@ for simultaneous writers sets `SupportsSameIdentityConcurrentUpserts = false` on
 Firestore, DynamoDB, Redis, the grain-based in-memory provider, and the oracle. Restart after `StopAsync`, ETag
 rotation, same-identity contention, parallel distinct-row writes, and unsigned hash-ring boundaries are independent
 affirmative capabilities. ADO.NET retains full-ring and exact-cardinality coverage while its signed range comparisons
-disable only unsigned boundary and wrap guarantees.
+disable unsigned boundary and wrap guarantees. ADO.NET also disables parallel distinct-row writes because relational
+deadlock behavior does not satisfy the TestKit's no-retry parallel guarantee.
+
+Service-level suites should pass the same reviewed `ReminderTableCapabilities` manifest to
+`ReminderServiceTestRunner`. Its provider-name compatibility overload uses the portable profile and therefore does not
+require optional guarantees. Schedule replacement and exact identity/cardinality are always checked; only the ETag
+difference assertion is conditional on `SupportsETagRotation`.
+
+Generated model tests always include blind upserts and full-ring reads. Profiles which declare
+`SupportsConditionalUpsert` additionally exercise current-ETag updates and stale-ETag rejection, including readback of
+the unchanged row after exception-based rejection. Profiles which declare `SupportsUnsignedHashRangeBoundaries`
+additionally exercise focused and wrap-around ownership ranges.
 
 Providers with eventually consistent reads set a positive `ReadConvergenceTimeout` and
 `ReadConvergenceDelay`. Direct and model-based checks retry only when that window is positive and fail with the

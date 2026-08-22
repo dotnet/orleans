@@ -27,6 +27,7 @@ public static class ReminderTableProviderProfiles
     public static ReminderTableCapabilities AdoNet(string providerName)
     {
         var result = Immediate(providerName);
+        result.SupportsParallelDistinctRows = false;
         result.SupportsUnsignedHashRangeBoundaries = false;
         result.CardinalityMutationBatchSize = 1;
         return result;
