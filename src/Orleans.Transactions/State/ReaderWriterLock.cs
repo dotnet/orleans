@@ -60,8 +60,14 @@ namespace Orleans.Transactions.State
             this.lockWorker = new BatchWorkerFromDelegate(LockWork, this.activationLifetime.OnDeactivating);
         }
 
-        public async Task<TResult> EnterLock<TResult>(Guid transactionId, DateTime priority,
-                                   AccessCounter counter, bool isRead, bool exclusiveLock, Func<TResult> task)
+        public async Task<TResult> EnterLock<TResult>(
+            Guid transactionId,
+            DateTime priority,
+            TimeSpan transactionTimeout,
+            AccessCounter counter,
+            bool isRead,
+            bool exclusiveLock,
+            Func<TResult> task)
         {
             bool rollbacksOccurred = false;
             List<Task> cleanup = new List<Task>();
@@ -108,10 +114,17 @@ namespace Orleans.Transactions.State
                     throw new OrleansBrokenTransactionLockException(transactionId.ToString(), "when trying to re-enter lock");
                 }
 
+                var now = DateTime.UtcNow;
+                var lockTimeout = GetEffectiveLockTimeout(transactionTimeout, this.options.LockTimeout);
+
                 // update the lock deadline
                 if (group == currentGroup)
                 {
-                    group.Deadline = DateTime.UtcNow + this.options.LockTimeout;
+                    var deadline = AddTimeout(now, lockTimeout);
+                    if (!group.Deadline.HasValue || group.Deadline.Value < deadline)
+                    {
+                        group.Deadline = deadline;
+                    }
                     LogTraceSetLockExpiration(new(group.Deadline));
                 }
 
@@ -120,7 +133,8 @@ namespace Orleans.Transactions.State
                 {
                     TransactionId = transactionId,
                     Priority = priority,
-                    Deadline = DateTime.UtcNow + this.options.LockAcquireTimeout
+                    Deadline = AddTimeout(now, this.options.LockAcquireTimeout),
+                    LockTimeout = lockTimeout
                 };
 
                 group.Add(transactionId, record);
@@ -362,12 +376,10 @@ namespace Orleans.Transactions.State
 
                         if (currentGroup != null)
                         {
-                            currentGroup.Deadline = now + this.options.LockTimeout;
-
                             // discard expired waiters that have no chance to succeed
                             // because they have been waiting for the lock for a longer timespan than the
                             // total transaction timeout
-                            foreach (var kvp in currentGroup)
+                            foreach (var kvp in currentGroup.ToArray())
                             {
                                 if (now > kvp.Value.Deadline)
                                 {
@@ -382,6 +394,10 @@ namespace Orleans.Transactions.State
                                     LogTraceExpireLockWaiter(kvp.Key);
                                 }
                             }
+
+                            currentGroup.Deadline = currentGroup.Count == 0
+                                ? null
+                                : AddTimeout(now, currentGroup.Values.Max(record => record.LockTimeout));
 
                             LogTraceLockGroupSize(currentGroup.Count, new(currentGroup.Deadline));
                             if (logger.IsEnabled(LogLevel.Trace))
@@ -405,6 +421,14 @@ namespace Orleans.Transactions.State
                 }
             }
         }
+
+        internal DateTime? CurrentGroupDeadline => currentGroup?.Deadline;
+
+        internal static TimeSpan GetEffectiveLockTimeout(TimeSpan transactionTimeout, TimeSpan configuredLockTimeout)
+            => transactionTimeout > configuredLockTimeout ? transactionTimeout : configuredLockTimeout;
+
+        private static DateTime AddTimeout(DateTime now, TimeSpan timeout)
+            => timeout >= DateTime.MaxValue - now ? DateTime.MaxValue : now + timeout;
 
         private bool Find(Guid guid, bool isRead, out LockGroup group, [NotNullWhen(true)] out TransactionRecord<TState>? record)
         {

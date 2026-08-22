@@ -19,6 +19,55 @@ namespace Orleans.Transactions.Tests;
 public class TransactionRecoveryLatencyTests
 {
     [Fact]
+    public async Task TransactionTimeoutIsPreservedAcrossForks()
+    {
+        var timeout = TimeSpan.FromSeconds(30);
+
+        var transaction = await CreateTransactionAgent(protocol: null!).StartTransaction(readOnly: false, timeout);
+        var fork = transaction.Fork();
+
+        Assert.Equal(timeout, transaction.Timeout);
+        Assert.Equal(timeout, fork.Timeout);
+    }
+
+    [Fact]
+    public async Task ParticipantLockUsesTransactionTimeoutWhenItExceedsConfiguredLockTimeout()
+    {
+        var resource = CreateParticipant("resource", ParticipantId.Role.Resource);
+        var activationLifetime = new TestActivationLifetime();
+        var configuredLockTimeout = TimeSpan.FromSeconds(8);
+        var transactionTimeout = TimeSpan.FromSeconds(30);
+        var queue = new GatedCancelTransactionQueue(
+            resource,
+            activationLifetime,
+            options: new TransactionalStateOptions { LockTimeout = configuredLockTimeout });
+        var transactionId = Guid.NewGuid();
+        var before = DateTime.UtcNow + transactionTimeout;
+
+        await queue.RWLock.EnterLock(
+            transactionId,
+            DateTime.UtcNow,
+            transactionTimeout,
+            default,
+            isRead: true,
+            exclusiveLock: false,
+            static () => true);
+
+        var after = DateTime.UtcNow + transactionTimeout;
+        var deadline = Assert.IsType<DateTime>(queue.RWLock.CurrentGroupDeadline);
+        Assert.InRange(deadline, before, after);
+        Assert.Equal(
+            transactionTimeout,
+            ReadWriteLock<TestState>.GetEffectiveLockTimeout(transactionTimeout, configuredLockTimeout));
+        Assert.Equal(
+            configuredLockTimeout,
+            ReadWriteLock<TestState>.GetEffectiveLockTimeout(TimeSpan.Zero, configuredLockTimeout));
+
+        queue.RWLock.Rollback(transactionId);
+        activationLifetime.Cancel();
+    }
+
+    [Fact]
     public void RestoredRemoteCommitUsesBoundedExponentialPingRetry()
     {
         var frequency = TimeSpan.FromSeconds(60);

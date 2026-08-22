@@ -37,6 +37,7 @@ namespace Orleans.Transactions
             this.UseExclusiveLock = other.UseExclusiveLock;
             this.TimeStamp = other.TimeStamp;
             this.Priority = other.Priority;
+            this.Timeout = other.Timeout;
         }
 
         public string Id => TransactionId.ToString();
@@ -66,6 +67,9 @@ namespace Orleans.Transactions
 
         [Id(7)]
         public bool UseExclusiveLock { get; set; } = false;
+
+        [Id(8)]
+        internal TimeSpan Timeout { get; set; }
 
         [NonSerialized]
         public int PendingCalls;
