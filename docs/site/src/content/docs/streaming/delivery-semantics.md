@@ -49,7 +49,7 @@ A rewindable provider can start or resume a subscription from a provider sequenc
 
 - Memory streams are rewindable only over their transient in-memory cache.
 - Event Hubs and Redis Streams are rewindable over retained external data.
-- Azure Queue, Amazon SQS, ADO.NET, and NATS JetStream providers aren't rewindable.
+- Azure Queue, Amazon SQS, ADO.NET, NATS JetStream, and RabbitMQ Streams providers aren't rewindable.
 
 See the [provider matrix](stream-providers.md#provider-matrix) for provider capabilities.
 
