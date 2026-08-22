@@ -510,6 +510,62 @@ public sealed class ReminderConcurrencyControlClusterTests
         await grain.StopReminder(handle).WaitAsync(cts.Token);
     }
 
+    [Fact]
+    public async Task StaleSchedule_DoesNotEmitTickSkipped()
+    {
+        var skipped = new ConcurrentBag<ReminderEvents.TickSkipped>();
+        using var subscription = ReminderEvents.AllEvents.Subscribe(evt =>
+        {
+            if (evt is ReminderEvents.TickSkipped value)
+            {
+                skipped.Add(value);
+            }
+        });
+
+        var observer = ReminderDiagnosticObserver.Create();
+        using var _o = observer;
+        var throttle = new DelayedSkipReminderDeliveryThrottle();
+
+        var builder = new InProcessTestClusterBuilder(initialSilosCount: 1);
+        var clock = builder.AddReminderTestClock(minimumReminderPeriod: TimeSpan.FromMilliseconds(100));
+        builder.ConfigureSilo((_, sb) =>
+        {
+            sb.AddMemoryGrainStorageAsDefault()
+                .AddReminders()
+                .UseInMemoryReminderService();
+            sb.Services.RemoveAll<IReminderDeliveryThrottle>();
+            sb.Services.AddSingleton<IReminderDeliveryThrottle>(throttle);
+        });
+
+        await using var cluster = builder.Build();
+        await cluster.DeployAsync();
+
+        using var cts = new CancellationTokenSource(TimeSpan.FromMinutes(2));
+        foreach (var silo in cluster.Silos)
+        {
+            await observer.WaitForReminderServiceStartedAsync(cts.Token, silo.SiloAddress);
+        }
+
+        const string reminderName = "stale_skip";
+        var grain = cluster.Client.GetGrain<IReminderTestGrain2>(Guid.NewGuid());
+        var registered = observer.WaitForReminderRegisteredAsync(grain.GetGrainId(), reminderName, cts.Token);
+        await grain.StartReminder(reminderName, TimeSpan.Zero, TimeSpan.FromHours(1)).WaitAsync(cts.Token);
+        await registered;
+        await observer.WaitForLocalReminderScheduleAsync(grain.GetGrainId(), reminderName, cts.Token);
+
+        var acquireStarted = throttle.WaitForAcquireAsync(cts.Token);
+        await clock.AdvanceAsync(TimeSpan.FromMilliseconds(100), cts.Token);
+        await acquireStarted;
+
+        var updateTask = grain.StartReminder(reminderName, TimeSpan.FromHours(1), TimeSpan.FromHours(1));
+        await throttle.WaitForCancellationAsync(cts.Token);
+        throttle.Release();
+        await updateTask.WaitAsync(cts.Token);
+
+        Assert.Empty(skipped);
+        await grain.StopReminder(reminderName).WaitAsync(cts.Token);
+    }
+
     /// <summary>
     /// Regression for Phase 1.5: when a tier opts in to RespectOverload and the silo's
     /// IOverloadDetector reports overload, reminder ticks are skipped (or delayed) per the
@@ -725,5 +781,26 @@ internal sealed class SkipFirstReminderDeliveryThrottle : IReminderDeliveryThrot
         return Interlocked.Increment(ref _acquireCount) == 1
             ? ValueTask.FromResult(ReminderDeliveryLease.Skipped("test", TimeSpan.Zero, ReminderSkipReason.LocalLimiterFull))
             : ValueTask.FromResult(ReminderDeliveryLease.NoOpAdmitted);
+    }
+}
+
+internal sealed class DelayedSkipReminderDeliveryThrottle : IReminderDeliveryThrottle
+{
+    private readonly TaskCompletionSource _acquireStarted = new(TaskCreationOptions.RunContinuationsAsynchronously);
+    private readonly TaskCompletionSource _cancelled = new(TaskCreationOptions.RunContinuationsAsynchronously);
+    private readonly TaskCompletionSource _release = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+    public Task WaitForAcquireAsync(CancellationToken cancellationToken) => _acquireStarted.Task.WaitAsync(cancellationToken);
+
+    public Task WaitForCancellationAsync(CancellationToken cancellationToken) => _cancelled.Task.WaitAsync(cancellationToken);
+
+    public void Release() => _release.TrySetResult();
+
+    public async ValueTask<ReminderDeliveryLease> AcquireAsync(ReminderDeliveryContext context, CancellationToken cancellationToken)
+    {
+        using var registration = cancellationToken.Register(static state => ((TaskCompletionSource)state!).TrySetResult(), _cancelled);
+        _acquireStarted.TrySetResult();
+        await _release.Task;
+        return ReminderDeliveryLease.Skipped("test", TimeSpan.Zero, ReminderSkipReason.LocalLimiterFull);
     }
 }
