@@ -13,6 +13,11 @@
   </ItemGroup>
 
   <ItemGroup>
+    <PackageReference Include="Polly" />
+    <PackageReference Include="Polly.Extensions" />
+  </ItemGroup>
+
+  <ItemGroup>
     <None Include="README.md" Pack="true" PackagePath="\" />
   </ItemGroup>
 
@@ -38,4 +43,3 @@
     <InternalsVisibleTo Include="TestInternalGrains" />
   </ItemGroup>
 </Project>
-

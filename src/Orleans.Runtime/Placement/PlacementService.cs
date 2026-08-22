@@ -15,6 +15,9 @@ using Orleans.Runtime.GrainDirectory;
 using Orleans.Runtime.Internal;
 using Orleans.Runtime.Placement.Filtering;
 using Orleans.Runtime.Versions;
+using Polly;
+using Polly.Registry;
+using Polly.Timeout;
 
 namespace Orleans.Runtime.Placement
 {
@@ -36,6 +39,7 @@ namespace Orleans.Runtime.Placement
         private readonly PlacementFilterStrategyResolver _filterStrategyResolver;
         private readonly PlacementFilterDirectorResolver _placementFilterDirectoryResolver;
         private readonly CancellationTokenSource _shutdownCts = new();
+        private readonly ResiliencePipeline<SiloAddress> _resiliencePipeline;
 
         internal interface ITestAccessor
         {
@@ -58,7 +62,8 @@ namespace Orleans.Runtime.Placement
             PlacementDirectorResolver directorResolver,
             PlacementStrategyResolver strategyResolver,
             PlacementFilterStrategyResolver filterStrategyResolver,
-            PlacementFilterDirectorResolver placementFilterDirectoryResolver)
+            PlacementFilterDirectorResolver placementFilterDirectoryResolver,
+            ResiliencePipelineProvider<string> resiliencePipelineProvider)
         {
             LocalSilo = localSiloDetails.SiloAddress;
             _strategyResolver = strategyResolver;
@@ -71,6 +76,7 @@ namespace Orleans.Runtime.Placement
             _versionSelectorManager = versionSelectorManager;
             _siloStatusOracle = siloStatusOracle;
             _assumeHomogeneousSilosForTesting = siloMessagingOptions.CurrentValue.AssumeHomogenousSilosForTesting;
+            _resiliencePipeline = resiliencePipelineProvider.GetPipeline<SiloAddress>(OrleansRuntimeResiliencePolicies.PlacementResiliencePipelineKey);
             _workers = new PlacementWorker[PlacementWorkerCount];
             for (var i = 0; i < PlacementWorkerCount; i++)
             {
@@ -312,7 +318,7 @@ namespace Orleans.Runtime.Placement
 
         private SiloUnavailableException CreateStoppingException() => new($"Silo '{LocalSilo}' is shutting down.");
 
-        private class PlacementWorker
+        private partial class PlacementWorker
         {
             private readonly Dictionary<GrainId, GrainPlacementWorkItem> _inProgress = new();
             private readonly SingleWaiterAutoResetEvent _workSignal = new() { RunContinuationsAsynchronously = true };
@@ -326,6 +332,7 @@ namespace Orleans.Runtime.Placement
             private readonly object _lockObj = new();
 #endif
             private readonly PlacementService _placementService;
+            private readonly Func<ResilienceContext, PlacementContext, ValueTask<Outcome<SiloAddress>>> _executePlacementDelegate;
             private readonly int _workerIndex;
             private List<(Message Message, TaskCompletionSource Completion)>? _messages = new();
 
@@ -334,6 +341,7 @@ namespace Orleans.Runtime.Placement
                 _logger = placementService._logger;
                 _placementService = placementService;
                 _workerIndex = workerIndex;
+                _executePlacementDelegate = ExecutePlacementOutcomeAsync;
 
                 using var _ = new ExecutionContextSuppressor();
                 _processLoopTask = Task.Run(ProcessLoop);
@@ -509,48 +517,125 @@ namespace Orleans.Runtime.Placement
                 await Task.Yield();
                 _placementService.ThrowIfStopping();
 
-                // InnerGetOrPlaceActivationAsync may set a new activity as current from the RequestContextData,
-                // so we need to save and restore the current activity.
-                var currentActivity = Activity.Current;
-                var activationLocation = await InnerGetOrPlaceActivationAsync();
-                Activity.Current = currentActivity;
-
-                return activationLocation;
-
-                async Task<SiloAddress> InnerGetOrPlaceActivationAsync()
+                if (firstMessage.IsExpired)
                 {
-                    // Restore activity context from the message's request context data
-                    // This ensures directory lookups are properly traced as children of the original request
-                    using var restoredActivity = TryRestoreActivityContext(firstMessage.RequestContextData, ActivityNames.PlaceGrain);
-
-                    var target = new PlacementTarget(
-                        firstMessage.TargetGrain,
-                        firstMessage.RequestContextData!,
-                        firstMessage.InterfaceType,
-                        firstMessage.InterfaceVersion);
-
-                    var targetGrain = target.GrainIdentity;
-                    var result = await _placementService._grainLocator.Lookup(targetGrain);
-                    if (result is not null)
-                    {
-                        return result.SiloAddress!;
-                    }
-
-                    _placementService.ThrowIfStopping();
-                    var strategy = _placementService._strategyResolver.GetPlacementStrategy(target.GrainIdentity.Type);
-                    var director = _placementService._directorResolver.GetPlacementDirector(strategy);
-                    var siloAddress = await director.OnAddActivation(strategy, target, _placementService);
-
-                    // Give the grain locator one last chance to tell us that the grain has already been placed
-                    if (_placementService._grainLocator.TryLookupInCache(targetGrain, out result) && _placementService.CachedAddressIsValid(firstMessage, result))
-                    {
-                        return result.SiloAddress!;
-                    }
-
-                    _placementService._grainLocator.InvalidateCache(targetGrain);
-                    _placementService._grainLocator.UpdateCache(targetGrain, siloAddress);
-                    return siloAddress;
+                    LogMessageExpiredDuringPlacement(_logger, firstMessage.TargetGrain);
+                    throw new OperationCanceledException($"Message expired before placement could complete for grain {firstMessage.TargetGrain}.");
                 }
+
+                var target = new PlacementTarget(
+                    firstMessage.TargetGrain,
+                    firstMessage.RequestContextData!,
+                    firstMessage.InterfaceType,
+                    firstMessage.InterfaceVersion);
+
+                var currentActivity = Activity.Current;
+                var resilienceContext = ResilienceContextPool.Shared.Get(_placementService._shutdownCts.Token);
+                try
+                {
+                    var outcome = await _placementService._resiliencePipeline.ExecuteOutcomeAsync(
+                        _executePlacementDelegate,
+                        resilienceContext,
+                        new PlacementContext(firstMessage, target));
+                    outcome.ThrowIfException();
+                    return outcome.Result!;
+                }
+                catch (TimeoutRejectedException exception)
+                {
+                    throw new TimeoutException($"Grain placement operation timed out for grain {firstMessage.TargetGrain}.", exception);
+                }
+                catch (OperationCanceledException) when (_placementService.IsStopping)
+                {
+                    throw _placementService.CreateStoppingException();
+                }
+                finally
+                {
+                    ResilienceContextPool.Shared.Return(resilienceContext);
+                    Activity.Current = currentActivity;
+                }
+            }
+
+            private ValueTask<Outcome<SiloAddress>> ExecutePlacementOutcomeAsync(ResilienceContext context, PlacementContext state)
+            {
+                try
+                {
+                    var pending = ExecutePlacementAsync(state, context.CancellationToken);
+                    return pending.IsCompletedSuccessfully
+                        ? Outcome.FromResultAsValueTask(pending.Result)
+                        : AwaitOutcome(pending);
+                }
+                catch (Exception exception)
+                {
+                    return Outcome.FromExceptionAsValueTask<SiloAddress>(exception);
+                }
+
+                static async ValueTask<Outcome<SiloAddress>> AwaitOutcome(ValueTask<SiloAddress> pending)
+                {
+                    try
+                    {
+                        return Outcome.FromResult(await pending);
+                    }
+                    catch (Exception exception)
+                    {
+                        return Outcome.FromException<SiloAddress>(exception);
+                    }
+                }
+            }
+
+            private async ValueTask<SiloAddress> ExecutePlacementAsync(PlacementContext context, CancellationToken cancellationToken)
+            {
+                var firstMessage = context.FirstMessage;
+                var target = context.Target;
+                var targetGrain = target.GrainIdentity;
+
+                if (firstMessage.IsExpired)
+                {
+                    LogMessageExpiredDuringPlacement(_logger, targetGrain);
+                    throw new OperationCanceledException($"Message expired before placement could complete for grain {targetGrain}.");
+                }
+
+                cancellationToken.ThrowIfCancellationRequested();
+
+                // Restore activity context on every attempt so retried lookups remain children of the request.
+                using var restoredActivity = TryRestoreActivityContext(firstMessage.RequestContextData, ActivityNames.PlaceGrain);
+                var lookup = _placementService._grainLocator.Lookup(targetGrain);
+                var result = lookup.IsCompletedSuccessfully
+                    ? lookup.Result
+                    : await lookup.AsTask().WaitAsync(cancellationToken);
+                if (result is not null)
+                {
+                    return result.SiloAddress!;
+                }
+
+                _placementService.ThrowIfStopping();
+                var strategy = _placementService._strategyResolver.GetPlacementStrategy(target.GrainIdentity.Type);
+                var director = _placementService._directorResolver.GetPlacementDirector(strategy);
+                var siloAddress = await director.OnAddActivation(strategy, target, _placementService).WaitAsync(cancellationToken);
+
+                // Give the grain locator one last chance to tell us that the grain has already been placed
+                if (_placementService._grainLocator.TryLookupInCache(targetGrain, out result) && _placementService.CachedAddressIsValid(firstMessage, result))
+                {
+                    return result.SiloAddress!;
+                }
+
+                _placementService._grainLocator.InvalidateCache(targetGrain);
+                _placementService._grainLocator.UpdateCache(targetGrain, siloAddress);
+                return siloAddress;
+            }
+
+            [LoggerMessage(
+                Level = LogLevel.Debug,
+                Message = "Message expired during placement for grain {GrainId}."
+            )]
+            private static partial void LogMessageExpiredDuringPlacement(ILogger logger, GrainId grainId);
+
+            /// <summary>
+            /// Context passed to the resilience pipeline to avoid allocations.
+            /// </summary>
+            private readonly struct PlacementContext(Message firstMessage, PlacementTarget target)
+            {
+                public Message FirstMessage { get; } = firstMessage;
+                public PlacementTarget Target { get; } = target;
             }
 
             private class GrainPlacementWorkItem
