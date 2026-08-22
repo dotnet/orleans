@@ -1,4 +1,6 @@
+using Microsoft.Extensions.Logging.Abstractions;
 using Orleans.Providers.Streams.Common;
+using Orleans.Streams;
 using Xunit;
 
 namespace UnitTests.OrleansRuntime.Streams
@@ -76,10 +78,70 @@ namespace UnitTests.OrleansRuntime.Streams
 #pragma warning restore xUnit2013 // Do not use equality check to check for collection size.
         }
 
+        [Fact, TestCategory("BVT"), TestCategory("Streaming")]
+        public void ObjectPoolBoundsRetainedObjects()
+        {
+            var created = 0;
+            var pool = new ObjectPool<FixedSizeBuffer>(
+                () =>
+                {
+                    created++;
+                    return new FixedSizeBuffer(TestBlockSize);
+                },
+                maxRetainedObjects: 1);
+
+            var first = pool.Allocate();
+            var second = pool.Allocate();
+            first.Dispose();
+            second.Dispose();
+
+            pool.Allocate();
+            pool.Allocate();
+
+            Assert.Equal(3, created);
+        }
+
+        [Fact, TestCategory("BVT"), TestCategory("Streaming")]
+        public void EvictionStrategyDoesNotReleaseActiveBuffersOnDispose()
+        {
+            var pool = new MyTestPooled();
+            var buffer = pool.Allocate();
+            var purgeObservable = new TestPurgeObservable { ItemCount = 1 };
+            var strategy = new ChronologicalEvictionStrategy(
+                NullLogger.Instance,
+                new TimePurgePredicate(TimeSpan.Zero, TimeSpan.Zero),
+                null,
+                null)
+            {
+                PurgeObservable = purgeObservable
+            };
+            strategy.OnBlockAllocated(buffer);
+
+            strategy.Dispose();
+            Assert.Equal(0, pool.Freed);
+
+            purgeObservable.ItemCount = 0;
+            strategy.Dispose();
+            Assert.Equal(1, pool.Freed);
+        }
+
         private void MyTestPurge(IDisposable resource, FixedSizeBuffer actualBuffer)
         {
             Assert.Equal<object>(resource, actualBuffer);
             resource.Dispose();
+        }
+
+        private sealed class TestPurgeObservable : IPurgeObservable
+        {
+            public CachedMessage? Newest => null;
+
+            public CachedMessage? Oldest => null;
+
+            public int ItemCount { get; set; }
+
+            public bool IsEmpty => ItemCount == 0;
+
+            public void RemoveOldestMessage() => ItemCount--;
         }
     }
 }

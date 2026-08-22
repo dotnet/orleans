@@ -279,6 +279,63 @@ namespace UnitTests.OrleansRuntime.Streams
         }
 
         [Fact, TestCategory("BVT"), TestCategory("Streaming")]
+        public void AdaptiveCacheReleasesPartialBlockWhenDrained()
+        {
+            var dataAdapter = new TestCacheDataAdapter();
+            var cache = new PooledQueueCache(dataAdapter, NullLogger.Instance, null, null, null, 2, 8, 1);
+            var streamId = StreamId.Create("test", "stream");
+            cache.Add(
+                [
+                    new CachedMessage
+                    {
+                        StreamId = streamId,
+                        SequenceNumber = 1,
+                        EnqueueTimeUtc = DateTime.UtcNow,
+                        DequeueTimeUtc = DateTime.UtcNow,
+                    }
+                ],
+                DateTime.UtcNow);
+
+            Assert.True(cache.AllocatedSizeInBytes > 0);
+            cache.RemoveOldestMessage();
+
+            Assert.True(cache.IsEmpty);
+            Assert.Equal(0, cache.AllocatedSizeInBytes);
+            var cursor = cache.GetCursor(streamId, null);
+            Assert.False(cache.TryGetNextMessage(cursor, out _));
+        }
+
+        [Fact, TestCategory("BVT"), TestCategory("Streaming")]
+        public void ActiveCursorReportsCacheMissWhenAdaptiveCacheIsDrained()
+        {
+            var bufferPool = new ObjectPool<FixedSizeBuffer>(() => new FixedSizeBuffer(PooledBufferSize));
+            var dataAdapter = new TestCacheDataAdapter();
+            var cache = new PooledQueueCache(dataAdapter, NullLogger.Instance, null, null, null, 2, 8, 1);
+            var evictionStrategy = new ChronologicalEvictionStrategy(
+                NullLogger.Instance,
+                new TimePurgePredicate(TimeSpan.FromMinutes(5), TimeSpan.FromMinutes(10)),
+                null,
+                null);
+            evictionStrategy.PurgeObservable = cache;
+            var converter = new CachedMessageConverter(bufferPool, evictionStrategy);
+            var streamId = StreamId.Create("test", "stream");
+            var now = DateTime.UtcNow;
+            cache.Add(
+                [
+                    converter.ToCachedMessage(new TestQueueMessage { StreamId = streamId, SequenceNumber = 1 }, now),
+                    converter.ToCachedMessage(new TestQueueMessage { StreamId = streamId, SequenceNumber = 2 }, now),
+                ],
+                now);
+            var cursor = cache.GetCursor(streamId, new EventSequenceTokenV2(1));
+            Assert.True(cache.TryGetNextMessage(cursor, out _));
+
+            cache.RemoveOldestMessage();
+            cache.RemoveOldestMessage();
+
+            Assert.Throws<QueueCacheMissException>(() => cache.TryGetNextMessage(cursor, out _));
+        }
+
+        [Fact, TestCategory("BVT"), TestCategory("Streaming")]
         public void AvoidCacheMissNotEmptyCache()
         {
             AvoidCacheMiss(false);
