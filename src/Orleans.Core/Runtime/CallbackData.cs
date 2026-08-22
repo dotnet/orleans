@@ -8,17 +8,13 @@ namespace Orleans.Runtime
 {
     internal sealed partial class CallbackData
     {
-        private const int StateNone = 0;
-        private const int StateCompleted = 1;
-        private const int StateCancellationRegistrationPending = 2;
-        private const int StateCancellationRegistrationPublished = 4;
-
         private readonly SharedCallbackData shared;
         private readonly IResponseCompletionSource context;
         private readonly ApplicationRequestInstruments _applicationRequestInstruments;
-        private int _state;
+        private int completed;
         private StatusResponse? lastKnownStatus;
         private ValueStopwatch stopwatch;
+        private CancellationToken _cancellationToken;
         private CancellationTokenRegistration _cancellationTokenRegistration;
 
         public CallbackData(
@@ -36,7 +32,7 @@ namespace Orleans.Runtime
 
         public Message Message { get; } // might hold metadata used by response pipeline
 
-        public bool IsCompleted => (Volatile.Read(ref _state) & StateCompleted) != 0;
+        public bool IsCompleted => Volatile.Read(ref completed) != 0;
 
         public void SubscribeForCancellation(CancellationToken cancellationToken)
         {
@@ -45,27 +41,20 @@ namespace Orleans.Runtime
                 return;
             }
 
-            if (Interlocked.CompareExchange(
-                ref _state,
-                StateCancellationRegistrationPending,
-                StateNone) != StateNone)
-            {
-                return;
-            }
-
-            var registration = cancellationToken.UnsafeRegister(static (arg, token) =>
+            _cancellationToken = cancellationToken;
+            var registration = cancellationToken.UnsafeRegister(static arg =>
             {
                 var callbackData = (CallbackData)arg!;
-                callbackData.OnCancellation(token);
+                callbackData.OnCancellation();
             }, this);
 
-            _cancellationTokenRegistration = registration;
-            if (Interlocked.CompareExchange(
-                ref _state,
-                StateCancellationRegistrationPublished,
-                StateCancellationRegistrationPending) != StateCancellationRegistrationPending)
+            if (IsCompleted)
             {
                 registration.Dispose();
+            }
+            else
+            {
+                _cancellationTokenRegistration = registration;
             }
         }
 
@@ -110,7 +99,7 @@ namespace Orleans.Runtime
             return type.IsDefault ? "unknown" : type.ToString()!;
         }
 
-        private void OnCancellation(CancellationToken cancellationToken)
+        private void OnCancellation()
         {
             // If waiting for acknowledgement is enabled, simply signal to the remote grain that cancellation
             // is requested and return.
@@ -122,7 +111,7 @@ namespace Orleans.Runtime
 
             // Otherwise, cancel the request immediately, without waiting for the callee to acknowledge the
             // cancellation request. The callee will still be signaled.
-            if (!TryComplete())
+            if (Interlocked.CompareExchange(ref completed, 1, 0) != 0)
             {
                 return;
             }
@@ -133,13 +122,13 @@ namespace Orleans.Runtime
             _applicationRequestInstruments.OnAppRequestsEnd((long)stopwatch.Elapsed.TotalMilliseconds);
             _applicationRequestInstruments.OnAppRequestsCanceled(GetTargetGrainType());
             OrleansCallBackDataEvent.Instance.OnCanceled(Message);
-            context.Complete(Response.FromException(new OperationCanceledException(cancellationToken)));
-            DisposeCancellationRegistration();
+            context.Complete(Response.FromException(new OperationCanceledException(_cancellationToken)));
+            _cancellationTokenRegistration.Dispose();
         }
 
         public void OnTimeout()
         {
-            if (!TryComplete())
+            if (Interlocked.CompareExchange(ref completed, 1, 0) != 0)
             {
                 return;
             }
@@ -151,7 +140,7 @@ namespace Orleans.Runtime
             }
 
             this.shared.Unregister(this.Message);
-            DisposeCancellationRegistration();
+            _cancellationTokenRegistration.Dispose();
             _applicationRequestInstruments.OnAppRequestsEnd((long)this.stopwatch.Elapsed.TotalMilliseconds);
             _applicationRequestInstruments.OnAppRequestsTimedOut(GetTargetGrainType());
 
@@ -169,14 +158,14 @@ namespace Orleans.Runtime
 
         public void OnTargetSiloFail()
         {
-            if (!TryComplete())
+            if (Interlocked.CompareExchange(ref this.completed, 1, 0) != 0)
             {
                 return;
             }
 
             this.stopwatch.Stop();
             this.shared.Unregister(this.Message);
-            DisposeCancellationRegistration();
+            _cancellationTokenRegistration.Dispose();
             _applicationRequestInstruments.OnAppRequestsEnd((long)this.stopwatch.Elapsed.TotalMilliseconds);
 
             OrleansCallBackDataEvent.Instance.OnTargetSiloFail(this.Message);
@@ -189,24 +178,24 @@ namespace Orleans.Runtime
 
         public void OnHostShutdown()
         {
-            if (!TryComplete())
+            if (Interlocked.CompareExchange(ref completed, 1, 0) != 0)
             {
                 return;
             }
 
-            this.stopwatch.Stop();
-            this.shared.Unregister(this.Message);
-            DisposeCancellationRegistration();
-            _applicationRequestInstruments.OnAppRequestsEnd((long)this.stopwatch.Elapsed.TotalMilliseconds);
+            stopwatch.Stop();
+            shared.Unregister(Message);
+            _cancellationTokenRegistration.Dispose();
+            _applicationRequestInstruments.OnAppRequestsEnd((long)stopwatch.Elapsed.TotalMilliseconds);
 
-            var msg = this.Message;
-            var exception = new SiloUnavailableException($"The local Orleans host is shutting down and can no longer process the request: {msg}.");
-            this.context.Complete(Response.FromException(exception));
+            var message = Message;
+            var exception = new SiloUnavailableException($"The local Orleans host is shutting down and can no longer process the request: {message}.");
+            context.Complete(Response.FromException(exception));
         }
 
         public void DoCallback(Message response)
         {
-            if (!TryComplete())
+            if (Interlocked.CompareExchange(ref this.completed, 1, 0) != 0)
             {
                 return;
             }
@@ -214,22 +203,11 @@ namespace Orleans.Runtime
             OrleansCallBackDataEvent.Instance.DoCallback(this.Message);
 
             this.stopwatch.Stop();
-            DisposeCancellationRegistration();
+            _cancellationTokenRegistration.Dispose();
             _applicationRequestInstruments.OnAppRequestsEnd((long)this.stopwatch.Elapsed.TotalMilliseconds);
 
             // do callback outside the CallbackData lock. Just not a good practice to hold a lock for this unrelated operation.
             ResponseCallback(response, this.context);
-        }
-
-        private bool TryComplete() => (Interlocked.Or(ref _state, StateCompleted) & StateCompleted) == 0;
-
-        private void DisposeCancellationRegistration()
-        {
-            // If registration is still pending, its publisher observes completion and disposes it.
-            if ((Volatile.Read(ref _state) & StateCancellationRegistrationPublished) != 0)
-            {
-                _cancellationTokenRegistration.Dispose();
-            }
         }
 
         private static void ResponseCallback(Message message, IResponseCompletionSource context)

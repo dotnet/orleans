@@ -1,3 +1,4 @@
+#nullable enable
 using System;
 using System.Collections.Generic;
 using System.Threading;
@@ -14,9 +15,8 @@ namespace Orleans.Serialization.Invocation
 
     internal class ConcurrentObjectPool<T, TPoolPolicy> : ObjectPool<T>, IDisposable where T : class where TPoolPolicy : IPooledObjectPolicy<T>
     {
-        private readonly ThreadLocal<Stack<T>> _objects = new(() => new());
-
         private readonly TPoolPolicy _policy;
+        private readonly ThreadLocal<Stack<T>> _objects = new(static () => new());
         private int _disposed;
 
         public ConcurrentObjectPool(TPoolPolicy policy) => _policy = policy;
@@ -65,7 +65,6 @@ namespace Orleans.Serialization.Invocation
         {
             if (Interlocked.Exchange(ref _disposed, 1) == 0)
             {
-                // Clear per-thread stacks so pooled objects do not keep their owning service provider alive.
                 _objects.Dispose();
             }
         }

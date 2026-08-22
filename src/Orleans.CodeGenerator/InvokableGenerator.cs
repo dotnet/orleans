@@ -22,9 +22,24 @@ internal class InvokableGenerator(ProxyGenerationContext generationContext)
         var generatedClassName = GetSimpleClassName(invokableMethodInfo);
 
         var baseClassType = GetBaseClassType(invokableMethodInfo);
-        var fieldDescriptions = GetFieldDescriptions(invokableMethodInfo);
-        var fields = GetFieldDeclarations(invokableMethodInfo, fieldDescriptions);
-        var (ctor, ctorArgs) = GenerateConstructor(generatedClassName, invokableMethodInfo, baseClassType);
+        var fieldDescriptions = GetFieldDescriptions(invokableMethodInfo, baseClassType);
+        var invokableTypeSyntax = CreateInvokableTypeSyntax(generatedClassName, invokableMethodInfo);
+        var fields = GetFieldDeclarations(invokableMethodInfo, fieldDescriptions, invokableTypeSyntax);
+        var (ctor, ctorArgs) = GenerateConstructor(generatedClassName, invokableMethodInfo, baseClassType, fieldDescriptions, invokableTypeSyntax);
+        var compatibilityCtor = fieldDescriptions.OfType<PoolFieldDescription>().Any()
+                ? ConstructorDeclaration(generatedClassName)
+                    .AddModifiers(Token(SyntaxKind.PublicKeyword))
+                    .WithInitializer(
+                        ConstructorInitializer(
+                            SyntaxKind.ThisConstructorInitializer,
+                            ArgumentList(
+                                SingletonSeparatedList(
+                                    Argument(
+                                        PostfixUnaryExpression(
+                                            SyntaxKind.SuppressNullableWarningExpression,
+                                            LiteralExpression(SyntaxKind.NullLiteralExpression)))))))
+                    .WithBody(Block())
+                : null;
         var accessibility = GetAccessibility(method);
         var compoundTypeAliases = GetCompoundTypeAliasAttributeArguments(invokableMethodInfo, invokableMethodInfo.Key);
 
@@ -52,6 +67,7 @@ internal class InvokableGenerator(ProxyGenerationContext generationContext)
             baseClassType,
             fieldDescriptions,
             fields,
+            compatibilityCtor,
             ctor,
             compoundTypeAliases,
             targetField,
@@ -106,6 +122,7 @@ internal class InvokableGenerator(ProxyGenerationContext generationContext)
         INamedTypeSymbol baseClassType,
         List<InvokerFieldDescription> fieldDescriptions,
         MemberDeclarationSyntax[] fields,
+        ConstructorDeclarationSyntax? compatibilityCtor,
         ConstructorDeclarationSyntax? ctor,
         List<CompoundTypeAliasComponent[]> compoundTypeAliases,
         TargetFieldDescription targetField,
@@ -123,7 +140,12 @@ internal class InvokableGenerator(ProxyGenerationContext generationContext)
                 AttributeList(SingletonSeparatedList(GetCompoundTypeAliasAttribute(alias))));
         }
 
-        if (ctor != null)
+        if (compatibilityCtor is not null)
+        {
+            classDeclaration = classDeclaration.AddMembers(compatibilityCtor);
+        }
+
+        if (ctor is not null)
         {
             classDeclaration = classDeclaration.AddMembers(ctor);
         }
@@ -563,11 +585,13 @@ internal class InvokableGenerator(ProxyGenerationContext generationContext)
             .WithModifiers(TokenList(Token(SyntaxKind.ProtectedKeyword), Token(SyntaxKind.OverrideKeyword)));
     }
 
-    private static MemberDeclarationSyntax GenerateDisposeMethod(
+    private MemberDeclarationSyntax GenerateDisposeMethod(
         List<InvokerFieldDescription> fields,
         INamedTypeSymbol baseClassType)
     {
         var body = new List<StatementSyntax>();
+        PoolFieldDescription? poolField = null;
+
         foreach (var field in fields)
         {
             if (field is CancellationTokenSourceFieldDescription ctsField)
@@ -580,6 +604,11 @@ internal class InvokableGenerator(ProxyGenerationContext generationContext)
                             ctsField.FieldName.ToIdentifierName(),
                             InvocationExpression(
                                 MemberBindingExpression(IdentifierName("Dispose"))))));
+            }
+
+            if (field is PoolFieldDescription candidate)
+            {
+                poolField = candidate;
             }
 
             if (field.IsInstanceField)
@@ -599,6 +628,17 @@ internal class InvokableGenerator(ProxyGenerationContext generationContext)
             && baseClassType.GetAllMembers<IMethodSymbol>("Dispose").FirstOrDefault(m => !m.IsAbstract && m.DeclaredAccessibility != Accessibility.Private) is { })
         {
             body.Add(ExpressionStatement(InvocationExpression(BaseExpression().Member("Dispose")).WithArgumentList(ArgumentList())));
+        }
+
+        if (poolField is not null)
+        {
+            body.Add(
+                ExpressionStatement(
+                    ConditionalAccessExpression(
+                        IdentifierName(poolField.FieldName),
+                        InvocationExpression(
+                            MemberBindingExpression(IdentifierName("Return")),
+                            ArgumentList(SingletonSeparatedList(Argument(ThisExpression())))))));
         }
 
         return MethodDeclaration(PredefinedType(Token(SyntaxKind.VoidKeyword)), "Dispose")
@@ -678,9 +718,24 @@ internal class InvokableGenerator(ProxyGenerationContext generationContext)
         return $"Invokable_{method.ContainingInterface.Name}_{proxyKey}_{method.GeneratedMethodId}{typeArgs}";
     }
 
+    private static TypeSyntax CreateInvokableTypeSyntax(string generatedClassName, InvokableMethodDescription method)
+    {
+        if (method.AllTypeParameters.Count == 0)
+        {
+            return IdentifierName(generatedClassName);
+        }
+
+        var typeArguments = method.AllTypeParameters.Select(parameter =>
+            (TypeSyntax)IdentifierName(method.TypeParameterSubstitutions[parameter.Parameter]));
+        return GenericName(
+            Identifier(generatedClassName),
+            TypeArgumentList(SeparatedList(typeArguments)));
+    }
+
     private MemberDeclarationSyntax[] GetFieldDeclarations(
         InvokableMethodDescription method,
-        List<InvokerFieldDescription> fieldDescriptions)
+        List<InvokerFieldDescription> fieldDescriptions,
+        TypeSyntax invokableTypeSyntax)
     {
         return [.. fieldDescriptions.Select(GetFieldDeclaration)];
 
@@ -707,6 +762,15 @@ internal class InvokableGenerator(ProxyGenerationContext generationContext)
                                     Argument(parameterTypes),
                                 ]))))))))
                     .AddModifiers(Token(SyntaxKind.PrivateKeyword), Token(SyntaxKind.StaticKeyword), Token(SyntaxKind.ReadOnlyKeyword));
+            }
+            else if (description is PoolFieldDescription)
+            {
+                var poolType = LibraryTypes.InvokablePool_1.ToTypeSyntax(invokableTypeSyntax);
+                field = FieldDeclaration(
+                    VariableDeclaration(
+                        poolType,
+                        SingletonSeparatedList(VariableDeclarator(description.FieldName))))
+                    .AddModifiers(Token(SyntaxKind.PrivateKeyword), Token(SyntaxKind.ReadOnlyKeyword));
             }
             else
             {
@@ -738,7 +802,9 @@ internal class InvokableGenerator(ProxyGenerationContext generationContext)
     private (ConstructorDeclarationSyntax? Constructor, List<TypeSyntax> ConstructorArguments) GenerateConstructor(
         string simpleClassName,
         InvokableMethodDescription method,
-        INamedTypeSymbol baseClassType)
+        INamedTypeSymbol baseClassType,
+        List<InvokerFieldDescription> fieldDescriptions,
+        TypeSyntax invokableTypeSyntax)
     {
         var parameters = new List<ParameterSyntax>();
 
@@ -746,6 +812,20 @@ internal class InvokableGenerator(ProxyGenerationContext generationContext)
 
         List<TypeSyntax> constructorArgumentTypes = new();
         List<ArgumentSyntax> baseConstructorArguments = new();
+
+        if (fieldDescriptions.OfType<PoolFieldDescription>().FirstOrDefault() is { } poolField)
+        {
+            var poolType = LibraryTypes.InvokablePool_1.ToTypeSyntax(invokableTypeSyntax);
+            constructorArgumentTypes.Add(poolType);
+            parameters.Add(Parameter(Identifier("pool")).WithType(poolType));
+            body.Add(
+                ExpressionStatement(
+                    AssignmentExpression(
+                        SyntaxKind.SimpleAssignmentExpression,
+                        IdentifierName(poolField.FieldName),
+                        IdentifierName("pool"))));
+        }
+
         foreach (var constructor in baseClassType.GetAllMembers<IMethodSymbol>())
         {
             if (constructor.MethodKind != MethodKind.Constructor || constructor.DeclaredAccessibility == Accessibility.Private || constructor.IsImplicitlyDeclared)
@@ -791,7 +871,9 @@ internal class InvokableGenerator(ProxyGenerationContext generationContext)
         return (constructorDeclaration, constructorArgumentTypes);
     }
 
-    private List<InvokerFieldDescription> GetFieldDescriptions(InvokableMethodDescription method)
+    private List<InvokerFieldDescription> GetFieldDescriptions(
+        InvokableMethodDescription method,
+        INamedTypeSymbol baseClassType)
     {
         var fields = new List<InvokerFieldDescription>();
         uint fieldId = 0;
@@ -809,6 +891,15 @@ internal class InvokableGenerator(ProxyGenerationContext generationContext)
         if (method.IsCancellable)
         {
             fields.Add(new CancellationTokenSourceFieldDescription(LibraryTypes));
+        }
+
+        var requiresDependencyInjection = baseClassType.GetAllMembers<IMethodSymbol>()
+            .Any(constructor =>
+                constructor.MethodKind == MethodKind.Constructor
+                && constructor.HasAttribute(LibraryTypes.GeneratedActivatorConstructorAttribute));
+        if (method.MethodTypeParameters.Count == 0 && !requiresDependencyInjection)
+        {
+            fields.Add(new PoolFieldDescription(LibraryTypes));
         }
 
         return fields;
@@ -906,6 +997,12 @@ internal class InvokableGenerator(ProxyGenerationContext generationContext)
     }
 
     internal sealed class MethodInfoFieldDescription(ITypeSymbol fieldType, string fieldName) : InvokerFieldDescription(fieldType, fieldName)
+    {
+        public override bool IsSerializable => false;
+        public override bool IsInstanceField => false;
+    }
+
+    internal sealed class PoolFieldDescription(LibraryTypes libraryTypes) : InvokerFieldDescription(libraryTypes.InvokablePool_1, "_pool")
     {
         public override bool IsSerializable => false;
         public override bool IsInstanceField => false;

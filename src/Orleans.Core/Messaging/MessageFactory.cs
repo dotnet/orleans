@@ -4,6 +4,7 @@ using System.Threading;
 using Microsoft.Extensions.Logging;
 using Orleans.CodeGeneration;
 using Orleans.Serialization;
+using Orleans.Serialization.Invocation;
 
 namespace Orleans.Runtime
 {
@@ -39,12 +40,16 @@ namespace Orleans.Runtime
                 IsUnordered = (options & InvokeMethodOptions.Unordered) != 0,
                 IsAlwaysInterleave = (options & InvokeMethodOptions.AlwaysInterleave) != 0,
                 BodyObject = body,
+                DisposeBodyObject = body is IInvokable,
+                BodyObjectIsShared = body is IInvokable,
                 RequestContextData = RequestContextExtensions.Export(_deepCopier),
             };
 
             _messagingTrace.OnCreateMessage(message);
             return message;
         }
+
+        public object CopyBodyObject(object body) => _deepCopier.Copy(body)!;
 
         private CorrelationId GetNextCorrelationId()
         {

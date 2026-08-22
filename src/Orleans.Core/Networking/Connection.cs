@@ -402,12 +402,11 @@ namespace Orleans.Runtime.Messaging
                     }
 
                     var flushResult = await output.FlushAsync();
+                    DisposeOneWayRequestBodies(inflight);
                     if (flushResult.IsCompleted || flushResult.IsCanceled)
                     {
                         break;
                     }
-
-                    inflight.Clear();
                 }
             }
             catch (Exception exception)
@@ -421,9 +420,23 @@ namespace Orleans.Runtime.Messaging
             }
             finally
             {
+                DisposeOneWayRequestBodies(inflight);
                 _transport!.Output.Complete();
                 this.StartClosing(error);
             }
+        }
+
+        private static void DisposeOneWayRequestBodies(List<Message> messages)
+        {
+            foreach (var message in messages)
+            {
+                if (message.Direction == Message.Directions.OneWay)
+                {
+                    message.DisposeBody();
+                }
+            }
+
+            messages.Clear();
         }
 
         private void RerouteMessage(Message message)
