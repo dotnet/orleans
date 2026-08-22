@@ -85,6 +85,9 @@ siloBuilder.Configure<DurableJobsOptions>(options =>
     options.ShardStripeCount = 16;
     options.MaxJobsPerShard = 10_000;
 
+    // Load only the next hour of durable job shards during recovery.
+    options.ShardLoadLookaheadPeriod = TimeSpan.FromHours(1);
+
     // Bound persistence and execution pressure independently.
     options.MaxPendingOperationsPerShard = 2_048;
     options.MaxShardBatchOperationCount = 512;

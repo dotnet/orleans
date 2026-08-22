@@ -130,6 +130,44 @@ WHERE NOT EXISTS
 
 INSERT INTO OrleansQuery(QueryKey, QueryText)
 SELECT
+    'AdvancedRemindersReadRangeRows1PagedKey',
+    'SELECT GrainId, ReminderName, StartTime, Period, CronExpression, CronTimeZoneId, NextDueUtc, LastFireUtc, ScheduleId, JobId, JobShardId, Priority, Action, Version
+    FROM OrleansAdvancedRemindersTable
+    WHERE ServiceId = @ServiceId AND @ServiceId IS NOT NULL
+        AND GrainHash > @BeginHash AND @BeginHash IS NOT NULL
+        AND GrainHash <= @EndHash AND @EndHash IS NOT NULL
+        AND (@HasCursor = 0
+            OR GrainHash > @CursorHash
+            OR (GrainHash = @CursorHash AND GrainId > @CursorGrainId)
+            OR (GrainHash = @CursorHash AND GrainId = @CursorGrainId AND ReminderName > @CursorReminderName))
+    ORDER BY GrainHash, GrainId, ReminderName
+    OFFSET 0 ROWS FETCH NEXT @PageSize ROWS ONLY;'
+WHERE NOT EXISTS
+(
+    SELECT 1 FROM OrleansQuery WHERE QueryKey = 'AdvancedRemindersReadRangeRows1PagedKey'
+);
+
+INSERT INTO OrleansQuery(QueryKey, QueryText)
+SELECT
+    'AdvancedRemindersReadRangeRows2PagedKey',
+    'SELECT GrainId, ReminderName, StartTime, Period, CronExpression, CronTimeZoneId, NextDueUtc, LastFireUtc, ScheduleId, JobId, JobShardId, Priority, Action, Version
+    FROM OrleansAdvancedRemindersTable
+    WHERE ServiceId = @ServiceId AND @ServiceId IS NOT NULL
+        AND ((GrainHash > @BeginHash AND @BeginHash IS NOT NULL)
+        OR (GrainHash <= @EndHash AND @EndHash IS NOT NULL))
+        AND (@HasCursor = 0
+            OR GrainHash > @CursorHash
+            OR (GrainHash = @CursorHash AND GrainId > @CursorGrainId)
+            OR (GrainHash = @CursorHash AND GrainId = @CursorGrainId AND ReminderName > @CursorReminderName))
+    ORDER BY GrainHash, GrainId, ReminderName
+    OFFSET 0 ROWS FETCH NEXT @PageSize ROWS ONLY;'
+WHERE NOT EXISTS
+(
+    SELECT 1 FROM OrleansQuery WHERE QueryKey = 'AdvancedRemindersReadRangeRows2PagedKey'
+);
+
+INSERT INTO OrleansQuery(QueryKey, QueryText)
+SELECT
 	'AdvancedRemindersReadReminderRowsKey',
 	'SELECT
 		GrainId,

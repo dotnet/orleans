@@ -136,6 +136,7 @@ internal partial class CosmosReminderTable : IReminderTable
                     {
                         reminders.AddRange(queryResponse);
                     }
+
                 } while (iterator.HasMoreResults);
 
                 return reminders;
@@ -143,6 +144,44 @@ internal partial class CosmosReminderTable : IReminderTable
             (this, begin, end)).ConfigureAwait(false);
 
             return new ReminderTableData(response.Select(_convertEntityToEntry));
+        }
+        catch (Exception exc)
+        {
+            LogErrorFailureReadingRemindersForService(exc, _clusterOptions.ServiceId, new(begin), new(end));
+            WrappedException.CreateAndRethrow(exc);
+            throw;
+        }
+    }
+
+    public async Task<ReminderTableData> ReadRows(uint begin, uint end, int maxRows, string? continuationToken)
+    {
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(maxRows);
+        try
+        {
+            var response = await _executor.ExecuteOperation(static async args =>
+            {
+                var (self, begin, end, maxRows, continuationToken) = args;
+                var query = self._container.GetItemLinqQueryable<ReminderEntity>(
+                        continuationToken: continuationToken,
+                        requestOptions: new QueryRequestOptions { MaxItemCount = maxRows })
+                    .Where(entity => entity.ServiceId == self._clusterOptions.ServiceId);
+
+                query = begin < end
+                    ? query.Where(r => r.GrainHash > begin && r.GrainHash <= end)
+                    : query.Where(r => r.GrainHash > begin || r.GrainHash <= end);
+
+                using var iterator = query.ToFeedIterator();
+                if (!iterator.HasMoreResults)
+                {
+                    return (Items: new List<ReminderEntity>(), ContinuationToken: (string?)null);
+                }
+
+                var page = await iterator.ReadNextAsync().ConfigureAwait(false);
+                return (Items: page.ToList(), page.ContinuationToken);
+            },
+            (this, begin, end, maxRows, continuationToken)).ConfigureAwait(false);
+
+            return new ReminderTableData(response.Items.Select(_convertEntityToEntry), response.ContinuationToken);
         }
         catch (Exception exc)
         {

@@ -167,6 +167,7 @@ public class LocalDurableJobManagerTests
     {
         var timeProvider = new FakeTimeProvider(new DateTimeOffset(2026, 1, 1, 0, 0, 0, TimeSpan.Zero));
         var options = CreateOptions();
+        options.ShardLoadLookaheadPeriod = TimeSpan.FromMinutes(30);
         var shardManager = new TestJobShardManager();
         var manager = CreateManager(shardManager, timeProvider, options);
         var accessor = new LocalDurableJobManager.TestAccessor(manager);
@@ -179,7 +180,7 @@ public class LocalDurableJobManagerTests
 
         Assert.False(accessor.HasWritableShard(shardKey));
         await shard.Received(1).MarkAsCompleteAsync(Arg.Any<CancellationToken>());
-        Assert.Equal(timeProvider.GetUtcNow().AddHours(1), shardManager.LastMaxDueTime);
+        Assert.Equal(timeProvider.GetUtcNow().Add(options.ShardLoadLookaheadPeriod), shardManager.LastMaxDueTime);
     }
 
     [Fact]

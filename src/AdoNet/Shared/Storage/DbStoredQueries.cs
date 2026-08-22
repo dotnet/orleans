@@ -119,6 +119,10 @@ namespace Orleans.Tests.SqlUtils
         /// </summary>
         internal string AdvancedRemindersReadRangeRows2Key => queries[nameof(AdvancedRemindersReadRangeRows2Key)];
 
+        internal string AdvancedRemindersReadRangeRows1PagedKey => queries[nameof(AdvancedRemindersReadRangeRows1PagedKey)];
+
+        internal string AdvancedRemindersReadRangeRows2PagedKey => queries[nameof(AdvancedRemindersReadRangeRows2PagedKey)];
+
         /// <summary>
         /// A query template to read an advanced reminder entry.
         /// </summary>
@@ -360,6 +364,36 @@ namespace Orleans.Tests.SqlUtils
             internal int GatewayPort
             {
                 set { Add(nameof(GatewayPort), value); }
+            }
+
+            internal int PageSize
+            {
+                set { Add(nameof(PageSize), value); }
+            }
+
+            internal int Offset
+            {
+                set { Add(nameof(Offset), value); }
+            }
+
+            internal int HasCursor
+            {
+                set { Add(nameof(HasCursor), value); }
+            }
+
+            internal uint CursorHash
+            {
+                set { AddGrainHash(nameof(CursorHash), value); }
+            }
+
+            internal string CursorGrainId
+            {
+                set { Add(nameof(CursorGrainId), value); }
+            }
+
+            internal string CursorReminderName
+            {
+                set { Add(nameof(CursorReminderName), value); }
             }
 
             internal IPAddress GatewayAddress

@@ -241,9 +241,27 @@ public sealed partial class AzureBasedReminderTable : IReminderTable
             LogTraceReadInRange(new(begin, end), data);
             return data;
         }
+
         catch (Exception exc)
         {
             LogWarningReadingReminderRange(exc, new(begin, end), this.remTableManager.TableName);
+            throw;
+        }
+    }
+
+    public async Task<ReminderTableData> ReadRows(uint begin, uint end, int maxRows, string? continuationToken)
+    {
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(maxRows);
+        try
+        {
+            await _initializationTask.Task;
+            var page = await remTableManager.FindReminderEntries(begin, end, maxRows, continuationToken);
+            var data = ConvertFromTableEntryList(page.Entries);
+            return new ReminderTableData(data.Reminders, page.ContinuationToken);
+        }
+        catch (Exception exc)
+        {
+            LogWarningReadingReminderRange(exc, new(begin, end), remTableManager.TableName);
             throw;
         }
     }

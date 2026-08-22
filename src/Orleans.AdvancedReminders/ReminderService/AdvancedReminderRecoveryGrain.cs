@@ -4,6 +4,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Options;
 using Orleans.DurableJobs;
 using Orleans.Placement;
 
@@ -21,18 +22,23 @@ internal sealed class AdvancedReminderRecoveryGrain(
     IGrainFactory grainFactory,
     ILogger<AdvancedReminderRecoveryGrain> logger,
     JobShardManager? jobShardManager = null,
+    IOptions<DurableJobsOptions>? durableJobsOptions = null,
     [FromKeyedServices(DurableJobTimeProviderNames.DurableJobs)] TimeProvider? timeProvider = null) : Grain, IAdvancedReminderRecoveryGrain
 {
     private const int BatchSize = 32;
+    internal const int RecoveryPageSize = 256;
     private const int ScanBucketCount = 4_096;
     internal const int ScanBucketsPerReconciliation = 256;
     private const ulong ScanBucketWidth = (ulong)uint.MaxValue / ScanBucketCount + 1;
     internal static readonly TimeSpan ReconciliationPeriod = TimeSpan.FromMinutes(1);
+    internal static readonly TimeSpan FullScanPeriod = ReconciliationPeriod * (ScanBucketCount / ScanBucketsPerReconciliation);
+    internal static readonly TimeSpan MinimumLookaheadPeriod = FullScanPeriod * 2;
     internal static readonly TimeSpan ReconciliationEntryTimeout = TimeSpan.FromMinutes(1);
     private readonly IReminderTable _reminderTable = reminderTable;
     private readonly IGrainFactory _grainFactory = grainFactory;
     private readonly ILogger<AdvancedReminderRecoveryGrain> _logger = logger;
     private readonly JobShardManager? _jobShardManager = jobShardManager;
+    private readonly DurableJobsOptions _durableJobsOptions = durableJobsOptions?.Value ?? new DurableJobsOptions();
     private readonly TimeProvider _timeProvider = timeProvider ?? TimeProvider.System;
     private bool _started;
     private bool _forceCurrentScan;
@@ -53,15 +59,15 @@ internal sealed class AdvancedReminderRecoveryGrain(
             _forceCurrentScan = true;
         }
 
+        var scanStartedUtc = now;
         await ReconcileAsync(force: _forceCurrentScan, cancellationToken);
         _started = true;
-        _nextReconciliationUtc = _timeProvider.GetUtcNow().Add(ReconciliationPeriod);
+        _nextReconciliationUtc = scanStartedUtc.Add(ReconciliationPeriod);
     }
 
     internal async Task ReconcileAsync(bool force, CancellationToken cancellationToken)
     {
         var tasks = new List<Task>(BatchSize);
-        var jobIdsByShard = new Dictionary<string, HashSet<string>?>(StringComparer.Ordinal);
         var bucketsScanned = 0;
         while (bucketsScanned < ScanBucketsPerReconciliation)
         {
@@ -69,42 +75,54 @@ internal sealed class AdvancedReminderRecoveryGrain(
             var bucket = _nextScanBucket;
             var begin = bucket == 0 ? uint.MaxValue : (uint)((ulong)bucket * ScanBucketWidth - 1);
             var end = (uint)(((ulong)bucket + 1) * ScanBucketWidth - 1);
-            var reminders = (await _reminderTable.ReadRows(begin, end)).Reminders;
-
-            foreach (var entry in reminders)
+            var jobIdsByShard = new Dictionary<string, HashSet<string>?>(StringComparer.Ordinal);
+            var lookaheadEnd = _timeProvider.GetUtcNow().UtcDateTime.Add(_durableJobsOptions.ShardLoadLookaheadPeriod);
+            string? continuationToken = null;
+            do
             {
-                var entryForce = force;
-                if (!entryForce
-                    && !string.IsNullOrEmpty(entry.JobId)
-                    && !string.IsNullOrEmpty(entry.JobShardId))
+                var page = await _reminderTable.ReadRows(begin, end, RecoveryPageSize, continuationToken);
+                foreach (var entry in page.Reminders)
                 {
-                    if (_jobShardManager is null)
+                    if (!force && (entry.NextDueUtc ?? entry.StartAt) > lookaheadEnd)
                     {
                         continue;
                     }
 
-                    if (!jobIdsByShard.TryGetValue(entry.JobShardId, out var existingJobIds))
+                    var entryForce = force;
+                    if (!entryForce
+                        && !string.IsNullOrEmpty(entry.JobId)
+                        && !string.IsNullOrEmpty(entry.JobShardId))
                     {
-                        existingJobIds = await _jobShardManager.GetJobIdsAsync(entry.JobShardId, cancellationToken);
-                        jobIdsByShard[entry.JobShardId] = existingJobIds;
+                        if (_jobShardManager is null)
+                        {
+                            continue;
+                        }
+
+                        if (!jobIdsByShard.TryGetValue(entry.JobShardId, out var existingJobIds))
+                        {
+                            existingJobIds = await _jobShardManager.GetJobIdsAsync(entry.JobShardId, cancellationToken);
+                            jobIdsByShard[entry.JobShardId] = existingJobIds;
+                        }
+
+                        if (existingJobIds is null || existingJobIds.Contains(entry.JobId))
+                        {
+                            continue;
+                        }
+
+                        entryForce = true;
                     }
 
-                    if (existingJobIds is null || existingJobIds.Contains(entry.JobId))
+                    tasks.Add(ReconcileEntryAsync(entry, entryForce, cancellationToken));
+
+                    if (tasks.Count == BatchSize)
                     {
-                        continue;
+                        await Task.WhenAll(tasks);
+                        tasks.Clear();
                     }
-
-                    entryForce = true;
                 }
 
-                tasks.Add(ReconcileEntryAsync(entry, entryForce, cancellationToken));
-
-                if (tasks.Count == BatchSize)
-                {
-                    await Task.WhenAll(tasks);
-                    tasks.Clear();
-                }
-            }
+                continuationToken = page.ContinuationToken;
+            } while (continuationToken is not null);
 
             bucketsScanned++;
             _nextScanBucket = (_nextScanBucket + 1) % ScanBucketCount;

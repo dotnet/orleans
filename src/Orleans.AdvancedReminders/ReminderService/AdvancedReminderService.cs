@@ -25,6 +25,7 @@ internal sealed class AdvancedReminderService : IReminderService, IAttributeRemi
     private readonly IGrainFactory _grainFactory;
     private readonly ILogger<AdvancedReminderService> _logger;
     private readonly ReminderOptions _options;
+    private readonly DurableJobsOptions _durableJobsOptions;
     private readonly TimeProvider _timeProvider;
     private readonly IClusterManifestProvider _clusterManifestProvider;
     private readonly IClusterMembershipService _clusterMembershipService;
@@ -40,7 +41,8 @@ internal sealed class AdvancedReminderService : IReminderService, IAttributeRemi
         ILogger<AdvancedReminderService> logger,
         [FromKeyedServices(DurableJobTimeProviderNames.DurableJobs)] TimeProvider timeProvider,
         IClusterManifestProvider clusterManifestProvider,
-        IClusterMembershipService clusterMembershipService)
+        IClusterMembershipService clusterMembershipService,
+        IOptions<DurableJobsOptions>? durableJobsOptions = null)
     {
         _reminderTable = reminderTable;
         _jobManager = jobManager;
@@ -48,6 +50,7 @@ internal sealed class AdvancedReminderService : IReminderService, IAttributeRemi
         _grainFactory = grainFactory;
         _logger = logger;
         _options = options.Value;
+        _durableJobsOptions = durableJobsOptions?.Value ?? new DurableJobsOptions();
         _timeProvider = timeProvider;
         _clusterManifestProvider = clusterManifestProvider;
         _clusterMembershipService = clusterMembershipService;
@@ -408,7 +411,7 @@ internal sealed class AdvancedReminderService : IReminderService, IAttributeRemi
         CancellationToken cancellationToken)
     {
         var entry = await _reminderTable.ReadRow(grainId, reminderName);
-        if (entry is null || !HasFutureSchedule(entry))
+        if (entry is null || !HasFutureSchedule(entry) || !IsWithinLoadLookahead(entry))
         {
             return;
         }
@@ -437,7 +440,7 @@ internal sealed class AdvancedReminderService : IReminderService, IAttributeRemi
     private async Task PersistAndScheduleCoreAsync(ReminderEntry entry, CancellationToken cancellationToken)
     {
         entry.ETag = await _reminderTable.UpsertRow(entry);
-        if (HasFutureSchedule(entry))
+        if (HasFutureSchedule(entry) && IsWithinLoadLookahead(entry))
         {
             await ScheduleAndPersistHandleAsync(entry, cancellationToken);
         }
@@ -657,6 +660,9 @@ internal sealed class AdvancedReminderService : IReminderService, IAttributeRemi
     }
 
     private DateTime GetUtcNow() => _timeProvider.GetUtcNow().UtcDateTime;
+
+    private bool IsWithinLoadLookahead(ReminderEntry entry)
+        => (entry.NextDueUtc ?? entry.StartAt) <= GetUtcNow().Add(_durableJobsOptions.ShardLoadLookaheadPeriod);
 
     private IAdvancedReminderDispatcherGrain GetDispatcher(GrainId grainId)
         => _grainFactory.GetGrain<IAdvancedReminderDispatcherGrain>(grainId.ToString());

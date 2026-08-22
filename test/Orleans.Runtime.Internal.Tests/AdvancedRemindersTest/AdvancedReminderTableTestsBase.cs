@@ -78,6 +78,38 @@ public abstract class AdvancedReminderTableTestsBase : IAsyncLifetime, IClassFix
     [Fact]
     public async Task RemindersTable_DurableRejectsStaleUpsert() => await ReminderRejectsStaleUpsert();
 
+    [Fact]
+    public async Task RemindersTable_DurableRangePagingIsBounded()
+    {
+        const int ReminderCount = 7;
+        const int PageSize = 2;
+        var expected = new List<string>(ReminderCount);
+        for (var index = 0; index < ReminderCount; index++)
+        {
+            var reminder = CreateReminder(MakeTestGrainReference(), $"paged-{index}");
+            await remindersTable.UpsertRow(reminder);
+            expected.Add($"{reminder.GrainId}|{reminder.ReminderName}");
+        }
+
+        var actual = new List<string>(ReminderCount);
+        var tokens = new HashSet<string>(StringComparer.Ordinal);
+        string? continuationToken = null;
+        do
+        {
+            var page = await remindersTable.ReadRows(0, 0, PageSize, continuationToken);
+            Assert.InRange(page.Reminders.Count, 0, PageSize);
+            actual.AddRange(page.Reminders.Select(reminder => $"{reminder.GrainId}|{reminder.ReminderName}"));
+            if (page.ContinuationToken is { } nextToken)
+            {
+                Assert.True(tokens.Add(nextToken), "The provider returned a repeated continuation token.");
+            }
+
+            continuationToken = page.ContinuationToken;
+        } while (continuationToken is not null);
+
+        Assert.Equal(expected.Order(StringComparer.Ordinal), actual.Order(StringComparer.Ordinal));
+    }
+
     protected async Task RemindersParallelUpsert()
     {
         var results = await Task.WhenAll(Enumerable.Range(0, 5).Select(async i =>

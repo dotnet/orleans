@@ -35,6 +35,7 @@ export default class Reminders extends React.Component<RemindersProps> {
     const showNext = isAdvanced
       ? this.props.remindersData.hasMore === true
       : totalPages > this.props.page;
+    const showLast = !isAdvanced && totalPages > this.props.page + 1;
     return (
       <div>
         <div className="row">
@@ -79,7 +80,7 @@ export default class Reminders extends React.Component<RemindersProps> {
             <ReminderTable data={this.props.remindersData.reminders} />
           </Panel>
         )}
-        {showPrevious || showNext ? (
+        {showPrevious || showNext || showLast ? (
           <div className="card">
             <div className="card-body">
               <div style={{ textAlign: 'center' }}>
@@ -107,6 +108,15 @@ export default class Reminders extends React.Component<RemindersProps> {
                     href={this.getPageHref(this.props.page + 1)}
                   >
                     Next <i className="fa fa-arrow-circle-right" />
+                  </a>
+                ) : null}
+                <span> </span>
+                {showLast ? (
+                  <a
+                    className="btn btn-default bg-purple"
+                    href={this.getPageHref(totalPages)}
+                  >
+                    Last <i className="fa fa-arrow-circle-right" />
                   </a>
                 ) : null}
               </div>

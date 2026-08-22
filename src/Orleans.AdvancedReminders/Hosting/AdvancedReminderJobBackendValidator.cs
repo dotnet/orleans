@@ -1,7 +1,9 @@
 using System;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Options;
 using Orleans.Configuration;
 using Orleans.DurableJobs;
+using Orleans.AdvancedReminders.Runtime.ReminderService;
 
 namespace Orleans.AdvancedReminders.Runtime.Hosting;
 
@@ -19,6 +21,13 @@ internal sealed class AdvancedReminderJobBackendValidator(IServiceProvider servi
         {
             throw new OrleansConfigurationException(
                 "AdvancedReminders requires a reminder table provider. Configure UseInMemoryAdvancedReminderService() or a storage-backed advanced reminder provider before starting the silo.");
+        }
+
+        var durableJobsOptions = serviceProvider.GetRequiredService<IOptions<DurableJobsOptions>>().Value;
+        if (durableJobsOptions.ShardLoadLookaheadPeriod < AdvancedReminderRecoveryGrain.MinimumLookaheadPeriod)
+        {
+            throw new OrleansConfigurationException(
+                $"{nameof(DurableJobsOptions)}.{nameof(DurableJobsOptions.ShardLoadLookaheadPeriod)} must be at least {AdvancedReminderRecoveryGrain.MinimumLookaheadPeriod} when AdvancedReminders is enabled.");
         }
     }
 

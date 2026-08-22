@@ -47,6 +47,16 @@ public interface IReminderTable
     Task<ReminderTableData> ReadRows(uint begin, uint end);
 
     /// <summary>
+    /// Returns a bounded page of rows that have their <see cref="GrainId.GetUniformHashCode"/> in the range (begin, end].
+    /// </summary>
+    /// <param name="begin">The exclusive lower bound.</param>
+    /// <param name="end">The inclusive upper bound.</param>
+    /// <param name="maxRows">The maximum number of rows to return.</param>
+    /// <param name="continuationToken">An opaque continuation token returned by the preceding call, or <see langword="null"/>.</param>
+    /// <returns>A bounded page of reminder rows and a continuation token when more rows remain.</returns>
+    Task<ReminderTableData> ReadRows(uint begin, uint end, int maxRows, string? continuationToken);
+
+    /// <summary>
     /// Reads the specified entry.
     /// </summary>
     /// <param name="grainId">The grain ID.</param>
@@ -93,6 +103,8 @@ internal interface IReminderTableGrain : IGrainWithIntegerKey
 
     Task<ReminderTableData> ReadRows(uint begin, uint end);
 
+    Task<ReminderTableData> ReadRows(uint begin, uint end, int maxRows, string? continuationToken);
+
     Task<ReminderEntry?> ReadRow(GrainId grainId, string reminderName);
 
     Task<string> UpsertRow(ReminderEntry entry);
@@ -113,9 +125,10 @@ public sealed class ReminderTableData
     /// Initializes a new instance of the <see cref="ReminderTableData"/> class.
     /// </summary>
     /// <param name="list">The entries.</param>
-    public ReminderTableData(IEnumerable<ReminderEntry> list)
+    public ReminderTableData(IEnumerable<ReminderEntry> list, string? continuationToken = null)
     {
         Reminders = new List<ReminderEntry>(list);
+        ContinuationToken = continuationToken;
     }
 
     /// <summary>
@@ -141,6 +154,12 @@ public sealed class ReminderTableData
     /// <value>The reminders.</value>
     [Id(0)]
     public IList<ReminderEntry> Reminders { get; private set; }
+
+    /// <summary>
+    /// Gets the opaque continuation token for the next page, or <see langword="null"/> when the range is exhausted.
+    /// </summary>
+    [Id(1)]
+    public string? ContinuationToken { get; private set; }
 
     /// <summary>
     /// Returns a <see cref="string" /> that represents this instance.

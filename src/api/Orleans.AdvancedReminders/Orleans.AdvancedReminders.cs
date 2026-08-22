@@ -149,6 +149,7 @@ namespace Orleans.AdvancedReminders
         System.Threading.Tasks.Task<ReminderEntry?> ReadRow(Orleans.Runtime.GrainId grainId, string reminderName);
         System.Threading.Tasks.Task<ReminderTableData> ReadRows(Orleans.Runtime.GrainId grainId);
         System.Threading.Tasks.Task<ReminderTableData> ReadRows(uint begin, uint end);
+        System.Threading.Tasks.Task<ReminderTableData> ReadRows(uint begin, uint end, int maxRows, string? continuationToken);
         System.Threading.Tasks.Task<bool> RemoveRow(Orleans.Runtime.GrainId grainId, string reminderName, string eTag);
         System.Threading.Tasks.Task StartAsync(System.Threading.CancellationToken cancellationToken = default);
         System.Threading.Tasks.Task StopAsync(System.Threading.CancellationToken cancellationToken = default);
@@ -795,7 +796,10 @@ namespace Orleans.AdvancedReminders
 
         public ReminderTableData(ReminderEntry entry) { }
 
-        public ReminderTableData(System.Collections.Generic.IEnumerable<ReminderEntry> list) { }
+        public ReminderTableData(System.Collections.Generic.IEnumerable<ReminderEntry> list, string? continuationToken = null) { }
+
+        [Id(1)]
+        public string? ContinuationToken { get { throw null; } }
 
         [Id(0)]
         public System.Collections.Generic.IList<ReminderEntry> Reminders { get { throw null; } }

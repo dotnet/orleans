@@ -47,6 +47,14 @@ internal sealed class InMemoryReminderTable : IReminderTable, ILifecycleParticip
         return this.isAvailable ? this.reminderTableGrain.ReadRows(begin, end) : Task.FromResult(new ReminderTableData());
     }
 
+    public Task<ReminderTableData> ReadRows(uint begin, uint end, int maxRows, string? continuationToken)
+    {
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(maxRows);
+        return this.isAvailable
+            ? this.reminderTableGrain.ReadRows(begin, end, maxRows, continuationToken)
+            : Task.FromResult(new ReminderTableData());
+    }
+
     public Task<bool> RemoveRow(GrainId grainId, string reminderName, string eTag)
     {
         this.ThrowIfNotAvailable();
