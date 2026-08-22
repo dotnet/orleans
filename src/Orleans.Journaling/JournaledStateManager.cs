@@ -1051,7 +1051,31 @@ internal sealed partial class JournaledStateManager : IJournaledStateManager, IJ
 
     public bool TryGetState(string name, [NotNullWhen(true)] out IJournaledState? state) => _states.TryGetValue(name, out state);
 
-    public long PendingWriteByteCount => _journalWriter.CommittedLength;
+    public long PendingWriteByteCount => _journalWriter.BufferedLength;
+
+    public bool HasPendingWrites
+    {
+        get
+        {
+            lock (_lock)
+            {
+                if (_journalWriter.BufferedLength > 0)
+                {
+                    return true;
+                }
+
+                foreach (var state in _states.Values)
+                {
+                    if (state.HasPendingChanges)
+                    {
+                        return true;
+                    }
+                }
+
+                return false;
+            }
+        }
+    }
 
     void ILifecycleParticipant<IGrainLifecycle>.Participate(IGrainLifecycle observer) => observer.Subscribe(GrainLifecycleStage.SetupState, this);
     Task ILifecycleObserver.OnStart(CancellationToken cancellationToken) => InitializeAsync(cancellationToken).AsTask();
@@ -1229,6 +1253,8 @@ internal sealed partial class JournaledStateManager : IJournaledStateManager, IJ
 
         public uint this[string name] => _ids[name];
 
+        bool IJournaledState.HasPendingChanges => false;
+
         void IJournaledState.ReplayEntry(JournalEntry entry, JournalReplayContext context) =>
             context.GetRequiredCommandCodec(entry.FormatKey, _codec).Apply(entry.Reader, this);
 
@@ -1326,6 +1352,8 @@ internal sealed partial class JournaledStateManager : IJournaledStateManager, IJ
         public JournalStreamId StreamId { get; } = streamId;
 
         public IReadOnlyList<IPreservedJournalEntry> PreservedEntries => _preservedEntries;
+
+        bool IJournaledState.HasPendingChanges => false;
 
         void IJournaledState.ReplayEntry(JournalEntry entry, JournalReplayContext context) =>
             _preservedEntries.Add(new PreservedJournalEntry(entry.FormatKey, entry.Reader));

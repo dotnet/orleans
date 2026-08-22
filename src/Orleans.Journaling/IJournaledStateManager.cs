@@ -62,4 +62,9 @@ public interface IJournaledStateManager : IAsyncDisposable
     /// concurrent writers and should not be used for correctness decisions.
     /// </remarks>
     long PendingWriteByteCount => -1;
+
+    /// <summary>
+    /// Gets a value indicating whether any registered state has changes which have not been written to storage.
+    /// </summary>
+    bool HasPendingWrites => PendingWriteByteCount != 0;
 }

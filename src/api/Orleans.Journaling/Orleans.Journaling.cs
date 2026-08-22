@@ -210,6 +210,8 @@ namespace Orleans.Journaling
 
     public partial interface IJournaledState
     {
+        bool HasPendingChanges { get; }
+
         void AppendEntries(JournalStreamWriter writer);
         void AppendSnapshot(JournalStreamWriter writer);
         IJournaledState DeepCopy();
@@ -221,6 +223,8 @@ namespace Orleans.Journaling
 
     public partial interface IJournaledStateManager : System.IAsyncDisposable
     {
+        bool HasPendingWrites { get; }
+
         long PendingWriteByteCount { get; }
 
         System.Threading.Tasks.ValueTask DeleteStateAsync(System.Threading.CancellationToken cancellationToken);
