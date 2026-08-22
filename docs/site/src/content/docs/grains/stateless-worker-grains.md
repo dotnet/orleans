@@ -1,7 +1,7 @@
 ---
 title: Stateless worker grains
 description: Scale location-transparent worker pools with Orleans.
-ms.date: 08/02/2026
+ms.date: 08/22/2026
 ms.topic: concept-article
 ---
 
@@ -28,10 +28,10 @@ Idle workers are removed by default. The two-argument attribute constructor can 
 
 ## State and concurrency
 
-"Stateless" means activations aren't individually addressable and no single activation owns authoritative state for the key. A worker can keep caches or other local state, but that state isn't coordinated with other activations and can disappear at any time.
+"Stateless" means activations aren't individually addressable and no single activation owns authoritative state for the key. A worker can keep caches or other local state; each activation manages its own copy for its lifetime.
 
 Stateless workers are non-reentrant by default. Add <xref:Orleans.Concurrency.ReentrantAttribute> only if their implementation is safe for request interleaving.
 
-Good uses include CPU-bound transformations, local pre-aggregation, protocol adaptation, and replicated read caches. Don't use stateless workers for entity state that requires single-writer consistency.
+Good uses include CPU-bound transformations, local pre-aggregation, protocol adaptation, and replicated read caches backed by an application-managed read model. Keep authoritative entity state and command ordering in a normal grain or another explicit consistency boundary. See [Scale grain reads](read-scaling.md) for the single-writer and read-model patterns.
 
 Stateless worker activations don't participate in grain migration.
