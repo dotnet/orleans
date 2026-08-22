@@ -49,8 +49,8 @@ internal static class ManifestHashCalculator
         var bytes = Encoding.UTF8.GetBytes(value ?? string.Empty);
         var length = Encoding.UTF8.GetBytes(bytes.Length.ToString(CultureInfo.InvariantCulture));
         hash.AppendData(length);
-        hash.AppendData(new byte[] { 0 });
+        hash.AppendData(stackalloc byte[] { 0 });
         hash.AppendData(bytes);
-        hash.AppendData(new byte[] { 0xff });
+        hash.AppendData(stackalloc byte[] { 0xff });
     }
 }
