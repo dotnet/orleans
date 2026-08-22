@@ -1,7 +1,7 @@
 # Microsoft Orleans Streaming for ADO.NET
 
 ## Introduction
-Microsoft Orleans Streaming for ADO.NET provides a stream provider implementation for Orleans using ADO.NET-compatible databases (SQL Server, MySQL, PostgreSQL, etc.). This allows for publishing and subscribing to streams of events with relational databases as the underlying infrastructure.
+Microsoft Orleans Streaming for ADO.NET provides a partitioned stream provider for Orleans using ADO.NET-compatible databases (SQL Server, MySQL, PostgreSQL, etc.). This allows for publishing and subscribing to streams of events with relational databases as the underlying infrastructure.
 
 ## Getting Started
 To use this package, install it via NuGet:
@@ -47,6 +47,24 @@ var builder = Host.CreateApplicationBuilder(args)
 // Run the host
 await builder.RunAsync();
 ```
+
+The provider stores each queue as an immutable, ordered stream partition. Its stream partition pipeline appends records, reads partition history, and advances an ownership-fenced checkpoint. Configure it with:
+
+- `StartFromNow`: initialize a new checkpoint at the current partition history tail instead of before the earliest retained record.
+- `FaultOnDeliveryFailure`: optionally fault a failing subscription while preserving the shared partition records.
+- `MaxMessagesPerRead`: bound each ordered storage read.
+- `CheckpointPersistInterval`: throttle durable checkpoint updates.
+- `RetentionPeriod`: retain checkpointed records for at least this period (one day by default).
+- `MaximumRetentionPeriod`: optionally delete older records even when they are not checkpointed. This is a hard capacity ceiling and can create a diagnosed retention gap.
+- `CleanupInterval` and `CleanupBatchSize`: bound cleanup frequency and work.
+
+The partitioned stream provider is rewindable while requested records remain retained. It resumes strictly after its durable, ownership-fenced checkpoint and can redeliver records after a crash without skipping uncheckpointed data.
+
+## Alpha schema upgrade
+
+The current streaming scripts use schema version 2 and are intentionally incompatible with the former queue, visibility-timeout, confirmation, and dead-letter schema. The provider fails during initialization when it detects old or mixed streaming query keys.
+
+There is no in-place migration for this alpha package. Stop producers and consumers, drop `OrleansStreamMessage`, `OrleansStreamDeadLetter`, `OrleansStreamControl`, `OrleansStreamMessageSequence`, the old streaming routines, and their `OrleansQuery` rows. Drop `OrleansStreamPartition` too after a partial version 2 installation. Then apply the current SQL Server, PostgreSQL, or MySQL streaming script. Existing alpha rows are not read or silently converted, so export payloads first if they must be retained.
 
 ## Example - Using ADO.NET Streams in a Grain
 ```csharp

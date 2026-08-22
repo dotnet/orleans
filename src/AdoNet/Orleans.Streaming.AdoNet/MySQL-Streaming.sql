@@ -1,389 +1,166 @@
-CREATE TABLE OrleansStreamMessageSequence
-(
-    MessageId BIGINT NOT NULL
-);
-INSERT INTO OrleansStreamMessageSequence
-SELECT 0
-WHERE NOT EXISTS (SELECT * FROM OrleansStreamMessageSequence);
+/*
+ADO.NET streaming schema version 2.
+
+This alpha schema is intentionally incompatible with the former destructive queue schema.
+Drop the former streaming tables, sequence, routines, and OrleansQuery rows before applying
+this script. Existing queue rows are not migrated.
+*/
+
+DROP PROCEDURE IF EXISTS ValidateOrleansStreamingSchemaUpgrade;
 
 DELIMITER $$
+
+CREATE PROCEDURE ValidateOrleansStreamingSchemaUpgrade()
+BEGIN
+    IF EXISTS
+    (
+        SELECT 1
+        FROM information_schema.tables
+        WHERE table_schema = DATABASE()
+            AND table_name IN
+            (
+                'OrleansStreamPartition',
+                'OrleansStreamMessage',
+                'OrleansStreamDeadLetter',
+                'OrleansStreamControl',
+                'OrleansStreamMessageSequence'
+            )
+    )
+    OR EXISTS
+    (
+        SELECT 1
+        FROM OrleansQuery
+        WHERE QueryKey IN
+        (
+            'QueueStreamMessageKey',
+            'GetStreamMessagesKey',
+            'ConfirmStreamMessagesKey',
+            'FailStreamMessageKey',
+            'EvictStreamMessagesKey',
+            'EvictStreamDeadLettersKey',
+            'StreamSchemaVersionKey'
+        )
+    )
+    THEN
+        SIGNAL SQLSTATE '45000'
+            SET MESSAGE_TEXT = 'Incompatible alpha ADO.NET streaming schema. Drop old streaming objects and query rows; no in-place migration.';
+    END IF;
+END$$
+
+DELIMITER ;
+
+CALL ValidateOrleansStreamingSchemaUpgrade();
+DROP PROCEDURE ValidateOrleansStreamingSchemaUpgrade;
+
+CREATE TABLE OrleansStreamPartition
+(
+    ServiceId VARCHAR(150) NOT NULL,
+    ProviderId VARCHAR(150) NOT NULL,
+    QueueId VARCHAR(150) NOT NULL,
+    NextMessageId BIGINT NOT NULL,
+    Checkpoint BIGINT NULL,
+    OwnerEpoch BIGINT NOT NULL,
+    CleanupOn DATETIME(6) NOT NULL,
+    CreatedOn DATETIME(6) NOT NULL,
+    ModifiedOn DATETIME(6) NOT NULL,
+
+    PRIMARY KEY (ServiceId, ProviderId, QueueId)
+) ENGINE = InnoDB;
 
 CREATE TABLE OrleansStreamMessage
 (
-	/* Identifies the application */
-	ServiceId NVARCHAR(150) NOT NULL,
+    ServiceId VARCHAR(150) NOT NULL,
+    ProviderId VARCHAR(150) NOT NULL,
+    QueueId VARCHAR(150) NOT NULL,
+    MessageId BIGINT NOT NULL,
+    StreamIdBytes LONGBLOB NOT NULL,
+    StreamNamespaceLength INT NOT NULL,
+    CreatedOn DATETIME(6) NOT NULL,
+    Payload LONGBLOB NOT NULL,
 
-    /* Identifies the provider within the application */
-    ProviderId NVARCHAR(150) NOT NULL,
-
-	/* Identifies the individual queue shard as configured in the provider*/
-	QueueId NVARCHAR(150) NOT NULL,
-
-	/* The unique ascending number of the queued message */
-	MessageId BIGINT NOT NULL,
-
-	/* The number of times the event was dequeued */
-	Dequeued INT NOT NULL,
-
-	/* The UTC time at which the event will become visible */
-	VisibleOn DATETIME(6) NOT NULL,
-
-	/* The UTC time at which the event will expire */
-	ExpiresOn DATETIME(6) NOT NULL,
-
-    /* The UTC time at which the event was created - troubleshooting only */
-	CreatedOn DATETIME(6) NOT NULL,
-
-    /* The UTC time at which the event was updated - troubleshooting only */
-	ModifiedOn DATETIME(6) NOT NULL,
-
-	/* The arbitrarily large payload of the event */
-	Payload LONGBLOB NOT NULL,
-
-	/* This PK supports the various ordered scanning queries. */
-	PRIMARY KEY (ServiceId, ProviderId, QueueId, MessageId)
-);
+    PRIMARY KEY (ServiceId, ProviderId, QueueId, MessageId)
+) ENGINE = InnoDB;
 
 DELIMITER $$
 
-CREATE TABLE OrleansStreamDeadLetter
+CREATE PROCEDURE AppendStreamMessage
 (
-	/* Identifies the application */
-	ServiceId NVARCHAR(150) NOT NULL,
-
-    /* Identifies the provider within the application */
-    ProviderId NVARCHAR(150) NOT NULL,
-
-	/* Identifies the individual queue shard as configured in the provider*/
-	QueueId NVARCHAR(150) NOT NULL,
-
-	/* The unique ascending number of the queued message */
-	MessageId BIGINT NOT NULL,
-
-	/* The number of times the event was dequeued */
-	Dequeued INT NOT NULL,
-
-	/* The UTC time at which the event will become visible */
-	VisibleOn DATETIME(6) NOT NULL,
-
-	/* The UTC time at which the event will expire */
-	ExpiresOn DATETIME(6) NOT NULL,
-
-    /* The UTC time at which the event was created - troubleshooting only */
-	CreatedOn DATETIME(6) NOT NULL,
-
-    /* The UTC time at which the event was updated - troubleshooting only */
-	ModifiedOn DATETIME(6) NOT NULL,
-
-    /* The UTC time at which the event was given up on - troubleshooting only */
-	DeadOn DATETIME(6) NOT NULL,
-
-	/* The UTC time at which the event is scheduled to be removed from dead letters */
-	RemoveOn DATETIME(6) NOT NULL,
-
-	/* The arbitrarily large payload of the event */
-	Payload LONGBLOB NULL,
-
-	/* This PK supports the various ordered scanning queries. */
-	PRIMARY KEY (ServiceId, ProviderId, QueueId, MessageId)
-);
-
-DELIMITER $$
-
-CREATE TABLE OrleansStreamControl
-(
-	/* Identifies the application */
-	ServiceId NVARCHAR(150) NOT NULL,
-
-    /* Identifies the provider within the application */
-    ProviderId NVARCHAR(150) NOT NULL,
-
-	/* Identifies the individual queue shard as configured in the provider */
-	QueueId NVARCHAR(150) NOT NULL,
-
-    /* The next due schedule for messages to be evicted */
-    EvictOn DATETIME(6) NOT NULL,
-
-    /* Each row represents a flat configuration object for an individual queue */
-	PRIMARY KEY (ServiceId, ProviderId, QueueId)
-);
-
-DELIMITER $$
-
-CREATE PROCEDURE QueueStreamMessage
-(
-    IN _ServiceId NVARCHAR(150),
-    IN _ProviderId NVARCHAR(150),
-    IN _QueueId NVARCHAR(150),
+    IN _ServiceId VARCHAR(150),
+    IN _ProviderId VARCHAR(150),
+    IN _QueueId VARCHAR(150),
+    IN _StreamIdBytes LONGBLOB,
+    IN _StreamNamespaceLength INT,
     IN _Payload LONGBLOB,
-    IN _ExpiryTimeout INT
+    IN _ManageTransaction BOOLEAN
 )
 BEGIN
+    DECLARE _Now DATETIME(6) DEFAULT UTC_TIMESTAMP(6);
+    DECLARE _MessageId BIGINT;
 
-DECLARE _Now DATETIME(6) DEFAULT UTC_TIMESTAMP(6);
-DECLARE _ExpiresOn DATETIME(6) DEFAULT DATE_ADD(_Now, INTERVAL _ExpiryTimeout SECOND);
-DECLARE _MessageId BIGINT;
+    DECLARE EXIT HANDLER FOR SQLEXCEPTION
+    BEGIN
+        IF _ManageTransaction THEN
+            ROLLBACK;
+        END IF;
+        RESIGNAL;
+    END;
 
-UPDATE OrleansStreamMessageSequence
-SET MessageId = LAST_INSERT_ID(MessageId + 1);
+    IF _ManageTransaction THEN
+        START TRANSACTION;
+    END IF;
 
-SET _MessageId = LAST_INSERT_ID();
-
-INSERT INTO OrleansStreamMessage
-(
-    ServiceId,
-    ProviderId,
-    QueueId,
-    MessageId,
-    Dequeued,
-    VisibleOn,
-    ExpiresOn,
-    CreatedOn,
-    ModifiedOn,
-    Payload
-)
-VALUES
-(
-    _ServiceId,
-    _ProviderId,
-    _QueueId,
-    _MessageId,
-    0,
-    _Now,
-    _ExpiresOn,
-    _Now,
-    _Now,
-    _Payload
-);
-
-SELECT
-    _ServiceId AS ServiceId,
-    _ProviderId AS ProviderId,
-    _QueueId AS QueueId,
-    _MessageId AS MessageId;
-
-END;
-
-DELIMITER $$
-
-INSERT INTO OrleansQuery
-(
-	QueryKey,
-	QueryText
-)
-SELECT
-	'QueueStreamMessageKey',
-	'CALL QueueStreamMessage(@ServiceId, @ProviderId, @QueueId, @Payload, @ExpiryTimeout)'
-
-DELIMITER $$
-
-CREATE PROCEDURE GetStreamMessages
-(
-    IN _ServiceId NVARCHAR(150),
-    IN _ProviderId NVARCHAR(150),
-	IN _QueueId NVARCHAR(150),
-    IN _MaxCount INT,
-	IN _MaxAttempts INT,
-	IN _VisibilityTimeout INT,
-    IN _RemovalTimeout INT,
-    IN _EvictionInterval INT,
-    IN _EvictionBatchSize INT
-)
-BEGIN
-
-DECLARE _Now DATETIME(6) DEFAULT UTC_TIMESTAMP(6);
-DECLARE _VisibleOn DATETIME(6) DEFAULT DATE_ADD(_Now, INTERVAL _VisibilityTimeout SECOND);
-DECLARE _NextEvictOn TIMESTAMP(6) DEFAULT DATE_ADD(_Now, INTERVAL _EvictionInterval SECOND);
-DECLARE _EvictOn DATETIME(6);
-DECLARE _Count INT;
-
--- get the next eviction schedule
-SET _EvictOn =
-(
-    SELECT EvictOn
-    FROM OrleansStreamControl
-    WHERE
-        ServiceId = _ServiceId
-        AND ProviderId = _ProviderId
-        AND QueueId = _QueueId
-);
-
--- initialize the control row as necessary
-IF _EvictOn IS NULL THEN
-
-    -- race to initialize the control row
-    INSERT OrleansStreamControl
+    INSERT INTO OrleansStreamPartition
     (
         ServiceId,
         ProviderId,
         QueueId,
-        EvictOn
+        NextMessageId,
+        Checkpoint,
+        OwnerEpoch,
+        CleanupOn,
+        CreatedOn,
+        ModifiedOn
     )
     VALUES
     (
         _ServiceId,
         _ProviderId,
         _QueueId,
-        _NextEvictOn
+        1,
+        NULL,
+        0,
+        _Now,
+        _Now,
+        _Now
     )
-    ON DUPLICATE KEY
-    UPDATE
-        EvictOn = EvictOn;
+    ON DUPLICATE KEY UPDATE NextMessageId = NextMessageId;
 
-    -- read the winning update
-    SET _EvictOn =
-    (
-        SELECT EvictOn
-        FROM OrleansStreamControl
-        WHERE
-            ServiceId = _ServiceId
-            AND ProviderId = _ProviderId
-            AND QueueId = _QueueId
-    );
-
-END IF;
-
-IF _EvictOn <= _Now THEN
-
-    -- race to update the control row
-    UPDATE OrleansStreamControl
-    SET EvictOn = _NextEvictOn
-    WHERE
-        ServiceId = _ServiceId
+    SELECT NextMessageId
+    INTO _MessageId
+    FROM OrleansStreamPartition
+    WHERE ServiceId = _ServiceId
         AND ProviderId = _ProviderId
         AND QueueId = _QueueId
-        AND EvictOn <= _Now;
+    FOR UPDATE;
 
-    -- if we won the race then we also run eviction
-    IF ROW_COUNT() > 0 THEN
-        CALL EvictStreamMessages(_ServiceId, _ProviderId, _QueueId, _MaxAttempts, _RemovalTimeout, _EvictionBatchSize);
-        CALL EvictStreamDeadLetters(_ServiceId, _ProviderId, _QueueId, _EvictionBatchSize);
-    END IF;
+    UPDATE OrleansStreamPartition
+    SET
+        NextMessageId = _MessageId + 1,
+        ModifiedOn = _Now
+    WHERE ServiceId = _ServiceId
+        AND ProviderId = _ProviderId
+        AND QueueId = _QueueId;
 
-END IF;
-
-START TRANSACTION;
-
-/* elect the batch of messages to dequeue and lock them in order */
-CREATE TEMPORARY TABLE _Batch AS
-SELECT
-	ServiceId,
-    ProviderId,
-	QueueId,
-	MessageId
-FROM
-    OrleansStreamMessage
-WHERE
-    ServiceId = _ServiceId
-    AND ProviderId = _ProviderId
-    AND QueueId = _QueueId
-    AND Dequeued < _MaxAttempts
-    AND VisibleOn <= _Now
-    AND ExpiresOn > _Now
-ORDER BY
-    ServiceId,
-    ProviderId,
-    QueueId,
-    MessageId
-LIMIT _MaxCount
-FOR UPDATE SKIP LOCKED;
-
-/* update the message batch */
-UPDATE OrleansStreamMessage AS M
-INNER JOIN _Batch AS B
-    ON M.ServiceId = B.ServiceId
-    AND M.ProviderId = B.ProviderId
-    AND M.QueueId = B.QueueId
-    AND M.MessageId = B.MessageId
-SET
-    M.Dequeued = M.Dequeued + 1,
-    M.VisibleOn = _VisibleOn,
-    M.ModifiedOn = _Now;
-
-/* return the updated batch */
-SELECT
-	M.ServiceId,
-    M.ProviderId,
-	M.QueueId,
-	M.MessageId,
-	M.Dequeued,
-	M.VisibleOn,
-	M.ExpiresOn,
-	M.CreatedOn,
-	M.ModifiedOn,
-	M.Payload
-FROM
-    OrleansStreamMessage AS M
-    INNER JOIN _Batch AS B
-        ON M.ServiceId = B.ServiceId
-        AND M.ProviderId = B.ProviderId
-        AND M.QueueId = B.QueueId
-        AND M.MessageId = B.MessageId
-ORDER BY
-    M.MessageId;
-
-DROP TEMPORARY TABLE _Batch;
-
-COMMIT;
-
-END;
-
-DELIMITER $$
-
-INSERT INTO OrleansQuery
-(
-	QueryKey,
-	QueryText
-)
-SELECT
-	'GetStreamMessagesKey',
-	'CALL GetStreamMessages(@ServiceId, @ProviderId, @QueueId, @MaxCount, @MaxAttempts, @VisibilityTimeout, @RemovalTimeout, @EvictionInterval, @EvictionBatchSize)';
-
-DELIMITER $$
-
-CREATE PROCEDURE ConfirmStreamMessages
-(
-    IN _ServiceId NVARCHAR(150),
-    IN _ProviderId NVARCHAR(150),
-    IN _QueueId NVARCHAR(150),
-    IN _Items LONGTEXT
-)
-BEGIN
-
-DECLARE _Delimiter1 NVARCHAR(1) DEFAULT '|';
-DECLARE _Delimiter2 NVARCHAR(1) DEFAULT ':';
-DECLARE _Value LONGTEXT;
-DECLARE _MessageId BIGINT;
-DECLARE _Dequeued INT;
-
-SET _Items = CONCAT(_Items, _Delimiter1);
-
-/* parse the message identifiers to be deleted */
-DROP TEMPORARY TABLE IF EXISTS _ItemsTable;
-CREATE TEMPORARY TABLE _ItemsTable
-(
-    ServiceId NVARCHAR(150) NOT NULL,
-    ProviderId NVARCHAR(150) NOT NULL,
-    QueueId NVARCHAR(150) NOT NULL,
-    MessageId BIGINT NOT NULL,
-    Dequeued INT NOT NULL,
-
-    PRIMARY KEY (ServiceId, ProviderId, QueueId, MessageId)
-);
-
-WHILE LOCATE(_Delimiter1, _Items) > 0 DO
-
-    SET _Value = SUBSTRING_INDEX(_Items, _Delimiter1, 1);
-    SET _MessageId = CAST(SUBSTRING_INDEX(_Value, _Delimiter2, 1) AS UNSIGNED);
-    SET _Dequeued = CAST(SUBSTRING_INDEX(_Value, _Delimiter2, -1) AS SIGNED);
-
-    INSERT INTO _ItemsTable
+    INSERT INTO OrleansStreamMessage
     (
         ServiceId,
         ProviderId,
         QueueId,
         MessageId,
-        Dequeued
+        StreamIdBytes,
+        StreamNamespaceLength,
+        CreatedOn,
+        Payload
     )
     VALUES
     (
@@ -391,353 +168,352 @@ WHILE LOCATE(_Delimiter1, _Items) > 0 DO
         _ProviderId,
         _QueueId,
         _MessageId,
-        _Dequeued
+        _StreamIdBytes,
+        _StreamNamespaceLength,
+        _Now,
+        _Payload
     );
 
-    SET _Items = SUBSTRING(_Items, LOCATE(_Delimiter1, _Items) + 1);
+    IF _ManageTransaction THEN
+        COMMIT;
+    END IF;
 
-END WHILE;
+    SELECT
+        _ServiceId AS ServiceId,
+        _ProviderId AS ProviderId,
+        _QueueId AS QueueId,
+        _MessageId AS MessageId;
+END$$
 
-START TRANSACTION;
-
-/* elect the batch of messages to confirm and lock them in order */
-CREATE TEMPORARY TABLE _Batch AS
-SELECT
-	M.ServiceId,
-    M.ProviderId,
-    M.QueueId,
-    M.MessageId
-FROM
-	OrleansStreamMessage AS M
-    INNER JOIN _ItemsTable AS I
-        ON M.ServiceId = I.ServiceId
-        AND M.ProviderId = I.ProviderId
-        AND M.QueueId = I.QueueId
-        AND M.MessageId = I.MessageId
-        AND M.Dequeued = ABS(I.Dequeued)
-ORDER BY
-    M.ServiceId,
-    M.ProviderId,
-    M.QueueId,
-	M.MessageId
-FOR UPDATE;
-
-IF EXISTS (SELECT 1 FROM _ItemsTable WHERE Dequeued < 0) THEN
-    /* negative dequeue receipts release messages for immediate redelivery */
-    UPDATE OrleansStreamMessage AS M
-    INNER JOIN _Batch AS B
-        ON M.ServiceId = B.ServiceId
-        AND M.ProviderId = B.ProviderId
-        AND M.QueueId = B.QueueId
-        AND M.MessageId = B.MessageId
-    SET
-        M.VisibleOn = UTC_TIMESTAMP(6),
-        M.ModifiedOn = UTC_TIMESTAMP(6);
-ELSE
-    /* delete the elected batch */
-    DELETE M
-    FROM OrleansStreamMessage AS M
-    INNER JOIN _Batch AS B
-        ON M.ServiceId = B.ServiceId
-        AND M.ProviderId = B.ProviderId
-        AND M.QueueId = B.QueueId
-        AND M.MessageId = B.MessageId;
-END IF;
-
-/* return the ack */
-SELECT
-    ServiceId,
-    ProviderId,
-    QueueId,
-    MessageId
-FROM
-    _Batch;
-
-DROP TEMPORARY TABLE _Batch;
-DROP TEMPORARY TABLE _ItemsTable;
-
-COMMIT;
-END;
-
-DELIMITER $$
-
-INSERT INTO OrleansQuery
+CREATE PROCEDURE AcquireStreamPartition
 (
-	QueryKey,
-	QueryText
-)
-SELECT
-	'ConfirmStreamMessagesKey',
-	'CALL ConfirmStreamMessages(@ServiceId, @ProviderId, @QueueId, @Items)';
-
-DELIMITER $$
-
-CREATE PROCEDURE FailStreamMessage
-(
-    IN _ServiceId NVARCHAR(150),
-    IN _ProviderId NVARCHAR(150),
-    IN _QueueId NVARCHAR(150),
-    IN _MessageId BIGINT,
-    IN _MaxAttempts INT,
-    IN _RemovalTimeout INT
+    IN _ServiceId VARCHAR(150),
+    IN _ProviderId VARCHAR(150),
+    IN _QueueId VARCHAR(150),
+    IN _StartFromNow BOOLEAN,
+    IN _ManageTransaction BOOLEAN
 )
 BEGIN
+    DECLARE _Now DATETIME(6) DEFAULT UTC_TIMESTAMP(6);
+    DECLARE _NextMessageId BIGINT;
+    DECLARE _Checkpoint BIGINT;
+    DECLARE _OwnerEpoch BIGINT;
+    DECLARE _EarliestMessageId BIGINT;
+    DECLARE _TailMessageId BIGINT;
 
-DECLARE _Now DATETIME(6) DEFAULT UTC_TIMESTAMP(6);
-DECLARE _RemoveOn DATETIME(6) DEFAULT DATE_ADD(_Now, INTERVAL _RemovalTimeout SECOND);
+    DECLARE EXIT HANDLER FOR SQLEXCEPTION
+    BEGIN
+        IF _ManageTransaction THEN
+            ROLLBACK;
+        END IF;
+        RESIGNAL;
+    END;
 
-/* if the message can still be dequeued then attempt to mark it visible again */
-UPDATE OrleansStreamMessage
-SET
-    VisibleOn = _Now,
-    ModifiedOn = _Now
-WHERE
-    ServiceId = _ServiceId
-    AND ProviderId = _ProviderId
-    AND QueueId = _QueueId
-    AND MessageId = _MessageId
-    AND Dequeued < _MaxAttempts;
+    IF _ManageTransaction THEN
+        START TRANSACTION;
+    END IF;
 
-IF ROW_COUNT() = 0 THEN
-
-    START TRANSACTION;
-
-    /* otherwise attempt to move the message to dead letters */
-    CREATE TEMPORARY TABLE Deleted AS
-    SELECT
-        *
-    FROM
-        OrleansStreamMessage
-    WHERE
-        ServiceId = _ServiceId
-        AND ProviderId = _ProviderId
-        AND QueueId = _QueueId
-        AND MessageId = _MessageId;
-
-    DELETE FROM OrleansStreamMessage
-    WHERE
-        ServiceId = _ServiceId
-        AND ProviderId = _ProviderId
-        AND QueueId = _QueueId
-        AND MessageId = _MessageId;
-
-    INSERT INTO OrleansStreamDeadLetter
+    INSERT INTO OrleansStreamPartition
     (
         ServiceId,
         ProviderId,
         QueueId,
-        MessageId,
-        Dequeued,
-        VisibleOn,
-        ExpiresOn,
+        NextMessageId,
+        Checkpoint,
+        OwnerEpoch,
+        CleanupOn,
         CreatedOn,
-        ModifiedOn,
-        DeadOn,
-        RemoveOn,
-        Payload
+        ModifiedOn
     )
+    VALUES
+    (
+        _ServiceId,
+        _ProviderId,
+        _QueueId,
+        1,
+        NULL,
+        0,
+        _Now,
+        _Now,
+        _Now
+    )
+    ON DUPLICATE KEY UPDATE NextMessageId = NextMessageId;
+
+    SELECT NextMessageId, Checkpoint
+    INTO _NextMessageId, _Checkpoint
+    FROM OrleansStreamPartition
+    WHERE ServiceId = _ServiceId
+        AND ProviderId = _ProviderId
+        AND QueueId = _QueueId
+    FOR UPDATE;
+
+    SELECT MIN(MessageId), MAX(MessageId)
+    INTO _EarliestMessageId, _TailMessageId
+    FROM OrleansStreamMessage
+    WHERE ServiceId = _ServiceId
+        AND ProviderId = _ProviderId
+        AND QueueId = _QueueId;
+
+    IF _Checkpoint IS NULL THEN
+        SET _Checkpoint = CASE
+            WHEN _StartFromNow THEN _NextMessageId - 1
+            ELSE COALESCE(_EarliestMessageId - 1, _NextMessageId - 1)
+        END;
+    END IF;
+
+    UPDATE OrleansStreamPartition
+    SET
+        Checkpoint = _Checkpoint,
+        OwnerEpoch = OwnerEpoch + 1,
+        ModifiedOn = _Now
+    WHERE ServiceId = _ServiceId
+        AND ProviderId = _ProviderId
+        AND QueueId = _QueueId;
+
+    SELECT OwnerEpoch
+    INTO _OwnerEpoch
+    FROM OrleansStreamPartition
+    WHERE ServiceId = _ServiceId
+        AND ProviderId = _ProviderId
+        AND QueueId = _QueueId;
+
+    IF _ManageTransaction THEN
+        COMMIT;
+    END IF;
+
     SELECT
-        ServiceId,
-        ProviderId,
-        QueueId,
-        MessageId,
-        Dequeued,
-        VisibleOn,
-        ExpiresOn,
-        CreatedOn,
-        ModifiedOn,
-        _Now AS DeadOn,
-        _RemoveOn AS RemoveOn,
-        Payload
-    FROM
-        Deleted;
+        _ServiceId AS ServiceId,
+        _ProviderId AS ProviderId,
+        _QueueId AS QueueId,
+        _OwnerEpoch AS OwnerEpoch,
+        _Checkpoint AS Checkpoint,
+        _EarliestMessageId AS EarliestMessageId,
+        _TailMessageId AS TailMessageId;
+END$$
 
-    COMMIT;
-
-END IF;
-
-END;
-
-DELIMITER $$
-
-INSERT INTO OrleansQuery
+CREATE PROCEDURE AdvanceStreamCheckpoint
 (
-	QueryKey,
-	QueryText
-)
-SELECT
-	'FailStreamMessageKey',
-	'CALL FailStreamMessage(@ServiceId, @ProviderId, @QueueId, @MessageId, @MaxAttempts, @RemovalTimeout)'
-
-DELIMITER $$
-
-CREATE PROCEDURE EvictStreamMessages
-(
-	IN _ServiceId NVARCHAR(150),
-    IN _ProviderId NVARCHAR(150),
-	IN _QueueId NVARCHAR(150),
-	IN _BatchSize INT,
-	IN _MaxAttempts INT,
-	IN _RemovalTimeout INT
+    IN _ServiceId VARCHAR(150),
+    IN _ProviderId VARCHAR(150),
+    IN _QueueId VARCHAR(150),
+    IN _OwnerEpoch BIGINT,
+    IN _Checkpoint BIGINT,
+    IN _ManageTransaction BOOLEAN
 )
 BEGIN
+    DECLARE _CurrentOwnerEpoch BIGINT;
+    DECLARE _CurrentCheckpoint BIGINT;
+    DECLARE _Updated BOOLEAN DEFAULT FALSE;
 
-DECLARE _Now DATETIME(6) DEFAULT UTC_TIMESTAMP();
-DECLARE _RemoveOn DATETIME(6) DEFAULT DATE_ADD(_Now, INTERVAL _RemovalTimeout SECOND);
+    DECLARE EXIT HANDLER FOR SQLEXCEPTION
+    BEGIN
+        IF _ManageTransaction THEN
+            ROLLBACK;
+        END IF;
+        RESIGNAL;
+    END;
 
-START TRANSACTION;
+    IF _ManageTransaction THEN
+        START TRANSACTION;
+    END IF;
 
-/* elect the batch of messages to move and lock them in order */
-CREATE TEMPORARY TABLE _Batch AS
-SELECT
-    ServiceId,
-    ProviderId,
-    QueueId,
-    MessageId
-FROM
-    OrleansStreamMessage
-WHERE
-    ServiceId = _ServiceId
-    AND ProviderId = _ProviderId
-    AND QueueId = _QueueId
-    AND
-	(
-		-- a message is no longer dequeueable if the last attempt timed out
-		(Dequeued >= _MaxAttempts AND VisibleOn <= _Now)
-		OR
-		-- a message is no longer dequeueable if it has expired regardless
-		(ExpiresOn <= _Now)
-	)
-ORDER BY
-    ServiceId,
-    ProviderId,
-    QueueId,
-    MessageId
-LIMIT _BatchSize
-FOR UPDATE SKIP LOCKED;
+    UPDATE OrleansStreamPartition
+    SET
+        Checkpoint = _Checkpoint,
+        ModifiedOn = UTC_TIMESTAMP(6)
+    WHERE ServiceId = _ServiceId
+        AND ProviderId = _ProviderId
+        AND QueueId = _QueueId
+        AND OwnerEpoch = _OwnerEpoch
+        AND (Checkpoint IS NULL OR Checkpoint < _Checkpoint)
+        AND _Checkpoint < NextMessageId;
 
-/* copy the messages to dead letters */
-INSERT INTO OrleansStreamDeadLetter
+    SET _Updated = ROW_COUNT() = 1;
+
+    SELECT OwnerEpoch, Checkpoint
+    INTO _CurrentOwnerEpoch, _CurrentCheckpoint
+    FROM OrleansStreamPartition
+    WHERE ServiceId = _ServiceId
+        AND ProviderId = _ProviderId
+        AND QueueId = _QueueId
+    FOR UPDATE;
+
+    IF _ManageTransaction THEN
+        COMMIT;
+    END IF;
+
+    SELECT
+        _ServiceId AS ServiceId,
+        _ProviderId AS ProviderId,
+        _QueueId AS QueueId,
+        _CurrentOwnerEpoch AS OwnerEpoch,
+        _CurrentCheckpoint AS Checkpoint,
+        _Updated AS Updated
+    FROM DUAL
+    WHERE _CurrentOwnerEpoch IS NOT NULL;
+END$$
+
+CREATE PROCEDURE CleanupStreamMessages
 (
-    ServiceId,
-    ProviderId,
-    QueueId,
-    MessageId,
-    Dequeued,
-    VisibleOn,
-    ExpiresOn,
-    CreatedOn,
-    ModifiedOn,
-    DeadOn,
-    RemoveOn,
-    Payload
-)
-SELECT
-    M.ServiceId,
-    M.ProviderId,
-    M.QueueId,
-    M.MessageId,
-    M.Dequeued,
-    M.VisibleOn,
-    M.ExpiresOn,
-    M.CreatedOn,
-    M.ModifiedOn,
-    _Now,
-    _RemoveOn,
-    M.Payload
-FROM
-    OrleansStreamMessage AS M
-    INNER JOIN _Batch AS B
-        ON M.ServiceId = B.ServiceId
-        AND M.ProviderId = B.ProviderId
-        AND M.QueueId = B.QueueId
-        AND M.MessageId = B.MessageId;
-
-/* delete elected messages from the source now */
-DELETE M
-FROM OrleansStreamMessage AS M
-INNER JOIN _Batch AS B
-    ON M.ServiceId = B.ServiceId
-    AND M.ProviderId = B.ProviderId
-    AND M.QueueId = B.QueueId
-    AND M.MessageId = B.MessageId;
-
-DROP TEMPORARY TABLE _Batch;
-
-COMMIT;
-
-END;
-
-DELIMITER $$
-
-INSERT INTO OrleansQuery
-(
-	QueryKey,
-	QueryText
-)
-SELECT
-	'EvictStreamMessagesKey',
-	'CALL EvictStreamMessages(@ServiceId, @ProviderId, @QueueId, @BatchSize, @MaxAttempts, @RemovalTimeout)'
-;
-
-DELIMITER $$
-
-CREATE PROCEDURE EvictStreamDeadLetters
-(
-	_ServiceId NVARCHAR(150),
-    _ProviderId NVARCHAR(150),
-	_QueueId NVARCHAR(150),
-	_BatchSize INT
+    IN _ServiceId VARCHAR(150),
+    IN _ProviderId VARCHAR(150),
+    IN _QueueId VARCHAR(150),
+    IN _RetentionPeriodSeconds INT,
+    IN _MaximumRetentionPeriodSeconds INT,
+    IN _CleanupIntervalSeconds INT,
+    IN _CleanupBatchSize INT,
+    IN _ManageTransaction BOOLEAN
 )
 BEGIN
+    DECLARE _Now DATETIME(6) DEFAULT UTC_TIMESTAMP(6);
+    DECLARE _Checkpoint BIGINT;
+    DECLARE _CleanupOn DATETIME(6);
+    DECLARE _DeletedCount INT DEFAULT 0;
+    DECLARE _DeletedThroughMessageId BIGINT;
+    DECLARE _HardDeletedCount INT DEFAULT 0;
+    DECLARE _HardDeletedFromMessageId BIGINT;
+    DECLARE _HardDeletedThroughMessageId BIGINT;
+    DECLARE _EarliestMessageId BIGINT;
+    DECLARE _TailMessageId BIGINT;
+    DECLARE _PartitionExists BOOLEAN DEFAULT FALSE;
 
-DECLARE _Now DATETIME(6) DEFAULT UTC_TIMESTAMP();
+    DECLARE EXIT HANDLER FOR SQLEXCEPTION
+    BEGIN
+        IF _ManageTransaction THEN
+            ROLLBACK;
+        END IF;
+        RESIGNAL;
+    END;
 
-/* elect the batch of messages to remove */
-CREATE TEMPORARY TABLE _Batch AS
-SELECT
-    ServiceId,
-    ProviderId,
-    QueueId,
-    MessageId
-FROM
-    OrleansStreamDeadLetter
-WHERE
-    ServiceId = _ServiceId
-    AND ProviderId = _ProviderId
-    AND QueueId = _QueueId
-    AND RemoveOn <= _Now
-ORDER BY
-    ServiceId,
-    ProviderId,
-    QueueId,
-    MessageId
-LIMIT _BatchSize
-FOR UPDATE SKIP LOCKED;
+    IF _ManageTransaction THEN
+        START TRANSACTION;
+    END IF;
 
-/* now delete the locked messages */
-DELETE M
-FROM OrleansStreamDeadLetter AS M
-INNER JOIN _Batch AS B
-    ON M.ServiceId = B.ServiceId
-    AND M.ProviderId = B.ProviderId
-    AND M.QueueId = B.QueueId
-    AND M.MessageId = B.MessageId;
+    SELECT TRUE, Checkpoint, CleanupOn
+    INTO _PartitionExists, _Checkpoint, _CleanupOn
+    FROM OrleansStreamPartition
+    WHERE ServiceId = _ServiceId
+        AND ProviderId = _ProviderId
+        AND QueueId = _QueueId
+    FOR UPDATE;
 
-DROP TEMPORARY TABLE _Batch;
+    IF NOT _PartitionExists OR _CleanupOn > _Now THEN
+        SELECT MIN(MessageId), MAX(MessageId)
+        INTO _EarliestMessageId, _TailMessageId
+        FROM OrleansStreamMessage
+        WHERE ServiceId = _ServiceId
+            AND ProviderId = _ProviderId
+            AND QueueId = _QueueId;
 
-END;
+        IF _ManageTransaction THEN
+            COMMIT;
+        END IF;
 
-DELIMITER $$
+        SELECT
+            FALSE AS Ran,
+            0 AS DeletedCount,
+            NULL AS DeletedThroughMessageId,
+            0 AS HardDeletedCount,
+            NULL AS HardDeletedFromMessageId,
+            NULL AS HardDeletedThroughMessageId,
+            _Checkpoint AS Checkpoint,
+            _EarliestMessageId AS EarliestMessageId,
+            _TailMessageId AS TailMessageId;
+    ELSE
+        UPDATE OrleansStreamPartition
+        SET
+            CleanupOn = DATE_ADD(_Now, INTERVAL _CleanupIntervalSeconds SECOND),
+            ModifiedOn = _Now
+        WHERE ServiceId = _ServiceId
+            AND ProviderId = _ProviderId
+            AND QueueId = _QueueId;
 
-INSERT INTO OrleansQuery
-(
-	QueryKey,
-	QueryText
-)
-SELECT
-	'EvictStreamDeadLettersKey',
-	'CALL EvictStreamDeadLetters(@ServiceId, @ProviderId, @QueueId, @BatchSize)'
-;
+        DROP TEMPORARY TABLE IF EXISTS OrleansStreamCleanupBatch;
+        CREATE TEMPORARY TABLE OrleansStreamCleanupBatch
+        (
+            MessageId BIGINT NOT NULL,
+            PRIMARY KEY (MessageId)
+        );
 
-DELIMITER $$
+        INSERT INTO OrleansStreamCleanupBatch (MessageId)
+        SELECT MessageId
+        FROM OrleansStreamMessage
+        WHERE ServiceId = _ServiceId
+            AND ProviderId = _ProviderId
+            AND QueueId = _QueueId
+            AND
+            (
+                (
+                    _Checkpoint IS NOT NULL
+                    AND MessageId <= _Checkpoint
+                    AND CreatedOn < DATE_SUB(_Now, INTERVAL _RetentionPeriodSeconds SECOND)
+                )
+                OR
+                (
+                    _MaximumRetentionPeriodSeconds IS NOT NULL
+                    AND CreatedOn < DATE_SUB(_Now, INTERVAL _MaximumRetentionPeriodSeconds SECOND)
+                )
+            )
+        ORDER BY MessageId
+        LIMIT _CleanupBatchSize
+        FOR UPDATE SKIP LOCKED;
+
+        SELECT
+            COUNT(*),
+            MAX(MessageId),
+            COALESCE(SUM(_Checkpoint IS NULL OR MessageId > _Checkpoint), 0),
+            MIN(CASE WHEN _Checkpoint IS NULL OR MessageId > _Checkpoint THEN MessageId END),
+            MAX(CASE WHEN _Checkpoint IS NULL OR MessageId > _Checkpoint THEN MessageId END)
+        INTO
+            _DeletedCount,
+            _DeletedThroughMessageId,
+            _HardDeletedCount,
+            _HardDeletedFromMessageId,
+            _HardDeletedThroughMessageId
+        FROM OrleansStreamCleanupBatch;
+
+        DELETE M
+        FROM OrleansStreamMessage AS M
+        INNER JOIN OrleansStreamCleanupBatch AS B
+            ON B.MessageId = M.MessageId
+        WHERE M.ServiceId = _ServiceId
+            AND M.ProviderId = _ProviderId
+            AND M.QueueId = _QueueId;
+
+        SELECT MIN(MessageId), MAX(MessageId)
+        INTO _EarliestMessageId, _TailMessageId
+        FROM OrleansStreamMessage
+        WHERE ServiceId = _ServiceId
+            AND ProviderId = _ProviderId
+            AND QueueId = _QueueId;
+
+        DROP TEMPORARY TABLE OrleansStreamCleanupBatch;
+
+        IF _ManageTransaction THEN
+            COMMIT;
+        END IF;
+
+        SELECT
+            TRUE AS Ran,
+            _DeletedCount AS DeletedCount,
+            _DeletedThroughMessageId AS DeletedThroughMessageId,
+            _HardDeletedCount AS HardDeletedCount,
+            _HardDeletedFromMessageId AS HardDeletedFromMessageId,
+            _HardDeletedThroughMessageId AS HardDeletedThroughMessageId,
+            _Checkpoint AS Checkpoint,
+            _EarliestMessageId AS EarliestMessageId,
+            _TailMessageId AS TailMessageId;
+    END IF;
+END$$
+
+DELIMITER ;
+
+INSERT INTO OrleansQuery (QueryKey, QueryText)
+VALUES
+    ('StreamSchemaVersionKey', '2'),
+    ('AppendStreamMessageKey', 'CALL AppendStreamMessage(@ServiceId, @ProviderId, @QueueId, @StreamIdBytes, @StreamNamespaceLength, @Payload, TRUE)'),
+    ('AcquireStreamPartitionKey', 'CALL AcquireStreamPartition(@ServiceId, @ProviderId, @QueueId, @StartFromNow, TRUE)'),
+    ('ReadStreamMessagesKey', 'SELECT ServiceId, ProviderId, QueueId, MessageId, StreamIdBytes, StreamNamespaceLength, CreatedOn, Payload FROM OrleansStreamMessage WHERE ServiceId = @ServiceId AND ProviderId = @ProviderId AND QueueId = @QueueId AND MessageId > @AfterMessageId ORDER BY MessageId LIMIT @MaxCount'),
+    ('AdvanceStreamCheckpointKey', 'CALL AdvanceStreamCheckpoint(@ServiceId, @ProviderId, @QueueId, @OwnerEpoch, @Checkpoint, TRUE)'),
+    ('GetStreamPartitionBoundsKey', 'SELECT P.ServiceId, P.ProviderId, P.QueueId, P.OwnerEpoch, P.Checkpoint, MIN(M.MessageId) AS EarliestMessageId, MAX(M.MessageId) AS TailMessageId FROM OrleansStreamPartition AS P LEFT JOIN OrleansStreamMessage AS M ON M.ServiceId = P.ServiceId AND M.ProviderId = P.ProviderId AND M.QueueId = P.QueueId WHERE P.ServiceId = @ServiceId AND P.ProviderId = @ProviderId AND P.QueueId = @QueueId GROUP BY P.ServiceId, P.ProviderId, P.QueueId, P.OwnerEpoch, P.Checkpoint'),
+    ('CleanupStreamMessagesKey', 'CALL CleanupStreamMessages(@ServiceId, @ProviderId, @QueueId, @RetentionPeriodSeconds, @MaximumRetentionPeriodSeconds, @CleanupIntervalSeconds, @CleanupBatchSize, TRUE)');

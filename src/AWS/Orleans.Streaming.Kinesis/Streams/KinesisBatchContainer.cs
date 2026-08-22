@@ -21,6 +21,12 @@ namespace Orleans.Streaming.Kinesis
         [NonSerialized]
         private Body? _payload;
 
+        [NonSerialized]
+        private StreamId _streamId;
+
+        [NonSerialized]
+        private bool _hasStreamId;
+
         [JsonIgnore]
         [field: NonSerialized]
         internal Serializer<KinesisBatchContainer.Body> Serializer { get; set; } = null!;
@@ -37,6 +43,20 @@ namespace Orleans.Streaming.Kinesis
             Token = new KinesisSequenceToken(record.SequenceNumber, sequenceId, 0);
         }
 
+        private KinesisBatchContainer(
+            byte[] rawRecord,
+            Serializer<KinesisBatchContainer.Body> serializer,
+            StreamId streamId,
+            string shardSequence,
+            long sequenceId)
+        {
+            Serializer = serializer;
+            _rawRecord = rawRecord;
+            _streamId = streamId;
+            _hasStreamId = true;
+            Token = new KinesisSequenceToken(shardSequence, sequenceId, 0);
+        }
+
         [GeneratedActivatorConstructor]
         internal KinesisBatchContainer(Serializer<KinesisBatchContainer.Body> serializer)
         {
@@ -46,7 +66,7 @@ namespace Orleans.Streaming.Kinesis
         /// <summary>
         /// Stream identifier for the stream this batch is part of.
         /// </summary>
-        public StreamId StreamId => GetPayload().StreamId;
+        public StreamId StreamId => _hasStreamId ? _streamId : GetPayload().StreamId;
 
         /// <summary>
         /// Stream Sequence Token for the start of this batch.
@@ -81,7 +101,7 @@ namespace Orleans.Streaming.Kinesis
         }
 
         public int CompareTo(KinesisBatchContainer? other)
-            => other is null ? 1 : Token.SequenceNumber.CompareTo(other.SequenceToken.SequenceNumber);
+            => other is null ? 1 : Token.CompareTo(other.Token);
 
         [Serializable]
         [GenerateSerializer]
@@ -113,5 +133,13 @@ namespace Orleans.Streaming.Kinesis
         {
             return new KinesisBatchContainer(record, serializer, sequenceId);
         }
+
+        internal static KinesisBatchContainer FromCachedRecord(
+            Serializer<KinesisBatchContainer.Body> serializer,
+            StreamId streamId,
+            byte[] rawRecord,
+            string shardSequence,
+            long sequenceId)
+            => new(rawRecord, serializer, streamId, shardSequence, sequenceId);
     }
 }

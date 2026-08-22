@@ -42,6 +42,7 @@ namespace Orleans.Streams
         private IQueueAdapterReceiver? receiver;
         private DateTime lastTimeCleanedPubSubCache;
         private IGrainTimer? timer;
+        private ITimer? deliveryProgressTimer;
 
         private Task? receiverInitTask;
         private Task _activePumpTask = Task.CompletedTask;
@@ -52,6 +53,7 @@ namespace Orleans.Streams
         {
             Task<bool> ReadFromQueue(QueueId myQueueId, IQueueAdapterReceiver? receiver, int maxCacheAddCount);
             Task RegisterStream(QualifiedStreamId streamId, StreamSequenceToken firstToken, DateTime now);
+            Task<bool> DoHandshakeWithConsumer(StreamConsumerData consumerData, StreamSequenceToken? cacheToken);
             Task<IReadOnlyDictionary<QualifiedStreamId, StreamConsumerCollection>> GetPubSubCache();
             Task RunQueuePump(QueueId myQueueId, CancellationToken cancellationToken);
             Task Shutdown();
@@ -82,6 +84,14 @@ namespace Orleans.Streams
             this.streamFilter = streamFilter;
             pubSubCache = new Dictionary<QualifiedStreamId, StreamConsumerCollection>();
             this.options = options;
+            if (options.DeliveryProgressUpdateInterval <= TimeSpan.Zero)
+            {
+                throw new ArgumentOutOfRangeException(
+                    nameof(options.DeliveryProgressUpdateInterval),
+                    options.DeliveryProgressUpdateInterval,
+                    "The delivery progress update interval must be greater than zero.");
+            }
+
             this.queueAdapter = queueAdapter ?? throw new ArgumentNullException(nameof(queueAdapter));
             this.streamFailureHandler = streamFailureHandler ?? throw new ArgumentNullException(nameof(streamFailureHandler));
             this.queueAdapterCache = queueAdapterCache;
@@ -111,6 +121,9 @@ namespace Orleans.Streams
 
                 return Task.CompletedTask;
             }).Unwrap();
+
+        Task<bool> ITestAccessor.DoHandshakeWithConsumer(StreamConsumerData consumerData, StreamSequenceToken? cacheToken)
+            => this.RunOrQueueTaskResult(() => DoHandshakeWithConsumer(consumerData, cacheToken)).Unwrap();
 
         Task<IReadOnlyDictionary<QualifiedStreamId, StreamConsumerCollection>> ITestAccessor.GetPubSubCache()
             => this.RunOrQueueTaskResult(() => (IReadOnlyDictionary<QualifiedStreamId, StreamConsumerCollection>)new Dictionary<QualifiedStreamId, StreamConsumerCollection>(pubSubCache));
@@ -182,6 +195,11 @@ namespace Orleans.Streams
             // Even if the receiver failed to initialize, treat it as OK and start pumping it. It's receiver responsibility to retry initialization.
             var randomTimerOffset = RandomTimeSpan.Next(this.options.GetQueueMsgsTimerPeriod);
             timer = RegisterGrainTimer(RunQueuePump, QueueId, randomTimerOffset, this.options.GetQueueMsgsTimerPeriod);
+            deliveryProgressTimer = _timeProvider.CreateTimer(
+                static state => ((PersistentStreamPullingAgent)state!).ScheduleDeliveryProgressUpdate(),
+                this,
+                this.options.DeliveryProgressUpdateInterval,
+                this.options.DeliveryProgressUpdateInterval);
             StreamingEvents.EmitPullingAgentStarted(streamProviderName, Silo, QueueId, randomTimerOffset, this.options.GetQueueMsgsTimerPeriod);
 
             _streamInstruments?.RegisterPersistentStreamPubSubCacheSizeObserve(() => new Measurement<int>(pubSubCache.Count, new KeyValuePair<string, object?>("name", StatisticUniquePostfix)));
@@ -211,6 +229,9 @@ namespace Orleans.Streams
 
             var asyncTimer = timer;
             timer = null;
+            var localDeliveryProgressTimer = deliveryProgressTimer;
+            deliveryProgressTimer = null;
+            localDeliveryProgressTimer?.Dispose();
             if (asyncTimer is not null)
             {
                 asyncTimer.Dispose();
@@ -325,8 +346,6 @@ namespace Orleans.Streams
 
             if (await DoHandshakeWithConsumer(data, cacheToken))
             {
-                var startToken = data.LastToken?.Token ?? cacheToken ?? data.PendingStartToken;
-                data.LastProcessedToken = startToken;
                 data.PendingStartToken = null;
                 data.IsRegistered = true;
                 StreamingEvents.EmitSubscriptionAttached(streamProviderName, streamId.StreamId, subscriptionId.Guid, streamConsumer, Silo);
@@ -342,6 +361,7 @@ namespace Orleans.Streams
             if (IsShutdown) return false;
 
             StreamHandshakeToken? requestedHandshakeToken = null;
+            var effectiveStartToken = cacheToken ?? consumerData.PendingStartToken;
             // if not cache, then we can't get cursor and there is no reason to ask consumer for token.
             if (queueCache != null)
             {
@@ -359,6 +379,7 @@ namespace Orleans.Streams
                     var requestedToken = requestedHandshakeToken?.Token;
                     if (requestedToken != null)
                     {
+                        effectiveStartToken = requestedToken;
                         consumerData.SafeDisposeCursor(logger);
                         try
                         {
@@ -368,6 +389,7 @@ namespace Orleans.Streams
                         {
                             // A cold stream's triggering batch is the receiver's first available
                             // message, so resume there if the consumer's prior token was evicted.
+                            effectiveStartToken = cacheToken;
                             consumerData.Cursor = queueCache.GetCacheCursor(consumerData.StreamId, cacheToken);
                         }
                     }
@@ -398,13 +420,17 @@ namespace Orleans.Streams
                 try
                 {
                     var registrationToken = cacheToken ?? consumerData.PendingStartToken;
+                    effectiveStartToken = registrationToken;
                     consumerData.Cursor = queueCache.GetCacheCursor(consumerData.StreamId, registrationToken);
                 }
                 catch (Exception)
                 {
                     consumerData.Cursor = queueCache.GetCacheCursor(consumerData.StreamId, null); // just in case last GetCacheCursor failed.
+                    effectiveStartToken = null;
                 }
             }
+
+            consumerData.LastProcessedToken = effectiveStartToken ?? consumerData.LastProcessedToken;
             return true;
         }
 
@@ -645,16 +671,23 @@ namespace Orleans.Streams
         }
 
         /// <summary>
-        /// Computes delivery progress before shutdown so the queue can persist the latest handoff checkpoint.
+        /// Computes delivery progress so the queue can persist the latest handoff checkpoint.
         /// </summary>
         private void NotifyDeliveryProgress()
         {
             if (queueCache is null) return;
 
             var utcNow = _timeProvider.GetUtcNow().UtcDateTime;
-            if (TryGetDeliveryProgress(out var earliest))
+            try
             {
-                queueCache.UpdateDeliveryProgress(earliest, utcNow);
+                if (TryGetDeliveryProgress(out var earliest))
+                {
+                    queueCache.UpdateDeliveryProgress(earliest, utcNow);
+                }
+            }
+            catch (ArgumentException exception)
+            {
+                LogWarningDeliveryProgressComparison(new(QueueId), exception);
             }
         }
 
@@ -692,11 +725,25 @@ namespace Orleans.Streams
             return true;
         }
 
-        private static bool IsBefore(StreamSequenceToken current, StreamSequenceToken other)
+        private void ScheduleDeliveryProgressUpdate()
         {
-            var difference = current.SequenceNumber.CompareTo(other.SequenceNumber);
-            return difference < 0 || difference == 0 && current.EventIndex < other.EventIndex;
+            this.RunOrQueueTask(() =>
+                {
+                    if (!IsShutdown && deliveryProgressTimer is not null)
+                    {
+                        NotifyDeliveryProgress();
+                    }
+
+                    return Task.CompletedTask;
+                })
+                .LogException(
+                    logger,
+                    ErrorCode.PersistentStreamPullingAgent_28,
+                    $"Failed to update delivery progress for queue {QueueId}.")
+                .Ignore();
         }
+
+        private static bool IsBefore(StreamSequenceToken current, StreamSequenceToken other) => current.CompareTo(other) < 0;
 
         private void RegisterStream(QualifiedStreamId streamId, StreamSequenceToken firstToken, DateTime now)
         {
@@ -1289,6 +1336,13 @@ namespace Orleans.Streams
             Message = "Exception calling MessagesDeliveredAsync on queue {MyQueueId}. Ignoring."
         )]
         private partial void LogWarningMessagesDeliveredAsync(QueueIdLogRecord myQueueId, Exception exception);
+
+        [LoggerMessage(
+            Level = LogLevel.Warning,
+            EventId = (int)ErrorCode.PersistentStreamPullingAgent_28,
+            Message = "Unable to compare delivery progress tokens for queue {QueueId}. The checkpoint will not advance."
+        )]
+        private partial void LogWarningDeliveryProgressComparison(QueueIdLogRecord queueId, Exception exception);
 
         [LoggerMessage(
             Level = LogLevel.Information,

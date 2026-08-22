@@ -72,16 +72,19 @@ namespace Orleans.GrainDirectory.AzureStorage
         /// Connects to, or creates and initializes a new Azure table if it does not already exist.
         /// </summary>
         /// <returns>Completion promise for this operation.</returns>
-        public async Task InitTableAsync()
+        public async Task InitTableAsync(CancellationToken cancellationToken = default)
         {
             const string operation = "InitTable";
             var startTime = DateTime.UtcNow;
 
             try
             {
-                TableServiceClient tableCreationClient = await GetCloudTableCreationClientAsync();
+                cancellationToken.ThrowIfCancellationRequested();
+                TableServiceClient tableCreationClient = await GetCloudTableCreationClientAsync()
+                    .AsTask()
+                    .WaitAsync(cancellationToken);
                 var table = tableCreationClient.GetTableClient(TableName);
-                var response = await table.CreateIfNotExistsAsync();
+                var response = await table.CreateIfNotExistsAsync(cancellationToken);
                 var alreadyExisted = response.GetRawResponse().Status == (int)HttpStatusCode.Conflict;
 
                 LogInfoTableCreation(Logger, alreadyExisted ? "Attached to" : "Created", TableName);
@@ -211,7 +214,9 @@ namespace Orleans.GrainDirectory.AzureStorage
         /// </summary>
         /// <param name="data">Data to be inserted or replaced in the table.</param>
         /// <returns>Value promise with new Etag for this data entry after completing this storage operation.</returns>
-        public async Task<(bool isSuccess, string? eTag)> InsertTableEntryAsync(T data)
+        public async Task<(bool isSuccess, string? eTag)> InsertTableEntryAsync(
+            T data,
+            CancellationToken cancellationToken = default)
         {
             const string operation = "InsertTableEntry";
             var startTime = DateTime.UtcNow;
@@ -220,7 +225,7 @@ namespace Orleans.GrainDirectory.AzureStorage
             {
                 try
                 {
-                    var opResult = await Table.AddEntityAsync(data);
+                    var opResult = await Table.AddEntityAsync(data, cancellationToken);
                     return (true, opResult.Headers.ETag.GetValueOrDefault().ToString());
                 }
                 catch (RequestFailedException storageException) when (storageException.Status == (int)HttpStatusCode.Conflict)
@@ -236,6 +241,40 @@ namespace Orleans.GrainDirectory.AzureStorage
             finally
             {
                 CheckAlertSlowAccess(startTime, operation);
+            }
+        }
+
+        /// <summary>
+        /// Conditionally replaces a data entry using an ETag.
+        /// </summary>
+        /// <param name="data">The replacement data.</param>
+        /// <param name="dataEtag">The expected ETag.</param>
+        /// <param name="cancellationToken">The cancellation token.</param>
+        /// <returns>The update result and the new ETag when successful.</returns>
+        public async Task<(bool isSuccess, string? eTag)> TryUpdateTableEntryAsync(
+            T data,
+            string dataEtag,
+            CancellationToken cancellationToken = default)
+        {
+            ArgumentNullException.ThrowIfNull(data);
+            ArgumentNullException.ThrowIfNull(dataEtag);
+
+            data.ETag = new ETag(dataEtag);
+            try
+            {
+                var response = await Table.UpdateEntityAsync(
+                    data,
+                    data.ETag,
+                    TableUpdateMode.Replace,
+                    cancellationToken);
+                return (true, response.Headers.ETag.GetValueOrDefault().ToString());
+            }
+            catch (RequestFailedException exception)
+                when (exception.Status is (int)HttpStatusCode.NotFound
+                    or (int)HttpStatusCode.Conflict
+                    or (int)HttpStatusCode.PreconditionFailed)
+            {
+                return (false, null);
             }
         }
 

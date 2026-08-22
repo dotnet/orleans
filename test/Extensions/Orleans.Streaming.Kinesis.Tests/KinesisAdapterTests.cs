@@ -101,6 +101,7 @@ namespace Orleans.Streaming.Kinesis.Tests
 
             int receivedBatches = 0;
             var streamsPerQueue = new ConcurrentDictionary<QueueId, HashSet<StreamId>>();
+            var firstTokens = new ConcurrentDictionary<(QueueId QueueId, StreamId StreamId), StreamSequenceToken>();
 
             // send events
             List<object> events = CreateEvents(NumMessagesPerBatch);
@@ -119,11 +120,18 @@ namespace Orleans.Streaming.Kinesis.Tests
                 foreach (var (queueId, receiver) in receivers)
                 {
                     var messages = (await receiver.GetQueueMessagesAsync(10, CancellationToken.None)).ToArray();
-                    foreach (var message in messages.Cast<KinesisBatchContainer>())
+                    foreach (var notification in messages)
                     {
+                        using var cursor = caches[queueId].GetCacheCursor(
+                            notification.StreamId,
+                            notification.SequenceToken);
+                        Assert.True(cursor.MoveNext());
+                        var message = Assert.IsType<KinesisBatchContainer>(cursor.GetCurrent(out var exception));
+                        Assert.Null(exception);
                         output.WriteLine($"Queue {queueId} received message on stream {message.StreamId}");
                         Assert.Equal(NumMessagesPerBatch / 2, message.GetEvents<int>().Count());
                         Assert.Equal(NumMessagesPerBatch / 2, message.GetEvents<string>().Count());
+                        firstTokens.TryAdd((queueId, message.StreamId), message.SequenceToken);
 
                         streamsPerQueue.AddOrUpdate(
                             queueId,
@@ -146,7 +154,6 @@ namespace Orleans.Streaming.Kinesis.Tests
             Assert.Equal(NumBatches, receivedBatches);
 
             // check to see if all the events are in the cache and we can enumerate through them
-            StreamSequenceToken firstInCache = new EventSequenceTokenV2(0);
             foreach (KeyValuePair<QueueId, HashSet<StreamId>> kvp in streamsPerQueue)
             {
                 var receiver = receivers[kvp.Key];
@@ -154,6 +161,7 @@ namespace Orleans.Streaming.Kinesis.Tests
 
                 foreach (StreamId streamGuid in kvp.Value)
                 {
+                    var firstInCache = firstTokens[(kvp.Key, streamGuid)];
                     // read all messages in cache for stream
                     IQueueCacheCursor cursor = qCache.GetCacheCursor(streamGuid, firstInCache);
                     int messageCount = 0;

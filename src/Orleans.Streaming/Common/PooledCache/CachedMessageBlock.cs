@@ -181,6 +181,28 @@ namespace Orleans.Providers.Streams.Common
         }
 
         /// <summary>
+        /// Gets the index of the first message in this block that has a sequence token at or before the provided token.
+        /// </summary>
+        /// <param name="token">The sequence token.</param>
+        /// <param name="dataAdapter">The data adapter used to compare provider-specific positions.</param>
+        /// <returns>The index of the first message in this block that has a sequence token equal to or before the provided token.</returns>
+        public int GetIndexOfFirstMessageLessThanOrEqualTo(
+            StreamSequenceToken token,
+            ICacheDataAdapter dataAdapter)
+        {
+            ArgumentNullException.ThrowIfNull(dataAdapter);
+            for (int i = writeIndex - 1; i >= readIndex; i--)
+            {
+                if (dataAdapter.Compare(ref cachedMessages[i], token) <= 0)
+                {
+                    return i;
+                }
+            }
+
+            throw new ArgumentOutOfRangeException(nameof(token));
+        }
+
+        /// <summary>
         /// Tries to find the first message in the block that is part of the provided stream.
         /// </summary>
         /// <param name="streamId">The stream identifier.</param>

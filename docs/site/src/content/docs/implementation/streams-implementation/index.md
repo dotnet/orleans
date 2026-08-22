@@ -97,6 +97,8 @@ flowchart TB
 
 Cache capacity is not durability. The queue remains the durable boundary, subject to the adapter's acknowledgement contract.
 
+Recoverable partitioned stream providers can compose a stream partition pipeline from <xref:Orleans.Providers.Streams.Common.RecoverableStreamReceiver%601>, a partition source, and a data adapter. The pipeline admits immutable stream records into pooled storage, reconstructs batches lazily, reconciles the earliest subscription delivery watermark, and persists a checkpoint which resumes strictly after the last fully delivered record.
+
 ## Pub-sub handshake
 
 The agent registers as a producer for each stream and obtains subscription records from stream pub-sub. It holds a pin cursor while subscription handshakes complete so cache cleanup cannot pass the requested start token. New subscription notifications update the agent's local pub-sub cache.

@@ -1,5 +1,4 @@
 using System;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
 using System.Threading.Tasks;
@@ -50,7 +49,7 @@ namespace Orleans.Streaming.EventHubs
         private readonly StreamCacheEvictionOptions cacheEvictionOptions;
         private HashRingBasedPartitionedStreamQueueMapper streamQueueMapper = null!;
         private string[] partitionIds = null!;
-        private ConcurrentDictionary<QueueId, EventHubAdapterReceiver> receivers = null!;
+        private QueueAdapterReceiverRegistry<EventHubAdapterReceiver> receivers = null!;
         private EventHubProducerClient client = null!;
 
         /// <summary>
@@ -101,7 +100,7 @@ namespace Orleans.Streaming.EventHubs
         /// Factory to create a IEventHubReceiver
         /// </summary>
         protected Func<EventHubPartitionSettings, string, ILogger, IEventHubReceiver> EventHubReceiverFactory = null!;
-        internal ConcurrentDictionary<QueueId, EventHubAdapterReceiver> EventHubReceivers => receivers;
+        internal IReadOnlyDictionary<QueueId, EventHubAdapterReceiver> EventHubReceivers => receivers.Receivers;
         internal HashRingBasedPartitionedStreamQueueMapper EventHubQueueMapper => streamQueueMapper;
 
         public EventHubAdapterFactory(
@@ -131,7 +130,7 @@ namespace Orleans.Streaming.EventHubs
 
         public virtual void Init()
         {
-            this.receivers = new ConcurrentDictionary<QueueId, EventHubAdapterReceiver>();
+            this.receivers = new QueueAdapterReceiverRegistry<EventHubAdapterReceiver>(MakeReceiver);
 
             InitEventHubClient();
 
@@ -246,7 +245,7 @@ namespace Orleans.Streaming.EventHubs
 
         private EventHubAdapterReceiver GetOrCreateReceiver(QueueId queueId)
         {
-            return this.receivers.GetOrAdd(queueId, (q, instance) => instance.MakeReceiver(q), this);
+            return this.receivers.GetOrCreate(queueId);
         }
 
         protected virtual void InitEventHubClient()

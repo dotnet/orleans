@@ -120,6 +120,16 @@ namespace Orleans.Configuration
         public static readonly TimeSpan DEFAULT_MAX_EVENT_DELIVERY_TIME = TimeSpan.FromMinutes(1);
 
         /// <summary>
+        /// Gets or sets the period between delivery progress updates.
+        /// </summary>
+        public TimeSpan DeliveryProgressUpdateInterval { get; set; } = DEFAULT_DELIVERY_PROGRESS_UPDATE_INTERVAL;
+
+        /// <summary>
+        /// The default period between delivery progress updates.
+        /// </summary>
+        public static readonly TimeSpan DEFAULT_DELIVERY_PROGRESS_UPDATE_INTERVAL = TimeSpan.FromSeconds(1);
+
+        /// <summary>
         /// Gets or sets the stream inactivity period.
         /// </summary>
         /// <value>The stream inactivity period.</value>
