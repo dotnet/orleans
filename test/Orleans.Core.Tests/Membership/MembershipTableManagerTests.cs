@@ -692,9 +692,12 @@ namespace NonSilo.Tests.Membership
             ((ILifecycleParticipant<ISiloLifecycle>)manager).Participate(this.lifecycle);
             await this.lifecycle.OnStart();
             await manager.UpdateStatus(SiloStatus.Active);
+            using var membershipEvents = new DiagnosticEventCollector(MembershipEvents.ListenerName);
 
             var victim = otherSilos.Last().SiloAddress;
+            var completion = WaitForSuspectOrKillCompletion(membershipEvents, victim);
             await manager.TryToSuspectOrKill(victim);
+            Assert.True((await completion).Success);
             Assert.Equal(SiloStatus.Dead, manager.MembershipTableSnapshot.GetSiloStatus(victim));
         }
 
@@ -774,6 +777,7 @@ namespace NonSilo.Tests.Membership
             ((ILifecycleParticipant<ISiloLifecycle>)manager).Participate(this.lifecycle);
             await this.lifecycle.OnStart();
             await manager.UpdateStatus(SiloStatus.Active);
+            using var membershipEvents = new DiagnosticEventCollector(MembershipEvents.ListenerName);
 
             // Add some suspect times. The time difference between them is larger than the recency window (DeathVoteExpirationTimeout),
             // so only one of the votes will be considered fresh, even though both will be in the future from the perspective
@@ -803,7 +807,9 @@ namespace NonSilo.Tests.Membership
             //   a) Adding our vote changes nothing, since our clock is too far behind
             //   b) The silo is not mistakenly declared dead, since the difference between the two votes is larger than DeathVoteExpirationTimeout.
             this.fatalErrorHandler.DidNotReceiveWithAnyArgs().OnFatalException(default, default, default);
+            var completion = WaitForSuspectOrKillCompletion(membershipEvents, victim);
             await manager.TryToSuspectOrKill(victim);
+            Assert.True((await completion).Success);
             this.fatalErrorHandler.DidNotReceiveWithAnyArgs().OnFatalException(default, default, default);
 
             // The victim should be alive as no second vote fell within the recency window of the latest vote.
@@ -986,13 +992,13 @@ namespace NonSilo.Tests.Membership
             return new MembershipTableSnapshot(version, entries.ToImmutableDictionary(entry => entry.SiloAddress));
         }
 
-        private static async Task<MembershipEvents.SuspectOrKillRequestCompleted> WaitForSuspectOrKillCompletion(DiagnosticEventCollector membershipEvents, SiloAddress silo)
+        private async Task<MembershipEvents.SuspectOrKillRequestCompleted> WaitForSuspectOrKillCompletion(DiagnosticEventCollector membershipEvents, SiloAddress silo)
         {
             var completions = await WaitForSuspectOrKillCompletions(membershipEvents, silo, expectedCount: 1);
             return completions[0];
         }
 
-        private static async Task<List<MembershipEvents.SuspectOrKillRequestCompleted>> WaitForSuspectOrKillCompletions(
+        private async Task<List<MembershipEvents.SuspectOrKillRequestCompleted>> WaitForSuspectOrKillCompletions(
             DiagnosticEventCollector membershipEvents,
             SiloAddress silo,
             int expectedCount)
@@ -1007,6 +1013,7 @@ namespace NonSilo.Tests.Membership
                 var diagnosticEvent = await membershipEvents.WaitForEventAsync(
                     nameof(MembershipEvents.SuspectOrKillRequestCompleted),
                     evt => evt.Payload is MembershipEvents.SuspectOrKillRequestCompleted completed
+                        && completed.ObserverSiloAddress.Equals(this.localSilo)
                         && completed.RequestType == MembershipEvents.SuspectOrKillRequestType.SuspectOrKill
                         && completed.SiloAddress.Equals(silo)
                         && !completions.Contains(completed),
