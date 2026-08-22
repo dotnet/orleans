@@ -198,8 +198,13 @@ namespace UnitTests.General
             var splitScripts = ConvertToExecutableBatches(setupScript, dataBaseName);
             foreach (var script in splitScripts)
             {
-                _ = await Storage.ExecuteAsync(script);
+                await ExecuteSetupScriptBatchAsync(script);
             }
+        }
+
+        protected virtual async Task ExecuteSetupScriptBatchAsync(string script)
+        {
+            _ = await Storage.ExecuteAsync(script);
         }
 
         /// <summary>

@@ -87,6 +87,26 @@ namespace UnitTests.General
             await readinessCommand.ExecuteNonQueryAsync();
         }
 
+        protected override async Task ExecuteSetupScriptBatchAsync(string script)
+        {
+            const int maxAttempts = 10;
+
+            for (var attempt = 1; ; attempt++)
+            {
+                try
+                {
+                    await base.ExecuteSetupScriptBatchAsync(script);
+                    return;
+                }
+                catch (SqlException exception) when (exception.Number == 18456 && exception.State == 1 && attempt < maxAttempts)
+                {
+                    using var connection = new SqlConnection(CurrentConnectionString);
+                    SqlConnection.ClearPool(connection);
+                    await Task.Delay(TimeSpan.FromMilliseconds(500));
+                }
+            }
+        }
+
         public override string CancellationTestQuery { get { return "WAITFOR DELAY '00:00:010'; SELECT 1; "; } }
 
         public override string CreateStreamTestTable { get { return "CREATE TABLE StreamingTest(Id INT NOT NULL, StreamData VARBINARY(MAX) NOT NULL);"; } }
