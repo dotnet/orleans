@@ -260,7 +260,7 @@ internal sealed class DelayedMembershipManager(MembershipTableManager inner) : I
 
     public void Participate(ISiloLifecycle lifecycle) => ((ILifecycleParticipant<ISiloLifecycle>)inner).Participate(lifecycle);
 
-    public Task ProcessGossipSnapshot(MembershipTableSnapshot snapshot, CancellationToken cancellationToken) =>
+    public Task<bool> ProcessGossipSnapshot(MembershipTableSnapshot snapshot, CancellationToken cancellationToken) =>
         ((IMembershipManager)inner).ProcessGossipSnapshot(snapshot, cancellationToken);
 
     public Task Refresh(MembershipVersion? targetVersion, CancellationToken cancellationToken) =>

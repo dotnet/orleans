@@ -113,7 +113,18 @@ namespace Orleans.Runtime
                 DeploymentLoadPublisherEvents.EmitPublished(_siloDetails.SiloAddress, myStats);
 
                 // Inform other cluster members about our refreshed statistics.
-                if (!await TryPublishStatisticsViaDissemination(myStats))
+                if (await TryPublishStatisticsViaDissemination(myStats))
+                {
+                    var dissemination = _serviceProvider.GetRequiredService<DisseminationService>();
+                    var unconfirmedPeers = dissemination.GetUnconfirmedPeers(
+                        DisseminationTopicNames.DeploymentLoad,
+                        DisseminationMembershipScope.ActiveMembers);
+                    if (unconfirmedPeers.Count > 0)
+                    {
+                        await PublishStatisticsDirectly(myStats, unconfirmedPeers);
+                    }
+                }
+                else
                 {
                     await PublishStatisticsDirectly(myStats, _siloStatusOracle.GetApproximateSiloStatuses(true).Keys);
                 }

@@ -83,7 +83,8 @@ internal interface IMembershipManager : ILifecycleParticipant<ISiloLifecycle>, I
     /// </summary>
     /// <param name="snapshot">The gossiped snapshot.</param>
     /// <param name="cancellationToken">A token to cancel the operation.</param>
-    Task ProcessGossipSnapshot(MembershipTableSnapshot snapshot, CancellationToken cancellationToken);
+    /// <returns><see langword="true"/> when the snapshot was applied; otherwise, <see langword="false"/>.</returns>
+    Task<bool> ProcessGossipSnapshot(MembershipTableSnapshot snapshot, CancellationToken cancellationToken);
 
     /// <summary>
     /// Updates the "I Am Alive" timestamp for the local silo.

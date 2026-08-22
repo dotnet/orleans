@@ -20,18 +20,21 @@ internal partial class MembershipGossiper(IServiceProvider serviceProvider, ILog
     {
         if (gossipPartners.Count == 0) return;
 
-        if (await TryGossipViaDissemination(snapshot))
+        var fallbackPartners = await TryGossipViaDissemination(snapshot, gossipPartners);
+        if (fallbackPartners.Count == 0)
         {
             return;
         }
 
-        LogDebugGossipingStatusToPartners(logger, updatedSilo, updatedStatus, gossipPartners.Count);
+        LogDebugGossipingStatusToPartners(logger, updatedSilo, updatedStatus, fallbackPartners.Count);
 
         var systemTarget = _membershipSystemTarget ??= serviceProvider.GetRequiredService<MembershipSystemTarget>();
-        await systemTarget.GossipToRemoteSilos(gossipPartners, snapshot, updatedSilo, updatedStatus);
+        await systemTarget.GossipToRemoteSilos(fallbackPartners, snapshot, updatedSilo, updatedStatus);
     }
 
-    private async Task<bool> TryGossipViaDissemination(MembershipTableSnapshot snapshot)
+    private async Task<List<SiloAddress>> TryGossipViaDissemination(
+        MembershipTableSnapshot snapshot,
+        List<SiloAddress> gossipPartners)
     {
         try
         {
@@ -39,17 +42,22 @@ internal partial class MembershipGossiper(IServiceProvider serviceProvider, ILog
             var topic = serviceProvider.GetService<MembershipDisseminationTopic>();
             if (dissemination is null || topic is null || !topic.IsEnabled)
             {
-                return false;
+                return gossipPartners;
             }
 
             var localSilo = serviceProvider.GetRequiredService<ILocalSiloDetails>().SiloAddress;
             var item = topic.CreateItem(localSilo, snapshot);
-            return await dissemination.Publish(topic.Name, item, targetPeers: null, CancellationToken.None);
+            if (!await dissemination.Publish(topic.Name, item, targetPeers: null, CancellationToken.None))
+            {
+                return gossipPartners;
+            }
+
+            return [.. dissemination.GetUnconfirmedPeers(topic.Name, topic.MembershipScope, gossipPartners)];
         }
         catch (Exception exception)
         {
             LogDebugMembershipDisseminationFailed(logger, exception);
-            return false;
+            return gossipPartners;
         }
     }
 
