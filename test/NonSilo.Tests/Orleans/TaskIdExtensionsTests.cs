@@ -54,7 +54,7 @@ public class TaskIdExtensionsTests
     public void ToTaskId_WithNullHierarchicalKey_ReturnsNone()
     {
         // Arrange
-        HierarchicalKey key = null;
+        HierarchicalKey? key = null;
 
         // Act
         var taskId = key.ToTaskId();
