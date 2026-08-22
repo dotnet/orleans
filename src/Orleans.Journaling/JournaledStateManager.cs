@@ -30,6 +30,7 @@ internal sealed partial class JournaledStateManager : IJournaledStateManager, IJ
     private readonly RetiredStateTracker _retirementTracker;
     private Task? _workLoop;
     private ManagerState _state;
+    private bool _automaticRecoveryPending;
     private bool _migrationSnapshotRequired;
     private int _disposed;
 
@@ -201,7 +202,7 @@ internal sealed partial class JournaledStateManager : IJournaledStateManager, IJ
                         bool fenceOnFailure;
                         lock (_lock)
                         {
-                            fenceOnFailure = _state is not ManagerState.Unknown;
+                            fenceOnFailure = !_automaticRecoveryPending && _state is not ManagerState.Unknown;
                             if (fenceOnFailure)
                             {
                                 _state = ManagerState.Recovering;
@@ -217,6 +218,8 @@ internal sealed partial class JournaledStateManager : IJournaledStateManager, IJ
                                 {
                                     _state = ManagerState.Ready;
                                 }
+
+                                _automaticRecoveryPending = false;
                             }
 
                             needsRecovery = false;
@@ -559,6 +562,7 @@ internal sealed partial class JournaledStateManager : IJournaledStateManager, IJ
                                     lock (_lock)
                                     {
                                         _state = ManagerState.Ready;
+                                        _automaticRecoveryPending = false;
                                     }
 
                                     break;
@@ -627,7 +631,7 @@ internal sealed partial class JournaledStateManager : IJournaledStateManager, IJ
                             }
                         }
 
-                        if (IsRecoverySignal(exception))
+                        if (workItem is not RevertPendingChangesWorkItem && IsRecoverySignal(exception))
                         {
                             Debug.Assert(recoveryTrigger is null);
                             recoveryTrigger = workItem;
@@ -638,6 +642,10 @@ internal sealed partial class JournaledStateManager : IJournaledStateManager, IJ
                             }
 
                             needsRecovery = true;
+                            lock (_lock)
+                            {
+                                _automaticRecoveryPending = true;
+                            }
                         }
                         else
                         {
@@ -648,9 +656,9 @@ internal sealed partial class JournaledStateManager : IJournaledStateManager, IJ
                                     _state = ManagerState.Fenced;
                                 }
                             }
-                        }
 
-                        workItem.SetException(exception);
+                            workItem.SetException(exception);
+                        }
                     }
                     finally
                     {
@@ -689,7 +697,7 @@ internal sealed partial class JournaledStateManager : IJournaledStateManager, IJ
                 return;
             }
 
-            trigger.SetException(recoveryTriggerException!);
+            trigger.TrySetException(recoveryTriggerException!);
             recoveryTrigger = null;
             recoveryTriggerException = null;
         }
@@ -1027,6 +1035,12 @@ internal sealed partial class JournaledStateManager : IJournaledStateManager, IJ
         lock (_lock)
         {
             ThrowIfStateOperationsUnavailable();
+            if (_automaticRecoveryPending && _journalWriter.CommittedLength > 0)
+            {
+                throw new InvalidOperationException(
+                    "Journaled state changed after automatic recovery failed. Call RevertPendingChangesAsync before writing.");
+            }
+
             var isSnapshot = _migrationSnapshotRequired || _storage.IsCompactionRequested;
             operation = isSnapshot ? JournalingInstruments.OperationSnapshot : JournalingInstruments.OperationAppend;
             pendingWrite = isSnapshot
