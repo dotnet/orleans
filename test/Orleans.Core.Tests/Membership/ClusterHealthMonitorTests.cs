@@ -1,13 +1,14 @@
 using System.Collections.Concurrent;
 using System.Collections.Immutable;
 using System.Threading.Channels;
-using Microsoft.AspNetCore.Connections;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Microsoft.Extensions.Time.Testing;
 using NonSilo.Tests.Utilities;
 using NSubstitute;
+using Orleans.Connections;
+using Orleans.Connections.Transport;
 using Orleans.Configuration;
 using Orleans.Core.Diagnostics;
 using Orleans.Messaging;
@@ -944,17 +945,15 @@ namespace NonSilo.Tests.Membership
         /// </summary>
         private TestConnection CreateTestConnection(ILoggerFactory loggerFactory)
         {
-            var features = new Microsoft.AspNetCore.Http.Features.FeatureCollection();
-            var context = Substitute.For<ConnectionContext>();
-            context.Features.Returns(features);
-            ConnectionDelegate middleware = _ => Task.CompletedTask;
+            var transport = Substitute.For<MessageTransport>();
+            transport.Features.Returns(new FeatureCollection());
             var services = new ServiceCollection();
             services.AddMetrics();
             services.AddSingleton<OrleansInstruments>();
             services.AddSingleton<MessagingInstruments>();
+            services.AddSingleton<NetworkingInstruments>();
             services.AddSingleton<MessagingProcessingInstruments>();
             var serviceProvider = services.BuildServiceProvider();
-            var orleansInstruments = serviceProvider.GetRequiredService<OrleansInstruments>();
             var messagingInstruments = serviceProvider.GetRequiredService<MessagingInstruments>();
             var messagingTrace = new MessagingTrace(
                 loggerFactory,
@@ -964,22 +963,23 @@ namespace NonSilo.Tests.Membership
                 serviceProvider,
                 null!,
                 messagingTrace,
-                orleansInstruments,
+                new ConnectionTrace(loggerFactory),
                 messagingInstruments,
-                loggerFactory.CreateLogger<Connection>(),
+                serviceProvider.GetRequiredService<NetworkingInstruments>(),
                 new NoOpMessageStatisticsSink());
-            return new TestConnection(context, middleware, shared);
+            return new TestConnection(transport, shared);
         }
 
-        private sealed class TestConnection(ConnectionContext context, ConnectionDelegate middleware, ConnectionCommon shared)
-            : Connection(context, middleware, shared)
+        private sealed class TestConnection(MessageTransport transport, ConnectionCommon shared)
+            : Connection(transport, shared)
         {
             protected override ConnectionDirection ConnectionDirection => ConnectionDirection.SiloToSilo;
+            protected override TimeSpan CloseConnectionTimeout => TimeSpan.FromSeconds(1);
             protected override IMessageCenter MessageCenter => null!;
             protected override bool PrepareMessageForSend(Message msg) => true;
-            protected override void OnReceivedMessage(Message msg) { }
-            protected override void RecordMessageReceive(Message msg, int numTotalBytes, int headerBytes) { }
-            protected override void RecordMessageSend(Message msg, int numTotalBytes, int headerBytes) { }
+            protected internal override void OnReceivedMessage(Message msg) { }
+            protected internal override void RecordMessageReceive(Message message, int totalBytes, int headerBytes) { }
+            protected internal override void RecordMessageSend(Message message, int totalBytes, int headerBytes) { }
             protected override void OnSendMessageFailure(Message message, string error) { }
             protected override void RetryMessage(Message msg, Exception? ex = null) { }
             public void SimulateMessageReceived() => MarkMessageReceived();
