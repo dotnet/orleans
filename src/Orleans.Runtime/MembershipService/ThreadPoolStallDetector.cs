@@ -22,6 +22,7 @@ internal sealed partial class ThreadPoolStallDetector : IDisposable
     private readonly TimeProvider _timeProvider;
     private readonly TimeSpan _retentionPeriod;
     private readonly long _detectionPeriodTimestampLength;
+    private readonly int _minimumRetainedStallCount;
     private readonly ITimer _timer;
     private readonly List<StallInterval> _stalls = [];
     private readonly SortedDictionary<long, int> _pendingQueries = [];
@@ -51,6 +52,7 @@ internal sealed partial class ThreadPoolStallDetector : IDisposable
         _timeProvider = timeProvider;
         _retentionPeriod = retentionPeriod;
         _detectionPeriodTimestampLength = GetTimestampLength(detectionPeriod);
+        _minimumRetainedStallCount = checked((int)Math.Ceiling(retentionPeriod / detectionPeriod));
         _lastSampleTimestamp = timeProvider.GetTimestamp();
         _nextExpectedTimestamp = _lastSampleTimestamp + _detectionPeriodTimestampLength;
         _timer = timeProvider.CreateTimer(TimerCallback, this, detectionPeriod, detectionPeriod);
@@ -250,7 +252,8 @@ internal sealed partial class ThreadPoolStallDetector : IDisposable
             oldestTimestamp = Math.Min(oldestTimestamp, enumerator.Current.Key);
         }
 
-        while (_stallHead < _stalls.Count && _stalls[_stallHead].EndTimestamp <= oldestTimestamp)
+        while (_stalls.Count - _stallHead > _minimumRetainedStallCount
+            && _stalls[_stallHead].EndTimestamp <= oldestTimestamp)
         {
             _stallHead++;
         }

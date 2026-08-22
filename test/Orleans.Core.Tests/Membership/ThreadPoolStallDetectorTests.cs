@@ -34,6 +34,25 @@ public sealed class ThreadPoolStallDetectorTests
     }
 
     [Fact]
+    public async Task LongStallExceedingHistoryDuration_IsDetected()
+    {
+        var timeProvider = new ManualTimerTimeProvider(Start);
+        using var detector = CreateDetector(timeProvider, TimeSpan.FromMilliseconds(500));
+        var startTimestamp = timeProvider.GetTimestamp();
+
+        timeProvider.Advance(TimeSpan.FromSeconds(2));
+        timeProvider.FireTimer();
+        var endTimestamp = timeProvider.GetTimestamp();
+
+        var duration = await detector.GetStallDurationAsync(
+            startTimestamp,
+            endTimestamp,
+            CancellationToken.None);
+
+        Assert.Equal(TimeSpan.FromMilliseconds(1900), duration);
+    }
+
+    [Fact]
     public async Task GetStallDurationAsync_WaitsForSampleAfterIntervalEnd()
     {
         var timeProvider = new ManualTimerTimeProvider(Start);
@@ -142,11 +161,9 @@ public sealed class ThreadPoolStallDetectorTests
         var timeProvider = new ManualTimerTimeProvider(Start);
         using var detector = CreateDetector(timeProvider, TimeSpan.FromMilliseconds(500));
         var startTimestamp = timeProvider.GetTimestamp();
-        timeProvider.Advance(TimeSpan.FromMilliseconds(300));
-        timeProvider.FireTimer();
-        for (var i = 0; i < 4; i++)
+        for (var i = 0; i < 5; i++)
         {
-            timeProvider.Advance(DetectionPeriod);
+            timeProvider.Advance(i == 0 ? TimeSpan.FromMilliseconds(150) : DetectionPeriod);
             timeProvider.FireTimer();
         }
 
@@ -162,8 +179,39 @@ public sealed class ThreadPoolStallDetectorTests
         timeProvider.Advance(TimeSpan.FromMilliseconds(50));
         timeProvider.FireTimer();
 
-        Assert.Equal(TimeSpan.FromMilliseconds(200), await durationTask);
-        Assert.Equal(TimeSpan.Zero, detector.GetStallDuration(startTimestamp, timeProvider.GetTimestamp()));
+        Assert.Equal(TimeSpan.FromMilliseconds(250), await durationTask);
+        Assert.Equal(
+            TimeSpan.Zero,
+            detector.GetStallDuration(
+                TimestampAt(timeProvider, startTimestamp, TimeSpan.FromMilliseconds(100)),
+                TimestampAt(timeProvider, startTimestamp, TimeSpan.FromMilliseconds(150))));
+    }
+
+    [Fact]
+    public void HistoryRetention_PreservesMinimumCycleCountAcrossLongStall()
+    {
+        var timeProvider = new ManualTimerTimeProvider(Start);
+        using var detector = CreateDetector(timeProvider, TimeSpan.FromMilliseconds(500));
+        var initialTimestamp = timeProvider.GetTimestamp();
+        for (var i = 0; i < 6; i++)
+        {
+            timeProvider.Advance(i == 0 ? TimeSpan.FromMilliseconds(150) : DetectionPeriod);
+            timeProvider.FireTimer();
+        }
+
+        timeProvider.Advance(TimeSpan.FromMilliseconds(1350));
+        timeProvider.FireTimer();
+
+        Assert.Equal(
+            TimeSpan.Zero,
+            detector.GetStallDuration(
+                TimestampAt(timeProvider, initialTimestamp, TimeSpan.FromMilliseconds(200)),
+                TimestampAt(timeProvider, initialTimestamp, TimeSpan.FromMilliseconds(250))));
+        Assert.Equal(
+            TimeSpan.FromMilliseconds(50),
+            detector.GetStallDuration(
+                TimestampAt(timeProvider, initialTimestamp, TimeSpan.FromMilliseconds(300)),
+                TimestampAt(timeProvider, initialTimestamp, TimeSpan.FromMilliseconds(350))));
     }
 
     private static ThreadPoolStallDetector CreateDetector(
