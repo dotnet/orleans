@@ -12,6 +12,8 @@ namespace Orleans.Reminders.AdoNet.Storage
 namespace Orleans.Streaming.AdoNet.Storage
 #elif GRAINDIRECTORY_ADONET
 namespace Orleans.GrainDirectory.AdoNet.Storage
+#elif TRANSACTIONS_ADONET
+namespace Orleans.Transactions.AdoNet.Storage
 #elif TESTER_SQLUTILS
 namespace Orleans.Tests.SqlUtils
 #else
@@ -110,7 +112,11 @@ namespace Orleans.Tests.SqlUtils
 
                 //Byte arrays are mapped as RAW which causes problems
                 //This sets the OracleDbType explicitly to BLOB
-                if (commandParameter.ParameterName == "PayloadBinary")
+                if (commandParameter.ParameterName == "PayloadBinary"
+#if TRANSACTIONS_ADONET
+                    || commandParameter.ParameterName is "Metadata" or "TransactionManager" or "StateData"
+#endif
+                    )
                 {
                     setBlobOracleDbTypeAction.Value(commandParameter);
                     continue;

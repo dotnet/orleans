@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Data;
+using System.Data.Common;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -14,6 +15,8 @@ namespace Orleans.Reminders.AdoNet.Storage
 namespace Orleans.Streaming.AdoNet.Storage
 #elif GRAINDIRECTORY_ADONET
 namespace Orleans.GrainDirectory.AdoNet.Storage
+#elif TRANSACTIONS_ADONET
+namespace Orleans.Transactions.AdoNet.Storage
 #elif TESTER_SQLUTILS
 namespace Orleans.Tests.SqlUtils
 #else
@@ -80,6 +83,17 @@ namespace Orleans.Tests.SqlUtils
         /// </example>
         Task<IEnumerable<TResult>> ReadAsync<TResult>(string query, Action<IDbCommand>? parameterProvider, Func<IDataRecord, int, CancellationToken, Task<TResult>> selector, CommandBehavior commandBehavior = CommandBehavior.Default, CancellationToken cancellationToken = default);
 
+#if TRANSACTIONS_ADONET
+        Task<(IReadOnlyList<TFirst> First, IReadOnlyList<TSecond> Second)> ReadTransactionAsync<TFirst, TSecond>(
+            string firstQuery,
+            Action<IDbCommand>? firstParameterProvider,
+            Func<IDataRecord, TFirst> firstSelector,
+            string secondQuery,
+            Action<IDbCommand>? secondParameterProvider,
+            Func<IDataRecord, TSecond> secondSelector,
+            CancellationToken cancellationToken = default);
+#endif
+
         /// <summary>
         /// Executes a given statement. Especially intended to use with <em>INSERT</em>, <em>UPDATE</em>, <em>DELETE</em> or <em>DDL</em> queries.
         /// </summary>
@@ -102,6 +116,10 @@ namespace Orleans.Tests.SqlUtils
         /// </code>
         /// </example>
         Task<int> ExecuteAsync(string query, Action<IDbCommand>? parameterProvider, CommandBehavior commandBehavior = CommandBehavior.Default, CancellationToken cancellationToken = default);
+
+#if TRANSACTIONS_ADONET
+        Task<int> ExecuteTransactionAsync(List<Tuple<string, Action<DbCommand>>> multipleQuery, CancellationToken cancellationToken = default);
+#endif
 
         /// <summary>
         /// The well known invariant name of the underlying database.
