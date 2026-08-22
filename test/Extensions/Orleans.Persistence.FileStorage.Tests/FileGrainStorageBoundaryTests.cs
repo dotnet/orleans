@@ -100,6 +100,37 @@ public sealed class FileGrainStorageBoundaryTests
     }
 
     [Fact]
+    public async Task RecordPathWithFilesystemAccessFailure_PropagatesTheFailure()
+    {
+        using var directory = new TemporaryDirectory();
+        var storage = FileGrainStorageTestContext.CreateStorage(directory.RootDirectory);
+        var grainId = GrainId.Create("filesystem-failure", "grain");
+        var written = new GrainState<FileStorageTestState>(
+            new FileStorageTestState { Value = "persisted", Revision = 29 });
+        await storage.WriteStateAsync("state", grainId, written);
+        var recordPath = Assert.Single(FileGrainStorageTestContext.GetRecordFiles(directory.RootDirectory));
+        File.Delete(recordPath);
+        Directory.CreateDirectory(recordPath);
+        var read = new GrainState<FileStorageTestState>(
+            new FileStorageTestState { Value = "unchanged", Revision = 30 },
+            "unchanged-etag")
+        {
+            RecordExists = true,
+        };
+
+        AssertFileSystemAccessFailure(
+            await Record.ExceptionAsync(() => storage.ReadStateAsync("state", grainId, read)));
+        AssertFileSystemAccessFailure(
+            await Record.ExceptionAsync(() => storage.ClearStateAsync("state", grainId, written)));
+        AssertFileSystemAccessFailure(
+            await Record.ExceptionAsync(() => storage.WriteStateAsync("state", grainId, written)));
+
+        Assert.Equal(new FileStorageTestState { Value = "unchanged", Revision = 30 }, read.State);
+        Assert.Equal("unchanged-etag", read.ETag);
+        Assert.True(read.RecordExists);
+    }
+
+    [Fact]
     public async Task StorageIdentityComponents_MapDeterministicallyWithoutCollisions()
     {
         using var directory = new TemporaryDirectory();
@@ -282,6 +313,13 @@ public sealed class FileGrainStorageBoundaryTests
 
         public FileGrainStorage Storage(string rootDirectory) =>
             FileGrainStorageTestContext.CreateStorage(rootDirectory, serviceId);
+    }
+
+    private static void AssertFileSystemAccessFailure(Exception? exception)
+    {
+        Assert.True(
+            exception is IOException or UnauthorizedAccessException,
+            $"Expected a filesystem access failure, but received: {exception}");
     }
 
     private sealed class CapturingSiloLifecycle : ISiloLifecycle

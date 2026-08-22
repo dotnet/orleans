@@ -421,6 +421,59 @@ public sealed class FileGrainStorageStateTransitionTests
         Assert.True(stopwatch.Elapsed < TimeSpan.FromSeconds(2), $"Elapsed: {stopwatch.Elapsed}");
     }
 
+    [Fact]
+    public async Task DifferentStorageRoots_DoNotShareInProcessLockStripes()
+    {
+        using var firstDirectory = new TemporaryDirectory();
+        using var secondDirectory = new TemporaryDirectory();
+        var firstStorage = FileGrainStorageTestContext.CreateStorage(firstDirectory.RootDirectory);
+        var secondStorage = FileGrainStorageTestContext.CreateStorage(
+            secondDirectory.RootDirectory,
+            lockAcquireTimeout: TimeSpan.FromSeconds(1));
+        var grainId = CreateGrainId();
+        var first = new GrainState<FileStorageTestState>(
+            new FileStorageTestState { Value = "first-initial", Revision = 24 });
+        var second = new GrainState<FileStorageTestState>(
+            new FileStorageTestState { Value = "second-initial", Revision = 25 });
+        await firstStorage.WriteStateAsync(StateName, grainId, first);
+        await secondStorage.WriteStateAsync(StateName, grainId, second);
+
+        var firstRecordPath = Assert.Single(
+            FileGrainStorageTestContext.GetRecordFiles(firstDirectory.RootDirectory));
+        var secondRecordPath = Assert.Single(
+            FileGrainStorageTestContext.GetRecordFiles(secondDirectory.RootDirectory));
+        Assert.Equal(Path.GetFileName(firstRecordPath), Path.GetFileName(secondRecordPath));
+        var lockIndex = Path.GetFileName(firstRecordPath)[..2];
+        var firstLockPath = Path.Combine(
+            firstDirectory.RootDirectory,
+            $".orleans-file-storage.{lockIndex}.lock");
+        using var process = StartLockWorker(firstLockPath);
+        Assert.Equal("READY", await process.StandardOutput.ReadLineAsync().WaitAsync(TimeSpan.FromSeconds(15)));
+
+        first.State = new FileStorageTestState { Value = "first-updated", Revision = 26 };
+        second.State = new FileStorageTestState { Value = "second-updated", Revision = 27 };
+        var blockedWrite = firstStorage.WriteStateAsync(StateName, grainId, first);
+        await Task.Delay(TimeSpan.FromMilliseconds(100));
+        Assert.False(blockedWrite.IsCompleted);
+
+        try
+        {
+            await secondStorage.WriteStateAsync(StateName, grainId, second).WaitAsync(TimeSpan.FromSeconds(1));
+        }
+        finally
+        {
+            await process.StandardInput.WriteLineAsync("RELEASE");
+            await process.StandardInput.FlushAsync();
+        }
+
+        await blockedWrite.WaitAsync(TimeSpan.FromSeconds(15));
+        await process.WaitForExitAsync().WaitAsync(TimeSpan.FromSeconds(15));
+
+        var secondRead = await ReadAsync(secondStorage, grainId);
+        Assert.Equal(second.State, secondRead.State);
+        Assert.Equal(second.ETag, secondRead.ETag);
+    }
+
     private static GrainId CreateGrainId() =>
         GrainId.Create("file-storage-test-grain", Guid.NewGuid().ToString("N"));
 

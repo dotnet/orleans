@@ -26,12 +26,14 @@ public sealed class FileGrainStorage(
     private const int LockStripeCount = 256;
     private const string RecordExtension = ".grain";
     private const int RecordHeaderLength = 24;
-    private static readonly SemaphoreSlim[] RecordLocks =
-        Enumerable.Range(0, LockStripeCount).Select(static _ => new SemaphoreSlim(1, 1)).ToArray();
     private static readonly byte[] RecordMagic = "ORLFS001"u8.ToArray();
     private readonly ClusterOptions _clusterOptions = clusterOptions.Value;
     private readonly TimeSpan _lockAcquireTimeout = options.LockAcquireTimeout;
+    private readonly SemaphoreSlim[] _recordLocks =
+        Enumerable.Range(0, LockStripeCount).Select(static _ => new SemaphoreSlim(1, 1)).ToArray();
     private readonly string _rootDirectory = Path.TrimEndingDirectorySeparator(Path.GetFullPath(options.RootDirectory));
+    private readonly SemaphoreSlim _rootInitializationLock = new(1, 1);
+    private int _rootInitialized;
 
     /// <inheritdoc />
     public async Task ClearStateAsync<T>(
@@ -42,14 +44,14 @@ public sealed class FileGrainStorage(
         var location = GetRecordLocation(stateName, grainId);
         using (await AcquireRecordLockAsync(location.LockIndex).ConfigureAwait(false))
         {
-            if (!File.Exists(location.Path))
+            var record = await TryReadRecordAsync(location.Path).ConfigureAwait(false);
+            if (record is null)
             {
                 ResetMissingState(grainState);
                 return;
             }
 
-            var record = await ReadRecordAsync(location.Path).ConfigureAwait(false);
-            if (!string.Equals(record.ETag, grainState.ETag, StringComparison.Ordinal))
+            if (!string.Equals(record.Value.ETag, grainState.ETag, StringComparison.Ordinal))
             {
                 throw CreateInconsistentStateException<T>("ClearState", grainId);
             }
@@ -68,15 +70,15 @@ public sealed class FileGrainStorage(
         var location = GetRecordLocation(stateName, grainId);
         using (await AcquireRecordLockAsync(location.LockIndex).ConfigureAwait(false))
         {
-            if (!File.Exists(location.Path))
+            var record = await TryReadRecordAsync(location.Path).ConfigureAwait(false);
+            if (record is null)
             {
                 ResetMissingState(grainState);
                 return;
             }
 
-            var record = await ReadRecordAsync(location.Path).ConfigureAwait(false);
-            grainState.State = options.GrainStorageSerializer.Deserialize<T>(new BinaryData(record.Payload));
-            grainState.ETag = record.ETag;
+            grainState.State = options.GrainStorageSerializer.Deserialize<T>(new BinaryData(record.Value.Payload));
+            grainState.ETag = record.Value.ETag;
             grainState.RecordExists = true;
         }
     }
@@ -90,10 +92,10 @@ public sealed class FileGrainStorage(
         var location = GetRecordLocation(stateName, grainId);
         using (await AcquireRecordLockAsync(location.LockIndex).ConfigureAwait(false))
         {
-            if (File.Exists(location.Path))
+            var record = await TryReadRecordAsync(location.Path).ConfigureAwait(false);
+            if (record is not null)
             {
-                var record = await ReadRecordAsync(location.Path).ConfigureAwait(false);
-                if (!string.Equals(record.ETag, grainState.ETag, StringComparison.Ordinal))
+                if (!string.Equals(record.Value.ETag, grainState.ETag, StringComparison.Ordinal))
                 {
                     throw CreateInconsistentStateException<T>("WriteState", grainId);
                 }
@@ -109,15 +111,25 @@ public sealed class FileGrainStorage(
             var temporaryPath = $"{location.Path}.{Guid.NewGuid():N}.tmp";
             try
             {
-                await File.WriteAllBytesAsync(temporaryPath, recordBytes).ConfigureAwait(false);
+                await using (var stream = new FileStream(
+                    temporaryPath,
+                    new FileStreamOptions
+                    {
+                        Mode = FileMode.CreateNew,
+                        Access = FileAccess.Write,
+                        Share = FileShare.None,
+                        Options = FileOptions.Asynchronous | FileOptions.WriteThrough,
+                    }))
+                {
+                    await stream.WriteAsync(recordBytes).ConfigureAwait(false);
+                    stream.Flush(flushToDisk: true);
+                }
+
                 File.Move(temporaryPath, location.Path, true);
             }
             finally
             {
-                if (File.Exists(temporaryPath))
-                {
-                    File.Delete(temporaryPath);
-                }
+                File.Delete(temporaryPath);
             }
 
             grainState.ETag = etag;
@@ -132,7 +144,7 @@ public sealed class FileGrainStorage(
             stage: ServiceLifecycleStage.ApplicationServices,
             onStart: (ct) =>
             {
-                Directory.CreateDirectory(_rootDirectory);
+                InitializeRootDirectory();
                 return Task.CompletedTask;
             });
 
@@ -157,11 +169,27 @@ public sealed class FileGrainStorage(
         return new StoredRecord(etag, bytes.AsMemory(RecordHeaderLength));
     }
 
+    private static async Task<StoredRecord?> TryReadRecordAsync(string path)
+    {
+        try
+        {
+            return await ReadRecordAsync(path).ConfigureAwait(false);
+        }
+        catch (FileNotFoundException)
+        {
+            return null;
+        }
+        catch (DirectoryNotFoundException)
+        {
+            return null;
+        }
+    }
+
     private async Task<RecordLock> AcquireRecordLockAsync(int lockIndex)
     {
-        Directory.CreateDirectory(_rootDirectory);
+        await EnsureRootDirectoryAsync().ConfigureAwait(false);
         var stopwatch = Stopwatch.StartNew();
-        var semaphore = RecordLocks[lockIndex];
+        var semaphore = _recordLocks[lockIndex];
         if (!await semaphore.WaitAsync(_lockAcquireTimeout).ConfigureAwait(false))
         {
             throw new TimeoutException(
@@ -203,6 +231,35 @@ public sealed class FileGrainStorage(
             semaphore.Release();
             throw;
         }
+    }
+
+    private async Task EnsureRootDirectoryAsync()
+    {
+        if (Volatile.Read(ref _rootInitialized) != 0)
+        {
+            return;
+        }
+
+        await _rootInitializationLock.WaitAsync().ConfigureAwait(false);
+        try
+        {
+            InitializeRootDirectory();
+        }
+        finally
+        {
+            _rootInitializationLock.Release();
+        }
+    }
+
+    private void InitializeRootDirectory()
+    {
+        if (Volatile.Read(ref _rootInitialized) != 0)
+        {
+            return;
+        }
+
+        Directory.CreateDirectory(_rootDirectory);
+        Volatile.Write(ref _rootInitialized, 1);
     }
 
     private void ResetMissingState<T>(IGrainState<T> grainState)
