@@ -22,42 +22,49 @@ public abstract class DurableTask
         ArgumentNullException.ThrowIfNull(action);
         return new DelegateDurableTask(action);
     }
+
     /// <summary>Creates a durable task which invokes <paramref name="function"/>.</summary>
     public static DurableTask<TResult> Run<TResult>(Func<CancellationToken, TResult> function)
     {
         ArgumentNullException.ThrowIfNull(function);
         return new DelegateDurableTask<TResult>(function);
     }
+
     /// <summary>Creates a durable task which invokes asynchronous <paramref name="function"/>.</summary>
     public static DurableTask Run(Func<CancellationToken, Task> function)
     {
         ArgumentNullException.ThrowIfNull(function);
         return new AsyncDelegateDurableTask(function);
     }
+
     /// <summary>Creates a durable task which invokes asynchronous <paramref name="function"/>.</summary>
     public static DurableTask<TResult> Run<TResult>(Func<CancellationToken, Task<TResult>> function)
     {
         ArgumentNullException.ThrowIfNull(function);
         return new AsyncDelegateDurableTask<TResult>(function);
     }
+
     /// <summary>Creates a durable task which invokes <paramref name="action"/> with captured <paramref name="state"/>.</summary>
     public static DurableTask Run<TState>(Action<TState, CancellationToken> action, TState state)
     {
         ArgumentNullException.ThrowIfNull(action);
         return Run(ct => action(state, ct));
     }
+
     /// <summary>Creates a durable task which invokes <paramref name="function"/> with captured <paramref name="state"/>.</summary>
     public static DurableTask<TResult> Run<TState, TResult>(Func<TState, CancellationToken, TResult> function, TState state)
     {
         ArgumentNullException.ThrowIfNull(function);
         return Run(ct => function(state, ct));
     }
+
     /// <summary>Creates a durable task which invokes asynchronous <paramref name="function"/> with captured <paramref name="state"/>.</summary>
     public static DurableTask Run<TState>(Func<TState, CancellationToken, Task> function, TState state)
     {
         ArgumentNullException.ThrowIfNull(function);
         return Run(ct => function(state, ct));
     }
+
     /// <summary>Creates a durable task which invokes asynchronous <paramref name="function"/> with captured <paramref name="state"/>.</summary>
     public static DurableTask<TResult> Run<TState, TResult>(Func<TState, CancellationToken, Task<TResult>> function, TState state)
     {
@@ -190,6 +197,7 @@ public abstract class DurableTask
 
     /// <summary>Runs the definition in the supplied execution context.</summary>
     protected internal abstract ValueTask<DurableTaskResponse> RunAsync(DurableExecutionContext context);
+
     internal virtual bool RunsInlineInParent => false;
 }
 
@@ -292,6 +300,7 @@ internal sealed class InlineAsyncDelegateDurableTask<TState, TResult>(
 internal struct ConfiguredDurableTaskCore<TTask> where TTask : DurableTask
 {
     private TaskId _taskId;
+
     internal ConfiguredDurableTaskCore(TTask task) : this(task, DurableExecutionContext.Current)
     {
     }
@@ -303,7 +312,9 @@ internal struct ConfiguredDurableTaskCore<TTask> where TTask : DurableTask
     }
 
     internal TTask Task { get; }
+
     internal DurableExecutionContext? ParentContext { get; }
+
     internal readonly TaskId TaskId => _taskId;
 
     internal void SetId(string segment)
@@ -392,12 +403,15 @@ internal struct ConfiguredDurableTaskCore<TTask> where TTask : DurableTask
 public struct ConfiguredDurableTask
 {
     private ConfiguredDurableTaskCore<DurableTask> _core;
+
     internal ConfiguredDurableTask(DurableTask task) => _core = new(task);
+
     internal ConfiguredDurableTask(DurableTask task, string rootId)
     {
         _core = new(task, parentContext: null);
         _core.SetId(TaskId.CreateRoot(rootId));
     }
+
     internal ConfiguredDurableTask(DurableTask task, TaskId taskId)
     {
         _core = new(task);
@@ -406,6 +420,7 @@ public struct ConfiguredDurableTask
 
     /// <summary>Gets an awaiter which runs or attaches to the task.</summary>
     public DurableTaskAwaiter GetAwaiter() => new(_core.RunAsync(CancellationToken.None));
+
     /// <summary>
     /// Assigns a stable logical identifier segment. Within a durable execution, segments beginning
     /// with <c>$</c> are reserved for generated identifiers.
@@ -436,12 +451,15 @@ public struct ConfiguredDurableTask
 public struct ConfiguredDurableTask<TResult>
 {
     private ConfiguredDurableTaskCore<DurableTask<TResult>> _core;
+
     internal ConfiguredDurableTask(DurableTask<TResult> task) => _core = new(task);
+
     internal ConfiguredDurableTask(DurableTask<TResult> task, string rootId)
     {
         _core = new(task, parentContext: null);
         _core.SetId(TaskId.CreateRoot(rootId));
     }
+
     internal ConfiguredDurableTask(DurableTask<TResult> task, TaskId taskId)
     {
         _core = new(task);
@@ -450,6 +468,7 @@ public struct ConfiguredDurableTask<TResult>
 
     /// <summary>Gets an awaiter which runs or attaches to the task.</summary>
     public DurableTaskAwaiter<TResult> GetAwaiter() => new(_core.RunAsync(CancellationToken.None));
+
     /// <summary>
     /// Assigns a stable logical identifier segment. Within a durable execution, segments beginning
     /// with <c>$</c> are reserved for generated identifiers.

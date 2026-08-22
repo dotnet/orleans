@@ -34,10 +34,13 @@ public readonly struct TaskId : IEquatable<TaskId>, IParsable<TaskId>, ISpanPars
 
     /// <summary>Returns whether this identifier is an ancestor of <paramref name="other"/>.</summary>
     public bool IsAncestorOf(TaskId other) => _key?.IsAncestorOf(other._key) is true;
+
     /// <summary>Returns whether this identifier is a descendant of <paramref name="other"/>.</summary>
     public bool IsDescendantOf(TaskId other) => other.IsAncestorOf(this);
+
     /// <summary>Returns whether this identifier is the parent of <paramref name="other"/>.</summary>
     public bool IsParentOf(TaskId other) => _key?.IsParentOf(other._key) is true;
+
     /// <summary>Returns whether this identifier is a child of <paramref name="other"/>.</summary>
     public bool IsChildOf(TaskId other) => other.IsParentOf(this);
 
@@ -112,6 +115,7 @@ public readonly struct TaskId : IEquatable<TaskId>, IParsable<TaskId>, ISpanPars
 
     /// <summary>Formats this identifier as an escaped hierarchical path.</summary>
     public override string ToString() => _key?.ToString() ?? string.Empty;
+
     /// <summary>Formats this identifier as an escaped hierarchical path.</summary>
     public string ToString(string? format, IFormatProvider? formatProvider) => ToString();
 
@@ -129,16 +133,22 @@ public readonly struct TaskId : IEquatable<TaskId>, IParsable<TaskId>, ISpanPars
 
     /// <inheritdoc />
     public bool Equals(TaskId other) => Equals(_key, other._key);
+
     /// <inheritdoc />
     public override bool Equals(object? obj) => obj is TaskId other && Equals(other);
+
     /// <inheritdoc />
     public override int GetHashCode() => _key?.GetHashCode() ?? 0;
+
     /// <summary>Returns whether two identifiers are equal.</summary>
     public static bool operator ==(TaskId left, TaskId right) => left.Equals(right);
+
     /// <summary>Returns whether two identifiers differ.</summary>
     public static bool operator !=(TaskId left, TaskId right) => !left.Equals(right);
+
     /// <summary>Formats an identifier as an escaped hierarchical path.</summary>
     public static explicit operator string(TaskId value) => value.ToString();
+
     /// <summary>Parses an escaped hierarchical path.</summary>
     public static explicit operator TaskId(string value) => Parse(value);
 }
