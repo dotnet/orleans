@@ -8,7 +8,7 @@ using RabbitMQ.Stream.Client;
 
 namespace Orleans.Streaming.RabbitMQ.RabbitMQ;
 
-public static class RabbitMQMessage
+internal static class RabbitMQMessage
 {
     public static string Format => "yyyyMMddHHmmssffff";
     public static string CreatedAtFieldName => "CreatedAt";
@@ -72,7 +72,7 @@ internal sealed class RabbitMQConsumer
         ILoggerFactory loggerFactory,
         QueueId queueId,
         Serializer<RabbitMqBatchContainer> serializer,
-        RabbitMqQueueCacheOptions cacheOptions)
+        RabbitMQQueueCacheOptions cacheOptions)
     {
         ArgumentOutOfRangeException.ThrowIfLessThan(cacheOptions.CacheSize, 1);
         _streamSystemProvider = streamSystemProvider;

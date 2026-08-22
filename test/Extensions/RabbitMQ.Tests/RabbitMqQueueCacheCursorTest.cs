@@ -80,7 +80,7 @@ public class RabbitMqQueueCacheCursorTest
     }
 
     private static RabbitMqQueueCache CreateCache() =>
-        new(new RabbitMqQueueCacheOptions { CacheSize = 10 });
+        new(new RabbitMQQueueCacheOptions { CacheSize = 10 });
 
     private static RabbitMqBatchContainer CreateBatch(StreamId streamId, long sequenceNumber) =>
         new(streamId, [new object()], new EventSequenceTokenV2(sequenceNumber));

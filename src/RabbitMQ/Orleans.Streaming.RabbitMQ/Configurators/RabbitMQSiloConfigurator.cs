@@ -57,9 +57,9 @@ public class RabbitMQSiloConfigurator : SiloPersistentStreamConfigurator
         return this;
     }
 
-    public RabbitMQSiloConfigurator ConfigureCache(int cacheSize = RabbitMqQueueCacheOptions.DEFAULT_CACHE_SIZE)
+    public RabbitMQSiloConfigurator ConfigureCache(int cacheSize = RabbitMQQueueCacheOptions.DEFAULT_CACHE_SIZE)
     {
-        this.Configure<RabbitMqQueueCacheOptions>(ob => ob.Configure(options => options.CacheSize = cacheSize));
+        this.Configure<RabbitMQQueueCacheOptions>(ob => ob.Configure(options => options.CacheSize = cacheSize));
         return this;
     }
 

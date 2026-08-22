@@ -5,9 +5,9 @@ namespace Orleans.Streaming.RabbitMQ.Adapters.Cache;
 
 internal class RabbitMqQueueCacheAdapter : IQueueAdapterCache
 {
-    private readonly RabbitMqQueueCacheOptions _rabbitMqQueueCacheOptions;
+    private readonly RabbitMQQueueCacheOptions _rabbitMqQueueCacheOptions;
 
-    public RabbitMqQueueCacheAdapter(RabbitMqQueueCacheOptions rabbitMqQueueCacheOptions)
+    public RabbitMqQueueCacheAdapter(RabbitMQQueueCacheOptions rabbitMqQueueCacheOptions)
     {
         _rabbitMqQueueCacheOptions = rabbitMqQueueCacheOptions;
     }
