@@ -23,7 +23,7 @@ public class InProcessTestClusterBuilderTimeProviderTests
     public async Task ConfigureHost_CanRegisterTimeProvider_ForClientAndSiloServices()
     {
         var fakeTimeProvider = new FakeTimeProvider(DateTimeOffset.Parse("2026-04-21T12:00:00+00:00"));
-        var builder = new InProcessTestClusterBuilder();
+        var builder = new InProcessTestClusterBuilder(initialSilosCount: 1);
         builder.ConfigureHost(hostBuilder => hostBuilder.Services.AddSingleton<TimeProvider>(fakeTimeProvider));
 
         await using var cluster = builder.Build();
@@ -96,7 +96,7 @@ public class InProcessTestClusterBuilderTimeProviderTests
 
     private static InProcessTestClusterBuilder CreateBuilder(FakeTimeProvider fakeTimeProvider)
     {
-        var builder = new InProcessTestClusterBuilder();
+        var builder = new InProcessTestClusterBuilder(initialSilosCount: 1);
         builder.ConfigureHost(hostBuilder => hostBuilder.Services.AddSingleton<TimeProvider>(fakeTimeProvider));
         builder.ConfigureSilo((_, siloBuilder) =>
         {
