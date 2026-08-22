@@ -226,7 +226,6 @@ internal sealed partial class JournaledStateManager : IJournaledStateManager, IJ
                             }
                             throw;
                         }
-                        }
                     }
 
                     WorkItem workItem;

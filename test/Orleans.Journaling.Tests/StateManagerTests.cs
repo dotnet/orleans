@@ -635,10 +635,15 @@ public class StateManagerTests : JournalingTestBase
 
         var secondRecoveryFailure = new IOException("Expected second recovery failure.");
         storage.NextReadException = secondRecoveryFailure;
-        var recoveryException = await Assert.ThrowsAsync<IOException>(
+        var fencedException = await Assert.ThrowsAsync<InvalidOperationException>(
             () => sut.Manager.WriteStateAsync(CancellationToken.None).AsTask().WaitAsync(TimeSpan.FromSeconds(10)));
+        Assert.Contains("writes are fenced", fencedException.Message, StringComparison.Ordinal);
+
+        var recoveryException = await Assert.ThrowsAsync<IOException>(
+            () => sut.Manager.RevertPendingChangesAsync(CancellationToken.None).AsTask().WaitAsync(TimeSpan.FromSeconds(10)));
         Assert.Same(secondRecoveryFailure, recoveryException);
 
+        await sut.Manager.RevertPendingChangesAsync(CancellationToken.None).AsTask().WaitAsync(TimeSpan.FromSeconds(10));
         await sut.Manager.WriteStateAsync(CancellationToken.None).AsTask().WaitAsync(TimeSpan.FromSeconds(10));
 
         Assert.True(dictionary.ContainsKey("first"));
