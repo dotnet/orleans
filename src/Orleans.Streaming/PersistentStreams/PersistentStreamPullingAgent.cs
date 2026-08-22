@@ -290,12 +290,90 @@ namespace Orleans.Streams
             string? filterData)
         {
             LogDebugAddSubscriber(streamId, streamConsumer);
-            // cannot await here because explicit consumers trigger this call, so it could cause a deadlock.
-            AddSubscriber_Impl(subscriptionId, streamId, streamConsumer, filterData, null)
-                .LogException(logger, ErrorCode.PersistentStreamPullingAgent_26,
-                    $"Failed to add subscription for stream {streamId}.")
-                .Ignore();
+            if (RequestContext.Get(StreamRequestContextKeys.StreamResumeToken) is StreamSequenceToken token)
+            {
+                RequestContext.Remove(StreamRequestContextKeys.StreamResumeToken);
+                RefreshSubscriber_Impl(subscriptionId, streamId, streamConsumer, filterData, token)
+                    .LogException(logger, ErrorCode.PersistentStreamPullingAgent_26,
+                        $"Failed to refresh subscription for stream {streamId}.")
+                    .Ignore();
+            }
+            else
+            {
+                // cannot await here because explicit consumers trigger this call, so it could cause a deadlock.
+                AddSubscriber_Impl(subscriptionId, streamId, streamConsumer, filterData, null)
+                    .LogException(logger, ErrorCode.PersistentStreamPullingAgent_26,
+                        $"Failed to add subscription for stream {streamId}.")
+                    .Ignore();
+            }
+
             return Task.CompletedTask;
+        }
+
+        private async Task RefreshSubscriber_Impl(
+            GuidId subscriptionId,
+            QualifiedStreamId streamId,
+            GrainId streamConsumer,
+            string? filterData,
+            StreamSequenceToken token)
+        {
+            if (IsShutdown)
+            {
+                return;
+            }
+
+            var now = _timeProvider.GetUtcNow().UtcDateTime;
+            if (!pubSubCache.TryGetValue(streamId, out var streamDataCollection))
+            {
+                RegisterStream(streamId, token, now, isSubscriberRefresh: true);
+                return;
+            }
+
+            streamDataCollection.RefreshActivity(now);
+            streamDataCollection.BeginRefresh();
+            try
+            {
+                IQueueCacheCursor? pinCursor;
+                try
+                {
+                    pinCursor = queueCache?.GetCacheCursor(streamId, token);
+                }
+                catch (QueueCacheMissException)
+                {
+                    pinCursor = null;
+                }
+
+                try
+                {
+                    if (!streamDataCollection.Contains(subscriptionId))
+                    {
+                        var subscribers = await RegisterAsStreamProducer(streamId);
+                        var subscription = subscribers.FirstOrDefault(
+                            item => item.SubscriptionId.Equals(subscriptionId) && item.Consumer.Equals(streamConsumer));
+                        if (subscription is null)
+                        {
+                            return;
+                        }
+
+                        filterData = subscription.FilterData;
+                        if (!pubSubCache.ContainsKey(streamId))
+                        {
+                            RegisterStream(streamId, token, _timeProvider.GetUtcNow().UtcDateTime, isSubscriberRefresh: true);
+                            return;
+                        }
+                    }
+
+                    await AddSubscriber_Impl(subscriptionId, streamId, streamConsumer, filterData, null);
+                }
+                finally
+                {
+                    pinCursor?.Dispose();
+                }
+            }
+            finally
+            {
+                streamDataCollection.EndRefresh();
+            }
         }
 
         // Called by rendezvous when new remote subscriber subscribes to this stream.
@@ -325,6 +403,15 @@ namespace Orleans.Streams
 
             if (await DoHandshakeWithConsumer(data, cacheToken))
             {
+                if (!pubSubCache.TryGetValue(streamId, out var currentStreamDataCollection)
+                    || !ReferenceEquals(currentStreamDataCollection, streamDataCollection)
+                    || !currentStreamDataCollection.TryGetConsumer(subscriptionId, out var currentData)
+                    || !ReferenceEquals(currentData, data))
+                {
+                    data.SafeDisposeCursor(logger);
+                    return;
+                }
+
                 var startToken = data.LastToken?.Token ?? cacheToken ?? data.PendingStartToken;
                 data.LastProcessedToken = startToken;
                 data.PendingStartToken = null;
@@ -349,7 +436,7 @@ namespace Orleans.Streams
                 try
                 {
                     requestedHandshakeToken = await AsyncExecutorWithRetries.ExecuteWithRetries(
-                         i => consumerData.StreamConsumer.GetSequenceToken(consumerData.SubscriptionId),
+                         i => GetSequenceToken(consumerData),
                          AsyncExecutorWithRetries.INFINITE_RETRIES,
                          // Do not retry if the agent is shutting down, or if the exception is ClientNotAvailableException
                          (exception, i) => exception is not ClientNotAvailableException && !IsShutdown,
@@ -406,6 +493,19 @@ namespace Orleans.Streams
                 }
             }
             return true;
+
+            async Task<StreamHandshakeToken?> GetSequenceToken(StreamConsumerData consumer)
+            {
+                RequestContext.Set(StreamRequestContextKeys.StreamProducer, GrainId);
+                try
+                {
+                    return await consumer.StreamConsumer.GetSequenceToken(consumer.SubscriptionId);
+                }
+                finally
+                {
+                    RequestContext.Remove(StreamRequestContextKeys.StreamProducer);
+                }
+            }
         }
 
         public Task RemoveSubscriber(GuidId subscriptionId, QualifiedStreamId streamId)
@@ -698,7 +798,11 @@ namespace Orleans.Streams
             return difference < 0 || difference == 0 && current.EventIndex < other.EventIndex;
         }
 
-        private void RegisterStream(QualifiedStreamId streamId, StreamSequenceToken firstToken, DateTime now)
+        private void RegisterStream(
+            QualifiedStreamId streamId,
+            StreamSequenceToken firstToken,
+            DateTime now,
+            bool isSubscriberRefresh = false)
         {
             if (IsShutdown)
             {
@@ -711,7 +815,16 @@ namespace Orleans.Streams
             // That way we will not purge the event from the cache, until we talk to pub sub.
             // This will help ensure the "casual consistency" between pre-existing subscripton (of a potentially new already subscribed consumer)
             // and later production.
-            var pinCursor = queueCache?.GetCacheCursor(streamId, firstToken);
+            IQueueCacheCursor? pinCursor;
+            try
+            {
+                pinCursor = queueCache?.GetCacheCursor(streamId, firstToken);
+            }
+            catch (QueueCacheMissException) when (isSubscriberRefresh)
+            {
+                pinCursor = null;
+            }
+
             streamData.RegistrationTask = RegisterStreamAsync();
             pubSubCache.Add(streamId, streamData);
 
@@ -789,7 +902,12 @@ namespace Orleans.Streams
 
                 try
                 {
-                    await AddSubscriber_Impl(item.SubscriptionId, item.Stream, item.Consumer, item.FilterData, firstToken);
+                    await AddSubscriber_Impl(
+                        item.SubscriptionId,
+                        item.Stream,
+                        item.Consumer,
+                        item.FilterData,
+                        isSubscriberRefresh ? null : firstToken);
                 }
                 catch (Exception exception)
                 {
@@ -1048,15 +1166,17 @@ namespace Orleans.Streams
         /// <summary>
         /// Add call context for batch delivery call, then clear context immediately, without giving up turn.
         /// </summary>
-        private static Task<StreamHandshakeToken?> ContextualizedDeliverBatchToConsumer(StreamConsumerData consumerData, IBatchContainer batch)
+        private Task<StreamHandshakeToken?> ContextualizedDeliverBatchToConsumer(StreamConsumerData consumerData, IBatchContainer batch)
         {
             bool isRequestContextSet = batch.ImportRequestContext();
+            RequestContext.Set(StreamRequestContextKeys.StreamProducer, GrainId);
             try
             {
                 return consumerData.StreamConsumer.DeliverBatch(consumerData.SubscriptionId, consumerData.StreamId, batch, consumerData.LastToken);
             }
             finally
             {
+                RequestContext.Remove(StreamRequestContextKeys.StreamProducer);
                 if (isRequestContextSet)
                 {
                     // clear RequestContext before await!

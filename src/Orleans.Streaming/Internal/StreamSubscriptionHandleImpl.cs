@@ -33,6 +33,8 @@ namespace Orleans.Streams
         internal bool IsValid { get { return streamImpl != null; } }
         internal GuidId SubscriptionId { get { return subscriptionId; } }
         internal bool IsRewindable { get { return isRewindable; } }
+        internal string? FilterData { get { return filterData; } }
+        internal bool HasObserver { get { return observer is not null || batchObserver is not null; } }
 
         public override string ProviderName { get { return this.streamImpl!.ProviderName; } }
         public override StreamId StreamId { get { return streamImpl!.StreamId; } }

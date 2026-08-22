@@ -155,7 +155,32 @@ namespace Orleans.Streams
 
             LogDebugResumeRendezvous(pubSub, myGrainReference, token);
 
-            StreamSubscriptionHandle<T> newHandle = myExtension!.SetObserver(oldHandleImpl.SubscriptionId, stream, observer, batchObserver, token, null);
+            var wasObserving = oldHandleImpl.HasObserver;
+            StreamSubscriptionHandle<T> newHandle = myExtension!.SetObserver(
+                oldHandleImpl.SubscriptionId,
+                stream,
+                observer,
+                batchObserver,
+                token,
+                oldHandleImpl.FilterData);
+
+            try
+            {
+                if (wasObserving && token is not null)
+                {
+                    await myExtension.RefreshStreamConsumer(
+                        oldHandleImpl.SubscriptionId,
+                        stream.InternalStreamId,
+                        myGrainReference!.GetGrainId(),
+                        oldHandleImpl.FilterData,
+                        token);
+                }
+            }
+            catch
+            {
+                myExtension.RestoreObserver(oldHandleImpl.SubscriptionId, oldHandleImpl);
+                throw;
+            }
 
             // On failure caller should be able to retry using the original handle, so invalidate old handle only if everything succeeded.
             oldHandleImpl.Invalidate();

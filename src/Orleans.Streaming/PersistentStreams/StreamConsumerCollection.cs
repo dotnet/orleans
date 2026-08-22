@@ -23,6 +23,9 @@ namespace Orleans.Streams
         [NonSerialized]
         public Task? RegistrationTask;
 
+        [NonSerialized]
+        private int activeRefreshCount;
+
         public StreamConsumerCollection(DateTime now)
         {
             queueData = new Dictionary<GuidId, StreamConsumerData>();
@@ -79,13 +82,17 @@ namespace Orleans.Streams
             lastActivityTime = now;
         }
 
+        public void BeginRefresh() => activeRefreshCount++;
+
+        public void EndRefresh() => activeRefreshCount--;
+
         public bool IsInactive(DateTime now, TimeSpan inactivityPeriod)
         {
             // Consider stream inactive (with all its consumers) from the pulling agent perspective if:
             // 1) There were no new events received for that stream in the last inactivityPeriod
             // 2) All consumer for that stream are currently inactive (that is, all cursors are inactive) - 
             //    meaning there is nothing for those consumers in the adapter cache.
-            if (now - lastActivityTime < inactivityPeriod) return false;
+            if (activeRefreshCount > 0 || now - lastActivityTime < inactivityPeriod) return false;
             return !queueData.Values.Any(data => data.State.Equals(StreamConsumerDataState.Active));
         }
     }

@@ -36,6 +36,8 @@ namespace Orleans.Streams
         private readonly ConcurrentDictionary<GuidId, IStreamSubscriptionHandle> allStreamObservers = new(); // map to different ObserversCollection<T> of different Ts.
         [Id(2)]
         private readonly ILogger logger;
+        [Id(3)]
+        private readonly ConcurrentDictionary<GuidId, GrainId> streamProducers = new();
         private const int MAXIMUM_ITEM_STRING_LOG_LENGTH = 128;
         [NonSerialized]
         private readonly IGrainContext? _grainContext;
@@ -91,7 +93,38 @@ namespace Orleans.Streams
 
         public bool RemoveObserver(GuidId subscriptionId)
         {
-            return allStreamObservers.TryRemove(subscriptionId, out _);
+            var result = allStreamObservers.TryRemove(subscriptionId, out _);
+            streamProducers.TryRemove(subscriptionId, out _);
+            return result;
+        }
+
+        internal void RestoreObserver(GuidId subscriptionId, IStreamSubscriptionHandle observer)
+        {
+            allStreamObservers[subscriptionId] = observer;
+        }
+
+        internal async Task RefreshStreamConsumer(
+            GuidId subscriptionId,
+            QualifiedStreamId streamId,
+            GrainId streamConsumer,
+            string? filterData,
+            StreamSequenceToken token)
+        {
+            if (!streamProducers.TryGetValue(subscriptionId, out var streamProducer))
+            {
+                return;
+            }
+
+            var producer = providerRuntime.GrainFactory.GetGrain(streamProducer).AsReference<IStreamProducerExtension>();
+            RequestContext.Set(StreamRequestContextKeys.StreamResumeToken, token);
+            try
+            {
+                await producer.AddSubscriber(subscriptionId, streamId, streamConsumer, filterData);
+            }
+            finally
+            {
+                RequestContext.Remove(StreamRequestContextKeys.StreamResumeToken);
+            }
         }
 
         public Task<StreamHandshakeToken?> DeliverImmutable(GuidId subscriptionId, QualifiedStreamId streamId, object item, StreamSequenceToken currentToken, StreamHandshakeToken? handshakeToken)
@@ -104,6 +137,7 @@ namespace Orleans.Streams
             LogTraceDeliverItem(new(item), subscriptionId);
             if (allStreamObservers.TryGetValue(subscriptionId, out var observer))
             {
+                RecordStreamProducer(subscriptionId);
                 return await observer.DeliverItem(item, currentToken, handshakeToken);
             }
             else if (StreamSubscriptionObserver is { } streamSubscriptionObserver)
@@ -116,6 +150,7 @@ namespace Orleans.Streams
                     //check if an observer were attached after handling the new subscription, deliver on it if attached
                     if (allStreamObservers.TryGetValue(subscriptionId, out observer))
                     {
+                        RecordStreamProducer(subscriptionId);
                         return await observer.DeliverItem(item, currentToken, handshakeToken);
                     }
                 }
@@ -136,6 +171,7 @@ namespace Orleans.Streams
 
             if (allStreamObservers.TryGetValue(subscriptionId, out var observer))
             {
+                RecordStreamProducer(subscriptionId);
                 return await observer.DeliverBatch(batch, handshakeToken);
             }
             else if (StreamSubscriptionObserver is { } streamSubscriptionObserver)
@@ -148,6 +184,7 @@ namespace Orleans.Streams
                     // check if an observer were attached after handling the new subscription, deliver on it if attached
                     if (allStreamObservers.TryGetValue(subscriptionId, out observer))
                     {
+                        RecordStreamProducer(subscriptionId);
                         return await observer.DeliverBatch(batch, handshakeToken);
                     }
                 }
@@ -197,7 +234,22 @@ namespace Orleans.Streams
 
         public Task<StreamHandshakeToken?> GetSequenceToken(GuidId subscriptionId)
         {
-            return Task.FromResult(allStreamObservers.TryGetValue(subscriptionId, out var observer) ? observer.GetSequenceToken() : null);
+            if (allStreamObservers.TryGetValue(subscriptionId, out var observer))
+            {
+                RecordStreamProducer(subscriptionId);
+                return Task.FromResult(observer.GetSequenceToken());
+            }
+
+            streamProducers.TryRemove(subscriptionId, out _);
+            return Task.FromResult<StreamHandshakeToken?>(null);
+        }
+
+        private void RecordStreamProducer(GuidId subscriptionId)
+        {
+            if (RequestContext.Get(StreamRequestContextKeys.StreamProducer) is GrainId streamProducer)
+            {
+                streamProducers[subscriptionId] = streamProducer;
+            }
         }
 
         internal int DiagCountStreamObservers<T>(QualifiedStreamId streamId)
