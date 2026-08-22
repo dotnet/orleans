@@ -1,7 +1,7 @@
 ---
 title: Grain request scheduling
 description: Understand Orleans turn-based execution, interleaving, and reentrancy.
-ms.date: 08/02/2026
+ms.date: 08/22/2026
 ms.topic: concept-article
 ---
 
@@ -42,7 +42,7 @@ Code in different requests doesn't run simultaneously, but multiple incomplete c
 ### Method-level interleaving
 
 :::code language="csharp" source="../snippets/compiled/Grains/RequestsAndVersioningSnippets.cs" id="interleaving_method_attributes":::
-`ReadOnly` is a scheduling promise. Don't mutate grain state from a read-only method.
+`ReadOnly` is a scheduling promise that the method preserves grain state. Read-only requests can interleave with other read-only requests. See [Scale grain reads](read-scaling.md) for a single-writer example and the application-managed read-model pattern.
 
 ### Predicate-based interleaving
 
