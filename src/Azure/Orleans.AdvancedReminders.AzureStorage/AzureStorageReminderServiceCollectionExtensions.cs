@@ -1,4 +1,6 @@
 using System;
+using System.Security.Cryptography;
+using System.Text;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using Orleans.AdvancedReminders.AzureStorage;
@@ -94,13 +96,26 @@ public static class AzureStorageReminderServiceCollectionExtensions
     {
         services.UseAzureBlobDurableJobs(_ => { });
         services.AddOptions<AzureBlobJournalStorageOptions>()
-            .Configure<IOptions<AzureTableReminderStorageOptions>>((jobOptions, storageOptions) =>
+            .Configure<IOptions<AzureTableReminderStorageOptions>, IOptions<ClusterOptions>>((jobOptions, storageOptions, clusterOptions) =>
             {
                 jobOptions.BlobServiceClient = storageOptions.Value.BlobServiceClient;
-                jobOptions.ContainerName = storageOptions.Value.JobContainerName;
+                jobOptions.ContainerName = GetServiceScopedContainerName(
+                    storageOptions.Value.JobContainerName,
+                    clusterOptions.Value.ServiceId);
             });
     }
 #pragma warning restore ORLEANSEXP005
+
+    internal static string GetServiceScopedContainerName(string baseName, string serviceId)
+    {
+        const int HashLength = 12;
+        const int MaximumBaseLength = 63 - HashLength - 1;
+        var normalizedBaseName = baseName.Length <= MaximumBaseLength
+            ? baseName.TrimEnd('-')
+            : baseName[..MaximumBaseLength].TrimEnd('-');
+        var serviceHash = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(serviceId)))[..HashLength].ToLowerInvariant();
+        return $"{normalizedBaseName}-{serviceHash}";
+    }
 
     private static void AddStorageOptionsValidator(IServiceCollection services)
     {

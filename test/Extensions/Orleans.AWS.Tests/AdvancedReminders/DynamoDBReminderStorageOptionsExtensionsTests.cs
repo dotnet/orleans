@@ -3,6 +3,9 @@ using Xunit;
 
 namespace AWSUtils.Tests.AdvancedReminders;
 
+[TestSuite("BVT")]
+[TestProvider("None")]
+[TestArea("Reminders")]
 [TestCategory("Reminders"), TestCategory("AWS"), TestCategory("DynamoDb")]
 public class DynamoDBReminderStorageOptionsExtensionsTests
 {

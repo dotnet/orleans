@@ -10,6 +10,9 @@ using Xunit;
 
 namespace Tester;
 
+[TestSuite("BVT")]
+[TestProvider("None")]
+[TestArea("TestingHost")]
 public class InProcessTestClusterBuilderTimeProviderTests
 {
     private static readonly TimeSpan ReminderDueTime = TimeSpan.FromHours(1);

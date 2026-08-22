@@ -18,7 +18,8 @@ public class AzureTableReminderStorageOptions : AzureStorageOperationOptions
     public BlobServiceClient BlobServiceClient { get; set; } = null!;
 
     /// <summary>
-    /// Gets or sets the container name used to store advanced reminder durable jobs.
+    /// Gets or sets the base container name used to store advanced reminder durable jobs.
+    /// The Orleans service id is appended as a stable hash to isolate each service.
     /// </summary>
     public string JobContainerName { get; set; } = "advanced-reminder-jobs";
 }

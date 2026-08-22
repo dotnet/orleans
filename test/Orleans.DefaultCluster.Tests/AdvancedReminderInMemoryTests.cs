@@ -8,6 +8,9 @@ using Xunit;
 
 namespace DefaultCluster.Tests;
 
+[TestSuite("BVT")]
+[TestProvider("None")]
+[TestArea("Reminders")]
 public sealed class AdvancedReminderInMemoryTests(AdvancedReminderInMemoryTests.Fixture fixture)
     : IClassFixture<AdvancedReminderInMemoryTests.Fixture>
 {

@@ -5,6 +5,9 @@ using AdvancedReminderEntry = Orleans.AdvancedReminders.ReminderEntry;
 
 namespace UnitTests.AdvancedRemindersTest;
 
+[TestSuite("BVT")]
+[TestProvider("None")]
+[TestArea("Reminders")]
 public class AdoNetAdvancedReminderTableTests
 {
     [Fact]

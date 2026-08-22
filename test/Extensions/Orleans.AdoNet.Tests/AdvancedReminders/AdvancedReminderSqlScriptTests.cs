@@ -3,6 +3,9 @@ using Xunit;
 
 namespace UnitTests.AdvancedRemindersTest;
 
+[TestSuite("BVT")]
+[TestProvider("None")]
+[TestArea("Reminders")]
 [TestCategory("Reminders"), TestCategory("AdoNet")]
 public sealed class AdvancedReminderSqlScriptTests
 {

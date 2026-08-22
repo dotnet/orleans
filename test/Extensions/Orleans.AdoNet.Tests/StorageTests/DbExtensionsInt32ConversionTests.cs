@@ -5,6 +5,9 @@ using Xunit;
 
 namespace UnitTests.StorageTests;
 
+[TestSuite("BVT")]
+[TestProvider("None")]
+[TestArea("Storage")]
 [TestCategory("AdoNet"), TestCategory("Storage")]
 public class DbExtensionsInt32ConversionTests
 {

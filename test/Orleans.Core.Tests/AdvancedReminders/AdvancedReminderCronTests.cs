@@ -99,6 +99,9 @@ internal static class AdvancedReminderTimeZoneTestHelper
     }
 }
 
+[TestSuite("BVT")]
+[TestProvider("None")]
+[TestArea("Reminders")]
 [TestCategory("Reminders")]
 public class ReminderCronTests
 {
@@ -205,6 +208,9 @@ public class ReminderCronTests
     }
 }
 
+[TestSuite("BVT")]
+[TestProvider("None")]
+[TestArea("Reminders")]
 [TestCategory("Reminders")]
 public class ReminderCronBuilderTimeZoneTests
 {
@@ -378,6 +384,9 @@ public class ReminderCronBuilderTimeZoneTests
     }
 }
 
+[TestSuite("BVT")]
+[TestProvider("None")]
+[TestArea("Reminders")]
 [TestCategory("Reminders")]
 public class ReminderCronExpressionTimeZoneTests
 {
@@ -459,6 +468,9 @@ public class ReminderCronExpressionTimeZoneTests
     }
 }
 
+[TestSuite("BVT")]
+[TestProvider("None")]
+[TestArea("Reminders")]
 [TestCategory("Reminders")]
 public class ReminderCronExpressionFuzzTests
 {
@@ -545,6 +557,9 @@ public class ReminderCronExpressionFuzzTests
     }
 }
 
+[TestSuite("BVT")]
+[TestProvider("None")]
+[TestArea("Reminders")]
 [TestCategory("Reminders")]
 public class ReminderEntryConversionTests
 {
@@ -593,6 +608,9 @@ public class ReminderEntryConversionTests
     }
 }
 
+[TestSuite("BVT")]
+[TestProvider("None")]
+[TestArea("Reminders")]
 [TestCategory("Reminders")]
 public class ReminderCronComplexPatternTests
 {
@@ -712,6 +730,9 @@ public class ReminderCronComplexPatternTests
     }
 }
 
+[TestSuite("BVT")]
+[TestProvider("None")]
+[TestArea("Reminders")]
 [TestCategory("Reminders")]
 public class ReminderCronBuilderTests
 {
@@ -1187,6 +1208,9 @@ public class ReminderCronBuilderTests
     }
 }
 
+[TestSuite("BVT")]
+[TestProvider("None")]
+[TestArea("Reminders")]
 [TestCategory("Reminders")]
 public class ReminderCronExpressionBehaviorTests
 {
@@ -1252,6 +1276,9 @@ public class ReminderCronExpressionBehaviorTests
     }
 }
 
+[TestSuite("BVT")]
+[TestProvider("None")]
+[TestArea("Reminders")]
 [TestCategory("Reminders")]
 public class ReminderCronScheduleTests
 {
@@ -1347,6 +1374,9 @@ public class ReminderCronScheduleTests
     }
 }
 
+[TestSuite("BVT")]
+[TestProvider("None")]
+[TestArea("Reminders")]
 [TestCategory("Reminders")]
 public class ReminderCronTimeZoneEdgeCaseTests
 {
@@ -1548,6 +1578,9 @@ public class ReminderCronTimeZoneEdgeCaseTests
     }
 }
 
+[TestSuite("BVT")]
+[TestProvider("None")]
+[TestArea("Reminders")]
 [TestCategory("Reminders")]
 public class CalendarHelperTests
 {

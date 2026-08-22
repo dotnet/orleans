@@ -13,6 +13,9 @@ using LoggerFilterOptions = Microsoft.Extensions.Logging.LoggerFilterOptions;
 
 namespace Tester.Redis.AdvancedReminders;
 
+[TestSuite("Functional")]
+[TestProvider("Redis")]
+[TestArea("Reminders")]
 [TestCategory("Redis"), TestCategory("Reminders"), TestCategory("Functional")]
 [Collection(TestEnvironmentFixture.DefaultCollection)]
 public class RedisAdvancedRemindersTableTests : AdvancedReminderTableTestsBase
@@ -128,6 +131,9 @@ public class RedisAdvancedRemindersTableTests : AdvancedReminderTableTestsBase
 
 }
 
+[TestSuite("BVT")]
+[TestProvider("None")]
+[TestArea("Reminders")]
 [TestCategory("Redis"), TestCategory("Reminders")]
 public class RedisAdvancedReminderOptionsTests
 {

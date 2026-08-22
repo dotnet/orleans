@@ -12,6 +12,9 @@ using LoggerFilterOptions = Microsoft.Extensions.Logging.LoggerFilterOptions;
 
 namespace UnitTests.AdvancedRemindersTest;
 
+[TestSuite("Functional")]
+[TestProvider("MySql")]
+[TestArea("Reminders")]
 [TestCategory("Functional"), TestCategory("Reminders"), TestCategory("AdoNet"), TestCategory("MySql")]
 public class MySqlAdvancedRemindersTableTests : AdvancedReminderTableTestsBase
 {

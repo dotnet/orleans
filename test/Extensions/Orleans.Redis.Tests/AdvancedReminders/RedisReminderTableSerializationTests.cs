@@ -23,6 +23,9 @@ using DurableJobPriority = Orleans.DurableJobs.DurableJobPriority;
 
 namespace Tester.Redis.AdvancedReminders;
 
+[TestSuite("BVT")]
+[TestProvider("None")]
+[TestArea("Reminders")]
 [TestCategory("Redis"), TestCategory("Reminders")]
 public class RedisReminderTableSerializationTests
 {

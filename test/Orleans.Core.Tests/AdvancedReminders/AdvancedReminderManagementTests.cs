@@ -24,6 +24,9 @@ using ReminderTableData = Orleans.AdvancedReminders.ReminderTableData;
 
 namespace UnitTests.AdvancedReminders;
 
+[TestSuite("BVT")]
+[TestProvider("None")]
+[TestArea("Reminders")]
 [TestCategory("Reminders")]
 public class ReminderIteratorTests
 {
@@ -153,6 +156,9 @@ public class ReminderIteratorTests
         };
 }
 
+[TestSuite("BVT")]
+[TestProvider("None")]
+[TestArea("Reminders")]
 [TestCategory("Reminders")]
 public class ReminderManagementGrainExtensionsTests
 {
@@ -266,6 +272,9 @@ public class ReminderManagementGrainExtensionsTests
         };
 }
 
+[TestSuite("BVT")]
+[TestProvider("None")]
+[TestArea("Reminders")]
 [TestCategory("Reminders")]
 public class ReminderManagementGrainTests
 {
@@ -912,6 +921,9 @@ public class ReminderManagementGrainTests
     }
 }
 
+[TestSuite("BVT")]
+[TestProvider("None")]
+[TestArea("Reminders")]
 [TestCategory("Reminders")]
 [TestCategory("Stress")]
 public class ReminderStressTests

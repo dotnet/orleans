@@ -10,6 +10,9 @@ using Xunit;
 
 namespace UnitTests.AdvancedRemindersTest;
 
+[TestSuite("Functional")]
+[TestProvider("Cosmos")]
+[TestArea("Reminders")]
 [TestCategory("Reminders"), TestCategory("Cosmos")]
 public class CosmosAdvancedRemindersTableTests : AdvancedReminderTableTestsBase
 {

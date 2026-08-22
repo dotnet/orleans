@@ -13,6 +13,9 @@ using LoggerFilterOptions = Microsoft.Extensions.Logging.LoggerFilterOptions;
 
 namespace UnitTests.AdvancedRemindersTest;
 
+[TestSuite("Functional")]
+[TestProvider("SqlServer")]
+[TestArea("Reminders")]
 [TestCategory("Functional"), TestCategory("Reminders"), TestCategory("AdoNet"), TestCategory("SqlServer")]
 public class SqlServerAdvancedRemindersTableTests : AdvancedReminderTableTestsBase
 {

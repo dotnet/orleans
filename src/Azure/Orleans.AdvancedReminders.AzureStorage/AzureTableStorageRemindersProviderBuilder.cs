@@ -28,6 +28,12 @@ internal sealed class AdvancedAzureTableStorageRemindersProviderBuilder : IProvi
                     options.TableName = tableName;
                 }
 
+                var jobContainerName = configurationSection["JobContainerName"];
+                if (!string.IsNullOrEmpty(jobContainerName))
+                {
+                    options.JobContainerName = jobContainerName;
+                }
+
                 var serviceKey = configurationSection["ServiceKey"];
                 if (!string.IsNullOrEmpty(serviceKey))
                 {
