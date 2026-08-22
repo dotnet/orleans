@@ -18,7 +18,7 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="Microsoft.Accordant" PrivateAssets="all" />
+    <PackageReference Include="Microsoft.Accordant" />
     <PackageReference Include="System.Collections.Immutable" VersionOverride="10.0.0" PrivateAssets="all" />
     <PackageReference Include="System.IO.Pipelines" VersionOverride="10.0.5" PrivateAssets="all" />
     <PackageReference Include="System.Text.Json" VersionOverride="10.0.5" PrivateAssets="all" />
