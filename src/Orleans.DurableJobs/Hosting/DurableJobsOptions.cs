@@ -30,6 +30,13 @@ public sealed class DurableJobsOptions
     public TimeSpan ShardActivationBufferPeriod { get; set; } = TimeSpan.FromMinutes(5);
 
     /// <summary>
+    /// Gets or sets how far into the future a silo loads and claims durable job shards during
+    /// recovery and periodic shard discovery. Farther-future shards remain only in durable storage
+    /// until they enter this window. Default: 1 hour.
+    /// </summary>
+    public TimeSpan ShardLoadLookaheadPeriod { get; set; } = TimeSpan.FromHours(1);
+
+    /// <summary>
     /// Gets or sets the number of writable shards to use for each shard time bucket.
     /// Increasing this value distributes jobs with the same due-time bucket across multiple shard journals.
     /// Default: 1.
@@ -289,6 +296,10 @@ public sealed partial class DurableJobsOptionsValidator : IConfigurationValidato
         if (options.ShardClaimRampUpDuration < TimeSpan.Zero)
         {
             throw new OrleansConfigurationException("DurableJobsOptions.ShardClaimRampUpDuration must be non-negative.");
+        }
+        if (options.ShardLoadLookaheadPeriod <= TimeSpan.Zero)
+        {
+            throw new OrleansConfigurationException("DurableJobsOptions.ShardLoadLookaheadPeriod must be greater than zero.");
         }
         LogInformationOptionsValidated(_logger, options.ShardDuration);
     }

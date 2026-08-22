@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.Threading;
 using System.Threading.Tasks;
 using Orleans.AdvancedReminders;
@@ -323,6 +324,24 @@ public sealed class DashboardRemindersGrainTests
             BeginHash = begin;
             EndHash = end;
             return Task.FromResult(new AdvancedReminderTableData(reminders));
+        }
+
+        public Task<AdvancedReminderTableData> ReadRows(uint begin, uint end, int maxRows, string? continuationToken)
+        {
+            RangeReadCount++;
+            BeginHash = begin;
+            EndHash = end;
+            var offset = continuationToken is null ? 0 : int.Parse(continuationToken, CultureInfo.InvariantCulture);
+            var page = reminders.Skip(offset).Take(maxRows + 1).ToList();
+            var hasMore = page.Count > maxRows;
+            if (hasMore)
+            {
+                page.RemoveAt(maxRows);
+            }
+
+            return Task.FromResult(new AdvancedReminderTableData(
+                page,
+                hasMore ? (offset + page.Count).ToString(CultureInfo.InvariantCulture) : null));
         }
 
         public Task<AdvancedReminderTableData> ReadRows(GrainId grainId) => throw new NotSupportedException();

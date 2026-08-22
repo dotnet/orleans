@@ -521,6 +521,28 @@ namespace Orleans.GrainDirectory.AzureStorage
             return result.Entries;
         }
 
+        public async Task<(List<(T Entity, string ETag)> Entries, string? ContinuationToken)> ReadTableEntriesAndEtagsPageAsync(
+            string? filter,
+            int maxRows,
+            string? continuationToken,
+            CancellationToken cancellationToken = default)
+        {
+            ArgumentOutOfRangeException.ThrowIfNegativeOrZero(maxRows);
+            await foreach (var page in Table.QueryAsync<T>(filter, maxPerPage: maxRows, cancellationToken: cancellationToken)
+                .AsPages(continuationToken, maxRows))
+            {
+                var results = new List<(T Entity, string ETag)>(page.Values.Count);
+                foreach (var value in page.Values)
+                {
+                    results.Add((value, value.ETag.ToString()));
+                }
+
+                return (results, page.ContinuationToken);
+            }
+
+            return ([], null);
+        }
+
         private async Task<(List<(T Entity, string ETag)> Entries, bool IsPaginated)> ReadTableEntriesAndEtagsWithPaginationAsync(
             string? filter,
             CancellationToken cancellationToken)

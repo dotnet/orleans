@@ -108,6 +108,42 @@ VALUES
 INSERT INTO OrleansQuery(QueryKey, QueryText)
 VALUES
 (
+    'AdvancedRemindersReadRangeRows1PagedKey','
+    SELECT GrainId, ReminderName, StartTime, Period, CronExpression, CronTimeZoneId, NextDueUtc, LastFireUtc, ScheduleId, JobId, JobShardId, Priority, Action, Version
+    FROM ORLEANSADVANCEDREMINDERSTABLE
+    WHERE ServiceId = :ServiceId AND :ServiceId IS NOT NULL
+        AND GrainHash > :BeginHash AND :BeginHash IS NOT NULL
+        AND GrainHash <= :EndHash AND :EndHash IS NOT NULL
+        AND (:HasCursor = 0
+            OR GrainHash > :CursorHash
+            OR (GrainHash = :CursorHash AND GrainId > :CursorGrainId)
+            OR (GrainHash = :CursorHash AND GrainId = :CursorGrainId AND ReminderName > :CursorReminderName))
+    ORDER BY GrainHash, GrainId, ReminderName
+    FETCH FIRST :PageSize ROWS ONLY
+');
+/
+
+INSERT INTO OrleansQuery(QueryKey, QueryText)
+VALUES
+(
+    'AdvancedRemindersReadRangeRows2PagedKey','
+    SELECT GrainId, ReminderName, StartTime, Period, CronExpression, CronTimeZoneId, NextDueUtc, LastFireUtc, ScheduleId, JobId, JobShardId, Priority, Action, Version
+    FROM ORLEANSADVANCEDREMINDERSTABLE
+    WHERE ServiceId = :ServiceId AND :ServiceId IS NOT NULL
+        AND ((GrainHash > :BeginHash AND :BeginHash IS NOT NULL)
+        OR (GrainHash <= :EndHash AND :EndHash IS NOT NULL))
+        AND (:HasCursor = 0
+            OR GrainHash > :CursorHash
+            OR (GrainHash = :CursorHash AND GrainId > :CursorGrainId)
+            OR (GrainHash = :CursorHash AND GrainId = :CursorGrainId AND ReminderName > :CursorReminderName))
+    ORDER BY GrainHash, GrainId, ReminderName
+    FETCH FIRST :PageSize ROWS ONLY
+');
+/
+
+INSERT INTO OrleansQuery(QueryKey, QueryText)
+VALUES
+(
     'AdvancedRemindersReadReminderRowsKey','
     SELECT GrainId, ReminderName, StartTime, Period, CronExpression, CronTimeZoneId, NextDueUtc, LastFireUtc, ScheduleId, JobId, JobShardId, Priority, Action, Version
     FROM ORLEANSADVANCEDREMINDERSTABLE

@@ -113,6 +113,22 @@ public sealed class AdvancedReminderSqlScriptTests
         Assert.Contains(declaration, script, StringComparison.OrdinalIgnoreCase);
     }
 
+    [Theory]
+    [InlineData("MySQL", "LIMIT @PageSize")]
+    [InlineData("PostgreSQL", "LIMIT @PageSize")]
+    [InlineData("Oracle", "FETCH FIRST :PageSize ROWS ONLY")]
+    [InlineData("SQLServer", "OFFSET 0 ROWS FETCH NEXT @PageSize ROWS ONLY")]
+    public void AdvancedRecoveryQueries_UseBoundedDeterministicPaging(string database, string pagingSyntax)
+    {
+        var script = ReadAdvancedScript(database);
+
+        Assert.Contains("AdvancedRemindersReadRangeRows1PagedKey", script, StringComparison.Ordinal);
+        Assert.Contains("AdvancedRemindersReadRangeRows2PagedKey", script, StringComparison.Ordinal);
+        Assert.Contains("ORDER BY GrainHash, GrainId, ReminderName", script, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("CursorReminderName", script, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains(pagingSyntax, script, StringComparison.OrdinalIgnoreCase);
+    }
+
     private static string ReadClassicScript(string database)
         => File.ReadAllText(Path.Combine(AppContext.BaseDirectory, $"{database}-Reminders.sql"));
 

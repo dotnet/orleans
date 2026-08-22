@@ -1,6 +1,8 @@
 using System;
 using System.Threading;
 using System.Threading.Tasks;
+using System.Globalization;
+using System.Text;
 using Microsoft.Extensions.Options;
 using Orleans.AdvancedReminders.AdoNet;
 using Orleans.Configuration;
@@ -40,6 +42,61 @@ internal sealed class AdoNetReminderTable : IReminderTable
     public Task<ReminderTableData> ReadRows(uint beginHash, uint endHash)
     {
         return this.orleansQueries.ReadReminderRowsAsync(this.serviceId, beginHash, endHash);
+    }
+
+    public Task<ReminderTableData> ReadRows(uint beginHash, uint endHash, int maxRows, string? continuationToken)
+    {
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(maxRows);
+        var cursor = AdoNetReminderContinuation.Parse(continuationToken);
+        return orleansQueries.ReadReminderRowsAsync(
+            serviceId,
+            beginHash,
+            endHash,
+            maxRows,
+            cursor is not null,
+            cursor?.Hash ?? 0,
+            cursor?.GrainId ?? string.Empty,
+            cursor?.ReminderName ?? string.Empty);
+    }
+
+    internal static class AdoNetReminderContinuation
+    {
+        public static string Format(ReminderEntry entry)
+            => string.Concat(
+                entry.GrainId.GetUniformHashCode().ToString("X8", CultureInfo.InvariantCulture),
+                ".",
+                Convert.ToBase64String(Encoding.UTF8.GetBytes(entry.GrainId.ToString())),
+                ".",
+                Convert.ToBase64String(Encoding.UTF8.GetBytes(entry.ReminderName)));
+
+        public static Cursor? Parse(string? continuationToken)
+        {
+            if (continuationToken is null)
+            {
+                return null;
+            }
+
+            try
+            {
+                var segments = continuationToken.Split('.');
+                if (segments.Length != 3
+                    || !uint.TryParse(segments[0], NumberStyles.HexNumber, CultureInfo.InvariantCulture, out var hash))
+                {
+                    throw new FormatException();
+                }
+
+                return new Cursor(
+                    hash,
+                    Encoding.UTF8.GetString(Convert.FromBase64String(segments[1])),
+                    Encoding.UTF8.GetString(Convert.FromBase64String(segments[2])));
+            }
+            catch (FormatException exception)
+            {
+                throw new ArgumentException("The continuation token is invalid.", nameof(continuationToken), exception);
+            }
+        }
+
+        internal sealed record Cursor(uint Hash, string GrainId, string ReminderName);
     }
 
     public async Task<ReminderEntry?> ReadRow(GrainId grainId, string reminderName)

@@ -1,6 +1,8 @@
 using System;
 using System.Collections.Generic;
 using System.Runtime.InteropServices;
+using System.Globalization;
+using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using Orleans.Concurrency;
@@ -29,10 +31,96 @@ internal sealed class AdvancedReminderTableGrain : Grain, IReminderTableGrain, I
             {
                 result.AddRange(reminders.Values);
             }
+
         }
 
         return Task.FromResult(new ReminderTableData(result));
     }
+
+    public Task<ReminderTableData> ReadRows(uint begin, uint end, int maxRows, string? continuationToken)
+    {
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(maxRows);
+        var range = RangeFactory.CreateRange(begin, end);
+        var cursor = ParseContinuationToken(continuationToken);
+        var query = _reminderTable
+            .Where(pair => range.InRange(pair.Key))
+            .SelectMany(pair => pair.Value.Values)
+            .OrderBy(entry => unchecked(entry.GrainId.GetUniformHashCode() - begin))
+            .ThenBy(entry => entry.GrainId.ToString(), StringComparer.Ordinal)
+            .ThenBy(entry => entry.ReminderName, StringComparer.Ordinal);
+        if (cursor is not null)
+        {
+            query = query.Where(entry => CompareToCursor(entry, cursor.Value, begin) > 0)
+                .OrderBy(entry => unchecked(entry.GrainId.GetUniformHashCode() - begin))
+                .ThenBy(entry => entry.GrainId.ToString(), StringComparer.Ordinal)
+                .ThenBy(entry => entry.ReminderName, StringComparer.Ordinal);
+        }
+
+        var rows = query
+            .Take(maxRows + 1)
+            .ToList();
+        var hasMore = rows.Count > maxRows;
+        if (hasMore)
+        {
+            rows.RemoveAt(maxRows);
+        }
+
+        return Task.FromResult(new ReminderTableData(
+            rows,
+            hasMore ? FormatContinuationToken(rows[^1]) : null));
+    }
+
+    private static int CompareToCursor(ReminderEntry entry, ReminderCursor cursor, uint begin)
+    {
+        var hashComparison = unchecked(entry.GrainId.GetUniformHashCode() - begin)
+            .CompareTo(unchecked(cursor.Hash - begin));
+        if (hashComparison != 0)
+        {
+            return hashComparison;
+        }
+
+        var grainComparison = string.CompareOrdinal(entry.GrainId.ToString(), cursor.GrainId);
+        return grainComparison != 0
+            ? grainComparison
+            : string.CompareOrdinal(entry.ReminderName, cursor.ReminderName);
+    }
+
+    private static string FormatContinuationToken(ReminderEntry entry)
+        => string.Concat(
+            entry.GrainId.GetUniformHashCode().ToString("X8", CultureInfo.InvariantCulture),
+            ".",
+            Convert.ToBase64String(Encoding.UTF8.GetBytes(entry.GrainId.ToString())),
+            ".",
+            Convert.ToBase64String(Encoding.UTF8.GetBytes(entry.ReminderName)));
+
+    private static ReminderCursor? ParseContinuationToken(string? continuationToken)
+    {
+        if (continuationToken is null)
+        {
+            return null;
+        }
+
+        try
+        {
+            var segments = continuationToken.Split('.');
+            if (segments.Length != 3
+                || !uint.TryParse(segments[0], NumberStyles.HexNumber, CultureInfo.InvariantCulture, out var hash))
+            {
+                throw new FormatException();
+            }
+
+            return new ReminderCursor(
+                hash,
+                Encoding.UTF8.GetString(Convert.FromBase64String(segments[1])),
+                Encoding.UTF8.GetString(Convert.FromBase64String(segments[2])));
+        }
+        catch (FormatException exception)
+        {
+            throw new ArgumentException("The continuation token is invalid.", nameof(continuationToken), exception);
+        }
+    }
+
+    private readonly record struct ReminderCursor(uint Hash, string GrainId, string ReminderName);
 
     public Task<ReminderEntry?> ReadRow(GrainId grainId, string reminderName)
     {

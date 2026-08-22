@@ -94,6 +94,16 @@ internal sealed partial class RemindersTableManager : AzureTableDataManager<Remi
     }
 
     internal async Task<List<(ReminderTableEntry Entity, string ETag)>> FindReminderEntries(uint begin, uint end)
+        => await ReadTableEntriesAndEtagsAsync(CreateRangeQuery(begin, end));
+
+    internal Task<(List<(ReminderTableEntry Entity, string ETag)> Entries, string? ContinuationToken)> FindReminderEntries(
+        uint begin,
+        uint end,
+        int maxRows,
+        string? continuationToken)
+        => ReadTableEntriesAndEtagsPageAsync(CreateRangeQuery(begin, end), maxRows, continuationToken);
+
+    private string CreateRangeQuery(uint begin, uint end)
     {
         string sBegin = ReminderTableEntry.ConstructPartitionKey(_serviceId, begin);
         string sEnd = ReminderTableEntry.ConstructPartitionKey(_serviceId, end);
@@ -123,7 +133,7 @@ internal sealed partial class RemindersTableManager : AzureTableDataManager<Remi
             }
         }
 
-        return await ReadTableEntriesAndEtagsAsync(query);
+        return query;
     }
 
     internal async Task<List<(ReminderTableEntry Entity, string ETag)>> FindReminderEntries(GrainId grainId)

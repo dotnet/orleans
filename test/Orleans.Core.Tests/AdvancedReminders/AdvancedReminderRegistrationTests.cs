@@ -2,6 +2,7 @@
 using System;
 using System.Collections.Generic;
 using System.Collections.Immutable;
+using System.Globalization;
 using System.Linq;
 using System.Reflection;
 using System.Threading;
@@ -1171,6 +1172,24 @@ public class SiloBuilderReminderExtensionsTests
         Assert.Contains(builder.Services, descriptor => descriptor.ServiceType == typeof(JobShardManager));
     }
 
+    [Fact]
+    public void AddAdvancedReminders_WithLookaheadShorterThanRecoveryCycle_FailsValidation()
+    {
+        var builder = new TestSiloBuilder();
+        builder.Services.AddLogging();
+        builder.UseInMemoryAdvancedReminderService();
+        builder.Services.Configure<DurableJobsOptions>(options =>
+            options.ShardLoadLookaheadPeriod = AdvancedReminderRecoveryGrain.MinimumLookaheadPeriod - TimeSpan.FromSeconds(1));
+        using var provider = builder.Services.BuildServiceProvider();
+        var validator = provider.GetServices<IConfigurationValidator>()
+            .OfType<AdvancedReminderJobBackendValidator>()
+            .Single();
+
+        var exception = Assert.Throws<OrleansConfigurationException>(validator.ValidateConfiguration);
+
+        Assert.Contains(nameof(DurableJobsOptions.ShardLoadLookaheadPeriod), exception.Message, StringComparison.Ordinal);
+    }
+
     private sealed class TestSiloBuilder(IServiceCollection? services = null) : ISiloBuilder
     {
         public IServiceCollection Services { get; } = services ?? new ServiceCollection();
@@ -1185,12 +1204,76 @@ public class SiloBuilderReminderExtensionsTests
 [TestCategory("Reminders")]
 public class AdvancedReminderRecoveryGrainTests
 {
+    [Fact]
+    public async Task InMemoryReminderTableGrain_RangePagingIsBounded()
+    {
+        var table = new AdvancedReminderTableGrain();
+        for (var index = 0; index < 7; index++)
+        {
+            await table.UpsertRow(new ReminderEntry
+            {
+                GrainId = GrainId.Create("test", $"paged-{index}"),
+                ReminderName = $"reminder-{index}",
+                StartAt = DateTime.UtcNow,
+                NextDueUtc = DateTime.UtcNow.AddMinutes(1),
+                Period = TimeSpan.FromMinutes(1),
+            });
+        }
+
+        var rows = new List<ReminderEntry>();
+        string? continuationToken = null;
+        do
+        {
+            var page = await table.ReadRows(0, 0, maxRows: 2, continuationToken);
+            Assert.InRange(page.Reminders.Count, 0, 2);
+            rows.AddRange(page.Reminders);
+            continuationToken = page.ContinuationToken;
+        } while (continuationToken is not null);
+
+        Assert.Equal(7, rows.Count);
+        Assert.Equal(7, rows.Select(row => (row.GrainId, row.ReminderName)).Distinct().Count());
+    }
+
+    [Fact]
+    public async Task InMemoryReminderTableGrain_KeysetPagingDoesNotSkipAfterEarlierDeletion()
+    {
+        var table = new AdvancedReminderTableGrain();
+        for (var index = 0; index < 5; index++)
+        {
+            await table.UpsertRow(new ReminderEntry
+            {
+                GrainId = GrainId.Create("test", $"mutation-{index}"),
+                ReminderName = $"reminder-{index}",
+                StartAt = DateTime.UtcNow,
+                NextDueUtc = DateTime.UtcNow.AddMinutes(1),
+                Period = TimeSpan.FromMinutes(1),
+            });
+        }
+
+        var first = await table.ReadRows(0, 0, maxRows: 2, continuationToken: null);
+        Assert.Equal(2, first.Reminders.Count);
+        Assert.NotNull(first.ContinuationToken);
+        var deleted = first.Reminders[0];
+        Assert.True(await table.RemoveRow(deleted.GrainId, deleted.ReminderName, deleted.ETag));
+
+        var rows = first.Reminders.ToList();
+        var continuationToken = first.ContinuationToken;
+        while (continuationToken is not null)
+        {
+            var page = await table.ReadRows(0, 0, maxRows: 2, continuationToken);
+            rows.AddRange(page.Reminders);
+            continuationToken = page.ContinuationToken;
+        }
+
+        Assert.Equal(5, rows.Select(row => (row.GrainId, row.ReminderName)).Distinct().Count());
+    }
+
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
     public async Task ReconcileAsync_ScansInBoundedRangesAndDispatchesOnlyRequiredRows(bool force)
     {
-        const int reminderCount = 65;
+        const int reminderCount = AdvancedReminderRecoveryGrain.RecoveryPageSize * 2 + 1;
         var entries = Enumerable.Range(0, reminderCount)
             .Select(index => new ReminderEntry
             {
@@ -1207,10 +1290,34 @@ public class AdvancedReminderRecoveryGrainTests
             .ToArray();
         var reminderTable = Substitute.For<Orleans.AdvancedReminders.IReminderTable>();
         var readCount = 0;
-        reminderTable.ReadRows(Arg.Any<uint>(), Arg.Any<uint>()).Returns(_ =>
-            Interlocked.Increment(ref readCount) == 1
-                ? new ReminderTableData(entries)
-                : new ReminderTableData());
+        uint? pagedBegin = null;
+        uint? pagedEnd = null;
+        reminderTable.ReadRows(Arg.Any<uint>(), Arg.Any<uint>(), AdvancedReminderRecoveryGrain.RecoveryPageSize, Arg.Any<string?>()).Returns(call =>
+        {
+            Interlocked.Increment(ref readCount);
+            var begin = call.ArgAt<uint>(0);
+            var end = call.ArgAt<uint>(1);
+            var continuationToken = call.ArgAt<string?>(3);
+            if (pagedBegin is null)
+            {
+                pagedBegin = begin;
+                pagedEnd = end;
+            }
+
+            if (begin != pagedBegin || end != pagedEnd)
+            {
+                return new ReminderTableData();
+            }
+
+            var offset = continuationToken is null
+                ? 0
+                : int.Parse(continuationToken, CultureInfo.InvariantCulture);
+            var rows = entries.Skip(offset).Take(AdvancedReminderRecoveryGrain.RecoveryPageSize).ToArray();
+            var nextOffset = offset + rows.Length;
+            return new ReminderTableData(
+                rows,
+                nextOffset < entries.Length ? nextOffset.ToString(CultureInfo.InvariantCulture) : null);
+        });
         var dispatcher = Substitute.For<IAdvancedReminderDispatcherGrain>();
         var grainFactory = Substitute.For<IGrainFactory>();
         grainFactory.GetGrain<IAdvancedReminderDispatcherGrain>(Arg.Any<string>(), null).Returns(dispatcher);
@@ -1222,8 +1329,13 @@ public class AdvancedReminderRecoveryGrainTests
         await recovery.ReconcileAsync(force, CancellationToken.None);
 
         await reminderTable.DidNotReceive().StartAsync(Arg.Any<CancellationToken>());
-        Assert.Equal(256, readCount);
+        Assert.Equal(AdvancedReminderRecoveryGrain.ScanBucketsPerReconciliation + 2, readCount);
         await reminderTable.DidNotReceive().ReadRows((uint)0, (uint)0);
+        await reminderTable.Received().ReadRows(
+            Arg.Any<uint>(),
+            Arg.Any<uint>(),
+            AdvancedReminderRecoveryGrain.RecoveryPageSize,
+            Arg.Any<string?>());
         await dispatcher.Received(1).EnsureScheduledAsync(
             entries[0].GrainId,
             entries[0].ReminderName,
@@ -1253,7 +1365,7 @@ public class AdvancedReminderRecoveryGrainTests
         };
         var reminderTable = Substitute.For<Orleans.AdvancedReminders.IReminderTable>();
         var readCount = 0;
-        reminderTable.ReadRows(Arg.Any<uint>(), Arg.Any<uint>()).Returns(_ =>
+        reminderTable.ReadRows(Arg.Any<uint>(), Arg.Any<uint>(), AdvancedReminderRecoveryGrain.RecoveryPageSize, Arg.Any<string?>()).Returns(_ =>
             Interlocked.Increment(ref readCount) == 1
                 ? new ReminderTableData([overdue])
                 : new ReminderTableData());
@@ -1265,7 +1377,7 @@ public class AdvancedReminderRecoveryGrainTests
             grainFactory,
             NullLogger<AdvancedReminderRecoveryGrain>.Instance,
             new RecoveryJobShardManager("overdue-job"),
-            timeProvider);
+            timeProvider: timeProvider);
 
         await recovery.ReconcileAsync(force: false, CancellationToken.None);
 
@@ -1293,7 +1405,7 @@ public class AdvancedReminderRecoveryGrainTests
         };
         var reminderTable = Substitute.For<Orleans.AdvancedReminders.IReminderTable>();
         var readCount = 0;
-        reminderTable.ReadRows(Arg.Any<uint>(), Arg.Any<uint>()).Returns(_ =>
+        reminderTable.ReadRows(Arg.Any<uint>(), Arg.Any<uint>(), AdvancedReminderRecoveryGrain.RecoveryPageSize, Arg.Any<string?>()).Returns(_ =>
             Interlocked.Increment(ref readCount) == 1
                 ? new ReminderTableData([entry])
                 : new ReminderTableData());
@@ -1317,6 +1429,41 @@ public class AdvancedReminderRecoveryGrainTests
     }
 
     [Fact]
+    public async Task ReconcileAsync_DefersFarFutureEntryUntilLookaheadWindow()
+    {
+        var now = new DateTimeOffset(2026, 8, 22, 10, 0, 0, TimeSpan.Zero);
+        var entry = new ReminderEntry
+        {
+            GrainId = GrainId.Create("test", "far-future"),
+            ReminderName = "far-future",
+            StartAt = now.UtcDateTime.AddHours(2),
+            NextDueUtc = now.UtcDateTime.AddHours(2),
+            Period = TimeSpan.FromMinutes(1),
+            ScheduleId = "far-future-schedule",
+        };
+        var reminderTable = Substitute.For<Orleans.AdvancedReminders.IReminderTable>();
+        var readCount = 0;
+        reminderTable.ReadRows(Arg.Any<uint>(), Arg.Any<uint>(), AdvancedReminderRecoveryGrain.RecoveryPageSize, Arg.Any<string?>()).Returns(_ =>
+            Interlocked.Increment(ref readCount) == 1
+                ? new ReminderTableData([entry])
+                : new ReminderTableData());
+        var dispatcher = Substitute.For<IAdvancedReminderDispatcherGrain>();
+        var grainFactory = Substitute.For<IGrainFactory>();
+        grainFactory.GetGrain<IAdvancedReminderDispatcherGrain>(entry.GrainId.ToString(), null).Returns(dispatcher);
+        var recovery = new AdvancedReminderRecoveryGrain(
+            reminderTable,
+            grainFactory,
+            NullLogger<AdvancedReminderRecoveryGrain>.Instance,
+            new RecoveryJobShardManager(jobId: null),
+            Options.Create(new DurableJobsOptions { ShardLoadLookaheadPeriod = TimeSpan.FromHours(1) }),
+            new FakeTimeProvider(now));
+
+        await recovery.ReconcileAsync(force: false, CancellationToken.None);
+
+        Assert.Empty(dispatcher.ReceivedCalls());
+    }
+
+    [Fact]
     public async Task ReconcileAsync_WhenOneDispatcherFails_ContinuesScanningOtherReminders()
     {
         var failedEntry = new ReminderEntry
@@ -1335,7 +1482,7 @@ public class AdvancedReminderRecoveryGrainTests
         };
         var reminderTable = Substitute.For<Orleans.AdvancedReminders.IReminderTable>();
         var readCount = 0;
-        reminderTable.ReadRows(Arg.Any<uint>(), Arg.Any<uint>()).Returns(_ =>
+        reminderTable.ReadRows(Arg.Any<uint>(), Arg.Any<uint>(), AdvancedReminderRecoveryGrain.RecoveryPageSize, Arg.Any<string?>()).Returns(_ =>
             Interlocked.Increment(ref readCount) == 1
                 ? new ReminderTableData([failedEntry, successfulEntry])
                 : new ReminderTableData());
@@ -1380,7 +1527,7 @@ public class AdvancedReminderRecoveryGrainTests
         };
         var reminderTable = Substitute.For<Orleans.AdvancedReminders.IReminderTable>();
         var readCount = 0;
-        reminderTable.ReadRows(Arg.Any<uint>(), Arg.Any<uint>()).Returns(_ =>
+        reminderTable.ReadRows(Arg.Any<uint>(), Arg.Any<uint>(), AdvancedReminderRecoveryGrain.RecoveryPageSize, Arg.Any<string?>()).Returns(_ =>
             Interlocked.Increment(ref readCount) == 1
                 ? new ReminderTableData([entry])
                 : new ReminderTableData());
@@ -1418,7 +1565,7 @@ public class AdvancedReminderRecoveryGrainTests
     {
         var timeProvider = new FakeTimeProvider(new DateTimeOffset(2026, 7, 22, 10, 0, 0, TimeSpan.Zero));
         var reminderTable = Substitute.For<Orleans.AdvancedReminders.IReminderTable>();
-        reminderTable.ReadRows(Arg.Any<uint>(), Arg.Any<uint>()).Returns(new ReminderTableData());
+        reminderTable.ReadRows(Arg.Any<uint>(), Arg.Any<uint>(), AdvancedReminderRecoveryGrain.RecoveryPageSize, Arg.Any<string?>()).Returns(new ReminderTableData());
         var recovery = new AdvancedReminderRecoveryGrain(
             reminderTable,
             Substitute.For<IGrainFactory>(),
@@ -1465,6 +1612,40 @@ public class AdvancedReminderRecoveryGrainTests
 [TestCategory("Reminders")]
 public class AdvancedReminderServiceTests
 {
+    [Fact]
+    public async Task RegisterOrUpdateReminder_FarFuture_PersistsWithoutCreatingResidentJobShard()
+    {
+        var now = new DateTimeOffset(2026, 8, 22, 10, 0, 0, TimeSpan.Zero);
+        var entry = new ReminderEntry
+        {
+            GrainId = GrainId.Create("test", "far-future-registration"),
+            ReminderName = "far-future",
+            StartAt = now.UtcDateTime.AddHours(2),
+            NextDueUtc = now.UtcDateTime.AddHours(2),
+            Period = TimeSpan.FromMinutes(5),
+        };
+        var reminderTable = Substitute.For<Orleans.AdvancedReminders.IReminderTable>();
+        reminderTable.UpsertRow(Arg.Any<ReminderEntry>()).Returns("etag-1");
+        var jobManager = Substitute.For<ILocalDurableJobManager>();
+        var service = CreateService(
+            reminderTable,
+            jobManager: jobManager,
+            timeProvider: new FakeTimeProvider(now),
+            durableJobsOptions: new DurableJobsOptions
+            {
+                ShardLoadLookaheadPeriod = TimeSpan.FromHours(1),
+            });
+
+        var handle = await service.RegisterOrUpdateCoreAsync(entry, CancellationToken.None);
+
+        Assert.NotNull(handle);
+        await reminderTable.Received(1).UpsertRow(Arg.Is<ReminderEntry>(value =>
+            value.ReminderName == entry.ReminderName
+            && string.IsNullOrEmpty(value.JobId)
+            && string.IsNullOrEmpty(value.JobShardId)));
+        await jobManager.DidNotReceive().ScheduleJobAsync(Arg.Any<ScheduleJobRequest>(), Arg.Any<CancellationToken>());
+    }
+
     [Fact]
     [Trait("Category", "Stress")]
     public void ValidateCronSchedule_OneMillionEquivalentRegistrationsReuseBoundedValidationResult()
@@ -3412,7 +3593,8 @@ public class AdvancedReminderServiceTests
         JobShardManager? jobShardManager = null,
         TimeProvider? timeProvider = null,
         IClusterManifestProvider? clusterManifestProvider = null,
-        IClusterMembershipService? clusterMembershipService = null)
+        IClusterMembershipService? clusterMembershipService = null,
+        DurableJobsOptions? durableJobsOptions = null)
     {
         jobManager ??= Substitute.For<ILocalDurableJobManager>();
         grainFactory ??= Substitute.For<IGrainFactory>();
@@ -3426,7 +3608,11 @@ public class AdvancedReminderServiceTests
             NullLogger<AdvancedReminderService>.Instance,
             timeProvider ?? TimeProvider.System,
             clusterManifestProvider ?? Substitute.For<IClusterManifestProvider>(),
-            clusterMembershipService ?? Substitute.For<IClusterMembershipService>());
+            clusterMembershipService ?? Substitute.For<IClusterMembershipService>(),
+            Options.Create(durableJobsOptions ?? new DurableJobsOptions
+            {
+                ShardLoadLookaheadPeriod = TimeSpan.FromDays(3_650),
+            }));
     }
 
     private static ReminderEntry CreateDueEntry(DateTimeOffset now, string key)
@@ -3610,6 +3796,12 @@ public class AdvancedReminderServiceTests
 
         public Task<ReminderTableData> ReadRows(uint begin, uint end)
             => Task.FromResult(_current is null ? new ReminderTableData() : new ReminderTableData([Clone(_current)]));
+
+        public Task<ReminderTableData> ReadRows(uint begin, uint end, int maxRows, string? continuationToken)
+            => Task.FromResult(
+                continuationToken is null && _current is not null
+                    ? new ReminderTableData([Clone(_current)])
+                    : new ReminderTableData());
 
         public Task<ReminderEntry?> ReadRow(GrainId grainId, string reminderName)
             => Task.FromResult(_current is not null && _current.GrainId == grainId && _current.ReminderName == reminderName

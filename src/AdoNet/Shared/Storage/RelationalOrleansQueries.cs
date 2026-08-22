@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Data;
 using System.Data.Common;
+using System.Globalization;
 using System.Linq;
 using System.Text;
 using System.Threading;
@@ -9,6 +10,7 @@ using System.Threading.Tasks;
 using Orleans.Runtime;
 
 #if ADVANCED_REMINDERS_ADONET
+using Orleans.AdvancedReminders.Runtime.ReminderService;
 using ReminderEntry = Orleans.AdvancedReminders.ReminderEntry;
 using ReminderTableData = Orleans.AdvancedReminders.ReminderTableData;
 using DurableJobPriority = Orleans.DurableJobs.DurableJobPriority;
@@ -64,6 +66,8 @@ namespace Orleans.Tests.SqlUtils
         private string ReadReminderRowsQuery => dbStoredQueries.AdvancedRemindersReadReminderRowsKey;
         private string ReadRangeRows1Query => dbStoredQueries.AdvancedRemindersReadRangeRows1Key;
         private string ReadRangeRows2Query => dbStoredQueries.AdvancedRemindersReadRangeRows2Key;
+        private string ReadRangeRows1PagedQuery => dbStoredQueries.AdvancedRemindersReadRangeRows1PagedKey;
+        private string ReadRangeRows2PagedQuery => dbStoredQueries.AdvancedRemindersReadRangeRows2PagedKey;
         private string ReadReminderRowQuery => dbStoredQueries.AdvancedRemindersReadReminderRowKey;
         private string UpsertReminderRowQuery => dbStoredQueries.AdvancedRemindersUpsertReminderRowKey;
         private string DeleteReminderRowQuery => dbStoredQueries.AdvancedRemindersDeleteReminderRowKey;
@@ -171,6 +175,42 @@ namespace Orleans.Tests.SqlUtils
                 new DbStoredQueries.Columns(command) { ServiceId = serviceId, BeginHash = beginHash, EndHash = endHash },
                 ret => new ReminderTableData(ret.ToList()));
         }
+
+#if ADVANCED_REMINDERS_ADONET
+        internal Task<ReminderTableData> ReadReminderRowsAsync(
+            string serviceId,
+            uint beginHash,
+            uint endHash,
+            int maxRows,
+            bool hasCursor,
+            uint cursorHash,
+            string cursorGrainId,
+            string cursorReminderName)
+        {
+            var query = (int)beginHash < (int)endHash ? ReadRangeRows1PagedQuery : ReadRangeRows2PagedQuery;
+            return ReadAsync<ReminderEntry, ReminderTableData>(
+                query,
+                record => GetReminderEntry(record)!,
+                command => new DbStoredQueries.Columns(command)
+                {
+                    ServiceId = serviceId,
+                    BeginHash = beginHash,
+                    EndHash = endHash,
+                    PageSize = maxRows,
+                    HasCursor = hasCursor ? 1 : 0,
+                    CursorHash = cursorHash,
+                    CursorGrainId = cursorGrainId,
+                    CursorReminderName = cursorReminderName,
+                },
+                ret =>
+                {
+                    var rows = ret.ToList();
+                    return new ReminderTableData(
+                        rows,
+                        rows.Count == maxRows ? AdoNetReminderTable.AdoNetReminderContinuation.Format(rows[^1]) : null);
+                });
+        }
+#endif
 
         internal static KeyValuePair<string, string> GetQueryKeyAndValue(IDataRecord record)
         {

@@ -23,7 +23,7 @@ namespace Orleans.DurableJobs;
 internal partial class LocalDurableJobManager : SystemTarget, ILocalDurableJobManager, ILocalDurableJobManagerSystemTarget, ILifecycleParticipant<ISiloLifecycle>
 {
     internal static readonly GrainType JobManagerGrainType = SystemTargetGrainId.CreateGrainType("job-manager");
-    private static readonly TimeSpan RegularShardCheckInterval = TimeSpan.FromMinutes(10);
+    private static readonly TimeSpan MaximumShardCheckInterval = TimeSpan.FromMinutes(10);
     private static readonly TimeSpan MinimumShardCheckInterval = TimeSpan.FromSeconds(1);
 
     private readonly JobShardManager _shardManager;
@@ -430,13 +430,13 @@ internal partial class LocalDurableJobManager : SystemTarget, ILocalDurableJobMa
         var rampUpDuration = _options.ShardClaimRampUpDuration;
         if (rampUpDuration <= TimeSpan.Zero)
         {
-            return RegularShardCheckInterval;
+            return GetRegularShardCheckInterval();
         }
 
         var remaining = rampUpDuration - _timeProvider.GetElapsedTime(_startTimestamp);
         if (remaining <= TimeSpan.Zero)
         {
-            return RegularShardCheckInterval;
+            return GetRegularShardCheckInterval();
         }
 
         var budgetSteps = Math.Max(1, _options.ShardClaimMaxBudget - _options.ShardClaimInitialBudget);
@@ -446,7 +446,20 @@ internal partial class LocalDurableJobManager : SystemTarget, ILocalDurableJobMa
             rampStep = MinimumShardCheckInterval;
         }
 
-        return Min(RegularShardCheckInterval, rampStep, remaining);
+        return Min(GetRegularShardCheckInterval(), rampStep, remaining);
+    }
+
+    private TimeSpan GetRegularShardCheckInterval()
+    {
+        var lookaheadInterval = _options.ShardLoadLookaheadPeriod / 2;
+        if (lookaheadInterval < MinimumShardCheckInterval)
+        {
+            lookaheadInterval = MinimumShardCheckInterval;
+        }
+
+        return lookaheadInterval < MaximumShardCheckInterval
+            ? lookaheadInterval
+            : MaximumShardCheckInterval;
     }
 
     private static TimeSpan Min(TimeSpan first, TimeSpan second, TimeSpan third)
@@ -481,7 +494,7 @@ internal partial class LocalDurableJobManager : SystemTarget, ILocalDurableJobMa
         var budget = ComputeClaimBudget();
 
         // Query ShardManager for assigned shards (source of truth)
-        var shards = await _shardManager.AssignJobShardsAsync(now.AddHours(1), budget, cancellationToken);
+        var shards = await _shardManager.AssignJobShardsAsync(now.Add(_options.ShardLoadLookaheadPeriod), budget, cancellationToken);
 
         // Count newly claimed shards (those not already in our cache)
         var newClaimsThisCycle = 0;

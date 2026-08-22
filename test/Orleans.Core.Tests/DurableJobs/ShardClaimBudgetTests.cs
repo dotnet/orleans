@@ -321,4 +321,18 @@ public class ShardClaimBudgetTests
 
         validator.ValidateConfiguration();
     }
+
+    [Fact]
+    public void ValidateConfiguration_NonPositiveShardLoadLookahead_Throws()
+    {
+        var options = Options.Create(new DurableJobsOptions
+        {
+            ShardLoadLookaheadPeriod = TimeSpan.Zero,
+        });
+        var validator = new DurableJobsOptionsValidator(
+            NullLogger<DurableJobsOptionsValidator>.Instance,
+            options);
+
+        Assert.Throws<OrleansConfigurationException>(validator.ValidateConfiguration);
+    }
 }

@@ -246,6 +246,8 @@ namespace Orleans.Hosting
 
         public System.TimeSpan ShardDuration { get { throw null; } set { } }
 
+        public System.TimeSpan ShardLoadLookaheadPeriod { get { throw null; } set { } }
+
         public int ShardStripeCount { get { throw null; } set { } }
 
         public System.Func<DurableJobs.IJobRunContext, System.Exception, System.DateTimeOffset?> ShouldRetry { get { throw null; } set { } }

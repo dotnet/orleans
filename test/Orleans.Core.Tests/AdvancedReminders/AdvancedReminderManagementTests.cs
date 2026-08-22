@@ -848,6 +848,20 @@ public class ReminderManagementGrainTests
                 _entries.Values.Where(entry => range.InRange(entry.GrainId)).Select(CloneEntry).ToList()));
         }
 
+        public async Task<ReminderTableData> ReadRows(uint begin, uint end, int maxRows, string? continuationToken)
+        {
+            var all = await ReadRows(begin, end);
+            var offset = continuationToken is null ? 0 : int.Parse(continuationToken, CultureInfo.InvariantCulture);
+            var rows = all.Reminders.Skip(offset).Take(maxRows + 1).ToList();
+            var hasMore = rows.Count > maxRows;
+            if (hasMore)
+            {
+                rows.RemoveAt(maxRows);
+            }
+
+            return new ReminderTableData(rows, hasMore ? (offset + rows.Count).ToString(CultureInfo.InvariantCulture) : null);
+        }
+
         public Task<ReminderEntry?> ReadRow(GrainId grainId, string reminderName)
         {
             _entries.TryGetValue((grainId, reminderName), out var entry);
@@ -1031,6 +1045,20 @@ public class ReminderStressTests
             RangeReadCallCount++;
             var range = RangeFactory.CreateRange(begin, end);
             return Task.FromResult(new ReminderTableData(reminders.Where(entry => range.InRange(entry.GrainId)).ToList()));
+        }
+
+        public async Task<ReminderTableData> ReadRows(uint begin, uint end, int maxRows, string? continuationToken)
+        {
+            var all = await ReadRows(begin, end);
+            var offset = continuationToken is null ? 0 : int.Parse(continuationToken, CultureInfo.InvariantCulture);
+            var rows = all.Reminders.Skip(offset).Take(maxRows + 1).ToList();
+            var hasMore = rows.Count > maxRows;
+            if (hasMore)
+            {
+                rows.RemoveAt(maxRows);
+            }
+
+            return new ReminderTableData(rows, hasMore ? (offset + rows.Count).ToString(CultureInfo.InvariantCulture) : null);
         }
 
         public Task<ReminderEntry?> ReadRow(GrainId grainId, string reminderName) => throw new NotSupportedException();
