@@ -76,11 +76,11 @@ Choose the limiter behavior by passing one of these block modes when you configu
 
 | Block mode | Behavior when no permit is available | Trade-off |
 |---|---|---|
-| `ThrottleBlockMode.Wait` (default) | Wait indefinitely for a permit unless an earlier composed gate established a shared `WaitUpTo` deadline. | When all gates use `Wait`, no ticks are dropped, but tardiness is unbounded. The grain may see a tick arrive much later than scheduled. |
-| `ThrottleBlockMode.WaitUpTo(timeout)` | Wait up to `timeout`, then skip the tick if no permit became available. | Bounded tardiness, bounded skip rate. Skips are classified as `ReminderSkipReason.AcquireTimeout` for observability. |
+| `ThrottleBlockMode.Wait` | Wait indefinitely for a permit unless an earlier composed gate established a shared `WaitUpTo` deadline. | When all gates use `Wait`, no ticks are dropped, but tardiness is unbounded. The grain may see a tick arrive much later than scheduled. |
+| `ThrottleBlockMode.WaitUpTo(timeout)` | Wait up to `timeout`, then skip the tick if no permit became available. | Bounded tardiness and skip rate. The skip reason identifies the gate: `AcquireTimeout`, `SiloOverloaded`, or `SlowStartLimited`. |
 | `ThrottleBlockMode.SkipImmediately` | Skip the tick if no permit is available right now. | Maximum downstream protection; minimum delivery guarantee. Best when "missing a tick" is materially better than "exceeding the limit". |
 
-All sequential waiting phases share a single `WaitUpTo` budget: a `WaitUpTo(500ms)` cap means the total wait across the composed gates is at most 500 ms, not 500 ms per gate. Once established, that deadline also bounds later gates configured with `Wait`.
+A `WaitUpTo(500ms)` gate establishes a deadline which bounds that gate and every later waiting gate. Earlier gates configured with `Wait` can wait indefinitely before that deadline is established.
 
 **Reasoning prompts:**
 
@@ -109,12 +109,12 @@ The overload check runs **before** any concurrency permit or rate token is consu
 
 ### 5. Slow-start ramp-up after silo restart? (optional)
 
-After a silo starts (or assumes responsibility for a new range of reminders after a membership change), thousands of reminders can become due "now". Even with a configured `MaxConcurrent`, the cold-start phase is where the thundering herd bites hardest — caches are cold, connection pools are empty, JITs aren't warm, the thread pool is undersized.
+After a silo starts, thousands of reminders can become due "now". Even with a configured `MaxConcurrent`, the cold-start phase is where the thundering herd bites hardest — caches are cold, connection pools are empty, JITs aren't warm, and the thread pool is still growing.
 
 Slow-start mirrors the equivalent behavior in `DurableJobsOptions` (`SlowStartInitialConcurrency`, `SlowStartInterval`). The configured `MaxConcurrent` becomes a *target*; capacity starts low and doubles every `interval` until it reaches the target.
 
 ```csharp
-.MaxConcurrent(100)
+.MaxConcurrent(100, ThrottleBlockMode.Wait)
 .SlowStart(
     initialCapacity: 10,
     interval: TimeSpan.FromSeconds(10),
@@ -133,15 +133,15 @@ The block mode is **required** at configuration time so that the behavior during
 
 Slow-start requires `MaxConcurrent` to be configured (it ramps *up to* that target). `initialCapacity` cannot exceed `MaxConcurrent`. Both rules are enforced at startup.
 
-## What you trade away
+## Delivery trade-offs
 
-This feature **trades accuracy of timer ticks for concurrency control of dispatch**. That is the whole point — if you are not willing to make that trade, the feature is not for you. Specifically:
+The selected block modes determine delivery timing and whether an occurrence reaches the grain:
 
 - A tick may fire later than its scheduled period (`Wait` and `WaitUpTo` modes).
 - A tick may be skipped entirely (`SkipImmediately` and `WaitUpTo` after timeout). The grain will not observe that tick at all; the *next* periodic tick is considered independently.
 - The `TickStatus.CurrentTickTime` passed to your grain is the actual dispatch time. If you log the difference between `TickStatus.CurrentTickTime` and `TickStatus.FirstTickTime`, expect a step change after you turn the feature on.
 
-Because of the second point, **avoid building "tick counting" into critical accounting** on top of reminders if you're going to enable `SkipImmediately` or `WaitUpTo`. Reminders are a "fire at least sometime around this period" primitive once concurrency control is on, not a "fire exactly N times" primitive.
+Persist critical work independently from reminder occurrences when using `SkipImmediately` or `WaitUpTo`. The reminder prompts processing, while durable application state records the work which must complete.
 
 ## Observability
 
@@ -172,7 +172,7 @@ A new `ActivitySource` (`Microsoft.Orleans.Reminders`) is added by the reminder 
 - `orleans.reminder.throttle.tier` (when a throttle is configured)
 - `orleans.reminder.throttle.outcome` (when a throttle is configured)
 
-The grain call to `ReceiveReminder` is wrapped by Orleans' existing application-call ActivitySource; that span becomes a child of `Reminder.Dispatch`, so traces show a clean waterfall: "waited 3 s for the limiter → grain call took 200 ms".
+The grain call to `ReceiveReminder` is wrapped by Orleans' existing application-call ActivitySource; that span becomes a child of `Reminder.Dispatch`. The dispatch span describes admitted grain execution, while `orleans-reminders-throttle-queued-duration` reports the preceding admission delay.
 
 The span is zero-allocation when no listeners are subscribed.
 
@@ -191,19 +191,18 @@ The feature emits exactly two log lines on the happy path:
 - **Information** at startup: one line per configured tier, with effective values (`MaxConcurrent`, `PermitsPerSecond`, `BurstSize`, `BlockMode`). This lets you confirm at silo start that the configuration loaded as expected.
 - *(No per-tick logs.)* Per-tick noise lives in metrics and traces.
 
-## Pit-of-success traps we explicitly closed
+## Configuration guarantees
 
-These are decisions we deliberately constrained at the API level so you cannot misconfigure them quietly:
+The API validates these relationships at configuration or silo startup:
 
-- **You cannot construct a `WaitWithTimeout` block mode without a timeout.** The factory `ThrottleBlockMode.WaitUpTo(timeout)` requires a positive `TimeSpan`. Zero/negative values throw at configuration time.
-- **You cannot install the feature with no tiers configured.** `AddReminderConcurrencyControl(b => { })` fails startup with a clear message. Silent no-ops are a footgun: you'd think you had protection and not have it.
-- **You cannot configure a tier with no behavior.** At least one of `MaxConcurrent`, `PermitsPerSecond`, or `RespectOverload` must be set; `ThrottleConfig` validates at build time.
-- **You cannot configure `BurstSize` without `PermitsPerSecond`.** Burst is a property of a token bucket; the validator rejects the combination.
-- **You cannot configure `SlowStart` without `MaxConcurrent`.** Slow-start ramps *up to* the target capacity; without a target there's nothing to ramp to.
-- **You cannot configure a `SlowStart.InitialCapacity` greater than `MaxConcurrent`.** The validator rejects this combination at build time.
-- **You cannot configure `RespectOverload` or `SlowStart` without explicitly choosing their block mode.** Both behaviors involve trade-offs (lose protection vs lose delivery) that the user must make consciously; no default is provided.
-- **You cannot configure `RespectOverload` and forget to wire `IOverloadDetector`.** The throttle factory throws at silo startup if `IOverloadDetector` is missing from DI (it is registered by default in any silo).
-- **You cannot configure attribute keys with unit suffixes.** All observability attribute keys follow OTel convention (no `_seconds` etc.); units live on the instrument, not the attribute name.
+- `ThrottleBlockMode.WaitUpTo(timeout)` requires a positive timeout.
+- `AddReminderConcurrencyControl` requires at least one configured tier.
+- Each tier enables at least one of `MaxConcurrent`, `PermitsPerSecond`, or `RespectOverload`.
+- `BurstSize` belongs to a `PermitsPerSecond` token bucket.
+- `SlowStart` uses `MaxConcurrent` as its target, and its initial capacity is no greater than that target.
+- `RespectOverload` and `SlowStart` require an explicit block mode.
+- `RespectOverload` resolves the silo's registered `IOverloadDetector` during startup.
+- Observability units are declared on instruments while attribute keys follow OpenTelemetry naming conventions.
 
 ## What's not in Phase 1
 
