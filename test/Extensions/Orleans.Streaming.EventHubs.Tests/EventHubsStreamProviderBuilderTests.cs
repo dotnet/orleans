@@ -140,9 +140,11 @@ public sealed class EventHubsStreamProviderBuilderTests
             .Select(attribute => (attribute.Name, attribute.Kind, attribute.Target))
             .ToHashSet();
 
-        Assert.Equal(6, registrations.Count);
+        Assert.Equal(8, registrations.Count);
         Assert.Contains(("EventHubs", "Streaming", "Silo"), registrations);
         Assert.Contains(("EventHubs", "Streaming", "Client"), registrations);
+        Assert.Contains(("AzureEventHubs", "Streaming", "Silo"), registrations);
+        Assert.Contains(("AzureEventHubs", "Streaming", "Client"), registrations);
         Assert.Contains(("AzureEventHub", "Streaming", "Silo"), registrations);
         Assert.Contains(("AzureEventHub", "Streaming", "Client"), registrations);
         Assert.Contains(("AzureEventHubConsumerGroup", "Streaming", "Silo"), registrations);

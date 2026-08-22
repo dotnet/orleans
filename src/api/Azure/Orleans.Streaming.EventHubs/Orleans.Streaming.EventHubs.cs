@@ -108,6 +108,13 @@ namespace Orleans.Hosting
         public static void UseDataAdapter(this IEventHubStreamConfigurator configurator, System.Func<System.IServiceProvider, string, Streaming.EventHubs.IEventHubDataAdapter> factory) { }
     }
 
+    public sealed partial class EventHubsStreamProviderBuilder : Providers.IProviderBuilder<ISiloBuilder>, Providers.IProviderBuilder<IClientBuilder>
+    {
+        public void Configure(IClientBuilder builder, string? name, Microsoft.Extensions.Configuration.IConfigurationSection configurationSection) { }
+
+        public void Configure(ISiloBuilder builder, string? name, Microsoft.Extensions.Configuration.IConfigurationSection configurationSection) { }
+    }
+
     public partial interface IClusterClientEventHubStreamConfigurator : IEventHubStreamConfigurator, INamedServiceConfigurator, IClusterClientPersistentStreamConfigurator, IPersistentStreamConfigurator
     {
     }

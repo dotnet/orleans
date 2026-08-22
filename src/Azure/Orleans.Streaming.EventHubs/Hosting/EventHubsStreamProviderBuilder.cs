@@ -14,6 +14,8 @@ using Orleans.Runtime;
 
 [assembly: RegisterProvider("EventHubs", "Streaming", "Silo", typeof(EventHubsStreamProviderBuilder))]
 [assembly: RegisterProvider("EventHubs", "Streaming", "Client", typeof(EventHubsStreamProviderBuilder))]
+[assembly: RegisterProvider("AzureEventHubs", "Streaming", "Silo", typeof(EventHubsStreamProviderBuilder))]
+[assembly: RegisterProvider("AzureEventHubs", "Streaming", "Client", typeof(EventHubsStreamProviderBuilder))]
 [assembly: RegisterProvider("AzureEventHub", "Streaming", "Silo", typeof(EventHubsStreamProviderBuilder))]
 [assembly: RegisterProvider("AzureEventHub", "Streaming", "Client", typeof(EventHubsStreamProviderBuilder))]
 [assembly: RegisterProvider("AzureEventHubConsumerGroup", "Streaming", "Silo", typeof(EventHubsStreamProviderBuilder))]
