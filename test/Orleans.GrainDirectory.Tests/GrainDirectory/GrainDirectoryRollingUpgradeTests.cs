@@ -2,11 +2,9 @@
 using System.Collections.Concurrent;
 using System.Diagnostics.CodeAnalysis;
 using System.Globalization;
-using System.Net;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Options;
 using Orleans;
 using Orleans.Concurrency;
 using Orleans.Configuration;
@@ -58,13 +56,6 @@ public sealed class GrainDirectoryRollingUpgradeTests(ITestOutputHelper output)
         var clusterId = builder.Options.ClusterId;
         var handoffPhase = new RollingUpgradePhase("local-to-distributed", output);
         var handoffLogs = new PhaseAwareLogCapture(handoffPhase);
-        builder.ConfigureSiloHost((siloOptions, hostBuilder) =>
-            hostBuilder.Services.AddSingleton<ILocalSiloDetails>(services =>
-                new DeterministicRingLocalSiloDetails(
-                    services.GetRequiredService<IOptions<SiloOptions>>(),
-                    services.GetRequiredService<IOptions<ClusterOptions>>(),
-                    services.GetRequiredService<IOptions<EndpointOptions>>(),
-                    GetRollingUpgradeSiloHash(siloOptions.SiloName))));
         builder.ConfigureSilo((siloOptions, siloBuilder) =>
         {
             if (!ShouldUseDistributedDirectory(siloOptions.SiloName, initialSiloCount))
@@ -93,7 +84,6 @@ public sealed class GrainDirectoryRollingUpgradeTests(ITestOutputHelper output)
             output.WriteLine($"Cluster deployed with {cluster.Silos.Count} silos (LocalGrainDirectory only).");
 
             IGrainFactory client = cluster.Client!;
-            await SeedSplitPartitionHandoffsAsync(cluster, client);
             var grainId = 0L;
             var nextGrainId = () => Interlocked.Increment(ref grainId);
 
@@ -111,10 +101,12 @@ public sealed class GrainDirectoryRollingUpgradeTests(ITestOutputHelper output)
                 for (var i = 0; i < oldSilos.Count; i++)
                 {
                     await ValidateDirectoryPhaseInvariantsAsync(cluster, $"before adding distributed silo {i + 1}/{oldSilos.Count}");
+                    var preSplitPartitions = CaptureLocalDirectoryPartitions(cluster);
                     var newSilo = await cluster.StartAdditionalSiloAsync();
                     output.WriteLine($"  Started new silo: {newSilo.SiloAddress}");
                     await cluster.WaitForLivenessToStabilizeAsync();
                     await WaitForDirectoryConvergenceAsync(cluster, $"after adding distributed silo {i + 1}/{oldSilos.Count}");
+                    await AssertSplitPartitionHandoffAsync(cluster, preSplitPartitions, newSilo, handoffLogs);
                     await ValidateDirectoryPhaseInvariantsAsync(cluster, $"after adding distributed silo {i + 1}/{oldSilos.Count}");
                     await DriveLoad(client, nextGrainId, count: 100, id => failingGrainKey = id);
                 }
@@ -141,7 +133,6 @@ public sealed class GrainDirectoryRollingUpgradeTests(ITestOutputHelper output)
                 output.WriteLine("Phase 4: Verifying fully-upgraded DistributedGrainDirectory cluster...");
                 await DriveLoad(client, nextGrainId, count: 200, id => failingGrainKey = id);
                 await ValidateDirectoryPhaseInvariantsAsync(cluster, "after final verification");
-                AssertSplitPartitionHandoffsAreDurable(handoffLogs, minimumNonEmptyHandoffs: oldSilos.Count);
             }
             catch
             {
@@ -181,77 +172,88 @@ public sealed class GrainDirectoryRollingUpgradeTests(ITestOutputHelper output)
         Assert.Empty(errors);
     }
 
-    private async Task SeedSplitPartitionHandoffsAsync(InProcessTestCluster cluster, IGrainFactory client)
-    {
-        var seeds = new[]
-        {
-            new SplitHandoffSeed(SourceSiloIndex: 1, TargetSiloIndex: 3, MinimumHash: 0, MaximumHash: 500_000_000),
-            new SplitHandoffSeed(SourceSiloIndex: 0, TargetSiloIndex: 4, MinimumHash: -1_500_000_000, MaximumHash: -1_000_000_000),
-            new SplitHandoffSeed(SourceSiloIndex: 2, TargetSiloIndex: 5, MinimumHash: 1_500_000_000, MaximumHash: 2_000_000_000),
-        };
-
-        var nextCandidateKey = -1_000_000L;
-        foreach (var seed in seeds)
-        {
-            var grain = FindGrainInHashRange(client, ref nextCandidateKey, seed.MinimumHash, seed.MaximumHash);
-            var grainId = grain.GetGrainId();
-            var grainHash = unchecked((int)grainId.GetUniformHashCode());
-            var sourceSilo = cluster.Silos.Single(silo => silo.InstanceNumber == seed.SourceSiloIndex);
-            var sourceDirectory = sourceSilo.ServiceProvider.GetRequiredService<LocalGrainDirectory>();
-
-            Assert.All(
-                cluster.Silos,
-                silo => Assert.Equal(
-                    sourceSilo.SiloAddress,
-                    silo.ServiceProvider.GetRequiredService<LocalGrainDirectory>().GetPrimaryForGrain(grainId)));
-
-            var activationHost = await grain.GetHost();
-            var registration = sourceDirectory.DirectoryPartition
-                .GetItems()
-                .Where(entry => entry.Key.Equals(grainId))
-                .Select(static entry => entry.Value.Activation)
-                .SingleOrDefault();
-            Assert.NotNull(registration);
-            Assert.Equal(registration.SiloAddress!.ToString(), activationHost);
-            output.WriteLine(
-                $"  Seeded grain '{grainId}' with hash {grainHash} on {sourceSilo.Name} for the "
-                + $"Silo_{seed.TargetSiloIndex} split-partition handoff.");
-        }
-    }
-
-    private static IRollingUpgradeTestGrain FindGrainInHashRange(
-        IGrainFactory client,
-        ref long candidateKey,
-        int minimumHash,
-        int maximumHash)
-    {
-        const int MaximumAttempts = 10_000;
-        for (var attempt = 0; attempt < MaximumAttempts; attempt++)
-        {
-            var grain = client.GetGrain<IRollingUpgradeTestGrain>(candidateKey--);
-            var hash = unchecked((int)grain.GetGrainId().GetUniformHashCode());
-            if (hash >= minimumHash && hash < maximumHash)
+    private static LocalDirectoryPartitionSnapshot[] CaptureLocalDirectoryPartitions(InProcessTestCluster cluster) =>
+        cluster.Silos
+            .Select(silo =>
             {
-                return grain;
+                var registrations = silo.ServiceProvider
+                    .GetRequiredService<LocalGrainDirectory>()
+                    .DirectoryPartition
+                    .GetItems()
+                    .Where(static entry => entry.Value.Activation is not null)
+                    .ToDictionary(static entry => entry.Key, static entry => entry.Value.Activation!);
+                return new LocalDirectoryPartitionSnapshot(silo, registrations);
+            })
+            .ToArray();
+
+    private async Task AssertSplitPartitionHandoffAsync(
+        InProcessTestCluster cluster,
+        LocalDirectoryPartitionSnapshot[] preSplitPartitions,
+        InProcessSiloHandle recipient,
+        PhaseAwareLogCapture logs)
+    {
+        var recipientAddress = recipient.SiloAddress;
+        var ownerDirectory = recipient.ServiceProvider.GetRequiredService<LocalGrainDirectory>();
+        var expectedTransfers = preSplitPartitions
+            .SelectMany(snapshot => snapshot.Registrations.Values.Select(address => new SplitPartitionTransfer(snapshot.Silo, address)))
+            .Where(transfer => recipientAddress.Equals(ownerDirectory.GetPrimaryForGrain(transfer.Address.GrainId)))
+            .ToArray();
+        var duplicateTransfers = expectedTransfers
+            .GroupBy(static entry => entry.Address.GrainId)
+            .Where(static group => group.Count() > 1)
+            .ToArray();
+        Assert.Empty(duplicateTransfers);
+        await AssertSplitPartitionHandoffIsDurableAsync(logs, recipient, expectedTransfers);
+
+        foreach (var snapshot in preSplitPartitions)
+        {
+            var transferredGrainIds = expectedTransfers
+                .Where(entry => ReferenceEquals(entry.Source, snapshot.Silo))
+                .Select(static entry => entry.Address.GrainId)
+                .ToHashSet();
+            var expectedRemaining = snapshot.Registrations
+                .Where(entry => !transferredGrainIds.Contains(entry.Key))
+                .ToDictionary(static entry => entry.Key, static entry => entry.Value);
+            var actualRemaining = snapshot.Silo.ServiceProvider
+                .GetRequiredService<LocalGrainDirectory>()
+                .DirectoryPartition
+                .GetItems()
+                .Where(static entry => entry.Value.Activation is not null)
+                .ToDictionary(static entry => entry.Key, static entry => entry.Value.Activation!);
+
+            foreach (var entry in expectedRemaining)
+            {
+                Assert.True(
+                    actualRemaining.TryGetValue(entry.Key, out var actual),
+                    $"Registration '{entry.Key}' was removed from {snapshot.Silo.Name} even though "
+                    + $"the split assigned it to '{ownerDirectory.GetPrimaryForGrain(entry.Key)}'.");
+                Assert.Equal(entry.Value, actual);
+            }
+
+            foreach (var grainId in transferredGrainIds)
+            {
+                Assert.False(
+                    actualRemaining.ContainsKey(grainId),
+                    $"Transferred registration '{grainId}' remained in the sender partition on {snapshot.Silo.Name}.");
             }
         }
 
-        throw new InvalidOperationException(
-            $"Could not find a grain key with a uniform hash in [{minimumHash}, {maximumHash}) "
-            + $"after {MaximumAttempts} attempts.");
-    }
-
-    private static int GetRollingUpgradeSiloHash(string siloName) =>
-        siloName switch
+        var distributedDirectory = recipient.ServiceProvider.GetRequiredService<DistributedGrainDirectory>();
+        var liveActivations = GetDirectoryActivations(cluster);
+        foreach (var transfer in expectedTransfers)
         {
-            "Silo_0" => int.MinValue,
-            "Silo_1" => -1_000_000_000,
-            "Silo_2" => 1_000_000_000,
-            "Silo_3" => 0,
-            "Silo_4" => -1_500_000_000,
-            "Silo_5" => 1_500_000_000,
-            _ => throw new InvalidOperationException($"Unexpected rolling-upgrade silo name '{siloName}'."),
-        };
+            var winner = await distributedDirectory.Lookup(transfer.Address.GrainId);
+            Assert.NotNull(winner);
+            Assert.Equal(transfer.Address.GrainId, winner.GrainId);
+            Assert.Contains(
+                liveActivations,
+                activation => activation.Address.Equals(winner));
+        }
+
+        output.WriteLine(
+            $"  Validated split-partition handoff to {recipient.Name} ({recipientAddress}): "
+            + $"{expectedTransfers.Length} registrations transferred.");
+    }
 
     private async Task WaitForDirectoryConvergenceAsync(InProcessTestCluster cluster, string stage)
     {
@@ -1032,7 +1034,7 @@ public sealed class GrainDirectoryRollingUpgradeTests(ITestOutputHelper output)
                     staleCacheEvidence);
             }
 
-            AssertSplitPartitionHandoffsAreDurable(logs, minimumNonEmptyHandoffs: 0);
+            AssertSplitPartitionHandoffsAreDurable(logs);
             var finalWorkerProgress = traffic.GetWorkerProgress();
             phase.Set("all-distributed-final");
             Assert.Equal(SiloCount, cluster.Silos.Count);
@@ -1434,12 +1436,78 @@ public sealed class GrainDirectoryRollingUpgradeTests(ITestOutputHelper output)
         Assert.Empty(errors);
     }
 
-    private static void AssertSplitPartitionHandoffsAreDurable(
+    private static async Task AssertSplitPartitionHandoffIsDurableAsync(
         PhaseAwareLogCapture logs,
-        int minimumNonEmptyHandoffs)
+        InProcessSiloHandle recipient,
+        SplitPartitionTransfer[] expectedTransfers)
+    {
+        var target = recipient.SiloAddress.ToString();
+        if (expectedTransfers.Length == 0)
+        {
+            var acceptedHandoff = await logs.WaitForAsync(
+                entry => string.Equals(entry.HandoffSilo, target, StringComparison.Ordinal)
+                    && string.Equals(
+                        entry.EventId.Name,
+                        "LogInformationAcceptSplitPartitionStarted",
+                        StringComparison.Ordinal),
+                DirectoryConvergenceTimeout,
+                $"zero-count split-partition handoff to {recipient.Name} ({target})");
+            Assert.Equal(recipient.Name, acceptedHandoff.SiloName);
+            Assert.Equal(0, acceptedHandoff.HandoffCount);
+            return;
+        }
+
+        await logs.WaitForAsync(
+            entry => string.Equals(entry.HandoffSilo, target, StringComparison.Ordinal)
+                && string.Equals(
+                    entry.EventId.Name,
+                    "LogInformationAcceptSplitPartitionCompleted",
+                    StringComparison.Ordinal),
+            DirectoryConvergenceTimeout,
+            $"recipient completion for split-partition handoff to {recipient.Name} ({target})");
+        await logs.WaitForAsync(
+            entry => string.Equals(entry.HandoffSilo, target, StringComparison.Ordinal)
+                && string.Equals(
+                    entry.EventId.Name,
+                    "LogInformationRemovedTransferredEntries",
+                    StringComparison.Ordinal),
+            DirectoryConvergenceTimeout,
+            $"sender removal for split-partition handoff to {recipient.Name} ({target})");
+
+        var relevantEntries = logs.ToArray()
+            .Where(entry => string.Equals(entry.HandoffSilo, target, StringComparison.Ordinal))
+            .ToArray();
+        var completed = relevantEntries
+            .Select((entry, index) => (Entry: entry, Index: index))
+            .Where(static item => string.Equals(
+                item.Entry.EventId.Name,
+                "LogInformationAcceptSplitPartitionCompleted",
+                StringComparison.Ordinal))
+            .ToArray();
+        var removed = relevantEntries
+            .Select((entry, index) => (Entry: entry, Index: index))
+            .Where(static item => string.Equals(
+                item.Entry.EventId.Name,
+                "LogInformationRemovedTransferredEntries",
+                StringComparison.Ordinal))
+            .ToArray();
+
+        var completedHandoff = Assert.Single(completed);
+        Assert.Equal(recipient.Name, completedHandoff.Entry.SiloName);
+        Assert.Equal(expectedTransfers.Length, completedHandoff.Entry.HandoffCount);
+
+        var source = Assert.Single(expectedTransfers.Select(static transfer => transfer.Source).Distinct());
+        var removedHandoff = Assert.Single(removed);
+        Assert.Equal(source.Name, removedHandoff.Entry.SiloName);
+        Assert.Equal(expectedTransfers.Length, removedHandoff.Entry.HandoffCount);
+        Assert.True(
+            completedHandoff.Index < removedHandoff.Index,
+            $"Sender-side registrations were removed before the recipient completed the handoff: {removedHandoff.Entry}");
+    }
+
+    private static void AssertSplitPartitionHandoffsAreDurable(PhaseAwareLogCapture logs)
     {
         var completedHandoffs = new Dictionary<(string Silo, int Count), int>();
-        var removedHandoffs = 0;
         foreach (var entry in logs.ToArray())
         {
             var isCompleted = string.Equals(
@@ -1465,61 +1533,19 @@ public sealed class GrainDirectoryRollingUpgradeTests(ITestOutputHelper output)
             }
             else
             {
-                removedHandoffs++;
                 Assert.True(
                     count > 0,
                     $"Sender-side registrations were removed before the recipient completed the handoff: {entry}");
                 completedHandoffs[handoff] = count - 1;
             }
         }
-
-        Assert.True(
-            removedHandoffs >= minimumNonEmptyHandoffs,
-            $"The rolling upgrade completed {removedHandoffs} non-empty split-partition handoffs; "
-            + $"the deterministic topology requires at least {minimumNonEmptyHandoffs}.");
     }
 
-    private readonly record struct SplitHandoffSeed(
-        int SourceSiloIndex,
-        int TargetSiloIndex,
-        int MinimumHash,
-        int MaximumHash);
+    private sealed record LocalDirectoryPartitionSnapshot(
+        InProcessSiloHandle Silo,
+        Dictionary<GrainId, GrainAddress> Registrations);
 
-    private sealed class DeterministicRingLocalSiloDetails : ILocalSiloDetails
-    {
-        public DeterministicRingLocalSiloDetails(
-            IOptions<SiloOptions> siloOptions,
-            IOptions<ClusterOptions> clusterOptions,
-            IOptions<EndpointOptions> endpointOptions,
-            int consistentHashCode)
-        {
-            Name = siloOptions.Value.SiloName;
-            ClusterId = clusterOptions.Value.ClusterId;
-            DnsHostName = Dns.GetHostName();
-
-            var endpoints = endpointOptions.Value;
-            SiloAddress = SiloAddress.New(
-                endpoints.AdvertisedIPAddress,
-                endpoints.SiloPort,
-                SiloAddress.AllocateNewGeneration());
-            SiloAddress.InternalSetConsistentHashCode(consistentHashCode);
-
-            var publicProxyEndpoint = endpoints.GetPublicProxyEndpoint();
-            GatewayAddress = publicProxyEndpoint is not null
-                ? SiloAddress.New(publicProxyEndpoint, 0)
-                : null!;
-        }
-
-        public string Name { get; }
-
-        public string ClusterId { get; }
-
-        public string DnsHostName { get; }
-
-        public SiloAddress SiloAddress { get; }
-
-        public SiloAddress GatewayAddress { get; }
-    }
+    private sealed record SplitPartitionTransfer(InProcessSiloHandle Source, GrainAddress Address);
 
     private static bool IsExpectedIntentionalRestartLog(PhaseAwareLogEntry entry)
     {
@@ -2103,6 +2129,7 @@ public sealed class GrainDirectoryRollingUpgradeTests(ITestOutputHelper output)
     private sealed class PhaseAwareLogCapture(RollingUpgradePhase phase)
     {
         private readonly ConcurrentQueue<PhaseAwareLogEntry> _entries = new();
+        private TaskCompletionSource<bool> _entryAdded = CreateEntryAddedSignal();
 
         public void Add(
             string siloName,
@@ -2128,9 +2155,38 @@ public sealed class GrainDirectoryRollingUpgradeTests(ITestOutputHelper output)
                     baseException?.Message,
                     handoffSilo,
                     handoffCount));
+            Interlocked.Exchange(ref _entryAdded, CreateEntryAddedSignal()).TrySetResult(true);
         }
 
         public PhaseAwareLogEntry[] ToArray() => _entries.ToArray();
+
+        public async Task<PhaseAwareLogEntry> WaitForAsync(
+            Func<PhaseAwareLogEntry, bool> predicate,
+            TimeSpan timeout,
+            string description)
+        {
+            using var cancellation = new CancellationTokenSource(timeout);
+            while (true)
+            {
+                var signal = Volatile.Read(ref _entryAdded);
+                if (_entries.FirstOrDefault(predicate) is { } entry)
+                {
+                    return entry;
+                }
+
+                try
+                {
+                    await signal.Task.WaitAsync(cancellation.Token);
+                }
+                catch (OperationCanceledException exception) when (cancellation.IsCancellationRequested)
+                {
+                    throw new TimeoutException($"Timed out waiting for {description} after {timeout}.", exception);
+                }
+            }
+        }
+
+        private static TaskCompletionSource<bool> CreateEntryAddedSignal() =>
+            new(TaskCreationOptions.RunContinuationsAsynchronously);
     }
 
     private sealed record PhaseAwareLogEntry(
