@@ -879,7 +879,7 @@ internal sealed partial class DisseminationBroadcastQueue
                 }
 
                 var madeProgress = sent.FromVersion is null
-                    ? acknowledgedVersion >= 0
+                    ? acknowledgedVersion > 0
                     : acknowledgedVersion > sent.FromVersion;
                 // Retire only the generation we sent; a newer notification remains queued even if this repair reached its target.
                 if (keyState.NotificationGeneration != sent.Work.NotificationGeneration

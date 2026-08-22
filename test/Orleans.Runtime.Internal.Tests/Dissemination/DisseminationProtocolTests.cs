@@ -590,11 +590,18 @@ public class DisseminationProtocolTests
         var local = CreateSilo(11111);
         var peer = CreateSilo(11112);
         var transport = new FakeTransport(local, peer);
+        var timeProvider = new FakeTimeProvider();
+        var secondAttempt = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         var sendCount = 0;
         transport.SendBroadcastResponseHandler = (target, batch, cancellationToken) =>
         {
             transport.BroadcastBatches.Add((target, batch));
             var acknowledgedVersion = Interlocked.Increment(ref sendCount) == 1 ? 0 : 1;
+            if (acknowledgedVersion == 1)
+            {
+                secondAttempt.TrySetResult();
+            }
+
             return Task.FromResult(new DisseminationBroadcastResponse
             {
                 Acknowledgments = new()
@@ -608,7 +615,8 @@ public class DisseminationProtocolTests
         };
 
         var ns = new FakeNamespace(local);
-        var protocol = CreateProtocol(transport, ns);
+        var protocol = CreateProtocol(transport, ns, timeProvider: timeProvider);
+        using var schedule = new BroadcastScheduleObserver();
 
         Assert.True(await PublishValue(
             protocol,
@@ -616,6 +624,14 @@ public class DisseminationProtocolTests
             ns.CreateValue(FakeNamespace.DefaultKey, sequence: 1),
             CancellationToken.None));
         await protocol.FlushPendingBroadcast(CancellationToken.None);
+        var retry = await schedule.WaitAsync(
+            e => e.Peer.Equals(peer) && e.Reason == DisseminationBroadcastScheduleReason.Retry,
+            TimeSpan.FromSeconds(5));
+
+        Assert.Equal(1, sendCount);
+
+        timeProvider.Advance(retry.DueTime);
+        await secondAttempt.Task.WaitAsync(TimeSpan.FromSeconds(5));
 
         Assert.Equal(2, sendCount);
         Assert.Equal(
@@ -2589,6 +2605,29 @@ public class DisseminationProtocolTests
         options.Overlay.MinFanOutFactor = 8;
         options.Overlay.MaxFanOutFactor = 4;
         var result = new DisseminationOptionsValidator().Validate(Options.DefaultName, options);
+
+        Assert.True(result.Failed);
+    }
+
+    [Fact]
+    public void NamespaceOptionsValidatorAllowsStaleTtlShorterThanCoalescingDelay()
+    {
+        var options = new DeploymentLoadPublisherOptions();
+        options.Dissemination.MaxCoalescingDelay = TimeSpan.FromSeconds(1);
+        options.Dissemination.StaleItemTtl = TimeSpan.FromMilliseconds(1);
+
+        var result = new DeploymentLoadPublisherOptionsValidator().Validate(Options.DefaultName, options);
+
+        Assert.Equal(ValidateOptionsResult.Success, result);
+    }
+
+    [Fact]
+    public void NamespaceOptionsValidatorRejectsNonPositiveStaleTtl()
+    {
+        var options = new DeploymentLoadPublisherOptions();
+        options.Dissemination.StaleItemTtl = TimeSpan.Zero;
+
+        var result = new DeploymentLoadPublisherOptionsValidator().Validate(Options.DefaultName, options);
 
         Assert.True(result.Failed);
     }
