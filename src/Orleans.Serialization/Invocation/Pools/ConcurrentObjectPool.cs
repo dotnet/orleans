@@ -141,3 +141,18 @@ internal class ConcurrentObjectPool<T, TPoolPolicy> : ObjectPool<T>, IDisposable
         internal void Release() => Interlocked.Exchange(ref Stack, null);
     }
 }
+
+internal sealed class WeakPoolReturner<T> where T : class
+{
+    private WeakReference<ObjectPool<T>>? _pool;
+
+    internal void SetPool(ObjectPool<T> pool) => _pool = new(pool);
+
+    internal void Return(T item)
+    {
+        if (_pool is { } reference && reference.TryGetTarget(out var pool))
+        {
+            pool.Return(item);
+        }
+    }
+}
