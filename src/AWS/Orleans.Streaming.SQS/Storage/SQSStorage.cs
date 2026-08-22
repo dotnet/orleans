@@ -74,7 +74,7 @@ namespace OrleansAWSUtils.Storage
 
         private void ParseDataConnectionString(string dataConnectionString)
         {
-            if(string.IsNullOrEmpty(dataConnectionString)) throw new ArgumentNullException(nameof(dataConnectionString));
+            if (string.IsNullOrEmpty(dataConnectionString)) throw new ArgumentNullException(nameof(dataConnectionString));
 
             var parameters = dataConnectionString.Split(new[] { ';' }, StringSplitOptions.RemoveEmptyEntries);
 
