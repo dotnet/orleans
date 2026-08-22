@@ -174,7 +174,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        provider: ["PostgreSql"]
+        provider: ["PostgreSql", "EFCore-PostgreSql"]
         framework: ["net8.0", "net10.0"]
     steps:
     - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
@@ -221,7 +221,7 @@ jobs:
       continue-on-error: true
       uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
       with:
-        name: test_output_${{ github.job }}_${{ matrix.framework }}
+        name: test_output_${{ github.job }}_${{ matrix.provider }}_${{ matrix.framework }}
         retention-days: 1
         path: |
           **/TestResults/*
@@ -240,7 +240,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        provider: ["MySql"]
+        provider: ["MySql", "EFCore-MySql"]
         framework: ["net8.0", "net10.0"]
     steps:
     - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
@@ -309,6 +309,39 @@ jobs:
       continue-on-error: true
       uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
       with:
+        name: test_output_${{ github.job }}_${{ matrix.provider }}_${{ matrix.framework }}
+        retention-days: 1
+        path: |
+          **/TestResults/*
+          **/logs/*
+  test-efcore-unit:
+    name: Entity Framework Core provider unit tests
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        framework: ["net8.0", "net10.0"]
+    steps:
+    - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
+    - name: Setup .NET
+      uses: actions/setup-dotnet@c2fa09f4bde5ebb9d1777cf28262a3eb3db3ced7 # v5
+      with:
+        global-json-file: global.json
+    - name: Test
+      run: dotnet test test/Extensions/Orleans.EntityFrameworkCore.Tests/Orleans.EntityFrameworkCore.Tests.csproj
+        --framework ${{ matrix.framework }}
+        --filter-query "/[(Area=EFCore)&(Provider=None)&(Suite=BVT)]"
+        --minimum-expected-tests 1
+        --hangdump --hangdump-timeout 10m
+        --crashdump --crashdump-type Full
+        --hangdump-type Full
+        --report-trx --report-trx-filename "test_results_EFCore-Unit_${{ matrix.framework }}_{asm}_{tfm}_{arch}.trx"
+        --max-parallel-test-modules 1
+    - name: Archive Test Results
+      if: always()
+      continue-on-error: true
+      uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+      with:
         name: test_output_${{ github.job }}_${{ matrix.framework }}
         retention-days: 1
         path: |
@@ -326,7 +359,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        provider: ["SqlServer"]
+        provider: ["SqlServer", "EFCore-SqlServer"]
         framework: ["net8.0", "net10.0"]
     steps:
     - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
@@ -381,7 +414,7 @@ jobs:
       continue-on-error: true
       uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
       with:
-        name: test_output_${{ github.job }}_${{ matrix.framework }}
+        name: test_output_${{ github.job }}_${{ matrix.provider }}_${{ matrix.framework }}
         retention-days: 1
         path: |
           **/TestResults/*

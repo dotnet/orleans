@@ -1,0 +1,60 @@
+﻿IF OBJECT_ID(N'[__EFMigrationsHistory]') IS NULL
+BEGIN
+    CREATE TABLE [__EFMigrationsHistory] (
+        [MigrationId] nvarchar(150) NOT NULL,
+        [ProductVersion] nvarchar(32) NOT NULL,
+        CONSTRAINT [PK___EFMigrationsHistory] PRIMARY KEY ([MigrationId])
+    );
+END;
+GO
+
+BEGIN TRANSACTION;
+GO
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20260811210058_InitialGrainDirectorySchema'
+)
+BEGIN
+    CREATE TABLE [Activations] (
+        [ClusterId] nvarchar(150) COLLATE Latin1_General_100_BIN2 NOT NULL,
+        [GrainId] nvarchar(512) COLLATE Latin1_General_100_BIN2 NOT NULL,
+        [SiloAddress] nvarchar(256) COLLATE Latin1_General_100_BIN2 NOT NULL,
+        [ActivationId] nvarchar(64) COLLATE Latin1_General_100_BIN2 NOT NULL,
+        [MembershipVersion] bigint NOT NULL,
+        [ETag] rowversion NOT NULL,
+        CONSTRAINT [PK_Activations] PRIMARY KEY NONCLUSTERED ([ClusterId], [GrainId])
+    );
+END;
+GO
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20260811210058_InitialGrainDirectorySchema'
+)
+BEGIN
+    CREATE NONCLUSTERED INDEX [IDX_Activations_ClusterId_GrainId_ActivationId] ON [Activations] ([ClusterId], [GrainId], [ActivationId]);
+END;
+GO
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20260811210058_InitialGrainDirectorySchema'
+)
+BEGIN
+    CREATE NONCLUSTERED INDEX [IDX_Activations_ClusterId_SiloAddress] ON [Activations] ([ClusterId], [SiloAddress]);
+END;
+GO
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20260811210058_InitialGrainDirectorySchema'
+)
+BEGIN
+    INSERT INTO [__EFMigrationsHistory] ([MigrationId], [ProductVersion])
+    VALUES (N'20260811210058_InitialGrainDirectorySchema', N'8.0.29');
+END;
+GO
+
+COMMIT;
+GO
