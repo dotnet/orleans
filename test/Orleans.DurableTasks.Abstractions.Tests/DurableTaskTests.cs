@@ -2001,17 +2001,20 @@ public class DurableTaskTests
     private struct NoopStateMachine : IAsyncStateMachine
     {
         public void MoveNext() { }
+
         public void SetStateMachine(IAsyncStateMachine stateMachine) { }
     }
 
     private readonly struct NonCriticalYieldAwaitable
     {
         public static NonCriticalYieldAwaitable Instance => default;
+
         public Awaiter GetAwaiter() => default;
 
         public readonly struct Awaiter : INotifyCompletion
         {
             public bool IsCompleted => false;
+
             public void GetResult() { }
 
             public void OnCompleted(Action continuation)
@@ -2025,12 +2028,15 @@ public class DurableTaskTests
     private readonly struct CriticalYieldAwaitable
     {
         public static CriticalYieldAwaitable Instance => default;
+
         public Awaiter GetAwaiter() => default;
 
         public readonly struct Awaiter : ICriticalNotifyCompletion
         {
             public bool IsCompleted => false;
+
             public void GetResult() { }
+
             public void OnCompleted(Action continuation) => UnsafeOnCompleted(continuation);
 
             public void UnsafeOnCompleted(Action continuation)
@@ -4611,18 +4617,29 @@ internal sealed class TestHost(DateTimeOffset utcNow)
     private readonly ConcurrentQueue<TaskId> _decisionIds = new();
     private int _activeWaitCount;
     public int ExecutionCount;
+
     public DateTimeOffset? LastDelayDueTime { get; private set; }
+
     public CancellationToken LastDelayCancellationToken { get; private set; }
+
     public TimeSpan? LastPollTimeout { get; private set; }
+
     public Exception? DelayException { get; init; }
+
     public bool DelayFailureIsAsynchronous { get; init; }
 
     public TestContext CreateContext(TaskId taskId) => new(this, taskId, utcNow);
+
     public RootDefinition<TResult> CreateRootDefinition<TResult>(Func<TestContext, ValueTask<DurableTaskResponse>> run) => new(this, run);
+
     public bool Contains(TaskId id) => _entries.ContainsKey(id);
+
     public bool IsCancellationRequested(TaskId id) => _entries.TryGetValue(id, out var entry) && entry.CancellationRequested;
+
     public IReadOnlyList<TaskId> EntryIds => _entries.Keys.OrderBy(id => id.ToString(), StringComparer.Ordinal).ToArray();
+
     public IReadOnlyList<TaskId> DecisionIds => _decisionIds.ToArray();
+
     public int ActiveWaitCount => Volatile.Read(ref _activeWaitCount);
 
     public async Task RunWithAmbientAsync(
@@ -4696,13 +4713,21 @@ internal sealed class TestHost(DateTimeOffset utcNow)
     {
         private readonly object _lock = new();
         private Task<DurableTaskResponse>? _response;
+
         public TaskId TaskId => id;
+
         public bool CancellationRequested { get; private set; }
+
         public Exception? WaitException { get; set; }
+
         public bool WaitExceptionIsSynchronous { get; set; }
+
         public bool DelayWaitCancellationCompletion { get; set; }
+
         public TaskCompletionSource WaitStarted { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
         public TaskCompletionSource WaitCancellationObserved { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
         public TaskCompletionSource WaitCancellationRelease { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
 
         public void StartOnce(Func<Task<DurableTaskResponse>> start)
@@ -4770,11 +4795,15 @@ internal sealed class TestHost(DateTimeOffset utcNow)
 internal sealed class TestContext(TestHost host, TaskId id, DateTimeOffset utcNow) : DurableExecutionContext(id)
 {
     public override DateTimeOffset UtcNow => utcNow;
+
     protected override ValueTask<IScheduledTaskHandle> ScheduleChildTaskAsync(TaskId taskId, DurableTask taskDefinition, CancellationToken cancellationToken)
         => host.ScheduleChildAsync(taskId, taskDefinition, cancellationToken);
+
     protected override ValueTask<DurableTaskResponse> ScheduleDelayAsync(TaskId taskId, DateTimeOffset dueTime, CancellationToken cancellationToken)
         => host.ScheduleDelayAsync(taskId, dueTime, cancellationToken);
+
     protected override IScheduledTaskHandle GetChildTaskHandle(TaskId taskId) => host.GetEntry(taskId);
+
     protected override ValueTask<TaskId> SelectCompletionAsync(TaskId decisionId, IReadOnlyList<TaskId> candidates, CancellationToken cancellationToken)
         => host.SelectCompletionAsync(decisionId, candidates, cancellationToken);
 
@@ -4833,16 +4862,27 @@ internal sealed class ControlledScheduledWaitState
     private int _waitCallCount;
 
     public Action<CancellationToken>? WaitConstruction { get; set; }
+
     public Exception? CancellationDrainException { get; init; }
+
     public Exception? CancellationCallbackException { get; init; }
+
     public bool UseFaultSource { get; init; }
+
     public bool IgnoreCancellationWhileWaitingForFault { get; init; }
+
     public TaskCompletionSource CancellationObserved { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
     public TaskCompletionSource WaitsDrained { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
     public int CancellationObservedCount { get; private set; }
+
     public int ActiveWaitCount => Volatile.Read(ref _activeWaitCount);
+
     public int ActiveRegistrationCount => Volatile.Read(ref _activeRegistrationCount);
+
     public int WaitCallCount => Volatile.Read(ref _waitCallCount);
+
     public IReadOnlyList<CancellationToken> WaitCancellationTokens => _waitCancellationTokens.ToArray();
 
     public ValueTask<DurableTaskResponse> WaitAsync(CancellationToken cancellationToken)
@@ -4854,6 +4894,7 @@ internal sealed class ControlledScheduledWaitState
     }
 
     public void Complete(DurableTaskResponse response) => _completion.TrySetResult(response);
+
     public void Fail(Exception exception) => _failure.TrySetResult(exception);
 
     private async ValueTask<DurableTaskResponse> WaitAsyncCore(CancellationToken cancellationToken)
@@ -4954,17 +4995,22 @@ internal sealed class ControlledRootDefinition<TResult>(ControlledScheduledWaitS
 internal sealed class ControlledScheduledTaskHandle(TaskId id, ControlledScheduledWaitState state) : IScheduledTaskHandle
 {
     public TaskId TaskId => id;
+
     public ValueTask<DurableTaskResponse> WaitAsync(CancellationToken cancellationToken)
         => state.WaitAsync(cancellationToken);
+
     public ValueTask<DurableTaskResponse> PollAsync(PollingOptions options, CancellationToken cancellationToken)
         => new(DurableTaskResponse.Pending);
+
     public ValueTask CancelAsync(CancellationToken cancellationToken) => ValueTask.CompletedTask;
 }
 
 internal sealed class RecordingRootDefinition<TResult>(RecordingScheduledTaskHandle handle) : DurableTask<TResult>, ISchedulableTask
 {
     public TaskId ScheduledId { get; private set; }
+
     public CancellationToken ScheduleCancellationToken { get; private set; }
+
     public int GetHandleCallCount { get; private set; }
 
     public ValueTask<DurableTaskResponse> ScheduleAsync(TaskId taskId, CancellationToken cancellationToken)
@@ -4990,13 +5036,21 @@ internal sealed class RecordingScheduledTaskHandle(TaskId id) : IScheduledTaskHa
     private readonly TaskCompletionSource<DurableTaskResponse> _completion = new(TaskCreationOptions.RunContinuationsAsynchronously);
 
     public TaskId TaskId => id;
+
     public TaskCompletionSource WaitStarted { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
     public int WaitCallCount { get; private set; }
+
     public int PollCallCount { get; private set; }
+
     public int CancelCallCount { get; private set; }
+
     public CancellationToken LastWaitCancellationToken { get; private set; }
+
     public CancellationToken LastPollCancellationToken { get; private set; }
+
     public CancellationToken LastCancelCancellationToken { get; private set; }
+
     public PollingOptions LastPollingOptions { get; private set; }
 
     public async ValueTask<DurableTaskResponse> WaitAsync(CancellationToken cancellationToken)
@@ -5034,6 +5088,7 @@ internal sealed record CompletedScheduledResult(string Name, int Value);
 internal static class ScheduledAwaiterInspector
 {
     public static void GetResult(ScheduledTaskAwaiter awaiter) => awaiter.GetResult();
+
     public static TResult GetResult<TResult>(ScheduledTaskAwaiter<TResult> awaiter) => awaiter.GetResult();
 }
 
@@ -5044,7 +5099,9 @@ internal sealed class ControlledSafeAwaitable<TResult>(TResult result)
     private readonly TResult _result = result;
 
     public int OnCompletedCount { get; private set; }
+
     public int GetResultCount { get; private set; }
+
     public Awaiter GetAwaiter() => new(this);
 
     public void Complete()
@@ -5094,8 +5151,11 @@ internal sealed class ControlledUnsafeAwaitable<TResult>(TResult result)
     private readonly TResult _result = result;
 
     public int OnCompletedCount { get; private set; }
+
     public int UnsafeOnCompletedCount { get; private set; }
+
     public int GetResultCount { get; private set; }
+
     public Awaiter GetAwaiter() => new(this);
 
     public void Complete()
@@ -5180,8 +5240,11 @@ internal sealed class DirectScheduledTaskState
 
     public TaskCompletionSource WaitStarted { get; } =
         new(TaskCreationOptions.RunContinuationsAsynchronously);
+
     public int WaitCallCount { get; private set; }
+
     public int CancelCallCount { get; private set; }
+
     public CancellationToken LastCancellationToken { get; private set; }
 
     public ValueTask<DurableTaskResponse> WaitAsync(CancellationToken cancellationToken)
@@ -5215,12 +5278,15 @@ internal sealed class DirectRootDefinition(DirectScheduledTaskState state) : Dur
 internal sealed class DirectScheduledTaskHandle(TaskId id, DirectScheduledTaskState state) : IScheduledTaskHandle
 {
     public TaskId TaskId => id;
+
     public ValueTask<DurableTaskResponse> WaitAsync(CancellationToken cancellationToken)
         => state.WaitAsync(cancellationToken);
+
     public ValueTask<DurableTaskResponse> PollAsync(
         PollingOptions options,
         CancellationToken cancellationToken)
         => new(DurableTaskResponse.Pending);
+
     public ValueTask CancelAsync(CancellationToken cancellationToken) => state.CancelAsync();
 }
 
@@ -5229,8 +5295,11 @@ internal sealed class ControlledSafeReferenceAwaitable<TResult>(TResult result)
     private readonly Awaiter _awaiter = new(result);
 
     public int OnCompletedCount => _awaiter.OnCompletedCount;
+
     public int GetResultCount => _awaiter.GetResultCount;
+
     public Awaiter GetAwaiter() => _awaiter;
+
     public void Complete() => _awaiter.Complete();
 
     internal sealed class Awaiter(TResult result) : INotifyCompletion
@@ -5239,7 +5308,9 @@ internal sealed class ControlledSafeReferenceAwaitable<TResult>(TResult result)
         private bool _isCompleted;
 
         public int OnCompletedCount { get; private set; }
+
         public int GetResultCount { get; private set; }
+
         public bool IsCompleted => _isCompleted;
 
         public void OnCompleted(Action continuation)
@@ -5271,8 +5342,11 @@ internal sealed class ControlledUnsafeReferenceAwaitable<TResult>(TResult result
     private readonly Awaiter _awaiter = new(result);
 
     public int UnsafeOnCompletedCount => _awaiter.UnsafeOnCompletedCount;
+
     public int GetResultCount => _awaiter.GetResultCount;
+
     public Awaiter GetAwaiter() => _awaiter;
+
     public void Complete() => _awaiter.Complete();
 
     internal sealed class Awaiter(TResult result) : ICriticalNotifyCompletion
@@ -5281,8 +5355,11 @@ internal sealed class ControlledUnsafeReferenceAwaitable<TResult>(TResult result
         private bool _isCompleted;
 
         public int UnsafeOnCompletedCount { get; private set; }
+
         public int GetResultCount { get; private set; }
+
         public bool IsCompleted => _isCompleted;
+
         public void OnCompleted(Action continuation)
             => throw new InvalidOperationException("The compiler should use the unsafe continuation path.");
 
