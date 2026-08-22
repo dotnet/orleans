@@ -1119,7 +1119,7 @@ jobs:
           **/logs/*
     - name: Archive coverage data
       if: >-
-        always() &&
+        success() &&
         github.event_name == 'pull_request' &&
         matrix.os == 'ubuntu-latest' &&
         matrix.framework == 'net10.0'
