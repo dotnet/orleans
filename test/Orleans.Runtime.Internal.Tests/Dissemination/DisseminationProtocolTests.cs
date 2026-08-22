@@ -2580,6 +2580,38 @@ public class DisseminationProtocolTests
         var service = CreateService(transport, topic);
 
         await service.StopAsync(CancellationToken.None);
+
+        Assert.True(service.IsProtocolDisposed);
+    }
+
+    [Fact]
+    public async Task DisseminationService_DisposeAsyncStopsAndDisposesProtocol()
+    {
+        var local = CreateSilo(21312);
+        var transport = new FakeTransport(local);
+        var topic = new FakeTopic(local);
+        var service = CreateService(transport, topic);
+        await service.StartAsync(CancellationToken.None);
+
+        await service.DisposeAsync();
+        await service.DisposeAsync();
+
+        Assert.False(service.IsAntiEntropyRunning);
+        Assert.True(service.IsProtocolDisposed);
+    }
+
+    [Fact]
+    public async Task DisseminationProtocol_DisposeAsyncDisposesOwnedResources()
+    {
+        var local = CreateSilo(21313);
+        var protocol = CreateProtocol(new FakeTransport(local), new FakeTopic(local));
+
+        await protocol.DisposeAsync();
+        await protocol.DisposeAsync();
+
+        Assert.True(protocol.IsDisposed);
+        await Assert.ThrowsAsync<ObjectDisposedException>(
+            () => protocol.FlushPendingGossip(CancellationToken.None));
     }
 
     [Fact]
@@ -2729,6 +2761,7 @@ public class DisseminationProtocolTests
         });
         await exchangeCompleted.Task.WaitAsync(TimeSpan.FromSeconds(2));
         await WaitUntil(() => !service.HasOutstandingAntiEntropyTask);
+        await WaitUntil(() => service.IsProtocolDisposed);
         Assert.Equal(new[] { peer }, service.GetUnconfirmedPeers(topic.Name, topic.MembershipScope));
     }
 

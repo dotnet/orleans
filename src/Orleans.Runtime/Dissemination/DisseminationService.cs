@@ -8,7 +8,7 @@ using Orleans.Configuration;
 
 namespace Orleans.Runtime.Dissemination;
 
-internal sealed partial class DisseminationService
+internal sealed partial class DisseminationService : IAsyncDisposable
 {
     private readonly Orleans.AsyncSerialExecutor<object?> _executor = new();
     private readonly DisseminationProtocol _protocol;
@@ -20,6 +20,7 @@ internal sealed partial class DisseminationService
     private CancellationTokenSource? _shutdownCts;
     private CancellationTokenSource? _antiEntropyCts;
     private Task? _antiEntropyTask;
+    private Task? _protocolDisposeTask;
 
     public DisseminationService(
         IDisseminationTransport transport,
@@ -59,7 +60,7 @@ internal sealed partial class DisseminationService
     {
         lock (_lifecycleLock)
         {
-            if (_shutdownCts is not null)
+            if (_shutdownCts is not null || _protocolDisposeTask is not null)
             {
                 return Task.CompletedTask;
             }
@@ -90,6 +91,8 @@ internal sealed partial class DisseminationService
         && _antiEntropyTask is { IsCompleted: false };
 
     internal bool HasOutstandingAntiEntropyTask => _antiEntropyTask is not null;
+
+    internal bool IsProtocolDisposed => _protocol.IsDisposed;
 
     internal async Task StopAsync(CancellationToken cancellationToken)
     {
@@ -158,10 +161,50 @@ internal sealed partial class DisseminationService
             shutdownCts?.Dispose();
         }
 
+        var protocolDisposeTask = GetProtocolDisposeTask();
+        if (cancellationException is null)
+        {
+            await protocolDisposeTask;
+        }
+
         if (cancellationException is not null)
         {
             throw cancellationException;
         }
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        Task? protocolDisposeTask;
+        Task? antiEntropyTask;
+        lock (_lifecycleLock)
+        {
+            protocolDisposeTask = _protocolDisposeTask;
+            antiEntropyTask = _antiEntropyTask;
+        }
+
+        if (protocolDisposeTask is null)
+        {
+            await StopAsync(CancellationToken.None);
+            return;
+        }
+
+        if (antiEntropyTask is not null)
+        {
+            try
+            {
+                await antiEntropyTask;
+            }
+            catch (OperationCanceledException)
+            {
+            }
+            catch (Exception exception)
+            {
+                LogDebugAntiEntropyLoopFailed(_logger, exception);
+            }
+        }
+
+        await protocolDisposeTask;
     }
 
     internal async Task RunAntiEntropy(CancellationToken cancellationToken)
@@ -215,6 +258,14 @@ internal sealed partial class DisseminationService
         }
 
         cancellationTokenSource?.Dispose();
+    }
+
+    private Task GetProtocolDisposeTask()
+    {
+        lock (_lifecycleLock)
+        {
+            return _protocolDisposeTask ??= _protocol.DisposeAsync().AsTask();
+        }
     }
 
     private async Task RunAntiEntropyLoop(CancellationToken cancellationToken)

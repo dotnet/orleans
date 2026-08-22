@@ -17,7 +17,7 @@ internal sealed partial class DisseminationProtocol(
     IOptionsMonitor<DisseminationOptions> options,
     IEnumerable<IDisseminationTopic> topics,
     TimeProvider timeProvider,
-    ILogger<DisseminationProtocol> logger)
+    ILogger<DisseminationProtocol> logger) : IAsyncDisposable
 {
     private readonly IDisseminationTransport _transport = transport;
     private readonly IOptionsMonitor<DisseminationOptions> _options = options;
@@ -26,6 +26,7 @@ internal sealed partial class DisseminationProtocol(
     private readonly ILogger<DisseminationProtocol> _logger = logger;
     private readonly Dictionary<SiloAddress, DateTimeOffset> _failureBackoffUntil = [];
     private readonly object _failureLock = new();
+    private readonly object _disposeLock = new();
     private readonly object _gossipQueueLock = new();
     private readonly object _peerCompatibilityLock = new();
     private readonly object _recentUpdateLock = new();
@@ -38,6 +39,7 @@ internal sealed partial class DisseminationProtocol(
     private DateTimeOffset? _nextGossipFlushAt;
     private CancellationTokenSource? _gossipFlushWakeup;
     private Task? _gossipFlushTask;
+    private Task? _disposeTask;
     private bool _gossipFlushScheduled;
     private bool _stopping;
     private ParticipantTopology _activeMembersTopology = ParticipantTopology.Empty;
@@ -45,6 +47,8 @@ internal sealed partial class DisseminationProtocol(
     private long _antiEntropyRound;
 
     public FrozenDictionary<string, IDisseminationTopic> Topics => _topics;
+
+    internal bool IsDisposed => _disposeTask?.IsCompletedSuccessfully == true;
 
     public async ValueTask<bool> Publish(
         string topicName,
@@ -469,6 +473,41 @@ internal sealed partial class DisseminationProtocol(
         {
             _gossipSendCts.Cancel();
         }
+    }
+
+    public ValueTask DisposeAsync()
+    {
+        lock (_disposeLock)
+        {
+            return new ValueTask(_disposeTask ??= DisposeCoreAsync());
+        }
+    }
+
+    private async Task DisposeCoreAsync()
+    {
+        Task? scheduledFlush;
+        lock (_gossipQueueLock)
+        {
+            _stopping = true;
+            _gossipFlushWakeup?.Cancel();
+            scheduledFlush = _gossipFlushTask;
+        }
+
+        _gossipSendCts.Cancel();
+        if (scheduledFlush is not null)
+        {
+            await scheduledFlush;
+        }
+
+        await _gossipFlushLock.WaitAsync();
+        lock (_gossipQueueLock)
+        {
+            DisposeGossipFlushWakeupUnsafe();
+            _pendingGossip.Clear();
+        }
+
+        _gossipSendCts.Dispose();
+        _gossipFlushLock.Dispose();
     }
 
     private bool EnqueueGossip(SiloAddress peer, DisseminationValue item, IDisseminationTopic topic)
