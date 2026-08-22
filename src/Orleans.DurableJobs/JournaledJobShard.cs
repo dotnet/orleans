@@ -137,6 +137,8 @@ internal sealed class JournaledJobShard : IJobShard
     /// <inheritdoc/>
     public ValueTask<int> GetJobCountAsync() => ValueTask.FromResult(_state.Count);
 
+    internal bool ContainsJob(string jobId) => _state.ContainsJob(jobId);
+
     /// <inheritdoc/>
     public async Task MarkAsCompleteAsync(CancellationToken cancellationToken)
     {

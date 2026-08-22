@@ -28,6 +28,7 @@
 
   <ItemGroup>
     <InternalsVisibleTo Include="DynamicProxyGenAssembly2" />
+    <InternalsVisibleTo Include="Orleans.AdvancedReminders" />
     <InternalsVisibleTo Include="Orleans.Core.Tests" />
     <InternalsVisibleTo Include="Orleans.DurableJobs.Tests" />
     <InternalsVisibleTo Include="Orleans.DurableJobs.AzureStorage" />

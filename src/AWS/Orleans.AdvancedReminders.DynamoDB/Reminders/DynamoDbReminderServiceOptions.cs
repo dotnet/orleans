@@ -1,14 +1,13 @@
-namespace Orleans.AdvancedReminders.DynamoDB
+namespace Orleans.AdvancedReminders.DynamoDB;
+
+/// <summary>
+/// Configuration for Amazon DynamoDB reminder storage.
+/// </summary>
+public class DynamoDBReminderTableOptions
 {
     /// <summary>
-    /// Configuration for Amazon DynamoDB reminder storage.
+    /// Gets or sets the connection string.
     /// </summary>
-    public class DynamoDBReminderTableOptions
-    {
-        /// <summary>
-        /// Gets or sets the connection string.
-        /// </summary>
-        [RedactConnectionString]
-        public string ConnectionString { get; set; } = string.Empty;
-    }
+    [RedactConnectionString]
+    public string ConnectionString { get; set; } = string.Empty;
 }

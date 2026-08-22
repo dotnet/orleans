@@ -76,6 +76,9 @@ public sealed class AdvancedReminderSqlScriptTests
 
         Assert.DoesNotContain("@NewVersion", script, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("LAST_INSERT_ID(2147483647)", script, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("INSERT IGNORE", script, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("IF(LAST_INSERT_ID(0) = 0, 0, 0)", script, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("ON DUPLICATE KEY UPDATE Version = Version + (LAST_INSERT_ID(2147483647) * 0)", script, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]
@@ -93,6 +96,18 @@ public sealed class AdvancedReminderSqlScriptTests
         var script = ReadAdvancedScript("SQLServer");
 
         Assert.Contains("Priority SMALLINT", script, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Theory]
+    [InlineData("MySQL", "ScheduleId VARCHAR(128)")]
+    [InlineData("Oracle", "\"SCHEDULEID\" VARCHAR2(128)")]
+    [InlineData("PostgreSQL", "ScheduleId varchar(128)")]
+    [InlineData("SQLServer", "ScheduleId VARCHAR(128)")]
+    public void AdvancedSchema_SupportsGeneratedScheduleIds(string database, string declaration)
+    {
+        var script = ReadAdvancedScript(database);
+
+        Assert.Contains(declaration, script, StringComparison.OrdinalIgnoreCase);
     }
 
     private static string ReadClassicScript(string database)

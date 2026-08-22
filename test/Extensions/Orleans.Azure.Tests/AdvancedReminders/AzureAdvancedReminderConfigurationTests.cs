@@ -3,8 +3,10 @@ using Azure.Data.Tables;
 using Azure.Storage.Blobs;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using Orleans.AdvancedReminders.AzureStorage;
+using Orleans.Configuration;
 using Orleans.Configuration.Internal;
 using Orleans.Hosting;
 using Orleans.Journaling;
@@ -47,6 +49,42 @@ public class AzureAdvancedReminderConfigurationTests
         var otherServiceKey = ReminderTableEntry.ConstructPartitionKey("service?", 42);
         Assert.False(string.CompareOrdinal(otherServiceKey, lower) > 0
             && string.CompareOrdinal(otherServiceKey, upper) < 0);
+    }
+
+    [Fact]
+    public void ConvertFromTableEntryList_SkipsMalformedGrainIdAndReturnsHealthyRows()
+    {
+        const string serviceId = "service";
+        var now = DateTime.UtcNow;
+        var options = new AzureTableReminderStorageOptions
+        {
+            TableServiceClient = new TableServiceClient("UseDevelopmentStorage=true"),
+            BlobServiceClient = new BlobServiceClient(new Uri("https://example.blob.core.windows.net")),
+        };
+        var table = new AzureBasedReminderTable(
+            NullLoggerFactory.Instance,
+            Options.Create(new ClusterOptions { ServiceId = serviceId }),
+            Options.Create(options));
+        var healthyGrainId = GrainId.Create("test", "healthy");
+        var entries = new List<(ReminderTableEntry Entity, string ETag)>
+        {
+            (CreateEntry(string.Empty), "etag-malformed"),
+            (CreateEntry(healthyGrainId.ToString()), "etag-healthy"),
+        };
+
+        var result = table.ConvertFromTableEntryList(entries);
+
+        var reminder = Assert.Single(result.Reminders);
+        Assert.Equal(healthyGrainId, reminder.GrainId);
+
+        ReminderTableEntry CreateEntry(string grainReference) => new()
+        {
+            GrainReference = grainReference,
+            ReminderName = "reminder",
+            ServiceId = serviceId,
+            StartAt = LogFormatter.PrintDate(now),
+            Period = TimeSpan.FromMinutes(1).ToString("c"),
+        };
     }
 
     [Fact]

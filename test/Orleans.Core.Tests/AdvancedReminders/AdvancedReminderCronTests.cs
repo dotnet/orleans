@@ -444,6 +444,19 @@ public class ReminderCronExpressionTimeZoneTests
 
         Assert.Throws<ArgumentNullException>(() => expression.GetNextOccurrence(fromUtc, zone: null!));
     }
+
+    [Fact]
+    public void GetNextOccurrence_WithNegativeUtcOffsetAtMaximumDate_ReturnsNull()
+    {
+        var expression = ReminderCronExpression.Parse("0 20 * * *");
+        var zone = AdvancedReminderTimeZoneTestHelper.GetUsEasternTimeZone();
+
+        var result = expression.GetNextOccurrence(
+            DateTime.SpecifyKind(DateTime.MaxValue, DateTimeKind.Utc),
+            zone);
+
+        Assert.Null(result);
+    }
 }
 
 [TestCategory("Reminders")]

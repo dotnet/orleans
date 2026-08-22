@@ -695,7 +695,6 @@ namespace Orleans.AdvancedReminders
 
         public System.TimeSpan MissedReminderGracePeriod { get { throw null; } set { } }
 
-        public System.TimeSpan StaleJobRecoveryDelay { get { throw null; } set { } }
     }
 
     [GenerateSerializer]

@@ -574,6 +574,30 @@ public class ReminderManagementGrainTests
     }
 
     [Fact]
+    public async Task RepairAsync_OverdueOneShot_PreservesOutstandingOccurrence()
+    {
+        var due = DateTime.UtcNow.AddMinutes(-15);
+        var grainId = GrainId.Create("test", "repair-one-shot");
+        var entry = new ReminderEntry
+        {
+            GrainId = grainId,
+            ReminderName = "one-shot",
+            StartAt = due,
+            NextDueUtc = due,
+            Period = TimeSpan.Zero,
+            ETag = "etag-1",
+        };
+        var table = new InMemoryManagementReminderTable(entry);
+        var grain = new ReminderManagementGrain(table);
+
+        await grain.RepairAsync(grainId, entry.ReminderName);
+
+        var repaired = await table.ReadRow(grainId, entry.ReminderName);
+        Assert.NotNull(repaired);
+        Assert.Equal(due, repaired.NextDueUtc);
+    }
+
+    [Fact]
     public async Task MutationApis_WithReminderService_RescheduleReminderChain()
     {
         var due = DateTime.UtcNow.AddMinutes(2);

@@ -1,19 +1,18 @@
-namespace Orleans.AdvancedReminders.AdoNet
+namespace Orleans.AdvancedReminders.AdoNet;
+
+/// <summary>
+/// Options for ADO.NET reminder storage.
+/// </summary>
+public class AdoNetReminderTableOptions
 {
     /// <summary>
-    /// Options for ADO.NET reminder storage.
+    /// Gets or sets the ADO.NET invariant.
     /// </summary>
-    public class AdoNetReminderTableOptions
-    {
-        /// <summary>
-        /// Gets or sets the ADO.NET invariant.
-        /// </summary>
-        public string Invariant { get; set; } = string.Empty;
+    public string Invariant { get; set; } = string.Empty;
 
-        /// <summary>
-        /// Gets or sets the connection string.
-        /// </summary>
-        [Redact]
-        public string ConnectionString { get; set; } = string.Empty;
-    }
+    /// <summary>
+    /// Gets or sets the connection string.
+    /// </summary>
+    [Redact]
+    public string ConnectionString { get; set; } = string.Empty;
 }

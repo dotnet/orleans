@@ -19,8 +19,6 @@ internal sealed class AdvancedReminderService : IReminderService, IAttributeRemi
     private const string ScheduleIdMetadataKey = "schedule-id";
     private const string LegacyETagMetadataKey = "etag";
     private const string JobNamePrefix = "advanced-reminder:";
-    private const string AttributeScheduleIdPrefix = "a1:";
-
     private readonly IReminderTable _reminderTable;
     private readonly ILocalDurableJobManager _jobManager;
     private readonly JobShardManager _jobShardManager;
@@ -209,8 +207,11 @@ internal sealed class AdvancedReminderService : IReminderService, IAttributeRemi
             return;
         }
 
-        if (!string.Equals(current.ETag, data.ETag, StringComparison.Ordinal)
-            || !await _reminderTable.RemoveRow(data.GrainId, data.ReminderName, data.ETag))
+        if (!string.Equals(
+                ReminderScheduleId.GetRegistrationId(current.ScheduleId),
+                data.RegistrationId,
+                StringComparison.Ordinal)
+            || !await _reminderTable.RemoveRow(data.GrainId, data.ReminderName, current.ETag))
         {
             throw new Runtime.ReminderException($"Could not unregister reminder {data} due to ETag mismatch.");
         }
@@ -499,65 +500,20 @@ internal sealed class AdvancedReminderService : IReminderService, IAttributeRemi
 
     private static void PrepareNextOccurrence(ReminderEntry entry)
     {
-        var currentScheduleId = entry.ScheduleId;
-        var declarationEnd = GetAttributeDeclarationEnd(currentScheduleId);
-        if (declarationEnd < 0)
-        {
-            entry.ScheduleId = Guid.NewGuid().ToString("N");
-        }
-        else
-        {
-            var prefixLength = declarationEnd + 1;
-            entry.ScheduleId = string.Create(
-                prefixLength + 32,
-                (CurrentScheduleId: currentScheduleId, PrefixLength: prefixLength, OccurrenceId: Guid.NewGuid()),
-                static (destination, state) =>
-                {
-                    state.CurrentScheduleId.AsSpan(0, state.PrefixLength).CopyTo(destination);
-                    _ = state.OccurrenceId.TryFormat(destination[state.PrefixLength..], out _, "N");
-                });
-        }
-
+        entry.ScheduleId = ReminderScheduleId.RotateOccurrence(entry.ScheduleId);
         entry.JobId = string.Empty;
         entry.JobShardId = string.Empty;
     }
 
     private static void PrepareNewSchedule(ReminderEntry entry, string? declarationId = null)
     {
-        entry.ScheduleId = declarationId is null
-            ? Guid.NewGuid().ToString("N")
-            : string.Create(
-                AttributeScheduleIdPrefix.Length + declarationId.Length + 1 + 32,
-                (DeclarationId: declarationId, OccurrenceId: Guid.NewGuid()),
-                static (destination, state) =>
-                {
-                    AttributeScheduleIdPrefix.CopyTo(destination);
-                    state.DeclarationId.CopyTo(destination[AttributeScheduleIdPrefix.Length..]);
-                    var occurrenceSeparator = AttributeScheduleIdPrefix.Length + state.DeclarationId.Length;
-                    destination[occurrenceSeparator] = ':';
-                    _ = state.OccurrenceId.TryFormat(destination[(occurrenceSeparator + 1)..], out _, "N");
-                });
+        entry.ScheduleId = ReminderScheduleId.Create(declarationId);
         entry.JobId = string.Empty;
         entry.JobShardId = string.Empty;
     }
 
     private static bool HasAttributeDeclaration(string scheduleId, string declarationId)
-    {
-        var declarationEnd = GetAttributeDeclarationEnd(scheduleId);
-        return declarationEnd == AttributeScheduleIdPrefix.Length + declarationId.Length
-            && scheduleId.AsSpan(AttributeScheduleIdPrefix.Length, declarationId.Length).SequenceEqual(declarationId);
-    }
-
-    private static int GetAttributeDeclarationEnd(string scheduleId)
-    {
-        if (!scheduleId.StartsWith(AttributeScheduleIdPrefix, StringComparison.Ordinal))
-        {
-            return -1;
-        }
-
-        var declarationEnd = scheduleId.IndexOf(':', AttributeScheduleIdPrefix.Length);
-        return declarationEnd > AttributeScheduleIdPrefix.Length ? declarationEnd : -1;
-    }
+        => ReminderScheduleId.HasAttributeDeclaration(scheduleId, declarationId);
 
     private ReminderEntry CreateIntervalEntry(
         GrainId grainId,

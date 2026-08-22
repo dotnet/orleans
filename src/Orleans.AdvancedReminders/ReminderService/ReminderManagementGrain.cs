@@ -140,7 +140,9 @@ public sealed class ReminderManagementGrain(
     public async Task RepairAsync(GrainId grainId, string name)
     {
         var entry = await GetEntryAsync(grainId, name);
-        entry.NextDueUtc = Runtime.ReminderService.AdvancedReminderService.CalculateNextDue(entry, GetUtcNow());
+        entry.NextDueUtc = Runtime.ReminderService.AdvancedReminderService.CalculateNextDue(entry, GetUtcNow())
+            ?? entry.NextDueUtc
+            ?? entry.StartAt;
         await PersistMutationAsync(entry);
     }
 

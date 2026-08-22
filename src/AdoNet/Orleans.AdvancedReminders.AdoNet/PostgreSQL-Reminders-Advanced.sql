@@ -10,7 +10,7 @@ CREATE TABLE OrleansAdvancedRemindersTable
     CronTimeZoneId varchar(200) NULL,
     NextDueUtc timestamptz(3) NULL,
     LastFireUtc timestamptz(3) NULL,
-    ScheduleId varchar(64) NULL,
+    ScheduleId varchar(128) NULL,
     JobId varchar(64) NULL,
     JobShardId varchar(150) NULL,
     Priority smallint NOT NULL DEFAULT 0,

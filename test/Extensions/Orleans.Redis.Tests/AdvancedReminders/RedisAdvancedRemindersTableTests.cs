@@ -95,6 +95,37 @@ public class RedisAdvancedRemindersTableTests : AdvancedReminderTableTestsBase
         }
     }
 
+    [Fact]
+    public async Task RemindersTable_Redis_DisablingEntryExpiryPersistsExistingKey()
+    {
+        TestUtils.CheckForRedis();
+        await using var multiplexer = await ConnectionMultiplexer.ConnectAsync(TestDefaultConfiguration.RedisConnectionString!);
+        var database = multiplexer.GetDatabase();
+        var key = (RedisKey)$"{clusterOptions.Value.ServiceId}/advanced-reminders";
+        await database.SortedSetAddAsync(key, "existing", 0);
+        await database.KeyExpireAsync(key, TimeSpan.FromMinutes(10));
+        await using var table = new RedisReminderTable(
+            loggerFactory.CreateLogger<RedisReminderTable>(),
+            clusterOptions,
+            Options.Create(new RedisReminderTableOptions
+            {
+                ConfigurationOptions = ConfigurationOptions.Parse(TestDefaultConfiguration.RedisConnectionString!),
+                EntryExpiry = null,
+                CreateMultiplexer = _ => Task.FromResult<(IConnectionMultiplexer Multiplexer, bool IsShared)>((multiplexer, true)),
+            }));
+
+        try
+        {
+            await table.Init();
+
+            Assert.Null(await database.KeyTimeToLiveAsync(key));
+        }
+        finally
+        {
+            await database.KeyDeleteAsync(key);
+        }
+    }
+
 }
 
 [TestCategory("Redis"), TestCategory("Reminders")]
