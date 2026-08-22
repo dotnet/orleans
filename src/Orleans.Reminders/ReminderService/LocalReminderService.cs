@@ -1232,6 +1232,11 @@ namespace Orleans.Runtime.ReminderService
                             {
                                 _shared._throttleInstruments.RecordAcquireDuration(lease.TierName, lease.Outcome, lease.WaitedFor);
 
+                                if (!IsTickStillValid(scheduledTick.ScheduleVersion, entry))
+                                {
+                                    continue;
+                                }
+
                                 if (lease.Outcome == ReminderAdmissionOutcome.Skipped)
                                 {
                                     _shared._throttleInstruments.OnTickSkipped(lease.TierName, lease.SkipReason!.Value);
@@ -1240,11 +1245,6 @@ namespace Orleans.Runtime.ReminderService
                                     ReminderEvents.EmitTickSkipped(entry.GrainId, entry.ReminderName, skippedStatus, lease.SkipReason!.Value, lease.TierName, lease.WaitedFor, _shared.Silo);
                                     previousTickTime = scheduledTick.TickTime;
                                     previousScheduleVersion = scheduledTick.ScheduleVersion;
-                                    continue;
-                                }
-
-                                if (!IsTickStillValid(scheduledTick.ScheduleVersion, entry))
-                                {
                                     continue;
                                 }
 
