@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
 using Microsoft.Extensions.Logging;
 using Orleans.Runtime;
+using Orleans.Streaming;
 using Orleans.Streams;
 
 namespace Orleans.Providers.Streams.Common
@@ -149,6 +150,14 @@ namespace Orleans.Providers.Streams.Common
             return cursor;
         }
 
+        /// <inheritdoc />
+        public virtual IQueueCacheCursor GetCacheCursorForCacheMiss(StreamId streamId)
+        {
+            var cursor = new SimpleQueueCacheCursor(this, streamId, logger);
+            InitializeCursor(cursor, OldestInStreamToken.Instance);
+            return cursor;
+        }
+
         internal void InitializeCursor(SimpleQueueCacheCursor cursor, StreamSequenceToken? sequenceToken)
         {
             LogDebugInitializeCursor(cursor, sequenceToken);
@@ -160,8 +169,10 @@ namespace Orleans.Providers.Streams.Common
                 return;
             }
 
-            // if no token is provided, set token to item at end of cache
-            sequenceToken = sequenceToken ?? cachedMessages.First?.Value?.SequenceToken!; // cachedMessages.Count > 0 here (checked above), so First/Value/SequenceToken are guaranteed non-null.
+            // Position default cursors at the newest item and cache-miss cursors at the oldest item.
+            sequenceToken = sequenceToken is OldestInStreamToken
+                ? cachedMessages.Last!.Value.SequenceToken
+                : sequenceToken ?? cachedMessages.First!.Value.SequenceToken;
 
             // If sequenceToken is too new to be in cache, unset token, and wait for more data.
             if (sequenceToken.Newer(cachedMessages.First!.Value.SequenceToken)) // cachedMessages.Count > 0 here (checked above), so First is guaranteed non-null.

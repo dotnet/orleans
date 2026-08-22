@@ -2,6 +2,7 @@ using System.Globalization;
 using Microsoft.Extensions.Logging.Abstractions;
 using Orleans.Providers.Streams.Common;
 using Orleans.Runtime;
+using Orleans.Streaming;
 using Orleans.Streams;
 using Xunit;
 
@@ -25,6 +26,25 @@ namespace UnitTests.OrleansRuntime.Streams
             public long SequenceNumber;
             public byte[] Data { get; init; } = FixedMessage;
             public DateTime EnqueueTimeUtc = DateTime.UtcNow;
+        }
+
+        private sealed class DefaultRecoveryQueueCache : IQueueCache
+        {
+            public StreamSequenceToken? RequestedToken { get; private set; }
+
+            public void AddToCache(IList<IBatchContainer> messages) => throw new NotSupportedException();
+
+            public IQueueCacheCursor GetCacheCursor(StreamId streamId, StreamSequenceToken? token)
+            {
+                RequestedToken = token;
+                return null!;
+            }
+
+            public int GetMaxAddCount() => throw new NotSupportedException();
+
+            public bool IsUnderPressure() => throw new NotSupportedException();
+
+            public bool TryPurgeFromCache(out IList<IBatchContainer> purgedItems) => throw new NotSupportedException();
         }
 
         [GenerateSerializer]
@@ -686,6 +706,85 @@ namespace UnitTests.OrleansRuntime.Streams
                 };
                 cache.Add(new List<CachedMessage>() { converter.ToCachedMessage(msg, now) }, now);
             }
+        }
+
+        [Fact, TestSuite("BVT"), TestArea("Streaming")]
+        public void PooledQueueCache_GetCursorAtOldestEntry()
+        {
+            var bufferPool = new ObjectPool<FixedSizeBuffer>(() => new FixedSizeBuffer(PooledBufferSize));
+            var dataAdapter = new TestCacheDataAdapter();
+            var cache = new PooledQueueCache(dataAdapter, NullLogger.Instance, null, null, TimeSpan.FromSeconds(10));
+            var evictionStrategy = new ChronologicalEvictionStrategy(NullLogger.Instance, new TimePurgePredicate(TimeSpan.FromSeconds(1), TimeSpan.FromSeconds(1)), null, null);
+            evictionStrategy.PurgeObservable = cache;
+            var converter = new CachedMessageConverter(bufferPool, evictionStrategy);
+
+            var seqNumber = 123;
+            var streamKey = Guid.NewGuid();
+            var stream = StreamId.Create(TestStreamNamespace, streamKey);
+
+            var oldestSequenceNumber = EnqueueMessage(streamKey);
+            var newestSequenceNumber = EnqueueMessage(streamKey);
+
+            var cursor = cache.GetCursor(stream, OldestInStreamToken.Instance);
+
+            Assert.True(cache.TryGetNextMessage(cursor, out var oldest));
+            Assert.Equal(oldestSequenceNumber, oldest.SequenceToken.SequenceNumber);
+            Assert.True(cache.TryGetNextMessage(cursor, out var newest));
+            Assert.Equal(newestSequenceNumber, newest.SequenceToken.SequenceNumber);
+            Assert.False(cache.TryGetNextMessage(cursor, out _));
+
+            long EnqueueMessage(Guid streamId)
+            {
+                var now = DateTime.UtcNow;
+                var msg = new TestQueueMessage
+                {
+                    StreamId = StreamId.Create(TestStreamNamespace, streamId),
+                    SequenceNumber = seqNumber,
+                };
+                cache.Add(new List<CachedMessage>() { converter.ToCachedMessage(msg, now) }, now);
+                seqNumber++;
+                return msg.SequenceNumber;
+            }
+        }
+
+        [Fact, TestSuite("BVT"), TestArea("Streaming")]
+        public void SimpleQueueCache_GetCursorAtOldestEntry()
+        {
+            var cache = new SimpleQueueCache(10, NullLogger.Instance);
+            var streamId = StreamId.Create(TestStreamNamespace, Guid.NewGuid());
+            var oldest = new TestBatchContainer { StreamId = streamId, SequenceToken = new EventSequenceTokenV2(1) };
+            var newest = new TestBatchContainer { StreamId = streamId, SequenceToken = new EventSequenceTokenV2(2) };
+            cache.AddToCache([oldest, newest]);
+
+            using var cursor = cache.GetCacheCursorForCacheMiss(streamId);
+
+            Assert.True(cursor.MoveNext());
+            Assert.Same(oldest, cursor.GetCurrent(out _));
+            Assert.True(cursor.MoveNext());
+            Assert.Same(newest, cursor.GetCurrent(out _));
+            Assert.False(cursor.MoveNext());
+        }
+
+        [Fact, TestSuite("BVT"), TestArea("Streaming")]
+        public void QueueCacheMissRecovery_UsesDefaultCursorPositionForCustomCache()
+        {
+            IQueueCache cache = new DefaultRecoveryQueueCache();
+
+            _ = cache.GetCacheCursorForCacheMiss(default);
+
+            Assert.Null(((DefaultRecoveryQueueCache)cache).RequestedToken);
+        }
+
+        [Fact, TestSuite("BVT"), TestArea("Streaming")]
+        public void OldestInStreamToken_RepresentsOldestPosition()
+        {
+            var token = OldestInStreamToken.Instance;
+
+            Assert.Equal(-1, token.SequenceNumber);
+            Assert.Equal(0, token.EventIndex);
+            Assert.Equal(0, token.CompareTo(new OldestInStreamToken()));
+            Assert.True(token.CompareTo(new EventSequenceTokenV2(0)) < 0);
+            Assert.True(token.CompareTo(null) > 0);
         }
 
         private int RunGoldenPath(PooledQueueCache cache, CachedMessageConverter converter, int startOfCache)

@@ -30,6 +30,17 @@ namespace Orleans.Streams
         IQueueCacheCursor GetCacheCursor(StreamId streamId, StreamSequenceToken? token);
 
         /// <summary>
+        /// Acquires a stream message cursor after a cache miss.
+        /// </summary>
+        /// <remarks>
+        /// The default implementation resumes from the cache's default cursor position.
+        /// Orleans-provided caches override this method to resume from the oldest retained message.
+        /// </remarks>
+        /// <param name="streamId">The stream identifier.</param>
+        /// <returns>The queue cache cursor.</returns>
+        IQueueCacheCursor GetCacheCursorForCacheMiss(StreamId streamId) => GetCacheCursor(streamId, null);
+
+        /// <summary>
         /// Returns <see langword="true" /> if this cache is under pressure, <see langword="false" /> otherwise.
         /// </summary>
         /// <returns><see langword="true" /> if this cache is under pressure; otherwise, <see langword="false" />.</returns>

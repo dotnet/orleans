@@ -1,7 +1,6 @@
 using System;
 using System.Collections.Generic;
 using System.Diagnostics.Metrics;
-using System.IO;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
@@ -863,7 +862,9 @@ namespace Orleans.Streams
                     {
                         exceptionOccured = exc;
                         consumerData.SafeDisposeCursor(logger);
-                        consumerData.Cursor = queueCache!.GetCacheCursor(consumerData.StreamId, null); // queueCache must be non-null here: consumerData.Cursor was only ever populated via queueCache.GetCacheCursor.
+                        consumerData.Cursor = exc is QueueCacheMissException
+                            ? queueCache!.GetCacheCursorForCacheMiss(consumerData.StreamId)
+                            : queueCache!.GetCacheCursor(consumerData.StreamId, null); // queueCache must be non-null here: consumerData.Cursor was only ever populated via queueCache.GetCacheCursor.
                     }
 
                     if (exceptionOccured is null)
