@@ -43,7 +43,9 @@ public sealed class InProcessTestCluster : IDisposable, IAsyncDisposable
     private readonly InProcessGrainDirectory _grainDirectory;
     private readonly InProcessMembershipTable _membershipTable;
     private readonly SemaphoreSlim _clientHostsSemaphore = new(1, 1);
-    private bool _disposed;
+    private readonly object _disposeLock = new();
+    private volatile bool _disposed;
+    private Task? _disposeTask;
     private int _startedInstances;
 
     private readonly Dictionary<string, IHost> _clientHosts = new();
@@ -604,6 +606,8 @@ public sealed class InProcessTestCluster : IDisposable, IAsyncDisposable
         await _clientHostsSemaphore.WaitAsync();
         try
         {
+            ThrowIfDisposed();
+
             IHost? client;
             lock (_clientHosts)
             {
@@ -727,6 +731,8 @@ public sealed class InProcessTestCluster : IDisposable, IAsyncDisposable
     {
         lock (_clientHosts)
         {
+            ThrowIfDisposed();
+
             return _clientHosts.TryGetValue(name, out var host)
                 ? host.Services.GetRequiredService<IInternalClusterClient>()
                 : null;
@@ -741,6 +747,8 @@ public sealed class InProcessTestCluster : IDisposable, IAsyncDisposable
         await _clientHostsSemaphore.WaitAsync();
         try
         {
+            ThrowIfDisposed();
+
             IHost? host;
             lock (_clientHosts)
             {
@@ -755,6 +763,7 @@ public sealed class InProcessTestCluster : IDisposable, IAsyncDisposable
                     await host.StartAsync();
                     lock (_clientHosts)
                     {
+                        ThrowIfDisposed();
                         _clientHosts.Add(name, host);
                     }
                 }
@@ -781,6 +790,8 @@ public sealed class InProcessTestCluster : IDisposable, IAsyncDisposable
         await _clientHostsSemaphore.WaitAsync();
         try
         {
+            ThrowIfDisposed();
+
             IHost? host;
             lock (_clientHosts)
             {
@@ -1015,56 +1026,102 @@ public sealed class InProcessTestCluster : IDisposable, IAsyncDisposable
     }
 
     /// <inheritdoc/>
-    public async ValueTask DisposeAsync()
+    public ValueTask DisposeAsync() => new(StartDisposal());
+
+    /// <inheritdoc/>
+    public void Dispose() => StartDisposal().GetAwaiter().GetResult();
+
+    private Task StartDisposal()
     {
-        if (_disposed)
+        lock (_disposeLock)
         {
-            return;
+            if (_disposeTask is not null)
+            {
+                return _disposeTask;
+            }
+
+            _disposed = true;
+            _disposeTask = Task.Run(DisposeCoreAsync);
+            return _disposeTask;
+        }
+    }
+
+    private async Task DisposeCoreAsync()
+    {
+        await _clientHostsSemaphore.WaitAsync().ConfigureAwait(false);
+        List<IHost> clientHosts;
+        try
+        {
+            lock (_clientHosts)
+            {
+                clientHosts = [.. _clientHosts.Values];
+                _clientHosts.Clear();
+            }
+        }
+        finally
+        {
+            _clientHostsSemaphore.Release();
         }
 
-        await Task.Run(async () =>
+        List<Exception>? exceptions = null;
+        foreach (var handle in Silos)
         {
-            foreach (var handle in Silos)
+            try
             {
                 await DisposeAsync(handle).ConfigureAwait(false);
             }
+            catch (Exception exception)
+            {
+                exceptions ??= [];
+                exceptions.Add(exception);
+            }
+        }
 
-            foreach (var clientHost in _clientHosts.Values)
+        foreach (var clientHost in clientHosts)
+        {
+            try
             {
                 await DisposeAsync(clientHost).ConfigureAwait(false);
             }
-            _clientHosts.Clear();
+            catch (Exception exception)
+            {
+                exceptions ??= [];
+                exceptions.Add(exception);
+            }
+        }
 
+        try
+        {
             PortAllocator.Dispose();
-            _grainDirectoryObserver.Dispose();
-        });
+        }
+        catch (Exception exception)
+        {
+            exceptions ??= [];
+            exceptions.Add(exception);
+        }
 
-        _disposed = true;
+        try
+        {
+            _grainDirectoryObserver.Dispose();
+        }
+        catch (Exception exception)
+        {
+            exceptions ??= [];
+            exceptions.Add(exception);
+        }
+
+        if (exceptions is not null)
+        {
+            throw new AggregateException("One or more errors occurred while disposing the test cluster.", exceptions);
+        }
     }
 
-    /// <inheritdoc/>
-    public void Dispose()
+    private void ThrowIfDisposed()
     {
         if (_disposed)
         {
-            return;
+            throw new ObjectDisposedException(nameof(InProcessTestCluster));
         }
-
-        foreach (var handle in Silos)
-        {
-            handle.Dispose();
-        }
-
-        foreach (var clientHost in _clientHosts.Values)
-        {
-            clientHost.Dispose();
-        }
-        _clientHosts.Clear();
-
-        PortAllocator.Dispose();
-        _grainDirectoryObserver.Dispose();
-
-        _disposed = true;
     }
 
     private static async Task DisposeAsync(IDisposable? value)

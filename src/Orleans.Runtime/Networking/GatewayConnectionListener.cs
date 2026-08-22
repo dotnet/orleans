@@ -4,7 +4,6 @@ using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Connections;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration;
 
@@ -32,8 +31,7 @@ namespace Orleans.Runtime.Messaging
             MessageCenter messageCenter,
             ConnectionManager connectionManager,
             ConnectionCommon connectionShared,
-            ConnectionPreambleHelper connectionPreambleHelper,
-            ILogger<GatewayConnectionListener> logger)
+            ConnectionPreambleHelper connectionPreambleHelper)
             : base(serviceProvider.GetRequiredKeyedService<IConnectionListenerFactory>(ServicesKey), connectionOptions, connectionManager, connectionShared)
         {
             this.siloConnectionOptions = siloConnectionOptions.Value;
