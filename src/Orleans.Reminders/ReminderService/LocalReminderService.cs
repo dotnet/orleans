@@ -1371,9 +1371,6 @@ namespace Orleans.Runtime.ReminderService
                             // accurate scheduling info; the grain-facing status is rebuilt after
                             // admission. Skipped ticks emit TickSkipped (no TickFiring, no
                             // tardiness sample) since the grain never observes them.
-                            var preThrottleNow = _shared._timeProvider.GetUtcNow().UtcDateTime;
-                            var provisionalStatus = new TickStatus(entry.StartAt, entry.Period, preThrottleNow);
-                            var context = new ReminderDeliveryContext(entry.GrainId, entry.ReminderName, provisionalStatus, scheduledTick.TickTime);
                             ReminderDeliveryLease lease;
                             if (ReferenceEquals(_shared._deliveryThrottle, NoOpReminderDeliveryThrottle.Instance))
                             {
@@ -1381,6 +1378,9 @@ namespace Orleans.Runtime.ReminderService
                             }
                             else
                             {
+                                var preThrottleNow = _shared._timeProvider.GetUtcNow().UtcDateTime;
+                                var provisionalStatus = new TickStatus(entry.StartAt, entry.Period, preThrottleNow);
+                                var context = new ReminderDeliveryContext(entry.GrainId, entry.ReminderName, provisionalStatus, scheduledTick.TickTime);
                                 using var acquireCancellation = CancellationTokenSource.CreateLinkedTokenSource(_stopCancellation.Token, scheduleChangedToken);
                                 try
                                 {
