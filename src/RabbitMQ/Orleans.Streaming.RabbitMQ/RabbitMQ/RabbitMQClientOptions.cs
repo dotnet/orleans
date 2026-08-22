@@ -42,7 +42,7 @@ public record RabbitMQClientOptions
     public StreamSpec StreamOptions { get; set; } = new(string.Empty);
 }
 
-public record RabbitMqQueueCacheOptions
+public record RabbitMQQueueCacheOptions
 {
     /// <summary>
     ///     The default value of <see cref="CacheSize" />.

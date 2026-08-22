@@ -20,7 +20,7 @@ public class RabbitMQRuntimeTests
             NullLoggerFactory.Instance,
             default,
             null!,
-            new RabbitMqQueueCacheOptions { CacheSize = 1 });
+            new RabbitMQQueueCacheOptions { CacheSize = 1 });
         consumer.StartBuffering();
         await consumer.BufferMessage([1], null!, 0);
 
@@ -117,7 +117,7 @@ public class RabbitMQRuntimeTests
             NullLoggerFactory.Instance,
             default,
             null!,
-            new RabbitMqQueueCacheOptions { CacheSize = 1 });
+            new RabbitMQQueueCacheOptions { CacheSize = 1 });
         consumer.StartBuffering();
         await consumer.BufferMessage([], null!, 4);
 

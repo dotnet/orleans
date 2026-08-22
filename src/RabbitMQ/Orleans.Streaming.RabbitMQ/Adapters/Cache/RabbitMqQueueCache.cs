@@ -8,7 +8,7 @@ namespace Orleans.Streaming.RabbitMQ.Adapters.Cache;
 internal sealed class RabbitMqQueueCache : IQueueCache
 {
     private readonly object _lock = new();
-    private readonly RabbitMqQueueCacheOptions _cacheOptions;
+    private readonly RabbitMQQueueCacheOptions _cacheOptions;
     private readonly LinkedList<CacheEntry> _entries = new();
     private readonly Dictionary<StreamId, List<CacheEntry>> _streamEntries = new();
     private readonly Dictionary<StreamId, HashSet<RabbitMqQueueCacheCursor>> _activeCursors = new();
@@ -16,7 +16,7 @@ internal sealed class RabbitMqQueueCache : IQueueCache
     private readonly LinkedList<PurgedHighWatermark> _purgedHighWatermarkOrder = new();
     private int _count;
 
-    public RabbitMqQueueCache(RabbitMqQueueCacheOptions cacheOptions)
+    public RabbitMqQueueCache(RabbitMQQueueCacheOptions cacheOptions)
     {
         _cacheOptions = cacheOptions;
     }

@@ -76,7 +76,7 @@ public class RabbitMqQueueCacheTest
     public void FailedDeliveryRemainsCachedUntilRetrySucceeds()
     {
         var streamId = StreamId.Create("test", Guid.NewGuid());
-        var cache = new RabbitMqQueueCache(new RabbitMqQueueCacheOptions { CacheSize = 1 });
+        var cache = new RabbitMqQueueCache(new RabbitMQQueueCacheOptions { CacheSize = 1 });
         cache.AddToCache([CreateBatch(streamId, 0)]);
         using var cursor = cache.GetCacheCursor(streamId, null);
         Assert.True(cursor.MoveNext());
@@ -114,7 +114,7 @@ public class RabbitMqQueueCacheTest
     [Fact]
     public void PurgedHighWatermarksRemainBoundedByCacheCapacity()
     {
-        var cache = new RabbitMqQueueCache(new RabbitMqQueueCacheOptions { CacheSize = 3 });
+        var cache = new RabbitMqQueueCache(new RabbitMQQueueCacheOptions { CacheSize = 3 });
         var streams = Enumerable.Range(0, 10)
             .Select(index => StreamId.Create("test", index.ToString()))
             .ToArray();
@@ -145,7 +145,7 @@ public class RabbitMqQueueCacheTest
     }
 
     private static RabbitMqQueueCache CreateCache() =>
-        new(new RabbitMqQueueCacheOptions { CacheSize = 10 });
+        new(new RabbitMQQueueCacheOptions { CacheSize = 10 });
 
     private static RabbitMqBatchContainer CreateBatch(StreamId streamId, long sequenceNumber) =>
         new(streamId, [new object()], new EventSequenceTokenV2(sequenceNumber));
