@@ -725,10 +725,12 @@ public class DisseminationProtocolTests
             CancellationToken.None));
         ns.RemoveValue("removed");
         await protocol.FlushPendingBroadcast(CancellationToken.None);
+        var repairRequestCount = ns.RepairRequestCount;
         timeProvider.Advance(TimeSpan.FromMinutes(1));
         await Task.Delay(TimeSpan.FromMilliseconds(50));
 
         Assert.Equal(0, sendCount);
+        Assert.Equal(repairRequestCount, ns.RepairRequestCount);
         await protocol.StopAsync(CancellationToken.None);
     }
 
@@ -1524,13 +1526,25 @@ public class DisseminationProtocolTests
         {
             var silos = CreateSilos(testCase.Count);
             var root = silos[testCase.RootIndex];
-            var directTargets = GetOriginatorTreeTargets(root, silos.Where(silo => !Equals(silo, root)), testCase.Fanout);
+            var options = new DisseminationOverlayOptions
+            {
+                FanOutFactor = _ => testCase.Fanout,
+            };
+            var members = silos.ToImmutableArray();
+            var snapshots = silos.ToDictionary(
+                static silo => silo,
+                silo => new DisseminationMembershipSnapshot(
+                    new MembershipVersion(1),
+                    silo,
+                    members,
+                    options));
+            var directTargets = snapshots[root].OriginatorTreeTargets;
 
             Assert.DoesNotContain(root, directTargets);
-            Assert.Equal(directTargets.Count, directTargets.Distinct().Count());
-            Assert.True(directTargets.Count <= Math.Min((testCase.Fanout * 2), Math.Max(0, testCase.Count - 1)));
+            Assert.Equal(directTargets.Length, directTargets.Distinct().Count());
+            Assert.True(directTargets.Length <= Math.Min((testCase.Fanout * 2), Math.Max(0, testCase.Count - 1)));
 
-            var reached = GetReachedParticipants(root, silos, testCase.Fanout);
+            var reached = GetReachedParticipants(root, snapshots);
             Assert.Equal(silos.OrderBy(static silo => silo), reached.OrderBy(static silo => silo));
         });
     }
@@ -1732,7 +1746,7 @@ public class DisseminationProtocolTests
         var ns = new FakeNamespace(local);
         ns.ExpectedKeys.Add(FakeNamespace.DefaultKey);
         var exchangeCount = 0;
-        transport.ExchangeAntiEntropyHandler = (target, request) =>
+        transport.ExchangeAntiEntropyHandler = (target, request, _) =>
         {
             if (Interlocked.Increment(ref exchangeCount) == 1)
             {
@@ -1764,10 +1778,10 @@ public class DisseminationProtocolTests
         ns.ExpectedKeys.Add(FakeNamespace.DefaultKey);
         var exchangeStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         using var cancellation = new CancellationTokenSource();
-        transport.ExchangeAntiEntropyHandler = async (target, request) =>
+        transport.ExchangeAntiEntropyHandler = async (target, request, cancellationToken) =>
         {
             exchangeStarted.TrySetResult();
-            await Task.Delay(Timeout.InfiniteTimeSpan, cancellation.Token);
+            await Task.Delay(Timeout.InfiniteTimeSpan, cancellationToken);
             return new DisseminationAntiEntropyResponse { Sender = target };
         };
 
@@ -1777,7 +1791,8 @@ public class DisseminationProtocolTests
 
         cancellation.Cancel();
 
-        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => exchangeTask);
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(
+            async () => await exchangeTask.WaitAsync(TimeSpan.FromSeconds(5)));
     }
 
     [Fact]
@@ -1811,7 +1826,7 @@ public class DisseminationProtocolTests
         var inFlight = 0;
         var started = 0;
         var observedMax = 0;
-        transport.ExchangeAntiEntropyHandler = async (target, request) =>
+        transport.ExchangeAntiEntropyHandler = async (target, request, _) =>
         {
             lock (gate)
             {
@@ -1873,7 +1888,7 @@ public class DisseminationProtocolTests
         var protocol = CreateProtocol(transport, ns);
         ns.ExpectedKeys.Add(FakeNamespace.DefaultKey);
         var repairItem = ns.CreateItem(peer, FakeNamespace.DefaultKey, sequence: 7);
-        transport.ExchangeAntiEntropyHandler = (target, request) => ValueTask.FromResult(new DisseminationAntiEntropyResponse
+        transport.ExchangeAntiEntropyHandler = (target, request, _) => ValueTask.FromResult(new DisseminationAntiEntropyResponse
         {
             Sender = target,
             Values = CreateValueGroups(repairItem),
@@ -1910,7 +1925,7 @@ public class DisseminationProtocolTests
             FakeNamespace.DefaultKey,
             sequence: 3,
             fromVersion: 2);
-        transport.ExchangeAntiEntropyHandler = (target, request) => ValueTask.FromResult(new DisseminationAntiEntropyResponse
+        transport.ExchangeAntiEntropyHandler = (target, request, _) => ValueTask.FromResult(new DisseminationAntiEntropyResponse
         {
             Sender = target,
             Values = CreateValueGroups(second, third),
@@ -1932,7 +1947,7 @@ public class DisseminationProtocolTests
         var ns = new FakeNamespace(local);
         ns.SetValue(FakeNamespace.DefaultKey, version: 1);
         var exchangeCount = 0;
-        transport.ExchangeAntiEntropyHandler = (target, request) =>
+        transport.ExchangeAntiEntropyHandler = (target, request, _) =>
         {
             var requestedVersion = Assert.Single(request.Digests[ns.Name]).Version;
             var responseVersion = Interlocked.Increment(ref exchangeCount) == 1 ? 2 : 3;
@@ -1995,7 +2010,7 @@ public class DisseminationProtocolTests
             ExpiresAt = TimeProvider.System.GetUtcNow().AddMinutes(1),
         };
         var goodRepairItem = ns.CreateItem(peer, FakeNamespace.DefaultKey, sequence: 3);
-        transport.ExchangeAntiEntropyHandler = (target, request) => ValueTask.FromResult(new DisseminationAntiEntropyResponse
+        transport.ExchangeAntiEntropyHandler = (target, request, _) => ValueTask.FromResult(new DisseminationAntiEntropyResponse
         {
             Sender = target,
             Values = CreateValueGroups(badRepairItem, goodRepairItem),
@@ -2023,7 +2038,7 @@ public class DisseminationProtocolTests
         };
         var goodRepairItem = ns.CreateItem(peer, FakeNamespace.DefaultKey, sequence: 3);
         var exchangeCount = 0;
-        transport.ExchangeAntiEntropyHandler = (target, request) =>
+        transport.ExchangeAntiEntropyHandler = (target, request, _) =>
         {
             var count = Interlocked.Increment(ref exchangeCount);
             return ValueTask.FromResult(new DisseminationAntiEntropyResponse
@@ -2555,6 +2570,19 @@ public class DisseminationProtocolTests
     }
 
     [Fact]
+    public void ManifestHashIncludesEntryBoundaries()
+    {
+        var manifest1 = CreateManifestWithProperties(
+            ("a", [("b", "c")]),
+            ("d", [("e", "f"), ("g", "h")]));
+        var manifest2 = CreateManifestWithProperties(
+            ("a", [("b", "c"), ("d", "e")]),
+            ("f", [("g", "h")]));
+
+        Assert.NotEqual(ManifestHashCalculator.ComputeHash(manifest1), ManifestHashCalculator.ComputeHash(manifest2));
+    }
+
+    [Fact]
     public void OptionsValidatorRejectsInvalidFanoutBounds()
     {
         var options = new DisseminationOptions();
@@ -2563,6 +2591,41 @@ public class DisseminationProtocolTests
         var result = new DisseminationOptionsValidator().Validate(Options.DefaultName, options);
 
         Assert.True(result.Failed);
+    }
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(4294967295)]
+    public void OptionsValidatorRejectsUnsupportedAntiEntropyIntervals(long milliseconds)
+    {
+        var options = new DisseminationOptions();
+        options.Overlay.AntiEntropyInterval = TimeSpan.FromMilliseconds(milliseconds);
+        var result = new DisseminationOptionsValidator().Validate(Options.DefaultName, options);
+
+        Assert.True(result.Failed);
+    }
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(4294967295)]
+    public void NamespaceOptionsValidatorRejectsUnsupportedCoalescingDelays(long milliseconds)
+    {
+        var options = new DeploymentLoadPublisherOptions();
+        options.Dissemination.MaxCoalescingDelay = TimeSpan.FromMilliseconds(milliseconds);
+        options.Dissemination.StaleItemTtl = options.Dissemination.MaxCoalescingDelay + TimeSpan.FromSeconds(1);
+        var result = new DeploymentLoadPublisherOptionsValidator().Validate(Options.DefaultName, options);
+
+        Assert.True(result.Failed);
+    }
+
+    [Fact]
+    public void DisseminationExpirationSaturatesAtMaximumTimestamp()
+    {
+        var timeProvider = new FakeTimeProvider(DateTimeOffset.MaxValue - TimeSpan.FromSeconds(1));
+
+        var expiration = DisseminationExpiration.Get(timeProvider, TimeSpan.FromSeconds(2));
+
+        Assert.Equal(DateTimeOffset.MaxValue, expiration);
     }
 
     [Fact]
@@ -2984,10 +3047,12 @@ public class DisseminationProtocolTests
         result.Add(peer);
     }
 
-    private static HashSet<SiloAddress> GetReachedParticipants(SiloAddress root, IReadOnlyList<SiloAddress> participants, int fanout)
+    private static HashSet<SiloAddress> GetReachedParticipants(
+        SiloAddress root,
+        IReadOnlyDictionary<SiloAddress, DisseminationMembershipSnapshot> snapshots)
     {
         var reached = new HashSet<SiloAddress> { root };
-        var pending = new Queue<SiloAddress>(GetOriginatorTreeTargets(root, participants.Where(silo => !Equals(silo, root)), fanout));
+        var pending = new Queue<SiloAddress>(snapshots[root].OriginatorTreeTargets);
         while (pending.Count > 0)
         {
             var current = pending.Dequeue();
@@ -2996,7 +3061,7 @@ public class DisseminationProtocolTests
                 continue;
             }
 
-            foreach (var child in GetForwardingTreeTargets(current, root, participants.Where(silo => !Equals(silo, current)), fanout, sender: root))
+            foreach (var child in snapshots[current].ForwardingTreeTargets)
             {
                 pending.Enqueue(child);
             }
@@ -3014,6 +3079,25 @@ public class DisseminationProtocolTests
             properties[grain.Key] = grain.Value;
             grainBuilder[GrainType.Create(grain.Grain)] = new GrainProperties(
                 properties.ToImmutable());
+        }
+
+        return new GrainManifest(
+            grainBuilder.ToImmutable(),
+            System.Collections.Immutable.ImmutableDictionary<GrainInterfaceType, GrainInterfaceProperties>.Empty);
+    }
+
+    private static GrainManifest CreateManifestWithProperties(params (string Grain, (string Key, string Value)[] Properties)[] grains)
+    {
+        var grainBuilder = System.Collections.Immutable.ImmutableDictionary.CreateBuilder<GrainType, GrainProperties>();
+        foreach (var grain in grains)
+        {
+            var properties = System.Collections.Immutable.ImmutableDictionary.CreateBuilder<string, string>(StringComparer.Ordinal);
+            foreach (var property in grain.Properties)
+            {
+                properties[property.Key] = property.Value;
+            }
+
+            grainBuilder[GrainType.Create(grain.Grain)] = new GrainProperties(properties.ToImmutable());
         }
 
         return new GrainManifest(
@@ -3079,6 +3163,7 @@ public class DisseminationProtocolTests
         private readonly Dictionary<DisseminationKey, long> _versions = new();
         private readonly Dictionary<DisseminationKey, SortedDictionary<long, DisseminationValue>> _publishedValues = new();
         private readonly DisseminationNamespace _name;
+        private int _repairRequestCount;
 
         public FakeNamespace(SiloAddress localSilo, DisseminationNamespace? name = null)
         {
@@ -3095,6 +3180,8 @@ public class DisseminationProtocolTests
         public DisseminationNamespaceOptions Options { get; } = new() { Enabled = true };
 
         public bool ReturnRepairChain { get; set; }
+
+        public int RepairRequestCount => Volatile.Read(ref _repairRequestCount);
 
         public DisseminationValue CreateValue(DisseminationKey key, long sequence, long fromVersion = 0) => new(
             key,
@@ -3180,6 +3267,7 @@ public class DisseminationProtocolTests
 
         public DisseminationRepairResult CreateRepair(in DisseminationRepairRequest request)
         {
+            Interlocked.Increment(ref _repairRequestCount);
             long version;
             List<DisseminationValue> candidates;
             lock (_lock)
@@ -3396,8 +3484,8 @@ public class DisseminationProtocolTests
 
         public Func<SiloAddress, DisseminationBroadcastBatch, CancellationToken, Task<DisseminationBroadcastResponse>>? SendBroadcastResponseHandler { get; set; }
 
-        public Func<SiloAddress, DisseminationAntiEntropyRequest, ValueTask<DisseminationAntiEntropyResponse>> ExchangeAntiEntropyHandler { get; set; } =
-            static (peer, _) => ValueTask.FromResult(new DisseminationAntiEntropyResponse { Sender = peer });
+        public Func<SiloAddress, DisseminationAntiEntropyRequest, CancellationToken, ValueTask<DisseminationAntiEntropyResponse>> ExchangeAntiEntropyHandler { get; set; } =
+            static (peer, _, _) => ValueTask.FromResult(new DisseminationAntiEntropyResponse { Sender = peer });
 
         public Func<CancellationToken, Task>? RefreshMembershipHandler { get; set; }
 
@@ -3483,7 +3571,7 @@ public class DisseminationProtocolTests
                 AntiEntropyRequests.Add((peer, request));
             }
 
-            return ExchangeAntiEntropyHandler(peer, request);
+            return ExchangeAntiEntropyHandler(peer, request, cancellationToken);
         }
 
         public static DisseminationBroadcastResponse CreateAcknowledgment(DisseminationBroadcastBatch batch)

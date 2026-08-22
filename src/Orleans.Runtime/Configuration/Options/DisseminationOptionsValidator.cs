@@ -5,6 +5,8 @@ namespace Orleans.Configuration;
 
 internal sealed class DisseminationOptionsValidator : IValidateOptions<DisseminationOptions>
 {
+    private static readonly TimeSpan MaxPeriodicTimerPeriod = TimeSpan.FromMilliseconds(uint.MaxValue - 1);
+
     public ValidateOptionsResult Validate(string? name, DisseminationOptions options)
     {
         if (options.MaxConcurrentSends <= 0)
@@ -38,9 +40,11 @@ internal sealed class DisseminationOptionsValidator : IValidateOptions<Dissemina
             return ValidateOptionsResult.Fail($"{nameof(DisseminationOverlayOptions.MaxFanOutFactor)} must be greater than or equal to {nameof(DisseminationOverlayOptions.MinFanOutFactor)}.");
         }
 
-        if (overlay.AntiEntropyInterval <= TimeSpan.Zero)
+        if (overlay.AntiEntropyInterval < TimeSpan.FromMilliseconds(1)
+            || overlay.AntiEntropyInterval > MaxPeriodicTimerPeriod)
         {
-            return ValidateOptionsResult.Fail($"{nameof(DisseminationOverlayOptions.AntiEntropyInterval)} must be greater than 0.");
+            return ValidateOptionsResult.Fail(
+                $"{nameof(DisseminationOverlayOptions.AntiEntropyInterval)} must be between 1 millisecond and {MaxPeriodicTimerPeriod}.");
         }
 
         if (overlay.AntiEntropyPeerCount <= 0)
@@ -54,6 +58,8 @@ internal sealed class DisseminationOptionsValidator : IValidateOptions<Dissemina
 
 internal sealed class DisseminationNamespaceOptionsValidator
 {
+    private static readonly TimeSpan MaxTimerPeriod = TimeSpan.FromMilliseconds(uint.MaxValue - 1);
+
     public static ValidateOptionsResult Validate(string owner, DisseminationNamespaceOptions options)
     {
         if (options.MaxPendingItemCount <= 0)
@@ -61,9 +67,11 @@ internal sealed class DisseminationNamespaceOptionsValidator
             return ValidateOptionsResult.Fail($"{owner}.{nameof(DisseminationNamespaceOptions.MaxPendingItemCount)} must be greater than 0.");
         }
 
-        if (options.MaxCoalescingDelay <= TimeSpan.Zero)
+        if (options.MaxCoalescingDelay < TimeSpan.FromMilliseconds(1)
+            || options.MaxCoalescingDelay > MaxTimerPeriod)
         {
-            return ValidateOptionsResult.Fail($"{owner}.{nameof(DisseminationNamespaceOptions.MaxCoalescingDelay)} must be greater than 0.");
+            return ValidateOptionsResult.Fail(
+                $"{owner}.{nameof(DisseminationNamespaceOptions.MaxCoalescingDelay)} must be between 1 millisecond and {MaxTimerPeriod}.");
         }
 
         if (options.StaleItemTtl <= options.MaxCoalescingDelay)

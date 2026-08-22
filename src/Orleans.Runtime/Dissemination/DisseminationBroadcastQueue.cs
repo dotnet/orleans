@@ -691,7 +691,7 @@ internal sealed partial class DisseminationBroadcastQueue
                         namespaceValues.Add(new DisseminationBroadcastValue
                         {
                             Value = value,
-                            ExpiresAt = _owner._timeProvider.GetUtcNow() + work.Namespace.Options.StaleItemTtl,
+                            ExpiresAt = DisseminationExpiration.Get(_owner._timeProvider, work.Namespace.Options.StaleItemTtl),
                         });
                         itemCount++;
                         byteCount += value.Payload.Length;
