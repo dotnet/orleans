@@ -58,6 +58,13 @@ namespace Orleans.Runtime
         /// <returns>The grain context.</returns>
         public IGrainContext CreateInstance(GrainAddress address)
         {
+            var context = CreateContext(address);
+            using var startup = context.Start();
+            return context;
+        }
+
+        internal IGrainContext CreateContext(GrainAddress address)
+        {
             var grainId = address.GrainId;
             if (!_activators.TryGetValue(grainId.Type, out var activator))
             {
@@ -131,6 +138,11 @@ namespace Orleans.Runtime
         /// <param name="address">The grain address.</param>
         /// <param name="configureActions">The actions which must be used to configure the context before grain construction begins.</param>
         /// <returns>The newly created grain context.</returns>
+        /// <remarks>
+        /// Call <see cref="IGrainContext.Start"/> on the returned context, or use
+        /// <see cref="GrainContextActivator.CreateInstance(GrainAddress)"/> to create and start it.
+        /// Custom contexts which start eagerly can use the default <see cref="IGrainContext.Start"/> implementation.
+        /// </remarks>
         public IGrainContext CreateContext(GrainAddress address, IConfigureGrainContext[] configureActions);
     }
 

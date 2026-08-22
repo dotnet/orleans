@@ -13,6 +13,7 @@ using Orleans.GrainDirectory;
 using Orleans.Internal;
 using Orleans.Runtime.Diagnostics;
 using Orleans.Runtime.GrainDirectory;
+using Orleans.Runtime.Internal;
 using Orleans.Runtime.Placement;
 using Orleans.Runtime.Scheduler;
 using Orleans.Serialization.Invocation;
@@ -42,8 +43,10 @@ internal sealed partial class ActivationData :
 {
     private const string GrainAddressMigrationContextKey = "sys.addr";
     private readonly GrainTypeSharedContext _shared;
+    private readonly IGrainActivator _grainActivator;
     private readonly IServiceScope _serviceScope;
     private readonly WorkItemGroup _workItemGroup;
+    private WorkItemGroup.ActivationStartup? _startup;
     private readonly List<(Message Message, CoarseStopwatch QueuedTime)> _waitingRequests = new();
     private readonly Dictionary<Message, CoarseStopwatch> _runningRequests = new();
     private readonly SingleWaiterAutoResetEvent _workSignal = new() { RunContinuationsAsynchronously = true };
@@ -65,6 +68,7 @@ internal sealed partial class ActivationData :
 #pragma warning disable IDE0052 // Remove unread private members
     private Task? _messageLoopTask;
 #pragma warning restore IDE0052 // Remove unread private members
+    private int _started;
 
     private Activity? _activationActivity;
 
@@ -88,18 +92,29 @@ internal sealed partial class ActivationData :
         GrainAddress grainAddress,
         Func<IGrainContext, WorkItemGroup> createWorkItemGroup,
         IServiceProvider applicationServices,
-        GrainTypeSharedContext shared)
+        GrainTypeSharedContext shared,
+        IGrainActivator grainActivator)
     {
         ArgumentNullException.ThrowIfNull(grainAddress);
         ArgumentNullException.ThrowIfNull(createWorkItemGroup);
         ArgumentNullException.ThrowIfNull(applicationServices);
         ArgumentNullException.ThrowIfNull(shared);
+        ArgumentNullException.ThrowIfNull(grainActivator);
         _shared = shared;
+        _grainActivator = grainActivator;
         Address = grainAddress;
         _serviceScope = applicationServices.CreateScope();
         Debug.Assert(_serviceScope != null, "_serviceScope must not be null.");
         _workItemGroup = createWorkItemGroup(this);
         Debug.Assert(_workItemGroup != null, "_workItemGroup must not be null.");
+        _startup = _workItemGroup.BeginActivationStartup();
+        _workItemGroup.QueueAction(
+            static state =>
+            {
+                var context = (ActivationData)state;
+                context._messageLoopTask = context.RunMessageLoop();
+            },
+            this);
     }
 
     internal void SetActivationActivity(Activity activity)
@@ -116,15 +131,85 @@ internal sealed partial class ActivationData :
         return _activationActivity?.Context;
     }
 
-    public void Start(IGrainActivator grainActivator)
+    public IDisposable? Start()
+    {
+        if (Interlocked.Exchange(ref _started, 1) != 0 || _startup is not { } startup)
+        {
+            throw new InvalidOperationException("The activation has already been started.");
+        }
+
+        try
+        {
+            ExecutionContext.Run(
+                DefaultExecutionContext.Instance,
+                static state =>
+                {
+                    var context = (ActivationData)state!;
+                    var task = new Task(
+                        static state => ((ActivationData)state!).StartCore(),
+                        context,
+                        CancellationToken.None,
+                        TaskCreationOptions.DenyChildAttach);
+                    context._startup!.RunConstructor(task);
+                    task.GetAwaiter().GetResult();
+                },
+                this);
+            _startup = null;
+            return startup;
+        }
+        catch (Exception exception)
+        {
+            _startup = null;
+            try
+            {
+                Deactivate(
+                    new DeactivationReason(
+                        DeactivationReasonCode.ActivationFailed,
+                        exception,
+                        "Error starting grain construction."),
+                    CancellationToken.None);
+            }
+            finally
+            {
+                startup.Dispose();
+            }
+
+            throw;
+        }
+    }
+
+    public void Abort()
+    {
+        if (Interlocked.Exchange(ref _startup, null) is { } startup)
+        {
+            startup.Abort();
+            using var suppressExecutionContext = new ExecutionContextSuppressor();
+            Task.Factory.StartNew(
+                    static state => DisposeAsync(state!).AsTask(),
+                    _serviceScope,
+                    CancellationToken.None,
+                    TaskCreationOptions.DenyChildAttach,
+                    TaskScheduler.Default)
+                .Unwrap()
+                .GetAwaiter()
+                .GetResult();
+        }
+    }
+
+    private void StartCore()
     {
         Debug.Assert(Equals(ActivationTaskScheduler, TaskScheduler.Current));
         // locking on `this` is intentional as there are other places in the codebase taking locks on ActivationData instances
         lock (this)
         {
+            if (State is not ActivationState.Creating)
+            {
+                return;
+            }
+
             try
             {
-                var instance = grainActivator.CreateInstance(this);
+                var instance = _grainActivator.CreateInstance(this);
                 SetGrainInstance(instance);
                 _activationActivity?.AddEvent(new ActivityEvent("instance-created"));
 
@@ -137,7 +222,6 @@ internal sealed partial class ActivationData :
                 Deactivate(new(DeactivationReasonCode.ActivationFailed, exception, "Error constructing grain instance."), _activationActivity?.Context, CancellationToken.None);
             }
 
-            _messageLoopTask = RunMessageLoop();
         }
     }
 

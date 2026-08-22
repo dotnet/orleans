@@ -112,6 +112,80 @@ namespace UnitTests.General
             Assert.True(state.WasConfiguredAtConstruction);
         }
 
+        [Fact]
+        public async Task ContextCreationStartsActivationSynchronouslyOnActivationSchedulerWithCleanExecutionContext()
+        {
+            var state = ActivationOrderingState.Instance;
+            var ambientState = new object();
+            state.Arm();
+            state.SetAmbientState(ambientState);
+
+            var primary = Assert.IsType<InProcessSiloHandle>(fixture.HostedCluster.Primary);
+            var services = primary.ServiceProvider;
+            var grainType = services.GetRequiredService<GrainTypeResolver>().GetGrainType(typeof(ExplicitlyRegisteredSimpleDIGrain));
+            var grainId = GrainId.Create(grainType, Guid.NewGuid().ToString());
+            var address = GrainAddress.NewActivationAddress(primary.SiloAddress, grainId);
+            ActivationData? context = null;
+
+            try
+            {
+                context = Assert.IsType<ActivationData>(services.GetRequiredService<GrainContextActivator>().CreateInstance(address));
+
+                Assert.NotNull(context.GrainInstance);
+                Assert.True(state.WasConfiguredAtConstruction);
+                Assert.True(state.HadSchedulerAffinityAtConstruction);
+                Assert.True(state.HadRuntimeContextAtConstruction);
+                Assert.Null(state.RequestContextAtConstruction);
+                Assert.Null(state.TransactionStateAtConstruction);
+                Assert.Same(ambientState, RequestContext.Get(ActivationOrderingState.RequestContextKey));
+                Assert.Same(ambientState, state.TransactionState);
+            }
+            finally
+            {
+                state.ClearAmbientState();
+                if (context is not null)
+                {
+                    context.Deactivate(new(DeactivationReasonCode.ApplicationRequested, "Test completed."));
+                    await context.Deactivated.WaitAsync(TimeSpan.FromSeconds(10));
+                }
+            }
+        }
+
+        [Fact]
+        public async Task BuiltInActivatorCreateContextReturnsUnstartedContext()
+        {
+            var primary = Assert.IsType<InProcessSiloHandle>(fixture.HostedCluster.Primary);
+            var services = primary.ServiceProvider;
+            var grainType = services.GetRequiredService<GrainTypeResolver>().GetGrainType(typeof(ExplicitlyRegisteredSimpleDIGrain));
+            var address = GrainAddress.NewActivationAddress(
+                primary.SiloAddress,
+                GrainId.Create(grainType, Guid.NewGuid().ToString()));
+            IGrainContextActivator? activator = null;
+            foreach (var provider in services.GetServices<IGrainContextActivatorProvider>())
+            {
+                if (provider.TryGet(grainType, out activator))
+                {
+                    break;
+                }
+            }
+
+            Assert.NotNull(activator);
+            var context = Assert.IsType<ActivationData>(activator.CreateContext(address, []));
+            try
+            {
+                Assert.Null(context.GrainInstance);
+                using (context.Start())
+                {
+                    Assert.NotNull(context.GrainInstance);
+                }
+            }
+            finally
+            {
+                context.Deactivate(new(DeactivationReasonCode.ApplicationRequested, "Test completed."));
+                await context.Deactivated.WaitAsync(TimeSpan.FromSeconds(10));
+            }
+        }
+
         /// <summary>
         /// Custom grain activator that bypasses dependency injection entirely.
         /// Implements both IGrainActivator (for creation/disposal) and IConfigureGrainTypeComponents
@@ -181,17 +255,45 @@ namespace UnitTests.General
 
         private sealed class ActivationOrderingState : IConfigureGrainContext
         {
+            private readonly AsyncLocal<object?> _transactionState = new();
             private int _armed;
+            private int _hadRuntimeContextAtConstruction;
+            private int _hadSchedulerAffinityAtConstruction;
             private int _wasConfiguredAtConstruction;
+            private object? _requestContextAtConstruction;
+            private object? _transactionStateAtConstruction;
 
             public static ActivationOrderingState Instance { get; } = new();
 
+            public const string RequestContextKey = "activation-ordering";
+
+            public bool HadRuntimeContextAtConstruction => Volatile.Read(ref _hadRuntimeContextAtConstruction) != 0;
+            public bool HadSchedulerAffinityAtConstruction => Volatile.Read(ref _hadSchedulerAffinityAtConstruction) != 0;
+            public object? RequestContextAtConstruction => Volatile.Read(ref _requestContextAtConstruction);
+            public object? TransactionState => _transactionState.Value;
+            public object? TransactionStateAtConstruction => Volatile.Read(ref _transactionStateAtConstruction);
             public bool WasConfiguredAtConstruction => Volatile.Read(ref _wasConfiguredAtConstruction) != 0;
 
             public void Arm()
             {
+                Volatile.Write(ref _hadRuntimeContextAtConstruction, 0);
+                Volatile.Write(ref _hadSchedulerAffinityAtConstruction, 0);
+                Volatile.Write(ref _requestContextAtConstruction, null);
+                Volatile.Write(ref _transactionStateAtConstruction, null);
                 Volatile.Write(ref _wasConfiguredAtConstruction, 0);
                 Volatile.Write(ref _armed, 1);
+            }
+
+            public void SetAmbientState(object value)
+            {
+                RequestContext.Set(RequestContextKey, value);
+                _transactionState.Value = value;
+            }
+
+            public void ClearAmbientState()
+            {
+                RequestContext.Remove(RequestContextKey);
+                _transactionState.Value = null;
             }
 
             public void Configure(IGrainContext context)
@@ -214,6 +316,14 @@ namespace UnitTests.General
                 Volatile.Write(
                     ref _wasConfiguredAtConstruction,
                     context.GetComponent<ConfiguredContextMarker>() is not null ? 1 : 0);
+                Volatile.Write(
+                    ref _hadSchedulerAffinityAtConstruction,
+                    ReferenceEquals(((ActivationData)context).ActivationTaskScheduler, TaskScheduler.Current) ? 1 : 0);
+                Volatile.Write(
+                    ref _hadRuntimeContextAtConstruction,
+                    ReferenceEquals(context, RuntimeContext.Current) ? 1 : 0);
+                Volatile.Write(ref _requestContextAtConstruction, RequestContext.Get(RequestContextKey));
+                Volatile.Write(ref _transactionStateAtConstruction, _transactionState.Value);
             }
         }
 

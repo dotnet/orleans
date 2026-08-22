@@ -117,6 +117,158 @@ namespace UnitTests.SchedulerTests
         }
 
         [Fact]
+        public async Task Sched_ActivationStartup_DefersQueuedWorkUntilDisposed()
+        {
+            Task? queuedTask = null;
+            var startCompleted = 0;
+            var queuedTaskObservedStartCompletion = 0;
+            var startTask = new Task(() =>
+            {
+                Assert.Same(_rootContext, RuntimeContext.Current);
+                Assert.Same(_rootContext.WorkItemGroup.TaskScheduler, TaskScheduler.Current);
+                queuedTask = new Task(
+                    () =>
+                    {
+                        Volatile.Write(
+                            ref queuedTaskObservedStartCompletion,
+                            Volatile.Read(ref startCompleted));
+                    });
+                queuedTask.Start(_rootContext.WorkItemGroup.TaskScheduler);
+
+                Assert.Equal(1, _rootContext.WorkItemGroup.ExternalWorkItemCount);
+                Assert.False(queuedTask.IsCompleted);
+                Volatile.Write(ref startCompleted, 1);
+            });
+
+            using (var startup = _rootContext.WorkItemGroup.BeginActivationStartup())
+            {
+                startup.RunConstructor(startTask);
+                Assert.True(startTask.IsCompletedSuccessfully, startTask.Exception?.ToString());
+                Assert.False(queuedTask!.IsCompleted);
+                Assert.Throws<InvalidOperationException>(
+                    () => startup.RunConstructor(new Task(static () => { })));
+                Assert.Throws<InvalidOperationException>(startup.Abort);
+            }
+
+            await queuedTask.WaitAsync(TimeSpan.FromSeconds(5));
+            Assert.Equal(1, queuedTaskObservedStartCompletion);
+        }
+
+        [Fact]
+        public async Task Sched_ActivationStartup_PreservesContextForReleasedAsynchronousWork()
+        {
+            const int IterationCount = 1_000;
+            var signal = new SingleWaiterAutoResetEvent { RunContinuationsAsynchronously = true };
+            var observations = new TaskCompletionSource<int>[IterationCount];
+            for (var i = 0; i < observations.Length; i++)
+            {
+                observations[i] = new(TaskCreationOptions.RunContinuationsAsynchronously);
+            }
+
+            Task? observationLoop = null;
+            var initialObservation = 0;
+            var asyncInitialObservation = 0;
+            var loopStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            var loopStarter = new Task(() =>
+            {
+                observationLoop = ObserveSignals();
+                loopStarted.SetResult();
+            });
+            var startTask = new Task(() =>
+            {
+                if (ReferenceEquals(RuntimeContext.Current, _rootContext))
+                {
+                    initialObservation |= 1;
+                }
+
+                if (ReferenceEquals(TaskScheduler.Current, _rootContext.WorkItemGroup.TaskScheduler))
+                {
+                    initialObservation |= 2;
+                }
+
+                loopStarter.Start(_rootContext.WorkItemGroup.TaskScheduler);
+            });
+            using (var startup = _rootContext.WorkItemGroup.BeginActivationStartup())
+            {
+                startup.RunConstructor(startTask);
+                Assert.True(startTask.IsCompletedSuccessfully, startTask.Exception?.ToString());
+                Assert.Equal(3, initialObservation);
+            }
+            await loopStarted.Task.WaitAsync(TimeSpan.FromSeconds(5));
+            Assert.Equal(3, asyncInitialObservation);
+
+            for (var i = 0; i < observations.Length; i++)
+            {
+                signal.Signal();
+                Assert.Equal(3, await observations[i].Task.WaitAsync(TimeSpan.FromSeconds(5)));
+            }
+
+            await observationLoop!.WaitAsync(TimeSpan.FromSeconds(5));
+
+            async Task ObserveSignals()
+            {
+                if (ReferenceEquals(RuntimeContext.Current, _rootContext))
+                {
+                    asyncInitialObservation |= 1;
+                }
+
+                if (ReferenceEquals(TaskScheduler.Current, _rootContext.WorkItemGroup.TaskScheduler))
+                {
+                    asyncInitialObservation |= 2;
+                }
+
+                for (var i = 0; i < observations.Length; i++)
+                {
+                    await signal.WaitAsync();
+                    var observation = 0;
+                    if (ReferenceEquals(RuntimeContext.Current, _rootContext))
+                    {
+                        observation |= 1;
+                    }
+
+                    if (ReferenceEquals(TaskScheduler.Current, _rootContext.WorkItemGroup.TaskScheduler))
+                    {
+                        observation |= 2;
+                    }
+
+                    observations[i].SetResult(observation);
+                }
+            }
+        }
+
+        [Fact]
+        public async Task Sched_ActivationStartup_DisposeIsIdempotent()
+        {
+            var queuedTaskRan = false;
+            var queuedTask = new Task(() => queuedTaskRan = true);
+            var startup = _rootContext.WorkItemGroup.BeginActivationStartup();
+            queuedTask.Start(_rootContext.WorkItemGroup.TaskScheduler);
+
+            startup.Dispose();
+            startup.Dispose();
+
+            await queuedTask.WaitAsync(TimeSpan.FromSeconds(5));
+            Assert.True(queuedTaskRan);
+        }
+
+        [Fact]
+        public async Task Sched_ActivationStartup_AbortDiscardsQueuedWorkAndAllowsReuse()
+        {
+            var discardedTask = new Task(static () => throw new InvalidOperationException("This task must not execute."));
+            var startup = _rootContext.WorkItemGroup.BeginActivationStartup();
+            discardedTask.Start(_rootContext.WorkItemGroup.TaskScheduler);
+            startup.Abort();
+
+            Assert.False(discardedTask.IsCompleted);
+
+            var subsequentTaskRan = false;
+            var subsequentTask = new Task(() => subsequentTaskRan = true);
+            subsequentTask.Start(_rootContext.WorkItemGroup.TaskScheduler);
+            await subsequentTask.WaitAsync(TimeSpan.FromSeconds(5));
+            Assert.True(subsequentTaskRan);
+        }
+
+        [Fact]
         public async Task Sched_SimpleFifoTest()
         {
             // This is not a great test because there's a 50/50 shot that it will work even if the scheduling
