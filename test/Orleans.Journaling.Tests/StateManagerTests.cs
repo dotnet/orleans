@@ -1,8 +1,11 @@
 using System.Buffers;
 using System.Collections.Concurrent;
 using System.Diagnostics.Metrics;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Time.Testing;
+using Orleans.Core;
+using Orleans.Serialization;
 using Orleans.Serialization.Buffers;
 using Orleans.Serialization.Buffers.Adaptors;
 using Orleans.Serialization.Session;
@@ -245,6 +248,112 @@ public class StateManagerTests : JournalingTestBase
 
         Assert.NotNull(storage.ReplaceBytesAfterYield);
         Assert.NotEmpty(storage.ReplaceBytesAfterYield);
+    }
+
+    [Fact]
+    public async Task StateManager_SnapshotCompletionPreservesReentrantDurableValueMutation()
+    {
+        var storage = new CapturingStorage { IsCompactionRequested = true, DelayReplace = true };
+        var sut = CreateTestSystem(storage: storage);
+        var value = new DurableValue<int>("value", sut.Manager, CreateValueCodec<int>());
+
+        await sut.Lifecycle.OnStart();
+        value.Value = 1;
+        var firstWrite = sut.Manager.WriteStateAsync(CancellationToken.None).AsTask();
+        await storage.ReplaceStarted.Task.WaitAsync(TimeSpan.FromSeconds(10));
+
+        value.Value = 2;
+        storage.AllowReplace.SetResult();
+        await firstWrite.WaitAsync(TimeSpan.FromSeconds(10));
+
+        Assert.True(sut.Manager.HasPendingWrites);
+        storage.IsCompactionRequested = false;
+        await sut.Manager.WriteStateAsync(CancellationToken.None);
+
+        var recovered = CreateTestSystem(storage: storage);
+        var recoveredValue = new DurableValue<int>("value", recovered.Manager, CreateValueCodec<int>());
+        await recovered.Lifecycle.OnStart();
+        Assert.Equal(2, recoveredValue.Value);
+    }
+
+    [Fact]
+    public async Task StateManager_SnapshotCompletionPreservesReentrantDurableStateClear()
+    {
+        var storage = new CapturingStorage { IsCompactionRequested = true, DelayReplace = true };
+        var sut = CreateTestSystem(storage: storage);
+        var state = new DurableState<string>(
+            "state",
+            sut.Manager,
+            new OrleansBinaryPersistentStateCommandCodec<string>(CodecProvider.GetCodec<string>(), SessionPool));
+
+        await sut.Lifecycle.OnStart();
+        ((IStorage<string>)state).State = "value";
+        var firstWrite = sut.Manager.WriteStateAsync(CancellationToken.None).AsTask();
+        await storage.ReplaceStarted.Task.WaitAsync(TimeSpan.FromSeconds(10));
+
+        storage.IsCompactionRequested = false;
+        var clear = ((IStorage)state).ClearStateAsync();
+        storage.AllowReplace.SetResult();
+        await Task.WhenAll(firstWrite, clear).WaitAsync(TimeSpan.FromSeconds(10));
+
+        var recovered = CreateTestSystem(storage: storage);
+        var recoveredState = new DurableState<string>(
+            "state",
+            recovered.Manager,
+            new OrleansBinaryPersistentStateCommandCodec<string>(CodecProvider.GetCodec<string>(), SessionPool));
+        await recovered.Lifecycle.OnStart();
+        Assert.False(((IStorage)recoveredState).RecordExists);
+    }
+
+    [Fact]
+    public async Task StateManager_SnapshotDoesNotCompleteDurableTaskBeforeReplace()
+    {
+        var storage = new CapturingStorage { IsCompactionRequested = true, DelayReplace = true };
+        var sut = CreateTestSystem(storage: storage);
+        var completion = new DurableTaskCompletionSource<int>(
+            "completion",
+            sut.Manager,
+            new OrleansBinaryDurableTaskCompletionSourceCommandCodec<int>(
+                CodecProvider.GetCodec<int>(),
+                CodecProvider.GetCodec<Exception>(),
+                SessionPool),
+            ServiceProvider.GetRequiredService<DeepCopier<int>>(),
+            ServiceProvider.GetRequiredService<DeepCopier<Exception>>());
+
+        await sut.Lifecycle.OnStart();
+        Assert.True(completion.TrySetResult(42));
+        var write = sut.Manager.WriteStateAsync(CancellationToken.None).AsTask();
+        await storage.ReplaceStarted.Task.WaitAsync(TimeSpan.FromSeconds(10));
+
+        Assert.False(completion.Task.IsCompleted);
+
+        storage.AllowReplace.SetResult();
+        await write.WaitAsync(TimeSpan.FromSeconds(10));
+        Assert.Equal(42, await completion.Task);
+    }
+
+    [Fact]
+    public async Task StateManager_FailedSnapshotPreservesDurableValuePendingState()
+    {
+        var expected = new IOException("Expected snapshot failure.");
+        var storage = new CapturingStorage { IsCompactionRequested = true, NextReplaceException = expected };
+        var sut = CreateTestSystem(storage: storage);
+        var value = new DurableValue<int>("value", sut.Manager, CreateValueCodec<int>());
+
+        await sut.Lifecycle.OnStart();
+        value.Value = 42;
+
+        var exception = await Assert.ThrowsAsync<IOException>(() => sut.Manager.WriteStateAsync(CancellationToken.None).AsTask());
+        Assert.Same(expected, exception);
+        Assert.True(sut.Manager.HasPendingWrites);
+
+        storage.IsCompactionRequested = false;
+        await sut.Manager.WriteStateAsync(CancellationToken.None);
+
+        var recovered = CreateTestSystem(storage: storage);
+        var recoveredValue = new DurableValue<int>("value", recovered.Manager, CreateValueCodec<int>());
+        await recovered.Lifecycle.OnStart();
+        Assert.Equal(42, recoveredValue.Value);
     }
 
     [Fact]
@@ -539,6 +648,57 @@ public class StateManagerTests : JournalingTestBase
 
         Assert.True(dictionary.ContainsKey("first"));
         Assert.False(dictionary.ContainsKey("second"));
+    }
+
+    [Fact]
+    public async Task StateManager_ReadStateAsync_RecoversBeforeReportingReadFailure()
+    {
+        var storage = new CapturingStorage();
+        var sut = CreateTestSystem(storage: storage);
+        var dictionary = new DurableDictionary<string, int>("dict", sut.Manager, CreateDictionaryCodec<string, int>());
+
+        await sut.Lifecycle.OnStart();
+        dictionary.Add("persisted", 1);
+        await sut.Manager.WriteStateAsync(CancellationToken.None);
+
+        var expected = new IOException("Expected storage read failure.");
+        storage.NextReadException = expected;
+        storage.BlockNextRead = true;
+
+        var failedRead = sut.Manager.ReadStateAsync(CancellationToken.None).AsTask();
+        await storage.BlockedReadStarted.Task.WaitAsync(TimeSpan.FromSeconds(10));
+        Assert.False(failedRead.IsCompleted);
+
+        storage.AllowBlockedRead.SetResult();
+        var exception = await Assert.ThrowsAsync<IOException>(() => failedRead.WaitAsync(TimeSpan.FromSeconds(10)));
+        Assert.Same(expected, exception);
+        Assert.Equal(1, dictionary["persisted"]);
+    }
+
+    [Fact]
+    public async Task StateManager_ReadStateAsync_RetriesRecoveryUntilStateIsRestored()
+    {
+        var storage = new CapturingStorage();
+        var sut = CreateTestSystem(storage: storage);
+        var dictionary = new DurableDictionary<string, int>("dict", sut.Manager, CreateDictionaryCodec<string, int>());
+
+        await sut.Lifecycle.OnStart();
+        dictionary.Add("persisted", 1);
+        await sut.Manager.WriteStateAsync(CancellationToken.None);
+
+        var expected = new IOException("Expected read failure.");
+        storage.ReadExceptions.Enqueue(expected);
+        storage.ReadExceptions.Enqueue(new IOException("Expected recovery failure."));
+        storage.BlockNextRead = true;
+
+        var failedRead = sut.Manager.ReadStateAsync(CancellationToken.None).AsTask();
+        await storage.BlockedReadStarted.Task.WaitAsync(TimeSpan.FromSeconds(10));
+        Assert.False(failedRead.IsCompleted);
+
+        storage.AllowBlockedRead.SetResult();
+        var exception = await Assert.ThrowsAsync<IOException>(() => failedRead.WaitAsync(TimeSpan.FromSeconds(10)));
+        Assert.Same(expected, exception);
+        Assert.Equal(1, dictionary["persisted"]);
     }
 
     [Fact]
@@ -1556,6 +1716,10 @@ public class StateManagerTests : JournalingTestBase
 
         public Exception? NextReadException { get; set; }
 
+        public Queue<Exception> ReadExceptions { get; } = new();
+
+        public Exception? NextReplaceException { get; set; }
+
         public bool BlockNextRead { get; set; }
 
         public TaskCompletionSource BlockedReadStarted { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -1577,6 +1741,11 @@ public class StateManagerTests : JournalingTestBase
         public async ValueTask ReadAsync(IJournalStorageConsumer consumer, CancellationToken cancellationToken)
         {
             ArgumentNullException.ThrowIfNull(consumer);
+
+            if (ReadExceptions.TryDequeue(out var queuedException))
+            {
+                throw queuedException;
+            }
 
             if (NextReadException is { } exception)
             {
@@ -1637,6 +1806,12 @@ public class StateManagerTests : JournalingTestBase
         public async ValueTask ReplaceAsync(ReadOnlySequence<byte> value, CancellationToken cancellationToken)
         {
             cancellationToken.ThrowIfCancellationRequested();
+            if (NextReplaceException is { } exception)
+            {
+                NextReplaceException = null;
+                throw exception;
+            }
+
             if (DelayReplace)
             {
                 ReplaceStarted.SetResult();

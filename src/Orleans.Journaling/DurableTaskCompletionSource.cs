@@ -25,6 +25,9 @@ internal sealed class DurableTaskCompletionSource<T> : IDurableTaskCompletionSou
     private DurableTaskCompletionSourceStatus _status;
     private T? _value;
     private Exception? _exception;
+    private bool _isDirty;
+    private ulong _changeVersion;
+    private ulong _stagedChangeVersion;
 
     public DurableTaskCompletionSource(
         [ServiceKey] string key,
@@ -64,6 +67,8 @@ internal sealed class DurableTaskCompletionSource<T> : IDurableTaskCompletionSou
 
         _status = DurableTaskCompletionSourceStatus.Completed;
         _value = _copier.Copy(value);
+        _isDirty = true;
+        _changeVersion++;
         return true;
     }
 
@@ -76,6 +81,8 @@ internal sealed class DurableTaskCompletionSource<T> : IDurableTaskCompletionSou
 
         _status = DurableTaskCompletionSourceStatus.Faulted;
         _exception = _exceptionCopier.Copy(exception);
+        _isDirty = true;
+        _changeVersion++;
         return true;
     }
 
@@ -87,6 +94,8 @@ internal sealed class DurableTaskCompletionSource<T> : IDurableTaskCompletionSou
         }
 
         _status = DurableTaskCompletionSourceStatus.Canceled;
+        _isDirty = true;
+        _changeVersion++;
         return true;
     }
 
@@ -100,6 +109,8 @@ internal sealed class DurableTaskCompletionSource<T> : IDurableTaskCompletionSou
         DurableTaskCompletionSourceStatus.Canceled => new DurableTaskCompletionSourceState<T> { Status = DurableTaskCompletionSourceStatus.Canceled },
         _ => throw new InvalidOperationException($"Unexpected status, \"{_status}\""),
     };
+
+    bool IJournaledState.HasPendingChanges => _isDirty;
 
     void IJournaledState.ReplayEntry(JournalEntry entry, JournalReplayContext context) =>
         context.GetRequiredCommandCodec(entry.FormatKey, _codec).Apply(entry.Reader, this);
@@ -122,14 +133,31 @@ internal sealed class DurableTaskCompletionSource<T> : IDurableTaskCompletionSou
         }
     }
 
-    void IJournaledState.OnRecoveryCompleted() => OnValuePersisted();
-    void IJournaledState.OnWriteCompleted() => OnValuePersisted();
+    void IJournaledState.OnRecoveryCompleted()
+    {
+        _isDirty = false;
+        _changeVersion = 0;
+        _stagedChangeVersion = 0;
+        OnValuePersisted();
+    }
+
+    void IJournaledState.OnWriteCompleted()
+    {
+        if (_stagedChangeVersion == _changeVersion)
+        {
+            _isDirty = false;
+            OnValuePersisted();
+        }
+    }
 
     void IJournaledState.Reset(JournalStreamWriter writer)
     {
         _status = DurableTaskCompletionSourceStatus.Pending;
         _value = default;
         _exception = null;
+        _isDirty = false;
+        _changeVersion = 0;
+        _stagedChangeVersion = 0;
 
         // Reset the task completion source if necessary.
         if (_completion.Task.IsCompleted)
@@ -140,13 +168,18 @@ internal sealed class DurableTaskCompletionSource<T> : IDurableTaskCompletionSou
 
     void IJournaledState.AppendEntries(JournalStreamWriter writer)
     {
-        if (_status is not DurableTaskCompletionSourceStatus.Pending)
+        if (_isDirty)
         {
             WriteState(writer);
+            _stagedChangeVersion = _changeVersion;
         }
     }
 
-    void IJournaledState.AppendSnapshot(JournalStreamWriter snapshotWriter) => WriteState(snapshotWriter);
+    void IJournaledState.AppendSnapshot(JournalStreamWriter snapshotWriter)
+    {
+        WriteState(snapshotWriter);
+        _stagedChangeVersion = _changeVersion;
+    }
 
     private void WriteState(JournalStreamWriter writer)
     {
@@ -167,20 +200,38 @@ internal sealed class DurableTaskCompletionSource<T> : IDurableTaskCompletionSou
         }
     }
 
-    void IDurableTaskCompletionSourceCommandHandler<T>.ApplyPending() => _status = DurableTaskCompletionSourceStatus.Pending;
+    void IDurableTaskCompletionSourceCommandHandler<T>.ApplyPending()
+    {
+        _status = DurableTaskCompletionSourceStatus.Pending;
+        _isDirty = false;
+        _changeVersion = 0;
+        _stagedChangeVersion = 0;
+    }
     void IDurableTaskCompletionSourceCommandHandler<T>.ApplyCompleted(T value)
     {
         _status = DurableTaskCompletionSourceStatus.Completed;
         _value = value;
+        _isDirty = false;
+        _changeVersion = 0;
+        _stagedChangeVersion = 0;
     }
 
     void IDurableTaskCompletionSourceCommandHandler<T>.ApplyFaulted(Exception exception)
     {
         _status = DurableTaskCompletionSourceStatus.Faulted;
         _exception = exception;
+        _isDirty = false;
+        _changeVersion = 0;
+        _stagedChangeVersion = 0;
     }
 
-    void IDurableTaskCompletionSourceCommandHandler<T>.ApplyCanceled() => _status = DurableTaskCompletionSourceStatus.Canceled;
+    void IDurableTaskCompletionSourceCommandHandler<T>.ApplyCanceled()
+    {
+        _status = DurableTaskCompletionSourceStatus.Canceled;
+        _isDirty = false;
+        _changeVersion = 0;
+        _stagedChangeVersion = 0;
+    }
 
     public IJournaledState DeepCopy() => throw new NotImplementedException();
 }
@@ -206,4 +257,3 @@ public readonly struct DurableTaskCompletionSourceState<T>
     [Id(2)]
     public Exception? Exception { get; init; }
 }
-
