@@ -9,11 +9,6 @@ namespace Orleans.Persistence.FileStorage;
 public sealed class FileGrainStorageOptions : IStorageProviderSerializerOptions
 {
     /// <summary>
-    /// Gets or sets the maximum time to wait for exclusive access to a storage record.
-    /// </summary>
-    public TimeSpan LockAcquireTimeout { get; set; } = TimeSpan.FromSeconds(30);
-
-    /// <summary>
     /// Gets or sets the directory used to store grain state.
     /// </summary>
     public required string RootDirectory { get; set; }
@@ -42,11 +37,5 @@ internal sealed class FileGrainStorageOptionsValidator(
                 $"{nameof(FileGrainStorageOptions)}.{nameof(FileGrainStorageOptions.RootDirectory)} must identify a directory.");
         }
 
-        if (options.LockAcquireTimeout <= TimeSpan.Zero)
-        {
-            throw new OrleansConfigurationException(
-                $"Invalid configuration for {nameof(FileGrainStorage)} with name {name}. " +
-                $"{nameof(FileGrainStorageOptions)}.{nameof(FileGrainStorageOptions.LockAcquireTimeout)} must be greater than zero.");
-        }
     }
 }

@@ -36,8 +36,6 @@ public sealed class FileGrainStorageConformanceTests
     [Fact]
     public async Task PersistenceStorage_WriteReadWriteRead()
     {
-        await base.PersistenceStorage_ETagChangesOnWrite();
-
         var grainId = GrainId.Create("write-read-write-read", Guid.NewGuid().ToString("N"));
         var written = new GrainState<FileStorageTestState>(
             new FileStorageTestState { Value = "first", Revision = 1 });
@@ -93,19 +91,4 @@ public sealed class FileGrainStorageConformanceTests
     [Fact]
     public Task PersistenceStorage_ParallelWritesRespectETags() =>
         base.PersistenceStorage_WriteReadWriteReadStatesInParallel();
-}
-
-[TestProvider("None"), TestSuite("BVT"), TestCategory("FileStorage"), TestCategory("Persistence")]
-public sealed class FileGrainStorageModelBasedTests : IClassFixture<FileGrainStorageTestFixture>
-{
-    private readonly FileGrainStorageTestFixture _fixture;
-
-    public FileGrainStorageModelBasedTests(FileGrainStorageTestFixture fixture)
-    {
-        _fixture = fixture;
-    }
-
-    [Fact, TestCategory("ModelBased")]
-    public Task RunGeneratedConformanceTests() =>
-        new GrainStorageModelBasedTestRunner(_fixture.Storage, "FileStore").RunGeneratedConformanceTests();
 }

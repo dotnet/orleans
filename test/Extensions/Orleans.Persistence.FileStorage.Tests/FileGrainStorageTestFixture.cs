@@ -71,15 +71,13 @@ internal static class FileGrainStorageTestContext
     public static FileGrainStorage CreateStorage(
         string rootDirectory,
         string serviceId = "file-storage-test-service",
-        IGrainStorageSerializer? serializer = null,
-        TimeSpan? lockAcquireTimeout = null) =>
+        IGrainStorageSerializer? serializer = null) =>
         new(
             "FileStore",
             new FileGrainStorageOptions
             {
                 RootDirectory = rootDirectory,
                 GrainStorageSerializer = serializer ?? CreateJsonSerializer(),
-                LockAcquireTimeout = lockAcquireTimeout ?? TimeSpan.FromSeconds(30),
             },
             Options.Create(new ClusterOptions { ServiceId = serviceId }),
             ActivatorProvider);

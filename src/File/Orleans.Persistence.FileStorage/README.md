@@ -1,6 +1,6 @@
 # Microsoft Orleans persistence for file storage
 
-This package stores Orleans grain state as files in a configured directory. Each record uses atomic replacement, persisted ETags for optimistic concurrency, and filesystem locks which coordinate silos that share the same storage volume.
+This package stores Orleans grain state as files in a configured directory. It is intended for local, single-silo development and testing. The provider does not replicate state or coordinate access through shared or network filesystems, so it is not production-ready.
 
 ## Install
 
@@ -59,6 +59,6 @@ public sealed class MyGrainState
 }
 ```
 
-The configured directory defines the storage boundary for the provider. Provider instances sharing that directory use deterministic record names and coordinate updates through the filesystem.
+The provider stores one binary file per grain state record and uses persisted ETags for basic optimistic concurrency checks. It does not coordinate multiple silos or replicate data.
 
 For Orleans persistence concepts, see [Grain persistence](https://learn.microsoft.com/dotnet/orleans/grains/grain-persistence).

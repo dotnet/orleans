@@ -10,7 +10,7 @@ ai-usage: ai-assisted
 
 In the tutorial on declarative actor storage, you learned how to allow grains to store their state in an Azure table using one of the built-in storage providers. While Azure is a great place to store your data, many alternatives exist. There are so many that supporting them all isn't feasible. Instead, Orleans is designed to let you easily add support for your preferred storage by writing a custom grain storage provider.
 
-In this tutorial, you'll build a file-based grain storage provider. It stores binary state records on a filesystem, coordinates access across silos that share the same volume, and uses persisted ETags for optimistic concurrency.
+In this tutorial, you'll build a simple file-based grain storage provider for a local, single-silo application. It stores binary state records on the local filesystem and uses persisted ETags for basic optimistic concurrency checks.
 
 ## Get started
 
@@ -60,7 +60,7 @@ Also, derive a fixed-length filename from length-delimited service ID, grain typ
 
 ## Read state
 
-To read a grain state, derive its record location and acquire the corresponding bounded lock stripe.
+To read a grain state, derive its record path and read the file if it exists.
 
 :::code source="snippets/custom-grain-storage/FileGrainStorage.cs" id="readstateasync":::
 
@@ -74,7 +74,7 @@ Writing the state is similar to reading the state.
 
 :::code source="snippets/custom-grain-storage/FileGrainStorage.cs" id="writestateasync":::
 
-Use <xref:Orleans.Storage.IStorageProviderSerializerOptions.GrainStorageSerializer?displayProperty=nameWithType> to produce the binary payload. While holding the record lock, compare the caller's `ETag` with the persisted token and throw an <xref:Orleans.Storage.InconsistentStateException> when they differ. A successful write creates a new opaque `ETag` and atomically replaces the record using a temporary file.
+Use <xref:Orleans.Storage.IStorageProviderSerializerOptions.GrainStorageSerializer?displayProperty=nameWithType> to produce the binary payload. Compare the caller's `ETag` with the persisted token and throw an <xref:Orleans.Storage.InconsistentStateException> when they differ. A successful write creates a new opaque `ETag` and writes the record file.
 
 ## Clear state
 

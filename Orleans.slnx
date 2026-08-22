@@ -181,7 +181,6 @@
     <Project Path="test/Extensions/Orleans.Clustering.Firestore.Tests/Orleans.Clustering.Firestore.Tests.csproj" />
     <Project Path="test/Extensions/Orleans.GrainDirectory.Firestore.Tests/Orleans.GrainDirectory.Firestore.Tests.csproj" />
     <Project Path="test/Extensions/Orleans.Persistence.FileStorage.Tests/Orleans.Persistence.FileStorage.Tests.csproj" />
-    <Project Path="test/Extensions/Orleans.Persistence.FileStorage.LockWorker/Orleans.Persistence.FileStorage.LockWorker.csproj" />
     <Project Path="test/Extensions/Orleans.Persistence.Firestore.Tests/Orleans.Persistence.Firestore.Tests.csproj" />
     <Project Path="test/Extensions/Orleans.Reminders.Firestore.Tests/Orleans.Reminders.Firestore.Tests.csproj" />
     <Project Path="test/Extensions/Orleans.AdoNet.Tests/Orleans.AdoNet.Tests.csproj" />

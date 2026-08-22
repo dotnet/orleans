@@ -6,8 +6,6 @@ namespace GrainStorage;
 
 public sealed class FileGrainStorageOptions : IStorageProviderSerializerOptions
 {
-    public TimeSpan LockAcquireTimeout { get; set; } = TimeSpan.FromSeconds(30);
-
     public required string RootDirectory { get; set; }
 
     public required IGrainStorageSerializer GrainStorageSerializer { get; set; }
@@ -33,12 +31,6 @@ internal sealed class FileGrainStorageOptionsValidator(
                 $"{nameof(FileGrainStorageOptions)}.{nameof(FileGrainStorageOptions.RootDirectory)} must identify a directory.");
         }
 
-        if (options.LockAcquireTimeout <= TimeSpan.Zero)
-        {
-            throw new OrleansConfigurationException(
-                $"Invalid configuration for {nameof(FileGrainStorage)} with name {name}. " +
-                $"{nameof(FileGrainStorageOptions)}.{nameof(FileGrainStorageOptions.LockAcquireTimeout)} must be greater than zero.");
-        }
     }
 }
 // </file_grain_storage_options>
