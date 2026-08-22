@@ -26,9 +26,7 @@ public sealed class InProcessTestClusterDirectoryTests
     public async Task DistributedDirectoryCanBeEnabled()
     {
         var builder = new InProcessTestClusterBuilder(1);
-#pragma warning disable ORLEANSEXP003
         builder.Options.UseDistributedGrainDirectory = true;
-#pragma warning restore ORLEANSEXP003
 
         await using var cluster = builder.Build();
         await cluster.DeployAsync();
@@ -42,10 +40,8 @@ public sealed class InProcessTestClusterDirectoryTests
     public async Task DistributedDirectoryCanBeEnabledWhenNamedDirectoryExists()
     {
         var builder = new InProcessTestClusterBuilder(1);
-#pragma warning disable ORLEANSEXP003
         builder.Options.UseDistributedGrainDirectory = true;
         builder.ConfigureSilo(static (_, siloBuilder) => siloBuilder.AddDistributedGrainDirectory("named"));
-#pragma warning restore ORLEANSEXP003
 
         await using var cluster = builder.Build();
         await cluster.DeployAsync();

@@ -38,7 +38,7 @@ Use this runtime map and the following topic list to choose the required depth. 
 - [Runtime architecture](runtime-architecture.md) follows a call through client, messaging, placement, directory, activation, and scheduling components.
 - [Activation lifecycle and migration](activation-lifecycle.md) explains creation, activation, collection, deactivation, and state transfer.
 - [Cluster membership](cluster-management.md) describes the failure detector, membership table, ordered views, and death-vote protocol.
-- [Grain directory](grain-directory.md) distinguishes the default `LocalGrainDirectory` DHT from the experimental distributed directory.
+- [Grain directory](grain-directory.md) distinguishes the default `LocalGrainDirectory` DHT from the configurable distributed directory.
 - [Scheduling and turn execution](scheduler.md) explains `WorkItemGroup`, continuations, interleaving, and single-threaded execution.
 - [Messaging and delivery semantics](messaging-delivery-guarantees.md) traces requests and explains why a timeout has an unknown outcome.
 - [Transport and networking internals](messaging-networking.md) explains connection establishment, framing, backpressure, and shutdown behavior.
@@ -61,8 +61,8 @@ Use this runtime map and the following topic list to choose the required depth. 
 | --- | --- |
 | Placement | <xref:Orleans.Runtime.ResourceOptimizedPlacement> |
 | Grain directory | `LocalGrainDirectory`, using the membership ring |
-| Experimental directory | Opt-in with <xref:Orleans.Hosting.CoreHostingExtensions.AddDistributedGrainDirectory*?displayProperty=nameWithType>; warning `ORLEANSEXP003` |
-| Experimental directory partitions | <xref:Orleans.Configuration.GrainDirectoryOptions.PartitionsPerSilo?displayProperty=nameWithType> defaults to 1 |
+| Distributed directory | Configure with <xref:Orleans.Hosting.CoreHostingExtensions.AddDistributedGrainDirectory*?displayProperty=nameWithType> |
+| Distributed directory partitions | <xref:Orleans.Configuration.GrainDirectoryOptions.PartitionsPerSilo?displayProperty=nameWithType> defaults to 1 |
 | Membership probe timeout | 5 seconds |
 | Death-vote expiry | 2 minutes |
 | <xref:Orleans.Configuration.MessagingOptions.ResponseTimeout?displayProperty=nameWithType> | 30 seconds, or 30 minutes while a debugger is attached |

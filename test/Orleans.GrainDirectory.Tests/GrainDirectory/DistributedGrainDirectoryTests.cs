@@ -39,9 +39,7 @@ public sealed class DistributedGrainDirectoryMembershipTests
     public async Task OwnerResolutionWaitsForActiveDirectoryMembership()
     {
         var builder = new InProcessTestClusterBuilder(1);
-#pragma warning disable ORLEANSEXP003
         builder.Options.UseDistributedGrainDirectory = true;
-#pragma warning restore ORLEANSEXP003
         builder.ConfigureSilo((_, siloBuilder) => siloBuilder.ConfigureServices(services =>
         {
             services.AddSingleton<ControlledMembershipService>();
