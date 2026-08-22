@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.Linq;
 using Azure.Messaging.EventHubs;
 
 namespace Orleans.Streaming.EventHubs
@@ -42,8 +41,22 @@ namespace Orleans.Streaming.EventHubs
         /// </summary>
         public static byte[] SerializeProperties(this EventData eventData, Serialization.Serializer serializer)
         {
-            var result = serializer.SerializeToArray(eventData.Properties.Where(kvp => !string.Equals(kvp.Key, EventDataPropertyStreamNamespaceKey, StringComparison.Ordinal)).ToList());
-            return result;
+            if (eventData.Properties.Count == 0
+                || (eventData.Properties.Count == 1 && eventData.Properties.ContainsKey(EventDataPropertyStreamNamespaceKey)))
+            {
+                return [];
+            }
+
+            var properties = new List<KeyValuePair<string, object>>(eventData.Properties.Count);
+            foreach (var property in eventData.Properties)
+            {
+                if (!string.Equals(property.Key, EventDataPropertyStreamNamespaceKey, StringComparison.Ordinal))
+                {
+                    properties.Add(property);
+                }
+            }
+
+            return serializer.SerializeToArray(properties);
         }
 
         /// <summary>
@@ -51,8 +64,19 @@ namespace Orleans.Streaming.EventHubs
         /// </summary>
         public static IDictionary<string, object> DeserializeProperties(this ArraySegment<byte> bytes, Serialization.Serializer serializer)
         {
-            // Serialized EventData properties always contain a property list.
-            return serializer.Deserialize<List<KeyValuePair<string, object>>>(bytes.AsSpan())!.ToDictionary(kvp => kvp.Key, kvp => kvp.Value);
+            if (bytes.Count == 0)
+            {
+                return new Dictionary<string, object>();
+            }
+
+            var properties = serializer.Deserialize<List<KeyValuePair<string, object>>>(bytes.AsSpan())!;
+            var result = new Dictionary<string, object>(properties.Count);
+            foreach (var property in properties)
+            {
+                result.Add(property.Key, property.Value);
+            }
+
+            return result;
         }
     }
 }
