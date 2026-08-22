@@ -1,9 +1,11 @@
+using System.Buffers;
 using System.Diagnostics.CodeAnalysis;
 using Orleans.DurableTasks;
 using Orleans.DurableTasks.Protocol;
 using Orleans.DurableTasks.Runtime;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using NSubstitute;
 using Orleans.Configuration;
 using Orleans.DurableJobs;
 using Orleans.DurableMessaging;
@@ -163,6 +165,68 @@ public sealed class DurableRpcProtocolTests
         Assert.Equal(DurableTaskMessageTransport.CompletionAckRoute, envelope.RouteKey);
         Assert.True(envelope.Data.TryGetBody<DurableTaskCompletionAckMessage>(out var body));
         Assert.Equal(TaskId.Parse("root"), body!.TaskId);
+    }
+
+    [Fact]
+    public void CompletionReplayUsesStableMessageIdentity()
+    {
+        var services = new ServiceCollection()
+            .AddSerializer(builder => builder.AddAssembly(typeof(DurableTaskMessageTransport).Assembly))
+            .BuildServiceProvider();
+        var outbox = new RecordingOutbox();
+        var transport = new DurableTaskMessageTransport(
+            outbox,
+            new RecordingJobManager(),
+            services.GetRequiredService<SerializerSessionPool>());
+        var sender = GrainId.Create("sender", "one");
+        var target = GrainId.Create("target", "one");
+        var taskId = TaskId.Parse("root");
+        var response = DurableTaskResponse.FromResult(42);
+
+        transport.SendCompletion(sender, target, taskId, response);
+        transport.SendCompletion(sender, target, taskId, response);
+
+        var messages = outbox.Messages.ToArray();
+        Assert.Equal(2, messages.Length);
+        Assert.Equal(messages[0].MessageId, messages[1].MessageId);
+        Assert.Equal(messages[0].CreatedAt, messages[1].CreatedAt);
+        Assert.Equal(Copy(messages[0].Data.GetBodyBytes()), Copy(messages[1].Data.GetBodyBytes()));
+
+        static byte[] Copy(ReadOnlySequence<byte> sequence)
+        {
+            var result = new byte[sequence.Length];
+            sequence.CopyTo(result);
+            return result;
+        }
+    }
+
+    [Fact]
+    public async Task CancelAbandonsWaitWithoutCancelingRemoteSubmission()
+    {
+        var request = new RuntimeTestDurableTaskRequest();
+        var grain = Substitute.For<IDurableTaskServer>();
+        var submitted = new TaskCompletionSource<CancellationToken>(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+        var completion = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        grain.CancelAsync(Arg.Any<TaskId>(), Arg.Any<CancellationToken>())
+            .Returns(call =>
+            {
+                submitted.TrySetResult(call.ArgAt<CancellationToken>(1));
+                return new ValueTask(completion.Task);
+            });
+        var handle = new GrainScheduledTaskHandle(
+            TaskId.Parse("root"),
+            request,
+            grain,
+            lastResponse: null);
+        using var cancellation = new CancellationTokenSource();
+
+        var cancel = handle.CancelAsync(cancellation.Token).AsTask();
+        cancellation.Cancel();
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => cancel);
+        Assert.False((await submitted.Task.WaitAsync(TimeSpan.FromSeconds(5))).CanBeCanceled);
+        completion.TrySetResult();
     }
 
     [Fact]
