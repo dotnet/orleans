@@ -60,6 +60,8 @@ namespace Orleans.Runtime.Messaging
 
         protected override void OnReceivedMessage(Message msg)
         {
+            this.gateway.RecordClientResponse(msg);
+
             // Don't process messages that have already timed out
             if (msg.IsExpired)
             {
@@ -170,7 +172,7 @@ namespace Orleans.Runtime.Messaging
                     msg,
                     Message.RejectionTypes.Transient,
                     $"Silo {this.myAddress} is rejecting message: {msg}. Reason = {reason}",
-                    new SiloUnavailableException());
+                    new ClientNotAvailableException($"Target client {msg.TargetGrain} is unavailable. {reason ?? "Connection terminated."}"));
             }
             else
             {

@@ -25,7 +25,7 @@ namespace Orleans.Runtime
     /// <summary>
     /// Internal class for system grains to get access to runtime object
     /// </summary>
-    internal sealed partial class InsideRuntimeClient : IRuntimeClient, ILifecycleParticipant<ISiloLifecycle>
+    internal sealed partial class InsideRuntimeClient : IRuntimeClient, ILifecycleParticipant<ISiloLifecycle>, IDisposable
     {
         private readonly ILogger logger;
         private readonly ILogger invokeExceptionLogger;
@@ -472,7 +472,7 @@ namespace Orleans.Runtime
             {
                 // IMPORTANT: we do not schedule the response callback via the scheduler, since the only thing it does
                 // is to resolve/break the resolver. The continuations/waits that are based on this resolution will be scheduled as work items.
-                callbackData.DoCallback(message);
+                callbackData.OnResponse(message);
             }
             else
             {
@@ -643,6 +643,11 @@ namespace Orleans.Runtime
                     LogWarningWhileProcessingCallbackExpiry(this.logger, ex);
                 }
             }
+        }
+
+        public void Dispose()
+        {
+            BreakOutstandingMessages();
         }
 
         [LoggerMessage(

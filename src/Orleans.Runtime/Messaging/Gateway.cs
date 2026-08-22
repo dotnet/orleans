@@ -89,6 +89,7 @@ namespace Orleans.Runtime.Messaging
                 {
                     DropDisconnectedClients();
                     DropExpiredRoutingCachedEntries();
+                    DropExpiredClientRequests();
                 }
                 catch (Exception exception)
                 {
@@ -211,11 +212,29 @@ namespace Orleans.Runtime.Messaging
             return null;
         }
 
+        internal void RecordClientResponse(Message message)
+        {
+            if (message.Direction == Message.Directions.Response
+                && ClientGrainId.TryParse(message.SendingGrain, out var respondingClientId)
+                && clients.TryGetValue(respondingClientId, out var respondingClient))
+            {
+                respondingClient.OnClientResponse(message);
+            }
+        }
+
         internal void DropExpiredRoutingCachedEntries()
         {
             lock (clients)
             {
                 clientsReplyRoutingCache.DropExpiredEntries();
+            }
+        }
+
+        private void DropExpiredClientRequests()
+        {
+            foreach (var client in clients.Values)
+            {
+                client.DropExpiredRequests();
             }
         }
 
@@ -229,17 +248,17 @@ namespace Orleans.Runtime.Messaging
         }
 
         // There is NO need to acquire individual ClientState lock, since we only close an older socket.
-        internal void DropDisconnectedClients()
+        internal void DropDisconnectedClients(bool excludeRecent = true)
         {
             var trackDroppedClients = GatewayEvents.IsClientDroppedEnabled();
             List<(GrainId ClientId, TimeSpan DisconnectedDuration)>? droppedClients = null;
             foreach (var kv in clients)
             {
-                if (kv.Value.ReadyToDrop())
+                if (ShouldDrop(excludeRecent, kv.Value))
                 {
                     lock (clients)
                     {
-                        if (clients.TryGetValue(kv.Key, out var client) && client.ReadyToDrop())
+                        if (clients.TryGetValue(kv.Key, out var client) && ShouldDrop(excludeRecent, client))
                         {
                             var disconnectedDuration = client.DisconnectedSince;
                             LogInformationGatewayDroppingClient(logger, kv.Key, disconnectedDuration);
@@ -253,13 +272,16 @@ namespace Orleans.Runtime.Messaging
                                     droppedClients ??= [];
                                     droppedClients.Add((kv.Key.GrainId, disconnectedDuration));
                                 }
-                            }
 
-                            clientsCollectionVersion++;
-                            _messagingInstruments.ConnectedClient.Add(-1);
+                                clientsCollectionVersion++;
+                                _messagingInstruments.ConnectedClient.Add(-1);
+                            }
                         }
                     }
                 }
+
+                static bool ShouldDrop(bool excludeRecent, ClientState client)
+                    => excludeRecent ? client.ReadyToDrop() : !client.IsConnected;
             }
 
             if (droppedClients is not null)
@@ -309,7 +331,9 @@ namespace Orleans.Runtime.Messaging
         {
             private readonly Gateway _gateway;
             private readonly Task _messageLoop;
-            private readonly ConcurrentQueue<Message> _pendingToSend = new();
+            private readonly Dictionary<(GrainId, CorrelationId), Message> _outstandingRequestsToClient = [];
+            private readonly ConcurrentQueue<WorkItem> _pendingToSend = new();
+            private readonly object _lifecycleLock = new();
             private readonly SingleWaiterAutoResetEvent _signal = new()
             {
                 RunContinuationsAsynchronously = true
@@ -318,6 +342,15 @@ namespace Orleans.Runtime.Messaging
             private GatewayInboundConnection? _connection;
             private int _dropped;
             private CoarseStopwatch _disconnectedSince;
+
+            private enum WorkItemType
+            {
+                SendMessageToClient,
+                ReceivedResponseFromClient,
+                DropExpiredRequests,
+            }
+
+            private readonly record struct WorkItem(WorkItemType Type, Message? Message);
 
             internal ClientState(Gateway gateway, ClientGrainId id)
             {
@@ -377,14 +410,31 @@ namespace Orleans.Runtime.Messaging
 
             public void Drop()
             {
-                Interlocked.Exchange(ref _dropped, 1);
-                RejectDroppedClientMessages();
+                lock (_lifecycleLock)
+                {
+                    Volatile.Write(ref _dropped, 1);
+                }
+
                 _signal.Signal();
             }
 
             public void Send(Message msg)
             {
-                _pendingToSend.Enqueue(msg);
+                lock (_lifecycleLock)
+                {
+                    if (IsDropped)
+                    {
+                        _gateway.messageCenter.RejectMessage(
+                            msg,
+                            Message.RejectionTypes.Transient,
+                            exc: new ClientNotAvailableException(Id.GrainId),
+                            rejectInfo: "Client dropped");
+                        return;
+                    }
+
+                    _pendingToSend.Enqueue(new(WorkItemType.SendMessageToClient, msg));
+                }
+
                 _signal.Signal();
                 LogTraceQueuedMessage(_gateway.logger, msg, msg.TargetGrain);
             }
@@ -400,27 +450,51 @@ namespace Orleans.Runtime.Messaging
                         if (IsDropped)
                         {
                             RejectDroppedClientMessages();
-                            continue;
+                            return;
                         }
 
-                        var connection = Volatile.Read(ref _connection);
-                        if (connection is null)
+                        var pendingCount = _pendingToSend.Count;
+                        while (pendingCount-- > 0 && _pendingToSend.TryDequeue(out var workItem))
                         {
-                            continue;
-                        }
-
-                        // Send all pending messages.
-                        while (_pendingToSend.TryDequeue(out var message))
-                        {
-                            if (TrySend(connection, message))
+                            if (workItem.Type is WorkItemType.DropExpiredRequests)
                             {
-                                LogTraceSentQueuedMessage(_gateway.logger, message, Id);
+                                RemoveExpiredRequests();
+                                continue;
+                            }
+
+                            var message = workItem.Message!;
+                            if (workItem.Type is WorkItemType.SendMessageToClient)
+                            {
+                                var connection = Volatile.Read(ref _connection);
+                                if (connection is null)
+                                {
+                                    _pendingToSend.Enqueue(workItem);
+                                    continue;
+                                }
+
+                                var requestKey = (message.SendingGrain, message.Id);
+                                var isRequest = message.Direction == Message.Directions.Request;
+                                if (isRequest)
+                                {
+                                    _outstandingRequestsToClient[requestKey] = message;
+                                }
+
+                                if (TrySend(connection, message))
+                                {
+                                    LogTraceSentQueuedMessage(_gateway.logger, message, Id);
+                                }
+                                else
+                                {
+                                    if (isRequest)
+                                    {
+                                        _outstandingRequestsToClient.Remove(requestKey);
+                                    }
+                                    _pendingToSend.Enqueue(workItem);
+                                }
                             }
                             else
                             {
-                                // Re-enqueue the message. It's ok that it is at the end of the queue: message ordering is not guaranteed.
-                                _pendingToSend.Enqueue(message);
-                                return;
+                                _outstandingRequestsToClient.Remove((message.TargetGrain, message.Id));
                             }
                         }
                     }
@@ -434,10 +508,76 @@ namespace Orleans.Runtime.Messaging
             private void RejectDroppedClientMessages()
             {
                 ClientNotAvailableException? exception = null;
-                while (_pendingToSend.TryDequeue(out var message))
+                while (_pendingToSend.TryDequeue(out var workItem))
                 {
-                    exception ??= new ClientNotAvailableException(Id.GrainId);
-                    _gateway.messageCenter.RejectMessage(message, Message.RejectionTypes.Transient, exc: exception, rejectInfo: "Client dropped");
+                    if (workItem.Type == WorkItemType.SendMessageToClient)
+                    {
+                        RejectMessage(ref exception, workItem.Message!);
+                    }
+                    else if (workItem.Type == WorkItemType.ReceivedResponseFromClient)
+                    {
+                        var message = workItem.Message!;
+                        _outstandingRequestsToClient.Remove((message.TargetGrain, message.Id));
+                    }
+                }
+
+                foreach (var message in _outstandingRequestsToClient.Values)
+                {
+                    RejectMessage(ref exception, message);
+                }
+
+                _outstandingRequestsToClient.Clear();
+
+                void RejectMessage(ref ClientNotAvailableException? error, Message message)
+                {
+                    error ??= new ClientNotAvailableException(Id.GrainId);
+                    _gateway.messageCenter.RejectMessage(message, Message.RejectionTypes.Transient, exc: error, rejectInfo: "Client dropped");
+                }
+            }
+
+            internal void OnClientResponse(Message message)
+            {
+                EnqueueIfActive(new(WorkItemType.ReceivedResponseFromClient, message));
+            }
+
+            internal void DropExpiredRequests()
+            {
+                EnqueueIfActive(new(WorkItemType.DropExpiredRequests, null));
+            }
+
+            private void EnqueueIfActive(WorkItem workItem)
+            {
+                lock (_lifecycleLock)
+                {
+                    if (IsDropped)
+                    {
+                        return;
+                    }
+
+                    _pendingToSend.Enqueue(workItem);
+                }
+
+                _signal.Signal();
+            }
+
+            private void RemoveExpiredRequests()
+            {
+                List<(GrainId, CorrelationId)>? expiredRequests = null;
+                foreach (var (key, message) in _outstandingRequestsToClient)
+                {
+                    if (message.IsExpired)
+                    {
+                        expiredRequests ??= [];
+                        expiredRequests.Add(key);
+                    }
+                }
+
+                if (expiredRequests is not null)
+                {
+                    foreach (var key in expiredRequests)
+                    {
+                        _outstandingRequestsToClient.Remove(key);
+                    }
                 }
             }
 

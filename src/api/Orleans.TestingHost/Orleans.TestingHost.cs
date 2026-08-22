@@ -104,6 +104,10 @@ namespace Orleans.TestingHost
 
         public System.Collections.Generic.IEnumerable<InProcessSiloHandle> GetActiveSilos() { throw null; }
 
+        public IClusterClient? GetClient(string name) { throw null; }
+
+        public System.Threading.Tasks.Task<IClusterClient> GetClientAsync(string name, System.Action<Microsoft.Extensions.Hosting.IHostApplicationBuilder>? configure = null) { throw null; }
+
         public static System.TimeSpan GetLivenessStabilizationTime(Configuration.ClusterMembershipOptions clusterMembershipOptions, bool didKill = false) { throw null; }
 
         public string GetLog() { throw null; }
@@ -121,6 +125,8 @@ namespace Orleans.TestingHost
         public System.Threading.Tasks.Task MigrateAsync(Runtime.GrainId grainId, Runtime.SiloAddress? targetSilo = null) { throw null; }
 
         public System.Threading.Tasks.Task MigrateAsync(Runtime.IAddressable grain, Runtime.SiloAddress? targetSilo = null) { throw null; }
+
+        public System.Threading.Tasks.Task RemoveClientAsync(string name) { throw null; }
 
         public System.Threading.Tasks.Task<InProcessSiloHandle?> RestartSiloAsync(InProcessSiloHandle instance) { throw null; }
 

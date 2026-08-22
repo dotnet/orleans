@@ -9,23 +9,8 @@ using Xunit;
 
 namespace UnitTests
 {
-    /// <summary>
-    /// Tests for Orleans timeout mechanisms and request cancellation.
-    /// 
-    /// Orleans implements timeouts to prevent indefinite waiting on grain calls:
-    /// - Each grain call has a configurable response timeout
-    /// - If a grain method doesn't complete within the timeout, a TimeoutException is thrown
-    /// - The original request continues executing on the silo (not cancelled)
-    /// - Subsequent calls to a busy grain may be dropped to prevent queue buildup
-    /// 
-    /// These tests verify:
-    /// - Timeout exceptions are thrown at the appropriate time
-    /// - Request tracking is properly cleaned up after timeouts
-    /// - Call dropping behavior for overloaded grains
-    /// 
-    /// Note: These tests modify global timeout settings, so they should run in isolation.
-    /// </summary>
-        [TestArea("Runtime")]
+    // If we parallelize tests, this should run in isolation.
+    [TestArea("Runtime")]
     public class TimeoutTests : HostedTestClusterEnsureDefaultStarted, IDisposable
     {
         private readonly ITestOutputHelper output;
@@ -37,25 +22,15 @@ namespace UnitTests
         {
             this.output = output;
             this.runtimeClient = this.HostedCluster.ServiceProvider.GetRequiredService<IRuntimeClient>();
-            // Save original timeout to restore it after tests
             originalTimeout = this.runtimeClient.GetResponseTimeout();
             this.typeResolver = this.HostedCluster.ServiceProvider.GetRequiredService<GrainInterfaceTypeResolver>();
         }
 
         public virtual void Dispose()
         {
-            // Restore original timeout to avoid affecting other tests
             this.runtimeClient.SetResponseTimeout(originalTimeout);
         }
 
-        /// <summary>
-        /// Tests that grain calls timeout correctly when the method takes longer than the response timeout.
-        /// Verifies:
-        /// - TimeoutException is thrown after the configured timeout period
-        /// - The timeout occurs within expected bounds (not too early, not too late)
-        /// - Request tracking is cleaned up (no lingering requests)
-        /// - Re-awaiting the same task fails immediately
-        /// </summary>
         [TestSuite("Functional")]
         [TestProvider("None")]
         [Fact, TestCategory("Functional"), TestCategory("Timeout")]
@@ -65,16 +40,13 @@ namespace UnitTests
             var grainName = typeof (ErrorGrain).FullName;
             IErrorGrain grain = this.GrainFactory.GetGrain<IErrorGrain>(GetRandomGrainId(), grainName);
             var errorGrainType = this.typeResolver.GetGrainInterfaceType(typeof(IErrorGrain));
-            // Set a 1-second timeout for this test
             TimeSpan timeout = TimeSpan.FromMilliseconds(1000);
             this.runtimeClient.SetResponseTimeout(timeout);
 
-            // Call a method that takes 4x longer than the timeout
             Task promise = grain.LongMethod((int)timeout.Multiply(4).TotalMilliseconds);
             //promise = grain.LongMethodWithError(2000);
 
-            // Note: There's a potential race condition in debugger where the call might complete
-            // Measure how long we wait for the timeout
+            // there is a race in the test here. If run in debugger, the invocation can actually finish OK
             Stopwatch stopwatch = new Stopwatch();
             stopwatch.Start();
             try
@@ -94,15 +66,13 @@ namespace UnitTests
             }
             output.WriteLine("Waited for " + stopwatch.Elapsed);
             Assert.True(!finished);
-            // Verify timeout occurred within expected bounds (90% to 350% of configured timeout)
             Assert.True(stopwatch.Elapsed >= timeout.Multiply(0.9), "Waited less than " + timeout.Multiply(0.9) + ". Waited " + stopwatch.Elapsed);
             Assert.True(stopwatch.Elapsed <= timeout.Multiply(3.5), "Waited longer than " + timeout.Multiply(3.5) + ". Waited " + stopwatch.Elapsed);
             Assert.True(promise.Status == TaskStatus.Faulted);
 
-            // Verify request tracking is cleaned up - no requests should be pending
             Assert.Equal(expected: 0, actual: this.runtimeClient.GetRunningRequestsCount(errorGrainType));
 
-            // Re-awaiting a timed-out task should fail immediately
+            // try to re-use the promise and should fail immediately.
             try
             {
                 stopwatch = new Stopwatch();
@@ -144,11 +114,11 @@ namespace UnitTests
 
             var target = Client.GetGrain<ILongRunningTaskGrain<int>>(Guid.NewGuid());
 
-            // First call: Takes 5 seconds but client times out after 2 seconds
+            // First call should be successful, but client will not receive the response
             var delay = TimeSpan.FromSeconds(5);
             var firstCall = target.LongRunningTask(1, responseTimeout + delay);
             await Task.Delay(TimeSpan.FromMilliseconds(100));
-            // Second call: Should be dropped because grain is still busy with first call
+            // Second call should be dropped by the silo
             var secondCall = target.LongRunningTask(2, TimeSpan.Zero);
 
             try
@@ -163,10 +133,8 @@ namespace UnitTests
                 throw;
             }
 
-            // Wait for first call to complete on the silo
             await Task.Delay(delay);
 
-            // Verify only the first call executed (value = 1), second call was dropped
             Assert.Equal(1, await target.GetLastValue());
         }
     }

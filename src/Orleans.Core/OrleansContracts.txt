@@ -4,6 +4,7 @@ interface Orleans.ClientObservers.IClientGatewayObserver [Version(0)]
 interface Orleans.IMembershipTableSystemTarget [Version(0)]
 
 interface Orleans.ISiloControl [Version(0)]
+  DropDisconnectedClients(bool) -> Task
   ForceActivationCollection(System.TimeSpan) -> Task
   ForceGarbageCollection() -> Task
   ForceRuntimeStatisticsCollection() -> Task
@@ -46,6 +47,7 @@ interface Orleans.Runtime.IGrainCallCancellationExtension [Version(0)]
   CancelRequestAsync(Orleans.Runtime.GrainId, Orleans.Runtime.CorrelationId) -> ValueTask
 
 interface Orleans.Runtime.IManagementGrain [Version(0)]
+  DropDisconnectedClients(bool) -> Task
   ForceActivationCollection(Orleans.Runtime.SiloAddress[], System.TimeSpan) -> Task
   ForceActivationCollection(System.TimeSpan) -> Task
   ForceGarbageCollection(Orleans.Runtime.SiloAddress[]) -> Task
