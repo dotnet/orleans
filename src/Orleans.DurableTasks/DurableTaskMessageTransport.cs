@@ -1,5 +1,6 @@
 using System;
 using System.Distributed.DurableTasks;
+using Orleans;
 using Orleans.DurableMessaging;
 using Orleans.Journaling;
 using Orleans.Runtime;
