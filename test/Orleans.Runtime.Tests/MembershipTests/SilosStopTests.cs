@@ -1,7 +1,9 @@
 using System.Net;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
 using Orleans.Configuration;
 using Orleans.Runtime;
+using Orleans.Runtime.Messaging;
 using Orleans.Runtime.Placement;
 using Orleans.TestingHost;
 using TestExtensions;
@@ -61,19 +63,117 @@ namespace UnitTests.MembershipTests
             await Assert.ThrowsAsync<SiloUnavailableException>(() => promise);
         }
 
+        [Fact, TestCategory("Liveness")]
+        public async Task SiloUngracefulShutdown_GatewayForwardedRequestBreaks()
+        {
+            var runtimeClient = Client.ServiceProvider.GetRequiredService<OutsideRuntimeClient>();
+            var gateway = GetGateway();
+            var previousResponseTimeout = runtimeClient.GetResponseTimeout();
+            runtimeClient.SetResponseTimeout(TimeSpan.FromMinutes(1));
+            try
+            {
+                var target = await GetGrainOnTargetSilo(HostedCluster.SecondarySilos[0]);
+                Assert.NotNull(target);
+
+                var observer = new LongRunningTaskObserver();
+                var observerReference = GrainFactory.CreateObjectReference<ILongRunningTaskObserver>(observer);
+                try
+                {
+                    var callId = Guid.NewGuid();
+                    var promise = target.LongWaitWithStartNotification(
+                        TimeSpan.FromMinutes(1),
+                        callId,
+                        observerReference,
+                        CancellationToken.None);
+
+                    await observer.WaitForCallToStart(callId);
+                    Assert.False(promise.IsCompleted);
+                    Assert.Equal(1, gateway.TrackedRequestClientCount);
+
+                    await HostedCluster.KillSiloAsync(HostedCluster.SecondarySilos[0]);
+
+                    await Assert.ThrowsAsync<SiloUnavailableException>(
+                        () => promise.WaitAsync(TimeSpan.FromSeconds(20)));
+                    Assert.Equal(0, gateway.TrackedRequestClientCount);
+                }
+                finally
+                {
+                    GrainFactory.DeleteObjectReference<ILongRunningTaskObserver>(observerReference);
+                }
+            }
+            finally
+            {
+                runtimeClient.SetResponseTimeout(previousResponseTimeout);
+            }
+        }
+
+        [Fact, TestCategory("Liveness")]
+        public async Task CompletedGatewayForwardedRequestStopsTrackingClient()
+        {
+            var gateway = GetGateway();
+            var target = await GetGrainOnTargetSilo(HostedCluster.SecondarySilos[0]);
+            Assert.NotNull(target);
+
+            var observer = new LongRunningTaskObserver();
+            var observerReference = GrainFactory.CreateObjectReference<ILongRunningTaskObserver>(observer);
+            try
+            {
+                var callId = Guid.NewGuid();
+                var promise = target.LongWaitWithStartNotification(
+                    TimeSpan.FromSeconds(5),
+                    callId,
+                    observerReference,
+                    CancellationToken.None);
+
+                await observer.WaitForCallToStart(callId);
+                Assert.Equal(1, gateway.TrackedRequestClientCount);
+
+                await promise;
+                Assert.Equal(0, gateway.TrackedRequestClientCount);
+            }
+            finally
+            {
+                GrainFactory.DeleteObjectReference<ILongRunningTaskObserver>(observerReference);
+            }
+        }
+
         private async Task<ILongRunningTaskGrain<bool>?> GetGrainOnTargetSilo(SiloHandle siloHandle)
         {
             const int maxRetry = 10;
             for (int i = 0; i < maxRetry; i++)
             {
                 RequestContext.Set(IPlacementDirector.PlacementHintKey, siloHandle.SiloAddress);
-                var grain = GrainFactory.GetGrain<ILongRunningTaskGrain<bool>>(Guid.NewGuid());
-                var instanceId = await grain.GetRuntimeInstanceId();
-                if (instanceId.Contains(siloHandle.SiloAddress.Endpoint.ToString()))
-                    return grain;
+                try
+                {
+                    var grain = GrainFactory.GetGrain<ILongRunningTaskGrain<bool>>(Guid.NewGuid());
+                    var instanceId = await grain.GetRuntimeInstanceId();
+                    if (instanceId.Contains(siloHandle.SiloAddress.Endpoint.ToString()))
+                        return grain;
+                }
+                finally
+                {
+                    RequestContext.Remove(IPlacementDirector.PlacementHintKey);
+                }
+
                 await Task.Delay(100);
             }
             return null;
+        }
+
+        private Gateway GetGateway() =>
+            ((InProcessSiloHandle)HostedCluster.Primary!).ServiceProvider.GetRequiredService<MessageCenter>().Gateway!;
+
+        private sealed class LongRunningTaskObserver : ILongRunningTaskObserver
+        {
+            private readonly TaskCompletionSource<Guid> _startedCall = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+            public void OnCallStarted(Guid callId) => _startedCall.TrySetResult(callId);
+
+            public async Task WaitForCallToStart(Guid callId)
+            {
+                var startedCallId = await _startedCall.Task.WaitAsync(TimeSpan.FromSeconds(30));
+                Assert.Equal(callId, startedCallId);
+            }
         }
     }
 }

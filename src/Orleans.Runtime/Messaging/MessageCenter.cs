@@ -141,7 +141,9 @@ namespace Orleans.Runtime.Messaging
             get => this.sniffIncomingMessageHandler;
         }
 
-        public void SendMessage(Message msg)
+        public void SendMessage(Message msg) => SendMessage(msg, sendMessage: null);
+
+        internal void SendMessage(Message msg, Action<Message, Connection?, Exception?>? sendMessage)
         {
             Debug.Assert(!msg.IsLocalOnly);
 
@@ -214,7 +216,15 @@ namespace Orleans.Runtime.Messaging
                 {
                     if (this.connectionManager.TryGetConnection(targetSilo, out var existingConnection))
                     {
-                        existingConnection.Send(msg);
+                        if (sendMessage is null)
+                        {
+                            existingConnection.Send(msg);
+                        }
+                        else
+                        {
+                            sendMessage(msg, existingConnection, null);
+                        }
+
                         return;
                     }
                     else if (this.siloStatusOracle.IsDeadSilo(targetSilo))
@@ -222,11 +232,24 @@ namespace Orleans.Runtime.Messaging
                         // Do not try to establish
                         if (msg.Direction is Message.Directions.Request or Message.Directions.OneWay)
                         {
-                            this.messagingTrace.OnRejectSendMessageToDeadSilo(_siloAddress, msg);
-                            this.SendRejection(msg, Message.RejectionTypes.Transient, "Target silo is known to be dead", new SiloUnavailableException());
+                            if (sendMessage is null)
+                            {
+                                RejectMessage();
+                            }
+                            else
+                            {
+                                this.messagingTrace.OnRejectSendMessageToDeadSilo(_siloAddress, msg);
+                                sendMessage(msg, null, null);
+                            }
                         }
 
                         return;
+
+                        void RejectMessage()
+                        {
+                            this.messagingTrace.OnRejectSendMessageToDeadSilo(_siloAddress, msg);
+                            this.SendRejection(msg, Message.RejectionTypes.Transient, "Target silo is known to be dead", new SiloUnavailableException());
+                        }
                     }
                     else
                     {
@@ -234,22 +257,52 @@ namespace Orleans.Runtime.Messaging
                         if (connectionTask.IsCompletedSuccessfully)
                         {
                             var sender = connectionTask.Result;
-                            sender.Send(msg);
+                            if (sendMessage is null)
+                            {
+                                sender.Send(msg);
+                            }
+                            else
+                            {
+                                sendMessage(msg, sender, null);
+                            }
                         }
                         else
                         {
-                            _ = SendAsync(this, connectionTask, msg);
+                            _ = SendAsync(this, connectionTask, msg, sendMessage);
 
-                            static async Task SendAsync(MessageCenter messageCenter, ValueTask<Connection> connectionTask, Message msg)
+                            static async Task SendAsync(
+                                MessageCenter messageCenter,
+                                ValueTask<Connection> connectionTask,
+                                Message msg,
+                                Action<Message, Connection?, Exception?>? sendMessage)
                             {
                                 try
                                 {
                                     var sender = await connectionTask;
-                                    sender.Send(msg);
+                                    if (sendMessage is null)
+                                    {
+                                        sender.Send(msg);
+                                    }
+                                    else
+                                    {
+                                        sendMessage(msg, sender, null);
+                                    }
                                 }
                                 catch (Exception exception)
                                 {
-                                    messageCenter.SendRejection(msg, Message.RejectionTypes.Transient, $"Exception while sending message: {exception}");
+                                    if (sendMessage is null)
+                                    {
+                                        RejectMessage();
+                                    }
+                                    else
+                                    {
+                                        sendMessage(msg, null, exception);
+                                    }
+
+                                    void RejectMessage() => messageCenter.SendRejection(
+                                        msg,
+                                        Message.RejectionTypes.Transient,
+                                        $"Exception while sending message: {exception}");
                                 }
                             }
                         }
@@ -433,6 +486,13 @@ namespace Orleans.Runtime.Messaging
             ResendMessageImpl(message);
         }
 
+        internal void RerouteMessage(
+            Message message,
+            Action<Message, Connection?, Exception?> sendMessage)
+        {
+            ResendMessageImpl(message, sendMessage: sendMessage);
+        }
+
         private bool TryForwardMessage(Message message, SiloAddress? forwardingAddress)
         {
             if (!MayForward(message, this.messagingOptions)) return false;
@@ -444,7 +504,10 @@ namespace Orleans.Runtime.Messaging
             return true;
         }
 
-        private void ResendMessageImpl(Message message, SiloAddress? forwardingAddress = null)
+        private void ResendMessageImpl(
+            Message message,
+            SiloAddress? forwardingAddress = null,
+            Action<Message, Connection?, Exception?>? sendMessage = null)
         {
             LogDebugResend(log, message);
 
@@ -461,7 +524,7 @@ namespace Orleans.Runtime.Messaging
             else
             {
                 message.TargetSilo = null;
-                _ = AddressAndSendMessage(message);
+                _ = AddressAndSendMessage(message, sendMessage);
             }
         }
 
@@ -479,7 +542,9 @@ namespace Orleans.Runtime.Messaging
         /// - add ordering info and maintain send order
         ///
         /// </summary>
-        internal Task AddressAndSendMessage(Message message)
+        internal Task AddressAndSendMessage(
+            Message message,
+            Action<Message, Connection?, Exception?>? sendMessage = null)
         {
             try
             {
@@ -489,7 +554,7 @@ namespace Orleans.Runtime.Messaging
                     return SendMessageAsync(messageAddressingTask, message);
                 }
 
-                SendMessage(message);
+                SendMessage(message, sendMessage);
             }
             catch (Exception ex)
             {
@@ -510,7 +575,7 @@ namespace Orleans.Runtime.Messaging
                     return;
                 }
 
-                SendMessage(m);
+                SendMessage(m, sendMessage);
             }
 
             void OnAddressingFailure(Message m, Exception ex)
