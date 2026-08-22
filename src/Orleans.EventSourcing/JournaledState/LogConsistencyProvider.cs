@@ -1,6 +1,5 @@
 using Orleans.Storage;
 #nullable disable
-#nullable disable
 namespace Orleans.EventSourcing.JournaledState;
 
 /// <summary>
