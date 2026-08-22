@@ -70,6 +70,10 @@ public static class EFReminderHostingExtension
     /// <returns>
     /// The provided <see cref="IServiceCollection"/>, for chaining.
     /// </returns>
+    /// <remarks>
+    /// Register an <see cref="IDbContextFactory{TContext}"/> for <typeparamref name="TDbContext"/> and an
+    /// <see cref="IEFReminderETagConverter{TETag}"/> before calling this overload.
+    /// </remarks>
     public static IServiceCollection UseEntityFrameworkCoreReminderService<TDbContext, TETag>(this IServiceCollection services) where TDbContext : ReminderDbContext<TDbContext, TETag>
     {
         services.AddReminders();
