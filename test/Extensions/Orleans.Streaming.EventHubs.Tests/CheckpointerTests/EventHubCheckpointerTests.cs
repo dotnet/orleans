@@ -25,12 +25,13 @@ public class EventHubCheckpointerTests
     /// </summary>
     private class TestCheckpointer : IStreamQueueCheckpointer<string>
     {
-        public bool CheckpointExists { get; init; } = true;
+        public bool CheckpointExists { get; set; } = true;
         public string LoadedOffset { get; init; } = EventHubConstants.StartOfStream;
         public string? LastOffset { get; private set; }
         public int UpdateCount { get; private set; }
         public string? FlushedOffset { get; private set; }
         public int FlushCount { get; private set; }
+        public int ResetCount { get; private set; }
 
         public Task<string> Load() => Task.FromResult(LoadedOffset);
 
@@ -50,6 +51,13 @@ public class EventHubCheckpointerTests
         {
             FlushedOffset = LastOffset;
             FlushCount++;
+            return Task.CompletedTask;
+        }
+
+        public Task Reset()
+        {
+            CheckpointExists = false;
+            ResetCount++;
             return Task.CompletedTask;
         }
 
@@ -150,6 +158,20 @@ public class EventHubCheckpointerTests
         public Task CloseAsync() => Task.CompletedTask;
     }
 
+    private sealed class FailingEventHubReceiver : IEventHubReceiver
+    {
+        public int CloseCount { get; private set; }
+
+        public Task<IEnumerable<EventData>> ReceiveAsync(int maxCount, TimeSpan waitTime) =>
+            throw new ArgumentException("The checkpoint offset is outside the retained Event Hubs range.");
+
+        public Task CloseAsync()
+        {
+            CloseCount++;
+            return Task.CompletedTask;
+        }
+    }
+
     private sealed class CancellableEventHubReceiver : IEventHubReceiver
     {
         public TaskCompletionSource<CancellationToken> ReceiveStarted { get; } = new(
@@ -208,7 +230,9 @@ public class EventHubCheckpointerTests
         TestCheckpointer checkpointer,
         TestEventHubQueueCache? cache = null,
         IEventHubReceiver? eventHubReceiver = null,
-        Action<string>? onReceiverCreated = null)
+        Action<string>? onReceiverCreated = null,
+        Func<IStreamQueueCheckpointer<string>, IEventHubQueueCache>? createCache = null,
+        Func<IEventHubReceiver>? createEventHubReceiver = null)
     {
         var settings = new EventHubPartitionSettings
         {
@@ -224,7 +248,8 @@ public class EventHubCheckpointerTests
 
         var receiver = new EventHubAdapterReceiver(
             settings,
-            cacheFactory: (_, createdCheckpointer, _) => cache ?? new TestEventHubQueueCache(createdCheckpointer),
+            cacheFactory: (_, createdCheckpointer, _) =>
+                createCache?.Invoke(createdCheckpointer) ?? cache ?? new TestEventHubQueueCache(createdCheckpointer),
             checkpointerFactory: _ => Task.FromResult<IStreamQueueCheckpointer<string>>(checkpointer),
             loggerFactory: Microsoft.Extensions.Logging.Abstractions.NullLoggerFactory.Instance,
             monitor: new Orleans.Streaming.EventHubs.DefaultEventHubReceiverMonitor(
@@ -239,7 +264,7 @@ public class EventHubCheckpointerTests
             eventHubReceiverFactory: (_, offset, _) =>
             {
                 onReceiverCreated?.Invoke(offset);
-                return eventHubReceiver ?? new TestEventHubReceiver();
+                return createEventHubReceiver?.Invoke() ?? eventHubReceiver ?? new TestEventHubReceiver();
             });
 
         await receiver.Initialize(TimeSpan.FromSeconds(5));
@@ -296,6 +321,40 @@ public class EventHubCheckpointerTests
 
         var exception = await Assert.ThrowsAnyAsync<OperationCanceledException>(() => operation);
         Assert.Equal(cancellation.Token, exception.CancellationToken);
+    }
+
+    [TestSuite("BVT")]
+    [Fact, TestCategory("BVT")]
+    public async Task GetQueueMessagesAsync_StaleCheckpointResetsAndReinitializes()
+    {
+        var checkpointer = new TestCheckpointer { LoadedOffset = "123" };
+        var firstReceiver = new FailingEventHubReceiver();
+        var receivers = new Queue<IEventHubReceiver>([firstReceiver, new TestEventHubReceiver()]);
+        var caches = new List<TestEventHubQueueCache>();
+        var offsets = new List<string>();
+        var receiver = await CreateReceiver(
+            checkpointer,
+            onReceiverCreated: offsets.Add,
+            createCache: createdCheckpointer =>
+            {
+                var created = new TestEventHubQueueCache(createdCheckpointer);
+                caches.Add(created);
+                return created;
+            },
+            createEventHubReceiver: receivers.Dequeue);
+
+        await Assert.ThrowsAsync<ArgumentException>(
+            () => receiver.GetQueueMessagesAsync(10, CancellationToken.None));
+
+        Assert.Equal(1, checkpointer.ResetCount);
+        Assert.Equal(1, caches[0].DisposeCount);
+        Assert.Equal(1, firstReceiver.CloseCount);
+        Assert.Equal(0, receiver.GetMaxAddCount());
+
+        Assert.Empty(await receiver.GetQueueMessagesAsync(10, CancellationToken.None));
+        Assert.Equal(2, caches.Count);
+        Assert.Equal([checkpointer.LoadedOffset, EventHubConstants.StartOfStream], offsets);
+        Assert.Equal(1_000, receiver.GetMaxAddCount());
     }
 
     [TestSuite("BVT")]
@@ -472,6 +531,57 @@ public class EventHubCheckpointerTests
         var checkpointer = (EventHubCheckpointer)constructor.Invoke([inner]);
 
         Assert.Equal(expected, await checkpointer.Load(CancellationToken.None));
+    }
+
+    [TestSuite("BVT")]
+    [Fact, TestCategory("BVT")]
+    public async Task EventHubCompatibilityWrapper_ForwardsReset()
+    {
+        var inner = new TestCheckpointer();
+        var constructor = typeof(EventHubCheckpointer).GetConstructor(
+            BindingFlags.Instance | BindingFlags.NonPublic,
+            binder: null,
+            [typeof(IStreamQueueCheckpointer<string>)],
+            modifiers: null);
+        Assert.NotNull(constructor);
+        var checkpointer = (EventHubCheckpointer)constructor.Invoke([inner]);
+
+        await checkpointer.Reset(CancellationToken.None);
+
+        Assert.Equal(1, inner.ResetCount);
+        Assert.False(checkpointer.CheckpointExists);
+    }
+
+    [TestSuite("BVT")]
+    [Fact, TestCategory("BVT")]
+    public async Task AzureTableReset_DeletesCheckpointAndClearsState()
+    {
+        var suffix = Guid.NewGuid().ToString("N");
+        var options = new Orleans.Configuration.AzureTableStreamCheckpointerOptions
+        {
+            PersistInterval = TimeSpan.FromMilliseconds(1),
+        }.ConfigureTestDefaults();
+        var checkpointer = await AzureTableStreamQueueCheckpointer.Create(
+            options,
+            $"provider-{suffix}",
+            $"partition-{suffix}",
+            $"service-{suffix}",
+            Microsoft.Extensions.Logging.Abstractions.NullLoggerFactory.Instance);
+        checkpointer.Update("42", DateTime.UtcNow, CancellationToken.None);
+        await checkpointer.FlushAsync(CancellationToken.None);
+        Assert.True(checkpointer.CheckpointExists);
+
+        await checkpointer.Reset(CancellationToken.None);
+
+        Assert.False(checkpointer.CheckpointExists);
+        var reloaded = await AzureTableStreamQueueCheckpointer.Create(
+            options,
+            $"provider-{suffix}",
+            $"partition-{suffix}",
+            $"service-{suffix}",
+            Microsoft.Extensions.Logging.Abstractions.NullLoggerFactory.Instance);
+        Assert.Equal(string.Empty, await reloaded.Load(CancellationToken.None));
+        Assert.False(reloaded.CheckpointExists);
     }
 
     [TestSuite("BVT")]

@@ -56,7 +56,7 @@ namespace Orleans.Streaming.EventHubs
         private readonly Func<EventHubPartitionSettings, string, ILogger, IEventHubReceiver> eventHubReceiverFactory;
 
         private IStreamQueueCheckpointer<string>? checkpointer;
-        private AggregatedQueueFlowController flowController = null!;
+        private AggregatedQueueFlowController? flowController;
 
         // Receiver life cycle
         private int receiverState = ReceiverShutdown;
@@ -66,7 +66,7 @@ namespace Orleans.Streaming.EventHubs
 
         public int GetMaxAddCount()
         {
-            return this.flowController.GetMaxAddCount();
+            return this.flowController?.GetMaxAddCount() ?? 0;
         }
 
         public EventHubAdapterReceiver(EventHubPartitionSettings settings,
@@ -205,6 +205,11 @@ namespace Orleans.Streaming.EventHubs
                 watch.Stop();
                 this.monitor?.TrackRead(false, watch.Elapsed, ex);
                 LogWarningFailedToReadFromEventHubPartition(this.settings.Hub.EventHubName, this.settings.Partition, ex);
+
+                if (ex is ArgumentException && this.checkpointer?.CheckpointExists == true)
+                {
+                    await ResetReceiver(cancellationToken);
+                }
                 throw;
             }
 
@@ -229,6 +234,62 @@ namespace Orleans.Streaming.EventHubs
                 batches.Add(new StreamActivityNotificationBatch(streamPosition));
             }
             return batches;
+        }
+
+        private async Task ResetReceiver(CancellationToken cancellationToken)
+        {
+            var checkpointer = Interlocked.Exchange(ref this.checkpointer, null);
+            var receiver = Interlocked.Exchange(ref this.receiver, null);
+            var cache = Interlocked.Exchange(ref this.cache, null);
+            Interlocked.Exchange(ref this.flowController, null);
+
+            if (checkpointer is not null)
+            {
+                try
+                {
+                    await checkpointer.Reset(cancellationToken);
+                }
+                catch (Exception exception)
+                {
+                    LogWarningFailedToResetEventHubReceiver(
+                        this.settings.Hub.EventHubName,
+                        this.settings.Partition,
+                        "checkpoint",
+                        exception);
+                }
+            }
+
+            if (cache is not null)
+            {
+                try
+                {
+                    cache.Dispose();
+                }
+                catch (Exception exception)
+                {
+                    LogWarningFailedToResetEventHubReceiver(
+                        this.settings.Hub.EventHubName,
+                        this.settings.Partition,
+                        "cache",
+                        exception);
+                }
+            }
+
+            if (receiver is not null)
+            {
+                try
+                {
+                    await receiver.CloseAsync(cancellationToken);
+                }
+                catch (Exception exception)
+                {
+                    LogWarningFailedToResetEventHubReceiver(
+                        this.settings.Hub.EventHubName,
+                        this.settings.Partition,
+                        "receiver",
+                        exception);
+                }
+            }
         }
 
         public void AddToCache(IList<IBatchContainer> messages)
@@ -464,7 +525,7 @@ namespace Orleans.Streaming.EventHubs
 
         [LoggerMessage(
             Level = LogLevel.Warning,
-            EventId = (int)OrleansEventHubErrorCode.FailedPartitionRead,
+            EventId = (int)OrleansEventHubErrorCode.RetryReceiverInit,
             Message = "Retrying initialization of EventHub partition {EventHubName}-{Partition}."
         )]
         private partial void LogWarningRetryingInitializationOfEventHubPartition(string eventHubName, string partition);
@@ -475,5 +536,15 @@ namespace Orleans.Streaming.EventHubs
             Message = "Failed to read from EventHub partition {EventHubName}-{Partition}"
         )]
         private partial void LogWarningFailedToReadFromEventHubPartition(string eventHubName, string partition, Exception exception);
+
+        [LoggerMessage(
+            Level = LogLevel.Warning,
+            EventId = (int)OrleansEventHubErrorCode.FailedPartitionReset,
+            Message = "Failed to reset the {Component} for EventHub partition {EventHubName}-{Partition}.")]
+        private partial void LogWarningFailedToResetEventHubReceiver(
+            string eventHubName,
+            string partition,
+            string component,
+            Exception exception);
     }
 }

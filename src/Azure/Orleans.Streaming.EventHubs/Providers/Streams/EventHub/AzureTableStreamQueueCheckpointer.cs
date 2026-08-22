@@ -1,7 +1,9 @@
 using System;
 using System.Collections.Generic;
+using System.Net;
 using System.Threading;
 using System.Threading.Tasks;
+using Azure;
 using Microsoft.Extensions.Logging;
 using Orleans.Configuration;
 using Orleans.Streaming.EventHubs;
@@ -14,6 +16,7 @@ namespace Orleans.Streams
     public partial class AzureTableStreamQueueCheckpointer : IStreamQueueCheckpointer<string>
     {
         private readonly AzureTableDataManager<StreamQueueCheckpointEntity> _dataManager;
+        private readonly ILogger<AzureTableStreamQueueCheckpointer> _logger;
         private readonly TimeSpan _persistInterval;
         private readonly IComparer<string>? _checkpointComparer;
         private readonly object _lock = new();
@@ -47,6 +50,7 @@ namespace Orleans.Streams
 
             _persistInterval = options.PersistInterval;
             _checkpointComparer = options.CheckpointComparer ?? defaultComparer;
+            _logger = loggerFactory.CreateLogger<AzureTableStreamQueueCheckpointer>();
             _dataManager = new AzureTableDataManager<StreamQueueCheckpointEntity>(
                 options,
                 loggerFactory.CreateLogger<StreamQueueCheckpointEntity>());
@@ -56,7 +60,7 @@ namespace Orleans.Streams
                 serviceId,
                 partition);
             LogCreatingCheckpointer(
-                loggerFactory.CreateLogger<AzureTableStreamQueueCheckpointer>(),
+                _logger,
                 partition,
                 streamProviderName,
                 serviceId);
@@ -125,6 +129,51 @@ namespace Orleans.Streams
             }
 
             return checkpoint;
+        }
+
+        /// <inheritdoc />
+        [Obsolete("Use the overload which accepts a CancellationToken.")]
+        public Task Reset() => Reset(CancellationToken.None);
+
+        /// <inheritdoc />
+        public async Task Reset(CancellationToken cancellationToken)
+        {
+            Task inProgressSave;
+            lock (_lock)
+            {
+                inProgressSave = _inProgressSave;
+            }
+
+            try
+            {
+                await inProgressSave.WaitAsync(cancellationToken);
+            }
+            catch (Exception exception) when (!cancellationToken.IsCancellationRequested)
+            {
+                LogWarningCheckpointSaveFailedBeforeReset(_logger, exception);
+            }
+
+            try
+            {
+                await _dataManager.DeleteTableEntryAsync(_entity, ETag.All);
+            }
+            catch (RequestFailedException exception) when (
+                exception.Status is (int)HttpStatusCode.NotFound or (int)HttpStatusCode.PreconditionFailed)
+            {
+                LogDebugCheckpointResetAlreadySatisfied(_logger, exception);
+            }
+            finally
+            {
+                lock (_lock)
+                {
+                    _entity.Offset = string.Empty;
+                    _entity.ETag = default;
+                    _latestCheckpoint = string.Empty;
+                    _persistedCheckpoint = string.Empty;
+                    _throttleSavesUntilUtc = null;
+                    _inProgressSave = Task.CompletedTask;
+                }
+            }
         }
 
         /// <inheritdoc />
@@ -221,5 +270,15 @@ namespace Orleans.Streams
             string partition,
             string streamProviderName,
             string serviceId);
+
+        [LoggerMessage(
+            Level = LogLevel.Warning,
+            Message = "The in-progress checkpoint save failed before the checkpoint was reset.")]
+        private static partial void LogWarningCheckpointSaveFailedBeforeReset(ILogger logger, Exception exception);
+
+        [LoggerMessage(
+            Level = LogLevel.Debug,
+            Message = "The checkpoint reset was already satisfied by concurrent storage state.")]
+        private static partial void LogDebugCheckpointResetAlreadySatisfied(ILogger logger, Exception exception);
     }
 }

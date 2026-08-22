@@ -12,5 +12,6 @@ namespace Orleans.Streaming.EventHubs
 
         FailedPartitionRead = ServiceBus + 1,
         RetryReceiverInit   = ServiceBus + 2,
+        FailedPartitionReset = ServiceBus + 3,
     }
 }

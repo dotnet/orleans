@@ -1761,6 +1761,9 @@ namespace Orleans.Streams
         [System.Obsolete("Use the overload which accepts a CancellationToken.")]
         System.Threading.Tasks.Task<TCheckpoint> Load();
         System.Threading.Tasks.Task<TCheckpoint> Load(System.Threading.CancellationToken cancellationToken);
+        [System.Obsolete("Use the overload which accepts a CancellationToken.")]
+        System.Threading.Tasks.Task Reset();
+        System.Threading.Tasks.Task Reset(System.Threading.CancellationToken cancellationToken);
         void Update(TCheckpoint offset, System.DateTime utcNow, System.Threading.CancellationToken cancellationToken);
         [System.Obsolete("Use the overload which accepts a CancellationToken.")]
         void Update(TCheckpoint offset, System.DateTime utcNow);
