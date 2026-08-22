@@ -24,7 +24,6 @@
     <ProjectReference Include="..\Orleans.Core.Abstractions\Orleans.Core.Abstractions.csproj" />
     <ProjectReference Include="..\Orleans.DurableMessaging\Orleans.DurableMessaging.csproj" />
     <ProjectReference Include="..\Orleans.Serialization\Orleans.Serialization.csproj" />
-    <ProjectReference Include="..\Orleans.Transactions\Orleans.Transactions.csproj" />
     <ProjectReference Include="..\Orleans.Server\Orleans.Server.csproj" />
     <ProjectReference Include="..\System.Distributed.DurableTasks\System.Distributed.DurableTasks.csproj" />
   </ItemGroup>

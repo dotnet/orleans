@@ -18,13 +18,12 @@ public class IntegrationTestFixture : IAsyncLifetime
     public IntegrationTestFixture()
     {
         var builder = new InProcessTestClusterBuilder();
-        var storageProvider = new VolatileJournalStorageProvider(
-            Microsoft.Extensions.Options.Options.Create(
-                new JournaledStateManagerOptions { JournalFormatKey = OrleansBinaryJournalFormat.JournalFormatKey }));
+        var storageProvider = new VolatileJournalStorageProvider();
         builder.ConfigureSilo((options, siloBuilder) =>
         {
             siloBuilder.UseInMemoryDurableJobs();
             siloBuilder.AddDurableMessaging();
+            siloBuilder.AddJournalStorage();
             siloBuilder.UseJsonJournalFormat(JournalingTestsJsonContext.Default);
             siloBuilder.Services.AddSingleton(storageProvider);
             siloBuilder.Services.AddSingleton<IJournalStorageProvider>(storageProvider);
