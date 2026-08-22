@@ -45,12 +45,12 @@ namespace Orleans.Runtime.Messaging
 
         protected override void RecordMessageReceive(Message msg, int numTotalBytes, int headerBytes)
         {
-            MessagingInstrumentation.OnMessageReceive(msg, numTotalBytes, headerBytes, ConnectionDirection, RemoteSiloAddress);
+            MessagingMetrics.OnMessageReceive(msg, numTotalBytes, headerBytes, ConnectionDirection, RemoteSiloAddress);
         }
 
         protected override void RecordMessageSend(Message msg, int numTotalBytes, int headerBytes)
         {
-            MessagingInstrumentation.OnMessageSend(msg, numTotalBytes, headerBytes, ConnectionDirection, RemoteSiloAddress);
+            MessagingMetrics.OnMessageSend(msg, numTotalBytes, headerBytes, ConnectionDirection, RemoteSiloAddress);
         }
 
         protected override void OnReceivedMessage(Message message)
@@ -138,7 +138,7 @@ namespace Orleans.Runtime.Messaging
 
         internal void SendRejection(Message msg, Message.RejectionTypes rejectionType, string reason)
         {
-            MessagingInstrumentation.OnRejectedMessage(msg);
+            MessagingMetrics.OnRejectedMessage(msg);
             if (string.IsNullOrEmpty(reason)) reason = "Rejection from silo - Unknown reason.";
             var error = this.MessageFactory.CreateRejectionResponse(msg, rejectionType, reason);
 
@@ -148,17 +148,24 @@ namespace Orleans.Runtime.Messaging
 
         public void FailMessage(Message msg, string reason)
         {
-            MessagingInstrumentation.OnFailedSentMessage(msg);
-            if (msg.Direction == Message.Directions.Request)
+            try
             {
-                LogDebugClientIsRejectingMessage(this.Log, msg, reason);
-                // Done retrying, send back an error instead
-                this.SendRejection(msg, Message.RejectionTypes.Transient, $"Client is rejecting message: {msg}. Reason = {reason}");
+                MessagingMetrics.OnFailedSentMessage(msg);
+                if (msg.Direction == Message.Directions.Request)
+                {
+                    LogDebugClientIsRejectingMessage(this.Log, msg, reason);
+                    // Done retrying, send back an error instead
+                    this.SendRejection(msg, Message.RejectionTypes.Transient, $"Client is rejecting message: {msg}. Reason = {reason}");
+                }
+                else
+                {
+                    LogInformationClientIsDroppingMessage(this.Log, msg, reason);
+                    MessagingMetrics.OnDroppedSentMessage(msg);
+                }
             }
-            else
+            finally
             {
-                LogInformationClientIsDroppingMessage(this.Log, msg, reason);
-                MessagingInstrumentation.OnDroppedSentMessage(msg);
+                msg.ReleaseDropped("ClientOutboundConnection.FailMessage");
             }
         }
 

@@ -46,7 +46,7 @@ namespace Orleans.Runtime
         private IGrainCallCancellationManager _cancellationManager = null!;
         private HostedClient hostedClient = null!;
 
-        private HostedClient HostedClient => this.hostedClient;
+        private HostedClient HostedClient => this.hostedClient ??= this.ServiceProvider.GetRequiredService<HostedClient>();
         private readonly MessageFactory messageFactory;
         private IGrainReferenceRuntime grainReferenceRuntime = null!;
         private Task? callbackTimerTask;
@@ -112,25 +112,15 @@ namespace Orleans.Runtime
 
         public GrainFactory ConcreteGrainFactory { get; }
 
-        private GrainLocator GrainLocator => this.grainLocator;
+        private GrainLocator GrainLocator
+            => this.grainLocator;
 
-        private List<IIncomingGrainCallFilter> GrainCallFilters => this.grainCallFilters;
+        private List<IIncomingGrainCallFilter> GrainCallFilters
+            => this.grainCallFilters;
 
-        private MessageCenter MessageCenter => this.messageCenter;
+        private MessageCenter MessageCenter => this.messageCenter ?? (this.messageCenter = this.ServiceProvider.GetRequiredService<MessageCenter>());
 
-        public IGrainReferenceRuntime GrainReferenceRuntime => this.grainReferenceRuntime;
-
-        internal void ConsumeServices()
-        {
-            this.grainLocator = this.ServiceProvider.GetRequiredService<GrainLocator>();
-            this.grainCallFilters = new List<IIncomingGrainCallFilter>(this.ServiceProvider.GetServices<IIncomingGrainCallFilter>());
-            this.messageCenter = this.ServiceProvider.GetRequiredService<MessageCenter>();
-            this.grainReferenceRuntime = this.ServiceProvider.GetRequiredService<IGrainReferenceRuntime>();
-            this.hostedClient = this.ServiceProvider.GetRequiredService<HostedClient>();
-            _cancellationManager = this.ServiceProvider.GetRequiredService<IGrainCallCancellationManager>();
-            sharedCallbackData.CancellationManager = _cancellationManager;
-            systemSharedCallbackData.CancellationManager = _cancellationManager;
-        }
+        public IGrainReferenceRuntime GrainReferenceRuntime => this.grainReferenceRuntime ?? (this.grainReferenceRuntime = this.ServiceProvider.GetRequiredService<IGrainReferenceRuntime>());
 
         public void SendRequest(
             GrainReference target,
@@ -188,10 +178,11 @@ namespace Orleans.Runtime
                 Debug.Assert(context is not null);
 
                 // Register a callback for the request.
-                callbackData = new CallbackData(sharedData, context, message, _applicationRequestInstruments);
+                callbackData = new CallbackData(sharedData, context!, message, _applicationRequestInstruments);
                 if (Volatile.Read(ref _isStopping) != 0)
                 {
                     callbackData.OnHostShutdown();
+                    message.ReleaseDropped("SiloStoppingBeforeCallbackRegistration");
                     return;
                 }
 
@@ -203,6 +194,7 @@ namespace Orleans.Runtime
                 context?.Complete();
                 if (Volatile.Read(ref _isStopping) != 0)
                 {
+                    message.ReleaseDropped("SiloStoppingBeforeOneWaySend");
                     return;
                 }
             }
@@ -212,6 +204,7 @@ namespace Orleans.Runtime
             if (Volatile.Read(ref _isStopping) != 0)
             {
                 callbackData?.OnHostShutdown();
+                message.ReleaseDropped("SiloStoppingBeforeSend");
                 return;
             }
 
@@ -227,6 +220,8 @@ namespace Orleans.Runtime
             if (request.IsExpired)
             {
                 this.messagingTrace.OnDropExpiredMessage(request, MessagingInstruments.Phase.Respond);
+                // Note: We don't release here because the request message is still owned by the activation.
+                // It will be released in ActivationData.OnCompletedRequest when invoke completes.
                 return;
             }
 
@@ -293,6 +288,8 @@ namespace Orleans.Runtime
                 if (message.IsExpired)
                 {
                     this.messagingTrace.OnDropExpiredMessage(message, MessagingInstruments.Phase.Invoke);
+                    // Note: We don't release here because the message is still owned by the activation.
+                    // It will be released in ActivationData.OnCompletedRequest when this method returns.
                     return;
                 }
 
@@ -320,7 +317,6 @@ namespace Orleans.Runtime
                                 else
                                 {
                                     response = await invokable.Invoke();
-                                    // The copier preserves the null state of its input.
                                     response = this.responseCopier.Copy(response)!;
                                 }
 
@@ -382,7 +378,6 @@ namespace Orleans.Runtime
         {
             try
             {
-                // The copier preserves the null state of its input.
                 SendResponse(message, (Response)this._deepCopier.Copy(response)!);
             }
             catch (Exception exc)
@@ -415,15 +410,7 @@ namespace Orleans.Runtime
         public void ReceiveResponse(Message message)
         {
             OrleansInsideRuntimeClientEvent.Instance.ReceiveResponse(message);
-
-            var result = message.Result;
-            if (result != Message.ResponseTypes.Rejection && result != Message.ResponseTypes.Status)
-            {
-                ProcessResponseCallback(message);
-                return;
-            }
-
-            if (result is Message.ResponseTypes.Rejection)
+            if (message.Result is Message.ResponseTypes.Rejection)
             {
                 if (!message.TargetSilo!.Matches(this.MySilo))
                 {
@@ -452,71 +439,67 @@ namespace Orleans.Runtime
                         break;
                     case Message.RejectionTypes.CacheInvalidation when message.HasCacheInvalidationHeader:
                         // The message targeted an invalid (eg, defunct) activation and this response serves only to invalidate this silo's activation cache.
+                        message.ReleaseDropped("CacheInvalidationResponse");
                         return;
                     default:
                         LogErrorUnsupportedRejectionType(this.logger, rejection.RejectionType);
                         break;
                 }
-
-                ProcessResponseCallback(message);
             }
-            else
+            else if (message.Result == Message.ResponseTypes.Status)
             {
-                ProcessStatusResponse(message);
-            }
-        }
+                var status = (StatusResponse)message.BodyObject!;
+                callbacks.TryGetValue((message.TargetGrain, message.Id), out var callback);
+                var request = callback?.Message;
+                if (request is not null)
+                {
+                    callback!.OnStatusUpdate(status);
+                    if (status.Diagnostics != null && status.Diagnostics.Count > 0)
+                    {
+                        LogInformationReceivedStatusUpdate(this.logger, request, status.Diagnostics);
+                    }
+                }
+                else
+                {
+                    if (messagingOptions.CancelUnknownRequestOnStatusUpdate)
+                    {
+                        // Cancel the call since the caller has abandoned it.
+                        // Note that the target and sender arguments are swapped because this is a response to the original request.
+                        _cancellationManager.SignalCancellation(
+                            message.SendingSilo,
+                            targetGrainId: message.SendingGrain,
+                            sendingGrainId: message.TargetGrain,
+                            messageId: message.Id);
+                    }
 
-        private void ProcessResponseCallback(Message message)
-        {
-            if (callbacks.TryRemove((message.TargetGrain, message.Id), out var callbackData))
+                    if (status.Diagnostics != null && status.Diagnostics.Count > 0 && logger.IsEnabled(LogLevel.Debug))
+                    {
+                        var diagnosticsString = string.Join("\n", status.Diagnostics);
+                        LogDebugReceivedStatusUpdateUnknownRequest(this.logger, message, diagnosticsString);
+                    }
+                }
+
+                message.ReleaseDropped("StatusResponseHandled");
+                return;
+            }
+
+            CallbackData? callbackData;
+            bool found = callbacks.TryRemove((message.TargetGrain, message.Id), out callbackData);
+            if (found)
             {
                 // IMPORTANT: we do not schedule the response callback via the scheduler, since the only thing it does
                 // is to resolve/break the resolver. The continuations/waits that are based on this resolution will be scheduled as work items.
-                callbackData.DoCallback(message);
+                callbackData!.DoCallback(message);
+                message.MarkTransferred("InsideRuntimeClient.ReceiveResponse:AfterDoCallback");
+                message.Release();
             }
             else
             {
                 LogDebugNoCallbackForResponse(this.logger, message);
-            }
-        }
-
-        private void ProcessStatusResponse(Message message)
-        {
-            var status = (StatusResponse)message.BodyObject!;
-            callbacks.TryGetValue((message.TargetGrain, message.Id), out var callback);
-            var request = callback?.Message;
-            if (request is not null)
-            {
-                callback!.OnStatusUpdate(status);
-                if (status.Diagnostics is { Count: > 0 })
-                {
-                    LogInformationReceivedStatusUpdate(this.logger, request, status.Diagnostics);
-                }
-
-                return;
+                message.MarkTransferred("InsideRuntimeClient.ReceiveResponse:NoCallbackNotFound");
+                message.Release();
             }
 
-            HandleUnknownStatusUpdate(message, status);
-        }
-
-        private void HandleUnknownStatusUpdate(Message message, StatusResponse status)
-        {
-            if (messagingOptions.CancelUnknownRequestOnStatusUpdate)
-            {
-                // Cancel the call since the caller has abandoned it.
-                // Note that the target and sender arguments are swapped because this is a response to the original request.
-                _cancellationManager.SignalCancellation(
-                    message.SendingSilo,
-                    targetGrainId: message.SendingGrain,
-                    sendingGrainId: message.TargetGrain,
-                    messageId: message.Id);
-            }
-
-            if (status.Diagnostics is { Count: > 0 } && logger.IsEnabled(LogLevel.Debug))
-            {
-                var diagnosticsString = string.Join("\n", status.Diagnostics);
-                LogDebugReceivedStatusUpdateUnknownRequest(this.logger, message, diagnosticsString);
-            }
         }
 
         public string CurrentActivationIdentity => RuntimeContext.Current?.Address.ToString() ?? this.HostedClient.ToString();
@@ -611,7 +594,11 @@ namespace Orleans.Runtime
 
         public void Participate(ISiloLifecycle lifecycle)
         {
-            ConsumeServices();
+            grainLocator = ServiceProvider.GetRequiredService<GrainLocator>();
+            grainCallFilters = new List<IIncomingGrainCallFilter>(ServiceProvider.GetServices<IIncomingGrainCallFilter>());
+            _cancellationManager = this.ServiceProvider.GetRequiredService<IGrainCallCancellationManager>();
+            sharedCallbackData.CancellationManager = _cancellationManager;
+            systemSharedCallbackData.CancellationManager = _cancellationManager;
             lifecycle.Subscribe<InsideRuntimeClient>(ServiceLifecycleStage.RuntimeInitialize, OnRuntimeInitializeStart, OnRuntimeInitializeStop);
         }
 
