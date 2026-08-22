@@ -1,0 +1,202 @@
+using Microsoft.Extensions.DependencyInjection;
+using Orleans.Reminders.TestKit;
+using Orleans.Runtime;
+using Orleans.Testing.Reminders;
+using Orleans.TestingHost;
+using Xunit;
+
+namespace Orleans.Reminders.TestKit.Tests;
+
+/// <summary>
+/// Verifies that the idealized oracle can be installed into every silo of an <see cref="InProcessTestCluster"/>
+/// and that it exposes exactly what the reminder service persisted.
+/// </summary>
+[TestSuite("BVT")]
+[TestProvider("None")]
+[TestArea("Reminders")]
+[TestCategory("BVT"), TestCategory("Reminders"), TestCategory("ReminderTestKit")]
+public sealed class ReminderTestKitClusterIntegrationTests
+{
+    [Fact]
+    public async Task ReminderTestKit_ClusterUsesOneOracleInstanceInEverySilo()
+    {
+        var builder = new InProcessTestClusterBuilder(2);
+        var oracle = builder.UseIdealizedReminderTable();
+        var cluster = builder.Build();
+
+        try
+        {
+            await cluster.DeployAsync();
+
+            Assert.Equal(2, cluster.Silos.Count);
+            foreach (var silo in cluster.Silos)
+            {
+                Assert.Same(oracle, silo.ServiceProvider.GetRequiredService<IReminderTable>());
+                Assert.Same(oracle, silo.ServiceProvider.GetRequiredService<IdealizedReminderTable>());
+            }
+        }
+        finally
+        {
+            await cluster.StopAllSilosAsync();
+            await cluster.DisposeAsync();
+        }
+    }
+
+    [Fact]
+    public async Task ReminderTestKit_ClusterRegistrationAndUnregistrationAreVisibleInTheOracle()
+    {
+        var builder = new InProcessTestClusterBuilder(1);
+        var oracle = builder.UseIdealizedReminderTable();
+        var cluster = builder.Build();
+
+        try
+        {
+            await cluster.DeployAsync();
+            var grain = cluster.Client.GetGrain<IReminderTestKitGrain>(Guid.NewGuid());
+            var grainId = grain.GetGrainId();
+            var period = TimeSpan.FromMinutes(5);
+
+            var registeredName = await grain.RegisterReminderAsync("cluster-reminder", period, period);
+
+            var persisted = Assert.Single(oracle.Snapshot());
+            Assert.Equal("cluster-reminder", registeredName);
+            Assert.Equal("cluster-reminder", persisted.ReminderName);
+            Assert.Equal(grainId, persisted.GrainId);
+            Assert.Equal(period, persisted.Period);
+            Assert.Equal(1, persisted.Version);
+            Assert.False(string.IsNullOrEmpty(persisted.ETag));
+            Assert.Null(persisted.PreviousETag);
+            Assert.Equal(["cluster-reminder"], await grain.GetReminderNamesAsync());
+
+            var unregistered = await grain.UnregisterReminderAsync("cluster-reminder");
+
+            Assert.True(unregistered);
+            Assert.Empty(oracle.Snapshot());
+            Assert.Empty(await grain.GetReminderNamesAsync());
+            Assert.Contains(
+                oracle.Operations,
+                operation => operation.Kind == ReminderTableOperationKind.RemoveRow
+                    && operation.GrainId == grainId
+                    && operation.ReminderName == "cluster-reminder"
+                    && operation.Succeeded);
+        }
+        finally
+        {
+            await cluster.StopAllSilosAsync();
+            await cluster.DisposeAsync();
+        }
+    }
+
+    [Fact]
+    public async Task ReminderTestKit_ClusterReminderUpdateRotatesTheOracleETagWithoutDuplicatingTheRow()
+    {
+        var builder = new InProcessTestClusterBuilder(1);
+        var oracle = builder.UseIdealizedReminderTable();
+        var cluster = builder.Build();
+
+        try
+        {
+            await cluster.DeployAsync();
+            var grain = cluster.Client.GetGrain<IReminderTestKitGrain>(Guid.NewGuid());
+
+            await grain.RegisterReminderAsync("updated-reminder", TimeSpan.FromMinutes(5), TimeSpan.FromMinutes(5));
+            var initial = Assert.Single(oracle.Snapshot());
+
+            await grain.RegisterReminderAsync("updated-reminder", TimeSpan.FromMinutes(9), TimeSpan.FromMinutes(9));
+            var updated = Assert.Single(oracle.Snapshot());
+
+            Assert.Equal(TimeSpan.FromMinutes(5), initial.Period);
+            Assert.Equal(TimeSpan.FromMinutes(9), updated.Period);
+            Assert.Equal(initial.ETag, updated.PreviousETag);
+            Assert.NotEqual(initial.ETag, updated.ETag);
+            Assert.Equal(2, updated.Version);
+            Assert.Equal(initial.GrainId, updated.GrainId);
+        }
+        finally
+        {
+            await cluster.StopAllSilosAsync();
+            await cluster.DisposeAsync();
+        }
+    }
+
+    [Fact]
+    public async Task ReminderTestKit_StorageOutageFailsRegistrationAndRecoveryAllowsRetry()
+    {
+        var builder = new InProcessTestClusterBuilder(1);
+        var oracle = builder.UseIdealizedReminderTable();
+        var cluster = builder.Build();
+
+        try
+        {
+            await cluster.DeployAsync();
+            var grain = cluster.Client.GetGrain<IReminderTestKitGrain>(Guid.NewGuid());
+
+            oracle.SetAvailable(false);
+            var failure = await Assert.ThrowsAsync<ReminderTableUnavailableException>(
+                () => grain.RegisterReminderAsync("outage-reminder", TimeSpan.FromMinutes(5), TimeSpan.FromMinutes(5)));
+
+            Assert.Contains("simulated storage outage", failure.Message, StringComparison.Ordinal);
+            Assert.Empty(oracle.Snapshot());
+            Assert.Contains(
+                oracle.Operations,
+                operation => operation.Kind == ReminderTableOperationKind.UpsertRow
+                    && operation.ReminderName == "outage-reminder"
+                    && !operation.Succeeded
+                    && operation.Failure == nameof(ReminderTableUnavailableException));
+
+            oracle.SetAvailable(true);
+            var registered = await grain.RegisterReminderAsync("outage-reminder", TimeSpan.FromMinutes(5), TimeSpan.FromMinutes(5));
+
+            Assert.Equal("outage-reminder", registered);
+            var record = Assert.Single(oracle.Snapshot());
+            Assert.Equal("outage-reminder", record.ReminderName);
+            Assert.Equal(TimeSpan.FromMinutes(5), record.Period);
+        }
+        finally
+        {
+            await cluster.StopAllSilosAsync();
+            await cluster.DisposeAsync();
+        }
+    }
+
+    [Fact]
+    public async Task ReminderTestKit_FakeClockFiresAtExactDueTimeWithoutSleeping()
+    {
+        var builder = new InProcessTestClusterBuilder(1);
+        var oracle = builder.UseIdealizedReminderTable();
+        using var clock = ReminderTestClock.Attach(
+            builder,
+            minimumReminderPeriod: TimeSpan.FromSeconds(1),
+            refreshReminderListPeriod: TimeSpan.FromSeconds(1));
+        using var observer = ReminderDiagnosticObserver.Create();
+        var cluster = builder.Build();
+
+        try
+        {
+            await cluster.DeployAsync();
+            var grain = cluster.Client.GetGrain<IReminderTestKitGrain>(Guid.NewGuid());
+            var grainId = grain.GetGrainId();
+            using var cancellation = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+
+            await grain.RegisterReminderAsync("exact-due", TimeSpan.FromSeconds(5), TimeSpan.FromSeconds(10));
+            await observer.WaitForLocalReminderScheduleAsync(grainId, "exact-due", cancellation.Token);
+
+            var tick = observer.WaitForReminderTickAsync(grainId, cancellation.Token, "exact-due");
+            await clock.AdvanceAsync(TimeSpan.FromSeconds(4), cancellation.Token);
+            Assert.False(tick.IsCompleted);
+
+            await clock.AdvanceAsync(TimeSpan.FromSeconds(1), cancellation.Token);
+            var completed = await tick;
+
+            Assert.Equal(grainId, completed.GrainId);
+            Assert.Equal("exact-due", completed.ReminderName);
+            Assert.Equal(1, observer.GetTickCount(grainId, "exact-due"));
+            Assert.Equal(TimeSpan.FromSeconds(10), Assert.Single(oracle.Snapshot()).Period);
+        }
+        finally
+        {
+            await cluster.StopAllSilosAsync();
+            await cluster.DisposeAsync();
+        }
+    }
+}
