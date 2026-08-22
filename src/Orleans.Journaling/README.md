@@ -65,6 +65,10 @@ siloBuilder
 
 To migrate to JSON, configure `JournaledStateManagerOptions.JournalFormatKey` to `JsonJournalExtensions.JournalFormatKey` and call `UseJsonJournalFormat(...)`. When a grain recovers data written with a different format than the configured write format, the next write is forced to a full snapshot so the journal is rewritten using JSON and the storage format metadata is updated.
 
+Journaled state observers are snapshotted once at the start of each write or recovery
+operation. An observer registered from inside a callback begins participating in the
+next operation, so every phase of the current operation sees the same observer set.
+
 ## Example - Using durable states
 ```csharp
 using Microsoft.Extensions.DependencyInjection;

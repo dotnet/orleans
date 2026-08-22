@@ -1,6 +1,7 @@
 using System.Buffers;
 using System.Collections.Concurrent;
 using System.Diagnostics.Metrics;
+using System.Runtime.ExceptionServices;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Time.Testing;
 using Orleans.Serialization.Buffers;
@@ -84,6 +85,57 @@ public class StateManagerTests : JournalingTestBase
 
         Assert.NotNull(exception.InnerException);
         Assert.Contains("did not read the completed journal data", exception.InnerException.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task StateManager_WriteOperations_RequireInitialization()
+    {
+        var sut = CreateTestSystem();
+
+        var writeException = await Assert.ThrowsAsync<InvalidOperationException>(
+            () => sut.Manager.WriteStateAsync(CancellationToken.None).AsTask());
+        var deleteException = await Assert.ThrowsAsync<InvalidOperationException>(
+            () => sut.Manager.DeleteStateAsync(CancellationToken.None).AsTask());
+
+        Assert.Contains("not been initialized", writeException.Message, StringComparison.Ordinal);
+        Assert.Contains("not been initialized", deleteException.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task StateManager_WriteOperations_RequireSuccessfulInitialization()
+    {
+        var storage = new CapturingStorage
+        {
+            NextReadException = new IOException("Expected recovery failure.")
+        };
+        var sut = CreateTestSystem(storage: storage);
+
+        await Assert.ThrowsAsync<IOException>(() => sut.Lifecycle.OnStart());
+
+        var writeException = await Assert.ThrowsAsync<InvalidOperationException>(
+            () => sut.Manager.WriteStateAsync(CancellationToken.None).AsTask());
+        var deleteException = await Assert.ThrowsAsync<InvalidOperationException>(
+            () => sut.Manager.DeleteStateAsync(CancellationToken.None).AsTask());
+
+        Assert.Contains("not been initialized", writeException.Message, StringComparison.Ordinal);
+        Assert.Contains("not been initialized", deleteException.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task StateManager_WriteOperations_ObserveShutdown()
+    {
+        var sut = CreateTestSystem();
+        await sut.Lifecycle.OnStart();
+        await sut.Lifecycle.OnStop(CancellationToken.None);
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(
+            () => sut.Manager.WriteStateAsync(CancellationToken.None).AsTask());
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(
+            () => sut.Manager.DeleteStateAsync(CancellationToken.None).AsTask());
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(
+            () => sut.Manager.RevertPendingChangesAsync(CancellationToken.None).AsTask());
+        Assert.ThrowsAny<OperationCanceledException>(
+            () => sut.Manager.RegisterObserver(new RecordingStateObserver()));
     }
 
     [Fact]
@@ -259,7 +311,7 @@ public class StateManagerTests : JournalingTestBase
         await sut.Manager.WriteStateAsync(CancellationToken.None);
 
         var replacement = Assert.Single(storage.Replaces);
-        Assert.Single(storage.Appends);
+        Assert.Empty(storage.Appends);
         AssertContainsRuntimeAndApplicationEntries(ReadBinaryEntries(replacement));
     }
 
@@ -276,9 +328,8 @@ public class StateManagerTests : JournalingTestBase
         value.Value = 42;
         await sut.Manager.WriteStateAsync(CancellationToken.None);
 
-        var append = Assert.Single(storage.Appends);
         var replacement = Assert.Single(storage.Replaces);
-        Assert.Contains(observedBytes, measurement => measurement.Operation == "append" && measurement.Status == "ok" && measurement.Value == append.Length);
+        Assert.Empty(storage.Appends);
         Assert.Contains(observedBytes, measurement => measurement.Operation == "replace" && measurement.Status == "ok" && measurement.Value == replacement.Length);
     }
 
@@ -382,14 +433,67 @@ public class StateManagerTests : JournalingTestBase
         dictionary.Add("key", 1);
         await sut.Manager.WriteStateAsync(CancellationToken.None);
 
-        Assert.Single(storage.Appends);
+        Assert.Empty(storage.Appends);
         Assert.Single(storage.Replaces);
+        Assert.Equal(0, sut.Manager.PendingWriteByteCount);
 
         var recovered = CreateTestSystem(storage: storage, journalFormat: new TrackingJournalFormat(SessionPool));
         var recoveredDictionary = new DurableDictionary<string, int>("dict", recovered.Manager, CreateDictionaryCodec<string, int>());
         await recovered.Lifecycle.OnStart();
 
         Assert.Equal(1, recoveredDictionary["key"]);
+    }
+
+    [Fact]
+    public async Task StateManager_SnapshotFailure_PreservesMixedPendingMutationsForOneCommitRetry()
+    {
+        var storage = new CapturingStorage();
+        var sut = CreateTestSystem(storage: storage);
+        var dictionary = new DurableDictionary<string, int>("dict", sut.Manager, CreateDictionaryCodec<string, int>());
+        var value = new DurableValue<int>("value", sut.Manager, CreateValueCodec<int>());
+        var notifications = new AlwaysWritingState();
+        sut.Manager.RegisterState("notifications", notifications);
+
+        await sut.Lifecycle.OnStart();
+        dictionary.Add("persisted", 1);
+        value.Value = 1;
+        await sut.Manager.WriteStateAsync(CancellationToken.None);
+        Assert.Equal(1, notifications.WriteCompletedCount);
+
+        storage.IsCompactionRequested = true;
+        dictionary.Add("pending", 2);
+        value.Value = 2;
+        var pendingBytes = sut.Manager.PendingWriteByteCount;
+        var expected = new IOException("Expected replace failure.");
+        storage.NextReplaceException = expected;
+
+        var exception = await Assert.ThrowsAsync<IOException>(
+            () => sut.Manager.WriteStateAsync(CancellationToken.None).AsTask());
+
+        Assert.Same(expected, exception);
+        Assert.Single(storage.Appends);
+        Assert.Empty(storage.Replaces);
+        Assert.Equal(1, notifications.WriteCompletedCount);
+        Assert.Equal(pendingBytes, sut.Manager.PendingWriteByteCount);
+        Assert.Equal(2, dictionary["pending"]);
+        Assert.Equal(2, value.Value);
+
+        await sut.Manager.WriteStateAsync(CancellationToken.None);
+
+        Assert.Single(storage.Appends);
+        Assert.Single(storage.Replaces);
+        Assert.Equal(2, storage.ReplaceAttemptCount);
+        Assert.Equal(2, notifications.WriteCompletedCount);
+        Assert.Equal(0, sut.Manager.PendingWriteByteCount);
+
+        var recovered = CreateTestSystem(storage: storage);
+        var recoveredDictionary = new DurableDictionary<string, int>("dict", recovered.Manager, CreateDictionaryCodec<string, int>());
+        var recoveredValue = new DurableValue<int>("value", recovered.Manager, CreateValueCodec<int>());
+        await recovered.Lifecycle.OnStart();
+
+        Assert.Equal(1, recoveredDictionary["persisted"]);
+        Assert.Equal(2, recoveredDictionary["pending"]);
+        Assert.Equal(2, recoveredValue.Value);
     }
 
     [Fact]
@@ -531,10 +635,15 @@ public class StateManagerTests : JournalingTestBase
 
         var secondRecoveryFailure = new IOException("Expected second recovery failure.");
         storage.NextReadException = secondRecoveryFailure;
-        var recoveryException = await Assert.ThrowsAsync<IOException>(
+        var fencedException = await Assert.ThrowsAsync<InvalidOperationException>(
             () => sut.Manager.WriteStateAsync(CancellationToken.None).AsTask().WaitAsync(TimeSpan.FromSeconds(10)));
+        Assert.Contains("writes are fenced", fencedException.Message, StringComparison.Ordinal);
+
+        var recoveryException = await Assert.ThrowsAsync<IOException>(
+            () => sut.Manager.RevertPendingChangesAsync(CancellationToken.None).AsTask().WaitAsync(TimeSpan.FromSeconds(10)));
         Assert.Same(secondRecoveryFailure, recoveryException);
 
+        await sut.Manager.RevertPendingChangesAsync(CancellationToken.None).AsTask().WaitAsync(TimeSpan.FromSeconds(10));
         await sut.Manager.WriteStateAsync(CancellationToken.None).AsTask().WaitAsync(TimeSpan.FromSeconds(10));
 
         Assert.True(dictionary.ContainsKey("first"));
@@ -542,36 +651,367 @@ public class StateManagerTests : JournalingTestBase
     }
 
     [Fact]
-    public async Task StateManager_WriteStateAsync_CoalescesQueuedWrites()
+    public async Task StateManager_RevertPendingChanges_RestoresLastDurableState()
     {
         var storage = new CapturingStorage();
         var sut = CreateTestSystem(storage: storage);
+        var dictionary = new DurableDictionary<string, int>("dict", sut.Manager, CreateDictionaryCodec<string, int>());
+        var value = new DurableValue<int>("value", sut.Manager, CreateValueCodec<int>());
+
+        await sut.Lifecycle.OnStart();
+        dictionary.Add("persisted", 1);
+        value.Value = 1;
+        await sut.Manager.WriteStateAsync(CancellationToken.None);
+
+        dictionary.Add("pending", 2);
+        value.Value = 2;
+        Assert.True(sut.Manager.PendingWriteByteCount > 0);
+
+        await sut.Manager.RevertPendingChangesAsync(CancellationToken.None);
+
+        Assert.Equal(0, sut.Manager.PendingWriteByteCount);
+        Assert.Equal(1, dictionary["persisted"]);
+        Assert.False(dictionary.ContainsKey("pending"));
+        Assert.Equal(1, value.Value);
+    }
+
+    [Fact]
+    public async Task StateManager_Observer_NotifiesOnceAfterWholeRecoveryAndCommit()
+    {
+        var sut = CreateTestSystem();
+        _ = new DurableDictionary<string, int>("first", sut.Manager, CreateDictionaryCodec<string, int>());
+        var second = new DurableDictionary<string, int>("second", sut.Manager, CreateDictionaryCodec<string, int>());
+        var observer = new RecordingStateObserver();
+        sut.Manager.RegisterObserver(observer);
+
+        await sut.Lifecycle.OnStart();
+        second["value"] = 1;
+        await sut.Manager.WriteStateAsync(CancellationToken.None);
+
+        Assert.Equal(1, observer.RecoveryCompletedCount);
+        Assert.Equal(1, observer.WritePreparingCount);
+        Assert.Equal(1, observer.WriteStartedCount);
+        Assert.Equal(1, observer.WriteCompletedCount);
+        Assert.Equal(["Preparing", "Started", "Completed"], observer.WriteCalls);
+    }
+
+    [Fact]
+    public async Task StateManager_DefaultRollbackImplementation_PreservesLegacyImplementations()
+    {
+        IJournaledStateManager manager = new LegacyStateManager();
+
+        var operation = manager.RevertPendingChangesAsync(CancellationToken.None);
+        var exception = await Assert.ThrowsAsync<NotSupportedException>(() => operation.AsTask());
+
+        Assert.Contains("does not support rollback", exception.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task StateManager_Observer_FailedWriteDoesNotCommitAndRevertNotifiesRecovery()
+    {
+        var storage = new CapturingStorage();
+        var sut = CreateTestSystem(storage: storage);
+        var value = new DurableValue<int>("value", sut.Manager, CreateValueCodec<int>());
+        var observer = new RecordingStateObserver();
+        sut.Manager.RegisterObserver(observer);
+
+        await sut.Lifecycle.OnStart();
+        value.Value = 1;
+        await sut.Manager.WriteStateAsync(CancellationToken.None);
+        storage.NextAppendException = new IOException("Expected write failure.");
+        value.Value = 2;
+
+        await Assert.ThrowsAsync<IOException>(
+            () => sut.Manager.WriteStateAsync(CancellationToken.None).AsTask());
+        Assert.Equal(2, observer.WriteStartedCount);
+        Assert.Equal(1, observer.WriteCompletedCount);
+
+        await sut.Manager.RevertPendingChangesAsync(CancellationToken.None);
+
+        Assert.Equal(1, value.Value);
+        Assert.Equal(2, observer.RecoveryCompletedCount);
+        Assert.Equal(2, observer.WriteStartedCount);
+        Assert.Equal(1, observer.WriteCompletedCount);
+    }
+
+    [Fact]
+    public async Task StateManager_ObserverException_DoesNotChangeCompletedOperationOutcome()
+    {
+        var sut = CreateTestSystem();
+        var value = new DurableValue<int>("value", sut.Manager, CreateValueCodec<int>());
+        sut.Manager.RegisterObserver(new ThrowingStateObserver());
+
+        await sut.Lifecycle.OnStart();
+        value.Value = 1;
+        await sut.Manager.WriteStateAsync(CancellationToken.None);
+        value.Value = 2;
+        await sut.Manager.RevertPendingChangesAsync(CancellationToken.None);
+
+        Assert.Equal(1, value.Value);
+    }
+
+    [Fact]
+    public async Task StateManager_Observer_NoOpWriteStillPairsStartAndCompletion()
+    {
+        var sut = CreateTestSystem();
+        await sut.Lifecycle.OnStart();
+        var observer = new RecordingStateObserver();
+        sut.Manager.RegisterObserver(observer);
+
+        await sut.Manager.WriteStateAsync(CancellationToken.None);
+
+        Assert.Equal(1, observer.WritePreparingCount);
+        Assert.Equal(1, observer.WriteStartedCount);
+        Assert.Equal(1, observer.WriteCompletedCount);
+        Assert.Equal(["Preparing", "Started", "Completed"], observer.WriteCalls);
+    }
+
+    [Theory]
+    [InlineData(false, ObserverRegistrationPhase.Preparing)]
+    [InlineData(false, ObserverRegistrationPhase.Started)]
+    [InlineData(false, ObserverRegistrationPhase.Completed)]
+    [InlineData(true, ObserverRegistrationPhase.Preparing)]
+    [InlineData(true, ObserverRegistrationPhase.Started)]
+    [InlineData(true, ObserverRegistrationPhase.Completed)]
+    public async Task StateManager_ObserverRegisteredDuringWritePhase_JoinsNextWrite(
+        bool hasPendingState,
+        ObserverRegistrationPhase registrationPhase)
+    {
+        var sut = CreateTestSystem();
+        var value = new DurableValue<int>("value", sut.Manager, CreateValueCodec<int>());
+        var lateObserver = new RecordingStateObserver();
+        var registeringObserver = new RegisteringStateObserver(
+            onWritePreparing: RegisterDuring(ObserverRegistrationPhase.Preparing),
+            onWriteStarted: RegisterDuring(ObserverRegistrationPhase.Started),
+            onWriteCompleted: RegisterDuring(ObserverRegistrationPhase.Completed));
+        sut.Manager.RegisterObserver(registeringObserver);
+        await sut.Lifecycle.OnStart();
+        if (hasPendingState)
+        {
+            value.Value = 1;
+        }
+
+        await sut.Manager.WriteStateAsync(CancellationToken.None);
+
+        Assert.Equal(["Preparing", "Started", "Completed"], registeringObserver.WriteCalls);
+        Assert.Empty(lateObserver.WriteCalls);
+
+        if (hasPendingState)
+        {
+            value.Value = 2;
+        }
+
+        await sut.Manager.WriteStateAsync(CancellationToken.None);
+
+        Assert.Equal(
+            ["Preparing", "Started", "Completed", "Preparing", "Started", "Completed"],
+            registeringObserver.WriteCalls);
+        Assert.Equal(["Preparing", "Started", "Completed"], lateObserver.WriteCalls);
+
+        Action? RegisterDuring(ObserverRegistrationPhase phase) =>
+            registrationPhase == phase ? () => sut.Manager.RegisterObserver(lateObserver) : null;
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task StateManager_Observer_WritePhasesAreConsistentForAppendAndSnapshot(bool isSnapshot)
+    {
+        var storage = new CapturingStorage { IsCompactionRequested = isSnapshot };
+        var sut = CreateTestSystem(storage: storage);
+        var value = new DurableValue<int>("value", sut.Manager, CreateValueCodec<int>());
+        var observer = new RecordingStateObserver();
+        sut.Manager.RegisterObserver(observer);
+        await sut.Lifecycle.OnStart();
+        value.Value = 1;
+
+        await sut.Manager.WriteStateAsync(CancellationToken.None);
+
+        Assert.Equal(["Preparing", "Started", "Completed"], observer.WriteCalls);
+        if (isSnapshot)
+        {
+            Assert.Single(storage.Replaces);
+            Assert.Empty(storage.Appends);
+        }
+        else
+        {
+            Assert.Single(storage.Appends);
+            Assert.Empty(storage.Replaces);
+        }
+    }
+
+    [Fact]
+    public async Task StateManager_ObserverRegisteredDuringRecovery_JoinsNextRecovery()
+    {
+        var sut = CreateTestSystem();
+        var lateObserver = new RecordingStateObserver();
+        var registeringObserver = new RegisteringStateObserver(
+            onRecoveryCompleted: () => sut.Manager.RegisterObserver(lateObserver));
+        sut.Manager.RegisterObserver(registeringObserver);
+
+        await sut.Lifecycle.OnStart();
+
+        Assert.Equal(1, registeringObserver.RecoveryCompletedCount);
+        Assert.Equal(0, lateObserver.RecoveryCompletedCount);
+
+        await sut.Manager.RevertPendingChangesAsync(CancellationToken.None);
+
+        Assert.Equal(2, registeringObserver.RecoveryCompletedCount);
+        Assert.Equal(1, lateObserver.RecoveryCompletedCount);
+    }
+
+    [Fact]
+    public async Task StateManager_ObserverRegisteredByStateDuringRecovery_JoinsNextRecovery()
+    {
+        var sut = CreateTestSystem();
+        var lateObserver = new RecordingStateObserver();
+        sut.Manager.RegisterState(
+            "registering",
+            new RecoveryRegisteringState(() => sut.Manager.RegisterObserver(lateObserver)));
+
+        await sut.Lifecycle.OnStart();
+
+        Assert.Equal(0, lateObserver.RecoveryCompletedCount);
+
+        await sut.Manager.RevertPendingChangesAsync(CancellationToken.None);
+
+        Assert.Equal(1, lateObserver.RecoveryCompletedCount);
+    }
+
+    [Fact]
+    public async Task StateManager_PreparationFailureAbortsCaptureAndRetryPersistsPreparedState()
+    {
+        var storage = new CapturingStorage();
+        var sut = CreateTestSystem(storage: storage);
+        var value = new DurableValue<string>("value", sut.Manager, CreateValueCodec<string>());
+        var observer = new PreparingStateObserver(() => value.Value = "owned");
+        sut.Manager.RegisterObserver(observer);
+        await sut.Lifecycle.OnStart();
+
+        observer.FailNext = true;
+        await Assert.ThrowsAsync<IOException>(
+            () => sut.Manager.WriteStateAsync(CancellationToken.None).AsTask());
+
+        Assert.Empty(storage.Appends);
+        Assert.Equal(0, observer.WriteStartedCount);
+
+        await sut.Manager.WriteStateAsync(CancellationToken.None);
+
+        Assert.Single(storage.Appends);
+        Assert.Equal("owned", value.Value);
+        Assert.Equal(2, observer.PreparingCount);
+        Assert.Equal(1, observer.WriteStartedCount);
+    }
+
+    [Fact]
+    public async Task StateManager_StateCompletionFailure_DoesNotSkipCommitObserver()
+    {
+        var sut = CreateTestSystem();
+        sut.Manager.RegisterState("throwing", new AlwaysWritingState { ThrowOnWriteCompleted = true });
+        var observer = new RecordingStateObserver();
+        sut.Manager.RegisterObserver(observer);
+
+        await sut.Lifecycle.OnStart();
+        await sut.Manager.WriteStateAsync(CancellationToken.None);
+
+        Assert.Equal(1, observer.WriteCompletedCount);
+    }
+
+    [Fact]
+    public async Task StateManager_FencesWritesUntilFailedRevertIsRetriedSuccessfully()
+    {
+        var storage = new CapturingStorage();
+        var sut = CreateTestSystem(storage: storage);
+        var value = new DurableValue<int>("value", sut.Manager, CreateValueCodec<int>());
+
+        await sut.Lifecycle.OnStart();
+        value.Value = 1;
+        await sut.Manager.WriteStateAsync(CancellationToken.None);
+        value.Value = 2;
+
+        var expected = new IOException("Expected recovery failure.");
+        storage.NextReadException = expected;
+        var exception = await Assert.ThrowsAsync<IOException>(
+            () => sut.Manager.RevertPendingChangesAsync(CancellationToken.None).AsTask());
+        Assert.Same(expected, exception);
+
+        var writeException = await Assert.ThrowsAsync<InvalidOperationException>(
+            () => sut.Manager.WriteStateAsync(CancellationToken.None).AsTask());
+        Assert.Contains("fenced", writeException.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("Call RevertPendingChangesAsync", writeException.Message, StringComparison.Ordinal);
+        var deleteException = await Assert.ThrowsAsync<InvalidOperationException>(
+            () => sut.Manager.DeleteStateAsync(CancellationToken.None).AsTask());
+        Assert.Contains("Call RevertPendingChangesAsync", deleteException.Message, StringComparison.Ordinal);
+
+        await sut.Manager.RevertPendingChangesAsync(CancellationToken.None);
+        Assert.Equal(1, value.Value);
+
+        value.Value = 3;
+        await sut.Manager.WriteStateAsync(CancellationToken.None);
+        Assert.Equal(3, value.Value);
+    }
+
+    [Fact]
+    public async Task StateManager_WriteOperations_ReportRecoveryInProgress()
+    {
+        var storage = new BlockingRecoveryStorage();
+        var sut = CreateTestSystem(storage: storage);
+        await sut.Lifecycle.OnStart();
+
+        var recovery = sut.Manager.RevertPendingChangesAsync(CancellationToken.None).AsTask();
+        await storage.RecoveryReadStarted.Task.WaitAsync(TimeSpan.FromSeconds(10));
+
+        var writeException = await Assert.ThrowsAsync<InvalidOperationException>(
+            () => sut.Manager.WriteStateAsync(CancellationToken.None).AsTask());
+        var deleteException = await Assert.ThrowsAsync<InvalidOperationException>(
+            () => sut.Manager.DeleteStateAsync(CancellationToken.None).AsTask());
+
+        Assert.Contains("recovery is in progress", writeException.Message, StringComparison.Ordinal);
+        Assert.Contains("recovery is in progress", deleteException.Message, StringComparison.Ordinal);
+        Assert.DoesNotContain("RevertPendingChangesAsync", writeException.Message, StringComparison.Ordinal);
+        Assert.DoesNotContain("RevertPendingChangesAsync", deleteException.Message, StringComparison.Ordinal);
+
+        storage.AllowRecoveryRead.SetResult();
+        await recovery.WaitAsync(TimeSpan.FromSeconds(10));
+    }
+
+    [Fact]
+    public async Task StateManager_WriteStateAsync_CoalescesQueuedWrites()
+    {
+        var storage = new BlockingAppendStorage();
+        var sut = CreateTestSystem(storage: storage);
         var state = new AlwaysWritingState();
         sut.Manager.RegisterState("state", state);
+        await sut.Lifecycle.OnStart();
 
         var first = sut.Manager.WriteStateAsync(CancellationToken.None).AsTask();
+        await storage.FirstAppendStarted.Task.WaitAsync(TimeSpan.FromSeconds(10));
         var second = sut.Manager.WriteStateAsync(CancellationToken.None).AsTask();
+        var third = sut.Manager.WriteStateAsync(CancellationToken.None).AsTask();
 
-        await sut.Lifecycle.OnStart().WaitAsync(TimeSpan.FromSeconds(10));
-        await Task.WhenAll(first, second).WaitAsync(TimeSpan.FromSeconds(10));
+        storage.AllowFirstAppend.SetResult();
+        await Task.WhenAll(first, second, third).WaitAsync(TimeSpan.FromSeconds(10));
 
-        Assert.Equal(1, state.AppendEntriesCount);
-        Assert.Single(storage.Appends);
+        Assert.Equal(2, state.AppendEntriesCount);
+        Assert.Equal(2, storage.Appends.Count);
     }
 
     [Fact]
     public async Task StateManager_DeleteStateAsync_CoalescesQueuedDeletes()
     {
-        var storage = new CapturingStorage();
+        var storage = new BlockingDeleteStorage();
         var sut = CreateTestSystem(storage: storage);
+        await sut.Lifecycle.OnStart();
 
         var first = sut.Manager.DeleteStateAsync(CancellationToken.None).AsTask();
+        await storage.FirstDeleteStarted.Task.WaitAsync(TimeSpan.FromSeconds(10));
         var second = sut.Manager.DeleteStateAsync(CancellationToken.None).AsTask();
+        var third = sut.Manager.DeleteStateAsync(CancellationToken.None).AsTask();
 
-        await sut.Lifecycle.OnStart().WaitAsync(TimeSpan.FromSeconds(10));
-        await Task.WhenAll(first, second).WaitAsync(TimeSpan.FromSeconds(10));
+        storage.AllowFirstDelete.SetResult();
+        await Task.WhenAll(first, second, third).WaitAsync(TimeSpan.FromSeconds(10));
 
-        Assert.Equal(1, storage.DeleteCount);
+        Assert.Equal(2, storage.DeleteCount);
     }
 
     [Fact]
@@ -634,13 +1074,13 @@ public class StateManagerTests : JournalingTestBase
         await writeTask.WaitAsync(TimeSpan.FromSeconds(10));
         var replacement = Assert.Single(storage.Replaces);
         Assert.DoesNotContain(ReadBinaryEntries(replacement), entry => entry.StreamId.Value >= 8);
-        Assert.Single(storage.Appends);
+        Assert.Empty(storage.Appends);
 
         storage.IsCompactionRequested = false;
         await sut.Manager.WriteStateAsync(CancellationToken.None).AsTask().WaitAsync(TimeSpan.FromSeconds(10));
 
-        Assert.Equal(2, storage.Appends.Count);
-        var append = storage.Appends[^1];
+        Assert.Single(storage.Appends);
+        var append = storage.Appends[0];
         Assert.Contains(ReadBinaryEntries(append), entry => entry.StreamId.Value >= 8);
 
         Task StartSnapshotAndCommitActiveEntry()
@@ -849,6 +1289,7 @@ public class StateManagerTests : JournalingTestBase
         await Assert.ThrowsAsync<InvalidOperationException>(
             () => sut.Lifecycle.OnStart().WaitAsync(TimeSpan.FromSeconds(10)));
 
+        await sut.Manager.InitializeAsync(CancellationToken.None).AsTask().WaitAsync(TimeSpan.FromSeconds(10));
         await sut.Manager.WriteStateAsync(CancellationToken.None).AsTask().WaitAsync(TimeSpan.FromSeconds(10));
 
         Assert.Equal(42, value.Value);
@@ -865,6 +1306,7 @@ public class StateManagerTests : JournalingTestBase
         await Assert.ThrowsAsync<InvalidOperationException>(
             () => sut.Lifecycle.OnStart().WaitAsync(TimeSpan.FromSeconds(10)));
 
+        await sut.Manager.InitializeAsync(CancellationToken.None).AsTask().WaitAsync(TimeSpan.FromSeconds(10));
         await sut.Manager.WriteStateAsync(CancellationToken.None).AsTask().WaitAsync(TimeSpan.FromSeconds(10));
 
         var replacement = Assert.Single(storage.Replaces);
@@ -882,6 +1324,7 @@ public class StateManagerTests : JournalingTestBase
         await Assert.ThrowsAsync<InvalidOperationException>(
             () => sut.Lifecycle.OnStart().WaitAsync(TimeSpan.FromSeconds(10)));
 
+        await sut.Manager.InitializeAsync(CancellationToken.None).AsTask().WaitAsync(TimeSpan.FromSeconds(10));
         await sut.Manager.WriteStateAsync(CancellationToken.None).AsTask().WaitAsync(TimeSpan.FromSeconds(10));
 
         Assert.False(sut.Manager.TryGetState("stale", out _));
@@ -1204,6 +1647,136 @@ public class StateManagerTests : JournalingTestBase
                 dict["a"] = i;
                 await manager.WriteStateAsync(CancellationToken.None);
             }
+        }
+    }
+
+    private sealed class RecordingStateObserver : IJournaledStateObserver
+    {
+        public List<string> WriteCalls { get; } = [];
+        public int WritePreparingCount { get; private set; }
+        public int WriteStartedCount { get; private set; }
+        public int WriteCompletedCount { get; private set; }
+        public int RecoveryCompletedCount { get; private set; }
+
+        public ValueTask OnWritePreparingAsync(CancellationToken cancellationToken)
+        {
+            WriteCalls.Add("Preparing");
+            WritePreparingCount++;
+            return default;
+        }
+
+        public void OnWriteStarted()
+        {
+            WriteCalls.Add("Started");
+            WriteStartedCount++;
+        }
+
+        public void OnWriteCompleted()
+        {
+            WriteCalls.Add("Completed");
+            WriteCompletedCount++;
+        }
+
+        public void OnRecoveryCompleted() => RecoveryCompletedCount++;
+    }
+
+    private sealed class LegacyStateManager : IJournaledStateManager
+    {
+        public ValueTask InitializeAsync(CancellationToken cancellationToken) => default;
+        public void RegisterState(string name, IJournaledState state) { }
+
+        public bool TryGetState(
+            string name,
+            [System.Diagnostics.CodeAnalysis.NotNullWhen(true)] out IJournaledState? state)
+        {
+            state = null;
+            return false;
+        }
+
+        public ValueTask WriteStateAsync(CancellationToken cancellationToken) => default;
+        public ValueTask DeleteStateAsync(CancellationToken cancellationToken) => default;
+    }
+
+    private sealed class ThrowingStateObserver : IJournaledStateObserver
+    {
+        public void OnWriteStarted() => throw new InvalidOperationException("Expected observer failure.");
+        public void OnWriteCompleted() => throw new InvalidOperationException("Expected observer failure.");
+        public void OnRecoveryCompleted() => throw new InvalidOperationException("Expected observer failure.");
+    }
+
+    private sealed class RegisteringStateObserver(
+        Action? onWritePreparing = null,
+        Action? onWriteStarted = null,
+        Action? onWriteCompleted = null,
+        Action? onRecoveryCompleted = null) : IJournaledStateObserver
+    {
+        private Action? _onWritePreparing = onWritePreparing;
+        private Action? _onWriteStarted = onWriteStarted;
+        private Action? _onWriteCompleted = onWriteCompleted;
+        private Action? _onRecoveryCompleted = onRecoveryCompleted;
+
+        public List<string> WriteCalls { get; } = [];
+        public int RecoveryCompletedCount { get; private set; }
+
+        public ValueTask OnWritePreparingAsync(CancellationToken cancellationToken)
+        {
+            WriteCalls.Add("Preparing");
+            Interlocked.Exchange(ref _onWritePreparing, null)?.Invoke();
+            return default;
+        }
+
+        public void OnWriteStarted()
+        {
+            WriteCalls.Add("Started");
+            Interlocked.Exchange(ref _onWriteStarted, null)?.Invoke();
+        }
+
+        public void OnWriteCompleted()
+        {
+            WriteCalls.Add("Completed");
+            Interlocked.Exchange(ref _onWriteCompleted, null)?.Invoke();
+        }
+
+        public void OnRecoveryCompleted()
+        {
+            RecoveryCompletedCount++;
+            Interlocked.Exchange(ref _onRecoveryCompleted, null)?.Invoke();
+        }
+    }
+
+    public enum ObserverRegistrationPhase
+    {
+        Preparing,
+        Started,
+        Completed
+    }
+
+    private sealed class PreparingStateObserver(Action prepare) : IJournaledStateObserver
+    {
+        public bool FailNext { get; set; }
+        public int PreparingCount { get; private set; }
+        public int WriteStartedCount { get; private set; }
+
+        public ValueTask OnWritePreparingAsync(CancellationToken cancellationToken)
+        {
+            PreparingCount++;
+            prepare();
+            if (FailNext)
+            {
+                FailNext = false;
+                throw new IOException("Expected preparation failure.");
+            }
+
+            return default;
+        }
+
+        public void OnWriteStarted() => WriteStartedCount++;
+        public void OnWriteCompleted()
+        {
+        }
+
+        public void OnRecoveryCompleted()
+        {
         }
     }
 
@@ -1540,6 +2113,66 @@ public class StateManagerTests : JournalingTestBase
         public ValueTask DeleteAsync(CancellationToken cancellationToken) => default;
     }
 
+    private sealed class BlockingDeleteStorage : IJournalStorage
+    {
+        public TaskCompletionSource FirstDeleteStarted { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        public TaskCompletionSource AllowFirstDelete { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        public int DeleteCount { get; private set; }
+
+        public bool IsCompactionRequested => false;
+
+        public ValueTask ReadAsync(IJournalStorageConsumer consumer, CancellationToken cancellationToken)
+        {
+            consumer.Complete(metadata: null);
+            return default;
+        }
+
+        public ValueTask ReplaceAsync(ReadOnlySequence<byte> value, CancellationToken cancellationToken) => default;
+
+        public ValueTask AppendAsync(ReadOnlySequence<byte> value, CancellationToken cancellationToken) => default;
+
+        public async ValueTask DeleteAsync(CancellationToken cancellationToken)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            DeleteCount++;
+            if (DeleteCount == 1)
+            {
+                FirstDeleteStarted.SetResult();
+                await AllowFirstDelete.Task.WaitAsync(cancellationToken);
+            }
+        }
+    }
+
+    private sealed class BlockingRecoveryStorage : IJournalStorage
+    {
+        private int _readCount;
+
+        public TaskCompletionSource RecoveryReadStarted { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        public TaskCompletionSource AllowRecoveryRead { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        public bool IsCompactionRequested => false;
+
+        public async ValueTask ReadAsync(IJournalStorageConsumer consumer, CancellationToken cancellationToken)
+        {
+            if (Interlocked.Increment(ref _readCount) == 2)
+            {
+                RecoveryReadStarted.SetResult();
+                await AllowRecoveryRead.Task.WaitAsync(cancellationToken);
+            }
+
+            consumer.Complete(metadata: null);
+        }
+
+        public ValueTask ReplaceAsync(ReadOnlySequence<byte> value, CancellationToken cancellationToken) => default;
+
+        public ValueTask AppendAsync(ReadOnlySequence<byte> value, CancellationToken cancellationToken) => default;
+
+        public ValueTask DeleteAsync(CancellationToken cancellationToken) => default;
+    }
+
     private sealed class CapturingStorage : IJournalStorage
     {
         private readonly List<byte[]> _segments = [];
@@ -1562,6 +2195,10 @@ public class StateManagerTests : JournalingTestBase
 
         public TaskCompletionSource AllowBlockedRead { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
 
+        public Exception? NextReplaceException { get; set; }
+
+        public int ReplaceAttemptCount { get; private set; }
+
         public int ReadConsumeCount { get; private set; }
 
         public void ResetReadConsumeCount() => ReadConsumeCount = 0;
@@ -1577,7 +2214,6 @@ public class StateManagerTests : JournalingTestBase
         public async ValueTask ReadAsync(IJournalStorageConsumer consumer, CancellationToken cancellationToken)
         {
             ArgumentNullException.ThrowIfNull(consumer);
-
             if (NextReadException is { } exception)
             {
                 NextReadException = null;
@@ -1637,6 +2273,13 @@ public class StateManagerTests : JournalingTestBase
         public async ValueTask ReplaceAsync(ReadOnlySequence<byte> value, CancellationToken cancellationToken)
         {
             cancellationToken.ThrowIfCancellationRequested();
+            ReplaceAttemptCount++;
+            if (NextReplaceException is { } exception)
+            {
+                NextReplaceException = null;
+                ExceptionDispatchInfo.Throw(exception);
+            }
+
             if (DelayReplace)
             {
                 ReplaceStarted.SetResult();
@@ -1908,6 +2551,10 @@ public class StateManagerTests : JournalingTestBase
     {
         public int AppendEntriesCount { get; private set; }
 
+        public int WriteCompletedCount { get; private set; }
+
+        public bool ThrowOnWriteCompleted { get; init; }
+
         void IJournaledState.ReplayEntry(JournalEntry entry, JournalReplayContext context) { }
 
         public void Reset(JournalStreamWriter writer) { }
@@ -1923,6 +2570,27 @@ public class StateManagerTests : JournalingTestBase
 
         public void AppendSnapshot(JournalStreamWriter writer) => AppendEntries(writer);
 
+        public void OnWriteCompleted()
+        {
+            WriteCompletedCount++;
+            if (ThrowOnWriteCompleted)
+            {
+                throw new InvalidOperationException("Expected state completion failure.");
+            }
+        }
+
+        public IJournaledState DeepCopy() => throw new NotSupportedException();
+    }
+
+    private sealed class RecoveryRegisteringState(Action onRecoveryCompleted) : IJournaledState
+    {
+        private Action? _onRecoveryCompleted = onRecoveryCompleted;
+
+        public void ReplayEntry(JournalEntry entry, JournalReplayContext context) { }
+        public void Reset(JournalStreamWriter writer) { }
+        public void AppendEntries(JournalStreamWriter writer) { }
+        public void AppendSnapshot(JournalStreamWriter writer) { }
+        public void OnRecoveryCompleted() => Interlocked.Exchange(ref _onRecoveryCompleted, null)?.Invoke();
         public IJournaledState DeepCopy() => throw new NotSupportedException();
     }
 
