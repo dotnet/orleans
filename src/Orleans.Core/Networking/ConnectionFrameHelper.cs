@@ -124,8 +124,7 @@ namespace Orleans.Runtime.Messaging
         }
 
         /// <summary>
-        /// Writes a frame using zero-copy framing via <see cref="PrefixingBufferWriter"/>.
-        /// The <paramref name="writePayload"/> delegate writes payload directly into the transport pipe buffer.
+        /// Writes a frame whose payload is produced by <paramref name="writePayload"/>.
         /// </summary>
         public static async ValueTask WriteFrameAsync(
             ConnectionContext connection,
@@ -133,7 +132,7 @@ namespace Orleans.Runtime.Messaging
             Action<IBufferWriter<byte>> writePayload,
             CancellationToken cancellationToken)
         {
-            WriteFrameWithPrefixingWriter(connection.Transport.Output, frameType, writePayload, MemoryPool<byte>.Shared);
+            WriteFrameWithPrefixingWriter(connection.Transport.Output, frameType, writePayload);
             await FlushFrameAsync(connection.Transport.Output, cancellationToken);
         }
 
@@ -207,28 +206,17 @@ namespace Orleans.Runtime.Messaging
         private static void WriteFrameWithPrefixingWriter(
             PipeWriter output,
             byte frameType,
-            Action<IBufferWriter<byte>> writeBody,
-            MemoryPool<byte> memoryPool)
+            Action<IBufferWriter<byte>> writeBody)
         {
-            using var prefixWriter = new PrefixingBufferWriter(FramePrefixSize, 256, memoryPool);
-            prefixWriter.Init(output);
+            var body = new ArrayBufferWriter<byte>(256);
+            writeBody?.Invoke(body);
 
-            try
-            {
-                writeBody?.Invoke(prefixWriter);
-
-                var payloadLength = prefixWriter.CommittedBytes;
-                var frameLength = 1 + payloadLength;
-                Span<byte> prefix = stackalloc byte[FramePrefixSize];
-                BinaryPrimitives.WriteInt32LittleEndian(prefix, frameLength);
-                prefix[4] = frameType;
-
-                prefixWriter.Complete(prefix);
-            }
-            finally
-            {
-                prefixWriter.Reset();
-            }
+            var frameLength = 1 + body.WrittenCount;
+            Span<byte> prefix = stackalloc byte[FramePrefixSize];
+            BinaryPrimitives.WriteInt32LittleEndian(prefix, frameLength);
+            prefix[4] = frameType;
+            output.Write(prefix);
+            output.Write(body.WrittenSpan);
         }
 
         private static void CheckCompletionWithData(ref ReadResult result, long required)

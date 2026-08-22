@@ -213,6 +213,7 @@ namespace Orleans
                     LogObserverGarbageCollected(_manager.logger, this.ObserverId, message);
                     // Try to remove. If it's not there, we don't care.
                     _manager.TryDeregister(this.ObserverId);
+                    message.Dispose();
                     return;
                 }
 
@@ -339,6 +340,7 @@ namespace Orleans
                     if (message.IsExpired)
                     {
                         _manager.messagingTrace.OnDropExpiredMessage(message, MessagingInstruments.Phase.Invoke);
+                        message.Dispose();
                         return;
                     }
 

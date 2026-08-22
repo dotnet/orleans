@@ -1,6 +1,6 @@
 using System.Security.Cryptography.X509Certificates;
 using Microsoft.Extensions.Hosting;
-using Orleans.Connections.Security;
+using Orleans.Connections.Transport.Security;
 using Orleans.Hosting;
 
 Console.WriteLine("TLS configuration examples");
