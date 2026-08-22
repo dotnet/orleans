@@ -439,6 +439,27 @@ public sealed class DurableTaskRuntimeInvariantTests
     }
 
     [Fact]
+    public async Task CompletedRequestReplayRequeuesPersistedUnacknowledgedCompletion()
+    {
+        var (runtime, storage, _, transport) = CreateRuntime();
+        var taskId = TaskId.Parse("root");
+        var request = CreateRequest(1);
+        var caller = request.Context!.CallerId;
+        var state = storage.GetOrCreate(taskId);
+        storage.SetRequest(taskId, state, request);
+        storage.SetRequestFingerprint(taskId, state, IDurableTaskRequest.GetFingerprint(request, CreateSerializer()));
+        storage.AddCompletionDestination(taskId, state, caller);
+        storage.SetResponse(taskId, state, DurableTaskResponse.FromResult(42));
+
+        var response = await runtime.ScheduleFromInboxAsync(taskId, request, default);
+
+        Assert.Equal(42, response.GetResult<int>());
+        var completion = Assert.Single(transport.Completions);
+        Assert.Equal(caller, completion.Target);
+        Assert.Equal(taskId, completion.TaskId);
+    }
+
+    [Fact]
     public async Task RootRemoteScheduleCreatesCallerStateBeforeAdvertisingCompletion()
     {
         var (runtime, storage, manager, transport) = CreateRuntime();
@@ -864,6 +885,29 @@ public sealed class DurableTaskRuntimeInvariantTests
         Assert.Equal(childId, cancellation.TaskId);
         Assert.Equal(target, cancellation.Target);
         Assert.Equal(fingerprint, storage.Get(childId).RemoteRequestFingerprint);
+    }
+
+    [Fact]
+    public async Task RemoteCancellationMarksStateBeforeStagingMessage()
+    {
+        var (runtime, storage, manager, transport) = CreateRuntime();
+        var taskId = TaskId.Parse("root/remote");
+        var target = GrainId.Create("target", "one");
+        var state = storage.GetOrCreate(taskId);
+        storage.SetRemoteRequest(taskId, state, target, "fingerprint");
+        transport.BeforeSendCancellation = (_, sentTarget, sentTaskId) =>
+        {
+            Assert.Equal(target, sentTarget);
+            Assert.Equal(taskId, sentTaskId);
+            Assert.NotNull(storage.Get(taskId).CancellationRequestedAt);
+            Assert.Equal(1, manager.WriteCount);
+        };
+
+        await runtime.CancelRemoteAsync(taskId, target, default);
+
+        Assert.Equal(2, manager.WriteCount);
+        Assert.Single(transport.Cancellations);
+        Assert.NotNull(storage.Get(taskId).CancellationRequestedAt);
     }
 
     [Fact]

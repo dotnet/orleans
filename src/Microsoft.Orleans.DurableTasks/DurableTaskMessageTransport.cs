@@ -1,5 +1,8 @@
 using System;
+using System.Buffers.Binary;
 using System.Collections.Generic;
+using System.Security.Cryptography;
+using System.Text;
 using Orleans.DurableTasks.Protocol;
 using Orleans.DurableJobs;
 using Orleans.DurableMessaging;
@@ -26,7 +29,14 @@ internal sealed class DurableTaskMessageTransport(
         Send(sender, target, taskId, InvocationRoute, new DurableTaskInvocationMessage { TaskId = taskId, Request = request }, replyTo: sender);
 
     public void SendCompletion(GrainId sender, GrainId target, TaskId taskId, DurableTaskResponse response) =>
-        Send(sender, target, taskId, CompletionRoute, new DurableTaskCompletionMessage { TaskId = taskId, Response = response }, replyTo: null);
+        Send(
+            sender,
+            target,
+            taskId,
+            CompletionRoute,
+            new DurableTaskCompletionMessage { TaskId = taskId, Response = response },
+            replyTo: null,
+            messageId: CreateStableMessageId(sender, target, taskId, CompletionRoute));
 
     public void SendCompletionAck(GrainId sender, GrainId target, TaskId taskId) =>
         Send(sender, target, taskId, CompletionAckRoute, new DurableTaskCompletionAckMessage { TaskId = taskId }, replyTo: null);
@@ -62,9 +72,10 @@ internal sealed class DurableTaskMessageTransport(
         TaskId taskId,
         string route,
         T body,
-        GrainId? replyTo)
+        GrainId? replyTo,
+        Guid? messageId = null)
     {
-        outbox.Send(CreateEnvelope(sender, target, taskId, route, body, replyTo));
+        outbox.Send(CreateEnvelope(sender, target, taskId, route, body, replyTo, messageId));
     }
 
     private DurableEnvelope CreateEnvelope<T>(
@@ -73,7 +84,8 @@ internal sealed class DurableTaskMessageTransport(
         TaskId taskId,
         string route,
         T body,
-        GrainId? replyTo)
+        GrainId? replyTo,
+        Guid? messageId)
     {
         // Validate the task id and compute the correlation key before serializing the body: several message body
         // types (see DurableTaskMessages.cs) embed the same TaskId, whose surrogate converter throws
@@ -90,6 +102,38 @@ internal sealed class DurableTaskMessageTransport(
             builder.WithReplyTo(address);
         }
 
-        return builder.Build();
+        var envelope = builder.Build();
+        return messageId is not { } id
+            ? envelope
+            : new DurableEnvelope
+            {
+                MessageId = id,
+                SenderId = envelope.SenderId,
+                ReceiverId = envelope.ReceiverId,
+                RouteKey = envelope.RouteKey,
+                CorrelationKey = envelope.CorrelationKey,
+                ReplyTo = envelope.ReplyTo,
+                Data = envelope.Data,
+                CreatedAt = DateTimeOffset.UnixEpoch,
+            };
+    }
+
+    private static Guid CreateStableMessageId(GrainId sender, GrainId target, TaskId taskId, string route)
+    {
+        using var hash = IncrementalHash.CreateHash(HashAlgorithmName.SHA256);
+        Append(sender.ToString());
+        Append(target.ToString());
+        Append(taskId.ToString());
+        Append(route);
+        return new Guid(hash.GetHashAndReset().AsSpan(0, 16));
+
+        void Append(string value)
+        {
+            var bytes = Encoding.UTF8.GetBytes(value);
+            Span<byte> length = stackalloc byte[sizeof(int)];
+            BinaryPrimitives.WriteInt32LittleEndian(length, bytes.Length);
+            hash.AppendData(length);
+            hash.AppendData(bytes);
+        }
     }
 }

@@ -298,11 +298,24 @@ internal sealed partial class DurableTaskGrainRuntime(
     public async ValueTask CancelRemoteAsync(TaskId taskId, GrainId target, CancellationToken cancellationToken)
     {
         ThrowIfStopping();
+        if (!_storage.TryGetTask(taskId, out var state) || state.Result is { IsCompleted: true })
+        {
+            return;
+        }
+
+        if (state.RemoteTarget.IsDefault || state.RemoteTarget != target)
+        {
+            throw new InvalidOperationException(
+                $"Durable task '{taskId}' is not associated with remote target '{target}'.");
+        }
+
+        _storage.RequestCancellation(taskId, state);
         if (_preStagedCancellations.TryRemove((taskId, target), out _))
         {
             return;
         }
 
+        await WriteStateAsync(cancellationToken);
         var transport = _messageTransport ?? throw new InvalidOperationException(
             "Durable messaging is not configured. Call AddDurableTasks on the silo builder.");
         transport.SendCancellation(GrainId, target, taskId);
@@ -687,8 +700,7 @@ internal sealed partial class DurableTaskGrainRuntime(
             if (response.IsCompleted)
             {
                 if (_storage.TryGetTask(taskId, out var completedState)
-                    && requestContext.SupportsDurableCompletion
-                    && TryRegisterCompletionDestination(taskId, completedState, requestContext.CallerId))
+                    && ShouldSendCompletion(taskId, completedState, requestContext))
                 {
                     SendCompletion(taskId, requestContext.CallerId, response);
                 }
@@ -738,7 +750,7 @@ internal sealed partial class DurableTaskGrainRuntime(
             // If the task was already scheduled, return a response immediately.
             if (state.Result is { } response && response.IsCompleted)
             {
-                if (subscribed)
+                if (subscribed || ShouldSendCompletion(taskId, state, requestContext))
                 {
                     SendCompletion(taskId, requestContext.CallerId, response);
                 }
@@ -767,6 +779,26 @@ internal sealed partial class DurableTaskGrainRuntime(
 
             return subscribed ? DurableTaskResponse.Subscribed : DurableTaskResponse.Pending;
         }
+    }
+
+    private bool ShouldSendCompletion(
+        TaskId taskId,
+        IDurableTaskState state,
+        DurableTaskRequestContext requestContext)
+    {
+        if (!requestContext.SupportsDurableCompletion
+            || requestContext.CallerId.IsDefault
+            || requestContext.CallerId.IsClient())
+        {
+            return false;
+        }
+
+        if (state.CompletionDestinations.Contains(requestContext.CallerId))
+        {
+            return true;
+        }
+
+        return TryRegisterCompletionDestination(taskId, state, requestContext.CallerId);
     }
 
     private void StartRequest(TaskId taskId)

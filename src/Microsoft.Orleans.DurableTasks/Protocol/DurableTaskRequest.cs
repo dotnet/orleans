@@ -427,7 +427,7 @@ internal sealed class GrainScheduledTaskHandle(TaskId taskId, IDurableTaskReques
     public async ValueTask CancelAsync(CancellationToken cancellationToken)
     {
         // TODO: Add resilience via Polly
-        await grain.CancelAsync(TaskId, cancellationToken);
+        await grain.CancelAsync(TaskId, CancellationToken.None).AsTask().WaitAsync(cancellationToken);
     }
 
     public async ValueTask<DurableTaskResponse> PollAsync(PollingOptions options, CancellationToken cancellationToken)
