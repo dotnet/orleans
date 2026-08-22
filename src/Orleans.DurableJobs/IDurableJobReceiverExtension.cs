@@ -26,21 +26,24 @@ internal interface IDurableJobReceiverExtension : IGrainExtension
 internal sealed partial class DurableJobReceiverExtension : IDurableJobReceiverExtension
 {
     private const int MaxCompletedJobAttempts = 65_536;
-    private static readonly TimeSpan CompletedJobAttemptRetention = TimeSpan.FromMinutes(1);
-
     private readonly IGrainContext _grain;
     private readonly DurableJobReceiverExtensionShared _shared;
+    private readonly IDurableJobHandlerLookup _featureHandlers;
     private readonly Dictionary<(string JobId, long ExecutionGeneration, int DequeueCount), JobAttemptState> _jobAttempts = [];
     private readonly Queue<CompletedJobAttempt> _completedJobAttempts = new();
     private int _completedJobAttemptCount;
 
-    public DurableJobReceiverExtension(IGrainContext grain, DurableJobReceiverExtensionShared shared)
+    public DurableJobReceiverExtension(
+        IGrainContext grain,
+        DurableJobReceiverExtensionShared shared,
+        IDurableJobHandlerLookup? featureHandlers = null)
     {
         ArgumentNullException.ThrowIfNull(grain);
         ArgumentNullException.ThrowIfNull(shared);
 
         _grain = grain;
         _shared = shared;
+        _featureHandlers = featureHandlers ?? new DurableJobHandlerRegistry();
     }
 
     /// <inheritdoc />
@@ -51,19 +54,34 @@ internal sealed partial class DurableJobReceiverExtension : IDurableJobReceiverE
         var key = GetExecutionKey(context);
         JobAttemptState state;
         ref var stateRef = ref CollectionsMarshal.GetValueRefOrAddDefault(_jobAttempts, key, out var exists);
+        var newJob = !exists;
         if (!exists)
         {
             Debug.Assert(stateRef is null);
             stateRef = new JobAttemptState(StartJob(context, cancellationToken));
         }
+        else if (stateRef is { } existingState && IsReadyToPoll(existingState))
+        {
+            stateRef = new JobAttemptState(StartJob(context, cancellationToken));
+            newJob = true;
+        }
 
         Debug.Assert(stateRef is not null);
         state = stateRef;
-        return GetJobStatusAsync(key, context, state, newJob: !exists);
+        return GetJobStatusAsync(key, context, state, newJob);
     }
+
+    private bool IsReadyToPoll(JobAttemptState state) =>
+        state.PollRequested
+        && _shared.TimeProvider.GetElapsedTime(state.PollTimestamp, _shared.TimeProvider.GetTimestamp()) >= state.PollAfterDelay;
 
     private Task<DurableJobRunResult> StartJob(IJobRunContext context, CancellationToken cancellationToken)
     {
+        if (_featureHandlers.TryGetHandler(context.Job.Name, out var featureHandler))
+        {
+            return ExecuteFeatureHandlerAsync(featureHandler, context, cancellationToken);
+        }
+
         if (_grain.GrainInstance is not IDurableJobHandler handler)
         {
             LogGrainDoesNotImplementHandler(_shared.Logger, _grain.GrainId);
@@ -71,6 +89,33 @@ internal sealed partial class DurableJobReceiverExtension : IDurableJobReceiverE
         }
 
         return ExecuteHandlerAsync(handler, context, cancellationToken);
+    }
+
+    private async Task<DurableJobRunResult> ExecuteFeatureHandlerAsync(
+        IDurableJobFeatureHandler handler,
+        IJobRunContext context,
+        CancellationToken cancellationToken)
+    {
+        using var tracker = _shared.BeginHandlerExecution(context);
+        try
+        {
+            var result = await handler.ExecuteJobAsync(context, cancellationToken)
+                ?? throw new InvalidOperationException(
+                    $"Durable job feature handler for '{context.Job.Name}' returned a null result.");
+            tracker.Completed();
+            return result;
+        }
+        catch (OperationCanceledException)
+        {
+            tracker.Canceled();
+            throw;
+        }
+        catch (Exception exception)
+        {
+            tracker.Failed(exception);
+            LogErrorExecutingDurableJob(_shared.Logger, exception, context.Job.Id, _grain.GrainId);
+            return DurableJobRunResult.Failed(exception);
+        }
     }
 
     private async Task<DurableJobRunResult> ExecuteHandlerAsync(IDurableJobHandler handler, IJobRunContext context, CancellationToken cancellationToken)
@@ -115,12 +160,12 @@ internal sealed partial class DurableJobReceiverExtension : IDurableJobReceiverE
             return new(DurableJobRunResult.InProgress(_shared.Options.JobStatusPollInterval));
         }
 
-        RecordCompletedJobAttempt(key, state);
-
         if (state.Task.IsCompletedSuccessfully)
         {
-            return new(state.Task);
+            return new(GetSuccessfulResult(key, state));
         }
+
+        RecordCompletedJobAttempt(key, state);
 
         if (state.Task.IsFaulted)
         {
@@ -140,7 +185,8 @@ internal sealed partial class DurableJobReceiverExtension : IDurableJobReceiverE
             {
                 using var cts = new CancellationTokenSource();
                 var longPollDuration = TimeSpan.FromTicks(Math.Min(_shared.MessagingOptions.ResponseTimeout.Divide(2).Ticks, _shared.Options.JobStatusPollInterval.Ticks));
-                await Task.WhenAny(Task.Delay(longPollDuration, cts.Token), state.Task);
+                await Task.WhenAny(Task.Delay(longPollDuration, _shared.TimeProvider, cts.Token), state.Task);
+                cts.Cancel();
 
                 if (!state.Task.IsCompleted)
                 {
@@ -148,18 +194,44 @@ internal sealed partial class DurableJobReceiverExtension : IDurableJobReceiverE
                 }
             }
 
-            RecordCompletedJobAttempt(key, state);
-
             if (state.Task.IsFaulted)
             {
+                RecordCompletedJobAttempt(key, state);
                 var ex = state.Task.Exception!.InnerException ?? state.Task.Exception;
                 LogErrorExecutingDurableJob(_shared.Logger, ex, context.Job.Id, _grain.GrainId);
                 return DurableJobRunResult.Failed(ex);
             }
 
-            // Completed successfully or canceled.
-            return await state.Task;
+            if (state.Task.IsCanceled)
+            {
+                RecordCompletedJobAttempt(key, state);
+                return await state.Task;
+            }
+
+            return GetSuccessfulResult(key, state);
         }
+    }
+
+    private DurableJobRunResult GetSuccessfulResult(
+        (string JobId, long ExecutionGeneration, int DequeueCount) key,
+        JobAttemptState state)
+    {
+        var result = state.Task.Result;
+        if (result.IsInProgress)
+        {
+            if (!state.PollRequested)
+            {
+                state.PollRequested = true;
+                state.PollTimestamp = _shared.TimeProvider.GetTimestamp();
+                state.PollAfterDelay = result.PollAfterDelay.Value;
+            }
+        }
+        else
+        {
+            RecordCompletedJobAttempt(key, state);
+        }
+
+        return result;
     }
 
     private void RecordCompletedJobAttempt((string JobId, long ExecutionGeneration, int DequeueCount) key, JobAttemptState state)
@@ -181,7 +253,7 @@ internal sealed partial class DurableJobReceiverExtension : IDurableJobReceiverE
         var now = _shared.TimeProvider.GetTimestamp();
         while (_completedJobAttempts.TryPeek(out var completedAttempt))
         {
-            var expired = _shared.TimeProvider.GetElapsedTime(completedAttempt.CompletedTimestamp, now) >= CompletedJobAttemptRetention;
+            var expired = _shared.TimeProvider.GetElapsedTime(completedAttempt.CompletedTimestamp, now) >= _shared.Options.CompletedJobAttemptRetentionPeriod;
             var overLimit = _completedJobAttemptCount > MaxCompletedJobAttempts;
             if (!expired && !overLimit)
             {
@@ -215,6 +287,12 @@ internal sealed partial class DurableJobReceiverExtension : IDurableJobReceiverE
         public bool CompletionRecorded;
 
         public long CompletedTimestamp;
+
+        public bool PollRequested;
+
+        public long PollTimestamp;
+
+        public TimeSpan PollAfterDelay;
     }
 
     private readonly record struct CompletedJobAttempt(
