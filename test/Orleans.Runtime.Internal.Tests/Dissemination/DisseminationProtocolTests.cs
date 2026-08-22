@@ -274,6 +274,100 @@ public class DisseminationProtocolTests
     }
 
     [Fact]
+    public async Task ReceiveGossipRejectsTopicApplyExceptionAndContinuesBatch()
+    {
+        var local = CreateSilo(11111);
+        var sender = CreateSilo(11112);
+        var transport = new FakeTransport(local, sender);
+        var appliedKeys = new List<string>();
+        var topic = new FakeTopic(local)
+        {
+            ApplyValueHandler = (value, _) =>
+            {
+                if (value.Digest.Key == "malformed")
+                {
+                    throw new InvalidOperationException("Malformed payload.");
+                }
+
+                appliedKeys.Add(value.Digest.Key);
+                return ValueTask.FromResult(DisseminationApplyResult.Applied);
+            },
+        };
+        await using var protocol = CreateProtocol(transport, topic);
+
+        await protocol.ReceiveGossip(
+            CreateGossipBatch(
+                sender,
+                topic.CreateItem(sender, "malformed", sequence: 1),
+                topic.CreateItem(sender, "valid", sequence: 1)),
+            CancellationToken.None);
+
+        Assert.Equal(new[] { "valid" }, appliedKeys);
+    }
+
+    [Fact]
+    public async Task ReceiveGossipRejectsUnrelatedOperationCanceledExceptionAndContinuesBatch()
+    {
+        var local = CreateSilo(11111);
+        var sender = CreateSilo(11112);
+        var transport = new FakeTransport(local, sender);
+        var appliedKeys = new List<string>();
+        var topic = new FakeTopic(local)
+        {
+            ApplyValueHandler = (value, _) =>
+            {
+                if (value.Digest.Key == "canceled")
+                {
+                    throw new OperationCanceledException("Topic operation canceled independently.");
+                }
+
+                appliedKeys.Add(value.Digest.Key);
+                return ValueTask.FromResult(DisseminationApplyResult.Applied);
+            },
+        };
+        await using var protocol = CreateProtocol(transport, topic);
+
+        await protocol.ReceiveGossip(
+            CreateGossipBatch(
+                sender,
+                topic.CreateItem(sender, "canceled", sequence: 1),
+                topic.CreateItem(sender, "valid", sequence: 1)),
+            CancellationToken.None);
+
+        Assert.Equal(new[] { "valid" }, appliedKeys);
+    }
+
+    [Fact]
+    public async Task ReceiveGossipPropagatesCallerCancellationFromTopicApply()
+    {
+        var local = CreateSilo(11111);
+        var sender = CreateSilo(11112);
+        var transport = new FakeTransport(local, sender);
+        var applyAttempts = new List<string>();
+        var topic = new FakeTopic(local)
+        {
+            ApplyValueHandler = (value, cancellationToken) =>
+            {
+                applyAttempts.Add(value.Digest.Key);
+                cancellationToken.ThrowIfCancellationRequested();
+                return ValueTask.FromResult(DisseminationApplyResult.Applied);
+            },
+        };
+        await using var protocol = CreateProtocol(transport, topic);
+        using var cancellation = new CancellationTokenSource();
+        cancellation.Cancel();
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => protocol.ReceiveGossip(
+            CreateGossipBatch(
+                sender,
+                topic.CreateItem(sender, "first", sequence: 1),
+                topic.CreateItem(sender, "second", sequence: 1)),
+            cancellation.Token));
+
+        Assert.Equal(new[] { "first" }, applyAttempts);
+    }
+
+    [Fact]
     public async Task ReceiveGossipWithMissingRootRefreshesMembershipAndDoesNotForward()
     {
         var root = CreateSilo(11111);
@@ -3391,6 +3485,8 @@ public class DisseminationProtocolTests
 
         public Func<DisseminationTopicDigest, DisseminationTopicDigest?, DisseminationValue?>? GetValueHandler { get; set; }
 
+        public Func<DisseminationValue, CancellationToken, ValueTask<DisseminationApplyResult>>? ApplyValueHandler { get; set; }
+
         public string Name => name;
 
         public DisseminationMembershipScope MembershipScope { get; set; } = DisseminationMembershipScope.ActiveMembers;
@@ -3454,6 +3550,11 @@ public class DisseminationProtocolTests
 
         public ValueTask<DisseminationApplyResult> ApplyValue(DisseminationValue value, CancellationToken cancellationToken)
         {
+            if (ApplyValueHandler is { } handler)
+            {
+                return handler(value, cancellationToken);
+            }
+
             var version = BitConverter.ToInt64(value.Payload.Span);
             if (_versions.TryGetValue(value.Digest.Key, out var current))
             {
