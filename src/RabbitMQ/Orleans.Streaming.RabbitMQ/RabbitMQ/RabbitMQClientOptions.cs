@@ -12,7 +12,7 @@ public record RabbitMQClientOptions
 
     public TimeSpan IntervalToUpdateOffset { get; set; } = DEFAULT_INTERVAL_TO_UPDATE_OFFSET;
 
-    public List<string> QueueNames { get; set; }
+    public List<string> QueueNames { get; set; } = [];
 
     /// <summary>
     ///     Configures the StreamSystem to connect with the RabbitMQ Cluster
