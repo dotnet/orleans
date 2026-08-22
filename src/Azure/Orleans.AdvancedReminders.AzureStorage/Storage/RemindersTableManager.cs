@@ -189,7 +189,11 @@ internal sealed partial class RemindersTableManager : AzureTableDataManager<Remi
             if (AzureTableUtils.EvaluateException(exc, out var httpStatusCode, out var restStatus))
             {
                 LogTraceDeleteReminderEntryConditionallyFailed(Logger, httpStatusCode, restStatus);
-                if (AzureTableUtils.IsContentionError(httpStatusCode)) return false;
+                if (AzureTableUtils.IsContentionError(httpStatusCode)
+                    || httpStatusCode == HttpStatusCode.BadRequest && string.Equals(restStatus, "InvalidInput", StringComparison.OrdinalIgnoreCase))
+                {
+                    return false;
+                }
             }
             throw;
         }
