@@ -127,6 +127,5 @@ consume the project from source using a private project reference:
                   PrivateAssets="all" />
 ```
 
-The TestKit keeps Accordant private so that a shared test-infrastructure assembly does not force Accordant's
-`System.*` dependency versions into unrelated test projects. Projects which execute
-`ReminderTableModelBasedTestRunner` therefore reference `Microsoft.Accordant` directly.
+The private project reference keeps the TestKit and Accordant out of downstream project dependency graphs while
+copying the runtime dependencies needed by each provider test application.

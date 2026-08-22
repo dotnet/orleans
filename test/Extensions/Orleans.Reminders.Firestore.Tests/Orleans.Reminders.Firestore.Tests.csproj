@@ -6,7 +6,6 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="Microsoft.Accordant" />
   </ItemGroup>
 
   <ItemGroup>

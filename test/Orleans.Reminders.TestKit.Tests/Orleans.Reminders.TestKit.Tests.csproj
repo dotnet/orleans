@@ -9,10 +9,6 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="Microsoft.Accordant" />
-  </ItemGroup>
-
-  <ItemGroup>
     <ProjectReference Include="..\..\src\Orleans.Reminders.TestKit\Orleans.Reminders.TestKit.csproj" PrivateAssets="all" />
     <ProjectReference Include="..\Orleans.Testing.Reminders\Orleans.Testing.Reminders.csproj" />
     <ProjectReference Include="..\TestInfrastructure\TestExtensions\TestExtensions.csproj" />
