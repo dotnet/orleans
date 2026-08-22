@@ -104,7 +104,7 @@ namespace Orleans.Runtime.MembershipService
         Task<bool> IMembershipManager.TryKillSilo(SiloAddress silo, CancellationToken cancellationToken) => this.TryKill(silo);
         Task<bool> IMembershipManager.TrySuspectSilo(SiloAddress silo, SiloAddress? indirectProbingSilo, CancellationToken cancellationToken) => this.TryToSuspectOrKill(silo, indirectProbingSilo);
         Task IMembershipManager.Refresh(MembershipVersion? targetVersion, CancellationToken cancellationToken) => this.Refresh(targetVersion, cancellationToken);
-        Task IMembershipManager.ProcessGossipSnapshot(MembershipTableSnapshot snapshot, CancellationToken cancellationToken) => this.RefreshFromSnapshot(snapshot);
+        Task<bool> IMembershipManager.ProcessGossipSnapshot(MembershipTableSnapshot snapshot, CancellationToken cancellationToken) => this.RefreshFromSnapshot(snapshot);
         Task IMembershipManager.UpdateIAmAlive(CancellationToken cancellationToken) => this.UpdateIAmAlive();
 
         private bool IsStopping => this.siloLifecycle.IsStopping;
@@ -133,7 +133,7 @@ namespace Orleans.Runtime.MembershipService
             }
         }
 
-        public async Task RefreshFromSnapshot(MembershipTableSnapshot snapshot)
+        public async Task<bool> RefreshFromSnapshot(MembershipTableSnapshot snapshot)
         {
             if (snapshot.Version == MembershipVersion.MinValue)
                 throw new ArgumentException("Cannot call RefreshFromSnapshot with Version == MembershipVersion.MinValue");
@@ -147,7 +147,7 @@ namespace Orleans.Runtime.MembershipService
 
             LogInformationReceivedClusterMembershipSnapshot(this.log, snapshot);
 
-            this.TryProcessMembershipUpdate(MembershipTableSnapshot.Update, snapshot, nameof(RefreshFromSnapshot));
+            return this.TryProcessMembershipUpdate(MembershipTableSnapshot.Update, snapshot, nameof(RefreshFromSnapshot));
         }
 
         private async Task<bool> RefreshInternal(bool requireCleanup)

@@ -6,6 +6,8 @@ class Orleans.Runtime.ClusterManifestSystemTarget
 
 class Orleans.Runtime.DeploymentLoadPublisher
 
+class Orleans.Runtime.Dissemination.DisseminationSystemTarget
+
 class Orleans.Runtime.Development.DevelopmentLeaseProviderGrain
 
 interface Orleans.Runtime.Development.IDevelopmentLeaseProviderGrain [Version(0)]
