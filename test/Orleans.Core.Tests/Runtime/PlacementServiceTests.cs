@@ -9,12 +9,15 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
+using Microsoft.Extensions.Time.Testing;
 using NSubstitute;
 using Orleans.Configuration;
+using Orleans.GrainDirectory;
 using Orleans.Metadata;
 using Orleans.Placement;
 using Orleans.Runtime;
 using Orleans.Runtime.Diagnostics;
+using Orleans.Runtime.GrainDirectory;
 using Orleans.Runtime.Placement;
 using Orleans.Runtime.Placement.Filtering;
 using Orleans.Runtime.Utilities;
@@ -95,6 +98,94 @@ namespace UnitTests.Runtime
             await StopAsync(target);
 
             await Assert.ThrowsAsync<SiloUnavailableException>(() => GetTestAccessor(target).GetOrPlaceActivationAsync(message));
+        }
+
+        [Fact]
+        public async Task GetOrPlaceActivationAsync_ExpiredMessage_DoesNotRetry()
+        {
+            var target = CreateTarget();
+            var message = new Message
+            {
+                TargetGrain = GrainId.Create("test", "grain-1"),
+                InterfaceType = GrainInterfaceType.Create("test.interface"),
+                InterfaceVersion = 1,
+                TimeToLive = TimeSpan.FromMilliseconds(-1),
+            };
+
+            await Assert.ThrowsAsync<OperationCanceledException>(() => GetTestAccessor(target).GetOrPlaceActivationAsync(message));
+            await StopAsync(target);
+        }
+
+        [Fact]
+        public async Task GetOrPlaceActivationAsync_WhenLookupDoesNotComplete_TimesOut()
+        {
+            var lookupStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            var lookupCompletion = new TaskCompletionSource<AddressAndTag>(TaskCreationOptions.RunContinuationsAsynchronously);
+            var localGrainDirectory = Substitute.For<ILocalGrainDirectory>();
+            localGrainDirectory.LookupAsync(Arg.Any<GrainId>(), Arg.Any<int>()).Returns(_ =>
+            {
+                lookupStarted.TrySetResult();
+                return lookupCompletion.Task;
+            });
+
+            var timeProvider = new FakeTimeProvider();
+            var messagingOptions = new SiloMessagingOptions
+            {
+                PlacementTimeout = TimeSpan.FromSeconds(10),
+                PlacementMaxRetries = 0,
+            };
+            var fixture = new PlacementServiceFixture(
+                messagingOptions: messagingOptions,
+                timeProvider: timeProvider,
+                localGrainDirectory: localGrainDirectory);
+            var message = new Message
+            {
+                TargetGrain = GrainId.Create("test", "grain-1"),
+                InterfaceType = GrainInterfaceType.Create("test.interface"),
+                InterfaceVersion = 1,
+            };
+
+            var placementTask = GetTestAccessor(fixture.Target).GetOrPlaceActivationAsync(message);
+            await lookupStarted.Task;
+            timeProvider.Advance(messagingOptions.PlacementTimeout);
+
+            var completedTask = await Task.WhenAny(placementTask, Task.Delay(TimeSpan.FromSeconds(1)));
+            Assert.Same(placementTask, completedTask);
+            var exception = await Assert.ThrowsAsync<TimeoutException>(() => placementTask);
+            Assert.IsType<Polly.Timeout.TimeoutRejectedException>(exception.InnerException);
+
+            lookupCompletion.TrySetResult(default);
+            await StopAsync(fixture.Target);
+        }
+
+        [Fact]
+        public async Task GetOrPlaceActivationAsync_WhenShutdownCancelsLookup_ThrowsSiloUnavailableException()
+        {
+            var lookupStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            var lookupCompletion = new TaskCompletionSource<AddressAndTag>(TaskCreationOptions.RunContinuationsAsynchronously);
+            var localGrainDirectory = Substitute.For<ILocalGrainDirectory>();
+            localGrainDirectory.LookupAsync(Arg.Any<GrainId>(), Arg.Any<int>()).Returns(_ =>
+            {
+                lookupStarted.TrySetResult();
+                return lookupCompletion.Task;
+            });
+
+            var fixture = new PlacementServiceFixture(
+                messagingOptions: new SiloMessagingOptions { PlacementMaxRetries = 0 },
+                localGrainDirectory: localGrainDirectory);
+            var message = new Message
+            {
+                TargetGrain = GrainId.Create("test", "grain-1"),
+                InterfaceType = GrainInterfaceType.Create("test.interface"),
+                InterfaceVersion = 1,
+            };
+
+            var placementTask = GetTestAccessor(fixture.Target).GetOrPlaceActivationAsync(message);
+            await lookupStarted.Task;
+            await StopAsync(fixture.Target);
+
+            await Assert.ThrowsAsync<SiloUnavailableException>(() => placementTask);
+            lookupCompletion.TrySetResult(default);
         }
 
         [Fact]
@@ -269,7 +360,8 @@ namespace UnitTests.Runtime
             ISiloStatusOracle siloStatusOracle,
             TestClusterManifestProvider clusterManifestProvider,
             IServiceProvider serviceProvider,
-            CachedVersionSelectorManager versionSelectorManager)
+            CachedVersionSelectorManager versionSelectorManager,
+            GrainLocator grainLocator)
         {
             var grainVersionManifest = new GrainVersionManifest(clusterManifestProvider);
             var filterStrategyResolver = new PlacementFilterStrategyResolver(serviceProvider, new GrainPropertiesResolver(clusterManifestProvider));
@@ -280,13 +372,14 @@ namespace UnitTests.Runtime
                 localSiloDetails,
                 siloStatusOracle,
                 NullLoggerFactory.Instance.CreateLogger<PlacementService>(),
-                grainLocator: null!,
+                grainLocator,
                 grainInterfaceVersions: grainVersionManifest,
                 versionSelectorManager,
                 directorResolver: null!,
                 strategyResolver: null!,
                 filterStrategyResolver,
-                placementFilterDirectorResolver);
+                placementFilterDirectorResolver,
+                serviceProvider.GetRequiredService<Polly.Registry.ResiliencePipelineProvider<string>>());
         }
 
         private static SiloAddress[] CreateSilos(int count)
@@ -364,9 +457,22 @@ namespace UnitTests.Runtime
                 membership);
         }
 
-        private static ServiceProvider CreateServiceProvider(TestPlacementFilterDirector? filterDirector = null)
+        private static ServiceProvider CreateServiceProvider(
+            TestPlacementFilterDirector? filterDirector = null,
+            SiloMessagingOptions? messagingOptions = null,
+            TimeProvider? timeProvider = null)
         {
+            messagingOptions ??= new SiloMessagingOptions();
             IServiceCollection services = new ServiceCollection();
+            services.AddOptions<SiloMessagingOptions>().Configure(options =>
+            {
+                options.PlacementTimeout = messagingOptions.PlacementTimeout;
+                options.PlacementMaxRetries = messagingOptions.PlacementMaxRetries;
+                options.PlacementRetryBaseDelay = messagingOptions.PlacementRetryBaseDelay;
+            });
+            services.AddSingleton(timeProvider ?? TimeProvider.System);
+            services.AddLogging();
+            OrleansRuntimeResiliencePolicies.AddOrleansRuntimeResiliencePolicies(services);
             if (filterDirector is not null)
             {
                 services.Add(ServiceDescriptor.DescribeKeyed(
@@ -378,6 +484,18 @@ namespace UnitTests.Runtime
             }
 
             return services.BuildServiceProvider();
+        }
+
+        private static GrainLocator CreateGrainLocator(
+            IServiceProvider serviceProvider,
+            TestClusterManifestProvider clusterManifestProvider,
+            ILocalGrainDirectory localGrainDirectory)
+        {
+            var grainPropertiesResolver = new GrainPropertiesResolver(clusterManifestProvider);
+            var grainDirectoryResolver = new GrainDirectoryResolver(serviceProvider, grainPropertiesResolver, []);
+            var dhtGrainLocator = new DhtGrainLocator(localGrainDirectory, Substitute.For<IGrainContext>());
+            var grainLocatorResolver = new GrainLocatorResolver(serviceProvider, grainDirectoryResolver, null!, dhtGrainLocator);
+            return new GrainLocator(grainLocatorResolver, null!);
         }
 
         private static async Task<SiloLifecycleSubject> StartAsync(PlacementService target)
@@ -427,8 +545,12 @@ namespace UnitTests.Runtime
                 TestClusterManifestProvider? manifestProvider = null,
                 bool useFilter = false,
                 SiloStatus localSiloStatus = SiloStatus.Active,
-                ushort interfaceVersion = 0)
+                ushort interfaceVersion = 0,
+                SiloMessagingOptions? messagingOptions = null,
+                TimeProvider? timeProvider = null,
+                ILocalGrainDirectory? localGrainDirectory = null)
             {
+                messagingOptions ??= new SiloMessagingOptions();
                 activeSilos ??= CreateSilos(1);
                 manifestSilos ??= activeSilos;
                 SetActiveSilos(activeSilos);
@@ -439,10 +561,10 @@ namespace UnitTests.Runtime
                 ClusterMembershipService = new TestClusterMembershipService(CreateMembershipSnapshot(_membershipVersion, _siloStatuses));
                 VersionSelectorManager = CreateCachedVersionSelectorManager(new GrainVersionManifest(ClusterManifestProvider), ClusterMembershipService);
                 FilterDirector = useFilter ? new TestPlacementFilterDirector() : null;
-                ServiceProvider = CreateServiceProvider(FilterDirector);
+                ServiceProvider = CreateServiceProvider(FilterDirector, messagingOptions, timeProvider);
 
                 var optionsMonitor = Substitute.For<IOptionsMonitor<SiloMessagingOptions>>();
-                optionsMonitor.CurrentValue.Returns(new SiloMessagingOptions());
+                optionsMonitor.CurrentValue.Returns(messagingOptions);
 
                 var localSiloDetails = Substitute.For<ILocalSiloDetails>();
                 localSiloDetails.SiloAddress.Returns(activeSilos[0]);
@@ -456,7 +578,17 @@ namespace UnitTests.Runtime
                 SiloStatusOracle.GetApproximateSiloStatuses(onlyActive: true).Returns(_ => _siloStatuses
                     .Where(static entry => entry.Value == SiloStatus.Active)
                     .ToDictionary());
-                Target = CreateTarget(optionsMonitor, localSiloDetails, SiloStatusOracle, ClusterManifestProvider, ServiceProvider, VersionSelectorManager);
+                var grainLocator = localGrainDirectory is null
+                    ? null!
+                    : CreateGrainLocator(ServiceProvider, ClusterManifestProvider, localGrainDirectory);
+                Target = CreateTarget(
+                    optionsMonitor,
+                    localSiloDetails,
+                    SiloStatusOracle,
+                    ClusterManifestProvider,
+                    ServiceProvider,
+                    VersionSelectorManager,
+                    grainLocator);
             }
 
             public PlacementService Target { get; }

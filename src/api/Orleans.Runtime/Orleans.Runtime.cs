@@ -274,6 +274,9 @@ namespace Orleans.Configuration
         public const int DEFAULT_MAX_ENQUEUED_REQUESTS_STATELESS_WORKER_HARD_LIMIT = 0;
         public const int DEFAULT_MAX_ENQUEUED_REQUESTS_STATELESS_WORKER_SOFT_LIMIT = 0;
         public static readonly System.TimeSpan DEFAULT_MAX_REQUEST_PROCESSING_TIME;
+        public const int DEFAULT_PLACEMENT_MAX_RETRIES = 3;
+        public static readonly System.TimeSpan DEFAULT_PLACEMENT_RETRY_BASE_DELAY;
+        public static readonly System.TimeSpan DEFAULT_PLACEMENT_TIMEOUT;
         [System.Obsolete("Unused, will be removed in a future version.")]
         public static readonly System.TimeSpan DEFAULT_SHUTDOWN_REROUTE_TIMEOUT;
         public static readonly System.TimeSpan DEFAULT_WAIT_FOR_MESSAGE_TO_BE_QUEUED_FOR_OUTBOUND_TIME;
@@ -300,6 +303,12 @@ namespace Orleans.Configuration
         public int MaxForwardCount { get { throw null; } set { } }
 
         public System.TimeSpan MaxRequestProcessingTime { get { throw null; } set { } }
+
+        public int PlacementMaxRetries { get { throw null; } set { } }
+
+        public System.TimeSpan PlacementRetryBaseDelay { get { throw null; } set { } }
+
+        public System.TimeSpan PlacementTimeout { get { throw null; } set { } }
 
         public System.TimeSpan RequestProcessingWarningTime { get { throw null; } set { } }
 
