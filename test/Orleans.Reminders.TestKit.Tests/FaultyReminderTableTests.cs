@@ -53,14 +53,14 @@ public sealed class FaultyReminderTableTests
     }
 
     [Fact]
-    public async Task ConstantETag_IsDetectedBy_UpsertReturnsNewNonEmptyETag()
+    public async Task ConstantETag_IsDetectedBy_DeclaredETagRotationGuarantee()
     {
         var runner = CreateRunner(new ConstantETagReminderTable(), "ConstantETag");
 
-        var exception = await Assert.ThrowsAsync<ReminderConformanceException>(runner.ReminderTable_UpsertRow_ReturnsNewNonEmptyETag);
+        var exception = await Assert.ThrowsAsync<ReminderConformanceException>(runner.ReminderTable_UpsertRow_ReplacesETagOnEachWrite);
 
-        AssertDiagnostics(exception.Message, "ConstantETag", nameof(ReminderTableTestRunner.ReminderTable_UpsertRow_ReturnsNewNonEmptyETag), "UpsertRow");
-        Assert.Contains("the second upsert to return an ETag different from the first", exception.Message, StringComparison.Ordinal);
+        AssertDiagnostics(exception.Message, "ConstantETag", nameof(ReminderTableTestRunner.ReminderTable_UpsertRow_ReplacesETagOnEachWrite), "UpsertRow");
+        Assert.Contains("write #2 to return a fresh ETag", exception.Message, StringComparison.Ordinal);
         Assert.Contains("constant-etag", exception.Message, StringComparison.Ordinal);
     }
 
@@ -161,7 +161,16 @@ public sealed class FaultyReminderTableTests
 
         Assert.Contains("Model-based reminder table conformance test failed [provider=ConstantETag, seed=0]", exception.Message, StringComparison.Ordinal);
         Assert.NotNull(failureOutput);
-        Assert.Contains("expected the upsert ETag 'constant-etag'", failureOutput, StringComparison.Ordinal);
+        Assert.Contains("Upsert reused the previous ETag 'constant-etag'", failureOutput, StringComparison.Ordinal);
+    }
+
+    [Fact, TestCategory("ModelBased")]
+    public async Task ConstantETag_IsAcceptedOnlyWhenRotationCapabilityIsNotDeclared()
+    {
+        var capabilities = ReminderTableProviderProfiles.Firestore("TimestampETag");
+        var runner = new ReminderTableModelBasedTestRunner(new ConstantETagReminderTable(), capabilities);
+
+        await runner.RunGeneratedConformanceTests();
     }
 
     [Fact, TestCategory("ModelBased")]
@@ -177,6 +186,9 @@ public sealed class FaultyReminderTableTests
     {
         var capabilities = ReminderTableCapabilities.Portable(providerName);
         capabilities.SupportsSubSecondPrecision = true;
+        capabilities.SupportsETagRotation = true;
+        capabilities.SupportsParallelDistinctRows = true;
+        capabilities.SupportsUnsignedHashRangeBoundaries = true;
         return new FaultyTableRunner(table, capabilities);
     }
 
@@ -232,10 +244,38 @@ public sealed class FaultyReminderTableTests
     /// <summary>Fault: every upsert reports the same ETag, so replacement is unobservable.</summary>
     private sealed class ConstantETagReminderTable() : DecoratedReminderTable("ConstantETag")
     {
+        private const string ConstantETag = "constant-etag";
+
         public override async Task<string?> UpsertRow(ReminderEntry entry)
         {
             await Inner.UpsertRow(entry);
-            return "constant-etag";
+            return ConstantETag;
+        }
+
+        public override async Task<ReminderEntry?> ReadRow(GrainId grainId, string reminderName)
+        {
+            var entry = await Inner.ReadRow(grainId, reminderName);
+            return entry is null ? null : WithConstantETag(entry);
+        }
+
+        public override async Task<ReminderTableData> ReadRows(GrainId grainId)
+            => new((await Inner.ReadRows(grainId)).Reminders.Select(WithConstantETag).ToList());
+
+        public override async Task<ReminderTableData> ReadRows(uint begin, uint end)
+            => new((await Inner.ReadRows(begin, end)).Reminders.Select(WithConstantETag).ToList());
+
+        public override async Task<bool> RemoveRow(GrainId grainId, string reminderName, string eTag)
+        {
+            var current = Inner.Find(grainId, reminderName);
+            return current is not null
+                && string.Equals(eTag, ConstantETag, StringComparison.Ordinal)
+                && await Inner.RemoveRow(grainId, reminderName, current.ETag);
+        }
+
+        private static ReminderEntry WithConstantETag(ReminderEntry entry)
+        {
+            entry.ETag = ConstantETag;
+            return entry;
         }
     }
 

@@ -28,7 +28,7 @@ public sealed class InMemoryReminderTableConformanceTests : ReminderTableTestRun
     private readonly InMemoryReminderTableFixture _fixture;
 
     public InMemoryReminderTableConformanceTests(InMemoryReminderTableFixture fixture)
-        : base(fixture.ReminderTable, ReminderTableCapabilities.Portable("InMemoryReminderTable"))
+        : base(fixture.ReminderTable, ReminderTableProviderProfiles.InMemory("InMemoryReminderTable"))
     {
         _fixture = fixture;
         _fixture.EnsurePreconditionsMet();
@@ -93,6 +93,10 @@ public sealed class InMemoryReminderTableConformanceTests : ReminderTableTestRun
     public override Task ReminderTable_ReadRows_FullRange_ReturnsAllReminders() => base.ReminderTable_ReadRows_FullRange_ReturnsAllReminders();
 
     [Fact]
+    public override Task ReminderTable_ReadRows_UnsignedBoundary_UsesUInt32Ordering()
+        => base.ReminderTable_ReadRows_UnsignedBoundary_UsesUInt32Ordering();
+
+    [Fact]
     public override Task ReminderTable_ReadRows_Range_ExcludesBeginAndIncludesEnd() => base.ReminderTable_ReadRows_Range_ExcludesBeginAndIncludesEnd();
 
     [Fact]
@@ -132,7 +136,7 @@ public sealed class InMemoryReminderTableConformanceTests : ReminderTableTestRun
 
     [Fact, TestCategory("ModelBased")]
     public Task InMemoryReminderTable_ModelBasedGeneratedConformance()
-        => new ReminderTableModelBasedTestRunner(ReminderTable, "InMemoryReminderTable").RunGeneratedConformanceTests();
+        => new ReminderTableModelBasedTestRunner(ReminderTable, Capabilities).RunGeneratedConformanceTests();
 
     [Fact]
     public void InMemoryCapabilities_DisabledGuaranteeManifest_IsCompleteWithoutInvocation()

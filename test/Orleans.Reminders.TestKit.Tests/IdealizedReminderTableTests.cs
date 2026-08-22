@@ -100,6 +100,10 @@ public sealed class IdealizedReminderTableTests : ReminderTableTestRunner
     public override Task ReminderTable_ReadRows_FullRange_ReturnsAllReminders() => base.ReminderTable_ReadRows_FullRange_ReturnsAllReminders();
 
     [Fact]
+    public override Task ReminderTable_ReadRows_UnsignedBoundary_UsesUInt32Ordering()
+        => base.ReminderTable_ReadRows_UnsignedBoundary_UsesUInt32Ordering();
+
+    [Fact]
     public override Task ReminderTable_ReadRows_Range_ExcludesBeginAndIncludesEnd() => base.ReminderTable_ReadRows_Range_ExcludesBeginAndIncludesEnd();
 
     [Fact]
@@ -136,7 +140,7 @@ public sealed class IdealizedReminderTableTests : ReminderTableTestRunner
     [Fact, TestCategory("ModelBased")]
     public Task Oracle_ModelBasedGeneratedConformance()
     {
-        var runner = new ReminderTableModelBasedTestRunner(_oracle, "Oracle");
+        var runner = new ReminderTableModelBasedTestRunner(_oracle, Capabilities);
         return runner.RunGeneratedConformanceTests();
     }
 
@@ -201,8 +205,11 @@ public sealed class IdealizedReminderTableTests : ReminderTableTestRunner
         Assert.True(Capabilities.SupportsSubSecondPrecision);
         Assert.False(Capabilities.SupportsConditionalUpsert);
         Assert.True(Capabilities.SupportsStartCancellation);
-        Assert.True(Capabilities.SupportsStopAsync);
-        Assert.True(Capabilities.SupportsConcurrentOperations);
+        Assert.True(Capabilities.SupportsRestartAfterStop);
+        Assert.True(Capabilities.SupportsSameIdentityConcurrentUpserts);
+        Assert.True(Capabilities.SupportsParallelDistinctRows);
+        Assert.True(Capabilities.SupportsETagRotation);
+        Assert.True(Capabilities.SupportsUnsignedHashRangeBoundaries);
         Assert.True(Capabilities.SupportsCrossTableIsolation);
         Assert.Equal(5, Capabilities.ConcurrentUpsertCount);
         Assert.Equal(5, Capabilities.ParallelGrainCount);
@@ -212,8 +219,11 @@ public sealed class IdealizedReminderTableTests : ReminderTableTestRunner
         Assert.False(portable.SupportsSubSecondPrecision);
         Assert.False(portable.SupportsConditionalUpsert);
         Assert.False(portable.SupportsStartCancellation);
-        Assert.True(portable.SupportsStopAsync);
-        Assert.True(portable.SupportsConcurrentOperations);
+        Assert.False(portable.SupportsRestartAfterStop);
+        Assert.False(portable.SupportsSameIdentityConcurrentUpserts);
+        Assert.False(portable.SupportsParallelDistinctRows);
+        Assert.False(portable.SupportsETagRotation);
+        Assert.False(portable.SupportsUnsignedHashRangeBoundaries);
         Assert.False(portable.SupportsCrossTableIsolation);
     }
 
@@ -501,17 +511,20 @@ public sealed class IdealizedReminderTableTests : ReminderTableTestRunner
     public static void PortableCapabilities_DisabledGuaranteeManifest_IsCompleteWithoutInvocation()
     {
         var capabilities = ReminderTableCapabilities.Portable("Portable");
-        capabilities.SupportsStopAsync = false;
-        capabilities.SupportsConcurrentOperations = false;
         var runner = new CapabilityManifestRunner(new IdealizedReminderTable("Portable"), capabilities);
 
         AssertDisabledGuarantees(
             runner.SkippedGuarantees,
             "Portable",
-            (nameof(ReminderTable_StopAsync_ThenRestart_ResumesService), nameof(ReminderTableCapabilities.SupportsStopAsync)),
+            (nameof(ReminderTable_StopAsync_ThenRestart_ResumesService), nameof(ReminderTableCapabilities.SupportsRestartAfterStop)),
+            (nameof(ReminderTable_UpsertRow_ReplacesETagOnEachWrite), nameof(ReminderTableCapabilities.SupportsETagRotation)),
+            (nameof(ReminderTable_RemoveRow_WithStaleETag_FailsAndRetainsRow), nameof(ReminderTableCapabilities.SupportsETagRotation)),
             (nameof(ReminderTable_UpsertRow_WithStaleETag_IsRejected), nameof(ReminderTableCapabilities.SupportsConditionalUpsert)),
-            (nameof(ReminderTable_ConcurrentUpserts_ProduceDistinctETags), nameof(ReminderTableCapabilities.SupportsConcurrentOperations)),
-            (nameof(ReminderTable_ParallelUpserts_AcrossGrains_RemainIsolated), nameof(ReminderTableCapabilities.SupportsConcurrentOperations)),
+            (nameof(ReminderTable_ConcurrentUpserts_ProduceDistinctETags), nameof(ReminderTableCapabilities.SupportsSameIdentityConcurrentUpserts)),
+            (nameof(ReminderTable_ParallelUpserts_AcrossGrains_RemainIsolated), nameof(ReminderTableCapabilities.SupportsParallelDistinctRows)),
+            (nameof(ReminderTable_ReadRows_UnsignedBoundary_UsesUInt32Ordering), nameof(ReminderTableCapabilities.SupportsUnsignedHashRangeBoundaries)),
+            (nameof(ReminderTable_ReadRows_Range_ExcludesBeginAndIncludesEnd), nameof(ReminderTableCapabilities.SupportsUnsignedHashRangeBoundaries)),
+            (nameof(ReminderTable_ReadRows_WrapAroundRange_ReturnsWrappedSegment), nameof(ReminderTableCapabilities.SupportsUnsignedHashRangeBoundaries)),
             (nameof(ReminderTable_SeparatelyScopedTables_DoNotShareReminders), nameof(ReminderTableCapabilities.SupportsCrossTableIsolation)),
             (nameof(ReminderTable_StartAsync_WithCanceledToken_ThrowsOperationCanceled), nameof(ReminderTableCapabilities.SupportsStartCancellation)));
     }
