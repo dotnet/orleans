@@ -86,17 +86,14 @@ namespace DefaultCluster.Tests
         }
 
         /// <summary>
-        /// Tests that non-existent grain prefixes throw an exception.
-        /// Validates proper error handling when attempting to resolve grains
-        /// with prefixes that don't match any registered implementations.
+        /// Tests that non-existent grain prefixes produce references which can resolve after the cluster manifest changes.
         /// </summary>
         [Fact, TestCategory("BVT"), TestCategory("Factory"), TestCategory("GetGrain")]
-        public void GetGrain_WrongPrefix()
+        public void GetGrain_WrongPrefix_ReturnsUnresolvedReference()
         {
-            Assert.Throws<ArgumentException>(() =>
-            {
-                var g = this.GrainFactory.GetGrain<IBase>(GetRandomGrainId(), "Foo");
-            });
+            var grain = this.GrainFactory.GetGrain<IBase>(GetRandomGrainId(), "Foo");
+
+            Assert.True(grain.GetGrainId().Type.IsStubGrain());
         }
 
         /// <summary>
@@ -153,17 +150,14 @@ namespace DefaultCluster.Tests
         }
 
         /// <summary>
-        /// Tests error handling for invalid prefixes with derived grains.
-        /// Validates that incorrect prefixes throw appropriate exceptions
-        /// even in inheritance scenarios.
+        /// Tests that invalid prefixes for derived grain interfaces produce unresolved references.
         /// </summary>
         [Fact, TestCategory("BVT"), TestCategory("Factory"), TestCategory("GetGrain")]
-        public void GetGrain_Derived_WithWrongPrefix()
+        public void GetGrain_Derived_WithWrongPrefix_ReturnsUnresolvedReference()
         {
-            Assert.Throws<ArgumentException>(() =>
-            {
-                var g = this.GrainFactory.GetGrain<IDerivedFromBase>(GetRandomGrainId(), "Foo");
-            });
+            var grain = this.GrainFactory.GetGrain<IDerivedFromBase>(GetRandomGrainId(), "Foo");
+
+            Assert.True(grain.GetGrainId().Type.IsStubGrain());
         }
 
         /// <summary>
