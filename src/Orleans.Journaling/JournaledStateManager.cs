@@ -1010,25 +1010,19 @@ internal sealed partial class JournaledStateManager : IJournaledStateManager, IJ
     private void ThrowIfWriteOperationsUnavailable()
     {
         _shutdownCancellation.Token.ThrowIfCancellationRequested();
-        if (_state is ManagerState.Unknown)
+        switch (_state)
         {
-            throw new InvalidOperationException("The journaled state manager has not been initialized.");
-        }
-
-        // Recovery-pending operations are queued as retry triggers; recovery completes before they are processed.
-        ThrowIfWritesFenced();
-    }
-
-    private void ThrowIfWritesFenced()
-    {
-        if (_state is ManagerState.Recovering)
-        {
-            throw new InvalidOperationException("Journaled state writes are unavailable while recovery is in progress.");
-        }
-
-        if (_state is ManagerState.Fenced)
-        {
-            throw new InvalidOperationException("Journaled state writes are fenced because recovery failed. Call RevertPendingChangesAsync to retry recovery.");
+            case ManagerState.Unknown:
+                throw new InvalidOperationException("The journaled state manager has not been initialized.");
+            case ManagerState.Ready:
+            case ManagerState.RecoveryPending:
+                return;
+            case ManagerState.Recovering:
+                throw new InvalidOperationException("Journaled state writes are unavailable while recovery is in progress.");
+            case ManagerState.Fenced:
+                throw new InvalidOperationException("Journaled state writes are fenced because recovery failed. Call RevertPendingChangesAsync to retry recovery.");
+            default:
+                throw new UnreachableException();
         }
     }
 
