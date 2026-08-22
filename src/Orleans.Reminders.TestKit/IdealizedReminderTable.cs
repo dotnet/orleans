@@ -92,15 +92,7 @@ public sealed class IdealizedReminderTable : IReminderTable
     /// </summary>
     /// <returns>A strict capability set naming this instance.</returns>
     public ReminderTableCapabilities CreateCapabilities()
-    {
-        var capabilities = ReminderTableCapabilities.Strict(Name);
-
-        // The oracle intentionally does not implement conditional upsert: it models the contract which every
-        // built-in Orleans reminder provider implements, in which upsert is a blind write and RemoveRow is the
-        // only conditional operation.
-        capabilities.SupportsConditionalUpsert = false;
-        return capabilities;
-    }
+        => ReminderTableProviderProfiles.Oracle(Name);
 
     /// <summary>
     /// Returns a deterministically ordered snapshot of every durable record.

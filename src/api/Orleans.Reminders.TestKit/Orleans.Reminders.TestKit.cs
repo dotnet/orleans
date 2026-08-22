@@ -126,31 +126,64 @@ namespace Orleans.Reminders.TestKit
 
     public sealed partial class ReminderTableCapabilities
     {
+        public int CardinalityMutationBatchSize { get { throw null; } set { } }
+
         public int ConcurrentUpsertCount { get { throw null; } set { } }
 
         public int ParallelGrainCount { get { throw null; } set { } }
 
         public string ProviderName { get { throw null; } set { } }
 
-        public bool SupportsConcurrentOperations { get { throw null; } set { } }
+        public System.TimeSpan ReadConvergenceDelay { get { throw null; } set { } }
+
+        public System.TimeSpan ReadConvergenceTimeout { get { throw null; } set { } }
 
         public bool SupportsConditionalUpsert { get { throw null; } set { } }
 
         public bool SupportsCrossTableIsolation { get { throw null; } set { } }
 
+        public bool SupportsETagRotation { get { throw null; } set { } }
+
+        public bool SupportsParallelDistinctRows { get { throw null; } set { } }
+
+        public bool SupportsRestartAfterStop { get { throw null; } set { } }
+
+        public bool SupportsSameIdentityConcurrentUpserts { get { throw null; } set { } }
+
         public bool SupportsStartCancellation { get { throw null; } set { } }
 
-        public bool SupportsStopAsync { get { throw null; } set { } }
-
         public bool SupportsSubSecondPrecision { get { throw null; } set { } }
+
+        public bool SupportsUnsignedHashRangeBoundaries { get { throw null; } set { } }
 
         public static ReminderTableCapabilities Portable(string providerName) { throw null; }
 
         public static ReminderTableCapabilities Strict(string providerName) { throw null; }
     }
 
+    public static partial class ReminderTableProviderProfiles
+    {
+        public static ReminderTableCapabilities AdoNet(string providerName) { throw null; }
+
+        public static ReminderTableCapabilities AzureStorage(string providerName) { throw null; }
+
+        public static ReminderTableCapabilities Cosmos(string providerName) { throw null; }
+
+        public static ReminderTableCapabilities DynamoDB(string providerName) { throw null; }
+
+        public static ReminderTableCapabilities Firestore(string providerName) { throw null; }
+
+        public static ReminderTableCapabilities InMemory(string providerName) { throw null; }
+
+        public static ReminderTableCapabilities Oracle(string providerName) { throw null; }
+
+        public static ReminderTableCapabilities Redis(string providerName) { throw null; }
+    }
+
     public sealed partial class ReminderTableModelBasedConformanceOptions
     {
+        public ReminderTableCapabilities Capabilities { get { throw null; } set { } }
+
         public string GrainType { get { throw null; } set { } }
 
         public string? KeyPrefix { get { throw null; } set { } }
@@ -166,6 +199,8 @@ namespace Orleans.Reminders.TestKit
 
     public sealed partial class ReminderTableModelBasedTestRunner
     {
+        public ReminderTableModelBasedTestRunner(IReminderTable reminderTable, ReminderTableCapabilities capabilities, System.Action<string>? output = null) { }
+
         public ReminderTableModelBasedTestRunner(IReminderTable reminderTable, ReminderTableModelBasedConformanceOptions options, System.Action<string>? output = null) { }
 
         public ReminderTableModelBasedTestRunner(IReminderTable reminderTable, string providerName, System.Action<string>? output = null) { }
@@ -290,7 +325,7 @@ namespace Orleans.Reminders.TestKit
 
         protected System.DateTime Normalize(System.DateTime value) { throw null; }
 
-        protected System.Threading.Tasks.Task<ReminderEntry> ReadRequiredAsync(Runtime.GrainId grainId, string reminderName, string guarantee) { throw null; }
+        protected System.Threading.Tasks.Task<ReminderEntry> ReadRequiredAsync(Runtime.GrainId grainId, string reminderName, string guarantee, ReminderEntry? expected = null, string? expectedETag = null) { throw null; }
 
         public virtual System.Threading.Tasks.Task ReminderTable_ConcurrentUpserts_ProduceDistinctETags() { throw null; }
 
@@ -317,6 +352,8 @@ namespace Orleans.Reminders.TestKit
         public virtual System.Threading.Tasks.Task ReminderTable_ReadRows_OutsideRange_DoesNotDeleteReminder() { throw null; }
 
         public virtual System.Threading.Tasks.Task ReminderTable_ReadRows_Range_ExcludesBeginAndIncludesEnd() { throw null; }
+
+        public virtual System.Threading.Tasks.Task ReminderTable_ReadRows_UnsignedBoundary_UsesUInt32Ordering() { throw null; }
 
         public virtual System.Threading.Tasks.Task ReminderTable_ReadRows_WrapAroundRange_ReturnsWrappedSegment() { throw null; }
 

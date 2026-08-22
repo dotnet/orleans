@@ -64,9 +64,9 @@ public sealed class ReminderTableCapabilities
     /// <see cref="ReminderEntry.ETag"/> as a precondition.
     /// </summary>
     /// <remarks>
-    /// Default is <see langword="false"/>. Upsert is a blind write in every built-in Orleans reminder provider;
-    /// <see cref="IReminderTable.RemoveRow"/> is the only conditional operation in the contract. Providers which
-    /// implement conditional upsert may opt in, which enables the stale-ETag rejection guarantee.
+    /// Default is <see langword="false"/>, which defines the portable blind-upsert contract.
+    /// Providers such as Cosmos DB and Firestore which apply the supplied ETag as a write precondition opt in,
+    /// enabling the stale-ETag rejection guarantee.
     /// </remarks>
     public bool SupportsConditionalUpsert { get; set; }
 
@@ -80,18 +80,43 @@ public sealed class ReminderTableCapabilities
     public bool SupportsStartCancellation { get; set; }
 
     /// <summary>
-    /// Gets or sets a value indicating whether <see cref="IReminderTable.StopAsync"/> may be invoked by the suite.
+    /// Gets or sets a value indicating whether a stopped table can be started again and resume serving durable rows.
     /// </summary>
     /// <remarks>
-    /// Default is <see langword="true"/>. Set to <see langword="false"/> when a shared provider instance is reused
-    /// across a test class and stopping it would invalidate later tests.
+    /// Default is <see langword="false"/>. Restartability is not part of the portable contract and providers whose
+    /// initialization completion source is one-shot cannot restart after <see cref="IReminderTable.StopAsync"/>.
     /// </remarks>
-    public bool SupportsStopAsync { get; set; } = true;
+    public bool SupportsRestartAfterStop { get; set; }
 
     /// <summary>
-    /// Gets or sets a value indicating whether the provider accepts concurrent operations against the same row.
+    /// Gets or sets a value indicating whether concurrent upserts of one identity all succeed with non-empty,
+    /// distinct ETags.
     /// </summary>
-    public bool SupportsConcurrentOperations { get; set; } = true;
+    public bool SupportsSameIdentityConcurrentUpserts { get; set; }
+
+    /// <summary>
+    /// Gets or sets a value indicating whether distinct reminder rows can be written in parallel without losing or
+    /// mixing their identities and payloads.
+    /// </summary>
+    public bool SupportsParallelDistinctRows { get; set; }
+
+    /// <summary>
+    /// Gets or sets a value indicating whether every successful replacement of one row rotates its ETag.
+    /// </summary>
+    /// <remarks>
+    /// When disabled, schedule and payload replacement are still verified. Providers which derive ETags from
+    /// finite-resolution timestamps can therefore retain state conformance without claiming per-write rotation.
+    /// </remarks>
+    public bool SupportsETagRotation { get; set; }
+
+    /// <summary>
+    /// Gets or sets a value indicating whether hash range comparisons use the unsigned 32-bit ring ordering at the
+    /// signed boundary and across ring wrap-around.
+    /// </summary>
+    /// <remarks>
+    /// The full-ring <c>(0, 0]</c> and exact-cardinality guarantees do not depend on this capability.
+    /// </remarks>
+    public bool SupportsUnsignedHashRangeBoundaries { get; set; }
 
     /// <summary>
     /// Gets or sets a value indicating whether the fixture can create a second, independently scoped table
@@ -115,6 +140,28 @@ public sealed class ReminderTableCapabilities
     public int ParallelGrainCount { get; set; } = 5;
 
     /// <summary>
+    /// Gets or sets the maximum number of concurrent mutations used to populate and clean up exact-cardinality tests.
+    /// </summary>
+    /// <remarks>
+    /// Providers whose storage engine serializes reminder-table mutations can set this value to one.
+    /// </remarks>
+    public int CardinalityMutationBatchSize { get; set; } = 12;
+
+    /// <summary>
+    /// Gets or sets the bounded period during which reads and enumerations may converge after a mutation.
+    /// </summary>
+    /// <remarks>
+    /// A value of <see cref="TimeSpan.Zero"/> requires the first read to observe the mutation and performs no delay.
+    /// A positive value enables retries until the expected state is observed or the timeout expires.
+    /// </remarks>
+    public TimeSpan ReadConvergenceTimeout { get; set; }
+
+    /// <summary>
+    /// Gets or sets the delay between read-convergence attempts.
+    /// </summary>
+    public TimeSpan ReadConvergenceDelay { get; set; } = TimeSpan.FromMilliseconds(100);
+
+    /// <summary>
     /// Creates a strict capability set in which every optional guarantee is enabled.
     /// </summary>
     /// <param name="providerName">The provider name reported in failure messages.</param>
@@ -125,8 +172,11 @@ public sealed class ReminderTableCapabilities
         SupportsSubSecondPrecision = true,
         SupportsConditionalUpsert = true,
         SupportsStartCancellation = true,
-        SupportsStopAsync = true,
-        SupportsConcurrentOperations = true,
+        SupportsRestartAfterStop = true,
+        SupportsSameIdentityConcurrentUpserts = true,
+        SupportsParallelDistinctRows = true,
+        SupportsETagRotation = true,
+        SupportsUnsignedHashRangeBoundaries = true,
         SupportsCrossTableIsolation = true
     };
 
@@ -143,21 +193,41 @@ public sealed class ReminderTableCapabilities
         var methodNames = new HashSet<string>(StringComparer.Ordinal);
 
         AddIfDisabled(
-            SupportsStopAsync,
+            SupportsRestartAfterStop,
             nameof(ReminderTableTestRunner.ReminderTable_StopAsync_ThenRestart_ResumesService),
-            nameof(SupportsStopAsync));
+            nameof(SupportsRestartAfterStop));
+        AddIfDisabled(
+            SupportsETagRotation,
+            nameof(ReminderTableTestRunner.ReminderTable_UpsertRow_ReplacesETagOnEachWrite),
+            nameof(SupportsETagRotation));
+        AddIfDisabled(
+            SupportsETagRotation,
+            nameof(ReminderTableTestRunner.ReminderTable_RemoveRow_WithStaleETag_FailsAndRetainsRow),
+            nameof(SupportsETagRotation));
         AddIfDisabled(
             SupportsConditionalUpsert,
             nameof(ReminderTableTestRunner.ReminderTable_UpsertRow_WithStaleETag_IsRejected),
             nameof(SupportsConditionalUpsert));
         AddIfDisabled(
-            SupportsConcurrentOperations,
+            SupportsSameIdentityConcurrentUpserts,
             nameof(ReminderTableTestRunner.ReminderTable_ConcurrentUpserts_ProduceDistinctETags),
-            nameof(SupportsConcurrentOperations));
+            nameof(SupportsSameIdentityConcurrentUpserts));
         AddIfDisabled(
-            SupportsConcurrentOperations,
+            SupportsParallelDistinctRows,
             nameof(ReminderTableTestRunner.ReminderTable_ParallelUpserts_AcrossGrains_RemainIsolated),
-            nameof(SupportsConcurrentOperations));
+            nameof(SupportsParallelDistinctRows));
+        AddIfDisabled(
+            SupportsUnsignedHashRangeBoundaries,
+            nameof(ReminderTableTestRunner.ReminderTable_ReadRows_UnsignedBoundary_UsesUInt32Ordering),
+            nameof(SupportsUnsignedHashRangeBoundaries));
+        AddIfDisabled(
+            SupportsUnsignedHashRangeBoundaries,
+            nameof(ReminderTableTestRunner.ReminderTable_ReadRows_Range_ExcludesBeginAndIncludesEnd),
+            nameof(SupportsUnsignedHashRangeBoundaries));
+        AddIfDisabled(
+            SupportsUnsignedHashRangeBoundaries,
+            nameof(ReminderTableTestRunner.ReminderTable_ReadRows_WrapAroundRange_ReturnsWrappedSegment),
+            nameof(SupportsUnsignedHashRangeBoundaries));
         AddIfDisabled(
             SupportsCrossTableIsolation,
             nameof(ReminderTableTestRunner.ReminderTable_SeparatelyScopedTables_DoNotShareReminders),

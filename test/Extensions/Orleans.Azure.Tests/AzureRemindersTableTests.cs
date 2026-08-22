@@ -5,6 +5,7 @@ using Tester;
 using TestExtensions;
 using Xunit;
 using Orleans.Reminders.AzureStorage;
+using Orleans.Reminders.TestKit;
 using Tester.AzureUtils;
 
 namespace UnitTests.RemindersTest
@@ -45,6 +46,9 @@ namespace UnitTests.RemindersTest
             options.Value.ConfigureTestDefaults();
             return new AzureBasedReminderTable(loggerFactory, this.clusterOptions, options);
         }
+
+        protected override ReminderTableCapabilities CreateReminderTableCapabilities()
+            => ReminderTableProviderProfiles.AzureStorage(GetType().Name);
 
         protected override Task<string> GetConnectionString()
         {

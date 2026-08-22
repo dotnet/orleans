@@ -4,6 +4,7 @@ using Microsoft.Extensions.Options;
 using Newtonsoft.Json;
 using Orleans.Configuration;
 using Orleans.Reminders.Redis;
+using Orleans.Reminders.TestKit;
 using Orleans.Runtime;
 using StackExchange.Redis;
 using TestExtensions;
@@ -55,6 +56,9 @@ namespace Tester.Redis.Reminders
 
             return reminderTable;
         }
+
+        protected override ReminderTableCapabilities CreateReminderTableCapabilities()
+            => ReminderTableProviderProfiles.Redis(GetType().Name);
 
         protected override Task<string> GetConnectionString() => Task.FromResult(TestDefaultConfiguration.RedisConnectionString!);
 

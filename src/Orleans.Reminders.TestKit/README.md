@@ -26,15 +26,15 @@ Each guarantee below is documented on, and executed by, the identically named `R
 | Test method | Guarantee |
 | --- | --- |
 | `ReminderTable_StartAsync_IsIdempotent` | Repeated initialization leaves the table usable. |
-| `ReminderTable_StopAsync_ThenRestart_ResumesService` | A stopped table can restart without losing durable rows. |
-| `ReminderTable_UpsertRow_ReturnsNewNonEmptyETag` | Every successful write returns a fresh non-empty ETag. |
+| `ReminderTable_StopAsync_ThenRestart_ResumesService` | A stopped table can restart without losing durable rows when restartability is explicitly declared. |
+| `ReminderTable_UpsertRow_ReturnsNewNonEmptyETag` | Every successful write returns a non-empty ETag. |
 | `ReminderTable_UpsertRow_PersistsScheduleForPointRead` | Identity, whole-second UTC `StartAt`, `Period`, and ETag round-trip. |
 | `ReminderTable_ReadRow_MissingReminder_ReturnsNull` | A missing point read returns `null`. |
 | `ReminderTable_ReadRows_ForGrain_ReturnsOnlyThatGrainsReminders` | A grain read returns all and only the requested grain's reminders. |
 | `ReminderTable_ReadRows_ForUnknownGrain_ReturnsEmpty` | An unknown grain returns an empty non-null result. |
 | `ReminderTable_Identity_IsGrainIdAndReminderName` | Identity is the `(GrainId, ReminderName)` pair. |
 | `ReminderTable_Identity_WithSpecialCharacters_RoundTrips` | Reserved characters in reminder names remain individually addressable. |
-| `ReminderTable_UpsertRow_ReplacesETagOnEachWrite` | Replacement rotates the ETag and the latest read observes it. |
+| `ReminderTable_UpsertRow_ReplacesETagOnEachWrite` | Providers which declare ETag rotation return a different ETag for each replacement and expose it to reads. |
 | `ReminderTable_RemoveRow_WithCurrentETag_RemovesRow` | Conditional removal with the current ETag succeeds. |
 | `ReminderTable_RemoveRow_WithStaleETag_FailsAndRetainsRow` | A stale ETag cannot delete or modify the current row. |
 | `ReminderTable_RemoveRow_WithUnknownReminderName_ReturnsFalse` | A mismatched name returns `false` and changes nothing. |
@@ -42,14 +42,15 @@ Each guarantee below is documented on, and executed by, the identically named `R
 | `ReminderTable_UpsertRow_WithStaleETag_IsRejected` | Conditional-upsert providers reject stale writers; blind-upsert providers explicitly disable this capability. |
 | `ReminderTable_UpsertRow_UpdatesStartAtAndPeriod` | A schedule update replaces one row rather than duplicating it. |
 | `ReminderTable_UpsertRow_MovesReminderBetweenLoadingWindows` | Moving `StartAt` across a loading-window boundary is observable without changing identity. |
-| `ReminderTable_ReadRows_FullRange_ReturnsAllReminders` | `(0, 0]` covers the full ring; `(0, uint.MaxValue]` excludes only hash zero. |
+| `ReminderTable_ReadRows_FullRange_ReturnsAllReminders` | `(0, 0]` covers the full ring. |
+| `ReminderTable_ReadRows_UnsignedBoundary_UsesUInt32Ordering` | Providers which declare unsigned ring ordering treat `(0, uint.MaxValue]` as excluding only hash zero. |
 | `ReminderTable_ReadRows_Range_ExcludesBeginAndIncludesEnd` | A normal range is the half-open interval `(begin, end]`. |
 | `ReminderTable_ReadRows_WrapAroundRange_ReturnsWrappedSegment` | `begin >= end` selects both sides of the ring origin. |
 | `ReminderTable_ReadRows_OutsideRange_DoesNotDeleteReminder` | Absence from an ownership range is not durable deletion. |
 | `ReminderTable_ReadRows_AfterRemoval_OmitsRemovedReminder` | Range enumeration explicitly observes removal while preserving siblings. |
 | `ReminderTable_ReadRow_AfterRemoval_ReturnsNull` | A point read, not page absence, confirms durable deletion. |
-| `ReminderTable_ConcurrentUpserts_ProduceDistinctETags` | Concurrent writes of one identity return distinct ETags. |
-| `ReminderTable_ParallelUpserts_AcrossGrains_RemainIsolated` | Parallel grains retain independent rows and ETag streams. |
+| `ReminderTable_ConcurrentUpserts_ProduceDistinctETags` | Providers which explicitly support same-identity contention accept every concurrent write and return distinct ETags. |
+| `ReminderTable_ParallelUpserts_AcrossGrains_RemainIsolated` | Providers which support parallel distinct rows retain each identity and payload independently; cross-row ETag uniqueness is not required. |
 | `ReminderTable_TestOnlyClearTable_RemovesAllReminders` | Test cleanup removes every row and point reads confirm absence. |
 | `ReminderTable_SeparatelyScopedTables_DoNotShareReminders` | Independently scoped services or clusters are isolated when the provider declares this capability. |
 | `ReminderTable_StartAsync_WithCanceledToken_ThrowsOperationCanceled` | Providers which declare initialization cancellation surface `OperationCanceledException`. |
@@ -63,6 +64,9 @@ the executable baseline for adding due-window paging in a future interface revis
 ```csharp
 public sealed class MyReminderTableFixture : ReminderTableTestFixture, IAsyncLifetime
 {
+    public ReminderTableCapabilities Capabilities { get; } =
+        ReminderTableCapabilities.Portable("MyProvider");
+
     protected override void ConfigureSilo(ISiloBuilder siloBuilder) => siloBuilder.UseMyReminderProvider();
 
     protected override void CheckPreconditionsOrThrow() => MyProviderEmulator.EnsureAvailable();
@@ -72,9 +76,12 @@ public sealed class MyReminderTableFixture : ReminderTableTestFixture, IAsyncLif
 public sealed class MyReminderTableTests : ReminderTableTestRunner, IClassFixture<MyReminderTableFixture>
 {
     public MyReminderTableTests(MyReminderTableFixture fixture)
-        : base(fixture.ReminderTable, ReminderTableCapabilities.Portable("MyProvider"))
+        : base(fixture.ReminderTable, fixture.Capabilities)
     {
+        _fixture = fixture;
     }
+
+    private readonly MyReminderTableFixture _fixture;
 
     [Fact]
     public override Task ReminderTable_UpsertRow_ReturnsNewNonEmptyETag() => base.ReminderTable_UpsertRow_ReturnsNewNonEmptyETag();
@@ -83,14 +90,25 @@ public sealed class MyReminderTableTests : ReminderTableTestRunner, IClassFixtur
 
     [Fact]
     public Task ReminderTable_ModelBasedGeneratedConformance()
-        => new ReminderTableModelBasedTestRunner(ReminderTable, "MyProvider").RunGeneratedConformanceTests();
+        => new ReminderTableModelBasedTestRunner(ReminderTable, _fixture.Capabilities).RunGeneratedConformanceTests();
 }
 ```
 
 Capability differences are declared, not omitted. For example a provider which cannot guarantee unique ETags
-for simultaneous writers sets `SupportsConcurrentUpserts = false` on its
+for simultaneous writers sets `SupportsSameIdentityConcurrentUpserts = false` on its
 `ReminderTableCapabilities`, which documents the deviation in code and records the disabled guarantee in
 `SkippedGuarantees`.
+
+`ReminderTableProviderProfiles` contains the reviewed manifests for Azure Table Storage, Cosmos DB, ADO.NET,
+Firestore, DynamoDB, Redis, the grain-based in-memory provider, and the oracle. Restart after `StopAsync`, ETag
+rotation, same-identity contention, parallel distinct-row writes, and unsigned hash-ring boundaries are independent
+affirmative capabilities. ADO.NET retains full-ring and exact-cardinality coverage while its signed range comparisons
+disable only unsigned boundary and wrap guarantees.
+
+Providers with eventually consistent reads set a positive `ReadConvergenceTimeout` and
+`ReadConvergenceDelay`. Direct and model-based checks retry only when that window is positive and fail with the
+provider, operation, timeout, attempt count, expected state, and last observation. Immediate profiles perform one
+read without a delay. DynamoDB uses a bounded ten-second convergence window.
 
 ## Cluster-level testing with the oracle
 

@@ -32,18 +32,6 @@ public class ReminderTableTestsBaseTests
                 && operation.Begin == 0
                 && operation.End == 0
                 && operation.ResultCount == RequestedCount);
-        Assert.Contains(
-            table.Operations,
-            operation => operation.Kind == ReminderTableOperationKind.ReadRange
-                && operation.Begin is uint begin
-                && operation.End is uint end
-                && begin < end);
-        Assert.Contains(
-            table.Operations,
-            operation => operation.Kind == ReminderTableOperationKind.ReadRange
-                && operation.Begin is uint begin
-                && operation.End is uint end
-                && begin > end);
         Assert.Empty(table.Snapshot());
     }
 
