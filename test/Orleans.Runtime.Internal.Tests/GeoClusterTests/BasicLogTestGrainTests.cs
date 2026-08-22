@@ -61,7 +61,7 @@ namespace Tests.GeoClusterTests
                 }
             }
         }
-        
+
         public BasicLogTestGrainTests(Fixture fixture)
         {
             this.fixture = fixture;

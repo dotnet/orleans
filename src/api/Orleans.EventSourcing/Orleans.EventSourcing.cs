@@ -370,11 +370,17 @@ namespace Orleans.EventSourcing.Common
 
 namespace Orleans.EventSourcing.CustomStorage
 {
+    public partial interface ICustomStorageFactory
+    {
+        ICustomStorageInterface<TState, TDelta> CreateCustomStorage<TState, TDelta>(Runtime.GrainId grainId);
+    }
+
     public partial interface ICustomStorageInterface<TState, TDelta>
     {
         System.Threading.Tasks.Task<bool> ApplyUpdatesToStorage(System.Collections.Generic.IReadOnlyList<TDelta> updates, int expectedVersion);
         System.Threading.Tasks.Task ClearStoredState();
         System.Threading.Tasks.Task<System.Collections.Generic.KeyValuePair<int, TState>> ReadStateFromStorage();
+        System.Threading.Tasks.Task<System.Collections.Generic.IReadOnlyList<TDelta>> RetrieveLogSegment(int fromVersion, int toVersion);
     }
 
     public partial class LogConsistencyProvider : ILogViewAdaptorFactory
@@ -507,7 +513,13 @@ namespace Orleans.Hosting
     {
         public static ISiloBuilder AddCustomStorageBasedLogConsistencyProvider(this ISiloBuilder builder, string name = "LogStorage", string? primaryCluster = null) { throw null; }
 
+        public static ISiloBuilder AddCustomStorageBasedLogConsistencyProvider<TCustomStorageFactory>(this ISiloBuilder builder, string name = "LogStorage", string? primaryCluster = null)
+            where TCustomStorageFactory : class, EventSourcing.CustomStorage.ICustomStorageFactory { throw null; }
+
         public static ISiloBuilder AddCustomStorageBasedLogConsistencyProviderAsDefault(this ISiloBuilder builder, string? primaryCluster = null) { throw null; }
+
+        public static ISiloBuilder AddCustomStorageBasedLogConsistencyProviderAsDefault<TCustomStorageFactory>(this ISiloBuilder builder, string? primaryCluster = null)
+            where TCustomStorageFactory : class, EventSourcing.CustomStorage.ICustomStorageFactory { throw null; }
     }
 
     public static partial class LogStorageSiloBuilderExtensions

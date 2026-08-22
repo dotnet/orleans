@@ -20,11 +20,42 @@ namespace Orleans.Hosting
         }
 
         /// <summary>
+        /// Adds a custom storage log consistency provider as the default consistency provider and registers its keyed storage factory.
+        /// </summary>
+        /// <typeparam name="TCustomStorageFactory">The custom storage factory type.</typeparam>
+        public static ISiloBuilder AddCustomStorageBasedLogConsistencyProviderAsDefault<TCustomStorageFactory>(
+            this ISiloBuilder builder,
+            string? primaryCluster = null)
+            where TCustomStorageFactory : class, ICustomStorageFactory
+        {
+            return builder.AddCustomStorageBasedLogConsistencyProvider<TCustomStorageFactory>(
+                ProviderConstants.DEFAULT_STORAGE_PROVIDER_NAME,
+                primaryCluster);
+        }
+
+        /// <summary>
         /// Adds a custom storage log consistency provider"/>
         /// </summary>
         public static ISiloBuilder AddCustomStorageBasedLogConsistencyProvider(this ISiloBuilder builder, string name = "LogStorage", string? primaryCluster = null)
         {
             return builder.ConfigureServices(services => services.AddCustomStorageBasedLogConsistencyProvider(name, primaryCluster));
+        }
+
+        /// <summary>
+        /// Adds a custom storage log consistency provider and registers its keyed storage factory.
+        /// </summary>
+        /// <typeparam name="TCustomStorageFactory">The custom storage factory type.</typeparam>
+        public static ISiloBuilder AddCustomStorageBasedLogConsistencyProvider<TCustomStorageFactory>(
+            this ISiloBuilder builder,
+            string name = "LogStorage",
+            string? primaryCluster = null)
+            where TCustomStorageFactory : class, ICustomStorageFactory
+        {
+            return builder.ConfigureServices(services =>
+            {
+                services.AddCustomStorageBasedLogConsistencyProvider(name, primaryCluster);
+                services.AddKeyedSingleton<ICustomStorageFactory, TCustomStorageFactory>(name);
+            });
         }
 
         internal static void AddCustomStorageBasedLogConsistencyProvider(this IServiceCollection services, string name, string? primaryCluster)
