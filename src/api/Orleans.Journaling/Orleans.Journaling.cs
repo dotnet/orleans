@@ -219,13 +219,20 @@ namespace Orleans.Journaling
         void Reset(JournalStreamWriter writer);
     }
 
+    public partial interface IJournaledGrainParticipant
+    {
+        void Initialize();
+    }
+
     public partial interface IJournaledStateManager : System.IAsyncDisposable
     {
         long PendingWriteByteCount { get; }
 
         System.Threading.Tasks.ValueTask DeleteStateAsync(System.Threading.CancellationToken cancellationToken);
         System.Threading.Tasks.ValueTask InitializeAsync(System.Threading.CancellationToken cancellationToken);
+        void RegisterObserver(IJournaledStateObserver observer);
         void RegisterState(string name, IJournaledState state);
+        System.Threading.Tasks.ValueTask RevertPendingChangesAsync(System.Threading.CancellationToken cancellationToken);
         System.Threading.Tasks.ValueTask System.IAsyncDisposable.DisposeAsync();
         bool TryGetState(string name, out IJournaledState? state);
         System.Threading.Tasks.ValueTask WriteStateAsync(System.Threading.CancellationToken cancellationToken);
@@ -234,6 +241,14 @@ namespace Orleans.Journaling
     public partial interface IJournaledStateManagerFactory
     {
         IJournaledStateManager Create(JournalId journalId);
+    }
+
+    public partial interface IJournaledStateObserver
+    {
+        void OnRecoveryCompleted();
+        void OnWriteCompleted();
+        System.Threading.Tasks.ValueTask OnWritePreparingAsync(System.Threading.CancellationToken cancellationToken);
+        void OnWriteStarted();
     }
 
     public partial interface IJournalFormat
