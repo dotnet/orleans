@@ -7,11 +7,13 @@ namespace Orleans.DurableTasks;
 public struct DurableTaskMethodBuilder
 {
     private VoidDurableTaskMethodInvocation? _invocation;
+
     private readonly VoidDurableTaskMethodInvocation Invocation
         => _invocation ?? throw new InvalidOperationException("The durable task builder has not started.");
 
     /// <summary>Gets the deferred durable task definition.</summary>
     public readonly DurableTask Task => Invocation;
+
     /// <summary>Creates a builder.</summary>
     public static DurableTaskMethodBuilder Create() => new();
 
@@ -32,6 +34,7 @@ public struct DurableTaskMethodBuilder
 
     /// <summary>Completes the definition with an exception.</summary>
     public readonly void SetException(Exception exception) => Invocation.SetException(exception);
+
     /// <summary>Completes the definition successfully.</summary>
     public readonly void SetResult() => Invocation.SetResult();
 
@@ -58,11 +61,13 @@ public struct DurableTaskMethodBuilder
 public struct DurableTaskMethodBuilder<TResult>
 {
     private DurableTaskMethodInvocation<TResult>? _invocation;
+
     private readonly DurableTaskMethodInvocation<TResult> Invocation
         => _invocation ?? throw new InvalidOperationException("The durable task builder has not started.");
 
     /// <summary>Gets the deferred durable task definition.</summary>
     public readonly DurableTask<TResult> Task => Invocation;
+
     /// <summary>Creates a builder.</summary>
     public static DurableTaskMethodBuilder<TResult> Create() => new();
 
@@ -83,6 +88,7 @@ public struct DurableTaskMethodBuilder<TResult>
 
     /// <summary>Completes the definition with an exception.</summary>
     public readonly void SetException(Exception exception) => Invocation.SetException(exception);
+
     /// <summary>Completes the definition successfully with <paramref name="result"/>.</summary>
     public readonly void SetResult(TResult result) => Invocation.SetResult(result);
 
