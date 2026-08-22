@@ -200,6 +200,8 @@ items:
         href: how-to/index.md
       - name: Implement long-running reminders
         href: how-to/long-running-reminders.md
+      - name: Model collections of grains
+        href: how-to/model-grain-collections.md
   - name: Host and configure
     items:
       - name: Hosting
