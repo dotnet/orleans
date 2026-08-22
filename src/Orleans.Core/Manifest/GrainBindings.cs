@@ -5,200 +5,194 @@ using System.Collections.Immutable;
 using System.Threading;
 using Orleans.Runtime;
 
-namespace Orleans.Metadata
+namespace Orleans.Metadata;
+
+/// <summary>
+/// Describes the bindings for a given grain type.
+/// </summary>
+/// <remarks>
+/// Bindings are a way to declaratively connect grains with other resources.
+/// </remarks>
+/// <remarks>
+/// Initializes a new instance of the <see cref="GrainBindings"/> class.
+/// </remarks>
+/// <param name="grainType">The grain type.</param>
+/// <param name="bindings">The bindings for the specified grain type.</param>
+public class GrainBindings(GrainType grainType, ImmutableArray<ImmutableDictionary<string, string>> bindings)
 {
+
     /// <summary>
-    /// Describes the bindings for a given grain type.
+    /// Gets the grain type.
     /// </summary>
-    /// <remarks>
-    /// Bindings are a way to declaratively connect grains with other resources.
-    /// </remarks>
-    public class GrainBindings
+    public GrainType GrainType { get; } = grainType;
+
+    /// <summary>
+    /// Gets the bindings for the specified grain type.
+    /// </summary>
+    public ImmutableArray<ImmutableDictionary<string, string>> Bindings { get; } = bindings;
+}
+
+/// <summary>
+/// Resolves bindings for grain types.
+/// </summary>
+public class GrainBindingsResolver
+{
+    private const string BindingPrefix = WellKnownGrainTypeProperties.BindingPrefix + ".";
+    private const char BindingIndexEnd = '.';
+#if NET9_0_OR_GREATER
+    private readonly Lock _lockObj = new();
+#else
+    private readonly object _lockObj = new();
+#endif
+    private readonly ConcurrentDictionary<GenericGrainType, GrainType> _genericMapping = new ConcurrentDictionary<GenericGrainType, GrainType>();
+    private readonly IClusterManifestProvider _clusterManifestProvider;
+    private Cache _cache;
+
+    /// <summary>
+    /// Initializes a new instance of the <see cref="GrainBindingsResolver"/> class.
+    /// </summary>
+    /// <param name="clusterManifestProvider">
+    /// The cluster manifest provider.
+    /// </param>
+    public GrainBindingsResolver(IClusterManifestProvider clusterManifestProvider)
     {
-        /// <summary>
-        /// Initializes a new instance of the <see cref="GrainBindings"/> class.
-        /// </summary>
-        /// <param name="grainType">The grain type.</param>
-        /// <param name="bindings">The bindings for the specified grain type.</param>
-        public GrainBindings(GrainType grainType, ImmutableArray<ImmutableDictionary<string, string>> bindings)
-        {
-            this.GrainType = grainType;
-            this.Bindings = bindings;
-        }
-
-        /// <summary>
-        /// Gets the grain type.
-        /// </summary>
-        public GrainType GrainType { get; }
-
-        /// <summary>
-        /// Gets the bindings for the specified grain type.
-        /// </summary>
-        public ImmutableArray<ImmutableDictionary<string, string>> Bindings { get; }
+        _clusterManifestProvider = clusterManifestProvider;
+        _cache = BuildCache(_clusterManifestProvider.Current);
     }
 
     /// <summary>
-    /// Resolves bindings for grain types.
+    /// Gets bindings for the provided grain type.
     /// </summary>
-    public class GrainBindingsResolver
+    /// <param name="grainType">
+    /// The grain type.
+    /// </param>
+    /// <returns>The grain bindings.</returns>
+    public GrainBindings GetBindings(GrainType grainType)
     {
-        private const string BindingPrefix = WellKnownGrainTypeProperties.BindingPrefix + ".";
-        private const char BindingIndexEnd = '.';
-#if NET9_0_OR_GREATER
-        private readonly Lock _lockObj = new();
-#else
-        private readonly object _lockObj = new();
-#endif
-        private readonly ConcurrentDictionary<GenericGrainType, GrainType> _genericMapping = new ConcurrentDictionary<GenericGrainType, GrainType>();
-        private readonly IClusterManifestProvider _clusterManifestProvider;
-        private Cache _cache;
-
-        /// <summary>
-        /// Initializes a new instance of the <see cref="GrainBindingsResolver"/> class.
-        /// </summary>
-        /// <param name="clusterManifestProvider">
-        /// The cluster manifest provider.
-        /// </param>
-        public GrainBindingsResolver(IClusterManifestProvider clusterManifestProvider)
+        GrainType lookupType;
+        if (GenericGrainType.TryParse(grainType, out var generic))
         {
-            _clusterManifestProvider = clusterManifestProvider;
-            _cache = BuildCache(_clusterManifestProvider.Current);
+            if (!_genericMapping.TryGetValue(generic, out lookupType))
+            {
+                lookupType = _genericMapping[generic] = generic.GetUnconstructedGrainType().GrainType;
+            }
+        }
+        else
+        {
+            lookupType = grainType;
         }
 
-        /// <summary>
-        /// Gets bindings for the provided grain type.
-        /// </summary>
-        /// <param name="grainType">
-        /// The grain type.
-        /// </param>
-        /// <returns>The grain bindings.</returns>
-        public GrainBindings GetBindings(GrainType grainType)
+        var cache = GetCache();
+        if (cache.Map.TryGetValue(lookupType, out var result))
         {
-            GrainType lookupType;
-            if (GenericGrainType.TryParse(grainType, out var generic))
-            {
-                if (!_genericMapping.TryGetValue(generic, out lookupType))
-                {
-                    lookupType = _genericMapping[generic] = generic.GetUnconstructedGrainType().GrainType;
-                }
-            }
-            else
-            {
-                lookupType = grainType;
-            }
-
-            var cache = GetCache();
-            if (cache.Map.TryGetValue(lookupType, out var result))
-            {
-                return result;
-            }
-
-            return new GrainBindings(grainType, ImmutableArray<ImmutableDictionary<string, string>>.Empty);
+            return result;
         }
 
-        /// <summary>
-        /// Gets all bindings.
-        /// </summary>
-        /// <returns>The collection of all grain bindings.</returns>
-        public (MajorMinorVersion Version, ImmutableDictionary<GrainType, GrainBindings> Bindings) GetAllBindings()
+        return new GrainBindings(grainType, ImmutableArray<ImmutableDictionary<string, string>>.Empty);
+    }
+
+    /// <summary>
+    /// Gets all bindings.
+    /// </summary>
+    /// <returns>The collection of all grain bindings.</returns>
+    public (MajorMinorVersion Version, ImmutableDictionary<GrainType, GrainBindings> Bindings) GetAllBindings()
+    {
+        var cache = GetCache();
+        return (cache.Version, cache.Map);
+    }
+
+    private Cache GetCache()
+    {
+        var cache = _cache;
+        var manifest = _clusterManifestProvider.Current;
+        if (manifest.Version == cache.Version)
         {
-            var cache = GetCache();
-            return (cache.Version, cache.Map);
+            return cache;
         }
 
-        private Cache GetCache()
+        lock (_lockObj)
         {
-            var cache = _cache;
-            var manifest = _clusterManifestProvider.Current;
+            cache = _cache;
+            manifest = _clusterManifestProvider.Current;
             if (manifest.Version == cache.Version)
             {
                 return cache;
             }
 
-            lock (_lockObj)
-            {
-                cache = _cache;
-                manifest = _clusterManifestProvider.Current;
-                if (manifest.Version == cache.Version)
-                {
-                    return cache;
-                }
-
-                return _cache = BuildCache(manifest);
-            }
+            return _cache = BuildCache(manifest);
         }
+    }
 
-        private static Cache BuildCache(ClusterManifest clusterManifest)
+    private static Cache BuildCache(ClusterManifest clusterManifest)
+    {
+        var result = new Dictionary<GrainType, GrainBindings>();
+
+        var bindings = new Dictionary<string, Dictionary<string, string>>();
+        foreach (var manifest in clusterManifest.AllGrainManifests)
         {
-            var result = new Dictionary<GrainType, GrainBindings>();
-
-            var bindings = new Dictionary<string, Dictionary<string, string>>();
-            foreach (var manifest in clusterManifest.AllGrainManifests)
+            foreach (var grainType in manifest.Grains)
             {
-                foreach (var grainType in manifest.Grains)
+                var id = grainType.Key;
+                if (result.ContainsKey(id)) continue;
+                bindings.Clear();
+                foreach (var pair in grainType.Value.Properties)
                 {
-                    var id = grainType.Key;
-                    if (result.ContainsKey(id)) continue;
-                    bindings.Clear();
-                    foreach (var pair in grainType.Value.Properties)
+                    if (TryExtractBindingProperty(pair, out var binding))
                     {
-                        if (TryExtractBindingProperty(pair, out var binding))
+                        if (!bindings.TryGetValue(binding.Index, out var properties))
                         {
-                            if (!bindings.TryGetValue(binding.Index, out var properties))
-                            {
-                                bindings[binding.Index] = properties = new Dictionary<string, string>();
-                            }
-
-                            properties.Add(binding.Key, binding.Value);
+                            bindings[binding.Index] = properties = new Dictionary<string, string>();
                         }
+
+                        properties.Add(binding.Key, binding.Value);
                     }
-
-                    var builder = ImmutableArray.CreateBuilder<ImmutableDictionary<string, string>>();
-                    foreach (var binding in bindings.Values)
-                    {
-                        builder.Add(ImmutableDictionary.CreateRange(binding));
-                    }
-
-                    result.Add(id, new GrainBindings(id, builder.ToImmutable()));
                 }
-            }
 
-            return new Cache(clusterManifest.Version, result.ToImmutableDictionary());
-
-            bool TryExtractBindingProperty(KeyValuePair<string, string> property, out (string Index, string Key, string Value) result)
-            {
-                if (!property.Key.StartsWith(BindingPrefix, StringComparison.Ordinal)
-                    || property.Key.IndexOf(BindingIndexEnd, BindingPrefix.Length) is int indexEndIndex && indexEndIndex < 0)
+                var builder = ImmutableArray.CreateBuilder<ImmutableDictionary<string, string>>();
+                foreach (var binding in bindings.Values)
                 {
-                    result = default;
-                    return false;
+                    builder.Add(ImmutableDictionary.CreateRange(binding));
                 }
 
-                var bindingIndex = property.Key[BindingPrefix.Length..indexEndIndex];
-                var bindingKey = property.Key[(indexEndIndex + 1)..];
-
-                if (string.IsNullOrWhiteSpace(bindingIndex) || string.IsNullOrWhiteSpace(bindingKey))
-                {
-                    result = default;
-                    return false;
-                }
-
-                result = (bindingIndex, bindingKey, property.Value);
-                return true;
+                result.Add(id, new GrainBindings(id, builder.ToImmutable()));
             }
         }
 
-        private class Cache
+        return new Cache(clusterManifest.Version, result.ToImmutableDictionary());
+
+        bool TryExtractBindingProperty(KeyValuePair<string, string> property, out (string Index, string Key, string Value) result)
         {
-            public Cache(MajorMinorVersion version, ImmutableDictionary<GrainType, GrainBindings> map)
+            if (!property.Key.StartsWith(BindingPrefix, StringComparison.Ordinal)
+                || property.Key.IndexOf(BindingIndexEnd, BindingPrefix.Length) is int indexEndIndex && indexEndIndex < 0)
             {
-                this.Version = version;
-                this.Map = map;
+                result = default;
+                return false;
             }
 
-            public MajorMinorVersion Version { get; }
+            var bindingIndex = property.Key[BindingPrefix.Length..indexEndIndex];
+            var bindingKey = property.Key[(indexEndIndex + 1)..];
 
-            public ImmutableDictionary<GrainType, GrainBindings> Map { get; }
+            if (string.IsNullOrWhiteSpace(bindingIndex) || string.IsNullOrWhiteSpace(bindingKey))
+            {
+                result = default;
+                return false;
+            }
+
+            result = (bindingIndex, bindingKey, property.Value);
+            return true;
         }
+    }
+
+    private class Cache
+    {
+        public Cache(MajorMinorVersion version, ImmutableDictionary<GrainType, GrainBindings> map)
+        {
+            this.Version = version;
+            this.Map = map;
+        }
+
+        public MajorMinorVersion Version { get; }
+
+        public ImmutableDictionary<GrainType, GrainBindings> Map { get; }
     }
 }

@@ -1,31 +1,23 @@
 using System.Threading;
 using System.Threading.Tasks;
 
-namespace Orleans.Runtime.Messaging
+namespace Orleans.Runtime.Messaging;
+
+internal class ConnectionManagerLifecycleAdapter<TLifecycle>(ConnectionManager connectionManager)
+    : ILifecycleParticipant<TLifecycle>, ILifecycleObserver where TLifecycle : ILifecycleObservable
 {
-    internal class ConnectionManagerLifecycleAdapter<TLifecycle>
-        : ILifecycleParticipant<TLifecycle>, ILifecycleObserver where TLifecycle : ILifecycleObservable
+    public Task OnStart(CancellationToken ct) => Task.CompletedTask;
+
+    public async Task OnStop(CancellationToken ct)
     {
-        private readonly ConnectionManager connectionManager;
+        await Task.Run(() => connectionManager.Close(ct));
+    }
 
-        public ConnectionManagerLifecycleAdapter(ConnectionManager connectionManager)
-        {
-            this.connectionManager = connectionManager;
-        }
-
-        public Task OnStart(CancellationToken ct) => Task.CompletedTask;
-
-        public async Task OnStop(CancellationToken ct)
-        {
-            await Task.Run(() => this.connectionManager.Close(ct));
-        }
-
-        public void Participate(TLifecycle lifecycle)
-        {
-            lifecycle.Subscribe(
-                nameof(ConnectionManager),
-                ServiceLifecycleStage.RuntimeInitialize-1, // Components from RuntimeInitialize need network
-                this);
-        }
+    public void Participate(TLifecycle lifecycle)
+    {
+        lifecycle.Subscribe(
+            nameof(ConnectionManager),
+            ServiceLifecycleStage.RuntimeInitialize-1, // Components from RuntimeInitialize need network
+            this);
     }
 }

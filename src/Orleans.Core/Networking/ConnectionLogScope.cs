@@ -2,65 +2,57 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 
-namespace Orleans.Runtime.Messaging
+namespace Orleans.Runtime.Messaging;
+
+internal class ConnectionLogScope(Connection connection) : IReadOnlyList<KeyValuePair<string, object?>>
 {
-    internal class ConnectionLogScope : IReadOnlyList<KeyValuePair<string, object?>>
+    private string? _cachedToString;
+
+    public KeyValuePair<string, object?> this[int index]
     {
-        private readonly Connection _connection;
-
-        private string? _cachedToString;
-
-        public ConnectionLogScope(Connection connection)
+        get
         {
-            _connection = connection;
-        }
-
-        public KeyValuePair<string, object?> this[int index]
-        {
-            get
+            if (index == 0)
             {
-                if (index == 0)
-                {
-                    return new KeyValuePair<string, object?>(nameof(Connection.ConnectionId), _connection.ConnectionId);
-                }
-
-                if (index == 1)
-                {
-                    return new KeyValuePair<string, object?>(nameof(Connection.LocalEndPoint), _connection.LocalEndPoint);
-                }
-
-                if (index == 2)
-                {
-                    return new KeyValuePair<string, object?>(nameof(Connection.RemoteEndPoint), _connection.RemoteEndPoint);
-                }
-
-                throw new ArgumentOutOfRangeException(nameof(index));
-            }
-        }
-
-        public int Count => 3;
-
-        public IEnumerator<KeyValuePair<string, object?>> GetEnumerator()
-        {
-            for (int i = 0; i < Count; ++i)
-            {
-                yield return this[i];
-            }
-        }
-
-        IEnumerator IEnumerable.GetEnumerator()
-        {
-            return GetEnumerator();
-        }
-
-        public override string ToString()
-        {
-            if (_cachedToString == null)
-            {
-                _cachedToString = _connection.ToString();
+                return new KeyValuePair<string, object?>(nameof(Connection.ConnectionId), connection.ConnectionId);
             }
 
-            return _cachedToString;
+            if (index == 1)
+            {
+                return new KeyValuePair<string, object?>(nameof(Connection.LocalEndPoint), connection.LocalEndPoint);
+            }
+
+            if (index == 2)
+            {
+                return new KeyValuePair<string, object?>(nameof(Connection.RemoteEndPoint), connection.RemoteEndPoint);
+            }
+
+            throw new ArgumentOutOfRangeException(nameof(index));
         }
+    }
+
+    public int Count => 3;
+
+    public IEnumerator<KeyValuePair<string, object?>> GetEnumerator()
+    {
+        for (int i = 0; i < Count; ++i)
+        {
+            yield return this[i];
+        }
+    }
+
+    IEnumerator IEnumerable.GetEnumerator()
+    {
+        return GetEnumerator();
+    }
+
+    public override string ToString()
+    {
+        if (_cachedToString == null)
+        {
+            _cachedToString = connection.ToString();
+        }
+
+        return _cachedToString;
     }
 }
