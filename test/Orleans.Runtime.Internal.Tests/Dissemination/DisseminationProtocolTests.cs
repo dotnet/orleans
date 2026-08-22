@@ -8,9 +8,7 @@ using System.Net;
 using System.Threading;
 using System.Threading.Tasks;
 using CsCheck;
-#if NET10_0_OR_GREATER
 using Microsoft.Accordant;
-#endif
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
@@ -407,6 +405,72 @@ public class DisseminationProtocolTests
     }
 
     [Fact]
+    public async Task GossipBatchingRejectsNewKeysAtPendingTopicLimit()
+    {
+        var local = CreateSilo(11111);
+        var peer = CreateSilo(11112);
+        var transport = new FakeTransport(local, peer);
+        var firstSendStarted = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var releaseFirstSend = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var sendCount = 0;
+        transport.SendGossipHandler = async (target, batch, cancellationToken) =>
+        {
+            transport.GossipBatches.Add((target, batch));
+            if (Interlocked.Increment(ref sendCount) == 1)
+            {
+                firstSendStarted.TrySetResult(true);
+                await releaseFirstSend.Task.WaitAsync(cancellationToken);
+            }
+        };
+        var topic = new FakeTopic(local);
+        topic.Options.MaxCoalescingDelay = TimeSpan.FromMinutes(1);
+        topic.Options.MaxPendingItemCount = 1;
+        var protocol = CreateProtocol(transport, topic);
+
+        var first = await protocol.Publish(topic.Name, topic.CreateItem(local, "first", sequence: 1), [peer], CancellationToken.None);
+        await firstSendStarted.Task.WaitAsync(TimeSpan.FromSeconds(2));
+        var second = await protocol.Publish(topic.Name, topic.CreateItem(local, "second", sequence: 1), [peer], CancellationToken.None);
+        var third = await protocol.Publish(topic.Name, topic.CreateItem(local, "third", sequence: 1), [peer], CancellationToken.None);
+
+        Assert.True(first);
+        Assert.True(second);
+        Assert.False(third);
+
+        releaseFirstSend.SetResult(true);
+        await protocol.FlushPendingGossip(CancellationToken.None);
+
+        Assert.Equal(2, transport.GossipBatches.Count);
+        Assert.Equal(
+            new[] { "first", "second" },
+            transport.GossipBatches.Select(batch => Assert.Single(GetGossipValues(batch.Batch)).Digest.Key));
+    }
+
+    [Fact]
+    public async Task GossipBatchingDropsExpiredValuesBeforeSend()
+    {
+        var local = CreateSilo(11111);
+        var peer = CreateSilo(11112);
+        var timeProvider = new TestTimeProvider();
+        var transport = new FakeTransport(local, peer);
+        var topic = new FakeTopic(local);
+        topic.Options.MaxCoalescingDelay = TimeSpan.FromMinutes(1);
+        var protocol = CreateProtocol(transport, topic, timeProvider: timeProvider);
+        var item = new DisseminationValue
+        {
+            Digest = new DisseminationTopicDigest(FakeTopic.DefaultKey, version: 1),
+            Root = local,
+            ExpiresAt = timeProvider.GetUtcNow().AddSeconds(1),
+            Payload = BitConverter.GetBytes(1L),
+        };
+
+        Assert.True(await protocol.Publish(topic.Name, item, [peer], CancellationToken.None));
+        timeProvider.Advance(TimeSpan.FromSeconds(1));
+        await protocol.FlushPendingGossip(CancellationToken.None);
+
+        Assert.Empty(transport.GossipBatches);
+    }
+
+    [Fact]
     public async Task GossipSendsHonorConfiguredConcurrency()
     {
         var local = CreateSilo(11111);
@@ -460,6 +524,56 @@ public class DisseminationProtocolTests
 
         Assert.Equal(peers.Length, started);
         Assert.Equal(2, maxInFlight);
+    }
+
+    [Fact]
+    public async Task ScheduledAndExplicitFlushesShareConfiguredConcurrencyLimit()
+    {
+        var local = CreateSilo(11111);
+        var firstPeer = CreateSilo(11112);
+        var secondPeer = CreateSilo(11113);
+        var transport = new FakeTransport(local, firstPeer, secondPeer);
+        var firstSendStarted = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var releaseFirstSend = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var allSendsCompleted = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var inFlight = 0;
+        var maxInFlight = 0;
+        var completed = 0;
+        transport.SendGossipHandler = async (_, _, cancellationToken) =>
+        {
+            var current = Interlocked.Increment(ref inFlight);
+            UpdateMaximum(ref maxInFlight, current);
+            if (Interlocked.CompareExchange(ref completed, 0, 0) == 0)
+            {
+                firstSendStarted.TrySetResult(true);
+                await releaseFirstSend.Task.WaitAsync(cancellationToken);
+            }
+
+            Interlocked.Decrement(ref inFlight);
+            if (Interlocked.Increment(ref completed) == 2)
+            {
+                allSendsCompleted.TrySetResult(true);
+            }
+        };
+
+        var topic = new FakeTopic(local);
+        topic.Options.MaxCoalescingDelay = TimeSpan.FromMilliseconds(1);
+        var protocol = CreateProtocol(transport, topic, options =>
+        {
+            options.MaxConcurrentSends = 1;
+            options.Overlay.FanOutFactor = static _ => 1;
+        });
+
+        Assert.True(await protocol.Publish(topic.Name, topic.CreateItem(local, "first", sequence: 1), [firstPeer], CancellationToken.None));
+        await firstSendStarted.Task.WaitAsync(TimeSpan.FromSeconds(2));
+        Assert.True(await protocol.Publish(topic.Name, topic.CreateItem(local, "second", sequence: 1), [secondPeer], CancellationToken.None));
+        var explicitFlush = protocol.FlushPendingGossip(CancellationToken.None);
+
+        Assert.Equal(1, Volatile.Read(ref maxInFlight));
+        releaseFirstSend.SetResult(true);
+        await explicitFlush;
+        await allSendsCompleted.Task.WaitAsync(TimeSpan.FromSeconds(2));
+        Assert.Equal(1, maxInFlight);
     }
 
     [Fact]
@@ -614,6 +728,7 @@ public class DisseminationProtocolTests
 
         var item = Assert.Single(GetAntiEntropyResponseValues(response));
         Assert.Equal("requested", item.Digest.Key);
+        Assert.Equal(new[] { topic.Name }, response.SupportedTopics);
     }
 
     [Fact]
@@ -790,6 +905,141 @@ public class DisseminationProtocolTests
     }
 
     [Fact]
+    public async Task AntiEntropyRequestsAreChunkedAtConfiguredItemLimit()
+    {
+        var local = CreateSilo(11111);
+        var peer = CreateSilo(11112);
+        var transport = new FakeTransport(local, peer);
+        var topic = new FakeTopic(local);
+        topic.SetValue("a", version: 1);
+        topic.SetValue("b", version: 1);
+        topic.SetValue("c", version: 1);
+        var protocol = CreateProtocol(transport, topic, options =>
+        {
+            options.MaxBatchItems = 2;
+            options.Overlay.AntiEntropyPeerCount = 1;
+        });
+
+        var responses = await protocol.ExchangeAntiEntropy(protocol.CreateAntiEntropyState(), CancellationToken.None);
+
+        Assert.Empty(responses);
+        Assert.Equal(2, transport.AntiEntropyRequests.Count);
+        Assert.All(
+            transport.AntiEntropyRequests,
+            entry => Assert.InRange(entry.Request.DigestsByTopic.Values.Sum(static digests => digests.Length), 1, 2));
+    }
+
+    [Fact]
+    public async Task EmptyAntiEntropyChunkDoesNotStarveLaterRepairChunk()
+    {
+        var local = CreateSilo(11111);
+        var peer = CreateSilo(11112);
+        var transport = new FakeTransport(local, peer);
+        var topic = new FakeTopic(local);
+        topic.SetValue("a", version: 1);
+        topic.SetValue("b", version: 1);
+        transport.ExchangeAntiEntropyHandler = (target, request) =>
+        {
+            var digest = request.DigestsByTopic.Values.SelectMany(static digests => digests).Single();
+            return ValueTask.FromResult(new DisseminationAntiEntropyResponse
+            {
+                Sender = target,
+                ValuesByTopic = digest.Key == "b"
+                    ? CreateValueGroups(topic.CreateItem(target, digest.Key, sequence: 2))
+                    : ImmutableDictionary<string, ImmutableArray<DisseminationValue>>.Empty,
+                SupportedTopics = [topic.Name],
+            });
+        };
+        var protocol = CreateProtocol(transport, topic, options =>
+        {
+            options.MaxBatchItems = 1;
+            options.Overlay.AntiEntropyPeerCount = 1;
+        });
+
+        var responses = await protocol.ExchangeAntiEntropy(protocol.CreateAntiEntropyState(), CancellationToken.None);
+
+        Assert.Equal(2, transport.AntiEntropyRequests.Count);
+        var repaired = Assert.Single(responses);
+        Assert.Equal("b", Assert.Single(GetAntiEntropyResponseValues(repaired)).Digest.Key);
+    }
+
+    [Fact]
+    public async Task AntiEntropyRoundRetainsAtMostConfiguredItemsAcrossChunks()
+    {
+        var local = CreateSilo(11111);
+        var peer = CreateSilo(11112);
+        var transport = new FakeTransport(local, peer);
+        var topic = new FakeTopic(local);
+        topic.SetValue("a", version: 1);
+        topic.SetValue("b", version: 1);
+        topic.SetValue("c", version: 1);
+        transport.ExchangeAntiEntropyHandler = (target, request) =>
+        {
+            var values = request.DigestsByTopic.Values
+                .SelectMany(static digests => digests)
+                .Select(digest => topic.CreateItem(target, digest.Key, sequence: 2))
+                .ToArray();
+            return ValueTask.FromResult(new DisseminationAntiEntropyResponse
+            {
+                Sender = target,
+                ValuesByTopic = CreateValueGroups(values),
+                SupportedTopics = [topic.Name],
+            });
+        };
+        var protocol = CreateProtocol(transport, topic, options =>
+        {
+            options.MaxBatchItems = 2;
+            options.Overlay.AntiEntropyPeerCount = 1;
+        });
+
+        var responses = await protocol.ExchangeAntiEntropy(protocol.CreateAntiEntropyState(), CancellationToken.None);
+
+        Assert.Single(transport.AntiEntropyRequests);
+        Assert.Equal(2, responses.Sum(static response => GetAntiEntropyResponseValues(response).Count()));
+    }
+
+    [Fact]
+    public async Task PeerTopicConfirmationExpiresAndAuthoritativeResponseCanRemoveIt()
+    {
+        var local = CreateSilo(11111);
+        var peer = CreateSilo(11112);
+        var timeProvider = new TestTimeProvider();
+        var transport = new FakeTransport(local, peer);
+        var topic = new FakeTopic(local);
+        var protocol = CreateProtocol(transport, topic, timeProvider: timeProvider);
+
+        await protocol.ReceiveAntiEntropy(new DisseminationAntiEntropyRequest
+        {
+            Sender = peer,
+            DigestsByTopic = CreateAntiEntropyRequestDigests(
+                topic.Name,
+                new DisseminationTopicDigest(FakeTopic.DefaultKey, long.MinValue)),
+        }, CancellationToken.None);
+        Assert.Empty(protocol.GetUnconfirmedPeers(topic.Name, topic.MembershipScope));
+
+        timeProvider.Advance(TimeSpan.FromSeconds(20));
+        Assert.Equal(new[] { peer }, protocol.GetUnconfirmedPeers(topic.Name, topic.MembershipScope));
+
+        await protocol.ReceiveAntiEntropy(new DisseminationAntiEntropyRequest
+        {
+            Sender = peer,
+            DigestsByTopic = CreateAntiEntropyRequestDigests(
+                topic.Name,
+                new DisseminationTopicDigest(FakeTopic.DefaultKey, long.MinValue)),
+        }, CancellationToken.None);
+        transport.ExchangeAntiEntropyHandler = (target, _) => ValueTask.FromResult(new DisseminationAntiEntropyResponse
+        {
+            Sender = target,
+            SupportedTopics = [],
+        });
+        topic.SetValue(FakeTopic.DefaultKey, version: 1);
+
+        await protocol.ExchangeAntiEntropy(protocol.CreateAntiEntropyState(), CancellationToken.None);
+
+        Assert.Equal(new[] { peer }, protocol.GetUnconfirmedPeers(topic.Name, topic.MembershipScope));
+    }
+
+    [Fact]
     public async Task AntiEntropyAppliesReturnedRepairItemsWithoutForwarding()
     {
         var local = CreateSilo(11111);
@@ -896,7 +1146,6 @@ public class DisseminationProtocolTests
         }
     }
 
-#if NET10_0_OR_GREATER
     [Fact]
     public async Task MonotonicDisseminationModelConformsToAccordantSpec()
     {
@@ -938,7 +1187,6 @@ public class DisseminationProtocolTests
         var failures = results.Where(static result => !result.Success).ToArray();
         Assert.Empty(failures);
     }
-#endif
 
     [Fact]
     public async Task MembershipTopicReturnsAndAppliesDiffWhenPeerVersionIsRetained()
@@ -1052,6 +1300,65 @@ public class DisseminationProtocolTests
         Assert.Equal(DisseminationApplyResult.Obsolete, obsoleteResult);
         Assert.Equal(DisseminationApplyResult.Duplicate, duplicateResult);
         Assert.Equal(currentSnapshot.Version, manager.CurrentSnapshot.Version);
+    }
+
+    [Fact]
+    public async Task MembershipTopicDoesNotReportAppliedWhenConcurrentUpdateAdvancesPastSnapshot()
+    {
+        var local = CreateSilo(11123);
+        using var serviceProvider = new ServiceCollection().AddSerializer().BuildServiceProvider();
+        var serializer = serviceProvider.GetRequiredService<Serializer>();
+        var currentSnapshot = CreateMembershipSnapshot(1, CreateMembershipEntry(local, SiloStatus.Active, DateTime.UnixEpoch));
+        var concurrentSnapshot = CreateMembershipSnapshot(3, CreateMembershipEntry(local, SiloStatus.Active, DateTime.UnixEpoch));
+        var manager = new FakeMembershipManager(currentSnapshot);
+        manager.ProcessGossipSnapshotHandler = _ =>
+        {
+            manager.CurrentSnapshot = concurrentSnapshot;
+            return Task.FromResult(false);
+        };
+        var topic = CreateMembershipTopic(local, manager, serializer);
+        var proposedSnapshot = CreateMembershipSnapshot(2, CreateMembershipEntry(local, SiloStatus.Active, DateTime.UnixEpoch));
+        var value = new DisseminationValue
+        {
+            Digest = new DisseminationTopicDigest("cluster", proposedSnapshot.Version.Value),
+            Root = local,
+            ExpiresAt = DateTimeOffset.UtcNow.AddMinutes(1),
+            Payload = serializer.SerializeToArray(new MembershipTableSnapshotUpdate { Snapshot = proposedSnapshot }),
+        };
+
+        var result = await topic.ApplyValue(value, CancellationToken.None);
+
+        Assert.Equal(DisseminationApplyResult.Obsolete, result);
+        Assert.Equal(concurrentSnapshot.Version, manager.CurrentSnapshot.Version);
+    }
+
+    [Fact]
+    public async Task MembershipTopicReportsDuplicateWhenConcurrentUpdateInstallsSameVersion()
+    {
+        var local = CreateSilo(11123);
+        using var serviceProvider = new ServiceCollection().AddSerializer().BuildServiceProvider();
+        var serializer = serviceProvider.GetRequiredService<Serializer>();
+        var currentSnapshot = CreateMembershipSnapshot(1, CreateMembershipEntry(local, SiloStatus.Active, DateTime.UnixEpoch));
+        var proposedSnapshot = CreateMembershipSnapshot(2, CreateMembershipEntry(local, SiloStatus.Active, DateTime.UnixEpoch));
+        var manager = new FakeMembershipManager(currentSnapshot);
+        manager.ProcessGossipSnapshotHandler = snapshot =>
+        {
+            manager.CurrentSnapshot = snapshot;
+            return Task.FromResult(false);
+        };
+        var topic = CreateMembershipTopic(local, manager, serializer);
+        var value = new DisseminationValue
+        {
+            Digest = new DisseminationTopicDigest("cluster", proposedSnapshot.Version.Value),
+            Root = local,
+            ExpiresAt = DateTimeOffset.UtcNow.AddMinutes(1),
+            Payload = serializer.SerializeToArray(new MembershipTableSnapshotUpdate { Snapshot = proposedSnapshot }),
+        };
+
+        var result = await topic.ApplyValue(value, CancellationToken.None);
+
+        Assert.Equal(DisseminationApplyResult.Duplicate, result);
+        Assert.Equal(proposedSnapshot.Version, manager.CurrentSnapshot.Version);
     }
 
     [Fact]
@@ -1359,6 +1666,7 @@ public class DisseminationProtocolTests
         {
             Sender = sender,
             ValuesByTopic = CreateValueGroups(value),
+            SupportedTopics = [FakeTopic.DefaultName],
         });
         var manifestSummary = RoundTrip(serializer, new ClusterManifestHashSummary(
             new MajorMinorVersion(1, 2),
@@ -1367,6 +1675,7 @@ public class DisseminationProtocolTests
         Assert.Equal(value.Digest, Assert.Single(GetGossipValues(gossip)).Digest);
         Assert.Equal(value.Digest, Assert.Single(request.DigestsByTopic.Values).Single());
         Assert.Equal(value.Digest, Assert.Single(GetAntiEntropyResponseValues(response)).Digest);
+        Assert.Equal(new[] { FakeTopic.DefaultName }, response.SupportedTopics);
         Assert.Equal(new ManifestHash("hash"), manifestSummary.SiloManifestHashes[sender]);
     }
 
@@ -1635,7 +1944,8 @@ public class DisseminationProtocolTests
         statusOracle.SetStatus(local, SiloStatus.Active);
         statusOracle.SetStatus(peer, SiloStatus.Active);
         var services = new MutableServiceProvider();
-        var publisher = CreateDeploymentLoadPublisher(local, statusOracle, serviceProvider: services);
+        var grainFactory = new RecordingGrainFactory();
+        var publisher = CreateDeploymentLoadPublisher(local, statusOracle, grainFactory, services);
         var topic = CreateDeploymentLoadTopic(
             publisher,
             serializer,
@@ -1656,7 +1966,7 @@ public class DisseminationProtocolTests
     }
 
     [Fact]
-    public async Task PublishStatistics_DisseminationSuccessDoesNotReadFallbackMembership()
+    public async Task PublishStatistics_DisseminationSuccessSkipsLegacySendForConfirmedPeer()
     {
         using var serializerProvider = new ServiceCollection().AddSerializer().BuildServiceProvider();
         var serializer = serializerProvider.GetRequiredService<Serializer>();
@@ -1666,7 +1976,50 @@ public class DisseminationProtocolTests
         statusOracle.SetStatus(local, SiloStatus.Active);
         statusOracle.SetStatus(peer, SiloStatus.Active);
         var services = new MutableServiceProvider();
-        var publisher = CreateDeploymentLoadPublisher(local, statusOracle, serviceProvider: services);
+        var grainFactory = new RecordingGrainFactory();
+        var publisher = CreateDeploymentLoadPublisher(local, statusOracle, grainFactory, services);
+        var topic = CreateDeploymentLoadTopic(
+            publisher,
+            serializer,
+            options => options.Dissemination.Enabled = true);
+        var transport = new FakeTransport(local, peer);
+        var dissemination = CreateService(transport, [topic]);
+        services.Add(dissemination);
+        services.Add(topic);
+        await dissemination.ReceiveAntiEntropy(new DisseminationAntiEntropyRequest
+        {
+            Sender = peer,
+            DigestsByTopic = CreateAntiEntropyRequestDigests(
+                topic.Name,
+                new DisseminationTopicDigest(local.ToParsableString(), long.MinValue)),
+        }, CancellationToken.None);
+
+        await publisher.PublishStatistics();
+        await dissemination.StopAsync(CancellationToken.None);
+
+        Assert.Empty(grainFactory.SystemTargetRequests);
+        Assert.Single(transport.GossipBatches);
+    }
+
+    [Fact]
+    public async Task PublishStatistics_DisseminationSuccessUsesLegacySendForUnconfirmedPeer()
+    {
+        using var serializerProvider = new ServiceCollection().AddSerializer().BuildServiceProvider();
+        var serializer = serializerProvider.GetRequiredService<Serializer>();
+        var local = CreateSilo(21017);
+        var peer = CreateSilo(21018);
+        var statusOracle = new FakeSiloStatusOracle();
+        statusOracle.SetStatus(local, SiloStatus.Active);
+        statusOracle.SetStatus(peer, SiloStatus.Active);
+        var services = new MutableServiceProvider();
+        var directTarget = new FakeDeploymentLoadPublisherTarget();
+        var grainFactory = new RecordingGrainFactory
+        {
+            Resolver = (type, _) => type == typeof(IDeploymentLoadPublisher)
+                ? directTarget
+                : throw new NotSupportedException(),
+        };
+        var publisher = CreateDeploymentLoadPublisher(local, statusOracle, grainFactory, services);
         var topic = CreateDeploymentLoadTopic(
             publisher,
             serializer,
@@ -1679,8 +2032,10 @@ public class DisseminationProtocolTests
         await publisher.PublishStatistics();
         await dissemination.StopAsync(CancellationToken.None);
 
-        Assert.Equal(0, statusOracle.ApproximateStatusesRequests);
         Assert.Single(transport.GossipBatches);
+        var update = Assert.Single(directTarget.Updates);
+        Assert.Equal(local, update.Source);
+        Assert.Equal(peer, Assert.Single(grainFactory.SystemTargetRequests).Destination);
     }
 
     [Theory]
@@ -2278,6 +2633,7 @@ public class DisseminationProtocolTests
         var peers = Enumerable.Range(21502, 3).Select(CreateSilo).ToArray();
         var transport = new FakeTransport(local, peers);
         var topic = new FakeTopic(local);
+        topic.Options.MaxCoalescingDelay = TimeSpan.FromMinutes(1);
         var service = CreateService(transport, topic, options => options.Overlay.FanOutFactor = static _ => 3);
         var item = topic.CreateItem(local, FakeTopic.DefaultKey, sequence: 1);
         var observedTokens = new List<CancellationToken>();
@@ -2293,6 +2649,87 @@ public class DisseminationProtocolTests
 
         Assert.NotEmpty(observedTokens);
         Assert.All(observedTokens, token => Assert.Equal(cts.Token, token));
+    }
+
+    [Fact]
+    public async Task DisseminationService_StopAsyncWaitsForScheduledFlushAndStopsBackgroundWork()
+    {
+        var local = CreateSilo(21510);
+        var peer = CreateSilo(21511);
+        var transport = new FakeTransport(local, peer);
+        var sendStarted = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var releaseSend = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+        transport.SendGossipHandler = async (target, batch, cancellationToken) =>
+        {
+            transport.GossipBatches.Add((target, batch));
+            sendStarted.TrySetResult(true);
+            await releaseSend.Task.WaitAsync(cancellationToken);
+        };
+        var topic = new FakeTopic(local);
+        topic.Options.MaxCoalescingDelay = TimeSpan.FromMilliseconds(1);
+        var service = CreateService(transport, topic);
+        await service.StartAsync(CancellationToken.None);
+
+        Assert.True(await service.Publish(
+            topic.Name,
+            topic.CreateItem(local, FakeTopic.DefaultKey, sequence: 1),
+            [peer],
+            CancellationToken.None));
+        await sendStarted.Task.WaitAsync(TimeSpan.FromSeconds(2));
+
+        var stopTask = service.StopAsync(CancellationToken.None);
+        Assert.False(stopTask.IsCompleted);
+        releaseSend.SetResult(true);
+        await stopTask;
+
+        Assert.False(service.IsAntiEntropyRunning);
+        Assert.Single(transport.GossipBatches);
+    }
+
+    [Fact]
+    public async Task DisseminationService_StopAsyncHonorsCancellationWhileAntiEntropyTransportIsBlocked()
+    {
+        var local = CreateSilo(21512);
+        var peer = CreateSilo(21513);
+        var transport = new FakeTransport(local, peer);
+        var exchangeStarted = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var exchangeCompleted = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var releaseExchange = new TaskCompletionSource<DisseminationAntiEntropyResponse>(TaskCreationOptions.RunContinuationsAsynchronously);
+        transport.ExchangeAntiEntropyHandler = ExchangeAntiEntropy;
+
+        async ValueTask<DisseminationAntiEntropyResponse> ExchangeAntiEntropy(
+            SiloAddress target,
+            DisseminationAntiEntropyRequest _)
+        {
+            exchangeStarted.TrySetResult(true);
+            var response = await releaseExchange.Task;
+            exchangeCompleted.TrySetResult(true);
+            return response;
+        }
+
+        var topic = new FakeTopic(local);
+        topic.SetValue(FakeTopic.DefaultKey, version: 1);
+        var service = CreateService(
+            transport,
+            topic,
+            options => options.Overlay.AntiEntropyInterval = TimeSpan.FromMilliseconds(1));
+        await service.StartAsync(CancellationToken.None);
+        await exchangeStarted.Task.WaitAsync(TimeSpan.FromSeconds(2));
+        using var cts = new CancellationTokenSource();
+        cts.Cancel();
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => service.StopAsync(cts.Token));
+
+        Assert.False(service.IsAntiEntropyRunning);
+        Assert.True(service.HasOutstandingAntiEntropyTask);
+        releaseExchange.TrySetResult(new DisseminationAntiEntropyResponse
+        {
+            Sender = peer,
+            SupportedTopics = [topic.Name],
+        });
+        await exchangeCompleted.Task.WaitAsync(TimeSpan.FromSeconds(2));
+        await WaitUntil(() => !service.HasOutstandingAntiEntropyTask);
+        Assert.Equal(new[] { peer }, service.GetUnconfirmedPeers(topic.Name, topic.MembershipScope));
     }
 
     [Fact]
@@ -2324,7 +2761,7 @@ public class DisseminationProtocolTests
     }
 
     [Fact]
-    public async Task MembershipGossiper_UsesDisseminationWhenTopicIsEnabledAndPublishSucceeds()
+    public async Task MembershipGossiper_UsesOnlyDisseminationForConfirmedPeer()
     {
         var local = CreateSilo(21402);
         var peer = CreateSilo(21403);
@@ -2342,8 +2779,39 @@ public class DisseminationProtocolTests
             .BuildServiceProvider();
         var gossiper = new MembershipGossiper(services, NullLogger<MembershipGossiper>.Instance);
 
-        // Must not throw: MembershipSystemTarget is deliberately not registered, so any fallback attempt would fail.
+        await disseminationService.ReceiveAntiEntropy(new DisseminationAntiEntropyRequest
+        {
+            Sender = peer,
+            DigestsByTopic = CreateAntiEntropyRequestDigests(
+                membershipTopic.Name,
+                new DisseminationTopicDigest("cluster", long.MinValue)),
+        }, CancellationToken.None);
         await gossiper.GossipToRemoteSilos(new List<SiloAddress> { peer }, snapshot, local, SiloStatus.Active);
+
+        await disseminationService.StopAsync(CancellationToken.None);
+        Assert.NotEmpty(transport.GossipBatches);
+    }
+
+    [Fact]
+    public async Task MembershipGossiper_UsesLegacyGossipForUnconfirmedPeer()
+    {
+        var local = CreateSilo(21410);
+        var peer = CreateSilo(21411);
+        using var serializerProvider = new ServiceCollection().AddSerializer().BuildServiceProvider();
+        var serializer = serializerProvider.GetRequiredService<Serializer>();
+        var snapshot = CreateMembershipSnapshot(1, CreateMembershipEntry(local, SiloStatus.Active, DateTime.UnixEpoch));
+        var membershipTopic = CreateMembershipTopic(local, new FakeMembershipManager(snapshot), serializer, options => options.Dissemination.Enabled = true);
+        var transport = new FakeTransport(local, peer);
+        var disseminationService = CreateService(transport, new IDisseminationTopic[] { membershipTopic });
+        var services = new ServiceCollection()
+            .AddSingleton(disseminationService)
+            .AddSingleton(membershipTopic)
+            .AddSingleton<ILocalSiloDetails>(new FakeLocalSiloDetails(local))
+            .BuildServiceProvider();
+        var gossiper = new MembershipGossiper(services, NullLogger<MembershipGossiper>.Instance);
+
+        await Assert.ThrowsAsync<InvalidOperationException>(
+            () => gossiper.GossipToRemoteSilos(new List<SiloAddress> { peer }, snapshot, local, SiloStatus.Active));
 
         await disseminationService.StopAsync(CancellationToken.None);
         Assert.NotEmpty(transport.GossipBatches);
@@ -2828,7 +3296,6 @@ public class DisseminationProtocolTests
             System.Collections.Immutable.ImmutableDictionary<GrainInterfaceType, GrainInterfaceProperties>.Empty);
     }
 
-#if NET10_0_OR_GREATER
     private static Spec<MonotonicDisseminationState> CreateMonotonicDisseminationSpec()
     {
         var spec = new Spec<MonotonicDisseminationState>()
@@ -2876,7 +3343,6 @@ public class DisseminationProtocolTests
 
         return spec;
     }
-#endif
 
     private sealed class FakeTopic(SiloAddress localSilo, string name = FakeTopic.DefaultName) : IDisseminationTopic
     {
@@ -3077,7 +3543,6 @@ public class DisseminationProtocolTests
         };
     }
 
-#if NET10_0_OR_GREATER
     private sealed class MonotonicDisseminationHarness(SiloAddress localSilo)
     {
         private readonly FakeTopic _topic = new(localSilo);
@@ -3122,7 +3587,6 @@ public class DisseminationProtocolTests
             _ => ModelApplyResult.Rejected,
         };
     }
-#endif
 
     private sealed class FakeMembershipManager(MembershipTableSnapshot currentSnapshot) : IMembershipManager
     {
@@ -3140,16 +3604,23 @@ public class DisseminationProtocolTests
 
         public List<MembershipVersion?> RefreshCalls { get; } = new();
 
+        public Func<MembershipTableSnapshot, Task<bool>>? ProcessGossipSnapshotHandler { get; set; }
+
         public Task Refresh(MembershipVersion? targetVersion, CancellationToken cancellationToken)
         {
             RefreshCalls.Add(targetVersion);
             return Task.CompletedTask;
         }
 
-        public Task ProcessGossipSnapshot(MembershipTableSnapshot snapshot, CancellationToken cancellationToken)
+        public Task<bool> ProcessGossipSnapshot(MembershipTableSnapshot snapshot, CancellationToken cancellationToken)
         {
+            if (ProcessGossipSnapshotHandler is { } handler)
+            {
+                return handler(snapshot);
+            }
+
             CurrentSnapshot = snapshot;
-            return Task.CompletedTask;
+            return Task.FromResult(true);
         }
 
         public Task UpdateIAmAlive(CancellationToken cancellationToken) => Task.CompletedTask;
@@ -3439,7 +3910,6 @@ public class DisseminationProtocolTests
     }
 }
 
-#if NET10_0_OR_GREATER
 [State]
 public partial class MonotonicDisseminationState
 {
@@ -3457,4 +3927,3 @@ public enum ModelApplyResult
 public sealed record ModelApplyResponse(ModelApplyResult Result, long Version);
 
 public sealed record ModelRepairResponse(bool HasValue, long Version);
-#endif

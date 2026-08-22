@@ -96,4 +96,7 @@ internal sealed class DisseminationAntiEntropyResponse
 
     [Id(2)]
     public bool Truncated { get; init; }
+
+    [Id(3)]
+    public ImmutableArray<string> SupportedTopics { get; init; } = [];
 }

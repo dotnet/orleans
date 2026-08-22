@@ -2,7 +2,7 @@
 
 ## Status
 
-This document describes the current efficient-broadcast branch. The branch implements deterministic fixed-tree broadcast, digest-based anti-entropy repair, value-oriented wire contracts, status-and-age-prioritized topology ordering, dynamic fanout, per-topic membership scopes, level-aware randomized repair peer selection, membership snapshot diffs, manifest peer-fill, stale-only anti-entropy probes, and per-peer outbound gossip coalescing. Dissemination is currently opt-in: the global `DisseminationOptions.Enabled` flag and each topic's `DisseminationTopicOptions.Enabled` flag default to `false`, so existing direct publication/gossip paths remain the default unless dissemination is explicitly enabled.
+This document describes the current efficient-broadcast branch. The branch implements deterministic fixed-tree broadcast, digest-based anti-entropy repair, value-oriented wire contracts, status-and-age-prioritized topology ordering, dynamic fanout, per-topic membership scopes, level-aware randomized repair peer selection, membership snapshot diffs, manifest peer-fill, stale-only anti-entropy probes, per-peer outbound gossip coalescing, and topic-aware rolling-upgrade fallback. Dissemination is currently opt-in: the global `DisseminationOptions.Enabled` flag and each topic's `DisseminationTopicOptions.Enabled` flag default to `false`, so existing direct publication/gossip paths remain the default unless dissemination is explicitly enabled.
 
 ## Problem statement
 
@@ -18,7 +18,7 @@ The goal is to reduce routine fanout while preserving correctness backstops. The
 | Membership and fault detection are authoritative | Dissemination uses membership to choose peers and relies on existing liveness logic to remove failed silos. |
 | Values are monotonic per `(topic, key)` | Topic version comparison provides duplicate suppression. |
 | Topics own value semantics | The protocol handles routing, validation, and batching. Topics compare versions, materialize values, apply values, and perform fallback. |
-| Rolling upgrades are best-effort | New dissemination messages are attempted directly. Peers which cannot process them fail or reject them, and anti-entropy plus existing authoritative refresh paths repair after the temporary mismatch clears. |
+| Rolling upgrades preserve updates | A peer receives the legacy topic-specific publication path until it confirms support for that enabled dissemination topic through gossip or anti-entropy. |
 | Payloads are bounded | Oversize payloads are rejected and topic fallback is used during publication. Gossip and anti-entropy batches are bounded by item count and total payload bytes. |
 | Delivery is best-effort | Tree send failures are repaired by anti-entropy on its periodic cadence. |
 | Different runtime systems have different membership eligibility | The protocol maintains both active-only and all-member topologies and lets each topic choose. |
@@ -86,7 +86,7 @@ Each topic declares a `DisseminationMembershipScope`:
 - Deployment load statistics use `ActiveMembers`, matching existing load publishing behavior.
 - Manifest exchange remains active-only and pull-based today.
 
-The all-member tree can include silos which are joining or leaving. Publication does not preflight peers. Transient send failures, temporary version mismatches, and membership skew are repaired by anti-entropy or made irrelevant by membership changes.
+The all-member tree can include silos which are joining or leaving. Topic-aware support confirmation keeps legacy publication active for unconfirmed peers, while transient send failures and membership skew are repaired by anti-entropy or made irrelevant by membership changes.
 
 ## Fast-path algorithm: fixed deterministic tree broadcast
 
@@ -161,7 +161,7 @@ Current branch behavior:
 
 1. Enumerate enabled topics and their local `DisseminationTopicDigest` values whose `(topic, key)` streams have not received a recent update.
 2. Select repair peers per topic using that topic's membership scope.
-3. Send `DisseminationAntiEntropyRequest` containing a per-topic map of stale local digests. If no stale digests remain for a peer, skip that peer for the round.
+3. Send one or more bounded `DisseminationAntiEntropyRequest` messages containing per-topic maps of stale local digests. Requests honor the configured item and byte limits. If no stale digests remain for a peer, skip that peer for the round.
 4. The receiver maps remote digests by key within each requested topic.
 5. For each requested local digest key, if local state is newer than the requester digest, materialize a value.
 6. Return topic-grouped values up to `MaxBatchItems` and `MaxBatchBytes`, where `MaxBatchBytes` is the sum of payload byte lengths rather than exact serialized envelope size, setting `Truncated` if more values remain.
@@ -228,10 +228,15 @@ This keeps manifests pull-based while reducing the number of direct per-member r
 Failure behavior:
 
 - Send and anti-entropy request failures back off the peer temporarily using `FailureBackoff`.
-- Publication queues tree sends without capability probing. If a peer cannot process a batch, the send fails or the receiver rejects unsupported values.
+- Gossip and anti-entropy exchanges confirm support per peer and topic.
+- Membership and deployment-load publishers continue the legacy direct path for each peer until that peer confirms support for the enabled topic.
+- Topic confirmations expire after a bounded interval and authoritative anti-entropy responses replace prior confirmation state, so runtime option changes restore legacy delivery promptly.
 - Non-active participants in the all-member tree can be unavailable while publication proceeds.
 - If dissemination is disabled, publish-time validation fails, payloads are oversize, or topic fallback is required before queueing, the producer uses the existing topic-specific safety path.
-- After publication has queued successfully, tree-send failures, unsupported receivers, temporary mixed-version mismatches, or short-lived membership skew are repaired by anti-entropy and existing authoritative refresh paths rather than by immediate legacy send fallback.
+- Tree-send failures and short-lived membership skew are repaired by anti-entropy and existing authoritative refresh paths.
+- Pending gossip queues enforce per-topic item limits and global batch item/byte limits. Values which expire or become obsolete while queued are discarded before transport.
+- Anti-entropy bounds each request, each response, and the total retained repair data for a round.
+- Shutdown stops new scheduling, waits for active flush work, flushes remaining queued values, and cancels background work before returning.
 
 ## Algorithms and data structures
 
@@ -246,6 +251,7 @@ Important structures:
 | `DigestKey` | Protocol comparison key `(topic, key)` used to compare versions for the same value stream. |
 | `AntiEntropyState` | Per-round local topics, digests, and selected peers grouped by topic. |
 | `_failureBackoffUntil` | Short backoff for failed sends and anti-entropy requests. |
+| `_confirmedPeerTopics` | Expiring per-peer topic support learned from successful anti-entropy responses and inbound dissemination traffic. |
 
 Important ordering rules:
 
@@ -330,6 +336,9 @@ Integration points:
    - Queue tree sends per peer before transport.
    - Coalesce pending values by `(topic, key)` and keep the newest version.
    - Flush by earliest topic coalescing delay, batch item/byte limits, or per-topic pending item limits.
+   - Enforce hard queue bounds while a previous flush is in flight.
+   - Revalidate expiry and obsolescence immediately before transport.
+   - Serialize flushes so `MaxConcurrentSends` is a process-wide dissemination limit.
 
 ## Future work, shortcomings, and trade-offs
 
@@ -342,9 +351,9 @@ Other trade-offs and improvement areas:
 - Status-and-age-prioritized ordering improves expected interior-node availability and value hit-rate while keeping ordering deterministic.
 - Dynamic fanout trades direct send count for tree depth: a 2-hop target gives faster convergence with larger fanout; a 3-hop target lowers per-node sends and adds one relay hop.
 - Diff repair reduces bytes for membership but adds history retention, self-describing payloads, base-version validation, and fallback paths.
-- Removing capability probing keeps the fast path cheap but means unsupported or temporarily mismatched peers discover incompatibility by rejecting or failing actual dissemination messages.
+- Topic support is learned from normal gossip and anti-entropy traffic. Legacy direct publication continues for an unconfirmed peer and stops independently for each topic after confirmation. Confirmations expire and are replaced by later authoritative anti-entropy responses.
 - Deterministic trees require silos to mostly agree on membership. Anti-entropy repairs short-lived skew, but the fast path can duplicate or miss during disagreement.
 - The protocol scope is monotonic versioned values. Ordered event streams would need separate sequencing, retention, and acknowledgment semantics.
 - Manifest whole-cluster fetch can reduce request count but can also transfer more bytes than per-silo fetch in highly divergent clusters. Hash validation and fallback keep it safe.
-- Tree sends are coalesced per peer before transport. Future scheduling work could respect `MaxConcurrentSends` across flushes and enforce cross-topic fairness under sustained overload.
+- Tree sends are coalesced per peer before transport. The scheduler serializes flushes and enforces `MaxConcurrentSends`; cross-topic ordering follows deterministic topic grouping within each bounded peer queue.
 - Once the protocol ships, wire-shape changes should become additive and versioned.

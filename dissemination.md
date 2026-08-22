@@ -13,13 +13,13 @@ This document describes a design for an internal Orleans dissemination subsystem
 - Make batching a transport optimization which is orthogonal to Plumtree tree maintenance.
 - Provide first-class observability through logs, metrics, and `DiagnosticListener` events.
 
-## Non-goals
+## Scope boundaries
 
-- This is not a general application pub/sub system.
-- This is not reliable ordered delivery.
-- This is not a replacement for the membership table.
-- This is not a large-payload broadcast channel.
-- This should not introduce new sockets or a separate networking stack.
+- The subsystem carries bounded, monotonic Orleans runtime state between silos.
+- Delivery is best-effort and converges through topic-specific anti-entropy and authoritative refresh paths.
+- The membership table remains the liveness authority.
+- Payload size limits keep gossip traffic bounded.
+- Orleans system-target messaging provides the transport.
 
 ## References
 
@@ -327,32 +327,28 @@ internal enum DisseminationApplyResult
 
 ### Transport API
 
-Use distinct control operations instead of overloading one generic one-way payload. This prevents old silos from misinterpreting control messages as full data payloads.
+Use distinct gossip and anti-entropy operations so payload delivery and repair remain independently bounded.
 
 ```csharp
 internal interface IDisseminationSystemTarget : ISystemTarget
 {
-    Task<DisseminationCapabilityResponse> GetCapabilities(
-        DisseminationCapabilityRequest request);
+    Task PushGossip(
+        DisseminationGossipBatch batch,
+        CancellationToken cancellationToken);
 
-    Task PushGossip(DisseminationGossipBatch batch);
-
-    Task PushAdvertise(DisseminationAdvertisementBatch batch);
-
-    Task Graft(DisseminationGraftBatch request);
-
-    Task Prune(DisseminationPruneMessage message);
+    Task<DisseminationAntiEntropyResponse> ExchangeAntiEntropy(
+        DisseminationAntiEntropyRequest request,
+        CancellationToken cancellationToken);
 }
 ```
 
-Capabilities must be topic-aware. A peer is only capable for a topic if:
+Topic support is learned from inbound gossip and the `SupportedTopics` advertised by successful anti-entropy responses. A peer is confirmed for a topic when:
 
 - The dissemination system target exists.
 - The topic is registered.
 - The topic is enabled.
-- The peer supports the requested protocol version and payload kinds.
 
-Unknown peers must use legacy topic-specific fallbacks or existing direct repair paths.
+Legacy topic-specific publication remains active for each unconfirmed peer. Confirmation is tracked per topic, expires after a bounded interval, is replaced by authoritative anti-entropy responses, and is removed when the peer leaves membership.
 
 ### Time and scheduling
 
@@ -453,26 +449,19 @@ If the implementation keeps independent per-topic loops initially, document that
 
 ## Reliability and rolling upgrades
 
-### Capability probing
+### Topic support discovery
 
-Before sending Plumtree control operations to a peer:
-
-1. Probe capabilities using an explicit request/response operation.
-2. Include topic name and protocol version in the probe.
-3. Cache capability with TTL.
-4. Re-probe on membership changes, transient failures, and cache expiry.
-
-Do not cache "unsupported" forever. A peer can upgrade during a rolling deployment, and a transient failure should not permanently downgrade it.
+Anti-entropy responses advertise enabled topics, and inbound gossip demonstrates support for the topics in that batch. The sender continues legacy topic-specific publication to each unconfirmed peer. Confirmations expire, later anti-entropy responses replace earlier topic sets, and membership changes prune confirmation state, so runtime option changes and restarted silo generations re-establish the correct delivery path.
 
 ### Fallbacks
 
-Fallback must be topic-specific:
+Fallback is topic-specific:
 
 - Load metrics fallback uses the existing deployment load publisher system target or direct stale-stat refresh.
 - Membership fallback uses existing membership notification/table refresh.
 - Manifest fallback uses direct manifest fetch or fetch-by-hash.
 
-Do not route fallback through a new dissemination system target that older silos do not have.
+Fallback uses established system targets which remain available during rolling upgrades.
 
 ### Oversize payloads
 
@@ -491,7 +480,6 @@ Global options:
 
 - Enable/disable dissemination subsystem.
 - Max concurrent sends.
-- Capability cache TTL.
 - Failure backoff.
 - Max batch bytes.
 - Max batch items.

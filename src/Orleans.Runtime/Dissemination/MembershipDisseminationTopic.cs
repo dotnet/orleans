@@ -122,9 +122,9 @@ internal sealed class MembershipDisseminationTopic(
             return DisseminationApplyResult.Duplicate;
         }
 
-        await membershipManager.ProcessGossipSnapshot(snapshot, cancellationToken);
-        RememberSnapshot(snapshot);
-        return DisseminationApplyResult.Applied;
+        return await membershipManager.ProcessGossipSnapshot(snapshot, cancellationToken)
+            ? RememberAppliedSnapshot(snapshot)
+            : GetRejectedApplyResult(snapshot.Version);
     }
 
     public async ValueTask OnFallbackRequired(SiloAddress? peer, DisseminationTopicDigest digest, CancellationToken cancellationToken)
@@ -189,9 +189,28 @@ internal sealed class MembershipDisseminationTopic(
         }
 
         var snapshot = new MembershipTableSnapshot(diff.Version, entries.ToImmutable());
-        await membershipManager.ProcessGossipSnapshot(snapshot, cancellationToken);
+        return await membershipManager.ProcessGossipSnapshot(snapshot, cancellationToken)
+            ? RememberAppliedSnapshot(snapshot)
+            : GetRejectedApplyResult(snapshot.Version);
+    }
+
+    private DisseminationApplyResult RememberAppliedSnapshot(MembershipTableSnapshot snapshot)
+    {
         RememberSnapshot(snapshot);
         return DisseminationApplyResult.Applied;
+    }
+
+    private DisseminationApplyResult GetRejectedApplyResult(MembershipVersion proposedVersion)
+    {
+        var currentVersion = membershipManager.CurrentSnapshot.Version;
+        if (currentVersion > proposedVersion)
+        {
+            return DisseminationApplyResult.Obsolete;
+        }
+
+        return currentVersion == proposedVersion
+            ? DisseminationApplyResult.Duplicate
+            : DisseminationApplyResult.Rejected;
     }
 
     private void RememberSnapshot(MembershipTableSnapshot snapshot)

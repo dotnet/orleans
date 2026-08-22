@@ -3,6 +3,7 @@ using System.Collections.Frozen;
 using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Linq;
+using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
@@ -26,13 +27,19 @@ internal sealed partial class DisseminationProtocol(
     private readonly Dictionary<SiloAddress, DateTimeOffset> _failureBackoffUntil = [];
     private readonly object _failureLock = new();
     private readonly object _gossipQueueLock = new();
+    private readonly object _peerCompatibilityLock = new();
     private readonly object _recentUpdateLock = new();
     private readonly object _topologyLock = new();
+    private readonly SemaphoreSlim _gossipFlushLock = new(1, 1);
+    private readonly CancellationTokenSource _gossipSendCts = new();
     private readonly Dictionary<SiloAddress, PendingGossipBatch> _pendingGossip = [];
+    private readonly Dictionary<SiloAddress, Dictionary<string, DateTimeOffset>> _confirmedPeerTopics = [];
     private readonly Dictionary<DigestKey, DateTimeOffset> _lastUpdateReceivedAt = [];
     private DateTimeOffset? _nextGossipFlushAt;
     private CancellationTokenSource? _gossipFlushWakeup;
+    private Task? _gossipFlushTask;
     private bool _gossipFlushScheduled;
+    private bool _stopping;
     private ParticipantTopology _activeMembersTopology = ParticipantTopology.Empty;
     private ParticipantTopology _allMembersTopology = ParticipantTopology.Empty;
     private long _antiEntropyRound;
@@ -67,16 +74,18 @@ internal sealed partial class DisseminationProtocol(
         }
 
         RecordRecentUpdate(topic.Name, item.Digest);
+        var queued = true;
         foreach (var peer in GetOriginatorTreeTargets(topology, root))
         {
-            EnqueueGossip(peer, item, topic);
+            queued &= EnqueueGossip(peer, item, topic);
         }
 
-        return true;
+        return queued;
     }
 
     public async Task ReceiveGossip(DisseminationGossipBatch batch, CancellationToken cancellationToken)
     {
+        RecordCompatiblePeer(batch.Sender, batch.ValuesByTopic.Keys);
         if (!_options.CurrentValue.Enabled)
         {
             return;
@@ -179,29 +188,56 @@ internal sealed partial class DisseminationProtocol(
         }
 
         var responses = new List<DisseminationAntiEntropyResponse>(requestsByPeer.Count);
-        foreach (var (peer, pendingRequest) in requestsByPeer)
+        var retainedItemCount = 0;
+        var retainedByteCount = 0;
+        var options = _options.CurrentValue;
+        foreach (var (peer, pendingRequest) in requestsByPeer.OrderBy(static entry => entry.Key))
         {
-            var request = new DisseminationAntiEntropyRequest
+            foreach (var digestsByTopic in CreateAntiEntropyRequests(pendingRequest))
             {
-                Sender = _transport.LocalSilo,
-                DigestsByTopic = pendingRequest.ToImmutableDictionary(StringComparer.Ordinal),
-            };
+                if (retainedItemCount >= options.MaxBatchItems || retainedByteCount >= options.MaxBatchBytes)
+                {
+                    return responses;
+                }
 
-            var response = await SafeRequest(
-                peer,
-                cancellationToken,
-                target => _transport.ExchangeAntiEntropy(target, request, cancellationToken));
-            if (response is null)
-            {
-                continue;
+                var request = new DisseminationAntiEntropyRequest
+                {
+                    Sender = _transport.LocalSilo,
+                    DigestsByTopic = digestsByTopic,
+                };
+
+                var response = await SafeRequest(
+                    peer,
+                    cancellationToken,
+                    target => _transport.ExchangeAntiEntropy(target, request, cancellationToken));
+                if (response is null)
+                {
+                    continue;
+                }
+
+                SetCompatiblePeerTopics(peer, response.SupportedTopics);
+                DisseminationInstruments.OnAntiEntropyExchange(
+                    "out",
+                    GetDigestCount(request.DigestsByTopic),
+                    GetValueCount(response.ValuesByTopic),
+                    response.Truncated);
+                var limitedResponse = LimitAntiEntropyResponse(
+                    response,
+                    options.MaxBatchItems - retainedItemCount,
+                    options.MaxBatchBytes - retainedByteCount,
+                    out var roundLimitReached);
+                if (limitedResponse is not null)
+                {
+                    responses.Add(limitedResponse);
+                    retainedItemCount += GetValueCount(limitedResponse.ValuesByTopic);
+                    retainedByteCount += GetValueByteCount(limitedResponse.ValuesByTopic);
+                }
+
+                if (roundLimitReached)
+                {
+                    return responses;
+                }
             }
-
-            DisseminationInstruments.OnAntiEntropyExchange(
-                "out",
-                GetDigestCount(request.DigestsByTopic),
-                GetValueCount(response.ValuesByTopic),
-                response.Truncated);
-            responses.Add(response);
         }
 
         return responses;
@@ -248,6 +284,7 @@ internal sealed partial class DisseminationProtocol(
         DisseminationAntiEntropyRequest request,
         CancellationToken cancellationToken)
     {
+        RecordCompatiblePeer(request.Sender, request.DigestsByTopic.Keys);
         if (!_options.CurrentValue.Enabled)
         {
             return CreateAntiEntropyResponse(ImmutableDictionary<string, ImmutableArray<DisseminationValue>>.Empty, truncated: false);
@@ -366,12 +403,75 @@ internal sealed partial class DisseminationProtocol(
 
     internal async Task FlushPendingGossip(CancellationToken cancellationToken)
     {
-        var batches = DrainPendingGossip(force: true);
-        CancelScheduledGossipFlushDelay();
-        await SendGossipBatches(batches, cancellationToken);
+        await _gossipFlushLock.WaitAsync(cancellationToken);
+        try
+        {
+            var batches = DrainPendingGossip(force: true);
+            CancelScheduledGossipFlushDelay();
+            await SendGossipBatches(batches, cancellationToken);
+        }
+        finally
+        {
+            _gossipFlushLock.Release();
+        }
     }
 
-    private void EnqueueGossip(SiloAddress peer, DisseminationValue item, IDisseminationTopic topic)
+    internal IReadOnlyList<SiloAddress> GetUnconfirmedPeers(
+        string topicName,
+        DisseminationMembershipScope membershipScope,
+        IReadOnlyCollection<SiloAddress>? candidates = null)
+    {
+        var membership = _transport.GetMembership();
+        var participants = membershipScope == DisseminationMembershipScope.ActiveMembers
+            ? membership.ActiveMembers
+            : membership.AllMembers;
+        var participantSet = participants.ToHashSet();
+        var now = _timeProvider.GetUtcNow();
+        var confirmationTtl = GetPeerTopicConfirmationTtl(topicName);
+        lock (_peerCompatibilityLock)
+        {
+            foreach (var peer in _confirmedPeerTopics.Keys.Where(peer => !participantSet.Contains(peer)).ToArray())
+            {
+                _confirmedPeerTopics.Remove(peer);
+            }
+
+            return participants
+                .Where(peer => !Equals(peer, _transport.LocalSilo)
+                    && (candidates is null || candidates.Contains(peer))
+                    && (!_confirmedPeerTopics.TryGetValue(peer, out var topics)
+                        || !topics.TryGetValue(topicName, out var confirmedAt)
+                        || now - confirmedAt >= confirmationTtl))
+                .ToArray();
+        }
+    }
+
+    internal async Task StopAsync(CancellationToken cancellationToken)
+    {
+        Task? scheduledFlush;
+        lock (_gossipQueueLock)
+        {
+            _stopping = true;
+            _gossipFlushWakeup?.Cancel();
+            scheduledFlush = _gossipFlushTask;
+        }
+
+        using var cancellationRegistration = cancellationToken.Register(static state => ((CancellationTokenSource)state!).Cancel(), _gossipSendCts);
+        try
+        {
+            if (scheduledFlush is not null)
+            {
+                await scheduledFlush.WaitAsync(cancellationToken);
+            }
+
+            await FlushPendingGossip(cancellationToken);
+        }
+        finally
+        {
+            _gossipSendCts.Cancel();
+        }
+    }
+
+    private bool EnqueueGossip(SiloAddress peer, DisseminationValue item, IDisseminationTopic topic)
     {
         var now = _timeProvider.GetUtcNow();
         var key = new DigestKey(topic.Name, item.Digest.Key);
@@ -385,14 +485,23 @@ internal sealed partial class DisseminationProtocol(
             else if (pending.TryGetValue(key, out var existing)
                 && topic.CompareVersion(existing.Digest, item.Digest) >= 0)
             {
-                return;
+                return true;
             }
             else if (now + topic.Options.MaxCoalescingDelay < pending.FlushAfter)
             {
                 pending.FlushAfter = now + topic.Options.MaxCoalescingDelay;
             }
 
-            pending.AddOrReplace(key, item);
+            if (!pending.TryAddOrReplace(
+                key,
+                item,
+                topic.Options.MaxPendingItemCount,
+                _options.CurrentValue.MaxBatchItems,
+                _options.CurrentValue.MaxBatchBytes))
+            {
+                return false;
+            }
+
             if (pending.Count >= _options.CurrentValue.MaxBatchItems
                 || pending.ByteCount >= _options.CurrentValue.MaxBatchBytes
                 || pending.GetTopicCount(topic.Name) >= topic.Options.MaxPendingItemCount)
@@ -402,14 +511,19 @@ internal sealed partial class DisseminationProtocol(
         }
 
         ScheduleGossipFlush();
+        return true;
     }
 
     private void ScheduleGossipFlush()
     {
-        var startFlushLoop = false;
         lock (_gossipQueueLock)
         {
             if (_pendingGossip.Count == 0)
+            {
+                return;
+            }
+
+            if (_stopping)
             {
                 return;
             }
@@ -419,18 +533,13 @@ internal sealed partial class DisseminationProtocol(
             {
                 _gossipFlushScheduled = true;
                 _nextGossipFlushAt = next;
-                startFlushLoop = true;
+                _gossipFlushTask = Task.Run(RunScheduledGossipFlush);
             }
             else if (_nextGossipFlushAt is null || next < _nextGossipFlushAt.Value)
             {
                 _nextGossipFlushAt = next;
                 _gossipFlushWakeup?.Cancel();
             }
-        }
-
-        if (startFlushLoop)
-        {
-            _ = Task.Run(RunScheduledGossipFlush);
         }
     }
 
@@ -454,13 +563,32 @@ internal sealed partial class DisseminationProtocol(
                     }
                     catch (OperationCanceledException) when (wakeupToken.IsCancellationRequested)
                     {
+                        lock (_gossipQueueLock)
+                        {
+                            if (_stopping)
+                            {
+                                return;
+                            }
+                        }
+
                         continue;
                     }
                 }
 
-                var batches = DrainPendingGossip(force: false);
-                await SendGossipBatches(batches, CancellationToken.None);
+                await _gossipFlushLock.WaitAsync(_gossipSendCts.Token);
+                try
+                {
+                    var batches = DrainPendingGossip(force: false);
+                    await SendGossipBatches(batches, _gossipSendCts.Token);
+                }
+                finally
+                {
+                    _gossipFlushLock.Release();
+                }
             }
+        }
+        catch (OperationCanceledException) when (_gossipSendCts.IsCancellationRequested)
+        {
         }
         catch (Exception exception)
         {
@@ -474,7 +602,8 @@ internal sealed partial class DisseminationProtocol(
                 _gossipFlushScheduled = false;
                 _nextGossipFlushAt = null;
                 DisposeGossipFlushWakeupUnsafe();
-                reschedule = _pendingGossip.Count > 0;
+                _gossipFlushTask = null;
+                reschedule = !_stopping && _pendingGossip.Count > 0;
             }
 
             if (reschedule)
@@ -488,7 +617,7 @@ internal sealed partial class DisseminationProtocol(
     {
         lock (_gossipQueueLock)
         {
-            if (_pendingGossip.Count == 0)
+            if (_stopping || _pendingGossip.Count == 0)
             {
                 _nextGossipFlushAt = null;
                 DisposeGossipFlushWakeupUnsafe();
@@ -507,7 +636,7 @@ internal sealed partial class DisseminationProtocol(
             }
 
             DisposeGossipFlushWakeupUnsafe();
-            _gossipFlushWakeup = new CancellationTokenSource();
+            _gossipFlushWakeup = CancellationTokenSource.CreateLinkedTokenSource(_gossipSendCts.Token);
             wakeupToken = _gossipFlushWakeup.Token;
             return next - now;
         }
@@ -579,13 +708,18 @@ internal sealed partial class DisseminationProtocol(
         var byteCount = 0;
         foreach (var group in valuesByTopic)
         {
-            if (!TryGetEnabledTopic(group.Topic, out _))
+            if (!TryGetEnabledTopic(group.Topic, out var topic))
             {
                 continue;
             }
 
             foreach (var item in group.Values)
             {
+                if (IsExpired(item) || topic.IsObsolete(item.Digest))
+                {
+                    continue;
+                }
+
                 if (itemCount > 0
                     && (itemCount >= _options.CurrentValue.MaxBatchItems
                         || byteCount + item.Payload.Length > _options.CurrentValue.MaxBatchBytes))
@@ -640,6 +774,7 @@ internal sealed partial class DisseminationProtocol(
         try
         {
             await send(peer);
+            cancellationToken.ThrowIfCancellationRequested();
             ClearPeerBackoff(peer);
             return true;
         }
@@ -669,6 +804,7 @@ internal sealed partial class DisseminationProtocol(
         try
         {
             var response = await request(peer);
+            cancellationToken.ThrowIfCancellationRequested();
             ClearPeerBackoff(peer);
             return response;
         }
@@ -1185,6 +1321,163 @@ internal sealed partial class DisseminationProtocol(
         }
     }
 
+    private void RecordCompatiblePeer(SiloAddress peer, IEnumerable<string> topics)
+    {
+        if (Equals(peer, _transport.LocalSilo))
+        {
+            return;
+        }
+
+        lock (_peerCompatibilityLock)
+        {
+            if (!_confirmedPeerTopics.TryGetValue(peer, out var confirmedTopics))
+            {
+                confirmedTopics = new Dictionary<string, DateTimeOffset>(StringComparer.Ordinal);
+                _confirmedPeerTopics.Add(peer, confirmedTopics);
+            }
+
+            var now = _timeProvider.GetUtcNow();
+            foreach (var topic in topics)
+            {
+                confirmedTopics[topic] = now;
+            }
+        }
+    }
+
+    private void SetCompatiblePeerTopics(SiloAddress peer, IEnumerable<string> topics)
+    {
+        if (Equals(peer, _transport.LocalSilo))
+        {
+            return;
+        }
+
+        lock (_peerCompatibilityLock)
+        {
+            var confirmedTopics = new Dictionary<string, DateTimeOffset>(StringComparer.Ordinal);
+            var now = _timeProvider.GetUtcNow();
+            foreach (var topic in topics)
+            {
+                confirmedTopics[topic] = now;
+            }
+
+            if (confirmedTopics.Count == 0)
+            {
+                _confirmedPeerTopics.Remove(peer);
+            }
+            else
+            {
+                _confirmedPeerTopics[peer] = confirmedTopics;
+            }
+        }
+    }
+
+    private TimeSpan GetPeerTopicConfirmationTtl(string topicName)
+    {
+        var antiEntropyInterval = _options.CurrentValue.Overlay.AntiEntropyInterval;
+        var expectedUpdateCadence = _topics.TryGetValue(topicName, out var topic)
+            ? topic.Options.ExpectedUpdateCadence
+            : antiEntropyInterval;
+        return antiEntropyInterval >= expectedUpdateCadence
+            ? antiEntropyInterval + antiEntropyInterval
+            : expectedUpdateCadence + expectedUpdateCadence;
+    }
+
+    private IEnumerable<ImmutableDictionary<string, ImmutableArray<DisseminationTopicDigest>>> CreateAntiEntropyRequests(
+        Dictionary<string, ImmutableArray<DisseminationTopicDigest>> digestsByTopic)
+    {
+        var options = _options.CurrentValue;
+        var result = new Dictionary<string, ImmutableArray<DisseminationTopicDigest>.Builder>(StringComparer.Ordinal);
+        var itemCount = 0;
+        var byteCount = 0;
+        foreach (var (topic, digests) in digestsByTopic.OrderBy(static entry => entry.Key, StringComparer.Ordinal))
+        {
+            foreach (var digest in digests)
+            {
+                var digestSize = sizeof(long) + Encoding.UTF8.GetByteCount(topic) + Encoding.UTF8.GetByteCount(digest.Key);
+                if (digestSize > options.MaxBatchBytes)
+                {
+                    continue;
+                }
+
+                if (itemCount > 0
+                    && (itemCount >= options.MaxBatchItems || byteCount + digestSize > options.MaxBatchBytes))
+                {
+                    yield return CreateDigestGroups(result);
+                    result.Clear();
+                    itemCount = 0;
+                    byteCount = 0;
+                }
+
+                if (!result.TryGetValue(topic, out var topicDigests))
+                {
+                    topicDigests = ImmutableArray.CreateBuilder<DisseminationTopicDigest>();
+                    result.Add(topic, topicDigests);
+                }
+
+                topicDigests.Add(digest);
+                itemCount++;
+                byteCount += digestSize;
+            }
+        }
+
+        if (itemCount > 0)
+        {
+            yield return CreateDigestGroups(result);
+        }
+    }
+
+    private static ImmutableDictionary<string, ImmutableArray<DisseminationTopicDigest>> CreateDigestGroups(
+        Dictionary<string, ImmutableArray<DisseminationTopicDigest>.Builder> result) =>
+        result.ToImmutableDictionary(
+            static pair => pair.Key,
+            static pair => pair.Value.ToImmutable(),
+            StringComparer.Ordinal);
+
+    private static DisseminationAntiEntropyResponse? LimitAntiEntropyResponse(
+        DisseminationAntiEntropyResponse response,
+        int remainingItems,
+        int remainingBytes,
+        out bool roundLimitReached)
+    {
+        var values = new Dictionary<string, ImmutableArray<DisseminationValue>.Builder>(StringComparer.Ordinal);
+        var itemCount = 0;
+        var byteCount = 0;
+        roundLimitReached = false;
+        foreach (var (topic, topicValues) in response.ValuesByTopic.OrderBy(static entry => entry.Key, StringComparer.Ordinal))
+        {
+            foreach (var value in topicValues)
+            {
+                if (itemCount >= remainingItems || byteCount + value.Payload.Length > remainingBytes)
+                {
+                    roundLimitReached = true;
+                    break;
+                }
+
+                AddToValueGroups(values, topic, value);
+                itemCount++;
+                byteCount += value.Payload.Length;
+            }
+
+            if (roundLimitReached)
+            {
+                break;
+            }
+        }
+
+        if (itemCount == 0)
+        {
+            return null;
+        }
+
+        return new DisseminationAntiEntropyResponse
+        {
+            Sender = response.Sender,
+            ValuesByTopic = CreateValueGroups(values),
+            Truncated = response.Truncated || roundLimitReached,
+            SupportedTopics = response.SupportedTopics,
+        };
+    }
+
     private void SetPeerBackoff(SiloAddress peer)
     {
         lock (_failureLock)
@@ -1206,6 +1499,9 @@ internal sealed partial class DisseminationProtocol(
         Sender = _transport.LocalSilo,
         ValuesByTopic = valuesByTopic,
         Truncated = truncated,
+        SupportedTopics = _options.CurrentValue.Enabled
+            ? [.. _topics.Values.Where(static topic => topic.IsEnabled).Select(static topic => topic.Name).Order(StringComparer.Ordinal)]
+            : [],
     };
 
     private static int GetDigestCount(ImmutableDictionary<string, ImmutableArray<DisseminationTopicDigest>> digestsByTopic)
@@ -1225,6 +1521,20 @@ internal sealed partial class DisseminationProtocol(
         foreach (var values in valuesByTopic.Values)
         {
             result += values.Length;
+        }
+
+        return result;
+    }
+
+    private static int GetValueByteCount(ImmutableDictionary<string, ImmutableArray<DisseminationValue>> valuesByTopic)
+    {
+        var result = 0;
+        foreach (var values in valuesByTopic.Values)
+        {
+            foreach (var value in values)
+            {
+                result += value.Payload.Length;
+            }
         }
 
         return result;
@@ -1300,25 +1610,47 @@ internal sealed partial class DisseminationProtocol(
             return false;
         }
 
-        public void AddOrReplace(DigestKey key, DisseminationValue value)
+        public bool TryAddOrReplace(
+            DigestKey key,
+            DisseminationValue value,
+            int maxTopicItems,
+            int maxItems,
+            int maxBytes)
         {
             if (!_valuesByTopic.TryGetValue(key.Topic, out var topicValues))
             {
                 topicValues = new Dictionary<string, DisseminationValue>(StringComparer.Ordinal);
-                _valuesByTopic.Add(key.Topic, topicValues);
             }
 
             if (topicValues.TryGetValue(key.Key, out var previous))
             {
+                if (ByteCount - previous.Payload.Length + value.Payload.Length > maxBytes)
+                {
+                    return false;
+                }
+
                 ByteCount -= previous.Payload.Length;
             }
             else
             {
+                if (topicValues.Count >= maxTopicItems
+                    || Count >= maxItems
+                    || ByteCount + value.Payload.Length > maxBytes)
+                {
+                    return false;
+                }
+
+                if (topicValues.Count == 0)
+                {
+                    _valuesByTopic.Add(key.Topic, topicValues);
+                }
+
                 Count++;
             }
 
             topicValues[key.Key] = value;
             ByteCount += value.Payload.Length;
+            return true;
         }
 
         public ImmutableArray<PendingTopicValues> ToImmutableValuesByTopic()

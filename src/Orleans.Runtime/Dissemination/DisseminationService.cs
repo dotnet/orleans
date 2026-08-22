@@ -49,6 +49,12 @@ internal sealed partial class DisseminationService
         CancellationToken cancellationToken) =>
         new(Execute(async () => await _protocol.ReceiveAntiEntropy(request, cancellationToken)));
 
+    internal IReadOnlyList<SiloAddress> GetUnconfirmedPeers(
+        string topicName,
+        DisseminationMembershipScope membershipScope,
+        IReadOnlyCollection<SiloAddress>? candidates = null) =>
+        _protocol.GetUnconfirmedPeers(topicName, membershipScope, candidates);
+
     internal Task StartAsync(CancellationToken cancellationToken)
     {
         lock (_lifecycleLock)
@@ -79,11 +85,14 @@ internal sealed partial class DisseminationService
         return Task.CompletedTask;
     }
 
-    internal bool IsAntiEntropyRunning => _antiEntropyTask is { IsCompleted: false };
+    internal bool IsAntiEntropyRunning =>
+        _shutdownCts is { IsCancellationRequested: false }
+        && _antiEntropyTask is { IsCompleted: false };
+
+    internal bool HasOutstandingAntiEntropyTask => _antiEntropyTask is not null;
 
     internal async Task StopAsync(CancellationToken cancellationToken)
     {
-        await Execute(async () => await _protocol.FlushPendingGossip(cancellationToken));
         Task? antiEntropyTask;
         CancellationTokenSource? shutdownCts;
         CancellationTokenSource? antiEntropyCts;
@@ -91,9 +100,7 @@ internal sealed partial class DisseminationService
         lock (_lifecycleLock)
         {
             antiEntropyTask = _antiEntropyTask;
-            _antiEntropyTask = null;
             antiEntropyCts = _antiEntropyCts;
-            _antiEntropyCts = null;
             shutdownCts = _shutdownCts;
             _shutdownCts = null;
             optionsChangeRegistration = _optionsChangeRegistration;
@@ -102,16 +109,91 @@ internal sealed partial class DisseminationService
             shutdownCts?.Cancel();
         }
 
-        optionsChangeRegistration?.Dispose();
-        if (antiEntropyTask is not null)
+        Exception? cancellationException = null;
+        var deferAntiEntropyCleanup = false;
+        try
+        {
+            optionsChangeRegistration?.Dispose();
+            if (antiEntropyTask is not null)
+            {
+                try
+                {
+                    await antiEntropyTask.WaitAsync(cancellationToken);
+                }
+                catch (OperationCanceledException exception) when (cancellationToken.IsCancellationRequested)
+                {
+                    cancellationException = exception;
+                    deferAntiEntropyCleanup = !antiEntropyTask.IsCompleted;
+                }
+                catch (OperationCanceledException)
+                {
+                    // Expected during silo shutdown.
+                }
+                catch (Exception exception)
+                {
+                    LogDebugAntiEntropyLoopFailed(_logger, exception);
+                }
+            }
+
+            try
+            {
+                await Execute(async () => await _protocol.StopAsync(cancellationToken));
+            }
+            catch (OperationCanceledException exception) when (cancellationToken.IsCancellationRequested)
+            {
+                cancellationException ??= exception;
+            }
+        }
+        finally
+        {
+            if (deferAntiEntropyCleanup && antiEntropyTask is not null)
+            {
+                ObserveAntiEntropyShutdown(antiEntropyTask, antiEntropyCts);
+            }
+            else
+            {
+                CompleteAntiEntropyShutdown(antiEntropyTask, antiEntropyCts);
+            }
+
+            shutdownCts?.Dispose();
+        }
+
+        if (cancellationException is not null)
+        {
+            throw cancellationException;
+        }
+    }
+
+    internal async Task RunAntiEntropy(CancellationToken cancellationToken)
+    {
+        var state = await Execute(() => Task.FromResult(_protocol.CreateAntiEntropyState()));
+        var responses = await _protocol.ExchangeAntiEntropy(state, cancellationToken);
+        cancellationToken.ThrowIfCancellationRequested();
+        await Execute(async () => await _protocol.ApplyAntiEntropyResponses(responses, cancellationToken));
+    }
+
+    private void ObserveAntiEntropyShutdown(Task task, CancellationTokenSource? cancellationTokenSource) =>
+        _ = task.ContinueWith(
+            static (completed, state) =>
+            {
+                var (service, source) = ((DisseminationService, CancellationTokenSource?))state!;
+                service.CompleteAntiEntropyShutdown(completed, source);
+            },
+            (this, cancellationTokenSource),
+            CancellationToken.None,
+            TaskContinuationOptions.ExecuteSynchronously,
+            TaskScheduler.Default);
+
+    private void CompleteAntiEntropyShutdown(Task? task, CancellationTokenSource? cancellationTokenSource)
+    {
+        if (task is not null)
         {
             try
             {
-                await antiEntropyTask.WaitAsync(cancellationToken);
+                task.GetAwaiter().GetResult();
             }
             catch (OperationCanceledException)
             {
-                // Expected during silo shutdown.
             }
             catch (Exception exception)
             {
@@ -119,15 +201,20 @@ internal sealed partial class DisseminationService
             }
         }
 
-        antiEntropyCts?.Dispose();
-        shutdownCts?.Dispose();
-    }
+        lock (_lifecycleLock)
+        {
+            if (ReferenceEquals(_antiEntropyTask, task))
+            {
+                _antiEntropyTask = null;
+            }
 
-    internal async Task RunAntiEntropy(CancellationToken cancellationToken)
-    {
-        var state = await Execute(() => Task.FromResult(_protocol.CreateAntiEntropyState()));
-        var responses = await _protocol.ExchangeAntiEntropy(state, cancellationToken);
-        await Execute(async () => await _protocol.ApplyAntiEntropyResponses(responses, cancellationToken));
+            if (ReferenceEquals(_antiEntropyCts, cancellationTokenSource))
+            {
+                _antiEntropyCts = null;
+            }
+        }
+
+        cancellationTokenSource?.Dispose();
     }
 
     private async Task RunAntiEntropyLoop(CancellationToken cancellationToken)
