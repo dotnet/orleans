@@ -69,6 +69,34 @@ public sealed class FileGrainStorageConformanceTests
         base.PersistenceStorage_ClearBeforeWrite();
 
     [Fact]
+    public override Task PersistenceStorage_WriteClearWrite() =>
+        base.PersistenceStorage_WriteClearWrite();
+
+    [Fact]
+    public override Task PersistenceStorage_WriteClearRead() =>
+        base.PersistenceStorage_WriteClearRead();
+
+    [Fact]
+    public override Task PersistenceStorage_ClearStateDoesNotNullifyState() =>
+        base.PersistenceStorage_ClearStateDoesNotNullifyState();
+
+    [Fact]
+    public override Task PersistenceStorage_ClearUpdatesETag() =>
+        base.PersistenceStorage_ClearUpdatesETag();
+
+    [Fact]
+    public override Task PersistenceStorage_ReadAfterClear() =>
+        base.PersistenceStorage_ReadAfterClear();
+
+    [Fact]
+    public override Task PersistenceStorage_MultipleClearOperations() =>
+        base.PersistenceStorage_MultipleClearOperations();
+
+    [Fact]
+    public override Task PersistenceStorage_ReadNonExistentStateHasNonNullState() =>
+        base.PersistenceStorage_ReadNonExistentStateHasNonNullState();
+
+    [Fact]
     public override Task PersistenceStorage_ETagChangesOnWrite() =>
         base.PersistenceStorage_ETagChangesOnWrite();
 
