@@ -173,6 +173,108 @@ public class LocalSiloHealthEventHistoryTests
         Assert.Equal(LocalSiloHealthMonitor.MaxScore, status.Score);
     }
 
+    [Fact]
+    public void AggregatePauses_ReportsPerKindDurationsAndDeduplicatedTotal()
+    {
+        var history = CreateHistory();
+        history.Add(Event(
+            TimestampAt(TimeSpan.FromSeconds(3)),
+            LocalSiloHealthCheckKind.GarbageCollectionPause,
+            duration: TimeSpan.FromSeconds(2)));
+        history.Add(Event(
+            TimestampAt(TimeSpan.FromSeconds(8)),
+            LocalSiloHealthCheckKind.GarbageCollectionPause,
+            duration: TimeSpan.FromSeconds(2)));
+        history.Add(Event(
+            TimestampAt(TimeSpan.FromSeconds(7)),
+            LocalSiloHealthCheckKind.RuntimeStall,
+            duration: TimeSpan.FromSeconds(5)));
+        history.Add(Event(
+            TimestampAt(TimeSpan.FromSeconds(9)),
+            LocalSiloHealthCheckKind.ThreadPoolQueueDelay,
+            duration: TimeSpan.FromSeconds(1)));
+
+        var end = TimestampAt(TimeSpan.FromSeconds(10));
+        var status = history.AggregatePauses(
+            _startTimestamp,
+            end,
+            end,
+            LocalSiloHealthCheckCategory.Local);
+
+        Assert.Equal(TimeSpan.FromSeconds(7), status.TotalPauseDuration);
+        Assert.Equal(TimeSpan.FromSeconds(4), status.GetDuration(LocalSiloHealthCheckKind.GarbageCollectionPause));
+        Assert.Equal(TimeSpan.FromSeconds(5), status.GetDuration(LocalSiloHealthCheckKind.RuntimeStall));
+        Assert.Equal(TimeSpan.Zero, status.GetDuration(LocalSiloHealthCheckKind.ThreadPoolQueueDelay));
+        Assert.Equal(TimeSpan.Zero, status.GetDuration(LocalSiloHealthCheckKind.ComponentHealthCheckStall));
+    }
+
+    [Fact]
+    public void AggregatePauses_UnionsOverlappingPausesOfSameKind()
+    {
+        var history = CreateHistory();
+        history.Add(Event(
+            TimestampAt(TimeSpan.FromSeconds(4)),
+            LocalSiloHealthCheckKind.RuntimeStall,
+            duration: TimeSpan.FromSeconds(3)));
+        history.Add(Event(
+            TimestampAt(TimeSpan.FromSeconds(6)),
+            LocalSiloHealthCheckKind.RuntimeStall,
+            duration: TimeSpan.FromSeconds(3)));
+
+        var end = TimestampAt(TimeSpan.FromSeconds(6));
+        var status = history.AggregatePauses(
+            _startTimestamp,
+            end,
+            end,
+            LocalSiloHealthCheckCategory.Local);
+
+        Assert.Equal(TimeSpan.FromSeconds(5), status.TotalPauseDuration);
+        Assert.Equal(TimeSpan.FromSeconds(5), status.GetDuration(LocalSiloHealthCheckKind.RuntimeStall));
+    }
+
+    [Fact]
+    public void AggregatePauses_ClipsPausesToRequestedInterval()
+    {
+        var history = CreateHistory();
+        history.Add(Event(
+            TimestampAt(TimeSpan.FromSeconds(6)),
+            LocalSiloHealthCheckKind.ComponentHealthCheckStall,
+            duration: TimeSpan.FromSeconds(5)));
+
+        var start = TimestampAt(TimeSpan.FromSeconds(3));
+        var end = TimestampAt(TimeSpan.FromSeconds(5));
+        var status = history.AggregatePauses(
+            start,
+            end,
+            TimestampAt(TimeSpan.FromSeconds(6)),
+            LocalSiloHealthCheckCategory.Local);
+
+        Assert.Equal(TimeSpan.FromSeconds(2), status.TotalPauseDuration);
+        Assert.Equal(TimeSpan.FromSeconds(2), status.GetDuration(LocalSiloHealthCheckKind.ComponentHealthCheckStall));
+    }
+
+    [Fact]
+    public void AggregatePauses_RetainsEventsForActiveLongRunningInterval()
+    {
+        var history = CreateHistory();
+        history.BeginPauseCollection(_startTimestamp);
+        history.Add(Event(
+            TimestampAt(TimeSpan.FromSeconds(30)),
+            LocalSiloHealthCheckKind.GarbageCollectionPause,
+            duration: TimeSpan.FromSeconds(10)));
+
+        var end = TimestampAt(TimeSpan.FromMinutes(2));
+        var status = history.AggregatePauses(
+            _startTimestamp,
+            end,
+            end,
+            LocalSiloHealthCheckCategory.Local);
+        history.EndPauseCollection(_startTimestamp, end);
+
+        Assert.Equal(TimeSpan.FromSeconds(10), status.TotalPauseDuration);
+        Assert.Equal(TimeSpan.FromSeconds(10), status.GetDuration(LocalSiloHealthCheckKind.GarbageCollectionPause));
+    }
+
     private LocalSiloHealthEventHistory CreateHistory()
         => new(_timeProvider, TimeSpan.FromMinutes(1), TimeSpan.FromSeconds(1));
 
@@ -180,7 +282,8 @@ public class LocalSiloHealthEventHistoryTests
         long timestamp,
         LocalSiloHealthCheckKind kind,
         int score = 1,
-        string? source = null)
+        string? source = null,
+        TimeSpan? duration = null)
         => new(
             timestamp,
             kind,
@@ -188,7 +291,7 @@ public class LocalSiloHealthEventHistoryTests
             source,
             score,
             Complaint: null,
-            Duration: null);
+            duration);
 
     private long TimestampAt(TimeSpan elapsed)
         => _startTimestamp

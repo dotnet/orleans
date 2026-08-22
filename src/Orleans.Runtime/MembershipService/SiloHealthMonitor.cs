@@ -207,12 +207,15 @@ namespace Orleans.Runtime.MembershipService
                     localDegradationScore = GetLocalDegradationScore(previousProbePeriod);
                     var timeout = CalculateProbeTimeout(failureDetector, options, localDegradationScore, isDirectProbe, Debugger.IsAttached);
                     probeStartTimestamp = _timeProvider.GetTimestamp();
+                    var pauseStartTimestamp = isDirectProbe
+                        ? _localSiloHealthMonitor.CapturePauseTimestamp()
+                        : 0;
                     using var cancellation = new CancellationTokenSource(timeout, _timeProvider);
 
                     if (isDirectProbe)
                     {
                         // Probe the silo directly.
-                        probeResult = await this.ProbeDirectly(cancellation.Token).ConfigureAwait(false);
+                        probeResult = await this.ProbeDirectly(cancellation.Token, timeout, pauseStartTimestamp).ConfigureAwait(false);
                     }
                     else
                     {
@@ -321,8 +324,10 @@ namespace Orleans.Runtime.MembershipService
         /// Probes the remote silo.
         /// </summary>
         /// <param name="cancellation">A token to cancel and fail the probe attempt.</param>
+        /// <param name="probeTimeout">The timeout used for this probe, for local pause evaluation.</param>
+        /// <param name="pauseStartTimestamp">The start of the local pause aggregation interval.</param>
         /// <returns>The number of failed probes since the last successful probe.</returns>
-        private async Task<ProbeResult> ProbeDirectly(CancellationToken cancellation)
+        private async Task<ProbeResult> ProbeDirectly(CancellationToken cancellation, TimeSpan probeTimeout, long pauseStartTimestamp)
         {
             var id = ++_nextProbeId;
             LogTraceGoingToSendPing(_log, id, TargetSiloAddress);
@@ -330,6 +335,7 @@ namespace Orleans.Runtime.MembershipService
             var roundTripTimer = TimeProviderValueStopwatch.StartNew(_timeProvider);
             ProbeResult probeResult;
             Exception? failureException;
+            var probeTimedOut = false;
             try
             {
                 await _prober.Probe(TargetSiloAddress, id, cancellation).WaitAsync(cancellation);
@@ -337,6 +343,7 @@ namespace Orleans.Runtime.MembershipService
             }
             catch (OperationCanceledException exception)
             {
+                probeTimedOut = cancellation.IsCancellationRequested;
                 failureException = new OperationCanceledException(
                     $"The ping attempt was cancelled after {roundTripTimer.GetElapsedTime(out _)}. Ping #{id}",
                     exception);
@@ -346,6 +353,15 @@ namespace Orleans.Runtime.MembershipService
                 failureException = exception;
             }
             var roundTripTime = roundTripTimer.GetElapsedTime(out _);
+            var pauseDurationDuring = TimeSpan.Zero;
+            if (probeTimedOut)
+            {
+                pauseDurationDuring = _localSiloHealthMonitor.GetPauseStatus(pauseStartTimestamp).TotalPauseDuration;
+            }
+            else
+            {
+                _localSiloHealthMonitor.EndPauseCollection(pauseStartTimestamp);
+            }
 
             if (failureException is null)
             {
@@ -361,12 +377,22 @@ namespace Orleans.Runtime.MembershipService
             }
             else
             {
-                _messagingInstruments?.OnPingReplyMissed(TargetSiloAddress);
+                // Check if a local pause consumed a significant portion of the probe timeout.
+                // If so, the local silo may have been unable to process the response in time,
+                // so we treat this as an inconclusive result rather than a failure.
+                if (probeTimedOut && pauseDurationDuring >= probeTimeout.Multiply(0.25))
+                {
+                    LogWarningProbeFailureDuringLocalPause(_log, id, TargetSiloAddress, roundTripTime, pauseDurationDuring, _failedProbes);
+                    probeResult = ProbeResult.CreateDirect(_failedProbes, ProbeResultStatus.Unknown);
+                }
+                else
+                {
+                    _messagingInstruments?.OnPingReplyMissed(TargetSiloAddress);
+                    var failedProbes = ++_failedProbes;
+                    LogWarningDidNotGetResponseForProbe(_log, failureException, id, TargetSiloAddress, roundTripTime, failedProbes);
 
-                var failedProbes = ++_failedProbes;
-                LogWarningDidNotGetResponseForProbe(_log, failureException, id, TargetSiloAddress, roundTripTime, failedProbes);
-
-                probeResult = ProbeResult.CreateDirect(failedProbes, ProbeResultStatus.Failed);
+                    probeResult = ProbeResult.CreateDirect(failedProbes, ProbeResultStatus.Failed);
+                }
             }
 
             return probeResult;
@@ -536,5 +562,11 @@ namespace Orleans.Runtime.MembershipService
             Message = "Exception monitoring silo {SiloAddress}"
         )]
         private static partial void LogErrorExceptionMonitoringSilo(ILogger logger, Exception exception, SiloAddress siloAddress);
+
+        [LoggerMessage(
+            Level = LogLevel.Warning,
+            Message = "Probe #{Id} to silo {SiloAddress} failed after {Elapsed}, but a local pause of {PauseDuration} was detected during the probe. Treating as inconclusive. Consecutive failed probe count remains at {FailedProbeCount}."
+        )]
+        private static partial void LogWarningProbeFailureDuringLocalPause(ILogger logger, int id, SiloAddress siloAddress, TimeSpan elapsed, TimeSpan pauseDuration, int failedProbeCount);
     }
 }

@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Collections.Immutable;
+using System.Linq;
 using System.Runtime.InteropServices;
 
 namespace Orleans.Runtime.MembershipService;
@@ -13,6 +14,12 @@ internal sealed class LocalSiloHealthEventHistory
     private readonly Bucket[] _buckets;
     private readonly Dictionary<HealthEventIdentity, AggregateEntry> _candidates = [];
     private readonly List<LocalSiloHealthEvent> _selected = [];
+    private readonly List<LocalSiloHealthEvent> _pauseEvents = [];
+    private readonly SortedDictionary<long, int> _activePauseIntervals = [];
+    private readonly Dictionary<LocalSiloHealthCheckKind, List<PauseInterval>> _pauseIntervalsByKind = [];
+    private readonly List<PauseInterval> _allPauseIntervals = [];
+    private readonly List<LocalSiloPauseDuration> _pauseDurations = [];
+    private int _pauseEventHead;
     private int _count;
     private int _occupiedBucketCount;
 
@@ -34,6 +41,37 @@ internal sealed class LocalSiloHealthEventHistory
     internal int Count => _count;
 
     internal int OccupiedBucketCount => _occupiedBucketCount;
+
+    public void BeginPauseCollection(long startTimestamp)
+    {
+        if (_activePauseIntervals.TryGetValue(startTimestamp, out var count))
+        {
+            _activePauseIntervals[startTimestamp] = count + 1;
+        }
+        else
+        {
+            _activePauseIntervals.Add(startTimestamp, 1);
+        }
+    }
+
+    public void EndPauseCollection(long startTimestamp, long nowTimestamp)
+    {
+        if (!_activePauseIntervals.TryGetValue(startTimestamp, out var count))
+        {
+            throw new InvalidOperationException($"Pause collection interval {startTimestamp} is not active.");
+        }
+
+        if (count == 1)
+        {
+            _activePauseIntervals.Remove(startTimestamp);
+        }
+        else
+        {
+            _activePauseIntervals[startTimestamp] = count - 1;
+        }
+
+        RemoveExpiredPauseEvents(nowTimestamp, force: true);
+    }
 
     public void Add(LocalSiloHealthEvent healthEvent)
     {
@@ -106,6 +144,7 @@ internal sealed class LocalSiloHealthEventHistory
                         entry.HasIntervalEvent = true;
                     }
                 }
+
             }
 
             _selected.EnsureCapacity(_candidates.Count);
@@ -148,6 +187,57 @@ internal sealed class LocalSiloHealthEventHistory
         }
     }
 
+    public LocalSiloPauseStatus AggregatePauses(
+        long startTimestamp,
+        long endTimestamp,
+        long nowTimestamp,
+        LocalSiloHealthCheckCategory categories)
+    {
+        RemoveExpired(nowTimestamp);
+        if (categories == LocalSiloHealthCheckCategory.None)
+        {
+            return new(TimeSpan.Zero, []);
+        }
+
+        try
+        {
+            for (var i = _pauseEventHead; i < _pauseEvents.Count; i++)
+            {
+                var healthEvent = _pauseEvents[i];
+                if ((healthEvent.Category & categories) == 0
+                    || !TryGetPauseInterval(healthEvent, startTimestamp, endTimestamp, out var interval))
+                {
+                    continue;
+                }
+
+                if (!_pauseIntervalsByKind.TryGetValue(healthEvent.Kind, out var intervals))
+                {
+                    intervals = [];
+                    _pauseIntervalsByKind.Add(healthEvent.Kind, intervals);
+                }
+
+                intervals.Add(interval);
+                _allPauseIntervals.Add(interval);
+            }
+
+            foreach (var (kind, intervals) in _pauseIntervalsByKind)
+            {
+                _pauseDurations.Add(new(kind, GetUnionDuration(intervals)));
+            }
+
+            _pauseDurations.Sort(static (left, right) => left.Kind.CompareTo(right.Kind));
+            return new(
+                GetUnionDuration(_allPauseIntervals),
+                ImmutableArray.CreateRange(_pauseDurations));
+        }
+        finally
+        {
+            _pauseIntervalsByKind.Clear();
+            _allPauseIntervals.Clear();
+            _pauseDurations.Clear();
+        }
+    }
+
     private void AddCore(LocalSiloHealthEvent healthEvent)
     {
         var bucketIndex = GetBucketIndex(healthEvent.Timestamp);
@@ -173,6 +263,10 @@ internal sealed class LocalSiloHealthEventHistory
 
         bucket.Events!.Add(healthEvent);
         _count++;
+        if (IsPause(healthEvent))
+        {
+            _pauseEvents.Add(healthEvent);
+        }
     }
 
     private void RemoveExpired(long nowTimestamp)
@@ -215,6 +309,31 @@ internal sealed class LocalSiloHealthEventHistory
                     Clear(ref bucket);
                 }
             }
+
+        }
+
+        RemoveExpiredPauseEvents(nowTimestamp, force: false);
+    }
+
+    private void RemoveExpiredPauseEvents(long nowTimestamp, bool force)
+    {
+        var oldestTimestamp = SubtractTimestamp(nowTimestamp, _retentionPeriod);
+        if (_activePauseIntervals.Count > 0)
+        {
+            oldestTimestamp = Math.Min(oldestTimestamp, _activePauseIntervals.First().Key);
+        }
+
+        while (_pauseEventHead < _pauseEvents.Count
+            && _pauseEvents[_pauseEventHead].Timestamp < oldestTimestamp)
+        {
+            _pauseEventHead++;
+        }
+
+        if (_pauseEventHead > 0
+            && (force || _pauseEventHead >= 1024 && _pauseEventHead >= _pauseEvents.Count / 2))
+        {
+            _pauseEvents.RemoveRange(0, _pauseEventHead);
+            _pauseEventHead = 0;
         }
     }
 
@@ -239,12 +358,80 @@ internal sealed class LocalSiloHealthEventHistory
                 && _timeProvider.GetElapsedTime(endTimestamp, healthEvent.Timestamp) <= duration;
     }
 
+    private bool TryGetPauseInterval(
+        LocalSiloHealthEvent healthEvent,
+        long startTimestamp,
+        long endTimestamp,
+        out PauseInterval interval)
+    {
+        if (healthEvent.Duration is not { } duration || duration <= TimeSpan.Zero)
+        {
+            interval = default;
+            return false;
+        }
+
+        var pauseStartTimestamp = SubtractTimestamp(healthEvent.Timestamp, duration);
+        var overlapStartTimestamp = Math.Max(startTimestamp, pauseStartTimestamp);
+        var overlapEndTimestamp = Math.Min(endTimestamp, healthEvent.Timestamp);
+        if (overlapEndTimestamp <= overlapStartTimestamp)
+        {
+            interval = default;
+            return false;
+        }
+
+        interval = new(overlapStartTimestamp, overlapEndTimestamp);
+        return true;
+    }
+
+    private TimeSpan GetUnionDuration(List<PauseInterval> intervals)
+    {
+        if (intervals.Count == 0)
+        {
+            return TimeSpan.Zero;
+        }
+
+        intervals.Sort(static (left, right) =>
+        {
+            var startComparison = left.StartTimestamp.CompareTo(right.StartTimestamp);
+            return startComparison != 0
+                ? startComparison
+                : left.EndTimestamp.CompareTo(right.EndTimestamp);
+        });
+
+        var totalTimestampLength = 0L;
+        var currentStartTimestamp = intervals[0].StartTimestamp;
+        var currentEndTimestamp = intervals[0].EndTimestamp;
+        for (var i = 1; i < intervals.Count; i++)
+        {
+            var interval = intervals[i];
+            if (interval.StartTimestamp <= currentEndTimestamp)
+            {
+                currentEndTimestamp = Math.Max(currentEndTimestamp, interval.EndTimestamp);
+            }
+            else
+            {
+                totalTimestampLength = checked(totalTimestampLength + currentEndTimestamp - currentStartTimestamp);
+                currentStartTimestamp = interval.StartTimestamp;
+                currentEndTimestamp = interval.EndTimestamp;
+            }
+        }
+
+        totalTimestampLength = checked(totalTimestampLength + currentEndTimestamp - currentStartTimestamp);
+        return _timeProvider.GetElapsedTime(0, totalTimestampLength);
+    }
+
     private static bool IsStateful(LocalSiloHealthCheckKind kind)
         => kind is LocalSiloHealthCheckKind.MembershipStatus
             or LocalSiloHealthCheckKind.HealthCheckParticipant
             or LocalSiloHealthCheckKind.ThreadPoolQueueDelay
             or LocalSiloHealthCheckKind.ProbeRequests
             or LocalSiloHealthCheckKind.ProbeResponses;
+
+    private static bool IsPause(LocalSiloHealthEvent healthEvent)
+        => healthEvent.Duration > TimeSpan.Zero
+            && healthEvent.Kind is LocalSiloHealthCheckKind.GarbageCollectionPause
+                or LocalSiloHealthCheckKind.RuntimeStall
+                or LocalSiloHealthCheckKind.ComponentHealthCheckStall;
 
     private static bool IsBetter(
         LocalSiloHealthEvent candidate,
@@ -269,6 +456,8 @@ internal sealed class LocalSiloHealthEventHistory
     private readonly record struct HealthEventIdentity(
         LocalSiloHealthCheckKind Kind,
         string? Source);
+
+    private readonly record struct PauseInterval(long StartTimestamp, long EndTimestamp);
 
     private struct AggregateEntry
     {
