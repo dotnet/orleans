@@ -22,7 +22,6 @@ namespace Orleans
 #else
         private readonly object _lockObj = new();
 #endif
-        private readonly ConcurrentDictionary<GrainInterfaceType, GrainType> _genericMapping = new ConcurrentDictionary<GrainInterfaceType, GrainType>();
         private readonly IClusterManifestProvider _clusterManifestProvider;
         private Cache? _cache;
 
@@ -45,8 +44,29 @@ namespace Orleans
                 return GetGrainType(interfaceType);
             }
 
-            GrainType result = default;
+            if (!TryGetGrainType(interfaceType, prefix, out var grainType))
+            {
+                throw new ArgumentException($"Could not find an implementation matching prefix \"{prefix}\" for interface {interfaceType}");
+            }
 
+            return grainType;
+        }
+
+        /// <summary>
+        /// Resolves a <see cref="GrainType"/> which implements the provided <see cref="GrainInterfaceType"/>, returning <see langword="true"/> if an implementation was found; otherwise <see langword="false"/>.
+        /// </summary>
+        /// <param name="interfaceType">The grain interface type.</param>
+        /// <param name="prefix">A prefix of the grain implementation class name to search for.</param>
+        /// <param name="result">The resolved grain type.</param>
+        /// <returns><see langword="true"/> if an implementation was found; otherwise <see langword="false"/>.</returns>
+        public bool TryGetGrainType(GrainInterfaceType interfaceType, string? prefix, out GrainType result)
+        {
+            if (string.IsNullOrWhiteSpace(prefix))
+            {
+                return TryGetGrainType(interfaceType, out result);
+            }
+
+            result = default;
             GrainInterfaceType lookupType;
             if (GenericGrainInterfaceType.TryParse(interfaceType, out var genericInterface))
             {
@@ -84,17 +104,12 @@ namespace Orleans
                 }
             }
 
-            if (result.IsDefault)
-            {
-                throw new ArgumentException($"Could not find an implementation matching prefix \"{prefix}\" for interface {interfaceType}");
-            }
-
-            if (GenericGrainType.TryParse(result, out var genericGrainType) && !genericGrainType.IsConstructed)
+            if (!result.IsDefault && GenericGrainType.TryParse(result, out var genericGrainType) && !genericGrainType.IsConstructed)
             {
                 result = genericGrainType.GetConstructed(genericInterface);
             }
 
-            return result;
+            return !result.IsDefault;
         }
 
         /// <summary>
@@ -113,38 +128,27 @@ namespace Orleans
         /// <summary>
         /// Resolves a <see cref="GrainType"/> which implements the provided <see cref="GrainInterfaceType"/>, returning <see langword="true"/> if an implementation was found; otherwise <see langword="false"/>.
         /// </summary>
+        /// <param name="interfaceType">The grain interface type.</param>
+        /// <param name="result">The resolved grain type.</param>
         /// <returns><see langword="true"/> if an implementation was found; otherwise <see langword="false"/>.</returns>
         public bool TryGetGrainType(GrainInterfaceType interfaceType, out GrainType result)
+            => TryGetGrainType(GetCache(), interfaceType, out result);
+
+        private bool TryGetGrainType(Cache cache, GrainInterfaceType interfaceType, out GrainType result)
         {
             result = default;
-            var cache = GetCache();
             if (cache.Map.TryGetValue(interfaceType, out var entry))
             {
-                if (!entry.PrimaryImplementation.IsDefault)
-                {
-                    result = entry.PrimaryImplementation;
-                }
-                else if (entry.Implementations.Count == 1)
-                {
-                    result = entry.Implementations[0].GrainType;
-                }
-                else if (entry.Implementations.Count > 1)
-                {
-                    var candidates = string.Join(", ", entry.Implementations.Select(i => $"{i.GrainType} ({i.Prefix})"));
-                    throw new ArgumentException($"Unable to identify a single appropriate grain type for interface {interfaceType}. Candidates: {candidates}");
-                }
-                else
-                {
-                    // No implementations
-                }
+                TryFind(interfaceType, entry, out result);
             }
-            else if (_genericMapping.TryGetValue(interfaceType, out result))
+            else if (cache.GenericMapping.TryGetValue(interfaceType, out result))
             {
+                // Nothing needed here.
             }
             else if (GenericGrainInterfaceType.TryParse(interfaceType, out var genericInterface) && genericInterface.IsConstructed)
             {
                 var unconstructedInterface = genericInterface.GetGenericGrainType();
-                if (TryGetGrainType(unconstructedInterface.Value, out var unconstructed))
+                if (TryGetGrainType(cache, unconstructedInterface.Value, out var unconstructed))
                 {
                     if (GenericGrainType.TryParse(unconstructed, out var genericGrainType))
                     {
@@ -163,7 +167,34 @@ namespace Orleans
                     }
                 }
 
-                _genericMapping[interfaceType] = result;
+                if (!result.IsDefault)
+                {
+                    cache.GenericMapping[interfaceType] = result;
+                }
+            }
+
+            return !result.IsDefault;
+        }
+
+        private bool TryFind(GrainInterfaceType interfaceType, CacheEntry entry, out GrainType result)
+        {
+            if (!entry.PrimaryImplementation.IsDefault)
+            {
+                result = entry.PrimaryImplementation;
+            }
+            else if (entry.Implementations.Count == 1)
+            {
+                result = entry.Implementations[0].GrainType;
+            }
+            else if (entry.Implementations.Count > 1)
+            {
+                var candidates = string.Join(", ", entry.Implementations.Select(i => $"{i.GrainType} ({i.Prefix})"));
+                throw new ArgumentException($"Unable to identify a single appropriate grain type for interface {interfaceType}. Candidates: {candidates}");
+            }
+            else
+            {
+                // No implementations
+                result = default;
             }
 
             return !result.IsDefault;
@@ -270,6 +301,7 @@ namespace Orleans
             {
                 this.Version = version;
                 this.Map = map;
+                this.GenericMapping = new();
             }
 
             /// <summary>
@@ -281,6 +313,11 @@ namespace Orleans
             /// Gets the mapping from grain interface type to implementations.
             /// </summary>
             public Dictionary<GrainInterfaceType, CacheEntry> Map { get; }
+
+            /// <summary>
+            /// Gets constructed generic mappings derived from this manifest version.
+            /// </summary>
+            public ConcurrentDictionary<GrainInterfaceType, GrainType> GenericMapping { get; }
         }
 
         /// <summary>

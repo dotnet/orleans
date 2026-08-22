@@ -83,15 +83,13 @@ namespace Tester.HeterogeneousSilosTests
         }
 
         [Fact]
-        public void GrainExcludedTest()
+        public void GrainReferenceIsCreatedWhenImplementationIsUnavailable()
         {
             SetupAndDeployCluster(typeof(RandomPlacement), typeof(TestGrain));
 
-            // Should fail
-            var exception = Assert.Throws<ArgumentException>(() => this.cluster!.GrainFactory!.GetGrain<ITestGrain>(0));
-            Assert.Contains("Could not find an implementation for interface", exception.Message);
+            var grain = this.cluster!.GrainFactory!.GetGrain<ITestGrain>(0);
+            Assert.True(grain.GetGrainId().Type.IsStubGrain());
 
-            // Should not fail
             this.cluster!.GrainFactory!.GetGrain<ISimpleGrainWithAsyncMethods>(0);
         }
 
@@ -181,28 +179,42 @@ namespace Tester.HeterogeneousSilosTests
         {
             SetupAndDeployCluster(defaultPlacementStrategy, blackListedTypes);
 
-            // Should fail
-            var exception = Assert.Throws<ArgumentException>(() => this.cluster!.GrainFactory!.GetGrain<T>(0));
-            Assert.Contains("Could not find an implementation for interface", exception.Message);
+            var grain = this.cluster!.GrainFactory!.GetGrain<T>(0);
+            var unresolvedGrainId = grain.GetGrainId();
+            var unresolvedGrainHashCode = grain.GetHashCode();
+            Assert.True(grain.GetGrainId().Type.IsStubGrain());
+            Task[]? pendingCalls = null;
+            if (!restartClient)
+            {
+                pendingCalls = [func(grain), func(grain)];
+                Assert.All(pendingCalls, static call => Assert.False(call.IsCompleted));
+            }
 
-            // Start a new silo with TestGrain
             await cluster!.StartAdditionalSiloAsync();
             await WaitForClusterStateToStabilizeAsync(restartClient);
+            if (pendingCalls is not null)
+            {
+                await Task.WhenAll(pendingCalls).WaitAsync(TestConstants.InitTimeout);
+                Assert.Equal(unresolvedGrainId, grain.GetGrainId());
+                Assert.Equal(unresolvedGrainHashCode, grain.GetHashCode());
+            }
+            else
+            {
+                grain = this.cluster.GrainFactory!.GetGrain<T>(0);
+                await func(grain);
+            }
 
             for (var i = 0; i < 5; i++)
             {
-                // Success
                 var g = this.cluster.GrainFactory!.GetGrain<T>(i);
                 await func(g);
             }
 
-            // Stop the latest silos
             await cluster.StopSecondarySilosAsync();
             await WaitForClusterStateToStabilizeAsync(restartClient);
 
-            // Should fail
-            exception = Assert.Throws<ArgumentException>(() => this.cluster.GrainFactory!.GetGrain<T>(0));
-            Assert.Contains("Could not find an implementation for interface", exception.Message);
+            var unresolvedGrain = this.cluster.GrainFactory!.GetGrain<T>(0);
+            Assert.True(unresolvedGrain.GetGrainId().Type.IsStubGrain());
         }
 
         public ValueTask InitializeAsync()

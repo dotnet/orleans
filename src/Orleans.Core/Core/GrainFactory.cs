@@ -1,5 +1,8 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
+using System.Threading;
+using System.Threading.Tasks;
 using Orleans.GrainReferences;
 using Orleans.Metadata;
 using Orleans.Runtime;
@@ -210,16 +213,13 @@ namespace Orleans
 
             var grainInterfaceType = this.interfaceTypeResolver.GetGrainInterfaceType(interfaceType);
 
-            GrainType grainType;
-            if (!string.IsNullOrWhiteSpace(grainClassNamePrefix))
+            if (!interfaceTypeToGrainTypeResolver.TryGetGrainType(grainInterfaceType, grainClassNamePrefix, out var grainType))
             {
-                grainType = this.interfaceTypeToGrainTypeResolver.GetGrainType(grainInterfaceType, grainClassNamePrefix);
-            }
-            else
-            {
-                grainType = this.interfaceTypeToGrainTypeResolver.GetGrainType(grainInterfaceType);
+                // A compatible implementation can become available as the cluster manifest changes.
+                grainType = GrainTypePrefix.CreateStubGrainType(grainInterfaceType, grainClassNamePrefix);
             }
 
+            Debug.Assert(!grainType.IsDefault);
             var grainId = GrainId.Create(grainType, grainKey);
             var grain = this.referenceActivator.CreateReference(grainId, grainInterfaceType);
             return grain;
