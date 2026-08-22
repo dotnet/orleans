@@ -487,27 +487,49 @@ public class DurableTaskModelTests
     private sealed class TaskIdObservation
     {
         public string FormattedPath { get; init; } = string.Empty;
+
         public bool IsDefault { get; init; }
+
         public bool EqualsDefault { get; init; }
+
         public bool EqualsNone { get; init; }
+
         public bool DefaultEqualsCurrent { get; init; }
+
         public bool NoneEqualsCurrent { get; init; }
+
         public string ParentFormattedPath { get; init; } = string.Empty;
+
         public bool ParentIsDefault { get; init; }
+
         public bool ParentEqualsNone { get; init; }
+
         public TaskIdRelationObservation CurrentToCurrent { get; init; } = new();
+
         public TaskIdRelationObservation ParentToCurrent { get; init; } = new();
+
         public TaskIdRelationObservation CurrentToParent { get; init; } = new();
+
         public TaskIdRelationObservation CurrentToNone { get; init; } = new();
+
         public TaskIdRelationObservation NoneToCurrent { get; init; } = new();
+
         public TaskIdRelationObservation NoneToNone { get; init; } = new();
+
         public string NoneFormattedPath { get; init; } = string.Empty;
+
         public bool NoneIsDefault { get; init; }
+
         public string NoneParentFormattedPath { get; init; } = string.Empty;
+
         public bool NoneParentIsDefault { get; init; }
+
         public int? SelectedSnapshotIndex { get; init; }
+
         public string? ExceptionType { get; init; }
+
         public string? ExceptionMessage { get; init; }
+
         public List<RememberedTaskIdObservation> RememberedSnapshots { get; init; } = [];
 
         public override string ToString()
@@ -517,20 +539,30 @@ public class DurableTaskModelTests
     private sealed class RememberedTaskIdObservation
     {
         public string FormattedPath { get; init; } = string.Empty;
+
         public bool IsDefault { get; init; }
+
         public bool EqualsNone { get; init; }
+
         public TaskIdRelationObservation CurrentToSnapshot { get; init; } = new();
+
         public TaskIdRelationObservation SnapshotToCurrent { get; init; } = new();
     }
 
     private sealed class TaskIdRelationObservation
     {
         public bool ValueEquals { get; init; }
+
         public bool OperatorEquals { get; init; }
+
         public bool OperatorNotEquals { get; init; }
+
         public bool IsAncestor { get; init; }
+
         public bool IsDescendant { get; init; }
+
         public bool IsParent { get; init; }
+
         public bool IsChild { get; init; }
     }
 
@@ -1374,15 +1406,25 @@ public class DurableTaskModelTests
         private sealed class RuntimeCancellationRegistration(int slot)
         {
             public int Slot { get; } = slot;
+
             public CallbackOutcome Outcome { get; set; }
+
             public CancellationRegistrationStatus Status { get; set; }
+
             public bool IsDisposed { get; set; }
+
             public bool IsLate { get; set; }
+
             public int RegistrationOrder { get; set; } = -1;
+
             public int CallbackCount { get; set; }
+
             public bool CallbackObservedCanceledToken { get; set; }
+
             public bool CallbackObservedAmbientContext { get; set; }
+
             public Exception? Failure { get; set; }
+
             public IAsyncDisposable? Registration { get; set; }
         }
     }
@@ -1421,6 +1463,7 @@ public class DurableTaskModelTests
 internal partial class TaskIdHierarchyModelState : State
 {
     public List<string> CurrentSegments { get; set; } = [];
+
     public List<TaskIdSnapshotModel> RememberedSnapshots { get; set; } = [];
 }
 
@@ -1458,13 +1501,21 @@ internal enum CancellationCompletionStatus
 internal partial class DurableCancellationModelState : State
 {
     public bool CancellationRequested { get; set; }
+
     public bool TokenCanceled { get; set; }
+
     public bool HasFirstCancellationCompletion { get; set; }
+
     public CancellationCompletionStatus SharedCompletionStatus { get; set; }
+
     public List<string> SharedFailureIdentities { get; set; } = [];
+
     public List<string> LateObservedFailureIdentities { get; set; } = [];
+
     public int NextRegistrationOrder { get; set; }
+
     public int CancellationRequestCount { get; set; }
+
     public List<CancellationRegistrationModel> Registrations { get; set; } = [];
 }
 
@@ -1472,10 +1523,16 @@ internal partial class DurableCancellationModelState : State
 internal partial class CancellationRegistrationModel : State
 {
     public int Slot { get; set; }
+
     public CallbackOutcome Outcome { get; set; }
+
     public CancellationRegistrationStatus Status { get; set; }
+
     public bool IsDisposed { get; set; }
+
     public bool IsLate { get; set; }
+
     public int RegistrationOrder { get; set; } = -1;
+
     public int CallbackCount { get; set; }
 }
