@@ -52,7 +52,7 @@ internal sealed class DurableMessageScheduler :
         _jobManager = jobManager;
         _outbox = outbox;
         _grainContext = grainContext;
-        handlers.Register(JobName, this);
+        handlers.Register(this, requiresTurnIsolation: true);
         grainContext.ObservableLifecycle.Subscribe(
             RuntimeTypeNameFormatter.Format(GetType()),
             GrainLifecycleStage.Activate,
@@ -86,6 +86,8 @@ internal sealed class DurableMessageScheduler :
             _gate.Release();
         }
     }
+
+    public bool CanHandle(string jobName) => string.Equals(jobName, JobName, StringComparison.Ordinal);
 
     public async ValueTask<DurableJobRunResult> ExecuteJobAsync(
         IJobRunContext context,

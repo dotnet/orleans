@@ -125,3 +125,17 @@ public interface IDurableOutbox
     /// </remarks>
     Task DeliverPendingMessagesAsync(CancellationToken cancellationToken = default);
 }
+
+[Alias("Orleans.DurableMessaging.IDurableOutboxCommitExtension")]
+internal interface IDurableOutboxCommitExtension : IGrainExtension
+{
+    ValueTask<bool> TryClaimJobAsync(string jobId, CancellationToken cancellationToken);
+
+    ValueTask<DateTimeOffset?> CompleteJobAttemptAsync(string jobId, CancellationToken cancellationToken);
+
+    ValueTask ApplyDeliveryResultAsync(
+        Guid messageId,
+        DeliveryResult result,
+        string? failure,
+        CancellationToken cancellationToken);
+}

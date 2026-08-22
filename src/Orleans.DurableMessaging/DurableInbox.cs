@@ -1,5 +1,4 @@
 using System;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
 using System.Linq;
@@ -22,7 +21,6 @@ internal sealed class DurableInbox : IDurableInbox, ILifecycleObserver
     private readonly IDurableDictionary<(GrainId SenderId, Guid MessageId), DateTimeOffset> _processed;
     private readonly List<IInboxHandler> _handlers;
     private readonly Dictionary<string, IInboxHandler> _legacyRouteHandlers;
-    private readonly ConcurrentDictionary<string, IInboxHandler?> _routeCache;
     private readonly int _capacity;
     private readonly IServiceProvider? _serviceProvider;
     private readonly DurableMessagingInstruments? _instruments;
@@ -47,7 +45,6 @@ internal sealed class DurableInbox : IDurableInbox, ILifecycleObserver
         _processed = processed;
         _handlers = new List<IInboxHandler>();
         _legacyRouteHandlers = new Dictionary<string, IInboxHandler>();
-        _routeCache = new ConcurrentDictionary<string, IInboxHandler?>();
         _capacity = capacity;
     }
 
@@ -166,14 +163,11 @@ internal sealed class DurableInbox : IDurableInbox, ILifecycleObserver
 
         _handlers.Add(handler);
 
-        // Clear cache when new handler is registered
-        _routeCache.Clear();
     }
 
     /// <summary>
     /// Tries to find a handler for the given context by calling CanHandle on registered handlers.
     /// Returns the first handler that returns true from CanHandle.
-    /// Uses caching for performance optimization.
     /// </summary>
     /// <param name="context">The inbox handler context containing envelope metadata.</param>
     /// <param name="handler">The handler if found; otherwise, null.</param>
@@ -182,29 +176,17 @@ internal sealed class DurableInbox : IDurableInbox, ILifecycleObserver
     {
         ArgumentNullException.ThrowIfNull(context);
 
-        var routeKey = context.Envelope.RouteKey ?? string.Empty;
-
-        // Try cache first for performance
-        if (_routeCache.TryGetValue(routeKey, out var cachedHandler))
-        {
-            handler = cachedHandler;
-            return cachedHandler is not null;
-        }
-
         // Linear scan through handlers in registration order
         foreach (var candidate in _handlers)
         {
             if (candidate.CanHandle(context))
             {
                 handler = candidate;
-                _routeCache[routeKey] = candidate;
                 return true;
             }
         }
 
-        // No handler found - cache the negative result
         handler = null;
-        _routeCache[routeKey] = null;
         return false;
     }
 
@@ -225,8 +207,6 @@ internal sealed class DurableInbox : IDurableInbox, ILifecycleObserver
         var wrappedHandler = new LegacyRouteKeyHandlerWrapper(routeKey, handler);
         _handlers.Add(wrappedHandler);
 
-        // Clear cache
-        _routeCache.Clear();
     }
 
     /// <summary>

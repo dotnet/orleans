@@ -49,9 +49,9 @@ namespace Orleans.Serialization.Invocation
         public abstract object? Result { get; set; }
 
         /// <summary>
-        /// Gets a value indicating whether this response is terminal.
+        /// Gets a value indicating whether this response completes the invocation.
         /// </summary>
-        public abstract bool IsFinal { get; }
+        public virtual bool IsFinal => true;
 
         /// <summary>
         /// Gets the result type when the response represents a simple typed result.
@@ -194,13 +194,6 @@ namespace Orleans.Serialization.Invocation
             set => _result = (TResult?)value;
         }
 
-        /// <inheritdoc/>
-<<<<<<< HEAD
-||||||| parent of dfd09f9c81 (feat(durable-tasks): add durable execution prototype)
-=======
-        public override bool IsFinal => true;
-
->>>>>>> dfd09f9c81 (feat(durable-tasks): add durable execution prototype)
         public override Type GetSimpleResultType() => typeof(TResult);
 
         /// <inheritdoc/>

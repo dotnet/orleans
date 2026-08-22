@@ -127,9 +127,11 @@ internal sealed class RuntimeTestDurableTaskRequestCopier : IDeepCopier<RuntimeT
 /// </summary>
 internal sealed class TestSchedulableTask(
     Func<TaskId, CancellationToken, ValueTask<DurableTaskResponse>> scheduleAsync,
-    Func<TaskId, IScheduledTaskHandle>? getHandle = null) : DurableTask, ISchedulableTask
+    Func<TaskId, IScheduledTaskHandle>? getHandle = null,
+    bool commitsDurableState = false) : DurableTask, ISchedulableTask
 {
     public int ScheduleAsyncCallCount { get; private set; }
+    public bool CommitsDurableState { get; } = commitsDurableState;
 
     public ValueTask<DurableTaskResponse> ScheduleAsync(TaskId taskId, CancellationToken cancellationToken)
     {

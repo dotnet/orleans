@@ -106,7 +106,10 @@ public class RequestContextTestGrain([FromKeyedServices("inbox")] IDurableInbox 
             .WithBody(message)
             .Build();
 
-        await inboxExtension.DeliverAsync(envelope, new DeliveryOptions { PollTimeout = TimeSpan.Zero }, CancellationToken.None);
+        using (RequestContext.AllowCallChainReentrancy())
+        {
+            await inboxExtension.DeliverAsync(envelope, new DeliveryOptions { PollTimeout = TimeSpan.Zero }, CancellationToken.None);
+        }
     }
 
     public Task<Dictionary<string, object>?> GetCapturedRequestContext()

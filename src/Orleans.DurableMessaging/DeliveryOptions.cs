@@ -11,7 +11,7 @@ public readonly struct DeliveryOptions()
 {
     /// <summary>
     /// How long to wait for the message to be processed before returning Pending.
-    /// Zero means return immediately after accepting/persisting.
+    /// <see cref="Timeout.InfiniteTimeSpan"/> uses the configured default timeout and zero returns immediately.
     /// </summary>
     [Id(0)]
     public TimeSpan PollTimeout { get; init; } = TimeSpan.Zero;

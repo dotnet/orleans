@@ -342,7 +342,10 @@ public class ErrorProcessorGrain : DurableGrain, IErrorProcessorGrain
 
         // Deliver directly to self via inbox extension
         var inboxExtension = this.AsReference<IDurableInboxExtension>();
-        await inboxExtension.DeliverAsync(envelope, new DeliveryOptions(), CancellationToken.None);
+        using (RequestContext.AllowCallChainReentrancy())
+        {
+            await inboxExtension.DeliverAsync(envelope, new DeliveryOptions(), CancellationToken.None);
+        }
     }
 
     public Task<int> GetProcessedCount() => Task.FromResult(_processedCount);

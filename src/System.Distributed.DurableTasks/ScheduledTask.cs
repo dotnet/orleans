@@ -72,7 +72,8 @@ public abstract class ScheduledTask
     /// Waits for the completion of this task.
     /// </summary>
     /// <returns>A task representing the completion of the operation.</returns>
-    public virtual async ValueTask WaitAsync(CancellationToken cancellationToken = default) => await WaitAsyncCore(cancellationToken);
+    public virtual async ValueTask WaitAsync(CancellationToken cancellationToken = default)
+        => (await WaitAsyncCore(cancellationToken)).ThrowIfExceptionResponse();
 
     /// <summary>
     /// Attempts to cancel the operation.
@@ -255,15 +256,15 @@ internal sealed class ScheduledDurableTask : ScheduledTask
 /// </summary>
 public readonly struct ScheduledTaskAwaiter : ICriticalNotifyCompletion
 {
-    private readonly TaskAwaiter _awaiter;
+    private readonly TaskAwaiter<DurableTaskResponse> _awaiter;
 
     internal ScheduledTaskAwaiter(ScheduledTask durableTaskInvocation, CancellationToken cancellationToken) =>
-        _awaiter = durableTaskInvocation.WaitAsync(cancellationToken).AsTask().GetAwaiter();
+        _awaiter = durableTaskInvocation.WaitAsyncCore(cancellationToken).AsTask().GetAwaiter();
 
     /// <summary>
     /// Gets the result of the task.
     /// </summary>
-    public void GetResult() => _awaiter.GetResult();
+    public void GetResult() => _awaiter.GetResult().ThrowIfExceptionResponse();
 
     /// <summary>
     /// Returns a value indicating whether the task has completed.

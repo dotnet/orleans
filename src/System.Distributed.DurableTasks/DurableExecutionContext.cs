@@ -17,6 +17,24 @@ public abstract partial class DurableExecutionContext(TaskId id)
         Current.Value = context;
     }
 
+    internal static Action WrapContinuation(Action continuation)
+    {
+        ArgumentNullException.ThrowIfNull(continuation);
+        var context = Current.Value;
+        return () =>
+        {
+            SetCurrentContext(context, out var previous);
+            try
+            {
+                continuation();
+            }
+            finally
+            {
+                SetCurrentContext(previous);
+            }
+        };
+    }
+
     public TaskId TaskId { get; } = id;
 
     protected internal abstract ValueTask<IScheduledTaskHandle> ScheduleChildTaskAsync(TaskId taskId, DurableTask taskDefinition, CancellationToken cancellationToken);

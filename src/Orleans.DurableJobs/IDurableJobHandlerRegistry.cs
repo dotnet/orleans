@@ -2,6 +2,8 @@ using System;
 using System.Diagnostics.CodeAnalysis;
 using System.Threading;
 using System.Threading.Tasks;
+using Microsoft.Extensions.Logging;
+using Orleans.Runtime;
 
 namespace Orleans.DurableJobs;
 
@@ -21,8 +23,12 @@ public interface IDurableJobHandlerRegistry
     /// Registers <paramref name="handler"/> for this grain activation.
     /// </summary>
     /// <param name="handler">The activation-scoped feature handler.</param>
+    /// <param name="requiresTurnIsolation">
+    /// <see langword="true"/> to execute the handler as a complete grain turn. Turn-isolated handlers return a
+    /// terminal or reschedule result and cannot return <see cref="DurableJobRunStatus.InProgress"/>.
+    /// </param>
     /// <exception cref="InvalidOperationException">The handler is already registered.</exception>
-    void Register(IDurableJobFeatureHandler handler);
+    void Register(IDurableJobFeatureHandler handler, bool requiresTurnIsolation = false);
 }
 
 /// <summary>
@@ -60,49 +66,130 @@ public interface IDurableJobFeatureHandler
 internal interface IDurableJobHandlerLookup
 {
     bool TryGetHandler(string jobName, [NotNullWhen(true)] out IDurableJobFeatureHandler? handler);
+
+    bool TryGetIsolatedHandler(string jobName, [NotNullWhen(true)] out IDurableJobFeatureHandler? handler);
 }
 
 internal sealed class DurableJobHandlerRegistry : IDurableJobHandlerRegistry, IDurableJobHandlerLookup
 {
-    private readonly List<IDurableJobFeatureHandler> _handlers = [];
+    private readonly List<Registration> _handlers = [];
 
-    public void Register(IDurableJobFeatureHandler handler)
+    public void Register(IDurableJobFeatureHandler handler, bool requiresTurnIsolation = false)
     {
         ArgumentNullException.ThrowIfNull(handler);
 
         foreach (var registeredHandler in _handlers)
         {
-            if (ReferenceEquals(registeredHandler, handler))
+            if (ReferenceEquals(registeredHandler.Handler, handler))
             {
                 throw new InvalidOperationException("The durable job feature handler is already registered.");
             }
         }
 
-        _handlers.Add(handler);
+        _handlers.Add(new(handler, requiresTurnIsolation));
     }
 
-    public bool TryGetHandler(string jobName, [NotNullWhen(true)] out IDurableJobFeatureHandler? handler)
+    public bool TryGetHandler(string jobName, [NotNullWhen(true)] out IDurableJobFeatureHandler? handler) =>
+        TryGetHandler(jobName, requiresTurnIsolation: false, out handler);
+
+    public bool TryGetIsolatedHandler(string jobName, [NotNullWhen(true)] out IDurableJobFeatureHandler? handler) =>
+        TryGetHandler(jobName, requiresTurnIsolation: true, out handler);
+
+    private bool TryGetHandler(
+        string jobName,
+        bool requiresTurnIsolation,
+        [NotNullWhen(true)] out IDurableJobFeatureHandler? handler)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(jobName);
 
-        handler = null;
+        Registration? match = null;
         foreach (var candidate in _handlers)
         {
-            if (!candidate.CanHandle(jobName))
+            if (!candidate.Handler.CanHandle(jobName))
             {
                 continue;
             }
 
-            if (handler is not null)
+            if (match is not null)
             {
                 throw new InvalidOperationException(
                     $"Multiple durable job feature handlers match job '{jobName}': "
-                    + $"'{handler.GetType().FullName}' and '{candidate.GetType().FullName}'.");
+                    + $"'{match.Value.Handler.GetType().FullName}' and '{candidate.Handler.GetType().FullName}'.");
             }
 
-            handler = candidate;
+            match = candidate;
         }
 
-        return handler is not null;
+        if (match is { } registration && registration.RequiresTurnIsolation == requiresTurnIsolation)
+        {
+            handler = registration.Handler;
+            return true;
+        }
+
+        handler = null;
+        return false;
     }
+
+    private readonly record struct Registration(
+        IDurableJobFeatureHandler Handler,
+        bool RequiresTurnIsolation);
+}
+
+[Alias("Orleans.DurableJobs.IDurableJobFeatureReceiverExtension")]
+internal interface IDurableJobFeatureReceiverExtension : IGrainExtension
+{
+    ValueTask<DurableJobRunResult?> TryHandleFeatureJobAsync(
+        IJobRunContext context,
+        CancellationToken attemptCancellationToken);
+}
+
+internal sealed partial class DurableJobFeatureReceiverExtension(
+    IDurableJobHandlerLookup handlers,
+    DurableJobReceiverExtensionShared shared) : IDurableJobFeatureReceiverExtension
+{
+    public async ValueTask<DurableJobRunResult?> TryHandleFeatureJobAsync(
+        IJobRunContext context,
+        CancellationToken attemptCancellationToken)
+    {
+        if (!handlers.TryGetIsolatedHandler(context.Job.Name, out var handler))
+        {
+            return null;
+        }
+
+        using var tracker = shared.BeginHandlerExecution(context);
+        try
+        {
+            var result = await handler.ExecuteJobAsync(context, attemptCancellationToken)
+                ?? throw new InvalidOperationException(
+                    $"Durable job feature handler for '{context.Job.Name}' returned a null result.");
+            if (result.IsInProgress)
+            {
+                throw new InvalidOperationException(
+                    $"Turn-isolated durable job feature handler for '{context.Job.Name}' returned InProgress.");
+            }
+
+            tracker.RecordResult(result);
+            return result;
+        }
+        catch (OperationCanceledException) when (attemptCancellationToken.IsCancellationRequested)
+        {
+            tracker.AttemptCanceled();
+            throw;
+        }
+        catch (Exception exception)
+        {
+            tracker.Failed(exception);
+            LogErrorExecutingFeatureJob(shared.Logger, exception, context.Job.Id, context.Job.TargetGrainId);
+            return DurableJobRunResult.Failed(exception);
+        }
+    }
+
+    [LoggerMessage(
+        Level = LogLevel.Error,
+        Message = "Error executing durable feature job {JobId} on grain {GrainId}")]
+    private static partial void LogErrorExecutingFeatureJob(
+        ILogger logger,
+        Exception exception,
+        string jobId,
+        GrainId grainId);
 }

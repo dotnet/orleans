@@ -4,6 +4,7 @@ using System.Distributed.DurableTasks;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
+using Orleans.DurableMessaging;
 using Orleans.Runtime;
 using Orleans.Serialization;
 using Orleans.Serialization.Session;
@@ -49,6 +50,31 @@ public class DurableTaskMessageTransportTests
         Assert.Equal(taskId, body!.TaskId);
         Assert.IsType<RpcTestDurableTaskRequest>(body.Request);
         Assert.Equal(request.ResultValue, ((RpcTestDurableTaskRequest)body.Request).ResultValue);
+    }
+
+    [Fact]
+    public void SendInvocation_CapturesCurrentRequestContext()
+    {
+        var (transport, outbox, _, _) = CreateTransport();
+        var sender = GrainId.Create("rpc-sender", "context-sender");
+        var target = GrainId.Create("rpc-target", "context-target");
+        var taskId = TaskId.Create("workflow/context");
+        var request = new RpcTestDurableTaskRequest { Context = new DurableTaskRequestContext { TargetId = target } };
+
+        RequestContext.Set("tenant", "contoso");
+        try
+        {
+            transport.SendInvocation(sender, target, taskId, request);
+        }
+        finally
+        {
+            RequestContext.Clear();
+        }
+
+        var envelope = Assert.Single(outbox.SentEnvelopes);
+        var contextKey = Assert.Single(envelope.Data.ContextKeys);
+        Assert.True(envelope.Data.TryGetContextValue<Dictionary<string, object>>(contextKey, out var requestContext));
+        Assert.Equal("contoso", requestContext["tenant"]);
     }
 
     [Fact]

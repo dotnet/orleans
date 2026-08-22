@@ -113,7 +113,7 @@ internal sealed class InboxHandlerContext : IInboxHandlerContext
         {
             SessionPool = _sessionPool,
             SenderId = GrainId
-        };
+        }.WithCurrentRequestContext();
     }
 
     /// <inheritdoc />

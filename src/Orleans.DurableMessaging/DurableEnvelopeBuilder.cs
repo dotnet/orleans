@@ -38,6 +38,8 @@ namespace Orleans.DurableMessaging;
 /// </remarks>
 public sealed class DurableEnvelopeBuilder : IBufferWriter<byte>
 {
+    internal const string RequestContextKey = "$orleans.request-context";
+
     // Reflection cache for setting private DurableEnvelopeData fields
     private static readonly FieldInfo BufferField = typeof(DurableEnvelopeData).GetField("_buffer", BindingFlags.NonPublic | BindingFlags.Instance)!;
     private static readonly FieldInfo BodySliceField = typeof(DurableEnvelopeData).GetField("_bodySlice", BindingFlags.NonPublic | BindingFlags.Instance)!;
@@ -237,6 +239,21 @@ public sealed class DurableEnvelopeBuilder : IBufferWriter<byte>
         SessionPool.CodecProvider.GetCodec<T>().WriteField(ref writer, 0, typeof(T), value);
         writer.Commit();
         _contextIndices[key] = (startOffset, _buffer.Length - startOffset);
+
+        return this;
+    }
+
+    /// <summary>
+    /// Adds every value from the current Orleans request context to the envelope.
+    /// </summary>
+    /// <returns>This builder for chaining.</returns>
+    public DurableEnvelopeBuilder WithCurrentRequestContext()
+    {
+        var values = RequestContext.Entries.ToDictionary(static entry => entry.Key, static entry => entry.Value, StringComparer.Ordinal);
+        if (values.Count > 0)
+        {
+            WithContextValue(RequestContextKey, values);
+        }
 
         return this;
     }

@@ -38,7 +38,12 @@ namespace Orleans.DurableMessaging;
 /// Orleans' non-blocking grain model.
 /// </para>
 /// </remarks>
-internal sealed partial class DurableOutbox : DurableDictionary<Guid, DurableEnvelope>, IDurableOutbox, IDurableJobFeatureHandler, ILifecycleObserver
+internal sealed partial class DurableOutbox :
+    DurableDictionary<Guid, DurableEnvelope>,
+    IDurableOutbox,
+    IDurableOutboxCommitExtension,
+    IDurableJobFeatureHandler,
+    ILifecycleObserver
 {
     internal const string JobName = "orleans.messaging.outbox-flush";
 
@@ -124,7 +129,7 @@ internal sealed partial class DurableOutbox : DurableDictionary<Guid, DurableEnv
         _maxRetryAge = options.Value.MaxOutboxRetryAge;
         _maxDeliveryAttempts = options.Value.MaxDeliveryAttempts;
         _batchSize = options.Value.OutboxBatchSize;
-        jobHandlers.Register(JobName, this);
+        jobHandlers.Register(this);
 
         // Subscribe to the grain lifecycle to start pumping on activation
         var lifecycle = grainContext.ObservableLifecycle;
@@ -191,20 +196,25 @@ internal sealed partial class DurableOutbox : DurableDictionary<Guid, DurableEnv
     /// </summary>
     /// <param name="messageId">The unique identifier of the message to remove.</param>
     /// <returns>True if the message was found and removed; otherwise, false.</returns>
-    /// <remarks>
-    /// Note: We do NOT dispose the envelope's ArcBuffer here because the envelope has been
-    /// delivered to the receiver. Due to [Immutable] marking on DurableEnvelope/DurableEnvelopeData,
-    /// Orleans may share the reference (especially for local calls), so the receiver still needs
-    /// the buffer to be valid. The receiver is responsible for disposing after processing.
-    /// </remarks>
-    public bool RemoveMessage(Guid messageId)
+    public bool RemoveMessage(Guid messageId) => RemoveMessage(messageId, disposeEnvelope: true);
+
+    private bool RemoveMessage(Guid messageId, bool disposeEnvelope)
     {
         _pendingMessageIds.Remove(messageId);
         _messageStates.Remove(messageId);
+        _ = TryGetValue(messageId, out var envelope);
         var removed = Remove(messageId);
-        if (removed && Volatile.Read(ref _metricsActive) != 0)
+        if (removed)
         {
-            _instruments.OnOutboxDepthChanged(-1);
+            if (disposeEnvelope)
+            {
+                envelope.Data.Dispose();
+            }
+
+            if (Volatile.Read(ref _metricsActive) != 0)
+            {
+                _instruments.OnOutboxDepthChanged(-1);
+            }
         }
 
         return removed;
@@ -263,18 +273,22 @@ internal sealed partial class DurableOutbox : DurableDictionary<Guid, DurableEnv
             var deliveredCount = 0;
             var backpressuredCount = 0;
             var failedCount = 0;
-            var stateChanged = false;
-
             foreach (var envelope in pending)
             {
                 var stopwatch = Stopwatch.StartNew();
                 try
                 {
                     var targetGrain = _grainFactory.GetGrain<IDurableInboxExtension>(envelope.ReceiverId);
-                    var result = await targetGrain.DeliverAsync(
-                        envelope,
-                        new DeliveryOptions { PollTimeout = TimeSpan.Zero },
-                        cancellationToken).ConfigureAwait(true);
+                    DeliveryResult result;
+                    using (RequestContext.AllowCallChainReentrancy())
+                    {
+                        result = await targetGrain.DeliverAsync(
+                            envelope,
+                            new DeliveryOptions { PollTimeout = TimeSpan.Zero },
+                            cancellationToken).ConfigureAwait(true);
+                    }
+                    cancellationToken.ThrowIfCancellationRequested();
+                    await CommitDeliveryResultAsync(envelope.MessageId, result, failure: null, cancellationToken).ConfigureAwait(true);
 
                     stopwatch.Stop();
                     switch (result.Status)
@@ -282,8 +296,6 @@ internal sealed partial class DurableOutbox : DurableDictionary<Guid, DurableEnv
                         case DeliveryStatus.Accepted:
                         case DeliveryStatus.Duplicate:
                         case DeliveryStatus.Processed:
-                            RemoveMessage(envelope.MessageId);
-                            stateChanged = true;
                             deliveredCount++;
                             LogMessageDelivered(
                                 _logger,
@@ -296,15 +308,11 @@ internal sealed partial class DurableOutbox : DurableDictionary<Guid, DurableEnv
                             _instruments.OnOutboxMessageDelivered(grainTypeName, envelope.RouteKey, result.Status.ToString().ToLowerInvariant());
                             break;
                         case DeliveryStatus.Backpressured:
-                            RecordDeliveryFailure(envelope, "The receiver is backpressured.");
-                            stateChanged = true;
                             backpressuredCount++;
                             LogDeliveryBackpressured(_logger, envelope.MessageId, envelope.ReceiverId, envelope.RouteKey, envelope.CorrelationKey?.ToString());
                             _instruments.OnOutboxMessageDelivered(grainTypeName, envelope.RouteKey, "backpressured");
                             break;
                         case DeliveryStatus.RouteNotFound:
-                            RecordDeliveryFailure(envelope, result.Message ?? "The receiver has no compatible route.");
-                            stateChanged = true;
                             failedCount++;
                             LogDeliveryRouteNotFound(
                                 _logger,
@@ -317,8 +325,6 @@ internal sealed partial class DurableOutbox : DurableDictionary<Guid, DurableEnv
                             _instruments.OnOutboxMessageDelivered(grainTypeName, envelope.RouteKey, "route_not_found");
                             break;
                         default:
-                            RecordDeliveryFailure(envelope, $"Unexpected delivery status '{result.Status}'.");
-                            stateChanged = true;
                             failedCount++;
                             LogUnexpectedDeliveryStatus(_logger, result.Status, envelope.MessageId, envelope.RouteKey, envelope.CorrelationKey?.ToString());
                             break;
@@ -329,8 +335,7 @@ internal sealed partial class DurableOutbox : DurableDictionary<Guid, DurableEnv
                 catch (Exception ex) when (ex is not OperationCanceledException)
                 {
                     stopwatch.Stop();
-                    RecordDeliveryFailure(envelope, ex.ToString());
-                    stateChanged = true;
+                    await CommitDeliveryResultAsync(envelope.MessageId, default, ex.ToString(), cancellationToken).ConfigureAwait(true);
                     failedCount++;
                     LogDeliveryError(_logger, ex, envelope.MessageId, envelope.SenderId, envelope.ReceiverId, envelope.RouteKey, envelope.CorrelationKey?.ToString());
                     _instruments.OnOutboxMessageDelivered(grainTypeName, envelope.RouteKey, "error");
@@ -338,16 +343,157 @@ internal sealed partial class DurableOutbox : DurableDictionary<Guid, DurableEnv
                 }
             }
 
-            if (stateChanged)
-            {
-                await _stateManager.WriteStateAsync(cancellationToken).ConfigureAwait(true);
-            }
-
             LogDeliveryComplete(_logger, deliveredCount, backpressuredCount, failedCount, Count);
         }
+
         finally
         {
             _deliveryGate.Release();
+        }
+    }
+
+    private async ValueTask CommitDeliveryResultAsync(
+        Guid messageId,
+        DeliveryResult result,
+        string? failure,
+        CancellationToken cancellationToken)
+    {
+        var target = _grainFactory.GetGrain<IDurableOutboxCommitExtension>(_grainContext.GrainId);
+        using (RequestContext.AllowCallChainReentrancy())
+        {
+            await target.ApplyDeliveryResultAsync(messageId, result, failure, cancellationToken);
+        }
+    }
+
+    async ValueTask IDurableOutboxCommitExtension.ApplyDeliveryResultAsync(
+        Guid messageId,
+        DeliveryResult result,
+        string? failure,
+        CancellationToken cancellationToken)
+    {
+        await _gate.WaitAsync(cancellationToken).ConfigureAwait(true);
+        try
+        {
+            if (!TryGetValue(messageId, out var envelope))
+            {
+                return;
+            }
+
+            if (failure is not null)
+            {
+                RecordDeliveryFailure(envelope, failure);
+            }
+            else
+            {
+                switch (result.Status)
+                {
+                    case DeliveryStatus.Accepted:
+                    case DeliveryStatus.Duplicate:
+                    case DeliveryStatus.Processed:
+                        RemoveMessage(messageId);
+                        break;
+                    case DeliveryStatus.Backpressured:
+                        RecordDeliveryFailure(envelope, "The receiver is backpressured.");
+                        break;
+                    case DeliveryStatus.RouteNotFound:
+                        RecordDeliveryFailure(envelope, result.Message ?? "The receiver has no compatible route.");
+                        break;
+                    default:
+                        RecordDeliveryFailure(envelope, $"Unexpected delivery status '{result.Status}'.");
+                        break;
+                }
+            }
+
+            await _stateManager.WriteStateAsync(cancellationToken).ConfigureAwait(true);
+        }
+        finally
+        {
+            _gate.Release();
+        }
+    }
+
+    async ValueTask<bool> IDurableOutboxCommitExtension.TryClaimJobAsync(
+        string jobId,
+        CancellationToken cancellationToken)
+    {
+        await _gate.WaitAsync(cancellationToken).ConfigureAwait(true);
+        try
+        {
+            if (string.IsNullOrEmpty(_jobId.Value))
+            {
+                if (Count == 0)
+                {
+                    return false;
+                }
+
+                _jobId.Value = jobId;
+                await _stateManager.WriteStateAsync(cancellationToken).ConfigureAwait(true);
+                return true;
+            }
+
+            return string.Equals(_jobId.Value, jobId, StringComparison.Ordinal);
+        }
+        finally
+        {
+            _gate.Release();
+        }
+    }
+
+    async ValueTask<DateTimeOffset?> IDurableOutboxCommitExtension.CompleteJobAttemptAsync(
+        string jobId,
+        CancellationToken cancellationToken)
+    {
+        await _gate.WaitAsync(cancellationToken).ConfigureAwait(true);
+        try
+        {
+            if (!string.Equals(_jobId.Value, jobId, StringComparison.Ordinal))
+            {
+                return null;
+            }
+
+            if (Count == 0)
+            {
+                _jobId.Value = null;
+                await _stateManager.WriteStateAsync(cancellationToken).ConfigureAwait(true);
+                return null;
+            }
+
+            var now = _timeProvider.GetUtcNow();
+            var nextAttempt = Values
+                .Select(envelope => _messageStates.TryGetValue(envelope.MessageId, out var state) ? state.NextAttemptAt : null)
+                .Where(static value => value.HasValue)
+                .Min() ?? now;
+            return nextAttempt <= now ? now : nextAttempt;
+        }
+        finally
+        {
+            _gate.Release();
+        }
+    }
+
+    private async ValueTask<bool> TryClaimJobAsync(
+        string jobId,
+        CancellationToken cancellationToken,
+        bool callerIsIsolated = false)
+    {
+        if (callerIsIsolated)
+        {
+            return await ((IDurableOutboxCommitExtension)this).TryClaimJobAsync(jobId, cancellationToken);
+        }
+
+        var target = _grainFactory.GetGrain<IDurableOutboxCommitExtension>(_grainContext.GrainId);
+        using (RequestContext.AllowCallChainReentrancy())
+        {
+            return await target.TryClaimJobAsync(jobId, cancellationToken);
+        }
+    }
+
+    private async ValueTask<DateTimeOffset?> CompleteJobAttemptAsync(string jobId, CancellationToken cancellationToken)
+    {
+        var target = _grainFactory.GetGrain<IDurableOutboxCommitExtension>(_grainContext.GrainId);
+        using (RequestContext.AllowCallChainReentrancy())
+        {
+            return await target.CompleteJobAttemptAsync(jobId, cancellationToken);
         }
     }
 
@@ -370,7 +516,7 @@ internal sealed partial class DurableOutbox : DurableDictionary<Guid, DurableEnv
                 Reason = error,
                 AttemptCount = state.AttemptCount
             };
-            RemoveMessage(envelope.MessageId);
+            RemoveMessage(envelope.MessageId, disposeEnvelope: false);
             return;
         }
 
@@ -393,8 +539,22 @@ internal sealed partial class DurableOutbox : DurableDictionary<Guid, DurableEnv
         EnsureMetricsActive();
         if (Count > 0)
         {
+            await _gate.WaitAsync(cancellationToken).ConfigureAwait(true);
+            try
+            {
+                if (!string.IsNullOrEmpty(_jobId.Value))
+                {
+                    _jobId.Value = null;
+                    await _stateManager.WriteStateAsync(cancellationToken).ConfigureAwait(true);
+                }
+            }
+            finally
+            {
+                _gate.Release();
+            }
+
             LogPumpStartingOnActivation(_logger, Count);
-            await EnsureJobScheduledAsync().ConfigureAwait(true);
+            await EnsureJobScheduledAsync(callerIsIsolated: true).ConfigureAwait(true);
         }
     }
 
@@ -420,7 +580,7 @@ internal sealed partial class DurableOutbox : DurableDictionary<Guid, DurableEnv
         }
     }
 
-    private async Task EnsureJobScheduledAsync()
+    private async Task EnsureJobScheduledAsync(bool callerIsIsolated = false)
     {
         while (!_shutdown.IsCancellationRequested)
         {
@@ -433,27 +593,23 @@ internal sealed partial class DurableOutbox : DurableDictionary<Guid, DurableEnv
                     {
                         return;
                     }
-
-                    var job = await _jobManager.ScheduleJobAsync(
-                        new ScheduleJobRequest
-                        {
-                            Target = _grainContext.GrainId,
-                            JobName = JobName,
-                            DueTime = _timeProvider.GetUtcNow()
-                        },
-                        _shutdown.Token).ConfigureAwait(true);
-
-                    if (string.IsNullOrEmpty(_jobId.Value))
-                    {
-                        _jobId.Value = job.Id;
-                        await _stateManager.WriteStateAsync(_shutdown.Token).ConfigureAwait(true);
-                    }
-                    return;
                 }
                 finally
                 {
                     _gate.Release();
                 }
+
+                var job = await _jobManager.ScheduleJobAsync(
+                    new ScheduleJobRequest
+                    {
+                        Target = _grainContext.GrainId,
+                        JobName = JobName,
+                        DueTime = _timeProvider.GetUtcNow()
+                    },
+                    _shutdown.Token).ConfigureAwait(true);
+
+                _ = await TryClaimJobAsync(job.Id, _shutdown.Token, callerIsIsolated).ConfigureAwait(true);
+                return;
             }
             catch (OperationCanceledException) when (_shutdown.IsCancellationRequested)
             {
@@ -467,59 +623,38 @@ internal sealed partial class DurableOutbox : DurableDictionary<Guid, DurableEnv
         }
     }
 
+    public bool CanHandle(string jobName) => string.Equals(jobName, JobName, StringComparison.Ordinal);
+
     public async ValueTask<DurableJobRunResult> ExecuteJobAsync(IJobRunContext context, CancellationToken cancellationToken)
     {
-        await _gate.WaitAsync(cancellationToken).ConfigureAwait(true);
         try
         {
-            if (string.IsNullOrEmpty(_jobId.Value))
-            {
-                if (Count == 0)
-                {
-                    return DurableJobRunResult.Completed;
-                }
-
-                _jobId.Value = context.Job.Id;
-                await _stateManager.WriteStateAsync(cancellationToken).ConfigureAwait(true);
-            }
-            else if (!string.Equals(_jobId.Value, context.Job.Id, StringComparison.Ordinal))
-            {
-                return DurableJobRunResult.Completed;
-            }
+            return await ExecuteJobCoreAsync(context, cancellationToken).ConfigureAwait(true);
         }
-        finally
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
-            _gate.Release();
+            throw;
+        }
+        catch (Exception exception)
+        {
+            LogPumpLoopError(_logger, exception);
+            return DurableJobRunResult.RescheduleAt(_timeProvider.GetUtcNow() + _backpressureRetryDelay);
+        }
+    }
+
+    private async ValueTask<DurableJobRunResult> ExecuteJobCoreAsync(IJobRunContext context, CancellationToken cancellationToken)
+    {
+        if (!await TryClaimJobAsync(context.Job.Id, cancellationToken).ConfigureAwait(true))
+        {
+            return DurableJobRunResult.Completed;
         }
 
         await DeliverPendingMessagesAsync(cancellationToken).ConfigureAwait(true);
 
-        await _gate.WaitAsync(cancellationToken).ConfigureAwait(true);
-        try
-        {
-            if (!string.Equals(_jobId.Value, context.Job.Id, StringComparison.Ordinal))
-            {
-                return DurableJobRunResult.Completed;
-            }
-
-            if (Count == 0)
-            {
-                _jobId.Value = null;
-                await _stateManager.WriteStateAsync(cancellationToken).ConfigureAwait(true);
-                return DurableJobRunResult.Completed;
-            }
-
-            var now = _timeProvider.GetUtcNow();
-            var nextAttempt = Values
-                .Select(envelope => _messageStates.TryGetValue(envelope.MessageId, out var state) ? state.NextAttemptAt : null)
-                .Where(static value => value.HasValue)
-                .Min() ?? now;
-            return DurableJobRunResult.RescheduleAt(nextAttempt <= now ? now : nextAttempt);
-        }
-        finally
-        {
-            _gate.Release();
-        }
+        var nextAttempt = await CompleteJobAttemptAsync(context.Job.Id, cancellationToken).ConfigureAwait(true);
+        return nextAttempt is { } value
+            ? DurableJobRunResult.RescheduleAt(value)
+            : DurableJobRunResult.Completed;
     }
 
     // Structured logging using LoggerMessage source generator

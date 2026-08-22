@@ -42,7 +42,7 @@ public struct DurableTaskMethodBuilder
         where TAwaiter : INotifyCompletion
         where TStateMachine : IAsyncStateMachine
     {
-        awaiter.OnCompleted(stateMachine.MoveNext);
+        awaiter.OnCompleted(DurableExecutionContext.WrapContinuation(stateMachine.MoveNext));
     }
 
     public readonly void AwaitUnsafeOnCompleted<TAwaiter, TStateMachine>(
@@ -50,7 +50,7 @@ public struct DurableTaskMethodBuilder
         where TAwaiter : ICriticalNotifyCompletion
         where TStateMachine : IAsyncStateMachine
     {
-        awaiter.UnsafeOnCompleted(stateMachine.MoveNext);
+        awaiter.UnsafeOnCompleted(DurableExecutionContext.WrapContinuation(stateMachine.MoveNext));
     }
 
     internal static void SetStateMachineCore(IAsyncStateMachine stateMachine)
@@ -99,7 +99,7 @@ public struct DurableTaskMethodBuilder<TResult>
         where TAwaiter : INotifyCompletion
         where TStateMachine : IAsyncStateMachine
     {
-        awaiter.OnCompleted(stateMachine.MoveNext);
+        awaiter.OnCompleted(DurableExecutionContext.WrapContinuation(stateMachine.MoveNext));
     }
 
     public readonly void AwaitUnsafeOnCompleted<TAwaiter, TStateMachine>(
@@ -107,6 +107,6 @@ public struct DurableTaskMethodBuilder<TResult>
         where TAwaiter : ICriticalNotifyCompletion
         where TStateMachine : IAsyncStateMachine
     {
-        awaiter.UnsafeOnCompleted(stateMachine.MoveNext);
+        awaiter.UnsafeOnCompleted(DurableExecutionContext.WrapContinuation(stateMachine.MoveNext));
     }
 }

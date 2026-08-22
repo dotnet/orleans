@@ -96,6 +96,10 @@ internal sealed class RpcTestDurableTaskGrainStorage : IDurableTaskGrainStorage
 
     public int WriteAsyncCallCount { get; private set; }
     public int ReadAsyncCallCount { get; private set; }
+    public bool BlockNextWrite { get; set; }
+    public Exception? NextWriteException { get; set; }
+    public TaskCompletionSource WriteStarted { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+    public TaskCompletionSource AllowWrite { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
 
     public IEnumerable<(TaskId Id, IDurableTaskState State)> Tasks =>
         _tasks.Select(kvp => (kvp.Key, (IDurableTaskState)kvp.Value)).ToList();
@@ -149,10 +153,21 @@ internal sealed class RpcTestDurableTaskGrainStorage : IDurableTaskGrainStorage
 
     public void Clear() => _tasks.Clear();
 
-    public ValueTask WriteAsync(CancellationToken cancellationToken)
+    public async ValueTask WriteAsync(CancellationToken cancellationToken)
     {
         WriteAsyncCallCount++;
-        return default;
+        if (NextWriteException is { } exception)
+        {
+            NextWriteException = null;
+            throw exception;
+        }
+
+        if (BlockNextWrite)
+        {
+            BlockNextWrite = false;
+            WriteStarted.TrySetResult();
+            await AllowWrite.Task.WaitAsync(cancellationToken);
+        }
     }
 
     public ValueTask ReadAsync(CancellationToken cancellationToken)
