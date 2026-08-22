@@ -15,6 +15,9 @@ internal sealed class DurableState<T> : IPersistentState<T>, IJournaledState, IP
     private PendingWriteKind _pendingWrite;
     private bool _hasState;
     private bool _clearRequested;
+    private bool _isDirty;
+    private ulong _changeVersion;
+    private ulong _stagedChangeVersion;
 
     public DurableState(
         [ServiceKey] string key,
@@ -42,6 +45,8 @@ internal sealed class DurableState<T> : IPersistentState<T>, IJournaledState, IP
         get
         {
             _hasState = true;
+            _isDirty = true;
+            _changeVersion++;
             return _value ??= Activator.CreateInstance<T>();
         }
         set
@@ -49,11 +54,15 @@ internal sealed class DurableState<T> : IPersistentState<T>, IJournaledState, IP
             _value = value;
             _hasState = true;
             _clearRequested = false;
+            _isDirty = true;
+            _changeVersion++;
         }
     }
 
     string IStorage.Etag => $"{_version}";
     bool IStorage.RecordExists => _version > 0;
+
+    bool IJournaledState.HasPendingChanges => _clearRequested || _isDirty;
 
     void IJournaledState.ReplayEntry(JournalEntry entry, JournalReplayContext context) =>
         context.GetRequiredCommandCodec(entry.FormatKey, _codec).Apply(entry.Reader, this);
@@ -64,18 +73,29 @@ internal sealed class DurableState<T> : IPersistentState<T>, IJournaledState, IP
         {
             case PendingWriteKind.Set:
                 _version = _pendingVersion;
-                _clearRequested = false;
-                _hasState = true;
+                if (_stagedChangeVersion == _changeVersion)
+                {
+                    _clearRequested = false;
+                    _hasState = true;
+                }
                 break;
             case PendingWriteKind.Clear:
                 _version = 0;
-                _clearRequested = false;
-                _hasState = false;
+                if (_stagedChangeVersion == _changeVersion)
+                {
+                    _clearRequested = false;
+                    _hasState = false;
+                }
                 break;
         }
 
         _pendingWrite = PendingWriteKind.None;
         _pendingVersion = 0;
+        if (_stagedChangeVersion == _changeVersion)
+        {
+            _isDirty = false;
+        }
+
         OnPersisted?.Invoke();
     }
 
@@ -87,6 +107,9 @@ internal sealed class DurableState<T> : IPersistentState<T>, IJournaledState, IP
         _pendingWrite = PendingWriteKind.None;
         _hasState = false;
         _clearRequested = false;
+        _isDirty = false;
+        _changeVersion = 0;
+        _stagedChangeVersion = 0;
     }
 
     void IJournaledState.AppendEntries(JournalStreamWriter writer)
@@ -94,10 +117,12 @@ internal sealed class DurableState<T> : IPersistentState<T>, IJournaledState, IP
         if (_clearRequested)
         {
             WriteClear(writer);
+            _stagedChangeVersion = _changeVersion;
         }
-        else if (_hasState)
+        else if (_hasState && _isDirty)
         {
             WriteState(writer);
+            _stagedChangeVersion = _changeVersion;
         }
     }
 
@@ -107,10 +132,12 @@ internal sealed class DurableState<T> : IPersistentState<T>, IJournaledState, IP
         {
             _pendingWrite = PendingWriteKind.Clear;
             _pendingVersion = 0;
+            _stagedChangeVersion = _changeVersion;
         }
         else if (_hasState)
         {
             WriteState(snapshotWriter);
+            _stagedChangeVersion = _changeVersion;
         }
     }
 
@@ -137,6 +164,9 @@ internal sealed class DurableState<T> : IPersistentState<T>, IJournaledState, IP
         _version = version;
         _hasState = true;
         _clearRequested = false;
+        _isDirty = false;
+        _changeVersion = 0;
+        _stagedChangeVersion = 0;
     }
 
     void IPersistentStateCommandHandler<T>.ApplyClear()
@@ -145,6 +175,9 @@ internal sealed class DurableState<T> : IPersistentState<T>, IJournaledState, IP
         _version = 0;
         _hasState = false;
         _clearRequested = false;
+        _isDirty = false;
+        _changeVersion = 0;
+        _stagedChangeVersion = 0;
     }
 
     Task IStorage.ClearStateAsync() => ((IStorage)this).ClearStateAsync(CancellationToken.None);
@@ -153,6 +186,8 @@ internal sealed class DurableState<T> : IPersistentState<T>, IJournaledState, IP
         _value = default;
         _hasState = false;
         _clearRequested = true;
+        _isDirty = true;
+        _changeVersion++;
         await _manager.WriteStateAsync(cancellationToken);
     }
 

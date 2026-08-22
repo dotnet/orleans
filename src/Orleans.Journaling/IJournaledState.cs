@@ -40,6 +40,11 @@ namespace Orleans.Journaling;
 public interface IJournaledState
 {
     /// <summary>
+    /// Gets a value indicating whether this state has changes which have not been materialized in the journal buffer.
+    /// </summary>
+    bool HasPendingChanges => true;
+
+    /// <summary>
     /// Replays one entry during journal recovery.
     /// </summary>
     /// <param name="entry">The entry to replay.</param>
