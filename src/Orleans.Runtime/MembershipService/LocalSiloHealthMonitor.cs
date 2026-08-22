@@ -83,6 +83,12 @@ namespace Orleans.Runtime.MembershipService
         long CapturePauseTimestamp();
 
         /// <summary>
+        /// Completes pause collection without aggregating the interval.
+        /// </summary>
+        /// <param name="startTimestamp">The timestamp returned by <see cref="CapturePauseTimestamp"/>.</param>
+        void EndPauseCollection(long startTimestamp);
+
+        /// <summary>
         /// Returns pause durations since the provided timestamp, aggregated by kind and as a deduplicated total.
         /// </summary>
         /// <param name="startTimestamp">The timestamp returned by <see cref="CapturePauseTimestamp"/>.</param>
@@ -219,6 +225,18 @@ namespace Orleans.Runtime.MembershipService
                 RecordGarbageCollectionPause(timestamp, GC.GetTotalPauseDuration());
                 _healthHistory.BeginPauseCollection(timestamp);
                 return timestamp;
+            }
+        }
+
+        /// <inheritdoc />
+        public void EndPauseCollection(long startTimestamp)
+        {
+            lock (_historyLock)
+            {
+                var cumulativePauseDuration = GC.GetTotalPauseDuration();
+                var endTimestamp = _timeProvider.GetTimestamp();
+                RecordGarbageCollectionPause(endTimestamp, cumulativePauseDuration);
+                _healthHistory.EndPauseCollection(startTimestamp, endTimestamp);
             }
         }
 

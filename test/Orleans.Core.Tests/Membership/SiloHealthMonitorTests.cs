@@ -145,7 +145,8 @@ namespace NonSilo.Tests.Membership
             Assert.True(probeResult.IsDirectProbe);
             Assert.Equal(0, probeResult.IntermediaryHealthDegradationScore);
             _localSiloHealthMonitor.Received(1).CapturePauseTimestamp();
-            _localSiloHealthMonitor.Received(1).GetPauseStatus(default);
+            _localSiloHealthMonitor.Received(1).EndPauseCollection(default);
+            _localSiloHealthMonitor.DidNotReceiveWithAnyArgs().GetPauseStatus(default);
 
             await Shutdown();
         }
@@ -221,6 +222,8 @@ namespace NonSilo.Tests.Membership
             Assert.True(probeResult.IsDirectProbe);
             Assert.Equal(0, probeResult.IntermediaryHealthDegradationScore);
             Assert.Equal(0, ((ITestAccessor)_monitor).ProbeTimeoutSampleCount);
+            _localSiloHealthMonitor.Received(1).GetPauseStatus(default);
+            _localSiloHealthMonitor.DidNotReceiveWithAnyArgs().EndPauseCollection(default);
 
             await Shutdown();
         }
@@ -319,6 +322,8 @@ namespace NonSilo.Tests.Membership
             Assert.True(probeResult.IsDirectProbe);
             Assert.Equal(0, probeResult.IntermediaryHealthDegradationScore);
             Assert.Equal(0, ((ITestAccessor)_monitor).ProbeTimeoutSampleCount);
+            _localSiloHealthMonitor.Received(2).EndPauseCollection(default);
+            _localSiloHealthMonitor.DidNotReceiveWithAnyArgs().GetPauseStatus(default);
 
             await Shutdown();
         }

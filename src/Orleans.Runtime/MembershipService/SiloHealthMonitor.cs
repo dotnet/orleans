@@ -353,7 +353,15 @@ namespace Orleans.Runtime.MembershipService
                 failureException = exception;
             }
             var roundTripTime = roundTripTimer.GetElapsedTime(out _);
-            var pauseStatus = _localSiloHealthMonitor.GetPauseStatus(pauseStartTimestamp);
+            var pauseDurationDuring = TimeSpan.Zero;
+            if (probeTimedOut)
+            {
+                pauseDurationDuring = _localSiloHealthMonitor.GetPauseStatus(pauseStartTimestamp).TotalPauseDuration;
+            }
+            else
+            {
+                _localSiloHealthMonitor.EndPauseCollection(pauseStartTimestamp);
+            }
 
             if (failureException is null)
             {
@@ -372,7 +380,6 @@ namespace Orleans.Runtime.MembershipService
                 // Check if a local pause consumed a significant portion of the probe timeout.
                 // If so, the local silo may have been unable to process the response in time,
                 // so we treat this as an inconclusive result rather than a failure.
-                var pauseDurationDuring = pauseStatus.TotalPauseDuration;
                 if (probeTimedOut && pauseDurationDuring >= probeTimeout.Multiply(0.25))
                 {
                     LogWarningProbeFailureDuringLocalPause(_log, id, TargetSiloAddress, roundTripTime, pauseDurationDuring, _failedProbes);
