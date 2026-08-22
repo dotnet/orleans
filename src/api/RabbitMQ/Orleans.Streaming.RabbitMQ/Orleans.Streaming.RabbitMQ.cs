@@ -79,14 +79,7 @@ namespace Orleans.Streaming.RabbitMQ.RabbitMQ
         public int MaxAttempts { get { throw null; } set { } }
     }
 
-    public static partial class RabbitMQMessage
-    {
-        public static string CreatedAtFieldName { get { throw null; } }
-
-        public static string Format { get { throw null; } }
-    }
-
-    public partial record RabbitMqQueueCacheOptions()
+    public partial record RabbitMQQueueCacheOptions()
     {
         public const int DEFAULT_CACHE_SIZE = 4096;
         public int CacheSize { get { throw null; } set { } }
