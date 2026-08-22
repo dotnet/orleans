@@ -52,7 +52,8 @@ builder.Services.AddOpenTelemetry()
                 "Microsoft.Orleans.Application",
                 "Microsoft.Orleans.Runtime",
                 "Microsoft.Orleans.Lifecycle",
-                "Microsoft.Orleans.Storage")
+                "Microsoft.Orleans.Storage",
+                "Microsoft.Orleans.Reminders")
             .AddAspNetCoreInstrumentation()
             .AddHttpClientInstrumentation()
             .SetSampler(new ParentBasedSampler(

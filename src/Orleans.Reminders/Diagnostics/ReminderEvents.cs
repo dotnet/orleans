@@ -280,6 +280,39 @@ public static class ReminderEvents
         public readonly Exception Exception = exception;
     }
 
+    /// <summary>
+    /// Event payload for when a reminder tick was skipped by a configured concurrency-control throttle.
+    /// The grain did not observe this tick; the next periodic tick will be considered independently.
+    /// </summary>
+    /// <param name="grainId">The grain associated with the reminder.</param>
+    /// <param name="reminderName">The reminder name.</param>
+    /// <param name="status">The tick status that would have been passed to the grain had the tick fired.</param>
+    /// <param name="reason">The classified reason for the skip.</param>
+    /// <param name="tierName">The name of the throttle tier that produced the skip, or <c>null</c> when no specific tier attribution applies.</param>
+    /// <param name="waitedFor">The duration the dispatch path spent waiting for a lease before the skip was returned.</param>
+    /// <param name="siloAddress">The address of the silo associated with the event, if any.</param>
+    public sealed class TickSkipped(
+        GrainId grainId,
+        string reminderName,
+        TickStatus status,
+        Concurrency.ReminderSkipReason reason,
+        string? tierName,
+        TimeSpan waitedFor,
+        SiloAddress? siloAddress) : ReminderEvent(grainId, reminderName, siloAddress)
+    {
+        /// <summary>The tick status that would have been passed to the grain had the tick fired.</summary>
+        public readonly TickStatus Status = status;
+
+        /// <summary>The classified reason for the skip.</summary>
+        public readonly Concurrency.ReminderSkipReason Reason = reason;
+
+        /// <summary>The name of the throttle tier that produced the skip, or <c>null</c> when no specific tier attribution applies.</summary>
+        public readonly string? TierName = tierName;
+
+        /// <summary>The duration the dispatch path spent waiting for a lease before the skip was returned.</summary>
+        public readonly TimeSpan WaitedFor = waitedFor;
+    }
+
     internal static void EmitRegistered(GrainId grainId, string reminderName, SiloAddress? siloAddress)
     {
         if (!Listener.IsEnabled(nameof(Registered)))
@@ -482,6 +515,29 @@ public static class ReminderEvents
                 reminderName,
                 status,
                 exception,
+                siloAddress));
+        }
+    }
+
+    internal static void EmitTickSkipped(GrainId grainId, string reminderName, TickStatus status, Concurrency.ReminderSkipReason reason, string? tierName, TimeSpan waitedFor, SiloAddress? siloAddress)
+    {
+        if (!Listener.IsEnabled(nameof(TickSkipped)))
+        {
+            return;
+        }
+
+        Emit(grainId, reminderName, status, reason, tierName, waitedFor, siloAddress);
+
+        [MethodImpl(MethodImplOptions.NoInlining)]
+        static void Emit(GrainId grainId, string reminderName, TickStatus status, Concurrency.ReminderSkipReason reason, string? tierName, TimeSpan waitedFor, SiloAddress? siloAddress)
+        {
+            Listener.Write(nameof(TickSkipped), new TickSkipped(
+                grainId,
+                reminderName,
+                status,
+                reason,
+                tierName,
+                waitedFor,
                 siloAddress));
         }
     }
