@@ -375,7 +375,27 @@ internal sealed partial class DisseminationProtocol(
             return DisseminationApplyResult.Obsolete;
         }
 
-        var result = await topic.ApplyValue(value, cancellationToken);
+        DisseminationApplyResult result;
+        try
+        {
+            result = await topic.ApplyValue(value, cancellationToken);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (Exception exception)
+        {
+            result = DisseminationApplyResult.Rejected;
+            LogDebugDisseminationValueApplyFailed(
+                _logger,
+                exception,
+                sender,
+                topicName,
+                value.Digest.Key,
+                value.Digest.Version);
+        }
+
         EmitApplyResult(topicName, value, sender, result);
         if (result is DisseminationApplyResult.Applied or DisseminationApplyResult.Duplicate)
         {
@@ -1722,6 +1742,11 @@ internal sealed partial class DisseminationProtocol(
         Level = LogLevel.Debug,
         Message = "Failed to apply anti-entropy repair value from {Sender} for topic {Topic}, key {Key}, version {Version}.")]
     private static partial void LogDebugAntiEntropyRepairValueFailed(ILogger logger, Exception exception, SiloAddress sender, string topic, string key, long version);
+
+    [LoggerMessage(
+        Level = LogLevel.Debug,
+        Message = "Failed to apply dissemination value from {Sender} for topic {Topic}, key {Key}, version {Version}.")]
+    private static partial void LogDebugDisseminationValueApplyFailed(ILogger logger, Exception exception, SiloAddress sender, string topic, string key, long version);
 
     [LoggerMessage(
         Level = LogLevel.Debug,
