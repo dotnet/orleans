@@ -1,13 +1,19 @@
-﻿// <file_grain_storage_options>
 using Orleans.Runtime;
 using Orleans.Storage;
 
-namespace GrainStorage;
+namespace Orleans.Persistence.FileStorage;
 
+/// <summary>
+/// Options for <see cref="FileGrainStorage"/>.
+/// </summary>
 public sealed class FileGrainStorageOptions : IStorageProviderSerializerOptions
 {
+    /// <summary>
+    /// Gets or sets the directory used to store grain state.
+    /// </summary>
     public required string RootDirectory { get; set; }
 
+    /// <inheritdoc />
     public required IGrainStorageSerializer GrainStorageSerializer { get; set; }
 }
 
@@ -33,4 +39,3 @@ internal sealed class FileGrainStorageOptionsValidator(
 
     }
 }
-// </file_grain_storage_options>

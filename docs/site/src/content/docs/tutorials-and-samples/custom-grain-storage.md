@@ -10,7 +10,7 @@ ai-usage: ai-assisted
 
 In the tutorial on declarative actor storage, you learned how to allow grains to store their state in an Azure table using one of the built-in storage providers. While Azure is a great place to store your data, many alternatives exist. There are so many that supporting them all isn't feasible. Instead, Orleans is designed to let you easily add support for your preferred storage by writing a custom grain storage provider.
 
-In this tutorial, you'll walk through how to write a simple file-based grain storage provider. A file system isn't the best place to store grain states because it's local, can have issues with file locks, and the last update date isn't sufficient to prevent inconsistency. However, it's an easy example to illustrate the implementation of a _grain storage_ provider.
+In this tutorial, you'll build a simple file-based grain storage provider for a local, single-silo application. It stores binary state records on the local filesystem and uses persisted ETags for basic optimistic concurrency checks.
 
 ## Get started
 
@@ -44,6 +44,7 @@ With the options class created, explore the constructor parameters of the `FileG
 - `storageName`: Specifies which grains should use this storage provider through <xref:Orleans.Providers.StorageProviderAttribute>, for example, `[StorageProvider(ProviderName = "File")]`.
 - `options`: The options class just created.
 - `clusterOptions`: The cluster options used for retrieving the <xref:Orleans.Configuration.ClusterOptions.ServiceId>.
+- `activatorProvider`: Creates missing or cleared state instances using the same activation rules as Orleans serialization.
 
 ## Initialize the storage
 
@@ -51,21 +52,21 @@ To initialize the storage, subscribe to the <xref:Orleans.ServiceLifecycleStage.
 
 :::code source="snippets/custom-grain-storage/FileGrainStorage.cs" id="participate":::
 
-The `onStart` function conditionally creates the root directory to store grain states if it doesn't already exist.
+The `onStart` function creates the root directory before application services use the provider.
 
-Also, provide a common function to construct the filename, ensuring uniqueness per service, grain ID, and state name:
+Also, derive a fixed-length filename from length-delimited service ID, grain type, grain key, and state name components:
 
 :::code source="snippets/custom-grain-storage/FileGrainStorage.cs" id="getkeystring":::
 
 ## Read state
 
-To read a grain state, get the filename using the `GetKeyString` function and combine it with the root directory from the `_options` instance.
+To read a grain state, derive its record path and read the file if it exists.
 
 :::code source="snippets/custom-grain-storage/FileGrainStorage.cs" id="readstateasync":::
 
-Use `fileInfo.LastWriteTimeUtc` as an `ETag`, which other functions use for inconsistency checks to prevent data loss. Set <xref:Orleans.IGrainState`1.RecordExists> to indicate whether the read found a record.
+The record header contains a persisted opaque `ETag`. Set <xref:Orleans.IGrainState`1.RecordExists> to indicate whether the read found a record, and reset all three state-container properties when the record is absent.
 
-For deserialization, use the <xref:Orleans.Storage.IStorageProviderSerializerOptions.GrainStorageSerializer?displayProperty=nameWithType>. This is important for correctly serializing and deserializing the state.
+Read the payload as bytes and deserialize it using <xref:Orleans.Storage.IStorageProviderSerializerOptions.GrainStorageSerializer?displayProperty=nameWithType>, preserving arbitrary serializer output without text conversion.
 
 ## Write state
 
@@ -73,7 +74,7 @@ Writing the state is similar to reading the state.
 
 :::code source="snippets/custom-grain-storage/FileGrainStorage.cs" id="writestateasync":::
 
-Similar to reading state, use the <xref:Orleans.Storage.IStorageProviderSerializerOptions.GrainStorageSerializer?displayProperty=nameWithType> to write the state. The current `ETag` checks against the file's last updated UTC time. If the date differs, it means another activation of the same grain changed the state concurrently. In this situation, throw an <xref:Orleans.Storage.InconsistentStateException>. This results in the current activation being killed to prevent overwriting the state previously saved by the other activated grain.
+Use <xref:Orleans.Storage.IStorageProviderSerializerOptions.GrainStorageSerializer?displayProperty=nameWithType> to produce the binary payload. Compare the caller's `ETag` with the persisted token and throw an <xref:Orleans.Storage.InconsistentStateException> when they differ. A successful write creates a new opaque `ETag` and writes the record file.
 
 ## Clear state
 
@@ -81,7 +82,7 @@ Clearing the state involves deleting the file if it exists.
 
 :::code source="snippets/custom-grain-storage/FileGrainStorage.cs" id="clearstateasync":::
 
-For the same reason as <xref:Orleans.Grain`1.WriteStateAsync*>, check for inconsistency. Before deleting the file and resetting the `ETag`, check if the current `ETag` matches the last write time UTC.
+Before deleting an existing record, verify that the caller's `ETag` matches the persisted token. A successful clear resets the state instance, `ETag`, and <xref:Orleans.IGrainState`1.RecordExists>.
 
 ## Put it all together
 
@@ -89,13 +90,13 @@ Next, create a factory that allows scoping the options to the provider name whil
 
 :::code source="snippets/custom-grain-storage/FileGrainStorageFactory.cs" id="file_grain_storage_factory":::
 
-Lastly, to register the grain storage, create an extension on <xref:Orleans.Hosting.ISiloBuilder>. This extension registers the grain storage as a keyed singleton using <xref:Microsoft.Extensions.DependencyInjection.ServiceCollectionServiceExtensions.AddKeyedSingleton*?displayProperty=nameWithType>.
+Lastly, create extensions on <xref:Orleans.Hosting.ISiloBuilder> and <xref:Microsoft.Extensions.DependencyInjection.IServiceCollection>. They configure named options, register configuration validation and serializer defaults, and add the provider using Orleans storage registration.
 
 :::code source="snippets/custom-grain-storage/FileSiloBuilderExtensions.cs" id="file_silo_builder_extensions":::
 
-The `FileGrainStorage` implements <xref:Orleans.Storage.IGrainStorage> and <xref:Orleans.ILifecycleParticipant`1> for <xref:Orleans.Runtime.ISiloLifecycle>. Therefore, register two keyed singleton services, one for each interface.
+The Orleans storage registration detects that `FileGrainStorage` implements <xref:Orleans.ILifecycleParticipant`1> for <xref:Orleans.Runtime.ISiloLifecycle> and registers its lifecycle participation.
 
-:::code source="snippets/custom-grain-storage/FileSiloBuilderExtensions.cs" id="KeyedRegistrations":::
+:::code source="snippets/custom-grain-storage/FileSiloBuilderExtensions.cs" id="storage_registration":::
 
 This enables adding the file storage using the extension on <xref:Orleans.Hosting.ISiloBuilder>:
 
