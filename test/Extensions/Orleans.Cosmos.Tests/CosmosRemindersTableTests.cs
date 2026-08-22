@@ -1,6 +1,7 @@
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Orleans.Reminders.Cosmos;
+using Orleans.Reminders.TestKit;
 using TestExtensions;
 using UnitTests;
 using UnitTests.RemindersTest;
@@ -14,6 +15,7 @@ namespace Tester.Cosmos.Reminders;
 [TestProvider("Cosmos")]
 [TestArea("Reminders")]
 [TestCategory("Reminders"), TestCategory("Cosmos")]
+[TestSuite("Functional")]
 public class CosmosRemindersTableTests : ReminderTableTestsBase
 {
     public CosmosRemindersTableTests(ConnectionStringFixture fixture, TestEnvironmentFixture environment)
@@ -37,6 +39,9 @@ public class CosmosRemindersTableTests : ReminderTableTestsBase
         options.ConfigureTestDefaults();
         return new CosmosReminderTable(loggerFactory, this.ClusterFixture.Services, Options.Create(options), this.clusterOptions);
     }
+
+    protected override ReminderTableCapabilities CreateReminderTableCapabilities()
+        => ReminderTableProviderProfiles.Cosmos(GetType().Name);
 
     protected override Task<string> GetConnectionString()
     {

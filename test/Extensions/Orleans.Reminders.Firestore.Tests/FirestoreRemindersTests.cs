@@ -4,6 +4,7 @@ using UnitTests;
 using TestExtensions;
 using UnitTests.RemindersTest;
 using Orleans.Reminders.Firestore;
+using Orleans.Reminders.TestKit;
 using Orleans.Runtime;
 
 
@@ -34,6 +35,9 @@ public class FirestoreRemindersTests : ReminderTableTestsBase, IClassFixture<Tes
             this.clusterOptions,
             Options.Create(options));
     }
+
+    protected override ReminderTableCapabilities CreateReminderTableCapabilities()
+        => ReminderTableProviderProfiles.Firestore(GetType().Name);
 
     protected override Task<string> GetConnectionString() => Task.FromResult(GoogleEmulatorHost.FirestoreEndpoint);
 

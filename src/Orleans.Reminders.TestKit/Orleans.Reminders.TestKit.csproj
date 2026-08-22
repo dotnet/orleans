@@ -1,0 +1,36 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <PackageId>Microsoft.Orleans.Reminders.TestKit</PackageId>
+    <Title>Orleans reminder provider test infrastructure</Title>
+    <Description>Repository-internal test infrastructure for validating Orleans IReminderTable implementations and reminder service integration</Description>
+    <PackageTags>$(PackageTags) ReminderTestKit</PackageTags>
+    <TargetFrameworks>$(DefaultTargetFrameworks)</TargetFrameworks>
+    <OrleansBuildTimeCodeGen>true</OrleansBuildTimeCodeGen>
+    <IsOrleansFrameworkPart>false</IsOrleansFrameworkPart>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+
+  <PropertyGroup>
+    <AssemblyName>Orleans.Reminders.TestKit</AssemblyName>
+    <RootNamespace>Orleans.Reminders.TestKit</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Accordant" />
+    <PackageReference Include="System.Collections.Immutable" VersionOverride="10.0.0" PrivateAssets="all" />
+    <PackageReference Include="System.IO.Pipelines" VersionOverride="10.0.5" PrivateAssets="all" />
+    <PackageReference Include="System.Text.Json" VersionOverride="10.0.5" PrivateAssets="all" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Orleans.Reminders\Orleans.Reminders.csproj" />
+    <ProjectReference Include="..\Orleans.TestingHost\Orleans.TestingHost.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="README.md" Pack="true" PackagePath="\" />
+  </ItemGroup>
+
+</Project>
