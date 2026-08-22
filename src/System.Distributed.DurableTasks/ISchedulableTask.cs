@@ -6,6 +6,11 @@
 public interface ISchedulableTask
 {
     /// <summary>
+    /// Gets a value indicating whether <see cref="ScheduleAsync"/> durably commits the task's scheduling state.
+    /// </summary>
+    bool CommitsDurableState => false;
+
+    /// <summary>
     /// Schedules the task, returning a handle to the scheduled task.
     /// </summary>
     /// <returns>A handle representing the scheduled task.</returns>

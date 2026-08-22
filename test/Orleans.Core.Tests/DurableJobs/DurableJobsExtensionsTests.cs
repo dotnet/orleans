@@ -137,18 +137,24 @@ public class DurableJobsExtensionsTests
 
     private sealed class ReplacementRegistry : IDurableJobHandlerRegistry
     {
-        public void Register(IDurableJobFeatureHandler handler)
+        public void Register(IDurableJobFeatureHandler handler, bool requiresTurnIsolation = false)
         {
         }
     }
 
     private sealed class LookupReplacementRegistry : IDurableJobHandlerRegistry, IDurableJobHandlerLookup
     {
-        public void Register(IDurableJobFeatureHandler handler)
+        public void Register(IDurableJobFeatureHandler handler, bool requiresTurnIsolation = false)
         {
         }
 
         public bool TryGetHandler(string jobName, [NotNullWhen(true)] out IDurableJobFeatureHandler? handler)
+        {
+            handler = null;
+            return false;
+        }
+
+        public bool TryGetIsolatedHandler(string jobName, [NotNullWhen(true)] out IDurableJobFeatureHandler? handler)
         {
             handler = null;
             return false;

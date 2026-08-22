@@ -71,7 +71,6 @@ internal sealed partial class DurableTaskGrainRuntime(
         var context = request.Context ?? throw new InvalidOperationException("The durable task request has no context.");
         context.CallerId = GrainId;
         transport.SendInvocation(GrainId, context.TargetId, taskId, request);
-        await _storage.WriteAsync(cancellationToken);
         await transport.CommitAsync(cancellationToken);
         return DurableTaskResponse.Pending;
     }
@@ -81,7 +80,6 @@ internal sealed partial class DurableTaskGrainRuntime(
         var transport = _messageTransport ?? throw new InvalidOperationException(
             "Durable messaging is not configured. Call AddDurableTasks on the silo builder.");
         transport.SendCancellation(GrainId, target, taskId);
-        await _storage.WriteAsync(cancellationToken);
         await transport.CommitAsync(cancellationToken);
     }
 
@@ -92,7 +90,7 @@ internal sealed partial class DurableTaskGrainRuntime(
             return;
         }
 
-        _storage.RequestCancellation(taskId, state);
+        await SignalCancellationAsync(taskId, cancellationToken, cancelRootHandle: false);
         await SetResponseAsync(
             taskId,
             DurableTaskResponse.FromException(new OperationCanceledException()),
@@ -214,17 +212,30 @@ internal sealed partial class DurableTaskGrainRuntime(
                 return response;
             }
 
+            // Reserve the running handle before yielding so that an interleaved duplicate schedule observes
+            // the in-progress invocation instead of rehydrating a competing handle from storage.
+            var executionContext = CreateExecutionContext(taskId);
+            handle = new TaskHandle(taskId, this) { IsRunning = true };
+            _taskHandles.Add(taskId, handle);
+
             // Persist the task state before invoking the task.
             // Note that if we intercept all outgoing calls to other durable tasks, then we do not need to do this here.
             // Instead, we can defer it until either the task completes or an outgoing call is made, since we can guarantee
             // no visible side-effects.
             // If the user does the 'wrong' thing and calls a non-durable task from their code, then that could expose an externality.
-            await _storage.WriteAsync(cancellationToken);
+            try
+            {
+                await _storage.WriteAsync(cancellationToken);
+            }
+            catch
+            {
+                _storage.RemoveTask(taskId);
+                _executionContexts.Remove(taskId);
+                _taskHandles.Remove(taskId);
+                throw;
+            }
 
             // Schedule the task with the runtime.
-            var executionContext = CreateExecutionContext(taskId);
-            handle = new TaskHandle(taskId, this) { IsRunning = true };
-            _taskHandles.Add(taskId, handle);
             request.SetTarget(_shared.GrainContextAccessor.GrainContext);
             var invocationTask = Invoke(static request => request.CreateTask(), request, executionContext);
             _runningRequests.Add(taskId, invocationTask);
@@ -282,7 +293,10 @@ internal sealed partial class DurableTaskGrainRuntime(
                 _taskHandles[taskId] = handle;
             }
 
-            await _storage.WriteAsync(cancellationToken);
+            if (!schedulableTask.CommitsDurableState)
+            {
+                await _storage.WriteAsync(cancellationToken);
+            }
             return handle!;
         }
 
@@ -349,6 +363,7 @@ internal sealed partial class DurableTaskGrainRuntime(
                 durableState.MigrateLegacyObservers();
             }
 
+            var sentCompletion = false;
             if (state.CompletionDestinations.Count > 0)
             {
                 var transport = _messageTransport ?? throw new InvalidOperationException(
@@ -356,16 +371,20 @@ internal sealed partial class DurableTaskGrainRuntime(
                 foreach (var destination in state.CompletionDestinations)
                 {
                     transport.SendCompletion(GrainId, destination, taskId, response);
+                    sentCompletion = true;
                 }
 
                 _storage.ClearCompletionDestinations(taskId, state);
             }
 
             _storage.SetResponse(taskId, state, response);
-            await _storage.WriteAsync(cancellationToken);
-            if (_messageTransport is { } messageTransport)
+            if (sentCompletion)
             {
-                await messageTransport.CommitAsync(cancellationToken);
+                await _messageTransport!.CommitAsync(cancellationToken);
+            }
+            else
+            {
+                await _storage.WriteAsync(cancellationToken);
             }
         }
 
@@ -519,6 +538,12 @@ internal sealed partial class DurableTaskGrainRuntime(
     }
 
     public async ValueTask SignalCancellationAsync(TaskId taskId, CancellationToken cancellationToken)
+        => await SignalCancellationAsync(taskId, cancellationToken, cancelRootHandle: true);
+
+    private async ValueTask SignalCancellationAsync(
+        TaskId taskId,
+        CancellationToken cancellationToken,
+        bool cancelRootHandle)
     {
         if (taskId.IsDefault)
         {
@@ -535,7 +560,7 @@ internal sealed partial class DurableTaskGrainRuntime(
 
         List<GrainDurableExecutionContext> canceledContexts = [];
         List<IScheduledTaskHandle> canceledHandles = [];
-        if (RequestCancellationCore(taskId, taskState, canceledContexts, canceledHandles))
+        if (RequestCancellationCore(taskId, taskState, cancelRootHandle, canceledContexts, canceledHandles))
         {
             // Something changed, write state.
             await _storage.WriteAsync(cancellationToken);
@@ -555,7 +580,12 @@ internal sealed partial class DurableTaskGrainRuntime(
 
         await Task.WhenAll(tasks);
 
-        bool RequestCancellationCore(TaskId taskId, IDurableTaskState taskState, List<GrainDurableExecutionContext> canceledContexts, List<IScheduledTaskHandle> canceledHandles)
+        bool RequestCancellationCore(
+            TaskId taskId,
+            IDurableTaskState taskState,
+            bool cancelHandle,
+            List<GrainDurableExecutionContext> canceledContexts,
+            List<IScheduledTaskHandle> canceledHandles)
         {
             if (taskState.CompletedAt.HasValue)
             {
@@ -574,7 +604,7 @@ internal sealed partial class DurableTaskGrainRuntime(
             foreach (var (childTaskId, childTaskState) in _storage.GetChildren(taskId))
             {
                 Debug.Assert(taskId.IsParentOf(childTaskId));
-                _ = RequestCancellationCore(childTaskId, childTaskState, canceledContexts, canceledHandles);
+                _ = RequestCancellationCore(childTaskId, childTaskState, cancelHandle: true, canceledContexts, canceledHandles);
             }
 
             _storage.RequestCancellation(taskId, taskState);
@@ -582,7 +612,7 @@ internal sealed partial class DurableTaskGrainRuntime(
             {
                 canceledContexts.Add(context);
             }
-            else if (TryGetScheduledTaskHandle(taskId, out var handle))
+            else if (cancelHandle && TryGetScheduledTaskHandle(taskId, out var handle))
             {
                 canceledHandles.Add(handle);
             }

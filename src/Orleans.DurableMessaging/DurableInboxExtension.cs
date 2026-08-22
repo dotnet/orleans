@@ -37,12 +37,13 @@ internal sealed partial class DurableInboxExtension : IDurableInboxExtension, ID
     private readonly IDurableOutbox _outbox;
     private readonly ILocalDurableJobManager _jobManager;
     private readonly TimeProvider _timeProvider;
-    private readonly Dictionary<Guid, TaskCompletionSource<DeliveryResult>> _pendingDeliveries;
     private readonly int _maxCapacity;
     private readonly TimeSpan _deduplicationWindow;
     private readonly int _maxProcessingAttempts;
     private readonly int _batchSize;
     private readonly TimeSpan _retryDelay;
+    private readonly bool _enableLongPolling;
+    private readonly TimeSpan _defaultPollTimeout;
     private readonly SemaphoreSlim _gate = new(1, 1);
     private readonly CancellationTokenSource _shutdownCts = new();
     private int _metricsActive;
@@ -109,13 +110,14 @@ internal sealed partial class DurableInboxExtension : IDurableInboxExtension, ID
         _outbox = outbox;
         _jobManager = jobManager;
         _timeProvider = timeProvider;
-        _pendingDeliveries = new Dictionary<Guid, TaskCompletionSource<DeliveryResult>>();
         _maxCapacity = options.MaxCapacity;
         _deduplicationWindow = options.DeduplicationWindow;
         _maxProcessingAttempts = options.MaxProcessingAttempts;
         _batchSize = options.InboxBatchSize;
         _retryDelay = options.BackpressureRetryDelay;
-        jobHandlers.Register(JobName, this);
+        _enableLongPolling = options.EnableLongPolling;
+        _defaultPollTimeout = options.DefaultPollTimeout;
+        jobHandlers.Register(this, requiresTurnIsolation: true);
     }
 
     /// <summary>
@@ -173,7 +175,9 @@ internal sealed partial class DurableInboxExtension : IDurableInboxExtension, ID
     {
         EnsureMetricsActive();
         var key = (envelope.SenderId, envelope.MessageId);
+        var pollTimeout = options.PollTimeout == Timeout.InfiniteTimeSpan ? _defaultPollTimeout : options.PollTimeout;
         var shouldWait = false;
+        DurableEnvelope? envelopeToProcess = null;
         var result = DeliveryResult.Accepted();
 
         await _gate.WaitAsync(CancellationToken.None).ConfigureAwait(true);
@@ -189,6 +193,7 @@ internal sealed partial class DurableInboxExtension : IDurableInboxExtension, ID
                     envelope.RouteKey,
                     envelope.CorrelationKey?.ToString());
                 _instruments.OnInboxMessageReceived(_grainContext.GrainId.Type.ToString(), envelope.RouteKey, "duplicate");
+                envelope.Data.Dispose();
                 return DeliveryResult.Duplicate();
             }
 
@@ -202,9 +207,19 @@ internal sealed partial class DurableInboxExtension : IDurableInboxExtension, ID
                     envelope.RouteKey,
                     envelope.CorrelationKey?.ToString());
                 _instruments.OnInboxMessageReceived(_grainContext.GrainId.Type.ToString(), envelope.RouteKey, "duplicate");
+                var storedEnvelope = _inboxDict[key];
+                if (!ReferenceEquals(storedEnvelope.Data, envelope.Data))
+                {
+                    envelope.Data.Dispose();
+                }
+
                 await EnsureJobScheduledUnderGateAsync(CancellationToken.None).ConfigureAwait(true);
                 result = DeliveryResult.Duplicate();
-                shouldWait = options.PollTimeout > TimeSpan.Zero;
+                shouldWait = _enableLongPolling && pollTimeout > TimeSpan.Zero;
+                if (shouldWait)
+                {
+                    envelopeToProcess = storedEnvelope;
+                }
             }
             else
             {
@@ -220,6 +235,7 @@ internal sealed partial class DurableInboxExtension : IDurableInboxExtension, ID
                         envelope.RouteKey,
                         envelope.CorrelationKey?.ToString());
                     _instruments.OnInboxMessageReceived(_grainContext.GrainId.Type.ToString(), envelope.RouteKey, "backpressured");
+                    envelope.Data.Dispose();
                     return DeliveryResult.Backpressured();
                 }
 
@@ -234,6 +250,7 @@ internal sealed partial class DurableInboxExtension : IDurableInboxExtension, ID
                         envelope.SenderId,
                         envelope.CorrelationKey?.ToString());
                     _instruments.OnInboxMessageReceived(_grainContext.GrainId.Type.ToString(), envelope.RouteKey, "route_not_found");
+                    envelope.Data.Dispose();
                     return DeliveryResult.RouteNotFound(envelope.RouteKey);
                 }
 
@@ -251,7 +268,11 @@ internal sealed partial class DurableInboxExtension : IDurableInboxExtension, ID
                     envelope.RouteKey,
                     envelope.CorrelationKey?.ToString());
                 _instruments.OnInboxMessageReceived(_grainContext.GrainId.Type.ToString(), envelope.RouteKey, "accepted");
-                shouldWait = options.PollTimeout > TimeSpan.Zero;
+                shouldWait = _enableLongPolling && pollTimeout > TimeSpan.Zero;
+                if (shouldWait)
+                {
+                    envelopeToProcess = envelope;
+                }
             }
         }
         finally
@@ -259,44 +280,25 @@ internal sealed partial class DurableInboxExtension : IDurableInboxExtension, ID
             _gate.Release();
         }
 
-        return shouldWait
-            ? await WaitForProcessingAsync(envelope.MessageId, options.PollTimeout, cancellationToken).ConfigureAwait(true)
-            : result;
-    }
+        if (!shouldWait || envelopeToProcess is not { } pendingEnvelope)
+        {
+            return result;
+        }
 
-    /// <summary>
-    /// Waits for a message to be processed, with timeout support for long-polling.
-    /// </summary>
-    private async ValueTask<DeliveryResult> WaitForProcessingAsync(
-        Guid messageId,
-        TimeSpan timeout,
-        CancellationToken cancellationToken)
-    {
-        var tcs = new TaskCompletionSource<DeliveryResult>(TaskCreationOptions.RunContinuationsAsynchronously);
-
-        // Register the waiter
-        _pendingDeliveries[messageId] = tcs;
-
+        using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        timeout.CancelAfter(pollTimeout);
         try
         {
-            // Wait for completion or timeout
-            using var cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-            cts.CancelAfter(timeout);
-
-            var task = await Task.WhenAny(tcs.Task, Task.Delay(timeout, cts.Token)).ConfigureAwait(true);
-
-            if (task == tcs.Task)
-            {
-                return await tcs.Task.ConfigureAwait(true);
-            }
-
-            // Timeout - return pending status
+            return await ProcessMessageAsync(pendingEnvelope, timeout.Token).ConfigureAwait(true);
+        }
+        catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested && timeout.IsCancellationRequested)
+        {
             return DeliveryResult.Pending();
         }
-        finally
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
-            // Clean up waiter
-            _pendingDeliveries.Remove(messageId);
+            cancellationToken.ThrowIfCancellationRequested();
+            throw;
         }
     }
 
@@ -323,7 +325,28 @@ internal sealed partial class DurableInboxExtension : IDurableInboxExtension, ID
         }
     }
 
+    public bool CanHandle(string jobName) => string.Equals(jobName, JobName, StringComparison.Ordinal);
+
     public async ValueTask<DurableJobRunResult> ExecuteJobAsync(IJobRunContext context, CancellationToken cancellationToken)
+    {
+        try
+        {
+            return await ExecuteJobCoreAsync(context, cancellationToken).ConfigureAwait(true);
+        }
+
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            await _stateManager.RevertPendingChangesAsync(CancellationToken.None).ConfigureAwait(true);
+            throw;
+        }
+        catch (Exception exception)
+        {
+            LogJobExecutionError(_logger, exception, context.Job.Id);
+            return DurableJobRunResult.RescheduleAt(_timeProvider.GetUtcNow() + _retryDelay);
+        }
+    }
+
+    private async ValueTask<DurableJobRunResult> ExecuteJobCoreAsync(IJobRunContext context, CancellationToken cancellationToken)
     {
         await _gate.WaitAsync(cancellationToken).ConfigureAwait(true);
         try
@@ -389,7 +412,7 @@ internal sealed partial class DurableInboxExtension : IDurableInboxExtension, ID
             cancellationToken.ThrowIfCancellationRequested();
             try
             {
-                await ProcessMessageAsync(envelope).ConfigureAwait(true);
+                _ = await ProcessMessageAsync(envelope, cancellationToken).ConfigureAwait(true);
             }
             catch (Exception exception) when (exception is not OperationCanceledException)
             {
@@ -420,14 +443,14 @@ internal sealed partial class DurableInboxExtension : IDurableInboxExtension, ID
     /// <summary>
     /// Processes a single message by invoking its handler.
     /// </summary>
-    private async Task ProcessMessageAsync(DurableEnvelope envelope)
+    private async Task<DeliveryResult> ProcessMessageAsync(DurableEnvelope envelope, CancellationToken cancellationToken)
     {
         var key = (envelope.SenderId, envelope.MessageId);
         var grainTypeName = _grainContext.GrainId.Type.ToString();
         var stopwatch = Stopwatch.StartNew();
         if (!_inboxDict.ContainsKey(key))
         {
-            return;
+            return DeliveryResult.Duplicate();
         }
 
         var context = new InboxHandlerContext(envelope, _grainContext.GrainId, _outbox, _sessionPool);
@@ -436,20 +459,20 @@ internal sealed partial class DurableInboxExtension : IDurableInboxExtension, ID
             DeliveryResult completionResult;
             if (_durableInbox.TryFindHandler(context, out var handler))
             {
-                await handler.HandleAsync(context, CancellationToken.None).ConfigureAwait(true);
+                await InvokeHandlerAsync(handler, context, cancellationToken).ConfigureAwait(true);
+                cancellationToken.ThrowIfCancellationRequested();
                 completionResult = DeliveryResult.Processed();
             }
             else
             {
-                await DeadLetterAsync(key, envelope, "No compatible handler is registered.").ConfigureAwait(true);
+                await DeadLetterAsync(key, envelope, "No compatible handler is registered.", cancellationToken).ConfigureAwait(true);
                 stopwatch.Stop();
                 _instruments.OnInboxMessageProcessed(grainTypeName, envelope.RouteKey, "dead_lettered");
                 _instruments.OnInboxProcessingDuration(stopwatch.Elapsed, grainTypeName, envelope.RouteKey);
-                CompleteDelivery(envelope.MessageId, DeliveryResult.DeadLettered("No compatible handler is registered."));
-                return;
+                return DeliveryResult.DeadLettered("No compatible handler is registered.");
             }
 
-            await _gate.WaitAsync(CancellationToken.None).ConfigureAwait(true);
+            await _gate.WaitAsync(cancellationToken).ConfigureAwait(true);
             try
             {
                 if (_inboxDict.ContainsKey(key))
@@ -457,7 +480,7 @@ internal sealed partial class DurableInboxExtension : IDurableInboxExtension, ID
                     RemoveMessage(key);
                     _messageStates.Remove(key);
                     _processed[key] = _timeProvider.GetUtcNow();
-                    await _stateManager.WriteStateAsync(CancellationToken.None).ConfigureAwait(true);
+                    await _stateManager.WriteStateAsync(cancellationToken).ConfigureAwait(true);
                 }
             }
             finally
@@ -470,28 +493,36 @@ internal sealed partial class DurableInboxExtension : IDurableInboxExtension, ID
             _instruments.OnInboxMessageProcessed(grainTypeName, envelope.RouteKey, "success");
             _instruments.OnInboxProcessingDuration(stopwatch.Elapsed, grainTypeName, envelope.RouteKey);
             LogMessageProcessed(_logger, envelope.MessageId, envelope.SenderId, envelope.RouteKey, envelope.CorrelationKey?.ToString());
-            CompleteDelivery(envelope.MessageId, completionResult);
+            return completionResult;
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            await _stateManager.RevertPendingChangesAsync(CancellationToken.None).ConfigureAwait(true);
+            throw;
         }
         catch (Exception ex)
         {
             LogHandlerException(_logger, ex, envelope.MessageId, envelope.SenderId, envelope.RouteKey, envelope.CorrelationKey?.ToString());
-            var deadLettered = await RecordProcessingFailureAsync(key, ex).ConfigureAwait(true);
+            var deadLettered = await RecordProcessingFailureAsync(key, ex, cancellationToken).ConfigureAwait(true);
             stopwatch.Stop();
             _instruments.OnInboxMessageProcessed(grainTypeName, envelope.RouteKey, deadLettered ? "dead_lettered" : "retry");
             _instruments.OnInboxProcessingDuration(stopwatch.Elapsed, grainTypeName, envelope.RouteKey);
             if (deadLettered)
             {
-                CompleteDelivery(envelope.MessageId, DeliveryResult.DeadLettered(ex.Message));
+                return DeliveryResult.DeadLettered(ex.Message);
             }
+
+            return DeliveryResult.Pending();
         }
     }
 
     private async ValueTask<bool> RecordProcessingFailureAsync(
         (GrainId SenderId, Guid MessageId) key,
-        Exception exception)
+        Exception exception,
+        CancellationToken cancellationToken)
     {
-        await _stateManager.RevertPendingChangesAsync(CancellationToken.None).ConfigureAwait(true);
-        await _gate.WaitAsync(CancellationToken.None).ConfigureAwait(true);
+        await _stateManager.RevertPendingChangesAsync(cancellationToken).ConfigureAwait(true);
+        await _gate.WaitAsync(cancellationToken).ConfigureAwait(true);
         try
         {
             if (!_inboxDict.TryGetValue(key, out var recoveredEnvelope))
@@ -508,14 +539,14 @@ internal sealed partial class DurableInboxExtension : IDurableInboxExtension, ID
             state.LastError = exception.ToString();
             if (state.AttemptCount >= _maxProcessingAttempts)
             {
-                await DeadLetterUnderGateAsync(key, recoveredEnvelope, exception.Message, state.AttemptCount).ConfigureAwait(true);
+                await DeadLetterUnderGateAsync(key, recoveredEnvelope, exception.Message, state.AttemptCount, cancellationToken).ConfigureAwait(true);
                 return true;
             }
 
             var exponent = Math.Min(state.AttemptCount - 1, 6);
             state.NextAttemptAt = _timeProvider.GetUtcNow() + TimeSpan.FromTicks(_retryDelay.Ticks * (1L << exponent));
             _messageStates[key] = state;
-            await _stateManager.WriteStateAsync(CancellationToken.None).ConfigureAwait(true);
+            await _stateManager.WriteStateAsync(cancellationToken).ConfigureAwait(true);
             return false;
         }
         finally
@@ -527,13 +558,14 @@ internal sealed partial class DurableInboxExtension : IDurableInboxExtension, ID
     private async ValueTask DeadLetterAsync(
         (GrainId SenderId, Guid MessageId) key,
         DurableEnvelope envelope,
-        string reason)
+        string reason,
+        CancellationToken cancellationToken)
     {
-        await _gate.WaitAsync(CancellationToken.None).ConfigureAwait(true);
+        await _gate.WaitAsync(cancellationToken).ConfigureAwait(true);
         try
         {
             var attemptCount = _messageStates.TryGetValue(key, out var state) ? state.AttemptCount : 0;
-            await DeadLetterUnderGateAsync(key, envelope, reason, attemptCount).ConfigureAwait(true);
+            await DeadLetterUnderGateAsync(key, envelope, reason, attemptCount, cancellationToken).ConfigureAwait(true);
         }
         finally
         {
@@ -545,7 +577,8 @@ internal sealed partial class DurableInboxExtension : IDurableInboxExtension, ID
         (GrainId SenderId, Guid MessageId) key,
         DurableEnvelope envelope,
         string reason,
-        int attemptCount)
+        int attemptCount,
+        CancellationToken cancellationToken)
     {
         _deadLetters[key] = new InboxDeadLetter
         {
@@ -557,17 +590,42 @@ internal sealed partial class DurableInboxExtension : IDurableInboxExtension, ID
         RemoveMessage(key);
         _messageStates.Remove(key);
         _processed[key] = _timeProvider.GetUtcNow();
-        await _stateManager.WriteStateAsync(CancellationToken.None).ConfigureAwait(true);
+        await _stateManager.WriteStateAsync(cancellationToken).ConfigureAwait(true);
     }
 
-    /// <summary>
-    /// Completes delivery for pending waiters.
-    /// </summary>
-    private void CompleteDelivery(Guid messageId, DeliveryResult result)
+    private static async ValueTask InvokeHandlerAsync(
+        IInboxHandler handler,
+        IInboxHandlerContext context,
+        CancellationToken cancellationToken)
     {
-        if (_pendingDeliveries.TryGetValue(messageId, out var tcs))
+        var previous = RequestContext.Entries.ToArray();
+        RequestContext.Clear();
+        try
         {
-            tcs.TrySetResult(result);
+            if (context.Envelope.Data.HasContextKey(DurableEnvelopeBuilder.RequestContextKey))
+            {
+                if (!context.Envelope.Data.TryGetContextValue<Dictionary<string, object>>(
+                    DurableEnvelopeBuilder.RequestContextKey,
+                    out var values))
+                {
+                    throw new InvalidOperationException("The durable request context could not be deserialized.");
+                }
+
+                foreach (var (key, value) in values)
+                {
+                    RequestContext.Set(key, value);
+                }
+            }
+
+            await handler.HandleAsync(context, cancellationToken).ConfigureAwait(true);
+        }
+        finally
+        {
+            RequestContext.Clear();
+            foreach (var (key, value) in previous)
+            {
+                RequestContext.Set(key, value);
+            }
         }
     }
 
@@ -577,6 +635,12 @@ internal sealed partial class DurableInboxExtension : IDurableInboxExtension, ID
         await _gate.WaitAsync(CancellationToken.None).ConfigureAwait(true);
         try
         {
+            if (_inboxDict.Count > 0 && !string.IsNullOrEmpty(_jobId.Value))
+            {
+                _jobId.Value = null;
+                await _stateManager.WriteStateAsync(CancellationToken.None).ConfigureAwait(true);
+            }
+
             await EnsureJobScheduledUnderGateAsync(CancellationToken.None).ConfigureAwait(true);
         }
         finally
@@ -674,4 +738,9 @@ internal sealed partial class DurableInboxExtension : IDurableInboxExtension, ID
         Level = LogLevel.Error,
         Message = "Handler threw exception for message {MessageId} from {SenderId} on route '{RouteKey}' (CorrelationKey: {CorrelationKey})")]
     private static partial void LogHandlerException(ILogger logger, Exception exception, Guid messageId, GrainId senderId, string routeKey, string? correlationKey);
+
+    [LoggerMessage(
+        Level = LogLevel.Error,
+        Message = "Durable inbox job {JobId} failed and will be rescheduled")]
+    private static partial void LogJobExecutionError(ILogger logger, Exception exception, string jobId);
 }

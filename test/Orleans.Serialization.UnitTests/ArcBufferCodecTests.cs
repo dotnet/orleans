@@ -163,21 +163,21 @@ public class ArcBufferCodecTests
     }
 
     /// <summary>
-    /// Tests that the copier performs a shallow copy (reference-counted).
+    /// Tests that the copier pins the shared pages for the copied buffer.
     /// </summary>
     [Fact]
-    public void ArcBufferCopier_ShallowCopy_PreservesData()
+    public void ArcBufferCopier_CopyRemainsValidAfterOriginalIsDisposed()
     {
         var data = new byte[512];
         _random.NextBytes(data);
 
         using var writer = new ArcBufferWriter();
         writer.Write(data);
-        using var original = writer.ConsumeSlice(data.Length);
-
+        var original = writer.ConsumeSlice(data.Length);
         using var copied = _copier.Copy(original);
+        original.Dispose();
 
-        Assert.Equal(original.Length, copied.Length);
+        Assert.Equal(data.Length, copied.Length);
         Assert.Equal(data, copied.ToArray());
     }
 
@@ -288,16 +288,16 @@ public class ArcBufferCodecTests
     }
 
     /// <summary>
-    /// Tests that the copier is marked as supporting shallow copy.
+    /// Tests that the copier requires a deep-copy call so that copied buffers pin their pages.
     /// </summary>
     [Fact]
-    public void ArcBufferCopier_IsShallowCopyable()
+    public void ArcBufferCopier_RequiresDeepCopy()
     {
         var copier = _serviceProvider.GetService<IDeepCopier<ArcBuffer>>();
         Assert.NotNull(copier);
         Assert.IsAssignableFrom<IOptionalDeepCopier>(copier);
 
         var optionalCopier = (IOptionalDeepCopier)copier;
-        Assert.True(optionalCopier.IsShallowCopyable());
+        Assert.False(optionalCopier.IsShallowCopyable());
     }
 }

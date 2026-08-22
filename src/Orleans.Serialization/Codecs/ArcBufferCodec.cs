@@ -86,5 +86,5 @@ public sealed class ArcBufferCopier : IDeepCopier<ArcBuffer>, IOptionalDeepCopie
     }
 
     /// <inheritdoc/>
-    public bool IsShallowCopyable() => true;
+    public bool IsShallowCopyable() => false;
 }

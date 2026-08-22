@@ -69,6 +69,14 @@ internal class DurableDictionary<K, V> : IDurableDictionary<K, V>, IJournaledSta
 
     void IJournaledState.Reset(JournalStreamWriter writer)
     {
+        foreach (var value in _items.Values)
+        {
+            if (value is IDisposable disposable)
+            {
+                disposable.Dispose();
+            }
+        }
+
         _items.Clear();
         _writer = writer;
     }

@@ -278,6 +278,8 @@ internal struct ConfiguredDurableTaskCore<TDurableTask> where TDurableTask : Dur
 
 internal sealed class DelayDurableTask(TimeSpan duration) : DurableTask, ISchedulableTask
 {
+    bool ISchedulableTask.CommitsDurableState => true;
+
     public async ValueTask<DurableTaskResponse> ScheduleAsync(TaskId taskId, CancellationToken cancellationToken)
     {
         var context = DurableExecutionContext.CurrentContext

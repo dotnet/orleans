@@ -23,7 +23,7 @@ namespace Orleans.DurableMessaging;
 ///   <item><description>Per-key context access: Individual context values can be retrieved independently</description></item>
 /// </list>
 /// </remarks>
-[GenerateSerializer, Immutable]
+[GenerateSerializer]
 public sealed class DurableEnvelopeData : IDisposable
 {
     [NonSerialized]
@@ -32,7 +32,7 @@ public sealed class DurableEnvelopeData : IDisposable
     /// <summary>
     /// Shared buffer containing body and all request context values.
     /// </summary>
-    [Id(0), Immutable]
+    [Id(0)]
     private ArcBuffer _buffer;
 
     /// <summary>
@@ -87,9 +87,8 @@ public sealed class DurableEnvelopeData : IDisposable
 
         try
         {
-            var slice = _buffer.Slice(_bodySlice.Offset, _bodySlice.Length);
             using var session = _sessionPool.GetSession();
-            var reader = Reader.Create(slice.AsReadOnlySequence(), session);
+            var reader = Reader.Create(_buffer.AsReadOnlySequence().Slice(_bodySlice.Offset, _bodySlice.Length), session);
             var field = reader.ReadFieldHeader();
             value = _sessionPool.CodecProvider.GetCodec<T>().ReadValue(ref reader, field);
             return value is not null;
@@ -119,9 +118,8 @@ public sealed class DurableEnvelopeData : IDisposable
 
         try
         {
-            var buffer = _buffer.Slice(slice.Offset, slice.Length);
             using var session = _sessionPool.GetSession();
-            var reader = Reader.Create(buffer.AsReadOnlySequence(), session);
+            var reader = Reader.Create(_buffer.AsReadOnlySequence().Slice(slice.Offset, slice.Length), session);
             var field = reader.ReadFieldHeader();
             value = _sessionPool.CodecProvider.GetCodec<T>().ReadValue(ref reader, field);
             return value is not null;
@@ -138,7 +136,7 @@ public sealed class DurableEnvelopeData : IDisposable
     /// </summary>
     /// <returns>A read-only sequence containing the raw body bytes.</returns>
     public ReadOnlySequence<byte> GetBodyBytes()
-        => _buffer.Slice(_bodySlice.Offset, _bodySlice.Length).AsReadOnlySequence();
+        => _buffer.AsReadOnlySequence().Slice(_bodySlice.Offset, _bodySlice.Length);
 
     /// <summary>
     /// Gets the raw bytes for a specific context key for forwarding without deserialization.
@@ -150,7 +148,7 @@ public sealed class DurableEnvelopeData : IDisposable
     {
         if (_contextIndices is not null && _contextIndices.TryGetValue(key, out var slice))
         {
-            value = _buffer.Slice(slice.Offset, slice.Length).AsReadOnlySequence();
+            value = _buffer.AsReadOnlySequence().Slice(slice.Offset, slice.Length);
             return true;
         }
 

@@ -106,7 +106,7 @@ namespace Orleans.DurableJobs
 
     public partial interface IDurableJobHandlerRegistry
     {
-        void Register(IDurableJobFeatureHandler handler);
+        void Register(IDurableJobFeatureHandler handler, bool requiresTurnIsolation = false);
     }
 
     public partial interface IJobRunContext

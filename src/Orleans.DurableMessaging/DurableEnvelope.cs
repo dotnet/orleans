@@ -37,8 +37,8 @@ namespace Orleans.DurableMessaging;
 /// context.Send(envelope);
 /// </code>
 /// </example>
-[GenerateSerializer, Immutable]
-public readonly struct DurableEnvelope
+[GenerateSerializer]
+public readonly struct DurableEnvelope : IDisposable
 {
     /// <summary>
     /// Unique identifier for this message instance, used for deduplication.
@@ -260,4 +260,7 @@ public readonly struct DurableEnvelope
     /// </remarks>
     [Id(7)]
     public DateTimeOffset CreatedAt { get; init; }
+
+    /// <inheritdoc />
+    public void Dispose() => Data?.Dispose();
 }
