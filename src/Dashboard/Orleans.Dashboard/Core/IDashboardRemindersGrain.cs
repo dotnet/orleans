@@ -9,4 +9,7 @@ internal interface IDashboardRemindersGrain : IGrainWithIntegerKey
 {
     [Alias("GetReminders")]
     Task<Immutable<ReminderResponse>> GetReminders(int pageNumber, int pageSize);
+
+    [Alias("GetAdvancedReminders")]
+    Task<Immutable<AdvancedReminderResponse>> GetAdvancedReminders(int pageNumber, int pageSize);
 }

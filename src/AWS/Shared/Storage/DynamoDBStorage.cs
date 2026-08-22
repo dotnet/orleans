@@ -1,8 +1,3 @@
-using Amazon.DynamoDBv2;
-using Amazon.DynamoDBv2.Model;
-using Amazon.Runtime;
-using Microsoft.Extensions.Logging;
-using Orleans.Runtime;
 using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
@@ -11,10 +6,17 @@ using System.Linq;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
+using Amazon.DynamoDBv2;
+using Amazon.DynamoDBv2.Model;
+using Amazon.Runtime;
 using Amazon.Runtime.CredentialManagement;
+using Microsoft.Extensions.Logging;
+using Orleans.Runtime;
 
 #if CLUSTERING_DYNAMODB
 namespace Orleans.Clustering.DynamoDB
+#elif ADVANCED_REMINDERS_DYNAMODB
+namespace Orleans.AdvancedReminders.DynamoDB
 #elif PERSISTENCE_DYNAMODB
 namespace Orleans.Persistence.DynamoDB
 #elif REMINDERS_DYNAMODB
@@ -356,7 +358,7 @@ namespace Orleans.Transactions.DynamoDB
                         }
                     }
                 },
-                AttributeDefinitions = attributes
+                AttributeDefinitions = GetAttributeDefinitionsForIndex(attributes, secondaryIndex)
             }, cancellationToken);
 
             // Adding a GSI to a table is an eventually consistent operation and we might miss the table UPDATING status if we query the table status imediatelly after the table update call.
@@ -367,6 +369,18 @@ namespace Orleans.Transactions.DynamoDB
             // For this reason, we will wait for both the table and the index to become ACTIVE before marking the operation as complete.
             await TableWaitOnStatusAsync(tableName, TableStatus.UPDATING, TableStatus.ACTIVE, cancellationToken: cancellationToken);
             await TableIndexWaitOnStatusAsync(tableName, secondaryIndex.IndexName, IndexStatus.CREATING, IndexStatus.ACTIVE, cancellationToken: cancellationToken);
+        }
+
+        internal static List<AttributeDefinition> GetAttributeDefinitionsForIndex(
+            IEnumerable<AttributeDefinition> attributes,
+            GlobalSecondaryIndex secondaryIndex)
+        {
+            var keyAttributes = secondaryIndex.KeySchema
+                .Select(static key => key.AttributeName)
+                .ToHashSet(StringComparer.Ordinal);
+            return attributes
+                .Where(attribute => keyAttributes.Contains(attribute.AttributeName))
+                .ToList();
         }
 
         private async ValueTask<TableDescription> TableUpdateTtlAsync(TableDescription tableDescription, string? ttlAttributeName, CancellationToken cancellationToken)
@@ -723,7 +737,36 @@ namespace Orleans.Transactions.DynamoDB
         /// <param name="lastEvaluatedKey">The primary key of the first item that this operation will evaluate. Use the value that was returned for LastEvaluatedKey in the previous operation</param>
         /// <param name="consistentRead">Determines the read consistency model. Note that if a GSI is used, this must be false.</param>
         /// <returns>The collection containing a list of objects translated by the resolver function and the LastEvaluatedKey for paged results</returns>
-        public async Task<(List<TResult> results, Dictionary<string, AttributeValue>? lastEvaluatedKey)> QueryAsync<TResult>(string tableName, Dictionary<string, AttributeValue> keys, string keyConditionExpression, Func<Dictionary<string, AttributeValue>, TResult> resolver, string indexName = "", bool scanIndexForward = true, Dictionary<string, AttributeValue>? lastEvaluatedKey = null, bool consistentRead = true) where TResult : class
+        public Task<(List<TResult> results, Dictionary<string, AttributeValue>? lastEvaluatedKey)> QueryAsync<TResult>(
+            string tableName,
+            Dictionary<string, AttributeValue> keys,
+            string keyConditionExpression,
+            Func<Dictionary<string, AttributeValue>, TResult> resolver,
+            string indexName = "",
+            bool scanIndexForward = true,
+            Dictionary<string, AttributeValue>? lastEvaluatedKey = null,
+            bool consistentRead = true) where TResult : class
+            => QueryAsync(
+                tableName,
+                keys,
+                keyConditionExpression,
+                resolver,
+                indexName,
+                scanIndexForward,
+                lastEvaluatedKey,
+                consistentRead,
+                limit: null);
+
+        internal async Task<(List<TResult> results, Dictionary<string, AttributeValue>? lastEvaluatedKey)> QueryAsync<TResult>(
+            string tableName,
+            Dictionary<string, AttributeValue> keys,
+            string keyConditionExpression,
+            Func<Dictionary<string, AttributeValue>, TResult> resolver,
+            string indexName,
+            bool scanIndexForward,
+            Dictionary<string, AttributeValue>? lastEvaluatedKey,
+            bool consistentRead,
+            int? limit) where TResult : class
         {
             try
             {
@@ -735,6 +778,11 @@ namespace Orleans.Transactions.DynamoDB
                     KeyConditionExpression = keyConditionExpression,
                     Select = Select.ALL_ATTRIBUTES
                 };
+
+                if (limit is > 0)
+                {
+                    request.Limit = limit;
+                }
 
                 if (lastEvaluatedKey != null && lastEvaluatedKey.Count > 0)
                 {

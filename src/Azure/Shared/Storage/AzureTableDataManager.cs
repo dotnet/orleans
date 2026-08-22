@@ -16,6 +16,8 @@ using LogLevel = Microsoft.Extensions.Logging.LogLevel;
 
 #if ORLEANS_CLUSTERING
 namespace Orleans.Clustering.AzureStorage
+#elif ADVANCED_REMINDERS_AZURE
+namespace Orleans.AdvancedReminders.AzureStorage
 #elif ORLEANS_PERSISTENCE
 namespace Orleans.Persistence.AzureStorage
 #elif ORLEANS_REMINDERS
@@ -182,7 +184,7 @@ namespace Orleans.GrainDirectory.AzureStorage
         /// </summary>
         /// <param name="data">Data to be inserted or replaced in the table.</param>
         /// <returns>Value promise with new Etag for this data entry after completing this storage operation.</returns>
-        public async Task<string> UpsertTableEntryAsync(T data)
+        public async Task<string> UpsertTableEntryAsync(T data, TableUpdateMode updateMode = TableUpdateMode.Merge)
         {
             const string operation = "UpsertTableEntry";
             var startTime = DateTime.UtcNow;
@@ -191,7 +193,7 @@ namespace Orleans.GrainDirectory.AzureStorage
             {
                 try
                 {
-                    var opResult = await Table.UpsertEntityAsync(data);
+                    var opResult = await Table.UpsertEntityAsync(data, updateMode);
                     return opResult.Headers.ETag.GetValueOrDefault().ToString();
                 }
                 catch (Exception exc)
@@ -517,6 +519,28 @@ namespace Orleans.GrainDirectory.AzureStorage
         {
             var result = await ReadTableEntriesAndEtagsWithPaginationAsync(filter, cancellationToken);
             return result.Entries;
+        }
+
+        public async Task<(List<(T Entity, string ETag)> Entries, string? ContinuationToken)> ReadTableEntriesAndEtagsPageAsync(
+            string? filter,
+            int maxRows,
+            string? continuationToken,
+            CancellationToken cancellationToken = default)
+        {
+            ArgumentOutOfRangeException.ThrowIfNegativeOrZero(maxRows);
+            await foreach (var page in Table.QueryAsync<T>(filter, maxPerPage: maxRows, cancellationToken: cancellationToken)
+                .AsPages(continuationToken, maxRows))
+            {
+                var results = new List<(T Entity, string ETag)>(page.Values.Count);
+                foreach (var value in page.Values)
+                {
+                    results.Add((value, value.ETag.ToString()));
+                }
+
+                return (results, page.ContinuationToken);
+            }
+
+            return ([], null);
         }
 
         private async Task<(List<(T Entity, string ETag)> Entries, bool IsPaginated)> ReadTableEntriesAndEtagsWithPaginationAsync(

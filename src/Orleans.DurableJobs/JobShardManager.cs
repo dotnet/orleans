@@ -62,4 +62,6 @@ public abstract class JobShardManager
     internal virtual ValueTask<SiloAddress?> GetShardOwnerAsync(string shardId, CancellationToken cancellationToken) => new((SiloAddress?)null);
 
     internal virtual ValueTask<bool> IsShardOwnedByLocalSiloAsync(string shardId, CancellationToken cancellationToken) => new(true);
+
+    internal virtual ValueTask<HashSet<string>?> GetJobIdsAsync(string shardId, CancellationToken cancellationToken) => new((HashSet<string>?)null);
 }

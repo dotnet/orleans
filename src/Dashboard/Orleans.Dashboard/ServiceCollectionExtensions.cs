@@ -165,6 +165,8 @@ public static class ServiceCollectionExtensions
 
         group.MapGet("/Reminders", async ([FromServices] IDashboardClient client) => await GetRemindersPage(1, client, jsonOptions));
         group.MapGet("/Reminders/{page:int}", async (int page, [FromServices] IDashboardClient client) => await GetRemindersPage(page, client, jsonOptions));
+        group.MapGet("/AdvancedReminders", async ([FromServices] IDashboardClient client) => await GetAdvancedRemindersPage(1, client, jsonOptions));
+        group.MapGet("/AdvancedReminders/{page:int}", async (int page, [FromServices] IDashboardClient client) => await GetAdvancedRemindersPage(page, client, jsonOptions));
 
         group.MapGet("/HistoricalStats/{*path}", async (string path, [FromServices] IDashboardClient client) =>
         {
@@ -328,6 +330,19 @@ public static class ServiceCollectionExtensions
         {
             // If reminders are not configured, return empty response
             return Results.Json(new ReminderResponse { Reminders = [], Count = 0 }, jsonOptions);
+        }
+    }
+
+    private static async Task<IResult> GetAdvancedRemindersPage(int page, IDashboardClient client, JsonSerializerOptions jsonOptions)
+    {
+        try
+        {
+            var result = await client.GetAdvancedReminders(page, 50);
+            return Results.Json(result.Value, jsonOptions);
+        }
+        catch (SiloUnavailableException)
+        {
+            return CreateUnavailableResult(true);
         }
     }
 

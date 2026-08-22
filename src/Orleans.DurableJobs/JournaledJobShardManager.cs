@@ -258,6 +258,30 @@ internal sealed class JournaledJobShardManager : JobShardManager
         return isOwned;
     }
 
+    internal override async ValueTask<HashSet<string>?> GetJobIdsAsync(string shardId, CancellationToken cancellationToken)
+    {
+        if (_jobShardCache.TryGetValue(shardId, out var cached))
+        {
+            return cached.GetJobIds();
+        }
+
+        var descriptor = await GetDescriptorAsync(shardId, cancellationToken);
+        if (descriptor is null || descriptor.Poisoned)
+        {
+            return [];
+        }
+
+        var shard = await OpenShardAsync(descriptor, cancellationToken);
+        try
+        {
+            return shard.GetJobIds();
+        }
+        finally
+        {
+            await shard.DisposeAsync();
+        }
+    }
+
     internal async ValueTask<bool> TryMarkShardClosedAsync(string shardId, CancellationToken cancellationToken)
     {
         for (var attempt = 0; attempt < 3; attempt++)
@@ -371,7 +395,13 @@ internal sealed class JournaledJobShardManager : JobShardManager
     private async ValueTask<JournaledJobShard> OpenShardAsync(ShardCatalogProperties descriptor, CancellationToken cancellationToken)
     {
         var codec = CreateOperationCodec();
-        var state = new JournaledJobShardState(descriptor.ShardId, descriptor.StartTime, descriptor.EndTime, codec, _timeProvider);
+        var state = new JournaledJobShardState(
+            descriptor.ShardId,
+            descriptor.StartTime,
+            descriptor.EndTime,
+            codec,
+            _timeProvider,
+            _options.MaxJobsPerShard);
         var manager = _stateManagerFactory.Create(descriptor.StorageId);
         try
         {
@@ -402,7 +432,10 @@ internal sealed class JournaledJobShardManager : JobShardManager
             this,
             _timeProvider,
             _options.ShardBatchLingerDelay,
-            _durableJobsInstruments);
+            _durableJobsInstruments,
+            _options.MaxShardBatchOperationCount,
+            _options.MaxShardBatchSizeBytes,
+            _options.MaxPendingOperationsPerShard);
     }
 
     private IDurableValueCommandCodec<DurableJobShardJournalRecord> CreateOperationCodec()
