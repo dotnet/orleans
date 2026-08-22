@@ -24,7 +24,7 @@ namespace Orleans.DurableJobs
         [Id(1)]
         public required string Name { get { throw null; } init { } }
 
-        [Id(8)]
+        [Id(9)]
         public DurableJobPriority Priority { get { throw null; } init { } }
 
         [Id(4)]

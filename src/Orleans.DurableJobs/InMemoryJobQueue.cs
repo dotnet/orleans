@@ -208,6 +208,14 @@ internal sealed class InMemoryJobQueue : IAsyncEnumerable<IJobRunContext>
     public IReadOnlyList<(DurableJob Job, int DequeueCount)> GetSnapshot()
         => GetSnapshot(static (job, dequeueCount) => (job, dequeueCount));
 
+    internal bool ContainsJob(string jobId)
+    {
+        lock (_syncLock)
+        {
+            return _jobsIdToBucket.ContainsKey(jobId);
+        }
+    }
+
     internal List<T> GetSnapshot<T>(Func<DurableJob, int, T> projector)
     {
         ArgumentNullException.ThrowIfNull(projector);

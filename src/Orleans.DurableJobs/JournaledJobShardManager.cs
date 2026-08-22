@@ -258,6 +258,30 @@ internal sealed class JournaledJobShardManager : JobShardManager
         return isOwned;
     }
 
+    internal override async ValueTask<bool?> ContainsJobAsync(string shardId, string jobId, CancellationToken cancellationToken)
+    {
+        if (_jobShardCache.TryGetValue(shardId, out var cached))
+        {
+            return cached.ContainsJob(jobId);
+        }
+
+        var descriptor = await GetDescriptorAsync(shardId, cancellationToken);
+        if (descriptor is null)
+        {
+            return false;
+        }
+
+        var shard = await OpenShardAsync(descriptor, cancellationToken);
+        try
+        {
+            return shard.ContainsJob(jobId);
+        }
+        finally
+        {
+            await shard.DisposeAsync();
+        }
+    }
+
     internal async ValueTask<bool> TryMarkShardClosedAsync(string shardId, CancellationToken cancellationToken)
     {
         for (var attempt = 0; attempt < 3; attempt++)

@@ -66,9 +66,6 @@ siloBuilder.AddAdvancedReminders(options =>
     // Each reminder selects Skip, FireImmediately, or Notify when registered.
     options.MissedReminderGracePeriod = TimeSpan.FromMinutes(2);
 
-    // Recreate overdue jobs whose persisted handles appear stale.
-    options.StaleJobRecoveryDelay = TimeSpan.FromMinutes(15);
-
     // Enable only when deployment policy makes an absent grain type retired.
     options.DeleteReminderWhenGrainTypeIsUnavailable = true;
 

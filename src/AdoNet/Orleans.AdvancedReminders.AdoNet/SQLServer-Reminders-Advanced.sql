@@ -11,7 +11,7 @@ CREATE TABLE OrleansAdvancedRemindersTable
 	CronTimeZoneId NVARCHAR(200) NULL,
 	NextDueUtc DATETIME2(3) NULL,
 	LastFireUtc DATETIME2(3) NULL,
-	ScheduleId VARCHAR(64) NULL,
+	ScheduleId VARCHAR(128) NULL,
 	JobId VARCHAR(64) NULL,
 	JobShardId VARCHAR(150) NULL,
 	Priority SMALLINT NOT NULL CONSTRAINT DF_OrleansAdvancedRemindersTable_Priority DEFAULT (0),

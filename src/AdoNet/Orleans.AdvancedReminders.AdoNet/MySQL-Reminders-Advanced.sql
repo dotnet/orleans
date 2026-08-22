@@ -10,7 +10,7 @@ CREATE TABLE OrleansAdvancedRemindersTable
     CronTimeZoneId NVARCHAR(200) NULL,
     NextDueUtc DATETIME NULL,
     LastFireUtc DATETIME NULL,
-    ScheduleId VARCHAR(64) NULL,
+    ScheduleId VARCHAR(128) NULL,
     JobId VARCHAR(64) NULL,
     JobShardId VARCHAR(150) NULL,
     Priority TINYINT NOT NULL DEFAULT 0,
@@ -56,7 +56,7 @@ VALUES
         AND Version = @Version
         AND @Version >= 0;
 
-    INSERT IGNORE INTO OrleansAdvancedRemindersTable
+    INSERT INTO OrleansAdvancedRemindersTable
     (
         ServiceId,
         GrainId,
@@ -91,10 +91,9 @@ VALUES
         @Priority,
         @Action,
         @GrainHash,
-        0
-    WHERE @Version = -1;
-
-    DO IF(ROW_COUNT() = 1, LAST_INSERT_ID(0), 0);
+        IF(LAST_INSERT_ID(0) = 0, 0, 0)
+    WHERE @Version = -1
+    ON DUPLICATE KEY UPDATE Version = Version + (LAST_INSERT_ID(2147483647) * 0);
 
     SELECT LAST_INSERT_ID() AS Version WHERE LAST_INSERT_ID() <> 2147483647;
     COMMIT;

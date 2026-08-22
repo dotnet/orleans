@@ -30,12 +30,6 @@ public sealed class ReminderOptions
     public TimeSpan MissedReminderGracePeriod { get; set; } = TimeSpan.FromSeconds(ReminderOptionsDefaults.MissedReminderGracePeriodSeconds);
 
     /// <summary>
-    /// Gets or sets how long a reminder may remain overdue with a persisted durable-job handle before
-    /// reconciliation treats the handle as stale and safely attempts to recreate the job.
-    /// </summary>
-    public TimeSpan StaleJobRecoveryDelay { get; set; } = TimeSpan.FromMinutes(15);
-
-    /// <summary>
     /// Gets or sets whether a due reminder is deleted when no active silo declares its target grain type.
     /// </summary>
     /// <remarks>
@@ -102,11 +96,6 @@ internal sealed partial class ReminderOptionsValidator : IConfigurationValidator
         if (options.Value.MissedReminderGracePeriod <= TimeSpan.Zero)
         {
             throw new OrleansConfigurationException($"{nameof(ReminderOptions)}.{nameof(ReminderOptions.MissedReminderGracePeriod)} must be greater than {TimeSpan.Zero}");
-        }
-
-        if (options.Value.StaleJobRecoveryDelay <= TimeSpan.Zero)
-        {
-            throw new OrleansConfigurationException($"{nameof(ReminderOptions)}.{nameof(ReminderOptions.StaleJobRecoveryDelay)} must be greater than {TimeSpan.Zero}");
         }
 
         if (options.Value.MaximumDeliveryAttempts is <= 0)

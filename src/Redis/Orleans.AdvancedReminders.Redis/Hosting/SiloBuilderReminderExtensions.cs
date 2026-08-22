@@ -1,56 +1,53 @@
 using System;
-
 using Microsoft.Extensions.DependencyInjection;
+using Orleans.AdvancedReminders.Redis;
 using Orleans.Configuration;
 using Orleans.Configuration.Internal;
-using Orleans.Hosting;
-using Orleans.AdvancedReminders.Redis;
 
-namespace Orleans.Hosting
+namespace Orleans.Hosting;
+
+/// <summary>
+/// Silo host builder extensions.
+/// </summary>
+public static class SiloBuilderReminderExtensions
 {
     /// <summary>
-    /// Silo host builder extensions.
+    /// Adds reminder storage backed by Redis.
     /// </summary>
-    public static class SiloBuilderReminderExtensions
+    /// <param name="builder">
+    /// The builder.
+    /// </param>
+    /// <param name="configure">
+    /// The delegate used to configure the reminder store.
+    /// </param>
+    /// <returns>
+    /// The provided <see cref="ISiloBuilder"/>, for chaining.
+    /// </returns>
+    public static ISiloBuilder UseRedisAdvancedReminderService(this ISiloBuilder builder, Action<RedisReminderTableOptions> configure)
     {
-        /// <summary>
-        /// Adds reminder storage backed by Redis.
-        /// </summary>
-        /// <param name="builder">
-        /// The builder.
-        /// </param>
-        /// <param name="configure">
-        /// The delegate used to configure the reminder store.
-        /// </param>
-        /// <returns>
-        /// The provided <see cref="ISiloBuilder"/>, for chaining.
-        /// </returns>
-        public static ISiloBuilder UseRedisAdvancedReminderService(this ISiloBuilder builder, Action<RedisReminderTableOptions> configure)
-        {
-            builder.ConfigureServices(services => services.UseRedisAdvancedReminderService(configure));
-            return builder;
-        }
+        builder.ConfigureServices(services => services.UseRedisAdvancedReminderService(configure));
+        return builder;
+    }
 
-        /// <summary>
-        /// Adds reminder storage backed by Redis.
-        /// </summary>
-        /// <param name="services">
-        /// The service collection.
-        /// </param>
-        /// <param name="configure">
-        /// The delegate used to configure the reminder store.
-        /// </param>
-        /// <returns>
-        /// The provided <see cref="IServiceCollection"/>, for chaining.
-        /// </returns>
-        public static IServiceCollection UseRedisAdvancedReminderService(this IServiceCollection services, Action<RedisReminderTableOptions> configure)
-        {
-            services.AddAdvancedReminders();
-            services.AddSingleton<Orleans.AdvancedReminders.IReminderTable, RedisReminderTable>();
-            services.Configure<RedisReminderTableOptions>(configure);
-            services.AddSingleton<IConfigurationValidator, RedisReminderTableOptionsValidator>();
-            services.ConfigureFormatter<RedisReminderTableOptions>();
-            return services;
-        }
+    /// <summary>
+    /// Adds reminder storage backed by Redis.
+    /// </summary>
+    /// <param name="services">
+    /// The service collection.
+    /// </param>
+    /// <param name="configure">
+    /// The delegate used to configure the reminder store.
+    /// </param>
+    /// <returns>
+    /// The provided <see cref="IServiceCollection"/>, for chaining.
+    /// </returns>
+    public static IServiceCollection UseRedisAdvancedReminderService(this IServiceCollection services, Action<RedisReminderTableOptions> configure)
+    {
+        services.AddAdvancedReminders();
+        services.AddSingleton<Orleans.AdvancedReminders.IReminderTable, RedisReminderTable>();
+        services.Configure<RedisReminderTableOptions>(configure);
+        services.AddSingleton<IConfigurationValidator, RedisReminderTableOptionsValidator>();
+        services.ConfigureFormatter<RedisReminderTableOptions>();
+        return services;
     }
 }

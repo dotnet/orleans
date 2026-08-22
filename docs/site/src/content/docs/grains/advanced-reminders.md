@@ -350,13 +350,13 @@ Configure the grace threshold and cleanup guards deliberately. The grace period 
 
 :::code language="csharp" source="../snippets/compiled/Grains/AdvancedSchedulingSnippets.cs" id="configure_advanced_reminder_cleanup":::
 
-Not every delivery problem means that the reminder is broken. The recovery service divides reminder storage into 4,096 hash ranges and advances through 256 ranges per one-minute reconciliation cycle instead of scanning the whole table during startup. Entries are repaired in batches of 32. Scheduling failures do not create a `KeepAlive` timer per reminder: the caller observes registration failures, Durable Jobs owns persisted delivery retries, and the singleton reconciliation cursor repairs persisted rows with missing handles. A persisted job handle is considered stale only after its due time is older than `StaleJobRecoveryDelay`, which defaults to 15 minutes. Recovery rotates the occurrence token before replacing a missing or stale job, so a job which was stored just before its handle write failed becomes a harmless no-op instead of delivering the occurrence twice. Recovery repairs the delivery handle; it doesn't delete the reminder.
+The recovery service divides reminder storage into 4,096 hash ranges and advances through 256 ranges per one-minute reconciliation cycle instead of scanning the whole table during startup. Entries are repaired in batches of 32. The caller observes registration failures, Durable Jobs owns persisted delivery retries, and the singleton reconciliation cursor repairs persisted rows with missing handles. Persisted job handles remain authoritative while Durable Jobs executes or retries an occurrence. A forced repair rotates the occurrence token before replacing the job, so an older job becomes a harmless no-op if it later runs.
 
 Deletion occurs only through a defined policy or an explicit administrative action:
 
 | Condition | Default behavior | Opt-in or explicit behavior |
 | --- | --- | --- |
-| Missing or stale job handle | Reconcile and schedule the current occurrence again. | Tune `StaleJobRecoveryDelay`; don't delete the definition. |
+| Missing job handle | Reconcile and schedule the current occurrence again. | Force repair rotates the occurrence token before scheduling a replacement. |
 | Callback throws | Log and advance a recurring series; a one-shot completes. | Set `MaximumDeliveryAttempts` to retry the same occurrence and delete the registration at the limit. |
 | Target grain type isn't declared | Keep the registration. | `DeleteReminderWhenGrainTypeIsUnavailable` deletes it when it becomes due, but only after stable membership and complete active-silo manifests prove absence. |
 | Known retired or irreparable registration | Keep the registration. | Page a narrow management query, inspect each match, then call `DeleteAsync`. |

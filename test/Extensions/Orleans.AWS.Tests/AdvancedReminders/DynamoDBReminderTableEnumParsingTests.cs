@@ -80,6 +80,34 @@ public class DynamoDBReminderTableEnumParsingTests
         Assert.Equal(expected, value);
     }
 
+    [Theory]
+    [InlineData("0123456789abcdef0123456789abcdef", true)]
+    [InlineData("42", true)]
+    [InlineData("missing-etag", false)]
+    [InlineData(" 42 ", false)]
+    [InlineData("+42", false)]
+    [InlineData("042", false)]
+    public void TryCreateETagValue_AcceptsOnlySupportedStorageFormats(string eTag, bool expected)
+    {
+        var result = DynamoDBReminderTable.TryCreateETagValue(eTag, out var value);
+
+        Assert.Equal(expected, result);
+        Assert.Equal(expected, value is not null);
+    }
+
+    [Fact]
+    public void ConstructReminderId_UsesUnambiguousStructuredIdentity()
+    {
+        var grainId = GrainId.Create("test", "G");
+
+        var first = DynamoDBReminderTable.ConstructReminderId("a", grainId, "G_b");
+        var second = DynamoDBReminderTable.ConstructReminderId("a_G", grainId, "b");
+
+        Assert.NotEqual(first, second);
+        Assert.Equal(64, first.Length);
+        Assert.Equal(64, second.Length);
+    }
+
     private static DurableJobPriority InvokeReadPriority(Dictionary<string, AttributeValue> item)
     {
         var method = typeof(DynamoDBReminderTable).GetMethod("ReadPriority", BindingFlags.NonPublic | BindingFlags.Static);

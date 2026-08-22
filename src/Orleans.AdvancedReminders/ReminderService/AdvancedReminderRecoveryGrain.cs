@@ -4,7 +4,6 @@ using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Options;
 using Orleans.DurableJobs;
 using Orleans.Placement;
 
@@ -21,7 +20,7 @@ internal sealed class AdvancedReminderRecoveryGrain(
     IReminderTable reminderTable,
     IGrainFactory grainFactory,
     ILogger<AdvancedReminderRecoveryGrain> logger,
-    IOptions<ReminderOptions>? options = null,
+    JobShardManager? jobShardManager = null,
     [FromKeyedServices(DurableJobTimeProviderNames.DurableJobs)] TimeProvider? timeProvider = null) : Grain, IAdvancedReminderRecoveryGrain
 {
     private const int BatchSize = 32;
@@ -33,7 +32,7 @@ internal sealed class AdvancedReminderRecoveryGrain(
     private readonly IReminderTable _reminderTable = reminderTable;
     private readonly IGrainFactory _grainFactory = grainFactory;
     private readonly ILogger<AdvancedReminderRecoveryGrain> _logger = logger;
-    private readonly ReminderOptions _options = options?.Value ?? new ReminderOptions();
+    private readonly JobShardManager? _jobShardManager = jobShardManager;
     private readonly TimeProvider _timeProvider = timeProvider ?? TimeProvider.System;
     private bool _started;
     private bool _forceCurrentScan;
@@ -73,10 +72,18 @@ internal sealed class AdvancedReminderRecoveryGrain(
 
             foreach (var entry in reminders)
             {
-                var entryForce = force || HasStaleJobHandle(entry);
-                if (!entryForce && !string.IsNullOrEmpty(entry.JobId) && !string.IsNullOrEmpty(entry.JobShardId))
+                var entryForce = force;
+                if (!entryForce
+                    && !string.IsNullOrEmpty(entry.JobId)
+                    && !string.IsNullOrEmpty(entry.JobShardId))
                 {
-                    continue;
+                    if (_jobShardManager is null
+                        || await _jobShardManager.ContainsJobAsync(entry.JobShardId, entry.JobId, cancellationToken) is not false)
+                    {
+                        continue;
+                    }
+
+                    entryForce = true;
                 }
 
                 tasks.Add(ReconcileEntryAsync(entry, entryForce, cancellationToken));
@@ -100,18 +107,6 @@ internal sealed class AdvancedReminderRecoveryGrain(
         {
             await Task.WhenAll(tasks);
         }
-    }
-
-    private bool HasStaleJobHandle(ReminderEntry entry)
-    {
-        if (string.IsNullOrEmpty(entry.JobId) || string.IsNullOrEmpty(entry.JobShardId))
-        {
-            return false;
-        }
-
-        var due = entry.NextDueUtc ?? entry.StartAt;
-        var now = _timeProvider.GetUtcNow().UtcDateTime;
-        return due <= now && now - due >= _options.StaleJobRecoveryDelay;
     }
 
     private async Task ReconcileEntryAsync(ReminderEntry entry, bool force, CancellationToken cancellationToken)

@@ -1,126 +1,126 @@
 using System;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
+using Orleans.AdvancedReminders.AzureStorage;
 using Orleans.Configuration;
 using Orleans.Configuration.Internal;
-using Orleans.AdvancedReminders.AzureStorage;
 using Orleans.Journaling;
-namespace Orleans.Hosting
+
+namespace Orleans.Hosting;
+
+/// <summary>
+/// <see cref="IServiceCollection"/> extensions.
+/// </summary>
+public static class AzureStorageReminderServiceCollectionExtensions
 {
     /// <summary>
-    /// <see cref="IServiceCollection"/> extensions.
+    /// Adds reminder storage backed by Azure Table Storage.
     /// </summary>
-    public static class AzureStorageReminderServiceCollectionExtensions
+    /// <param name="services">
+    /// The service collection.
+    /// </param>
+    /// <param name="configure">
+    /// The delegate used to configure the reminder store.
+    /// </param>
+    /// <returns>
+    /// The provided <see cref="IServiceCollection"/>, for chaining.
+    /// </returns>
+    public static IServiceCollection UseAzureTableAdvancedReminderService(this IServiceCollection services, Action<AzureTableReminderStorageOptions> configure)
     {
-        /// <summary>
-        /// Adds reminder storage backed by Azure Table Storage.
-        /// </summary>
-        /// <param name="services">
-        /// The service collection.
-        /// </param>
-        /// <param name="configure">
-        /// The delegate used to configure the reminder store.
-        /// </param>
-        /// <returns>
-        /// The provided <see cref="IServiceCollection"/>, for chaining.
-        /// </returns>
-        public static IServiceCollection UseAzureTableAdvancedReminderService(this IServiceCollection services, Action<AzureTableReminderStorageOptions> configure)
-        {
-            services.AddAdvancedReminders();
-            ConfigureDurableJobStorage(services);
-            services.AddSingleton<Orleans.AdvancedReminders.IReminderTable, AzureBasedReminderTable>();
-            services.Configure<AzureTableReminderStorageOptions>(configure);
-            services.ConfigureFormatter<AzureTableReminderStorageOptions>();
-            AddStorageOptionsValidator(services);
-            return services;
-        }
+        services.AddAdvancedReminders();
+        ConfigureDurableJobStorage(services);
+        services.AddSingleton<Orleans.AdvancedReminders.IReminderTable, AzureBasedReminderTable>();
+        services.Configure<AzureTableReminderStorageOptions>(configure);
+        services.ConfigureFormatter<AzureTableReminderStorageOptions>();
+        AddStorageOptionsValidator(services);
+        return services;
+    }
 
-        /// <summary>
-        /// Adds reminder storage backed by Azure Table Storage.
-        /// </summary>
-        /// <param name="services">
-        /// The service collection.
-        /// </param>
-        /// <param name="configureOptions">
-        /// The configuration delegate.
-        /// </param>
-        /// <returns>
-        /// The provided <see cref="IServiceCollection"/>, for chaining.
-        /// </returns>
-        public static IServiceCollection UseAzureTableAdvancedReminderService(this IServiceCollection services, Action<OptionsBuilder<AzureTableReminderStorageOptions>> configureOptions)
-        {
-            services.AddAdvancedReminders();
-            ConfigureDurableJobStorage(services);
-            services.AddSingleton<Orleans.AdvancedReminders.IReminderTable, AzureBasedReminderTable>();
-            configureOptions?.Invoke(services.AddOptions<AzureTableReminderStorageOptions>());
-            services.ConfigureFormatter<AzureTableReminderStorageOptions>();
-            AddStorageOptionsValidator(services);
-            return services;
-        }
+    /// <summary>
+    /// Adds reminder storage backed by Azure Table Storage.
+    /// </summary>
+    /// <param name="services">
+    /// The service collection.
+    /// </param>
+    /// <param name="configureOptions">
+    /// The configuration delegate.
+    /// </param>
+    /// <returns>
+    /// The provided <see cref="IServiceCollection"/>, for chaining.
+    /// </returns>
+    public static IServiceCollection UseAzureTableAdvancedReminderService(this IServiceCollection services, Action<OptionsBuilder<AzureTableReminderStorageOptions>> configureOptions)
+    {
+        services.AddAdvancedReminders();
+        ConfigureDurableJobStorage(services);
+        services.AddSingleton<Orleans.AdvancedReminders.IReminderTable, AzureBasedReminderTable>();
+        configureOptions?.Invoke(services.AddOptions<AzureTableReminderStorageOptions>());
+        services.ConfigureFormatter<AzureTableReminderStorageOptions>();
+        AddStorageOptionsValidator(services);
+        return services;
+    }
 
-        /// <summary>
-        /// Adds reminder storage backed by Azure Table Storage.
-        /// </summary>
-        /// <param name="services">
-        /// The service collection.
-        /// </param>
-        /// <param name="connectionString">
-        /// The storage connection string.
-        /// </param>
-        /// <returns>
-        /// The provided <see cref="IServiceCollection"/>, for chaining.
-        /// </returns>
-        public static IServiceCollection UseAzureTableAdvancedReminderService(this IServiceCollection services, string connectionString)
+    /// <summary>
+    /// Adds reminder storage backed by Azure Table Storage.
+    /// </summary>
+    /// <param name="services">
+    /// The service collection.
+    /// </param>
+    /// <param name="connectionString">
+    /// The storage connection string.
+    /// </param>
+    /// <returns>
+    /// The provided <see cref="IServiceCollection"/>, for chaining.
+    /// </returns>
+    public static IServiceCollection UseAzureTableAdvancedReminderService(this IServiceCollection services, string connectionString)
+    {
+        services.UseAzureTableAdvancedReminderService(options =>
         {
-            services.UseAzureTableAdvancedReminderService(options =>
+            if (Uri.TryCreate(connectionString, UriKind.Absolute, out var uri))
             {
-                if (Uri.TryCreate(connectionString, UriKind.Absolute, out var uri))
-                {
-                    options.TableServiceClient = new(uri);
-                    options.BlobServiceClient = new(CreateBlobServiceUri(uri));
-                }
-                else
-                {
-                    options.TableServiceClient = new(connectionString);
-                    options.BlobServiceClient = new(connectionString);
-                }
-            });
-            return services;
-        }
+                options.TableServiceClient = new(uri);
+                options.BlobServiceClient = new(CreateBlobServiceUri(uri));
+            }
+            else
+            {
+                options.TableServiceClient = new(connectionString);
+                options.BlobServiceClient = new(connectionString);
+            }
+        });
+        return services;
+    }
 
 #pragma warning disable ORLEANSEXP005
-        private static void ConfigureDurableJobStorage(IServiceCollection services)
-        {
-            services.UseAzureBlobDurableJobs(_ => { });
-            services.AddOptions<AzureBlobJournalStorageOptions>()
-                .Configure<IOptions<AzureTableReminderStorageOptions>>((jobOptions, storageOptions) =>
-                {
-                    jobOptions.BlobServiceClient = storageOptions.Value.BlobServiceClient;
-                    jobOptions.ContainerName = storageOptions.Value.JobContainerName;
-                });
-        }
+    private static void ConfigureDurableJobStorage(IServiceCollection services)
+    {
+        services.UseAzureBlobDurableJobs(_ => { });
+        services.AddOptions<AzureBlobJournalStorageOptions>()
+            .Configure<IOptions<AzureTableReminderStorageOptions>>((jobOptions, storageOptions) =>
+            {
+                jobOptions.BlobServiceClient = storageOptions.Value.BlobServiceClient;
+                jobOptions.ContainerName = storageOptions.Value.JobContainerName;
+            });
+    }
 #pragma warning restore ORLEANSEXP005
 
-        private static void AddStorageOptionsValidator(IServiceCollection services)
-        {
-            services.AddTransient<IConfigurationValidator>(sp => new AzureTableReminderStorageOptionsValidator(
-                sp.GetRequiredService<IOptionsMonitor<AzureTableReminderStorageOptions>>().Get(Options.DefaultName),
-                Options.DefaultName));
-        }
+    private static void AddStorageOptionsValidator(IServiceCollection services)
+    {
+        services.AddTransient<IConfigurationValidator>(sp => new AzureTableReminderStorageOptionsValidator(
+            sp.GetRequiredService<IOptionsMonitor<AzureTableReminderStorageOptions>>().Get(Options.DefaultName),
+            Options.DefaultName));
+    }
 
-        private static Uri CreateBlobServiceUri(Uri serviceUri)
+    private static Uri CreateBlobServiceUri(Uri serviceUri)
+    {
+        if (serviceUri.Host.Contains(".table.", StringComparison.OrdinalIgnoreCase))
         {
-            if (serviceUri.Host.Contains(".table.", StringComparison.OrdinalIgnoreCase))
+            var builder = new UriBuilder(serviceUri)
             {
-                var builder = new UriBuilder(serviceUri)
-                {
-                    Host = serviceUri.Host.Replace(".table.", ".blob.", StringComparison.OrdinalIgnoreCase),
-                };
+                Host = serviceUri.Host.Replace(".table.", ".blob.", StringComparison.OrdinalIgnoreCase),
+            };
 
-                return builder.Uri;
-            }
-
-            return serviceUri;
+            return builder.Uri;
         }
+
+        return serviceUri;
     }
 }

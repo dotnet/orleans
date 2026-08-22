@@ -8,6 +8,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using Microsoft.Extensions.Time.Testing;
@@ -1005,6 +1006,24 @@ public class ReminderRegistryValidationTests
 public class SiloBuilderReminderExtensionsTests
 {
     [Fact]
+    public void HostConfiguration_AdvancedRemindersSection_ConfiguresProvider()
+    {
+        var configuration = new Dictionary<string, string?>
+        {
+            ["Orleans:ClusterId"] = "test-cluster",
+            ["Orleans:ServiceId"] = "test-service",
+            ["Orleans:AdvancedReminders:ProviderType"] = "Memory",
+        };
+        using var host = new HostBuilder()
+            .ConfigureAppConfiguration(builder => builder.AddInMemoryCollection(configuration))
+            .UseOrleans(builder => builder.UseLocalhostClustering())
+            .Build();
+
+        Assert.IsType<InMemoryReminderTable>(
+            host.Services.GetRequiredService<Orleans.AdvancedReminders.IReminderTable>());
+    }
+
+    [Fact]
     public void AddAdvancedReminders_RegistersAdvancedReminderService()
     {
         var services = new ServiceCollection();
@@ -1196,37 +1215,26 @@ public class AdvancedReminderRecoveryGrainTests
     }
 
     [Fact]
-    public async Task ReconcileAsync_RepairsOnlyHandlesWhichAreStale()
+    public async Task ReconcileAsync_DoesNotReplacePersistedJobHandles()
     {
         var now = new DateTimeOffset(2026, 7, 22, 10, 0, 0, TimeSpan.Zero);
         var timeProvider = new FakeTimeProvider(now);
-        var stale = new ReminderEntry
+        var overdue = new ReminderEntry
         {
-            GrainId = GrainId.Create("test", "stale-recovery"),
-            ReminderName = "stale",
+            GrainId = GrainId.Create("test", "overdue-recovery"),
+            ReminderName = "overdue",
             StartAt = now.UtcDateTime.AddHours(-1),
             NextDueUtc = now.UtcDateTime.AddMinutes(-16),
             Period = TimeSpan.FromMinutes(1),
-            ScheduleId = "stale-schedule",
-            JobId = "stale-job",
-            JobShardId = "stale-shard",
-        };
-        var active = new ReminderEntry
-        {
-            GrainId = GrainId.Create("test", "active-recovery"),
-            ReminderName = "active",
-            StartAt = now.UtcDateTime,
-            NextDueUtc = now.UtcDateTime.AddMinutes(-14),
-            Period = TimeSpan.FromMinutes(1),
-            ScheduleId = "active-schedule",
-            JobId = "active-job",
-            JobShardId = "active-shard",
+            ScheduleId = "overdue-schedule",
+            JobId = "overdue-job",
+            JobShardId = "overdue-shard",
         };
         var reminderTable = Substitute.For<Orleans.AdvancedReminders.IReminderTable>();
         var readCount = 0;
         reminderTable.ReadRows(Arg.Any<uint>(), Arg.Any<uint>()).Returns(_ =>
             Interlocked.Increment(ref readCount) == 1
-                ? new ReminderTableData([stale, active])
+                ? new ReminderTableData([overdue])
                 : new ReminderTableData());
         var dispatcher = Substitute.For<IAdvancedReminderDispatcherGrain>();
         var grainFactory = Substitute.For<IGrainFactory>();
@@ -1235,22 +1243,55 @@ public class AdvancedReminderRecoveryGrainTests
             reminderTable,
             grainFactory,
             NullLogger<AdvancedReminderRecoveryGrain>.Instance,
-            Options.Create(new AdvancedReminderOptions { StaleJobRecoveryDelay = TimeSpan.FromMinutes(15) }),
+            new RecoveryJobShardManager(jobExists: true),
             timeProvider);
 
         await recovery.ReconcileAsync(force: false, CancellationToken.None);
 
-        await dispatcher.Received(1).EnsureScheduledAsync(
-            stale.GrainId,
-            stale.ReminderName,
-            stale.ScheduleId,
-            force: true,
-            Arg.Any<CancellationToken>());
         await dispatcher.DidNotReceive().EnsureScheduledAsync(
-            active.GrainId,
-            active.ReminderName,
-            active.ScheduleId,
+            overdue.GrainId,
+            overdue.ReminderName,
+            overdue.ScheduleId,
             Arg.Any<bool>(),
+            Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task ReconcileAsync_ReplacesPersistedHandleWhenJobIsAbsent()
+    {
+        var entry = new ReminderEntry
+        {
+            GrainId = GrainId.Create("test", "missing-job"),
+            ReminderName = "missing-job",
+            StartAt = DateTime.UtcNow.AddMinutes(-1),
+            NextDueUtc = DateTime.UtcNow.AddMinutes(-1),
+            Period = TimeSpan.FromMinutes(1),
+            ScheduleId = "missing-schedule",
+            JobId = "missing-job-id",
+            JobShardId = "missing-shard",
+        };
+        var reminderTable = Substitute.For<Orleans.AdvancedReminders.IReminderTable>();
+        var readCount = 0;
+        reminderTable.ReadRows(Arg.Any<uint>(), Arg.Any<uint>()).Returns(_ =>
+            Interlocked.Increment(ref readCount) == 1
+                ? new ReminderTableData([entry])
+                : new ReminderTableData());
+        var dispatcher = Substitute.For<IAdvancedReminderDispatcherGrain>();
+        var grainFactory = Substitute.For<IGrainFactory>();
+        grainFactory.GetGrain<IAdvancedReminderDispatcherGrain>(entry.GrainId.ToString(), null).Returns(dispatcher);
+        var recovery = new AdvancedReminderRecoveryGrain(
+            reminderTable,
+            grainFactory,
+            NullLogger<AdvancedReminderRecoveryGrain>.Instance,
+            new RecoveryJobShardManager(jobExists: false));
+
+        await recovery.ReconcileAsync(force: false, CancellationToken.None);
+
+        await dispatcher.Received(1).EnsureScheduledAsync(
+            entry.GrainId,
+            entry.ReminderName,
+            entry.ScheduleId,
+            force: true,
             Arg.Any<CancellationToken>());
     }
 
@@ -1375,6 +1416,25 @@ public class AdvancedReminderRecoveryGrainTests
             .Where(call => call.GetMethodInfo().Name == nameof(Orleans.AdvancedReminders.IReminderTable.ReadRows))
             .ToArray();
         Assert.NotEqual(rangeReads[0].GetArguments()[0], rangeReads[AdvancedReminderRecoveryGrain.ScanBucketsPerReconciliation].GetArguments()[0]);
+    }
+
+    private sealed class RecoveryJobShardManager(bool jobExists) : JobShardManager(SiloAddress.Zero)
+    {
+        public override Task<List<IJobShard>> AssignJobShardsAsync(DateTimeOffset maxDueTime, int maxNewClaims, CancellationToken cancellationToken)
+            => throw new NotSupportedException();
+
+        public override Task<IJobShard> CreateShardAsync(
+            DateTimeOffset minDueTime,
+            DateTimeOffset maxDueTime,
+            IDictionary<string, string> metadata,
+            CancellationToken cancellationToken)
+            => throw new NotSupportedException();
+
+        public override Task UnregisterShardAsync(IJobShard shard, CancellationToken cancellationToken)
+            => throw new NotSupportedException();
+
+        internal override ValueTask<bool?> ContainsJobAsync(string shardId, string jobId, CancellationToken cancellationToken)
+            => new(jobExists);
     }
 }
 
@@ -2178,6 +2238,36 @@ public class AdvancedReminderServiceTests
     }
 
     [Fact]
+    public async Task UnregisterReminder_AfterRecurringDelivery_UsesStableRegistrationId()
+    {
+        var now = DateTime.UtcNow;
+        var grainId = GrainId.Create("test", "unregister-after-delivery");
+        var registered = new ReminderEntry
+        {
+            GrainId = grainId,
+            ReminderName = "recurring",
+            StartAt = now,
+            NextDueUtc = now,
+            Period = TimeSpan.FromMinutes(1),
+            ETag = "etag-registered",
+            ScheduleId = "r1:registration:occurrence-1",
+        };
+        var reminderTable = new MutableReminderTable(registered);
+        var service = CreateService(reminderTable);
+        var handle = Assert.IsType<Orleans.AdvancedReminders.ReminderData>(registered.ToIGrainReminder());
+
+        reminderTable.ReplaceCurrent(Clone(
+            registered,
+            etag: "etag-after-delivery",
+            scheduleId: "r1:registration:occurrence-2"));
+
+        await service.UnregisterCoreAsync(handle, CancellationToken.None);
+
+        Assert.Null(await reminderTable.ReadRow(grainId, registered.ReminderName));
+        Assert.Equal([("etag-after-delivery", true)], reminderTable.RemoveAttempts);
+    }
+
+    [Fact]
     public async Task LifecycleStart_WhenInitializationExceedsConfiguredTimeout_ThrowsTimeoutException()
     {
         var reminderTable = Substitute.For<Orleans.AdvancedReminders.IReminderTable>();
@@ -2426,6 +2516,7 @@ public class AdvancedReminderServiceTests
             GrainId = grainId,
             ReminderName = "r",
             ETag = "etag-remove",
+            ScheduleId = "r1:registration:occurrence",
         }));
         reminderTable.RemoveRow(grainId, "r", "etag-remove").Returns(Task.FromResult(true));
         var service = CreateService(reminderTable);
@@ -2462,12 +2553,16 @@ public class AdvancedReminderServiceTests
             NextDueUtc = now,
             Period = TimeSpan.FromMinutes(1),
             ETag = "etag-v1",
+            ScheduleId = "r1:registration-v1:occurrence",
         };
         var reminderTable = new MutableReminderTable(original);
         var service = CreateService(reminderTable);
         var staleHandle = original.ToIGrainReminder();
 
-        reminderTable.ReplaceCurrent(Clone(original, etag: "etag-v2"));
+        reminderTable.ReplaceCurrent(Clone(
+            original,
+            etag: "etag-v2",
+            scheduleId: "r1:registration-v2:occurrence"));
 
         await Assert.ThrowsAsync<AdvancedReminderException>(
             () => service.UnregisterCoreAsync(
@@ -3436,7 +3531,8 @@ public class AdvancedReminderServiceTests
         string? cronExpression = null,
         string? cronTimeZoneId = null,
         DateTime? nextDueUtc = null,
-        DateTime? lastFireUtc = null)
+        DateTime? lastFireUtc = null,
+        string? scheduleId = null)
         => new()
         {
             GrainId = entry.GrainId,
@@ -3450,7 +3546,7 @@ public class AdvancedReminderServiceTests
             LastFireUtc = lastFireUtc ?? entry.LastFireUtc,
             Priority = entry.Priority,
             Action = entry.Action,
-            ScheduleId = entry.ScheduleId,
+            ScheduleId = scheduleId ?? entry.ScheduleId,
             JobId = entry.JobId,
             JobShardId = entry.JobShardId,
         };
