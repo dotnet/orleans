@@ -71,8 +71,15 @@ internal static class FileGrainStorageTestContext
     public static FileGrainStorage CreateStorage(
         string rootDirectory,
         string serviceId = "file-storage-test-service",
-        IGrainStorageSerializer? serializer = null) =>
-        new(
+        IGrainStorageSerializer? serializer = null,
+        bool createRootDirectory = true)
+    {
+        if (createRootDirectory)
+        {
+            Directory.CreateDirectory(rootDirectory);
+        }
+
+        return new(
             "FileStore",
             new FileGrainStorageOptions
             {
@@ -81,6 +88,7 @@ internal static class FileGrainStorageTestContext
             },
             Options.Create(new ClusterOptions { ServiceId = serviceId }),
             ActivatorProvider);
+    }
 
     public static IGrainStorageSerializer CreateJsonSerializer() =>
         new SystemTextJsonGrainStorageSerializer(Options.Create(new SystemTextJsonGrainStorageSerializerOptions()));

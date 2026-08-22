@@ -67,7 +67,6 @@ public sealed class FileGrainStorage(
         GrainId grainId,
         IGrainState<T> grainState)
     {
-        Directory.CreateDirectory(_rootDirectory);
         var path = GetRecordPath(stateName, grainId);
         var existingRecord = await TryReadRecordAsync(path).ConfigureAwait(false);
         if (existingRecord is not null)

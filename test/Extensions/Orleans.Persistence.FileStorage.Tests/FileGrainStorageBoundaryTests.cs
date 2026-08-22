@@ -81,7 +81,9 @@ public sealed class FileGrainStorageBoundaryTests
     public async Task LifecycleStart_CreatesRootDirectory()
     {
         using var directory = new TemporaryDirectory();
-        var storage = FileGrainStorageTestContext.CreateStorage(directory.RootDirectory);
+        var storage = FileGrainStorageTestContext.CreateStorage(
+            directory.RootDirectory,
+            createRootDirectory: false);
         var lifecycle = new SiloLifecycleSubject(NullLogger<SiloLifecycleSubject>.Instance);
         Assert.False(Directory.Exists(directory.RootDirectory));
 
