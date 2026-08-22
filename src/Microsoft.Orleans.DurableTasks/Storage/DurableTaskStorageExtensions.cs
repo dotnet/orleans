@@ -19,7 +19,7 @@ public static class DurableTaskStorageExtensions
     /// <returns>The provided silo builder.</returns>
     public static ISiloBuilder AddVolatileDurableTaskStorage(this ISiloBuilder siloBuilder)
     {
-        siloBuilder.Services.AddTransient<VolatileDurableTaskGrainStorage>();
+        siloBuilder.Services.AddScoped<VolatileDurableTaskGrainStorage>();
         siloBuilder.Services.AddFromExisting<IDurableTaskGrainStorage, VolatileDurableTaskGrainStorage>();
         return siloBuilder;
     }

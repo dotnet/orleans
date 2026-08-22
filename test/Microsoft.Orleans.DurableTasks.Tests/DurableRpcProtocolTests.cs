@@ -215,6 +215,19 @@ public sealed class DurableRpcProtocolTests
     }
 
     [Fact]
+    public void VolatileStorageRegistrationIsActivationScoped()
+    {
+        var silo = new TestSiloBuilder();
+
+        silo.AddVolatileDurableTaskStorage();
+
+        var registration = Assert.Single(
+            silo.Services,
+            descriptor => descriptor.ServiceType == typeof(VolatileDurableTaskGrainStorage));
+        Assert.Equal(ServiceLifetime.Scoped, registration.Lifetime);
+    }
+
+    [Fact]
     public void CodeGeneratorEmitsDurableTaskRequestForMappedReturnType()
     {
         var generated = typeof(IDurableRpcCodegenGrain).Assembly

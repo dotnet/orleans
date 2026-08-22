@@ -374,6 +374,22 @@ public sealed class DurableTaskRuntimeInvariantTests
     }
 
     [Fact]
+    public async Task PollAsync_PropagatesCancellationWhileResponseIsPending()
+    {
+        var (runtime, _, _, _) = CreateRuntime();
+        var taskId = TaskId.Parse("root/poll");
+        await runtime.ScheduleDelayAsync(taskId, runtime.UtcNow.AddMinutes(1), default);
+        var handle = runtime.GetScheduledTaskHandle(taskId);
+        using var cancellation = new CancellationTokenSource();
+        cancellation.Cancel();
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(
+            () => handle.PollAsync(
+                new PollingOptions { PollTimeout = TimeSpan.FromMinutes(1) },
+                cancellation.Token).AsTask());
+    }
+
+    [Fact]
     public async Task RecoveredCanceledDelayTerminalizesBeforeRescheduleAndStaleResumesAreHarmless()
     {
         var (runtime, storage, _, transport) = CreateRuntime();

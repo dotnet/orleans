@@ -43,7 +43,13 @@ internal sealed partial class DurableTaskGrainRuntime
         {
             if (options.PollTimeout > TimeSpan.Zero)
             {
-                await ((Task)ResponseTask).WaitAsync(options.PollTimeout, runtime._shared.TimeProvider, cancellationToken).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext | ConfigureAwaitOptions.SuppressThrowing);
+                try
+                {
+                    await ((Task)ResponseTask).WaitAsync(options.PollTimeout, runtime._shared.TimeProvider, cancellationToken).ConfigureAwait(true);
+                }
+                catch (TimeoutException)
+                {
+                }
             }
 
             if (ResponseTask.IsCompleted)
