@@ -206,8 +206,7 @@ namespace Orleans.Runtime.MembershipService
                     isDirectProbe = !options.EnableIndirectProbes || _failedProbes < options.NumMissedProbesLimit - 1 || otherNodes.Length == 0;
                     localDegradationScore = GetLocalDegradationScore(previousProbePeriod);
                     var timeout = CalculateProbeTimeout(failureDetector, options, localDegradationScore, isDirectProbe, Debugger.IsAttached);
-                    var currentProbeStartTimestamp = _timeProvider.GetTimestamp();
-                    probeStartTimestamp = currentProbeStartTimestamp;
+                    probeStartTimestamp = _timeProvider.GetTimestamp();
                     var stallStartTimestamp = isDirectProbe
                         ? _localSiloHealthMonitor.GetTimestamp()
                         : 0;

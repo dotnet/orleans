@@ -394,14 +394,14 @@ namespace Orleans.Runtime.MembershipService
             List<LocalSiloHealthEvent> events,
             List<string> complaints)
         {
-            var delay = _stallDetector.GetMaximumStallDuration(
+            var stallDuration = _stallDetector.GetMaximumStallDuration(
                 SubtractTimestamp(timestamp, MinimumCheckPeriod),
                 timestamp);
-            var score = (int)delay.TotalSeconds;
+            var score = (int)stallDuration.TotalSeconds;
             string? complaint = null;
             if (score >= 1)
             {
-                complaint = $".NET Thread Pool is exhibiting delays of {delay.TotalSeconds}s. This can indicate .NET Thread Pool starvation, very long .NET GC pauses, or other runtime or machine pauses.";
+                complaint = $".NET Thread Pool execution stalled for {stallDuration.TotalSeconds}s. This can indicate .NET Thread Pool starvation, very long .NET GC pauses, or other runtime or machine pauses.";
                 complaints.Add(complaint);
             }
 
@@ -412,7 +412,7 @@ namespace Orleans.Runtime.MembershipService
                 Source: null,
                 score,
                 complaint,
-                delay,
+                stallDuration,
                 score >= 10 ? LogLevel.Error : LogLevel.Warning));
         }
 
@@ -653,7 +653,7 @@ namespace Orleans.Runtime.MembershipService
 
                 if (healthEvent.Kind == LocalSiloHealthCheckKind.ThreadPoolQueueDelay)
                 {
-                    LogThreadPoolDelay(healthEvent.LogLevel, healthEvent.Duration?.TotalSeconds ?? 0);
+                    LogThreadPoolStall(healthEvent.LogLevel, healthEvent.Duration?.TotalSeconds ?? 0);
                 }
                 else
                 {
@@ -685,12 +685,16 @@ namespace Orleans.Runtime.MembershipService
             }
         }
 
-        public void Dispose() => _stallDetector.Dispose();
+        public void Dispose()
+        {
+            _degradationCheckTimer.Dispose();
+            _stallDetector.Dispose();
+        }
 
         [LoggerMessage(
-            Message = ".NET Thread Pool is exhibiting delays of {ThreadPoolQueueDelaySeconds}s. This can indicate .NET Thread Pool starvation, very long .NET GC pauses, or other runtime or machine pauses."
+            Message = ".NET Thread Pool execution stalled for {ThreadPoolStallSeconds}s. This can indicate .NET Thread Pool starvation, very long .NET GC pauses, or other runtime or machine pauses."
         )]
-        private partial void LogThreadPoolDelay(LogLevel logLevel, double threadPoolQueueDelaySeconds);
+        private partial void LogThreadPoolStall(LogLevel logLevel, double threadPoolStallSeconds);
 
         [LoggerMessage(
             Message = "{Kind} health check for {Source} reported: {Complaint}"

@@ -608,6 +608,18 @@ namespace NonSilo.Tests.Membership
             Assert.DoesNotContain(status.Complaints, complaint => complaint == "rejected");
         }
 
+        [Fact]
+        public void Dispose_DisposesDegradationTimer()
+        {
+            var timer = new DelegateAsyncTimer(_ => Task.FromResult(false));
+            var monitor = CreateMonitor(
+                new DelegateAsyncTimerFactory((_, _) => timer));
+
+            monitor.Dispose();
+
+            Assert.Equal(1, timer.DisposedCounter);
+        }
+
         private LocalSiloHealthMonitor CreateMonitor(params IHealthCheckParticipant[] participants)
         {
             var timerFactory = new DelegateAsyncTimerFactory(
