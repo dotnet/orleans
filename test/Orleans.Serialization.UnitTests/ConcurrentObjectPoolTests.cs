@@ -91,6 +91,16 @@ public sealed class ConcurrentObjectPoolTests
         Assert.False(pool.IsAlive);
     }
 
+    [Fact]
+    public void CustomPolicyCallbacksDoNotRootUndisposedPool()
+    {
+        var pool = CreateWeakReferenceToUndisposedCallbackPool();
+
+        Collect();
+
+        Assert.False(pool.IsAlive);
+    }
+
     [MethodImpl(MethodImplOptions.NoInlining)]
     private static WeakReference ReturnItemOnNewThread(ConcurrentObjectPool<PooledItem> pool)
     {
@@ -117,6 +127,16 @@ public sealed class ConcurrentObjectPoolTests
         return new(pool);
     }
 
+    [MethodImpl(MethodImplOptions.NoInlining)]
+    private static WeakReference CreateWeakReferenceToUndisposedCallbackPool()
+    {
+        var returner = new WeakPoolReturner<CallbackPooledItem>();
+        var pool = new ConcurrentObjectPool<CallbackPooledItem, CallbackPoolPolicy>(new(returner.Return));
+        returner.SetPool(pool);
+        pool.Get().Dispose();
+        return new(pool);
+    }
+
     private static void Collect()
     {
         for (var i = 0; i < 3; i++)
@@ -128,5 +148,17 @@ public sealed class ConcurrentObjectPoolTests
 
     private sealed class PooledItem
     {
+    }
+
+    private sealed class CallbackPooledItem(Action<CallbackPooledItem> onDisposed) : IDisposable
+    {
+        public void Dispose() => onDisposed(this);
+    }
+
+    private readonly struct CallbackPoolPolicy(Action<CallbackPooledItem> onDisposed) : Microsoft.Extensions.ObjectPool.IPooledObjectPolicy<CallbackPooledItem>
+    {
+        public CallbackPooledItem Create() => new(onDisposed);
+
+        public bool Return(CallbackPooledItem obj) => true;
     }
 }
