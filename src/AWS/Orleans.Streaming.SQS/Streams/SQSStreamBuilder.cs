@@ -2,6 +2,7 @@ using System;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration;
+using Orleans.Streaming.SQS.Streams;
 using OrleansAWSUtils.Streams;
 
 namespace Orleans.Hosting
@@ -36,6 +37,12 @@ namespace Orleans.Hosting
             this.Configure<HashRingStreamQueueMapperOptions>(ob => ob.Configure(options => options.TotalQueueCount = numOfparitions));
             return this;
         }
+
+        public SiloSqsStreamConfigurator UseDataAdapter(Func<IServiceProvider, string, ISQSDataAdapter> factory)
+        {
+            this.ConfigureComponent(factory);
+            return this;
+        }
     }
 
     public class ClusterClientSqsStreamConfigurator : ClusterClientPersistentStreamConfigurator
@@ -61,6 +68,12 @@ namespace Orleans.Hosting
         public ClusterClientSqsStreamConfigurator ConfigurePartitioning(int numOfparitions = HashRingStreamQueueMapperOptions.DEFAULT_NUM_QUEUES)
         {
             this.Configure<HashRingStreamQueueMapperOptions>(ob => ob.Configure(options => options.TotalQueueCount = numOfparitions));
+            return this;
+        }
+
+        public ClusterClientSqsStreamConfigurator UseDataAdapter(Func<IServiceProvider, string, ISQSDataAdapter> factory)
+        {
+            this.ConfigureComponent(factory);
             return this;
         }
     }

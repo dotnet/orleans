@@ -23,6 +23,7 @@
     <ProjectReference Include="$(RepositoryRoot)src\Orleans.Hosting.Kubernetes\Orleans.Hosting.Kubernetes.csproj" />
     <ProjectReference Include="$(RepositoryRoot)src\Orleans.Serialization.SystemTextJson\Orleans.Serialization.SystemTextJson.csproj" />
     <ProjectReference Include="$(RepositoryRoot)src\AWS\Orleans.Streaming.Kinesis\Orleans.Streaming.Kinesis.csproj" />
+    <ProjectReference Include="$(RepositoryRoot)src\AWS\Orleans.Streaming.SQS\Orleans.Streaming.SQS.csproj" />
     <ProjectReference Include="$(RepositoryRoot)src\Orleans.Streaming\Orleans.Streaming.csproj" />
   </ItemGroup>
 </Project>

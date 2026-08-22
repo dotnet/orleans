@@ -1,18 +1,18 @@
 using System.Collections.Concurrent;
 using System.Globalization;
-using Microsoft.Extensions.DependencyInjection;
+using AWSUtils.Tests.StorageTests;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
+using Orleans.Configuration;
 using Orleans.Providers.Streams.Common;
 using Orleans.Runtime;
 using Orleans.Serialization;
+using Orleans.Streaming.SQS.Streams;
 using Orleans.Streams;
+using OrleansAWSUtils.Storage;
 using OrleansAWSUtils.Streams;
-using AWSUtils.Tests.StorageTests;
 using TestExtensions;
 using Xunit;
-using OrleansAWSUtils.Storage;
-using Orleans.Configuration;
 
 namespace AWSUtils.Tests.Streaming
 {
@@ -32,6 +32,7 @@ namespace AWSUtils.Tests.Streaming
         private const int NumMessagesPerBatch = 20;
         private readonly string clusterId;
         public static readonly string SQS_STREAM_PROVIDER_NAME = "SQSAdapterTests";
+        private readonly TimeSpan QueuePollRate = TimeSpan.FromSeconds(1);
 
         public SQSAdapterTests(ITestOutputHelper output, TestEnvironmentFixture fixture)
         {
@@ -66,14 +67,9 @@ namespace AWSUtils.Tests.Streaming
             {
                 ConnectionString = AWSTestConstants.SqsConnectionString,
             };
-
-            // Create a service collection to build a serializer
-            var serviceProvider = new ServiceCollection()
-                .AddSerializer()
-                .BuildServiceProvider();
-            var serializer = serviceProvider.GetRequiredService<Serializer>();
-
-            var adapterFactory = new SQSAdapterFactory(SQS_STREAM_PROVIDER_NAME, options, new HashRingStreamQueueMapperOptions(), new SimpleQueueCacheOptions(), Options.Create(new ClusterOptions()), serializer, NullLoggerFactory.Instance);
+            var clusterOptions = new ClusterOptions { ServiceId = this.clusterId };
+            var dataAdapter = new SQSDataAdapter(fixture.Serializer);
+            var adapterFactory = new SQSAdapterFactory(SQS_STREAM_PROVIDER_NAME, options, new HashRingStreamQueueMapperOptions(), new SimpleQueueCacheOptions(), Options.Create(clusterOptions), dataAdapter, NullLoggerFactory.Instance);
             adapterFactory.Init();
             await SendAndReceiveFromQueueAdapter(adapterFactory);
         }
@@ -104,15 +100,16 @@ namespace AWSUtils.Tests.Streaming
                 QueueId queueId = receiverKvp.Key;
                 var receiver = receiverKvp.Value;
                 var qCache = caches[queueId];
-                Task task = Task.Factory.StartNew(() =>
+                Task task = Task.Run(async () =>
                 {
                     while (receivedBatches < NumBatches)
                     {
-                        var messages = receiver.GetQueueMessagesAsync(
+                        var messages = (await receiver.GetQueueMessagesAsync(
                             SQSStorage.MAX_NUMBER_OF_MESSAGE_TO_PEEK,
-                            CancellationToken.None).Result.ToArray();
+                            CancellationToken.None)).ToArray();
                         if (!messages.Any())
                         {
+                            await Task.Delay(QueuePollRate);
                             continue;
                         }
                         foreach (var message in messages.Cast<SQSBatchContainer>())
@@ -121,8 +118,7 @@ namespace AWSUtils.Tests.Streaming
                                 id => new HashSet<StreamId> { message.StreamId },
                                 (id, set) =>
                                 {
-                                    set.Add(message.StreamId);
-                                    return set;
+                                    return new HashSet<StreamId>(set) { message.StreamId };
                                 });
                             output.WriteLine("Queue {0} received message on stream {1}", queueId,
                                 message.StreamId);
@@ -138,13 +134,21 @@ namespace AWSUtils.Tests.Streaming
 
             // send events
             List<object> events = CreateEvents(NumMessagesPerBatch);
-            work.Add(Task.Factory.StartNew(() => Enumerable.Range(0, NumBatches)
-                .Select(i => i % 2 == 0 ? streamId1 : streamId2)
-                .ToList()
-                .ForEach(streamId =>
-                    adapter.QueueMessageBatchAsync(StreamId.Create(streamId.ToString(), streamId),
-                        events.Take(NumMessagesPerBatch).ToArray(), null!, RequestContextExtensions.Export(this.fixture.DeepCopier)!).Wait())));
+            work.Add(Task.Run(async () =>
+            {
+                foreach (var streamId in Enumerable.Range(0, NumBatches).Select(i => i % 2 == 0 ? streamId1 : streamId2))
+                {
+                    await adapter.QueueMessageBatchAsync(
+                        StreamId.Create(streamId.ToString(), streamId),
+                        events.Take(NumMessagesPerBatch).ToArray(),
+                        null,
+                        RequestContextExtensions.Export(this.fixture.DeepCopier));
+                }
+            }));
             await Task.WhenAll(work);
+
+            // Wait for everything to be consumed.
+            await Task.Delay(QueuePollRate * 2);
 
             // Make sure we got back everything we sent
             Assert.Equal(NumBatches, receivedBatches);
@@ -210,8 +214,8 @@ namespace AWSUtils.Tests.Streaming
         internal static string MakeClusterId()
         {
             const string DeploymentIdFormat = "cluster-{0}";
-            string now = DateTime.UtcNow.ToString("yyyy-MM-dd-hh-mm-ss-ffff");
-            return string.Format(DeploymentIdFormat, now);
+            string now = DateTime.UtcNow.ToString("yyyy-MM-dd-HH-mm-ss-ffff", CultureInfo.InvariantCulture);
+            return string.Format(CultureInfo.InvariantCulture, DeploymentIdFormat, now);
         }
     }
 }

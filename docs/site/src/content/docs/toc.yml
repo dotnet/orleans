@@ -148,6 +148,8 @@ items:
         href: streaming/custom-queue-adapter.md
       - name: Amazon Kinesis
         href: streaming/kinesis-streaming.md
+      - name: Amazon SQS
+        href: streaming/sqs-streaming.md
       - name: Delivery semantics
         href: streaming/delivery-semantics.md
       - name: Pub-sub storage

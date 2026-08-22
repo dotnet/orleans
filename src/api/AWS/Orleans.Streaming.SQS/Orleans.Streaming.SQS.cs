@@ -12,6 +12,16 @@ namespace Orleans.Configuration
     {
         [Redact]
         public string ConnectionString { get { throw null; } set { } }
+
+        public bool FifoQueue { get { throw null; } set { } }
+
+        public System.Collections.Generic.List<string> ReceiveMessageAttributes { get { throw null; } set { } }
+
+        public System.Collections.Generic.List<string> ReceiveMessageSystemAttributes { get { throw null; } set { } }
+
+        public int? ReceiveWaitTimeSeconds { get { throw null; } set { } }
+
+        public int? VisibilityTimeoutSeconds { get { throw null; } set { } }
     }
 }
 
@@ -31,6 +41,8 @@ namespace Orleans.Hosting
         public ClusterClientSqsStreamConfigurator ConfigurePartitioning(int numOfparitions = 8) { throw null; }
 
         public ClusterClientSqsStreamConfigurator ConfigureSqs(System.Action<Microsoft.Extensions.Options.OptionsBuilder<Configuration.SqsOptions>> configureOptions) { throw null; }
+
+        public ClusterClientSqsStreamConfigurator UseDataAdapter(System.Func<System.IServiceProvider, string, Streaming.SQS.Streams.ISQSDataAdapter> factory) { throw null; }
     }
 
     public static partial class SiloBuilderExtensions
@@ -49,6 +61,24 @@ namespace Orleans.Hosting
         public SiloSqsStreamConfigurator ConfigurePartitioning(int numOfparitions = 8) { throw null; }
 
         public SiloSqsStreamConfigurator ConfigureSqs(System.Action<Microsoft.Extensions.Options.OptionsBuilder<Configuration.SqsOptions>> configureOptions) { throw null; }
+
+        public SiloSqsStreamConfigurator UseDataAdapter(System.Func<System.IServiceProvider, string, Streaming.SQS.Streams.ISQSDataAdapter> factory) { throw null; }
+    }
+}
+
+namespace Orleans.Streaming.SQS.Streams
+{
+    public partial interface ISQSDataAdapter : Orleans.Streams.IQueueDataAdapter<Amazon.SQS.Model.Message, Orleans.Streams.IBatchContainer>, Orleans.Streams.IQueueDataAdapter<Amazon.SQS.Model.Message>
+    {
+    }
+
+    public partial class SQSDataAdapter : ISQSDataAdapter, Orleans.Streams.IQueueDataAdapter<Amazon.SQS.Model.Message, Orleans.Streams.IBatchContainer>, Orleans.Streams.IQueueDataAdapter<Amazon.SQS.Model.Message>
+    {
+        public SQSDataAdapter(Serialization.Serializer serializer) { }
+
+        public virtual Orleans.Streams.IBatchContainer FromQueueMessage(Amazon.SQS.Model.Message sqsMessage, long sequenceId) { throw null; }
+
+        public virtual Amazon.SQS.Model.Message ToQueueMessage<T>(Runtime.StreamId streamId, System.Collections.Generic.IEnumerable<T> events, Orleans.Streams.StreamSequenceToken? token, System.Collections.Generic.Dictionary<string, object>? requestContext) { throw null; }
     }
 }
 
@@ -57,6 +87,8 @@ namespace OrleansAWSUtils.Streams
     public partial class SQSAdapterFactory : Orleans.Streams.IQueueAdapterFactory
     {
         public SQSAdapterFactory(string name, Orleans.Configuration.SqsOptions sqsOptions, Orleans.Configuration.HashRingStreamQueueMapperOptions queueMapperOptions, Orleans.Configuration.SimpleQueueCacheOptions cacheOptions, Microsoft.Extensions.Options.IOptions<Orleans.Configuration.ClusterOptions> clusterOptions, Orleans.Serialization.Serializer serializer, Microsoft.Extensions.Logging.ILoggerFactory loggerFactory) { }
+
+        public SQSAdapterFactory(string name, Orleans.Configuration.SqsOptions sqsOptions, Orleans.Configuration.HashRingStreamQueueMapperOptions queueMapperOptions, Orleans.Configuration.SimpleQueueCacheOptions cacheOptions, Microsoft.Extensions.Options.IOptions<Orleans.Configuration.ClusterOptions> clusterOptions, Orleans.Streaming.SQS.Streams.ISQSDataAdapter dataAdapter, Microsoft.Extensions.Logging.ILoggerFactory loggerFactory) { }
 
         protected System.Func<Orleans.Streams.QueueId, System.Threading.Tasks.Task<Orleans.Streams.IStreamFailureHandler>> StreamFailureHandlerFactory { set { } }
 
@@ -73,8 +105,81 @@ namespace OrleansAWSUtils.Streams
         public virtual void Init() { }
     }
 
+    [Orleans.GenerateSerializer]
+    public partial class SQSFIFOSequenceToken : Orleans.Streams.StreamSequenceToken
+    {
+        public SQSFIFOSequenceToken() { }
+
+        public SQSFIFOSequenceToken(Orleans.Runtime.StreamId streamId, System.UInt128 seqNumber, long sequenceNumber, int eventInd) { }
+
+        public SQSFIFOSequenceToken(Orleans.Runtime.StreamId streamId, System.UInt128 seqNumber, long sequenceNumber) { }
+
+        [Orleans.Id(1)]
+        [Newtonsoft.Json.JsonProperty]
+        public override int EventIndex { get { throw null; } protected set { } }
+
+        [Orleans.Id(3)]
+        [Newtonsoft.Json.JsonProperty]
+        public override long SequenceNumber { get { throw null; } protected set { } }
+
+        [Orleans.Id(0)]
+        [Newtonsoft.Json.JsonProperty]
+        public System.UInt128 SqsSequenceNumber { get { throw null; } set { } }
+
+        [Orleans.Id(2)]
+        [Newtonsoft.Json.JsonProperty]
+        public Orleans.Runtime.StreamId StreamId { get { throw null; } set { } }
+
+        public override int CompareTo(Orleans.Streams.StreamSequenceToken? other) { throw null; }
+
+        public SQSFIFOSequenceToken CreateSequenceTokenForEvent(int eventInd) { throw null; }
+
+        public override bool Equals(Orleans.Streams.StreamSequenceToken? other) { throw null; }
+
+        public override bool Equals(object? obj) { throw null; }
+
+        public override int GetHashCode() { throw null; }
+
+        public override string ToString() { throw null; }
+    }
+
     public partial class SQSStreamProviderUtils
     {
+        public static System.Threading.Tasks.Task DeleteAllUsedQueues(string providerName, string clusterId, string storageConnectionString, Microsoft.Extensions.Logging.ILoggerFactory loggerFactory, bool fifoQueue) { throw null; }
+
         public static System.Threading.Tasks.Task DeleteAllUsedQueues(string providerName, string clusterId, string storageConnectionString, Microsoft.Extensions.Logging.ILoggerFactory loggerFactory) { throw null; }
+    }
+}
+
+namespace OrleansCodeGen.OrleansAWSUtils.Streams
+{
+    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
+    [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
+    [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
+    public sealed partial class Codec_SQSFIFOSequenceToken : global::Orleans.Serialization.Codecs.IFieldCodec<global::OrleansAWSUtils.Streams.SQSFIFOSequenceToken>, global::Orleans.Serialization.Codecs.IFieldCodec, global::Orleans.Serialization.Serializers.IBaseCodec<global::OrleansAWSUtils.Streams.SQSFIFOSequenceToken>, global::Orleans.Serialization.Serializers.IBaseCodec
+    {
+        public Codec_SQSFIFOSequenceToken(global::Orleans.Serialization.Serializers.ICodecProvider codecProvider) { }
+
+        public void Deserialize<TReaderInput>(ref global::Orleans.Serialization.Buffers.Reader<TReaderInput> reader, global::OrleansAWSUtils.Streams.SQSFIFOSequenceToken instance) { }
+
+        public global::OrleansAWSUtils.Streams.SQSFIFOSequenceToken ReadValue<TReaderInput>(ref global::Orleans.Serialization.Buffers.Reader<TReaderInput> reader, global::Orleans.Serialization.WireProtocol.Field field) { throw null; }
+
+        public void Serialize<TBufferWriter>(ref global::Orleans.Serialization.Buffers.Writer<TBufferWriter> writer, global::OrleansAWSUtils.Streams.SQSFIFOSequenceToken instance)
+            where TBufferWriter : System.Buffers.IBufferWriter<byte> { }
+
+        public void WriteField<TBufferWriter>(ref global::Orleans.Serialization.Buffers.Writer<TBufferWriter> writer, uint fieldIdDelta, System.Type expectedType, global::OrleansAWSUtils.Streams.SQSFIFOSequenceToken value)
+            where TBufferWriter : System.Buffers.IBufferWriter<byte> { }
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
+    [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
+    [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
+    public sealed partial class Copier_SQSFIFOSequenceToken : global::Orleans.Serialization.Cloning.IDeepCopier<global::OrleansAWSUtils.Streams.SQSFIFOSequenceToken>, global::Orleans.Serialization.Cloning.IDeepCopier, global::Orleans.Serialization.Cloning.IBaseCopier<global::OrleansAWSUtils.Streams.SQSFIFOSequenceToken>, global::Orleans.Serialization.Cloning.IBaseCopier
+    {
+        public Copier_SQSFIFOSequenceToken(global::Orleans.Serialization.Serializers.ICodecProvider codecProvider) { }
+
+        public global::OrleansAWSUtils.Streams.SQSFIFOSequenceToken DeepCopy(global::OrleansAWSUtils.Streams.SQSFIFOSequenceToken original, global::Orleans.Serialization.Cloning.CopyContext context) { throw null; }
+
+        public void DeepCopy(global::OrleansAWSUtils.Streams.SQSFIFOSequenceToken input, global::OrleansAWSUtils.Streams.SQSFIFOSequenceToken output, global::Orleans.Serialization.Cloning.CopyContext context) { }
     }
 }

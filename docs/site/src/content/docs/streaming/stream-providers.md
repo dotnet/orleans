@@ -62,7 +62,7 @@ Register [Amazon Kinesis Data Streams](https://docs.aws.amazon.com/streams/lates
 
 ## Amazon SQS
 
-Register [Amazon SQS](https://docs.aws.amazon.com/AWSSimpleQueueService/latest/SQSDeveloperGuide/welcome.html) with <xref:Orleans.Hosting.SiloBuilderExtensions.AddSqsStreams*>. Standard queues use [at-least-once delivery](https://docs.aws.amazon.com/AWSSimpleQueueService/latest/SQSDeveloperGuide/standard-queues-at-least-once-delivery.html), and SQS redelivers after the [visibility timeout](https://docs.aws.amazon.com/AWSSimpleQueueService/latest/SQSDeveloperGuide/sqs-visibility-timeout.html) when processing isn't acknowledged. The Orleans provider isn't rewindable. Configure credentials using the deployment environment's AWS credential chain or protected connection configuration, and monitor queue age, redelivery, and dead-letter policy.
+Register [Amazon SQS](https://docs.aws.amazon.com/AWSSimpleQueueService/latest/SQSDeveloperGuide/welcome.html) with <xref:Orleans.Hosting.SiloBuilderExtensions.AddSqsStreams*>. Standard queues provide at-least-once delivery, while FIFO queues preserve ordering within each Orleans stream. SQS redelivers after the [visibility timeout](https://docs.aws.amazon.com/AWSSimpleQueueService/latest/SQSDeveloperGuide/sqs-visibility-timeout.html) when processing isn't acknowledged. See [Stream with Amazon SQS](sqs-streaming.md) for standard and FIFO configuration, custom data adapters, permissions, and operational guidance.
 
 ## ADO.NET streaming (alpha)
 
@@ -80,6 +80,6 @@ Register [Redis Streams](https://redis.io/docs/latest/develop/data-types/streams
 
 <a id="queue-adapters"></a>
 
-A [persistent-stream data adapter](data-adapters.md) customizes the wire format used by Azure Queue Storage or Azure Event Hubs while retaining that provider's transport, partitioning, acknowledgement, cache, and recovery behavior.
+A [persistent-stream data adapter](data-adapters.md) customizes the wire format used by Azure Queue Storage, Azure Event Hubs, or Amazon SQS while retaining that provider's transport, partitioning, acknowledgement, cache, and recovery behavior.
 
 <xref:Orleans.Providers.Streams.Common.PersistentStreamProvider> hosts providers built on <xref:Orleans.Streams.IQueueAdapter>. A custom queue adapter supplies enqueue/dequeue behavior, queue mapping, rewindability, and failure handling while Orleans supplies pulling agents, subscription routing, and caches. See [Write a custom persistent-stream queue adapter](custom-queue-adapter.md) for an implementation guide and [stream implementation architecture](../implementation/streams-implementation/index.md) for the runtime design.

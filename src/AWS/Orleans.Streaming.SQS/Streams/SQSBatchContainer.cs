@@ -1,3 +1,8 @@
+using System;
+using System.Collections.Generic;
+using System.Globalization;
+using System.Linq;
+using Amazon.SQS;
 using Amazon.SQS.Model;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
@@ -5,9 +10,6 @@ using Orleans.Providers.Streams.Common;
 using Orleans.Runtime;
 using Orleans.Serialization;
 using Orleans.Streams;
-using System;
-using System.Collections.Generic;
-using System.Linq;
 using SQSMessage = Amazon.SQS.Model.Message;
 
 namespace OrleansAWSUtils.Streams
@@ -18,7 +20,7 @@ namespace OrleansAWSUtils.Streams
     {
         [JsonProperty]
         [Orleans.Id(0)]
-        private EventSequenceTokenV2 sequenceToken = null!;
+        private StreamSequenceToken sequenceToken = null!;
 
         [JsonProperty]
         [Orleans.Id(1)]
@@ -27,11 +29,6 @@ namespace OrleansAWSUtils.Streams
         [JsonProperty]
         [Orleans.Id(2)]
         private readonly Dictionary<string, object>? requestContext;
-
-        [NonSerialized]
-        // Need to store reference to the original SQS Message to be able to delete it later on.
-        // Don't need to serialize it, since we are never interested in sending it to stream consumers.
-        internal SQSMessage Message = null!;
 
         [Orleans.Id(3)]
         public StreamId StreamId { get; private set; }
@@ -42,11 +39,11 @@ namespace OrleansAWSUtils.Streams
         }
 
         [JsonConstructor]
-        private SQSBatchContainer(
+        internal SQSBatchContainer(
             StreamId streamId,
             List<object> events,
             Dictionary<string, object>? requestContext,
-            EventSequenceTokenV2 sequenceToken)
+            StreamSequenceToken sequenceToken)
             : this(streamId, events, requestContext)
         {
             this.sequenceToken = sequenceToken;
@@ -63,10 +60,20 @@ namespace OrleansAWSUtils.Streams
 
         public IEnumerable<Tuple<T, StreamSequenceToken>> GetEvents<T>()
         {
-            return events.OfType<T>().Select((e, i) => Tuple.Create<T, StreamSequenceToken>(e, sequenceToken.CreateSequenceTokenForEvent(i)));
+            static StreamSequenceToken CreateStreamSequenceToken(StreamSequenceToken token, int eventIndex)
+            {
+                return token switch
+                {
+                    EventSequenceTokenV2 v2Tok => v2Tok.CreateSequenceTokenForEvent(eventIndex),
+                    SQSFIFOSequenceToken fifoTok => fifoTok.CreateSequenceTokenForEvent(eventIndex),
+                    _ => throw new NotSupportedException($"Unsupported sequence token type: {token.GetType().FullName}.")
+                };
+            }
+
+            return events.OfType<T>().Select((e, i) => Tuple.Create<T, StreamSequenceToken>(e, CreateStreamSequenceToken(sequenceToken, i)));
         }
 
-        internal static SendMessageRequest ToSQSMessage<T>(
+        internal static SQSMessage ToSQSMessage<T>(
             Serializer<SQSBatchContainer> serializer,
             StreamId streamId,
             IEnumerable<T> events,
@@ -78,19 +85,28 @@ namespace OrleansAWSUtils.Streams
             {
                 { "payload", JToken.FromObject(rawBytes) }
             };
-            return new SendMessageRequest
+            return new SQSMessage
             {
-                MessageBody = payload.ToString()
+                Body = payload.ToString(),
             };
         }
 
-        internal static SQSBatchContainer FromSQSMessage(Serializer<SQSBatchContainer> serializer, SQSMessage msg, long sequenceId)
+        internal static SQSBatchContainer FromSQSMessage(Serializer<SQSBatchContainer> serializer, SQSMessage msg, long sequenceNumber)
         {
             var json = JObject.Parse(msg.Body);
             // A valid SQS stream message contains a serialized batch payload.
             var sqsBatch = serializer.Deserialize(json["payload"]!.ToObject<byte[]>()!)!;
-            sqsBatch.Message = msg;
-            sqsBatch.sequenceToken = new EventSequenceTokenV2(sequenceId);
+            if (msg.Attributes is { } attributes
+                && attributes.TryGetValue(MessageSystemAttributeName.SequenceNumber, out var fifoSeqNum))
+            {
+                sqsBatch.sequenceToken = new SQSFIFOSequenceToken(
+                    sqsBatch.StreamId,
+                    UInt128.Parse(fifoSeqNum, CultureInfo.InvariantCulture),
+                    sequenceNumber);
+            }
+            else 
+                sqsBatch.sequenceToken = new EventSequenceTokenV2(sequenceNumber);
+
             return sqsBatch;
         }
 

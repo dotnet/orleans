@@ -1,12 +1,13 @@
-using Orleans;
-using Orleans.Streams;
-using OrleansAWSUtils.Storage;
 using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
-using Orleans.Serialization;
+using Orleans;
+using Orleans.Configuration;
+using Orleans.Streaming.SQS.Streams;
+using Orleans.Streams;
+using OrleansAWSUtils.Storage;
 using SQSMessage = Amazon.SQS.Model.Message;
 
 namespace OrleansAWSUtils.Streams
@@ -17,25 +18,25 @@ namespace OrleansAWSUtils.Streams
     internal partial class SQSAdapterReceiver : IQueueAdapterReceiver
     {
         private SQSStorage? queue;
-        private long lastReadMessage;
+        private long lastReadMessage = -1;
         private Task? outstandingTask;
         private readonly ILogger logger;
-        private readonly Serializer<SQSBatchContainer> serializer;
-
+        private readonly ISQSDataAdapter dataAdapter;
+        private readonly List<PendingDelivery> pending = [];
 
         public QueueId Id { get; private set; }
 
-        public static IQueueAdapterReceiver Create(Serializer<SQSBatchContainer> serializer, ILoggerFactory loggerFactory, QueueId queueId, string dataConnectionString, string serviceId)
+        public static IQueueAdapterReceiver Create(ISQSDataAdapter dataAdapter, ILoggerFactory loggerFactory, QueueId queueId, SqsOptions sqsOptions, string serviceId)
         {
             if (queueId.IsDefault) throw new ArgumentNullException(nameof(queueId));
-            if (string.IsNullOrEmpty(dataConnectionString)) throw new ArgumentNullException(nameof(dataConnectionString));
+            if (sqsOptions is null) throw new ArgumentNullException(nameof(sqsOptions));
             if (string.IsNullOrEmpty(serviceId)) throw new ArgumentNullException(nameof(serviceId));
 
-            var queue = new SQSStorage(loggerFactory, queueId.ToString(), dataConnectionString, serviceId);
-            return new SQSAdapterReceiver(serializer, loggerFactory, queueId, queue);
+            var queue = new SQSStorage(loggerFactory, queueId.ToString(), sqsOptions, serviceId);
+            return new SQSAdapterReceiver(dataAdapter, loggerFactory, queueId, queue);
         }
 
-        private SQSAdapterReceiver(Serializer<SQSBatchContainer> serializer, ILoggerFactory loggerFactory, QueueId queueId, SQSStorage queue)
+        private SQSAdapterReceiver(ISQSDataAdapter dataAdapter, ILoggerFactory loggerFactory, QueueId queueId, SQSStorage queue)
         {
             if (queueId.IsDefault) throw new ArgumentNullException(nameof(queueId));
             if (queue == null) throw new ArgumentNullException(nameof(queue));
@@ -43,7 +44,7 @@ namespace OrleansAWSUtils.Streams
             Id = queueId;
             this.queue = queue;
             logger = loggerFactory.CreateLogger<SQSAdapterReceiver>();
-            this.serializer = serializer;
+            this.dataAdapter = dataAdapter;
         }
 
         public Task Initialize(TimeSpan timeout)
@@ -67,6 +68,7 @@ namespace OrleansAWSUtils.Streams
             {
                 // remember that we shut down so we never try to read from the queue again.
                 queue = null;
+                pending.Clear();
             }
         }
 
@@ -86,9 +88,22 @@ namespace OrleansAWSUtils.Streams
                 if (!messages.Any())
                     return Array.Empty<IBatchContainer>();
 
-                List<IBatchContainer> messageBatch = messages
-                    .Select(msg => (IBatchContainer)SQSBatchContainer.FromSQSMessage(this.serializer, msg, lastReadMessage++)).ToList();
+                var messageBatch = new List<IBatchContainer>();
+                var pendingDeliveries = new List<PendingDelivery>();
+                foreach (var message in messages)
+                {
+                    if (!string.IsNullOrEmpty(message.MessageId))
+                    {
+                        pending.RemoveAll(item => string.Equals(item.Message.MessageId, message.MessageId, StringComparison.Ordinal));
+                    }
 
+                    var sequenceId = Interlocked.Increment(ref lastReadMessage);
+                    var batch = dataAdapter.FromQueueMessage(message, sequenceId);
+                    messageBatch.Add(batch);
+                    pendingDeliveries.Add(new PendingDelivery(batch, message));
+                }
+
+                pending.AddRange(pendingDeliveries);
                 return messageBatch;
             }
             finally
@@ -103,8 +118,21 @@ namespace OrleansAWSUtils.Streams
             {
                 var queueRef = queue; // store direct ref, in case we are somehow asked to shutdown while we are receiving.
                 if (messages.Count == 0 || queueRef == null) return;
-                List<SQSMessage> cloudQueueMessages = messages.Cast<SQSBatchContainer>().Select(b => b.Message).ToList();
-                outstandingTask = Task.WhenAll(cloudQueueMessages.Select(queueRef.DeleteMessage));
+
+                var cloudQueueMessages = new List<SQSMessage>();
+                foreach (var message in messages)
+                {
+                    var index = pending.FindIndex(item => ReferenceEquals(item.Batch, message));
+                    if (index >= 0)
+                    {
+                        cloudQueueMessages.Add(pending[index].Message);
+                        pending.RemoveAt(index);
+                    }
+                }
+
+                if (cloudQueueMessages.Count == 0) return;
+
+                outstandingTask = queueRef.DeleteMessages(cloudQueueMessages);
                 try
                 {
                     await outstandingTask;
@@ -125,5 +153,7 @@ namespace OrleansAWSUtils.Streams
             Message = "Exception upon DeleteMessage on queue {Id}. Ignoring."
         )]
         private static partial void LogWarningDeleteMessageException(ILogger logger, Exception exception, QueueId id);
+
+        private sealed record PendingDelivery(IBatchContainer Batch, SQSMessage Message);
     }
 }
