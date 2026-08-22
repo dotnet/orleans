@@ -39,7 +39,7 @@ public class CallbackDataTests
 
         Assert.True(callback.IsCompleted);
         Assert.Equal(1, unregisterCount);
-        var exception = Assert.IsType<OperationCanceledException>(completion.Response.Exception);
+        var exception = Assert.IsType<OperationCanceledException>(completion.Response!.Exception);
         Assert.Equal(cancellation.Token, exception.CancellationToken);
     }
 
@@ -112,6 +112,38 @@ public class CallbackDataTests
         CallbackDataPool.Return(reusedOwner);
     }
 
+    [TestSuite("BVT")]
+    [TestProvider("None")]
+    [Fact, TestCategory("BVT")]
+    public void CancellationAfterCompletionDoesNotAffectReusedCallback()
+    {
+        using var serviceProvider = CreateServiceProvider();
+        using var cancellation = new CancellationTokenSource();
+        var instruments = CreateInstruments(serviceProvider);
+        CallbackDataOwner completedOwner = default;
+        completedOwner = CallbackDataPool.Rent(
+            CreateSharedData(_ => CallbackDataPool.Return(completedOwner)),
+            new TestResponseCompletionSource(),
+            new Message(),
+            instruments);
+        var completedLease = completedOwner.Acquire();
+        var completedCallback = completedLease.Value;
+        completedCallback.SubscribeForCancellation(cancellation.Token);
+        completedCallback.OnHostShutdown();
+        completedLease.Dispose();
+
+        var currentCompletion = new TestResponseCompletionSource();
+        var currentOwner = CallbackDataPool.Rent(CreateSharedData(), currentCompletion, new Message(), instruments);
+        using var currentLease = currentOwner.Acquire();
+        Assert.Same(completedCallback, currentLease.Value);
+
+        cancellation.Cancel();
+
+        Assert.False(currentLease.Value.IsCompleted);
+        Assert.Null(currentCompletion.Response);
+        CallbackDataPool.Return(currentOwner);
+    }
+
     [MethodImpl(MethodImplOptions.NoInlining)]
     private static WeakReference CreateCompletedCallback(CancellationToken cancellationToken, ApplicationRequestInstruments instruments)
     {
@@ -152,7 +184,7 @@ public class CallbackDataTests
 
     private sealed class TestResponseCompletionSource : IResponseCompletionSource
     {
-        public Response Response { get; private set; } = null!;
+        public Response? Response { get; private set; }
 
         public void Complete(Response value) => Response = value;
 

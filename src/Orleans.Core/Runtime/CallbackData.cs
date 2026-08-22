@@ -194,7 +194,7 @@ namespace Orleans.Runtime
             var generation = Volatile.Read(ref _generation);
             if (!TryAcquireLease(generation))
             {
-                throw new InvalidOperationException("Cancellation ran after CallbackData ownership ended.");
+                return;
             }
 
             try
