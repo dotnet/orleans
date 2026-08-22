@@ -103,7 +103,8 @@ namespace Orleans.Runtime.MembershipService
         Task IMembershipManager.UpdateLocalStatus(SiloStatus status, CancellationToken cancellationToken) => this.UpdateStatus(status);
         Task<bool> IMembershipManager.TryKillSilo(SiloAddress silo, CancellationToken cancellationToken) => this.TryKill(silo);
         Task<bool> IMembershipManager.TrySuspectSilo(SiloAddress silo, SiloAddress? indirectProbingSilo, CancellationToken cancellationToken) => this.TryToSuspectOrKill(silo, indirectProbingSilo);
-        Task IMembershipManager.Refresh(MembershipVersion? targetVersion, CancellationToken cancellationToken) => this.Refresh(targetVersion, cancellationToken);
+        Task IMembershipManager.Refresh(MembershipVersion? targetVersion, CancellationToken cancellationToken, bool requireFresh) =>
+            this.Refresh(targetVersion, cancellationToken, requireFresh);
         Task IMembershipManager.ProcessGossipSnapshot(MembershipTableSnapshot snapshot, CancellationToken cancellationToken) => this.RefreshFromSnapshot(snapshot);
         Task IMembershipManager.UpdateIAmAlive(CancellationToken cancellationToken) => this.UpdateIAmAlive();
 
@@ -111,8 +112,22 @@ namespace Orleans.Runtime.MembershipService
 
         private Task? pendingRefresh;
 
-        public async Task Refresh(MembershipVersion? targetVersion = null, CancellationToken cancellationToken = default)
+        public async Task Refresh(
+            MembershipVersion? targetVersion = null,
+            CancellationToken cancellationToken = default,
+            bool requireFresh = false)
         {
+            if (requireFresh)
+            {
+                // A concurrent write which publishes a full view could also satisfy this fence. Issue an
+                // independent read here so that the operation makes progress without relying on other activity.
+                await RefreshInternal(requireCleanup: false).WaitAsync(cancellationToken);
+                if (!targetVersion.HasValue || this.MembershipTableSnapshot.Version >= targetVersion.Value)
+                {
+                    return;
+                }
+            }
+
             while (!targetVersion.HasValue || this.MembershipTableSnapshot.Version < targetVersion.Value)
             {
                 cancellationToken.ThrowIfCancellationRequested();

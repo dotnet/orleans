@@ -1,8 +1,7 @@
-using System.Text;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
-using Orleans.CodeGenerator.Hashing;
 using Orleans.CodeGenerator.SyntaxGeneration;
+using Orleans.CodeGeneration;
 using static Microsoft.CodeAnalysis.CSharp.SyntaxFactory;
 using static Orleans.CodeGenerator.SyntaxGeneration.SymbolExtensions;
 
@@ -25,63 +24,8 @@ internal static class GeneratedCodeUtilities
             : null;
     }
 
-    internal static string CreateHashedMethodId(IMethodSymbol methodSymbol)
-    {
-        var methodSignature = Format(methodSymbol);
-        var hash = XxHash32.Hash(Encoding.UTF8.GetBytes(methodSignature));
-        return $"{HexConverter.ToString(hash)}";
-
-        static string Format(IMethodSymbol methodInfo)
-        {
-            var result = new StringBuilder();
-            result.Append(methodInfo.ContainingType.ToDisplayName());
-            result.Append('.');
-            result.Append(methodInfo.Name);
-
-            if (methodInfo.IsGenericMethod)
-            {
-                result.Append('<');
-                var first = true;
-                foreach (var typeArgument in methodInfo.TypeArguments)
-                {
-                    if (!first) result.Append(',');
-                    else first = false;
-                    result.Append(typeArgument.Name);
-                }
-
-                result.Append('>');
-            }
-
-            {
-                result.Append('(');
-                var parameters = methodInfo.Parameters;
-                var first = true;
-                foreach (var parameter in parameters)
-                {
-                    if (!first)
-                    {
-                        result.Append(',');
-                    }
-
-                    var parameterType = parameter.Type;
-                    switch (parameterType)
-                    {
-                        case ITypeParameterSymbol _:
-                            result.Append(parameterType.Name);
-                            break;
-                        default:
-                            result.Append(parameterType.ToDisplayName());
-                            break;
-                    }
-
-                    first = false;
-                }
-            }
-
-            result.Append(')');
-            return result.ToString();
-        }
-    }
+    internal static string CreateHashedMethodId(IMethodSymbol methodSymbol) =>
+        RpcMethodIdGenerator.GetId(methodSymbol);
 
     internal static string? GetAlias(LibraryTypes libraryTypes, ISymbol symbol) => (string?)symbol.GetAttribute(libraryTypes.AliasAttribute)?.ConstructorArguments.First().Value;
 

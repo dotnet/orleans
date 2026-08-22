@@ -9,15 +9,36 @@ namespace Orleans.Streams
     internal class GrainBasedPubSubRuntime : IStreamPubSub
     {
         private readonly IGrainFactory grainFactory;
+        private readonly IClusterMembershipService? clusterMembershipService;
 
         public GrainBasedPubSubRuntime(IGrainFactory grainFactory)
         {
             this.grainFactory = grainFactory;
         }
 
+        public GrainBasedPubSubRuntime(
+            IGrainFactory grainFactory,
+            IClusterMembershipService clusterMembershipService)
+        {
+            this.grainFactory = grainFactory;
+            this.clusterMembershipService = clusterMembershipService;
+        }
+
         public Task<ISet<PubSubSubscriptionState>> RegisterProducer(QualifiedStreamId streamId, GrainId streamProducer)
         {
             var streamRendezvous = GetRendezvousGrain(streamId);
+            if (clusterMembershipService is not null
+                && SystemTargetGrainId.TryParse(streamProducer, out var systemTarget))
+            {
+                var snapshot = clusterMembershipService.CurrentSnapshot;
+                var status = snapshot.GetSiloStatus(systemTarget.GetSiloAddress());
+                if (status != SiloStatus.None
+                    && snapshot.Version != PubSubPublisherState.UnknownMembershipVersion)
+                {
+                    return streamRendezvous.RegisterProducer(streamId, streamProducer, snapshot.Version);
+                }
+            }
+
             return streamRendezvous.RegisterProducer(streamId, streamProducer);
         }
 

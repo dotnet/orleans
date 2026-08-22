@@ -49,23 +49,28 @@ public class GenerateAliasAttributesCodeFix : CodeFixProvider
     {
         var documentEditor = await DocumentEditor.CreateAsync(context.Document, context.CancellationToken);
 
-        var arityString = diagnostic.Properties["Arity"] switch
+        var alias = diagnostic.Properties["MethodId"];
+        if (alias is null)
         {
-            null or "0" => "",
-            string value => $"`{value}"
-        };
-        var typeName = diagnostic.Properties["TypeName"];
-        var ns = diagnostic.Properties["NamespaceAndNesting"] switch
-        {
-            { Length: > 0 } value => $"{value}.",
-            _ => ""
-        };
+            var arityString = diagnostic.Properties["Arity"] switch
+            {
+                null or "0" => "",
+                string value => $"`{value}"
+            };
+            var typeName = diagnostic.Properties["TypeName"];
+            var ns = diagnostic.Properties["NamespaceAndNesting"] switch
+            {
+                { Length: > 0 } value => $"{value}.",
+                _ => ""
+            };
+            alias = $"{ns}{typeName}{arityString}";
+        }
 
         var aliasAttribute =
             Attribute(
                 ParseName(Constants.AliasAttributeSourceName))
                     .WithArgumentList(
-                        ParseAttributeArgumentList($"(\"{ns}{typeName}{arityString}\")"))
+                        ParseAttributeArgumentList($"(\"{alias}\")"))
                             .WithAdditionalAnnotations(Simplifier.Annotation);
 
         documentEditor.AddAttribute(declaration, aliasAttribute);

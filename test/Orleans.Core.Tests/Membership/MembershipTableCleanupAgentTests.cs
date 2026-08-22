@@ -290,7 +290,10 @@ namespace NonSilo.Tests.Membership
             public Task UpdateLocalStatus(SiloStatus status, CancellationToken cancellationToken) => Task.CompletedTask;
             public Task<bool> TryKillSilo(SiloAddress silo, CancellationToken cancellationToken) => Task.FromResult(false);
             public Task<bool> TrySuspectSilo(SiloAddress silo, SiloAddress? indirectProbingSilo, CancellationToken cancellationToken) => Task.FromResult(false);
-            public Task Refresh(MembershipVersion? targetVersion, CancellationToken cancellationToken) => Task.CompletedTask;
+            public Task Refresh(
+                MembershipVersion? targetVersion,
+                CancellationToken cancellationToken,
+                bool requireFresh = false) => Task.CompletedTask;
             public Task ProcessGossipSnapshot(MembershipTableSnapshot snapshot, CancellationToken cancellationToken) => Task.CompletedTask;
             public Task UpdateIAmAlive(CancellationToken cancellationToken) => Task.CompletedTask;
             public void Participate(ISiloLifecycle lifecycle) { }

@@ -4,6 +4,7 @@ using System.Text;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.CodeAnalysis.Diagnostics;
+using Orleans.CodeGeneration;
 
 namespace Orleans.Analyzers;
 
@@ -27,11 +28,19 @@ public class GenerateAliasAttributesAnalyzer : DiagnosticAnalyzer
         context.RegisterCompilationStartAction(context =>
         {
             var aliasAttributeSymbol = context.Compilation.GetTypeByMetadataName(Constants.AliasAttributeFullyQualifiedName);
+            var idAttributeSymbol = context.Compilation.GetTypeByMetadataName(Constants.IdAttributeFullyQualifiedName);
             var generateSerializerAttributeSymbol = context.Compilation.GetTypeByMetadataName(Constants.GenerateSerializerAttributeFullyQualifiedName);
             var grainSymbol = context.Compilation.GetTypeByMetadataName(Constants.GrainBaseFullyQualifiedName);
             if (aliasAttributeSymbol is not null && generateSerializerAttributeSymbol is not null)
             {
-                context.RegisterSymbolAction(context => AnalyzeNamedType(context, aliasAttributeSymbol, generateSerializerAttributeSymbol, grainSymbol), SymbolKind.NamedType);
+                context.RegisterSymbolAction(
+                    context => AnalyzeNamedType(
+                        context,
+                        aliasAttributeSymbol,
+                        idAttributeSymbol,
+                        generateSerializerAttributeSymbol,
+                        grainSymbol),
+                    SymbolKind.NamedType);
             }
         });
     }
@@ -39,6 +48,7 @@ public class GenerateAliasAttributesAnalyzer : DiagnosticAnalyzer
     private static void AnalyzeNamedType(
         SymbolAnalysisContext context,
         INamedTypeSymbol aliasAttributeSymbol,
+        INamedTypeSymbol? idAttributeSymbol,
         INamedTypeSymbol generateSerializerAttributeSymbol,
         INamedTypeSymbol? grainSymbol)
     {
@@ -74,14 +84,21 @@ public class GenerateAliasAttributesAnalyzer : DiagnosticAnalyzer
                     continue;
                 }
 
-                if (!methodSymbol.HasAttribute(aliasAttributeSymbol))
+                if (!methodSymbol.HasAttribute(aliasAttributeSymbol)
+                    && (idAttributeSymbol is null || !methodSymbol.HasAttribute(idAttributeSymbol)))
                 {
                     if (!TryGetDeclarationSyntax(methodSymbol, out MethodDeclarationSyntax? methodDeclaration))
                     {
                         continue;
                     }
 
-                    ReportFor(context, methodDeclaration.GetLocation(), methodSymbol.Name, arity: 0, namespaceAndNesting: null);
+                    ReportFor(
+                        context,
+                        methodDeclaration.GetLocation(),
+                        methodSymbol.Name,
+                        arity: 0,
+                        namespaceAndNesting: null,
+                        methodId: RpcMethodIdGenerator.GetId(methodSymbol));
                 }
             }
 
@@ -173,13 +190,20 @@ public class GenerateAliasAttributesAnalyzer : DiagnosticAnalyzer
         return syntax is not null;
     }
 
-    private static void ReportFor(SymbolAnalysisContext context, Location location, string typeName, int arity, string? namespaceAndNesting)
+    private static void ReportFor(
+        SymbolAnalysisContext context,
+        Location location,
+        string typeName,
+        int arity,
+        string? namespaceAndNesting,
+        string? methodId = null)
     {
         var builder = ImmutableDictionary.CreateBuilder<string, string?>();
 
         builder.Add("TypeName", typeName);
         builder.Add("NamespaceAndNesting", namespaceAndNesting);
         builder.Add("Arity", arity.ToString(System.Globalization.CultureInfo.InvariantCulture));
+        builder.Add("MethodId", methodId);
 
         context.ReportDiagnostic(Diagnostic.Create(
             descriptor: Rule,

@@ -30,6 +30,7 @@
 
   <ItemGroup>
     <Compile Include="..\Orleans.CodeGenerator.Shared\InvokableBaseTypeResolver.cs" Link="InvokableBaseTypeResolver.cs" />
+    <Compile Include="..\Orleans.CodeGenerator.Shared\RpcMethodIdGenerator.cs" Link="RpcMethodIdGenerator.cs" />
   </ItemGroup>
 
   <ItemGroup>

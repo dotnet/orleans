@@ -1,0 +1,97 @@
+using System;
+using System.Collections.Generic;
+using System.Threading;
+using System.Threading.Tasks;
+using Microsoft.Extensions.Logging;
+using Orleans.Caching;
+
+namespace Orleans.Runtime.MembershipService;
+
+/// <summary>
+/// Classifies silos which remain absent after a fresh membership refresh as dead,
+/// and leaves their status unknown when validation fails.
+/// </summary>
+internal sealed partial class UnknownSiloStatusCache
+{
+    private const int CacheCapacity = 1_024;
+    private readonly ConcurrentLruCache<SiloAddress, byte> _deadSilos = new(CacheCapacity);
+    private readonly IMembershipManager _membershipManager;
+    private readonly ILogger _logger;
+
+    public UnknownSiloStatusCache(IMembershipManager membershipManager, ILogger<UnknownSiloStatusCache> logger)
+    {
+        _membershipManager = membershipManager;
+        _logger = logger;
+    }
+
+    public async ValueTask<Dictionary<SiloAddress, SiloStatus>> GetSiloStatuses(
+        ClusterMembershipSnapshot snapshot,
+        IReadOnlySet<SiloAddress> siloAddresses,
+        CancellationToken cancellationToken)
+    {
+        var result = new Dictionary<SiloAddress, SiloStatus>();
+        List<SiloAddress>? unknownSilos = null;
+        foreach (var siloAddress in siloAddresses)
+        {
+            var status = snapshot.GetSiloStatus(siloAddress);
+            if (status != SiloStatus.None)
+            {
+                _deadSilos.TryRemove(siloAddress);
+                result.Add(siloAddress, status);
+            }
+            else if (_deadSilos.TryGet(siloAddress, out _))
+            {
+                result.Add(siloAddress, SiloStatus.Dead);
+            }
+            else
+            {
+                unknownSilos ??= [];
+                unknownSilos.Add(siloAddress);
+            }
+        }
+
+        if (unknownSilos is null)
+        {
+            return result;
+        }
+
+        try
+        {
+            await _membershipManager.Refresh(
+                targetVersion: null,
+                cancellationToken: cancellationToken,
+                requireFresh: true);
+
+            var refreshedSnapshot = _membershipManager.CurrentSnapshot;
+            foreach (var siloAddress in unknownSilos)
+            {
+                var status = refreshedSnapshot.GetSiloStatus(siloAddress);
+                if (status == SiloStatus.None)
+                {
+                    status = SiloStatus.Dead;
+                    _deadSilos.AddOrUpdate(siloAddress, 0);
+                }
+
+                result.Add(siloAddress, status);
+            }
+        }
+        catch (Exception exception) when (!cancellationToken.IsCancellationRequested)
+        {
+            LogWarningUnableToValidateUnknownSilos(_logger, exception);
+            foreach (var siloAddress in unknownSilos)
+            {
+                result.Add(siloAddress, SiloStatus.None);
+            }
+        }
+
+        return result;
+    }
+
+    [LoggerMessage(
+        Level = LogLevel.Warning,
+        Message = "Unable to validate unknown silos against cluster membership"
+    )]
+    private static partial void LogWarningUnableToValidateUnknownSilos(
+        ILogger logger,
+        Exception exception);
+}
