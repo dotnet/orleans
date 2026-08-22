@@ -2640,6 +2640,11 @@ namespace Orleans.Runtime
         void Change(System.TimeSpan dueTime, System.TimeSpan period);
     }
 
+    public partial interface IMessageReceiverCache
+    {
+        object? MessageReceiver { get; set; }
+    }
+
     public partial interface IRehydrationContext
     {
         System.Collections.Generic.IEnumerable<string> Keys { get; }

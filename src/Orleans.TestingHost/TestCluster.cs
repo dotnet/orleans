@@ -16,22 +16,26 @@ using Microsoft.Extensions.Configuration.Memory;
 using Orleans.Configuration;
 using Microsoft.Extensions.Options;
 using Microsoft.Extensions.Hosting;
-using Orleans.TestingHost.InMemoryTransport;
+using Orleans.Runtime.Messaging;
+using Orleans.Connections.Transport;
 using Orleans.TestingHost.UnixSocketTransport;
 using System.Net;
 using Orleans.Statistics;
-using Orleans.Runtime.TestHooks;
+using Orleans.TestingHost.InMemoryTransport;
 using Orleans.Messaging;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 
+#nullable disable
 namespace Orleans.TestingHost
 {
     /// <summary>
-    /// A host class for local testing with Orleans using in-process silos. 
+    /// A host class for local testing with Orleans using in-process silos.
     /// Runs a Primary and optionally secondary silos in separate app domains, and client in the main app domain.
     /// Additional silos can also be started in-process on demand if required for particular test cases.
     /// </summary>
     /// <remarks>
-    /// Make sure that your test project references your test grains and test grain interfaces 
+    /// Make sure that your test project references your test grains and test grain interfaces
     /// projects, and has CopyLocal=True set on those references [which should be the default].
     /// </remarks>
     public class TestCluster : IDisposable, IAsyncDisposable
@@ -40,7 +44,6 @@ namespace Orleans.TestingHost
         private readonly TestClusterOptions options;
         private readonly StringBuilder log = new StringBuilder();
         private readonly InMemoryTransportConnectionHub _transportHub = new();
-        private readonly GrainDirectoryObserver _grainDirectoryObserver = new();
         private bool _disposed;
         private int startedInstances;
 
@@ -48,7 +51,7 @@ namespace Orleans.TestingHost
         /// Primary silo handle, if applicable.
         /// </summary>
         /// <remarks>This handle is valid only when using Grain-based membership.</remarks>
-        public SiloHandle? Primary { get; private set; }
+        public SiloHandle Primary { get; private set; }
 
         /// <summary>
         /// List of handles to the secondary silos.
@@ -89,7 +92,7 @@ namespace Orleans.TestingHost
         /// <summary>
         /// Options used to configure the test cluster.
         /// </summary>
-        /// <remarks>This is the options you configured your test cluster with, or the default one. 
+        /// <remarks>This is the options you configured your test cluster with, or the default one.
         /// If the cluster is being configured via ClusterConfiguration, then this object may not reflect the true settings.
         /// </remarks>
         public TestClusterOptions Options => this.options;
@@ -97,12 +100,12 @@ namespace Orleans.TestingHost
         /// <summary>
         /// The internal client interface.
         /// </summary>
-        internal IHost? ClientHost { get; private set; }
+        internal IHost ClientHost { get; private set; }
 
         /// <summary>
         /// The internal client interface.
         /// </summary>
-        internal IInternalClusterClient? InternalClient => ClientHost?.Services.GetRequiredService<IInternalClusterClient>();
+        internal IInternalClusterClient InternalClient => ClientHost?.Services.GetRequiredService<IInternalClusterClient>();
 
         /// <summary>
         /// The client.
@@ -114,13 +117,12 @@ namespace Orleans.TestingHost
         /// <summary>
         /// GrainFactory to use in the tests
         /// </summary>
-        /// <exception cref="InvalidOperationException">The cluster has not been deployed or the client has been stopped.</exception>
         public IGrainFactory GrainFactory => this.Client;
 
         /// <summary>
         /// GrainFactory to use in the tests
         /// </summary>
-        internal IInternalGrainFactory? InternalGrainFactory => this.InternalClient;
+        internal IInternalGrainFactory InternalGrainFactory => this.InternalClient;
 
         /// <summary>
         /// Client-side <see cref="IServiceProvider"/> to use in the tests.
@@ -136,7 +138,7 @@ namespace Orleans.TestingHost
         /// The port allocator.
         /// </summary>
         public ITestClusterPortAllocator PortAllocator { get; }
-        
+
         /// <summary>
         /// Configures the test cluster plus client in-process.
         /// </summary>
@@ -156,7 +158,7 @@ namespace Orleans.TestingHost
         /// </summary>
         /// <param name="silo">The silo process to the the service provider for.</param>
         /// <remarks>If <paramref name="silo"/> is <see langword="null"/> one of the existing silos will be picked randomly.</remarks>
-        public IServiceProvider GetSiloServiceProvider(SiloAddress? silo = null)
+        public IServiceProvider GetSiloServiceProvider(SiloAddress silo = null)
         {
             if (silo != null)
             {
@@ -178,6 +180,7 @@ namespace Orleans.TestingHost
         /// <param name="grainId">The ID of the grain to find.</param>
         /// <param name="grainContext">When this method returns, contains the grain context if found; otherwise, <see langword="null"/>.</param>
         /// <returns><see langword="true"/> if the grain was found in one of the silos; otherwise, <see langword="false"/>.</returns>
+        #nullable enable
         public bool TryGetGrainContext(GrainId grainId, [System.Diagnostics.CodeAnalysis.NotNullWhen(true)] out IGrainContext? grainContext)
         {
             foreach (var silo in Silos)
@@ -193,6 +196,7 @@ namespace Orleans.TestingHost
             grainContext = null;
             return false;
         }
+#nullable restore
 
         /// <summary>
         /// Gets a <see cref="Task"/> that completes when the current activation of the specified grain
@@ -251,6 +255,7 @@ namespace Orleans.TestingHost
         /// await cluster.MigrateAsync(grain.GetGrainId(), targetSilo);
         /// </code>
         /// </example>
+#nullable enable
         public async Task MigrateAsync(GrainId grainId, SiloAddress? targetSilo = null)
         {
             var deactivated = WaitForDeactivationAsync(grainId);
@@ -262,6 +267,7 @@ namespace Orleans.TestingHost
             await GrainFactory.GetGrain(grainId).Cast<IGrainManagementExtension>().MigrateOnIdle();
             await deactivated;
         }
+#nullable restore
 
         /// <inheritdoc cref="WaitForDeactivationAsync(GrainId)"/>
         /// <param name="grain">The grain to observe.</param>
@@ -274,7 +280,9 @@ namespace Orleans.TestingHost
         /// <inheritdoc cref="MigrateAsync(GrainId, SiloAddress?)"/>
         /// <param name="grain">The grain to migrate.</param>
         /// <param name="targetSilo">The target silo address, or <see langword="null"/> to let the placement director choose.</param>
+#nullable enable
         public Task MigrateAsync(IAddressable grain, SiloAddress? targetSilo = null) => MigrateAsync(grain.GetGrainId(), targetSilo);
+#nullable restore
 
         /// <summary>
         /// Deploys the cluster using the specified configuration and starts the client in-process.
@@ -351,7 +359,7 @@ namespace Orleans.TestingHost
 
                 foreach (var silo in silos)
                 {
-                    var hooks = this.InternalClient!.GetTestHooks(silo); // Membership stabilization requires an initialized client.
+                    var hooks = this.InternalClient.GetTestHooks(silo);
                     var statuses = await hooks.GetApproximateSiloStatuses();
                     var activeCount = statuses.Count(s => s.Value == SiloStatus.Active);
                     if (activeCount != expectedCount) break;
@@ -391,7 +399,7 @@ namespace Orleans.TestingHost
                 Primary, additional.Count, Runtime.Utils.EnumerableToString(additional));
 
             if (Primary?.IsActive == true) yield return Primary;
-            
+
 
             if (additional.Count > 0)
             foreach (var s in additional)
@@ -419,50 +427,20 @@ namespace Orleans.TestingHost
         {
             var clusterMembershipOptions = this.ServiceProvider.GetRequiredService<IOptions<ClusterMembershipOptions>>().Value;
             TimeSpan stabilizationTime = GetLivenessStabilizationTime(clusterMembershipOptions, didKill);
-            var activeSilos = GetActiveSilos().ToArray();
-            var testHooks = activeSilos.Select(GetTestHooks).ToArray();
-            var gatewayManager = this.InternalClient!.ServiceProvider.GetRequiredService<GatewayManager>(); // Stabilization requires an initialized client.
-            var inProcessSilos = activeSilos.OfType<InProcessSiloHandle>().ToArray();
-            Func<TimeSpan, Task<bool>>? waitForGrainDirectoryConvergence =
-                inProcessSilos.Length == activeSilos.Length && GrainDirectoryObserver.CanObserve(inProcessSilos)
-                    ? timeout => _grainDirectoryObserver.WaitForConvergenceAsync(inProcessSilos, timeout)
-                    : null;
-            WriteLog(Environment.NewLine + Environment.NewLine + "WaitForLivenessToStabilize is waiting up to {0} for {1} active silo(s)", stabilizationTime, activeSilos.Length);
-            if (await LivenessStabilizationHelper.WaitForExpectedActiveSilosAndGatewaysAsync(
-                activeSilos,
-                testHooks,
-                gatewayManager,
-                stabilizationTime,
-                waitForGrainDirectoryConvergence))
-            {
-                WriteLog("WaitForLivenessToStabilize observed stable active silo and gateway views");
-            }
-            else
-            {
-                WriteLog("WaitForLivenessToStabilize reached the fallback wait of {0}", stabilizationTime);
-            }
-        }
-
-        private ITestHooks GetTestHooks(SiloHandle silo)
-        {
-            if (silo is InProcessSiloHandle inProcessSilo)
-            {
-                return inProcessSilo.ServiceProvider.GetRequiredService<TestHooksSystemTarget>();
-            }
-
-            return this.InternalClient!.GetTestHooks(silo); // Test hooks require an initialized client.
+            WriteLog(Environment.NewLine + Environment.NewLine + "WaitForLivenessToStabilize is about to sleep for {0}", stabilizationTime);
+            await Task.Delay(stabilizationTime);
+            WriteLog("WaitForLivenessToStabilize is done sleeping");
         }
 
         /// <summary>
-        /// Wait for active silos to observe cluster manifest updates for all active silos.
+        /// Waits for active silos to observe cluster manifest updates for all active silos.
         /// </summary>
-        /// <param name="didKill">Whether recent membership changes were done by graceful Stop.</param>
         public async Task WaitForClusterManifestToStabilizeAsync(bool didKill = false)
         {
             var clusterMembershipOptions = this.ServiceProvider.GetRequiredService<IOptions<ClusterMembershipOptions>>().Value;
             var stabilizationTime = GetLivenessStabilizationTime(clusterMembershipOptions, didKill);
             var activeSilos = GetActiveSilos().ToArray();
-            var testHooks = activeSilos.Select(GetTestHooks).ToArray();
+            var testHooks = activeSilos.Select(silo => this.InternalClient!.GetTestHooks(silo)).ToArray();
 
             WriteLog(Environment.NewLine + Environment.NewLine + "WaitForClusterManifestToStabilize is waiting up to {0} for {1} active silo manifest(s)", stabilizationTime, activeSilos.Length);
             if (await ClusterManifestStabilizationHelper.WaitForExpectedClusterManifestAsync(activeSilos, testHooks, stabilizationTime))
@@ -485,7 +463,7 @@ namespace Orleans.TestingHost
             if (didKill)
             {
                 // in case of hard kill (kill and not Stop), we should give silos time to detect failures first.
-                stabilizationTime = TestingUtils.Multiply(clusterMembershipOptions.MaxProbeTimeout, clusterMembershipOptions.NumMissedProbesLimit);
+                stabilizationTime = TestingUtils.Multiply(clusterMembershipOptions.ProbeTimeout, clusterMembershipOptions.NumMissedProbesLimit);
             }
             if (clusterMembershipOptions.UseLivenessGossip)
             {
@@ -587,7 +565,7 @@ namespace Orleans.TestingHost
                 if (client is not null)
                 {
                     await client.StopAsync().ConfigureAwait(false);
-                }                
+                }
             }
             catch (Exception exc)
             {
@@ -799,13 +777,18 @@ namespace Orleans.TestingHost
                         switch (transport)
                         {
                             case ConnectionTransportType.TcpSocket:
+                                // TCP is used by default
                                 break;
                             case ConnectionTransportType.InMemory:
-                                clientBuilder.UseInMemoryConnectionTransport(_transportHub);
-                                break;
+                                {
+                                    clientBuilder.UseInMemoryTransport(_transportHub);
+                                    break;
+                                }
                             case ConnectionTransportType.UnixSocket:
-                                clientBuilder.UseUnixSocketConnection();
-                                break;
+                                {
+                                    clientBuilder.UseUnixSocketConnection();
+                                    break;
+                                }
                             default:
                                 throw new ArgumentException($"Unsupported {nameof(ConnectionTransportType)}: {transport}");
                         }
@@ -870,11 +853,15 @@ namespace Orleans.TestingHost
                         case ConnectionTransportType.TcpSocket:
                             break;
                         case ConnectionTransportType.InMemory:
-                            siloBuilder.UseInMemoryConnectionTransport(_transportHub);
-                            break;
+                            {
+                                siloBuilder.UseInMemoryTransport(_transportHub);
+                               break;
+                            }
                         case ConnectionTransportType.UnixSocket:
-                            siloBuilder.UseUnixSocketConnection();
-                            break;
+                            {
+                                siloBuilder.UseUnixSocketConnection();
+                                break;
+                            }
                         default:
                             throw new ArgumentException($"Unsupported {nameof(ConnectionTransportType)}: {transport}");
                     }
@@ -904,13 +891,7 @@ namespace Orleans.TestingHost
         public static async Task<SiloHandle> StartSiloAsync(TestCluster cluster, int instanceNumber, TestClusterOptions clusterOptions, IReadOnlyList<IConfigurationSource>? configurationOverrides = null, bool startSiloOnNewPort = false)
         {
             if (cluster == null) throw new ArgumentNullException(nameof(cluster));
-            var silo = await cluster.StartSiloAsync(instanceNumber, clusterOptions, configurationOverrides, startSiloOnNewPort);
-            lock (cluster.additionalSilos)
-            {
-                cluster.additionalSilos.Add(silo);
-            }
-
-            return silo;
+            return await cluster.StartSiloAsync(instanceNumber, clusterOptions, configurationOverrides, startSiloOnNewPort);
         }
 
         /// <summary>
@@ -968,13 +949,13 @@ namespace Orleans.TestingHost
             return this.log.ToString();
         }
 
-        private void ReportUnobservedException(object? sender, UnhandledExceptionEventArgs eventArgs)
+        private void ReportUnobservedException(object sender, UnhandledExceptionEventArgs eventArgs)
         {
             Exception exception = (Exception)eventArgs.ExceptionObject;
             this.WriteLog("Unobserved exception: {0}", exception);
         }
 
-        private void WriteLog(string format, params object?[] args)
+        private void WriteLog(string format, params object[] args)
         {
             log.AppendFormat(format + Environment.NewLine, args);
         }
@@ -1008,7 +989,6 @@ namespace Orleans.TestingHost
                 ClientHost = null;
 
                 PortAllocator?.Dispose();
-                _grainDirectoryObserver.Dispose();
             });
 
             _disposed = true;
@@ -1025,7 +1005,7 @@ namespace Orleans.TestingHost
             DisposeAsync().AsTask().Wait();
         }
 
-        private static async Task DisposeAsync(IDisposable? value)
+        private static async Task DisposeAsync(IDisposable value)
         {
             if (value is IAsyncDisposable asyncDisposable)
             {

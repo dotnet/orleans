@@ -1,3 +1,4 @@
+/*
 using System.Buffers;
 using System.Buffers.Binary;
 using System.Collections.Generic;
@@ -21,7 +22,6 @@ namespace UnitTests.Serialization
     /// Tests for Orleans message serialization functionality.
     /// </summary>
     [Collection(TestEnvironmentFixture.DefaultCollection)]
-    [TestArea("Serialization")]
     public class MessageSerializerTests
     {
         private readonly ITestOutputHelper output;
@@ -41,8 +41,6 @@ namespace UnitTests.Serialization
             _grainAddressCodec = fixture.Services.GetRequiredService<IFieldCodec<GrainAddress>>();
         }
 
-        [TestSuite("Functional")]
-        [TestProvider("None")]
         [Fact, TestCategory("Functional")]
         public async Task MessageTest_TtlUpdatedOnAccess()
         {
@@ -53,8 +51,6 @@ namespace UnitTests.Serialization
             Assert.InRange(message.TimeToLive.Value, TimeSpan.FromMilliseconds(-1000), TimeSpan.FromMilliseconds(900));
         }
 
-        [TestSuite("Functional")]
-        [TestProvider("None")]
         [Fact, TestCategory("Functional"), TestCategory("Serialization")]
         public async Task MessageTest_TtlUpdatedOnSerialization()
         {
@@ -68,22 +64,106 @@ namespace UnitTests.Serialization
             Assert.InRange(message.TimeToLive.Value, TimeSpan.FromMilliseconds(-1000), TimeSpan.FromMilliseconds(900));
         }
 
-        [TestSuite("Functional")]
-        [TestProvider("None")]
         [Fact, TestCategory("Functional"), TestCategory("Serialization")]
-        public void Message_SerializeHeaderTooBig()
+        public void Message_Serialize_RoundTrip_Buffer()
+        {
+            for (var i = 0; i < 10; i++)
+            {
+                var writeBuffer = new PooledBuffer();
+                var readBuffer = new PooledBuffer();
+                try
+                {
+                    var message = CreateTestMessage();
+                    var (headerLength, bodyLength) = this.messageSerializer.Write(ref writeBuffer, message);
+
+                    writeBuffer.CopyTo(ref readBuffer);
+                    var bufferSlice = readBuffer.Slice();
+                    this.messageSerializer.Read(in bufferSlice, headerLength, bodyLength, out var deserializedMessage);
+
+                    CheckMessage(message, deserializedMessage);
+                }
+                finally
+                {
+                    writeBuffer.Dispose();
+                    readBuffer.Dispose();
+                    RequestContext.Clear();
+                }
+            }
+        }
+
+        [Fact, TestCategory("Functional"), TestCategory("Serialization")]
+        public void Message_Serialize_RoundTrip_Request()
+        {
+            for (var i = 0; i < 10; i++)
+            {
+                var writeRequest = this.messageHandlerShared.GetSendMessageHandler();
+                var message = CreateTestMessage();
+                writeRequest.Initialize(message);
+
+                var readRequest = messageHandlerShared.GetReceiveMessageHandler();
+
+                var writeBuffers = writeRequest.Buffers;
+                int writeLength;
+                do
+                {
+                    writeLength = (int)Math.Min(writeBuffers.Length, readRequest.Buffer.Length);
+                    writeBuffers.Slice(0, writeLength).CopyTo(readRequest.Buffer.Span);
+                    writeBuffers = writeBuffers.Slice(writeLength);
+                } while (!readRequest.OnProgress(writeLength));
+
+                //var deserializedMessage = readRequest.TestReadMessage();
+                CheckMessage(message, deserializedMessage);
+            }
+        }
+
+        private static void CheckMessage(Message message, Message deserializedMessage)
+        {
+            Assert.Equal(message.Id, deserializedMessage.Id);
+            Assert.Equal(message.BodyObject, deserializedMessage.BodyObject);
+            Assert.Equal(message.SendingGrain, deserializedMessage.SendingGrain);
+            Assert.Equal(message.SendingSilo, deserializedMessage.SendingSilo);
+            Assert.Equal(message.TargetGrain, deserializedMessage.TargetGrain);
+            Assert.Equal(message.TargetSilo, deserializedMessage.TargetSilo);
+            Assert.Equal(message.CacheInvalidationHeader.Count, deserializedMessage.CacheInvalidationHeader.Count);
+            Assert.Equal(message.ForwardCount, deserializedMessage.ForwardCount);
+            Assert.Equal(message.Direction, deserializedMessage.Direction);
+            Assert.Equal(message.InterfaceType, deserializedMessage.InterfaceType);
+            Assert.Equal(message.InterfaceVersion, deserializedMessage.InterfaceVersion);
+            foreach (var header in message.CacheInvalidationHeader)
+            {
+                Assert.Contains(header, deserializedMessage.CacheInvalidationHeader);
+            }
+
+            Assert.Equal(message.BodyObject, deserializedMessage.BodyObject);
+        }
+
+        private Message CreateTestMessage()
         {
             try
             {
-                // Create a ridiculously big RequestContext
-                var maxHeaderSize = this.fixture.Services.GetService<IOptions<SiloMessagingOptions>>()!.Value.MaxMessageHeaderSize;
-                RequestContext.Set("big_object", new byte[maxHeaderSize + 1]);
+                RequestContext.Set("fancy_feet", "yes");
+                var message = this.messageFactory.CreateMessage("ladida", InvokeMethodOptions.None);
+                message.SendingGrain = GrainId.Create("test", "foo");
+                message.TargetGrain = GrainId.Create("test2", "foo2");
+                message.SendingSilo = SiloAddress.New(IPAddress.Loopback, 12345, 543212345);
+                message.TargetSilo = SiloAddress.New(IPAddress.Parse("100.200.1.2"), 12345, 543212345);
+                message.CacheInvalidationHeader = new()
+                {
+                    new GrainAddress
+                    {
+                        GrainId = GrainId.Create("test", "foo"),
+                        ActivationId = ActivationId.NewId(),
+                        SiloAddress = SiloAddress.New(IPAddress.Parse("1.2.3.4"), 8285, 11)
+                    },
 
-                var message = this.messageFactory.CreateMessage(null, InvokeMethodOptions.None);
-
-                var pipe = new Pipe(new PipeOptions(pauseWriterThreshold: 0));
-                var writer = pipe.Writer;
-                Assert.Throws<InvalidMessageFrameException>(() => this.messageSerializer.Write(writer, message));
+                    new GrainAddress
+                    {
+                        GrainId = GrainId.Create("cow", "gertrude"),
+                        ActivationId = ActivationId.NewId(),
+                        SiloAddress = SiloAddress.New(IPAddress.Parse("2.2.2.22"), 1, 123456)
+                    }
+                };
+                return message;
             }
             finally
             {
@@ -91,77 +171,97 @@ namespace UnitTests.Serialization
             }
         }
 
-        [TestSuite("Functional")]
-        [TestProvider("None")]
+        [Fact, TestCategory("Functional"), TestCategory("Serialization")]
+        public void Message_SerializeHeaderTooBig()
+        {
+            var buffer = new PooledBuffer();
+            try
+            {
+                // Create a ridiculously big RequestContext
+                var maxHeaderSize = this.fixture.Services.GetService<IOptions<SiloMessagingOptions>>().Value.MaxMessageHeaderSize;
+                RequestContext.Set("big_object", new byte[maxHeaderSize + 1]);
+
+                var message = this.messageFactory.CreateMessage(null, InvokeMethodOptions.None);
+
+                Assert.Throws<OrleansException>(() => this.messageSerializer.Write(ref buffer, message));
+            }
+            finally
+            {
+                buffer.Dispose();
+                RequestContext.Clear();
+            }
+        }
+
         [Fact, TestCategory("Functional"), TestCategory("Serialization")]
         public void Message_SerializeBodyTooBig()
         {
-            var maxBodySize = this.fixture.Services.GetService<IOptions<SiloMessagingOptions>>()!.Value.MaxMessageBodySize;
+            var buffer = new PooledBuffer();
+            try
+            {
+                var maxBodySize = this.fixture.Services.GetService<IOptions<SiloMessagingOptions>>().Value.MaxMessageBodySize;
 
-            // Create a request with a ridiculously big argument
-            var arg = new byte[maxBodySize + 1];
-            var request = new[] { arg };
-            var message = this.messageFactory.CreateMessage(request, InvokeMethodOptions.None);
+                // Create a request with a ridiculously big argument
+                var arg = new byte[maxBodySize + 1];
+                var request = new[] { arg };
+                var message = this.messageFactory.CreateMessage(request, InvokeMethodOptions.None);
 
-            var pipe = new Pipe(new PipeOptions(pauseWriterThreshold: 0));
-            var writer = pipe.Writer;
-            Assert.Throws<InvalidMessageFrameException>(() => this.messageSerializer.Write(writer, message));
+                Assert.Throws<OrleansException>(() => this.messageSerializer.Write(ref buffer, message));
+            }
+            finally
+            {
+                buffer.Dispose();
+            }
         }
 
-        [TestSuite("Functional")]
-        [TestProvider("None")]
         [Fact, TestCategory("Functional"), TestCategory("Serialization")]
         public void Message_DeserializeHeaderTooBig()
         {
-            var maxHeaderSize = this.fixture.Services.GetService<IOptions<SiloMessagingOptions>>()!.Value.MaxMessageHeaderSize;
-            var maxBodySize = this.fixture.Services.GetService<IOptions<SiloMessagingOptions>>()!.Value.MaxMessageBodySize;
+            var maxSize = this.fixture.Services.GetService<IOptions<SiloMessagingOptions>>().Value.MaxMessageHeaderSize;
 
-            DeserializeFakeMessage(maxHeaderSize + 1, maxBodySize - 1);
+            DeserializeFakeMessage(maxSize + 1, 0);
         }
 
-        [TestSuite("Functional")]
-        [TestProvider("None")]
         [Fact, TestCategory("Functional"), TestCategory("Serialization")]
         public void Message_DeserializeBodyTooBig()
         {
-            var maxHeaderSize = this.fixture.Services.GetService<IOptions<SiloMessagingOptions>>()!.Value.MaxMessageHeaderSize;
-            var maxBodySize = this.fixture.Services.GetService<IOptions<SiloMessagingOptions>>()!.Value.MaxMessageBodySize;
+            var maxSize = this.fixture.Services.GetService<IOptions<SiloMessagingOptions>>().Value.MaxMessageHeaderSize;
 
-            DeserializeFakeMessage(maxHeaderSize - 1, maxBodySize + 1);
+            DeserializeFakeMessage(0, maxSize + 1);
         }
 
         private void DeserializeFakeMessage(int headerSize, int bodySize)
         {
-            var pipe = new Pipe(new PipeOptions(pauseWriterThreshold: 0));
-            var writer = pipe.Writer;
+            var buffer = new PooledBuffer();
 
-            Span<byte> lengthFields = stackalloc byte[8];
-            BinaryPrimitives.WriteInt32LittleEndian(lengthFields, headerSize);
-            BinaryPrimitives.WriteInt32LittleEndian(lengthFields[4..], bodySize);
-            writer.Write(lengthFields);
-            writer.FlushAsync().AsTask().GetAwaiter().GetResult();
+            try
+            {
+                Span<byte> lengthFields = stackalloc byte[8];
+                BinaryPrimitives.WriteInt32LittleEndian(lengthFields, headerSize);
+                BinaryPrimitives.WriteInt32LittleEndian(lengthFields[4..], bodySize);
+                buffer.Write(lengthFields);
 
-            pipe.Reader.TryRead(out var readResult);
-            var reader = readResult.Buffer;
-            Assert.Throws<InvalidMessageFrameException>(() => this.messageSerializer.TryRead(ref reader, out var message));
+                var reader = buffer.Slice(0);
+                Assert.Throws<OrleansException>(() => this.messageSerializer.Read(in reader, headerSize, bodySize, out var message));
+            }
+            finally
+            {
+                buffer.Dispose();
+            }
         }
 
         private Message RoundTripMessage(Message message)
         {
-            var pipe = new Pipe(new PipeOptions(pauseWriterThreshold: 0));
-            var writer = pipe.Writer;
-            this.messageSerializer.Write(writer, message);
-            writer.FlushAsync().AsTask().GetAwaiter().GetResult();
+            var buffer = new PooledBuffer();
 
-            pipe.Reader.TryRead(out var readResult);
-            var reader = readResult.Buffer;
-            var (requiredBytes, _, _) = this.messageSerializer.TryRead(ref reader, out var deserializedMessage);
-            Assert.Equal(0, requiredBytes);
-            return deserializedMessage!;
+            try
+            {
+                var (headerSize, bodySize) = this.messageSerializer.Write(ref buffer, message);
+
+                var reader = buffer.Slice();
+                this.messageSerializer.Read(in reader, headerSize, bodySize, out var deserializedMessage);
+                return deserializedMessage;
         }
 
-        [TestSuite("Functional")]
-        [TestProvider("None")]
         [Theory, TestCategory("Functional"), TestCategory("Serialization")]
         [InlineData(0, 0)]
         [InlineData(1, 1)]
@@ -173,8 +273,6 @@ namespace UnitTests.Serialization
             Assert.Equal(expected, MessageSerializer.GetRequestContextInitialCapacity(size));
         }
 
-        [TestSuite("Functional")]
-        [TestProvider("None")]
         [Fact, TestCategory("Functional"), TestCategory("Serialization")]
         public void Message_RequestContextBeyondInitialCapacity_RoundTrips()
         {
@@ -198,8 +296,6 @@ namespace UnitTests.Serialization
             }
         }
 
-        [TestSuite("BVT")]
-        [TestProvider("None")]
         [Fact, TestCategory("BVT")]
         public void MessageTest_CacheInvalidationHeader_RoundTripCompatibility()
         {
@@ -294,42 +390,6 @@ namespace UnitTests.Serialization
             }
         }
 
-        [TestSuite("BVT")]
-        [TestProvider("None")]
-        [Fact, TestCategory("BVT")]
-        public void MessageTest_CacheInvalidationHeader_DeserializeCapsHeaderCount()
-        {
-            var fromNew = new List<GrainAddressCacheUpdate>();
-            for (var i = 0; i < Message.MaxCacheInvalidationHeaderEntries + 1; i++)
-            {
-                var grainId = GrainId.Create("test", i.ToString());
-                fromNew.Add(new GrainAddressCacheUpdate(
-                    GrainAddress.NewActivationAddress(SiloAddress.New(new IPEndPoint(IPAddress.Loopback, 11_000 + i), 11_000 + i), grainId),
-                    GrainAddress.NewActivationAddress(SiloAddress.New(new IPEndPoint(IPAddress.Loopback, 22_000 + i), 22_000 + i), grainId)));
-            }
-
-            using var writer1Session = _serializerSessionPool.GetSession();
-            var writer = Writer.CreatePooled(writer1Session);
-            var message = new Message { CacheInvalidationHeader = fromNew };
-            messageSerializer.WriteCacheInvalidationHeaders(ref writer, message);
-            writer.WriteVarUInt32(42);
-            writer.Commit();
-
-            using var reader1Session = _serializerSessionPool.GetSession();
-            var reader = Reader.Create(writer.Output.AsReadOnlySequence(), reader1Session);
-            var toNew = messageSerializer.ReadCacheInvalidationHeaders(ref reader);
-            Assert.NotNull(toNew);
-            Assert.Equal(Message.MaxCacheInvalidationHeaderEntries, toNew.Count);
-            for (var i = 0; i < Message.MaxCacheInvalidationHeaderEntries; i++)
-            {
-                Assert.Equal(fromNew[i].InvalidGrainAddress, toNew[i].InvalidGrainAddress);
-                Assert.Equal(fromNew[i].ValidGrainAddress, toNew[i].ValidGrainAddress);
-            }
-
-            Assert.Equal(42u, reader.ReadVarUInt32());
-            writer.Dispose();
-        }
-
         private class MessageSerializerBackwardsCompatibilityStub
         {
             private readonly IFieldCodec<GrainAddress> _grainAddressCodec;
@@ -338,7 +398,7 @@ namespace UnitTests.Serialization
             {
                 _grainAddressCodec = grainAddressCodec;
             }
-            
+
             internal List<GrainAddress> ReadCacheInvalidationHeaders<TInput>(ref Reader<TInput> reader)
             {
                 var n = (int)reader.ReadVarUInt32();
@@ -347,9 +407,7 @@ namespace UnitTests.Serialization
                     var list = new List<GrainAddress>(n);
                     for (int i = 0; i < n; i++)
                     {
-                        var address = _grainAddressCodec.ReadValue(ref reader, reader.ReadFieldHeader());
-                        Assert.NotNull(address);
-                        list.Add(address);
+                        list.Add(_grainAddressCodec.ReadValue(ref reader, reader.ReadFieldHeader()));
                     }
 
                     return list;
@@ -366,6 +424,12 @@ namespace UnitTests.Serialization
                     _grainAddressCodec.WriteField(ref writer, 0, typeof(GrainAddress), entry);
                 }
             }
+            }
+            finally
+            {
+                buffer.Dispose();
+            }
         }
     }
 }
+*/

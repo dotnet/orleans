@@ -99,9 +99,9 @@ namespace Orleans.TestingHost
         /// Gets or sets a value indicating what transport to use for connecting silos and clients.
         /// </summary>
         /// <remarks>
-        /// Defaults to InMemory.
+        /// Defaults to TCP sockets.
         /// </remarks>
-        public ConnectionTransportType ConnectionTransport { get; set; } = ConnectionTransportType.InMemory;
+        public ConnectionTransportType ConnectionTransport { get; set; } = ConnectionTransportType.TcpSocket;
 
         /// <summary>
         /// Converts these options into a dictionary.
@@ -132,7 +132,7 @@ namespace Orleans.TestingHost
             }
 
             result["UseRealEnvironmentStatistics"] = UseRealEnvironmentStatistics ? "True" : "False";
-            
+
             if (this.SiloBuilderConfiguratorTypes != null)
             {
                 for (int i = 0; i < this.SiloBuilderConfiguratorTypes.Count; i++)

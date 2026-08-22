@@ -246,6 +246,7 @@ namespace Orleans
                     }
                 default:
                     LogMessageNotSupported(logger, message);
+                    message.Dispose();
                     break;
             }
         }
@@ -372,6 +373,7 @@ namespace Orleans
             else
             {
                 LogDebugNoCallbackForResponseMessage(logger, response);
+                response.Dispose();
             }
         }
 
