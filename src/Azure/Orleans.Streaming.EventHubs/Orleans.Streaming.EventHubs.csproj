@@ -33,7 +33,6 @@
   </ItemGroup>
 
   <ItemGroup>
-    <InternalsVisibleTo Include="Orleans.Streaming.EventHubs.Aspire.Tests" />
     <InternalsVisibleTo Include="Orleans.Streaming.EventHubs.Tests" />
   </ItemGroup>
 </Project>
