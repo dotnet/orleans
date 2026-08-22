@@ -42,6 +42,18 @@ namespace NonSilo.Tests.Membership
         }
 
         [Fact]
+        public void GetTimestamp_UsesMembershipTimeProvider()
+        {
+            var monitor = CreateMonitor();
+
+            Assert.Equal(_startTimestamp, monitor.GetTimestamp());
+
+            _timeProvider.Advance(TimeSpan.FromMilliseconds(250));
+
+            Assert.Equal(TimestampAt(TimeSpan.FromMilliseconds(250)), monitor.GetTimestamp());
+        }
+
+        [Fact]
         public void GetLocalHealthStatus_RejectsNegativePeriod()
         {
             var participant = new TestHealthCheckParticipant(_ => (true, null));
@@ -350,9 +362,14 @@ namespace NonSilo.Tests.Membership
             var healthEvent = Assert.Single(
                 status.Events,
                 item => item.Kind == LocalSiloHealthCheckKind.RuntimeStall);
-            Assert.Equal(2, status.Score);
+            Assert.Equal(4, status.Score);
             Assert.Equal(TimestampAt(TimeSpan.FromSeconds(3)), healthEvent.Timestamp);
             Assert.Equal(TimeSpan.FromSeconds(2), healthEvent.Duration);
+            var stallEvent = Assert.Single(
+                status.Events,
+                item => item.Kind == LocalSiloHealthCheckKind.ThreadPoolQueueDelay);
+            Assert.Equal(2, stallEvent.Score);
+            Assert.Equal(TimeSpan.FromMilliseconds(2900), stallEvent.Duration);
         }
 
         [Fact]

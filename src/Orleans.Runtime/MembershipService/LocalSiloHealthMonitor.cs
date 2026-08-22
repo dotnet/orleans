@@ -51,49 +51,25 @@ namespace Orleans.Runtime.MembershipService
             => [.. Events.Where(static status => status.Complaint is not null).Select(static status => status.Complaint!)];
     }
 
-    internal readonly record struct LocalSiloPauseDuration(LocalSiloHealthCheckKind Kind, TimeSpan Duration);
-
-    internal readonly record struct LocalSiloPauseStatus(
-        TimeSpan TotalPauseDuration,
-        ImmutableArray<LocalSiloPauseDuration> Durations)
-    {
-        public TimeSpan GetDuration(LocalSiloHealthCheckKind kind)
-        {
-            if (!Durations.IsDefaultOrEmpty)
-            {
-                foreach (var item in Durations)
-                {
-                    if (item.Kind == kind)
-                    {
-                        return item.Duration;
-                    }
-                }
-            }
-
-            return TimeSpan.Zero;
-        }
-    }
-
     internal interface ILocalSiloHealthMonitor
     {
         /// <summary>
-        /// Captures the start of a pause aggregation interval.
+        /// Returns a timestamp from the stall detector's time source.
         /// </summary>
-        /// <returns>The timestamp which begins the interval.</returns>
-        long CapturePauseTimestamp();
+        /// <returns>A timestamp suitable for use with <see cref="GetStallDurationAsync"/>.</returns>
+        long GetTimestamp();
 
         /// <summary>
-        /// Completes pause collection without aggregating the interval.
+        /// Waits for the stall detector to sample past the end of the interval, then returns the detected stall duration.
         /// </summary>
-        /// <param name="startTimestamp">The timestamp returned by <see cref="CapturePauseTimestamp"/>.</param>
-        void EndPauseCollection(long startTimestamp);
-
-        /// <summary>
-        /// Returns pause durations since the provided timestamp, aggregated by kind and as a deduplicated total.
-        /// </summary>
-        /// <param name="startTimestamp">The timestamp returned by <see cref="CapturePauseTimestamp"/>.</param>
-        /// <returns>The pause duration summary.</returns>
-        LocalSiloPauseStatus GetPauseStatus(long startTimestamp);
+        /// <param name="startTimestamp">The start of the interval.</param>
+        /// <param name="endTimestamp">The end of the interval.</param>
+        /// <param name="cancellationToken">A token which cancels the wait.</param>
+        /// <returns>The detected stall duration.</returns>
+        ValueTask<TimeSpan> GetStallDurationAsync(
+            long startTimestamp,
+            long endTimestamp,
+            CancellationToken cancellationToken);
 
         /// <summary>
         /// Returns the aggregate local health status over the provided interval.
@@ -143,7 +119,7 @@ namespace Orleans.Runtime.MembershipService
     ///   <item><description>Check that no other silo suspects this silo.</description></item>
     ///   <item><description>Check for recently received successful ping responses (via <see cref="IProbeHealthMonitor"/>).</description></item>
     ///   <item><description>Check for recently received ping requests (via <see cref="IProbeHealthMonitor"/>).</description></item>
-    ///   <item><description>Check that the .NET Thread Pool is able to process work items within one second.</description></item>
+    ///   <item><description>Check that the .NET Thread Pool executes periodic timer callbacks on schedule.</description></item>
     ///   <item><description>Check that local async timers have been firing on-time (within 3 seconds of their due time).</description></item>
     /// </list>
     /// </remarks>
@@ -151,7 +127,8 @@ namespace Orleans.Runtime.MembershipService
         ILifecycleParticipant<ISiloLifecycle>,
         ILifecycleObserver,
         ILocalSiloHealthMonitor,
-        ILocalSiloHealthEventRecorder
+        ILocalSiloHealthEventRecorder,
+        IDisposable
     {
         internal const int MaxScore = 8;
         private static readonly TimeSpan HistoryDuration = TimeSpan.FromMinutes(1);
@@ -164,9 +141,8 @@ namespace Orleans.Runtime.MembershipService
         private readonly ILogger<LocalSiloHealthMonitor> _log;
         private readonly ClusterMembershipOptions _clusterMembershipOptions;
         private readonly IAsyncTimer _degradationCheckTimer;
-        private readonly ThreadPoolMonitor _threadPoolMonitor;
+        private readonly ThreadPoolStallDetector _stallDetector;
         private readonly TimeProvider _timeProvider;
-        private TimeSpan _cumulativeGCPauseDuration;
 #if NET9_0_OR_GREATER
         private readonly Lock _historyLock = new();
         private readonly Lock _samplingLock = new();
@@ -204,72 +180,36 @@ namespace Orleans.Runtime.MembershipService
             _log = log;
             _clusterMembershipOptions = clusterMembershipOptions.Value;
             _timeProvider = timeProvider;
-            _cumulativeGCPauseDuration = GC.GetTotalPauseDuration();
             _healthHistory = new(timeProvider, HistoryDuration, MinimumCheckPeriod);
             _degradationCheckTimer = timerFactory.Create(
                 MinimumCheckPeriod,
                 nameof(LocalSiloHealthMonitor),
                 timeProvider);
-            _threadPoolMonitor = new ThreadPoolMonitor(loggerFactory.CreateLogger<ThreadPoolMonitor>(), timeProvider);
+            var stallRetentionPeriod = _clusterMembershipOptions.MaxProbeTimeout + ThreadPoolStallDetector.DetectionPeriod;
+            if (stallRetentionPeriod < HistoryDuration)
+            {
+                stallRetentionPeriod = HistoryDuration;
+            }
+
+            _stallDetector = new(
+                loggerFactory.CreateLogger<ThreadPoolStallDetector>(),
+                timeProvider,
+                ThreadPoolStallDetector.DetectionPeriod,
+                stallRetentionPeriod);
         }
 
         /// <inheritdoc />
         public ImmutableArray<string> Complaints { get; private set; } = [];
 
         /// <inheritdoc />
-        public long CapturePauseTimestamp()
-        {
-            lock (_historyLock)
-            {
-                var timestamp = _timeProvider.GetTimestamp();
-                RecordGarbageCollectionPause(timestamp, GC.GetTotalPauseDuration());
-                _healthHistory.BeginPauseCollection(timestamp);
-                return timestamp;
-            }
-        }
+        public long GetTimestamp() => _timeProvider.GetTimestamp();
 
         /// <inheritdoc />
-        public void EndPauseCollection(long startTimestamp)
-        {
-            lock (_historyLock)
-            {
-                var cumulativePauseDuration = GC.GetTotalPauseDuration();
-                var endTimestamp = _timeProvider.GetTimestamp();
-                RecordGarbageCollectionPause(endTimestamp, cumulativePauseDuration);
-                _healthHistory.EndPauseCollection(startTimestamp, endTimestamp);
-            }
-        }
-
-        /// <inheritdoc />
-        public LocalSiloPauseStatus GetPauseStatus(long startTimestamp)
-        {
-            lock (_historyLock)
-            {
-                var cumulativePauseDuration = GC.GetTotalPauseDuration();
-                var endTimestamp = _timeProvider.GetTimestamp();
-                if (endTimestamp < startTimestamp)
-                {
-                    throw new ArgumentOutOfRangeException(
-                        nameof(startTimestamp),
-                        startTimestamp,
-                        "The interval start must not follow the current timestamp.");
-                }
-
-                RecordGarbageCollectionPause(endTimestamp, cumulativePauseDuration);
-                try
-                {
-                    return _healthHistory.AggregatePauses(
-                        startTimestamp,
-                        endTimestamp,
-                        endTimestamp,
-                        LocalSiloHealthCheckCategory.Local);
-                }
-                finally
-                {
-                    _healthHistory.EndPauseCollection(startTimestamp, endTimestamp);
-                }
-            }
-        }
+        public ValueTask<TimeSpan> GetStallDurationAsync(
+            long startTimestamp,
+            long endTimestamp,
+            CancellationToken cancellationToken)
+            => _stallDetector.GetStallDurationAsync(startTimestamp, endTimestamp, cancellationToken);
 
         /// <inheritdoc />
         public LocalSiloHealthStatus GetLocalHealthStatus(
@@ -300,13 +240,10 @@ namespace Orleans.Runtime.MembershipService
 
             lock (_historyLock)
             {
-                var cumulativePauseDuration = GC.GetTotalPauseDuration();
-                var nowTimestamp = _timeProvider.GetTimestamp();
-                RecordGarbageCollectionPause(nowTimestamp, cumulativePauseDuration);
                 return _healthHistory.Aggregate(
                     startTimestamp,
                     endTimestamp,
-                    nowTimestamp,
+                    _timeProvider.GetTimestamp(),
                     categories,
                     MaxScore);
             }
@@ -367,7 +304,7 @@ namespace Orleans.Runtime.MembershipService
                 var events = new List<LocalSiloHealthEvent>(_healthCheckParticipants.Count + 1);
                 var complaints = new List<string>();
                 CheckLocalHealthCheckParticipants(now.UtcDateTime, timestamp, events, complaints);
-                CheckThreadPoolQueueDelay(timestamp, events, complaints);
+                CheckThreadPoolStalls(timestamp, events, complaints);
                 AddEvents(timestamp, events);
 
                 var score = GetScore(events);
@@ -452,31 +389,14 @@ namespace Orleans.Runtime.MembershipService
             }
         }
 
-        private void RecordGarbageCollectionPause(long timestamp, TimeSpan cumulativePauseDuration)
-        {
-            var pauseDuration = cumulativePauseDuration - _cumulativeGCPauseDuration;
-            _cumulativeGCPauseDuration = cumulativePauseDuration;
-            if (pauseDuration <= TimeSpan.Zero)
-            {
-                return;
-            }
-
-            _healthHistory.Add(new(
-                timestamp,
-                LocalSiloHealthCheckKind.GarbageCollectionPause,
-                LocalSiloHealthCheckCategory.Local,
-                Source: null,
-                Score: 0,
-                Complaint: $"The .NET runtime paused for garbage collection for {pauseDuration}.",
-                pauseDuration));
-        }
-
-        private void CheckThreadPoolQueueDelay(
+        private void CheckThreadPoolStalls(
             long timestamp,
             List<LocalSiloHealthEvent> events,
             List<string> complaints)
         {
-            var delay = _threadPoolMonitor.MeasureQueueDelay();
+            var delay = _stallDetector.GetMaximumStallDuration(
+                SubtractTimestamp(timestamp, MinimumCheckPeriod),
+                timestamp);
             var score = (int)delay.TotalSeconds;
             string? complaint = null;
             if (score >= 1)
@@ -686,12 +606,6 @@ namespace Orleans.Runtime.MembershipService
                     var networkHealthCheckVersion = Volatile.Read(ref _networkHealthCheckVersion);
                     lock (_samplingLock)
                     {
-                        lock (_historyLock)
-                        {
-                            var cumulativePauseDuration = GC.GetTotalPauseDuration();
-                            RecordGarbageCollectionPause(_timeProvider.GetTimestamp(), cumulativePauseDuration);
-                        }
-
                         status = EnsureHealthCheck(
                             _timeProvider.GetUtcNow(),
                             _timeProvider.GetTimestamp(),
@@ -771,74 +685,7 @@ namespace Orleans.Runtime.MembershipService
             }
         }
 
-        /// <summary>
-        /// Measures queue delay on the .NET <see cref="ThreadPool"/>.
-        /// </summary>
-        private class ThreadPoolMonitor
-        {
-            private static readonly WaitCallback Callback = state => ((ThreadPoolMonitor)state!).Execute();
-#if NET9_0_OR_GREATER
-            private readonly Lock _lockObj = new();
-#else
-            private readonly object _lockObj = new();
-#endif
-            private readonly ILogger<ThreadPoolMonitor> _log;
-            private readonly TimeProvider _timeProvider;
-            private bool _scheduled;
-            private TimeSpan _lastQueueDelay;
-            private long _queueDelayTimestamp;
-
-            public ThreadPoolMonitor(ILogger<ThreadPoolMonitor> log, TimeProvider timeProvider)
-            {
-                _log = log;
-                _timeProvider = timeProvider;
-            }
-
-            public TimeSpan MeasureQueueDelay()
-            {
-                bool shouldSchedule;
-                TimeSpan delay;
-                lock (_lockObj)
-                {
-                    var currentQueueDelay = _scheduled ? _timeProvider.GetElapsedTime(_queueDelayTimestamp) : TimeSpan.Zero;
-                    delay = currentQueueDelay > _lastQueueDelay ? currentQueueDelay : _lastQueueDelay;
-
-                    if (!_scheduled)
-                    {
-                        _scheduled = true;
-                        shouldSchedule = true;
-                        _queueDelayTimestamp = _timeProvider.GetTimestamp();
-                    }
-                    else
-                    {
-                        shouldSchedule = false;
-                    }
-                }
-
-                if (shouldSchedule)
-                {
-                    _ = ThreadPool.UnsafeQueueUserWorkItem(Callback, this);
-                }
-
-                return delay;
-            }
-
-            private void Execute()
-            {
-                try
-                {
-                    lock (_lockObj)
-                    {
-                        _scheduled = false;
-                        _lastQueueDelay = _timeProvider.GetElapsedTime(_queueDelayTimestamp);
-                    }
-                }
-                catch (Exception exception)
-                {
-                    LocalSiloHealthMonitor.LogThreadPoolDelayMonitorError(_log, exception);
-                }
-            }
-        }
+        public void Dispose() => _stallDetector.Dispose();
 
         [LoggerMessage(
             Message = ".NET Thread Pool is exhibiting delays of {ThreadPoolQueueDelaySeconds}s. This can indicate .NET Thread Pool starvation, very long .NET GC pauses, or other runtime or machine pauses."
@@ -889,12 +736,6 @@ namespace Orleans.Runtime.MembershipService
             Message = "Self-monitoring determined that local health is degraded. Degradation score is {Score}/{MaxScore} (lower is better). Complaints: {Complaints}"
         )]
         private partial void LogSelfMonitoringDegraded(int score, int maxScore, string complaints);
-
-        [LoggerMessage(
-            Level = LogLevel.Error,
-            Message = "Exception monitoring .NET thread pool delay"
-        )]
-        private static partial void LogThreadPoolDelayMonitorError(ILogger logger, Exception exception);
 
         [LoggerMessage(
             Level = LogLevel.Error,

@@ -16,6 +16,24 @@ public class WatchdogTests
     private static readonly DateTimeOffset Start = new(2026, 1, 1, 12, 0, 0, TimeSpan.Zero);
 
     [Fact, TestCategory("BVT")]
+    public void CheckRuntimeHealth_RecordsGarbageCollectionPauseEvent()
+    {
+        using var fixture = new WatchdogFixture();
+        fixture.SetWatchdogTimestamp("_platformWatchdogTimestamp");
+        fixture.SetWatchdogTimestamp("_componentWatchdogTimestamp");
+        fixture.SetField("_cumulativeGCPauseDuration", GC.GetTotalPauseDuration() - TimeSpan.FromTicks(1));
+
+        fixture.CheckRuntimeHealth();
+
+        var healthEvent = Assert.Single(fixture.Events);
+        Assert.Equal(LocalSiloHealthCheckKind.GarbageCollectionPause, healthEvent.Kind);
+        Assert.Equal(0, healthEvent.Score);
+        Assert.Contains("garbage collection", healthEvent.Complaint, StringComparison.OrdinalIgnoreCase);
+        Assert.True(healthEvent.Duration > TimeSpan.Zero);
+        Assert.Null(healthEvent.Source);
+    }
+
+    [Fact, TestCategory("BVT")]
     public void CheckRuntimeHealth_RecordsRuntimeStallEvent()
     {
         using var fixture = new WatchdogFixture();
