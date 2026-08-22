@@ -39,6 +39,43 @@ public sealed class OrleansBinaryCommandCodecTests : JournalingTestBase
     }
 
     [Fact]
+    public void DictionaryCodec_SnapshotResetsReferencesBetweenIndependentlySerializedValues()
+    {
+        var codec = new OrleansBinaryDurableDictionaryCommandCodec<string, SnapshotReferenceRecord>(
+            ValueCodec<string>(),
+            ValueCodec<SnapshotReferenceRecord>(),
+            SessionPool);
+        var consumer = new RecordingDictionaryCommandHandler<string, SnapshotReferenceRecord>();
+        var firstPayload = new byte[] { 1, 2, 3 };
+        var secondPayload = new byte[] { 4, 5, 6 };
+
+        Apply(
+            codec,
+            writer => codec.WriteSnapshot(
+                [
+                    new("first", new SnapshotReferenceRecord { Payload = firstPayload, Alias = firstPayload }),
+                    new("second", new SnapshotReferenceRecord { Payload = secondPayload, Alias = secondPayload })
+                ],
+                writer),
+            consumer);
+
+        Assert.Collection(
+            consumer.SnapshotItems,
+            item =>
+            {
+                Assert.Equal("first", item.Key);
+                Assert.Equal(firstPayload, item.Value.Payload);
+                Assert.Same(item.Value.Payload, item.Value.Alias);
+            },
+            item =>
+            {
+                Assert.Equal("second", item.Key);
+                Assert.Equal(secondPayload, item.Value.Payload);
+                Assert.Same(item.Value.Payload, item.Value.Alias);
+            });
+    }
+
+    [Fact]
     public void ListCodec_AllCommands_RoundTrip()
     {
         var codec = new OrleansBinaryDurableListCommandCodec<string>(ValueCodec<string>(), SessionPool);
@@ -492,4 +529,14 @@ public sealed class OrleansBinaryCommandCodecTests : JournalingTestBase
         var exception = Assert.Throws<InvalidOperationException>(action);
         Assert.Contains("trailing data", exception.Message);
     }
+}
+
+[GenerateSerializer]
+internal sealed class SnapshotReferenceRecord
+{
+    [Id(0)]
+    public required byte[] Payload { get; init; }
+
+    [Id(1)]
+    public required byte[] Alias { get; init; }
 }

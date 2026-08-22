@@ -1,10 +1,14 @@
+using System.Diagnostics.Metrics;
 using System.Runtime.CompilerServices;
 using System.Reflection;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Diagnostics.Metrics.Testing;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using Microsoft.Extensions.Time.Testing;
 using NSubstitute;
 using Orleans.DurableJobs;
+using Orleans.Runtime;
 using Orleans.Runtime.Messaging;
 using Xunit;
 
@@ -444,6 +448,43 @@ public class ShardExecutorTests
     }
 
     [Fact]
+    public async Task RunShardAsync_WhenReceiverThrows_UsesRetryPolicy()
+    {
+        var retryAt = DateTimeOffset.UtcNow.AddMinutes(1);
+        var options = CreateOptions(
+            maxConcurrentJobs: 1,
+            shouldRetry: (_, exception) =>
+            {
+                Assert.Equal("Simulated receiver failure", exception.Message);
+                return retryAt;
+            });
+        var shard = CreateJobShard(CreateJobs(1));
+        var grainFactory = CreateGrainFactory();
+        var extension = Substitute.For<IDurableJobReceiverExtension>();
+        extension.HandleDurableJobAsync(Arg.Any<IJobRunContext>(), Arg.Any<CancellationToken>())
+            .Returns((Func<NSubstitute.Core.CallInfo, ValueTask<DurableJobRunResult>>)
+                (_ => throw new InvalidOperationException("Simulated receiver failure")));
+        grainFactory.GetGrain<IDurableJobReceiverExtension>(Arg.Any<GrainId>()).Returns(extension);
+        var executor = new ShardExecutor(
+            grainFactory,
+            options,
+            CreateOverloadDetector(isOverloaded: false),
+            NullLogger<ShardExecutor>.Instance);
+
+        await executor.RunShardAsync(shard, CancellationToken.None);
+
+        await shard.Received(1).RetryJobLaterAsync(
+            Arg.Any<IJobRunContext>(),
+            retryAt,
+            Arg.Any<CancellationToken>());
+        await shard.DidNotReceive().RemoveJobAsync(Arg.Any<string>(), Arg.Any<CancellationToken>());
+        await shard.DidNotReceive().RescheduleJobAsync(
+            Arg.Any<IJobRunContext>(),
+            Arg.Any<DateTimeOffset>(),
+            Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
     public async Task RunShardAsync_WhenExecutionIsCanceled_DoesNotRetryOrRemove()
     {
         var options = CreateOptions(
@@ -668,7 +709,131 @@ public class ShardExecutorTests
             NullLogger<Orleans.Hosting.DurableJobsOptionsValidator>.Instance,
             options);
 
-        validator.ValidateConfiguration();
+        var exception = Record.Exception(validator.ValidateConfiguration);
+
+        Assert.Null(exception);
+    }
+
+    [Fact]
+    public async Task RunShardAsync_WhenJobFailsWithNoRetryPolicy_RecordsFailureWithoutRetryingReschedulingOrRemoving()
+    {
+        // Default ShouldRetry (CreateOptions default) always returns null, i.e. no retry: this is the
+        // terminal-failure branch (ExecuteJobAsync's "failureException is not null && retryTime is null" path)
+        // which none of the other tests exercise (they all configure ShouldRetry to return a retry time).
+        var services = new ServiceCollection();
+        services.AddMetrics();
+        using var serviceProvider = services.BuildServiceProvider();
+        var meterFactory = serviceProvider.GetRequiredService<IMeterFactory>();
+        var instruments = new DurableJobsInstruments(new OrleansInstruments(meterFactory));
+        using var failedCollector = new MetricCollector<long>(meterFactory, "Microsoft.Orleans", "orleans-durablejobs-jobs-failed");
+        using var retriedCollector = new MetricCollector<long>(meterFactory, "Microsoft.Orleans", "orleans-durablejobs-jobs-retried");
+        using var completedCollector = new MetricCollector<long>(meterFactory, "Microsoft.Orleans", "orleans-durablejobs-jobs-completed");
+
+        var options = CreateOptions(maxConcurrentJobs: 10);
+        var overloadDetector = CreateOverloadDetector(isOverloaded: false);
+        var jobs = CreateJobs(1);
+        var shard = CreateJobShard(jobs);
+
+        var grainFactory = Substitute.For<IInternalGrainFactory>();
+        var extension = Substitute.For<IDurableJobReceiverExtension>();
+        var terminalException = new InvalidOperationException("Simulated permanent job failure");
+        extension.HandleDurableJobAsync(Arg.Any<IJobRunContext>(), Arg.Any<CancellationToken>())
+            .Returns(DurableJobRunResult.Failed(terminalException));
+        grainFactory.GetGrain<IDurableJobReceiverExtension>(Arg.Any<GrainId>()).Returns(extension);
+
+        var executor = new ShardExecutor(
+            grainFactory,
+            options,
+            overloadDetector,
+            NullLogger<ShardExecutor>.Instance,
+            timeProvider: null,
+            durableJobsInstruments: instruments);
+
+        await executor.RunShardAsync(shard, CancellationToken.None);
+
+        // No follow-up action should be taken for a terminal (non-retryable) failure.
+        await shard.DidNotReceive().RetryJobLaterAsync(Arg.Any<IJobRunContext>(), Arg.Any<DateTimeOffset>(), Arg.Any<CancellationToken>());
+        await shard.DidNotReceive().RescheduleJobAsync(Arg.Any<IJobRunContext>(), Arg.Any<DateTimeOffset>(), Arg.Any<CancellationToken>());
+        await shard.DidNotReceive().RemoveJobAsync(Arg.Any<string>(), Arg.Any<CancellationToken>());
+
+        // Exactly one failure metric recorded, and none of the completed/retried metrics fired -
+        // a mutation that routed this branch through OnJobCompleted/OnJobRetried instead of OnJobFailed
+        // would be caught here.
+        Assert.Equal(1, Assert.Single(failedCollector.GetMeasurementSnapshot()).Value);
+        Assert.Empty(retriedCollector.GetMeasurementSnapshot());
+        Assert.Empty(completedCollector.GetMeasurementSnapshot());
+    }
+
+    [Fact]
+    public async Task SlowStartRampUpAsync_WhenTimerThrows_RecoversByReleasingFullConcurrencyImmediately()
+    {
+        // Covers the catch(Exception) branch in SlowStartRampUpAsync: if the ramp-up delay fails for any
+        // reason, all remaining capacity must be released immediately (a single jump to full concurrency)
+        // instead of leaving the shard stuck at the low initial concurrency forever.
+        var initialConcurrency = 2;
+        var maxConcurrency = 6;
+        var options = CreateOptions(
+            maxConcurrentJobs: maxConcurrency,
+            concurrencySlowStartEnabled: true,
+            slowStartInitialConcurrency: initialConcurrency,
+            slowStartInterval: TimeSpan.FromMilliseconds(5));
+        var overloadDetector = CreateOverloadDetector(isOverloaded: false);
+        var grainFactory = Substitute.For<IInternalGrainFactory>();
+
+        var holdGate = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var reachedFullConcurrency = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var currentConcurrent = 0;
+        var maxObservedConcurrent = 0;
+        var concurrentLock = new object();
+
+        // Enough jobs to occupy every permit simultaneously once the ramp-up releases full capacity.
+        var jobs = CreateJobs(maxConcurrency + 4);
+        var shard = CreateJobShard(jobs);
+
+        ConfigureGrainFactoryWithSlowJobExecution(grainFactory, async () =>
+        {
+            lock (concurrentLock)
+            {
+                currentConcurrent++;
+                if (currentConcurrent > maxObservedConcurrent)
+                {
+                    maxObservedConcurrent = currentConcurrent;
+                    if (maxObservedConcurrent >= maxConcurrency)
+                    {
+                        reachedFullConcurrency.TrySetResult();
+                    }
+                }
+            }
+
+            await holdGate.Task;
+
+            lock (concurrentLock)
+            {
+                currentConcurrent--;
+            }
+        });
+
+        var throwingTimeProvider = new ThrowingTimerTimeProvider();
+        var executor = new ShardExecutor(grainFactory, options, overloadDetector, NullLogger<ShardExecutor>.Instance, throwingTimeProvider);
+
+        var runTask = executor.RunShardAsync(shard, CancellationToken.None);
+        try
+        {
+            var completedTask = await Task.WhenAny(reachedFullConcurrency.Task, Task.Delay(TimeSpan.FromSeconds(10)));
+            Assert.Same(reachedFullConcurrency.Task, completedTask);
+        }
+        finally
+        {
+            holdGate.TrySetResult();
+            await runTask.WaitAsync(TimeSpan.FromSeconds(10));
+        }
+
+        // Despite the initial concurrency being capped at 2, the failed ramp-up must have released the
+        // full remaining capacity so the shard is not permanently stuck at the low initial value.
+        Assert.Equal(maxConcurrency, maxObservedConcurrent);
+
+        // The shard must still make forward progress after recovering from the ramp-up failure.
+        await shard.Received(maxConcurrency + 4).RemoveJobAsync(Arg.Any<string>(), Arg.Any<CancellationToken>());
     }
 
     // Helper methods
@@ -700,6 +865,16 @@ public class ShardExecutorTests
         return detector;
     }
 
+    /// <summary>
+    /// A <see cref="TimeProvider"/> whose <see cref="CreateTimer"/> always throws, used to deterministically
+    /// simulate a failure in the middle of an <c>await Task.Delay(..., TimeProvider, ...)</c> call without
+    /// relying on wall-clock timing.
+    /// </summary>
+    private sealed class ThrowingTimerTimeProvider : TimeProvider
+    {
+        public override ITimer CreateTimer(TimerCallback callback, object? state, TimeSpan dueTime, TimeSpan period)
+            => throw new InvalidOperationException("Simulated timer failure");
+    }
     private static List<DurableJob> CreateJobs(int count, DateTimeOffset? dueTime = null)
     {
         var jobs = new List<DurableJob>();

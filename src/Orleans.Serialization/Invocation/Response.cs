@@ -46,6 +46,11 @@ namespace Orleans.Serialization.Invocation
         /// <inheritdoc />
         public abstract object? Result { get; set; }
 
+        /// <summary>
+        /// Gets a value indicating whether this response completes the invocation.
+        /// </summary>
+        public virtual bool IsFinal => true;
+
         public virtual Type? GetSimpleResultType() => null;
 
         /// <inheritdoc />
@@ -78,6 +83,9 @@ namespace Orleans.Serialization.Invocation
 
         /// <inheritdoc/>
         public override Exception? Exception { get => null; set => throw new InvalidOperationException($"Type {nameof(CompletedResponse)} is read-only"); }
+
+        /// <inheritdoc/>
+        public override bool IsFinal => true;
 
         /// <inheritdoc/>
         [return: System.Diagnostics.CodeAnalysis.MaybeNull]
@@ -123,6 +131,9 @@ namespace Orleans.Serialization.Invocation
         public override Exception? Exception { get; set; }
 
         /// <inheritdoc/>
+        public override bool IsFinal => true;
+
+        /// <inheritdoc/>
         [return: System.Diagnostics.CodeAnalysis.MaybeNull]
         public override T GetResult<T>()
         {
@@ -160,6 +171,9 @@ namespace Orleans.Serialization.Invocation
             get => _result;
             set => _result = (TResult?)value;
         }
+
+        /// <inheritdoc/>
+        public override bool IsFinal => true;
 
         public override Type GetSimpleResultType() => typeof(TResult);
 

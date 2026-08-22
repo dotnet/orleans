@@ -17,6 +17,7 @@ using Microsoft.CodeAnalysis;
 using Orleans.Placement.Repartitioning;
 using Microsoft.Extensions.DependencyInjection;
 using System.Collections.Concurrent;
+using Orleans.Runtime.Internal;
 
 namespace Orleans.Runtime.Placement.Repartitioning;
 

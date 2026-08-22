@@ -27,6 +27,13 @@
     <Project Path="playground/DashboardCohosted/DashboardCohosted.csproj" />
     <Project Path="playground/DashboardSeparateHost/DashboardSeparateHost.csproj" />
   </Folder>
+  <Folder Name="/playground/PaymentWorkflowApp/">
+    <Project Path="playground/PaymentWorkflowApp/PaymentWorkflowApp.csproj" />
+  </Folder>
+  <Folder Name="/playground/WorkflowsApp/">
+    <Project Path="playground/WorkflowsApp/WorkflowsApp.AppHost/WorkflowsApp.AppHost.csproj" />
+    <Project Path="playground/WorkflowsApp/WorkflowsApp.Service/WorkflowsApp.Service.csproj" />
+  </Folder>
   <Folder Name="/Solution Items/">
     <File Path=".editorconfig" />
     <File Path="Directory.Build.props" />
@@ -40,6 +47,8 @@
     <Project Path="src/Orleans.CodeGenerator/Orleans.CodeGenerator.csproj" />
     <Project Path="src/Orleans.Core.Abstractions/Orleans.Core.Abstractions.csproj" />
     <Project Path="src/Orleans.Core/Orleans.Core.csproj" />
+    <Project Path="src/Orleans.DurableTasks/Orleans.DurableTasks.csproj" />
+    <Project Path="src/Orleans.DurableMessaging/Orleans.DurableMessaging.csproj" />
     <Project Path="src/Orleans.EventSourcing/Orleans.EventSourcing.csproj" />
     <Project Path="src/Orleans.Journaling/Orleans.Journaling.csproj" />
     <Project Path="src/Orleans.Persistence.Memory/Orleans.Persistence.Memory.csproj" />
@@ -59,6 +68,7 @@
     <Project Path="src/Orleans.Streaming/Orleans.Streaming.csproj" />
     <Project Path="src/Orleans.TestingHost/Orleans.TestingHost.csproj" />
     <Project Path="src/Serializers/Orleans.Serialization.Protobuf/Orleans.Serialization.Protobuf.csproj" />
+    <Project Path="src/System.Distributed.DurableTasks/System.Distributed.DurableTasks.csproj" />
   </Folder>
   <Folder Name="/src/Dashboard/">
     <Project Path="src/Dashboard/Orleans.Dashboard.Abstractions/Orleans.Dashboard.Abstractions.csproj" />
@@ -132,8 +142,10 @@
     <Project Path="test/Orleans.Core.Tests/Orleans.Core.Tests.csproj" />
     <Project Path="test/Orleans.CodeGenerator.Tests/Orleans.CodeGenerator.Tests.csproj" />
     <Project Path="test/Orleans.Connections.Security.Tests/Orleans.Connections.Security.Tests.csproj" />
+    <Project Path="test/Orleans.DurableTasks.Tests/Orleans.DurableTasks.Tests.csproj" />
     <Project Path="test/Orleans.Journaling.Tests/Orleans.Journaling.Tests.csproj" />
     <Project Path="test/Orleans.Journaling.Json.Tests/Orleans.Journaling.Json.Tests.csproj" />
+    <Project Path="test/WorkflowsApp.Service.Tests/WorkflowsApp.Service.Tests.csproj" />
     <Project Path="test/Orleans.Serialization.FSharp.Tests/Orleans.Serialization.FSharp.Tests.fsproj" />
     <Project Path="test/Orleans.Serialization.UnitTests/Orleans.Serialization.UnitTests.csproj" />
     <Project Path="test/Orleans.Runtime.Tests/Orleans.Runtime.Tests.csproj" />

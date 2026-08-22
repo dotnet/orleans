@@ -34,6 +34,7 @@
     <PackageReference Include="Microsoft.Extensions.Configuration.Abstractions" />
     <PackageReference Include="Microsoft.Extensions.Logging" />
     <ProjectReference Include="$(SourceRoot)src\Orleans.Serialization\Orleans.Serialization.csproj" />
+    <ProjectReference Include="..\System.Distributed.DurableTasks\System.Distributed.DurableTasks.csproj" />
   </ItemGroup>
 
   <ItemGroup>
@@ -50,6 +51,8 @@
     <InternalsVisibleTo Include="Orleans.DefaultCluster.Tests" />
     <InternalsVisibleTo Include="Orleans.DurableJobs" />
     <InternalsVisibleTo Include="Orleans.DurableJobs.Tests" />
+    <InternalsVisibleTo Include="Orleans.DurableTasks" />
+    <InternalsVisibleTo Include="Orleans.DurableTasks.Tests" />
     <InternalsVisibleTo Include="Orleans.GrainDirectory.Tests" />
     <InternalsVisibleTo Include="Orleans.Journaling" />
     <InternalsVisibleTo Include="Orleans.Journaling.Tests" />

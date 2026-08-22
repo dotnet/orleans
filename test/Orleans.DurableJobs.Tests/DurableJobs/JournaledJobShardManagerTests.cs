@@ -1,6 +1,7 @@
 using System.Buffers;
 using System.Collections.Concurrent;
 using System.Collections.Immutable;
+using System.Diagnostics.CodeAnalysis;
 using System.Diagnostics.Metrics;
 using System.Net;
 using Microsoft.Extensions.Configuration;
@@ -512,6 +513,174 @@ public class JournaledJobShardManagerTests
         foreach (var shard in remainingClaims)
         {
             await DrainAndUnregisterAsync(manager2, shard);
+        }
+    }
+
+    [Fact]
+    public async Task ProcessMutationBatchAsync_WhenPendingWriteByteCountThrows_FaultsEveryIncompleteOperationInTheBatchWithTheSameException()
+    {
+        var storageProvider = new VolatileJournalStorageProvider();
+        using var services = CreateServices(storageProvider);
+        var membership = new TestClusterMembershipService();
+        var silo = SiloAddress.New(new IPEndPoint(IPAddress.Loopback, 5090), 0);
+        membership.SetSiloStatus(silo, SiloStatus.Active);
+
+        var manager = CreateManager(services, membership, silo);
+        var start = DateTimeOffset.UtcNow.AddSeconds(-5);
+        var end = start.AddHours(1);
+
+        // Create a shard normally so that `manager`'s sticky ownership cache genuinely records this
+        // shard id as owned by the local silo (JournaledJobShardManager._ownedShards), the same way
+        // production code establishes ownership before ProcessMutationBatchAsync ever runs.
+        var canonicalShard = await manager.CreateShardAsync(start, end, new Dictionary<string, string>(), CancellationToken.None);
+        var shardId = JobShardId.Parse(canonicalShard.Id);
+
+        // Build a second JournaledJobShard instance for the SAME (already-owned) shard id, backed by an
+        // independent, throwaway journal so it never touches canonicalShard's real persisted state, but
+        // whose IJournaledStateManager.PendingWriteByteCount getter always throws. ProcessMutationBatchAsync
+        // reads PendingWriteByteCount immediately after confirming ownership and before applying any
+        // operation, so this deterministically drives execution into the method's outer catch block,
+        // which must route through CompleteIncompleteOperations for every still-incomplete operation.
+        var stateManagerFactory = services.GetRequiredService<IJournaledStateManagerFactory>();
+        var innerStateManager = stateManagerFactory.Create(JobShardId.New().ToJournalId());
+        var state = new JournaledJobShardState(shardId, start, end, timeProvider: null);
+        var faultingStateManager = new ThrowingPendingWriteByteCountStateManager(innerStateManager);
+        faultingStateManager.RegisterState(JournaledJobShardState.StateName, state);
+        await faultingStateManager.InitializeAsync(CancellationToken.None);
+
+        await using var testShard = new JournaledJobShard(
+            shardId,
+            start,
+            end,
+            metadata: null,
+            isClosed: false,
+            state,
+            faultingStateManager,
+            manager,
+            timeProvider: null,
+            batchLingerDelay: default,
+            durableJobsInstruments: null);
+
+        // Enqueue two mutations back-to-back. Whether or not they land in the same physical batch, each
+        // must independently observe the SAME injected exception instance once PendingWriteByteCount
+        // throws - proving CompleteIncompleteOperations resolves every operation it is handed, not just
+        // the first (a foreach->if mutation on the private helper would leave the second Task hanging).
+        var firstRemoval = testShard.RemoveJobAsync("job-a", CancellationToken.None);
+        var secondRemoval = testShard.RemoveJobAsync("job-b", CancellationToken.None);
+
+        var firstFault = await Assert.ThrowsAsync<InvalidOperationException>(() => firstRemoval).WaitAsync(TimeSpan.FromSeconds(10));
+        var secondFault = await Assert.ThrowsAsync<InvalidOperationException>(() => secondRemoval).WaitAsync(TimeSpan.FromSeconds(10));
+
+        Assert.Same(faultingStateManager.InjectedException, firstFault);
+        Assert.Same(faultingStateManager.InjectedException, secondFault);
+
+        await canonicalShard.DisposeAsync();
+    }
+
+    [Fact]
+    public async Task ProcessMutationBatchAsync_WhenShardIsDisposed_CancelsEveryIncompleteOperation()
+    {
+        var storageProvider = new VolatileJournalStorageProvider();
+        using var services = CreateServices(storageProvider);
+        var membership = new TestClusterMembershipService();
+        var silo = SiloAddress.New(new IPEndPoint(IPAddress.Loopback, 5091), 0);
+        membership.SetSiloStatus(silo, SiloStatus.Active);
+
+        var manager = CreateManager(services, membership, silo);
+        var start = DateTimeOffset.UtcNow.AddSeconds(-5);
+        var end = start.AddHours(1);
+        var canonicalShard = await manager.CreateShardAsync(start, end, new Dictionary<string, string>(), CancellationToken.None);
+        var shardId = JobShardId.Parse(canonicalShard.Id);
+        var innerStateManager = services.GetRequiredService<IJournaledStateManagerFactory>().Create(JobShardId.New().ToJournalId());
+        var state = new JournaledJobShardState(shardId, start, end, timeProvider: null);
+        var blockingStateManager = new BlockingPendingWriteByteCountStateManager(innerStateManager);
+        blockingStateManager.RegisterState(JournaledJobShardState.StateName, state);
+        await blockingStateManager.InitializeAsync(CancellationToken.None);
+
+        var testShard = new JournaledJobShard(
+            shardId,
+            start,
+            end,
+            metadata: null,
+            isClosed: false,
+            state,
+            blockingStateManager,
+            manager,
+            timeProvider: null,
+            batchLingerDelay: default,
+            durableJobsInstruments: null);
+
+        var firstRemoval = testShard.RemoveJobAsync("job-a", CancellationToken.None);
+        var secondRemoval = testShard.RemoveJobAsync("job-b", CancellationToken.None);
+        await blockingStateManager.PendingWriteByteCountRead.WaitAsync(TimeSpan.FromSeconds(10));
+
+        var disposeTask = testShard.DisposeAsync().AsTask();
+        blockingStateManager.ReleasePendingWriteByteCount();
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => firstRemoval).WaitAsync(TimeSpan.FromSeconds(10));
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => secondRemoval).WaitAsync(TimeSpan.FromSeconds(10));
+        await disposeTask.WaitAsync(TimeSpan.FromSeconds(10));
+
+        await canonicalShard.DisposeAsync();
+    }
+
+    private sealed class ThrowingPendingWriteByteCountStateManager(IJournaledStateManager inner) : IJournaledStateManager
+    {
+        public InvalidOperationException InjectedException { get; } =
+            new("Simulated PendingWriteByteCount failure injected for JournaledJobShard.ProcessMutationBatchAsync test coverage.");
+
+        public long PendingWriteByteCount => throw InjectedException;
+
+        public ValueTask InitializeAsync(CancellationToken cancellationToken) => inner.InitializeAsync(cancellationToken);
+
+        public void RegisterState(string name, IJournaledState state) => inner.RegisterState(name, state);
+
+        public bool TryGetState(string name, [NotNullWhen(true)] out IJournaledState? state) => inner.TryGetState(name, out state);
+
+        public ValueTask WriteStateAsync(CancellationToken cancellationToken) => inner.WriteStateAsync(cancellationToken);
+
+        public ValueTask RevertPendingChangesAsync(CancellationToken cancellationToken) => inner.RevertPendingChangesAsync(cancellationToken);
+
+        public ValueTask DeleteStateAsync(CancellationToken cancellationToken) => inner.DeleteStateAsync(cancellationToken);
+
+        public ValueTask DisposeAsync() => inner.DisposeAsync();
+    }
+
+    private sealed class BlockingPendingWriteByteCountStateManager(IJournaledStateManager inner) : IJournaledStateManager
+    {
+        private readonly ManualResetEventSlim _releasePendingWriteByteCount = new(initialState: false);
+        private readonly TaskCompletionSource _pendingWriteByteCountRead = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        public Task PendingWriteByteCountRead => _pendingWriteByteCountRead.Task;
+
+        public long PendingWriteByteCount
+        {
+            get
+            {
+                _pendingWriteByteCountRead.TrySetResult();
+                _releasePendingWriteByteCount.Wait();
+                throw new OperationCanceledException();
+            }
+        }
+
+        public void ReleasePendingWriteByteCount() => _releasePendingWriteByteCount.Set();
+
+        public ValueTask InitializeAsync(CancellationToken cancellationToken) => inner.InitializeAsync(cancellationToken);
+
+        public void RegisterState(string name, IJournaledState state) => inner.RegisterState(name, state);
+
+        public bool TryGetState(string name, [NotNullWhen(true)] out IJournaledState? state) => inner.TryGetState(name, out state);
+
+        public ValueTask WriteStateAsync(CancellationToken cancellationToken) => inner.WriteStateAsync(cancellationToken);
+
+        public ValueTask RevertPendingChangesAsync(CancellationToken cancellationToken) => inner.RevertPendingChangesAsync(cancellationToken);
+
+        public ValueTask DeleteStateAsync(CancellationToken cancellationToken) => inner.DeleteStateAsync(cancellationToken);
+
+        public ValueTask DisposeAsync()
+        {
+            _releasePendingWriteByteCount.Dispose();
+            return inner.DisposeAsync();
         }
     }
 

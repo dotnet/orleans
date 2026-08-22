@@ -123,6 +123,7 @@
     <PackageVersion Include="xunit.v3.mtp-v2" Version="3.2.2" />
     <PackageVersion Include="ZeroFormatter" Version="1.6.4" />
     <PackageVersion Include="ZooKeeperNetEx" Version="3.4.12.4" />
+    <PackageVersion Include="LiteDB" Version="5.0.20" />
   </ItemGroup>
   <!-- Updates for later TFMs -->
   <ItemGroup Condition=" '$(TargetFramework)' == 'net10.0' ">
@@ -130,6 +131,7 @@
     <PackageVersion Update="Aspire.Azure.Storage.Blobs" Version="13.2.4" />
     <PackageVersion Update="Aspire.Azure.Storage.Queues" Version="13.2.4" />
     <PackageVersion Update="Aspire.Hosting.AppHost" Version="13.2.4" />
+    <PackageVersion Include="Aspire.Hosting.Azure" Version="13.2.4" />
     <PackageVersion Include="Aspire.Hosting.Azure.Storage" Version="13.2.4" />
     <PackageVersion Update="Aspire.Hosting.Orleans" Version="13.2.4" />
     <PackageVersion Update="Aspire.Hosting.Redis" Version="13.2.4" />

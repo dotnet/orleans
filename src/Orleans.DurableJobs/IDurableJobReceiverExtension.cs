@@ -30,17 +30,22 @@ internal sealed partial class DurableJobReceiverExtension : IDurableJobReceiverE
 
     private readonly IGrainContext _grain;
     private readonly DurableJobReceiverExtensionShared _shared;
+    private readonly DurableJobHandlerRegistry? _featureHandlers;
     private readonly Dictionary<(string JobId, long ExecutionGeneration, int DequeueCount), JobAttemptState> _jobAttempts = [];
     private readonly Queue<CompletedJobAttempt> _completedJobAttempts = new();
     private int _completedJobAttemptCount;
 
-    public DurableJobReceiverExtension(IGrainContext grain, DurableJobReceiverExtensionShared shared)
+    public DurableJobReceiverExtension(
+        IGrainContext grain,
+        DurableJobReceiverExtensionShared shared,
+        DurableJobHandlerRegistry? featureHandlers = null)
     {
         ArgumentNullException.ThrowIfNull(grain);
         ArgumentNullException.ThrowIfNull(shared);
 
         _grain = grain;
         _shared = shared;
+        _featureHandlers = featureHandlers;
     }
 
     /// <inheritdoc />
@@ -64,6 +69,11 @@ internal sealed partial class DurableJobReceiverExtension : IDurableJobReceiverE
 
     private Task<DurableJobRunResult> StartJob(IJobRunContext context, CancellationToken cancellationToken)
     {
+        if (_featureHandlers?.TryGetHandler(context.Job.Name, out var featureHandler) is true)
+        {
+            return ExecuteFeatureHandlerAsync(featureHandler, context, cancellationToken);
+        }
+
         if (_grain.GrainInstance is not IDurableJobHandler handler)
         {
             LogGrainDoesNotImplementHandler(_shared.Logger, _grain.GrainId);
@@ -71,6 +81,32 @@ internal sealed partial class DurableJobReceiverExtension : IDurableJobReceiverE
         }
 
         return ExecuteHandlerAsync(handler, context, cancellationToken);
+    }
+
+    private async Task<DurableJobRunResult> ExecuteFeatureHandlerAsync(
+        IDurableJobFeatureHandler handler,
+        IJobRunContext context,
+        CancellationToken cancellationToken)
+    {
+        using var tracker = _shared.BeginHandlerExecution(context);
+        try
+        {
+            var result = await handler.ExecuteJobAsync(context, cancellationToken);
+            tracker.Completed();
+            return result ?? throw new InvalidOperationException(
+                $"Durable job feature handler for '{context.Job.Name}' returned a null result.");
+        }
+        catch (OperationCanceledException)
+        {
+            tracker.Canceled();
+            throw;
+        }
+        catch (Exception exception)
+        {
+            tracker.Failed(exception);
+            LogErrorExecutingDurableJob(_shared.Logger, exception, context.Job.Id, _grain.GrainId);
+            return DurableJobRunResult.Failed(exception);
+        }
     }
 
     private async Task<DurableJobRunResult> ExecuteHandlerAsync(IDurableJobHandler handler, IJobRunContext context, CancellationToken cancellationToken)

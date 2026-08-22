@@ -1,3 +1,6 @@
+interface Orleans.DurableJobs.IDurableJobFeatureReceiverExtension [Version(0)]
+  TryHandleFeatureJobAsync(Orleans.DurableJobs.IJobRunContext, System.Threading.CancellationToken) -> ValueTask<Orleans.DurableJobs.DurableJobRunResult?>
+
 interface Orleans.DurableJobs.IDurableJobReceiverExtension [Version(0)]
   HandleDurableJobAsync(Orleans.DurableJobs.IJobRunContext, System.Threading.CancellationToken) -> ValueTask<Orleans.DurableJobs.DurableJobRunResult>
 

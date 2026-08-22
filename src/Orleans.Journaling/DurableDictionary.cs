@@ -64,6 +64,14 @@ internal class DurableDictionary<K, V> : IDurableDictionary<K, V>, IJournaledSta
 
     void IJournaledState.Reset(JournalStreamWriter writer)
     {
+        foreach (var value in _items.Values)
+        {
+            if (value is IDisposable disposable)
+            {
+                disposable.Dispose();
+            }
+        }
+
         _items.Clear();
         _writer = writer;
     }
@@ -111,6 +119,14 @@ internal class DurableDictionary<K, V> : IDurableDictionary<K, V>, IJournaledSta
     }
 
     protected virtual void OnSet(K key, V value) { }
+
+    /// <summary>
+    /// Called when pending writes have been durably persisted.
+    /// Override in derived classes to receive write completion notifications.
+    /// </summary>
+    protected virtual void OnWriteCompleted() { }
+
+    void IJournaledState.OnWriteCompleted() => OnWriteCompleted();
 
     private void ApplySet(K key, V value)
     {
