@@ -240,8 +240,6 @@ public class ConfirmationWorkerTests
 
         public Task<bool> Delay(TimeSpan timeSpan, CancellationToken cancellationToken = default)
         {
-            this.DelayCallCount++;
-
             if (cancellationToken.IsCancellationRequested)
             {
                 return Task.FromResult(false);
@@ -253,6 +251,7 @@ public class ConfirmationWorkerTests
             lock (this.delays)
             {
                 this.delays.Enqueue(delay);
+                this.DelayCallCount++;
             }
 
             this.delayRequested.TrySetResult(null);
@@ -261,7 +260,7 @@ public class ConfirmationWorkerTests
 
         public Task WaitForDelayAsync()
         {
-            return this.DelayCallCount > 0 ? Task.CompletedTask : this.delayRequested.Task;
+            return this.delayRequested.Task;
         }
 
         public void ReleaseNextDelay(bool result = true)
