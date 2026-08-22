@@ -358,7 +358,7 @@ namespace Orleans.Transactions.DynamoDB
                         }
                     }
                 },
-                AttributeDefinitions = attributes
+                AttributeDefinitions = GetAttributeDefinitionsForIndex(attributes, secondaryIndex)
             }, cancellationToken);
 
             // Adding a GSI to a table is an eventually consistent operation and we might miss the table UPDATING status if we query the table status imediatelly after the table update call.
@@ -369,6 +369,18 @@ namespace Orleans.Transactions.DynamoDB
             // For this reason, we will wait for both the table and the index to become ACTIVE before marking the operation as complete.
             await TableWaitOnStatusAsync(tableName, TableStatus.UPDATING, TableStatus.ACTIVE, cancellationToken: cancellationToken);
             await TableIndexWaitOnStatusAsync(tableName, secondaryIndex.IndexName, IndexStatus.CREATING, IndexStatus.ACTIVE, cancellationToken: cancellationToken);
+        }
+
+        internal static List<AttributeDefinition> GetAttributeDefinitionsForIndex(
+            IEnumerable<AttributeDefinition> attributes,
+            GlobalSecondaryIndex secondaryIndex)
+        {
+            var keyAttributes = secondaryIndex.KeySchema
+                .Select(static key => key.AttributeName)
+                .ToHashSet(StringComparer.Ordinal);
+            return attributes
+                .Where(attribute => keyAttributes.Contains(attribute.AttributeName))
+                .ToList();
         }
 
         private async ValueTask<TableDescription> TableUpdateTtlAsync(TableDescription tableDescription, string? ttlAttributeName, CancellationToken cancellationToken)

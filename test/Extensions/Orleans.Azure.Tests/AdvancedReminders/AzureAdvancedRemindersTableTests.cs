@@ -9,6 +9,9 @@ using Xunit;
 
 namespace UnitTests.AdvancedRemindersTest;
 
+[TestSuite("Functional")]
+[TestProvider("AzureStorage")]
+[TestArea("Reminders")]
 [TestCategory("Reminders"), TestCategory("AzureStorage")]
 public class AzureAdvancedRemindersTableTests : AdvancedReminderTableTestsBase
 {

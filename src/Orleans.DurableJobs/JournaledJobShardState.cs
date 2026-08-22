@@ -77,7 +77,7 @@ internal sealed class JournaledJobShardState : IJournaledState, IDurableValueCom
 
     internal int MaxJobCount => _maxJobCount;
 
-    internal bool ContainsJob(string jobId) => _jobQueue.ContainsJob(jobId);
+    internal HashSet<string> GetJobIds() => _jobQueue.GetJobIds();
 
     public IAsyncEnumerable<IJobRunContext> ConsumeDurableJobsAsync() => _jobQueue;
 

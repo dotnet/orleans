@@ -1,6 +1,7 @@
 #nullable enable
 using System.Collections.Generic;
 using System.Reflection;
+using Amazon.DynamoDBv2;
 using Amazon.DynamoDBv2.Model;
 using Orleans.AdvancedReminders.DynamoDB;
 using Xunit;
@@ -9,6 +10,9 @@ using MissedReminderAction = Orleans.AdvancedReminders.Runtime.MissedReminderAct
 
 namespace AWSUtils.Tests.AdvancedReminders;
 
+[TestSuite("BVT")]
+[TestProvider("None")]
+[TestArea("Reminders")]
 [TestCategory("Reminders"), TestCategory("AWS"), TestCategory("DynamoDb")]
 public class DynamoDBReminderTableEnumParsingTests
 {
@@ -106,6 +110,30 @@ public class DynamoDBReminderTableEnumParsingTests
         Assert.NotEqual(first, second);
         Assert.Equal(64, first.Length);
         Assert.Equal(64, second.Length);
+    }
+
+    [Fact]
+    public void GetAttributeDefinitionsForIndex_ReturnsOnlyIndexKeyAttributes()
+    {
+        var attributes = new List<AttributeDefinition>
+        {
+            new("ServiceId", ScalarAttributeType.S),
+            new("GrainHash", ScalarAttributeType.N),
+            new("GrainReference", ScalarAttributeType.S),
+            new("ReminderId", ScalarAttributeType.S),
+        };
+        var index = new GlobalSecondaryIndex
+        {
+            KeySchema =
+            [
+                new KeySchemaElement("ServiceId", KeyType.HASH),
+                new KeySchemaElement("GrainHash", KeyType.RANGE),
+            ],
+        };
+
+        var result = DynamoDBStorage.GetAttributeDefinitionsForIndex(attributes, index);
+
+        Assert.Equal(["ServiceId", "GrainHash"], result.Select(attribute => attribute.AttributeName));
     }
 
     private static DurableJobPriority InvokeReadPriority(Dictionary<string, AttributeValue> item)

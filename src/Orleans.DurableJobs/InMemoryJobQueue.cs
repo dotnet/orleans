@@ -208,11 +208,11 @@ internal sealed class InMemoryJobQueue : IAsyncEnumerable<IJobRunContext>
     public IReadOnlyList<(DurableJob Job, int DequeueCount)> GetSnapshot()
         => GetSnapshot(static (job, dequeueCount) => (job, dequeueCount));
 
-    internal bool ContainsJob(string jobId)
+    internal HashSet<string> GetJobIds()
     {
         lock (_syncLock)
         {
-            return _jobsIdToBucket.ContainsKey(jobId);
+            return new HashSet<string>(_jobsIdToBucket.Keys, StringComparer.Ordinal);
         }
     }
 

@@ -17,6 +17,9 @@ using DurableJobPriority = Orleans.DurableJobs.DurableJobPriority;
 
 namespace Orleans.Dashboard.UnitTests;
 
+[TestSuite("BVT")]
+[TestProvider("None")]
+[TestArea("Reminders")]
 public sealed class DashboardRemindersGrainTests
 {
     [Fact]

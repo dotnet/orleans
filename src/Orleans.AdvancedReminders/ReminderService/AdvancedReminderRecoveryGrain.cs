@@ -61,6 +61,7 @@ internal sealed class AdvancedReminderRecoveryGrain(
     internal async Task ReconcileAsync(bool force, CancellationToken cancellationToken)
     {
         var tasks = new List<Task>(BatchSize);
+        var jobIdsByShard = new Dictionary<string, HashSet<string>?>(StringComparer.Ordinal);
         var bucketsScanned = 0;
         while (bucketsScanned < ScanBucketsPerReconciliation)
         {
@@ -77,8 +78,18 @@ internal sealed class AdvancedReminderRecoveryGrain(
                     && !string.IsNullOrEmpty(entry.JobId)
                     && !string.IsNullOrEmpty(entry.JobShardId))
                 {
-                    if (_jobShardManager is null
-                        || await _jobShardManager.ContainsJobAsync(entry.JobShardId, entry.JobId, cancellationToken) is not false)
+                    if (_jobShardManager is null)
+                    {
+                        continue;
+                    }
+
+                    if (!jobIdsByShard.TryGetValue(entry.JobShardId, out var existingJobIds))
+                    {
+                        existingJobIds = await _jobShardManager.GetJobIdsAsync(entry.JobShardId, cancellationToken);
+                        jobIdsByShard[entry.JobShardId] = existingJobIds;
+                    }
+
+                    if (existingJobIds is null || existingJobIds.Contains(entry.JobId))
                     {
                         continue;
                     }

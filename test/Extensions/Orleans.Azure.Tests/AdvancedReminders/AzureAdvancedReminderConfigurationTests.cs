@@ -1,4 +1,6 @@
 using System.Linq;
+using System.Security.Cryptography;
+using System.Text;
 using Azure.Data.Tables;
 using Azure.Storage.Blobs;
 using Microsoft.Extensions.Configuration;
@@ -18,6 +20,9 @@ namespace UnitTests.AdvancedRemindersTest;
 
 #pragma warning disable ORLEANSEXP005
 
+[TestSuite("BVT")]
+[TestProvider("None")]
+[TestArea("Reminders")]
 [TestCategory("Reminders"), TestCategory("AzureStorage")]
 public class AzureAdvancedReminderConfigurationTests
 {
@@ -92,6 +97,7 @@ public class AzureAdvancedReminderConfigurationTests
     {
         var blobServiceClient = new BlobServiceClient(new Uri("https://example.blob.core.windows.net"));
         var services = new ServiceCollection();
+        services.Configure<ClusterOptions>(options => options.ServiceId = "service-a");
 
         services.UseAzureTableAdvancedReminderService(options =>
         {
@@ -103,7 +109,8 @@ public class AzureAdvancedReminderConfigurationTests
         var options = serviceProvider.GetRequiredService<IOptions<AzureBlobJournalStorageOptions>>().Value;
 
         Assert.Same(blobServiceClient, options.BlobServiceClient);
-        Assert.Equal("advanced-reminder-jobs-test", options.ContainerName);
+        var servicePrefix = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes("service-a")));
+        Assert.Equal($"advanced-reminder-jobs-test-{servicePrefix[..12].ToLowerInvariant()}", options.ContainerName);
     }
 
     [Fact]
@@ -169,6 +176,26 @@ public class AzureAdvancedReminderConfigurationTests
         Assert.NotNull(reminderOptions.TableServiceClient);
         Assert.NotNull(reminderOptions.BlobServiceClient);
         Assert.Same(reminderOptions.BlobServiceClient, jobOptions.BlobServiceClient);
+    }
+
+    [Fact]
+    public void ProviderBuilder_BindsDurableJobContainerName()
+    {
+        var configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["AdvancedReminders:ConnectionString"] = "UseDevelopmentStorage=true",
+                ["AdvancedReminders:JobContainerName"] = "configured-advanced-reminder-jobs",
+            })
+            .Build();
+        var builder = new TestSiloBuilder();
+
+        new AdvancedAzureTableStorageRemindersProviderBuilder()
+            .Configure(builder, name: null, configuration.GetSection("AdvancedReminders"));
+
+        using var serviceProvider = builder.Services.BuildServiceProvider();
+        var options = serviceProvider.GetRequiredService<IOptions<AzureTableReminderStorageOptions>>().Value;
+        Assert.Equal("configured-advanced-reminder-jobs", options.JobContainerName);
     }
 
     private sealed class TestSiloBuilder : ISiloBuilder

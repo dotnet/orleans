@@ -79,6 +79,9 @@ internal sealed class ActivationBelowMinimumRegistrationTestGrain : Grain, IActi
     public Task ReceiveReminder(string reminderName, AdvancedTickStatus status) => Task.CompletedTask;
 }
 
+[TestSuite("BVT")]
+[TestProvider("None")]
+[TestArea("Reminders")]
 [TestCategory("Reminders")]
 public class RegisterReminderAttributeTests
 {
@@ -139,6 +142,9 @@ public class RegisterReminderAttributeTests
     }
 }
 
+[TestSuite("BVT")]
+[TestProvider("None")]
+[TestArea("Reminders")]
 [TestCategory("Reminders")]
 public class RegisterReminderActivationConfiguratorProviderTests
 {
@@ -351,6 +357,9 @@ public class RegisterReminderActivationConfiguratorProviderTests
     }
 }
 
+[TestSuite("BVT")]
+[TestProvider("None")]
+[TestArea("Reminders")]
 [TestCategory("Reminders")]
 public class ReminderOptionsValidatorTests
 {
@@ -451,6 +460,9 @@ public class ReminderOptionsValidatorTests
         => new(NullLogger<AdvancedReminderOptionsValidator>.Instance, Options.Create(options));
 }
 
+[TestSuite("BVT")]
+[TestProvider("None")]
+[TestArea("Reminders")]
 [TestCategory("Reminders")]
 public class ReminderRegistrationExtensionsTests
 {
@@ -747,6 +759,9 @@ public class ReminderRegistrationExtensionsTests
     }
 }
 
+[TestSuite("BVT")]
+[TestProvider("None")]
+[TestArea("Reminders")]
 [TestCategory("Reminders")]
 public class ReminderRegistryValidationTests
 {
@@ -1002,6 +1017,9 @@ public class ReminderRegistryValidationTests
     }
 }
 
+[TestSuite("BVT")]
+[TestProvider("None")]
+[TestArea("Reminders")]
 [TestCategory("Reminders")]
 public class SiloBuilderReminderExtensionsTests
 {
@@ -1161,6 +1179,9 @@ public class SiloBuilderReminderExtensionsTests
     }
 }
 
+[TestSuite("BVT")]
+[TestProvider("None")]
+[TestArea("Reminders")]
 [TestCategory("Reminders")]
 public class AdvancedReminderRecoveryGrainTests
 {
@@ -1243,7 +1264,7 @@ public class AdvancedReminderRecoveryGrainTests
             reminderTable,
             grainFactory,
             NullLogger<AdvancedReminderRecoveryGrain>.Instance,
-            new RecoveryJobShardManager(jobExists: true),
+            new RecoveryJobShardManager("overdue-job"),
             timeProvider);
 
         await recovery.ReconcileAsync(force: false, CancellationToken.None);
@@ -1283,7 +1304,7 @@ public class AdvancedReminderRecoveryGrainTests
             reminderTable,
             grainFactory,
             NullLogger<AdvancedReminderRecoveryGrain>.Instance,
-            new RecoveryJobShardManager(jobExists: false));
+            new RecoveryJobShardManager(jobId: null));
 
         await recovery.ReconcileAsync(force: false, CancellationToken.None);
 
@@ -1418,7 +1439,7 @@ public class AdvancedReminderRecoveryGrainTests
         Assert.NotEqual(rangeReads[0].GetArguments()[0], rangeReads[AdvancedReminderRecoveryGrain.ScanBucketsPerReconciliation].GetArguments()[0]);
     }
 
-    private sealed class RecoveryJobShardManager(bool jobExists) : JobShardManager(SiloAddress.Zero)
+    private sealed class RecoveryJobShardManager(string? jobId) : JobShardManager(SiloAddress.Zero)
     {
         public override Task<List<IJobShard>> AssignJobShardsAsync(DateTimeOffset maxDueTime, int maxNewClaims, CancellationToken cancellationToken)
             => throw new NotSupportedException();
@@ -1433,11 +1454,14 @@ public class AdvancedReminderRecoveryGrainTests
         public override Task UnregisterShardAsync(IJobShard shard, CancellationToken cancellationToken)
             => throw new NotSupportedException();
 
-        internal override ValueTask<bool?> ContainsJobAsync(string shardId, string jobId, CancellationToken cancellationToken)
-            => new(jobExists);
+        internal override ValueTask<HashSet<string>?> GetJobIdsAsync(string shardId, CancellationToken cancellationToken)
+            => new(jobId is null ? [] : [jobId]);
     }
 }
 
+[TestSuite("BVT")]
+[TestProvider("None")]
+[TestArea("Reminders")]
 [TestCategory("Reminders")]
 public class AdvancedReminderServiceTests
 {

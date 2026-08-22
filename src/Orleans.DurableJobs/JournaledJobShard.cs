@@ -24,6 +24,7 @@ internal sealed class JournaledJobShard : IJobShard
     private readonly int _maxBatchSizeBytes;
     private readonly Channel<PendingOperation> _pendingOperations;
     private readonly CancellationTokenSource _shutdownCancellation = new();
+    private readonly CancellationToken _shutdownToken;
     private readonly Task _operationProcessor;
     private int _admittedJobCount;
     private int _disposed;
@@ -92,6 +93,7 @@ internal sealed class JournaledJobShard : IJobShard
         _batchLingerDelay = batchLingerDelay;
         _maxBatchOperationCount = maxBatchOperationCount;
         _maxBatchSizeBytes = maxBatchSizeBytes;
+        _shutdownToken = _shutdownCancellation.Token;
         _admittedJobCount = state.Count;
         _pendingOperations = Channel.CreateBounded<PendingOperation>(
             new BoundedChannelOptions(maxPendingOperationCount)
@@ -136,7 +138,7 @@ internal sealed class JournaledJobShard : IJobShard
     /// <inheritdoc/>
     public ValueTask<int> GetJobCountAsync() => ValueTask.FromResult(_state.Count);
 
-    internal bool ContainsJob(string jobId) => _state.ContainsJob(jobId);
+    internal HashSet<string> GetJobIds() => _state.GetJobIds();
 
     /// <inheritdoc/>
     public async Task MarkAsCompleteAsync(CancellationToken cancellationToken)
@@ -339,18 +341,18 @@ internal sealed class JournaledJobShard : IJobShard
     {
         using var linkedCancellation = CancellationTokenSource.CreateLinkedTokenSource(
             operation.CancellationToken,
-            _shutdownCancellation.Token);
+            _shutdownToken);
         try
         {
             await _pendingOperations.Writer.WriteAsync(operation, linkedCancellation.Token).ConfigureAwait(false);
         }
         catch (OperationCanceledException) when (_shutdownCancellation.IsCancellationRequested)
         {
-            throw new OperationCanceledException(_shutdownCancellation.Token);
+            throw new OperationCanceledException(_shutdownToken);
         }
         catch (ChannelClosedException) when (_shutdownCancellation.IsCancellationRequested)
         {
-            throw new OperationCanceledException(_shutdownCancellation.Token);
+            throw new OperationCanceledException(_shutdownToken);
         }
         catch (ChannelClosedException)
         {
@@ -364,7 +366,7 @@ internal sealed class JournaledJobShard : IJobShard
         var batch = new List<PendingMutationOperation>(Math.Min(_maxBatchOperationCount, 1_024));
         try
         {
-            while (await _pendingOperations.Reader.WaitToReadAsync(_shutdownCancellation.Token).ConfigureAwait(false))
+            while (await _pendingOperations.Reader.WaitToReadAsync(_shutdownToken).ConfigureAwait(false))
             {
                 if (!TryDequeueOperation(out var operation) || operation is null)
                 {
@@ -405,7 +407,7 @@ internal sealed class JournaledJobShard : IJobShard
     {
         try
         {
-            await Task.Delay(_batchLingerDelay, _timeProvider, _shutdownCancellation.Token).ConfigureAwait(false);
+            await Task.Delay(_batchLingerDelay, _timeProvider, _shutdownToken).ConfigureAwait(false);
         }
         catch (OperationCanceledException) when (_shutdownCancellation.IsCancellationRequested)
         {
@@ -434,7 +436,7 @@ internal sealed class JournaledJobShard : IJobShard
     {
         while (_pendingOperations.Reader.TryRead(out var operation))
         {
-            operation.TryCancel(_shutdownCancellation.Token);
+            operation.TryCancel(_shutdownToken);
         }
     }
 
@@ -442,7 +444,7 @@ internal sealed class JournaledJobShard : IJobShard
     {
         foreach (var operation in operations)
         {
-            operation.TryCancel(_shutdownCancellation.Token);
+            operation.TryCancel(_shutdownToken);
         }
 
         operations.Clear();
@@ -483,7 +485,7 @@ internal sealed class JournaledJobShard : IJobShard
             bool isOwned;
             try
             {
-                isOwned = await _shardManager.IsShardOwnedByLocalSiloAsync(Id, _shutdownCancellation.Token).ConfigureAwait(false);
+                isOwned = await _shardManager.IsShardOwnedByLocalSiloAsync(Id, _shutdownToken).ConfigureAwait(false);
             }
             finally
             {
@@ -539,7 +541,7 @@ internal sealed class JournaledJobShard : IJobShard
             try
             {
                 using var batchActivity = DurableJobsDiagnostics.StartPersistBatchActivity(operations, Id);
-                await _stateManager.WriteStateAsync(_shutdownCancellation.Token).ConfigureAwait(false);
+                await _stateManager.WriteStateAsync(_shutdownToken).ConfigureAwait(false);
                 _durableJobsInstruments.OnStorageBatchWritten(operations.Count, canceled: false, error: false);
                 batchActivity?.SetStatus(System.Diagnostics.ActivityStatusCode.Ok);
                 foreach (var operation in operations)
@@ -586,7 +588,7 @@ internal sealed class JournaledJobShard : IJobShard
             switch (operation)
             {
                 case MarkAsCompleteOperation markAsComplete:
-                    if (!_state.IsAddingCompleted && await _shardManager.TryMarkShardClosedAsync(Id, _shutdownCancellation.Token).ConfigureAwait(false))
+                    if (!_state.IsAddingCompleted && await _shardManager.TryMarkShardClosedAsync(Id, _shutdownToken).ConfigureAwait(false))
                     {
                         _state.MarkAsComplete();
                     }
@@ -596,7 +598,7 @@ internal sealed class JournaledJobShard : IJobShard
                 case DeleteStateOperation deleteState:
                     using (var deleteActivity = DurableJobsDiagnostics.StartDeleteShardActivity(deleteState.CapturedContext, Id))
                     {
-                        await _stateManager.DeleteStateAsync(_shutdownCancellation.Token).ConfigureAwait(false);
+                        await _stateManager.DeleteStateAsync(_shutdownToken).ConfigureAwait(false);
                         deleteActivity?.SetStatus(System.Diagnostics.ActivityStatusCode.Ok);
                     }
 

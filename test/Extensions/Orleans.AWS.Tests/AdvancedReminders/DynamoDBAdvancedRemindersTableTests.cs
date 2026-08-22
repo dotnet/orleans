@@ -12,6 +12,9 @@ using LoggerFilterOptions = Microsoft.Extensions.Logging.LoggerFilterOptions;
 
 namespace AWSUtils.Tests.AdvancedReminders;
 
+[TestSuite("Functional")]
+[TestProvider("DynamoDB")]
+[TestArea("Reminders")]
 [TestCategory("Reminders"), TestCategory("AWS"), TestCategory("DynamoDb")]
 [Collection(TestEnvironmentFixture.DefaultCollection)]
 public class DynamoDBAdvancedRemindersTableTests : AdvancedReminderTableTestsBase, IClassFixture<DynamoDBStorageTestsFixture>

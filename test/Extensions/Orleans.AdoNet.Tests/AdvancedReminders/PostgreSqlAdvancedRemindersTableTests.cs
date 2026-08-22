@@ -12,6 +12,9 @@ using LoggerFilterOptions = Microsoft.Extensions.Logging.LoggerFilterOptions;
 
 namespace UnitTests.AdvancedRemindersTest;
 
+[TestSuite("Functional")]
+[TestProvider("PostgreSql")]
+[TestArea("Reminders")]
 [TestCategory("Functional"), TestCategory("Reminders"), TestCategory("AdoNet"), TestCategory("PostgreSql")]
 public class PostgreSqlAdvancedRemindersTableTests : AdvancedReminderTableTestsBase
 {
