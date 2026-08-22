@@ -761,7 +761,7 @@ namespace Orleans.Connections.Transport.Security
         public static System.Security.Cryptography.X509Certificates.X509Certificate2 LoadFromStoreCert(string subject, string storeName, System.Security.Cryptography.X509Certificates.StoreLocation storeLocation, bool allowInvalid, bool server) { throw null; }
     }
 
-    public delegate System.Security.Cryptography.X509Certificates.X509Certificate? ClientCertificateSelectionCallback(object sender, string targetHost, System.Security.Cryptography.X509Certificates.X509CertificateCollection localCertificates, System.Security.Cryptography.X509Certificates.X509Certificate remoteCertificate, string[] acceptableIssuers);
+    public delegate System.Security.Cryptography.X509Certificates.X509Certificate? ClientCertificateSelectionCallback(object sender, string targetHost, System.Security.Cryptography.X509Certificates.X509CertificateCollection localCertificates, System.Security.Cryptography.X509Certificates.X509Certificate? remoteCertificate, string[] acceptableIssuers);
     public partial class ClientTlsMessageTransport : TlsMessageTransport
     {
         public ClientTlsMessageTransport(MessageTransport transport, TlsOptions options, Microsoft.Extensions.Logging.ILogger logger) : base(default!, default!, default!) { }
@@ -903,7 +903,7 @@ namespace Orleans.Connections.Transport.Security
 
         public System.Security.Cryptography.X509Certificates.X509Certificate2? LocalCertificate { get { throw null; } set { } }
 
-        public System.Func<object, string, System.Security.Cryptography.X509Certificates.X509CertificateCollection, System.Security.Cryptography.X509Certificates.X509Certificate, string[], System.Security.Cryptography.X509Certificates.X509Certificate2>? LocalClientCertificateSelector { get { throw null; } set { } }
+        public System.Func<object, string, System.Security.Cryptography.X509Certificates.X509CertificateCollection, System.Security.Cryptography.X509Certificates.X509Certificate?, string[], System.Security.Cryptography.X509Certificates.X509Certificate2>? LocalClientCertificateSelector { get { throw null; } set { } }
 
         public System.Func<MessageTransport, string?, System.Security.Cryptography.X509Certificates.X509Certificate2?>? LocalServerCertificateSelector { get { throw null; } set { } }
 
