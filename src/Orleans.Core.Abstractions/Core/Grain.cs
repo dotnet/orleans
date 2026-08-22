@@ -14,6 +14,8 @@ namespace Orleans;
 /// </summary>
 public abstract partial class Grain : IGrainBase, IAddressable
 {
+    private IGrainRuntime? _grainRuntime;
+
     // Do not use this directly because we currently don't provide a way to inject it;
     // any interaction with it will result in non unit-testable code. Any behavior that can be accessed
     // from within client code (including subclasses of this class), should be exposed through IGrainRuntime.
@@ -23,7 +25,7 @@ public abstract partial class Grain : IGrainBase, IAddressable
 
     public GrainReference GrainReference { get { return GrainContext.GrainReference; } }
 
-    internal IGrainRuntime Runtime { get; }
+    internal IGrainRuntime Runtime => _grainRuntime ??= GetGrainRuntime()!;
 
     /// <summary>
     /// Gets an object which can be used to access other grains. Null if this grain is not associated with a Runtime, such as when created directly for unit testing.
@@ -54,9 +56,7 @@ public abstract partial class Grain : IGrainBase, IAddressable
     protected Grain(IGrainContext grainContext, IGrainRuntime? grainRuntime = null)
     {
         GrainContext = grainContext;
-
-        // ! The runtime ensures that this is not null and Unit testing frameworks must make sure that this is not null.
-        Runtime = grainRuntime ?? grainContext?.ActivationServices.GetService<IGrainRuntime>()!;
+        _grainRuntime = grainRuntime;
     }
 
     /// <summary>
@@ -162,6 +162,22 @@ public abstract partial class Grain : IGrainBase, IAddressable
     /// <param name="reason">The reason for deactivation. Informational only.</param>
     /// <param name="cancellationToken">A cancellation token which signals when deactivation should complete promptly.</param>
     public virtual Task OnDeactivateAsync(DeactivationReason reason, CancellationToken cancellationToken) => Task.CompletedTask;
+
+    private IGrainRuntime? GetGrainRuntime()
+    {
+        var grainContext = GrainContext;
+        if (grainContext is null)
+        {
+            return null;
+        }
+
+        if (grainContext.GetComponent(typeof(IGrainRuntime)) is IGrainRuntime grainRuntime)
+        {
+            return grainRuntime;
+        }
+
+        return grainContext.ActivationServices.GetService<IGrainRuntime>();
+    }
 
     internal void EnsureRuntime()
     {

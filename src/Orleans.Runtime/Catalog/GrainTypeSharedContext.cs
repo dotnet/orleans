@@ -118,6 +118,11 @@ public sealed class GrainTypeSharedContext
             return (TComponent)Logger;
         }
 
+        if (typeof(TComponent) == typeof(IGrainRuntime) && Runtime is TComponent runtime)
+        {
+            return runtime;
+        }
+
         if (_components is null) return default;
         _components.TryGetValue(typeof(TComponent), out var resultObj);
         return (TComponent?)resultObj;
@@ -138,6 +143,11 @@ public sealed class GrainTypeSharedContext
         if (componentType == typeof(ILogger))
         {
             return Logger;
+        }
+
+        if (componentType == typeof(IGrainRuntime))
+        {
+            return Runtime;
         }
 
         if (_components is null) return default;
