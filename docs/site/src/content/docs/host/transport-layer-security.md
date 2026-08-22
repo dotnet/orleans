@@ -30,7 +30,14 @@ The two similarly named options apply at different stages:
 
 Every silo both accepts and initiates connections. For mTLS, a silo certificate therefore needs the Server Authentication extended key usage (EKU) for inbound connections and the Client Authentication EKU for outbound connections. For server-authenticated TLS, the silo certificate only needs Server Authentication. An Orleans client certificate used for mTLS needs Client Authentication. Certificate identity, issuance, and trust should reflect workload roles rather than reusing one certificate and private key across the cluster.
 
-TLS provides confidentiality, integrity, and certificate-based peer authentication for the Orleans transport. It doesn't authorize grain calls, isolate tenants, protect data after either process receives it, or secure membership/storage provider traffic unless those providers are separately configured. Compromise of a trusted certificate or private key can let an attacker impersonate that workload.
+TLS provides confidentiality, integrity, and certificate-based peer
+authentication for the Orleans transport. Orleans trusts a silo or client after
+it is admitted; TLS doesn't provide per-grain authorization, isolate tenants, or
+protect data after either process receives it. Configured membership and storage
+providers and their data are trusted cluster infrastructure, and their transport
+and access controls must be secured separately. Compromise of a trusted
+certificate or private key can let an attacker enter the Orleans trust boundary
+as that workload.
 
 ## Load the local certificate
 
@@ -93,7 +100,11 @@ Keep trust stores narrow. Don't place unrelated public or corporate roots in a w
 
 <xref:Orleans.Connections.Security.TlsOptions.SslProtocols> defaults to TLS 1.2 and TLS 1.3. Retain those defaults unless an interoperability or policy requirement calls for a narrower set. Orleans doesn't enable TLS 1.0 or TLS 1.1 by default.
 
-Set <xref:Orleans.Connections.Security.TlsOptions.CheckCertificateRevocation> to check remote certificates on inbound silo connections. For outbound connections, set <xref:Orleans.Connections.Security.TlsClientAuthenticationOptions.CertificateRevocationCheckMode> in <xref:Orleans.Connections.Security.TlsOptions.OnAuthenticateAsClient>. Before enabling revocation checks, verify that every workload can reach the certificate revocation list (CRL) or Online Certificate Status Protocol (OCSP) service and decide how outages should affect availability.
+Set <xref:Orleans.Connections.Security.TlsOptions.CheckCertificateRevocation> to
+check remote certificates on both inbound and outbound connections. Before
+enabling it, verify that every workload can reach the certificate revocation
+list (CRL) or Online Certificate Status Protocol (OCSP) service and decide how
+outages should affect availability.
 
 ## Rotate certificates
 
@@ -125,6 +136,7 @@ Certificate selectors are called during authentication, but certificate loading,
 - [Network hardening](../security/networking.md)
 - <xref:Orleans.Connections.Security.TlsOptions>
 - <xref:Orleans.Hosting.OrleansConnectionSecurityHostingExtensions.UseTls*>
+- [Authenticate Orleans connections](authenticated-silo-connections.md)
 - [Client configuration](configuration-guide/client-configuration.md)
 - [Server configuration](configuration-guide/server-configuration.md)
 - [.NET TLS/SSL best practices](https://learn.microsoft.com/dotnet/core/extensions/sslstream-best-practices)

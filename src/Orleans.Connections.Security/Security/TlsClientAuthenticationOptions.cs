@@ -39,6 +39,15 @@ namespace Orleans.Connections.Security
             set => this.Value.ClientCertificates = value;
         }
 
+        /// <summary>
+        /// Gets or sets the application protocols offered by the client during TLS application-layer protocol negotiation.
+        /// </summary>
+        public List<SslApplicationProtocol>? ApplicationProtocols
+        {
+            get => Value.ApplicationProtocols;
+            set => Value.ApplicationProtocols = value;
+        }
+
         public SslProtocols EnabledSslProtocols
         {
             get => this.Value.EnabledSslProtocols;

@@ -137,6 +137,9 @@ namespace Orleans.Connections.Security
                         ClientCertificates = _certificate == null || _certificateSelector != null ? null : new X509CertificateCollection { _certificate },
                         LocalCertificateSelectionCallback = selector,
                         EnabledSslProtocols = _options.SslProtocols,
+                        CertificateRevocationCheckMode = _options.CheckCertificateRevocation
+                            ? X509RevocationMode.Online
+                            : X509RevocationMode.NoCheck,
                     };
 
                     _options.OnAuthenticateAsClient?.Invoke(context, sslOptions);

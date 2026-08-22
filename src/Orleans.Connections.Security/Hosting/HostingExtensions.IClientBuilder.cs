@@ -1,5 +1,7 @@
 using System;
+using System.Linq;
 using System.Security.Cryptography.X509Certificates;
+using Microsoft.Extensions.DependencyInjection;
 using Orleans.Configuration;
 using Orleans.Connections.Security;
 
@@ -121,6 +123,15 @@ namespace Orleans.Hosting
             {
                 TlsConnectionBuilderExtensions.ThrowNoPrivateKey(certificate, $"{nameof(TlsOptions)}.{nameof(TlsOptions.LocalCertificate)}");
             }
+
+            if (builder.Services.Any(descriptor =>
+                descriptor.ServiceType == typeof(ClientTlsRegistrationMarker)
+                || descriptor.ServiceType == typeof(ClientConnectionAuthenticationRegistration)))
+            {
+                throw new InvalidOperationException("Client TLS or connection authentication has already been configured.");
+            }
+
+            builder.Services.AddSingleton<ClientTlsRegistrationMarker>();
 
             return builder.Configure<ClientConnectionOptions>(connectionOptions =>
             {

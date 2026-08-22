@@ -24,6 +24,31 @@ namespace Orleans.Connections.Security
     }
 
     public delegate System.Security.Cryptography.X509Certificates.X509Certificate? ClientCertificateSelectionCallback(object sender, string targetHost, System.Security.Cryptography.X509Certificates.X509CertificateCollection localCertificates, System.Security.Cryptography.X509Certificates.X509Certificate? remoteCertificate, string[] acceptableIssuers);
+    public partial interface ISiloConnectionAuthenticationFeature
+    {
+        bool AuthenticationAttempted { get; }
+
+        System.DateTimeOffset? ExpiresAt { get; }
+
+        SiloConnectionAuthenticationFailure Failure { get; }
+
+        bool IsAuthenticated { get; }
+
+        System.Security.Claims.ClaimsPrincipal? Principal { get; }
+
+        string Protocol { get; }
+    }
+
+    public partial interface ISiloConnectionTokenProvider
+    {
+        System.Threading.Tasks.ValueTask<SiloConnectionToken> GetTokenAsync(SiloConnectionTokenRequestContext context, System.Threading.CancellationToken cancellationToken);
+    }
+
+    public partial interface ISiloConnectionTokenValidator
+    {
+        System.Threading.Tasks.ValueTask<SiloConnectionTokenValidationResult> ValidateTokenAsync(string token, SiloConnectionTokenValidationContext context, System.Threading.CancellationToken cancellationToken);
+    }
+
     public partial interface ITlsApplicationProtocolFeature
     {
         System.ReadOnlyMemory<byte> ApplicationProtocol { get; }
@@ -66,8 +91,202 @@ namespace Orleans.Connections.Security
 
     public delegate bool RemoteCertificateValidator(System.Security.Cryptography.X509Certificates.X509Certificate2 certificate, System.Security.Cryptography.X509Certificates.X509Chain? chain, System.Net.Security.SslPolicyErrors policyErrors);
     public delegate System.Security.Cryptography.X509Certificates.X509Certificate ServerCertificateSelectionCallback(object sender, string? hostName);
+    public sealed partial class SiloConnectionAuthenticationBuilder
+    {
+        internal SiloConnectionAuthenticationBuilder() { }
+
+        public bool AllowNonExpiringCredentials { get { throw null; } set { } }
+
+        public System.TimeSpan ExpirationJitter { get { throw null; } set { } }
+
+        public System.TimeSpan ExpirationSafetyMargin { get { throw null; } set { } }
+
+        public int MaxConcurrentInboundAuthentications { get { throw null; } set { } }
+
+        public int MaxConcurrentOutboundAuthentications { get { throw null; } set { } }
+
+        public int MaxPendingInboundAuthentications { get { throw null; } set { } }
+
+        public int MaxPendingOutboundAuthentications { get { throw null; } set { } }
+
+        public int MaxTokenSize { get { throw null; } set { } }
+
+        public System.TimeSpan MinimumRemainingTokenLifetime { get { throw null; } set { } }
+
+        public SiloConnectionAuthenticationMode Mode { get { throw null; } set { } }
+
+        public string Name { get { throw null; } }
+
+        public Microsoft.Extensions.DependencyInjection.IServiceCollection Services { get { throw null; } }
+
+        public string? TargetHost { get { throw null; } set { } }
+
+        public System.TimeProvider TimeProvider { get { throw null; } set { } }
+
+        public System.TimeSpan TokenExchangeTimeout { get { throw null; } set { } }
+
+        public SiloConnectionAuthenticationBuilder UseTokenProvider(ISiloConnectionTokenProvider provider) { throw null; }
+
+        public SiloConnectionAuthenticationBuilder UseTokenProvider(System.Func<System.IServiceProvider, ISiloConnectionTokenProvider> factory) { throw null; }
+
+        public SiloConnectionAuthenticationBuilder UseTokenProvider<TProvider>()
+            where TProvider : class, ISiloConnectionTokenProvider { throw null; }
+
+        public SiloConnectionAuthenticationBuilder UseTokenValidator(ISiloConnectionTokenValidator validator) { throw null; }
+
+        public SiloConnectionAuthenticationBuilder UseTokenValidator(System.Func<System.IServiceProvider, ISiloConnectionTokenValidator> factory) { throw null; }
+
+        public SiloConnectionAuthenticationBuilder UseTokenValidator<TValidator>()
+            where TValidator : class, ISiloConnectionTokenValidator { throw null; }
+    }
+
+    public enum SiloConnectionAuthenticationDirection
+    {
+        Inbound = 0,
+        Outbound = 1
+    }
+
+    public enum SiloConnectionAuthenticationFailure
+    {
+        None = 0,
+        MissingToken = 1,
+        InvalidToken = 2,
+        ExpiredToken = 3,
+        UnauthorizedCaller = 4,
+        ProviderUnavailable = 5,
+        ValidationError = 6
+    }
+
+    public enum SiloConnectionAuthenticationMode
+    {
+        Disabled = 0,
+        Audit = 1,
+        Required = 2
+    }
+
+    public enum SiloConnectionAuthenticationTarget
+    {
+        Silo = 0,
+        Client = 1
+    }
+
+    public sealed partial class SiloConnectionAuthenticationOptions
+    {
+        public bool AllowNonExpiringCredentials { get { throw null; } set { } }
+
+        public System.TimeSpan ExpirationJitter { get { throw null; } set { } }
+
+        public System.TimeSpan ExpirationSafetyMargin { get { throw null; } set { } }
+
+        public int MaxConcurrentInboundAuthentications { get { throw null; } set { } }
+
+        public int MaxConcurrentOutboundAuthentications { get { throw null; } set { } }
+
+        public int MaxPendingInboundAuthentications { get { throw null; } set { } }
+
+        public int MaxPendingOutboundAuthentications { get { throw null; } set { } }
+
+        public int MaxTokenSize { get { throw null; } set { } }
+
+        public System.TimeSpan MinimumRemainingTokenLifetime { get { throw null; } set { } }
+
+        public SiloConnectionAuthenticationMode Mode { get { throw null; } set { } }
+
+        public string? TargetHost { get { throw null; } set { } }
+
+        public System.TimeProvider TimeProvider { get { throw null; } set { } }
+
+        public System.TimeSpan TokenExchangeTimeout { get { throw null; } set { } }
+    }
+
+    public static partial class SiloConnectionAuthenticationProtocol
+    {
+        public const string Version2 = "Orleans1+TokenAuth2";
+    }
+
+    public readonly partial struct SiloConnectionToken : System.IEquatable<SiloConnectionToken>
+    {
+        private readonly object _dummy;
+        private readonly int _dummyPrimitive;
+        public SiloConnectionToken(string Value, System.DateTimeOffset? ExpiresAt) { }
+
+        public System.DateTimeOffset? ExpiresAt { get { throw null; } init { } }
+
+        public string Value { get { throw null; } init { } }
+
+        [System.Runtime.CompilerServices.CompilerGenerated]
+        public readonly void Deconstruct(out string Value, out System.DateTimeOffset? ExpiresAt) { throw null; }
+
+        [System.Runtime.CompilerServices.CompilerGenerated]
+        public readonly bool Equals(SiloConnectionToken other) { throw null; }
+
+        [System.Runtime.CompilerServices.CompilerGenerated]
+        public override readonly bool Equals(object obj) { throw null; }
+
+        [System.Runtime.CompilerServices.CompilerGenerated]
+        public override readonly int GetHashCode() { throw null; }
+
+        [System.Runtime.CompilerServices.CompilerGenerated]
+        public static bool operator ==(SiloConnectionToken left, SiloConnectionToken right) { throw null; }
+
+        [System.Runtime.CompilerServices.CompilerGenerated]
+        public static bool operator !=(SiloConnectionToken left, SiloConnectionToken right) { throw null; }
+
+        [System.Runtime.CompilerServices.CompilerGenerated]
+        public override readonly string ToString() { throw null; }
+    }
+
+    public sealed partial class SiloConnectionTokenRequestContext
+    {
+        internal SiloConnectionTokenRequestContext() { }
+
+        public string ClusterId { get { throw null; } }
+
+        public SiloConnectionAuthenticationDirection Direction { get { throw null; } }
+
+        public System.Net.EndPoint? LocalEndPoint { get { throw null; } }
+
+        public System.Net.EndPoint? RemoteEndPoint { get { throw null; } }
+
+        public SiloConnectionAuthenticationTarget Target { get { throw null; } }
+    }
+
+    public sealed partial class SiloConnectionTokenValidationContext
+    {
+        internal SiloConnectionTokenValidationContext() { }
+
+        public string ClusterId { get { throw null; } }
+
+        public SiloConnectionAuthenticationDirection Direction { get { throw null; } }
+
+        public System.Net.EndPoint? LocalEndPoint { get { throw null; } }
+
+        public System.Net.EndPoint? RemoteEndPoint { get { throw null; } }
+
+        public SiloConnectionAuthenticationTarget Target { get { throw null; } }
+    }
+
+    public sealed partial class SiloConnectionTokenValidationResult
+    {
+        internal SiloConnectionTokenValidationResult() { }
+
+        public System.DateTimeOffset? ExpiresAt { get { throw null; } }
+
+        public SiloConnectionAuthenticationFailure Failure { get { throw null; } }
+
+        public System.Security.Claims.ClaimsPrincipal? Principal { get { throw null; } }
+
+        public bool Succeeded { get { throw null; } }
+
+        public static SiloConnectionTokenValidationResult Fail(SiloConnectionAuthenticationFailure failure) { throw null; }
+
+        public static SiloConnectionTokenValidationResult Success(System.Security.Claims.ClaimsPrincipal principal, System.DateTimeOffset? expiresAt) { throw null; }
+    }
+
     public partial class TlsClientAuthenticationOptions
     {
+        public System.Collections.Generic.List<System.Net.Security.SslApplicationProtocol>? ApplicationProtocols { get { throw null; } set { } }
+
         public System.Security.Cryptography.X509Certificates.X509RevocationMode CertificateRevocationCheckMode { get { throw null; } set { } }
 
         public System.Security.Cryptography.X509Certificates.X509CertificateCollection? ClientCertificates { get { throw null; } set { } }
@@ -110,6 +329,8 @@ namespace Orleans.Connections.Security
 
     public partial class TlsServerAuthenticationOptions
     {
+        public System.Collections.Generic.List<System.Net.Security.SslApplicationProtocol>? ApplicationProtocols { get { throw null; } set { } }
+
         public System.Security.Cryptography.X509Certificates.X509RevocationMode CertificateRevocationCheckMode { get { throw null; } set { } }
 
         public bool ClientCertificateRequired { get { throw null; } set { } }
@@ -128,6 +349,16 @@ namespace Orleans.Hosting
 {
     public static partial class OrleansConnectionSecurityHostingExtensions
     {
+        public static ISiloBuilder UseGatewayTls(this ISiloBuilder builder, System.Action<Connections.Security.TlsOptions> configureOptions) { throw null; }
+
+        public static ISiloBuilder UseSiloTls(this ISiloBuilder builder, System.Action<Connections.Security.TlsOptions> configureOptions) { throw null; }
+
+        public static ISiloBuilder UseAuthenticatedSiloConnections(this ISiloBuilder builder, System.Action<Connections.Security.TlsOptions> configureTls, System.Action<Connections.Security.SiloConnectionAuthenticationBuilder> configureAuthentication) { throw null; }
+
+        public static IClientBuilder UseAuthenticatedClientConnections(this IClientBuilder builder, System.Action<Connections.Security.TlsOptions> configureTls, System.Action<Connections.Security.SiloConnectionAuthenticationBuilder> configureAuthentication) { throw null; }
+
+        public static ISiloBuilder UseAuthenticatedClientConnections(this ISiloBuilder builder, System.Action<Connections.Security.TlsOptions> configureTls, System.Action<Connections.Security.SiloConnectionAuthenticationBuilder> configureAuthentication) { throw null; }
+
         public static IClientBuilder UseTls(this IClientBuilder builder, System.Action<Connections.Security.TlsOptions> configureOptions) { throw null; }
 
         public static IClientBuilder UseTls(this IClientBuilder builder, System.Security.Cryptography.X509Certificates.StoreName storeName, string subject, bool allowInvalid, System.Security.Cryptography.X509Certificates.StoreLocation location, System.Action<Connections.Security.TlsOptions> configureOptions) { throw null; }
