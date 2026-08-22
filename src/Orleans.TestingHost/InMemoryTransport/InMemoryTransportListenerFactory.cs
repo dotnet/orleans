@@ -1,86 +1,49 @@
-using System;
+#nullable enable
 using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.IO.Pipelines;
 using System.Net;
 using System.Threading;
 using System.Threading.Channels;
 using System.Threading.Tasks;
-using Microsoft.AspNetCore.Connections;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
-using Orleans.Hosting;
-using Orleans.Networking.Shared;
+using Orleans.Connections.Transport;
 using Orleans.Runtime.Messaging;
 
 namespace Orleans.TestingHost.InMemoryTransport;
 
-internal static class InMemoryTransportExtensions
+internal class InMemoryTransportListener : MessageTransportListener
 {
-    public static ISiloBuilder UseInMemoryConnectionTransport(this ISiloBuilder siloBuilder, InMemoryTransportConnectionHub hub)
-    {
-        siloBuilder.ConfigureServices(services =>
-        {
-            services.AddKeyedSingleton<IConnectionFactory>(SiloConnectionFactory.ServicesKey, CreateInMemoryConnectionFactory(hub));
-            services.AddKeyedSingleton<IConnectionListenerFactory>(SiloConnectionListener.ServicesKey, CreateInMemoryConnectionListenerFactory(hub));
-            services.AddKeyedSingleton<IConnectionListenerFactory>(GatewayConnectionListener.ServicesKey, CreateInMemoryConnectionListenerFactory(hub));
-        });
-
-        return siloBuilder;
-    }
-
-    public static IClientBuilder UseInMemoryConnectionTransport(this IClientBuilder clientBuilder, InMemoryTransportConnectionHub hub)
-    {
-        clientBuilder.ConfigureServices(services =>
-        {
-            services.AddKeyedSingleton<IConnectionFactory>(ClientOutboundConnectionFactory.ServicesKey, CreateInMemoryConnectionFactory(hub));
-        });
-
-        return clientBuilder;
-    }
-
-    private static Func<IServiceProvider, object?, IConnectionFactory> CreateInMemoryConnectionFactory(InMemoryTransportConnectionHub hub)
-    {
-        return (IServiceProvider sp, object? key) =>
-        {
-            var loggerFactory = sp.GetRequiredService<ILoggerFactory>();
-            var sharedMemoryPool = sp.GetRequiredService<SharedMemoryPool>();
-            return new InMemoryTransportConnectionFactory(hub, loggerFactory, sharedMemoryPool);
-        };
-    }
-
-    private static Func<IServiceProvider, object?, IConnectionListenerFactory> CreateInMemoryConnectionListenerFactory(InMemoryTransportConnectionHub hub)
-    {
-        return (IServiceProvider sp, object? key) =>
-        {
-            var loggerFactory = sp.GetRequiredService<ILoggerFactory>();
-            var sharedMemoryPool = sp.GetRequiredService<SharedMemoryPool>();
-            return new InMemoryTransportListener(hub, loggerFactory, sharedMemoryPool);
-        };
-    }
-}
-
-internal class InMemoryTransportListener : IConnectionListenerFactory, IConnectionListener
-{
-    private readonly Channel<(InMemoryTransportConnection Connection, TaskCompletionSource<bool> ConnectionAcceptedTcs)> _acceptQueue = Channel.CreateUnbounded<(InMemoryTransportConnection, TaskCompletionSource<bool>)>();
+    private readonly Channel<(InMemoryMessageTransport Connection, TaskCompletionSource<bool> ConnectionAcceptedTcs)> _acceptQueue = Channel.CreateUnbounded<(InMemoryMessageTransport, TaskCompletionSource<bool>)>();
+    private readonly string? _endpointValue;
     private readonly InMemoryTransportConnectionHub _hub;
-    private readonly ILoggerFactory _loggerFactory;
-    private readonly SharedMemoryPool _memoryPool;
     private readonly CancellationTokenSource _disposedCts = new();
 
-    public InMemoryTransportListener(InMemoryTransportConnectionHub hub, ILoggerFactory loggerFactory, SharedMemoryPool memoryPool)
+    public InMemoryTransportListener(string endpointName, string? endpointValue, InMemoryTransportConnectionHub hub)
     {
+        ListenerName = endpointName;
+        _endpointValue = endpointValue;
         _hub = hub;
-        _loggerFactory = loggerFactory;
-        _memoryPool = memoryPool;
     }
 
     public CancellationToken OnDisposed => _disposedCts.Token;
 
-    public EndPoint EndPoint { get; set; } = null!;
+    public override bool IsValid => _endpointValue is not null && !OnDisposed.IsCancellationRequested;
+    public override IFeatureCollection Features { get; } = new FeatureCollection();
+    public override string ListenerName { get; }
 
-    public async Task ConnectAsync(InMemoryTransportConnection connection)
+    public async Task AddConnection(InMemoryMessageTransport connection, CancellationToken cancellationToken)
     {
         var completion = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+        using var registration = cancellationToken.UnsafeRegister(
+            static state =>
+            {
+                var (source, token) = ((TaskCompletionSource<bool>, CancellationToken))state!;
+                source.TrySetCanceled(token);
+            },
+            (completion, cancellationToken));
+
         if (_acceptQueue.Writer.TryWrite((connection, completion)))
         {
             var connected = await completion.Task;
@@ -90,45 +53,42 @@ internal class InMemoryTransportListener : IConnectionListenerFactory, IConnecti
             }
         }
 
-        throw new ConnectionFailedException($"Unable to connect to {EndPoint} because its listener has terminated.");
+        throw new ConnectionFailedException($"Unable to connect to endpoint because its listener has terminated.");
     }
 
-    public async ValueTask<ConnectionContext?> AcceptAsync(CancellationToken cancellationToken = default)
+    public override async ValueTask<MessageTransport?> AcceptAsync(CancellationToken cancellationToken = default)
     {
-        if (await _acceptQueue.Reader.WaitToReadAsync(cancellationToken))
+        while (await _acceptQueue.Reader.WaitToReadAsync(cancellationToken))
         {
-            if (_acceptQueue.Reader.TryRead(out var item))
+            while (_acceptQueue.Reader.TryRead(out var item))
             {
-                var remoteConnectionContext = item.Connection;
-                var localConnectionContext = InMemoryTransportConnection.Create(
-                    _memoryPool.Pool,
-                    _loggerFactory.CreateLogger<InMemoryTransportConnection>(),
-                    other: remoteConnectionContext,
-                    localEndPoint: EndPoint);
-
-                // Set the result to true to indicate that the connection was accepted.
-                item.ConnectionAcceptedTcs.TrySetResult(true);
-
-                return localConnectionContext;
+                // Acceptance and cancellation race through the same completion source.
+                if (item.ConnectionAcceptedTcs.TrySetResult(true))
+                {
+                    return item.Connection;
+                }
             }
         }
 
         return null;
     }
 
-    public ValueTask<IConnectionListener> BindAsync(EndPoint endpoint, CancellationToken cancellationToken = default)
+    public override ValueTask BindAsync(CancellationToken cancellationToken = default)
     {
-        EndPoint = endpoint;
-        _hub.RegisterConnectionListenerFactory(endpoint, this);
-        return new ValueTask<IConnectionListener>(this);
+        if (_endpointValue is not null)
+        {
+            _hub.RegisterConnectionListenerFactory(_endpointValue, this);
+        }
+
+        return default;
     }
 
-    public ValueTask DisposeAsync()
+    public override ValueTask DisposeAsync()
     {
         return UnbindAsync(default);
     }
 
-    public ValueTask UnbindAsync(CancellationToken cancellationToken = default)
+    public override ValueTask UnbindAsync(CancellationToken cancellationToken = default)
     {
         _acceptQueue.Writer.TryComplete();
         while (_acceptQueue.Reader.TryRead(out var item))
@@ -144,55 +104,82 @@ internal class InMemoryTransportListener : IConnectionListenerFactory, IConnecti
 
 internal class InMemoryTransportConnectionHub
 {
-    private readonly ConcurrentDictionary<EndPoint, InMemoryTransportListener> _listeners = new();
+    private readonly ConcurrentDictionary<string, InMemoryTransportListener> _listeners = new();
 
     public static InMemoryTransportConnectionHub Instance { get; } = new();
 
-    public void RegisterConnectionListenerFactory(EndPoint endPoint, InMemoryTransportListener listener)
+    public void RegisterConnectionListenerFactory(string endpoint, InMemoryTransportListener listener)
     {
-        _listeners[endPoint] = listener;
+        _listeners[endpoint] = listener;
         listener.OnDisposed.Register(() =>
         {
-            ((IDictionary<EndPoint, InMemoryTransportListener>)_listeners).Remove(new KeyValuePair<EndPoint, InMemoryTransportListener>(endPoint, listener));
+            ((IDictionary<string, InMemoryTransportListener>)_listeners).Remove(new KeyValuePair<string, InMemoryTransportListener>(endpoint, listener));
         });
     }
 
-    public InMemoryTransportListener? GetConnectionListenerFactory(EndPoint endPoint)
+    public async ValueTask<InMemoryTransportListener> GetConnectionListenerFactoryAsync(string endpoint, CancellationToken cancellationToken)
     {
-        _listeners.TryGetValue(endPoint, out var listener);
-        return listener;
+        while (true)
+        {
+            if (_listeners.TryGetValue(endpoint, out var listener) && listener.IsValid)
+            {
+                return listener;
+            }
+
+            await Task.Delay(TimeSpan.FromMilliseconds(10), cancellationToken).ConfigureAwait(false);
+        }
     }
 }
 
-internal class InMemoryTransportConnectionFactory : IConnectionFactory
+internal class InMemoryTransportConnector : MessageTransportConnector
 {
     private readonly InMemoryTransportConnectionHub _hub;
-    private readonly ILoggerFactory _loggerFactory;
-    private readonly SharedMemoryPool _memoryPool;
-    private readonly IPEndPoint _localEndpoint;
+    private readonly ILogger<InMemoryMessageTransport> _connectionLogger;
 
-    public InMemoryTransportConnectionFactory(InMemoryTransportConnectionHub hub, ILoggerFactory loggerFactory, SharedMemoryPool memoryPool)
+    public override IFeatureCollection Features { get; } = new FeatureCollection();
+    public override bool IsValid => true;
+
+    public InMemoryTransportConnector(InMemoryTransportConnectionHub hub, ILoggerFactory loggerFactory)
     {
         _hub = hub;
-        _loggerFactory = loggerFactory;
-        _memoryPool = memoryPool;
-        _localEndpoint = new IPEndPoint(IPAddress.Loopback, Random.Shared.Next(1024, ushort.MaxValue - 1024));
+        _connectionLogger = loggerFactory.CreateLogger<InMemoryMessageTransport>();
     }
 
-    public async ValueTask<ConnectionContext> ConnectAsync(EndPoint endpoint, CancellationToken cancellationToken = default)
+    public override async ValueTask<MessageTransport> CreateAsync(EndPoint endpoint, CancellationToken cancellationToken = default)
     {
-        var listener = _hub.GetConnectionListenerFactory(endpoint);
-        if (listener is null)
-        {
-            throw new ConnectionFailedException($"Unable to connect to endpoint {endpoint} because no such endpoint is currently registered.");
-        }
+        var listener = await _hub.GetConnectionListenerFactoryAsync(endpoint.ToString()!, cancellationToken).ConfigureAwait(false);
 
-        var connectionContext = InMemoryTransportConnection.Create(
-            _memoryPool.Pool,
-            _loggerFactory.CreateLogger<InMemoryTransportConnection>(),
-            _localEndpoint,
-            endpoint);
-        await listener.ConnectAsync(connectionContext).WaitAsync(cancellationToken);
-        return connectionContext;
+        var pipePair = DuplexPipe.CreatePair();
+        var local = new InMemoryMessageTransport(pipePair.Left, _connectionLogger);
+        local.Start();
+        var remote = new InMemoryMessageTransport(pipePair.Right, _connectionLogger);
+        remote.Start();
+        try
+        {
+            await listener.AddConnection(remote, cancellationToken);
+            return local;
+        }
+        catch
+        {
+            await local.DisposeAsync();
+            await remote.DisposeAsync();
+            throw;
+        }
+    }
+
+    private class DuplexPipe : IDuplexPipe
+    {
+        public required PipeReader Input { get; init; }
+        public required PipeWriter Output { get; init; }
+
+        public static (DuplexPipe Left, DuplexPipe Right) CreatePair()
+        {
+            var pipeOptions = new PipeOptions(readerScheduler: PipeScheduler.Inline, writerScheduler: PipeScheduler.Inline, useSynchronizationContext: false);
+            var one = new Pipe(pipeOptions);
+            var two = new Pipe(pipeOptions);
+            var left = new DuplexPipe { Input = one.Reader, Output = two.Writer };
+            var right = new DuplexPipe { Input = two.Reader, Output = one.Writer };
+            return (left, right);
+        }
     }
 }

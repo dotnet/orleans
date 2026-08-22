@@ -4,11 +4,11 @@ using System.Diagnostics;
 using System.Runtime.CompilerServices;
 using System.Text;
 using System.Threading.Tasks;
-using Microsoft.AspNetCore.Connections;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Orleans.Configuration;
 using Orleans.Messaging;
+using Orleans.Connections.Transport;
 using Orleans.Serialization.Invocation;
 
 namespace Orleans.Runtime.Messaging
@@ -23,9 +23,8 @@ namespace Orleans.Runtime.Messaging
         private readonly ConnectionPreambleHelper connectionPreambleHelper;
 
         public SiloConnection(
-            SiloAddress? remoteSiloAddress,
-            ConnectionContext connection,
-            ConnectionDelegate middleware,
+            SiloAddress remoteSiloAddress,
+            MessageTransport transport,
             MessageCenter messageCenter,
             ILocalSiloDetails localSiloDetails,
             ConnectionManager connectionManager,
@@ -33,7 +32,7 @@ namespace Orleans.Runtime.Messaging
             ConnectionCommon connectionShared,
             ProbeRequestMonitor probeMonitor,
             ConnectionPreambleHelper connectionPreambleHelper)
-            : base(connection, middleware, connectionShared)
+            : base(transport, connectionShared)
         {
             this.messageCenter = messageCenter;
             this.connectionManager = connectionManager;
@@ -45,7 +44,7 @@ namespace Orleans.Runtime.Messaging
             this.RemoteSiloAddress = remoteSiloAddress;
         }
 
-        public SiloAddress? RemoteSiloAddress { get; private set; }
+        public SiloAddress RemoteSiloAddress { get; private set; }
 
         public SiloAddress LocalSiloAddress { get; }
 
@@ -53,24 +52,30 @@ namespace Orleans.Runtime.Messaging
 
         protected override ConnectionDirection ConnectionDirection => ConnectionDirection.SiloToSilo;
 
-        protected override IMessageCenter MessageCenter => this.messageCenter;
+        protected override TimeSpan CloseConnectionTimeout => this.connectionOptions.CloseConnectionTimeout;
 
-        protected override void RecordMessageReceive(Message msg, int numTotalBytes, int headerBytes)
-        {
-            MessagingInstrumentation.OnMessageReceive(msg, numTotalBytes, headerBytes, ConnectionDirection, RemoteSiloAddress);
-        }
+        protected override MessageCenter MessageCenter => this.messageCenter;
 
-        protected override void RecordMessageSend(Message msg, int numTotalBytes, int headerBytes)
-        {
-            MessagingInstrumentation.OnMessageSend(msg, numTotalBytes, headerBytes, ConnectionDirection, RemoteSiloAddress);
-        }
+        internal protected override void RecordMessageReceive(Message message, int totalBytes, int headerBytes) =>
+            MessagingMetrics.OnMessageReceive(message, totalBytes, headerBytes, ConnectionDirection, RemoteSiloAddress);
 
-        protected override void OnReceivedMessage(Message msg)
+        internal protected override void RecordMessageSend(Message message, int totalBytes, int headerBytes) =>
+            MessagingMetrics.OnMessageSend(message, totalBytes, headerBytes, ConnectionDirection, RemoteSiloAddress);
+
+        protected internal override void OnReceivedMessage(Message msg)
         {
             // See it's a Ping message, and if so, short-circuit it
             if (msg.IsPing())
             {
-                this.HandlePingMessage(msg);
+                try
+                {
+                    this.HandlePingMessage(msg);
+                }
+                finally
+                {
+                    msg.Dispose();
+                }
+
                 return;
             }
 
@@ -81,26 +86,26 @@ namespace Orleans.Runtime.Messaging
             if (msg.IsExpired)
             {
                 this.MessagingTrace.OnDropExpiredMessage(msg, MessagingInstruments.Phase.Receive);
+                msg.Dispose();
                 return;
             }
 
-            // If we've stopped application message processing, then reject requests and filter out other messages.
+            // If we've stopped application message processing, then filter those out now
             // Note that if we identify or add other grains that are required for proper stopping, we will need to treat them as we do the membership table grain here.
             if (messageCenter.IsBlockingApplicationMessages && !msg.IsSystemMessage)
             {
-                // We reject new requests with targeted cache invalidation and drop all other messages.
+                // We reject new requests, and drop all other messages
                 if (msg.Direction != Message.Directions.Request)
                 {
                     this.MessagingTrace.OnDropBlockedApplicationMessage(msg);
+                    msg.Dispose();
                     return;
                 }
 
-                messageCenter.ProcessRequestToInvalidActivation(
-                    msg,
-                    new GrainAddress { GrainId = msg.TargetGrain, SiloAddress = msg.TargetSilo },
-                    forwardingAddress: null,
-                    failedOperation: "Silo stopping",
-                    rejectMessages: true);
+                MessagingMetrics.OnRejectedMessage(msg);
+                var rejection = this.MessageFactory.CreateRejectionResponse(msg, Message.RejectionTypes.Unrecoverable, "Silo stopping", new SiloUnavailableException());
+                this.Send(rejection);
+                msg.Dispose();
                 return;
             }
 
@@ -124,7 +129,7 @@ namespace Orleans.Runtime.Messaging
             // (if it was a request), or drop it on the floor if it was a response or one-way.
             if (msg.Direction == Message.Directions.Request)
             {
-                MessagingInstrumentation.OnRejectedMessage(msg);
+                MessagingMetrics.OnRejectedMessage(msg);
                 var rejection = this.MessageFactory.CreateRejectionResponse(
                     msg,
                     Message.RejectionTypes.Transient,
@@ -140,11 +145,13 @@ namespace Orleans.Runtime.Messaging
 
                 LogDebugRejectingObsoleteRequest(this.Log, msg.TargetSilo?.ToString() ?? "null", this.LocalSiloAddress.ToString(), msg);
             }
+
+            msg.Dispose();
         }
 
         private void HandlePingMessage(Message msg)
         {
-            MessagingInstrumentation.OnPingReceive(msg.SendingSilo!);
+            MessagingMetrics.OnPingReceive(msg.SendingSilo!);
 
             var objectId = RuntimeHelpers.GetHashCode(msg);
             LogTraceRespondingToPing(this.Log, msg.SendingSilo!, objectId, msg);
@@ -152,7 +159,7 @@ namespace Orleans.Runtime.Messaging
             if (!this.LocalSiloAddress.Equals(msg.TargetSilo))
             {
                 // Got ping that is not destined to me. For example, got a ping to my older incarnation.
-                MessagingInstrumentation.OnRejectedMessage(msg);
+                MessagingMetrics.OnRejectedMessage(msg);
                 Message rejection = this.MessageFactory.CreateRejectionResponse(msg, Message.RejectionTypes.Unrecoverable,
                     $"The target silo is no longer active: target was {msg.TargetSilo}, but this silo is {LocalSiloAddress}. The rejected ping message is {msg}.");
                 this.Send(rejection);
@@ -176,13 +183,13 @@ namespace Orleans.Runtime.Messaging
             this.FailMessage(message, error);
         }
 
-        protected override async Task RunInternal()
+        protected override async Task RunAsyncCore()
         {
             Exception? error = default;
             try
             {
                 await Task.WhenAll(ReadPreamble(), WritePreamble());
-                await base.RunInternal();
+                await base.RunAsyncCore();
             }
             catch (Exception exception) when ((error = exception) is null)
             {
@@ -243,6 +250,7 @@ namespace Orleans.Runtime.Messaging
                     LogWarningDroppingExpiredPingMessage(this.Log, msg);
                 }
 
+                msg.Dispose();
                 return false;
             }
 
@@ -269,7 +277,7 @@ namespace Orleans.Runtime.Messaging
                 LogWarningFailedPingMessage(this.Log, msg);
             }
 
-            MessagingInstrumentation.OnFailedSentMessage(msg);
+            MessagingMetrics.OnFailedSentMessage(msg);
             if (msg.Direction == Message.Directions.Request)
             {
                 LogDebugSiloRejectingMessage(this.Log, this.LocalSiloAddress, msg, reason);
@@ -284,6 +292,7 @@ namespace Orleans.Runtime.Messaging
             else
             {
                 this.MessagingTrace.OnSiloDropSendingMessage(this.LocalSiloAddress, msg, reason);
+                msg.Dispose();
             }
         }
 
@@ -309,6 +318,12 @@ namespace Orleans.Runtime.Messaging
                 reason.Append("Msg is: ").Append(msg);
                 FailMessage(msg, reason.ToString());
             }
+        }
+
+        public override void ReceiveMessage(Message message, IMessageReceiverCache cache)
+        {
+            message.TargetSilo ??= this.RemoteSiloAddress;
+            base.ReceiveMessage(message, cache);
         }
 
         [LoggerMessage(
