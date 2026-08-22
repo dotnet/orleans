@@ -23,6 +23,7 @@
   <ItemGroup>
     <PackageReference Include="Azure.Core" />
     <PackageReference Include="Azure.Data.Tables" />
+    <PackageReference Include="Azure.Identity" />
     <PackageReference Include="Azure.Messaging.EventHubs" />
     <ProjectReference Include="$(SourceRoot)src\Orleans.Streaming\Orleans.Streaming.csproj" />
   </ItemGroup>
