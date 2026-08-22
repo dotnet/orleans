@@ -12,13 +12,15 @@ public class TestCompilationHelperTests
         var matchingDirectory = OperatingSystem.IsWindows() ? frameworkDirectory.ToUpperInvariant() : frameworkDirectory;
         var matchingAssemblyPath = Path.Combine(matchingDirectory, "System.Runtime.dll");
         var otherAssemblyPath = Path.Combine(Path.GetTempPath(), "Other", "System.Runtime.dll");
+        var runtimeAssemblyPath = Path.Combine(Path.GetTempPath(), "Packages", "System.Runtime.dll");
         var trustedPlatformAssemblies = $"{matchingAssemblyPath}{Path.PathSeparator}{otherAssemblyPath}";
 
         var result = TestCompilationHelper.GetFrameworkAssemblyPaths(
             trustedPlatformAssemblies,
-            frameworkAssemblyPath);
+            frameworkAssemblyPath,
+            runtimeAssemblyPath);
 
-        Assert.Equal(matchingAssemblyPath, Assert.Single(result));
+        Assert.Equal(runtimeAssemblyPath, Assert.Single(result));
     }
 
     [Theory]

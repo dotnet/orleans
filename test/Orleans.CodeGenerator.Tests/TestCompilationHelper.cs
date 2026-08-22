@@ -1,5 +1,7 @@
 using System.Collections.Immutable;
 using System.IO;
+using System.IO.Pipelines;
+using System.Text.Json;
 using System.Threading.Tasks;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
@@ -53,14 +55,20 @@ internal static class TestCompilationHelper
         var trustedPlatformAssemblies = (string?)AppContext.GetData("TRUSTED_PLATFORM_ASSEMBLIES")
             ?? throw new InvalidOperationException("The test host must provide trusted platform assemblies.");
 
-        return GetFrameworkAssemblyPaths(trustedPlatformAssemblies, typeof(object).Assembly.Location)
+        return GetFrameworkAssemblyPaths(
+                trustedPlatformAssemblies,
+                typeof(object).Assembly.Location,
+                typeof(ImmutableArray<>).Assembly.Location,
+                typeof(Pipe).Assembly.Location,
+                typeof(JsonSerializer).Assembly.Location)
             .Select(static path => (MetadataReference)MetadataReference.CreateFromFile(path))
             .ToImmutableArray();
     }
 
     internal static ImmutableArray<string> GetFrameworkAssemblyPaths(
         string trustedPlatformAssemblies,
-        string frameworkAssemblyPath)
+        string frameworkAssemblyPath,
+        params string[] runtimeAssemblyPaths)
     {
         if (string.IsNullOrWhiteSpace(trustedPlatformAssemblies))
         {
@@ -85,6 +93,10 @@ internal static class TestCompilationHelper
                 $"The trusted platform assemblies must include references from '{frameworkDirectory}'.");
         }
 
-        return frameworkAssemblyPaths;
+        var runtimeAssemblies = runtimeAssemblyPaths.ToDictionary(static path => Path.GetFileName(path)!, PathComparer);
+        return frameworkAssemblyPaths
+            .Where(path => !runtimeAssemblies.ContainsKey(Path.GetFileName(path)!))
+            .Concat(runtimeAssemblies.Values)
+            .ToImmutableArray();
     }
 }
