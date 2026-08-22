@@ -51,11 +51,12 @@ public class InProcessTestClusterBuilderTimeProviderTests
         using var cancellation = new CancellationTokenSource(TimeSpan.FromSeconds(30));
 
         fakeTimeProvider.Advance(ReminderDueTime - DueTimeBoundary);
-        await observer.WaitForLocalReminderScheduleAsync(grain, reminderName, cancellation.Token);
+        await WaitForSingleLocalReminderScheduleAsync(observer, grain, reminderName, cancellation.Token);
         await AssertReminderTickCountAsync(grain, reminderName, expectedCount: 0);
 
         fakeTimeProvider.Advance(DueTimeBoundary);
         await observer.WaitForTickCountAsync(grain, expectedCount: 1, cancellation.Token, reminderName);
+        await observer.WaitForReminderQuiescenceAsync(grain, reminderName, cancellation.Token);
         await AssertReminderTickCountAsync(grain, reminderName, expectedCount: 1);
     }
 
@@ -76,21 +77,24 @@ public class InProcessTestClusterBuilderTimeProviderTests
         using var cancellation = new CancellationTokenSource(TimeSpan.FromSeconds(30));
 
         fakeTimeProvider.Advance(ReminderDueTime - DueTimeBoundary);
-        await observer.WaitForLocalReminderScheduleAsync(grain, reminderName, cancellation.Token);
+        await WaitForSingleLocalReminderScheduleAsync(observer, grain, reminderName, cancellation.Token);
         fakeTimeProvider.Advance(DueTimeBoundary);
         await observer.WaitForTickCountAsync(grain, expectedCount: 1, cancellation.Token, reminderName);
+        await observer.WaitForReminderQuiescenceAsync(grain, reminderName, cancellation.Token);
         await AssertReminderTickCountAsync(grain, reminderName, expectedCount: 1);
 
         fakeTimeProvider.Advance(ReminderPeriod - DueTimeBoundary);
-        await observer.WaitForLocalReminderScheduleAsync(grain, reminderName, cancellation.Token);
+        await WaitForSingleLocalReminderScheduleAsync(observer, grain, reminderName, cancellation.Token);
         fakeTimeProvider.Advance(DueTimeBoundary);
         await observer.WaitForTickCountAsync(grain, expectedCount: 2, cancellation.Token, reminderName);
+        await observer.WaitForReminderQuiescenceAsync(grain, reminderName, cancellation.Token);
         await AssertReminderTickCountAsync(grain, reminderName, expectedCount: 2);
 
         fakeTimeProvider.Advance(ReminderPeriod - DueTimeBoundary);
-        await observer.WaitForLocalReminderScheduleAsync(grain, reminderName, cancellation.Token);
+        await WaitForSingleLocalReminderScheduleAsync(observer, grain, reminderName, cancellation.Token);
         fakeTimeProvider.Advance(DueTimeBoundary);
         await observer.WaitForTickCountAsync(grain, expectedCount: 3, cancellation.Token, reminderName);
+        await observer.WaitForReminderQuiescenceAsync(grain, reminderName, cancellation.Token);
         await AssertReminderTickCountAsync(grain, reminderName, expectedCount: 3);
     }
 
@@ -105,6 +109,16 @@ public class InProcessTestClusterBuilderTimeProviderTests
         });
 
         return builder;
+    }
+
+    private static async Task WaitForSingleLocalReminderScheduleAsync(
+        ReminderDiagnosticObserver observer,
+        IReminderTestGrain2 grain,
+        string reminderName,
+        CancellationToken cancellationToken)
+    {
+        await observer.WaitForLocalReminderScheduleAsync(grain, reminderName, cancellationToken);
+        Assert.Equal(1, observer.GetActiveReminderCount(grain.GetGrainId(), reminderName));
     }
 
     private static async Task AssertReminderTickCountAsync(IReminderTestGrain2 grain, string reminderName, int expectedCount)
