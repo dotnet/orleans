@@ -47,10 +47,13 @@ public class DurableInboxExtensionTests : IClassFixture<DefaultClusterFixture>
     private DurableInboxExtension CreateInboxExtension(
         Dictionary<(GrainId, Guid), DurableEnvelope>? inbox = null,
         Dictionary<(GrainId, Guid), DateTimeOffset>? processed = null,
-        int maxCapacity = 1000)
+        int maxCapacity = 1000,
+        bool enableLongPolling = true,
+        TimeSpan? defaultPollTimeout = null,
+        TestStateManager? stateManager = null)
     {
         var grainContext = new MockGrainContext();
-        var stateManager = new TestStateManager();
+        stateManager ??= new TestStateManager();
         var sessionPool = _fixture.Client.ServiceProvider.GetRequiredService<SerializerSessionPool>();
         var logger = NullLogger<DurableInboxExtension>.Instance;
 
@@ -83,7 +86,9 @@ public class DurableInboxExtensionTests : IClassFixture<DefaultClusterFixture>
             {
                 MaxCapacity = maxCapacity,
                 BackpressureRetryDelay = TimeSpan.FromMilliseconds(1),
-                MaxProcessingAttempts = 1
+                MaxProcessingAttempts = 1,
+                EnableLongPolling = enableLongPolling,
+                DefaultPollTimeout = defaultPollTimeout ?? TimeSpan.FromSeconds(30)
             });
     }
 
@@ -154,6 +159,41 @@ public class DurableInboxExtensionTests : IClassFixture<DefaultClusterFixture>
         // In test environments with synchronous mock state machines, processing completes
         // before DeliverAsync returns, so Count == 0 is expected.
         // The key assertion is that the delivery was accepted.
+    }
+
+    [Fact]
+    public async Task DeliverAsync_ImportsEnvelopeRequestContextForHandler()
+    {
+        var extension = CreateInboxExtension();
+        var handler = new RequestContextHandler();
+        extension.RegisterHandler("test.route", handler);
+        var senderId = GrainId.Create("test", "context-sender");
+        var receiverId = GrainId.Create("test", "context-receiver");
+        var sessionPool = _fixture.Client.ServiceProvider.GetRequiredService<SerializerSessionPool>();
+
+        RequestContext.Set("tenant", "contoso");
+        try
+        {
+            var envelope = new DurableEnvelopeBuilder(sessionPool, senderId)
+                .To(receiverId, "test.route")
+                .WithCurrentRequestContext()
+                .WithBody(new TestMessage { Value = "test", Count = 1 })
+                .Build();
+            RequestContext.Set("tenant", "outer");
+
+            var result = await extension.DeliverAsync(
+                envelope,
+                new DeliveryOptions { PollTimeout = TimeSpan.FromSeconds(10) },
+                CancellationToken.None);
+
+            Assert.Equal(DeliveryStatus.Processed, result.Status);
+            Assert.Equal("contoso", await handler.ObservedTenant.Task.WaitAsync(TimeSpan.FromSeconds(10)));
+            Assert.Equal("outer", RequestContext.Get("tenant"));
+        }
+        finally
+        {
+            RequestContext.Clear();
+        }
     }
 
     [Fact]
@@ -321,6 +361,67 @@ public class DurableInboxExtensionTests : IClassFixture<DefaultClusterFixture>
     }
 
     [Fact]
+    public async Task DeliverAsync_WithConfiguredDefaultPollTimeout_UsesDefault()
+    {
+        var extension = CreateInboxExtension(defaultPollTimeout: TimeSpan.FromMilliseconds(100));
+        extension.RegisterHandler("test.route", new SlowMessageHandler(delayMs: 10000));
+        var envelope = CreateTestEnvelope(
+            GrainId.Create("test", "sender"),
+            GrainId.Create("test", "receiver"),
+            "test.route",
+            "test message");
+
+        var result = await extension.DeliverAsync(
+            envelope,
+            new DeliveryOptions { PollTimeout = Timeout.InfiniteTimeSpan },
+            CancellationToken.None);
+
+        Assert.Equal(DeliveryStatus.Pending, result.Status);
+    }
+
+    [Fact]
+    public async Task DeliverAsync_WhenLongPollingDisabled_ReturnsAfterAcceptance()
+    {
+        var extension = CreateInboxExtension(enableLongPolling: false);
+        extension.RegisterHandler("test.route", new SlowMessageHandler(delayMs: 10000));
+        var envelope = CreateTestEnvelope(
+            GrainId.Create("test", "sender"),
+            GrainId.Create("test", "receiver"),
+            "test.route",
+            "test message");
+
+        var result = await extension.DeliverAsync(
+            envelope,
+            new DeliveryOptions { PollTimeout = TimeSpan.FromSeconds(5) },
+            CancellationToken.None);
+
+        Assert.Equal(DeliveryStatus.Accepted, result.Status);
+    }
+
+    [Fact]
+    public async Task DeliverAsync_WithLongPolling_PropagatesCallerCancellation()
+    {
+        var stateManager = new TestStateManager();
+        var extension = CreateInboxExtension(stateManager: stateManager);
+        extension.RegisterHandler("test.route", new SlowMessageHandler(delayMs: 10000));
+        var envelope = CreateTestEnvelope(
+            GrainId.Create("test", "sender"),
+            GrainId.Create("test", "receiver"),
+            "test.route",
+            "test message");
+        using var cancellation = new CancellationTokenSource(TimeSpan.FromMilliseconds(100));
+
+        var exception = await Assert.ThrowsAnyAsync<OperationCanceledException>(
+            () => extension.DeliverAsync(
+                envelope,
+                new DeliveryOptions { PollTimeout = TimeSpan.FromSeconds(5) },
+                cancellation.Token).AsTask());
+
+        Assert.Equal(cancellation.Token, exception.CancellationToken);
+        Assert.Equal(1, stateManager.RevertCount);
+    }
+
+    [Fact]
     public async Task ProcessMessage_InvokesHandler()
     {
         // Arrange
@@ -416,6 +517,20 @@ public class DurableInboxExtensionTests : IClassFixture<DefaultClusterFixture>
         }
     }
 
+    private sealed class RequestContextHandler : IInboxHandler
+    {
+        public TaskCompletionSource<object?> ObservedTenant { get; } =
+            new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        public bool CanHandle(IInboxHandlerContext context) => true;
+
+        public ValueTask HandleAsync(IInboxHandlerContext context, CancellationToken cancellationToken)
+        {
+            ObservedTenant.TrySetResult(RequestContext.Get("tenant"));
+            return ValueTask.CompletedTask;
+        }
+    }
+
     // Slow handler for timeout tests
     private class SlowMessageHandler : IInboxHandler
     {
@@ -475,6 +590,7 @@ public class DurableInboxExtensionTests : IClassFixture<DefaultClusterFixture>
     private class TestStateManager : IJournaledStateManager
     {
         public int WriteCount { get; private set; }
+        public int RevertCount { get; private set; }
 
         public ValueTask InitializeAsync(CancellationToken cancellationToken = default) => ValueTask.CompletedTask;
 
@@ -492,7 +608,11 @@ public class DurableInboxExtensionTests : IClassFixture<DefaultClusterFixture>
             return ValueTask.CompletedTask;
         }
 
-        public ValueTask RevertPendingChangesAsync(CancellationToken cancellationToken = default) => ValueTask.CompletedTask;
+        public ValueTask RevertPendingChangesAsync(CancellationToken cancellationToken = default)
+        {
+            RevertCount++;
+            return ValueTask.CompletedTask;
+        }
 
         public ValueTask DeleteStateAsync(CancellationToken cancellationToken = default) => ValueTask.CompletedTask;
 
@@ -553,7 +673,7 @@ public class DurableInboxExtensionTests : IClassFixture<DefaultClusterFixture>
     {
         public IDurableJobFeatureHandler? Handler { get; private set; }
 
-        public void Register(string jobName, IDurableJobFeatureHandler handler) => Handler = handler;
+        public void Register(string jobName, IDurableJobFeatureHandler handler, bool requiresTurnIsolation = false) => Handler = handler;
     }
 
     private sealed class TestJobManager(TestJobHandlerRegistry handlers) : ILocalDurableJobManager

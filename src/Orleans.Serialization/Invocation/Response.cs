@@ -46,7 +46,10 @@ namespace Orleans.Serialization.Invocation
         /// <inheritdoc />
         public abstract object? Result { get; set; }
 
-        public abstract bool IsFinal { get; }
+        /// <summary>
+        /// Gets a value indicating whether this response completes the invocation.
+        /// </summary>
+        public virtual bool IsFinal => true;
 
         public virtual Type? GetSimpleResultType() => null;
 

@@ -175,7 +175,7 @@ public class InboxHandlerRegistrationTests
     }
 
     [Fact]
-    public void TryFindHandler_CachesResultForSameRouteKey()
+    public void TryFindHandler_ReevaluatesResultForSameRouteKey()
     {
         // Arrange
         var inbox = CreateInbox();
@@ -198,13 +198,13 @@ public class InboxHandlerRegistrationTests
         inbox.TryFindHandler(context, out _);
         var secondCallCount = callCount;
 
-        // Assert - CanHandle should only be called once due to caching
+        // Assert - the full envelope is evaluated for every lookup.
         Assert.Equal(1, firstCallCount);
-        Assert.Equal(1, secondCallCount); // No additional calls
+        Assert.Equal(2, secondCallCount);
     }
 
     [Fact]
-    public void TryFindHandler_CachesNegativeResults()
+    public void TryFindHandler_ReevaluatesNegativeResults()
     {
         // Arrange
         var inbox = CreateInbox();
@@ -230,7 +230,7 @@ public class InboxHandlerRegistrationTests
         Assert.Null(handler1);
         Assert.False(found2);
         Assert.Null(handler2);
-        Assert.Equal(1, callCount); // CanHandle called only once, cached thereafter
+        Assert.Equal(2, callCount);
     }
 
     [Fact]

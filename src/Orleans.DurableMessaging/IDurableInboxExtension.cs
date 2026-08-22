@@ -1,5 +1,4 @@
 using Orleans;
-using Orleans.Concurrency;
 using Orleans.Runtime;
 using Orleans.Serialization;
 
@@ -20,6 +19,6 @@ public interface IDurableInboxExtension : IGrainExtension
     /// <param name="options">Delivery options including poll timeout.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>Result indicating delivery/processing status.</returns>
-    [Alias("DeliverAsync"), AlwaysInterleave]
+    [Alias("DeliverAsync")]
     ValueTask<DeliveryResult> DeliverAsync(DurableEnvelope envelope, DeliveryOptions options, CancellationToken cancellationToken = default);
 }

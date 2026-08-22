@@ -59,6 +59,10 @@ public static class DurableJobsExtensions
                 sp.GetRequiredService<DurableJobReceiverExtensionShared>(),
                 sp.GetRequiredService<DurableJobHandlerRegistry>());
         });
+        services.AddKeyedTransient<IGrainExtension>(typeof(IDurableJobFeatureReceiverExtension), (sp, _) =>
+            new DurableJobFeatureReceiverExtension(
+                sp.GetRequiredService<DurableJobHandlerRegistry>(),
+                sp.GetRequiredService<DurableJobReceiverExtensionShared>()));
     }
 
     /// <summary>

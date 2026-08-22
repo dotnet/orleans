@@ -41,7 +41,20 @@ internal sealed partial class DurableTaskGrainRuntime
             {
                 using var timeout = new CancellationTokenSource(options.PollTimeout, runtime._shared.TimeProvider);
                 using var linkedCancellation = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, timeout.Token);
-                await ((Task)ResponseTask).WaitAsync(linkedCancellation.Token).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext | ConfigureAwaitOptions.SuppressThrowing);
+                try
+                {
+                    await ((Task)ResponseTask).WaitAsync(linkedCancellation.Token).ConfigureAwait(true);
+                }
+                catch (OperationCanceledException) when (timeout.IsCancellationRequested && !cancellationToken.IsCancellationRequested)
+                {
+                }
+                catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+                {
+                    cancellationToken.ThrowIfCancellationRequested();
+                    throw;
+                }
+
+                cancellationToken.ThrowIfCancellationRequested();
             }
 
             if (ResponseTask.IsCompleted)

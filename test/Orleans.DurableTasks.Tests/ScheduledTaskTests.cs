@@ -45,6 +45,33 @@ public class ScheduledTaskTests
     }
 
     [Fact]
+    public async Task CompletedScheduledTask_AwaitPropagatesFailure()
+    {
+        var expected = new InvalidOperationException("Expected failure.");
+        ScheduledTask task = new CompletedScheduledDurableTask(
+            TaskId.Create("failed"),
+            DurableTaskResponse.FromException(expected));
+
+        var awaitException = await Assert.ThrowsAsync<InvalidOperationException>(async () => await task);
+        Assert.Same(expected, awaitException);
+
+        var waitException = await Assert.ThrowsAsync<InvalidOperationException>(async () => await task.WaitAsync());
+        Assert.Same(expected, waitException);
+    }
+
+    [Fact]
+    public async Task CompletedScheduledTask_AwaitPropagatesCancellation()
+    {
+        var expected = new OperationCanceledException("Expected cancellation.");
+        ScheduledTask task = new CompletedScheduledDurableTask(
+            TaskId.Create("canceled"),
+            DurableTaskResponse.FromException(expected));
+
+        var exception = await Assert.ThrowsAnyAsync<OperationCanceledException>(async () => await task);
+        Assert.Same(expected, exception);
+    }
+
+    [Fact]
     public async Task ScheduledDurableTask_DelegatesToHandle()
     {
         var taskId = TaskId.Create("scheduled");

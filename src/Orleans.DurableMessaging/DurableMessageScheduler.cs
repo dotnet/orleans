@@ -52,7 +52,7 @@ internal sealed class DurableMessageScheduler :
         _jobManager = jobManager;
         _outbox = outbox;
         _grainContext = grainContext;
-        handlers.Register(JobName, this);
+        handlers.Register(JobName, this, requiresTurnIsolation: true);
         grainContext.ObservableLifecycle.Subscribe(
             RuntimeTypeNameFormatter.Format(GetType()),
             GrainLifecycleStage.Activate,

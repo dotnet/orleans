@@ -111,6 +111,7 @@ public class DurableOutboxTests : JournalingTestBase
                 MaxDeliveryAttempts = maxDeliveryAttempts,
                 OutboxBatchSize = batchSize
             }));
+        grainFactory.OutboxCommitExtension = outbox;
 
         // Drive the lifecycle's Activate stage so the manager processes its queued RegisterState work item
         // and initializes the outbox's JournalStreamWriter (mirrors what a real grain activation does).
@@ -213,6 +214,8 @@ public class DurableOutboxTests : JournalingTestBase
         Assert.True(h.DeadLetters.TryGetValue(envelope.MessageId, out var deadLetter));
         Assert.Contains("Pending", deadLetter!.Reason);
         Assert.Equal(1, deadLetter.AttemptCount);
+        Assert.True(deadLetter.Envelope.Data.TryGetBody<string>(out var body));
+        Assert.Equal("payload", body);
         // The message state itself is cleaned up as part of RemoveMessage.
         Assert.False(h.MessageStates.ContainsKey(envelope.MessageId));
     }
@@ -420,11 +423,18 @@ public class DurableOutboxTests : JournalingTestBase
 
     private sealed class TestGrainFactory(IDurableInboxExtension extension) : IGrainFactory
     {
+        public IDurableOutboxCommitExtension? OutboxCommitExtension { get; set; }
+
         public TGrainInterface GetGrain<TGrainInterface>(GrainId grainId) where TGrainInterface : IAddressable
         {
             if (typeof(TGrainInterface) == typeof(IDurableInboxExtension))
             {
                 return (TGrainInterface)(object)extension;
+            }
+
+            if (typeof(TGrainInterface) == typeof(IDurableOutboxCommitExtension))
+            {
+                return (TGrainInterface)(object)OutboxCommitExtension!;
             }
 
             throw new NotSupportedException($"Unexpected grain interface requested: {typeof(TGrainInterface)}");
@@ -502,7 +512,7 @@ public class DurableOutboxTests : JournalingTestBase
     private sealed class TestJobHandlerRegistry : IDurableJobHandlerRegistry
     {
         public IDurableJobFeatureHandler? Handler { get; private set; }
-        public void Register(string jobName, IDurableJobFeatureHandler handler) => Handler = handler;
+        public void Register(string jobName, IDurableJobFeatureHandler handler, bool requiresTurnIsolation = false) => Handler = handler;
     }
 
     /// <summary>

@@ -79,6 +79,8 @@ public sealed class DurableTaskRequestShared(IGrainContextAccessor grainContextA
 [method: GeneratedActivatorConstructor]
 public abstract class DurableTaskRequest(DurableTaskRequestShared shared) : DurableTask, IDurableTaskRequest, ISchedulableTask
 {
+    bool ISchedulableTask.CommitsDurableState => true;
+
     // Note: we could save a field here by using RuntimeContext, but that will require making internals visible to this assembly.
     // For now, we're not doing that, just to make sure that we can get far without needing it, demonstrating the extensibility of Orleans.
     // It might be worthwhile making RuntimeContext public at some point, even if it is not the recommended approach.
@@ -263,6 +265,8 @@ public abstract class DurableTaskRequest(DurableTaskRequestShared shared) : Dura
 [method: GeneratedActivatorConstructor]
 public abstract class DurableTaskRequest<TResult>(DurableTaskRequestShared shared) : DurableTask<TResult>, IDurableTaskRequest, ISchedulableTask
 {
+    bool ISchedulableTask.CommitsDurableState => true;
+
     // Note: we could save a field here by using RuntimeContext, but that will require making internals visible to this assembly.
     // For now, we're not doing that, just to make sure that we can get far without needing it, demonstrating the extensibility of Orleans.
     // It might be worthwhile making RuntimeContext public at some point, even if it is not the recommended approach.

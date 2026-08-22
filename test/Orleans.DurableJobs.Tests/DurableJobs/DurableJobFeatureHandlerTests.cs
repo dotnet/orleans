@@ -1,7 +1,12 @@
 using System;
 using System.Threading;
 using System.Threading.Tasks;
+using Microsoft.Extensions.Logging.Abstractions;
+using Microsoft.Extensions.Options;
+using Orleans.Configuration;
+using Orleans.Concurrency;
 using Orleans.DurableJobs;
+using Orleans.Runtime;
 using Xunit;
 
 namespace Tester.DurableJobs;
@@ -15,7 +20,7 @@ public class DurableJobFeatureHandlerTests
         var registry = new DurableJobHandlerRegistry();
         var handler = new TestHandler();
 
-        registry.Register("feature", handler);
+        registry.Register("feature", handler, requiresTurnIsolation: true);
 
         Assert.Throws<InvalidOperationException>(() => registry.Register("feature", handler));
     }
@@ -61,7 +66,7 @@ public class DurableJobFeatureHandlerTests
     {
         var registry = new DurableJobHandlerRegistry();
         var handler = new TestHandler();
-        registry.Register("feature", handler);
+        registry.Register("feature", handler, requiresTurnIsolation: true);
 
         var found = registry.TryGetHandler("feature", out var resolved);
 
@@ -73,7 +78,7 @@ public class DurableJobFeatureHandlerTests
     public void Registry_TryGetHandler_ReturnsFalseAndNull_WhenJobNameNotRegistered()
     {
         var registry = new DurableJobHandlerRegistry();
-        registry.Register("feature", new TestHandler());
+        registry.Register("feature", new TestHandler(), requiresTurnIsolation: true);
 
         var found = registry.TryGetHandler("some-other-job", out var resolved);
 
@@ -109,6 +114,63 @@ public class DurableJobFeatureHandlerTests
 
         Assert.Same(first, second);
         Assert.Equal(DurableJobRunStatus.Completed, first.Status);
+    }
+
+    [Fact]
+    public void FeatureReceiverMethod_IsNotAlwaysInterleavable()
+    {
+        var method = typeof(IDurableJobFeatureReceiverExtension).GetMethod(
+            nameof(IDurableJobFeatureReceiverExtension.TryHandleFeatureJobAsync));
+
+        Assert.NotNull(method);
+        Assert.Null(method.GetCustomAttributes(typeof(AlwaysInterleaveAttribute), inherit: false).SingleOrDefault());
+    }
+
+    [Fact]
+    public async Task FeatureReceiver_ExecutesRegisteredHandlerToCompletion()
+    {
+        var registry = new DurableJobHandlerRegistry();
+        var handler = new TestHandler();
+        registry.Register("feature", handler, requiresTurnIsolation: true);
+        var extension = new DurableJobFeatureReceiverExtension(registry, CreateShared());
+
+        var result = await extension.TryHandleFeatureJobAsync(
+            new TestJobRunContext("feature"),
+            CancellationToken.None);
+
+        Assert.Same(DurableJobRunResult.Completed, result);
+        Assert.Equal(1, handler.ExecutionCount);
+    }
+
+    [Fact]
+    public async Task FeatureReceiver_ReturnsNullForUserJob()
+    {
+        var extension = new DurableJobFeatureReceiverExtension(new DurableJobHandlerRegistry(), CreateShared());
+
+        var result = await extension.TryHandleFeatureJobAsync(
+            new TestJobRunContext("user-job"),
+            CancellationToken.None);
+
+        Assert.Null(result);
+    }
+
+    [Fact]
+    public async Task FeatureReceiver_RejectsInProgressFromTurnIsolatedHandler()
+    {
+        var registry = new DurableJobHandlerRegistry();
+        registry.Register(
+            "feature",
+            new DelegateHandler(() => DurableJobRunResult.InProgress(TimeSpan.FromSeconds(1))),
+            requiresTurnIsolation: true);
+        var extension = new DurableJobFeatureReceiverExtension(registry, CreateShared());
+
+        var result = await extension.TryHandleFeatureJobAsync(
+            new TestJobRunContext("feature"),
+            CancellationToken.None);
+
+        Assert.NotNull(result);
+        Assert.True(result.IsFailed);
+        Assert.Contains("returned InProgress", result.Exception!.Message);
     }
 
     [Theory]
@@ -162,7 +224,40 @@ public class DurableJobFeatureHandlerTests
 
     private sealed class TestHandler : IDurableJobFeatureHandler
     {
-        public ValueTask<DurableJobRunResult> ExecuteJobAsync(IJobRunContext context, CancellationToken cancellationToken) =>
-            ValueTask.FromResult(DurableJobRunResult.Completed);
+        public int ExecutionCount { get; private set; }
+
+        public ValueTask<DurableJobRunResult> ExecuteJobAsync(IJobRunContext context, CancellationToken cancellationToken)
+        {
+            ExecutionCount++;
+            return ValueTask.FromResult(DurableJobRunResult.Completed);
+        }
+    }
+
+    private sealed class DelegateHandler(Func<DurableJobRunResult> resultFactory) : IDurableJobFeatureHandler
+    {
+        public ValueTask<DurableJobRunResult> ExecuteJobAsync(IJobRunContext context, CancellationToken cancellationToken)
+            => ValueTask.FromResult(resultFactory());
+    }
+
+    private static DurableJobReceiverExtensionShared CreateShared() =>
+        new(
+            NullLogger<DurableJobReceiverExtension>.Instance,
+            Options.Create(new DurableJobsOptions()),
+            Options.Create(new SiloMessagingOptions()),
+            TimeProvider.System);
+
+    private sealed class TestJobRunContext(string jobName) : IJobRunContext
+    {
+        public DurableJob Job { get; } = new()
+        {
+            Id = Guid.NewGuid().ToString(),
+            Name = jobName,
+            DueTime = DateTimeOffset.UtcNow,
+            TargetGrainId = GrainId.Create("test", Guid.NewGuid().ToString()),
+            ShardId = "test"
+        };
+
+        public string RunId { get; } = Guid.NewGuid().ToString();
+        public int DequeueCount => 0;
     }
 }

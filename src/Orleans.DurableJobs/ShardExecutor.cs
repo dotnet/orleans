@@ -249,19 +249,23 @@ internal sealed partial class ShardExecutor
             {
                 LogExecutingJob(_logger, jobContext.Job.Id, jobContext.Job.Name, jobContext.Job.TargetGrainId, jobContext.Job.DueTime);
 
-                var target = _grainFactory.GetGrain<IDurableJobReceiverExtension>(jobContext.Job.TargetGrainId);
-
-                var result = await target.HandleDurableJobAsync(jobContext, cancellationToken);
-
-                // Handle the result based on status
-                while (result.IsInProgress)
+                var featureTarget = _grainFactory.GetGrain<IDurableJobFeatureReceiverExtension>(jobContext.Job.TargetGrainId);
+                var result = await featureTarget.TryHandleFeatureJobAsync(jobContext, cancellationToken);
+                if (result is null)
                 {
-                    // Enter polling loop
-                    LogPollingJob(_logger, jobContext.Job.Id, jobContext.Job.Name, result.PollAfterDelay.Value);
-
-                    await Task.Delay(result.PollAfterDelay.Value, _timeProvider, cancellationToken);
-
+                    var target = _grainFactory.GetGrain<IDurableJobReceiverExtension>(jobContext.Job.TargetGrainId);
                     result = await target.HandleDurableJobAsync(jobContext, cancellationToken);
+
+                    // Handle the result based on status
+                    while (result.IsInProgress)
+                    {
+                        // Enter polling loop
+                        LogPollingJob(_logger, jobContext.Job.Id, jobContext.Job.Name, result.PollAfterDelay.Value);
+
+                        await Task.Delay(result.PollAfterDelay.Value, _timeProvider, cancellationToken);
+
+                        result = await target.HandleDurableJobAsync(jobContext, cancellationToken);
+                    }
                 }
 
                 switch (result.Status)

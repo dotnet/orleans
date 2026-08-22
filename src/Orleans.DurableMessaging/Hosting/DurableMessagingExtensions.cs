@@ -97,6 +97,9 @@ public static class DurableMessagingExtensions
 
         services.TryAddKeyedScoped<IDurableOutbox, DurableOutbox>("outbox");
         services.TryAddScoped<IDurableOutbox>(sp => sp.GetRequiredKeyedService<IDurableOutbox>("outbox"));
+        services.TryAddKeyedScoped<IGrainExtension>(
+            typeof(IDurableOutboxCommitExtension),
+            (sp, _) => (DurableOutbox)sp.GetRequiredService<IDurableOutbox>());
         services.TryAddScoped<DurableMessageScheduler>();
         services.TryAddScoped<IDurableMessageScheduler>(sp => sp.GetRequiredService<DurableMessageScheduler>());
         services.TryAddScoped<IDurableMessagingDiagnostics, DurableMessagingDiagnostics>();
