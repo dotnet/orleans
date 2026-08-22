@@ -1,5 +1,8 @@
 {
   "$schema": "https://xunit.net/schema/current/testconfig.schema.json",
+  "environmentVariables": {
+    "DiffEngine_Disabled": "true"
+  },
   "xUnit": {
     "diagnosticMessages": true,
     "longRunningTestSeconds": 120,
