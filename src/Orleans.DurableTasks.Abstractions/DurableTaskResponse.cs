@@ -41,28 +41,38 @@ public abstract class DurableTaskResponse
 
     /// <summary>Gets the response for a successful task without a result value.</summary>
     public static DurableTaskResponse Completed => SuccessDurableTaskResponse.Instance;
+
     /// <summary>Gets the pending response.</summary>
     public static DurableTaskResponse Pending => PendingDurableTaskResponse.Instance;
+
     /// <summary>Gets the subscribed response.</summary>
     public static DurableTaskResponse Subscribed => SubscribedDurableTaskResponse.Instance;
+
     /// <summary>Gets a canceled response with a default cancellation exception.</summary>
     public static DurableTaskResponse Canceled => CanceledDurableTaskResponse.Instance;
+
     /// <summary>Creates a canceled response.</summary>
     public static DurableTaskResponse FromCanceled(OperationCanceledException exception) => new CanceledDurableTaskResponse(exception);
+
     /// <summary>Creates a failed or canceled response from an exception.</summary>
     public static DurableTaskResponse FromException(Exception exception)
         => exception is OperationCanceledException canceled ? FromCanceled(canceled) : new ExceptionDurableTaskResponse(exception);
+
     /// <summary>Creates a successful response containing <paramref name="value"/>.</summary>
     public static DurableTaskResponse<TResult> FromResult<TResult>(TResult value) => new(value);
 
     /// <summary>Gets the response kind.</summary>
     public abstract DurableTaskResponseKind ResponseKind { get; }
+
     /// <summary>Gets the untyped result, or throws if the task did not complete successfully.</summary>
     public abstract object? Result { get; }
+
     /// <summary>Gets the declared result type, if any.</summary>
     public virtual Type? ResultType => null;
+
     /// <summary>Gets the terminal exception, if any.</summary>
     public abstract Exception? Exception { get; }
+
     /// <summary>Returns the result as <typeparamref name="T"/>, or throws if it is unavailable or incompatible.</summary>
     public abstract T GetResult<T>();
 
@@ -105,13 +115,18 @@ public sealed class SuccessDurableTaskResponse : DurableTaskResponse
 {
     /// <summary>Gets the shared successful response.</summary>
     public static SuccessDurableTaskResponse Instance { get; } = new();
+
     private SuccessDurableTaskResponse() { }
+
     /// <inheritdoc />
     public override DurableTaskResponseKind ResponseKind => DurableTaskResponseKind.CompletedSuccessfully;
+
     /// <inheritdoc />
     public override object? Result => null;
+
     /// <inheritdoc />
     public override Exception? Exception => null;
+
     /// <inheritdoc />
     public override T GetResult<T>() => throw new InvalidOperationException("The completed task has no result value.");
 }
@@ -121,14 +136,19 @@ public sealed class DurableTaskResponse<TResult>(TResult result) : DurableTaskRe
 {
     /// <summary>Gets the typed result.</summary>
     public TResult TypedResult => result;
+
     /// <inheritdoc />
     public override DurableTaskResponseKind ResponseKind => DurableTaskResponseKind.CompletedSuccessfully;
+
     /// <inheritdoc />
     public override object? Result => result;
+
     /// <inheritdoc />
     public override Type ResultType => typeof(TResult);
+
     /// <inheritdoc />
     public override Exception? Exception => null;
+
     /// <inheritdoc />
     public override T GetResult<T>()
     {
@@ -157,10 +177,13 @@ public sealed class ExceptionDurableTaskResponse : DurableTaskResponse
 
     /// <inheritdoc />
     public override DurableTaskResponseKind ResponseKind => DurableTaskResponseKind.Failed;
+
     /// <inheritdoc />
     public override object? Result => GetResult<object?>();
+
     /// <inheritdoc />
     public override Exception Exception { get; }
+
     /// <inheritdoc />
     public override T GetResult<T>()
     {
@@ -181,10 +204,13 @@ public sealed class CanceledDurableTaskResponse : DurableTaskResponse
 
     /// <inheritdoc />
     public override DurableTaskResponseKind ResponseKind => DurableTaskResponseKind.Canceled;
+
     /// <inheritdoc />
     public override object? Result => GetResult<object?>();
+
     /// <inheritdoc />
     public override OperationCanceledException Exception { get; }
+
     /// <inheritdoc />
     public override T GetResult<T>()
     {
@@ -198,13 +224,18 @@ public sealed class PendingDurableTaskResponse : DurableTaskResponse
 {
     /// <summary>Gets the shared pending response.</summary>
     public static PendingDurableTaskResponse Instance { get; } = new();
+
     private PendingDurableTaskResponse() { }
+
     /// <inheritdoc />
     public override DurableTaskResponseKind ResponseKind => DurableTaskResponseKind.Pending;
+
     /// <inheritdoc />
     public override object? Result => throw Incomplete();
+
     /// <inheritdoc />
     public override Exception? Exception => null;
+
     /// <inheritdoc />
     public override T GetResult<T>() => throw Incomplete();
 }
@@ -214,13 +245,18 @@ public sealed class SubscribedDurableTaskResponse : DurableTaskResponse
 {
     /// <summary>Gets the shared subscribed response.</summary>
     public static SubscribedDurableTaskResponse Instance { get; } = new();
+
     private SubscribedDurableTaskResponse() { }
+
     /// <inheritdoc />
     public override DurableTaskResponseKind ResponseKind => DurableTaskResponseKind.Subscribed;
+
     /// <inheritdoc />
     public override object? Result => throw Incomplete();
+
     /// <inheritdoc />
     public override Exception? Exception => null;
+
     /// <inheritdoc />
     public override T GetResult<T>() => throw Incomplete();
 }

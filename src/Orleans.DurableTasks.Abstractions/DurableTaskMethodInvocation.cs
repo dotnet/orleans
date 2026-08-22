@@ -12,6 +12,7 @@ internal abstract class DeferredMethodInvocation : DurableTask
     private int _started;
 
     public Action MoveNextAction => _moveNextAction ??= MoveNext;
+
     public void CaptureExecutionContext() => _executionContext = ExecutionContext.Capture();
 
     private void MoveNext()
@@ -39,6 +40,7 @@ internal abstract class DeferredMethodInvocation : DurableTask
     }
 
     protected abstract void MoveNextCore();
+
     protected void Complete(DurableTaskResponse response)
     {
         _executionContext = null;
@@ -62,6 +64,7 @@ internal abstract class DeferredMethodInvocation : DurableTask
 internal abstract class VoidDurableTaskMethodInvocation : DeferredMethodInvocation
 {
     public abstract void SetResult();
+
     public abstract void SetException(Exception exception);
 }
 
@@ -69,9 +72,13 @@ internal sealed class VoidDurableTaskMethodInvocation<TStateMachine> : VoidDurab
     where TStateMachine : IAsyncStateMachine
 {
     private TStateMachine _stateMachine = default!;
+
     public void SetStateMachine(TStateMachine stateMachine) => _stateMachine = stateMachine;
+
     protected override void MoveNextCore() => _stateMachine.MoveNext();
+
     public override void SetResult() => Complete(DurableTaskResponse.Completed);
+
     public override void SetException(Exception exception) => Complete(DurableTaskResponse.FromException(exception));
 }
 
@@ -85,6 +92,7 @@ internal abstract class DurableTaskMethodInvocation<TResult> : DurableTask<TResu
     private int _started;
 
     public Action MoveNextAction => _moveNextAction ??= MoveNext;
+
     public void CaptureExecutionContext() => _executionContext = ExecutionContext.Capture();
 
     private void MoveNext()
@@ -112,8 +120,11 @@ internal abstract class DurableTaskMethodInvocation<TResult> : DurableTask<TResu
     }
 
     protected abstract void MoveNextCore();
+
     public abstract void SetResult(TResult result);
+
     public abstract void SetException(Exception exception);
+
     protected void Complete(DurableTaskResponse response)
     {
         _executionContext = null;
@@ -138,8 +149,12 @@ internal sealed class DurableTaskMethodInvocation<TResult, TStateMachine> : Dura
     where TStateMachine : IAsyncStateMachine
 {
     private TStateMachine _stateMachine = default!;
+
     public void SetStateMachine(TStateMachine stateMachine) => _stateMachine = stateMachine;
+
     protected override void MoveNextCore() => _stateMachine.MoveNext();
+
     public override void SetResult(TResult result) => Complete(DurableTaskResponse.FromResult(result));
+
     public override void SetException(Exception exception) => Complete(DurableTaskResponse.FromException(exception));
 }
