@@ -84,6 +84,12 @@ namespace UnitTests.MembershipTests
         }
 
         [Fact]
+        public async Task MembershipTable_SqlServer_MetadataRoundTrips()
+        {
+            await MembershipTable_MetadataRoundTrips();
+        }
+
+        [Fact]
         public async Task MembershipTable_SqlServer_ReadRow_Insert_Read()
         {
             await MembershipTable_ReadRow_Insert_Read();

@@ -101,6 +101,7 @@ namespace Orleans.Runtime.MembershipService
 
             try
             {
+                ClearMetadataIfUnavailable(entry);
                 return await orleansQueries.InsertMembershipRowAsync(this.clusterId, entry, tableVersion.VersionEtag);
             }
             catch (Exception ex)
@@ -132,6 +133,7 @@ namespace Orleans.Runtime.MembershipService
 
             try
             {
+                ClearMetadataIfUnavailable(entry);
                 return await orleansQueries.UpdateMembershipRowAsync(this.clusterId, entry, tableVersion.VersionEtag);
             }
             catch (Exception ex)
@@ -198,6 +200,14 @@ namespace Orleans.Runtime.MembershipService
             {
                 LogTraceInsertSiloMembershipVersionFailed(ex);
                 throw;
+            }
+        }
+
+        private void ClearMetadataIfUnavailable(MembershipEntry entry)
+        {
+            if (!orleansQueries.SupportsMembershipMetadata)
+            {
+                entry.Metadata = null;
             }
         }
 

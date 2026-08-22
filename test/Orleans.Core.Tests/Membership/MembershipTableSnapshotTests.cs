@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using AwesomeAssertions.Common;
 using Orleans;
 using Orleans.Runtime;
@@ -85,6 +86,68 @@ namespace NonSilo.Tests.Membership
                 var iAmAliveTime = newSnapshot.Entries[originalSilo].IAmAliveTime;
                 Assert.Equal(laterDate, iAmAliveTime);
             }
+        }
+
+        [Fact]
+        public void MembershipEntry_CopyPreservesMetadata()
+        {
+            var silo = Silo("127.0.0.1:100@1");
+            var metadata = ImmutableDictionary.CreateRange([new KeyValuePair<string, string>("region", "west")]);
+            var entry = Entry(silo, SiloStatus.Active);
+            entry.Metadata = metadata;
+
+            var copy = entry.WithStatus(SiloStatus.Stopping);
+
+            Assert.Same(metadata, copy.Metadata);
+            Assert.Equal(SiloStatus.Stopping, copy.Status);
+        }
+
+        [Fact]
+        public void MembershipTableSnapshot_AvailableMetadataIsSuccessorToUnavailableMetadata()
+        {
+            var silo = Silo("127.0.0.1:100@1");
+            var originalEntry = Entry(silo, SiloStatus.Active);
+
+            var updatedEntry = Entry(silo, SiloStatus.Active);
+            updatedEntry.Metadata = ImmutableDictionary.CreateRange([new KeyValuePair<string, string>("region", "east")]);
+
+            var originalSnapshot = MembershipTableSnapshot.Create(Table(originalEntry));
+            var updatedSnapshot = MembershipTableSnapshot.Update(originalSnapshot, Table(updatedEntry));
+
+            Assert.True(updatedSnapshot.IsSuccessorTo(originalSnapshot));
+        }
+
+        [Fact]
+        public void MembershipTableSnapshot_UnavailableMetadataDoesNotReplaceAvailableMetadata()
+        {
+            var silo = Silo("127.0.0.1:100@1");
+            var metadata = ImmutableDictionary.CreateRange([new KeyValuePair<string, string>("region", "west")]);
+            var originalEntry = Entry(silo, SiloStatus.Active);
+            originalEntry.Metadata = metadata;
+
+            var updatedSnapshot = MembershipTableSnapshot.Update(
+                MembershipTableSnapshot.Create(Table(originalEntry)),
+                Table(Entry(silo, SiloStatus.Active)));
+
+            Assert.Same(metadata, updatedSnapshot.Entries[silo].Metadata);
+            Assert.False(updatedSnapshot.IsSuccessorTo(MembershipTableSnapshot.Create(Table(originalEntry))));
+        }
+
+        [Fact]
+        public void MembershipTableSnapshot_ConflictingMetadataDoesNotReplaceAvailableMetadata()
+        {
+            var silo = Silo("127.0.0.1:100@1");
+            var originalMetadata = ImmutableDictionary.CreateRange([new KeyValuePair<string, string>("region", "west")]);
+            var originalEntry = Entry(silo, SiloStatus.Active);
+            originalEntry.Metadata = originalMetadata;
+            var originalSnapshot = MembershipTableSnapshot.Create(Table(originalEntry));
+
+            var conflictingEntry = Entry(silo, SiloStatus.Active);
+            conflictingEntry.Metadata = ImmutableDictionary.CreateRange([new KeyValuePair<string, string>("region", "east")]);
+            var updatedSnapshot = MembershipTableSnapshot.Update(originalSnapshot, Table(conflictingEntry));
+
+            Assert.Same(originalMetadata, updatedSnapshot.Entries[silo].Metadata);
+            Assert.False(updatedSnapshot.IsSuccessorTo(originalSnapshot));
         }
 
         [Fact]

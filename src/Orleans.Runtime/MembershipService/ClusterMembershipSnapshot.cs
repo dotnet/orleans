@@ -90,16 +90,11 @@ namespace Orleans.Runtime
                 throw new ArgumentException($"Argument must have a previous version to the current instance. Expected <= {this.Version}, encountered {previous.Version}", nameof(previous));
             }
 
-            if (this.Version == previous.Version)
-            {
-                return new ClusterMembershipUpdate(this, ImmutableArray<ClusterMember>.Empty);
-            }
-
             var changes = ImmutableHashSet.CreateBuilder<ClusterMember>();
             foreach (var entry in this.Members)
             {
                 // Include any entry which is new or has changed state.
-                if (!previous.Members.TryGetValue(entry.Key, out var previousEntry) || previousEntry.Status != entry.Value.Status)
+                if (!previous.Members.TryGetValue(entry.Key, out var previousEntry) || !entry.Value.Equals(previousEntry))
                 {
                     changes.Add(entry.Value);
                 }
@@ -110,11 +105,23 @@ namespace Orleans.Runtime
             {
                 if (!this.Members.TryGetValue(entry.Key, out _))
                 {
-                    changes.Add(new ClusterMember(entry.Key, SiloStatus.Dead, entry.Value.Name, wasDeclaredDead: true));
+                    changes.Add(entry.Value.Metadata is { } metadata
+                        ? new ClusterMember(entry.Key, SiloStatus.Dead, entry.Value.Name, metadata, wasDeclaredDead: true)
+                        : new ClusterMember(entry.Key, SiloStatus.Dead, entry.Value.Name, wasDeclaredDead: true));
                 }
             }
 
             return new ClusterMembershipUpdate(this, changes.ToImmutableArray());
+        }
+
+        internal bool IsSuccessorTo(ClusterMembershipSnapshot previous)
+        {
+            if (this.Version > previous.Version)
+            {
+                return true;
+            }
+
+            return this.Version == previous.Version && this.CreateUpdate(previous).HasChanges;
         }
 
         /// <inheritdoc/>

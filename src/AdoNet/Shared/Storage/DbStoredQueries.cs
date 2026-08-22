@@ -1,9 +1,11 @@
 using System;
 using System.Collections.Generic;
+using System.Collections.Immutable;
 using System.Data;
 using System.Linq;
 using System.Net;
 using System.Reflection;
+using System.Text.Json;
 using Orleans.Runtime;
 
 #if CLUSTERING_ADONET
@@ -88,6 +90,12 @@ namespace Orleans.Tests.SqlUtils
         /// A query template to update a membership row.
         /// </summary>
         internal string UpdateMembershipKey => queries[nameof(UpdateMembershipKey)];
+
+        internal bool SupportsMembershipMetadata()
+            => MembershipReadAllKey.Contains(nameof(Columns.MetadataJson), StringComparison.OrdinalIgnoreCase)
+            && MembershipReadRowKey.Contains(nameof(Columns.MetadataJson), StringComparison.OrdinalIgnoreCase)
+            && InsertMembershipKey.Contains(nameof(Columns.MetadataJson), StringComparison.OrdinalIgnoreCase)
+            && UpdateMembershipKey.Contains(nameof(Columns.MetadataJson), StringComparison.OrdinalIgnoreCase);
 
         /// <summary>
         /// A query template to delete membership entries.
@@ -226,6 +234,12 @@ namespace Orleans.Tests.SqlUtils
                         IAmAliveTime = record.GetDateTimeValue(nameof(Columns.IAmAliveTime))
                     };
 
+                    var metadataJson = TryGetMetadataJson(record);
+                    if (!string.IsNullOrEmpty(metadataJson))
+                    {
+                        entry.Metadata = JsonSerializer.Deserialize<Dictionary<string, string>>(metadataJson)?.ToImmutableDictionary();
+                    }
+
                     string? suspectingSilos = record.GetValueOrDefault<string>(nameof(Columns.SuspectTimes));
                     if (!string.IsNullOrWhiteSpace(suspectingSilos))
                     {
@@ -237,9 +251,23 @@ namespace Orleans.Tests.SqlUtils
                                 LogFormatter.ParseDate(split[1]));
                         }));
                     }
+
                 }
 
                 return Tuple.Create(entry, GetVersion(record));
+            }
+
+            private static string? TryGetMetadataJson(IDataRecord record)
+            {
+                try
+                {
+                    var pos = record.GetOrdinal(nameof(Columns.MetadataJson));
+                    return record.IsDBNull(pos) ? null : Convert.ToString(record.GetValue(pos));
+                }
+                catch (IndexOutOfRangeException)
+                {
+                    return null;
+                }
             }
 
             /// <summary>
@@ -492,6 +520,11 @@ namespace Orleans.Tests.SqlUtils
                         : string.Join("|", value.Select(
                             s => $"{s.Item1.ToParsableString()},{LogFormatter.PrintDate(s.Item2)}")));
                 }
+            }
+
+            internal string? MetadataJson
+            {
+                set { Add(nameof(MetadataJson), value); }
             }
 
             internal string QueueId

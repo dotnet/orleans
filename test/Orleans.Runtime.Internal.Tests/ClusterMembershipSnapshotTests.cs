@@ -2,6 +2,7 @@ using System.Collections.Immutable;
 using System.Net;
 using Orleans.Runtime;
 using Orleans.Runtime.MembershipService;
+using Orleans.Runtime.MembershipService.SiloMetadata;
 using Xunit;
 
 namespace UnitTests;
@@ -105,6 +106,57 @@ public class ClusterMembershipSnapshotTests
         AssertSpanFormattable(snapshot.Version);
         AssertSpanFormattable(member);
         AssertSpanFormattable(member.SiloAddress);
+    }
+
+    [Fact]
+    public void ClusterMember_DistinguishesUnavailableFromAvailableEmptyMetadata()
+    {
+        var silo = CreateSiloAddress(1);
+
+        var unavailable = new ClusterMember(silo, SiloStatus.Active, "silo");
+        var availableEmpty = new ClusterMember(silo, SiloStatus.Active, "silo", SiloMetadata.Empty);
+
+        Assert.False(unavailable.IsMetadataAvailable);
+        Assert.True(availableEmpty.IsMetadataAvailable);
+        Assert.Null(unavailable.Metadata);
+        Assert.NotNull(availableEmpty.Metadata);
+        Assert.Empty(availableEmpty.Metadata.Metadata);
+        Assert.NotEqual(unavailable, availableEmpty);
+    }
+
+    [Fact]
+    public void CreateUpdate_IncludesMetadataOnlyChanges()
+    {
+        var silo = CreateSiloAddress(1);
+        var previous = CreateSnapshot(
+            new ClusterMember(silo, SiloStatus.Active, "silo", new SiloMetadata([new KeyValuePair<string, string>("region", "west")])),
+            version: 1);
+        var current = CreateSnapshot(
+            new ClusterMember(silo, SiloStatus.Active, "silo", new SiloMetadata([new KeyValuePair<string, string>("region", "east")])),
+            version: 2);
+
+        var update = current.CreateUpdate(previous);
+
+        Assert.True(update.HasChanges);
+        var change = Assert.Single(update.Changes);
+        Assert.NotNull(change.Metadata);
+        Assert.Equal("east", change.Metadata.Metadata["region"]);
+    }
+
+    [Fact]
+    public void CreateUpdate_IncludesSameVersionMetadataEnrichment()
+    {
+        var silo = CreateSiloAddress(1);
+        var previous = CreateSnapshot(new ClusterMember(silo, SiloStatus.Active, "silo"), version: 1);
+        var current = CreateSnapshot(
+            new ClusterMember(silo, SiloStatus.Active, "silo", new SiloMetadata([new KeyValuePair<string, string>("region", "east")])),
+            version: 1);
+
+        var change = Assert.Single(current.CreateUpdate(previous).Changes);
+
+        Assert.NotNull(change.Metadata);
+        Assert.Equal("east", change.Metadata.Metadata["region"]);
+        Assert.True(current.IsSuccessorTo(previous));
     }
 
     private static ClusterMembershipSnapshot CreateSnapshot(ClusterMember member, long version)
