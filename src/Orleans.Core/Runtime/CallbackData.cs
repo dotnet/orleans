@@ -1,5 +1,6 @@
 using System;
 using System.Diagnostics;
+using System.Diagnostics.CodeAnalysis;
 using System.Threading;
 using Microsoft.Extensions.Logging;
 using Orleans.Serialization.Invocation;
@@ -13,20 +14,23 @@ namespace Orleans.Runtime
         private const int StateCancellationRegistrationPending = 2;
         private const int StateCancellationRegistrationPublished = 4;
 
-        private readonly SharedCallbackData shared;
-        private readonly IResponseCompletionSource context;
-        private readonly ApplicationRequestInstruments _applicationRequestInstruments;
+        private SharedCallbackData shared = null!;
+        private IResponseCompletionSource context = null!;
+        private ApplicationRequestInstruments _applicationRequestInstruments = null!;
         private int _state;
         private StatusResponse? lastKnownStatus;
         private ValueStopwatch stopwatch;
         private CancellationTokenRegistration _cancellationTokenRegistration;
+        private int _refCount;
+        private long _generation;
 
-        public CallbackData(
-            SharedCallbackData shared,
-            IResponseCompletionSource ctx,
-            Message msg,
-            ApplicationRequestInstruments applicationRequestInstruments)
+        internal CallbackData()
         {
+        }
+
+        internal void Initialize(SharedCallbackData shared, IResponseCompletionSource ctx, Message msg, ApplicationRequestInstruments applicationRequestInstruments)
+        {
+            Debug.Assert(_refCount == 0, "CallbackData ref count should be 0 before initialization");
             this.shared = shared;
             this.context = ctx;
             this.Message = msg;
@@ -34,7 +38,85 @@ namespace Orleans.Runtime
             this.stopwatch = ValueStopwatch.StartNew();
         }
 
-        public Message Message { get; } // might hold metadata used by response pipeline
+        internal void Reset()
+        {
+            Debug.Assert(_refCount == 0, "CallbackData ref count should be 0 before reset");
+            shared = null!;
+            context = null!;
+            _applicationRequestInstruments = null!;
+            _state = StateNone;
+            lastKnownStatus = null;
+            stopwatch = default;
+            _cancellationTokenRegistration.Dispose();
+            _cancellationTokenRegistration = default;
+            Message = null!;
+        }
+
+        internal long AcquireOwnerReference()
+        {
+            var generation = Interlocked.Increment(ref _generation);
+            if (Interlocked.CompareExchange(ref _refCount, 1, 0) != 0)
+            {
+                throw new InvalidOperationException("CallbackData already has an owner.");
+            }
+
+            return generation;
+        }
+
+        internal bool TryAcquireLease(long generation)
+        {
+            while (true)
+            {
+                if (generation != Volatile.Read(ref _generation))
+                {
+                    return false;
+                }
+
+                var currentRefCount = Volatile.Read(ref _refCount);
+
+                if (currentRefCount <= 0)
+                {
+                    return false;
+                }
+
+                if (Interlocked.CompareExchange(ref _refCount, currentRefCount + 1, currentRefCount) == currentRefCount)
+                {
+                    if (generation == Volatile.Read(ref _generation))
+                    {
+                        return true;
+                    }
+
+                    ReleaseReference();
+                    return false;
+                }
+            }
+        }
+
+        internal void ReleaseLease(long generation)
+        {
+            if (generation != Volatile.Read(ref _generation))
+            {
+                throw new InvalidOperationException("Cannot release a stale CallbackData reference.");
+            }
+
+            ReleaseReference();
+        }
+
+        private void ReleaseReference()
+        {
+            var newRefCount = Interlocked.Decrement(ref _refCount);
+            if (newRefCount == 0)
+            {
+                CallbackDataPool.ReturnCore(this);
+            }
+            else if (newRefCount < 0)
+            {
+                Debug.Fail("CallbackData ref count went negative");
+                throw new InvalidOperationException("CallbackData was released more than once.");
+            }
+        }
+
+        public Message Message { get; private set; } = null!; // might hold metadata used by response pipeline
 
         public bool IsCompleted => (Volatile.Read(ref _state) & StateCompleted) != 0;
 
@@ -80,10 +162,7 @@ namespace Orleans.Runtime
             }
         }
 
-        public void OnStatusUpdate(StatusResponse status)
-        {
-            this.lastKnownStatus = status;
-        }
+        public void OnStatusUpdate(StatusResponse status) => this.lastKnownStatus = status;
 
         public bool IsExpired(long currentTimestamp)
         {
@@ -112,6 +191,24 @@ namespace Orleans.Runtime
 
         private void OnCancellation(CancellationToken cancellationToken)
         {
+            var generation = Volatile.Read(ref _generation);
+            if (!TryAcquireLease(generation))
+            {
+                return;
+            }
+
+            try
+            {
+                OnCancellationCore(cancellationToken);
+            }
+            finally
+            {
+                ReleaseLease(generation);
+            }
+        }
+
+        private void OnCancellationCore(CancellationToken cancellationToken)
+        {
             // If waiting for acknowledgement is enabled, simply signal to the remote grain that cancellation
             // is requested and return.
             if (shared.WaitForCancellationAcknowledgement)
@@ -130,11 +227,11 @@ namespace Orleans.Runtime
             stopwatch.Stop();
             SignalCancellation();
             shared.Unregister(Message);
+            DisposeCancellationRegistration();
             _applicationRequestInstruments.OnAppRequestsEnd((long)stopwatch.Elapsed.TotalMilliseconds);
             _applicationRequestInstruments.OnAppRequestsCanceled(GetTargetGrainType());
             OrleansCallBackDataEvent.Instance.OnCanceled(Message);
             context.Complete(Response.FromException(new OperationCanceledException(cancellationToken)));
-            DisposeCancellationRegistration();
         }
 
         public void OnTimeout()
@@ -156,13 +253,10 @@ namespace Orleans.Runtime
             _applicationRequestInstruments.OnAppRequestsTimedOut(GetTargetGrainType());
 
             OrleansCallBackDataEvent.Instance.OnTimeout(this.Message);
-
-            var msg = this.Message; // Local working copy
-
+            var msg = this.Message;
             var statusMessage = lastKnownStatus is StatusResponse status ? $"Last known status is {status}. " : string.Empty;
             var timeout = GetResponseTimeout();
             LogTimeout(this.shared.Logger, timeout, msg, statusMessage);
-
             var exception = new TimeoutException($"Response did not arrive on time in {timeout} for message: {msg}. {statusMessage}");
             context.Complete(Response.FromException(exception));
         }
@@ -281,5 +375,70 @@ namespace Orleans.Runtime
             Message = "The target silo became unavailable for message: '{Message}'. {StatusMessage}See {TroubleshootingHelpLink} for troubleshooting help. About to break its promise."
         )]
         private static partial void LogTargetSiloFail(ILogger logger, Message message, string statusMessage, string troubleshootingHelpLink);
+    }
+
+    /// <summary>
+    /// Holds the dictionary-owned reference to a pooled <see cref="CallbackData"/> instance.
+    /// </summary>
+    internal readonly struct CallbackDataOwner
+    {
+        private readonly CallbackData? _callback;
+        private readonly long _generation;
+
+        public CallbackDataOwner(CallbackData callback)
+        {
+            _callback = callback;
+            _generation = callback.AcquireOwnerReference();
+        }
+
+        public CallbackDataLease Acquire()
+        {
+            var callback = _callback ?? throw new InvalidOperationException("CallbackDataOwner is not initialized.");
+            if (callback.TryAcquireLease(_generation))
+            {
+                return new CallbackDataLease(callback, _generation);
+            }
+
+            return default;
+        }
+
+        public void Release()
+        {
+            var callback = _callback ?? throw new InvalidOperationException("CallbackDataOwner is not initialized.");
+            callback.ReleaseLease(_generation);
+        }
+    }
+
+    /// <summary>
+    /// Holds a scoped reference to a pooled <see cref="CallbackData"/> instance.
+    /// </summary>
+    internal ref struct CallbackDataLease
+    {
+        private CallbackData? _callback;
+        private readonly long _generation;
+
+        internal CallbackDataLease(CallbackData callback, long generation)
+        {
+            _callback = callback;
+            _generation = generation;
+        }
+
+        public readonly CallbackData Value =>
+            _callback ?? throw new InvalidOperationException("CallbackDataLease is not initialized.");
+
+        public readonly bool TryGetValue([NotNullWhen(true)] out CallbackData? callback)
+        {
+            callback = _callback;
+            return callback is not null;
+        }
+
+        public void Dispose()
+        {
+            if (_callback is { } callback)
+            {
+                _callback = null;
+                callback.ReleaseLease(_generation);
+            }
+        }
     }
 }
