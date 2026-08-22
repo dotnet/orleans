@@ -18,6 +18,16 @@ public interface IJournaledStateManager : IAsyncDisposable
     ValueTask InitializeAsync(CancellationToken cancellationToken);
 
     /// <summary>
+    /// Reads the persisted journal, replacing registered states with their durable contents.
+    /// </summary>
+    /// <remarks>
+    /// The caller must serialize this operation with state mutations so that recovery observes a stable in-memory state boundary.
+    /// </remarks>
+    /// <param name="cancellationToken">The cancellation token.</param>
+    /// <returns>A <see cref="ValueTask"/> which represents the operation.</returns>
+    ValueTask ReadStateAsync(CancellationToken cancellationToken);
+
+    /// <summary>
     /// Registers a state with the manager.
     /// </summary>
     /// <param name="name">The state's stable identifier.</param>
@@ -55,4 +65,9 @@ public interface IJournaledStateManager : IAsyncDisposable
     /// concurrent writers and should not be used for correctness decisions.
     /// </remarks>
     long PendingWriteByteCount => -1;
+
+    /// <summary>
+    /// Gets a value indicating whether any registered state has changes which have not been written to storage.
+    /// </summary>
+    bool HasPendingWrites => PendingWriteByteCount != 0;
 }

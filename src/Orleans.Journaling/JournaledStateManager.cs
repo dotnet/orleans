@@ -151,7 +151,7 @@ internal sealed partial class JournaledStateManager : IJournaledStateManager, IJ
             _workSignal.Signal();
         }
 
-        await task;
+        await task.WaitAsync(cancellationToken);
     }
 
     private Task Start()
@@ -166,6 +166,7 @@ internal sealed partial class JournaledStateManager : IJournaledStateManager, IJ
         var needsRecovery = true;
         WorkItem? recoveryTrigger = null;
         Exception? recoveryTriggerException = null;
+        var recoveryTriggerRequiresSuccessfulRecovery = false;
         while (!_shutdownCancellation.Token.IsCancellationRequested)
         {
             try
@@ -367,16 +368,12 @@ internal sealed partial class JournaledStateManager : IJournaledStateManager, IJ
                                         var writeCompleted = false;
                                         try
                                         {
-                                            if (isSnapshot && hasBufferToConsume)
+                                            if (isSnapshot && hasBufferToConsume && !_migrationSnapshotRequired)
                                             {
                                                 await AppendStorageAsync(bufferToConsume.AsReadOnlySequence(), _shutdownCancellation.Token).ConfigureAwait(true);
                                                 lock (_lock)
                                                 {
                                                     _journalWriter.Consume(bufferToConsume);
-                                                    foreach (var state in _states.Values)
-                                                    {
-                                                        state.OnWriteCompleted();
-                                                    }
                                                 }
 
                                                 bufferToConsume.Dispose();
@@ -461,6 +458,18 @@ internal sealed partial class JournaledStateManager : IJournaledStateManager, IJ
                                     break;
                                 }
 
+                            case ReadStateWorkItem:
+                                {
+                                    await RecoverAsync(_shutdownCancellation.Token).ConfigureAwait(true);
+                                    needsRecovery = false;
+                                    lock (_lock)
+                                    {
+                                        _state = ManagerState.Ready;
+                                    }
+
+                                    break;
+                                }
+
                             case InitializeWorkItem:
                                 {
                                     lock (_lock)
@@ -523,11 +532,20 @@ internal sealed partial class JournaledStateManager : IJournaledStateManager, IJ
                             }
                         }
 
-                        if (IsRecoverySignal(exception))
+                        if (workItem is ReadStateWorkItem)
                         {
                             Debug.Assert(recoveryTrigger is null);
                             recoveryTrigger = workItem;
                             recoveryTriggerException = exception;
+                            recoveryTriggerRequiresSuccessfulRecovery = true;
+                            needsRecovery = true;
+                        }
+                        else if (IsRecoverySignal(exception))
+                        {
+                            Debug.Assert(recoveryTrigger is null);
+                            recoveryTrigger = workItem;
+                            recoveryTriggerException = exception;
+                            recoveryTriggerRequiresSuccessfulRecovery = false;
                             needsRecovery = true;
                         }
                         else
@@ -557,7 +575,15 @@ internal sealed partial class JournaledStateManager : IJournaledStateManager, IJ
                 }
                 finally
                 {
-                    CompleteRecoveryTrigger();
+                    if (!recoveryTriggerRequiresSuccessfulRecovery)
+                    {
+                        CompleteRecoveryTrigger();
+                    }
+                    else
+                    {
+                        await Task.Delay(TimeSpan.FromMilliseconds(100)).ConfigureAwait(true);
+                        _workSignal.Signal();
+                    }
                 }
             }
         }
@@ -572,6 +598,7 @@ internal sealed partial class JournaledStateManager : IJournaledStateManager, IJ
             trigger.SetException(recoveryTriggerException!);
             recoveryTrigger = null;
             recoveryTriggerException = null;
+            recoveryTriggerRequiresSuccessfulRecovery = false;
         }
     }
 
@@ -664,6 +691,9 @@ internal sealed partial class JournaledStateManager : IJournaledStateManager, IJ
 
     public async ValueTask DeleteStateAsync(CancellationToken cancellationToken)
     {
+        cancellationToken.ThrowIfCancellationRequested();
+        _shutdownCancellation.Token.ThrowIfCancellationRequested();
+
         Task task;
         bool didEnqueue;
         lock (_lock)
@@ -679,7 +709,7 @@ internal sealed partial class JournaledStateManager : IJournaledStateManager, IJ
         var startTimestamp = _shared.TimeProvider.GetTimestamp();
         try
         {
-            await task;
+            await task.WaitAsync(cancellationToken);
             _shared.Instruments.OnStateDeleteRequest(_shared.TimeProvider.GetElapsedTime(startTimestamp), succeeded: true);
         }
         catch
@@ -687,6 +717,30 @@ internal sealed partial class JournaledStateManager : IJournaledStateManager, IJ
             _shared.Instruments.OnStateDeleteRequest(_shared.TimeProvider.GetElapsedTime(startTimestamp), succeeded: false);
             throw;
         }
+    }
+
+    public async ValueTask ReadStateAsync(CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        _shutdownCancellation.Token.ThrowIfCancellationRequested();
+
+        Task task;
+        bool didEnqueue;
+        lock (_lock)
+        {
+            if (_workLoop is null)
+            {
+                _workLoop = Start();
+            }
+
+            task = EnqueueOrGetPendingWorkItem<ReadStateWorkItem>(out didEnqueue);
+        }
+
+        if (didEnqueue)
+        {
+            _workSignal.Signal();
+        }
+        await task.WaitAsync(cancellationToken);
     }
 
     private async Task RecoverAsync(CancellationToken cancellationToken)
@@ -975,7 +1029,31 @@ internal sealed partial class JournaledStateManager : IJournaledStateManager, IJ
 
     public bool TryGetState(string name, [NotNullWhen(true)] out IJournaledState? state) => _states.TryGetValue(name, out state);
 
-    public long PendingWriteByteCount => _journalWriter.CommittedLength;
+    public long PendingWriteByteCount => _journalWriter.BufferedLength;
+
+    public bool HasPendingWrites
+    {
+        get
+        {
+            lock (_lock)
+            {
+                if (_journalWriter.BufferedLength > 0)
+                {
+                    return true;
+                }
+
+                foreach (var state in _states.Values)
+                {
+                    if (state.HasPendingChanges)
+                    {
+                        return true;
+                    }
+                }
+
+                return false;
+            }
+        }
+    }
 
     void ILifecycleParticipant<IGrainLifecycle>.Participate(IGrainLifecycle observer) => observer.Subscribe(GrainLifecycleStage.SetupState, this);
     Task ILifecycleObserver.OnStart(CancellationToken cancellationToken) => InitializeAsync(cancellationToken).AsTask();
@@ -1103,6 +1181,8 @@ internal sealed partial class JournaledStateManager : IJournaledStateManager, IJ
 
     private sealed class DeleteStateWorkItem : WorkItem;
 
+    private sealed class ReadStateWorkItem : WorkItem;
+
     private sealed class RegisterStateWorkItem(string name) : WorkItem(name)
     {
         public string Name => (string)Task.AsyncState!;
@@ -1126,6 +1206,8 @@ internal sealed partial class JournaledStateManager : IJournaledStateManager, IJ
         private JournalStreamWriter _writer;
 
         public uint this[string name] => _ids[name];
+
+        bool IJournaledState.HasPendingChanges => false;
 
         void IJournaledState.ReplayEntry(JournalEntry entry, JournalReplayContext context) =>
             context.GetRequiredCommandCodec(entry.FormatKey, _codec).Apply(entry.Reader, this);
@@ -1224,6 +1306,8 @@ internal sealed partial class JournaledStateManager : IJournaledStateManager, IJ
         public JournalStreamId StreamId { get; } = streamId;
 
         public IReadOnlyList<IPreservedJournalEntry> PreservedEntries => _preservedEntries;
+
+        bool IJournaledState.HasPendingChanges => false;
 
         void IJournaledState.ReplayEntry(JournalEntry entry, JournalReplayContext context) =>
             _preservedEntries.Add(new PreservedJournalEntry(entry.FormatKey, entry.Reader));
