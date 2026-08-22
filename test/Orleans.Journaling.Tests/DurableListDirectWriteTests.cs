@@ -96,6 +96,8 @@ public sealed class DurableListDirectWriteTests
 
         public void RegisterState(string name, IJournaledState state) => state.Reset(writer.CreateWriter());
 
+        public void RegisterObserver(IJournaledStateObserver observer) { }
+
         public bool TryGetState(string name, [NotNullWhen(true)] out IJournaledState? state)
         {
             state = null;
@@ -103,6 +105,8 @@ public sealed class DurableListDirectWriteTests
         }
 
         public ValueTask WriteStateAsync(CancellationToken cancellationToken) => default;
+
+        public ValueTask RevertPendingChangesAsync(CancellationToken cancellationToken) => default;
 
         public ValueTask DeleteStateAsync(CancellationToken cancellationToken) => default;
     }

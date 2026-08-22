@@ -32,8 +32,7 @@ public interface IJournaledStateManager : IAsyncDisposable
     /// Each operation uses a stable snapshot of the registered observers. An observer registered
     /// from a callback participates in subsequent operations, not later phases of the current one.
     /// </remarks>
-    void RegisterObserver(IJournaledStateObserver observer) =>
-        throw new NotSupportedException("This journaled state manager does not support observers.");
+    void RegisterObserver(IJournaledStateObserver observer);
 
     /// <summary>
     /// Attempts to get a state registered with the manager.
@@ -54,11 +53,7 @@ public interface IJournaledStateManager : IAsyncDisposable
     /// </summary>
     /// <param name="cancellationToken">The cancellation token.</param>
     /// <returns>A <see cref="ValueTask"/> which represents the operation.</returns>
-    /// <remarks>
-    /// Implementations override this member to provide rollback to the last durable state.
-    /// </remarks>
-    ValueTask RevertPendingChangesAsync(CancellationToken cancellationToken) =>
-        ValueTask.FromException(new NotSupportedException("This journaled state manager does not support rollback."));
+    ValueTask RevertPendingChangesAsync(CancellationToken cancellationToken);
 
     /// <summary>
     /// Resets this instance, removing any persistent state.

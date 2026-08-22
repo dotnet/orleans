@@ -130,6 +130,8 @@ public class DurableListJournalBenchmarks
 
         public void RegisterState(string name, IJournaledState state) => state.Reset(buffer.CreateJournalStreamWriter(streamId));
 
+        public void RegisterObserver(IJournaledStateObserver observer) { }
+
         public bool TryGetState(string name, [NotNullWhen(true)] out IJournaledState state)
         {
             state = null!;
@@ -137,6 +139,8 @@ public class DurableListJournalBenchmarks
         }
 
         public ValueTask WriteStateAsync(CancellationToken cancellationToken) => default;
+
+        public ValueTask RevertPendingChangesAsync(CancellationToken cancellationToken) => default;
 
         public ValueTask DeleteStateAsync(CancellationToken cancellationToken) => default;
     }

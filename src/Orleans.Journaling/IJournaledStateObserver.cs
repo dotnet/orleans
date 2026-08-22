@@ -35,7 +35,7 @@ public interface IJournaledStateObserver
     /// State mutated by this method is included in the pending write. Throwing aborts the write.
     /// Implementations must be idempotent because a failed storage write can be retried.
     /// </remarks>
-    ValueTask OnWritePreparingAsync(CancellationToken cancellationToken) => default;
+    ValueTask OnWritePreparingAsync(CancellationToken cancellationToken);
 
     /// <summary>
     /// Called immediately before registered states are captured for a durable write.
