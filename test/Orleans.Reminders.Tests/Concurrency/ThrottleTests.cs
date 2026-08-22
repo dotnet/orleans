@@ -51,6 +51,14 @@ public sealed class ThrottleBlockModeTests
     [TestSuite("BVT")]
     [TestProvider("None")]
     [Fact]
+    public void WaitUpTo_RejectsTimeoutBeyondRuntimeTimerLimit()
+    {
+        Assert.Throws<ArgumentOutOfRangeException>(() => ThrottleBlockMode.WaitUpTo(TimeSpan.MaxValue));
+    }
+
+    [TestSuite("BVT")]
+    [TestProvider("None")]
+    [Fact]
     public void WaitUpTo_ProducesDistinctValuesForDistinctTimeouts()
     {
         Assert.NotEqual(ThrottleBlockMode.WaitUpTo(TimeSpan.FromSeconds(1)), ThrottleBlockMode.WaitUpTo(TimeSpan.FromSeconds(2)));
@@ -144,6 +152,15 @@ public sealed class ThrottleConfigTests
     public void Builder_RejectsNonFiniteRate()
     {
         var b = new ReminderThrottleConfigBuilder().PermitsPerSecond(double.PositiveInfinity, 1, ThrottleBlockMode.Wait);
+        Assert.Throws<ArgumentOutOfRangeException>(() => b.Build());
+    }
+
+    [TestSuite("BVT")]
+    [TestProvider("None")]
+    [Fact]
+    public void Builder_RejectsRateWhoseTokenWaitExceedsRuntimeTimerLimit()
+    {
+        var b = new ReminderThrottleConfigBuilder().PermitsPerSecond(double.Epsilon, 1, ThrottleBlockMode.Wait);
         Assert.Throws<ArgumentOutOfRangeException>(() => b.Build());
     }
 
@@ -421,6 +438,28 @@ public sealed class LocalThrottleRateTests
     [TestSuite("BVT")]
     [TestProvider("None")]
     [Fact]
+    public async Task WaitUpTo_DoesNotAdmitRateTokenGeneratedAtDeadline()
+    {
+        var clock = new FakeTimeProvider(DateTimeOffset.UtcNow);
+        var config = new ReminderThrottleConfigBuilder()
+            .PermitsPerSecond(2, 1, ThrottleBlockMode.WaitUpTo(TimeSpan.FromMilliseconds(500)))
+            .Build();
+        await using var throttle = new TestThrottle(config, clock);
+
+        var first = await throttle.AcquireAsync(TestContext.Default(), CancellationToken.None);
+        var secondTask = throttle.AcquireAsync(TestContext.Default(), CancellationToken.None).AsTask();
+
+        clock.Advance(TimeSpan.FromMilliseconds(500));
+        var second = await secondTask.WaitAsync(TimeSpan.FromSeconds(5));
+
+        Assert.Equal(ReminderAdmissionOutcome.Skipped, second.Outcome);
+        Assert.Equal(ReminderSkipReason.AcquireTimeout, second.SkipReason);
+        first.Dispose();
+    }
+
+    [TestSuite("BVT")]
+    [TestProvider("None")]
+    [Fact]
     public async Task ExplicitLimiterBlockModes_AreAppliedIndependently()
     {
         var clock = new FakeTimeProvider(DateTimeOffset.UtcNow);
@@ -534,6 +573,6 @@ internal static class TestContext
         var grainId = GrainId.Create("test", "grain");
         var now = DateTime.UtcNow;
         var status = new TickStatus(now, TimeSpan.FromMinutes(1), now);
-        return new ReminderDeliveryContext(grainId, "test-reminder", status);
+        return new ReminderDeliveryContext(grainId, "test-reminder", status, now);
     }
 }

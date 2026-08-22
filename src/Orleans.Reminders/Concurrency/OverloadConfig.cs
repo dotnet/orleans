@@ -24,6 +24,11 @@ public sealed class OverloadConfig
             throw new ArgumentOutOfRangeException(nameof(pollInterval), pollInterval, "Poll interval must be greater than zero.");
         }
 
+        if (pollInterval > ReminderThrottleTime.MaxTimerDelay)
+        {
+            throw new ArgumentOutOfRangeException(nameof(pollInterval), pollInterval, $"Poll interval must be less than or equal to {ReminderThrottleTime.MaxTimerDelay}.");
+        }
+
         PollInterval = pollInterval;
     }
 

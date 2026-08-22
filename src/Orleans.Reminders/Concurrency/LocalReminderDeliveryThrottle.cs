@@ -115,6 +115,20 @@ public sealed class LocalReminderDeliveryThrottle : IReminderDeliveryThrottle, I
                 throw;
             }
 
+            if (cancellationToken.IsCancellationRequested)
+            {
+                try
+                {
+                    result.ReleaseAction?.Invoke();
+                }
+                finally
+                {
+                    ReleaseAcquired(releaseActions);
+                }
+
+                cancellationToken.ThrowIfCancellationRequested();
+            }
+
             if (!result.AdmittedLease)
             {
                 ReleaseAcquired(releaseActions);

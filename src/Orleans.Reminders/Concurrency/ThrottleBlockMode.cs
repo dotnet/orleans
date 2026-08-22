@@ -26,15 +26,25 @@ public abstract record ThrottleBlockMode
     /// <summary>
     /// Wait up to <paramref name="timeout"/> for a permit. If no permit becomes available
     /// in time, the acquire returns <see cref="ReminderAdmissionOutcome.Skipped"/> with
-    /// reason <see cref="ReminderSkipReason.AcquireTimeout"/>.
+    /// the reason reported by the gate which exhausted the timeout, such as
+    /// <see cref="ReminderSkipReason.AcquireTimeout"/>,
+    /// <see cref="ReminderSkipReason.SiloOverloaded"/>, or
+    /// <see cref="ReminderSkipReason.SlowStartLimited"/>.
     /// </summary>
     /// <param name="timeout">The maximum time to wait. Must be greater than <see cref="TimeSpan.Zero"/>.</param>
-    /// <exception cref="ArgumentOutOfRangeException">The timeout is non-positive.</exception>
+    /// <exception cref="ArgumentOutOfRangeException">
+    /// The timeout is non-positive or exceeds the runtime timer limit of 4294967294 milliseconds.
+    /// </exception>
     public static ThrottleBlockMode WaitUpTo(TimeSpan timeout)
     {
         if (timeout <= TimeSpan.Zero)
         {
             throw new ArgumentOutOfRangeException(nameof(timeout), timeout, "The timeout must be greater than zero. Use ThrottleBlockMode.SkipImmediately to skip when no permit is available, or ThrottleBlockMode.Wait to wait indefinitely.");
+        }
+
+        if (timeout > ReminderThrottleTime.MaxTimerDelay)
+        {
+            throw new ArgumentOutOfRangeException(nameof(timeout), timeout, $"The timeout must be less than or equal to {ReminderThrottleTime.MaxTimerDelay}.");
         }
 
         return new WaitWithTimeout(timeout);
@@ -63,4 +73,9 @@ public abstract record ThrottleBlockMode
     {
         public override string ToString() => nameof(SkipImmediately);
     }
+}
+
+internal static class ReminderThrottleTime
+{
+    public static readonly TimeSpan MaxTimerDelay = TimeSpan.FromMilliseconds(0xfffffffe);
 }

@@ -8,8 +8,7 @@ namespace Orleans.Reminders.Concurrency;
 /// <remarks>
 /// <para>A configuration must specify at least one active limiter or overload gate. The startup
 /// validator rejects empty configurations rather than silently installing a no-op.</para>
-/// <para>Construct via <see cref="ReminderThrottleConfigBuilder"/> for compile-time-friendly
-/// chaining; direct construction is supported for advanced scenarios.</para>
+/// <para>Construct via <see cref="ReminderThrottleConfigBuilder"/>.</para>
 /// </remarks>
 public sealed class ThrottleConfig
 {
@@ -92,6 +91,15 @@ internal sealed class LocalRateLimiterConfig
         if (!(permitsPerSecond > 0 && double.IsFinite(permitsPerSecond)))
         {
             throw new ArgumentOutOfRangeException(nameof(permitsPerSecond), permitsPerSecond, "PermitsPerSecond must be greater than zero and finite.");
+        }
+
+        var maximumTokenWaitSeconds = 1d / permitsPerSecond;
+        if (maximumTokenWaitSeconds > ReminderThrottleTime.MaxTimerDelay.TotalSeconds)
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(permitsPerSecond),
+                permitsPerSecond,
+                $"PermitsPerSecond must be at least {1d / ReminderThrottleTime.MaxTimerDelay.TotalSeconds:R} so token waits do not exceed the runtime timer limit.");
         }
 
         if (burstSize is { } bs && bs <= 0)

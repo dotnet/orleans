@@ -73,9 +73,8 @@ public static class SiloBuilderReminderConcurrencyExtensions
                     return new LocalReminderDeliveryThrottle(perSilo, timeProvider, tierName: "per-silo", overloadDetector);
                 }
 
-                // The validator rejects zero-tier configurations, so this should be unreachable;
-                // keep a safe fallback regardless.
-                return NoOpReminderDeliveryThrottle.Instance;
+                throw new OrleansConfigurationException(
+                    "AddReminderConcurrencyControl requires at least one configured tier.");
             });
         });
     }

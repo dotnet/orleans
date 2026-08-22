@@ -1,21 +1,21 @@
 ---
 title: Control reminder delivery concurrency
 description: Limit reminder delivery concurrency and rate to protect silos and downstream dependencies.
-ms.date: 08/12/2026
+ms.date: 08/21/2026
 ms.topic: how-to
 ---
 
 # Control reminder delivery concurrency
 
 Orleans reminders can become due in bursts after a silo starts, a reminder range
-moves between silos, or a downstream dependency recovers. By default, a silo
-doesn't impose a reminder-specific limit on the number or rate of
-<xref:Orleans.IRemindable.ReceiveReminder*> calls.
+moves between silos, or a downstream dependency recovers. Standard reminder
+delivery uses available silo capacity for <xref:Orleans.IRemindable.ReceiveReminder*>
+calls.
 
 Reminder concurrency control adds an opt-in, per-silo admission pipeline before
 reminder dispatch. Use it to protect a constrained dependency or to reduce
-reminder work while a silo is overloaded. If it isn't configured, reminder
-delivery behavior is unchanged.
+reminder work while a silo is overloaded. The default no-op throttle preserves
+standard reminder delivery.
 
 > [!IMPORTANT]
 > The limits apply independently to each silo. Increasing the number of silos
@@ -57,7 +57,9 @@ reminder rate. Account for all silos which can dispatch reminders concurrently.
 
 <xref:Orleans.Reminders.Concurrency.ReminderThrottleConfigBuilder.RespectOverload*>
 uses the silo's existing overload detector. Its block mode determines whether a
-tick waits or is skipped while the silo is overloaded.
+tick waits or is skipped while the silo is overloaded. Enable
+<xref:Orleans.Configuration.LoadSheddingOptions.LoadSheddingEnabled> and configure
+its thresholds so the detector reports CPU or memory pressure.
 
 <xref:Orleans.Reminders.Concurrency.ReminderThrottleConfigBuilder.SlowStart*>
 limits admitted concurrency during startup. Its initial capacity must be
@@ -118,7 +120,9 @@ policy is discarding occurrences.
 
 Reminder dispatch also emits `Reminder.Dispatch` activities from the
 `Microsoft.Orleans.Reminders` activity source. Subscribe to that source to
-separate admission delay from grain execution time. See
+trace admitted grain execution. Use
+`orleans-reminders-throttle-queued-duration` for the preceding admission delay.
+See
 [Orleans observability](../host/monitoring/index.md) for OpenTelemetry
 configuration.
 
