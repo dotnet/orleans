@@ -221,11 +221,11 @@ internal sealed partial class JournaledStateManager : IJournaledStateManager, IJ
                             {
                                 if (fenceOnFailure)
                                 {
-                                    _state = ManagerState.Fenced;
+                                    _state = ManagerState.Ready;
                                 }
                             }
+
                             throw;
-                        }
                         }
                     }
 
@@ -615,8 +615,9 @@ internal sealed partial class JournaledStateManager : IJournaledStateManager, IJ
                             recoveryTriggerException = exception;
                             lock (_lock)
                             {
-                                _state = ManagerState.Fenced;
+                                _state = ManagerState.Recovering;
                             }
+
                             needsRecovery = true;
                         }
                         else
