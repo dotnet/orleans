@@ -14,7 +14,7 @@ internal class RabbitMQAdapterFactory : IQueueAdapterFactory, ILifecycleParticip
     private readonly object _adapterLock = new();
     private readonly ILoggerFactory _loggerFactory;
     private readonly string _providerName;
-    private readonly RabbitMqQueueCacheOptions _rabbitMqQueueCacheOptions;
+    private readonly RabbitMQQueueCacheOptions _rabbitMqQueueCacheOptions;
     private readonly RabbitMQAdapterReceiverFactory _receiverFactory;
     private readonly Serializer _serializer;
     private readonly HashRingBasedStreamQueueMapper _streamQueueMapper;
@@ -24,7 +24,7 @@ internal class RabbitMQAdapterFactory : IQueueAdapterFactory, ILifecycleParticip
     private bool _disposed;
 
     public RabbitMQAdapterFactory(ILoggerFactory loggerFactory, string providerName,
-        RabbitMqQueueCacheOptions rabbitMqQueueCacheOptions,
+        RabbitMQQueueCacheOptions rabbitMqQueueCacheOptions,
         RabbitMQClientOptions rabbitMqClientOptions, RabbitMQAdapterReceiverFactory receiverFactory,
         Serializer serializer, RabbitMQStreamSystemProvider streamSystemProvider, RabbitMQQueueProvider rabbitMqQueueProvider, HashRingStreamQueueMapperOptions hashRingStreamQueueMapperOptions)
     {
@@ -69,7 +69,7 @@ internal class RabbitMQAdapterFactory : IQueueAdapterFactory, ILifecycleParticip
     {
         var loggerFactory = serviceProvider.GetService<ILoggerFactory>();
         var rabbitMqClientOptions = serviceProvider.GetOptionsByName<RabbitMQClientOptions>(providerName);
-        var rabbitMqQueueCacheOptions = serviceProvider.GetOptionsByName<RabbitMqQueueCacheOptions>(providerName);
+        var rabbitMqQueueCacheOptions = serviceProvider.GetOptionsByName<RabbitMQQueueCacheOptions>(providerName);
         var receiverFactory = serviceProvider.GetRequiredKeyedService<RabbitMQAdapterReceiverFactory>(providerName);
         var serializer = serviceProvider.GetService<Serializer>();
         var streamProvider = serviceProvider.GetRequiredKeyedService<RabbitMQStreamSystemProvider>(providerName);

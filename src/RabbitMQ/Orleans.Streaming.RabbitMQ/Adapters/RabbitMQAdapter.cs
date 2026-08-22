@@ -18,14 +18,14 @@ internal class RabbitMQAdapter : IQueueAdapter, IAsyncDisposable
     private readonly Serializer<RabbitMqBatchContainer> _rabbitMqContainerSerializer;
     private readonly RabbitMQAdapterReceiverFactory _receiverFactory;
     private readonly RabbitMQStreamSystemProvider _streamSystemProvider;
-    private readonly RabbitMqQueueCacheOptions _cacheOptions;
+    private readonly RabbitMQQueueCacheOptions _cacheOptions;
     private bool _disposed;
 
     public RabbitMQAdapter(HashRingBasedStreamQueueMapper streamQueueMapper,
         RabbitMQQueueProvider rabbitMqQueueProvider,
         RabbitMQStreamSystemProvider streamSystemProvider, ILoggerFactory loggerFactory,
         RabbitMQAdapterReceiverFactory receiverFactory, Serializer serializer, string providerName,
-        RabbitMqQueueCacheOptions cacheOptions)
+        RabbitMQQueueCacheOptions cacheOptions)
     {
         Name = providerName;
         _streamQueueMapper = streamQueueMapper;
