@@ -6,19 +6,25 @@ namespace Orleans.DurableTasks;
 public abstract class ScheduledTask
 {
     internal ScheduledTask() { }
+
     /// <summary>Gets the stable durable task identifier.</summary>
     public abstract TaskId Id { get; }
+
     /// <summary>Gets an awaiter which waits for successful completion.</summary>
     public ScheduledTaskAwaiter GetAwaiter() => new(this, CancellationToken.None);
+
     /// <summary>Polls whether the task has reached a terminal state.</summary>
     public async Task<bool> IsCompletedAsync(PollingOptions options = default, CancellationToken cancellationToken = default)
         => (await PollAsyncCore(options, cancellationToken).ConfigureAwait(false)).IsCompleted;
+
     /// <summary>Polls the current task status.</summary>
     public async Task<DurableTaskStatus> GetStatusAsync(PollingOptions options = default, CancellationToken cancellationToken = default)
         => (await PollAsyncCore(options, cancellationToken).ConfigureAwait(false)).Status;
+
     /// <summary>Waits for and returns the terminal response.</summary>
     public Task<DurableTaskResponse> GetResponseAsync(CancellationToken cancellationToken = default)
         => WaitAsyncCore(cancellationToken).AsTask();
+
     /// <summary>Polls and returns the current response.</summary>
     public Task<DurableTaskResponse> GetResponseAsync(PollingOptions options, CancellationToken cancellationToken = default)
         => PollAsyncCore(options, cancellationToken).AsTask();
@@ -29,8 +35,10 @@ public abstract class ScheduledTask
 
     /// <summary>Durably requests cancellation.</summary>
     public abstract ValueTask CancelAsync(CancellationToken cancellationToken = default);
+
     /// <summary>Waits for a terminal host response.</summary>
     protected internal abstract ValueTask<DurableTaskResponse> WaitAsyncCore(CancellationToken cancellationToken);
+
     /// <summary>Polls the current host response.</summary>
     protected abstract ValueTask<DurableTaskResponse> PollAsyncCore(PollingOptions options, CancellationToken cancellationToken);
 
@@ -180,6 +188,7 @@ public abstract class ScheduledTask<TResult> : ScheduledTask
 {
     /// <summary>Gets an awaiter which returns the successful result.</summary>
     public new ScheduledTaskAwaiter<TResult> GetAwaiter() => new(this, CancellationToken.None);
+
     /// <summary>Configures a typed wait with a wait-cancellation token.</summary>
     public new ConfiguredScheduledTaskAwaitable<TResult> WaitAsync(CancellationToken cancellationToken = default)
         => new(this, cancellationToken);
@@ -188,8 +197,11 @@ public abstract class ScheduledTask<TResult> : ScheduledTask
 internal sealed class ScheduledTaskHandle(IScheduledTaskHandle handle) : ScheduledTask
 {
     public override TaskId Id => handle.TaskId;
+
     public override ValueTask CancelAsync(CancellationToken cancellationToken = default) => handle.CancelAsync(cancellationToken);
+
     protected internal override ValueTask<DurableTaskResponse> WaitAsyncCore(CancellationToken cancellationToken) => handle.WaitAsync(cancellationToken);
+
     protected override ValueTask<DurableTaskResponse> PollAsyncCore(PollingOptions options, CancellationToken cancellationToken)
         => handle.PollAsync(options, cancellationToken);
 }
@@ -197,8 +209,11 @@ internal sealed class ScheduledTaskHandle(IScheduledTaskHandle handle) : Schedul
 internal sealed class ScheduledTaskHandle<TResult>(IScheduledTaskHandle handle) : ScheduledTask<TResult>
 {
     public override TaskId Id => handle.TaskId;
+
     public override ValueTask CancelAsync(CancellationToken cancellationToken = default) => handle.CancelAsync(cancellationToken);
+
     protected internal override ValueTask<DurableTaskResponse> WaitAsyncCore(CancellationToken cancellationToken) => handle.WaitAsync(cancellationToken);
+
     protected override ValueTask<DurableTaskResponse> PollAsyncCore(PollingOptions options, CancellationToken cancellationToken)
         => handle.PollAsync(options, cancellationToken);
 }
@@ -206,16 +221,22 @@ internal sealed class ScheduledTaskHandle<TResult>(IScheduledTaskHandle handle) 
 internal sealed class CompletedScheduledTask(TaskId id, DurableTaskResponse response) : ScheduledTask
 {
     public override TaskId Id => id;
+
     public override ValueTask CancelAsync(CancellationToken cancellationToken = default) => ValueTask.CompletedTask;
+
     protected internal override ValueTask<DurableTaskResponse> WaitAsyncCore(CancellationToken cancellationToken) => new(response);
+
     protected override ValueTask<DurableTaskResponse> PollAsyncCore(PollingOptions options, CancellationToken cancellationToken) => new(response);
 }
 
 internal sealed class CompletedScheduledTask<TResult>(TaskId id, DurableTaskResponse response) : ScheduledTask<TResult>
 {
     public override TaskId Id => id;
+
     public override ValueTask CancelAsync(CancellationToken cancellationToken = default) => ValueTask.CompletedTask;
+
     protected internal override ValueTask<DurableTaskResponse> WaitAsyncCore(CancellationToken cancellationToken) => new(response);
+
     protected override ValueTask<DurableTaskResponse> PollAsyncCore(PollingOptions options, CancellationToken cancellationToken) => new(response);
 }
 
@@ -223,14 +244,19 @@ internal sealed class CompletedScheduledTask<TResult>(TaskId id, DurableTaskResp
 public readonly struct ScheduledTaskAwaiter : ICriticalNotifyCompletion
 {
     private readonly ValueTaskAwaiter _awaiter;
+
     internal ScheduledTaskAwaiter(ScheduledTask task, CancellationToken cancellationToken)
         => _awaiter = task.WaitAsync(cancellationToken).GetAwaiter();
+
     /// <inheritdoc />
     public bool IsCompleted => _awaiter.IsCompleted;
+
     /// <inheritdoc />
     public void OnCompleted(Action continuation) => _awaiter.OnCompleted(continuation);
+
     /// <inheritdoc />
     public void UnsafeOnCompleted(Action continuation) => _awaiter.UnsafeOnCompleted(continuation);
+
     /// <summary>Waits for successful completion.</summary>
     public void GetResult() => _awaiter.GetResult();
 }
@@ -239,14 +265,19 @@ public readonly struct ScheduledTaskAwaiter : ICriticalNotifyCompletion
 public readonly struct ScheduledTaskAwaiter<TResult> : ICriticalNotifyCompletion
 {
     private readonly ValueTaskAwaiter<DurableTaskResponse> _awaiter;
+
     internal ScheduledTaskAwaiter(ScheduledTask<TResult> task, CancellationToken cancellationToken)
         => _awaiter = task.WaitAsyncCore(cancellationToken).GetAwaiter();
+
     /// <inheritdoc />
     public bool IsCompleted => _awaiter.IsCompleted;
+
     /// <inheritdoc />
     public void OnCompleted(Action continuation) => _awaiter.OnCompleted(continuation);
+
     /// <inheritdoc />
     public void UnsafeOnCompleted(Action continuation) => _awaiter.UnsafeOnCompleted(continuation);
+
     /// <summary>Returns the successful result.</summary>
     public TResult GetResult() => _awaiter.GetResult().GetResult<TResult>();
 }
