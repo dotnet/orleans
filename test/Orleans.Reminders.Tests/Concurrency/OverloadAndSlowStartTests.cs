@@ -107,6 +107,28 @@ public sealed class OverloadBackoffTests
     [TestSuite("BVT")]
     [TestProvider("None")]
     [Fact]
+    public async Task RespectOverload_WaitUpTo_DoesNotAdmitClearanceAtDeadline()
+    {
+        var clock = new FakeTimeProvider(DateTimeOffset.UtcNow);
+        var detector = new TimeBasedOverloadDetector(clock, clock.GetUtcNow() + TimeSpan.FromMilliseconds(500));
+        var config = new ReminderThrottleConfigBuilder()
+            .RespectOverload(
+                ThrottleBlockMode.WaitUpTo(TimeSpan.FromMilliseconds(500)),
+                pollInterval: TimeSpan.FromMilliseconds(500))
+            .Build();
+        await using var throttle = new TestThrottle(config, clock, overloadDetector: detector);
+
+        var acquireTask = throttle.AcquireAsync(TestContext.Default(), CancellationToken.None).AsTask();
+        clock.Advance(TimeSpan.FromMilliseconds(500));
+        var lease = await acquireTask.WaitAsync(TimeSpan.FromSeconds(5));
+
+        Assert.Equal(ReminderAdmissionOutcome.Skipped, lease.Outcome);
+        Assert.Equal(ReminderSkipReason.SiloOverloaded, lease.SkipReason);
+    }
+
+    [TestSuite("BVT")]
+    [TestProvider("None")]
+    [Fact]
     public void RespectOverload_RequiresOverloadDetector_OrThrowsAtConstruction()
     {
         var config = new ReminderThrottleConfigBuilder()
@@ -117,6 +139,15 @@ public sealed class OverloadBackoffTests
         var ex = Assert.Throws<ArgumentException>(() =>
             new LocalReminderDeliveryThrottle(config, TimeProvider.System, tierName: "test", overloadDetector: null));
         Assert.Contains("IOverloadDetector", ex.Message);
+    }
+
+    [TestSuite("BVT")]
+    [TestProvider("None")]
+    [Fact]
+    public void RespectOverload_RejectsPollIntervalBeyondRuntimeTimerLimit()
+    {
+        Assert.Throws<ArgumentOutOfRangeException>(() => new ReminderThrottleConfigBuilder()
+            .RespectOverload(ThrottleBlockMode.Wait, TimeSpan.MaxValue));
     }
 
     [TestSuite("BVT")]
@@ -242,6 +273,37 @@ public sealed class SlowStartTests
     [TestSuite("BVT")]
     [TestProvider("None")]
     [Fact]
+    public async Task SlowStart_StopsApplyingItsBlockModeAtTargetCapacity()
+    {
+        var clock = new FakeTimeProvider(DateTimeOffset.UtcNow);
+        var config = new ReminderThrottleConfigBuilder()
+            .MaxConcurrent(2, ThrottleBlockMode.Wait)
+            .SlowStart(initialCapacity: 1, interval: TimeSpan.FromSeconds(1), onCapacityExceeded: ThrottleBlockMode.SkipImmediately)
+            .Build();
+        await using var throttle = new TestThrottle(config, clock);
+
+        clock.Advance(TimeSpan.FromSeconds(1));
+        await WaitForCapacityAsync(throttle, expected: 2);
+
+        var first = await throttle.AcquireAsync(TestContext.Default(), CancellationToken.None);
+        var second = await throttle.AcquireAsync(TestContext.Default(), CancellationToken.None);
+        var thirdTask = throttle.AcquireAsync(TestContext.Default(), CancellationToken.None).AsTask();
+
+        Assert.Equal(ReminderAdmissionOutcome.Admitted, first.Outcome);
+        Assert.Equal(ReminderAdmissionOutcome.Admitted, second.Outcome);
+        Assert.False(thirdTask.IsCompleted);
+
+        first.Dispose();
+        var third = await thirdTask.WaitAsync(TimeSpan.FromSeconds(5));
+        Assert.Equal(ReminderAdmissionOutcome.Admitted, third.Outcome);
+
+        second.Dispose();
+        third.Dispose();
+    }
+
+    [TestSuite("BVT")]
+    [TestProvider("None")]
+    [Fact]
     public async Task SlowStart_WaitMode_AdmitsAfterRampOpensCapacity()
     {
         var clock = new FakeTimeProvider(DateTimeOffset.UtcNow);
@@ -341,6 +403,16 @@ public sealed class SlowStartTests
             .Build());
     }
 
+    [TestSuite("BVT")]
+    [TestProvider("None")]
+    [Fact]
+    public void SlowStart_RejectsIntervalBeyondRuntimeTimerLimit()
+    {
+        Assert.Throws<ArgumentOutOfRangeException>(() => new ReminderThrottleConfigBuilder()
+            .MaxConcurrent(10, ThrottleBlockMode.Wait)
+            .SlowStart(initialCapacity: 1, interval: TimeSpan.MaxValue, onCapacityExceeded: ThrottleBlockMode.Wait));
+    }
+
     private static async Task WaitForCapacityAsync(TestThrottle throttle, int expected)
     {
         var deadline = DateTime.UtcNow + TimeSpan.FromSeconds(2);
@@ -356,4 +428,9 @@ public sealed class SlowStartTests
 internal sealed class FakeOverloadDetector : IOverloadDetector
 {
     public bool IsOverloaded { get; set; }
+}
+
+internal sealed class TimeBasedOverloadDetector(TimeProvider timeProvider, DateTimeOffset overloadedUntil) : IOverloadDetector
+{
+    public bool IsOverloaded => timeProvider.GetUtcNow() < overloadedUntil;
 }
