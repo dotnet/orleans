@@ -847,6 +847,44 @@ namespace UnitTests.Runtime
             Assert.Equal(2, collector._activationCount);
         }
 
+        [Fact, TestCategory("Activation")]
+        public async Task WorkingSetScan_DoesNotUpdateReaddedMember()
+        {
+            var timer = Substitute.For<IAsyncTimer>();
+            timer.NextTick().Returns(Task.FromResult(true), Task.FromResult(false));
+            var timerFactory = Substitute.For<IAsyncTimerFactory>();
+            timerFactory.Create(Arg.Any<TimeSpan>(), Arg.Any<string>(), Arg.Any<TimeProvider>()).Returns(timer);
+            var workingSet = new ActivationWorkingSet(
+                timerFactory,
+                NullLogger<ActivationWorkingSet>.Instance,
+                Array.Empty<IActivationWorkingSetObserver>(),
+                CreateCatalogInstruments(),
+                TimeProvider.System);
+            var member = Substitute.For<IActivationWorkingSetMember>();
+            var scanStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            using var resumeScan = new ManualResetEventSlim();
+            member.IsCandidateForRemoval(false).Returns(_ =>
+            {
+                scanStarted.TrySetResult();
+                resumeScan.Wait();
+                return true;
+            });
+            workingSet.OnActivated(member);
+
+            var lifecycle = new SiloLifecycleSubject(NullLogger<SiloLifecycleSubject>.Instance);
+            ((ILifecycleParticipant<ISiloLifecycle>)workingSet).Participate(lifecycle);
+            await lifecycle.OnStart();
+            await scanStarted.Task.WaitAsync(TimeSpan.FromSeconds(10));
+
+            workingSet.OnEvicted(member);
+            workingSet.OnActivated(member);
+            resumeScan.Set();
+            await lifecycle.OnStop();
+
+            Assert.Equal(1, workingSet.Count);
+            Assert.Contains(member, workingSet.Members);
+        }
+
         private IActivationWorkingSetMember PrepareActivation(int collectionAgeLimitMinutes, ActivationCollector collector)
             => PrepareActivation(TimeSpan.FromMinutes(collectionAgeLimitMinutes), collector);
 

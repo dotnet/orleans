@@ -17,12 +17,14 @@ namespace Orleans.Runtime;
 /// </summary>
 internal sealed partial class ActivationWorkingSet : IActivationWorkingSet, ILifecycleParticipant<ISiloLifecycle>
 {
-    private readonly ConcurrentDictionary<IActivationWorkingSetMember, bool> _members = new();
+    private const long IdleMask = 1;
+    private readonly ConcurrentDictionary<IActivationWorkingSetMember, long> _members = new();
     private readonly ILogger _logger;
     private readonly IAsyncTimer _scanPeriodTimer;
     private readonly List<IActivationWorkingSetObserver> _observers;
 
     private int _activeCount;
+    private long _nextGeneration;
     private Task? _runTask;
 
     public ActivationWorkingSet(
@@ -46,7 +48,7 @@ internal sealed partial class ActivationWorkingSet : IActivationWorkingSet, ILif
     {
         foreach (var pair in _members)
         {
-            if (!pair.Value)
+            if (!IsIdle(pair.Value))
             {
                 yield return pair.Key;
             }
@@ -56,7 +58,7 @@ internal sealed partial class ActivationWorkingSet : IActivationWorkingSet, ILif
     public void OnActivated(IActivationWorkingSetMember member)
     {
         Debug.Assert(member is not ICollectibleGrainContext collectible || collectible.IsValid);
-        if (_members.TryAdd(member, false))
+        if (_members.TryAdd(member, GetNextActiveState()))
         {
             Interlocked.Increment(ref _activeCount);
             foreach (var observer in _observers)
@@ -74,14 +76,14 @@ internal sealed partial class ActivationWorkingSet : IActivationWorkingSet, ILif
     {
         while (true)
         {
-            if (_members.TryGetValue(member, out var isIdle))
+            if (_members.TryGetValue(member, out var state))
             {
-                if (!isIdle || _members.TryUpdate(member, false, comparisonValue: true))
+                if (!IsIdle(state) || _members.TryUpdate(member, GetActiveState(state), comparisonValue: state))
                 {
                     break;
                 }
             }
-            else if (_members.TryAdd(member, false))
+            else if (_members.TryAdd(member, GetNextActiveState()))
             {
                 Interlocked.Increment(ref _activeCount);
                 break;
@@ -102,9 +104,9 @@ internal sealed partial class ActivationWorkingSet : IActivationWorkingSet, ILif
         }
     }
 
-    private void OnEvicted(IActivationWorkingSetMember member, bool isIdle)
+    private void OnEvicted(IActivationWorkingSetMember member, long state)
     {
-        if (_members.TryRemove(KeyValuePair.Create(member, isIdle)))
+        if (_members.TryRemove(KeyValuePair.Create(member, state)))
         {
             OnEvictedCore(member);
         }
@@ -155,18 +157,18 @@ internal sealed partial class ActivationWorkingSet : IActivationWorkingSet, ILif
         }
     }
 
-    private void VisitMember(IActivationWorkingSetMember member, bool isIdle)
+    private void VisitMember(IActivationWorkingSetMember member, long state)
     {
-        var wouldRemove = isIdle;
+        var wouldRemove = IsIdle(state);
         if (member.IsCandidateForRemoval(wouldRemove))
         {
             if (wouldRemove)
             {
-                OnEvicted(member, isIdle);
+                OnEvicted(member, state);
             }
             else
             {
-                if (_members.TryUpdate(member, true, comparisonValue: isIdle))
+                if (_members.TryUpdate(member, GetIdleState(state), comparisonValue: state))
                 {
                     foreach (var observer in _observers)
                     {
@@ -177,9 +179,9 @@ internal sealed partial class ActivationWorkingSet : IActivationWorkingSet, ILif
         }
         else
         {
-            if (isIdle)
+            if (wouldRemove)
             {
-                _members.TryUpdate(member, false, comparisonValue: true);
+                _members.TryUpdate(member, GetActiveState(state), comparisonValue: state);
             }
 
             foreach (var observer in _observers)
@@ -188,6 +190,14 @@ internal sealed partial class ActivationWorkingSet : IActivationWorkingSet, ILif
             }
         }
     }
+
+    private long GetNextActiveState() => unchecked(Interlocked.Increment(ref _nextGeneration) << 1);
+
+    private static bool IsIdle(long state) => (state & IdleMask) != 0;
+
+    private static long GetActiveState(long state) => state & ~IdleMask;
+
+    private static long GetIdleState(long state) => state | IdleMask;
 
     void ILifecycleParticipant<ISiloLifecycle>.Participate(ISiloLifecycle lifecycle)
     {
