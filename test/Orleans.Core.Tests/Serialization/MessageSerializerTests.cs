@@ -2,17 +2,25 @@ using System.Buffers;
 using System.Buffers.Binary;
 using System.Collections.Generic;
 using System.IO.Pipelines;
+using System.Linq;
 using System.Net;
+using System.Reflection;
+using System.Text;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using Orleans.CodeGeneration;
 using Orleans.Configuration;
 using Orleans.Runtime;
 using Orleans.Runtime.Messaging;
+using Orleans.Serialization;
 using Orleans.Serialization.Buffers;
 using Orleans.Serialization.Codecs;
+using Orleans.Serialization.Configuration;
 using Orleans.Serialization.Session;
+using Orleans.Serialization.TypeSystem;
+using Orleans.Serialization.WireProtocol;
 using TestExtensions;
+using UnitTests.GrainInterfaces;
 using Xunit;
 
 namespace UnitTests.Serialization
@@ -37,6 +45,7 @@ namespace UnitTests.Serialization
             this.fixture = fixture;
             this.messageFactory = this.fixture.Services.GetRequiredService<MessageFactory>();
             this.messageSerializer = this.fixture.Services.GetRequiredService<MessageSerializer>();
+            this.messageSerializer.SetProtocolVersion(NetworkProtocolVersion.Version2);
             _serializerSessionPool = fixture.Services.GetRequiredService<SerializerSessionPool>();
             _grainAddressCodec = fixture.Services.GetRequiredService<IFieldCodec<GrainAddress>>();
         }
@@ -330,6 +339,240 @@ namespace UnitTests.Serialization
             writer.Dispose();
         }
 
+        [TestSuite("BVT")]
+        [TestProvider("None")]
+        [Fact]
+        public void Message_ForwardedBodyKeepsItsMeaningBehindRewrittenHeaders()
+        {
+            try
+            {
+                var payload = new GrainAddress { GrainId = GrainId.Create("test", "1"), ActivationId = ActivationId.NewId() };
+                RequestContext.Set("payload", payload);
+
+                var sent = this.messageFactory.CreateMessage(new object[] { payload }, InvokeMethodOptions.None);
+                var (sentHeader, sentBody) = WriteMessage(sent, NewSerializer());
+
+                using (var session = _serializerSessionPool.GetSession())
+                {
+                    var reader = Reader.Create(sentBody, session);
+                    var standaloneArguments = Assert.IsType<object[]>(this.fixture.Services.GetRequiredService<Serializer<object>>().Deserialize(ref reader));
+                    Assert.Equal(payload, Assert.IsType<GrainAddress>(standaloneArguments[0]));
+                }
+
+                var received = ReadMessage(sentHeader, sentBody, NewSerializer());
+
+                received.ForwardCount++;
+                received.TargetSilo = SiloAddress.New(IPAddress.Loopback, 5555, 1);
+                received.AddToCacheInvalidationHeader(
+                    new GrainAddress { GrainId = GrainId.Create("test", "1"), ActivationId = ActivationId.NewId() },
+                    validAddress: null);
+
+                var (forwardedHeader, _) = WriteMessage(received, NewSerializer());
+
+                var delivered = ReadMessage(forwardedHeader, sentBody, NewSerializer());
+
+                var arguments = Assert.IsType<object[]>(delivered.BodyObject);
+                Assert.Equal(payload, Assert.IsType<GrainAddress>(arguments[0]));
+            }
+            finally
+            {
+                RequestContext.Clear();
+            }
+        }
+
+        [TestSuite("BVT")]
+        [TestProvider("None")]
+        [Fact]
+        public void Message_UnresolvableInvokableAlias_IsPreservedVerbatim()
+        {
+            var grainReference = RuntimeTypeNameFormatter.Format(typeof(GrainReference));
+            var alias = $"(\"inv\",[{grainReference}],[{grainReference}],\"DEADBEEF\")";
+
+            var body = EncodeBodyWithFieldType(alias);
+            var message = ReadMessageWithBody(body);
+
+            Assert.NotNull(message);
+            var undecoded = Assert.IsType<UndecodedRequestBody>(message.BodyObject);
+            Assert.Contains("DEADBEEF", undecoded.Alias);
+
+            var (_, rewritten) = WriteMessage(message);
+            Assert.Equal(body, rewritten);
+        }
+
+        [TestSuite("BVT")]
+        [TestProvider("None")]
+        [Fact]
+        public void Message_Version1_BodyStillNamesATypeFromTheHeaders()
+        {
+            try
+            {
+                var payload = new GrainAddress { GrainId = GrainId.Create("test", "1"), ActivationId = ActivationId.NewId() };
+                RequestContext.Set("payload", payload);
+
+                var message = this.messageFactory.CreateMessage(new object[] { payload }, InvokeMethodOptions.None);
+                var (_, body) = WriteMessage(message, Version1Serializer());
+
+                Assert.Throws<UnknownReferencedTypeException>(() =>
+                {
+                    using var session = _serializerSessionPool.GetSession();
+                    var reader = Reader.Create(body, session);
+                    _ = this.fixture.Services.GetRequiredService<Serializer<object>>().Deserialize(ref reader);
+                });
+            }
+            finally
+            {
+                RequestContext.Clear();
+            }
+        }
+
+        [TestSuite("BVT")]
+        [TestProvider("None")]
+        [Fact]
+        public void Message_Version1_UnresolvableInvokableAlias_StillThrows()
+        {
+            var grainReference = RuntimeTypeNameFormatter.Format(typeof(GrainReference));
+            var alias = $"(\"inv\",[{grainReference}],[{grainReference}],\"DEADBEEF\")";
+
+            var body = EncodeBodyWithFieldType(alias);
+            var exception = Assert.Throws<TypeLoadException>(() => ReadMessageWithBody(body, Version1Serializer()));
+            Assert.IsNotType<UnresolvedInvokableAliasException>(exception);
+        }
+
+        [TestSuite("BVT")]
+        [TestProvider("None")]
+        [Fact]
+        public void Message_UnresolvableNonInvokableAlias_StillThrows()
+        {
+            var grainReference = RuntimeTypeNameFormatter.Format(typeof(GrainReference));
+            var alias = $"(\"notaninvokable\",[{grainReference}],\"DEADBEEF\")";
+
+            var body = EncodeBodyWithFieldType(alias);
+            Assert.ThrowsAny<TypeLoadException>(() => ReadMessageWithBody(body));
+        }
+
+        [TestSuite("BVT")]
+        [TestProvider("None")]
+        [Fact]
+        public void InvokableAlias_UnresolvableWhereMethodIsMissing_ThrowsTypedException()
+        {
+            var invokable = typeof(IEchoGrain).Assembly.GetTypes()
+                .First(t => t.GetCustomAttribute<Orleans.CompoundTypeAliasAttribute>() is { Components: ["inv", ..] } a && a.Components.Contains(typeof(IEchoGrain)));
+
+            var aliasAttribute = invokable.GetCustomAttribute<Orleans.CompoundTypeAliasAttribute>();
+            Assert.NotNull(aliasAttribute);
+
+            var realAlias = RuntimeTypeNameFormatter.Format(invokable);
+            var methodHash = (string)aliasAttribute.Components[^1];
+
+            Assert.Equal(invokable, this.fixture.Services.GetRequiredService<TypeConverter>().Parse(realAlias));
+
+            var ex = Assert.Throws<UnresolvedInvokableAliasException>(() => CreateConverterWithoutInvokables().Parse(realAlias));
+            Assert.Contains(methodHash, ex.Alias);
+
+            TypeConverter CreateConverterWithoutInvokables() =>
+                new(
+                    [],
+                    [],
+                    [],
+                    Options.Create(new TypeManifestOptions { AllowAllTypes = true }),
+                    new CachedTypeResolver());
+        }
+
+        [TestSuite("BVT")]
+        [TestProvider("None")]
+        [Fact]
+        public void Message_UnresolvableInvokableAliasInResponse_StillThrows()
+        {
+            var grainReference = RuntimeTypeNameFormatter.Format(typeof(GrainReference));
+            var alias = $"(\"inv\",[{grainReference}],[{grainReference}],\"DEADBEEF\")";
+            var body = EncodeBodyWithFieldType(alias);
+            var request = this.messageFactory.CreateMessage(null, InvokeMethodOptions.None);
+            var response = this.messageFactory.CreateResponseMessage(request);
+            var (header, _) = WriteMessage(response);
+
+            Assert.Throws<UnresolvedInvokableAliasException>(() => ReadMessage(header, body));
+        }
+
+        private byte[] EncodeBodyWithFieldType(string typeName)
+        {
+            using var session = _serializerSessionPool.GetSession();
+            var writer = Writer.CreatePooled(session);
+            try
+            {
+                writer.WriteByte((byte)((uint)WireType.TagDelimited | (uint)SchemaType.Encoded));
+
+                var nameBytes = Encoding.UTF8.GetBytes(typeName);
+                writer.WriteByte(1);
+                writer.WriteInt32(0);
+                writer.WriteVarUInt32((uint)nameBytes.Length);
+                writer.Write(nameBytes);
+
+                writer.WriteEndObject();
+                writer.Commit();
+                return writer.Output.AsReadOnlySequence().ToArray();
+            }
+            finally
+            {
+                writer.Dispose();
+            }
+        }
+
+        private Message ReadMessageWithBody(byte[] body, MessageSerializer? serializer = null)
+        {
+            serializer ??= this.messageSerializer;
+            var (header, _) = WriteMessage(this.messageFactory.CreateMessage(null, InvokeMethodOptions.None), serializer);
+            return ReadMessage(header, body, serializer);
+        }
+
+        private Message ReadMessage(byte[] header, byte[] body, MessageSerializer? serializer = null)
+        {
+            serializer ??= this.messageSerializer;
+
+            var pipe = new Pipe(new PipeOptions(pauseWriterThreshold: 0));
+            Span<byte> lengthFields = stackalloc byte[8];
+            BinaryPrimitives.WriteInt32LittleEndian(lengthFields, header.Length);
+            BinaryPrimitives.WriteInt32LittleEndian(lengthFields[4..], body.Length);
+            pipe.Writer.Write(lengthFields);
+            pipe.Writer.Write(header);
+            pipe.Writer.Write(body);
+            pipe.Writer.FlushAsync().AsTask().GetAwaiter().GetResult();
+
+            pipe.Reader.TryRead(out var readResult);
+            var buffer = readResult.Buffer;
+            var (requiredBytes, _, _) = serializer.TryRead(ref buffer, out var message);
+            Assert.Equal(0, requiredBytes);
+            return message!;
+        }
+
+        private (byte[] Header, byte[] Body) WriteMessage(Message message, MessageSerializer? serializer = null)
+        {
+            var pipe = new Pipe(new PipeOptions(pauseWriterThreshold: 0));
+            var (headerLength, bodyLength) = (serializer ?? this.messageSerializer).Write(pipe.Writer, message);
+            pipe.Writer.FlushAsync().AsTask().GetAwaiter().GetResult();
+
+            pipe.Reader.TryRead(out var readResult);
+            var framed = readResult.Buffer.ToArray();
+
+            const int framing = 8;
+            return (
+                framed[framing..(framing + headerLength)],
+                framed[(framing + headerLength)..(framing + headerLength + bodyLength)]);
+        }
+
+        private MessageSerializer NewSerializer()
+        {
+            var serializer = this.fixture.Services.GetRequiredService<MessageSerializer>();
+            serializer.SetProtocolVersion(NetworkProtocolVersion.Version2);
+            return serializer;
+        }
+
+        private MessageSerializer Version1Serializer()
+        {
+            var serializer = this.fixture.Services.GetRequiredService<MessageSerializer>();
+            serializer.SetProtocolVersion(NetworkProtocolVersion.Version1);
+            return serializer;
+        }
+
         private class MessageSerializerBackwardsCompatibilityStub
         {
             private readonly IFieldCodec<GrainAddress> _grainAddressCodec;
@@ -338,7 +581,7 @@ namespace UnitTests.Serialization
             {
                 _grainAddressCodec = grainAddressCodec;
             }
-            
+
             internal List<GrainAddress> ReadCacheInvalidationHeaders<TInput>(ref Reader<TInput> reader)
             {
                 var n = (int)reader.ReadVarUInt32();

@@ -9,9 +9,10 @@ namespace Orleans.Configuration
     public class ConnectionOptions
     {
         /// <summary>
-        /// Gets or sets the network protocol version to negotiate with.
+        /// Gets or sets the highest network protocol version to offer. Each connection uses the
+        /// lower of the two versions its endpoints offer.
         /// </summary>
-        public NetworkProtocolVersion ProtocolVersion { get; set; } = NetworkProtocolVersion.Version1;
+        public NetworkProtocolVersion ProtocolVersion { get; set; } = NetworkProtocolVersion.Version2;
 
         /// <summary>
         /// Gets or sets the number of connections to maintain for each endpoint.
