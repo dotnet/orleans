@@ -355,7 +355,6 @@ public sealed class GrainDirectoryRollingUpgradeTests(ITestOutputHelper output)
         output.WriteLine($"  Validating grain directory invariants {stage}...");
 
         var activations = GetDirectoryActivations(cluster);
-        var activationGroups = activations.GroupBy(static activation => activation.Address.GrainId).ToArray();
         var distributedPartitions = new List<IGrainDirectoryTestHooks>();
         var distributedSiloCount = 0;
         foreach (var silo in cluster.Silos)
@@ -385,6 +384,7 @@ public sealed class GrainDirectoryRollingUpgradeTests(ITestOutputHelper output)
             return;
         }
 
+        var activationGroups = activations.GroupBy(static activation => activation.Address.GrainId).ToArray();
         var duplicateActivations = activationGroups.Where(static group => group.Count() > 1).ToArray();
         Assert.True(
             duplicateActivations.Length == 0,
@@ -1194,7 +1194,11 @@ public sealed class GrainDirectoryRollingUpgradeTests(ITestOutputHelper output)
                     && activation.Address.ActivationId.Equals(observedAddress.ActivationId));
             if (!isMixedDirectoryCluster)
             {
-                Assert.Single(activationMatches);
+                Assert.True(
+                    activationMatches.Length == 1,
+                    $"Expected exactly one live activation for grain {grainKey} during '{stage}', but found "
+                    + $"{activationMatches.Length}: "
+                    + $"[{string.Join(", ", activationMatches.Select(static activation => activation.Address.ToFullString()))}].");
             }
 
             Assert.Equal(observedAddress.MembershipVersion, observedActivation.Address.MembershipVersion);
