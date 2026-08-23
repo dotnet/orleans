@@ -1,7 +1,7 @@
 ---
 title: Configure ADO.NET providers
 description: Configure Orleans clustering, reminders, storage, and grain directories with ADO.NET.
-ms.date: 08/10/2026
+ms.date: 08/23/2026
 ms.topic: how-to
 ---
 
@@ -39,6 +39,45 @@ or another storage layout, adapt the scripts as part of your database
 deployment and keep the resulting table names, columns, parameters, and query
 result shapes compatible with Orleans. Apply and test those changes outside the
 application startup path.
+
+## Configure with Aspire
+
+`Aspire.Hosting.Orleans` emits the database resource name as `ServiceKey`. The Orleans ADO.NET provider resolves the corresponding connection string and selects the invariant from the Aspire database resource type:
+
+| Aspire resource | Orleans invariant | Supported capabilities |
+|---|---|---|
+| `SqlServerDatabaseResource`, `AzureSqlDatabaseResource` | `Microsoft.Data.SqlClient` | Clustering, grain storage, reminders, grain directory, streaming |
+| `PostgresDatabaseResource`, `AzurePostgresFlexibleServerDatabaseResource` | `Npgsql` | Clustering, grain storage, reminders, grain directory, streaming |
+| `MySqlDatabaseResource` | `MySql.Data.MySqlClient` | Clustering, grain storage, reminders, grain directory, streaming |
+| `OracleDatabaseResource` | `Oracle.DataAccess.Client` | Clustering, grain storage, reminders |
+
+The SQL Server AppHost can create the database and apply the Orleans scripts through a creation script:
+
+:::code language="csharp" source="../snippets/aspire/AppHost/AppHostExamples.cs" id="adonet_apphost":::
+
+The `schema/sqlserver.sql` file creates `orleans-db`, selects it, and then contains the SQL Server main script followed by the scripts for each configured capability. Aspire runs this script when the SQL Server resource becomes ready.
+
+PostgreSQL and MySQL/MariaDB container initialization directories can provision the database and schema before the Orleans project starts:
+
+:::code language="csharp" source="../snippets/aspire/AppHost/AppHostExamples.cs" id="adonet_postgresql_apphost":::
+
+:::code language="csharp" source="../snippets/aspire/AppHost/AppHostExamples.cs" id="adonet_mysql_apphost":::
+
+Place ordered initialization files in the referenced directory. Start with a file that creates `orleans-db`, then apply the main script and each configured capability script. MariaDB uses the MySQL scripts and provider mapping.
+
+Oracle supports clustering, grain storage, and reminders:
+
+:::code language="csharp" source="../snippets/aspire/AppHost/AppHostExamples.cs" id="adonet_oracle_apphost":::
+
+The Oracle initialization directory creates the database user or service and applies the Oracle main, clustering, persistence, and reminder scripts. The Oracle container image terms and startup requirements apply to local orchestration.
+
+### Configure a custom database resource
+
+An `IProviderConfiguration` can emit the `AdoNet` provider type, an explicit invariant, and the connection-string resource name. Custom resources use this configuration to select their database driver:
+
+:::code language="csharp" source="../snippets/aspire/AppHost/AppHostExamples.cs" id="adonet_explicit_provider":::
+
+Explicit `Invariant` and `ConnectionString` values take precedence over inferred values. `ServiceKey` resolves an Aspire-injected connection string, and `ConnectionName` resolves a conventional .NET connection string.
 
 ## Configure SQL Server
 
