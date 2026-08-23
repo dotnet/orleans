@@ -219,7 +219,7 @@ internal sealed partial class S3JournalStorage : IJournalStorage
                     succeeded = true;
                     return CreateJournalMetadata(response.ETag, metadata);
                 }
-                catch (AmazonS3Exception exception) when (exception.StatusCode is HttpStatusCode.PreconditionFailed)
+                catch (AmazonS3Exception exception) when (IsWalMutationConflict(exception))
                 {
                     if (expectedETag is not null)
                     {
@@ -385,6 +385,7 @@ internal sealed partial class S3JournalStorage : IJournalStorage
                     if (refreshed is not null)
                     {
                         expectedETag = refreshed.Value.ETag;
+                        expectedProviderState = refreshed.Value.ProviderState;
                         continue;
                     }
 

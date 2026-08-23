@@ -51,7 +51,7 @@ internal sealed class S3JournalStorageProvider : ILifecycleParticipant<ISiloLife
     {
         var client = GetClient();
         var bucketName = GetBucketName();
-        var journalIds = new List<JournalId>();
+        var journalIds = new HashSet<JournalId>();
         string? continuationToken = null;
 
         do
