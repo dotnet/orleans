@@ -374,6 +374,7 @@ try {
             $setupCoverageScript `
             'DOTNET_COVERAGE_VERSION must specify' `
             'Coverage setup must reject a missing tool version.'
+        Assert-Equal 2 ([regex]::Matches($setupCoverageScript, 'Assert-NotReparsePoint \$toolPath')).Count 'Coverage tool path validation count differs.'
     }
 
     Write-Output "$testsRun coverage tests passed."
