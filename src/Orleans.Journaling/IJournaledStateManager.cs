@@ -34,6 +34,11 @@ public interface IJournaledStateManager : IAsyncDisposable
     /// <summary>
     /// Prepares and persists an update to the journal.
     /// </summary>
+    /// <remarks>
+    /// When the operation writes a snapshot, the complete captured state is replaced atomically. If storage
+    /// does not complete the replacement, the captured changes remain pending and can be retried.
+    /// Changes made while storage is awaiting are not consumed by the completed operation.
+    /// </remarks>
     /// <param name="cancellationToken">The cancellation token.</param>
     /// <returns>A <see cref="ValueTask"/> which represents the operation.</returns>
     ValueTask WriteStateAsync(CancellationToken cancellationToken);

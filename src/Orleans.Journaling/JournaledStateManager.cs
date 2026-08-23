@@ -401,6 +401,9 @@ internal sealed partial class JournaledStateManager : IJournaledStateManager, IJ
                                         {
                                             if (isSnapshot)
                                             {
+                                                // The snapshot includes all state represented by the captured journal prefix.
+                                                // Replace it atomically, then consume only that prefix so commands added while
+                                                // storage is awaiting remain pending for the next write.
                                                 await ReplaceStorageAsync(writeSequence, _shutdownCancellation.Token).ConfigureAwait(true);
                                             }
                                             else
