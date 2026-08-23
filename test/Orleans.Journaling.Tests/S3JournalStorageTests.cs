@@ -419,11 +419,13 @@ public sealed class S3JournalStorageTests : IAsyncLifetime
             client.GetObjectMetadataAsync(
                     Arg.Do<GetObjectMetadataRequest>(request => partRequest = request),
                     Arg.Any<CancellationToken>())
-                .Returns(Task.FromResult(new GetObjectMetadataResponse
+                .Returns(call =>
                 {
-                    ETag = "etag-1",
-                    PartsCount = 9_801,
-                }));
+                    var request = call.Arg<GetObjectMetadataRequest>();
+                    return Task.FromResult(request.PartNumber == 1
+                        ? new GetObjectMetadataResponse { ETag = "etag-1", PartsCount = 9_801 }
+                        : new GetObjectMetadataResponse { ETag = "etag-1", ContentLength = 1 });
+                });
             var storage = CreateStorage(client, new S3JournalStorageOptions { BucketName = BucketName });
 
             await storage.ReadAsync(new CapturingJournalStorageConsumer(), CancellationToken.None);
@@ -446,7 +448,13 @@ public sealed class S3JournalStorageTests : IAsyncLifetime
                     ResponseStream = new MemoryStream([1], writable: false),
                 }));
             client.GetObjectMetadataAsync(Arg.Any<GetObjectMetadataRequest>(), Arg.Any<CancellationToken>())
-                .Returns(Task.FromException<GetObjectMetadataResponse>(CreateS3Exception(HttpStatusCode.PreconditionFailed)));
+                .Returns(call =>
+                {
+                    var request = call.Arg<GetObjectMetadataRequest>();
+                    return request.PartNumber == 1
+                        ? Task.FromException<GetObjectMetadataResponse>(CreateS3Exception(HttpStatusCode.PreconditionFailed))
+                        : Task.FromResult(new GetObjectMetadataResponse { ETag = "etag-1", ContentLength = 1 });
+                });
             var storage = CreateStorage(client, new S3JournalStorageOptions { BucketName = BucketName });
 
             await storage.ReadAsync(new CapturingJournalStorageConsumer(), CancellationToken.None);

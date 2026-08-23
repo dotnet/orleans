@@ -423,6 +423,21 @@ internal sealed partial class S3JournalStorage : IJournalStorage
 
         try
         {
+            var walProperties = await GetPropertiesCoreAsync(expectedETag: null, cancellationToken).ConfigureAwait(false);
+            if (walProperties is null)
+            {
+                SetWal(eTag: null, providerState: default, lastModified: null);
+                consumer.Complete(metadata: null);
+                succeeded = true;
+                return;
+            }
+
+            var partsCount = await GetWalPartsCountAsync(
+                walProperties.ETag,
+                walProperties.ContentLength,
+                walProperties.PartsCount,
+                cancellationToken).ConfigureAwait(false);
+
             GetObjectResponse walResult;
             try
             {
@@ -431,6 +446,7 @@ internal sealed partial class S3JournalStorage : IJournalStorage
                     {
                         BucketName = _shared.BucketName,
                         Key = _walObjectKey,
+                        EtagToMatch = walProperties.ETag,
                     },
                     cancellationToken).ConfigureAwait(false);
             }
@@ -446,11 +462,6 @@ internal sealed partial class S3JournalStorage : IJournalStorage
             {
                 var walMetadata = CopyMetadata(walResult.Metadata);
                 var manifest = CreateWalManifest(walMetadata);
-                var partsCount = await GetWalPartsCountAsync(
-                    walResult.ETag,
-                    walResult.ContentLength,
-                    walResult.PartsCount,
-                    cancellationToken).ConfigureAwait(false);
                 SetWal(walResult.ETag, CreateWalProviderState(manifest, walResult.ContentLength, partsCount), walResult.LastModified);
 
                 var expectedFormat = manifest.Metadata.Format;
@@ -1522,12 +1533,13 @@ internal sealed partial class S3JournalStorage : IJournalStorage
             Options = options.Value;
             Instruments = instruments;
             ArgumentNullException.ThrowIfNull(Options);
-            if (string.IsNullOrWhiteSpace(Options.BucketName))
+            var bucketName = Options.BucketName;
+            if (string.IsNullOrWhiteSpace(bucketName))
             {
                 throw new InvalidOperationException($"{nameof(S3JournalStorageOptions.BucketName)} must be configured.");
             }
 
-            BucketName = Options.BucketName;
+            BucketName = bucketName;
             MimeType = mimeType;
             JournalFormatKey = journalFormatKey;
         }
