@@ -12,16 +12,22 @@
     <PackageReference Include="Microsoft.Orleans.Clustering.AzureStorage" Version="10.2.2" />
     <PackageReference Include="Microsoft.Orleans.Persistence.AzureStorage" Version="10.2.2" />
     <PackageReference Include="Microsoft.Orleans.Reminders.AzureStorage" Version="10.2.2" />
+    <PackageReference Include="Aspire.Azure.Storage.Blobs" Version="13.4.6" />
     <PackageReference Include="Aspire.StackExchange.Redis" Version="13.4.6" />
   </ItemGroup>
   <!-- </silo_packages> -->
 
   <ItemGroup>
     <PackageReference Include="Aspire.Azure.Data.Tables" Version="13.4.6" />
+    <PackageReference Include="Aspire.Microsoft.Azure.Cosmos" Version="13.4.6" />
     <PackageReference Include="Aspire.Microsoft.Data.SqlClient" Version="13.4.6" />
     <PackageReference Include="Microsoft.Orleans.Persistence.Redis" Version="10.2.2" />
+    <PackageReference Include="Microsoft.Orleans.Clustering.Cosmos" Version="10.2.2" />
+    <PackageReference Include="Microsoft.Orleans.Persistence.Cosmos" Version="10.2.2" />
+    <PackageReference Include="Microsoft.Orleans.Reminders.Cosmos" Version="10.2.2" />
     <PackageReference Include="Microsoft.Orleans.Reminders.Redis" Version="10.2.2" />
     <PackageReference Include="Microsoft.Orleans.GrainDirectory.Redis" Version="10.2.2" />
+    <PackageReference Include="Microsoft.Orleans.Streaming.EventHubs" Version="10.2.2" />
     <PackageReference Include="Microsoft.Orleans.Clustering.AdoNet" Version="10.2.2" />
     <PackageReference Include="Microsoft.Orleans.Persistence.AdoNet" Version="10.2.2" />
     <PackageReference Include="Microsoft.Orleans.Reminders.AdoNet" Version="10.2.2" />

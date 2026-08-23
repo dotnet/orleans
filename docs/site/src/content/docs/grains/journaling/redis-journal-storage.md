@@ -1,7 +1,7 @@
 ---
 title: Redis journal storage
 description: Configure Redis as a storage provider for experimental Orleans Journaling durable state.
-ms.date: 08/21/2026
+ms.date: 08/23/2026
 ms.topic: how-to
 ---
 
@@ -36,6 +36,14 @@ continue there. A Redis catalog scan has live-listing semantics, so successful
 inventory is an observation rather than a transactionally frozen cluster view.
 Follow [Migrate Durable Jobs storage](durable-jobs-migration.md), including
 repeated complete inventories after all scheduling silos have cut over.
+
+## Use with Aspire
+
+Aspire injects the Redis connection and keyed client. Configure the journaling provider section explicitly in the silo resource:
+
+:::code language="csharp" source="../../host/snippets/aspire/AppHost/AppHostExamples.cs" id="redis_journaling_aspire":::
+
+The silo registers the `orleans-redis` keyed client before `UseOrleans`, as shown in the [Redis provider silo example](../grain-persistence/redis-storage.md#use-with-aspire). Orleans then activates Redis journal storage from `Orleans:GrainJournaling`.
 
 ## Storage behavior
 

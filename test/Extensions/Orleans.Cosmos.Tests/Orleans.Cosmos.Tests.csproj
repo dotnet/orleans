@@ -1,15 +1,33 @@
 <Project Sdk="Microsoft.NET.Sdk">
+  <Sdk Name="Aspire.AppHost.Sdk" Version="13.2.4" />
 
   <PropertyGroup>
     <TargetFrameworks>$(TestTargetFrameworks)</TargetFrameworks>
     <OrleansBuildTimeCodeGen>true</OrleansBuildTimeCodeGen>
+    <IsAspireHost>false</IsAspireHost>
     <Nullable>enable</Nullable>
   </PropertyGroup>
 
   <ItemGroup>
+    <ProjectCapability Include="Aspire" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Aspire.Hosting.AppHost" />
+    <PackageReference Include="Aspire.Microsoft.Azure.Cosmos" />
     <PackageReference Include="Azure.Identity" />
     <PackageReference Include="Microsoft.Extensions.TimeProvider.Testing" />
     <PackageReference Include="System.Diagnostics.PerformanceCounter" />
+  </ItemGroup>
+
+  <ItemGroup Condition="'$(TargetFramework)' == 'net10.0'">
+    <PackageReference Include="Aspire.Hosting.Azure.CosmosDB" />
+    <PackageReference Include="Aspire.Hosting.Orleans" />
+    <PackageReference Include="Aspire.Hosting.Testing" />
+  </ItemGroup>
+
+  <ItemGroup Condition="'$(TargetFramework)' != 'net10.0'">
+    <Compile Remove="CosmosAspireIntegrationTests.cs" />
   </ItemGroup>
 
   <ItemGroup>

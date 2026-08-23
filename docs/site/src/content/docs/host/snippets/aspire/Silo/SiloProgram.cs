@@ -69,6 +69,59 @@ public static class SiloProgram
     }
     // </silo_azure_config>
 
+    // <azure_storage_providers_silo>
+    public static void AzureStorageProvidersSilo(string[] args)
+    {
+        var builder = Host.CreateApplicationBuilder(args);
+
+        builder.AddServiceDefaults();
+        builder.AddKeyedAzureTableServiceClient("orleans-tables");
+        builder.AddKeyedAzureBlobServiceClient("orleans-blobs");
+        builder.UseOrleans();
+
+        builder.Build().Run();
+    }
+    // </azure_storage_providers_silo>
+
+    // <cosmos_providers_silo>
+    public static void CosmosProvidersSilo(string[] args)
+    {
+        var builder = Host.CreateApplicationBuilder(args);
+
+        builder.AddServiceDefaults();
+        builder.AddKeyedAzureCosmosClient("orleans-cosmos");
+        builder.UseOrleans();
+
+        builder.Build().Run();
+    }
+    // </cosmos_providers_silo>
+
+    // <redis_providers_silo>
+    public static void RedisProvidersSilo(string[] args)
+    {
+        var builder = Host.CreateApplicationBuilder(args);
+
+        builder.AddServiceDefaults();
+        builder.AddKeyedRedisClient("orleans-redis");
+        builder.UseOrleans();
+
+        builder.Build().Run();
+    }
+    // </redis_providers_silo>
+
+    // <event_hubs_silo>
+    public static void EventHubsSilo(string[] args)
+    {
+        var builder = Host.CreateApplicationBuilder(args);
+
+        builder.AddServiceDefaults();
+        builder.AddKeyedAzureTableServiceClient("checkpoint-tables");
+        builder.UseOrleans();
+
+        builder.Build().Run();
+    }
+    // </event_hubs_silo>
+
     // <health_checks>
     public static void ConfigureHealthChecks(IHostApplicationBuilder builder)
     {
