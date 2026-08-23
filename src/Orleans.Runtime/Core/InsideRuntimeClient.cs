@@ -178,7 +178,7 @@ namespace Orleans.Runtime
 
             if (this.messagingOptions.DropExpiredMessages && message.IsExpirableMessage())
             {
-                message.TimeToLive = request.GetDefaultResponseTimeout() ?? sharedData.ResponseTimeout;
+                message.TimeToLive = InvocationResponseTimeout.Get(request) ?? sharedData.ResponseTimeout;
             }
 
             var oneWay = (options & InvokeMethodOptions.OneWay) != 0;

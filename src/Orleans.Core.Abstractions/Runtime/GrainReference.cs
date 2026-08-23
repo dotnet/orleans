@@ -270,7 +270,7 @@ namespace Orleans.Runtime
         /// The grain reference functionality which is shared by all grain references of a given type.
         /// </summary>
         [NonSerialized]
-        private readonly GrainReferenceShared _shared;
+        private GrainReferenceShared _shared;
 
         /// <summary>
         /// The underlying grain id key.
@@ -281,7 +281,11 @@ namespace Orleans.Runtime
         /// <summary>
         /// Gets the grain reference functionality which is shared by all grain references of a given type.
         /// </summary>
-        internal GrainReferenceShared Shared => _shared ?? throw new GrainReferenceNotBoundException(this);
+        internal GrainReferenceShared Shared
+        {
+            get => Volatile.Read(ref _shared) ?? throw new GrainReferenceNotBoundException(this);
+            set => Volatile.Write(ref _shared, value ?? throw new ArgumentNullException(nameof(value)));
+        }
 
         /// <summary>
         /// Gets the grain reference runtime.
@@ -291,22 +295,22 @@ namespace Orleans.Runtime
         /// <summary>
         /// Gets the grain id.
         /// </summary>
-        public GrainId GrainId => GrainId.Create(_shared.GrainType, _key);
+        public GrainId GrainId => GrainId.Create(Shared.GrainType, _key);
 
         /// <summary>
         /// Gets the interface type.
         /// </summary>
-        public GrainInterfaceType InterfaceType => _shared.InterfaceType;
+        public GrainInterfaceType InterfaceType => Shared.InterfaceType;
 
         /// <summary>
         /// Gets the serialization copy context pool.
         /// </summary>
-        protected CopyContextPool CopyContextPool => _shared.CopyContextPool;
+        protected CopyContextPool CopyContextPool => Shared.CopyContextPool;
 
         /// <summary>
         /// Gets the serialization codec provider.
         /// </summary>
-        protected CodecProvider CodecProvider => _shared.CodecProvider;
+        protected CodecProvider CodecProvider => Shared.CodecProvider;
 
         /// <summary>Initializes a new instance of the <see cref="GrainReference"/> class.</summary>
         /// <param name="shared">
@@ -335,7 +339,7 @@ namespace Orleans.Runtime
         /// <returns>A new grain reference which implements the specified interface type.</returns>
         public virtual TGrainInterface Cast<TGrainInterface>()
             where TGrainInterface : IAddressable
-            => (TGrainInterface)_shared.Runtime.Cast(this, typeof(TGrainInterface));
+            => (TGrainInterface)Shared.Runtime.Cast(this, typeof(TGrainInterface));
 
         /// <summary>
         /// Tests this reference for equality to another object.
@@ -352,7 +356,7 @@ namespace Orleans.Runtime
         public bool Equals(GrainReference? other) => other is not null && this.GrainId.Equals(other.GrainId);
 
         /// <inheritdoc />
-        public override int GetHashCode() => this.GrainId.GetHashCode();
+        public override int GetHashCode() => _key.GetHashCode();
 
         /// <summary>
         /// Get a uniform hash code for this grain reference.

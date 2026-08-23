@@ -284,17 +284,20 @@ namespace Orleans.GrainReferences
 
             private async Task<GrainReference> ResolveGrainTypeAsync(GrainReference reference, IInvokable request)
             {
-                if (Volatile.Read(ref _resolvedReference) is GrainReference resolvedReference)
+                if (Volatile.Read(ref _resolvedReference) is GrainReference cachedReference)
                 {
-                    return resolvedReference;
+                    reference.Shared = cachedReference.Shared;
+                    return reference;
                 }
 
                 var runtimeClient = RuntimeClient;
                 var requestCancellation = request.GetCancellationToken();
-                var timeout = request.GetDefaultResponseTimeout() ?? runtimeClient.GetResponseTimeout();
+                var timeout = InvocationResponseTimeout.Get(request) ?? runtimeClient.GetResponseTimeout();
+                var startedAt = _timeProvider.GetTimestamp();
                 using var timeoutCancellation = new CancellationTokenSource(timeout, _timeProvider);
                 using var cancellation = CancellationTokenSource.CreateLinkedTokenSource(requestCancellation, timeoutCancellation.Token);
 
+                GrainReference resolvedReference;
                 try
                 {
                     await _resolutionLock.WaitAsync(cancellation.Token);
@@ -302,28 +305,31 @@ namespace Orleans.GrainReferences
                     {
                         if (_resolvedReference is not null)
                         {
-                            return _resolvedReference;
+                            resolvedReference = _resolvedReference;
                         }
-
-                        if (!GrainTypePrefix.TryGetStubGrainType(reference.GrainId.Type, out var resolutionInterfaceType, out var grainClassPrefix))
+                        else
                         {
-                            throw new InvalidOperationException($"Invalid unresolved grain type: {reference.GrainId.Type}");
-                        }
-
-                        await using var clusterManifestUpdates = _clusterManifestProvider.Updates.WithCancellation(cancellation.Token).GetAsyncEnumerator();
-                        GrainType grainType;
-                        while (!_interfaceTypeToGrainTypeResolver.TryGetGrainType(resolutionInterfaceType, grainClassPrefix, out grainType))
-                        {
-                            if (!await clusterManifestUpdates.MoveNextAsync())
+                            if (!GrainTypePrefix.TryGetStubGrainType(reference.GrainId.Type, out var resolutionInterfaceType, out var grainClassPrefix))
                             {
-                                throw new InvalidOperationException("The cluster manifest update stream completed before a compatible grain implementation became available.");
+                                throw new InvalidOperationException($"Invalid unresolved grain type: {reference.GrainId.Type}");
                             }
+
+                            await using var clusterManifestUpdates = _clusterManifestProvider.Updates.WithCancellation(cancellation.Token).GetAsyncEnumerator();
+                            GrainType grainType;
+                            while (!_interfaceTypeToGrainTypeResolver.TryGetGrainType(resolutionInterfaceType, grainClassPrefix, out grainType))
+                            {
+                                if (!await clusterManifestUpdates.MoveNextAsync())
+                                {
+                                    throw new InvalidOperationException("The cluster manifest update stream completed before a compatible grain implementation became available.");
+                                }
+                            }
+
+                            var grainId = GrainId.Create(grainType, reference.GrainId.Key);
+                            resolvedReference = (GrainReference)runtimeClient.InternalGrainFactory.GetGrain(grainId, reference.InterfaceType);
                         }
 
-                        var grainId = GrainId.Create(grainType, reference.GrainId.Key);
-                        resolvedReference = (GrainReference)runtimeClient.InternalGrainFactory.GetGrain(grainId, reference.InterfaceType);
+                        reference.Shared = resolvedReference.Shared;
                         Volatile.Write(ref _resolvedReference, resolvedReference);
-                        return resolvedReference;
                     }
                     finally
                     {
@@ -334,6 +340,15 @@ namespace Orleans.GrainReferences
                 {
                     throw new TimeoutException($"A compatible grain implementation did not become available within the response timeout of {timeout}.");
                 }
+
+                var remainingTimeout = timeout - _timeProvider.GetElapsedTime(startedAt);
+                if (remainingTimeout <= TimeSpan.Zero)
+                {
+                    throw new TimeoutException($"A compatible grain implementation did not become available within the response timeout of {timeout}.");
+                }
+
+                InvocationResponseTimeout.Set(request, remainingTimeout);
+                return reference;
             }
         }
     }
