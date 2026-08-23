@@ -1,10 +1,36 @@
 <Project Sdk="Microsoft.NET.Sdk">
+  <Sdk Name="Aspire.AppHost.Sdk" Version="13.2.4" />
+
   <PropertyGroup>
     <DefineConstants>$(DefineConstants);AWSUTILS_TESTS</DefineConstants>
     <TargetFrameworks>$(TestTargetFrameworks)</TargetFrameworks>
     <OrleansBuildTimeCodeGen>true</OrleansBuildTimeCodeGen>
+    <IsAspireHost>false</IsAspireHost>
     <Nullable>enable</Nullable>
   </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectCapability Include="Aspire" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Aspire.Hosting.AppHost" />
+  </ItemGroup>
+
+  <ItemGroup Condition="'$(TargetFramework)' == 'net10.0'">
+    <PackageReference Include="Aspire.Hosting.AWS" />
+    <PackageReference Include="Aspire.Hosting.Orleans" />
+    <PackageReference Include="Aspire.Hosting.Testing" />
+    <PackageReference Include="AWSSDK.Core" />
+    <PackageReference Include="AWSSDK.Lambda" />
+    <PackageReference Include="AWSSDK.SSO" />
+    <PackageReference Include="AWSSDK.SSOOIDC" />
+  </ItemGroup>
+
+  <ItemGroup Condition="'$(TargetFramework)' != 'net10.0'">
+    <Compile Remove="DynamoDBAspireIntegrationTests.cs" />
+    <Compile Remove="DynamoDBAspireLiveTests.cs" />
+  </ItemGroup>
 
   <ItemGroup>
     <Compile Include="$(SourceRoot)src\AWS\Shared\AWSUtils.cs" Link="AWSUtils.cs" />
