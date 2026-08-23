@@ -1,26 +1,34 @@
 using Docker.DotNet;
 using DotNet.Testcontainers.Builders;
 using DotNet.Testcontainers.Configurations;
-using DotNet.Testcontainers.Containers;
 
 namespace TestExtensions;
 
 /// <summary>
 /// Starts one shared test container and reports Docker availability to test fixtures.
 /// </summary>
-internal sealed class TestContainerManager<TContainer> where TContainer : IContainer
+internal sealed class TestContainerManager<TContainer>
 {
     private static readonly Lazy<Task<string?>> DockerSkipReason = new(GetDockerSkipReasonAsync);
 
     private readonly string _serviceName;
     private readonly Lazy<TContainer> _container;
+    private readonly Func<TContainer, CancellationToken, Task> _startAsync;
+    private readonly Func<Task<string?>> _getDockerSkipReasonAsync;
     private readonly Action<TContainer>? _onStarted;
     private readonly Lazy<Task<string?>> _startSkipReason;
 
-    public TestContainerManager(string serviceName, Func<TContainer> containerFactory, Action<TContainer>? onStarted = null)
+    public TestContainerManager(
+        string serviceName,
+        Func<TContainer> containerFactory,
+        Func<TContainer, CancellationToken, Task> startAsync,
+        Action<TContainer>? onStarted = null,
+        Func<Task<string?>>? getDockerSkipReasonAsync = null)
     {
         _serviceName = serviceName;
         _container = new(containerFactory);
+        _startAsync = startAsync;
+        _getDockerSkipReasonAsync = getDockerSkipReasonAsync ?? (() => DockerSkipReason.Value);
         _onStarted = onStarted;
         _startSkipReason = new(StartAndGetSkipReasonAsync);
     }
@@ -47,14 +55,14 @@ internal sealed class TestContainerManager<TContainer> where TContainer : IConta
 
     private async Task<string?> StartAndGetSkipReasonAsync()
     {
-        var dockerSkipReason = await DockerSkipReason.Value.ConfigureAwait(false);
+        var dockerSkipReason = await _getDockerSkipReasonAsync().ConfigureAwait(false);
         if (dockerSkipReason is not null)
         {
             return $"{dockerSkipReason} {_serviceName} tests are skipped.";
         }
 
         var container = _container.Value;
-        await container.StartAsync().ConfigureAwait(false);
+        await _startAsync(container, CancellationToken.None).ConfigureAwait(false);
         _onStarted?.Invoke(container);
         return null;
     }

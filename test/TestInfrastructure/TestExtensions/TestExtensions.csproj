@@ -28,6 +28,7 @@
     <InternalsVisibleTo Include="Orleans.Cosmos.Tests" />
     <InternalsVisibleTo Include="Orleans.Redis.Tests" />
     <InternalsVisibleTo Include="Orleans.Runtime.Internal.Tests" />
+    <InternalsVisibleTo Include="Orleans.TestingHost.Tests" />
     <InternalsVisibleTo Include="Orleans.Persistence.Firestore.Tests" />
     <InternalsVisibleTo Include="Orleans.Streaming.NATS.Tests" />
     <InternalsVisibleTo Include="Orleans.Streaming.Kinesis.Tests" />

@@ -11,6 +11,7 @@ public static class AzuriteContainerManager
     private static readonly TestContainerManager<AzuriteContainer> ContainerManager = new(
         "Azure Storage",
         CreateContainer,
+        static (container, cancellationToken) => container.StartAsync(cancellationToken),
         container => Environment.SetEnvironmentVariable(ConnectionStringEnvVar, container.GetConnectionString()));
 
     /// <summary>
@@ -42,17 +43,6 @@ public static class AzuriteContainerManager
         }
 
         ContainerManager.EnsureStarted();
-    }
-
-    /// <summary>
-    /// Starts the shared Azurite container and propagates its connection string to child processes.
-    /// </summary>
-    /// <returns><see langword="true"/> when Azurite is available.</returns>
-    public static Task<bool> EnsureStartedAsync()
-    {
-        return !string.IsNullOrEmpty(Environment.GetEnvironmentVariable(ConnectionStringEnvVar))
-            ? Task.FromResult(true)
-            : ContainerManager.EnsureStartedAsync();
     }
 
     private static AzuriteContainer CreateContainer()
