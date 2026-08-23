@@ -18,11 +18,14 @@ namespace Orleans.Reminders.EntityFrameworkCore.MySql.Data.Migrations
                 name: "Reminders",
                 columns: table => new
                 {
-                    ServiceId = table.Column<string>(type: "varchar(255)", nullable: false, collation: "utf8mb4_bin")
+                    ServiceIdHash = table.Column<byte[]>(type: "binary(32)", maxLength: 32, nullable: false),
+                    GrainIdHash = table.Column<byte[]>(type: "binary(32)", maxLength: 32, nullable: false),
+                    ReminderNameHash = table.Column<byte[]>(type: "binary(32)", maxLength: 32, nullable: false),
+                    ServiceId = table.Column<string>(type: "longtext", nullable: false, collation: "utf8mb4_bin")
                         .Annotation("MySql:CharSet", "utf8mb4"),
-                    GrainId = table.Column<string>(type: "varchar(255)", nullable: false, collation: "utf8mb4_bin")
+                    GrainId = table.Column<string>(type: "longtext", nullable: false, collation: "utf8mb4_bin")
                         .Annotation("MySql:CharSet", "utf8mb4"),
-                    Name = table.Column<string>(type: "varchar(255)", nullable: false, collation: "utf8mb4_bin")
+                    Name = table.Column<string>(type: "longtext", nullable: false, collation: "utf8mb4_bin")
                         .Annotation("MySql:CharSet", "utf8mb4"),
                     StartAt = table.Column<DateTimeOffset>(type: "datetime(6)", nullable: false),
                     Period = table.Column<long>(type: "bigint", nullable: false),
@@ -31,19 +34,19 @@ namespace Orleans.Reminders.EntityFrameworkCore.MySql.Data.Migrations
                 },
                 constraints: table =>
                 {
-                    table.PrimaryKey("PK_Reminders", x => new { x.ServiceId, x.GrainId, x.Name });
+                    table.PrimaryKey("PK_Reminders", x => new { x.ServiceIdHash, x.GrainIdHash, x.ReminderNameHash });
                 })
                 .Annotation("MySql:CharSet", "utf8mb4");
 
             migrationBuilder.CreateIndex(
-                name: "IX_Reminders_ServiceId_GrainHash",
+                name: "IX_Reminders_ServiceIdHash_GrainHash",
                 table: "Reminders",
-                columns: new[] { "ServiceId", "GrainHash" });
+                columns: new[] { "ServiceIdHash", "GrainHash" });
 
             migrationBuilder.CreateIndex(
-                name: "IX_Reminders_ServiceId_GrainId",
+                name: "IX_Reminders_ServiceIdHash_GrainIdHash",
                 table: "Reminders",
-                columns: new[] { "ServiceId", "GrainId" });
+                columns: new[] { "ServiceIdHash", "GrainIdHash" });
         }
 
         /// <inheritdoc />

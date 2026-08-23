@@ -13,18 +13,21 @@ public class SqlServerGrainDirectoryDbContext : GrainDirectoryDbContext<SqlServe
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
+        base.OnModelCreating(modelBuilder);
+
         modelBuilder.Entity<GrainActivationRecord<byte[]>>(c =>
         {
-            c.HasKey(p => new {p.ClusterId, p.GrainId}).IsClustered(false).HasName("PK_Activations");
-            c.Property(p => p.ClusterId).HasMaxLength(150).UseCollation(IdentifierCollation).IsRequired();
-            c.Property(p => p.GrainId).HasMaxLength(512).UseCollation(IdentifierCollation).IsRequired();
-            c.Property(p => p.SiloAddress).HasMaxLength(256).UseCollation(IdentifierCollation).IsRequired();
-            c.Property(p => p.ActivationId).HasMaxLength(64).UseCollation(IdentifierCollation).IsRequired();
-            c.Property(p => p.MembershipVersion).IsRequired();
+            c.HasKey(p => new {p.ClusterIdHash, p.GrainIdHash}).IsClustered(false).HasName("PK_Activations");
+            c.Property(p => p.ClusterIdHash).HasColumnType("binary(32)");
+            c.Property(p => p.GrainIdHash).HasColumnType("binary(32)");
+            c.Property(p => p.SiloAddressHash).HasColumnType("binary(32)");
+            c.Property(p => p.ClusterId).HasColumnType("nvarchar(max)").UseCollation(IdentifierCollation);
+            c.Property(p => p.GrainId).HasColumnType("nvarchar(max)").UseCollation(IdentifierCollation);
+            c.Property(p => p.SiloAddress).HasColumnType("nvarchar(max)").UseCollation(IdentifierCollation);
+            c.Property(p => p.ActivationId).HasColumnType("nvarchar(max)").UseCollation(IdentifierCollation);
             c.Property(p => p.ETag).IsRequired().IsRowVersion();
 
-            c.HasIndex(p => new {p.ClusterId, p.SiloAddress}).IsClustered(false).HasDatabaseName("IDX_Activations_ClusterId_SiloAddress");
-            c.HasIndex(p => new {p.ClusterId, p.GrainId, p.ActivationId}).IsClustered(false).HasDatabaseName("IDX_Activations_ClusterId_GrainId_ActivationId");
+            c.HasIndex(p => new {p.ClusterIdHash, p.SiloAddressHash}).IsClustered(false).HasDatabaseName("IDX_Activations_ClusterIdHash_SiloAddressHash");
         });
     }
 }

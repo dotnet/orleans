@@ -96,34 +96,30 @@ public sealed class SqlServerDbContextModelTests
         using var context = CreateContext(Feature.GrainDirectory);
         var activation = context.Model.FindEntityType(typeof(GrainActivationRecord<byte[]>))!;
 
-        Assert.Equal(["ClusterId", "GrainId"], GetPropertyNames(activation.FindPrimaryKey()!.Properties));
+        Assert.Equal(["ClusterIdHash", "GrainIdHash"], GetPropertyNames(activation.FindPrimaryKey()!.Properties));
         AssertIndexSet(
             activation,
-            ["ClusterId", "SiloAddress"],
-            ["ClusterId", "GrainId", "ActivationId"]);
-        Assert.Equal(150, activation.FindProperty("ClusterId")!.GetMaxLength());
-        Assert.Equal(512, activation.FindProperty("GrainId")!.GetMaxLength());
-        Assert.Equal(256, activation.FindProperty("SiloAddress")!.GetMaxLength());
-        Assert.Equal(64, activation.FindProperty("ActivationId")!.GetMaxLength());
-        AssertKeyWithinNonclusteredLimit(activation);
+            ["ClusterIdHash", "SiloAddressHash"]);
+        Assert.Equal("binary(32)", activation.FindProperty("ClusterIdHash")!.GetColumnType());
+        Assert.Equal("binary(32)", activation.FindProperty("GrainIdHash")!.GetColumnType());
+        Assert.Equal("binary(32)", activation.FindProperty("SiloAddressHash")!.GetColumnType());
+        Assert.Equal("nvarchar(max)", activation.FindProperty("ClusterId")!.GetColumnType());
+        Assert.Equal("nvarchar(max)", activation.FindProperty("GrainId")!.GetColumnType());
         Assert.Contains("PRIMARY KEY NONCLUSTERED", context.Database.GenerateCreateScript());
     }
 
     [Fact]
-    public void PersistenceModel_RetainsFourColumnKeyAndLengths()
+    public void PersistenceModel_UsesHashKeyAndUnboundedIdentifiers()
     {
         using var context = CreateContext(Feature.Persistence);
         var state = context.Model.FindEntityType(typeof(GrainStateRecord<byte[]>))!;
-        var keyNames = new[] { "ServiceId", "GrainType", "StateType", "GrainId" };
-
-        Assert.Equal(keyNames, GetPropertyNames(state.FindPrimaryKey()!.Properties));
-        Assert.Equal(150, state.FindProperty("ServiceId")!.GetMaxLength());
-        Assert.Equal(250, state.FindProperty("GrainType")!.GetMaxLength());
-        Assert.Equal(150, state.FindProperty("StateType")!.GetMaxLength());
-        Assert.Equal(299, state.FindProperty("GrainId")!.GetMaxLength());
+        Assert.Equal(["KeyHash"], GetPropertyNames(state.FindPrimaryKey()!.Properties));
+        Assert.Equal("binary(32)", state.FindProperty("KeyHash")!.GetColumnType());
+        Assert.All(
+            new[] { "ServiceId", "GrainType", "StateType", "GrainId" },
+            name => Assert.Equal("nvarchar(max)", state.FindProperty(name)!.GetColumnType()));
         Assert.Equal(typeof(byte[]), state.FindProperty("Data")!.ClrType);
         Assert.True(state.FindProperty("Data")!.IsNullable);
-        AssertKeyWithinNonclusteredLimit(state);
         Assert.Contains("PRIMARY KEY NONCLUSTERED", context.Database.GenerateCreateScript());
     }
 
@@ -133,15 +129,19 @@ public sealed class SqlServerDbContextModelTests
         using var context = CreateContext(Feature.Reminders);
         var reminder = context.Model.FindEntityType(typeof(ReminderRecord<byte[]>))!;
 
-        Assert.Equal(["ServiceId", "GrainId", "Name"], GetPropertyNames(reminder.FindPrimaryKey()!.Properties));
+        Assert.Equal(
+            ["ServiceIdHash", "GrainIdHash", "ReminderNameHash"],
+            GetPropertyNames(reminder.FindPrimaryKey()!.Properties));
         AssertIndexSet(
             reminder,
-            ["ServiceId", "GrainHash"],
-            ["ServiceId", "GrainId"]);
-        Assert.Equal(150, reminder.FindProperty("ServiceId")!.GetMaxLength());
-        Assert.Equal(512, reminder.FindProperty("GrainId")!.GetMaxLength());
-        Assert.Equal(150, reminder.FindProperty("Name")!.GetMaxLength());
-        AssertKeyWithinNonclusteredLimit(reminder);
+            ["ServiceIdHash", "GrainHash"],
+            ["ServiceIdHash", "GrainIdHash"]);
+        Assert.Equal("binary(32)", reminder.FindProperty("ServiceIdHash")!.GetColumnType());
+        Assert.Equal("binary(32)", reminder.FindProperty("GrainIdHash")!.GetColumnType());
+        Assert.Equal("binary(32)", reminder.FindProperty("ReminderNameHash")!.GetColumnType());
+        Assert.Equal("nvarchar(max)", reminder.FindProperty("ServiceId")!.GetColumnType());
+        Assert.Equal("nvarchar(max)", reminder.FindProperty("GrainId")!.GetColumnType());
+        Assert.Equal("nvarchar(max)", reminder.FindProperty("Name")!.GetColumnType());
         Assert.Contains("PRIMARY KEY NONCLUSTERED", context.Database.GenerateCreateScript());
     }
 
@@ -195,15 +195,6 @@ public sealed class SqlServerDbContextModelTests
             .ToArray();
 
         Assert.Equal(expected, actual);
-    }
-
-    private static void AssertKeyWithinNonclusteredLimit(IEntityType entity)
-    {
-        var key = entity.FindPrimaryKey()!;
-        Assert.InRange(
-            key.Properties.Sum(property => property.GetMaxLength()!.Value * sizeof(char)),
-            1,
-            1_700);
     }
 
     private static DbContext CreateContext(Feature feature) => feature switch

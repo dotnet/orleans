@@ -9,24 +9,25 @@ START TRANSACTION;
 
 DO $EF$
 BEGIN
-    IF NOT EXISTS(SELECT 1 FROM "__EFMigrationsHistory" WHERE "MigrationId" = '20260811155003_InitialPersistenceSchema') THEN
+    IF NOT EXISTS(SELECT 1 FROM "__EFMigrationsHistory" WHERE "MigrationId" = '20260823101503_InitialPersistenceSchema') THEN
     CREATE TABLE "GrainState" (
-        "ServiceId" character varying(280) NOT NULL,
-        "GrainType" character varying(280) NOT NULL,
-        "StateType" character varying(280) NOT NULL,
-        "GrainId" character varying(280) NOT NULL,
+        "KeyHash" bytea NOT NULL,
+        "ServiceId" text NOT NULL,
+        "GrainType" text NOT NULL,
+        "StateType" text NOT NULL,
+        "GrainId" text NOT NULL,
         "Data" bytea,
         "ETag" uuid NOT NULL,
-        CONSTRAINT "PK_GrainState" PRIMARY KEY ("ServiceId", "GrainType", "StateType", "GrainId")
+        CONSTRAINT "PK_GrainState" PRIMARY KEY ("KeyHash")
     );
     END IF;
 END $EF$;
 
 DO $EF$
 BEGIN
-    IF NOT EXISTS(SELECT 1 FROM "__EFMigrationsHistory" WHERE "MigrationId" = '20260811155003_InitialPersistenceSchema') THEN
+    IF NOT EXISTS(SELECT 1 FROM "__EFMigrationsHistory" WHERE "MigrationId" = '20260823101503_InitialPersistenceSchema') THEN
     INSERT INTO "__EFMigrationsHistory" ("MigrationId", "ProductVersion")
-    VALUES ('20260811155003_InitialPersistenceSchema', '8.0.29');
+    VALUES ('20260823101503_InitialPersistenceSchema', '8.0.29');
     END IF;
 END $EF$;
 COMMIT;

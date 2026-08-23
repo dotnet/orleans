@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Metadata;
 using Orleans.Persistence.EntityFrameworkCore.Data;
 
 namespace Orleans.Persistence.EntityFrameworkCore.SqlServer.Data;
@@ -15,11 +16,15 @@ public class SqlServerGrainStateDbContext : GrainStateDbContext<SqlServerGrainSt
     {
         modelBuilder.Entity<GrainStateRecord<byte[]>>(c =>
         {
-            c.HasKey(p => new {p.ServiceId, p.GrainType, p.StateType, p.GrainId}).IsClustered(false).HasName("PK_GrainState");
-            c.Property(p => p.ServiceId).HasMaxLength(150).UseCollation(IdentifierCollation).IsRequired();
-            c.Property(p => p.GrainType).HasMaxLength(250).UseCollation(IdentifierCollation).IsRequired();
-            c.Property(p => p.StateType).HasMaxLength(150).UseCollation(IdentifierCollation).IsRequired();
-            c.Property(p => p.GrainId).HasMaxLength(299).UseCollation(IdentifierCollation).IsRequired();
+            c.HasKey(p => p.KeyHash).IsClustered(false).HasName("PK_GrainState");
+            c.Property(p => p.KeyHash)
+                .HasColumnType("binary(32)")
+                .IsRequired()
+                .UsePropertyAccessMode(PropertyAccessMode.Property);
+            c.Property(p => p.ServiceId).HasColumnType("nvarchar(max)").UseCollation(IdentifierCollation).IsRequired();
+            c.Property(p => p.GrainType).HasColumnType("nvarchar(max)").UseCollation(IdentifierCollation).IsRequired();
+            c.Property(p => p.StateType).HasColumnType("nvarchar(max)").UseCollation(IdentifierCollation).IsRequired();
+            c.Property(p => p.GrainId).HasColumnType("nvarchar(max)").UseCollation(IdentifierCollation).IsRequired();
             c.Property(p => p.Data).IsRequired(false);
             c.Property(p => p.ETag).IsRequired().IsRowVersion();
         });

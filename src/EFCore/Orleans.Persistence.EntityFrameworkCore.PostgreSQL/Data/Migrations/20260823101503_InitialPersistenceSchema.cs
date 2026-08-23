@@ -15,16 +15,17 @@ namespace Orleans.Persistence.EntityFrameworkCore.PostgreSQL.Data.Migrations
                 name: "GrainState",
                 columns: table => new
                 {
-                    ServiceId = table.Column<string>(type: "character varying(280)", maxLength: 280, nullable: false),
-                    GrainType = table.Column<string>(type: "character varying(280)", maxLength: 280, nullable: false),
-                    StateType = table.Column<string>(type: "character varying(280)", maxLength: 280, nullable: false),
-                    GrainId = table.Column<string>(type: "character varying(280)", maxLength: 280, nullable: false),
+                    KeyHash = table.Column<byte[]>(type: "bytea", maxLength: 32, nullable: false),
+                    ServiceId = table.Column<string>(type: "text", nullable: false),
+                    GrainType = table.Column<string>(type: "text", nullable: false),
+                    StateType = table.Column<string>(type: "text", nullable: false),
+                    GrainId = table.Column<string>(type: "text", nullable: false),
                     Data = table.Column<byte[]>(type: "bytea", nullable: true),
                     ETag = table.Column<Guid>(type: "uuid", nullable: false)
                 },
                 constraints: table =>
                 {
-                    table.PrimaryKey("PK_GrainState", x => new { x.ServiceId, x.GrainType, x.StateType, x.GrainId });
+                    table.PrimaryKey("PK_GrainState", x => x.KeyHash);
                 });
         }
 

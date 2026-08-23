@@ -17,14 +17,17 @@ IF NOT EXISTS (
 )
 BEGIN
     CREATE TABLE [Reminders] (
-        [ServiceId] nvarchar(150) COLLATE Latin1_General_100_BIN2 NOT NULL,
-        [GrainId] nvarchar(512) COLLATE Latin1_General_100_BIN2 NOT NULL,
-        [Name] nvarchar(150) COLLATE Latin1_General_100_BIN2 NOT NULL,
+        [ServiceIdHash] binary(32) NOT NULL,
+        [GrainIdHash] binary(32) NOT NULL,
+        [ReminderNameHash] binary(32) NOT NULL,
+        [ServiceId] nvarchar(max) COLLATE Latin1_General_100_BIN2 NOT NULL,
+        [GrainId] nvarchar(max) COLLATE Latin1_General_100_BIN2 NOT NULL,
+        [Name] nvarchar(max) COLLATE Latin1_General_100_BIN2 NOT NULL,
         [StartAt] datetimeoffset NOT NULL,
         [Period] bigint NOT NULL,
         [GrainHash] bigint NOT NULL,
         [ETag] rowversion NOT NULL,
-        CONSTRAINT [PK_Reminders] PRIMARY KEY NONCLUSTERED ([ServiceId], [GrainId], [Name])
+        CONSTRAINT [PK_Reminders] PRIMARY KEY NONCLUSTERED ([ServiceIdHash], [GrainIdHash], [ReminderNameHash])
     );
 END;
 GO
@@ -34,7 +37,7 @@ IF NOT EXISTS (
     WHERE [MigrationId] = N'20260811210132_InitialRemindersSchema'
 )
 BEGIN
-    CREATE NONCLUSTERED INDEX [IDX_Reminders_ServiceId_GrainHash] ON [Reminders] ([ServiceId], [GrainHash]);
+    CREATE NONCLUSTERED INDEX [IDX_Reminders_ServiceIdHash_GrainHash] ON [Reminders] ([ServiceIdHash], [GrainHash]);
 END;
 GO
 
@@ -43,7 +46,7 @@ IF NOT EXISTS (
     WHERE [MigrationId] = N'20260811210132_InitialRemindersSchema'
 )
 BEGIN
-    CREATE NONCLUSTERED INDEX [IDX_Reminders_ServiceId_GrainId] ON [Reminders] ([ServiceId], [GrainId]);
+    CREATE NONCLUSTERED INDEX [IDX_Reminders_ServiceIdHash_GrainIdHash] ON [Reminders] ([ServiceIdHash], [GrainIdHash]);
 END;
 GO
 

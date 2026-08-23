@@ -3,6 +3,7 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Metadata;
 
 namespace Orleans.Reminders.EntityFrameworkCore.Data;
 
@@ -17,7 +18,10 @@ public abstract class GuidReminderDbContext<TDbContext> : ReminderDbContext<TDbC
     {
         modelBuilder.Entity<ReminderRecord<Guid>>(entity =>
         {
-            entity.HasKey(record => new { record.ServiceId, record.GrainId, record.Name });
+            entity.HasKey(record => new { record.ServiceIdHash, record.GrainIdHash, record.ReminderNameHash });
+            entity.Property(record => record.ServiceIdHash).HasMaxLength(32).IsRequired().UsePropertyAccessMode(PropertyAccessMode.Property);
+            entity.Property(record => record.GrainIdHash).HasMaxLength(32).IsRequired().UsePropertyAccessMode(PropertyAccessMode.Property);
+            entity.Property(record => record.ReminderNameHash).HasMaxLength(32).IsRequired().UsePropertyAccessMode(PropertyAccessMode.Property);
             entity.Property(record => record.ServiceId).IsRequired();
             entity.Property(record => record.GrainId).IsRequired();
             entity.Property(record => record.Name).IsRequired();
@@ -30,8 +34,8 @@ public abstract class GuidReminderDbContext<TDbContext> : ReminderDbContext<TDbC
                 .IsRequired()
                 .ValueGeneratedNever()
                 .IsConcurrencyToken();
-            entity.HasIndex(record => new { record.ServiceId, record.GrainHash });
-            entity.HasIndex(record => new { record.ServiceId, record.GrainId });
+            entity.HasIndex(record => new { record.ServiceIdHash, record.GrainHash });
+            entity.HasIndex(record => new { record.ServiceIdHash, record.GrainIdHash });
         });
     }
 

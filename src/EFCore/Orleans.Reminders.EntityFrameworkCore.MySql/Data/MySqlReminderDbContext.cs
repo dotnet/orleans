@@ -17,9 +17,12 @@ public class MySqlReminderDbContext : GuidReminderDbContext<MySqlReminderDbConte
 
         modelBuilder.Entity<ReminderRecord<Guid>>(entity =>
         {
-            entity.Property(record => record.ServiceId).UseCollation(IdentifierCollation);
-            entity.Property(record => record.GrainId).UseCollation(IdentifierCollation);
-            entity.Property(record => record.Name).UseCollation(IdentifierCollation);
+            entity.Property(record => record.ServiceIdHash).HasColumnType("binary(32)");
+            entity.Property(record => record.GrainIdHash).HasColumnType("binary(32)");
+            entity.Property(record => record.ReminderNameHash).HasColumnType("binary(32)");
+            entity.Property(record => record.ServiceId).HasColumnType("longtext").UseCollation(IdentifierCollation);
+            entity.Property(record => record.GrainId).HasColumnType("longtext").UseCollation(IdentifierCollation);
+            entity.Property(record => record.Name).HasColumnType("longtext").UseCollation(IdentifierCollation);
         });
     }
 }

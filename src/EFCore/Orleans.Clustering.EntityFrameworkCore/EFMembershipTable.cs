@@ -139,23 +139,29 @@ internal class EFMembershipTable<TDbContext, TETag> : IMembershipTable where TDb
         {
             await using var ctx = await this._dbContextFactory.CreateDbContextAsync().ConfigureAwait(false);
 
-            var record = await ctx.Silos.Include(s => s.Cluster).AsNoTracking()
-                .SingleOrDefaultAsync(s =>
-                    s.ClusterId == this._clusterId &&
+            var cluster = await ctx.Clusters.AsNoTracking()
+                .AsSingleQuery()
+                .Include(c => c.Silos.Where(s =>
                     s.Address == key.Endpoint.Address.ToString() &&
                     s.Port == key.Endpoint.Port &&
-                    s.Generation == key.Generation)
+                    s.Generation == key.Generation))
+                .SingleOrDefaultAsync(c => c.Id == this._clusterId)
                 .ConfigureAwait(false);
 
-            if (record is null)
+            if (cluster is null)
             {
-                throw new InvalidOperationException($"Silo '{key.ToParsableString()}' not found");
+                throw new InvalidOperationException($"Cluster '{this._clusterId}' not found");
             }
 
             var version = new TableVersion(
-                record.Cluster.Version,
-                this._etagConverter.FromDbETag(record.Cluster.ETag)
+                cluster.Version,
+                this._etagConverter.FromDbETag(cluster.ETag)
             );
+            var record = cluster.Silos.SingleOrDefault();
+            if (record is null)
+            {
+                return new MembershipTableData(version);
+            }
 
             var memEntries = new List<Tuple<MembershipEntry, string>> {Tuple.Create(ConvertRecord(record), this._etagConverter.FromDbETag(record.ETag))};
 
@@ -175,7 +181,7 @@ internal class EFMembershipTable<TDbContext, TETag> : IMembershipTable where TDb
         {
             await using var ctx = await this._dbContextFactory.CreateDbContextAsync().ConfigureAwait(false);
 
-            var clusterRecord = await ctx.Clusters.Include(s => s.Silos).AsNoTracking()
+            var clusterRecord = await ctx.Clusters.Include(s => s.Silos).AsNoTracking().AsSingleQuery()
                 .FirstOrDefaultAsync(s => s.Id == this._clusterId)
                 .ConfigureAwait(false);
 

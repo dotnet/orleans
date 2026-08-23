@@ -148,26 +148,30 @@ public sealed class GuidDbContextModelTests
         using var context = CreateContext(DatabaseProvider.PostgreSql, Feature.GrainDirectory);
         var activation = context.Model.FindEntityType(typeof(GrainActivationRecord<Guid>))!;
 
-        Assert.Equal(["ClusterId", "GrainId"], GetPropertyNames(activation.FindPrimaryKey()!.Properties));
+        Assert.Equal(["ClusterIdHash", "GrainIdHash"], GetPropertyNames(activation.FindPrimaryKey()!.Properties));
         AssertIndexSet(
             activation,
-            ["ClusterId", "SiloAddress"],
-            ["ClusterId", "GrainId", "ActivationId"]);
+            ["ClusterIdHash", "SiloAddressHash"]);
+        Assert.Equal(32, activation.FindProperty("ClusterIdHash")!.GetMaxLength());
+        Assert.Equal(32, activation.FindProperty("GrainIdHash")!.GetMaxLength());
+        Assert.Equal(32, activation.FindProperty("SiloAddressHash")!.GetMaxLength());
+        Assert.Null(activation.FindProperty("ClusterId")!.GetMaxLength());
+        Assert.Null(activation.FindProperty("GrainId")!.GetMaxLength());
     }
 
     [Theory]
-    [InlineData(DatabaseProvider.MySql, 191)]
-    [InlineData(DatabaseProvider.PostgreSql, 280)]
-    public void PersistenceModel_HasFourColumnKeyAndProviderSpecificLengths(
-        DatabaseProvider provider,
-        int expectedMaxLength)
+    [InlineData(DatabaseProvider.MySql)]
+    [InlineData(DatabaseProvider.PostgreSql)]
+    public void PersistenceModel_UsesHashKeyAndUnboundedIdentifiers(DatabaseProvider provider)
     {
         using var context = CreateContext(provider, Feature.Persistence);
         var state = context.Model.FindEntityType(typeof(GrainStateRecord<Guid>))!;
-        var keyNames = new[] { "ServiceId", "GrainType", "StateType", "GrainId" };
 
-        Assert.Equal(keyNames, GetPropertyNames(state.FindPrimaryKey()!.Properties));
-        Assert.All(keyNames, name => Assert.Equal(expectedMaxLength, state.FindProperty(name)!.GetMaxLength()));
+        Assert.Equal(["KeyHash"], GetPropertyNames(state.FindPrimaryKey()!.Properties));
+        Assert.Equal(32, state.FindProperty("KeyHash")!.GetMaxLength());
+        Assert.All(
+            new[] { "ServiceId", "GrainType", "StateType", "GrainId" },
+            name => Assert.Null(state.FindProperty(name)!.GetMaxLength()));
         Assert.True(state.FindProperty("Data")!.IsNullable);
     }
 
@@ -177,11 +181,19 @@ public sealed class GuidDbContextModelTests
         using var context = CreateContext(DatabaseProvider.PostgreSql, Feature.Reminders);
         var reminder = context.Model.FindEntityType(typeof(ReminderRecord<Guid>))!;
 
-        Assert.Equal(["ServiceId", "GrainId", "Name"], GetPropertyNames(reminder.FindPrimaryKey()!.Properties));
+        Assert.Equal(
+            ["ServiceIdHash", "GrainIdHash", "ReminderNameHash"],
+            GetPropertyNames(reminder.FindPrimaryKey()!.Properties));
         AssertIndexSet(
             reminder,
-            ["ServiceId", "GrainHash"],
-            ["ServiceId", "GrainId"]);
+            ["ServiceIdHash", "GrainHash"],
+            ["ServiceIdHash", "GrainIdHash"]);
+        Assert.Equal(32, reminder.FindProperty("ServiceIdHash")!.GetMaxLength());
+        Assert.Equal(32, reminder.FindProperty("GrainIdHash")!.GetMaxLength());
+        Assert.Equal(32, reminder.FindProperty("ReminderNameHash")!.GetMaxLength());
+        Assert.Null(reminder.FindProperty("ServiceId")!.GetMaxLength());
+        Assert.Null(reminder.FindProperty("GrainId")!.GetMaxLength());
+        Assert.Null(reminder.FindProperty("Name")!.GetMaxLength());
     }
 
     [Theory]

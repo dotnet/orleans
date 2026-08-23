@@ -17,10 +17,13 @@ public class MySqlGrainDirectoryDbContext : GuidGrainDirectoryDbContext<MySqlGra
 
         modelBuilder.Entity<GrainActivationRecord<Guid>>(entity =>
         {
-            entity.Property(record => record.ClusterId).UseCollation(IdentifierCollation);
-            entity.Property(record => record.GrainId).UseCollation(IdentifierCollation);
-            entity.Property(record => record.SiloAddress).UseCollation(IdentifierCollation);
-            entity.Property(record => record.ActivationId).UseCollation(IdentifierCollation);
+            entity.Property(record => record.ClusterIdHash).HasColumnType("binary(32)");
+            entity.Property(record => record.GrainIdHash).HasColumnType("binary(32)");
+            entity.Property(record => record.SiloAddressHash).HasColumnType("binary(32)");
+            entity.Property(record => record.ClusterId).HasColumnType("longtext").UseCollation(IdentifierCollation);
+            entity.Property(record => record.GrainId).HasColumnType("longtext").UseCollation(IdentifierCollation);
+            entity.Property(record => record.SiloAddress).HasColumnType("longtext").UseCollation(IdentifierCollation);
+            entity.Property(record => record.ActivationId).HasColumnType("longtext").UseCollation(IdentifierCollation);
         });
     }
 }

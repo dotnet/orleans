@@ -15,6 +15,9 @@ namespace Orleans.GrainDirectory.EntityFrameworkCore.PostgreSQL.Data.Migrations
                 name: "Activations",
                 columns: table => new
                 {
+                    ClusterIdHash = table.Column<byte[]>(type: "bytea", maxLength: 32, nullable: false),
+                    GrainIdHash = table.Column<byte[]>(type: "bytea", maxLength: 32, nullable: false),
+                    SiloAddressHash = table.Column<byte[]>(type: "bytea", maxLength: 32, nullable: false),
                     ClusterId = table.Column<string>(type: "text", nullable: false),
                     GrainId = table.Column<string>(type: "text", nullable: false),
                     SiloAddress = table.Column<string>(type: "text", nullable: false),
@@ -24,18 +27,16 @@ namespace Orleans.GrainDirectory.EntityFrameworkCore.PostgreSQL.Data.Migrations
                 },
                 constraints: table =>
                 {
-                    table.PrimaryKey("PK_Activations", x => new { x.ClusterId, x.GrainId });
+                    table.PrimaryKey("PK_Activations", x => new { x.ClusterIdHash, x.GrainIdHash });
+                    table.CheckConstraint("CK_Activations_ClusterIdHash_Length", "octet_length(\"ClusterIdHash\") = 32");
+                    table.CheckConstraint("CK_Activations_GrainIdHash_Length", "octet_length(\"GrainIdHash\") = 32");
+                    table.CheckConstraint("CK_Activations_SiloAddressHash_Length", "octet_length(\"SiloAddressHash\") = 32");
                 });
 
             migrationBuilder.CreateIndex(
-                name: "IX_Activations_ClusterId_GrainId_ActivationId",
+                name: "IX_Activations_ClusterIdHash_SiloAddressHash",
                 table: "Activations",
-                columns: new[] { "ClusterId", "GrainId", "ActivationId" });
-
-            migrationBuilder.CreateIndex(
-                name: "IX_Activations_ClusterId_SiloAddress",
-                table: "Activations",
-                columns: new[] { "ClusterId", "SiloAddress" });
+                columns: new[] { "ClusterIdHash", "SiloAddressHash" });
         }
 
         /// <inheritdoc />

@@ -27,13 +27,16 @@ BEGIN
     IF NOT EXISTS(SELECT 1 FROM `__EFMigrationsHistory` WHERE `MigrationId` = '20260811210051_InitialGrainDirectorySchema') THEN
 
     CREATE TABLE `Activations` (
-        `ClusterId` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin NOT NULL,
-        `GrainId` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin NOT NULL,
-        `SiloAddress` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin NOT NULL,
-        `ActivationId` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin NOT NULL,
+        `ClusterIdHash` binary(32) NOT NULL,
+        `GrainIdHash` binary(32) NOT NULL,
+        `SiloAddressHash` binary(32) NOT NULL,
+        `ClusterId` longtext CHARACTER SET utf8mb4 COLLATE utf8mb4_bin NOT NULL,
+        `GrainId` longtext CHARACTER SET utf8mb4 COLLATE utf8mb4_bin NOT NULL,
+        `SiloAddress` longtext CHARACTER SET utf8mb4 COLLATE utf8mb4_bin NOT NULL,
+        `ActivationId` longtext CHARACTER SET utf8mb4 COLLATE utf8mb4_bin NOT NULL,
         `MembershipVersion` bigint NOT NULL,
         `ETag` char(36) COLLATE ascii_general_ci NOT NULL,
-        CONSTRAINT `PK_Activations` PRIMARY KEY (`ClusterId`, `GrainId`)
+        CONSTRAINT `PK_Activations` PRIMARY KEY (`ClusterIdHash`, `GrainIdHash`)
     ) CHARACTER SET=utf8mb4;
 
     END IF;
@@ -48,21 +51,7 @@ CREATE PROCEDURE MigrationsScript()
 BEGIN
     IF NOT EXISTS(SELECT 1 FROM `__EFMigrationsHistory` WHERE `MigrationId` = '20260811210051_InitialGrainDirectorySchema') THEN
 
-    CREATE INDEX `IX_Activations_ClusterId_GrainId_ActivationId` ON `Activations` (`ClusterId`, `GrainId`, `ActivationId`);
-
-    END IF;
-END //
-DELIMITER ;
-CALL MigrationsScript();
-DROP PROCEDURE MigrationsScript;
-
-DROP PROCEDURE IF EXISTS MigrationsScript;
-DELIMITER //
-CREATE PROCEDURE MigrationsScript()
-BEGIN
-    IF NOT EXISTS(SELECT 1 FROM `__EFMigrationsHistory` WHERE `MigrationId` = '20260811210051_InitialGrainDirectorySchema') THEN
-
-    CREATE INDEX `IX_Activations_ClusterId_SiloAddress` ON `Activations` (`ClusterId`, `SiloAddress`);
+    CREATE INDEX `IX_Activations_ClusterIdHash_SiloAddressHash` ON `Activations` (`ClusterIdHash`, `SiloAddressHash`);
 
     END IF;
 END //

@@ -3,6 +3,7 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Metadata;
 
 namespace Orleans.GrainDirectory.EntityFrameworkCore.Data;
 
@@ -17,7 +18,10 @@ public abstract class GuidGrainDirectoryDbContext<TDbContext> : GrainDirectoryDb
     {
         modelBuilder.Entity<GrainActivationRecord<Guid>>(entity =>
         {
-            entity.HasKey(record => new { record.ClusterId, record.GrainId });
+            entity.HasKey(record => new { record.ClusterIdHash, record.GrainIdHash });
+            entity.Property(record => record.ClusterIdHash).HasMaxLength(32).IsRequired().UsePropertyAccessMode(PropertyAccessMode.Property);
+            entity.Property(record => record.GrainIdHash).HasMaxLength(32).IsRequired().UsePropertyAccessMode(PropertyAccessMode.Property);
+            entity.Property(record => record.SiloAddressHash).HasMaxLength(32).IsRequired().UsePropertyAccessMode(PropertyAccessMode.Property);
             entity.Property(record => record.ClusterId).IsRequired();
             entity.Property(record => record.GrainId).IsRequired();
             entity.Property(record => record.SiloAddress).IsRequired();
@@ -27,8 +31,7 @@ public abstract class GuidGrainDirectoryDbContext<TDbContext> : GrainDirectoryDb
                 .IsRequired()
                 .ValueGeneratedNever()
                 .IsConcurrencyToken();
-            entity.HasIndex(record => new { record.ClusterId, record.SiloAddress });
-            entity.HasIndex(record => new { record.ClusterId, record.GrainId, record.ActivationId });
+            entity.HasIndex(record => new { record.ClusterIdHash, record.SiloAddressHash });
         });
     }
 

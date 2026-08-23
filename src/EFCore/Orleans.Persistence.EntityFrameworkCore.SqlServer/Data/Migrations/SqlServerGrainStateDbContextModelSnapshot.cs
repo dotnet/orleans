@@ -23,25 +23,8 @@ namespace Orleans.Persistence.EntityFrameworkCore.SqlServer.Data.Migrations
 
             modelBuilder.Entity("Orleans.Persistence.EntityFrameworkCore.Data.GrainStateRecord<byte[]>", b =>
                 {
-                    b.Property<string>("ServiceId")
-                        .HasMaxLength(150)
-                        .HasColumnType("nvarchar(150)")
-                        .UseCollation("Latin1_General_100_BIN2");
-
-                    b.Property<string>("GrainType")
-                        .HasMaxLength(250)
-                        .HasColumnType("nvarchar(250)")
-                        .UseCollation("Latin1_General_100_BIN2");
-
-                    b.Property<string>("StateType")
-                        .HasMaxLength(150)
-                        .HasColumnType("nvarchar(150)")
-                        .UseCollation("Latin1_General_100_BIN2");
-
-                    b.Property<string>("GrainId")
-                        .HasMaxLength(299)
-                        .HasColumnType("nvarchar(299)")
-                        .UseCollation("Latin1_General_100_BIN2");
+                    b.Property<byte[]>("KeyHash")
+                        .HasColumnType("binary(32)");
 
                     b.Property<byte[]>("Data")
                         .HasColumnType("varbinary(max)");
@@ -52,10 +35,30 @@ namespace Orleans.Persistence.EntityFrameworkCore.SqlServer.Data.Migrations
                         .ValueGeneratedOnAddOrUpdate()
                         .HasColumnType("rowversion");
 
-                    b.HasKey("ServiceId", "GrainType", "StateType", "GrainId")
+                    b.Property<string>("GrainId")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)")
+                        .UseCollation("Latin1_General_100_BIN2");
+
+                    b.Property<string>("GrainType")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)")
+                        .UseCollation("Latin1_General_100_BIN2");
+
+                    b.Property<string>("ServiceId")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)")
+                        .UseCollation("Latin1_General_100_BIN2");
+
+                    b.Property<string>("StateType")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)")
+                        .UseCollation("Latin1_General_100_BIN2");
+
+                    b.HasKey("KeyHash")
                         .HasName("PK_GrainState");
 
-                    SqlServerKeyBuilderExtensions.IsClustered(b.HasKey("ServiceId", "GrainType", "StateType", "GrainId"), false);
+                    SqlServerKeyBuilderExtensions.IsClustered(b.HasKey("KeyHash"), false);
 
                     b.ToTable("GrainState");
                 });
