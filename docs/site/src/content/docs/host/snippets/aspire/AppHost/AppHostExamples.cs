@@ -103,6 +103,150 @@ public static class AppHostExamples
     }
     // </azure_storage_aspire>
 
+    // <azure_storage_providers_aspire>
+    public static void AzureStorageProvidersWithAspire(string[] args)
+    {
+        var builder = DistributedApplication.CreateBuilder(args);
+
+        var storage = builder.AddAzureStorage("orleans-storage")
+            .RunAsEmulator();
+        var tables = storage.AddTables("orleans-tables");
+        var blobs = storage.AddBlobs("orleans-blobs");
+
+        var orleans = builder.AddOrleans("cluster")
+            .WithClustering(tables)
+            .WithGrainStorage("table-state", tables)
+            .WithGrainStorage("blob-state", blobs)
+            .WithReminders(tables)
+            .WithGrainDirectory("directory", tables);
+
+        builder.AddProject<Projects.Silo>("silo")
+            .WithReference(orleans)
+            .WaitFor(storage);
+
+        builder.Build().Run();
+    }
+    // </azure_storage_providers_aspire>
+
+    // <cosmos_providers_aspire>
+    public static void CosmosProvidersWithAspire(string[] args)
+    {
+        var builder = DistributedApplication.CreateBuilder(args);
+
+        var cosmos = builder.AddAzureCosmosDB("orleans-cosmos")
+            .RunAsEmulator();
+        var database = cosmos.AddCosmosDatabase("orleans-db", "Orleans");
+        database.AddContainer("membership", "/ClusterId", "OrleansCluster");
+        database.AddContainer("state", "/PartitionKey", "OrleansStorage");
+        database.AddContainer("reminders", "/PartitionKey", "OrleansReminders");
+
+        var orleans = builder.AddOrleans("cluster")
+            .WithClustering(cosmos)
+            .WithGrainStorage("Default", cosmos)
+            .WithReminders(cosmos);
+
+        builder.AddProject<Projects.Silo>("silo")
+            .WithReference(orleans)
+            .WithEnvironment("Orleans__Clustering__DatabaseName", "Orleans")
+            .WithEnvironment("Orleans__Clustering__ContainerName", "OrleansCluster")
+            .WithEnvironment("Orleans__GrainStorage__Default__DatabaseName", "Orleans")
+            .WithEnvironment("Orleans__GrainStorage__Default__ContainerName", "OrleansStorage")
+            .WithEnvironment("Orleans__Reminders__DatabaseName", "Orleans")
+            .WithEnvironment("Orleans__Reminders__ContainerName", "OrleansReminders")
+            .WaitFor(cosmos);
+
+        builder.Build().Run();
+    }
+    // </cosmos_providers_aspire>
+
+    // <redis_providers_aspire>
+    public static void RedisProvidersWithAspire(string[] args)
+    {
+        var builder = DistributedApplication.CreateBuilder(args);
+
+        var redis = builder.AddAzureManagedRedis("orleans-redis")
+            .RunAsContainer();
+
+        var orleans = builder.AddOrleans("cluster")
+            .WithClustering(redis)
+            .WithGrainStorage("Default", redis)
+            .WithReminders(redis)
+            .WithGrainDirectory("directory", redis);
+
+        builder.AddProject<Projects.Silo>("silo")
+            .WithReference(orleans)
+            .WaitFor(redis);
+
+        builder.Build().Run();
+    }
+    // </redis_providers_aspire>
+
+    // <redis_journaling_aspire>
+    public static void RedisJournalingWithAspire(string[] args)
+    {
+        var builder = DistributedApplication.CreateBuilder(args);
+
+        var redis = builder.AddRedis("orleans-redis");
+        var orleans = builder.AddOrleans("cluster")
+            .WithClustering(redis);
+
+        builder.AddProject<Projects.Silo>("silo")
+            .WithReference(orleans)
+            .WithEnvironment("Orleans__GrainJournaling__ProviderType", "Redis")
+            .WithEnvironment("Orleans__GrainJournaling__ServiceKey", "orleans-redis")
+            .WaitFor(redis);
+
+        builder.Build().Run();
+    }
+    // </redis_journaling_aspire>
+
+    // <azure_table_journaling_aspire>
+    public static void AzureTableJournalingWithAspire(string[] args)
+    {
+        var builder = DistributedApplication.CreateBuilder(args);
+
+        var storage = builder.AddAzureStorage("orleans-storage")
+            .RunAsEmulator();
+        var tables = storage.AddTables("orleans-tables");
+        var orleans = builder.AddOrleans("cluster")
+            .WithClustering(tables);
+
+        builder.AddProject<Projects.Silo>("silo")
+            .WithReference(orleans)
+            .WithEnvironment("Orleans__GrainJournaling__ProviderType", "AzureTableStorage")
+            .WithEnvironment("Orleans__GrainJournaling__ServiceKey", "orleans-tables")
+            .WaitFor(storage);
+
+        builder.Build().Run();
+    }
+    // </azure_table_journaling_aspire>
+
+    // <event_hubs_aspire>
+    public static void EventHubsWithAspire(string[] args)
+    {
+        var builder = DistributedApplication.CreateBuilder(args);
+
+        var eventHubs = builder.AddAzureEventHubs("event-hubs");
+        var consumerGroup = eventHubs
+            .AddHub("orders-hub", "orders")
+            .AddConsumerGroup("orders-consumer", "orleans");
+        var storage = builder.AddAzureStorage("checkpoints");
+        var tables = storage.AddTables("checkpoint-tables");
+        var orleans = builder.AddOrleans("cluster")
+            .WithDevelopmentClustering()
+            .WithStreaming("orders", consumerGroup);
+
+        builder.AddProject<Projects.Silo>("silo")
+            .WithReference(orleans)
+            .WithReference(tables)
+            .WithEnvironment("Orleans__Streaming__orders__CheckpointerServiceKey", "checkpoint-tables")
+            .WaitFor(eventHubs)
+            .WaitFor(storage);
+
+        builder.Build().Run();
+    }
+    // </event_hubs_aspire>
+
     // <local_development>
     public static void LocalDevelopment(string[] args)
     {
