@@ -26,6 +26,7 @@ internal sealed class AdvancedReminderRecoveryGrain(
     [FromKeyedServices(DurableJobTimeProviderNames.DurableJobs)] TimeProvider? timeProvider = null) : Grain, IAdvancedReminderRecoveryGrain
 {
     private const int BatchSize = 32;
+    private const int JobIdCacheCapacity = 32;
     internal const int RecoveryPageSize = 256;
     private const int ScanBucketCount = 4_096;
     internal const int ScanBucketsPerReconciliation = 256;
@@ -68,6 +69,7 @@ internal sealed class AdvancedReminderRecoveryGrain(
     internal async Task ReconcileAsync(bool force, CancellationToken cancellationToken)
     {
         var tasks = new List<Task>(BatchSize);
+        var jobIdsByShard = new BoundedJobIdCache(JobIdCacheCapacity);
         var bucketsScanned = 0;
         while (bucketsScanned < ScanBucketsPerReconciliation)
         {
@@ -75,7 +77,6 @@ internal sealed class AdvancedReminderRecoveryGrain(
             var bucket = _nextScanBucket;
             var begin = bucket == 0 ? uint.MaxValue : (uint)((ulong)bucket * ScanBucketWidth - 1);
             var end = (uint)(((ulong)bucket + 1) * ScanBucketWidth - 1);
-            var jobIdsByShard = new Dictionary<string, HashSet<string>?>(StringComparer.Ordinal);
             var lookaheadEnd = _timeProvider.GetUtcNow().UtcDateTime.Add(_durableJobsOptions.ShardLoadLookaheadPeriod);
             string? continuationToken = null;
             do
@@ -98,10 +99,10 @@ internal sealed class AdvancedReminderRecoveryGrain(
                             continue;
                         }
 
-                        if (!jobIdsByShard.TryGetValue(entry.JobShardId, out var existingJobIds))
+                        if (!jobIdsByShard.TryGet(entry.JobShardId, out var existingJobIds))
                         {
                             existingJobIds = await _jobShardManager.GetJobIdsAsync(entry.JobShardId, cancellationToken);
-                            jobIdsByShard[entry.JobShardId] = existingJobIds;
+                            jobIdsByShard.Set(entry.JobShardId, existingJobIds);
                         }
 
                         if (existingJobIds is null || existingJobIds.Contains(entry.JobId))
@@ -135,6 +136,54 @@ internal sealed class AdvancedReminderRecoveryGrain(
         if (tasks.Count > 0)
         {
             await Task.WhenAll(tasks);
+        }
+    }
+
+    private sealed class BoundedJobIdCache(int capacity)
+    {
+        private readonly Dictionary<string, CacheEntry> _entries = new(StringComparer.Ordinal);
+        private readonly LinkedList<string> _recency = new();
+
+        public bool TryGet(string shardId, out HashSet<string>? jobIds)
+        {
+            if (!_entries.TryGetValue(shardId, out var entry))
+            {
+                jobIds = null;
+                return false;
+            }
+
+            _recency.Remove(entry.Node);
+            _recency.AddLast(entry.Node);
+            jobIds = entry.JobIds;
+            return true;
+        }
+
+        public void Set(string shardId, HashSet<string>? jobIds)
+        {
+            if (_entries.TryGetValue(shardId, out var existing))
+            {
+                existing.JobIds = jobIds;
+                _recency.Remove(existing.Node);
+                _recency.AddLast(existing.Node);
+                return;
+            }
+
+            if (_entries.Count == capacity)
+            {
+                var leastRecent = _recency.First!;
+                _recency.RemoveFirst();
+                _entries.Remove(leastRecent.Value);
+            }
+
+            var node = _recency.AddLast(shardId);
+            _entries.Add(shardId, new CacheEntry(node, jobIds));
+        }
+
+        private sealed class CacheEntry(LinkedListNode<string> node, HashSet<string>? jobIds)
+        {
+            public LinkedListNode<string> Node { get; } = node;
+
+            public HashSet<string>? JobIds { get; set; } = jobIds;
         }
     }
 

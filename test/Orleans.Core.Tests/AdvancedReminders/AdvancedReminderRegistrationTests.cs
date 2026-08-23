@@ -1390,6 +1390,53 @@ public class AdvancedReminderRecoveryGrainTests
     }
 
     [Fact]
+    public async Task ReconcileAsync_SharedShardAcrossHashBuckets_LoadsMembershipOnce()
+    {
+        var grainIds = Enumerable.Range(0, 100_000)
+            .Select(index => GrainId.Create("test", $"shared-shard-{index}"))
+            .GroupBy(grainId => grainId.GetUniformHashCode() >> 20)
+            .Take(2)
+            .Select(group => group.First())
+            .ToArray();
+        Assert.Equal(2, grainIds.Length);
+        var entries = grainIds.Select((grainId, index) => new ReminderEntry
+        {
+            GrainId = grainId,
+            ReminderName = $"shared-{index}",
+            StartAt = DateTime.UtcNow.AddMinutes(-1),
+            NextDueUtc = DateTime.UtcNow.AddMinutes(-1),
+            Period = TimeSpan.FromMinutes(1),
+            ScheduleId = $"schedule-{index}",
+            JobId = $"job-{index}",
+            JobShardId = "shared-shard",
+        }).ToArray();
+        var reminderTable = Substitute.For<Orleans.AdvancedReminders.IReminderTable>();
+        reminderTable.ReadRows(
+            Arg.Any<uint>(),
+            Arg.Any<uint>(),
+            AdvancedReminderRecoveryGrain.RecoveryPageSize,
+            Arg.Any<string?>()).Returns(call =>
+        {
+            var range = RangeFactory.CreateRange(call.ArgAt<uint>(0), call.ArgAt<uint>(1));
+            return new ReminderTableData(entries.Where(entry => range.InRange(entry.GrainId)));
+        });
+        var dispatcher = Substitute.For<IAdvancedReminderDispatcherGrain>();
+        var grainFactory = Substitute.For<IGrainFactory>();
+        grainFactory.GetGrain<IAdvancedReminderDispatcherGrain>(Arg.Any<string>(), null).Returns(dispatcher);
+        var shardManager = new RecoveryJobShardManager(entries.Select(entry => entry.JobId).ToArray());
+        var recovery = new AdvancedReminderRecoveryGrain(
+            reminderTable,
+            grainFactory,
+            NullLogger<AdvancedReminderRecoveryGrain>.Instance,
+            shardManager);
+
+        await recovery.ReconcileAsync(force: false, CancellationToken.None);
+
+        Assert.Equal(1, shardManager.GetJobIdsCallCount);
+        Assert.Empty(dispatcher.ReceivedCalls());
+    }
+
+    [Fact]
     public async Task ReconcileAsync_ReplacesPersistedHandleWhenJobIsAbsent()
     {
         var entry = new ReminderEntry
@@ -1416,7 +1463,7 @@ public class AdvancedReminderRecoveryGrainTests
             reminderTable,
             grainFactory,
             NullLogger<AdvancedReminderRecoveryGrain>.Instance,
-            new RecoveryJobShardManager(jobId: null));
+            new RecoveryJobShardManager());
 
         await recovery.ReconcileAsync(force: false, CancellationToken.None);
 
@@ -1454,7 +1501,7 @@ public class AdvancedReminderRecoveryGrainTests
             reminderTable,
             grainFactory,
             NullLogger<AdvancedReminderRecoveryGrain>.Instance,
-            new RecoveryJobShardManager(jobId: null),
+            new RecoveryJobShardManager(),
             Options.Create(new DurableJobsOptions { ShardLoadLookaheadPeriod = TimeSpan.FromHours(1) }),
             new FakeTimeProvider(now));
 
@@ -1586,8 +1633,12 @@ public class AdvancedReminderRecoveryGrainTests
         Assert.NotEqual(rangeReads[0].GetArguments()[0], rangeReads[AdvancedReminderRecoveryGrain.ScanBucketsPerReconciliation].GetArguments()[0]);
     }
 
-    private sealed class RecoveryJobShardManager(string? jobId) : JobShardManager(SiloAddress.Zero)
+    private sealed class RecoveryJobShardManager(params string[] jobIds) : JobShardManager(SiloAddress.Zero)
     {
+        private readonly HashSet<string> _jobIds = new(jobIds, StringComparer.Ordinal);
+
+        public int GetJobIdsCallCount { get; private set; }
+
         public override Task<List<IJobShard>> AssignJobShardsAsync(DateTimeOffset maxDueTime, int maxNewClaims, CancellationToken cancellationToken)
             => throw new NotSupportedException();
 
@@ -1602,7 +1653,10 @@ public class AdvancedReminderRecoveryGrainTests
             => throw new NotSupportedException();
 
         internal override ValueTask<HashSet<string>?> GetJobIdsAsync(string shardId, CancellationToken cancellationToken)
-            => new(jobId is null ? [] : [jobId]);
+        {
+            GetJobIdsCallCount++;
+            return new(new HashSet<string>(_jobIds, StringComparer.Ordinal));
+        }
     }
 }
 
