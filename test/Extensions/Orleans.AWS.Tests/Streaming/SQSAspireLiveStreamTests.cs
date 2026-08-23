@@ -1,3 +1,4 @@
+#if NET10_0
 using AWSUtils.Tests.StorageTests;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -11,6 +12,7 @@ using Xunit;
 
 namespace AWSUtils.Tests.Streaming;
 
+[Collection(SQSStreamProviderBuilderTestCollection.CollectionName)]
 [TestSuite("Functional")]
 [TestProvider("SQS")]
 [TestArea("Streaming")]
@@ -18,29 +20,38 @@ namespace AWSUtils.Tests.Streaming;
 public sealed class SQSAspireLiveStreamTests : TestClusterPerTest
 {
     private const string ProviderName = "AspireSQS";
+    private SqsAspireTestApp _app = null!;
+    private EnvironmentVariableScope _environment = null!;
     private SingleStreamTestRunner _runner = null!;
 
-    protected override void ConfigureTestCluster(TestClusterBuilder builder)
+    protected override void CheckPreconditionsOrThrow()
     {
         if (!AWSTestConstants.IsSqsAvailable)
         {
             throw Xunit.Sdk.SkipException.ForSkip("SQS connection string is not configured.");
         }
+    }
 
-        var configuration = new Dictionary<string, string?>
-        {
-            [$"Orleans:Streaming:{ProviderName}:ProviderType"] = "SQS",
-            [$"Orleans:Streaming:{ProviderName}:ServiceKey"] = "orleans-sqs",
-            [$"Orleans:Streaming:{ProviderName}:PartitionCount"] = "4",
-            [$"Orleans:Streaming:{ProviderName}:FifoQueue"] = "false",
-            ["ConnectionStrings:orleans-sqs"] = AWSTestConstants.SqsConnectionString,
-        };
-        builder.ConfigureHostConfiguration(config => config.AddInMemoryCollection(configuration));
+    protected override void ConfigureTestCluster(TestClusterBuilder builder)
+    {
+        builder.ConfigureHostConfiguration(configuration => configuration.AddEnvironmentVariables());
         builder.AddSiloBuilderConfigurator<SiloConfigurator>();
     }
 
     public override async ValueTask InitializeAsync()
     {
+        EnsurePreconditionsMet();
+        _app = await SqsAspireTestApp.CreateAsync(
+            ProviderName,
+            [
+                ("ServiceKey", "orleans-sqs"),
+                ("PartitionCount", "4"),
+                ("FifoQueue", "false"),
+            ],
+            [("ConnectionStrings:orleans-sqs", AWSTestConstants.SqsConnectionString)]);
+        _environment = await _app.CreateEnvironmentScopeAsync(
+            SqsAspireResourceRole.Silo,
+            streamingOnly: true);
         await base.InitializeAsync();
         _runner = new SingleStreamTestRunner(InternalClient, ProviderName);
     }
@@ -56,13 +67,27 @@ public sealed class SQSAspireLiveStreamTests : TestClusterPerTest
             return;
         }
 
-        var clusterId = HostedCluster.Options.ClusterId;
-        await base.DisposeAsync();
-        await SQSStreamProviderUtils.DeleteAllUsedQueues(
-            ProviderName,
-            clusterId,
-            AWSTestConstants.SqsConnectionString,
-            NullLoggerFactory.Instance);
+        try
+        {
+            if (HostedCluster is not null)
+            {
+                var clusterId = HostedCluster.Options.ClusterId;
+                await base.DisposeAsync();
+                await SQSStreamProviderUtils.DeleteAllUsedQueues(
+                    ProviderName,
+                    clusterId,
+                    AWSTestConstants.SqsConnectionString,
+                    NullLoggerFactory.Instance);
+            }
+        }
+        finally
+        {
+            _environment?.Dispose();
+            if (_app is not null)
+            {
+                await _app.DisposeAsync();
+            }
+        }
     }
 
     private sealed class SiloConfigurator : ISiloConfigurator
@@ -71,3 +96,4 @@ public sealed class SQSAspireLiveStreamTests : TestClusterPerTest
             => siloBuilder.AddMemoryGrainStorage("PubSubStore");
     }
 }
+#endif
