@@ -1,3 +1,4 @@
+using System.Globalization;
 using Amazon;
 using Aspire.Hosting;
 using Aspire.Hosting.ApplicationModel;
@@ -315,15 +316,18 @@ public static class AppHostExamples
             string configSectionPath)
             where T : IResourceWithEnvironment
         {
-            var environmentPrefix = configSectionPath.Replace(":", "__", StringComparison.Ordinal);
+            var environmentPrefix = $"Orleans__{configSectionPath.Replace(":", "__", StringComparison.Ordinal)}";
+            var region = aws.Region?.SystemName
+                ?? throw new InvalidOperationException("SQS streaming requires an AWS region.");
             resourceBuilder
                 .WithReference(aws)
                 .WithEnvironment($"{environmentPrefix}__ProviderType", "SQS")
-                .WithEnvironment($"{environmentPrefix}__PartitionCount", partitionCount.ToString())
-                .WithEnvironment($"{environmentPrefix}__CacheSize", cacheSize.ToString())
+                .WithEnvironment($"{environmentPrefix}__Region", region)
+                .WithEnvironment($"{environmentPrefix}__PartitionCount", partitionCount.ToString(CultureInfo.InvariantCulture))
+                .WithEnvironment($"{environmentPrefix}__CacheSize", cacheSize.ToString(CultureInfo.InvariantCulture))
                 .WithEnvironment($"{environmentPrefix}__FifoQueue", fifoQueue.ToString())
-                .WithEnvironment($"{environmentPrefix}__ReceiveWaitTimeSeconds", receiveWaitTimeSeconds.ToString())
-                .WithEnvironment($"{environmentPrefix}__VisibilityTimeoutSeconds", visibilityTimeoutSeconds.ToString());
+                .WithEnvironment($"{environmentPrefix}__ReceiveWaitTimeSeconds", receiveWaitTimeSeconds.ToString(CultureInfo.InvariantCulture))
+                .WithEnvironment($"{environmentPrefix}__VisibilityTimeoutSeconds", visibilityTimeoutSeconds.ToString(CultureInfo.InvariantCulture));
         }
     }
     // </sqs_provider_configuration>
