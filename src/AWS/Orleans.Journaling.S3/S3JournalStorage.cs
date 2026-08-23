@@ -434,7 +434,7 @@ internal sealed partial class S3JournalStorage : IJournalStorage
                     },
                     cancellationToken).ConfigureAwait(false);
             }
-            catch (AmazonS3Exception exception) when (exception.StatusCode is HttpStatusCode.NotFound)
+            catch (AmazonS3Exception exception) when (IsObjectNotFound(exception))
             {
                 SetWal(eTag: null, providerState: default, lastModified: null);
                 consumer.Complete(metadata: null);
@@ -1030,7 +1030,7 @@ internal sealed partial class S3JournalStorage : IJournalStorage
                 cancellationToken).ConfigureAwait(false);
             return true;
         }
-        catch (AmazonS3Exception exception) when (exception.StatusCode is HttpStatusCode.NotFound)
+        catch (AmazonS3Exception exception) when (IsObjectNotFound(exception))
         {
             return false;
         }
@@ -1200,7 +1200,7 @@ internal sealed partial class S3JournalStorage : IJournalStorage
                 },
                 cancellationToken).ConfigureAwait(false);
         }
-        catch (AmazonS3Exception exception) when (exception.StatusCode is HttpStatusCode.NotFound)
+        catch (AmazonS3Exception exception) when (IsObjectNotFound(exception))
         {
             return null;
         }
@@ -1426,8 +1426,13 @@ internal sealed partial class S3JournalStorage : IJournalStorage
     private static bool IsConditionalRequestConflict(AmazonS3Exception exception)
         => exception.StatusCode is HttpStatusCode.Conflict;
 
+    private static bool IsObjectNotFound(AmazonS3Exception exception)
+        => exception.StatusCode is HttpStatusCode.NotFound
+            && !string.Equals(exception.ErrorCode, "NoSuchBucket", StringComparison.Ordinal);
+
     private static bool IsWalMutationConflict(AmazonS3Exception exception)
-        => exception.StatusCode is HttpStatusCode.NotFound or HttpStatusCode.PreconditionFailed or HttpStatusCode.Conflict;
+        => IsObjectNotFound(exception)
+            || exception.StatusCode is HttpStatusCode.PreconditionFailed or HttpStatusCode.Conflict;
 
     private static InconsistentStateException CreateInconsistentWalStateException(string message, string? expectedETag, Exception? exception = null)
     {
