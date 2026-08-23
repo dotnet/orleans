@@ -2464,12 +2464,13 @@ internal sealed partial class ActivationData :
     private abstract class Command(CancellationTokenSource cts) : IDisposable
     {
         private bool _disposed;
+        private readonly object _lock = new();
         private readonly CancellationTokenSource _cts = cts;
         public CancellationToken CancellationToken => _cts.Token;
 
         public virtual void Cancel()
         {
-            lock (_cts)
+            lock (_lock)
             {
                 if (_disposed) return;
                 _cts.Cancel();
@@ -2480,7 +2481,7 @@ internal sealed partial class ActivationData :
         {
             try
             {
-                lock (_cts)
+                lock (_lock)
                 {
                     _disposed = true;
                     _cts.Dispose();
