@@ -2,6 +2,6 @@
   "description": "Generated API assemblies which are not currently published as standalone NuGet packages.",
   "packages": {
     "Microsoft.Orleans.Journaling.S3": "The new provider is awaiting its first NuGet publication.",
-    "System.Distributed.DurableTasks": "This experimental durable task model is unpublished pending formal .NET/BCL ownership review."
+    "Microsoft.Orleans.DurableTasks.Abstractions": "The new durable task abstractions package is awaiting its first NuGet publication."
   }
 }
