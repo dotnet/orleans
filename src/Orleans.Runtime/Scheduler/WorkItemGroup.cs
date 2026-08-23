@@ -115,8 +115,19 @@ internal sealed partial class WorkItemGroup : SynchronizationContext, IThreadPoo
 
         // Create a dummy task associated with our scheduler (never actually runs)
         // We set m_taskScheduler directly so TaskScheduler.Current returns our scheduler
-        _schedulerTask = new Task(() => { }, TaskCreationOptions.DenyChildAttach);
+        _schedulerTask = CreateSchedulerTask();
         GetTaskSchedulerRef(_schedulerTask) = TaskScheduler;
+    }
+
+    private static Task CreateSchedulerTask()
+    {
+        if (ExecutionContext.IsFlowSuppressed())
+        {
+            return new Task(static () => { }, TaskCreationOptions.DenyChildAttach);
+        }
+
+        using var suppressExecutionContext = ExecutionContext.SuppressFlow();
+        return new Task(static () => { }, TaskCreationOptions.DenyChildAttach);
     }
 
     /// <summary>
