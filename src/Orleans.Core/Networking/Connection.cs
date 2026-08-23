@@ -395,8 +395,8 @@ namespace Orleans.Runtime.Messaging
                     {
                         while (inflight.Count < inflight.Capacity && reader.TryRead(out message) && this.PrepareMessageForSend(message))
                         {
-                            inflight.Add(message);
                             var (headerLength, bodyLength) = serializer.Write(output, message);
+                            inflight.Add(message);
                             RecordMessageSend(message, headerLength + bodyLength, headerLength);
                             messageObserver?.Invoke(message);
                             message = null;

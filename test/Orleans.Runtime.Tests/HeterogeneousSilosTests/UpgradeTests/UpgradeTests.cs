@@ -38,6 +38,7 @@ namespace Tester.HeterogeneousSilosTests.UpgradeTests
     {
         protected override Type VersionSelectorStrategy => typeof(LatestVersion);
         protected override Type CompatibilityStrategy => typeof(BackwardCompatible);
+        protected override bool WaitForCancellationAcknowledgement => true;
 
         [Fact]
         public Task AlwaysCreateActivationWithLatestVersion()
@@ -158,6 +159,94 @@ namespace Tester.HeterogeneousSilosTests.UpgradeTests
 
             var exception = await Assert.ThrowsAsync<NotSupportedException>(() => caller.ProxyCallVersion2Method(target));
             Assert.Contains("undecoded request with unavailable invokable alias", exception.Message);
+        }
+
+        [Fact]
+        public async Task QueuedUndecodableRequestAcknowledgesCancellation()
+        {
+            await StartSiloV1();
+
+            var target = Client.GetGrain<IVersionUpgradeTestGrain>(0);
+            Assert.Equal(1, await target.GetVersion());
+
+            await StartSiloV2();
+
+            var caller = Client.GetGrain<IVersionUpgradeTestGrain>(1);
+            Assert.Equal(2, await caller.GetVersion());
+
+            var resolver = Client.ServiceProvider.GetRequiredService<GrainInterfaceTypeResolver>();
+            var interfaceType = resolver.GetGrainInterfaceType(typeof(IVersionUpgradeTestGrain));
+            await ManagementGrain.SetCompatibilityStrategy(interfaceType, AllVersionsCompatible.Singleton);
+
+            var targetBarrier = new UpgradeBarrier();
+            var targetObserver = Client.CreateObjectReference<IVersionUpgradeTestObserver>(targetBarrier);
+            var callerBarrier = new UpgradeBarrier();
+            var callerObserver = Client.CreateObjectReference<IVersionUpgradeTestObserver>(callerBarrier);
+            using var cancellation = new CancellationTokenSource();
+            try
+            {
+                var blockingCall = target.WaitForRelease(targetObserver);
+                await targetBarrier.Entered.WaitAsync(TimeSpan.FromSeconds(30));
+
+                var call = caller.ProxyCallCancellableVersion2MethodAfterBarrier(target, callerObserver, cancellation.Token);
+                await callerBarrier.Entered.WaitAsync(TimeSpan.FromSeconds(30));
+
+                cancellation.Cancel();
+                callerBarrier.Release();
+
+                await Assert.ThrowsAnyAsync<OperationCanceledException>(
+                    () => call.WaitAsync(TimeSpan.FromSeconds(30)));
+
+                targetBarrier.Release();
+                await blockingCall.WaitAsync(TimeSpan.FromSeconds(30));
+            }
+            finally
+            {
+                callerBarrier.Release();
+                targetBarrier.Release();
+                Client.DeleteObjectReference<IVersionUpgradeTestObserver>(callerObserver);
+                Client.DeleteObjectReference<IVersionUpgradeTestObserver>(targetObserver);
+            }
+        }
+
+        [Fact]
+        public async Task IncompatibleOldSiloForwardsVersion2OneWayRequest()
+        {
+            await StartSiloV1();
+
+            var target = Client.GetGrain<IVersionUpgradeTestGrain>(0);
+            Assert.Equal(1, await target.GetVersion());
+
+            await StartSiloV2();
+
+            var caller = Client.GetGrain<IVersionUpgradeTestGrain>(1);
+            Assert.Equal(2, await caller.GetVersion());
+
+            var resolver = Client.ServiceProvider.GetRequiredService<GrainInterfaceTypeResolver>();
+            var interfaceType = resolver.GetGrainInterfaceType(typeof(IVersionUpgradeTestGrain));
+
+            var callerBarrier = new UpgradeBarrier();
+            var callerObserver = Client.CreateObjectReference<IVersionUpgradeTestObserver>(callerBarrier);
+            var deliveryBarrier = new UpgradeBarrier();
+            var deliveryObserver = Client.CreateObjectReference<IVersionUpgradeTestObserver>(deliveryBarrier);
+            try
+            {
+                var call = caller.ProxyCallVersion2OneWayMethodAfterBarrier(target, callerObserver, deliveryObserver);
+                await callerBarrier.Entered.WaitAsync(TimeSpan.FromSeconds(30));
+
+                await ManagementGrain.SetCompatibilityStrategy(interfaceType, StrictVersionCompatible.Singleton);
+                callerBarrier.Release();
+
+                await call.WaitAsync(TimeSpan.FromSeconds(30));
+                await deliveryBarrier.Entered.WaitAsync(TimeSpan.FromSeconds(30));
+            }
+            finally
+            {
+                callerBarrier.Release();
+                deliveryBarrier.Release();
+                Client.DeleteObjectReference<IVersionUpgradeTestObserver>(deliveryObserver);
+                Client.DeleteObjectReference<IVersionUpgradeTestObserver>(callerObserver);
+            }
         }
 
         private sealed class UpgradeBarrier : IVersionUpgradeTestObserver
