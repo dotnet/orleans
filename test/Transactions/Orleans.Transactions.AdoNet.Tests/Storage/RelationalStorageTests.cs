@@ -1,6 +1,7 @@
 // Copyright (c) Microsoft Corporation. All rights reserved.
 // Licensed under the MIT License.
 
+using System.Data;
 using System.Data.Common;
 using System.Runtime.CompilerServices;
 using Orleans.Storage;
@@ -89,6 +90,23 @@ public sealed class RelationalStorageTests
             providerException));
     }
 
+    [Fact]
+    public async Task RollbackFailure_PreservesOriginalDatabaseFailure()
+    {
+        var originalException = new NumberedDbException(1205);
+        var rollbackException = new InvalidOperationException("Transaction was already rolled back.");
+        var transaction = new FailingRollbackTransaction(rollbackException);
+
+        await RelationalStorage.RollbackPreservingOriginalExceptionAsync(
+            transaction,
+            originalException,
+            CancellationToken.None);
+
+        Assert.Same(
+            rollbackException,
+            originalException.Data[RelationalStorage.RollbackExceptionDataKey]);
+    }
+
     private sealed class NumberedDbException(int number) : DbException("Provider failure")
     {
         public int Number { get; } = number;
@@ -97,5 +115,19 @@ public sealed class RelationalStorageTests
     private sealed class SqlStateDbException(string sqlState) : DbException("Provider failure")
     {
         public override string? SqlState { get; } = sqlState;
+    }
+
+    private sealed class FailingRollbackTransaction(Exception exception) : DbTransaction
+    {
+        public override IsolationLevel IsolationLevel => IsolationLevel.ReadCommitted;
+
+        protected override DbConnection? DbConnection => null;
+
+        public override void Commit() => throw new NotSupportedException();
+
+        public override void Rollback() => throw exception;
+
+        public override Task RollbackAsync(CancellationToken cancellationToken = default) =>
+            Task.FromException(exception);
     }
 }
