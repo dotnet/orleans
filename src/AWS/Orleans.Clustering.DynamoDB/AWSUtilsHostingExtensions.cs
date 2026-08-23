@@ -2,6 +2,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Orleans.Clustering.DynamoDB;
 using Orleans.Configuration;
 using Orleans.Messaging;
+using Orleans.Runtime;
 using System;
 using Microsoft.Extensions.Options;
 
@@ -36,6 +37,10 @@ namespace Orleans.Hosting
                         services.Configure(configureOptions);
                     }
 
+                    services.AddTransient<IConfigurationValidator>(sp =>
+                        new DynamoDBClusteringOptionsValidator(
+                            sp.GetRequiredService<IOptions<DynamoDBClusteringOptions>>().Value));
+                    services.ConfigureFormatter<DynamoDBClusteringOptions>();
                     services.AddSingleton<IMembershipTable, DynamoDBMembershipTable>();
                 });
         }
@@ -60,6 +65,10 @@ namespace Orleans.Hosting
                 services =>
                 {
                     configureOptions?.Invoke(services.AddOptions<DynamoDBClusteringOptions>());
+                    services.AddTransient<IConfigurationValidator>(sp =>
+                        new DynamoDBClusteringOptionsValidator(
+                            sp.GetRequiredService<IOptions<DynamoDBClusteringOptions>>().Value));
+                    services.ConfigureFormatter<DynamoDBClusteringOptions>();
                     services.AddSingleton<IMembershipTable, DynamoDBMembershipTable>();
                 });
         }
@@ -88,6 +97,10 @@ namespace Orleans.Hosting
                         services.Configure(configureOptions);
                     }
 
+                    services.AddTransient<IConfigurationValidator>(sp =>
+                        new DynamoDBGatewayOptionsValidator(
+                            sp.GetRequiredService<IOptions<DynamoDBGatewayOptions>>().Value));
+                    services.ConfigureFormatter<DynamoDBGatewayOptions>();
                     services.AddSingleton<IGatewayListProvider, DynamoDBGatewayListProvider>();
                 });
         }
@@ -112,6 +125,10 @@ namespace Orleans.Hosting
                 services =>
                 {
                     configureOptions?.Invoke(services.AddOptions<DynamoDBGatewayOptions>());
+                    services.AddTransient<IConfigurationValidator>(sp =>
+                        new DynamoDBGatewayOptionsValidator(
+                            sp.GetRequiredService<IOptions<DynamoDBGatewayOptions>>().Value));
+                    services.ConfigureFormatter<DynamoDBGatewayOptions>();
                     services.AddSingleton<IGatewayListProvider, DynamoDBGatewayListProvider>();
                 });
         }

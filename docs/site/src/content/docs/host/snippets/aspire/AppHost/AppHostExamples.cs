@@ -1,5 +1,7 @@
 using Aspire.Hosting;
+using Aspire.Hosting.ApplicationModel;
 using Aspire.Hosting.Azure;
+using Aspire.Hosting.Orleans;
 
 namespace Orleans.Docs.Snippets.Aspire;
 
@@ -247,6 +249,43 @@ public static class AppHostExamples
     }
     // </event_hubs_aspire>
 
+    // <dynamodb_local_aspire>
+    public static void DynamoDBLocalWithAspire(string[] args)
+    {
+        var builder = DistributedApplication.CreateBuilder(args);
+
+        var dynamodb = builder.AddAWSDynamoDBLocal("dynamodb");
+        var provider = new DynamoDBProviderConfiguration(dynamodb.Resource.Name);
+        var orleans = builder.AddOrleans("cluster")
+            .WithClusterId("orders")
+            .WithServiceId("orders")
+            .WithClustering(provider)
+            .WithGrainStorage("Default", provider)
+            .WithReminders(provider);
+
+        builder.AddProject<Projects.Silo>("silo")
+            .WithReference(orleans)
+            .WithReference(dynamodb)
+            .WaitFor(dynamodb);
+
+        builder.Build().Run();
+    }
+
+    private sealed class DynamoDBProviderConfiguration(string serviceKey) : IProviderConfiguration
+    {
+        public void ConfigureResource<T>(
+            IResourceBuilder<T> resourceBuilder,
+            string configSectionPath)
+            where T : IResourceWithEnvironment
+        {
+            var prefix = $"Orleans__{configSectionPath.Replace(":", "__", StringComparison.Ordinal)}";
+            resourceBuilder
+                .WithEnvironment($"{prefix}__ProviderType", "DynamoDB")
+                .WithEnvironment($"{prefix}__ServiceKey", serviceKey);
+        }
+    }
+    // </dynamodb_local_aspire>
+
     // <local_development>
     public static void LocalDevelopment(string[] args)
     {
@@ -407,4 +446,5 @@ public static class AppHostExamples
         builder.Build().Run();
     }
     // </explicit_cluster_ids>
+
 }

@@ -5,6 +5,7 @@ using Microsoft.Extensions.Options;
 using Orleans;
 using Orleans.Configuration;
 using Orleans.Hosting;
+using Orleans.Persistence.DynamoDB;
 using Orleans.Providers;
 using Orleans.Storage;
 
@@ -20,44 +21,18 @@ internal sealed class DynamoDBGrainStorageProviderBuilder : IProviderBuilder<ISi
             name!,
             (OptionsBuilder<DynamoDBStorageOptions> optionsBuilder) => optionsBuilder.Configure<IServiceProvider>((options, services) =>
             {
-                var accessKey = configurationSection[nameof(options.AccessKey)];
-                if (!string.IsNullOrEmpty(accessKey))
-                {
-                    options.AccessKey = accessKey;
-                }
+                var configuration = services.GetRequiredService<IConfiguration>();
+                var providerConfiguration = DynamoDBProviderConfiguration.Create(configurationSection, configuration);
+                providerConfiguration.ConfigureClientOptions(options);
 
-                var secretKey = configurationSection[nameof(options.SecretKey)];
-                if (!string.IsNullOrEmpty(secretKey))
-                {
-                    options.SecretKey = secretKey;
-                }
-
-                var region = configurationSection[nameof(options.Service)] ?? configurationSection["Region"];
-                if (!string.IsNullOrEmpty(region))
-                {
-                    options.Service = region;
-                }
-
-                var token = configurationSection[nameof(options.Token)];
-                if (!string.IsNullOrEmpty(token))
-                {
-                    options.Token = token;
-                }
-
-                var profileName = configurationSection[nameof(options.ProfileName)];
-                if (!string.IsNullOrEmpty(profileName))
-                {
-                    options.ProfileName = profileName;
-                }
-
-                var serviceId = configurationSection[nameof(options.ServiceId)];
-                if (!string.IsNullOrEmpty(serviceId))
+                var serviceId = providerConfiguration.GetValue(nameof(options.ServiceId));
+                if (serviceId is not null)
                 {
                     options.ServiceId = serviceId;
                 }
 
-                var tableName = configurationSection[nameof(options.TableName)];
-                if (!string.IsNullOrEmpty(tableName))
+                var tableName = providerConfiguration.GetValue(nameof(options.TableName));
+                if (tableName is not null)
                 {
                     options.TableName = tableName;
                 }

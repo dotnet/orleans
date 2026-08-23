@@ -10,8 +10,11 @@
     <PackageReference Include="Microsoft.Orleans.Server" Version="10.2.2" />
     <PackageReference Include="Microsoft.Orleans.Clustering.Redis" Version="10.2.2" />
     <PackageReference Include="Microsoft.Orleans.Clustering.AzureStorage" Version="10.2.2" />
+    <PackageReference Include="Microsoft.Orleans.Clustering.DynamoDB" Version="10.2.2" />
     <PackageReference Include="Microsoft.Orleans.Persistence.AzureStorage" Version="10.2.2" />
+    <PackageReference Include="Microsoft.Orleans.Persistence.DynamoDB" Version="10.2.2" />
     <PackageReference Include="Microsoft.Orleans.Reminders.AzureStorage" Version="10.2.2" />
+    <PackageReference Include="Microsoft.Orleans.Reminders.DynamoDB" Version="10.2.2" />
     <PackageReference Include="Aspire.Azure.Storage.Blobs" Version="13.4.6" />
     <PackageReference Include="Aspire.StackExchange.Redis" Version="13.4.6" />
   </ItemGroup>
