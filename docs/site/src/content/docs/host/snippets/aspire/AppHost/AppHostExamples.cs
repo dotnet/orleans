@@ -624,4 +624,5 @@ public static class AppHostExamples
                 .WithReference(database);
         }
     }
+
 }
