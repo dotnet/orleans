@@ -186,12 +186,11 @@ internal sealed partial class ThreadPoolStallDetector : IDisposable
                     AddStall(new(_nextExpectedTimestamp, timestamp));
                 }
 
-                if (timestamp >= _nextExpectedTimestamp)
-                {
-                    var elapsedPeriods = (timestamp - _nextExpectedTimestamp) / _detectionPeriodTimestampLength + 1;
-                    _nextExpectedTimestamp = checked(
-                        _nextExpectedTimestamp + elapsedPeriods * _detectionPeriodTimestampLength);
-                }
+                var elapsedPeriods = Math.Max(
+                    1,
+                    (timestamp - _nextExpectedTimestamp) / _detectionPeriodTimestampLength + 1);
+                _nextExpectedTimestamp = checked(
+                    _nextExpectedTimestamp + elapsedPeriods * _detectionPeriodTimestampLength);
 
                 _lastSampleTimestamp = timestamp;
                 RemoveExpired(timestamp);

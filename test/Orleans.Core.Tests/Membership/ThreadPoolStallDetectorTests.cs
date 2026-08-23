@@ -140,6 +140,26 @@ public sealed class ThreadPoolStallDetectorTests
     }
 
     [Fact]
+    public async Task TimerCallback_EarlyExecutionAdvancesExpectedCadence()
+    {
+        var timeProvider = new ManualTimerTimeProvider(Start);
+        using var detector = CreateDetector(timeProvider);
+        var startTimestamp = timeProvider.GetTimestamp();
+        timeProvider.Advance(TimeSpan.FromMilliseconds(99));
+        timeProvider.FireTimer();
+        timeProvider.Advance(DetectionPeriod);
+        timeProvider.FireTimer();
+        var endTimestamp = timeProvider.GetTimestamp();
+
+        var duration = await detector.GetStallDurationAsync(
+            startTimestamp,
+            endTimestamp,
+            CancellationToken.None);
+
+        Assert.Equal(TimeSpan.Zero, duration);
+    }
+
+    [Fact]
     public void GetMaximumStallDuration_ReturnsFullOverlappingStall()
     {
         var timeProvider = new ManualTimerTimeProvider(Start);

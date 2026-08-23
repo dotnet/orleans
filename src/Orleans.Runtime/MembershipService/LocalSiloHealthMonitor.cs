@@ -27,7 +27,7 @@ namespace Orleans.Runtime.MembershipService
         MembershipStatus,
         SiloSuspected,
         HealthCheckParticipant,
-        ThreadPoolQueueDelay,
+        ThreadPoolStall,
         ProbeRequests,
         ProbeResponses,
         GarbageCollectionPause,
@@ -407,8 +407,8 @@ namespace Orleans.Runtime.MembershipService
 
             events.Add(new(
                 timestamp,
-                LocalSiloHealthCheckKind.ThreadPoolQueueDelay,
-                GetCategory(LocalSiloHealthCheckKind.ThreadPoolQueueDelay),
+                LocalSiloHealthCheckKind.ThreadPoolStall,
+                GetCategory(LocalSiloHealthCheckKind.ThreadPoolStall),
                 Source: null,
                 score,
                 complaint,
@@ -651,7 +651,7 @@ namespace Orleans.Runtime.MembershipService
                     continue;
                 }
 
-                if (healthEvent.Kind == LocalSiloHealthCheckKind.ThreadPoolQueueDelay)
+                if (healthEvent.Kind == LocalSiloHealthCheckKind.ThreadPoolStall)
                 {
                     LogThreadPoolStall(healthEvent.LogLevel, healthEvent.Duration?.TotalSeconds ?? 0);
                 }

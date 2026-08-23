@@ -367,7 +367,7 @@ namespace NonSilo.Tests.Membership
             Assert.Equal(TimeSpan.FromSeconds(2), healthEvent.Duration);
             var stallEvent = Assert.Single(
                 status.Events,
-                item => item.Kind == LocalSiloHealthCheckKind.ThreadPoolQueueDelay);
+                item => item.Kind == LocalSiloHealthCheckKind.ThreadPoolStall);
             Assert.Equal(2, stallEvent.Score);
             Assert.Equal(TimeSpan.FromMilliseconds(2900), stallEvent.Duration);
         }
@@ -571,14 +571,14 @@ namespace NonSilo.Tests.Membership
         }
 
         [Fact]
-        public void GetLocalHealthStatus_EmitsTypedThreadPoolQueueDelayEvent()
+        public void GetLocalHealthStatus_EmitsTypedThreadPoolStallEvent()
         {
             var monitor = CreateMonitor();
 
             var status = monitor.GetLocalHealthStatus(TimeSpan.Zero, LocalSiloHealthCheckCategory.Local);
             var threadPoolEvent = Assert.Single(
                 status.Events,
-                item => item.Kind == LocalSiloHealthCheckKind.ThreadPoolQueueDelay);
+                item => item.Kind == LocalSiloHealthCheckKind.ThreadPoolStall);
 
             Assert.Equal(_startTimestamp, threadPoolEvent.Timestamp);
             Assert.Equal(LocalSiloHealthCheckCategory.Local, threadPoolEvent.Category);
