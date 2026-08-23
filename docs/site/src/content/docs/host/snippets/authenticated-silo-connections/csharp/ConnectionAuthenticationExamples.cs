@@ -51,7 +51,7 @@ internal static class ConnectionAuthenticationExamples
                     options,
                     credential,
                     options.Entra.AllowedSiloCallerClientIds,
-                    "Orleans.Silo.Connect");
+                    options.Entra.SiloClusterRole);
             });
         // </AuthenticatedSiloConnections>
 
@@ -69,7 +69,7 @@ internal static class ConnectionAuthenticationExamples
                     options,
                     credential,
                     options.Entra.AllowedClientCallerClientIds,
-                    "Orleans.Client.Connect");
+                    options.Entra.ClientClusterRole);
             });
         // </AuthenticatedClientGateway>
     }
@@ -92,7 +92,7 @@ internal static class ConnectionAuthenticationExamples
                     options,
                     credential,
                     options.Entra.AllowedClientCallerClientIds,
-                    "Orleans.Client.Connect");
+                    options.Entra.ClientClusterRole);
             });
         // </AuthenticatedClient>
     }
@@ -144,24 +144,23 @@ internal static class ConnectionAuthenticationExamples
         authentication.MaxPendingOutboundAuthentications = 256;
         authentication.MinimumRemainingTokenLifetime = TimeSpan.FromMinutes(2);
 
+        // <EntraAuthenticationOptions>
         authentication.UseEntra(
             credential,
             entra =>
             {
                 entra.Authority = options.Entra.Authority;
-                entra.TokenScope = $"{options.Entra.Audience}/.default";
-                entra.ValidAudiences.Add(options.Entra.Audience);
+                entra.TokenScope = options.Entra.TokenScope;
+                entra.ResourceApplicationId = options.Entra.ResourceApplicationId;
                 entra.ValidTenantIds.Add(options.Entra.TenantId);
-                entra.ClusterAudienceFormat =
-                    $"api://{options.Entra.ResourceApplicationId}/{{0}}";
+                entra.ClusterRole = requiredRole;
 
                 foreach (var clientId in allowedCallerClientIds)
                 {
                     entra.AllowedClientIds.Add(clientId);
                 }
-
-                entra.RequiredRoles.Add(requiredRole);
             });
+        // </EntraAuthenticationOptions>
     }
 }
 
@@ -181,17 +180,27 @@ internal sealed class CertificateOptions
 
 internal sealed class EntraOptions
 {
-    public string TenantId { get; init; } = "";
+    public string TenantId { get; init; } = "22222222-2222-2222-2222-222222222222";
 
-    public string ResourceApplicationId { get; init; } = "";
+    public string TokenScope { get; init; }
+        = "api://11111111-1111-1111-1111-111111111111/contoso-prod-westus";
 
-    public string WorkloadClientId { get; init; } = "";
+    public string ResourceApplicationId { get; init; }
+        = "11111111-1111-1111-1111-111111111111";
 
-    public string FederatedTokenFile { get; init; } = "";
+    public string SiloClusterRole { get; init; }
+        = "Orleans.Silo.Connect.contoso-prod-westus";
 
-    public string Audience { get; init; } = "";
+    public string ClientClusterRole { get; init; }
+        = "Orleans.Client.Connect.contoso-prod-westus";
 
-    public Uri Authority { get; init; } = null!;
+    public string WorkloadClientId { get; init; }
+        = "33333333-3333-3333-3333-333333333333";
+
+    public string FederatedTokenFile { get; init; } = "<federated-token-file>";
+
+    public Uri Authority { get; init; }
+        = new("https://login.microsoftonline.com/22222222-2222-2222-2222-222222222222/v2.0");
 
     public string[] AllowedSiloCallerClientIds { get; init; } = [];
 

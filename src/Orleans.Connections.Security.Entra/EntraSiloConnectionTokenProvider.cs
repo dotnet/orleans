@@ -7,7 +7,7 @@ namespace Orleans.Connections.Security.Entra;
 
 internal sealed class EntraSiloConnectionTokenProvider : ISiloConnectionTokenProvider
 {
-    private readonly EntraTokenProvider _provider;
+    private readonly IEntraTokenProvider _provider;
 
     public EntraSiloConnectionTokenProvider(
         Azure.Core.TokenCredential credential,
@@ -17,11 +17,17 @@ internal sealed class EntraSiloConnectionTokenProvider : ISiloConnectionTokenPro
         _provider = new EntraTokenProvider(credential, options, timeProvider);
     }
 
+    internal EntraSiloConnectionTokenProvider(IEntraTokenProvider provider)
+    {
+        ArgumentNullException.ThrowIfNull(provider);
+        _provider = provider;
+    }
+
     public async ValueTask<SiloConnectionToken> GetTokenAsync(
         SiloConnectionTokenRequestContext context,
         CancellationToken cancellationToken)
     {
-        var token = await _provider.GetTokenAsync(cancellationToken).ConfigureAwait(false);
+        var token = await _provider.GetTokenAsync(context, cancellationToken).ConfigureAwait(false);
         return new SiloConnectionToken(token.Token, token.ExpiresOn);
     }
 }

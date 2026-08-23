@@ -8,7 +8,6 @@ namespace Orleans.Connections.Security;
 internal enum AuthenticationResultCategory
 {
     Authenticated,
-    AcceptedUnauthenticated,
     BaselineFallback,
     Rejected,
     Overload,
@@ -93,7 +92,6 @@ internal static partial class SiloConnectionAuthenticationTelemetry
     public static string GetResultName(AuthenticationResultCategory result) => result switch
     {
         AuthenticationResultCategory.Authenticated => "authenticated",
-        AuthenticationResultCategory.AcceptedUnauthenticated => "accepted_unauthenticated",
         AuthenticationResultCategory.BaselineFallback => "baseline_fallback",
         AuthenticationResultCategory.Rejected => "rejected",
         AuthenticationResultCategory.Overload => "overload",

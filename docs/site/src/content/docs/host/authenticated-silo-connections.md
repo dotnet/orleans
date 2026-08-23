@@ -1,7 +1,7 @@
 ---
 title: Authenticate Orleans connections
 description: Authenticate silo and external client connections with TLS and Microsoft Entra workload identities.
-ms.date: 08/07/2026
+ms.date: 08/23/2026
 ms.topic: how-to
 ---
 
@@ -27,8 +27,8 @@ single trust decision.
 
 | Component or path | Trust requirement | Recommended controls |
 |---|---|---|
-| Silo-to-silo connection | Every admitted silo is trusted as part of this cluster | Private network policy, TLS or mTLS, `Orleans.Silo.Connect`, cluster-specific audience, silo caller allowlist |
-| External client-to-gateway connection | Every admitted client is trusted to access the Orleans cluster | Private network policy, server-authenticated TLS or mTLS, `Orleans.Client.Connect`, client caller allowlist |
+| Silo-to-silo connection | Every admitted silo is trusted as part of this cluster | Private network policy, TLS or mTLS, resource-application GUID audience, exact cluster-specific silo role, silo caller allowlist |
+| External client-to-gateway connection | Every admitted client is trusted to access the Orleans cluster | Private network policy, server-authenticated TLS or mTLS, resource-application GUID audience, exact cluster-specific client role, client caller allowlist |
 | Public user traffic | End users and arbitrary upstream callers aren't inside the Orleans trust boundary | Authenticate and authorize at application ingress; don't expose an Orleans port as public ingress |
 | Membership, storage, reminders, and streams | Configured providers and the data they return are trusted cluster infrastructure | Provider-native TLS, workload identity, least-privilege data-plane permissions, and administrative access controls |
 
@@ -61,8 +61,8 @@ items:
 - `ServiceId` and environment-specific `ClusterId`.
 - Silo and gateway DNS names, ports, and permitted network sources.
 - Certificate issuers, SANs, EKUs, trust stores, and revocation endpoints.
-- Entra tenant, resource application, exact audience, roles, and caller
-  application IDs.
+- Entra tenant, cluster-qualified token request scope, resource application
+  client-ID GUID, exact cluster roles, and caller application IDs.
 - Credential and certificate rotation owners, alert thresholds, and emergency
   revocation procedure.
 
@@ -96,25 +96,29 @@ reduce the remaining risk.
 
 ## Provision Entra authorization
 
-Audience validation alone isn't caller authorization. Configure all of the
-following:
+Audience validation alone isn't caller authorization. Keep these three values
+separate:
 
-1. A tenant-specific authority.
-2. A dedicated audience for one cluster and deployment environment, such as
-   `api://<resource-application-id>/contoso-prod-westus`.
-3. A path-specific application role, such as `Orleans.Silo.Connect` or
-   `Orleans.Client.Connect`.
-4. A separate explicit caller application-ID allowlist for silos and external
-   clients.
+| Token request scope | Entra v2 JWT audience | Exact cluster authorization |
+|---|---|---|
+| Register a cluster-qualified resource identifier such as `api://<resource-application-client-id-guid>/contoso-prod-westus`. Set it as `TokenScope` without `/.default`; Orleans appends that suffix only when acquiring a token. | Set `ResourceApplicationId` to the resource application's client-ID GUID. Microsoft Entra emits this GUID as `aud` in a v2 access token. | Require an exact role such as `Orleans.Silo.Connect.contoso-prod-westus` or `Orleans.Client.Connect.contoso-prod-westus`. Alternatively, require one explicit custom claim whose value exactly equals the local `ClusterId`. |
+
+The cluster-qualified URI is never a successful JWT audience. For example, the
+credential requests
+`api://<resource-application-client-id-guid>/contoso-prod-westus/.default`,
+but the resulting v2 JWT must contain
+`"aud": "<resource-application-client-id-guid>"`.
 
 Create the identity boundary in this order:
 
 1. Create a resource application for the Orleans cluster security boundary.
-2. Give each environment a distinct identifier URI which includes the
-   `ClusterId`, for example
-   `api://<resource-application-id>/contoso-prod-westus`.
-3. Define application roles `Orleans.Silo.Connect` and
-   `Orleans.Client.Connect`, with applications as allowed member types.
+2. Note its client-ID GUID, request v2 access tokens, and give each environment
+   a distinct identifier URI which includes the `ClusterId`, for example
+   `api://<resource-application-client-id-guid>/contoso-prod-westus`.
+3. Define exact cluster-specific application roles
+   `Orleans.Silo.Connect.contoso-prod-westus` and
+   `Orleans.Client.Connect.contoso-prod-westus`, with applications as allowed
+   member types.
 4. Configure `idtyp` as an optional access-token claim so that application
    tokens include `idtyp: "app"`.
 5. Create or select one workload identity for each independently deployable
@@ -128,15 +132,63 @@ Create the identity boundary in this order:
    non-interactive credential. Grant no Microsoft Graph permission merely to
    establish an Orleans connection.
 
-The audience must exactly match the resource identifier registered in Microsoft
-Entra. Don't remove the `api://` prefix or share a general-purpose silo audience
-across environments. If the audience must be shared, require a separate
-cluster-specific claim or role and compare it exactly to the local `ClusterId`.
+This bounded manifest excerpt contains identifiers only. Generate stable GUIDs
+for each `appRoles[].id`; they aren't credentials. App-role assignments are
+made to workload service principals separately from this resource-application
+manifest.
+
+```json
+{
+  "appId": "<resource-application-client-id-guid>",
+  "identifierUris": [
+    "api://<resource-application-client-id-guid>/contoso-prod-westus"
+  ],
+  "api": {
+    "requestedAccessTokenVersion": 2
+  },
+  "appRoles": [
+    {
+      "allowedMemberTypes": [ "Application" ],
+      "description": "Connect a silo to contoso-prod-westus.",
+      "displayName": "Orleans silo connect: contoso-prod-westus",
+      "id": "<silo-cluster-role-guid>",
+      "isEnabled": true,
+      "value": "Orleans.Silo.Connect.contoso-prod-westus"
+    },
+    {
+      "allowedMemberTypes": [ "Application" ],
+      "description": "Connect an Orleans client to contoso-prod-westus.",
+      "displayName": "Orleans client connect: contoso-prod-westus",
+      "id": "<client-cluster-role-guid>",
+      "isEnabled": true,
+      "value": "Orleans.Client.Connect.contoso-prod-westus"
+    }
+  ],
+  "optionalClaims": {
+    "accessToken": [
+      {
+        "name": "idtyp",
+        "essential": true,
+        "additionalProperties": []
+      }
+    ]
+  }
+}
+```
+
+As an alternative to app-role cluster binding, a trusted issuer claims-mapping
+policy can emit a signed custom claim such as
+`orleans_cluster: "contoso-prod-westus"`. Set `ClusterClaimType` to
+`orleans_cluster` instead of setting `ClusterRole`; don't configure both. The
+validator compares the claim value to the local `ClusterId` using exact ordinal
+matching. A general caller role doesn't replace either exact cluster-binding
+mechanism.
 
 Use a tenant-specific authority. Don't use `common`, `organizations`, or
 `consumers`. Permit only application tokens issued to the expected tenant,
-audience, caller application, role, and cluster binding. Keep access tokens
-short-lived and keep every host's clock synchronized.
+resource-application GUID audience, caller application, exact cluster role or
+claim, and cluster binding. Keep access tokens short-lived and keep every
+host's clock synchronized.
 
 ## Issue and deploy certificates
 
@@ -195,6 +247,11 @@ queue, concurrency, metadata-refresh, and token-lifetime limits finite.
 Configuration is validated at startup; invalid middleware ordering, missing
 TLS/provider registrations, and conflicting TLS policies fail closed.
 
+The compiled configuration separates token acquisition, GUID audience
+validation, and exact cluster authorization:
+
+:::code language="csharp" source="snippets/authenticated-silo-connections/csharp/ConnectionAuthenticationExamples.cs" id="EntraAuthenticationOptions":::
+
 Call
 <xref:Orleans.Hosting.OrleansConnectionSecurityHostingExtensions.UseAuthenticatedSiloConnections*>
 once on every silo. A silo both validates inbound silo tokens and acquires a
@@ -212,8 +269,9 @@ Configure each external Orleans client with the corresponding outbound policy:
 :::code language="csharp" source="snippets/authenticated-silo-connections/csharp/ConnectionAuthenticationExamples.cs" id="AuthenticatedClient":::
 
 The client and gateway must use compatible enforcement modes and the same Entra
-audience, tenant, cluster binding, client role, and caller authorization. Keep
-the external-client role and allowlist separate from the silo policy. The
+token request scope, resource-application GUID, tenant, exact client cluster
+role, and caller authorization. Keep the external-client role and allowlist
+separate from the silo policy. The
 <xref:Orleans.Connections.Security.SiloConnectionTokenRequestContext.Target> and
 <xref:Orleans.Connections.Security.SiloConnectionTokenValidationContext.Target>
 properties distinguish
@@ -241,7 +299,7 @@ each path rollout-compatible.
 | Mode | Negotiation and acceptance behavior |
 |---|---|
 | `Disabled` | Advertises only the baseline Orleans protocol and doesn't exchange authentication frames. |
-| `Audit` | Prefers authentication, permits baseline negotiation with an older or disabled peer, and accepts measured authentication failures. |
+| `Audit` | Prefers authentication and permits measured, unauthenticated baseline fallback only with a peer which doesn't negotiate authentication. A failed negotiated authentication rejects the connection. |
 | `Required` | Advertises only the authentication protocol and accepts only a successful authenticated result with a principal and, by default, a finite expiration. |
 
 `Required` has no unauthenticated fallback. A `Required` silo and an old or
@@ -249,13 +307,12 @@ disabled silo have no common ALPN protocol, so TLS negotiation fails. A
 `Required` outbound peer also rejects an Audit result which was accepted but
 isn't authenticated.
 
-After peers negotiate the authentication ALPN, malformed framing,
-acknowledgment, timeout, or overload failures abort the connection in every
-mode. `Audit` can explicitly accept token acquisition, validation,
-authorization, or provider failures as unauthenticated, but it cannot
-reinterpret them as baseline Orleans traffic. Baseline fallback is permitted
-only when TLS negotiated the baseline ALPN with a peer which doesn't support
-authentication.
+After peers negotiate the authentication ALPN, every acquisition, validation,
+authorization, expiry, malformed framing, acknowledgment, timeout, or overload
+failure aborts the connection in both `Audit` and `Required`. `Audit` cannot
+reinterpret a failed exchange as baseline Orleans traffic. Its baseline
+fallback applies only when TLS negotiated the baseline ALPN with a peer which
+doesn't support authentication.
 
 ## Plan for token expiration
 
@@ -312,16 +369,17 @@ Run positive and negative connection tests in a non-production environment
 before enabling `Required`. A successful happy-path connection alone doesn't
 prove the boundary.
 
-| Test | Expected result in `Required` |
-|---|---|
-| Authorized silo and authorized external client | Connect and make representative grain calls |
-| Missing token, malformed token, or user-delegated token | Connection rejected before the Orleans preamble |
-| Wrong tenant, audience, cluster binding, role, or caller application ID | Connection rejected |
-| Expired token or token below the minimum remaining lifetime | Connection rejected |
-| Untrusted issuer, wrong DNS SAN, missing EKU, expired certificate, or revoked certificate | TLS handshake rejected |
-| Peer using baseline Orleans ALPN only | TLS negotiation fails; no unauthenticated fallback |
-| Token provider, metadata endpoint, or signing-key refresh unavailable | New connection fails; mode remains `Required` |
-| Handshake concurrency or queue limit exceeded | Excess work is rejected without unbounded growth |
+| Test | Expected result in `Required` | Expected result in `Audit` |
+|---|---|---|
+| Authorized silo and authorized external client | Connect and make representative grain calls | Connect, authenticate, and make representative grain calls |
+| Missing token, malformed token, or user-delegated token after authentication negotiation | Connection rejected before the Orleans preamble | Connection rejected before the Orleans preamble |
+| URI `aud` instead of the resource application GUID | Connection rejected | Connection rejected after authentication negotiation |
+| Wrong tenant or issuer, missing or wrong exact cluster role/claim, or unlisted caller application ID | Connection rejected | Connection rejected after authentication negotiation |
+| Expired token or token below the minimum remaining lifetime | Connection rejected | Connection rejected after authentication negotiation |
+| Untrusted issuer, wrong DNS SAN, missing EKU, expired certificate, or revoked certificate | TLS handshake rejected | TLS handshake rejected |
+| Peer using baseline Orleans ALPN only | TLS negotiation fails; no unauthenticated fallback | Baseline connection can continue unauthenticated and is recorded as fallback |
+| Token provider, metadata endpoint, or signing-key refresh unavailable after authentication negotiation | New connection fails; mode remains `Required` | New connection fails; mode remains `Audit` |
+| Handshake concurrency or queue limit exceeded | Excess work is rejected without unbounded growth | Excess work is rejected without unbounded growth |
 
 Repeat the tests after certificate, federated-credential, app-role, audience,
 and signing-key rotation. Include reconnects: an already open connection can
@@ -384,8 +442,10 @@ Maintain runbooks for these events:
 
 - Use an explicit workload credential and keep its federated token or secret
   material out of source and ordinary configuration.
-- Give each cluster/environment an exact audience, use separate silo and client
-  roles, and require both the matching role and caller allowlist.
+- Give each cluster/environment a cluster-qualified token request scope, use the
+  resource application client-ID GUID as the v2 audience, use separate exact
+  silo and client cluster roles, and require both the matching role and caller
+  allowlist.
 - Keep TLS 1.2 or later, certificate chain/name checks, revocation policy, and
   narrow trust roots enabled.
 - Bound token, timeout, concurrency, queue, metadata refresh, and token lifetime
@@ -396,8 +456,9 @@ Maintain runbooks for these events:
 - Treat configured storage and providers as trusted infrastructure, and protect
   their credentials, transport, data, and administrative access.
 - Synchronize clocks and exercise certificate, key, and identity rotation.
-- Treat unexpected baseline fallback in `Audit` and every authentication
-  failure in `Required` as an operational event.
+- Treat unexpected baseline fallback and every failed negotiated
+  authentication in `Audit`, and every authentication failure in `Required`,
+  as an operational event.
 - Test wrong-certificate, wrong-identity, provider-outage, overload, rotation,
   reconnect, and rollback scenarios before production.
 
