@@ -333,7 +333,7 @@ public sealed class DynamoDBProviderConfigurationTests
                     ["Orleans:Reminders:ServiceKey"] = serviceKey,
                     ["AWS_ENDPOINT_URL_DYNAMODB"] = serviceUrl,
                 }))
-            .UseOrleans()
+            .UseOrleans(_ => { })
             .Build();
 
         var clustering = host.Services.GetRequiredService<IOptions<DynamoDBClusteringOptions>>().Value;
