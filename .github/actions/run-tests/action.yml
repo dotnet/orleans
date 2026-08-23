@@ -1,0 +1,42 @@
+name: Run tests
+description: Set up, run, cover, and archive a standard CI test partition.
+
+inputs:
+  artifact-name:
+    description: Test output artifact name.
+    required: true
+  coverage-id:
+    description: Unique coverage report identifier.
+    required: true
+  filter-query:
+    description: Microsoft Testing Platform query filter.
+    required: true
+  framework:
+    description: Target framework.
+    required: true
+  project:
+    description: Optional project path.
+    required: false
+    default: ''
+  report-trx-filename:
+    description: TRX report filename template.
+    required: true
+
+runs:
+  using: composite
+  steps:
+  - uses: ./.github/actions/setup-test-environment
+  - name: Test
+    shell: pwsh
+    run: >
+      ./.github/scripts/run-dotnet-test.ps1
+      -CoverageId "${{ inputs.coverage-id }}"
+      -Framework "${{ inputs.framework }}"
+      -Project "${{ inputs.project }}"
+      -FilterQuery "${{ inputs.filter-query }}"
+      -ReportTrxFilename "${{ inputs.report-trx-filename }}"
+  - name: Archive test results
+    if: always()
+    uses: ./.github/actions/archive-test-results
+    with:
+      name: ${{ inputs.artifact-name }}

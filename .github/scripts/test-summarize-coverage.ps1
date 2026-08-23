@@ -6,6 +6,10 @@ $ErrorActionPreference = 'Stop'
 
 $scriptPath = Join-Path $PSScriptRoot 'summarize-coverage.ps1'
 $collectorScriptPath = Join-Path $PSScriptRoot 'run-dotnet-test.ps1'
+$codeGeneratorScriptPath = Join-Path $PSScriptRoot 'run-codegenerator-tests.ps1'
+$cosmosScriptPath = Join-Path $PSScriptRoot 'run-cosmos-tests.ps1'
+$mergeScriptPath = Join-Path $PSScriptRoot 'merge-coverage.ps1'
+$runTestsActionPath = Join-Path $PSScriptRoot '../actions/run-tests/action.yml'
 $workflowPath = Join-Path $PSScriptRoot '../workflows/ci.yml'
 $temporaryRoot = Join-Path ([IO.Path]::GetTempPath()) "orleans-coverage-tests-$([guid]::NewGuid())"
 $testsRun = 0
@@ -270,7 +274,7 @@ try {
 
     Invoke-Test 'uses external coverage collection for CI builds' {
         $collectorScript = Get-Content -Raw -LiteralPath $collectorScriptPath
-        $workflow = Get-Content -Raw -LiteralPath $workflowPath
+        $codeGeneratorScript = Get-Content -Raw -LiteralPath $codeGeneratorScriptPath
         Assert-Matches `
             $collectorScript `
             '& \$coverageTool @coverageArguments @testArguments' `
@@ -288,8 +292,8 @@ try {
             'coverage\.static\.config\.xml' `
             'macOS coverage must use static-only instrumentation settings.'
         Assert-Matches `
-            $workflow `
-            '(?s)Test Code Generator.*?-UseStaticInstrumentation.*?-UseStaticInstrumentation' `
+            $codeGeneratorScript `
+            '(?s)-UseStaticInstrumentation.*?-UseStaticInstrumentation' `
             'Both CodeGen runs must use static instrumentation.'
         Assert-Matches `
             $collectorScript `
@@ -319,26 +323,40 @@ try {
 
     Invoke-Test 'requires every test matrix job before merging' {
         $workflow = Get-Content -Raw -LiteralPath $workflowPath
+        $mergeScript = Get-Content -Raw -LiteralPath $mergeScriptPath
         Assert-Matches `
             $workflow `
             "if: github\.event_name == 'pull_request' && !cancelled\(\)" `
             'Coverage merge must run after test failures.'
         Assert-Matches `
             $workflow `
-            '\$expectedArtifactCount = 60' `
-            'The merge must validate every test matrix artifact.'
+            'needs: ci' `
+            'Coverage merge must depend on the aggregate CI job.'
         Assert-Matches `
             $workflow `
+            '(?s)coverage-merge:.*?actions/checkout@.*?actions/setup-dotnet@.*?actions/setup-coverage' `
+            'Coverage merge must check out scripts before running local actions.'
+        Assert-Matches `
+            $mergeScript `
+            'ExpectedArtifactCount' `
+            'The merge must validate every test matrix artifact.'
+        Assert-Matches `
+            $mergeScript `
             'contains no coverage report' `
             'The merge must reject test artifacts without coverage.'
     }
 
     Invoke-Test 'collects coverage from every test job' {
         $workflow = Get-Content -Raw -LiteralPath $workflowPath
-        $setupCount = ([regex]::Matches($workflow, '- name: Setup code coverage')).Count
-        $runnerCount = ([regex]::Matches($workflow, 'run-dotnet-test\.ps1')).Count
-        Assert-Equal 18 $setupCount 'Coverage setup step count differs.'
-        Assert-Equal 19 $runnerCount 'Covered test command count differs.'
+        $runTestsAction = Get-Content -Raw -LiteralPath $runTestsActionPath
+        $codeGeneratorScript = Get-Content -Raw -LiteralPath $codeGeneratorScriptPath
+        $cosmosScript = Get-Content -Raw -LiteralPath $cosmosScriptPath
+        Assert-Equal 15 ([regex]::Matches($workflow, 'uses: \./\.github/actions/run-tests')).Count 'Standard test action count differs.'
+        Assert-Equal 3 ([regex]::Matches($workflow, 'uses: \./\.github/actions/setup-test-environment')).Count 'Special test setup count differs.'
+        Assert-Equal 1 ([regex]::Matches($runTestsAction, 'run-dotnet-test\.ps1')).Count 'Standard test command count differs.'
+        Assert-Equal 2 ([regex]::Matches($codeGeneratorScript, 'run-dotnet-test\.ps1')).Count 'CodeGen test command count differs.'
+        Assert-Equal 1 ([regex]::Matches($cosmosScript, 'run-dotnet-test\.ps1')).Count 'Cosmos test command count differs.'
+        Assert-Equal 1 ([regex]::Matches($workflow, 'run-dotnet-test\.ps1')).Count 'Core matrix test command count differs.'
     }
 
     Write-Output "$testsRun coverage tests passed."

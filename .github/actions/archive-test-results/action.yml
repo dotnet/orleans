@@ -1,0 +1,19 @@
+name: Archive test results
+description: Upload test results, coverage reports, and test logs.
+
+inputs:
+  name:
+    description: Artifact name.
+    required: true
+
+runs:
+  using: composite
+  steps:
+  - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+    continue-on-error: true
+    with:
+      name: ${{ inputs.name }}
+      retention-days: 1
+      path: |
+        **/TestResults/*
+        **/logs/*

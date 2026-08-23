@@ -89,36 +89,19 @@ jobs:
           "$REDIS_IMAGE"
 
         bash .github/scripts/docker-wait-for-health.sh redis
-    - name: Setup .NET
-      uses: actions/setup-dotnet@c2fa09f4bde5ebb9d1777cf28262a3eb3db3ced7 # v5
-      with:
-        global-json-file: global.json
-    - name: Setup code coverage
-      if: github.event_name == 'pull_request'
-      uses: ./.github/actions/setup-coverage
     - name: Test
-      shell: pwsh
-      run: >
-        ./.github/scripts/run-dotnet-test.ps1
-        -CoverageId "${{ github.job }}-${{ matrix.provider }}-${{ matrix.framework }}"
-        -Framework "${{ matrix.framework }}"
-        -FilterQuery "/[(Provider=${{ matrix.provider }})&((Suite=BVT)|(Suite=SlowBVT)|(Suite=Functional))&(Category!=Performance)&(Category!=Stress)]"
-        -ReportTrxFilename "test_results_${{ matrix.provider }}_${{ matrix.framework }}_{asm}_{tfm}_{arch}.trx"
+      uses: ./.github/actions/run-tests
+      with:
+        artifact-name: test_output_${{ github.job }}_${{ matrix.framework }}
+        coverage-id: ${{ github.job }}-${{ matrix.provider }}-${{ matrix.framework }}
+        filter-query: /[(Provider=${{ matrix.provider }})&((Suite=BVT)|(Suite=SlowBVT)|(Suite=Functional))&(Category!=Performance)&(Category!=Stress)]
+        framework: ${{ matrix.framework }}
+        report-trx-filename: test_results_${{ matrix.provider }}_${{ matrix.framework }}_{asm}_{tfm}_{arch}.trx
       env:
         ORLEANSREDISCONNECTIONSTRING: "localhost:6379,ssl=False,abortConnect=False"
     - name: Clean up Redis
       if: always()
       run: docker rm -f redis || true
-    - name: Archive Test Results
-      if: always()
-      continue-on-error: true
-      uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
-      with:
-        name: test_output_${{ github.job }}_${{ matrix.framework }}
-        retention-days: 1
-        path: |
-          **/TestResults/*
-          **/logs/*
   test-cassandra:
     name: Cassandra provider tests
     runs-on: ubuntu-latest
@@ -140,33 +123,16 @@ jobs:
 
         bash .github/scripts/docker-pull-with-retry.sh "$TESTCONTAINERS_RYUK_IMAGE"
         bash .github/scripts/docker-pull-with-retry.sh "$CASSANDRA_IMAGE"
-    - name: Setup .NET
-      uses: actions/setup-dotnet@c2fa09f4bde5ebb9d1777cf28262a3eb3db3ced7 # v5
-      with:
-        global-json-file: global.json
-    - name: Setup code coverage
-      if: github.event_name == 'pull_request'
-      uses: ./.github/actions/setup-coverage
     - name: Test
-      shell: pwsh
-      run: >
-        ./.github/scripts/run-dotnet-test.ps1
-        -CoverageId "${{ github.job }}-${{ matrix.provider }}-${{ matrix.dbversion }}-${{ matrix.framework }}"
-        -Framework "${{ matrix.framework }}"
-        -FilterQuery "/[(Provider=${{ matrix.provider }})&((Suite=BVT)|(Suite=SlowBVT)|(Suite=Functional))&(Category!=Performance)&(Category!=Stress)]"
-        -ReportTrxFilename "test_results_${{ matrix.provider }}_${{ matrix.dbversion }}_${{ matrix.framework }}_{asm}_{tfm}_{arch}.trx"
+      uses: ./.github/actions/run-tests
+      with:
+        artifact-name: test_output_${{ github.job }}_${{ matrix.dbversion }}_${{ matrix.framework }}
+        coverage-id: ${{ github.job }}-${{ matrix.provider }}-${{ matrix.dbversion }}-${{ matrix.framework }}
+        filter-query: /[(Provider=${{ matrix.provider }})&((Suite=BVT)|(Suite=SlowBVT)|(Suite=Functional))&(Category!=Performance)&(Category!=Stress)]
+        framework: ${{ matrix.framework }}
+        report-trx-filename: test_results_${{ matrix.provider }}_${{ matrix.dbversion }}_${{ matrix.framework }}_{asm}_{tfm}_{arch}.trx
       env:
         CASSANDRAVERSION: ${{ matrix.dbversion }}
-    - name: Archive Test Results
-      if: always()
-      continue-on-error: true
-      uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
-      with:
-        name: test_output_${{ github.job }}_${{ matrix.dbversion }}_${{ matrix.framework }}
-        retention-days: 1
-        path: |
-          **/TestResults/*
-          **/logs/*
   test-postgres:
     name: PostgreSQL provider tests
     runs-on: ubuntu-latest
@@ -199,37 +165,20 @@ jobs:
           -c max_connections=200
 
         bash .github/scripts/docker-wait-for-health.sh postgres
-    - name: Setup .NET
-      uses: actions/setup-dotnet@c2fa09f4bde5ebb9d1777cf28262a3eb3db3ced7 # v5
-      with:
-        global-json-file: global.json
-    - name: Setup code coverage
-      if: github.event_name == 'pull_request'
-      uses: ./.github/actions/setup-coverage
     - name: Test
-      shell: pwsh
-      run: >
-        ./.github/scripts/run-dotnet-test.ps1
-        -CoverageId "${{ github.job }}-${{ matrix.provider }}-${{ matrix.framework }}"
-        -Framework "${{ matrix.framework }}"
-        -FilterQuery "/[(Provider=${{ matrix.provider }})&((Suite=BVT)|(Suite=SlowBVT)|(Suite=Functional))&(Category!=Performance)&(Category!=Stress)]"
-        -ReportTrxFilename "test_results_${{ matrix.provider }}_${{ matrix.framework }}_{asm}_{tfm}_{arch}.trx"
+      uses: ./.github/actions/run-tests
+      with:
+        artifact-name: test_output_${{ github.job }}_${{ matrix.framework }}
+        coverage-id: ${{ github.job }}-${{ matrix.provider }}-${{ matrix.framework }}
+        filter-query: /[(Provider=${{ matrix.provider }})&((Suite=BVT)|(Suite=SlowBVT)|(Suite=Functional))&(Category!=Performance)&(Category!=Stress)]
+        framework: ${{ matrix.framework }}
+        report-trx-filename: test_results_${{ matrix.provider }}_${{ matrix.framework }}_{asm}_{tfm}_{arch}.trx
       env:
 # [SuppressMessage("Microsoft.Security", "CS002:SecretInNextLine", Justification="False positive")]
         ORLEANSPOSTGRESCONNECTIONSTRING: "Server=127.0.0.1;Port=5432;Pooling=false;User Id=postgres;Password=postgres;SSL Mode=Disable"
     - name: Clean up PostgreSQL
       if: always()
       run: docker rm -f postgres || true
-    - name: Archive Test Results
-      if: always()
-      continue-on-error: true
-      uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
-      with:
-        name: test_output_${{ github.job }}_${{ matrix.framework }}
-        retention-days: 1
-        path: |
-          **/TestResults/*
-          **/logs/*
   test-mariadb:
     name: MariaDB/MySQL provider tests
     runs-on: ubuntu-latest
@@ -252,10 +201,6 @@ jobs:
       uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
       with:
         node-version: '24.x'
-    - name: Setup .NET
-      uses: actions/setup-dotnet@c2fa09f4bde5ebb9d1777cf28262a3eb3db3ced7 # v5
-      with:
-        global-json-file: global.json
     - name: Start MariaDB
       shell: bash
       run: |
@@ -295,30 +240,17 @@ jobs:
         echo "MariaDB did not become healthy in time."
         docker logs mariadb
         exit 1
-    - name: Setup code coverage
-      if: github.event_name == 'pull_request'
-      uses: ./.github/actions/setup-coverage
     - name: Test
-      shell: pwsh
-      run: >
-        ./.github/scripts/run-dotnet-test.ps1
-        -CoverageId "${{ github.job }}-${{ matrix.provider }}-${{ matrix.framework }}"
-        -Framework "${{ matrix.framework }}"
-        -FilterQuery "/[(Provider=${{ matrix.provider }})&((Suite=BVT)|(Suite=SlowBVT)|(Suite=Functional))&(Category!=Performance)&(Category!=Stress)]"
-        -ReportTrxFilename "test_results_${{ matrix.provider }}_${{ matrix.framework }}_{asm}_{tfm}_{arch}.trx"
+      uses: ./.github/actions/run-tests
+      with:
+        artifact-name: test_output_${{ github.job }}_${{ matrix.framework }}
+        coverage-id: ${{ github.job }}-${{ matrix.provider }}-${{ matrix.framework }}
+        filter-query: /[(Provider=${{ matrix.provider }})&((Suite=BVT)|(Suite=SlowBVT)|(Suite=Functional))&(Category!=Performance)&(Category!=Stress)]
+        framework: ${{ matrix.framework }}
+        report-trx-filename: test_results_${{ matrix.provider }}_${{ matrix.framework }}_{asm}_{tfm}_{arch}.trx
       env:
 # [SuppressMessage("Microsoft.Security", "CS002:SecretInNextLine", Justification="Not a secret")]
         ORLEANSMYSQLCONNECTIONSTRING: "Server=127.0.0.1;Port=3306;UId=root;Pwd=mariadb;"
-    - name: Archive Test Results
-      if: always()
-      continue-on-error: true
-      uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
-      with:
-        name: test_output_${{ github.job }}_${{ matrix.framework }}
-        retention-days: 1
-        path: |
-          **/TestResults/*
-          **/logs/*
   test-sqlserver:
     name: Microsoft SQL Server provider tests
     runs-on: ubuntu-latest
@@ -354,21 +286,14 @@ jobs:
           "$MSSQL_IMAGE"
 
         bash .github/scripts/docker-wait-for-health.sh mssql 120
-    - name: Setup .NET
-      uses: actions/setup-dotnet@c2fa09f4bde5ebb9d1777cf28262a3eb3db3ced7 # v5
-      with:
-        global-json-file: global.json
-    - name: Setup code coverage
-      if: github.event_name == 'pull_request'
-      uses: ./.github/actions/setup-coverage
     - name: Test
-      shell: pwsh
-      run: >
-        ./.github/scripts/run-dotnet-test.ps1
-        -CoverageId "${{ github.job }}-${{ matrix.provider }}-${{ matrix.framework }}"
-        -Framework "${{ matrix.framework }}"
-        -FilterQuery "/[(Provider=${{ matrix.provider }})&((Suite=BVT)|(Suite=SlowBVT)|(Suite=Functional))&(Category!=Performance)&(Category!=Stress)]"
-        -ReportTrxFilename "test_results_${{ matrix.provider }}_${{ matrix.framework }}_{asm}_{tfm}_{arch}.trx"
+      uses: ./.github/actions/run-tests
+      with:
+        artifact-name: test_output_${{ github.job }}_${{ matrix.framework }}
+        coverage-id: ${{ github.job }}-${{ matrix.provider }}-${{ matrix.framework }}
+        filter-query: /[(Provider=${{ matrix.provider }})&((Suite=BVT)|(Suite=SlowBVT)|(Suite=Functional))&(Category!=Performance)&(Category!=Stress)]
+        framework: ${{ matrix.framework }}
+        report-trx-filename: test_results_${{ matrix.provider }}_${{ matrix.framework }}_{asm}_{tfm}_{arch}.trx
       env:
 # [SuppressMessage("Microsoft.Security", "CS002:SecretInNextLine", Justification="Not a secret")]
         ORLEANSMSSQLCONNECTIONSTRING: "Server=127.0.0.1,1433;User Id=SA;Password=yourWeak(!)Password;TrustServerCertificate=True;"
@@ -382,16 +307,6 @@ jobs:
     - name: Clean up SQL Server
       if: always()
       run: docker rm -f mssql || true
-    - name: Archive Test Results
-      if: always()
-      continue-on-error: true
-      uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
-      with:
-        name: test_output_${{ github.job }}_${{ matrix.framework }}
-        retention-days: 1
-        path: |
-          **/TestResults/*
-          **/logs/*
   test-sqlite:
     name: SQLite provider tests
     runs-on: ubuntu-latest
@@ -402,31 +317,14 @@ jobs:
         framework: ["net8.0", "net10.0"]
     steps:
     - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
-    - name: Setup .NET
-      uses: actions/setup-dotnet@c2fa09f4bde5ebb9d1777cf28262a3eb3db3ced7 # v5
-      with:
-        global-json-file: global.json
-    - name: Setup code coverage
-      if: github.event_name == 'pull_request'
-      uses: ./.github/actions/setup-coverage
     - name: Test
-      shell: pwsh
-      run: >
-        ./.github/scripts/run-dotnet-test.ps1
-        -CoverageId "${{ github.job }}-${{ matrix.provider }}-${{ matrix.framework }}"
-        -Framework "${{ matrix.framework }}"
-        -FilterQuery "/[(Provider=${{ matrix.provider }})&((Suite=BVT)|(Suite=SlowBVT)|(Suite=Functional))&(Category!=Performance)&(Category!=Stress)]"
-        -ReportTrxFilename "test_results_${{ matrix.provider }}_${{ matrix.framework }}_{asm}_{tfm}_{arch}.trx"
-    - name: Archive Test Results
-      if: always()
-      continue-on-error: true
-      uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+      uses: ./.github/actions/run-tests
       with:
-        name: test_output_${{ github.job }}_${{ matrix.framework }}
-        retention-days: 1
-        path: |
-          **/TestResults/*
-          **/logs/*
+        artifact-name: test_output_${{ github.job }}_${{ matrix.framework }}
+        coverage-id: ${{ github.job }}-${{ matrix.provider }}-${{ matrix.framework }}
+        filter-query: /[(Provider=${{ matrix.provider }})&((Suite=BVT)|(Suite=SlowBVT)|(Suite=Functional))&(Category!=Performance)&(Category!=Stress)]
+        framework: ${{ matrix.framework }}
+        report-trx-filename: test_results_${{ matrix.provider }}_${{ matrix.framework }}_{asm}_{tfm}_{arch}.trx
   test-azure-storage:
     name: Azure Storage provider tests
     runs-on: ubuntu-latest
@@ -456,21 +354,14 @@ jobs:
         echo "Waiting for Azurite to be ready..."
         timeout 60 bash -c 'until nc -z localhost 10000 && nc -z localhost 10001 && nc -z localhost 10002; do sleep 1; done'
         echo "Azurite is ready"
-    - name: Setup .NET
-      uses: actions/setup-dotnet@c2fa09f4bde5ebb9d1777cf28262a3eb3db3ced7 # v5
-      with:
-        global-json-file: global.json
-    - name: Setup code coverage
-      if: github.event_name == 'pull_request'
-      uses: ./.github/actions/setup-coverage
     - name: Test
-      shell: pwsh
-      run: >
-        ./.github/scripts/run-dotnet-test.ps1
-        -CoverageId "${{ github.job }}-${{ matrix.provider }}-${{ matrix.framework }}"
-        -Framework "${{ matrix.framework }}"
-        -FilterQuery "/[(Provider=${{ matrix.provider }})&((Suite=BVT)|(Suite=SlowBVT)|(Suite=Functional))&(Category!=Performance)&(Category!=Stress)]"
-        -ReportTrxFilename "test_results_${{ matrix.provider }}_${{ matrix.framework }}_{asm}_{tfm}_{arch}.trx"
+      uses: ./.github/actions/run-tests
+      with:
+        artifact-name: test_output_${{ github.job }}_${{ matrix.framework }}
+        coverage-id: ${{ github.job }}-${{ matrix.provider }}-${{ matrix.framework }}
+        filter-query: /[(Provider=${{ matrix.provider }})&((Suite=BVT)|(Suite=SlowBVT)|(Suite=Functional))&(Category!=Performance)&(Category!=Stress)]
+        framework: ${{ matrix.framework }}
+        report-trx-filename: test_results_${{ matrix.provider }}_${{ matrix.framework }}_{asm}_{tfm}_{arch}.trx
       env:
 # [SuppressMessage("Microsoft.Security", "CS002:SecretInNextLine", Justification="Not a secret")]
 # [SuppressMessage("Microsoft.Security", "CSCAN0090:ConfigFile", Justification="Not a secret")]
@@ -479,16 +370,6 @@ jobs:
     - name: Clean up Azurite
       if: always()
       run: docker rm -f azurite || true
-    - name: Archive Test Results
-      if: always()
-      continue-on-error: true
-      uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
-      with:
-        name: test_output_${{ github.job }}_${{ matrix.framework }}
-        retention-days: 1
-        path: |
-          **/TestResults/*
-          **/logs/*
   test-azure-eventhubs:
     name: Azure Event Hubs provider tests
     runs-on: ubuntu-latest
@@ -537,21 +418,14 @@ jobs:
         echo "Waiting for Event Hubs emulator to be ready..."
         timeout 60 bash -c 'until nc -z localhost 5672; do sleep 1; done'
         echo "Event Hubs emulator is ready"
-    - name: Setup .NET
-      uses: actions/setup-dotnet@c2fa09f4bde5ebb9d1777cf28262a3eb3db3ced7 # v5
-      with:
-        global-json-file: global.json
-    - name: Setup code coverage
-      if: github.event_name == 'pull_request'
-      uses: ./.github/actions/setup-coverage
     - name: Test
-      shell: pwsh
-      run: >
-        ./.github/scripts/run-dotnet-test.ps1
-        -CoverageId "${{ github.job }}-${{ matrix.provider }}-${{ matrix.framework }}"
-        -Framework "${{ matrix.framework }}"
-        -FilterQuery "/[(Provider=${{ matrix.provider }})&((Suite=BVT)|(Suite=SlowBVT)|(Suite=Functional))&(Category!=Performance)&(Category!=Stress)]"
-        -ReportTrxFilename "test_results_${{ matrix.provider }}_${{ matrix.framework }}_{asm}_{tfm}_{arch}.trx"
+      uses: ./.github/actions/run-tests
+      with:
+        artifact-name: test_output_${{ github.job }}_${{ matrix.framework }}
+        coverage-id: ${{ github.job }}-${{ matrix.provider }}-${{ matrix.framework }}
+        filter-query: /[(Provider=${{ matrix.provider }})&((Suite=BVT)|(Suite=SlowBVT)|(Suite=Functional))&(Category!=Performance)&(Category!=Stress)]
+        framework: ${{ matrix.framework }}
+        report-trx-filename: test_results_${{ matrix.provider }}_${{ matrix.framework }}_{asm}_{tfm}_{arch}.trx
       env:
 # [SuppressMessage("Microsoft.Security", "CS002:SecretInNextLine", Justification="Not a secret")]
 # [SuppressMessage("Microsoft.Security", "CSCAN0090:ConfigFile", Justification="Not a secret")]
@@ -565,16 +439,6 @@ jobs:
     - name: Clean up Azurite
       if: always()
       run: docker rm -f azurite || true
-    - name: Archive Test Results
-      if: always()
-      continue-on-error: true
-      uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
-      with:
-        name: test_output_${{ github.job }}_${{ matrix.framework }}
-        retention-days: 1
-        path: |
-          **/TestResults/*
-          **/logs/*
   test-azure-cosmosdb:
     name: Azure Cosmos DB provider tests
     runs-on: ubuntu-latest
@@ -587,13 +451,7 @@ jobs:
         provider: ["Cosmos"]
     steps:
     - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
-    - name: Setup .NET
-      uses: actions/setup-dotnet@c2fa09f4bde5ebb9d1777cf28262a3eb3db3ced7 # v5
-      with:
-        global-json-file: global.json
-    - name: Setup code coverage
-      if: github.event_name == 'pull_request'
-      uses: ./.github/actions/setup-coverage
+    - uses: ./.github/actions/setup-test-environment
     - name: Start Azure Cosmos DB emulator
       run: |
         set -euo pipefail
@@ -628,30 +486,11 @@ jobs:
         done
     - name: Test
       shell: pwsh
-      run: |
-        $cosmosFilter = '/[(Provider=${{ matrix.provider }})&((Suite=BVT)|(Suite=SlowBVT)|(Suite=Functional))&(Category!=Performance)&(Category!=Stress)]'
-        foreach ($attempt in 1, 2) {
-          $arguments = @{
-            CoverageId = "${{ github.job }}-${{ matrix.provider }}-${{ matrix.framework }}"
-            Framework = "${{ matrix.framework }}"
-            Project = 'test/Extensions/Orleans.Cosmos.Tests/Orleans.Cosmos.Tests.csproj'
-            FilterQuery = $cosmosFilter
-            ReportTrxFilename = "test_results_${{ matrix.provider }}_${{ matrix.framework }}_attempt${attempt}.trx"
-          }
-          if ($attempt -gt 1) {
-            Write-Host "Cosmos tests failed on attempt $($attempt - 1); retrying once with the same filter."
-            $arguments.NoBuild = $true
-          }
-
-          try {
-            ./.github/scripts/run-dotnet-test.ps1 @arguments
-            break
-          } catch {
-            if ($attempt -eq 2) {
-              throw
-            }
-          }
-        }
+      run: >
+        ./.github/scripts/run-cosmos-tests.ps1
+        -CoverageId "${{ github.job }}-${{ matrix.provider }}-${{ matrix.framework }}"
+        -Framework "${{ matrix.framework }}"
+        -Provider "${{ matrix.provider }}"
       env:
 # [SuppressMessage("Microsoft.Security", "CS002:SecretInNextLine", Justification="Not a secret")]
         #ORLEANSCOSMOSDBACCOUNTENDPOINT: "https://localhost:8081/"
@@ -660,16 +499,11 @@ jobs:
     - name: Clean up Azure Cosmos DB emulator
       if: always()
       run: docker rm -f cosmosdb-emulator || true
-    - name: Archive Test Results
+    - name: Archive test results
       if: always()
-      continue-on-error: true
-      uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+      uses: ./.github/actions/archive-test-results
       with:
         name: test_output_${{ github.job }}_${{ matrix.framework }}
-        retention-days: 1
-        path: |
-          **/TestResults/*
-          **/logs/*
   test-consul:
     name: Consul provider tests
     runs-on: ubuntu-latest
@@ -689,31 +523,14 @@ jobs:
 
         bash .github/scripts/docker-pull-with-retry.sh "$TESTCONTAINERS_RYUK_IMAGE"
         bash .github/scripts/docker-pull-with-retry.sh "$CONSUL_IMAGE"
-    - name: Setup .NET
-      uses: actions/setup-dotnet@c2fa09f4bde5ebb9d1777cf28262a3eb3db3ced7 # v5
-      with:
-        global-json-file: global.json
-    - name: Setup code coverage
-      if: github.event_name == 'pull_request'
-      uses: ./.github/actions/setup-coverage
     - name: Test
-      shell: pwsh
-      run: >
-        ./.github/scripts/run-dotnet-test.ps1
-        -CoverageId "${{ github.job }}-${{ matrix.provider }}-${{ matrix.framework }}"
-        -Framework "${{ matrix.framework }}"
-        -FilterQuery "/[(Provider=${{ matrix.provider }})&((Suite=BVT)|(Suite=SlowBVT)|(Suite=Functional))&(Category!=Performance)&(Category!=Stress)]"
-        -ReportTrxFilename "test_results_${{ matrix.provider }}_${{ matrix.framework }}_{asm}_{tfm}_{arch}.trx"
-    - name: Archive Test Results
-      if: always()
-      continue-on-error: true
-      uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+      uses: ./.github/actions/run-tests
       with:
-        name: test_output_${{ github.job }}_${{ matrix.framework }}
-        retention-days: 1
-        path: |
-          **/TestResults/*
-          **/logs/*
+        artifact-name: test_output_${{ github.job }}_${{ matrix.framework }}
+        coverage-id: ${{ github.job }}-${{ matrix.provider }}-${{ matrix.framework }}
+        filter-query: /[(Provider=${{ matrix.provider }})&((Suite=BVT)|(Suite=SlowBVT)|(Suite=Functional))&(Category!=Performance)&(Category!=Stress)]
+        framework: ${{ matrix.framework }}
+        report-trx-filename: test_results_${{ matrix.provider }}_${{ matrix.framework }}_{asm}_{tfm}_{arch}.trx
   test-zookeeper:
     name: ZooKeeper provider tests
     runs-on: ubuntu-latest
@@ -740,36 +557,19 @@ jobs:
         echo "Waiting for ZooKeeper to accept TCP connections..."
         timeout 60 bash -c 'until nc -z localhost 2181; do sleep 1; done'
         echo "ZooKeeper is accepting TCP connections"
-    - name: Setup .NET
-      uses: actions/setup-dotnet@c2fa09f4bde5ebb9d1777cf28262a3eb3db3ced7 # v5
-      with:
-        global-json-file: global.json
-    - name: Setup code coverage
-      if: github.event_name == 'pull_request'
-      uses: ./.github/actions/setup-coverage
     - name: Test
-      shell: pwsh
-      run: >
-        ./.github/scripts/run-dotnet-test.ps1
-        -CoverageId "${{ github.job }}-${{ matrix.provider }}-${{ matrix.framework }}"
-        -Framework "${{ matrix.framework }}"
-        -FilterQuery "/[(Provider=${{ matrix.provider }})&((Suite=BVT)|(Suite=SlowBVT)|(Suite=Functional))&(Category!=Performance)&(Category!=Stress)]"
-        -ReportTrxFilename "test_results_${{ matrix.provider }}_${{ matrix.framework }}_{asm}_{tfm}_{arch}.trx"
+      uses: ./.github/actions/run-tests
+      with:
+        artifact-name: test_output_${{ github.job }}_${{ matrix.framework }}
+        coverage-id: ${{ github.job }}-${{ matrix.provider }}-${{ matrix.framework }}
+        filter-query: /[(Provider=${{ matrix.provider }})&((Suite=BVT)|(Suite=SlowBVT)|(Suite=Functional))&(Category!=Performance)&(Category!=Stress)]
+        framework: ${{ matrix.framework }}
+        report-trx-filename: test_results_${{ matrix.provider }}_${{ matrix.framework }}_{asm}_{tfm}_{arch}.trx
       env:
         ORLEANSZOOKEEPERCONNECTIONSTRING: "localhost:2181"
     - name: Clean up ZooKeeper
       if: always()
       run: docker rm -f zookeeper || true
-    - name: Archive Test Results
-      if: always()
-      continue-on-error: true
-      uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
-      with:
-        name: test_output_${{ github.job }}_${{ matrix.framework }}
-        retention-days: 1
-        path: |
-          **/TestResults/*
-          **/logs/*
   test-dynamodb:
     name: AWS DynamoDB provider tests
     runs-on: ubuntu-latest
@@ -804,21 +604,14 @@ jobs:
         echo "Waiting for DynamoDB Local to accept TCP connections..."
         timeout 60 bash -c 'until nc -z localhost 8000; do sleep 1; done'
         echo "DynamoDB Local is accepting TCP connections"
-    - name: Setup .NET
-      uses: actions/setup-dotnet@c2fa09f4bde5ebb9d1777cf28262a3eb3db3ced7 # v5
-      with:
-        global-json-file: global.json
-    - name: Setup code coverage
-      if: github.event_name == 'pull_request'
-      uses: ./.github/actions/setup-coverage
     - name: Test
-      shell: pwsh
-      run: >
-        ./.github/scripts/run-dotnet-test.ps1
-        -CoverageId "${{ github.job }}-${{ matrix.provider }}-${{ matrix.framework }}"
-        -Framework "${{ matrix.framework }}"
-        -FilterQuery "/[(Provider=${{ matrix.provider }})&((Suite=BVT)|(Suite=SlowBVT)|(Suite=Functional))&(Category!=Performance)&(Category!=Stress)]"
-        -ReportTrxFilename "test_results_${{ matrix.provider }}_${{ matrix.framework }}_{asm}_{tfm}_{arch}.trx"
+      uses: ./.github/actions/run-tests
+      with:
+        artifact-name: test_output_${{ github.job }}_${{ matrix.framework }}
+        coverage-id: ${{ github.job }}-${{ matrix.provider }}-${{ matrix.framework }}
+        filter-query: /[(Provider=${{ matrix.provider }})&((Suite=BVT)|(Suite=SlowBVT)|(Suite=Functional))&(Category!=Performance)&(Category!=Stress)]
+        framework: ${{ matrix.framework }}
+        report-trx-filename: test_results_${{ matrix.provider }}_${{ matrix.framework }}_{asm}_{tfm}_{arch}.trx
       env:
         ORLEANSDYNAMODBSERVICE: "http://127.0.0.1:8000"
 # [SuppressMessage("Microsoft.Security", "CS002:SecretInNextLine", Justification="Not a secret")]
@@ -828,16 +621,6 @@ jobs:
     - name: Clean up DynamoDB Local
       if: always()
       run: docker rm -f dynamodb || true
-    - name: Archive Test Results
-      if: always()
-      continue-on-error: true
-      uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
-      with:
-        name: test_output_${{ github.job }}_${{ matrix.framework }}
-        retention-days: 1
-        path: |
-          **/TestResults/*
-          **/logs/*
   test-sqs:
     name: AWS SQS provider tests
     runs-on: ubuntu-latest
@@ -883,22 +666,15 @@ jobs:
         echo "Waiting for ElasticMQ and DynamoDB Local to be ready..."
         timeout 60 bash -c 'until nc -z localhost 9324 && nc -z localhost 8000; do sleep 1; done'
         echo "ElasticMQ and DynamoDB Local are ready"
-    - name: Setup .NET
-      uses: actions/setup-dotnet@v4
-      with:
-        global-json-file: global.json
-    - name: Setup code coverage
-      if: github.event_name == 'pull_request'
-      uses: ./.github/actions/setup-coverage
     - name: Test
-      shell: pwsh
-      run: >
-        ./.github/scripts/run-dotnet-test.ps1
-        -CoverageId "${{ github.job }}-${{ matrix.provider }}-${{ matrix.framework }}"
-        -Framework "${{ matrix.framework }}"
-        -Project "test/Extensions/Orleans.AWS.Tests/Orleans.AWS.Tests.csproj"
-        -FilterQuery "/[(Provider=${{ matrix.provider }})&((Suite=BVT)|(Suite=SlowBVT)|(Suite=Functional))&(Category!=Performance)&(Category!=Stress)]"
-        -ReportTrxFilename "test_results_${{ matrix.provider }}_${{ matrix.framework }}_{asm}_{tfm}_{arch}.trx"
+      uses: ./.github/actions/run-tests
+      with:
+        artifact-name: test_output_${{ github.job }}_${{ matrix.framework }}
+        coverage-id: ${{ github.job }}-${{ matrix.provider }}-${{ matrix.framework }}
+        filter-query: /[(Provider=${{ matrix.provider }})&((Suite=BVT)|(Suite=SlowBVT)|(Suite=Functional))&(Category!=Performance)&(Category!=Stress)]
+        framework: ${{ matrix.framework }}
+        project: test/Extensions/Orleans.AWS.Tests/Orleans.AWS.Tests.csproj
+        report-trx-filename: test_results_${{ matrix.provider }}_${{ matrix.framework }}_{asm}_{tfm}_{arch}.trx
       env:
         ORLEANSSQSCONNECTIONSTRING: "Service=http://127.0.0.1:9324"
         ORLEANSDYNAMODBSERVICE: "http://127.0.0.1:8000"
@@ -912,16 +688,6 @@ jobs:
     - name: Clean up DynamoDB Local
       if: always()
       run: docker rm -f dynamodb || true
-    - name: Archive Test Results
-      if: always()
-      continue-on-error: true
-      uses: actions/upload-artifact@v4
-      with:
-        name: test_output_${{ github.job }}_${{ matrix.framework }}
-        retention-days: 1
-        path: |
-          **/TestResults/*
-          **/logs/*
   test-nats:
     name: NATS stream provider tests
     runs-on: ubuntu-latest
@@ -962,35 +728,18 @@ jobs:
           exit 1
         fi
         echo "NATS is ready"
-    - name: Setup .NET
-      uses: actions/setup-dotnet@c2fa09f4bde5ebb9d1777cf28262a3eb3db3ced7 # v5
-      with:
-        global-json-file: global.json
-    - name: Setup code coverage
-      if: github.event_name == 'pull_request'
-      uses: ./.github/actions/setup-coverage
     - name: Test
-      shell: pwsh
-      run: >
-        ./.github/scripts/run-dotnet-test.ps1
-        -CoverageId "${{ github.job }}-${{ matrix.provider }}-${{ matrix.framework }}"
-        -Framework "${{ matrix.framework }}"
-        -Project "test/Extensions/Orleans.Streaming.NATS.Tests/Orleans.Streaming.NATS.Tests.csproj"
-        -FilterQuery "/[(Provider=${{ matrix.provider }})&((Suite=BVT)|(Suite=SlowBVT)|(Suite=Functional))&(Category!=Performance)&(Category!=Stress)]"
-        -ReportTrxFilename "test_results_${{ matrix.provider }}_${{ matrix.framework }}_{asm}_{tfm}_{arch}.trx"
+      uses: ./.github/actions/run-tests
+      with:
+        artifact-name: test_output_${{ github.job }}_${{ matrix.framework }}
+        coverage-id: ${{ github.job }}-${{ matrix.provider }}-${{ matrix.framework }}
+        filter-query: /[(Provider=${{ matrix.provider }})&((Suite=BVT)|(Suite=SlowBVT)|(Suite=Functional))&(Category!=Performance)&(Category!=Stress)]
+        framework: ${{ matrix.framework }}
+        project: test/Extensions/Orleans.Streaming.NATS.Tests/Orleans.Streaming.NATS.Tests.csproj
+        report-trx-filename: test_results_${{ matrix.provider }}_${{ matrix.framework }}_{asm}_{tfm}_{arch}.trx
     - name: Clean up container
       if: always()
       run: docker rm -f nats || true
-    - name: Archive Test Results
-      if: always()
-      continue-on-error: true
-      uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
-      with:
-        name: test_output_${{ github.job }}_${{ matrix.framework }}
-        retention-days: 1
-        path: |
-          **/TestResults/*
-          **/logs/*
   test-kinesis:
     name: AWS Kinesis provider tests
     runs-on: ubuntu-latest
@@ -1037,22 +786,15 @@ jobs:
         echo "Waiting for Ministack and DynamoDB Local to be ready..."
         timeout 60 bash -c 'until curl --fail --silent http://localhost:4566/_ministack/health > /dev/null && nc -z localhost 8000; do sleep 1; done'
         echo "Ministack and DynamoDB Local are ready"
-    - name: Setup .NET
-      uses: actions/setup-dotnet@c2fa09f4bde5ebb9d1777cf28262a3eb3db3ced7 # v5
-      with:
-        global-json-file: global.json
-    - name: Setup code coverage
-      if: github.event_name == 'pull_request'
-      uses: ./.github/actions/setup-coverage
     - name: Test
-      shell: pwsh
-      run: >
-        ./.github/scripts/run-dotnet-test.ps1
-        -CoverageId "${{ github.job }}-${{ matrix.provider }}-${{ matrix.framework }}"
-        -Framework "${{ matrix.framework }}"
-        -Project "test/Extensions/Orleans.Streaming.Kinesis.Tests/Orleans.Streaming.Kinesis.Tests.csproj"
-        -FilterQuery "/[(Provider=${{ matrix.provider }})&((Suite=BVT)|(Suite=SlowBVT)|(Suite=Functional))&(Category!=Performance)&(Category!=Stress)]"
-        -ReportTrxFilename "test_results_${{ matrix.provider }}_${{ matrix.framework }}_{asm}_{tfm}_{arch}.trx"
+      uses: ./.github/actions/run-tests
+      with:
+        artifact-name: test_output_${{ github.job }}_${{ matrix.framework }}
+        coverage-id: ${{ github.job }}-${{ matrix.provider }}-${{ matrix.framework }}
+        filter-query: /[(Provider=${{ matrix.provider }})&((Suite=BVT)|(Suite=SlowBVT)|(Suite=Functional))&(Category!=Performance)&(Category!=Stress)]
+        framework: ${{ matrix.framework }}
+        project: test/Extensions/Orleans.Streaming.Kinesis.Tests/Orleans.Streaming.Kinesis.Tests.csproj
+        report-trx-filename: test_results_${{ matrix.provider }}_${{ matrix.framework }}_{asm}_{tfm}_{arch}.trx
       env:
         ORLEANSKINESISCONNECTIONSTRING: "http://localhost:4566;test;test;us-east-1"
         ORLEANSDYNAMODBSERVICE: "http://localhost:8000"
@@ -1066,16 +808,6 @@ jobs:
     - name: Clean up DynamoDB Local
       if: always()
       run: docker rm -f dynamodb || true
-    - name: Archive Test Results
-      if: always()
-      continue-on-error: true
-      uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
-      with:
-        name: test_output_${{ github.job }}_${{ matrix.framework }}
-        retention-days: 1
-        path: |
-          **/TestResults/*
-          **/logs/*
   test:
     name: Test
     runs-on: ${{ matrix.os }}
@@ -1091,13 +823,7 @@ jobs:
       uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
       with:
         node-version: '24.x'
-    - name: Setup .NET
-      uses: actions/setup-dotnet@c2fa09f4bde5ebb9d1777cf28262a3eb3db3ced7 # v5
-      with:
-        global-json-file: global.json
-    - name: Setup code coverage
-      if: github.event_name == 'pull_request'
-      uses: ./.github/actions/setup-coverage
+    - uses: ./.github/actions/setup-test-environment
     - name: Build
       run: dotnet build
     - name: Test
@@ -1108,47 +834,26 @@ jobs:
         -Framework "${{ matrix.framework }}"
         -FilterQuery "/[(Provider=None)&(Suite=${{ matrix.suite }})&(Area!=CodeGen)]"
         -ReportTrxFilename "test_results_${{ matrix.suite }}_${{ matrix.framework }}_{asm}_{tfm}_{arch}.trx"
-    - name: Archive Test Results
+    - name: Archive test results
       if: always()
-      continue-on-error: true
-      uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+      uses: ./.github/actions/archive-test-results
       with:
         name: test_output_${{ github.job }}_${{ matrix.suite }}_${{ matrix.os }}_${{ matrix.framework }}
-        retention-days: 1
-        path: |
-          **/TestResults/*
-          **/logs/*
   coverage-merge:
     name: Merge code coverage
     if: github.event_name == 'pull_request' && !cancelled()
-    needs:
-      - test-redis
-      - test-cassandra
-      - test-postgres
-      - test-mariadb
-      - test-sqlserver
-      - test-sqlite
-      - test-azure-storage
-      - test-azure-eventhubs
-      - test-azure-cosmosdb
-      - test-consul
-      - test-zookeeper
-      - test-dynamodb
-      - test-sqs
-      - test-nats
-      - test-kinesis
-      - test
-      - test-codegenerator
-      - test-google
+    needs: ci
     runs-on: ubuntu-latest
     permissions:
       actions: read
       contents: read
     steps:
+    - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
     - name: Setup .NET
       uses: actions/setup-dotnet@c2fa09f4bde5ebb9d1777cf28262a3eb3db3ced7 # v5
       with:
         dotnet-version: '10.0.400'
+    - uses: ./.github/actions/setup-coverage
     - name: Download coverage data
       uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
       with:
@@ -1157,55 +862,12 @@ jobs:
         merge-multiple: false
     - name: Merge coverage
       shell: pwsh
-      run: |
-        dotnet tool install --tool-path .tools dotnet-coverage --version $env:DOTNET_COVERAGE_VERSION
-        New-Item -ItemType Directory -Force -Path TestResults | Out-Null
-
-        $artifactDirectories = @(Get-ChildItem -LiteralPath 'coverage-data' -Directory)
-        $expectedArtifactCount = 60
-        if ($artifactDirectories.Count -ne $expectedArtifactCount) {
-          throw "Expected coverage from $expectedArtifactCount test matrix jobs, found $($artifactDirectories.Count)"
-        }
-
-        $coverageFiles = @(
-          foreach ($artifactDirectory in $artifactDirectories) {
-            $reports = @(Get-ChildItem -LiteralPath $artifactDirectory.FullName -Recurse -File -Filter '*.cobertura.xml')
-            if ($reports.Count -eq 0) {
-              throw "$($artifactDirectory.Name) contains no coverage report"
-            }
-
-            Write-Host "Merging $($reports.Count) coverage report(s) from $($artifactDirectory.Name)."
-            $reports
-          }
-        )
-
-        $duplicateNames = @($coverageFiles | Group-Object Name | Where-Object Count -gt 1)
-        if ($duplicateNames.Count -gt 0) {
-          $names = $duplicateNames.Name -join ', '
-          throw "Coverage report names must be unique across test matrix jobs: $names"
-        }
-
-        ./.tools/dotnet-coverage merge $coverageFiles.FullName `
-          --output TestResults/coverage.cobertura.xml `
-          --output-format cobertura `
-          --remove-input-files `
-          --nologo
-
-        $settings = [Xml.XmlReaderSettings]::new()
-        $settings.DtdProcessing = [Xml.DtdProcessing]::Prohibit
-        $settings.XmlResolver = $null
-        $settings.MaxCharactersInDocument = 100MB
-        $reader = [Xml.XmlReader]::Create('TestResults/coverage.cobertura.xml', $settings)
-        try {
-          $coverage = [Xml.XmlDocument]::new()
-          $coverage.XmlResolver = $null
-          $coverage.Load($reader)
-          if (-not $coverage.SelectSingleNode('//*[local-name()="line"]')) {
-            throw 'Merged coverage report contains no measured lines'
-          }
-        } finally {
-          $reader.Dispose()
-        }
+      run: >
+        ./.github/scripts/merge-coverage.ps1
+        -CoverageToolPath ./.tools/dotnet-coverage
+        -ExpectedArtifactCount 60
+        -OutputPath TestResults/coverage.cobertura.xml
+        -ReportDirectory coverage-data
     - name: Archive coverage
       uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
       with:
@@ -1223,39 +885,18 @@ jobs:
         framework: ["net8.0", "net10.0"]
     steps:
     - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
-    - name: Setup .NET
-      uses: actions/setup-dotnet@c2fa09f4bde5ebb9d1777cf28262a3eb3db3ced7 # v5
-      with:
-        global-json-file: global.json
-    - name: Setup code coverage
-      if: github.event_name == 'pull_request'
-      uses: ./.github/actions/setup-coverage
+    - uses: ./.github/actions/setup-test-environment
     - name: Test Code Generator
       shell: pwsh
-      run: |
-        ./.github/scripts/run-dotnet-test.ps1 `
-          -CoverageId "${{ github.job }}-generator-${{ matrix.os }}-${{ matrix.framework }}" `
-          -Framework "${{ matrix.framework }}" `
-          -Project "test/Orleans.CodeGenerator.Tests/Orleans.CodeGenerator.Tests.csproj" `
-          -UseStaticInstrumentation `
-          -ReportTrxFilename "test_results_${{ matrix.framework }}_{asm}_{tfm}_{arch}.trx"
-        ./.github/scripts/run-dotnet-test.ps1 `
-          -CoverageId "${{ github.job }}-defaultcluster-${{ matrix.os }}-${{ matrix.framework }}" `
-          -Framework "${{ matrix.framework }}" `
-          -Project "test/Orleans.DefaultCluster.Tests/Orleans.DefaultCluster.Tests.csproj" `
-          -FilterQuery "/[(Provider=None)&(Area=CodeGen)&((Suite=BVT)|(Suite=SlowBVT)|(Suite=Functional))]" `
-          -UseStaticInstrumentation `
-          -ReportTrxFilename "test_results_defaultcluster_codegen_${{ matrix.framework }}_{asm}_{tfm}_{arch}.trx"
-    - name: Archive Test Results
+      run: >
+        ./.github/scripts/run-codegenerator-tests.ps1
+        -CoveragePrefix "${{ github.job }}-${{ matrix.os }}-${{ matrix.framework }}"
+        -Framework "${{ matrix.framework }}"
+    - name: Archive test results
       if: always()
-      continue-on-error: true
-      uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+      uses: ./.github/actions/archive-test-results
       with:
         name: test_output_${{ github.job }}_${{ matrix.os }}_${{ matrix.framework }}
-        retention-days: 1
-        path: |
-          **/TestResults/*
-          **/logs/*
   test-google:
     name: Google Cloud providers tests
     runs-on: ubuntu-latest
@@ -1270,13 +911,6 @@ jobs:
       uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
       with:
         node-version: '24.x'
-    - name: Setup .NET
-      uses: actions/setup-dotnet@c2fa09f4bde5ebb9d1777cf28262a3eb3db3ced7 # v5
-      with:
-        global-json-file: global.json
-    - name: Setup code coverage
-      if: github.event_name == 'pull_request'
-      uses: ./.github/actions/setup-coverage
     - name: Setup Java
       uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961 # v5
       with:
@@ -1318,23 +952,13 @@ jobs:
         cat firebase-emulators.log
         exit 1
     - name: Test
-      shell: pwsh
-      run: >
-        ./.github/scripts/run-dotnet-test.ps1
-        -CoverageId "${{ github.job }}-${{ matrix.provider }}-${{ matrix.framework }}"
-        -Framework "${{ matrix.framework }}"
-        -FilterQuery "/[(Provider=${{ matrix.provider }})&((Suite=BVT)|(Suite=SlowBVT)|(Suite=Functional))&(Category!=Performance)&(Category!=Stress)]"
-        -ReportTrxFilename "test_results_${{ matrix.provider }}_${{ matrix.framework }}_{asm}_{tfm}_{arch}.trx"
-    - name: Archive Test Results
-      if: always()
-      continue-on-error: true
-      uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+      uses: ./.github/actions/run-tests
       with:
-        name: test_output_${{ github.job }}_${{ matrix.framework }}
-        retention-days: 1
-        path: |
-          **/TestResults/*
-          **/logs/*
+        artifact-name: test_output_${{ github.job }}_${{ matrix.framework }}
+        coverage-id: ${{ github.job }}-${{ matrix.provider }}-${{ matrix.framework }}
+        filter-query: /[(Provider=${{ matrix.provider }})&((Suite=BVT)|(Suite=SlowBVT)|(Suite=Functional))&(Category!=Performance)&(Category!=Stress)]
+        framework: ${{ matrix.framework }}
+        report-trx-filename: test_results_${{ matrix.provider }}_${{ matrix.framework }}_{asm}_{tfm}_{arch}.trx
   ci:
     name: CI
     if: always()
