@@ -148,7 +148,12 @@ internal sealed partial class ActivationData :
     public ActivationState State { get; private set; } = ActivationState.Creating;
     public PlacementStrategy PlacementStrategy => _shared.PlacementStrategy;
     public DateTime CollectionTicket { get; set; }
+
+    /// <summary>
+    /// Gets the monitor which protects mutable state for this activation.
+    /// </summary>
     internal object SynchronizationLock => _lock;
+
     public IServiceProvider ActivationServices => _serviceScope.ServiceProvider;
     public ActivationId ActivationId => Address.ActivationId;
     public IGrainLifecycle ObservableLifecycle
@@ -162,8 +167,11 @@ internal sealed partial class ActivationData :
 
     internal GrainTypeSharedContext Shared => _shared;
 
-    internal static object GetSynchronizationLock(ICollectibleGrainContext context) =>
-        context is ActivationData activation ? activation._lock : context;
+    /// <summary>
+    /// Gets the monitor which protects collection state for the provided context.
+    /// </summary>
+    internal static object GetSynchronizationLock(ICollectibleGrainContext context)
+        => context is ActivationData activation ? activation._lock : context;
 
     public GrainId GrainId => Address.GrainId;
     public bool IsExemptFromCollection => _shared.CollectionAgeLimit == Timeout.InfiniteTimeSpan;
@@ -2456,13 +2464,12 @@ internal sealed partial class ActivationData :
     private abstract class Command(CancellationTokenSource cts) : IDisposable
     {
         private bool _disposed;
-        private readonly object _lock = new();
         private readonly CancellationTokenSource _cts = cts;
         public CancellationToken CancellationToken => _cts.Token;
 
         public virtual void Cancel()
         {
-            lock (_lock)
+            lock (_cts)
             {
                 if (_disposed) return;
                 _cts.Cancel();
@@ -2473,7 +2480,7 @@ internal sealed partial class ActivationData :
         {
             try
             {
-                lock (_lock)
+                lock (_cts)
                 {
                     _disposed = true;
                     _cts.Dispose();

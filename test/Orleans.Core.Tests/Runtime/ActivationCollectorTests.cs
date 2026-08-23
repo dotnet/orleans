@@ -103,6 +103,22 @@ namespace UnitTests.Runtime
             Assert.NotEqual(DateTime.MaxValue, activation.CollectionTicket);
         }
 
+        [Fact, TestCategory("Activation")]
+        public void ScheduleCollection_UsesContextMonitor_ForNonActivationData()
+        {
+            var activation = Substitute.For<ICollectibleGrainContext>();
+            activation.IsExemptFromCollection.Returns(_ =>
+            {
+                Assert.True(Monitor.IsEntered(activation));
+                return false;
+            });
+
+            var now = timeProvider.GetUtcNow().UtcDateTime;
+            collector.ScheduleCollection(activation, TimeSpan.FromMinutes(1), now);
+
+            Assert.NotEqual(default, activation.CollectionTicket);
+        }
+
         [Theory, TestCategory("MemoryBasedDeactivations")]
         [InlineData(80.0, 70.0, 1000, 150, 100, true, 82)] // Over threshold, need to deactivate
         [InlineData(80.0, 70.0, 1000, 250, 100, false, 0)] // Below threshold, no deactivation
