@@ -28,10 +28,10 @@ internal sealed class EntraTokenProvider : IEntraTokenProvider
 
     public async ValueTask<AccessToken> GetTokenAsync(CancellationToken cancellationToken)
     {
-        var configuredScope = _options.TokenScope!;
+        var configuredScope = _options.TokenScope!.TrimEnd('/');
         var requestScope = configuredScope.EndsWith("/.default", StringComparison.Ordinal)
             ? configuredScope
-            : $"{configuredScope.TrimEnd('/')}/.default";
+            : $"{configuredScope}/.default";
         var token = await _credential.GetTokenAsync(
             new TokenRequestContext([requestScope]),
             cancellationToken).ConfigureAwait(false);

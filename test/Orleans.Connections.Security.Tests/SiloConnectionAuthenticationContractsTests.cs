@@ -282,10 +282,17 @@ public class SiloConnectionAuthenticationProtocolTests
                 Assert.Contains("does not permit", exception.Message, StringComparison.Ordinal);
             }
 
-            [Fact]
-            public void RequiredMode_RequiresOnlyServicesUsedByConnectionDirection()
+            [Theory]
+            [InlineData(SiloConnectionAuthenticationMode.Audit)]
+            [InlineData(SiloConnectionAuthenticationMode.Required)]
+            public void EnabledModes_RequireOnlyServicesUsedByConnectionDirection(
+                SiloConnectionAuthenticationMode mode)
             {
-                var clientOptions = new SiloConnectionAuthenticationOptions { TargetHost = "gateway.test" };
+                var clientOptions = new SiloConnectionAuthenticationOptions
+                {
+                    Mode = mode,
+                    TargetHost = "gateway.test",
+                };
                 var clientRegistration = new ClientConnectionAuthenticationRegistration(
                     "client",
                     new object(),
@@ -293,7 +300,7 @@ public class SiloConnectionAuthenticationProtocolTests
                     new TlsOptions(),
                     hasTokenProvider: true,
                     hasTokenValidator: false);
-                var gatewayOptions = new SiloConnectionAuthenticationOptions();
+                var gatewayOptions = new SiloConnectionAuthenticationOptions { Mode = mode };
                 var gatewayRegistration = new GatewayConnectionAuthenticationRegistration(
                     "gateway",
                     new object(),
@@ -306,6 +313,44 @@ public class SiloConnectionAuthenticationProtocolTests
                     .Validate("client", clientOptions).Succeeded);
                 Assert.True(new SiloConnectionAuthenticationOptionsValidator(gatewayRegistration)
                     .Validate("gateway", gatewayOptions).Succeeded);
+            }
+
+            [Theory]
+            [InlineData(SiloConnectionAuthenticationMode.Audit)]
+            [InlineData(SiloConnectionAuthenticationMode.Required)]
+            public void EnabledModes_RejectMissingDirectionalServices(
+                SiloConnectionAuthenticationMode mode)
+            {
+                var clientOptions = new SiloConnectionAuthenticationOptions
+                {
+                    Mode = mode,
+                    TargetHost = "gateway.test",
+                };
+                var clientRegistration = new ClientConnectionAuthenticationRegistration(
+                    "client",
+                    new object(),
+                    clientOptions,
+                    new TlsOptions(),
+                    hasTokenProvider: false,
+                    hasTokenValidator: false);
+                var gatewayOptions = new SiloConnectionAuthenticationOptions { Mode = mode };
+                var gatewayRegistration = new GatewayConnectionAuthenticationRegistration(
+                    "gateway",
+                    new object(),
+                    gatewayOptions,
+                    new TlsOptions(),
+                    hasTokenProvider: false,
+                    hasTokenValidator: false);
+
+                var clientResult = new SiloConnectionAuthenticationOptionsValidator(clientRegistration)
+                    .Validate("client", clientOptions);
+                var gatewayResult = new SiloConnectionAuthenticationOptionsValidator(gatewayRegistration)
+                    .Validate("gateway", gatewayOptions);
+
+                Assert.False(clientResult.Succeeded);
+                Assert.Contains($"{mode} mode needs exactly one token provider.", clientResult.FailureMessage);
+                Assert.False(gatewayResult.Succeeded);
+                Assert.Contains($"{mode} mode needs exactly one token validator.", gatewayResult.FailureMessage);
             }
 
             private sealed class TestTokenProvider(string value) : ISiloConnectionTokenProvider

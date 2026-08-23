@@ -43,18 +43,21 @@ internal sealed class SiloConnectionAuthenticationOptionsValidator : IValidateOp
             failures.Add($"{nameof(options.TimeProvider)} is required.");
         }
 
-        if (options.Mode == SiloConnectionAuthenticationMode.Required)
+        if (options.Mode != SiloConnectionAuthenticationMode.Disabled)
         {
             if (_registration.RequiresTokenProvider && !_registration.HasTokenProvider)
             {
-                failures.Add("Required mode needs exactly one token provider.");
+                failures.Add($"{options.Mode} mode needs exactly one token provider.");
             }
 
             if (_registration.RequiresTokenValidator && !_registration.HasTokenValidator)
             {
-                failures.Add("Required mode needs exactly one token validator.");
+                failures.Add($"{options.Mode} mode needs exactly one token validator.");
             }
+        }
 
+        if (options.Mode == SiloConnectionAuthenticationMode.Required)
+        {
             if (_registration.TlsOptions.RemoteCertificateValidation is not null)
             {
                 failures.Add("Required mode does not permit custom remote-certificate validation callbacks.");
