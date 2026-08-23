@@ -110,6 +110,48 @@ public class FirestoreRemindersTests : ReminderTableTestsBase, IClassFixture<Tes
     }
 
     [Fact]
+    public async Task IdenticalReplacementsReturnDistinctETags()
+    {
+        var reminder = new ReminderEntry
+        {
+            GrainId = GrainId.Parse($"user/{Guid.NewGuid():N}"),
+            ReminderName = "rapid-replacement",
+            StartAt = new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc),
+            Period = TimeSpan.FromMinutes(1),
+        };
+
+        var firstETag = await RemindersTable.UpsertRow(reminder);
+        reminder.ETag = null;
+        var secondETag = await RemindersTable.UpsertRow(reminder);
+        reminder.ETag = secondETag;
+        var thirdETag = await RemindersTable.UpsertRow(reminder);
+
+        Assert.False(string.IsNullOrEmpty(firstETag));
+        Assert.False(string.IsNullOrEmpty(secondETag));
+        Assert.False(string.IsNullOrEmpty(thirdETag));
+        Assert.NotEqual(firstETag, secondETag);
+        Assert.NotEqual(secondETag, thirdETag);
+        Assert.Equal(thirdETag, (await RemindersTable.ReadRow(reminder.GrainId, reminder.ReminderName))?.ETag);
+    }
+
+    [Fact]
+    public async Task WildcardETagRemovesExistingReminder()
+    {
+        var reminder = new ReminderEntry
+        {
+            GrainId = GrainId.Parse($"user/{Guid.NewGuid():N}"),
+            ReminderName = "wildcard-removal",
+            StartAt = new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc),
+            Period = TimeSpan.FromMinutes(1),
+        };
+
+        await RemindersTable.UpsertRow(reminder);
+
+        Assert.True(await RemindersTable.RemoveRow(reminder.GrainId, reminder.ReminderName, "*"));
+        Assert.Null(await RemindersTable.ReadRow(reminder.GrainId, reminder.ReminderName));
+    }
+
+    [Fact]
     public async Task UnspecifiedStartTimePreservesTicks()
     {
         var startAt = new DateTime(2026, 1, 1, 12, 34, 56, DateTimeKind.Unspecified);

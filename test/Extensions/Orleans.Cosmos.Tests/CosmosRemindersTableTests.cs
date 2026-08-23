@@ -14,6 +14,7 @@ namespace Tester.Cosmos.Reminders;
 [TestProvider("Cosmos")]
 [TestArea("Reminders")]
 [TestCategory("Reminders"), TestCategory("Cosmos")]
+[TestSuite("Functional")]
 public class CosmosRemindersTableTests : ReminderTableTestsBase
 {
     public CosmosRemindersTableTests(ConnectionStringFixture fixture, TestEnvironmentFixture environment)

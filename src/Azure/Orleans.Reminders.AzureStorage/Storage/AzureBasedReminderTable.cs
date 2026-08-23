@@ -18,7 +18,8 @@ namespace Orleans.Runtime.ReminderService
         private readonly ClusterOptions clusterOptions;
         private readonly AzureTableReminderStorageOptions storageOptions;
         private readonly RemindersTableManager remTableManager;
-        private readonly TaskCompletionSource _initializationTask = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        private readonly SemaphoreSlim _lifecycleLock = new(1, 1);
+        private TaskCompletionSource _initializationTask = CreateInitializationSource();
 
         public AzureBasedReminderTable(
             ILoggerFactory loggerFactory,
@@ -38,14 +39,26 @@ namespace Orleans.Runtime.ReminderService
 
         public async Task StartAsync(CancellationToken cancellationToken)
         {
+            await _lifecycleLock.WaitAsync(cancellationToken);
             try
             {
+                if (_initializationTask.Task.IsCompletedSuccessfully)
+                {
+                    return;
+                }
+
+                if (_initializationTask.Task.IsCompleted)
+                {
+                    Volatile.Write(ref _initializationTask, CreateInitializationSource());
+                }
+
+                var initialization = _initializationTask;
                 while (true)
                 {
                     try
                     {
                         await remTableManager.InitTableAsync();
-                        _initializationTask.TrySetResult();
+                        initialization.TrySetResult();
                         return;
                     }
                     catch (Exception ex) when (!cancellationToken.IsCancellationRequested)
@@ -67,13 +80,29 @@ namespace Orleans.Runtime.ReminderService
                 _initializationTask.TrySetException(ex);
                 throw;
             }
+            finally
+            {
+                _lifecycleLock.Release();
+            }
         }
 
-        public Task StopAsync(CancellationToken cancellationToken)
+        public async Task StopAsync(CancellationToken cancellationToken)
         {
-            _initializationTask.TrySetCanceled(CancellationToken.None);
-            return Task.CompletedTask;
+            await _lifecycleLock.WaitAsync(cancellationToken);
+            try
+            {
+                var stopped = CreateInitializationSource();
+                stopped.TrySetCanceled(CancellationToken.None);
+                Volatile.Write(ref _initializationTask, stopped);
+            }
+            finally
+            {
+                _lifecycleLock.Release();
+            }
         }
+
+        private static TaskCompletionSource CreateInitializationSource()
+            => new(TaskCreationOptions.RunContinuationsAsynchronously);
 
         private ReminderTableData ConvertFromTableEntryList(List<(ReminderTableEntry Entity, string ETag)> entries)
         {
@@ -152,7 +181,7 @@ namespace Orleans.Runtime.ReminderService
 
         public async Task TestOnlyClearTable()
         {
-            await _initializationTask.Task;
+            await Volatile.Read(ref _initializationTask).Task;
 
             await this.remTableManager.DeleteTableEntries();
         }
@@ -161,7 +190,7 @@ namespace Orleans.Runtime.ReminderService
         {
             try
             {
-                await _initializationTask.Task;
+                await Volatile.Read(ref _initializationTask).Task;
 
                 var entries = await this.remTableManager.FindReminderEntries(grainId);
                 ReminderTableData data = ConvertFromTableEntryList(entries);
@@ -179,7 +208,7 @@ namespace Orleans.Runtime.ReminderService
         {
             try
             {
-                await _initializationTask.Task;
+                await Volatile.Read(ref _initializationTask).Task;
 
                 var entries = await this.remTableManager.FindReminderEntries(begin, end);
                 ReminderTableData data = ConvertFromTableEntryList(entries);
@@ -197,7 +226,7 @@ namespace Orleans.Runtime.ReminderService
         {
             try
             {
-                await _initializationTask.Task;
+                await Volatile.Read(ref _initializationTask).Task;
 
                 LogDebugReadRow(grainId, reminderName);
                 var result = await this.remTableManager.FindReminderEntry(grainId, reminderName);
@@ -214,7 +243,7 @@ namespace Orleans.Runtime.ReminderService
         {
             try
             {
-                await _initializationTask.Task;
+                await Volatile.Read(ref _initializationTask).Task;
 
                 LogDebugUpsertRow(entry);
                 ReminderTableEntry remTableEntry = ConvertToTableEntry(entry, this.clusterOptions.ServiceId, this.clusterOptions.ClusterId);
@@ -244,7 +273,7 @@ namespace Orleans.Runtime.ReminderService
 
             try
             {
-                await _initializationTask.Task;
+                await Volatile.Read(ref _initializationTask).Task;
 
                 LogTraceRemoveRow(entry);
 
