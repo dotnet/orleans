@@ -35,6 +35,8 @@ Scope: this design covers Orleans internal runtime replication for bounded, mono
 
 The key distinguishing factors are value cardinality, update rate, payload size, diffability, and correctness authority. Load has many small latest-wins values. Membership has one correctness-sensitive stream which can potentially be represented as diffs. Manifests are large, mostly identical across hosts, and better handled by content-addressed pull with direct fallback.
 
+Deployment load mutations use one status-and-version boundary shared by direct publication, refresh, dissemination, and terminal membership removal. Active status is checked before version comparison, newer timestamps supersede older timestamps, and terminal removal is ordered with updates so a late value cannot resurrect a removed silo.
+
 ## Value model
 
 Each disseminated value is summarized by a payload-free `DisseminationTopicDigest`. The topic comes from the enclosing grouped batch or topic API:
@@ -214,6 +216,8 @@ Current branch behavior:
 - When a silo manifest is missing, the provider asks the target silo for its manifest hash, reuses a cached manifest when possible, fetches by hash otherwise, validates the hash before accepting the payload, and falls back to direct manifest fetch if the hash path fails.
 - The provider removes non-active silos from the cluster manifest and only fetches manifests for active silos.
 
+The canonical hash input is a versioned, domain-separated structural encoding. Manifest, collection, entry, field, property, count, raw type-byte, and UTF-16 code-unit boundaries are explicit. Type identifiers are ordered by their raw bytes and property dictionaries are ordered ordinally before encoding. Hashes are transient runtime cache/exchange identifiers rather than persisted manifest identities. If peers use different encoding versions during an upgrade, validation declines cache reuse and the existing direct manifest fetch path supplies the manifest.
+
 Accepted improvement:
 
 - When many active manifests are missing, fetch a peer's whole cluster manifest or hash summary first.
@@ -234,6 +238,7 @@ Failure behavior:
 - Non-active participants in the all-member tree can be unavailable while publication proceeds.
 - If dissemination is disabled, publish-time validation fails, payloads are oversize, or topic fallback is required before queueing, the producer uses the existing topic-specific safety path.
 - Tree-send failures and short-lived membership skew are repaired by anti-entropy and existing authoritative refresh paths.
+- Each received gossip value is processed independently. An apply or forwarding failure is logged and diagnosed for that value, later values in the one-way batch continue, and anti-entropy repairs the missed subtree. Caller cancellation still stops batch processing.
 - Pending gossip queues enforce per-topic item limits and global batch item/byte limits. Values which expire or become obsolete while queued are discarded before transport.
 - Anti-entropy bounds each request, each response, and the total retained repair data for a round.
 - Shutdown stops new scheduling, waits for active flush work, flushes remaining queued values, and cancels background work before returning.
@@ -277,6 +282,8 @@ Runtime implementation:
 - `src\Orleans.Runtime\Dissemination\DisseminationSystemTarget.cs`: Orleans system target endpoint.
 - `src\Orleans.Runtime\Dissemination\OrleansDisseminationTransport.cs`: system-target transport adapter and membership-scope construction.
 - `src\Orleans.Runtime\Dissemination\DisseminationInstruments.cs` and `DisseminationEvents.cs`: metrics and diagnostic events.
+
+Forwarding failures increment `orleans.dissemination.forward.failures` with topic and bounded reason tags (`exception` or `queue-capacity`) and emit `Dissemination.ForwardFailure` diagnostic events containing the topic, key, version, reason, payload size, and the failed peer when a target is known.
 
 Topic implementations:
 

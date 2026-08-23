@@ -5,6 +5,8 @@ namespace Orleans.Configuration;
 
 internal sealed class DisseminationOptionsValidator : IValidateOptions<DisseminationOptions>
 {
+    private static readonly TimeSpan MaximumTimerDelay = TimeSpan.FromMilliseconds(uint.MaxValue - 1);
+
     public ValidateOptionsResult Validate(string? name, DisseminationOptions options)
     {
         if (options.MaxConcurrentSends <= 0)
@@ -48,6 +50,11 @@ internal sealed class DisseminationOptionsValidator : IValidateOptions<Dissemina
             return ValidateOptionsResult.Fail($"{nameof(DisseminationOverlayOptions.AntiEntropyInterval)} must be greater than 0.");
         }
 
+        if (overlay.AntiEntropyInterval > MaximumTimerDelay)
+        {
+            return ValidateOptionsResult.Fail($"{nameof(DisseminationOverlayOptions.AntiEntropyInterval)} must not exceed {MaximumTimerDelay}.");
+        }
+
         if (overlay.AntiEntropyPeerCount <= 0)
         {
             return ValidateOptionsResult.Fail($"{nameof(DisseminationOverlayOptions.AntiEntropyPeerCount)} must be greater than 0.");
@@ -59,6 +66,8 @@ internal sealed class DisseminationOptionsValidator : IValidateOptions<Dissemina
 
 internal sealed class DisseminationTopicOptionsValidator
 {
+    private static readonly TimeSpan MaximumTimerDelay = TimeSpan.FromMilliseconds(uint.MaxValue - 1);
+
     public static ValidateOptionsResult Validate(string owner, DisseminationTopicOptions options)
     {
         if (options.MaxPendingItemCount <= 0)
@@ -69,6 +78,11 @@ internal sealed class DisseminationTopicOptionsValidator
         if (options.MaxCoalescingDelay <= TimeSpan.Zero)
         {
             return ValidateOptionsResult.Fail($"{owner}.{nameof(DisseminationTopicOptions.MaxCoalescingDelay)} must be greater than 0.");
+        }
+
+        if (options.MaxCoalescingDelay > MaximumTimerDelay)
+        {
+            return ValidateOptionsResult.Fail($"{owner}.{nameof(DisseminationTopicOptions.MaxCoalescingDelay)} must not exceed {MaximumTimerDelay}.");
         }
 
         if (options.StaleItemTtl <= options.MaxCoalescingDelay)

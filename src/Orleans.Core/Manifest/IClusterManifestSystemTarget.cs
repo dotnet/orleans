@@ -42,8 +42,12 @@ namespace Orleans.Runtime
     }
 
     /// <summary>
-    /// Identifies a manifest by its canonical content hash.
+    /// Identifies a manifest by its canonical runtime protocol content hash.
     /// </summary>
+    /// <remarks>
+    /// This value is a transient cache and exchange identifier. It is not a persistent manifest identity,
+    /// and its structural encoding can change between Orleans versions.
+    /// </remarks>
     [GenerateSerializer, Immutable]
     internal readonly struct ManifestHash : System.IEquatable<ManifestHash>
     {

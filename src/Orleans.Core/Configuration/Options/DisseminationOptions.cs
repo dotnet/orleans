@@ -71,6 +71,9 @@ public sealed class DisseminationOverlayOptions
     /// <summary>
     /// Gets or sets the interval between anti-entropy repair rounds.
     /// </summary>
+    /// <remarks>
+    /// The value must fit within the platform timer range (at most 4,294,967,294 milliseconds).
+    /// </remarks>
     public TimeSpan AntiEntropyInterval { get; set; } = TimeSpan.FromSeconds(5);
 
     /// <summary>
@@ -97,6 +100,9 @@ public sealed class DisseminationTopicOptions
     /// <summary>
     /// Gets or sets the maximum delay for topic coalescing.
     /// </summary>
+    /// <remarks>
+    /// The value must fit within the platform timer range (at most 4,294,967,294 milliseconds).
+    /// </remarks>
     public TimeSpan MaxCoalescingDelay { get; set; } = TimeSpan.FromMilliseconds(100);
 
     /// <summary>

@@ -1,6 +1,7 @@
 #nullable enable
 
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Linq;
@@ -17,6 +18,7 @@ using Orleans.Configuration;
 using Orleans.Metadata;
 using Orleans.Providers;
 using Orleans.Runtime;
+using Orleans.Runtime.Diagnostics;
 using Orleans.Runtime.Dissemination;
 using Orleans.Runtime.MembershipService;
 using Orleans.Serialization;
@@ -338,7 +340,7 @@ public class DisseminationProtocolTests
     }
 
     [Fact]
-    public async Task ReceiveGossipPropagatesCallerCancellationFromTopicApply()
+    public async Task ReceiveGossipChecksCallerCancellationBeforeApplyingValue()
     {
         var local = CreateSilo(11111);
         var sender = CreateSilo(11112);
@@ -346,10 +348,9 @@ public class DisseminationProtocolTests
         var applyAttempts = new List<string>();
         var topic = new FakeTopic(local)
         {
-            ApplyValueHandler = (value, cancellationToken) =>
+            ApplyValueHandler = (value, _) =>
             {
                 applyAttempts.Add(value.Digest.Key);
-                cancellationToken.ThrowIfCancellationRequested();
                 return ValueTask.FromResult(DisseminationApplyResult.Applied);
             },
         };
@@ -364,7 +365,32 @@ public class DisseminationProtocolTests
                 topic.CreateItem(sender, "second", sequence: 1)),
             cancellation.Token));
 
-        Assert.Equal(new[] { "first" }, applyAttempts);
+        Assert.Empty(applyAttempts);
+    }
+
+    [Fact]
+    public async Task ReceiveGossipPropagatesCancellationRaisedDuringApplyBeforeForwarding()
+    {
+        var local = CreateSilo(11111);
+        var sender = CreateSilo(11112);
+        var peer = CreateSilo(11113);
+        var transport = new FakeTransport(local, sender, peer);
+        using var cancellation = new CancellationTokenSource();
+        var topic = new FakeTopic(local)
+        {
+            ApplyValueHandler = (_, _) =>
+            {
+                cancellation.Cancel();
+                return ValueTask.FromResult(DisseminationApplyResult.Applied);
+            },
+        };
+        await using var protocol = CreateProtocol(transport, topic);
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => protocol.ReceiveGossip(
+            CreateGossipBatch(sender, topic.CreateItem(sender, "value", sequence: 1)),
+            cancellation.Token));
+
+        Assert.Empty(transport.GossipBatches);
     }
 
     [Fact]
@@ -410,6 +436,112 @@ public class DisseminationProtocolTests
         Assert.Equal(1, topic.GetVersion(FakeTopic.DefaultKey));
         Assert.Equal(1, transport.RefreshMembershipCallCount);
         Assert.Equal(new[] { peer }, transport.GossipBatches.Select(static batch => batch.Peer));
+    }
+
+    [Fact]
+    public async Task ReceiveGossipContinuesAfterForwardFailure()
+    {
+        var local = CreateSilo(11111);
+        var sender = CreateSilo(11112);
+        var peer = CreateSilo(11113);
+        var root = CreateSilo(11120);
+        var transport = new FakeTransport(local, sender, peer);
+        transport.RefreshMembershipHandler = _ =>
+        {
+            if (transport.RefreshMembershipCallCount == 1)
+            {
+                throw new InvalidOperationException("Transient membership refresh failure.");
+            }
+
+            transport.Peers.Add(root);
+            return Task.CompletedTask;
+        };
+        var topic = new FakeTopic(local);
+        await using var protocol = CreateProtocol(transport, topic, options => options.Overlay.FanOutFactor = static _ => 2);
+        var failures = new List<DisseminationValueEvent>();
+        using var subscription = DisseminationEvents.Listener.Subscribe(
+            new ActionObserver<KeyValuePair<string, object?>>(entry =>
+            {
+                if (entry.Key == "Dissemination.ForwardFailure" && entry.Value is DisseminationValueEvent value)
+                {
+                    failures.Add(value);
+                }
+            }));
+
+        await protocol.ReceiveGossip(
+            CreateGossipBatch(
+                sender,
+                topic.CreateItem(root, "first", sequence: 1),
+                topic.CreateItem(root, "second", sequence: 1)),
+            CancellationToken.None);
+        await protocol.FlushPendingGossip(CancellationToken.None);
+
+        Assert.Equal(1, topic.GetVersion("first"));
+        Assert.Equal(1, topic.GetVersion("second"));
+        Assert.Equal(2, transport.RefreshMembershipCallCount);
+        var forwarded = Assert.Single(transport.GossipBatches);
+        Assert.Equal(peer, forwarded.Peer);
+        Assert.Equal("second", Assert.Single(GetGossipValues(forwarded.Batch)).Digest.Key);
+        var failure = Assert.Single(failures);
+        Assert.Equal("exception", failure.Result);
+        Assert.Null(failure.Peer);
+    }
+
+    [Fact]
+    public async Task ReceiveGossipDiagnosesForwardQueueCapacityFailure()
+    {
+        var root = CreateSilo(11111);
+        var local = CreateSilo(11112);
+        var peer = CreateSilo(11113);
+        var transport = new FakeTransport(local, root, peer);
+        var firstSendStarted = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var releaseFirstSend = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var sendCount = 0;
+        transport.SendGossipHandler = async (target, batch, cancellationToken) =>
+        {
+            transport.GossipBatches.Add((target, batch));
+            if (Interlocked.Increment(ref sendCount) == 1)
+            {
+                firstSendStarted.TrySetResult(true);
+                await releaseFirstSend.Task.WaitAsync(cancellationToken);
+            }
+        };
+        var topic = new FakeTopic(local);
+        topic.Options.MaxPendingItemCount = 1;
+        topic.Options.MaxCoalescingDelay = TimeSpan.FromMinutes(1);
+        var protocol = CreateProtocol(transport, topic, options => options.Overlay.FanOutFactor = static _ => 1);
+        var failures = new List<DisseminationValueEvent>();
+        using var subscription = DisseminationEvents.Listener.Subscribe(
+            new ActionObserver<KeyValuePair<string, object?>>(entry =>
+            {
+                if (entry.Key == "Dissemination.ForwardFailure" && entry.Value is DisseminationValueEvent value)
+                {
+                    failures.Add(value);
+                }
+            }));
+
+        try
+        {
+            Assert.True(await protocol.Publish(topic.Name, topic.CreateItem(local, "in-flight", sequence: 1), [peer], CancellationToken.None));
+            await firstSendStarted.Task.WaitAsync(TimeSpan.FromSeconds(2));
+            Assert.True(await protocol.Publish(topic.Name, topic.CreateItem(local, "queued", sequence: 1), [peer], CancellationToken.None));
+
+            await protocol.ReceiveGossip(
+                CreateGossipBatch(root, topic.CreateItem(root, "rejected", sequence: 1)),
+                CancellationToken.None);
+
+            var failure = Assert.Single(failures);
+            Assert.Equal(topic.Name, failure.Topic);
+            Assert.Equal("rejected", failure.Key);
+            Assert.Equal("queue-capacity", failure.Result);
+            Assert.Equal(peer, failure.Peer);
+        }
+        finally
+        {
+            releaseFirstSend.TrySetResult(true);
+            await protocol.FlushPendingGossip(CancellationToken.None);
+            await protocol.DisposeAsync();
+        }
     }
 
     [Fact]
@@ -1694,6 +1826,103 @@ public class DisseminationProtocolTests
     }
 
     [Fact]
+    public void ManifestHashCalculator_DistinguishesNestedStructuresWithSameFlattenedStrings()
+    {
+        var firstGrains = System.Collections.Immutable.ImmutableDictionary.CreateBuilder<GrainType, GrainProperties>();
+        firstGrains[GrainType.Create("G1")] = new GrainProperties(
+            System.Collections.Immutable.ImmutableDictionary.Create<string, string>(StringComparer.Ordinal).Add("K", "V"));
+        firstGrains[GrainType.Create("G2")] = new GrainProperties(
+            System.Collections.Immutable.ImmutableDictionary.Create<string, string>(StringComparer.Ordinal));
+        var first = new GrainManifest(
+            firstGrains.ToImmutable(),
+            System.Collections.Immutable.ImmutableDictionary<GrainInterfaceType, GrainInterfaceProperties>.Empty);
+
+        var secondGrains = System.Collections.Immutable.ImmutableDictionary.CreateBuilder<GrainType, GrainProperties>();
+        secondGrains[GrainType.Create("G1")] = new GrainProperties(
+            System.Collections.Immutable.ImmutableDictionary.Create<string, string>(StringComparer.Ordinal));
+        secondGrains[GrainType.Create("K")] = new GrainProperties(
+            System.Collections.Immutable.ImmutableDictionary.Create<string, string>(StringComparer.Ordinal).Add("V", "G2"));
+        var second = new GrainManifest(
+            secondGrains.ToImmutable(),
+            System.Collections.Immutable.ImmutableDictionary<GrainInterfaceType, GrainInterfaceProperties>.Empty);
+
+        Assert.NotEqual(ManifestHashCalculator.ComputeHash(first), ManifestHashCalculator.ComputeHash(second));
+    }
+
+    [Fact]
+    public void ManifestHashCalculator_PreservesRawTypeBytesAndInvalidUtf16()
+    {
+        static GrainManifest Create(byte grainType, string propertyValue)
+        {
+            var grains = System.Collections.Immutable.ImmutableDictionary.CreateBuilder<GrainType, GrainProperties>();
+            grains[new GrainType([grainType])] = new GrainProperties(
+                System.Collections.Immutable.ImmutableDictionary.Create<string, string>(StringComparer.Ordinal)
+                    .Add("value", propertyValue));
+            return new GrainManifest(
+                grains.ToImmutable(),
+                System.Collections.Immutable.ImmutableDictionary<GrainInterfaceType, GrainInterfaceProperties>.Empty);
+        }
+
+        Assert.NotEqual(
+            ManifestHashCalculator.ComputeHash(Create(0x80, "value")),
+            ManifestHashCalculator.ComputeHash(Create(0x81, "value")));
+        Assert.NotEqual(
+            ManifestHashCalculator.ComputeHash(Create(0x80, "\uD800")),
+            ManifestHashCalculator.ComputeHash(Create(0x80, "\uD801")));
+    }
+
+    [Fact]
+    public void ManifestHashCalculator_DistinguishesNullAndEmptyPropertyValues()
+    {
+        static GrainManifest Create(string? propertyValue)
+        {
+            var grains = System.Collections.Immutable.ImmutableDictionary.CreateBuilder<GrainType, GrainProperties>();
+            grains[GrainType.Create("grain")] = new GrainProperties(
+                System.Collections.Immutable.ImmutableDictionary.Create<string, string>(StringComparer.Ordinal)
+                    .Add("value", propertyValue!));
+            return new GrainManifest(
+                grains.ToImmutable(),
+                System.Collections.Immutable.ImmutableDictionary<GrainInterfaceType, GrainInterfaceProperties>.Empty);
+        }
+
+        Assert.NotEqual(
+            ManifestHashCalculator.ComputeHash(Create(propertyValue: null)),
+            ManifestHashCalculator.ComputeHash(Create(string.Empty)));
+    }
+
+    [Fact]
+    public void ManifestHashCalculator_DistinguishesDefaultAndEmptyTypeIdentifiers()
+    {
+        static GrainManifest CreateGrainManifest(GrainType grainType)
+        {
+            var grains = System.Collections.Immutable.ImmutableDictionary.CreateBuilder<GrainType, GrainProperties>();
+            grains[grainType] = new GrainProperties(
+                System.Collections.Immutable.ImmutableDictionary.Create<string, string>(StringComparer.Ordinal));
+            return new GrainManifest(
+                grains.ToImmutable(),
+                System.Collections.Immutable.ImmutableDictionary<GrainInterfaceType, GrainInterfaceProperties>.Empty);
+        }
+
+        static GrainManifest CreateInterfaceManifest(GrainInterfaceType interfaceType)
+        {
+            var interfaces = System.Collections.Immutable.ImmutableDictionary.CreateBuilder<GrainInterfaceType, GrainInterfaceProperties>();
+            interfaces[interfaceType] = new GrainInterfaceProperties(
+                System.Collections.Immutable.ImmutableDictionary.Create<string, string>(StringComparer.Ordinal));
+            return new GrainManifest(
+                System.Collections.Immutable.ImmutableDictionary<GrainType, GrainProperties>.Empty,
+                interfaces.ToImmutable());
+        }
+
+        Assert.NotEqual(
+            ManifestHashCalculator.ComputeHash(CreateGrainManifest(default)),
+            ManifestHashCalculator.ComputeHash(CreateGrainManifest(new GrainType(Array.Empty<byte>()))));
+        Assert.NotEqual(
+            ManifestHashCalculator.ComputeHash(CreateInterfaceManifest(default)),
+            ManifestHashCalculator.ComputeHash(CreateInterfaceManifest(
+                new GrainInterfaceType(new IdSpan(Array.Empty<byte>())))));
+    }
+
+    [Fact]
     public void ManifestHashCalculator_IsDeterministicForEmptyManifest()
     {
         var empty = new GrainManifest(
@@ -1893,6 +2122,17 @@ public class DisseminationProtocolTests
     }
 
     [Fact]
+    public void OptionsValidatorRejectsAntiEntropyIntervalBeyondTimerMaximum()
+    {
+        var options = new DisseminationOptions();
+        options.Overlay.AntiEntropyInterval = TimeSpan.FromMilliseconds(uint.MaxValue);
+
+        var result = new DisseminationOptionsValidator().Validate(Options.DefaultName, options);
+
+        Assert.True(result.Failed);
+    }
+
+    [Fact]
     public void OptionsValidatorRejectsNonPositiveAntiEntropyPeerCount()
     {
         var options = new DisseminationOptions();
@@ -1925,6 +2165,20 @@ public class DisseminationProtocolTests
     public void TopicOptionsValidatorRejectsNonPositiveMaxCoalescingDelay()
     {
         var options = new DisseminationTopicOptions { MaxCoalescingDelay = TimeSpan.Zero };
+
+        var result = DisseminationTopicOptionsValidator.Validate("Test", options);
+
+        Assert.True(result.Failed);
+    }
+
+    [Fact]
+    public void TopicOptionsValidatorRejectsMaxCoalescingDelayBeyondTimerMaximum()
+    {
+        var options = new DisseminationTopicOptions
+        {
+            MaxCoalescingDelay = TimeSpan.FromMilliseconds(uint.MaxValue),
+            StaleItemTtl = TimeSpan.FromMilliseconds(uint.MaxValue + 1d),
+        };
 
         var result = DisseminationTopicOptionsValidator.Validate("Test", options);
 
@@ -1987,6 +2241,120 @@ public class DisseminationProtocolTests
         Assert.Equal(DisseminationApplyResult.Duplicate, duplicate);
         Assert.Equal(DisseminationApplyResult.Obsolete, obsolete);
         Assert.Equal(baseline.DateTime, publisher.PeriodicStatistics[peer].DateTime);
+    }
+
+    [Fact]
+    public async Task RuntimeStatisticsConcurrentNewerAndOlderUpdatesRemainMonotonic()
+    {
+        var local = CreateSilo(21019);
+        var peer = CreateSilo(21020);
+        using var statusCheckEntered = new ManualResetEventSlim();
+        using var releaseStatusCheck = new ManualResetEventSlim();
+        using var olderStatusCheckEntered = new ManualResetEventSlim();
+        var statusCalls = 0;
+        var statusOracle = new FakeSiloStatusOracle
+        {
+            GetStatusHandler = _ =>
+            {
+                if (Interlocked.Increment(ref statusCalls) == 1)
+                {
+                    statusCheckEntered.Set();
+                    releaseStatusCheck.Wait();
+                }
+                else
+                {
+                    olderStatusCheckEntered.Set();
+                }
+
+                return SiloStatus.Active;
+            },
+        };
+        statusOracle.SetStatus(peer, SiloStatus.Active);
+        var publisher = CreateDeploymentLoadPublisher(local, statusOracle);
+        var older = CreateStatistics(new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc));
+        var newer = CreateStatistics(older.DateTime.AddSeconds(1));
+
+        var newerUpdate = Task.Run(() => publisher.ApplyDisseminatedRuntimeStatistics(peer, newer));
+        Assert.True(statusCheckEntered.Wait(TimeSpan.FromSeconds(2)), "The newer update did not enter the status/version boundary.");
+        var olderUpdate = Task.Run(() => publisher.UpdateRuntimeStatistics(peer, older));
+        Assert.False(
+            olderStatusCheckEntered.Wait(TimeSpan.FromMilliseconds(100)),
+            "The older update entered the status/version boundary while the newer update still owned it.");
+        releaseStatusCheck.Set();
+
+        Assert.Equal(DisseminationApplyResult.Applied, await newerUpdate);
+        await olderUpdate;
+        Assert.Equal(newer.DateTime, publisher.PeriodicStatistics[peer].DateTime);
+    }
+
+    [Fact]
+    public async Task RuntimeStatisticsTerminationRaceCannotResurrectRemovedSilo()
+    {
+        var local = CreateSilo(21021);
+        var peer = CreateSilo(21022);
+        using var statusCheckEntered = new ManualResetEventSlim();
+        using var releaseStatusCheck = new ManualResetEventSlim();
+        var blockStatusCheck = false;
+        var statusOracle = new FakeSiloStatusOracle();
+        statusOracle.GetStatusHandler = silo =>
+        {
+            var status = statusOracle.GetStoredStatus(silo);
+            if (blockStatusCheck)
+            {
+                statusCheckEntered.Set();
+                releaseStatusCheck.Wait();
+            }
+
+            return status;
+        };
+        statusOracle.SetStatus(peer, SiloStatus.Active);
+        var publisher = CreateDeploymentLoadPublisher(local, statusOracle);
+        var baseline = CreateStatistics(new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc));
+        Assert.Equal(DisseminationApplyResult.Applied, publisher.ApplyDisseminatedRuntimeStatistics(peer, baseline));
+        blockStatusCheck = true;
+        var lateStatistics = CreateStatistics(baseline.DateTime.AddSeconds(1));
+
+        var lateUpdate = Task.Run(() => publisher.ApplyDisseminatedRuntimeStatistics(peer, lateStatistics));
+        Assert.True(statusCheckEntered.Wait(TimeSpan.FromSeconds(2)), "The late update did not enter the status/version boundary.");
+        statusOracle.SetStatus(peer, SiloStatus.Dead);
+        var termination = Task.Run(() => publisher.OnSiloStatusChange(peer, SiloStatus.Dead));
+        releaseStatusCheck.Set();
+
+        await lateUpdate;
+        await termination;
+        Assert.False(publisher.PeriodicStatistics.ContainsKey(peer));
+
+        var postTermination = publisher.ApplyDisseminatedRuntimeStatistics(
+            peer,
+            CreateStatistics(lateStatistics.DateTime.AddSeconds(1)));
+        Assert.Equal(DisseminationApplyResult.Rejected, postTermination);
+        Assert.False(publisher.PeriodicStatistics.ContainsKey(peer));
+    }
+
+    [Fact]
+    public void RuntimeStatisticsRemovedEventObservesCompletedRemoval()
+    {
+        var local = CreateSilo(21023);
+        var peer = CreateSilo(21024);
+        var statusOracle = new FakeSiloStatusOracle();
+        statusOracle.SetStatus(peer, SiloStatus.Active);
+        var publisher = CreateDeploymentLoadPublisher(local, statusOracle);
+        var statistics = CreateStatistics(new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc));
+        Assert.Equal(DisseminationApplyResult.Applied, publisher.ApplyDisseminatedRuntimeStatistics(peer, statistics));
+        bool? entryPresentWhenRemovedEventRaised = null;
+        using var subscription = DeploymentLoadPublisherEvents.AllEvents.Subscribe(
+            new ActionObserver<DeploymentLoadPublisherEvents.DeploymentLoadPublisherEvent>(evt =>
+            {
+                if (evt is DeploymentLoadPublisherEvents.Removed removed && removed.RemovedSilo.Equals(peer))
+                {
+                    entryPresentWhenRemovedEventRaised = publisher.PeriodicStatistics.ContainsKey(peer);
+                }
+            }));
+
+        statusOracle.SetStatus(peer, SiloStatus.Dead);
+        publisher.OnSiloStatusChange(peer, SiloStatus.Dead);
+
+        Assert.False(entryPresentWhenRemovedEventRaised);
     }
 
     [Fact]
@@ -3832,9 +4200,12 @@ public class DisseminationProtocolTests
 
     private sealed class FakeSiloStatusOracle : ISiloStatusOracle
     {
-        private readonly Dictionary<SiloAddress, SiloStatus> _statuses = new();
+        private readonly ConcurrentDictionary<SiloAddress, SiloStatus> _statuses = new();
+        private int _approximateStatusesRequests;
 
-        public int ApproximateStatusesRequests { get; private set; }
+        public int ApproximateStatusesRequests => Volatile.Read(ref _approximateStatusesRequests);
+
+        public Func<SiloAddress, SiloStatus>? GetStatusHandler { get; set; }
 
         public SiloStatus CurrentStatus => SiloStatus.Active;
 
@@ -3844,15 +4215,18 @@ public class DisseminationProtocolTests
 
         public void SetStatus(SiloAddress silo, SiloStatus status) => _statuses[silo] = status;
 
+        public SiloStatus GetStoredStatus(SiloAddress siloAddress) =>
+            _statuses.TryGetValue(siloAddress, out var status) ? status : SiloStatus.None;
+
         public SiloAddress[] GetActiveSilos() =>
             _statuses.Where(static kvp => kvp.Value == SiloStatus.Active).Select(static kvp => kvp.Key).ToArray();
 
         public SiloStatus GetApproximateSiloStatus(SiloAddress siloAddress) =>
-            _statuses.TryGetValue(siloAddress, out var status) ? status : SiloStatus.None;
+            GetStatusHandler?.Invoke(siloAddress) ?? GetStoredStatus(siloAddress);
 
         public Dictionary<SiloAddress, SiloStatus> GetApproximateSiloStatuses(bool onlyActive = false)
         {
-            ApproximateStatusesRequests++;
+            Interlocked.Increment(ref _approximateStatusesRequests);
             return _statuses
                 .Where(kvp => !onlyActive || kvp.Value == SiloStatus.Active)
                 .ToDictionary(static kvp => kvp.Key, static kvp => kvp.Value);
@@ -3876,6 +4250,19 @@ public class DisseminationProtocolTests
     private sealed class FakeEnvironmentStatisticsProvider : Orleans.Statistics.IEnvironmentStatisticsProvider
     {
         public Orleans.Statistics.EnvironmentStatistics GetEnvironmentStatistics() => default;
+    }
+
+    private sealed class ActionObserver<T>(Action<T> onNext) : IObserver<T>
+    {
+        public void OnCompleted()
+        {
+        }
+
+        public void OnError(Exception error)
+        {
+        }
+
+        public void OnNext(T value) => onNext(value);
     }
 
     private sealed class FakeActivationWorkingSet : IActivationWorkingSet

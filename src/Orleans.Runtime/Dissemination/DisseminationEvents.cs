@@ -43,6 +43,30 @@ internal static class DisseminationEvents
         }
     }
 
+    public static void EmitForwardFailure(
+        string topic,
+        DisseminationTopicDigest digest,
+        SiloAddress localSilo,
+        SiloAddress? peer,
+        string reason,
+        int payloadBytes)
+    {
+        if (Listener.IsEnabled("Dissemination.ForwardFailure"))
+        {
+            Listener.Write("Dissemination.ForwardFailure", new DisseminationValueEvent
+            {
+                Topic = topic,
+                LocalSilo = localSilo,
+                Peer = peer,
+                Key = digest.Key,
+                Version = digest.Version,
+                Result = reason,
+                PayloadBytes = payloadBytes,
+                Timestamp = DateTimeOffset.UtcNow,
+            });
+        }
+    }
+
 }
 
 internal sealed class DisseminationValueEvent

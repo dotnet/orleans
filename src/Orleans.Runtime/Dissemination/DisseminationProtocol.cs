@@ -106,6 +106,7 @@ internal sealed partial class DisseminationProtocol(
 
             foreach (var item in values)
             {
+                cancellationToken.ThrowIfCancellationRequested();
                 await ApplyReceivedValue(topicName, topic, item, batch.Sender, forward: true, cancellationToken);
             }
         }
@@ -404,7 +405,33 @@ internal sealed partial class DisseminationProtocol(
 
         if (result == DisseminationApplyResult.Applied && forward)
         {
-            await Forward(value, topic, sender, cancellationToken);
+            cancellationToken.ThrowIfCancellationRequested();
+            try
+            {
+                await Forward(value, topic, sender, cancellationToken);
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                throw;
+            }
+            catch (Exception exception)
+            {
+                LogDebugDisseminationValueForwardFailed(
+                    _logger,
+                    exception,
+                    sender,
+                    topicName,
+                    value.Digest.Key,
+                    value.Digest.Version);
+                DisseminationEvents.EmitForwardFailure(
+                    topicName,
+                    value.Digest,
+                    _transport.LocalSilo,
+                    (SiloAddress?)null,
+                    "exception",
+                    value.Payload.Length);
+                DisseminationInstruments.OnForwardFailure(topicName, "exception");
+            }
         }
 
         return result;
@@ -421,7 +448,23 @@ internal sealed partial class DisseminationProtocol(
 
         foreach (var peer in GetForwardingTreeTargets(topology, root, sender))
         {
-            EnqueueGossip(peer, item, topic);
+            if (!EnqueueGossip(peer, item, topic))
+            {
+                LogDebugDisseminationValueForwardRejected(
+                    _logger,
+                    peer,
+                    topic.Name,
+                    item.Digest.Key,
+                    item.Digest.Version);
+                DisseminationEvents.EmitForwardFailure(
+                    topic.Name,
+                    item.Digest,
+                    _transport.LocalSilo,
+                    peer,
+                    "queue-capacity",
+                    item.Payload.Length);
+                DisseminationInstruments.OnForwardFailure(topic.Name, "queue-capacity");
+            }
         }
     }
 
@@ -1747,6 +1790,16 @@ internal sealed partial class DisseminationProtocol(
         Level = LogLevel.Debug,
         Message = "Failed to apply dissemination value from {Sender} for topic {Topic}, key {Key}, version {Version}.")]
     private static partial void LogDebugDisseminationValueApplyFailed(ILogger logger, Exception exception, SiloAddress sender, string topic, string key, long version);
+
+    [LoggerMessage(
+        Level = LogLevel.Debug,
+        Message = "Failed to forward dissemination value from {Sender} for topic {Topic}, key {Key}, version {Version}.")]
+    private static partial void LogDebugDisseminationValueForwardFailed(ILogger logger, Exception exception, SiloAddress sender, string topic, string key, long version);
+
+    [LoggerMessage(
+        Level = LogLevel.Debug,
+        Message = "Failed to queue dissemination value for {Peer} because outbound queue limits were reached for topic {Topic}, key {Key}, version {Version}.")]
+    private static partial void LogDebugDisseminationValueForwardRejected(ILogger logger, SiloAddress peer, string topic, string key, long version);
 
     [LoggerMessage(
         Level = LogLevel.Debug,
