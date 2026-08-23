@@ -373,6 +373,7 @@ namespace Orleans.Runtime
 
                 default:
                     LogInvalidMessage(_logger, msg);
+                    msg.ReleaseDropped("UnsupportedMessageDirection");
                     break;
             }
         }

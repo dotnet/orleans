@@ -73,7 +73,11 @@ namespace Orleans.Runtime.Messaging
             {
                 MessagingMetrics.OnRejectedMessage(msg);
                 Message rejection = this.MessageFactory.CreateRejectionResponse(msg, Message.RejectionTypes.GatewayTooBusy, "Shedding load");
-                this.messageCenter.TryDeliverToProxy(rejection);
+                if (!this.messageCenter.TryDeliverToProxy(rejection))
+                {
+                    rejection.ReleaseDropped("GatewayOverloadRejectionUndeliverable");
+                }
+
                 LogRejectingRequestDueToOverloading(this.Log, msg);
                 gatewayInstruments.OnGatewayLoadShedding();
                 msg.ReleaseDropped("RejectedGatewayOverload");

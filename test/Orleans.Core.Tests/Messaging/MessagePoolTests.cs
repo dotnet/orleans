@@ -23,11 +23,18 @@ public class MessagePoolTests
     [Fact, TestCategory("BVT"), TestCategory("Messaging")]
     public void Message_RefCount_InitializedToOne()
     {
+        MessagePool.ClearCurrentThreadPool();
         var message = MessagePool.Get();
 
-        Assert.NotNull(message);
+        Assert.Equal(0, MessagePool.GetCachedMessageCount());
 
         message.Release();
+
+        Assert.Equal(1, MessagePool.GetCachedMessageCount());
+        var reused = MessagePool.Get();
+        Assert.Same(message, reused);
+        Assert.Equal(0, MessagePool.GetCachedMessageCount());
+        reused.Release();
     }
 
     [Fact, TestCategory("BVT"), TestCategory("Messaging")]
@@ -176,5 +183,31 @@ public class MessagePoolTests
         Assert.Null(newMessage.BodyObject);
 
         newMessage.Release();
+    }
+
+    [Fact, TestCategory("BVT"), TestCategory("Messaging")]
+    public void Message_DoubleReleaseThrows()
+    {
+        MessagePool.ClearCurrentThreadPool();
+        var message = MessagePool.Get();
+        message.Release();
+
+        Assert.Throws<InvalidOperationException>(() => message.Release());
+    }
+
+    [Fact, TestCategory("BVT"), TestCategory("Messaging")]
+    public void Message_ConcurrentOwnersReturnStateOnce()
+    {
+        MessagePool.ClearCurrentThreadPool();
+        var message = MessagePool.Get();
+
+        Parallel.For(0, 10_000, _ =>
+        {
+            message.Acquire();
+            message.Release();
+        });
+
+        message.Release();
+        Assert.Equal(1, MessagePool.GetCachedMessageCount());
     }
 }

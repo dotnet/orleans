@@ -247,14 +247,14 @@ internal partial class StatelessWorkerGrainContext : IGrainContext, IAsyncDispos
 
     private void ReceiveMessageInternal(object message)
     {
-        if (_terminated)
-        {
-            ForwardToReplacementContext((Message)message);
-            return;
-        }
-
         try
         {
+            if (_terminated)
+            {
+                ForwardToReplacementContext((Message)message);
+                return;
+            }
+
             ActivationData? worker = null;
             ActivationData? minimumWaitingCountWorker = null;
             var minimumWaitingCount = int.MaxValue;

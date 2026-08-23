@@ -7,6 +7,14 @@ using System.Threading;
 
 namespace Orleans.Runtime
 {
+    /// <summary>
+    /// Represents an ownership-counted pooled message.
+    /// </summary>
+    /// <remarks>
+    /// A pooled message begins with one owner. Each additional concurrent owner calls <see cref="Acquire"/>
+    /// and every owner calls <see cref="Release"/> exactly once. The final release resets the instance before
+    /// returning it to the current thread's pool. Owners relinquish their aliases before the final release.
+    /// </remarks>
     [Id(101)]
     internal sealed class Message : ISpanFormattable
     {
@@ -350,7 +358,11 @@ namespace Orleans.Runtime
         internal void Acquire()
         {
             var newRefCount = Interlocked.Increment(ref _refCount);
-            Debug.Assert(newRefCount > 1);
+            if (newRefCount <= 1)
+            {
+                Interlocked.Decrement(ref _refCount);
+                ThrowInvalidOwnershipOperation("Cannot acquire a released message.");
+            }
         }
 
         internal void Release()
@@ -362,12 +374,8 @@ namespace Orleans.Runtime
             }
             else if (newRefCount < 0)
             {
-                // Ref count should never go negative - indicates a double release.
-#if DEBUG
-                Debug.Fail($"Message ref count went negative. Last transfer tag: '{_lastTransferTag}'");
-#else
-                Debug.Fail("Message ref count went negative.");
-#endif
+                Interlocked.Increment(ref _refCount);
+                ThrowInvalidOwnershipOperation("Cannot release a message which has no owner.");
             }
         }
 
@@ -496,6 +504,8 @@ grow:
             _interfaceType = default;
             _cacheInvalidationHeader = null;
         }
+
+        private static void ThrowInvalidOwnershipOperation(string message) => throw new InvalidOperationException(message);
 
         [Flags]
         internal enum MessageFlags : ushort

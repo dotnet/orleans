@@ -390,6 +390,7 @@ namespace Orleans.Runtime.Messaging
         {
             Debug.Assert(!message.IsLocalOnly);
 
+            message.Acquire();
             bool forwardingSucceeded = false;
             var forwardingAddress = destination?.SiloAddress;
             try
@@ -435,6 +436,9 @@ namespace Orleans.Runtime.Messaging
 
                     message.ReleaseDropped("ForwardingFailed");
                 }
+
+                message.MarkTransferred("MessageCenter.TryForwardRequest");
+                message.Release();
             }
         }
 

@@ -116,4 +116,8 @@ internal static class MessagePool
             stack.Push(message);
         }
     }
+
+    internal static int GetCachedMessageCount() => _messages.Value!.Count;
+
+    internal static void ClearCurrentThreadPool() => _messages.Value!.Clear();
 }
