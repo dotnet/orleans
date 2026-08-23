@@ -251,7 +251,7 @@ internal sealed partial class WorkItemGroup : SynchronizationContext, IThreadPoo
                         case WorkItem.WorkItemType.SendOrPostCallback:
                         case WorkItem.WorkItemType.ActionOfObject:
                             _currentWorkItem = workItem;
-                            ExecutionContext.Run(ExecutionContext.Capture()!, ExecuteCallback, this);
+                            ExecutionContext.Run(CaptureExecutionContext(), ExecuteCallback, this);
                             break;
                     }
                 }
@@ -390,6 +390,7 @@ internal sealed partial class WorkItemGroup : SynchronizationContext, IThreadPoo
                 Unsafe.As<Action<object?>>(workItem.Callback)(workItem.State);
             }
         }
+
         catch (Exception exception)
         {
             LogTaskLoopError(exception);
@@ -397,6 +398,25 @@ internal sealed partial class WorkItemGroup : SynchronizationContext, IThreadPoo
         finally
         {
             _currentWorkItem = default;
+        }
+    }
+
+    private static ExecutionContext CaptureExecutionContext()
+    {
+        if (ExecutionContext.Capture() is { } executionContext)
+        {
+            return executionContext;
+        }
+
+        Debug.Assert(ExecutionContext.IsFlowSuppressed());
+        ExecutionContext.RestoreFlow();
+        try
+        {
+            return ExecutionContext.Capture()!;
+        }
+        finally
+        {
+            ExecutionContext.SuppressFlow();
         }
     }
 

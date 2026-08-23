@@ -41,13 +41,26 @@ public class WorkItemGroupWaiterTests
     [Fact]
     public async Task ConcurrentSignalsReleaseSingleWaiter()
     {
-        var waiter = new WorkItemGroupWaiter(null!);
-        var wait = waiter.WaitAsync();
+        using var services = CreateServices();
+        var workItemGroup = CreateWorkItemGroup(services);
+        SetRunning(workItemGroup);
+        var waiter = new WorkItemGroupWaiter(workItemGroup);
+        var wait = waiter.WaitAsync().AsTask();
 
         Parallel.For(0, Environment.ProcessorCount * 4, _ => waiter.Signal());
 
-        Assert.True(wait.IsCompleted);
+        Assert.False(wait.IsCompleted);
+        workItemGroup.Execute();
         await wait;
+    }
+
+    [Fact]
+    public void ConcurrentWaitersAreRejected()
+    {
+        var waiter = new WorkItemGroupWaiter(null!);
+        _ = waiter.WaitAsync();
+
+        Assert.Throws<InvalidOperationException>(() => waiter.WaitAsync());
     }
 
     [Fact]
@@ -75,12 +88,48 @@ public class WorkItemGroupWaiterTests
     {
         using var services = CreateServices();
         var workItemGroup = CreateWorkItemGroup(services);
+        SetRunning(workItemGroup);
         var waiter = new WorkItemGroupWaiter(workItemGroup);
-        var wait = waiter.WaitAsync().AsTask();
+        var wait = ObserveScheduler(waiter.WaitAsync());
 
         waiter.Signal();
+        Assert.False(wait.IsCompleted);
+        workItemGroup.Execute();
 
-        await wait.WaitAsync(TimeSpan.FromSeconds(10));
+        Assert.Same(workItemGroup.TaskScheduler, await wait.WaitAsync(TimeSpan.FromSeconds(10)));
+
+        static async Task<TaskScheduler> ObserveScheduler(ValueTask wait)
+        {
+            await wait;
+            return TaskScheduler.Current;
+        }
+    }
+
+    [Fact]
+    public async Task ReuseInvalidatesPriorValueTask()
+    {
+        var waiter = new WorkItemGroupWaiter(null!);
+        var firstWait = waiter.WaitAsync();
+        waiter.Signal();
+        await firstWait;
+
+        var secondWait = waiter.WaitAsync();
+        await Assert.ThrowsAsync<InvalidOperationException>(async () => await firstWait);
+
+        waiter.Signal();
+        await secondWait;
+    }
+
+    [Fact]
+    public async Task GetResultBeforeCompletionPreservesPendingWait()
+    {
+        var waiter = new WorkItemGroupWaiter(null!);
+        var wait = waiter.WaitAsync();
+
+        Assert.Throws<InvalidOperationException>(() => wait.GetAwaiter().GetResult());
+
+        waiter.Signal();
+        await wait;
     }
 
     [Fact]
@@ -95,6 +144,28 @@ public class WorkItemGroupWaiterTests
         workItemGroup.QueueAction(() => observedValue.SetResult(asyncLocal.Value));
 
         Assert.Null(await observedValue.Task.WaitAsync(TimeSpan.FromSeconds(10)));
+    }
+
+    [Fact]
+    public void DirectCallbacksRunWithSuppressedExecutionContextFlow()
+    {
+        using var services = CreateServices();
+        var workItemGroup = CreateWorkItemGroup(
+            services,
+            new SchedulingOptions { ActivationSchedulingQuantum = TimeSpan.Zero });
+        SetRunning(workItemGroup);
+        var asyncLocal = new AsyncLocal<object?>();
+        object? observedValue = new object();
+
+        workItemGroup.QueueAction(() => asyncLocal.Value = new object());
+        workItemGroup.QueueAction(() => observedValue = asyncLocal.Value);
+
+        using (ExecutionContext.SuppressFlow())
+        {
+            workItemGroup.Execute();
+        }
+
+        Assert.Null(observedValue);
     }
 
     [Fact]
@@ -117,8 +188,7 @@ public class WorkItemGroupWaiterTests
         var workItemGroup = CreateWorkItemGroup(
             services,
             new SchedulingOptions { ActivationSchedulingQuantum = TimeSpan.Zero });
-        var stateField = typeof(WorkItemGroup).GetField("_state", BindingFlags.Instance | BindingFlags.NonPublic);
-        stateField!.SetValue(workItemGroup, Enum.Parse(stateField.FieldType, "Running"));
+        SetRunning(workItemGroup);
         var executingThread = Environment.CurrentManagedThreadId;
         var subsequentCallbackRanOnExecutingThread = false;
 
@@ -132,6 +202,47 @@ public class WorkItemGroupWaiterTests
             call => call.GetMethodInfo().Name == nameof(ILogger.Log)
                 && (LogLevel)call.GetArguments()[0]! == LogLevel.Error
                 && call.GetArguments()[3] is InvalidOperationException);
+    }
+
+    [Fact]
+    public void CallbackQueuedDuringDrainRunsInSameExecution()
+    {
+        using var services = CreateServices();
+        var workItemGroup = CreateWorkItemGroup(
+            services,
+            new SchedulingOptions { ActivationSchedulingQuantum = TimeSpan.Zero });
+        SetRunning(workItemGroup);
+        var callbacks = new List<int>();
+
+        workItemGroup.QueueAction(() =>
+        {
+            callbacks.Add(1);
+            workItemGroup.QueueAction(() => callbacks.Add(2));
+        });
+
+        workItemGroup.Execute();
+
+        Assert.Equal([1, 2], callbacks);
+        Assert.Equal(0, workItemGroup.ExternalWorkItemCount);
+    }
+
+    [Fact]
+    public void FaultedTaskDoesNotInterruptQueueDrain()
+    {
+        using var services = CreateServices();
+        var workItemGroup = CreateWorkItemGroup(
+            services,
+            new SchedulingOptions { ActivationSchedulingQuantum = TimeSpan.Zero });
+        SetRunning(workItemGroup);
+        var task = new Task(static () => throw new InvalidOperationException("Test exception"));
+        var subsequentCallbackRan = false;
+
+        task.Start(workItemGroup.TaskScheduler);
+        workItemGroup.QueueAction(() => subsequentCallbackRan = true);
+        workItemGroup.Execute();
+
+        Assert.True(task.IsFaulted);
+        Assert.True(subsequentCallbackRan);
     }
 
     private static ServiceProvider CreateServices(ILogger<WorkItemGroup>? logger = null)
@@ -158,5 +269,11 @@ public class WorkItemGroupWaiterTests
             context,
             Options.Create(schedulingOptions ?? new SchedulingOptions()),
             services.GetRequiredService<SchedulerInstruments>());
+    }
+
+    private static void SetRunning(WorkItemGroup workItemGroup)
+    {
+        var stateField = typeof(WorkItemGroup).GetField("_state", BindingFlags.Instance | BindingFlags.NonPublic);
+        stateField!.SetValue(workItemGroup, Enum.Parse(stateField.FieldType, "Running"));
     }
 }
