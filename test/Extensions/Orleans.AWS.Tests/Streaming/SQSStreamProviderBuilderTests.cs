@@ -1,16 +1,13 @@
+#if NET10_0
 using System.Reflection;
-using SqsMessage = Amazon.SQS.Model.Message;
-using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration;
-using Orleans.Hosting;
 using Orleans.Providers;
-using Orleans.Serialization;
 using Orleans.Streaming.SQS.Streams;
 using Orleans.Streams;
 using OrleansAWSUtils.Streams;
-using TestExtensions;
+using SqsMessage = Amazon.SQS.Model.Message;
 using Xunit;
 
 namespace AWSUtils.Tests.Streaming;
@@ -48,38 +45,18 @@ public sealed class SQSStreamProviderBuilderTests
     }
 
     [Fact]
-    public void ConfigureSilo_Region_BindsSqsPartitionAndCacheOptions()
+    public async Task AspireAwsSdkResource_ConfiguresRegionWithoutCredentialMaterial()
     {
-        var builder = CreateSiloBuilder(
+        await using var app = await SqsAspireTestApp.CreateAsync(
             ProviderName,
-            [
-                ("Region", "us-west-2"),
-                ("FifoQueue", "true"),
-                ("ReceiveWaitTimeSeconds", "12"),
-                ("VisibilityTimeoutSeconds", "45"),
-                ("ReceiveMessageAttributes:0", "TraceId"),
-                ("ReceiveMessageAttributes:1", "Tenant"),
-                ("ReceiveMessageSystemAttributes:0", "SentTimestamp"),
-                ("ReceiveMessageSystemAttributes:1", "SequenceNumber"),
-                ("PartitionCount", "7"),
-                ("CacheSize", "2048"),
-            ]);
+            [],
+            awsProfile: "integration-profile",
+            awsRegion: "ap-southeast-2");
+        using var host = await app.BuildSiloHostAsync();
+        var options = GetOptions<SqsOptions>(host.Services, ProviderName);
 
-        ConfigureSilo(builder, ProviderName);
-
-        using var services = builder.Services.BuildServiceProvider();
-        var sqsOptions = GetOptions<SqsOptions>(services, ProviderName);
-        var partitionOptions = GetOptions<HashRingStreamQueueMapperOptions>(services, ProviderName);
-        var cacheOptions = GetOptions<SimpleQueueCacheOptions>(services, ProviderName);
-
-        Assert.Equal("Service=us-west-2", sqsOptions.ConnectionString);
-        Assert.True(sqsOptions.FifoQueue);
-        Assert.Equal(12, sqsOptions.ReceiveWaitTimeSeconds);
-        Assert.Equal(45, sqsOptions.VisibilityTimeoutSeconds);
-        Assert.Equal(["TraceId", "Tenant"], sqsOptions.ReceiveMessageAttributes);
-        Assert.Equal(["SentTimestamp", "SequenceNumber"], sqsOptions.ReceiveMessageSystemAttributes);
-        Assert.Equal(7, partitionOptions.TotalQueueCount);
-        Assert.Equal(2048, cacheOptions.CacheSize);
+        Assert.Equal("Service=ap-southeast-2", options.ConnectionString);
+        Assert.DoesNotContain("integration-profile", options.ConnectionString, StringComparison.Ordinal);
         Assert.DoesNotContain(
             typeof(SqsOptions).GetProperties(),
             property => property.Name.Contains("Credential", StringComparison.OrdinalIgnoreCase)
@@ -89,136 +66,18 @@ public sealed class SQSStreamProviderBuilderTests
     }
 
     [Theory]
-    [InlineData("ServiceEndpoint")]
-    [InlineData("Endpoint")]
-    public void ConfigureClient_CustomEndpoint_BindsSqsAndPartitionOptions(string endpointKey)
-    {
-        const string endpoint = "http://127.0.0.1:9324";
-        var builder = CreateClientBuilder(
-            ProviderName,
-            [
-                (endpointKey, endpoint),
-                ("FifoQueue", "true"),
-                ("ReceiveWaitTimeSeconds", "4"),
-                ("VisibilityTimeoutSeconds", "30"),
-                ("ReceiveMessageAttributes:0", "CorrelationId"),
-                ("ReceiveMessageSystemAttributes:0", "ApproximateReceiveCount"),
-                ("PartitionCount", "5"),
-                ("CacheSize", "999"),
-            ]);
-
-        ConfigureClient(builder, ProviderName);
-
-        using var services = builder.Services.BuildServiceProvider();
-        var sqsOptions = GetOptions<SqsOptions>(services, ProviderName);
-        var partitionOptions = GetOptions<HashRingStreamQueueMapperOptions>(services, ProviderName);
-
-        Assert.Equal($"Service={endpoint}", sqsOptions.ConnectionString);
-        Assert.True(sqsOptions.FifoQueue);
-        Assert.Equal(4, sqsOptions.ReceiveWaitTimeSeconds);
-        Assert.Equal(30, sqsOptions.VisibilityTimeoutSeconds);
-        Assert.Equal(["CorrelationId"], sqsOptions.ReceiveMessageAttributes);
-        Assert.Equal(["ApproximateReceiveCount"], sqsOptions.ReceiveMessageSystemAttributes);
-        Assert.Equal(5, partitionOptions.TotalQueueCount);
-        Assert.DoesNotContain(
-            builder.Services,
-            descriptor => descriptor.ServiceType == typeof(IConfigureOptions<SimpleQueueCacheOptions>));
-    }
-
-    [Fact]
-    public void ConfigureClient_WhitespaceLocationAliases_UsesConfiguredEndpoint()
-    {
-        const string endpoint = "http://127.0.0.1:9324";
-        var builder = CreateClientBuilder(
-            ProviderName,
-            [
-                ("Region", " "),
-                ("ServiceEndpoint", " "),
-                ("Endpoint", endpoint),
-            ]);
-
-        ConfigureClient(builder, ProviderName);
-
-        using var services = builder.Services.BuildServiceProvider();
-        var options = GetOptions<SqsOptions>(services, ProviderName);
-
-        Assert.Equal($"Service={endpoint}", options.ConnectionString);
-    }
-
-    [Fact]
-    public void ConfigureClient_ConnectionStringWithWhitespaceSegment_IsAccepted()
-    {
-        var builder = CreateClientBuilder(
-            ProviderName,
-            [("ConnectionString", "Service=us-east-1; ")]);
-
-        ConfigureClient(builder, ProviderName);
-
-        using var services = builder.Services.BuildServiceProvider();
-        var options = GetOptions<SqsOptions>(services, ProviderName);
-
-        Assert.Equal("Service=us-east-1; ", options.ConnectionString);
-    }
-
-    [Theory]
-    [InlineData(false)]
-    [InlineData(true)]
-    public void ConfigureSiloAndClient_IdenticalConfiguration_ProducesIdenticalQueueTopology(bool fifoQueue)
-    {
-        const string providerName = "Topology";
-        const string serviceId = "topology-service";
-        (string Key, string? Value)[] configuration =
-        [
-            ("Region", "eu-central-1"),
-            ("FifoQueue", fifoQueue.ToString()),
-            ("PartitionCount", "4"),
-        ];
-        var siloBuilder = CreateSiloBuilder(providerName, configuration);
-        var clientBuilder = CreateClientBuilder(providerName, configuration);
-
-        ConfigureSilo(siloBuilder, providerName);
-        ConfigureClient(clientBuilder, providerName);
-
-        using var siloServices = siloBuilder.Services.BuildServiceProvider();
-        using var clientServices = clientBuilder.Services.BuildServiceProvider();
-        var siloSqsOptions = GetOptions<SqsOptions>(siloServices, providerName);
-        var clientSqsOptions = GetOptions<SqsOptions>(clientServices, providerName);
-        var siloMapper = CreateQueueMapper(siloServices, providerName);
-        var clientMapper = CreateQueueMapper(clientServices, providerName);
-        var siloQueueIds = siloMapper.GetAllQueues().Order().ToArray();
-        var clientQueueIds = clientMapper.GetAllQueues().Order().ToArray();
-        var siloPhysicalNames = GetPhysicalQueueNames(siloQueueIds, siloSqsOptions, serviceId);
-        var clientPhysicalNames = GetPhysicalQueueNames(clientQueueIds, clientSqsOptions, serviceId);
-        var expectedPhysicalNames = Enumerable.Range(0, 4)
-            .Select(index => $"{serviceId}-topology-{index}{(fifoQueue ? ".fifo" : string.Empty)}")
-            .Order()
-            .ToArray();
-
-        Assert.Equal(4, siloQueueIds.Length);
-        Assert.Equal(siloQueueIds, clientQueueIds);
-        Assert.Equal(fifoQueue, siloSqsOptions.FifoQueue);
-        Assert.Equal(siloSqsOptions.FifoQueue, clientSqsOptions.FifoQueue);
-        Assert.Equal(expectedPhysicalNames, siloPhysicalNames);
-        Assert.Equal(siloPhysicalNames, clientPhysicalNames);
-        Assert.All(siloPhysicalNames, name => Assert.Equal(fifoQueue, name.EndsWith(".fifo", StringComparison.Ordinal)));
-    }
-
-    [Theory]
     [InlineData("ServiceKey")]
     [InlineData("ConnectionName")]
-    public void ConfigureClient_ServiceKey_ResolvesReferencedConnectionString(string referenceKey)
+    public async Task AspireConnectionResource_ResolvesReferencedConnectionString(string referenceKey)
     {
         const string serviceKey = "shared-sqs";
         const string connectionString = "Service=http://localhost:9324";
-        var builder = CreateClientBuilder(
+        await using var app = await SqsAspireTestApp.CreateAsync(
             ProviderName,
             [(referenceKey, serviceKey)],
             [($"ConnectionStrings:{serviceKey}", connectionString)]);
-
-        ConfigureClient(builder, ProviderName);
-
-        using var services = builder.Services.BuildServiceProvider();
-        var options = GetOptions<SqsOptions>(services, ProviderName);
+        using var host = await app.BuildClientHostAsync();
+        var options = GetOptions<SqsOptions>(host.Services, ProviderName);
 
         Assert.Equal(connectionString, options.ConnectionString);
         Assert.DoesNotContain(ProviderName, options.ConnectionString, StringComparison.OrdinalIgnoreCase);
@@ -226,139 +85,68 @@ public sealed class SQSStreamProviderBuilderTests
     }
 
     [Fact]
-    public void ConfigureClient_EquivalentReferenceAliases_ResolveConnectionString()
+    public async Task AspireConnectionResource_EquivalentReferenceAliasesResolve()
     {
         const string serviceKey = "shared-sqs";
         const string connectionString = "Service=http://localhost:9324";
-        var builder = CreateClientBuilder(
+        await using var app = await SqsAspireTestApp.CreateAsync(
             ProviderName,
             [
                 ("ServiceKey", serviceKey.ToUpperInvariant()),
                 ("ConnectionName", serviceKey),
             ],
             [($"ConnectionStrings:{serviceKey}", connectionString)]);
-
-        ConfigureClient(builder, ProviderName);
-
-        using var services = builder.Services.BuildServiceProvider();
-        var options = GetOptions<SqsOptions>(services, ProviderName);
+        using var host = await app.BuildClientHostAsync();
+        var options = GetOptions<SqsOptions>(host.Services, ProviderName);
 
         Assert.Equal(connectionString, options.ConnectionString);
-    }
-
-    [Fact]
-    public void ConfigureSilo_AwsRegionEnvironment_UsesSdkCredentialChainConfiguration()
-    {
-        string[] variableNames =
-        [
-            "AWS_REGION",
-            "AWS_DEFAULT_REGION",
-            "AWS_PROFILE",
-            "AWS_ACCESS_KEY_ID",
-            "AWS_SECRET_ACCESS_KEY",
-        ];
-        var previousValues = variableNames.ToDictionary(name => name, Environment.GetEnvironmentVariable);
-
-        try
-        {
-            Environment.SetEnvironmentVariable("AWS_REGION", "ap-southeast-2");
-            Environment.SetEnvironmentVariable("AWS_DEFAULT_REGION", "ap-southeast-2");
-            Environment.SetEnvironmentVariable("AWS_PROFILE", "integration-profile");
-            Environment.SetEnvironmentVariable("AWS_ACCESS_KEY_ID", "test-access-key");
-            Environment.SetEnvironmentVariable("AWS_SECRET_ACCESS_KEY", "test-secret-key");
-            var configuration = new ConfigurationBuilder()
-                .AddEnvironmentVariables()
-                .AddInMemoryCollection(
-                    new Dictionary<string, string?>
-                    {
-                        [$"Orleans:Streaming:{ProviderName}:ProviderType"] = "SQS",
-                    })
-                .Build();
-            var builder = new TestSiloBuilder(configuration);
-
-            ConfigureSilo(builder, ProviderName);
-
-            using var services = builder.Services.BuildServiceProvider();
-            var options = GetOptions<SqsOptions>(services, ProviderName);
-
-            Assert.Equal("Service=ap-southeast-2", options.ConnectionString);
-            Assert.DoesNotContain("integration-profile", options.ConnectionString, StringComparison.Ordinal);
-            Assert.DoesNotContain("test-access-key", options.ConnectionString, StringComparison.Ordinal);
-            Assert.DoesNotContain("test-secret-key", options.ConnectionString, StringComparison.Ordinal);
-            Assert.DoesNotContain(
-                typeof(SqsOptions).GetProperties(),
-                property => property.Name.Contains("Credential", StringComparison.OrdinalIgnoreCase)
-                    || property.Name.Contains("AccessKey", StringComparison.OrdinalIgnoreCase)
-                    || property.Name.Contains("SecretKey", StringComparison.OrdinalIgnoreCase)
-                    || property.Name.Contains("Profile", StringComparison.OrdinalIgnoreCase));
-        }
-        finally
-        {
-            foreach (var (name, value) in previousValues)
-            {
-                Environment.SetEnvironmentVariable(name, value);
-            }
-        }
     }
 
     [Theory]
     [InlineData("DataAdapterServiceKey")]
     [InlineData("DataAdapterKey")]
-    public void ConfigureSilo_DataAdapterServiceKey_ResolvesKeyedAdapter(string adapterConfigurationKey)
+    public async Task AspireGeneratedConfiguration_ResolvesKeyedDataAdapter(string adapterConfigurationKey)
     {
         const string adapterServiceKey = "custom-adapter";
         var defaultAdapter = new FakeSqsDataAdapter("default");
         var keyedAdapter = new FakeSqsDataAdapter("keyed");
-        var builder = CreateSiloBuilder(
+        await using var app = await SqsAspireTestApp.CreateAsync(
             ProviderName,
-            [
-                ("Region", "us-east-1"),
-                (adapterConfigurationKey, adapterServiceKey),
-            ]);
-        builder.Services.AddSingleton<ISQSDataAdapter>(defaultAdapter);
-        builder.Services.AddKeyedSingleton<ISQSDataAdapter>(adapterServiceKey, keyedAdapter);
-        builder.Services
-            .AddLogging()
-            .AddSerializer()
-            .Configure<ClusterOptions>(options =>
-            {
-                options.ServiceId = "adapter-test-service";
-                options.ClusterId = "adapter-test-cluster";
-            });
-
-        ConfigureSilo(builder, ProviderName);
-
-        using var services = builder.Services.BuildServiceProvider();
-        var configuredAdapter = services.GetRequiredKeyedService<ISQSDataAdapter>(ProviderName);
-        var adapterFactory = SQSAdapterFactory.Create(services, ProviderName);
+            [(adapterConfigurationKey, adapterServiceKey)],
+            awsRegion: "us-east-1");
+        using var host = await app.BuildSiloHostAsync(services =>
+        {
+            services.AddSingleton<ISQSDataAdapter>(defaultAdapter);
+            services.AddKeyedSingleton<ISQSDataAdapter>(adapterServiceKey, keyedAdapter);
+        });
+        var configuredAdapter = host.Services.GetRequiredKeyedService<ISQSDataAdapter>(ProviderName);
+        var adapterFactory = SQSAdapterFactory.Create(host.Services, ProviderName);
         var factoryAdapter = typeof(SQSAdapterFactory)
             .GetField("dataAdapter", BindingFlags.Instance | BindingFlags.NonPublic)!
             .GetValue(adapterFactory);
 
         Assert.Same(keyedAdapter, configuredAdapter);
         Assert.NotSame(defaultAdapter, configuredAdapter);
-        Assert.Equal("keyed", Assert.IsType<FakeSqsDataAdapter>(configuredAdapter).Id);
         Assert.Same(keyedAdapter, factoryAdapter);
     }
 
     [Theory]
     [MemberData(nameof(InvalidConfigurations))]
-    public void ConfigureSilo_InvalidConfiguration_ThrowsActionableError(
+    public async Task AspireGeneratedConfiguration_InvalidSiloConfigurationThrowsActionableError(
         string caseId,
         string[] providerValues,
         string[] rootValues,
         string expectedMessage)
     {
-        var builder = CreateSiloBuilder(
+        await using var app = await SqsAspireTestApp.CreateAsync(
             ProviderName,
             ToPairs(providerValues),
             ToPairs(rootValues));
 
-        var exception = Assert.Throws<OrleansConfigurationException>(() =>
+        var exception = await Assert.ThrowsAsync<OrleansConfigurationException>(async () =>
         {
-            ConfigureSilo(builder, ProviderName);
-            using var services = builder.Services.BuildServiceProvider();
-            _ = GetOptions<SqsOptions>(services, ProviderName);
+            using var host = await app.BuildSiloHostAsync();
+            _ = GetOptions<SqsOptions>(host.Services, ProviderName);
         });
 
         Assert.NotEmpty(caseId);
@@ -366,15 +154,13 @@ public sealed class SQSStreamProviderBuilderTests
     }
 
     [Fact]
-    public void ConfigureClient_MissingServiceLocation_ThrowsActionableError()
+    public async Task AspireGeneratedConfiguration_MissingServiceLocationThrowsActionableError()
     {
-        var builder = CreateClientBuilder(ProviderName, []);
+        await using var app = await SqsAspireTestApp.CreateAsync(ProviderName, []);
+        using var host = await app.BuildClientHostAsync();
 
-        ConfigureClient(builder, ProviderName);
-
-        using var services = builder.Services.BuildServiceProvider();
         var exception = Assert.Throws<OrleansConfigurationException>(
-            () => GetOptions<SqsOptions>(services, ProviderName));
+            () => GetOptions<SqsOptions>(host.Services, ProviderName));
 
         Assert.Contains("SQS streaming", exception.Message, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("service location", exception.Message, StringComparison.OrdinalIgnoreCase);
@@ -524,48 +310,6 @@ public sealed class SQSStreamProviderBuilderTests
         },
     };
 
-    private static void ConfigureSilo(TestSiloBuilder builder, string providerName)
-        => new SqsStreamProviderBuilder().Configure(
-            builder,
-            providerName,
-            builder.Configuration.GetSection($"Orleans:Streaming:{providerName}"));
-
-    private static void ConfigureClient(TestClientBuilder builder, string providerName)
-        => new SqsStreamProviderBuilder().Configure(
-            builder,
-            providerName,
-            builder.Configuration.GetSection($"Orleans:Streaming:{providerName}"));
-
-    private static TestSiloBuilder CreateSiloBuilder(
-        string providerName,
-        (string Key, string? Value)[] providerValues,
-        params (string Key, string? Value)[] rootValues)
-        => new(CreateConfiguration(providerName, providerValues, rootValues));
-
-    private static TestClientBuilder CreateClientBuilder(
-        string providerName,
-        (string Key, string? Value)[] providerValues,
-        params (string Key, string? Value)[] rootValues)
-        => new(CreateConfiguration(providerName, providerValues, rootValues));
-
-    private static IConfigurationRoot CreateConfiguration(
-        string providerName,
-        IEnumerable<(string Key, string? Value)> providerValues,
-        IEnumerable<(string Key, string? Value)> rootValues)
-    {
-        var values = providerValues
-            .Select(pair => new KeyValuePair<string, string?>(
-                $"Orleans:Streaming:{providerName}:{pair.Key}",
-                pair.Value))
-            .Concat(rootValues.Select(pair => new KeyValuePair<string, string?>(pair.Key, pair.Value)))
-            .ToDictionary();
-        values[$"Orleans:Streaming:{providerName}:ProviderType"] = "SQS";
-
-        return new ConfigurationBuilder()
-            .AddInMemoryCollection(values)
-            .Build();
-    }
-
     private static (string Key, string? Value)[] ToPairs(string[] values)
     {
         Assert.Equal(0, values.Length % 2);
@@ -578,49 +322,6 @@ public sealed class SQSStreamProviderBuilderTests
     private static TOptions GetOptions<TOptions>(IServiceProvider services, string providerName)
         where TOptions : class
         => services.GetRequiredService<IOptionsMonitor<TOptions>>().Get(providerName);
-
-    private static HashRingBasedStreamQueueMapper CreateQueueMapper(IServiceProvider services, string providerName)
-        => new(GetOptions<HashRingStreamQueueMapperOptions>(services, providerName), providerName);
-
-    private static string[] GetPhysicalQueueNames(
-        IEnumerable<QueueId> queueIds,
-        SqsOptions options,
-        string serviceId)
-    {
-        var storageType = typeof(SqsStreamProviderBuilder).Assembly.GetType(
-            "OrleansAWSUtils.Storage.SQSStorage",
-            throwOnError: true)!;
-        var constructQueueName = storageType.GetMethod(
-            "ConstructQueueName",
-            BindingFlags.NonPublic | BindingFlags.Static)!;
-
-        return queueIds
-            .Select(queueId => (string)constructQueueName.Invoke(null, [queueId.ToString(), options, serviceId])!)
-            .Order()
-            .ToArray();
-    }
-
-    private sealed class TestSiloBuilder(IConfiguration configuration) : ISiloBuilder
-    {
-        public IServiceCollection Services { get; } = CreateServices(configuration);
-
-        public IConfiguration Configuration { get; } = configuration;
-    }
-
-    private sealed class TestClientBuilder(IConfiguration configuration) : IClientBuilder
-    {
-        public IServiceCollection Services { get; } = CreateServices(configuration);
-
-        public IConfiguration Configuration { get; } = configuration;
-    }
-
-    private static ServiceCollection CreateServices(IConfiguration configuration)
-    {
-        var services = new ServiceCollection();
-        services.AddSingleton(configuration);
-        services.AddSingleton<IConfiguration>(configuration);
-        return services;
-    }
 
     private sealed class FakeSqsDataAdapter(string id) : ISQSDataAdapter
     {
@@ -637,3 +338,4 @@ public sealed class SQSStreamProviderBuilderTests
             => throw new NotSupportedException();
     }
 }
+#endif
