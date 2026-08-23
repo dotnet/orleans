@@ -454,27 +454,114 @@ public static class AppHostExamples
     {
         var builder = DistributedApplication.CreateBuilder(args);
 
-        // Add a SQL Server instance and database.
-        // Note: Aspire infers the Orleans provider type from the resource class name
-        // (SqlServerDatabaseResource → "SqlServerDatabase"), which does not match
-        // the Orleans provider name "AdoNet".
-        //
-        // There is no public API to override this inference in the current version
-        // of Aspire.Hosting.Orleans. As a workaround, configure the Orleans providers
-        // manually in the silo using UseOrleans(siloBuilder => {...}) and read the
-        // connection string from IConfiguration.
-        var sql = builder.AddSqlServer("sql");
-        var db = sql.AddDatabase("orleans-db");
+        var database = builder.AddSqlServer("sql")
+            .AddDatabase("orleans-db")
+            .WithCreationScript(File.ReadAllText("schema/sqlserver.sql"));
 
-        // Pass the database resource so Aspire injects ConnectionStrings__orleans-db.
-        // Then configure Orleans manually in the silo (see silo example).
+        var orleans = builder.AddOrleans("cluster")
+            .WithClustering(database)
+            .WithGrainStorage("Default", database)
+            .WithReminders(database)
+            .WithStreaming("streams", database)
+            .WithGrainDirectory("directory", database);
+
         builder.AddProject<Projects.Silo>("silo")
-            .WithReference(db)
-            .WaitFor(sql);
+            .WithReference(orleans)
+            .WaitFor(database);
 
         builder.Build().Run();
     }
     // </adonet_apphost>
+
+    // <adonet_postgresql_apphost>
+    public static void AdoNetPostgreSqlAppHost(string[] args)
+    {
+        var builder = DistributedApplication.CreateBuilder(args);
+
+        var postgres = builder.AddPostgres("postgres")
+            .WithInitFiles("schema/postgresql");
+        var database = postgres.AddDatabase("orleans-db");
+
+        var orleans = builder.AddOrleans("cluster")
+            .WithClustering(database)
+            .WithGrainStorage("Default", database)
+            .WithReminders(database)
+            .WithStreaming("streams", database)
+            .WithGrainDirectory("directory", database);
+
+        builder.AddProject<Projects.Silo>("silo")
+            .WithReference(orleans)
+            .WaitFor(database);
+
+        builder.Build().Run();
+    }
+    // </adonet_postgresql_apphost>
+
+    // <adonet_mysql_apphost>
+    public static void AdoNetMySqlAppHost(string[] args)
+    {
+        var builder = DistributedApplication.CreateBuilder(args);
+
+        var mysql = builder.AddMySql("mysql")
+            .WithInitFiles("schema/mysql");
+        var database = mysql.AddDatabase("orleans-db");
+
+        var orleans = builder.AddOrleans("cluster")
+            .WithClustering(database)
+            .WithGrainStorage("Default", database)
+            .WithReminders(database)
+            .WithStreaming("streams", database)
+            .WithGrainDirectory("directory", database);
+
+        builder.AddProject<Projects.Silo>("silo")
+            .WithReference(orleans)
+            .WaitFor(database);
+
+        builder.Build().Run();
+    }
+    // </adonet_mysql_apphost>
+
+    // <adonet_oracle_apphost>
+    public static void AdoNetOracleAppHost(string[] args)
+    {
+        var builder = DistributedApplication.CreateBuilder(args);
+
+        var oracle = builder.AddOracle("oracle")
+            .WithInitFiles("schema/oracle");
+        var database = oracle.AddDatabase("orleans-db");
+
+        var orleans = builder.AddOrleans("cluster")
+            .WithClustering(database)
+            .WithGrainStorage("Default", database)
+            .WithReminders(database);
+
+        builder.AddProject<Projects.Silo>("silo")
+            .WithReference(orleans)
+            .WaitFor(database);
+
+        builder.Build().Run();
+    }
+    // </adonet_oracle_apphost>
+
+    // <adonet_explicit_provider>
+    public static void ExplicitAdoNetProviderAppHost(string[] args)
+    {
+        var builder = DistributedApplication.CreateBuilder(args);
+
+        var database = builder.AddConnectionString("orders-db");
+        var provider = new ExplicitAdoNetProviderConfiguration(database, "Npgsql");
+
+        var orleans = builder.AddOrleans("cluster")
+            .WithClustering(provider)
+            .WithGrainStorage("Default", provider)
+            .WithReminders(provider);
+
+        builder.AddProject<Projects.Silo>("silo")
+            .WithReference(orleans);
+
+        builder.Build().Run();
+    }
+    // </adonet_explicit_provider>
 
     // <grain_directory_apphost>
     public static void GrainDirectoryAppHost(string[] args)
@@ -520,4 +607,21 @@ public static class AppHostExamples
     }
     // </explicit_cluster_ids>
 
+    private sealed class ExplicitAdoNetProviderConfiguration(
+        IResourceBuilder<IResourceWithConnectionString> database,
+        string invariant) : IProviderConfiguration
+    {
+        public void ConfigureResource<T>(
+            IResourceBuilder<T> resourceBuilder,
+            string configurationSectionPath)
+            where T : IResourceWithEnvironment
+        {
+            var prefix = configurationSectionPath.Replace(":", "__", StringComparison.Ordinal);
+            resourceBuilder
+                .WithEnvironment($"Orleans__{prefix}__ProviderType", "AdoNet")
+                .WithEnvironment($"Orleans__{prefix}__Invariant", invariant)
+                .WithEnvironment($"Orleans__{prefix}__ServiceKey", database.Resource.Name)
+                .WithReference(database);
+        }
+    }
 }
