@@ -309,4 +309,52 @@ public abstract class EFCoreGrainDirectoryTestsBase<TDbContext, TETag> :
         {
         }
     }
+
+    [Fact]
+    public async Task PR8654_GrainDirectory_LongGrainIdentifierRoundTripsAddressAndRawKeyExactly()
+    {
+        const string grainType = "directory-long";
+        var grainKey = new string('k', 600 - grainType.Length - 1);
+        var expectedIdentifier = $"{grainType}/{grainKey}";
+        var grainId = GrainId.Create(grainType, grainKey);
+        var address = new GrainAddress
+        {
+            ActivationId = new ActivationId(new Guid("00112233-4455-6677-8899-aabbccddeeff")),
+            GrainId = grainId,
+            SiloAddress = SiloAddress.FromParsableString("10.24.8.16:23456@34567"),
+            MembershipVersion = new MembershipVersion(8654)
+        };
+        Assert.Equal(600, expectedIdentifier.Length);
+        Assert.Equal(expectedIdentifier, grainId.ToString());
+
+        var registered = await GrainDirectory.Register(address);
+
+        Assert.NotNull(registered);
+        Assert.Equal(grainId, registered.GrainId);
+        Assert.Equal(address.ActivationId, registered.ActivationId);
+        Assert.Equal(address.SiloAddress, registered.SiloAddress);
+        Assert.Equal(address.MembershipVersion, registered.MembershipVersion);
+        var lookup = await GrainDirectory.Lookup(grainId);
+        Assert.NotNull(lookup);
+        Assert.Equal(grainId, lookup.GrainId);
+        Assert.Equal(address.ActivationId, lookup.ActivationId);
+        Assert.Equal(address.SiloAddress, lookup.SiloAddress);
+        Assert.Equal(address.MembershipVersion, lookup.MembershipVersion);
+
+        await using (var context = await Factory.CreateDbContextAsync())
+        {
+            var persisted = Assert.Single(await context.Activations.AsNoTracking().ToListAsync());
+            Assert.Equal(_clusterId, persisted.ClusterId);
+            Assert.Equal(expectedIdentifier, persisted.GrainId);
+            Assert.Equal(address.ActivationId.ToParsableString(), persisted.ActivationId);
+            Assert.Equal(address.SiloAddress.ToParsableString(), persisted.SiloAddress);
+            Assert.Equal(address.MembershipVersion.Value, persisted.MembershipVersion);
+        }
+
+        await GrainDirectory.Unregister(address);
+
+        Assert.Null(await GrainDirectory.Lookup(grainId));
+        await using var verification = await Factory.CreateDbContextAsync();
+        Assert.Empty(await verification.Activations.AsNoTracking().ToListAsync());
+    }
 }

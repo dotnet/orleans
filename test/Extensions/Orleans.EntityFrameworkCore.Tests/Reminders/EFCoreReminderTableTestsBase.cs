@@ -234,4 +234,45 @@ public abstract class EFCoreReminderTableTestsBase<TDbContext, TETag> :
         return "unknown";
 #endif
     }
+
+    [Fact, TestSuite(EFCoreTestCategories.Functional)]
+    public async Task PR8654_Reminder_LongGrainIdentifierRoundTripsReminderAndRawKeyExactly()
+    {
+        const string grainType = "reminder-long";
+        var grainKey = new string('r', 600 - grainType.Length - 1);
+        var expectedIdentifier = $"{grainType}/{grainKey}";
+        var grainId = GrainId.Create(grainType, grainKey);
+        var expected = new ReminderEntry
+        {
+            GrainId = grainId,
+            ReminderName = "long-identifier/reminder #8654",
+            StartAt = new DateTime(2026, 8, 23, 1, 31, 43, DateTimeKind.Utc),
+            Period = TimeSpan.FromMinutes(8654)
+        };
+        Assert.Equal(600, expectedIdentifier.Length);
+        Assert.Equal(expectedIdentifier, grainId.ToString());
+
+        expected.ETag = await RemindersTable.UpsertRow(expected);
+
+        Assert.False(string.IsNullOrWhiteSpace(expected.ETag));
+        AssertReminder(expected, Assert.IsType<ReminderEntry>(
+            await RemindersTable.ReadRow(grainId, expected.ReminderName)));
+        await using (var context = await Factory.CreateDbContextAsync())
+        {
+            var persisted = Assert.Single(await context.Reminders.AsNoTracking().ToListAsync());
+            Assert.Equal(clusterOptions.Value.ServiceId, persisted.ServiceId);
+            Assert.Equal(expectedIdentifier, persisted.GrainId);
+            Assert.Equal(expected.ReminderName, persisted.Name);
+            Assert.Equal(expected.StartAt, persisted.StartAt.UtcDateTime);
+            Assert.Equal(expected.Period, persisted.Period);
+            Assert.Equal(grainId.GetUniformHashCode(), persisted.GrainHash);
+            Assert.Equal(expected.ETag, CreateETagConverter().FromDbETag(persisted.ETag));
+        }
+
+        Assert.True(await RemindersTable.RemoveRow(grainId, expected.ReminderName, expected.ETag!));
+
+        Assert.Null(await RemindersTable.ReadRow(grainId, expected.ReminderName));
+        await using var verification = await Factory.CreateDbContextAsync();
+        Assert.Empty(await verification.Reminders.AsNoTracking().ToListAsync());
+    }
 }

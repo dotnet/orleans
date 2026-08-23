@@ -6,6 +6,7 @@ using Microsoft.Extensions.Options;
 using Microsoft.EntityFrameworkCore;
 using Orleans.Runtime;
 using Orleans.Configuration;
+using Orleans.EntityFrameworkCore;
 using Orleans.Reminders.EntityFrameworkCore.Data;
 
 namespace Orleans.Reminders.EntityFrameworkCore;
@@ -14,6 +15,7 @@ public class EFReminderTable<TDbContext, TETag> : IReminderTable where TDbContex
 {
     private readonly ILogger _logger;
     private readonly string _serviceId;
+    private readonly byte[] _serviceIdHash;
     private readonly IDbContextFactory<TDbContext> _dbContextFactory;
     private readonly IEFReminderETagConverter<TETag> _eTagConverter;
 
@@ -25,6 +27,7 @@ public class EFReminderTable<TDbContext, TETag> : IReminderTable where TDbContex
     {
         this._logger = loggerFactory.CreateLogger<EFReminderTable<TDbContext, TETag>>();
         this._serviceId = clusterOptions.Value.ServiceId;
+        this._serviceIdHash = EFCoreIdentifierHash.Compute(this._serviceId);
         this._dbContextFactory = dbContextFactory;
         this._eTagConverter = eTagConverter;
     }
@@ -45,12 +48,15 @@ public class EFReminderTable<TDbContext, TETag> : IReminderTable where TDbContex
         {
             await using var ctx = await this._dbContextFactory.CreateDbContextAsync().ConfigureAwait(false);
 
-            var records = await ctx.Reminders.AsNoTracking().Where(r =>
-                    r.ServiceId == this._serviceId &&
-                    r.GrainId == grainId.ToString())
+            var grainIdValue = grainId.ToString();
+            var grainIdHash = EFCoreIdentifierHash.Compute(grainIdValue);
+            var candidates = await ctx.Reminders.AsNoTracking().Where(r =>
+                    r.ServiceIdHash == this._serviceIdHash &&
+                    r.GrainIdHash == grainIdHash)
                 .ToArrayAsync().ConfigureAwait(false);
+            EnsureExactGrain(candidates, this._serviceId, grainIdValue);
 
-            return new ReminderTableData(records.Select(ConvertToEntity));
+            return new ReminderTableData(candidates.Select(ConvertToEntity));
         }
         catch (Exception ex)
         {
@@ -67,13 +73,14 @@ public class EFReminderTable<TDbContext, TETag> : IReminderTable where TDbContex
             await using var ctx = await this._dbContextFactory.CreateDbContextAsync().ConfigureAwait(false);
 
             var query = ctx.Reminders.AsNoTracking()
-                .Where(r => r.ServiceId == this._serviceId);
+                .Where(r => r.ServiceIdHash == this._serviceIdHash);
 
             query = begin < end
                 ? query.Where(r => r.GrainHash > begin && r.GrainHash <= end)
                 : query.Where(r => r.GrainHash > begin || r.GrainHash <= end);
 
             var records = await query.ToArrayAsync().ConfigureAwait(false);
+            EnsureExactService(records, this._serviceId);
 
             return new ReminderTableData(records.Select(ConvertToEntity));
         }
@@ -96,13 +103,18 @@ public class EFReminderTable<TDbContext, TETag> : IReminderTable where TDbContex
         {
             await using var ctx = await this._dbContextFactory.CreateDbContextAsync().ConfigureAwait(false);
 
-            var record = await ctx.Reminders
+            var grainIdValue = grainId.ToString();
+            var grainIdHash = EFCoreIdentifierHash.Compute(grainIdValue);
+            var reminderNameHash = EFCoreIdentifierHash.Compute(reminderName);
+            var candidates = await ctx.Reminders
                 .AsNoTracking()
-                .SingleOrDefaultAsync(r =>
-                    r.ServiceId == this._serviceId &&
-                    r.Name == reminderName &&
-                    r.GrainId == grainId.ToString())
+                .Where(r =>
+                    r.ServiceIdHash == this._serviceIdHash &&
+                    r.GrainIdHash == grainIdHash &&
+                    r.ReminderNameHash == reminderNameHash)
+                .ToArrayAsync()
                 .ConfigureAwait(false);
+            var record = GetExactRecord(candidates, this._serviceId, grainIdValue, reminderName);
 
             return record is null ? null : ConvertToEntity(record);
         }
@@ -121,17 +133,18 @@ public class EFReminderTable<TDbContext, TETag> : IReminderTable where TDbContex
             var record = ConvertToRecord(entry);
 
             await using var ctx = await this._dbContextFactory.CreateDbContextAsync().ConfigureAwait(false);
+            var candidates = await ctx.Reminders
+                .AsNoTracking()
+                .Where(r =>
+                    r.ServiceIdHash == record.ServiceIdHash &&
+                    r.GrainIdHash == record.GrainIdHash &&
+                    r.ReminderNameHash == record.ReminderNameHash)
+                .ToArrayAsync()
+                .ConfigureAwait(false);
+            var foundRecord = GetExactRecord(candidates, record.ServiceId, record.GrainId, record.Name);
 
             if (string.IsNullOrWhiteSpace(entry.ETag))
             {
-                var foundRecord = await ctx.Reminders
-                    .AsNoTracking()
-                    .SingleOrDefaultAsync(r =>
-                        r.ServiceId == this._serviceId &&
-                        r.Name == entry.ReminderName &&
-                        r.GrainId == entry.GrainId.ToString())
-                    .ConfigureAwait(false);
-
                 if (foundRecord is not null)
                 {
                     record.ETag = foundRecord.ETag;
@@ -165,11 +178,16 @@ public class EFReminderTable<TDbContext, TETag> : IReminderTable where TDbContex
         {
             await using var ctx = await this._dbContextFactory.CreateDbContextAsync().ConfigureAwait(false);
 
-            var record = await ctx.Reminders.SingleOrDefaultAsync(r =>
-                    r.ServiceId == this._serviceId &&
-                    r.GrainId == grainId.ToString() &&
-                    r.Name == reminderName)
+            var grainIdValue = grainId.ToString();
+            var grainIdHash = EFCoreIdentifierHash.Compute(grainIdValue);
+            var reminderNameHash = EFCoreIdentifierHash.Compute(reminderName);
+            var candidates = await ctx.Reminders.Where(r =>
+                    r.ServiceIdHash == this._serviceIdHash &&
+                    r.GrainIdHash == grainIdHash &&
+                    r.ReminderNameHash == reminderNameHash)
+                .ToArrayAsync()
                 .ConfigureAwait(false);
+            var record = GetExactRecord(candidates, this._serviceId, grainIdValue, reminderName);
 
             if (record is null) return false;
 
@@ -205,9 +223,10 @@ public class EFReminderTable<TDbContext, TETag> : IReminderTable where TDbContex
             await using var ctx = await this._dbContextFactory.CreateDbContextAsync().ConfigureAwait(false);
 
             var records = await ctx.Reminders
-                .Where(r => r.ServiceId == this._serviceId)
+                .Where(r => r.ServiceIdHash == this._serviceIdHash)
                 .ToArrayAsync()
                 .ConfigureAwait(false);
+            EnsureExactService(records, this._serviceId);
 
             ctx.Reminders.RemoveRange(records);
 
@@ -225,6 +244,9 @@ public class EFReminderTable<TDbContext, TETag> : IReminderTable where TDbContex
     {
         var record = new ReminderRecord<TETag>
         {
+            ServiceIdHash = this._serviceIdHash,
+            GrainIdHash = EFCoreIdentifierHash.Compute(entry.GrainId.ToString()),
+            ReminderNameHash = EFCoreIdentifierHash.Compute(entry.ReminderName),
             ServiceId = this._serviceId,
             GrainHash = entry.GrainId.GetUniformHashCode(),
             GrainId = entry.GrainId.ToString(),
@@ -239,6 +261,43 @@ public class EFReminderTable<TDbContext, TETag> : IReminderTable where TDbContex
         }
 
         return record;
+    }
+
+    private static ReminderRecord<TETag>? GetExactRecord(
+        ReminderRecord<TETag>[] candidates,
+        string serviceId,
+        string grainId,
+        string reminderName)
+    {
+        foreach (var candidate in candidates)
+        {
+            if (!string.Equals(candidate.ServiceId, serviceId, StringComparison.Ordinal) ||
+                !string.Equals(candidate.GrainId, grainId, StringComparison.Ordinal) ||
+                !string.Equals(candidate.Name, reminderName, StringComparison.Ordinal))
+            {
+                throw new InvalidOperationException("An Entity Framework Core reminder identifier hash collision was detected.");
+            }
+        }
+
+        return candidates.SingleOrDefault();
+    }
+
+    private static void EnsureExactGrain(ReminderRecord<TETag>[] records, string serviceId, string grainId)
+    {
+        if (records.Any(record =>
+            !string.Equals(record.ServiceId, serviceId, StringComparison.Ordinal) ||
+            !string.Equals(record.GrainId, grainId, StringComparison.Ordinal)))
+        {
+            throw new InvalidOperationException("An Entity Framework Core reminder identifier hash collision was detected.");
+        }
+    }
+
+    private static void EnsureExactService(ReminderRecord<TETag>[] records, string serviceId)
+    {
+        if (records.Any(record => !string.Equals(record.ServiceId, serviceId, StringComparison.Ordinal)))
+        {
+            throw new InvalidOperationException("An Entity Framework Core reminder identifier hash collision was detected.");
+        }
     }
 
     private ReminderEntry ConvertToEntity(ReminderRecord<TETag> record)

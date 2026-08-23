@@ -27,19 +27,29 @@ namespace Orleans.GrainDirectory.EntityFrameworkCore.PostgreSQL.Data.Migrations
 
             modelBuilder.Entity("Orleans.GrainDirectory.EntityFrameworkCore.Data.GrainActivationRecord<System.Guid>", b =>
                 {
-                    b.Property<string>("ClusterId")
-                        .HasColumnType("text");
+                    b.Property<byte[]>("ClusterIdHash")
+                        .HasMaxLength(32)
+                        .HasColumnType("bytea");
 
-                    b.Property<string>("GrainId")
-                        .HasColumnType("text");
+                    b.Property<byte[]>("GrainIdHash")
+                        .HasMaxLength(32)
+                        .HasColumnType("bytea");
 
                     b.Property<string>("ActivationId")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("ClusterId")
                         .IsRequired()
                         .HasColumnType("text");
 
                     b.Property<Guid>("ETag")
                         .IsConcurrencyToken()
                         .HasColumnType("uuid");
+
+                    b.Property<string>("GrainId")
+                        .IsRequired()
+                        .HasColumnType("text");
 
                     b.Property<long>("MembershipVersion")
                         .HasColumnType("bigint");
@@ -48,13 +58,23 @@ namespace Orleans.GrainDirectory.EntityFrameworkCore.PostgreSQL.Data.Migrations
                         .IsRequired()
                         .HasColumnType("text");
 
-                    b.HasKey("ClusterId", "GrainId");
+                    b.Property<byte[]>("SiloAddressHash")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("bytea");
 
-                    b.HasIndex("ClusterId", "SiloAddress");
+                    b.HasKey("ClusterIdHash", "GrainIdHash");
 
-                    b.HasIndex("ClusterId", "GrainId", "ActivationId");
+                    b.HasIndex("ClusterIdHash", "SiloAddressHash");
 
-                    b.ToTable("Activations");
+                    b.ToTable("Activations", t =>
+                        {
+                            t.HasCheckConstraint("CK_Activations_ClusterIdHash_Length", "octet_length(\"ClusterIdHash\") = 32");
+
+                            t.HasCheckConstraint("CK_Activations_GrainIdHash_Length", "octet_length(\"GrainIdHash\") = 32");
+
+                            t.HasCheckConstraint("CK_Activations_SiloAddressHash_Length", "octet_length(\"SiloAddressHash\") = 32");
+                        });
                 });
 #pragma warning restore 612, 618
         }

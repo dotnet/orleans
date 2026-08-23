@@ -12,7 +12,7 @@ using Orleans.Persistence.EntityFrameworkCore.PostgreSQL.Data;
 namespace Orleans.Persistence.EntityFrameworkCore.PostgreSQL.Data.Migrations
 {
     [DbContext(typeof(PostgreSqlGrainStateDbContext))]
-    [Migration("20260811155003_InitialPersistenceSchema")]
+    [Migration("20260823101503_InitialPersistenceSchema")]
     partial class InitialPersistenceSchema
     {
         /// <inheritdoc />
@@ -27,21 +27,9 @@ namespace Orleans.Persistence.EntityFrameworkCore.PostgreSQL.Data.Migrations
 
             modelBuilder.Entity("Orleans.Persistence.EntityFrameworkCore.Data.GrainStateRecord<System.Guid>", b =>
                 {
-                    b.Property<string>("ServiceId")
-                        .HasMaxLength(280)
-                        .HasColumnType("character varying(280)");
-
-                    b.Property<string>("GrainType")
-                        .HasMaxLength(280)
-                        .HasColumnType("character varying(280)");
-
-                    b.Property<string>("StateType")
-                        .HasMaxLength(280)
-                        .HasColumnType("character varying(280)");
-
-                    b.Property<string>("GrainId")
-                        .HasMaxLength(280)
-                        .HasColumnType("character varying(280)");
+                    b.Property<byte[]>("KeyHash")
+                        .HasMaxLength(32)
+                        .HasColumnType("bytea");
 
                     b.Property<byte[]>("Data")
                         .HasColumnType("bytea");
@@ -50,7 +38,23 @@ namespace Orleans.Persistence.EntityFrameworkCore.PostgreSQL.Data.Migrations
                         .IsConcurrencyToken()
                         .HasColumnType("uuid");
 
-                    b.HasKey("ServiceId", "GrainType", "StateType", "GrainId");
+                    b.Property<string>("GrainId")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("GrainType")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("ServiceId")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("StateType")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.HasKey("KeyHash");
 
                     b.ToTable("GrainState");
                 });

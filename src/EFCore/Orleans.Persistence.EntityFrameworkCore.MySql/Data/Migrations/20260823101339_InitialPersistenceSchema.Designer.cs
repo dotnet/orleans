@@ -12,7 +12,7 @@ using Orleans.Persistence.EntityFrameworkCore.MySql.Data;
 namespace Orleans.Persistence.EntityFrameworkCore.MySql.Data.Migrations
 {
     [DbContext(typeof(MySqlGrainStateDbContext))]
-    [Migration("20260811210104_InitialPersistenceSchema")]
+    [Migration("20260823101339_InitialPersistenceSchema")]
     partial class InitialPersistenceSchema
     {
         /// <inheritdoc />
@@ -27,25 +27,9 @@ namespace Orleans.Persistence.EntityFrameworkCore.MySql.Data.Migrations
 
             modelBuilder.Entity("Orleans.Persistence.EntityFrameworkCore.Data.GrainStateRecord<System.Guid>", b =>
                 {
-                    b.Property<string>("ServiceId")
-                        .HasMaxLength(191)
-                        .HasColumnType("varchar(191)")
-                        .UseCollation("utf8mb4_bin");
-
-                    b.Property<string>("GrainType")
-                        .HasMaxLength(191)
-                        .HasColumnType("varchar(191)")
-                        .UseCollation("utf8mb4_bin");
-
-                    b.Property<string>("StateType")
-                        .HasMaxLength(191)
-                        .HasColumnType("varchar(191)")
-                        .UseCollation("utf8mb4_bin");
-
-                    b.Property<string>("GrainId")
-                        .HasMaxLength(191)
-                        .HasColumnType("varchar(191)")
-                        .UseCollation("utf8mb4_bin");
+                    b.Property<byte[]>("KeyHash")
+                        .HasMaxLength(32)
+                        .HasColumnType("binary(32)");
 
                     b.Property<byte[]>("Data")
                         .HasColumnType("longblob");
@@ -54,7 +38,27 @@ namespace Orleans.Persistence.EntityFrameworkCore.MySql.Data.Migrations
                         .IsConcurrencyToken()
                         .HasColumnType("char(36)");
 
-                    b.HasKey("ServiceId", "GrainType", "StateType", "GrainId");
+                    b.Property<string>("GrainId")
+                        .IsRequired()
+                        .HasColumnType("longtext")
+                        .UseCollation("utf8mb4_bin");
+
+                    b.Property<string>("GrainType")
+                        .IsRequired()
+                        .HasColumnType("longtext")
+                        .UseCollation("utf8mb4_bin");
+
+                    b.Property<string>("ServiceId")
+                        .IsRequired()
+                        .HasColumnType("longtext")
+                        .UseCollation("utf8mb4_bin");
+
+                    b.Property<string>("StateType")
+                        .IsRequired()
+                        .HasColumnType("longtext")
+                        .UseCollation("utf8mb4_bin");
+
+                    b.HasKey("KeyHash");
 
                     b.ToTable("GrainState");
                 });

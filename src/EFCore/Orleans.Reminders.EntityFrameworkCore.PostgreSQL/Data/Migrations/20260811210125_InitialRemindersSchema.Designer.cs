@@ -27,14 +27,17 @@ namespace Orleans.Reminders.EntityFrameworkCore.PostgreSQL.Data.Migrations
 
             modelBuilder.Entity("Orleans.Reminders.EntityFrameworkCore.Data.ReminderRecord<System.Guid>", b =>
                 {
-                    b.Property<string>("ServiceId")
-                        .HasColumnType("text");
+                    b.Property<byte[]>("ServiceIdHash")
+                        .HasMaxLength(32)
+                        .HasColumnType("bytea");
 
-                    b.Property<string>("GrainId")
-                        .HasColumnType("text");
+                    b.Property<byte[]>("GrainIdHash")
+                        .HasMaxLength(32)
+                        .HasColumnType("bytea");
 
-                    b.Property<string>("Name")
-                        .HasColumnType("text");
+                    b.Property<byte[]>("ReminderNameHash")
+                        .HasMaxLength(32)
+                        .HasColumnType("bytea");
 
                     b.Property<Guid>("ETag")
                         .IsConcurrencyToken()
@@ -43,19 +46,38 @@ namespace Orleans.Reminders.EntityFrameworkCore.PostgreSQL.Data.Migrations
                     b.Property<long>("GrainHash")
                         .HasColumnType("bigint");
 
+                    b.Property<string>("GrainId")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasColumnType("text");
+
                     b.Property<long>("Period")
                         .HasColumnType("bigint");
+
+                    b.Property<string>("ServiceId")
+                        .IsRequired()
+                        .HasColumnType("text");
 
                     b.Property<DateTimeOffset>("StartAt")
                         .HasColumnType("timestamp with time zone");
 
-                    b.HasKey("ServiceId", "GrainId", "Name");
+                    b.HasKey("ServiceIdHash", "GrainIdHash", "ReminderNameHash");
 
-                    b.HasIndex("ServiceId", "GrainHash");
+                    b.HasIndex("ServiceIdHash", "GrainHash");
 
-                    b.HasIndex("ServiceId", "GrainId");
+                    b.HasIndex("ServiceIdHash", "GrainIdHash");
 
-                    b.ToTable("Reminders");
+                    b.ToTable("Reminders", t =>
+                        {
+                            t.HasCheckConstraint("CK_Reminders_GrainIdHash_Length", "octet_length(\"GrainIdHash\") = 32");
+
+                            t.HasCheckConstraint("CK_Reminders_ReminderNameHash_Length", "octet_length(\"ReminderNameHash\") = 32");
+
+                            t.HasCheckConstraint("CK_Reminders_ServiceIdHash_Length", "octet_length(\"ServiceIdHash\") = 32");
+                        });
                 });
 #pragma warning restore 612, 618
         }

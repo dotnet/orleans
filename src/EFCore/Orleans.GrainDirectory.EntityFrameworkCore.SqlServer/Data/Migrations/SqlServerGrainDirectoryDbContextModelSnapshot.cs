@@ -23,20 +23,22 @@ namespace Orleans.GrainDirectory.EntityFrameworkCore.SqlServer.Data.Migrations
 
             modelBuilder.Entity("Orleans.GrainDirectory.EntityFrameworkCore.Data.GrainActivationRecord<byte[]>", b =>
                 {
-                    b.Property<string>("ClusterId")
-                        .HasMaxLength(150)
-                        .HasColumnType("nvarchar(150)")
-                        .UseCollation("Latin1_General_100_BIN2");
+                    b.Property<byte[]>("ClusterIdHash")
+                        .HasMaxLength(32)
+                        .HasColumnType("binary(32)");
 
-                    b.Property<string>("GrainId")
-                        .HasMaxLength(512)
-                        .HasColumnType("nvarchar(512)")
-                        .UseCollation("Latin1_General_100_BIN2");
+                    b.Property<byte[]>("GrainIdHash")
+                        .HasMaxLength(32)
+                        .HasColumnType("binary(32)");
 
                     b.Property<string>("ActivationId")
                         .IsRequired()
-                        .HasMaxLength(64)
-                        .HasColumnType("nvarchar(64)")
+                        .HasColumnType("nvarchar(max)")
+                        .UseCollation("Latin1_General_100_BIN2");
+
+                    b.Property<string>("ClusterId")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)")
                         .UseCollation("Latin1_General_100_BIN2");
 
                     b.Property<byte[]>("ETag")
@@ -45,29 +47,33 @@ namespace Orleans.GrainDirectory.EntityFrameworkCore.SqlServer.Data.Migrations
                         .ValueGeneratedOnAddOrUpdate()
                         .HasColumnType("rowversion");
 
+                    b.Property<string>("GrainId")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)")
+                        .UseCollation("Latin1_General_100_BIN2");
+
                     b.Property<long>("MembershipVersion")
                         .HasColumnType("bigint");
 
                     b.Property<string>("SiloAddress")
                         .IsRequired()
-                        .HasMaxLength(256)
-                        .HasColumnType("nvarchar(256)")
+                        .HasColumnType("nvarchar(max)")
                         .UseCollation("Latin1_General_100_BIN2");
 
-                    b.HasKey("ClusterId", "GrainId")
+                    b.Property<byte[]>("SiloAddressHash")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("binary(32)");
+
+                    b.HasKey("ClusterIdHash", "GrainIdHash")
                         .HasName("PK_Activations");
 
-                    SqlServerKeyBuilderExtensions.IsClustered(b.HasKey("ClusterId", "GrainId"), false);
+                    SqlServerKeyBuilderExtensions.IsClustered(b.HasKey("ClusterIdHash", "GrainIdHash"), false);
 
-                    b.HasIndex("ClusterId", "SiloAddress")
-                        .HasDatabaseName("IDX_Activations_ClusterId_SiloAddress");
+                    b.HasIndex("ClusterIdHash", "SiloAddressHash")
+                        .HasDatabaseName("IDX_Activations_ClusterIdHash_SiloAddressHash");
 
-                    SqlServerIndexBuilderExtensions.IsClustered(b.HasIndex("ClusterId", "SiloAddress"), false);
-
-                    b.HasIndex("ClusterId", "GrainId", "ActivationId")
-                        .HasDatabaseName("IDX_Activations_ClusterId_GrainId_ActivationId");
-
-                    SqlServerIndexBuilderExtensions.IsClustered(b.HasIndex("ClusterId", "GrainId", "ActivationId"), false);
+                    SqlServerIndexBuilderExtensions.IsClustered(b.HasIndex("ClusterIdHash", "SiloAddressHash"), false);
 
                     b.ToTable("Activations");
                 });

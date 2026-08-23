@@ -11,6 +11,9 @@ DO $EF$
 BEGIN
     IF NOT EXISTS(SELECT 1 FROM "__EFMigrationsHistory" WHERE "MigrationId" = '20260811210125_InitialRemindersSchema') THEN
     CREATE TABLE "Reminders" (
+        "ServiceIdHash" bytea NOT NULL,
+        "GrainIdHash" bytea NOT NULL,
+        "ReminderNameHash" bytea NOT NULL,
         "ServiceId" text NOT NULL,
         "GrainId" text NOT NULL,
         "Name" text NOT NULL,
@@ -18,7 +21,10 @@ BEGIN
         "Period" bigint NOT NULL,
         "GrainHash" bigint NOT NULL,
         "ETag" uuid NOT NULL,
-        CONSTRAINT "PK_Reminders" PRIMARY KEY ("ServiceId", "GrainId", "Name")
+        CONSTRAINT "PK_Reminders" PRIMARY KEY ("ServiceIdHash", "GrainIdHash", "ReminderNameHash"),
+        CONSTRAINT "CK_Reminders_GrainIdHash_Length" CHECK (octet_length("GrainIdHash") = 32),
+        CONSTRAINT "CK_Reminders_ReminderNameHash_Length" CHECK (octet_length("ReminderNameHash") = 32),
+        CONSTRAINT "CK_Reminders_ServiceIdHash_Length" CHECK (octet_length("ServiceIdHash") = 32)
     );
     END IF;
 END $EF$;
@@ -26,14 +32,14 @@ END $EF$;
 DO $EF$
 BEGIN
     IF NOT EXISTS(SELECT 1 FROM "__EFMigrationsHistory" WHERE "MigrationId" = '20260811210125_InitialRemindersSchema') THEN
-    CREATE INDEX "IX_Reminders_ServiceId_GrainHash" ON "Reminders" ("ServiceId", "GrainHash");
+    CREATE INDEX "IX_Reminders_ServiceIdHash_GrainHash" ON "Reminders" ("ServiceIdHash", "GrainHash");
     END IF;
 END $EF$;
 
 DO $EF$
 BEGIN
     IF NOT EXISTS(SELECT 1 FROM "__EFMigrationsHistory" WHERE "MigrationId" = '20260811210125_InitialRemindersSchema') THEN
-    CREATE INDEX "IX_Reminders_ServiceId_GrainId" ON "Reminders" ("ServiceId", "GrainId");
+    CREATE INDEX "IX_Reminders_ServiceIdHash_GrainIdHash" ON "Reminders" ("ServiceIdHash", "GrainIdHash");
     END IF;
 END $EF$;
 

@@ -27,14 +27,17 @@ BEGIN
     IF NOT EXISTS(SELECT 1 FROM `__EFMigrationsHistory` WHERE `MigrationId` = '20260811210118_InitialRemindersSchema') THEN
 
     CREATE TABLE `Reminders` (
-        `ServiceId` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin NOT NULL,
-        `GrainId` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin NOT NULL,
-        `Name` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin NOT NULL,
+        `ServiceIdHash` binary(32) NOT NULL,
+        `GrainIdHash` binary(32) NOT NULL,
+        `ReminderNameHash` binary(32) NOT NULL,
+        `ServiceId` longtext CHARACTER SET utf8mb4 COLLATE utf8mb4_bin NOT NULL,
+        `GrainId` longtext CHARACTER SET utf8mb4 COLLATE utf8mb4_bin NOT NULL,
+        `Name` longtext CHARACTER SET utf8mb4 COLLATE utf8mb4_bin NOT NULL,
         `StartAt` datetime(6) NOT NULL,
         `Period` bigint NOT NULL,
         `GrainHash` int unsigned NOT NULL,
         `ETag` char(36) COLLATE ascii_general_ci NOT NULL,
-        CONSTRAINT `PK_Reminders` PRIMARY KEY (`ServiceId`, `GrainId`, `Name`)
+        CONSTRAINT `PK_Reminders` PRIMARY KEY (`ServiceIdHash`, `GrainIdHash`, `ReminderNameHash`)
     ) CHARACTER SET=utf8mb4;
 
     END IF;
@@ -49,7 +52,7 @@ CREATE PROCEDURE MigrationsScript()
 BEGIN
     IF NOT EXISTS(SELECT 1 FROM `__EFMigrationsHistory` WHERE `MigrationId` = '20260811210118_InitialRemindersSchema') THEN
 
-    CREATE INDEX `IX_Reminders_ServiceId_GrainHash` ON `Reminders` (`ServiceId`, `GrainHash`);
+    CREATE INDEX `IX_Reminders_ServiceIdHash_GrainHash` ON `Reminders` (`ServiceIdHash`, `GrainHash`);
 
     END IF;
 END //
@@ -63,7 +66,7 @@ CREATE PROCEDURE MigrationsScript()
 BEGIN
     IF NOT EXISTS(SELECT 1 FROM `__EFMigrationsHistory` WHERE `MigrationId` = '20260811210118_InitialRemindersSchema') THEN
 
-    CREATE INDEX `IX_Reminders_ServiceId_GrainId` ON `Reminders` (`ServiceId`, `GrainId`);
+    CREATE INDEX `IX_Reminders_ServiceIdHash_GrainIdHash` ON `Reminders` (`ServiceIdHash`, `GrainIdHash`);
 
     END IF;
 END //

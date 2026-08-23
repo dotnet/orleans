@@ -22,6 +22,7 @@
 
   <ItemGroup>
     <PackageReference Include="Microsoft.EntityFrameworkCore"/>
+    <Compile Include="$(MSBuildThisFileDirectory)..\Shared\EFCoreIdentifierHash.cs" Link="Shared\EFCoreIdentifierHash.cs" />
   </ItemGroup>
 
   <ItemGroup>

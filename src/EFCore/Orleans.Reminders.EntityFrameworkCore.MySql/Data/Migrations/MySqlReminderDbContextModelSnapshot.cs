@@ -24,17 +24,17 @@ namespace Orleans.Reminders.EntityFrameworkCore.MySql.Data.Migrations
 
             modelBuilder.Entity("Orleans.Reminders.EntityFrameworkCore.Data.ReminderRecord<System.Guid>", b =>
                 {
-                    b.Property<string>("ServiceId")
-                        .HasColumnType("varchar(255)")
-                        .UseCollation("utf8mb4_bin");
+                    b.Property<byte[]>("ServiceIdHash")
+                        .HasMaxLength(32)
+                        .HasColumnType("binary(32)");
 
-                    b.Property<string>("GrainId")
-                        .HasColumnType("varchar(255)")
-                        .UseCollation("utf8mb4_bin");
+                    b.Property<byte[]>("GrainIdHash")
+                        .HasMaxLength(32)
+                        .HasColumnType("binary(32)");
 
-                    b.Property<string>("Name")
-                        .HasColumnType("varchar(255)")
-                        .UseCollation("utf8mb4_bin");
+                    b.Property<byte[]>("ReminderNameHash")
+                        .HasMaxLength(32)
+                        .HasColumnType("binary(32)");
 
                     b.Property<Guid>("ETag")
                         .IsConcurrencyToken()
@@ -43,17 +43,32 @@ namespace Orleans.Reminders.EntityFrameworkCore.MySql.Data.Migrations
                     b.Property<uint>("GrainHash")
                         .HasColumnType("int unsigned");
 
+                    b.Property<string>("GrainId")
+                        .IsRequired()
+                        .HasColumnType("longtext")
+                        .UseCollation("utf8mb4_bin");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasColumnType("longtext")
+                        .UseCollation("utf8mb4_bin");
+
                     b.Property<long>("Period")
                         .HasColumnType("bigint");
+
+                    b.Property<string>("ServiceId")
+                        .IsRequired()
+                        .HasColumnType("longtext")
+                        .UseCollation("utf8mb4_bin");
 
                     b.Property<DateTimeOffset>("StartAt")
                         .HasColumnType("datetime(6)");
 
-                    b.HasKey("ServiceId", "GrainId", "Name");
+                    b.HasKey("ServiceIdHash", "GrainIdHash", "ReminderNameHash");
 
-                    b.HasIndex("ServiceId", "GrainHash");
+                    b.HasIndex("ServiceIdHash", "GrainHash");
 
-                    b.HasIndex("ServiceId", "GrainId");
+                    b.HasIndex("ServiceIdHash", "GrainIdHash");
 
                     b.ToTable("Reminders");
                 });

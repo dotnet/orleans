@@ -3,6 +3,7 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Metadata;
 
 namespace Orleans.Persistence.EntityFrameworkCore.Data;
 
@@ -17,11 +18,15 @@ public abstract class GuidGrainStateDbContext<TDbContext> : GrainStateDbContext<
     {
         modelBuilder.Entity<GrainStateRecord<Guid>>(entity =>
         {
-            entity.HasKey(record => new { record.ServiceId, record.GrainType, record.StateType, record.GrainId });
-            entity.Property(record => record.ServiceId).HasMaxLength(280).IsRequired();
-            entity.Property(record => record.GrainType).HasMaxLength(280).IsRequired();
-            entity.Property(record => record.StateType).HasMaxLength(280).IsRequired();
-            entity.Property(record => record.GrainId).HasMaxLength(280).IsRequired();
+            entity.HasKey(record => record.KeyHash);
+            entity.Property(record => record.KeyHash)
+                .HasMaxLength(32)
+                .IsRequired()
+                .UsePropertyAccessMode(PropertyAccessMode.Property);
+            entity.Property(record => record.ServiceId).IsRequired();
+            entity.Property(record => record.GrainType).IsRequired();
+            entity.Property(record => record.StateType).IsRequired();
+            entity.Property(record => record.GrainId).IsRequired();
             entity.Property(record => record.Data).IsRequired(false);
             entity.Property(record => record.ETag)
                 .IsRequired()

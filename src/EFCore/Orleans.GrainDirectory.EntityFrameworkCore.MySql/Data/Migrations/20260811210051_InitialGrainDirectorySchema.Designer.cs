@@ -27,36 +27,49 @@ namespace Orleans.GrainDirectory.EntityFrameworkCore.MySql.Data.Migrations
 
             modelBuilder.Entity("Orleans.GrainDirectory.EntityFrameworkCore.Data.GrainActivationRecord<System.Guid>", b =>
                 {
-                    b.Property<string>("ClusterId")
-                        .HasColumnType("varchar(255)")
-                        .UseCollation("utf8mb4_bin");
+                    b.Property<byte[]>("ClusterIdHash")
+                        .HasMaxLength(32)
+                        .HasColumnType("binary(32)");
 
-                    b.Property<string>("GrainId")
-                        .HasColumnType("varchar(255)")
-                        .UseCollation("utf8mb4_bin");
+                    b.Property<byte[]>("GrainIdHash")
+                        .HasMaxLength(32)
+                        .HasColumnType("binary(32)");
 
                     b.Property<string>("ActivationId")
                         .IsRequired()
-                        .HasColumnType("varchar(255)")
+                        .HasColumnType("longtext")
+                        .UseCollation("utf8mb4_bin");
+
+                    b.Property<string>("ClusterId")
+                        .IsRequired()
+                        .HasColumnType("longtext")
                         .UseCollation("utf8mb4_bin");
 
                     b.Property<Guid>("ETag")
                         .IsConcurrencyToken()
                         .HasColumnType("char(36)");
 
+                    b.Property<string>("GrainId")
+                        .IsRequired()
+                        .HasColumnType("longtext")
+                        .UseCollation("utf8mb4_bin");
+
                     b.Property<long>("MembershipVersion")
                         .HasColumnType("bigint");
 
                     b.Property<string>("SiloAddress")
                         .IsRequired()
-                        .HasColumnType("varchar(255)")
+                        .HasColumnType("longtext")
                         .UseCollation("utf8mb4_bin");
 
-                    b.HasKey("ClusterId", "GrainId");
+                    b.Property<byte[]>("SiloAddressHash")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("binary(32)");
 
-                    b.HasIndex("ClusterId", "SiloAddress");
+                    b.HasKey("ClusterIdHash", "GrainIdHash");
 
-                    b.HasIndex("ClusterId", "GrainId", "ActivationId");
+                    b.HasIndex("ClusterIdHash", "SiloAddressHash");
 
                     b.ToTable("Activations");
                 });

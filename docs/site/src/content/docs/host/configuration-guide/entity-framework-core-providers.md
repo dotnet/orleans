@@ -35,11 +35,13 @@ Each package exposes `ISiloBuilder` extensions in the Orleans capability namespa
 
 Pass the overload which accepts an `Action<DbContextOptionsBuilder>` and configure the matching EF Core database provider. Clustering must be configured on both silos and external clients. Grain storage, reminders, and grain directories are silo services.
 
-The provider-neutral packages expose generic overloads for applications which supply a custom context derived from the corresponding Orleans context. A custom model can add indexes or constraints, but it must preserve the Orleans keys, relationships, and ETag concurrency token.
+The provider-neutral packages expose generic overloads for applications which supply a custom context derived from the corresponding Orleans context. A custom model can add indexes or constraints, but it must preserve the Orleans identifier-hash keys, full identifier values, relationships, and ETag concurrency token.
 
 ## Create and deploy the schema
 
 Each database-specific package contains EF Core migrations and an idempotent SQL script. Apply the schema for every enabled capability before starting the cluster. Run migrations from a deployment job or administration process rather than concurrently from every silo.
+
+Grain persistence, grain-directory, and reminder rows retain the complete Orleans identifiers and use fixed-width SHA-256 keys for database identity and lookup. This supports long identifiers and preserves ordinal identity, including trailing spaces, across the supported databases. Every lookup verifies the stored full values after matching the hash so a hash collision is reported instead of aliasing one Orleans identity to another.
 
 Keep generated migrations and scripts under source control. When a custom context changes the model, generate a new migration from the database-specific project:
 
@@ -52,7 +54,7 @@ Back up production data before applying schema changes. Test both rolling upgrad
 
 ## Concurrency and consistency
 
-The providers implement Orleans optimistic concurrency using the stored ETag. SQL Server uses `rowversion`. MySQL and PostgreSQL use application-managed GUID tokens which change on every insert or update. Treat ETags as opaque values; a stale write fails instead of overwriting a newer record.
+The providers implement Orleans optimistic concurrency using the stored ETag. SQL Server uses `rowversion`. MySQL and PostgreSQL use application-managed GUID tokens which change on every insert or update. Treat ETags as opaque values; a stale write or clear fails instead of overwriting or deleting a newer record. A clear which begins from a missing or unversioned caller state resets that caller without deleting a row created by another activation.
 
 Grain persistence stores each grain state as a serialized payload. It doesn't map individual state members to relational columns and doesn't make writes across multiple grains or storage providers atomic. Directly updating provider tables can violate Orleans ownership and consistency guarantees.
 
