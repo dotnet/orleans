@@ -22,7 +22,7 @@ public class NoOpCheckpointer : IStreamQueueCheckpointer<string>
 {
     public static NoOpCheckpointer Instance = new NoOpCheckpointer();
 
-    public bool CheckpointExists => true;
+    public bool CheckpointExists => false;
     public Task<string> Load()
     {
         return Task.FromResult(EventHubConstants.StartOfStream);

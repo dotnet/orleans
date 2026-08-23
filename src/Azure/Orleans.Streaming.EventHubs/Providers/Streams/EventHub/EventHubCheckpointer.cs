@@ -12,17 +12,17 @@ namespace Orleans.Streaming.EventHubs;
 
 public class EventHubCheckpointerFactory : IStreamQueueCheckpointerFactory
 {
-    private readonly ILoggerFactory loggerFactory;
-    private readonly string providerName;
-    private readonly AzureTableStreamCheckpointerOptions options;
-    private readonly ClusterOptions clusterOptions;
+    private readonly ILoggerFactory _loggerFactory;
+    private readonly string _providerName;
+    private readonly AzureTableStreamCheckpointerOptions _options;
+    private readonly ClusterOptions _clusterOptions;
 
     public EventHubCheckpointerFactory(string providerName, AzureTableStreamCheckpointerOptions options, IOptions<ClusterOptions> clusterOptions, ILoggerFactory loggerFactory)
     {
-        this.options = options;
-        this.clusterOptions = clusterOptions.Value;
-        this.loggerFactory = loggerFactory;
-        this.providerName = providerName;
+        _options = options;
+        _clusterOptions = clusterOptions.Value;
+        _loggerFactory = loggerFactory;
+        _providerName = providerName;
     }
 
     public Task<IStreamQueueCheckpointer<string>> Create(string partition)
@@ -33,11 +33,11 @@ public class EventHubCheckpointerFactory : IStreamQueueCheckpointerFactory
         CancellationToken cancellationToken)
     {
         return EventHubCheckpointer.Create(
-            options,
-            providerName,
+            _options,
+            _providerName,
             partition,
-            this.clusterOptions.ServiceId.ToString(),
-            loggerFactory,
+            _clusterOptions.ServiceId.ToString(),
+            _loggerFactory,
             cancellationToken);
     }
 
