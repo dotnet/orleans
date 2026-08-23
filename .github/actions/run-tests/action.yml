@@ -14,8 +14,12 @@ inputs:
   framework:
     description: Target framework.
     required: true
-  project:
-    description: Optional project path.
+  modules:
+    description: Optional semicolon-separated prebuilt test module paths.
+    required: false
+    default: ''
+  projects:
+    description: Optional semicolon-separated test project paths.
     required: false
     default: ''
   report-trx-filename:
@@ -29,11 +33,12 @@ runs:
   - name: Test
     shell: pwsh
     run: >
-      ./.github/scripts/run-dotnet-test.ps1
+      ./.github/scripts/run-test-projects.ps1
       -CoverageId "${{ inputs.coverage-id }}"
       -Framework "${{ inputs.framework }}"
-      -Project "${{ inputs.project }}"
       -FilterQuery "${{ inputs.filter-query }}"
+      -Modules "${{ inputs.modules }}"
+      -Projects "${{ inputs.projects }}"
       -ReportTrxFilename "${{ inputs.report-trx-filename }}"
   - name: Archive test results
     if: always()

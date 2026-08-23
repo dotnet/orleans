@@ -9,6 +9,7 @@ $collectorScriptPath = Join-Path $PSScriptRoot 'run-dotnet-test.ps1'
 $codeGeneratorScriptPath = Join-Path $PSScriptRoot 'run-codegenerator-tests.ps1'
 $cosmosScriptPath = Join-Path $PSScriptRoot 'run-cosmos-tests.ps1'
 $mergeScriptPath = Join-Path $PSScriptRoot 'merge-coverage.ps1'
+$runTestProjectsScriptPath = Join-Path $PSScriptRoot 'run-test-projects.ps1'
 $runTestsActionPath = Join-Path $PSScriptRoot '../actions/run-tests/action.yml'
 $setupCoverageScriptPath = Join-Path $PSScriptRoot 'setup-coverage.ps1'
 $workflowPath = Join-Path $PSScriptRoot '../workflows/ci.yml'
@@ -312,6 +313,10 @@ try {
             $collectorScript `
             'contains no measured lines' `
             'Coverage collection must reject empty reports from successful test runs.'
+        Assert-Matches `
+            $collectorScript `
+            'Push-Location \$testWorkingDirectory' `
+            'Prebuilt test modules must execute from their output directory.'
     }
 
     Invoke-Test 'preserves coverage artifact directories during download' {
@@ -350,14 +355,17 @@ try {
     Invoke-Test 'collects coverage from every test job' {
         $workflow = Get-Content -Raw -LiteralPath $workflowPath
         $runTestsAction = Get-Content -Raw -LiteralPath $runTestsActionPath
+        $runTestProjectsScript = Get-Content -Raw -LiteralPath $runTestProjectsScriptPath
         $codeGeneratorScript = Get-Content -Raw -LiteralPath $codeGeneratorScriptPath
         $cosmosScript = Get-Content -Raw -LiteralPath $cosmosScriptPath
         Assert-Equal 15 ([regex]::Matches($workflow, 'uses: \./\.github/actions/run-tests')).Count 'Standard test action count differs.'
         Assert-Equal 3 ([regex]::Matches($workflow, 'uses: \./\.github/actions/setup-test-environment')).Count 'Special test setup count differs.'
-        Assert-Equal 1 ([regex]::Matches($runTestsAction, 'run-dotnet-test\.ps1')).Count 'Standard test command count differs.'
+        Assert-Equal 1 ([regex]::Matches($runTestsAction, 'run-test-projects\.ps1')).Count 'Standard test action command count differs.'
+        Assert-Equal 1 ([regex]::Matches($runTestProjectsScript, 'run-dotnet-test\.ps1')).Count 'Standard test command count differs.'
         Assert-Equal 2 ([regex]::Matches($codeGeneratorScript, 'run-dotnet-test\.ps1')).Count 'CodeGen test command count differs.'
         Assert-Equal 1 ([regex]::Matches($cosmosScript, 'run-dotnet-test\.ps1')).Count 'Cosmos test command count differs.'
         Assert-Equal 1 ([regex]::Matches($workflow, 'run-dotnet-test\.ps1')).Count 'Core matrix test command count differs.'
+        Assert-Equal 6 ([regex]::Matches($workflow, 'uses: \./\.github/actions/restore-provider-test-assets')).Count 'Shared provider build consumer count differs.'
     }
 
     Invoke-Test 'validates the coverage tool version' {

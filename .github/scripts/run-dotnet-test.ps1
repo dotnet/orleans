@@ -9,6 +9,8 @@ param(
 
     [string] $Project,
 
+    [string] $TestModule,
+
     [string] $FilterQuery,
 
     [Parameter(Mandatory)]
@@ -37,13 +39,22 @@ function Assert-NotReparsePoint {
 }
 
 $testArguments = [Collections.Generic.List[string]]::new()
-$testArguments.Add('test')
-if (-not [string]::IsNullOrWhiteSpace($Project)) {
-    $testArguments.Add('--project')
-    $testArguments.Add($Project)
+$usesTestModule = -not [string]::IsNullOrWhiteSpace($TestModule)
+$testWorkingDirectory = $null
+if ($usesTestModule) {
+    $resolvedTestModule = (Resolve-Path -LiteralPath $TestModule).Path
+    $testWorkingDirectory = [IO.Path]::GetDirectoryName($resolvedTestModule)
+    $testArguments.Add('exec')
+    $testArguments.Add($resolvedTestModule)
+} else {
+    $testArguments.Add('test')
+    if (-not [string]::IsNullOrWhiteSpace($Project)) {
+        $testArguments.Add('--project')
+        $testArguments.Add($Project)
+    }
+    $testArguments.Add('--framework')
+    $testArguments.Add($Framework)
 }
-$testArguments.Add('--framework')
-$testArguments.Add($Framework)
 if (-not [string]::IsNullOrWhiteSpace($FilterQuery)) {
     $testArguments.Add('--filter-query')
     $testArguments.Add($FilterQuery)
@@ -61,17 +72,29 @@ $testArguments.Add('Full')
 $testArguments.Add('--report-trx')
 $testArguments.Add('--report-trx-filename')
 $testArguments.Add($ReportTrxFilename)
-$testArguments.Add('--max-parallel-test-modules')
-$testArguments.Add('1')
+if (-not $usesTestModule) {
+    $testArguments.Add('--max-parallel-test-modules')
+    $testArguments.Add('1')
+}
 
 if ($env:GITHUB_EVENT_NAME -ne 'pull_request') {
-    if ($NoBuild) {
+    if ($NoBuild -and -not $usesTestModule) {
         $testArguments.Add('--no-build')
     }
 
-    & dotnet @testArguments
-    if ($LASTEXITCODE -ne 0) {
-        throw "dotnet test failed with exit code $LASTEXITCODE"
+    try {
+        if ($testWorkingDirectory) {
+            Push-Location $testWorkingDirectory
+        }
+        & dotnet @testArguments
+        $testExitCode = $LASTEXITCODE
+    } finally {
+        if ($testWorkingDirectory) {
+            Pop-Location
+        }
+    }
+    if ($testExitCode -ne 0) {
+        throw "dotnet test failed with exit code $testExitCode"
     }
 
     return
@@ -114,7 +137,7 @@ if ($useStaticInstrumentation) {
     $testArguments.Add('--no-build')
 } elseif ($NoBuild) {
     $testArguments.Add('--no-build')
-} else {
+} elseif (-not $usesTestModule) {
     $testArguments.Add('-p:ContinuousIntegrationBuild=false')
 }
 
@@ -134,9 +157,19 @@ if ($staticInstrumentationFiles) {
 }
 $coverageArguments.Add('dotnet')
 
-& $coverageTool @coverageArguments @testArguments
-if ($LASTEXITCODE -ne 0) {
-    throw "Coverage test run failed with exit code $LASTEXITCODE"
+try {
+    if ($testWorkingDirectory) {
+        Push-Location $testWorkingDirectory
+    }
+    & $coverageTool @coverageArguments @testArguments
+    $testExitCode = $LASTEXITCODE
+} finally {
+    if ($testWorkingDirectory) {
+        Pop-Location
+    }
+}
+if ($testExitCode -ne 0) {
+    throw "Coverage test run failed with exit code $testExitCode"
 }
 
 $settings = [Xml.XmlReaderSettings]::new()

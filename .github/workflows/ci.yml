@@ -61,6 +61,43 @@ jobs:
         retention-days: 1
         path: |
           **/*.binlog
+  provider-test-build:
+    name: Provider test build
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+        - group: adonet
+          framework: net8.0
+          projects: test/Extensions/Orleans.AdoNet.Tests/Orleans.AdoNet.Tests.csproj
+        - group: adonet
+          framework: net10.0
+          projects: test/Extensions/Orleans.AdoNet.Tests/Orleans.AdoNet.Tests.csproj
+        - group: aws
+          framework: net8.0
+          projects: test/Extensions/Orleans.AWS.Tests/Orleans.AWS.Tests.csproj;test/Transactions/Orleans.Transactions.DynamoDB.Test/Orleans.Transactions.DynamoDB.Test.csproj
+        - group: aws
+          framework: net10.0
+          projects: test/Extensions/Orleans.AWS.Tests/Orleans.AWS.Tests.csproj;test/Transactions/Orleans.Transactions.DynamoDB.Test/Orleans.Transactions.DynamoDB.Test.csproj
+    steps:
+    - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
+    - name: Setup .NET
+      uses: actions/setup-dotnet@c2fa09f4bde5ebb9d1777cf28262a3eb3db3ced7 # v5
+      with:
+        global-json-file: global.json
+    - name: Build provider tests
+      shell: pwsh
+      run: >
+        ./.github/scripts/build-provider-test-assets.ps1
+        -Framework "${{ matrix.framework }}"
+        -OutputDirectory "Artifacts/provider-tests/${{ matrix.group }}/${{ matrix.framework }}"
+        -Projects "${{ matrix.projects }}"
+    - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+      with:
+        name: provider_test_build_${{ matrix.group }}_${{ matrix.framework }}
+        retention-days: 1
+        path: Artifacts/provider-tests/${{ matrix.group }}/${{ matrix.framework }}
   test-redis:
     name: Redis provider tests
     runs-on: ubuntu-latest
@@ -96,6 +133,7 @@ jobs:
         coverage-id: ${{ github.job }}-${{ matrix.provider }}-${{ matrix.framework }}
         filter-query: /[(Provider=${{ matrix.provider }})&((Suite=BVT)|(Suite=SlowBVT)|(Suite=Functional))&(Category!=Performance)&(Category!=Stress)]
         framework: ${{ matrix.framework }}
+        projects: test/Extensions/Orleans.Redis.Tests/Orleans.Redis.Tests.csproj
         report-trx-filename: test_results_${{ matrix.provider }}_${{ matrix.framework }}_{asm}_{tfm}_{arch}.trx
       env:
         ORLEANSREDISCONNECTIONSTRING: "localhost:6379,ssl=False,abortConnect=False"
@@ -130,11 +168,13 @@ jobs:
         coverage-id: ${{ github.job }}-${{ matrix.provider }}-${{ matrix.dbversion }}-${{ matrix.framework }}
         filter-query: /[(Provider=${{ matrix.provider }})&((Suite=BVT)|(Suite=SlowBVT)|(Suite=Functional))&(Category!=Performance)&(Category!=Stress)]
         framework: ${{ matrix.framework }}
+        projects: test/Extensions/Orleans.Clustering.Cassandra.Tests/Orleans.Clustering.Cassandra.Tests.csproj
         report-trx-filename: test_results_${{ matrix.provider }}_${{ matrix.dbversion }}_${{ matrix.framework }}_{asm}_{tfm}_{arch}.trx
       env:
         CASSANDRAVERSION: ${{ matrix.dbversion }}
   test-postgres:
     name: PostgreSQL provider tests
+    needs: provider-test-build
     runs-on: ubuntu-latest
     env:
       BuildExternalAssets: "false"
@@ -147,6 +187,9 @@ jobs:
         framework: ["net8.0", "net10.0"]
     steps:
     - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
+    - uses: ./.github/actions/restore-provider-test-assets
+      with:
+        name: provider_test_build_adonet_${{ matrix.framework }}
     - name: Start PostgreSQL
       shell: bash
       run: |
@@ -172,6 +215,7 @@ jobs:
         coverage-id: ${{ github.job }}-${{ matrix.provider }}-${{ matrix.framework }}
         filter-query: /[(Provider=${{ matrix.provider }})&((Suite=BVT)|(Suite=SlowBVT)|(Suite=Functional))&(Category!=Performance)&(Category!=Stress)]
         framework: ${{ matrix.framework }}
+        modules: test/Extensions/Orleans.AdoNet.Tests/bin/Debug/${{ matrix.framework }}/Orleans.AdoNet.Tests.dll
         report-trx-filename: test_results_${{ matrix.provider }}_${{ matrix.framework }}_{asm}_{tfm}_{arch}.trx
       env:
 # [SuppressMessage("Microsoft.Security", "CS002:SecretInNextLine", Justification="False positive")]
@@ -181,6 +225,7 @@ jobs:
       run: docker rm -f postgres || true
   test-mariadb:
     name: MariaDB/MySQL provider tests
+    needs: provider-test-build
     runs-on: ubuntu-latest
     env:
       BuildExternalAssets: "false"
@@ -197,6 +242,9 @@ jobs:
         framework: ["net8.0", "net10.0"]
     steps:
     - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
+    - uses: ./.github/actions/restore-provider-test-assets
+      with:
+        name: provider_test_build_adonet_${{ matrix.framework }}
     - name: Setup Node.js
       uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
       with:
@@ -247,12 +295,14 @@ jobs:
         coverage-id: ${{ github.job }}-${{ matrix.provider }}-${{ matrix.framework }}
         filter-query: /[(Provider=${{ matrix.provider }})&((Suite=BVT)|(Suite=SlowBVT)|(Suite=Functional))&(Category!=Performance)&(Category!=Stress)]
         framework: ${{ matrix.framework }}
+        modules: test/Extensions/Orleans.AdoNet.Tests/bin/Debug/${{ matrix.framework }}/Orleans.AdoNet.Tests.dll
         report-trx-filename: test_results_${{ matrix.provider }}_${{ matrix.framework }}_{asm}_{tfm}_{arch}.trx
       env:
 # [SuppressMessage("Microsoft.Security", "CS002:SecretInNextLine", Justification="Not a secret")]
         ORLEANSMYSQLCONNECTIONSTRING: "Server=127.0.0.1;Port=3306;UId=root;Pwd=mariadb;"
   test-sqlserver:
     name: Microsoft SQL Server provider tests
+    needs: provider-test-build
     runs-on: ubuntu-latest
     env:
       BuildExternalAssets: "false"
@@ -267,6 +317,9 @@ jobs:
         framework: ["net8.0", "net10.0"]
     steps:
     - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
+    - uses: ./.github/actions/restore-provider-test-assets
+      with:
+        name: provider_test_build_adonet_${{ matrix.framework }}
     - name: Start SQL Server
       shell: bash
       run: |
@@ -293,6 +346,7 @@ jobs:
         coverage-id: ${{ github.job }}-${{ matrix.provider }}-${{ matrix.framework }}
         filter-query: /[(Provider=${{ matrix.provider }})&((Suite=BVT)|(Suite=SlowBVT)|(Suite=Functional))&(Category!=Performance)&(Category!=Stress)]
         framework: ${{ matrix.framework }}
+        modules: test/Extensions/Orleans.AdoNet.Tests/bin/Debug/${{ matrix.framework }}/Orleans.AdoNet.Tests.dll
         report-trx-filename: test_results_${{ matrix.provider }}_${{ matrix.framework }}_{asm}_{tfm}_{arch}.trx
       env:
 # [SuppressMessage("Microsoft.Security", "CS002:SecretInNextLine", Justification="Not a secret")]
@@ -309,6 +363,7 @@ jobs:
       run: docker rm -f mssql || true
   test-sqlite:
     name: SQLite provider tests
+    needs: provider-test-build
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -317,6 +372,9 @@ jobs:
         framework: ["net8.0", "net10.0"]
     steps:
     - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
+    - uses: ./.github/actions/restore-provider-test-assets
+      with:
+        name: provider_test_build_adonet_${{ matrix.framework }}
     - name: Test
       uses: ./.github/actions/run-tests
       with:
@@ -324,6 +382,7 @@ jobs:
         coverage-id: ${{ github.job }}-${{ matrix.provider }}-${{ matrix.framework }}
         filter-query: /[(Provider=${{ matrix.provider }})&((Suite=BVT)|(Suite=SlowBVT)|(Suite=Functional))&(Category!=Performance)&(Category!=Stress)]
         framework: ${{ matrix.framework }}
+        modules: test/Extensions/Orleans.AdoNet.Tests/bin/Debug/${{ matrix.framework }}/Orleans.AdoNet.Tests.dll
         report-trx-filename: test_results_${{ matrix.provider }}_${{ matrix.framework }}_{asm}_{tfm}_{arch}.trx
   test-azure-storage:
     name: Azure Storage provider tests
@@ -361,6 +420,7 @@ jobs:
         coverage-id: ${{ github.job }}-${{ matrix.provider }}-${{ matrix.framework }}
         filter-query: /[(Provider=${{ matrix.provider }})&((Suite=BVT)|(Suite=SlowBVT)|(Suite=Functional))&(Category!=Performance)&(Category!=Stress)]
         framework: ${{ matrix.framework }}
+        projects: test/Extensions/Orleans.Azure.Tests/Orleans.Azure.Tests.csproj;test/Extensions/Orleans.DurableJobs.AzureStorage.Tests/Orleans.DurableJobs.AzureStorage.Tests.csproj;test/Orleans.Journaling.Tests/Orleans.Journaling.Tests.csproj;test/Orleans.Runtime.Internal.Tests/Orleans.Runtime.Internal.Tests.csproj;test/Transactions/Orleans.Transactions.Azure.Test/Orleans.Transactions.Azure.Test.csproj
         report-trx-filename: test_results_${{ matrix.provider }}_${{ matrix.framework }}_{asm}_{tfm}_{arch}.trx
       env:
 # [SuppressMessage("Microsoft.Security", "CS002:SecretInNextLine", Justification="Not a secret")]
@@ -425,6 +485,7 @@ jobs:
         coverage-id: ${{ github.job }}-${{ matrix.provider }}-${{ matrix.framework }}
         filter-query: /[(Provider=${{ matrix.provider }})&((Suite=BVT)|(Suite=SlowBVT)|(Suite=Functional))&(Category!=Performance)&(Category!=Stress)]
         framework: ${{ matrix.framework }}
+        projects: test/Extensions/Orleans.Streaming.EventHubs.Tests/Orleans.Streaming.EventHubs.Tests.csproj
         report-trx-filename: test_results_${{ matrix.provider }}_${{ matrix.framework }}_{asm}_{tfm}_{arch}.trx
       env:
 # [SuppressMessage("Microsoft.Security", "CS002:SecretInNextLine", Justification="Not a secret")]
@@ -530,6 +591,7 @@ jobs:
         coverage-id: ${{ github.job }}-${{ matrix.provider }}-${{ matrix.framework }}
         filter-query: /[(Provider=${{ matrix.provider }})&((Suite=BVT)|(Suite=SlowBVT)|(Suite=Functional))&(Category!=Performance)&(Category!=Stress)]
         framework: ${{ matrix.framework }}
+        projects: test/Extensions/Orleans.Clustering.Consul.Tests/Orleans.Clustering.Consul.Tests.csproj
         report-trx-filename: test_results_${{ matrix.provider }}_${{ matrix.framework }}_{asm}_{tfm}_{arch}.trx
   test-zookeeper:
     name: ZooKeeper provider tests
@@ -564,6 +626,7 @@ jobs:
         coverage-id: ${{ github.job }}-${{ matrix.provider }}-${{ matrix.framework }}
         filter-query: /[(Provider=${{ matrix.provider }})&((Suite=BVT)|(Suite=SlowBVT)|(Suite=Functional))&(Category!=Performance)&(Category!=Stress)]
         framework: ${{ matrix.framework }}
+        projects: test/Extensions/Orleans.Clustering.ZooKeeper.Tests/Orleans.Clustering.ZooKeeper.Tests.csproj
         report-trx-filename: test_results_${{ matrix.provider }}_${{ matrix.framework }}_{asm}_{tfm}_{arch}.trx
       env:
         ORLEANSZOOKEEPERCONNECTIONSTRING: "localhost:2181"
@@ -572,6 +635,7 @@ jobs:
       run: docker rm -f zookeeper || true
   test-dynamodb:
     name: AWS DynamoDB provider tests
+    needs: provider-test-build
     runs-on: ubuntu-latest
     env:
       BuildExternalAssets: "false"
@@ -587,6 +651,9 @@ jobs:
         framework: ["net8.0", "net10.0"]
     steps:
     - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
+    - uses: ./.github/actions/restore-provider-test-assets
+      with:
+        name: provider_test_build_aws_${{ matrix.framework }}
     - name: Start DynamoDB Local
       shell: bash
       run: |
@@ -611,6 +678,7 @@ jobs:
         coverage-id: ${{ github.job }}-${{ matrix.provider }}-${{ matrix.framework }}
         filter-query: /[(Provider=${{ matrix.provider }})&((Suite=BVT)|(Suite=SlowBVT)|(Suite=Functional))&(Category!=Performance)&(Category!=Stress)]
         framework: ${{ matrix.framework }}
+        modules: test/Extensions/Orleans.AWS.Tests/bin/Debug/${{ matrix.framework }}/Orleans.AWS.Tests.dll;test/Transactions/Orleans.Transactions.DynamoDB.Test/bin/Debug/${{ matrix.framework }}/Orleans.Transactions.DynamoDB.Tests.dll
         report-trx-filename: test_results_${{ matrix.provider }}_${{ matrix.framework }}_{asm}_{tfm}_{arch}.trx
       env:
         ORLEANSDYNAMODBSERVICE: "http://127.0.0.1:8000"
@@ -623,6 +691,7 @@ jobs:
       run: docker rm -f dynamodb || true
   test-sqs:
     name: AWS SQS provider tests
+    needs: provider-test-build
     runs-on: ubuntu-latest
     env:
       BuildExternalAssets: "false"
@@ -638,6 +707,9 @@ jobs:
         framework: ["net8.0", "net10.0"]
     steps:
     - uses: actions/checkout@v4
+    - uses: ./.github/actions/restore-provider-test-assets
+      with:
+        name: provider_test_build_aws_${{ matrix.framework }}
     - name: Start DynamoDB Local
       shell: bash
       run: |
@@ -673,7 +745,7 @@ jobs:
         coverage-id: ${{ github.job }}-${{ matrix.provider }}-${{ matrix.framework }}
         filter-query: /[(Provider=${{ matrix.provider }})&((Suite=BVT)|(Suite=SlowBVT)|(Suite=Functional))&(Category!=Performance)&(Category!=Stress)]
         framework: ${{ matrix.framework }}
-        project: test/Extensions/Orleans.AWS.Tests/Orleans.AWS.Tests.csproj
+        modules: test/Extensions/Orleans.AWS.Tests/bin/Debug/${{ matrix.framework }}/Orleans.AWS.Tests.dll
         report-trx-filename: test_results_${{ matrix.provider }}_${{ matrix.framework }}_{asm}_{tfm}_{arch}.trx
       env:
         ORLEANSSQSCONNECTIONSTRING: "Service=http://127.0.0.1:9324"
@@ -735,7 +807,7 @@ jobs:
         coverage-id: ${{ github.job }}-${{ matrix.provider }}-${{ matrix.framework }}
         filter-query: /[(Provider=${{ matrix.provider }})&((Suite=BVT)|(Suite=SlowBVT)|(Suite=Functional))&(Category!=Performance)&(Category!=Stress)]
         framework: ${{ matrix.framework }}
-        project: test/Extensions/Orleans.Streaming.NATS.Tests/Orleans.Streaming.NATS.Tests.csproj
+        projects: test/Extensions/Orleans.Streaming.NATS.Tests/Orleans.Streaming.NATS.Tests.csproj
         report-trx-filename: test_results_${{ matrix.provider }}_${{ matrix.framework }}_{asm}_{tfm}_{arch}.trx
     - name: Clean up container
       if: always()
@@ -793,7 +865,7 @@ jobs:
         coverage-id: ${{ github.job }}-${{ matrix.provider }}-${{ matrix.framework }}
         filter-query: /[(Provider=${{ matrix.provider }})&((Suite=BVT)|(Suite=SlowBVT)|(Suite=Functional))&(Category!=Performance)&(Category!=Stress)]
         framework: ${{ matrix.framework }}
-        project: test/Extensions/Orleans.Streaming.Kinesis.Tests/Orleans.Streaming.Kinesis.Tests.csproj
+        projects: test/Extensions/Orleans.Streaming.Kinesis.Tests/Orleans.Streaming.Kinesis.Tests.csproj
         report-trx-filename: test_results_${{ matrix.provider }}_${{ matrix.framework }}_{asm}_{tfm}_{arch}.trx
       env:
         ORLEANSKINESISCONNECTIONSTRING: "http://localhost:4566;test;test;us-east-1"
@@ -958,12 +1030,14 @@ jobs:
         coverage-id: ${{ github.job }}-${{ matrix.provider }}-${{ matrix.framework }}
         filter-query: /[(Provider=${{ matrix.provider }})&((Suite=BVT)|(Suite=SlowBVT)|(Suite=Functional))&(Category!=Performance)&(Category!=Stress)]
         framework: ${{ matrix.framework }}
+        projects: test/Extensions/Orleans.Clustering.Firestore.Tests/Orleans.Clustering.Firestore.Tests.csproj;test/Extensions/Orleans.GrainDirectory.Firestore.Tests/Orleans.GrainDirectory.Firestore.Tests.csproj;test/Extensions/Orleans.Persistence.Firestore.Tests/Orleans.Persistence.Firestore.Tests.csproj;test/Extensions/Orleans.Reminders.Firestore.Tests/Orleans.Reminders.Firestore.Tests.csproj
         report-trx-filename: test_results_${{ matrix.provider }}_${{ matrix.framework }}_{asm}_{tfm}_{arch}.trx
   ci:
     name: CI
     if: always()
     needs:
       - build
+      - provider-test-build
       - test-redis
       - test-cassandra
       - test-postgres
