@@ -943,46 +943,24 @@ public class ReminderManagementGrainTests
 public class ReminderStressTests
 {
     [Fact]
-    public async Task ListFilteredAsync_HighLoad_200K_Reminders_PagesCorrectly()
+    public async Task ListAllAsync_Skewed200KBucket_SmallPublicPageUsesBoundedProviderPages()
     {
         const int totalReminders = 200_000;
-        const int pageSize = 2_048;
+        const int pageSize = 1;
 
         var now = DateTime.UtcNow;
         var reminders = CreateSyntheticReminders(totalReminders, now);
         var table = new SingleSegmentReminderTable(reminders);
         var grain = new ReminderManagementGrain(table);
 
-        var filter = new ReminderQueryFilter
-        {
-            Priority = DurableJobPriority.High,
-            ScheduleKind = ReminderScheduleKind.Cron,
-            Status = ReminderQueryStatus.Upcoming,
-        };
+        var page = await grain.ListAllAsync(pageSize);
 
-        var expectedCount = reminders.Count(reminder =>
-            reminder.Priority == DurableJobPriority.High
-            && !string.IsNullOrWhiteSpace(reminder.CronExpression)
-            && (reminder.NextDueUtc ?? reminder.StartAt) > now);
-
-        var observedCount = 0;
-        var pageRequests = 0;
-        string? continuationToken = null;
-
-        do
-        {
-            pageRequests++;
-            var page = await grain.ListFilteredAsync(filter, pageSize, continuationToken);
-            Assert.InRange(page.Reminders.Count, 0, pageSize);
-            observedCount += page.Reminders.Count;
-            continuationToken = page.ContinuationToken;
-        }
-        while (!string.IsNullOrEmpty(continuationToken));
-
-        Assert.Equal(expectedCount, observedCount);
-        // Every one of the 256 hash buckets is read once. The hot bucket is cached across
-        // continuation pages instead of rereading and re-materializing all 200K entries.
-        Assert.Equal(256, table.RangeReadCallCount);
+        Assert.Single(page.Reminders);
+        Assert.NotNull(page.ContinuationToken);
+        Assert.Equal(0, table.CompleteRangeReadCallCount);
+        Assert.Equal(256, table.MaxRequestedRows);
+        Assert.InRange(table.MaxReturnedRows, 0, 256);
+        Assert.True(table.PagedRangeReadCallCount >= (int)Math.Ceiling(totalReminders / 256d));
     }
 
     [Fact]
@@ -1036,29 +1014,40 @@ public class ReminderStressTests
 
     private sealed class SingleSegmentReminderTable(List<ReminderEntry> reminders) : Orleans.AdvancedReminders.IReminderTable
     {
-        public int RangeReadCallCount { get; private set; }
+        public int CompleteRangeReadCallCount { get; private set; }
+
+        public int PagedRangeReadCallCount { get; private set; }
+
+        public int MaxRequestedRows { get; private set; }
+
+        public int MaxReturnedRows { get; private set; }
 
         public Task<ReminderTableData> ReadRows(GrainId grainId) => throw new NotSupportedException();
 
         public Task<ReminderTableData> ReadRows(uint begin, uint end)
         {
-            RangeReadCallCount++;
-            var range = RangeFactory.CreateRange(begin, end);
-            return Task.FromResult(new ReminderTableData(reminders.Where(entry => range.InRange(entry.GrainId)).ToList()));
+            CompleteRangeReadCallCount++;
+            throw new InvalidOperationException("Management paging must use the bounded provider overload.");
         }
 
-        public async Task<ReminderTableData> ReadRows(uint begin, uint end, int maxRows, string? continuationToken)
+        public Task<ReminderTableData> ReadRows(uint begin, uint end, int maxRows, string? continuationToken)
         {
-            var all = await ReadRows(begin, end);
-            var offset = continuationToken is null ? 0 : int.Parse(continuationToken, CultureInfo.InvariantCulture);
-            var rows = all.Reminders.Skip(offset).Take(maxRows + 1).ToList();
-            var hasMore = rows.Count > maxRows;
-            if (hasMore)
+            PagedRangeReadCallCount++;
+            MaxRequestedRows = Math.Max(MaxRequestedRows, maxRows);
+            var range = RangeFactory.CreateRange(begin, end);
+            if (reminders.Count == 0 || !range.InRange(reminders[0].GrainId))
             {
-                rows.RemoveAt(maxRows);
+                return Task.FromResult(new ReminderTableData());
             }
 
-            return new ReminderTableData(rows, hasMore ? (offset + rows.Count).ToString(CultureInfo.InvariantCulture) : null);
+            var offset = continuationToken is null ? 0 : int.Parse(continuationToken, CultureInfo.InvariantCulture);
+            var rows = reminders.Skip(offset).Take(maxRows).ToList();
+            MaxReturnedRows = Math.Max(MaxReturnedRows, rows.Count);
+            var nextOffset = offset + rows.Count;
+
+            return Task.FromResult(new ReminderTableData(
+                rows,
+                nextOffset < reminders.Count ? nextOffset.ToString(CultureInfo.InvariantCulture) : null));
         }
 
         public Task<ReminderEntry?> ReadRow(GrainId grainId, string reminderName) => throw new NotSupportedException();

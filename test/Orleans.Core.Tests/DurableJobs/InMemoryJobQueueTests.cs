@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
@@ -804,6 +805,31 @@ public class InMemoryJobQueueTests
         Assert.True(queue.CancelJob(replacement.Id));
 
         Assert.False(await enumerator.MoveNextAsync().AsTask().WaitAsync(TimeSpan.FromSeconds(5)));
+    }
+
+    [Fact]
+    public async Task GetAsyncEnumerator_FullBatchMutations_ValidateEachEntryAtMostOnce()
+    {
+        var timeProvider = new FakeTimeProvider(new DateTimeOffset(2026, 8, 16, 0, 0, 0, TimeSpan.Zero));
+        var queue = new InMemoryJobQueue(timeProvider);
+        var dueTime = timeProvider.GetUtcNow().AddMinutes(-1);
+        for (var index = 0; index < InMemoryJobQueue.MaxDequeueBatchSize; index++)
+        {
+            queue.Enqueue(CreateJob(index.ToString(CultureInfo.InvariantCulture), dueTime), 0);
+        }
+
+        queue.MarkAsComplete();
+        await using var enumerator = queue.GetAsyncEnumerator(CancellationToken.None);
+        var observed = 0;
+        while (await enumerator.MoveNextAsync())
+        {
+            observed++;
+            Assert.True(queue.CancelJob(enumerator.Current.Job.Id));
+        }
+
+        Assert.Equal(InMemoryJobQueue.MaxDequeueBatchSize, observed);
+        Assert.Equal(InMemoryJobQueue.MaxDequeueBatchSize, queue.ValidationProbeCount);
+        Assert.Equal(0, queue.Count);
     }
 
     [Fact]

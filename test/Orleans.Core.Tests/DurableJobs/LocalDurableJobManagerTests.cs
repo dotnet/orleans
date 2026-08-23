@@ -3,6 +3,7 @@
 
 using System.Collections.Concurrent;
 using System.Collections.Immutable;
+using System.Globalization;
 using System.Net;
 using System.Runtime.CompilerServices;
 using System.Threading.Channels;
@@ -243,6 +244,34 @@ public class LocalDurableJobManagerTests
 
         Assert.Equal(1, shardManager.CreateShardCallCount);
         Assert.Equal(1, accessor.WritableShardCount);
+    }
+
+    [Fact]
+    public async Task ScheduleJobAsync_PreCanceledDistinctBuckets_DoNotCreateShardArtifacts()
+    {
+        const int RequestCount = 100;
+        var timeProvider = new FakeTimeProvider(new DateTimeOffset(2026, 1, 1, 0, 0, 0, TimeSpan.Zero));
+        var options = CreateOptions();
+        var shardManager = new TestJobShardManager();
+        var manager = CreateManager(shardManager, timeProvider, options);
+        var accessor = new LocalDurableJobManager.TestAccessor(manager);
+        using var cancellation = new CancellationTokenSource();
+        cancellation.Cancel();
+
+        for (var index = 0; index < RequestCount; index++)
+        {
+            await Assert.ThrowsAnyAsync<OperationCanceledException>(() => manager.ScheduleJobAsync(
+                new ScheduleJobRequest
+                {
+                    Target = GrainId.Create("test", index.ToString(CultureInfo.InvariantCulture)),
+                    JobName = $"canceled-{index}",
+                    DueTime = timeProvider.GetUtcNow().Add(options.ShardDuration * (index + 1)),
+                },
+                cancellation.Token));
+        }
+
+        Assert.Equal(0, shardManager.CreateShardCallCount);
+        Assert.Equal(0, accessor.WritableShardCount);
     }
 
     [Fact]

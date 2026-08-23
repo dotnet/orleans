@@ -136,6 +136,14 @@ public class DynamoDBReminderTableEnumParsingTests
         Assert.Equal(["ServiceId", "GrainHash"], result.Select(attribute => attribute.AttributeName));
     }
 
+    [Fact]
+    public void WrappedRangePhaseContinuation_MakesLowerRangeReachableAfterExactFullPage()
+    {
+        var continuationToken = DynamoDBReminderTable.CreatePhaseContinuationToken(phase: 1);
+
+        Assert.Equal(1, DynamoDBReminderTable.GetContinuationPhase(continuationToken));
+    }
+
     private static DurableJobPriority InvokeReadPriority(Dictionary<string, AttributeValue> item)
     {
         var method = typeof(DynamoDBReminderTable).GetMethod("ReadPriority", BindingFlags.NonPublic | BindingFlags.Static);

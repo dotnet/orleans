@@ -88,6 +88,7 @@ internal partial class LocalDurableJobManager : SystemTarget, ILocalDurableJobMa
     /// <inheritdoc/>
     public async Task<DurableJob> ScheduleJobAsync(ScheduleJobRequest request, CancellationToken cancellationToken)
     {
+        cancellationToken.ThrowIfCancellationRequested();
         var startTimestamp = _timeProvider.GetTimestamp();
         using var activity = DurableJobsDiagnostics.StartScheduleActivity(in request);
         request = EnsureScheduleRequestHasTraceContext(request, activity);
@@ -141,12 +142,14 @@ internal partial class LocalDurableJobManager : SystemTarget, ILocalDurableJobMa
 
                 // Coalesce creation only for this time-bucket/stripe. Independent shard keys can
                 // initialize concurrently instead of waiting behind one silo-wide semaphore.
+                cancellationToken.ThrowIfCancellationRequested();
                 var pendingCreation = _pendingShardCreations.GetOrAdd(
                     shardKey,
                     static (key, manager) => new Lazy<Task>(
                         () => manager.CreateWritableShardAsync(key),
                         LazyThreadSafetyMode.ExecutionAndPublication),
                     this);
+                cancellationToken.ThrowIfCancellationRequested();
                 await pendingCreation.Value.WaitAsync(cancellationToken);
             }
         }

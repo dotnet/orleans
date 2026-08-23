@@ -296,6 +296,10 @@ internal sealed partial class DynamoDBReminderTable : IReminderTable
                 }
 
                 token = new DynamoContinuationToken { Phase = 1 };
+                if (records.Count == maxRows)
+                {
+                    return new ReminderTableData(records, CreatePhaseContinuationToken(token.Phase));
+                }
             }
 
             return new ReminderTableData(records);
@@ -349,6 +353,15 @@ internal sealed partial class DynamoDBReminderTable : IReminderTable
             Values = values,
         }));
     }
+
+    internal static string CreatePhaseContinuationToken(int phase)
+        => Convert.ToBase64String(JsonSerializer.SerializeToUtf8Bytes(new DynamoContinuationToken
+        {
+            Phase = phase,
+        }));
+
+    internal static int GetContinuationPhase(string continuationToken)
+        => ParseContinuationToken(continuationToken).Phase;
 
     private sealed class DynamoContinuationToken
     {
