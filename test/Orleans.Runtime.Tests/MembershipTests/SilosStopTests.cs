@@ -37,7 +37,9 @@ namespace UnitTests.MembershipTests
             public void Configure(IConfiguration configuration, IClientBuilder clientBuilder)
             {
                 var clusterOptions = configuration.GetTestClusterOptions();
-                clientBuilder.UseStaticClustering(new IPEndPoint(IPAddress.Loopback, clusterOptions.BaseGatewayPort));
+                clientBuilder
+                    .Configure<ClientMessagingOptions>(options => options.DropExpiredMessages = false)
+                    .UseStaticClustering(new IPEndPoint(IPAddress.Loopback, clusterOptions.BaseGatewayPort));
             }
         }
 
@@ -135,6 +137,32 @@ namespace UnitTests.MembershipTests
             {
                 GrainFactory.DeleteObjectReference<ILongRunningTaskObserver>(observerReference);
             }
+        }
+
+        [Fact, TestCategory("Liveness")]
+        public async Task ClientShutdownWithGatewayForwardedRequestClearsTracking()
+        {
+            var gateway = GetGateway();
+            var target = await GetGrainOnTargetSilo(HostedCluster.SecondarySilos[0]);
+            Assert.NotNull(target);
+
+            var observer = new LongRunningTaskObserver();
+            var observerReference = GrainFactory.CreateObjectReference<ILongRunningTaskObserver>(observer);
+            var callId = Guid.NewGuid();
+            var promise = target.LongWaitWithStartNotification(
+                TimeSpan.FromMinutes(1),
+                callId,
+                observerReference,
+                CancellationToken.None);
+
+            await observer.WaitForCallToStart(callId);
+            GrainFactory.DeleteObjectReference<ILongRunningTaskObserver>(observerReference);
+            Assert.Equal(1, gateway.TrackedRequestClientCount);
+
+            await HostedCluster.StopClusterClientAsync();
+
+            await Assert.ThrowsAsync<SiloUnavailableException>(() => promise);
+            Assert.Equal(0, gateway.TrackedRequestClientCount);
         }
 
         private async Task<ILongRunningTaskGrain<bool>?> GetGrainOnTargetSilo(SiloHandle siloHandle)
