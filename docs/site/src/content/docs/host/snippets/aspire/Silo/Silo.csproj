@@ -12,6 +12,7 @@
     <PackageReference Include="Microsoft.Orleans.Clustering.AzureStorage" Version="10.2.2" />
     <PackageReference Include="Microsoft.Orleans.Persistence.AzureStorage" Version="10.2.2" />
     <PackageReference Include="Microsoft.Orleans.Reminders.AzureStorage" Version="10.2.2" />
+    <PackageReference Include="Microsoft.Orleans.Streaming.SQS" Version="10.2.2" />
     <PackageReference Include="Aspire.StackExchange.Redis" Version="13.4.6" />
   </ItemGroup>
   <!-- </silo_packages> -->

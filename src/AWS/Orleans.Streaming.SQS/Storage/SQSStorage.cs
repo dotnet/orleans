@@ -75,41 +75,17 @@ namespace OrleansAWSUtils.Storage
 
         private void ParseDataConnectionString(string dataConnectionString)
         {
-            if (string.IsNullOrEmpty(dataConnectionString)) throw new ArgumentNullException(nameof(dataConnectionString));
-
-            var parameters = dataConnectionString.Split(new[] { ';' }, StringSplitOptions.RemoveEmptyEntries);
-
-            var serviceConfig = Array.Find(parameters, p => p.Contains(ServicePropertyName));
-            if (!string.IsNullOrWhiteSpace(serviceConfig))
+            var parameters = SqsConnectionString.Parse(dataConnectionString);
+            if (!parameters.TryGetValue(ServicePropertyName, out var serviceValue))
             {
-                var value = serviceConfig.Split('=', StringSplitOptions.RemoveEmptyEntries);
-                if (value.Length == 2 && !string.IsNullOrWhiteSpace(value[1]))
-                    service = value[1];
+                throw new OrleansConfigurationException(
+                    "SQS streaming connection strings require a non-empty Service value containing an AWS region or SQS-compatible endpoint.");
             }
 
-            var secretKeyConfig = Array.Find(parameters, p => p.Contains(SecretKeyPropertyName));
-            if (!string.IsNullOrWhiteSpace(secretKeyConfig))
-            {
-                var value = secretKeyConfig.Split('=', StringSplitOptions.RemoveEmptyEntries);
-                if (value.Length == 2 && !string.IsNullOrWhiteSpace(value[1]))
-                    secretKey = value[1];
-            }
-
-            var accessKeyConfig = Array.Find(parameters, p => p.Contains(AccessKeyPropertyName));
-            if (!string.IsNullOrWhiteSpace(accessKeyConfig))
-            {
-                var value = accessKeyConfig.Split('=', StringSplitOptions.RemoveEmptyEntries);
-                if (value.Length == 2 && !string.IsNullOrWhiteSpace(value[1]))
-                    accessKey = value[1];
-            }
-
-            var sessionTokenConfig = parameters.Where(p => p.Contains(SessionTokenPropertyName)).FirstOrDefault();
-            if (!string.IsNullOrWhiteSpace(sessionTokenConfig))
-            {
-                var value = sessionTokenConfig.Split('=', 2, StringSplitOptions.RemoveEmptyEntries);
-                if (value.Length == 2 && !string.IsNullOrWhiteSpace(value[1]))
-                    sessionToken = value[1];
-            }
+            service = serviceValue;
+            parameters.TryGetValue(SecretKeyPropertyName, out secretKey);
+            parameters.TryGetValue(AccessKeyPropertyName, out accessKey);
+            parameters.TryGetValue(SessionTokenPropertyName, out sessionToken);
         }
 
         private void CreateClient()

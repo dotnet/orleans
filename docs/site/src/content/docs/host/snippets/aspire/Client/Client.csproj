@@ -9,6 +9,7 @@
   <ItemGroup>
     <PackageReference Include="Microsoft.Orleans.Client" Version="10.2.2" />
     <PackageReference Include="Microsoft.Orleans.Clustering.Redis" Version="10.2.2" />
+    <PackageReference Include="Microsoft.Orleans.Streaming.SQS" Version="10.2.2" />
     <PackageReference Include="Aspire.StackExchange.Redis" Version="13.4.6" />
   </ItemGroup>
   <!-- </client_packages> -->

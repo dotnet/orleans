@@ -11,6 +11,7 @@
   <!-- <apphost_packages> -->
   <ItemGroup>
     <PackageReference Include="Aspire.Hosting.AppHost" Version="13.4.6" />
+    <PackageReference Include="Aspire.Hosting.AWS" Version="13.6.0" />
     <PackageReference Include="Aspire.Hosting.Orleans" Version="13.4.6" />
     <PackageReference Include="Aspire.Hosting.Redis" Version="13.4.6" />
   </ItemGroup>
