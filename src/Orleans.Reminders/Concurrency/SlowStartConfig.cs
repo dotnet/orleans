@@ -7,9 +7,10 @@ namespace Orleans.Reminders.Concurrency;
 /// <see cref="ReminderThrottleConfigBuilder.SlowStart"/>.
 /// </summary>
 /// <remarks>
-/// <para>Slow-start mitigates cold-start thundering herds when a silo starts and many reminders
-/// become due at once. The reduced initial capacity lets the silo's caches, connection pools,
-/// and thread pool warm up before the configured full capacity is unlocked.</para>
+/// <para>Slow-start mitigates cold-start thundering herds when the reminder service finishes its
+/// initial storage load and enables delivery. The reduced initial capacity lets the silo's caches,
+/// connection pools, and thread pool warm up before the configured full capacity is unlocked.
+/// Stopping and restarting reminder delivery resets the ramp to its initial capacity.</para>
 /// <para>Slow-start mirrors the equivalent behavior in <c>DurableJobsOptions</c>
 /// (<c>SlowStartInitialConcurrency</c>, <c>SlowStartInterval</c>).</para>
 /// </remarks>
@@ -37,7 +38,7 @@ public sealed class SlowStartConfig
         BlockMode = blockMode ?? throw new ArgumentNullException(nameof(blockMode));
     }
 
-    /// <summary>The initial concurrency capacity available immediately after the throttle starts.</summary>
+    /// <summary>The initial concurrency capacity available when the reminder service enables delivery.</summary>
     public int InitialCapacity { get; }
 
     /// <summary>The interval at which the capacity is doubled until it reaches <c>MaxConcurrent</c>.</summary>

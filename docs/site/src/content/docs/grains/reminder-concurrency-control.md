@@ -47,9 +47,9 @@ Empty and invalid configurations fail during silo startup.
 | Control | Use when | Important behavior |
 |---|---|---|
 | `MaxConcurrent` | Each tick holds a limited resource, such as a database connection or downstream request. | Caps admitted calls until their delivery attempt completes. |
-| `PermitsPerSecond` | A dependency has a request-rate limit or performs poorly under bursts. | Uses a token bucket. `burstSize` controls how many accumulated tokens can be consumed together. |
+| `PermitsPerSecond` | A dependency has a request-rate limit or performs poorly under bursts. | Uses a token bucket. `burstSize` controls how many accumulated tokens can be reserved together. A token is consumed when the complete admission commits. |
 | `RespectOverload` | Reminder work should back off during silo CPU or memory pressure. | Checks the silo overload detector before consuming concurrency or rate capacity. |
-| `SlowStart` | A starting silo needs time to warm caches, connection pools, JIT-compiled code, or thread-pool capacity. | Starts at `initialCapacity` and doubles after each interval until `MaxConcurrent` is reached. Requires `MaxConcurrent`. |
+| `SlowStart` | A starting reminder service needs time to warm caches, connection pools, JIT-compiled code, or thread-pool capacity. | Begins after the initial reminder storage load, starts at `initialCapacity`, and doubles after each interval until `MaxConcurrent` is reached. Requires `MaxConcurrent`. |
 
 Combine concurrency and rate limits when the protected dependency has both
 constraints. Choose values from measured dependency capacity, not the normal
@@ -62,8 +62,9 @@ tick waits or is skipped while the silo is overloaded. Enable
 its thresholds so the detector reports CPU or memory pressure.
 
 <xref:Orleans.Reminders.Concurrency.ReminderThrottleConfigBuilder.SlowStart*>
-limits admitted concurrency during startup. Its initial capacity must be
-positive and no greater than `MaxConcurrent`.
+limits admitted concurrency after the reminder service finishes its initial
+storage load and enables delivery. Its initial capacity must be positive and no
+greater than `MaxConcurrent`. Restarting reminder delivery resets the ramp.
 
 ## Choose admission behavior
 
@@ -76,10 +77,12 @@ Every gate requires an explicit
 | `WaitUpTo(timeout)` | Wait until capacity is available or the timeout expires. Skip the tick after the timeout. |
 | `SkipImmediately` | Skip the tick instead of waiting. |
 
-Sequential gates share one timeout budget. For example, if an overload gate
-uses 300 ms of a 500 ms `WaitUpTo` budget, later gates have at most 200 ms
-remaining. Once a gate establishes a deadline, it also bounds later gates
-configured with `Wait`.
+The shortest configured `WaitUpTo` value establishes one deadline measured from
+the beginning of admission. It bounds every gate, including gates configured
+with `Wait`, and the final admission commit. Capacity reserved by earlier gates
+is restored if cancellation, a reminder schedule update, a later rejection, or
+the deadline prevents admission from committing. Rate tokens are consumed only
+when the runtime returns an admitted lease.
 
 Use `Wait` when delayed execution is acceptable but dropping a tick isn't. Use
 `WaitUpTo` or `SkipImmediately` when exceeding downstream capacity is worse than
