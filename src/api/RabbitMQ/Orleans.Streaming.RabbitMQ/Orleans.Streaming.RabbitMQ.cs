@@ -36,6 +36,22 @@ namespace Orleans.Streaming.RabbitMQ.Adapters
 
 namespace Orleans.Streaming.RabbitMQ.Configurators
 {
+    public static partial class ClientBuilderExtensions
+    {
+        public static Hosting.IClientBuilder AddRabbitMQStreams(this Hosting.IClientBuilder builder, string name, System.Action<RabbitMQClientConfigurator> configure) { throw null; }
+
+        public static Hosting.IClientBuilder AddRabbitMQStreams(this Hosting.IClientBuilder builder, string name, System.Action<RabbitMQ.RabbitMQClientOptions> configureOptions) { throw null; }
+    }
+
+    public partial class RabbitMQClientConfigurator : Hosting.ClusterClientPersistentStreamConfigurator
+    {
+        public RabbitMQClientConfigurator(string providerName, Hosting.IClientBuilder builder) : base(default!, default!, default!) { }
+
+        public RabbitMQClientConfigurator ConfigurePartitioning(int numOfPartitions = 8) { throw null; }
+
+        public RabbitMQClientConfigurator ConfigureRabbitMQ(System.Action<Microsoft.Extensions.Options.OptionsBuilder<RabbitMQ.RabbitMQClientOptions>> configureOptions) { throw null; }
+    }
+
     public partial class RabbitMQSiloConfigurator : Hosting.SiloPersistentStreamConfigurator
     {
         public RabbitMQSiloConfigurator(string providerName, System.Action<System.Action<Microsoft.Extensions.DependencyInjection.IServiceCollection>> configureDelegate) : base(default!, default!, default!) { }
@@ -61,6 +77,7 @@ namespace Orleans.Streaming.RabbitMQ.RabbitMQ
 {
     public partial record RabbitMQClientOptions()
     {
+        public const ulong DEFAULT_STREAM_MAX_LENGTH_BYTES = 209715200UL;
         public RabbitMQConnectionRetryOptions ConnectionRetry { get { throw null; } set { } }
 
         public System.TimeSpan IntervalToUpdateOffset { get { throw null; } set { } }

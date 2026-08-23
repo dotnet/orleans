@@ -38,6 +38,12 @@ internal sealed class RabbitMQClientOptionsFormatter : IOptionFormatter<RabbitMQ
         yield return OptionFormattingUtilities.Format(
             $"{nameof(RabbitMQClientOptions.ConnectionRetry)}.{nameof(RabbitMQConnectionRetryOptions.Delay)}",
             _options.ConnectionRetry.Delay);
+        if (_options.StreamOptions.Args.TryGetValue("max-length-bytes", out var maxLengthBytes))
+        {
+            yield return OptionFormattingUtilities.Format(
+                $"{nameof(RabbitMQClientOptions.StreamOptions)}.{nameof(global::RabbitMQ.Stream.Client.StreamSpec.MaxLengthBytes)}",
+                maxLengthBytes);
+        }
         yield return OptionFormattingUtilities.Format(
             $"{nameof(RabbitMQClientOptions.StreamSystemConfig)}.VirtualHost",
             _options.StreamSystemConfig.VirtualHost);

@@ -39,4 +39,27 @@ public static class RabbitMQConfiguration
             });
         // </rabbitmq_silo>
     }
+
+    public static void ConfigureClient(IClientBuilder clientBuilder)
+    {
+        // <rabbitmq_client>
+        var endpoint = new IPEndPoint(IPAddress.Loopback, 5552);
+
+        clientBuilder.AddRabbitMQStreams("RabbitMQ", stream =>
+        {
+            stream.ConfigureRabbitMQ(optionsBuilder => optionsBuilder.Configure(options =>
+            {
+                options.StreamSystemConfig = new StreamSystemConfig
+                {
+                    UserName = "guest",
+                    Password = "guest",
+                    Endpoints = [endpoint],
+                    AddressResolver = new AddressResolver(endpoint),
+                };
+            }));
+
+            stream.ConfigurePartitioning(8);
+        });
+        // </rabbitmq_client>
+    }
 }

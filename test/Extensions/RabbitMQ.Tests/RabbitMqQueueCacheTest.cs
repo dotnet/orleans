@@ -149,4 +149,38 @@ public class RabbitMqQueueCacheTest
 
     private static RabbitMqBatchContainer CreateBatch(StreamId streamId, long sequenceNumber) =>
         new(streamId, [new object()], new EventSequenceTokenV2(sequenceNumber));
+
+    [Fact]
+    public void PurgedHighWatermark_OutOfOrderPurgeRetainsMaximumAndRefreshesLru()
+    {
+        var streamA = StreamId.Create("test", "a");
+        var streamB = StreamId.Create("test", "b");
+        var streamC = StreamId.Create("test", "c");
+        var cache = new RabbitMqQueueCache(new RabbitMQQueueCacheOptions { CacheSize = 2 });
+        cache.AddToCache(
+        [
+            CreateBatch(streamA, 8),
+            CreateBatch(streamA, 9),
+            CreateBatch(streamA, 10),
+            CreateBatch(streamB, 20),
+            CreateBatch(streamA, 8),
+            CreateBatch(streamC, 30)
+        ]);
+
+        Assert.True(cache.TryPurgeFromCache(out var purged));
+        Assert.Equal([8L, 9L, 10L, 20L, 8L, 30L], purged.Select(item => item.SequenceToken.SequenceNumber));
+        Assert.Equal(2, cache.PurgedHighWatermarkCount);
+
+        var streamAMiss = Assert.Throws<QueueCacheMissException>(
+            () => cache.GetCacheCursor(streamA, new EventSequenceTokenV2(7)));
+        Assert.Equal(new EventSequenceTokenV2(10).ToString(), streamAMiss.Low);
+        Assert.Equal(new EventSequenceTokenV2(10).ToString(), streamAMiss.High);
+
+        using var evictedStreamBCursor = cache.GetCacheCursor(streamB, new EventSequenceTokenV2(19));
+
+        var streamCMiss = Assert.Throws<QueueCacheMissException>(
+            () => cache.GetCacheCursor(streamC, new EventSequenceTokenV2(29)));
+        Assert.Equal(new EventSequenceTokenV2(30).ToString(), streamCMiss.Low);
+        Assert.Equal(new EventSequenceTokenV2(30).ToString(), streamCMiss.High);
+    }
 }

@@ -77,7 +77,7 @@ Register [NATS JetStream](https://docs.nats.io/nats-concepts/jetstream) with `Ad
 
 ## RabbitMQ Streams (alpha)
 
-Register [RabbitMQ Streams](https://www.rabbitmq.com/docs/streams) with `AddRabbitMQStreams`. The provider maps Orleans queues to RabbitMQ streams and stores consumer offsets in RabbitMQ after delivery. Receiver recovery resumes from the stored broker offset; application-supplied subscription rewind isn't supported. See [Stream with RabbitMQ](rabbitmq-streaming.md) for local setup, silo configuration, and operational guidance.
+Register [RabbitMQ Streams](https://www.rabbitmq.com/docs/streams) with `AddRabbitMQStreams`. The provider maps Orleans queues to RabbitMQ streams and stores consumer offsets in RabbitMQ after delivery. Receiver recovery resumes from the stored broker offset, and new subscriptions begin at the provider's current position. New streams default to a 200 MiB maximum length, configurable through `RabbitMQClientOptions.StreamOptions.MaxLengthBytes`. See [Stream with RabbitMQ](rabbitmq-streaming.md) for silo and standalone-client configuration, local setup, and operational guidance.
 
 ## Redis Streams streaming (alpha)
 

@@ -33,6 +33,14 @@ Install the package and register a named stream provider on every silo:
 
 Don't store production credentials in source code. Populate `StreamSystemConfig` from protected configuration or a secret store. RabbitMQ Streams supports multiple endpoints through `StreamSystemConfig`; use stable, reachable advertised addresses for clustered RabbitMQ deployments.
 
+## Configure standalone clients
+
+Register the same provider name, RabbitMQ connection, queue names, and partition count on every standalone Orleans client which accesses the stream provider:
+
+:::code language="csharp" source="snippets/rabbitmq/RabbitMQConfiguration.cs" id="rabbitmq_client":::
+
+The client registration creates an isolated named provider and closes its producer resources with the Orleans client lifecycle.
+
 ## Partitioning and queue names
 
 `ConfigurePartitioning` controls the number of Orleans queues and therefore the maximum physical receive parallelism. The provider creates one RabbitMQ stream per queue. Keep the Orleans provider name and partition count stable across restarts so that a replacement deployment uses the same streams and offsets.
@@ -47,7 +55,9 @@ The pulling agent uses `BatchContainerBatchSize = 1` so each delivery result pro
 
 Delivery is at least once across failures. A silo can stop after delivering an event but before persisting the new offset, causing the event to be replayed. Consumers must be idempotent.
 
-Receiver recovery resumes from the last stored RabbitMQ offset while the corresponding entries remain within RabbitMQ retention. The provider doesn't support subscription rewind from an application-supplied sequence token. Configure maximum age or length in RabbitMQ according to the required receiver recovery window, and monitor disk capacity, stream growth, consumer lag, connection failures, and Orleans streaming metrics.
+Receiver recovery resumes from the last stored RabbitMQ offset while the corresponding entries remain within RabbitMQ retention. New subscriptions begin at the provider's current position. Configure maximum age or length in RabbitMQ according to the required receiver recovery window, and monitor disk capacity, stream growth, consumer lag, connection failures, and Orleans streaming metrics.
+
+New streams default to a maximum length of 200 MiB. Set `RabbitMQClientOptions.StreamOptions.MaxLengthBytes` to select a capacity which matches the recovery window and available broker storage. RabbitMQ applies its configured retention policy as new entries arrive.
 
 ## Run the sample
 
