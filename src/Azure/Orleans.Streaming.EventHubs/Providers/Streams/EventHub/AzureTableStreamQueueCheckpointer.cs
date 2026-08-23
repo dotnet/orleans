@@ -235,7 +235,7 @@ public partial class AzureTableStreamQueueCheckpointer : IStreamQueueCheckpointe
             }
 
             _throttleSavesUntilUtc = utcNow + _persistInterval;
-            _inProgressSave = Save(offset);
+            _inProgressSave = Save(offset, CancellationToken.None);
             _inProgressSave.Ignore();
         }
     }
@@ -282,16 +282,16 @@ public partial class AzureTableStreamQueueCheckpointer : IStreamQueueCheckpointe
                     return;
                 }
 
-                _inProgressSave = Save(_latestCheckpoint);
+                _inProgressSave = Save(_latestCheckpoint, cancellationToken);
                 retryingSave = true;
             }
         }
     }
 
-    private async Task Save(string checkpoint)
+    private async Task Save(string checkpoint, CancellationToken cancellationToken)
     {
         _entity.Offset = checkpoint;
-        await _dataManager.UpsertTableEntryAsync(_entity);
+        await _dataManager.UpsertTableEntryAsync(_entity, cancellationToken);
         lock (_lock)
         {
             _persistedCheckpoint = checkpoint;
