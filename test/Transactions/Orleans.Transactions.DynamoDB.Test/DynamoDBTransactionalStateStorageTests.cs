@@ -532,8 +532,14 @@ namespace Orleans.Transactions.DynamoDB.Tests
             if (service.StartsWith("http://", StringComparison.OrdinalIgnoreCase)
                 || service.StartsWith("https://", StringComparison.OrdinalIgnoreCase))
             {
+                var credentials = string.IsNullOrEmpty(AWSTestConstants.DynamoDbAccessKey)
+                    || string.IsNullOrEmpty(AWSTestConstants.DynamoDbSecretKey)
+                        ? new BasicAWSCredentials("dummy", "dummyKey")
+                        : new BasicAWSCredentials(
+                            AWSTestConstants.DynamoDbAccessKey,
+                            AWSTestConstants.DynamoDbSecretKey);
                 return new AmazonDynamoDBClient(
-                    new BasicAWSCredentials("dummy", "dummyKey"),
+                    credentials,
                     new AmazonDynamoDBConfig { ServiceURL = service });
             }
 
