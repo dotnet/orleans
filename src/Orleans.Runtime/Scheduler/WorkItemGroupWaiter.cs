@@ -34,9 +34,12 @@ internal sealed class WorkItemGroupWaiter(WorkItemGroup workItemGroup) : IValueT
     private Action<object?>? _continuation;
     private object? _continuationState;
     private uint _status;
+    private int _version;
 
     ValueTaskSourceStatus IValueTaskSource.GetStatus(short token)
     {
+        ValidateToken(token);
+
         // We only support success completion (no exception/cancellation paths)
         return ReferenceEquals(Volatile.Read(ref _continuation), CompletedSentinel)
             ? ValueTaskSourceStatus.Succeeded
@@ -45,6 +48,8 @@ internal sealed class WorkItemGroupWaiter(WorkItemGroup workItemGroup) : IValueT
 
     void IValueTaskSource.OnCompleted(Action<object?> continuation, object? state, short token, ValueTaskSourceOnCompletedFlags flags)
     {
+        ValidateToken(token);
+
         if (continuation is null)
         {
             ThrowArgumentNullException();
@@ -89,11 +94,21 @@ internal sealed class WorkItemGroupWaiter(WorkItemGroup workItemGroup) : IValueT
 
     void IValueTaskSource.GetResult(short token)
     {
+        ValidateToken(token);
+        if (!ReferenceEquals(Volatile.Read(ref _continuation), CompletedSentinel))
+        {
+            ThrowOperationNotCompleted();
+        }
+
         // Reset the wait source.
         Reset();
 
         // Reset the status.
         ResetStatus();
+
+        // The activation loop is the sole consumer, so the next operation cannot begin until
+        // GetResult completes. Advance the version last to invalidate stale ValueTask instances.
+        Volatile.Write(ref _version, unchecked(_version + 1));
     }
 
     /// <summary>
@@ -147,7 +162,7 @@ internal sealed class WorkItemGroupWaiter(WorkItemGroup workItemGroup) : IValueT
             return default;
         }
 
-        return new(this, 0);
+        return new(this, unchecked((short)Volatile.Read(ref _version)));
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -160,6 +175,7 @@ internal sealed class WorkItemGroupWaiter(WorkItemGroup workItemGroup) : IValueT
     private void SignalCompletion()
     {
         var continuation = Interlocked.Exchange(ref _continuation, CompletingSentinel);
+        var continuationState = _continuationState;
         Debug.Assert(continuation is null || (!ReferenceEquals(continuation, CompletingSentinel) && !ReferenceEquals(continuation, CompletedSentinel)));
 
         // The continuation slot is the completion authority. Publish completion only after
@@ -167,10 +183,17 @@ internal sealed class WorkItemGroupWaiter(WorkItemGroup workItemGroup) : IValueT
         Volatile.Write(ref _continuation, CompletedSentinel);
         if (continuation is not null)
         {
-            Debug.Assert(continuation is not null);
-
             // Always schedule on the WorkItemGroup
-            _workItemGroup.QueueNullableAction(continuation, _continuationState);
+            _workItemGroup.QueueNullableAction(continuation, continuationState);
+        }
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private void ValidateToken(short token)
+    {
+        if (token != unchecked((short)Volatile.Read(ref _version)))
+        {
+            ThrowInvalidToken();
         }
     }
 
@@ -190,4 +213,10 @@ internal sealed class WorkItemGroupWaiter(WorkItemGroup workItemGroup) : IValueT
 
     [DoesNotReturn]
     private static void ThrowConcurrentWaitersNotSupported() => throw new InvalidOperationException("Concurrent waiters are not supported");
+
+    [DoesNotReturn]
+    private static void ThrowInvalidToken() => throw new InvalidOperationException("The token does not match the current wait operation");
+
+    [DoesNotReturn]
+    private static void ThrowOperationNotCompleted() => throw new InvalidOperationException("The wait operation has not completed");
 }
