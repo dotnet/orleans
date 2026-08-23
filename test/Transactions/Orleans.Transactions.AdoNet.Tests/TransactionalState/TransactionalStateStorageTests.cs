@@ -410,6 +410,7 @@ public sealed class TransactionalStateStorageTests
         await sut.Store(null, EmptyMeta(), null, null, null);
 
         Assert.Single(fake.TransactionCallLog);
+        Assert.Null(Assert.Single(fake.TransactionETagCallLog));
         var ops = fake.TransactionCallLog[0];
         var addKeySql = opts.ExecuteSqlDictionary[Constants.AddKeySql];
         Assert.Contains(ops, t => t.Item1 == addKeySql);
@@ -629,6 +630,7 @@ public sealed class TransactionalStateStorageTests
 
         var updateStateSql = opts.ExecuteSqlDictionary[Constants.UpdateStateSql];
         var ops = fake.TransactionCallLog.SelectMany(call => call).ToList();
+        Assert.Equal("etag-k", Assert.Single(fake.TransactionETagCallLog));
         Assert.Equal(opts.ExecuteSqlDictionary[Constants.UpdateKeySql], ops[0].Item1);
         Assert.Contains(ops, t => t.Item1 == updateStateSql);
         var tracked = Assert.Single(GetTrackedStates(sut));

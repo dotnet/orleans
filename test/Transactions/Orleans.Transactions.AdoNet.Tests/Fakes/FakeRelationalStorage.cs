@@ -20,6 +20,7 @@ internal sealed class FakeRelationalStorage : IRelationalStorage
 
     // All ExecuteTransactionAsync argument lists, in call order (outer = calls, inner = operations per call).
     public List<List<Tuple<string, Action<DbCommand>>>> TransactionCallLog { get; } = new();
+    public List<string?> TransactionETagCallLog { get; } = new();
     public Exception? TransactionException { get; set; }
 
     public Task<IEnumerable<TResult>> ReadAsync<TResult>(
@@ -61,9 +62,11 @@ internal sealed class FakeRelationalStorage : IRelationalStorage
 
     public Task<int> ExecuteTransactionAsync(
         List<Tuple<string, Action<DbCommand>>> operations,
+        string? currentETag,
         CancellationToken cancellationToken = default)
     {
         TransactionCallLog.Add(new List<Tuple<string, Action<DbCommand>>>(operations));
+        TransactionETagCallLog.Add(currentETag);
         if (TransactionException is { } exception)
         {
             return Task.FromException<int>(exception);
