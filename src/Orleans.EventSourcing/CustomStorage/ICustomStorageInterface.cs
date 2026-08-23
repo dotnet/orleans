@@ -25,12 +25,12 @@ namespace Orleans.EventSourcing.CustomStorage
         Task<bool> ApplyUpdatesToStorage(IReadOnlyList<TDelta> updates, int expectedVersion);
 
         /// <summary>
-        /// Attempt to retrieve a segment of the log, possibly from storage. Throws <see cref="NotSupportedException"/> if
-        /// the log cannot be read, which depends on the providers used and how they are configured.
+        /// Retrieves a segment of the confirmed log from storage.
         /// </summary>
-        /// <param name="fromVersion">the start position </param>
-        /// <param name="toVersion">the end position</param>
-        /// <returns></returns>
+        /// <param name="fromVersion">The inclusive start version.</param>
+        /// <param name="toVersion">The exclusive end version.</param>
+        /// <returns>A task containing the confirmed updates in the requested range.</returns>
+        /// <exception cref="NotSupportedException">The storage implementation doesn't retain confirmed updates.</exception>
         Task<IReadOnlyList<TDelta>> RetrieveLogSegment(int fromVersion, int toVersion) =>
             throw new NotSupportedException();
 

@@ -32,6 +32,9 @@ namespace Orleans.Hosting
         /// Adds a custom storage log consistency provider as the default consistency provider and registers its keyed storage factory.
         /// </summary>
         /// <typeparam name="TCustomStorageFactory">The custom storage factory type.</typeparam>
+        /// <param name="builder">The silo builder.</param>
+        /// <param name="primaryCluster">The configured primary cluster identifier.</param>
+        /// <returns>The silo builder.</returns>
         public static ISiloBuilder AddCustomStorageBasedLogConsistencyProviderAsDefault<TCustomStorageFactory>(
             this ISiloBuilder builder,
             string? primaryCluster = null)
@@ -61,6 +64,10 @@ namespace Orleans.Hosting
         /// Adds a custom storage log consistency provider and registers its keyed storage factory.
         /// </summary>
         /// <typeparam name="TCustomStorageFactory">The custom storage factory type.</typeparam>
+        /// <param name="builder">The silo builder.</param>
+        /// <param name="name">The provider name and keyed factory registration key.</param>
+        /// <param name="primaryCluster">The configured primary cluster identifier.</param>
+        /// <returns>The silo builder.</returns>
         public static ISiloBuilder AddCustomStorageBasedLogConsistencyProvider<TCustomStorageFactory>(
             this ISiloBuilder builder,
             string name = "LogStorage",
