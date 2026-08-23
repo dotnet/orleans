@@ -7,14 +7,14 @@ ELSE IF EXISTS (
     FROM sys.columns
     WHERE object_id = OBJECT_ID(N'OrleansMembershipTable')
       AND name = N'MetadataJson'
-      AND max_length <> -1
+      AND (max_length <> -1 OR is_nullable = 0)
 )
 BEGIN
     ALTER TABLE OrleansMembershipTable ALTER COLUMN MetadataJson NVARCHAR(MAX) NULL;
 END;
 
-UPDATE OrleansQuery
-SET QueryText = 'SET XACT_ABORT, NOCOUNT ON;
+BEGIN
+    DECLARE @InsertQueryText NVARCHAR(MAX) = 'SET XACT_ABORT, NOCOUNT ON;
     DECLARE @ROWCOUNT AS INT;
     BEGIN TRANSACTION;
     INSERT INTO OrleansMembershipTable
@@ -71,11 +71,15 @@ SET QueryText = 'SET XACT_ABORT, NOCOUNT ON;
     ELSE
         COMMIT TRANSACTION
     SELECT @ROWCOUNT;
-    '
-WHERE QueryKey = 'InsertMembershipKey';
+    ';
 
-UPDATE OrleansQuery
-SET QueryText = 'SET XACT_ABORT, NOCOUNT ON;
+    UPDATE OrleansQuery SET QueryText = @InsertQueryText WHERE QueryKey = 'InsertMembershipV2Key';
+    IF @@ROWCOUNT = 0
+        INSERT INTO OrleansQuery(QueryKey, QueryText) VALUES ('InsertMembershipV2Key', @InsertQueryText);
+END;
+
+BEGIN
+    DECLARE @UpdateQueryText NVARCHAR(MAX) = 'SET XACT_ABORT, NOCOUNT ON;
     BEGIN TRANSACTION;
 
     UPDATE OrleansMembershipVersionTable
@@ -101,11 +105,15 @@ SET QueryText = 'SET XACT_ABORT, NOCOUNT ON;
 
     SELECT @@ROWCOUNT;
     COMMIT TRANSACTION;
-    '
-WHERE QueryKey = 'UpdateMembershipKey';
+    ';
 
-UPDATE OrleansQuery
-SET QueryText = 'SELECT
+    UPDATE OrleansQuery SET QueryText = @UpdateQueryText WHERE QueryKey = 'UpdateMembershipV2Key';
+    IF @@ROWCOUNT = 0
+        INSERT INTO OrleansQuery(QueryKey, QueryText) VALUES ('UpdateMembershipV2Key', @UpdateQueryText);
+END;
+
+BEGIN
+    DECLARE @ReadRowQueryText NVARCHAR(MAX) = 'SELECT
         v.DeploymentId,
         m.Address,
         m.Port,
@@ -127,11 +135,15 @@ SET QueryText = 'SELECT
         AND Generation = @Generation AND @Generation IS NOT NULL
     WHERE
         v.DeploymentId = @DeploymentId AND @DeploymentId IS NOT NULL;
-    '
-WHERE QueryKey = 'MembershipReadRowKey';
+    ';
 
-UPDATE OrleansQuery
-SET QueryText = 'SELECT
+    UPDATE OrleansQuery SET QueryText = @ReadRowQueryText WHERE QueryKey = 'MembershipReadRowV2Key';
+    IF @@ROWCOUNT = 0
+        INSERT INTO OrleansQuery(QueryKey, QueryText) VALUES ('MembershipReadRowV2Key', @ReadRowQueryText);
+END;
+
+BEGIN
+    DECLARE @ReadAllQueryText NVARCHAR(MAX) = 'SELECT
         v.DeploymentId,
         m.Address,
         m.Port,
@@ -150,5 +162,9 @@ SET QueryText = 'SELECT
         ON v.DeploymentId = m.DeploymentId
     WHERE
         v.DeploymentId = @DeploymentId AND @DeploymentId IS NOT NULL;
-    '
-WHERE QueryKey = 'MembershipReadAllKey';
+    ';
+
+    UPDATE OrleansQuery SET QueryText = @ReadAllQueryText WHERE QueryKey = 'MembershipReadAllV2Key';
+    IF @@ROWCOUNT = 0
+        INSERT INTO OrleansQuery(QueryKey, QueryText) VALUES ('MembershipReadAllV2Key', @ReadAllQueryText);
+END;

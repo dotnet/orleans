@@ -92,6 +92,12 @@ namespace UnitTests.MembershipTests
         }
 
         [Fact]
+        public async Task MembershipTable_MySql_LargeMetadataRoundTrips()
+        {
+            await MembershipTable_LargeMetadataRoundTrips();
+        }
+
+        [Fact]
         public async Task MembershipTable_MySql_ReadRow_Insert_Read()
         {
             await MembershipTable_ReadRow_Insert_Read();

@@ -1,9 +1,13 @@
+using System.Collections.Immutable;
+using System.Net;
+using Microsoft.Azure.Cosmos;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using TestExtensions;
 using UnitTests.MembershipTests;
 using Orleans.Messaging;
 using Orleans.Clustering.Cosmos;
+using Orleans.Clustering.Cosmos.Models;
 using UnitTests;
 
 namespace Tester.Cosmos.Clustering;
@@ -148,5 +152,132 @@ public class CosmosMembershipTableTests : MembershipTableTestsBase
     public async Task MembershipTable_Cosmos_UpdateIAmAlive()
     {
         await MembershipTable_UpdateIAmAlive();
+    }
+
+    [Fact, TestCategory("Functional")]
+    public async Task MembershipMetadata_SurvivesLegacyReplacement_RejectsConflict_AndIsCleanedUp()
+    {
+        CosmosTestUtils.SkipIfCosmosEmulator(CosmosEmulatorTransactionalBatchConditionSkipReason);
+
+        var options = new CosmosClusteringOptions();
+        options.ConfigureTestDefaults();
+        var membership = new CosmosMembershipTable(loggerFactory, Services, Options.Create(options), _clusterOptions);
+        await membership.InitializeMembershipTable(false);
+
+        var entry = CreateMetadataEntry();
+        var initial = await membership.ReadAll();
+        Assert.True(await membership.InsertRow(entry, initial.Version.Next()));
+
+        using var client = await options.CreateClient(Services);
+        var container = client.GetContainer(options.DatabaseName, options.ContainerName);
+        var partitionKey = new PartitionKey(clusterId);
+        var id = $"{entry.SiloAddress.Endpoint.Address}-{entry.SiloAddress.Endpoint.Port}-{entry.SiloAddress.Generation}";
+        var legacyEntity = (await container.ReadItemAsync<SiloEntity>(id, partitionKey)).Resource;
+        legacyEntity.Metadata = null;
+        await container.ReplaceItemAsync(legacyEntity, id, partitionKey);
+
+        var afterLegacyWrite = await membership.ReadRow(entry.SiloAddress);
+        var storedTuple = Assert.Single(afterLegacyWrite.Members);
+        Assert.Equal(entry.Metadata, storedTuple.Item1.Metadata);
+
+        storedTuple.Item1.Metadata = ImmutableDictionary<string, string>.Empty.Add("region", "conflict");
+        storedTuple.Item1.Status = SiloStatus.Dead;
+        Assert.True(await membership.UpdateRow(storedTuple.Item1, storedTuple.Item2, afterLegacyWrite.Version.Next()));
+
+        var afterConflict = await membership.ReadRow(entry.SiloAddress);
+        Assert.Equal(entry.Metadata, Assert.Single(afterConflict.Members).Item1.Metadata);
+
+        await membership.CleanupDefunctSiloEntries(DateTimeOffset.UtcNow.AddDays(1));
+        Assert.Empty((await membership.ReadAll()).Members);
+
+        var metadataContainer = client.GetContainer(
+            options.DatabaseName,
+            CosmosMembershipTable.GetMetadataContainerName(options));
+        var exception = await Assert.ThrowsAsync<CosmosException>(
+            () => metadataContainer.ReadItemAsync<SiloMetadataEntity>(id, partitionKey));
+        Assert.Equal(HttpStatusCode.NotFound, exception.StatusCode);
+    }
+
+    [Fact, TestCategory("Functional")]
+    public async Task MembershipMetadata_LegacyCleanupOrphanIsReconciled()
+    {
+        CosmosTestUtils.SkipIfCosmosEmulator(CosmosEmulatorTransactionalBatchConditionSkipReason);
+        var options = new CosmosClusteringOptions();
+        options.ConfigureTestDefaults();
+        var membership = new CosmosMembershipTable(loggerFactory, Services, Options.Create(options), _clusterOptions);
+        await membership.InitializeMembershipTable(false);
+        var entry = CreateMetadataEntry();
+        var initial = await membership.ReadAll();
+        Assert.True(await membership.InsertRow(entry, initial.Version.Next()));
+
+        using var client = await options.CreateClient(Services);
+        var partitionKey = new PartitionKey(clusterId);
+        var id = $"{entry.SiloAddress.Endpoint.Address}-{entry.SiloAddress.Endpoint.Port}-{entry.SiloAddress.Generation}";
+        var membershipContainer = client.GetContainer(options.DatabaseName, options.ContainerName);
+        var metadataContainer = client.GetContainer(
+            options.DatabaseName,
+            CosmosMembershipTable.GetMetadataContainerName(options));
+        await membershipContainer.DeleteItemAsync<SiloEntity>(id, partitionKey);
+        var metadataEntity = (await metadataContainer.ReadItemAsync<SiloMetadataEntity>(id, partitionKey)).Resource;
+        metadataEntity.CreatedAt = DateTimeOffset.UtcNow - CosmosMembershipTable.MetadataOrphanGracePeriod - TimeSpan.FromMinutes(1);
+        await metadataContainer.ReplaceItemAsync(metadataEntity, id, partitionKey);
+
+        await membership.CleanupDefunctSiloEntries(DateTimeOffset.UtcNow);
+
+        var exception = await Assert.ThrowsAsync<CosmosException>(
+            () => metadataContainer.ReadItemAsync<SiloMetadataEntity>(id, partitionKey));
+        Assert.Equal(HttpStatusCode.NotFound, exception.StatusCode);
+    }
+
+    private static MembershipEntry CreateMetadataEntry() => new()
+    {
+        SiloAddress = SiloAddress.New(new IPEndPoint(IPAddress.Loopback, 12345), 123456),
+        HostName = "host",
+        SiloName = "silo",
+        Status = SiloStatus.Joining,
+        StartTime = DateTime.UtcNow,
+        IAmAliveTime = DateTime.UtcNow,
+        Metadata = ImmutableDictionary<string, string>.Empty.Add("region", "west")
+    };
+}
+
+[TestSuite("BVT")]
+[TestProvider("Cosmos")]
+[TestArea("Membership")]
+public class CosmosMembershipMetadataContractTests
+{
+    [Fact]
+    public void CompanionContainerName_IsValidAndDeterministicAtMaximumLength()
+    {
+        var options = new CosmosClusteringOptions { ContainerName = new string('c', 255) };
+
+        var first = CosmosMembershipTable.GetMetadataContainerName(options);
+        var second = CosmosMembershipTable.GetMetadataContainerName(options);
+
+        Assert.Equal(first, second);
+        Assert.Equal(255, first.Length);
+        Assert.NotEqual(options.ContainerName, first);
+    }
+
+    [Fact]
+    public void ExplicitCompanionContainerName_IsPreserved()
+    {
+        var options = new CosmosClusteringOptions { MetadataContainerName = "ProvisionedMetadata" };
+
+        Assert.Equal("ProvisionedMetadata", CosmosMembershipTable.GetMetadataContainerName(options));
+    }
+
+    [Fact]
+    public void CompanionContainerName_MustDifferFromMembershipContainer()
+    {
+        var options = new CosmosClusteringOptions
+        {
+            ContainerName = "Membership",
+            MetadataContainerName = "Membership"
+        };
+
+        var exception = Assert.Throws<OrleansConfigurationException>(
+            () => CosmosMembershipTable.GetMetadataContainerName(options));
+        Assert.Contains(nameof(CosmosClusteringOptions.MetadataContainerName), exception.Message);
     }
 }

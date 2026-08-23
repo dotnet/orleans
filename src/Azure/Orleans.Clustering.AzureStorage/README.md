@@ -106,6 +106,12 @@ Console.WriteLine($"Grain response: {response}");
 await host.WaitForShutdownAsync();
 ```
 
+## Membership metadata storage
+
+The silo provider stores immutable membership metadata in a companion Azure Table so that rolling-upgrade writes from older silos cannot remove it when they replace a membership entity. The companion table name is derived deterministically from `TableName` by adding `Metadata`; long names are shortened with a stable hash to remain within Azure Table naming limits.
+
+The silo identity needs create, read, add, query, and delete permissions for both tables. Clients continue reading only the membership table for gateway discovery.
+
 ## Documentation
 For more comprehensive documentation, please refer to:
 - [Microsoft Orleans Documentation](https://dotnet.github.io/orleans/docs/)

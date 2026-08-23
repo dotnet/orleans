@@ -393,6 +393,9 @@ namespace Orleans
         /// <remarks>
         /// A <see langword="null"/> value indicates that metadata is unavailable. An empty dictionary indicates
         /// that metadata is available and the silo has not supplied any metadata values.
+        /// Metadata is fixed for the lifetime of a silo instance. Membership snapshots can enrich an unavailable
+        /// value when metadata becomes available, and retain the first available value thereafter.
+        /// Storage limits are determined by the configured membership provider.
         /// </remarks>
         [Id(11)]
         public ImmutableDictionary<string, string>? Metadata { get; set; }

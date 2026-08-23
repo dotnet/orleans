@@ -10,6 +10,7 @@ namespace Orleans.Clustering.Cosmos
 {
     public partial class CosmosClusteringOptions : CosmosOptions
     {
+        public string? MetadataContainerName { get { throw null; } set { } }
     }
 
     public partial class CosmosClusteringOptionsValidator : CosmosOptionsValidator<CosmosClusteringOptions>

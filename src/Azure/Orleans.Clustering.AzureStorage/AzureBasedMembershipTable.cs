@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Globalization;
+using System.Linq;
 using System.Net;
 using System.Text;
 using System.Text.Json;
@@ -43,7 +44,8 @@ namespace Orleans.Runtime.MembershipService
             this.tableManager = await OrleansSiloInstanceManager.GetManager(
                 this.clusterId,
                 this.loggerFactory,
-                this.options);
+                this.options,
+                initializeMetadataStorage: true);
 
             // even if I am not the one who created the table,
             // try to insert an initial table version if it is not already there,
@@ -70,8 +72,10 @@ namespace Orleans.Runtime.MembershipService
         {
             try
             {
-                var entries = await tableManager.FindSiloEntryAndTableVersionRow(key);
-                MembershipTableData data = Convert(entries);
+                var entriesTask = tableManager.FindSiloEntryAndTableVersionRow(key);
+                var metadataTask = tableManager.ReadMetadataEntry(key);
+                await Task.WhenAll(entriesTask, metadataTask);
+                MembershipTableData data = Convert(await entriesTask, await metadataTask);
                 LogDebugReadMyEntry(key, data);
                 return data;
             }
@@ -86,8 +90,10 @@ namespace Orleans.Runtime.MembershipService
         {
             try
             {
-                var entries = await tableManager.FindAllSiloEntries();
-                MembershipTableData data = Convert(entries);
+                var entriesTask = tableManager.FindAllSiloEntries();
+                var metadataTask = tableManager.ReadMetadataEntries();
+                await Task.WhenAll(entriesTask, metadataTask);
+                MembershipTableData data = Convert(await entriesTask, await metadataTask);
                 LogTraceReadAllTable(data);
 
                 return data;
@@ -105,6 +111,7 @@ namespace Orleans.Runtime.MembershipService
             {
                 LogDebugInsertRow(entry, tableVersion);
                 var tableEntry = Convert(entry, tableManager.DeploymentId);
+                tableEntry.Metadata = await tableManager.EnsureMetadataEntry(entry.SiloAddress, tableEntry.Metadata) ?? tableEntry.Metadata;
                 var versionEntry = tableManager.CreateTableVersionEntry(tableVersion.Version);
 
                 bool result = await tableManager.InsertSiloEntryConditionally(
@@ -130,6 +137,10 @@ namespace Orleans.Runtime.MembershipService
             {
                 LogDebugUpdateRow(entry, etag, tableVersion);
                 var siloEntry = Convert(entry, tableManager.DeploymentId);
+                siloEntry.Metadata = await tableManager.EnsureMetadataEntry(
+                    entry.SiloAddress,
+                    siloEntry.Metadata,
+                    preserveInlineMetadata: true) ?? siloEntry.Metadata;
                 var versionEntry = tableManager.CreateTableVersionEntry(tableVersion.Version);
 
                 bool result = await tableManager.UpdateSiloEntryConditionally(siloEntry, etag, versionEntry, tableVersion.VersionEtag);
@@ -164,7 +175,24 @@ namespace Orleans.Runtime.MembershipService
             }
         }
 
-        private MembershipTableData Convert(List<(SiloInstanceTableEntry Entity, string ETag)> entries)
+        private MembershipTableData Convert(List<(SiloInstanceTableEntry Entity, string ETag)> entries, string? metadata)
+        {
+            Dictionary<string, string>? metadataEntries = null;
+            if (metadata is not null)
+            {
+                var silo = entries.FirstOrDefault(entry => !SiloInstanceTableEntry.IsVersionRow(entry.Entity.RowKey)).Entity;
+                if (silo is not null)
+                {
+                    metadataEntries = new(StringComparer.Ordinal) { [silo.RowKey] = metadata };
+                }
+            }
+
+            return Convert(entries, metadataEntries);
+        }
+
+        private MembershipTableData Convert(
+            List<(SiloInstanceTableEntry Entity, string ETag)> entries,
+            IReadOnlyDictionary<string, string>? metadataEntries)
         {
             try
             {
@@ -189,8 +217,9 @@ namespace Orleans.Runtime.MembershipService
                     {
                         try
                         {
-
-                            MembershipEntry membershipEntry = Parse(tableEntry);
+                            string? metadata = null;
+                            metadataEntries?.TryGetValue(tableEntry.RowKey, out metadata);
+                            MembershipEntry membershipEntry = Parse(tableEntry, metadata);
                             memEntries.Add(new Tuple<MembershipEntry, string>(membershipEntry, tuple.ETag));
                         }
                         catch (Exception exc)
@@ -211,7 +240,7 @@ namespace Orleans.Runtime.MembershipService
             }
         }
 
-        private static MembershipEntry Parse(SiloInstanceTableEntry tableEntry)
+        private static MembershipEntry Parse(SiloInstanceTableEntry tableEntry, string? companionMetadata)
         {
             var parse = new MembershipEntry
             {
@@ -255,9 +284,10 @@ namespace Orleans.Runtime.MembershipService
             parse.IAmAliveTime = !string.IsNullOrEmpty(tableEntry.IAmAliveTime) ?
                 LogFormatter.ParseDate(tableEntry.IAmAliveTime) : default;
 
-            if (!string.IsNullOrEmpty(tableEntry.Metadata))
+            var metadata = companionMetadata ?? tableEntry.Metadata;
+            if (!string.IsNullOrEmpty(metadata))
             {
-                parse.Metadata = JsonSerializer.Deserialize<Dictionary<string, string>>(tableEntry.Metadata)?.ToImmutableDictionary();
+                parse.Metadata = JsonSerializer.Deserialize<Dictionary<string, string>>(metadata)?.ToImmutableDictionary();
             }
 
             var suspectingSilos = new List<SiloAddress>();

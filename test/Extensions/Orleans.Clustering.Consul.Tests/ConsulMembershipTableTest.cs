@@ -1,7 +1,13 @@
+using System.Collections.Immutable;
+using System.Net;
+using System.Text;
+using Consul;
+using Newtonsoft.Json;
 using Orleans.Messaging;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration;
+using Orleans.Runtime.Host;
 using Orleans.Runtime.Membership;
 using TestExtensions;
 using UnitTests;
@@ -162,5 +168,149 @@ namespace Consul.Tests
         {
             await MembershipTable_CleanupDefunctSiloEntries(false);
         }
+
+        [Fact, TestCategory("Functional")]
+        public async Task MembershipMetadata_SurvivesLegacyReplacement_RejectsConflict_AndIsCleanedUp()
+        {
+            var options = new ConsulClusteringOptions();
+            options.ConfigureConsulClient(new Uri(connectionString));
+            var membership = new ConsulBasedMembershipTable(
+                loggerFactory.CreateLogger<ConsulBasedMembershipTable>(),
+                Options.Create(options),
+                _clusterOptions);
+
+            var entry = CreateMetadataEntry();
+            var initial = await membership.ReadAll();
+            Assert.True(await membership.InsertRow(entry, initial.Version.Next()));
+
+            using var client = options.CreateClient();
+            var address = entry.SiloAddress.ToParsableString();
+            var membershipKey = $"orleans/{clusterId}/{address}";
+            var metadataKey = $"orleans-metadata/{clusterId}/{address}";
+            var legacyPair = (await client.KV.Get(membershipKey)).Response;
+            var legacyRegistration = JsonConvert.DeserializeObject<ConsulSiloRegistration>(
+                Encoding.UTF8.GetString(legacyPair.Value))!;
+            legacyRegistration.Metadata = null;
+            legacyPair.Value = Encoding.UTF8.GetBytes(JsonConvert.SerializeObject(legacyRegistration));
+            Assert.True((await client.KV.Put(legacyPair)).Response);
+
+            var afterLegacyWrite = await membership.ReadRow(entry.SiloAddress);
+            var storedTuple = Assert.Single(afterLegacyWrite.Members);
+            Assert.Equal(entry.Metadata, storedTuple.Item1.Metadata);
+
+            storedTuple.Item1.Metadata = ImmutableDictionary<string, string>.Empty.Add("region", "conflict");
+            storedTuple.Item1.Status = SiloStatus.Dead;
+            Assert.True(await membership.UpdateRow(storedTuple.Item1, storedTuple.Item2, afterLegacyWrite.Version.Next()));
+
+            var afterConflict = await membership.ReadRow(entry.SiloAddress);
+            Assert.Equal(entry.Metadata, Assert.Single(afterConflict.Members).Item1.Metadata);
+
+            await membership.CleanupDefunctSiloEntries(DateTimeOffset.UtcNow.AddDays(1));
+            Assert.Empty((await membership.ReadAll()).Members);
+            Assert.Null((await client.KV.Get(metadataKey)).Response);
+        }
+
+        [Fact, TestCategory("Functional")]
+        public async Task MembershipMetadata_LegacyCleanupOrphanIsReconciled()
+        {
+            var options = new ConsulClusteringOptions();
+            options.ConfigureConsulClient(new Uri(connectionString));
+            var membership = new ConsulBasedMembershipTable(
+                loggerFactory.CreateLogger<ConsulBasedMembershipTable>(),
+                Options.Create(options),
+                _clusterOptions);
+            var entry = CreateMetadataEntry();
+            var initial = await membership.ReadAll();
+            Assert.True(await membership.InsertRow(entry, initial.Version.Next()));
+
+            using var client = options.CreateClient();
+            var address = entry.SiloAddress.ToParsableString();
+            var membershipKey = $"orleans/{clusterId}/{address}";
+            var metadataKey = $"orleans-metadata/{clusterId}/{address}";
+            await client.KV.DeleteTree(membershipKey);
+            var metadataPair = (await client.KV.Get(metadataKey)).Response;
+            metadataPair.Value = Encoding.UTF8.GetBytes(JsonConvert.SerializeObject(new
+            {
+                FormatVersion = 1,
+                Metadata = entry.Metadata!.ToDictionary(item => item.Key, item => item.Value),
+                CreatedAt = DateTimeOffset.UtcNow - TimeSpan.FromMinutes(6)
+            }));
+            Assert.True((await client.KV.Put(metadataPair)).Response);
+
+            await membership.CleanupDefunctSiloEntries(DateTimeOffset.UtcNow);
+
+            Assert.Null((await client.KV.Get(metadataKey)).Response);
+        }
+
+        [Fact, TestCategory("Functional")]
+        public async Task MembershipMetadata_InsertClaimsExistingOrphan()
+        {
+            var options = new ConsulClusteringOptions();
+            options.ConfigureConsulClient(new Uri(connectionString));
+            var membership = new ConsulBasedMembershipTable(
+                loggerFactory.CreateLogger<ConsulBasedMembershipTable>(),
+                Options.Create(options),
+                _clusterOptions);
+            var entry = CreateMetadataEntry();
+            var metadataKey = $"orleans-metadata/{clusterId}/{entry.SiloAddress.ToParsableString()}";
+
+            using var client = options.CreateClient();
+            var orphan = new KVPair(metadataKey)
+            {
+                Value = Encoding.UTF8.GetBytes(JsonConvert.SerializeObject(new
+                {
+                    FormatVersion = 1,
+                    Metadata = entry.Metadata!.ToDictionary(item => item.Key, item => item.Value),
+                    CreatedAt = DateTimeOffset.UtcNow - TimeSpan.FromMinutes(6)
+                }))
+            };
+            Assert.True((await client.KV.Put(orphan)).Response);
+            var originalIndex = (await client.KV.Get(metadataKey)).Response.ModifyIndex;
+
+            var initial = await membership.ReadAll();
+            Assert.True(await membership.InsertRow(entry, initial.Version.Next()));
+
+            var claimed = (await client.KV.Get(metadataKey)).Response;
+            Assert.True(claimed.ModifyIndex > originalIndex);
+            Assert.True(ConsulSiloRegistrationAssembler.MetadataCreatedAtFromKVPair(claimed) > DateTimeOffset.UtcNow - TimeSpan.FromMinutes(1));
+        }
+
+        private static MembershipEntry CreateMetadataEntry() => new()
+        {
+            SiloAddress = SiloAddress.New(new IPEndPoint(IPAddress.Loopback, 12345), 123456),
+            HostName = "host",
+            SiloName = "silo",
+            Status = SiloStatus.Joining,
+            StartTime = DateTime.UtcNow,
+            IAmAliveTime = DateTime.UtcNow,
+            Metadata = ImmutableDictionary<string, string>.Empty.Add("region", "west")
+        };
+    }
+}
+
+[TestCategory("BVT")]
+[TestSuite("BVT")]
+[TestProvider("None")]
+[TestArea("Membership")]
+public class ConsulMembershipMetadataSerializationTests
+{
+    [Fact]
+    public void PlainDictionary_WithEnvelopePropertyNames_RemainsMetadata()
+    {
+        var expected = new Dictionary<string, string>
+        {
+            ["Metadata"] = "metadata-value",
+            ["CreatedAt"] = "created-value",
+            ["region"] = "west"
+        };
+        var pair = new KVPair("metadata")
+        {
+            Value = Encoding.UTF8.GetBytes(JsonConvert.SerializeObject(expected))
+        };
+
+        var actual = ConsulSiloRegistrationAssembler.MetadataFromKVPair(pair);
+
+        Assert.Equal(expected, actual);
+        Assert.Equal(DateTimeOffset.MinValue, ConsulSiloRegistrationAssembler.MetadataCreatedAtFromKVPair(pair));
     }
 }
