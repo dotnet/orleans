@@ -92,7 +92,7 @@ namespace Orleans
                     TimeSpan.FromSeconds(1)));
             this.callbackTimer = new PeriodicTimer(period, timeProvider);
             this.sharedCallbackData = new SharedCallbackData(
-                msg => this.UnregisterCallback(msg.Id),
+                msg => this.UnregisterCallback(msg.SendingGrain, msg.Id),
                 this.loggerFactory.CreateLogger<CallbackData>(),
                 this.clientMessagingOptions.ResponseTimeout,
                 this.clientMessagingOptions.CancelRequestOnTimeout,
@@ -296,7 +296,7 @@ namespace Orleans
                     return;
                 }
 
-                callbacks.TryAdd(message.Id, callbackData);
+                callbacks.TryAdd(message.SendingGrain, message.Id, callbackData);
                 callbackData.SubscribeForCancellation(cancellationToken);
 
                 if (Volatile.Read(ref _isStopping) != 0)
@@ -327,7 +327,7 @@ namespace Orleans
             if (response.Result is Message.ResponseTypes.Status)
             {
                 var status = (StatusResponse)response.BodyObject!;
-                callbacks.TryGetValue(response.Id, out var callback);
+                callbacks.TryGetValue(response.TargetGrain, response.Id, out var callback);
                 var request = callback?.Message;
                 if (request is not null)
                 {
@@ -360,7 +360,7 @@ namespace Orleans
             }
 
             CallbackData? callbackData;
-            var found = callbacks.TryRemove(response.Id, out callbackData);
+            var found = callbacks.TryRemove(response.TargetGrain, response.Id, out callbackData);
             if (found)
             {
                 // We need to import the RequestContext here as well.
@@ -374,9 +374,9 @@ namespace Orleans
             }
         }
 
-        private void UnregisterCallback(CorrelationId id)
+        private void UnregisterCallback(GrainId owner, CorrelationId id)
         {
-            callbacks.TryRemove(id, out _);
+            callbacks.TryRemove(owner, id, out _);
         }
 
         private void ConstructorReset()
@@ -448,16 +448,16 @@ namespace Orleans
         {
             foreach (var callback in callbacks)
             {
-                if (deadSilo.Equals(callback.Value.Message.TargetSilo))
+                if (deadSilo.Equals(callback.Message.TargetSilo))
                 {
-                    callback.Value.OnTargetSiloFail();
+                    callback.OnTargetSiloFail();
                 }
             }
         }
 
         private void BreakOutstandingMessages()
         {
-            foreach (var (_, callback) in callbacks)
+            foreach (var callback in callbacks)
             {
                 try
                 {
@@ -471,7 +471,7 @@ namespace Orleans
         }
 
         public int GetRunningRequestsCount(GrainInterfaceType grainInterfaceType)
-            => this.callbacks.CountWhere(c => c.Value.Message.InterfaceType == grainInterfaceType);
+            => this.callbacks.CountWhere(c => c.Message.InterfaceType == grainInterfaceType);
 
         /// <inheritdoc />
         public void NotifyClusterConnectionLost()
@@ -515,7 +515,7 @@ namespace Orleans
                 try
                 {
                     var currentStopwatchTicks = ValueStopwatch.GetTimestamp();
-                    foreach (var (_, callback) in callbacks)
+                    foreach (var callback in callbacks)
                     {
                         if (callback.IsCompleted)
                         {
