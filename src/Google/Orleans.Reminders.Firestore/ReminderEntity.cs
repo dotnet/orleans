@@ -22,6 +22,9 @@ internal class ReminderEntity : FirestoreEntity
     [FirestoreProperty("GrainId")]
     public string GrainId { get; set; } = default!;
 
+    [FirestoreProperty("WriteId")]
+    public string WriteId { get; set; } = default!;
+
     public override IDictionary<string, object?> GetFields()
     {
         return new Dictionary<string, object?>
@@ -31,6 +34,7 @@ internal class ReminderEntity : FirestoreEntity
             { "Period", Period },
             { "GrainHash", GrainHash },
             { "GrainId", GrainId },
+            { "WriteId", WriteId },
         };
     }
 }

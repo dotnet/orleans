@@ -124,7 +124,8 @@ internal partial class FirestoreReminderTable : IReminderTable
                 GrainHash = entry.GrainId.GetUniformHashCode(),
                 Name = entry.ReminderName,
                 Id = FormatReminderId(entry),
-                GrainId = entry.GrainId.ToString()
+                GrainId = entry.GrainId.ToString(),
+                WriteId = Guid.NewGuid().ToString("N"),
             };
 
             if (string.IsNullOrWhiteSpace(entry.ETag) || entry.ETag == "*")
@@ -158,9 +159,7 @@ internal partial class FirestoreReminderTable : IReminderTable
 
             LogRemoveRow(grainId, reminderName);
 
-            var result = await this._dataManager.DeleteEntity(FormatReminderId(reminderName, grainId), eTag).ConfigureAwait(false);
-
-            return result;
+            return await this._dataManager.DeleteEntity(FormatReminderId(reminderName, grainId), eTag).ConfigureAwait(false);
         }
         catch (FormatException)
         {
