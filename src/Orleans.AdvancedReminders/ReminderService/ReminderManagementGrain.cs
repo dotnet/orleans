@@ -386,7 +386,7 @@ public sealed class ReminderManagementGrain(
         {
             var payload = string.Create(
                 CultureInfo.InvariantCulture,
-                $"2\n{bucket}\n{entry.GrainId}\n{entry.ReminderName}");
+                $"3\n{bucket}\n{Convert.ToBase64String(Encoding.UTF8.GetBytes(entry.GrainId.ToString()))}\n{Convert.ToBase64String(Encoding.UTF8.GetBytes(entry.ReminderName))}");
             return Convert.ToBase64String(Encoding.UTF8.GetBytes(payload));
         }
 
@@ -401,7 +401,7 @@ public sealed class ReminderManagementGrain(
             {
                 var payload = Encoding.UTF8.GetString(Convert.FromBase64String(continuationToken));
                 var parts = payload.Split('\n', 4);
-                if (parts.Length != 4 || parts[0] != "2")
+                if (parts.Length != 4 || parts[0] != "3")
                 {
                     throw new FormatException("Continuation token payload is incomplete.");
                 }
@@ -413,15 +413,17 @@ public sealed class ReminderManagementGrain(
                     throw new FormatException("Continuation token scan bucket is invalid.");
                 }
 
-                if (string.IsNullOrEmpty(parts[2]) || string.IsNullOrEmpty(parts[3]))
+                var grainId = Encoding.UTF8.GetString(Convert.FromBase64String(parts[2]));
+                var reminderName = Encoding.UTF8.GetString(Convert.FromBase64String(parts[3]));
+                if (string.IsNullOrEmpty(grainId) || string.IsNullOrEmpty(reminderName))
                 {
                     throw new FormatException("Continuation token identity is invalid.");
                 }
 
                 return new ReminderCursor(
                     bucket,
-                    GrainId.Parse(parts[2]),
-                    parts[3]);
+                    GrainId.Parse(grainId),
+                    reminderName);
             }
             catch (Exception exception) when (exception is FormatException or ArgumentException)
             {

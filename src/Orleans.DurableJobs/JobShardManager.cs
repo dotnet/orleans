@@ -19,6 +19,8 @@ public abstract class JobShardManager
     /// </summary>
     protected SiloAddress SiloAddress { get; }
 
+    internal virtual bool HasMoreCatalogWork => false;
+
     /// <summary>
     /// Initializes a new instance of the <see cref="JobShardManager"/> class.
     /// </summary>

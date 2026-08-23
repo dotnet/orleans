@@ -563,6 +563,11 @@ internal partial class LocalDurableJobManager : SystemTarget, ILocalDurableJobMa
             _totalClaimedShards += newClaimsThisCycle;
             LogOrphanedShardsClaimed(_logger, newClaimsThisCycle, _totalClaimedShards);
         }
+
+        if (_shardManager.HasMoreCatalogWork)
+        {
+            _shardCheckSignals.Writer.TryWrite(true);
+        }
     }
 
     /// <summary>

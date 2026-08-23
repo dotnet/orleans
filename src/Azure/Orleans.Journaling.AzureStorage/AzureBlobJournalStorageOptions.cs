@@ -25,7 +25,7 @@ public sealed class AzureBlobJournalStorageOptions
     /// </summary>
     public Func<JournalId, string> GetWalBlobName { get; set; } = DefaultGetWalBlobName;
 
-    private static readonly Func<JournalId, string> DefaultGetWalBlobName =
+    internal static readonly Func<JournalId, string> DefaultGetWalBlobName =
         static journalId => GetDefaultWalBlobName(journalId);
 
     /// <summary>

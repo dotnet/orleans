@@ -356,6 +356,35 @@ public class ReminderManagementGrainTests
     }
 
     [Fact]
+    public async Task ListAllAsync_ContinuationPreservesEmbeddedNewlines()
+    {
+        var grainId = GrainId.Create("test", "grain\nkey");
+        var table = new InMemoryManagementReminderTable(
+            new ReminderEntry
+            {
+                GrainId = grainId,
+                ReminderName = "reminder\none",
+                StartAt = DateTime.UtcNow,
+                Period = TimeSpan.FromMinutes(1),
+            },
+            new ReminderEntry
+            {
+                GrainId = grainId,
+                ReminderName = "reminder\ntwo",
+                StartAt = DateTime.UtcNow,
+                Period = TimeSpan.FromMinutes(1),
+            });
+        var grain = new ReminderManagementGrain(table);
+
+        var first = await grain.ListAllAsync(pageSize: 1);
+        var second = await grain.ListAllAsync(pageSize: 1, first.ContinuationToken);
+
+        Assert.Equal("reminder\none", Assert.Single(first.Reminders).ReminderName);
+        Assert.Equal("reminder\ntwo", Assert.Single(second.Reminders).ReminderName);
+        Assert.Null(second.ContinuationToken);
+    }
+
+    [Fact]
     public async Task ListFilteredAsync_AppliesPriorityScheduleAndStatus()
     {
         var now = DateTime.UtcNow;

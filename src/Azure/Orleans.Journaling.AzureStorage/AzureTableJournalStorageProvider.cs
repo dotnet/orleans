@@ -7,7 +7,7 @@ using Orleans.Runtime;
 
 namespace Orleans.Journaling;
 
-internal sealed class AzureTableJournalStorageProvider : ILifecycleParticipant<ISiloLifecycle>, IJournalStorageProvider, IJournalStorageCatalog
+internal sealed class AzureTableJournalStorageProvider : ILifecycleParticipant<ISiloLifecycle>, IJournalStorageProvider, IJournalStorageCatalog, IPagedJournalStorageCatalog
 {
     private static readonly string[] JournalIdSelect = [AzureTableJournalStorage.JournalIdPropertyName];
 
@@ -76,6 +76,40 @@ internal sealed class AzureTableJournalStorageProvider : ILifecycleParticipant<I
             cancellationToken.ThrowIfCancellationRequested();
             yield return journalId;
         }
+    }
+
+    async ValueTask<JournalStorageCatalogPage> IPagedJournalStorageCatalog.ReadPageAsync(
+        JournalId prefix,
+        int pageSize,
+        string? continuationToken,
+        CancellationToken cancellationToken)
+    {
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(pageSize);
+        var table = _tableClientProvider.GetTableClient();
+        var filter = TableClient.CreateQueryFilter($"RowKey eq {AzureTableJournalStorage.HeaderRowKey}");
+        await foreach (var page in table.QueryAsync<TableEntity>(
+            filter,
+            maxPerPage: pageSize,
+            select: JournalIdSelect,
+            cancellationToken: cancellationToken).AsPages(continuationToken, pageSize))
+        {
+            var journalIds = new List<JournalId>(page.Values.Count);
+            foreach (var entity in page.Values)
+            {
+                if (TryGetJournalId(entity, out var journalId) && prefix.IsPrefixOf(journalId))
+                {
+                    journalIds.Add(journalId);
+                }
+            }
+
+            return new JournalStorageCatalogPage
+            {
+                JournalIds = journalIds,
+                ContinuationToken = page.ContinuationToken,
+            };
+        }
+
+        return new JournalStorageCatalogPage { JournalIds = [] };
     }
 
     private static bool TryGetJournalId(TableEntity entity, out JournalId journalId)

@@ -150,7 +150,7 @@ internal sealed class AdvancedReminderService : IReminderService, IAttributeRemi
         await PersistAndScheduleCoreAsync(entry, cancellationToken);
         if (previous is not null)
         {
-            await CancelScheduledJobAsync(previous, cancellationToken);
+            await CancelScheduledJobAsync(previous);
         }
 
         return entry.ToIGrainReminder();
@@ -178,7 +178,7 @@ internal sealed class AdvancedReminderService : IReminderService, IAttributeRemi
         await PersistAndScheduleCoreAsync(entry, cancellationToken);
         if (previous is not null)
         {
-            await CancelScheduledJobAsync(previous, cancellationToken);
+            await CancelScheduledJobAsync(previous);
         }
 
         return entry.ToIGrainReminder();
@@ -196,7 +196,7 @@ internal sealed class AdvancedReminderService : IReminderService, IAttributeRemi
         await PersistAndScheduleCoreAsync(entry, cancellationToken);
         if (previous is not null)
         {
-            await CancelScheduledJobAsync(previous, cancellationToken);
+            await CancelScheduledJobAsync(previous);
         }
 
         return entry.ETag;
@@ -219,7 +219,7 @@ internal sealed class AdvancedReminderService : IReminderService, IAttributeRemi
             throw new Runtime.ReminderException($"Could not unregister reminder {data} due to ETag mismatch.");
         }
 
-        await CancelScheduledJobAsync(current, cancellationToken);
+        await CancelScheduledJobAsync(current);
     }
 
     internal async Task ProcessDueReminderCoreAsync(
@@ -473,28 +473,40 @@ internal sealed class AdvancedReminderService : IReminderService, IAttributeRemi
         entry.ETag = await _reminderTable.UpsertRow(entry);
     }
 
-    private async Task CancelScheduledJobAsync(ReminderEntry entry, CancellationToken cancellationToken)
+    private async Task CancelScheduledJobAsync(ReminderEntry entry)
     {
         if (string.IsNullOrEmpty(entry.JobId) || string.IsNullOrEmpty(entry.JobShardId))
         {
             return;
         }
 
-        var canceled = await _jobManager.TryCancelDurableJobAsync(
-            new DurableJob
-            {
-                Id = entry.JobId,
-                Name = string.Concat(JobNamePrefix, entry.ReminderName),
-                ShardId = entry.JobShardId,
-                DueTime = new DateTimeOffset(entry.NextDueUtc ?? entry.StartAt, TimeSpan.Zero),
-                TargetGrainId = GetDispatcher(entry.GrainId).GetGrainId(),
-            },
-            cancellationToken);
+        try
+        {
+            var canceled = await _jobManager.TryCancelDurableJobAsync(
+                new DurableJob
+                {
+                    Id = entry.JobId,
+                    Name = string.Concat(JobNamePrefix, entry.ReminderName),
+                    ShardId = entry.JobShardId,
+                    DueTime = new DateTimeOffset(entry.NextDueUtc ?? entry.StartAt, TimeSpan.Zero),
+                    TargetGrainId = GetDispatcher(entry.GrainId).GetGrainId(),
+                },
+                CancellationToken.None);
 
-        if (!canceled)
+            if (!canceled)
+            {
+                _logger.LogWarning(
+                    "Durable job {JobId} for reminder {ReminderName} on grain {GrainId} could not be canceled. The stale job will be ignored by its schedule id.",
+                    entry.JobId,
+                    entry.ReminderName,
+                    entry.GrainId);
+            }
+        }
+        catch (Exception exception)
         {
             _logger.LogWarning(
-                "Durable job {JobId} for reminder {ReminderName} on grain {GrainId} could not be canceled. The stale job will be ignored by its schedule id.",
+                exception,
+                "Durable job {JobId} for reminder {ReminderName} on grain {GrainId} could not be canceled after the reminder mutation committed. The stale job will be ignored by its schedule id.",
                 entry.JobId,
                 entry.ReminderName,
                 entry.GrainId);

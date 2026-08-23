@@ -2012,6 +2012,60 @@ public class AdvancedReminderServiceTests
     }
 
     [Fact]
+    public async Task ReconcileAttributeReminder_WhenObsoleteJobCancellationThrows_CommitsReplacement()
+    {
+        var timeProvider = new FakeTimeProvider(new DateTimeOffset(2026, 8, 16, 11, 0, 0, TimeSpan.Zero));
+        var grainId = GrainId.Create("test", "attribute-update-cancel-failure");
+        var reminderTable = new MutableReminderTable(current: null);
+        var dispatcher = CreateDispatcherGrain(GrainId.Create("sys", "attribute-update-cancel-failure-dispatcher"));
+        var grainFactory = Substitute.For<IGrainFactory>();
+        grainFactory.GetGrain<IAdvancedReminderDispatcherGrain>(grainId.ToString(), null).Returns(dispatcher);
+        var jobManager = Substitute.For<ILocalDurableJobManager>();
+        jobManager.ScheduleJobAsync(Arg.Any<ScheduleJobRequest>(), Arg.Any<CancellationToken>())
+            .Returns(callInfo => Task.FromResult(CreateDurableJob(callInfo.Arg<ScheduleJobRequest>())));
+        jobManager.TryCancelDurableJobAsync(Arg.Any<DurableJob>(), Arg.Any<CancellationToken>())
+            .Returns(Task.FromException<bool>(new InvalidOperationException("Cancellation failed.")));
+        var service = CreateService(
+            reminderTable,
+            jobManager: jobManager,
+            grainFactory: grainFactory,
+            timeProvider: timeProvider);
+        dispatcher.Service = service;
+        var originalSchedule = ReminderSchedule.Interval(TimeSpan.FromMinutes(30), TimeSpan.FromMinutes(30));
+
+        await service.ReconcileReminder(
+            grainId,
+            "changed-attribute",
+            originalSchedule,
+            DurableJobPriority.Normal,
+            MissedReminderAction.Skip,
+            AttributeReminderRegistration.GetDeclarationId(
+                originalSchedule,
+                DurableJobPriority.Normal,
+                MissedReminderAction.Skip));
+        var original = await reminderTable.ReadRow(grainId, "changed-attribute");
+        Assert.NotNull(original);
+        var changedSchedule = ReminderSchedule.Interval(TimeSpan.FromMinutes(40), TimeSpan.FromHours(1));
+
+        await service.ReconcileReminder(
+            grainId,
+            "changed-attribute",
+            changedSchedule,
+            DurableJobPriority.High,
+            MissedReminderAction.FireImmediately,
+            AttributeReminderRegistration.GetDeclarationId(
+                changedSchedule,
+                DurableJobPriority.High,
+                MissedReminderAction.FireImmediately));
+
+        var updated = await reminderTable.ReadRow(grainId, "changed-attribute");
+        Assert.NotNull(updated);
+        Assert.Equal(TimeSpan.FromHours(1), updated.Period);
+        Assert.NotEqual(original.ScheduleId, updated.ScheduleId);
+        Assert.NotEqual(original.JobId, updated.JobId);
+    }
+
+    [Fact]
     public async Task SchedulingFailure_LeavesPendingRowWhichReconciliationRepairsIdempotently()
     {
         var now = DateTime.UtcNow;

@@ -348,7 +348,7 @@ public class PaymentProcessorGrain : Grain, IDurableJobHandler
 ```csharp
 public class WorkflowGrain : Grain, IDurableJobHandler
 {
-    private readonly Dictionary<string, TaskCompletionSource> _pendingJobs = new();
+    private readonly ConcurrentDictionary<string, TaskCompletionSource> _pendingJobs = new();
 
     public async Task<DurableJob> ScheduleWorkflowStep(string stepName, DateTimeOffset executeAt)
     {

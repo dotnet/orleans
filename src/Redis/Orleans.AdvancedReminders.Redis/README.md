@@ -96,9 +96,7 @@ You can configure Orleans Redis advanced reminders using `Microsoft.Extensions.C
     "ServiceId": "MyOrleansService",
     "AdvancedReminders": {
       "ProviderType": "Redis",
-      "ServiceKey": "redis",
-      "Database": 0,
-      "KeyPrefix": "reminder-"
+      "ConnectionName": "redis"
     }
   }
 }

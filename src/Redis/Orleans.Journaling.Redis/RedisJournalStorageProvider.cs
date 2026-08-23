@@ -1,4 +1,6 @@
+using System.Globalization;
 using System.Runtime.CompilerServices;
+using System.Text;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration;
 using Orleans.Runtime;
@@ -6,7 +8,7 @@ using StackExchange.Redis;
 
 namespace Orleans.Journaling;
 
-internal sealed class RedisJournalStorageProvider : IJournalStorageProvider, IJournalStorageCatalog, ILifecycleParticipant<ISiloLifecycle>
+internal sealed class RedisJournalStorageProvider : IJournalStorageProvider, IJournalStorageCatalog, IPagedJournalStorageCatalog, ILifecycleParticipant<ISiloLifecycle>
 {
     private const int JournalIdReadBatchSize = 128;
     private const int ScanPageSize = 250;
@@ -153,6 +155,175 @@ internal sealed class RedisJournalStorageProvider : IJournalStorageProvider, IJo
         {
             cancellationToken.ThrowIfCancellationRequested();
             yield return journalId;
+        }
+    }
+
+    async ValueTask<JournalStorageCatalogPage> IPagedJournalStorageCatalog.ReadPageAsync(
+        JournalId prefix,
+        int pageSize,
+        string? continuationToken,
+        CancellationToken cancellationToken)
+    {
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(pageSize);
+        var connection = GetConnection();
+        var database = GetDatabase();
+        var servers = connection.GetEndPoints()
+            .OrderBy(static endpoint => endpoint.ToString(), StringComparer.Ordinal)
+            .Select(endpoint => connection.GetServer(endpoint))
+            .Where(static server => !server.IsReplica)
+            .ToArray();
+        if (servers.Length == 0)
+        {
+            throw new InvalidOperationException("No Redis primary servers are available for journal discovery.");
+        }
+
+        foreach (var server in servers)
+        {
+            if (!server.IsConnected)
+            {
+                throw new InvalidOperationException(
+                    $"Redis primary server '{server.EndPoint}' is not connected, so journal discovery cannot produce a complete result.");
+            }
+        }
+
+        var (serverIndex, cursor, pageOffset) = ParseContinuationToken(continuationToken);
+        if ((uint)serverIndex >= (uint)servers.Length)
+        {
+            throw new ArgumentException("The Redis journal catalog continuation token is invalid.", nameof(continuationToken));
+        }
+
+        var pattern = RedisJournalStorage.GetMetadataKeyPattern(_keyPrefix);
+        for (; serverIndex < servers.Length; serverIndex++, cursor = 0, pageOffset = 0)
+        {
+            var enumerable = servers[serverIndex].KeysAsync(
+                database.Database,
+                pattern,
+                pageSize: ScanPageSize,
+                cursor,
+                pageOffset);
+            await using var enumerator = enumerable.GetAsyncEnumerator(cancellationToken);
+            var scanningCursor = enumerator as IScanningCursor
+                ?? throw new InvalidOperationException("The Redis journal catalog scan does not expose a resumable cursor.");
+            var metadataKeys = new List<RedisKey>(pageSize);
+            while (metadataKeys.Count < pageSize && await enumerator.MoveNextAsync())
+            {
+                metadataKeys.Add(enumerator.Current);
+            }
+
+            if (metadataKeys.Count == 0)
+            {
+                continue;
+            }
+
+            var journalIds = await ReadJournalIdsAsync(database, metadataKeys, prefix, cancellationToken);
+            var nextToken = metadataKeys.Count == pageSize
+                ? CreateContinuationToken(serverIndex, scanningCursor.Cursor, checked(scanningCursor.PageOffset + 1))
+                : serverIndex + 1 < servers.Length
+                    ? CreateContinuationToken(serverIndex + 1, 0, 0)
+                    : null;
+            return new JournalStorageCatalogPage
+            {
+                JournalIds = journalIds,
+                ContinuationToken = nextToken,
+            };
+        }
+
+        return new JournalStorageCatalogPage { JournalIds = [] };
+    }
+
+    private async Task<List<JournalId>> ReadJournalIdsAsync(
+        IDatabase database,
+        List<RedisKey> metadataKeys,
+        JournalId prefix,
+        CancellationToken cancellationToken)
+    {
+        var journalIds = new List<JournalId>(metadataKeys.Count);
+        foreach (var batch in metadataKeys.Chunk(JournalIdReadBatchSize))
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            var reads = new Task<RedisValue>[batch.Length];
+            for (var i = 0; i < batch.Length; i++)
+            {
+                reads[i] = database.HashGetAsync(batch[i], RedisJournalStorage.JournalIdMetadataKey);
+            }
+
+            var values = await Task.WhenAll(reads).ConfigureAwait(false);
+            for (var i = 0; i < values.Length; i++)
+            {
+                var value = values[i];
+                if (value.IsNullOrEmpty)
+                {
+                    var result = (RedisResult[]?)await database.ScriptEvaluateAsync(
+                        ReadJournalIdScript,
+                        [batch[i]],
+                        NoValues).ConfigureAwait(false);
+                    if (result is not { Length: > 0 })
+                    {
+                        throw new InvalidOperationException("The Redis journal discovery script returned an invalid response.");
+                    }
+
+                    var status = (int)result[0];
+                    if (status == 0)
+                    {
+                        continue;
+                    }
+
+                    if (status != 1 || result.Length != 2)
+                    {
+                        throw new InvalidOperationException(
+                            $"Redis journal metadata '{batch[i]}' is missing '{RedisJournalStorage.JournalIdMetadataKey}'.");
+                    }
+
+                    value = (RedisValue)result[1];
+                }
+
+                if (!RedisJournalStorage.TryParseJournalId(value.ToString(), out var journalId))
+                {
+                    throw new InvalidOperationException(
+                        $"Redis journal metadata '{batch[i]}' contains an invalid '{RedisJournalStorage.JournalIdMetadataKey}' value.");
+                }
+
+                if (prefix.IsPrefixOf(journalId))
+                {
+                    journalIds.Add(journalId);
+                }
+            }
+        }
+
+        return journalIds;
+    }
+
+    private static string CreateContinuationToken(int serverIndex, long cursor, int pageOffset)
+        => Convert.ToBase64String(Encoding.UTF8.GetBytes(
+            string.Create(CultureInfo.InvariantCulture, $"{serverIndex}:{cursor}:{pageOffset}")));
+
+    private static (int ServerIndex, long Cursor, int PageOffset) ParseContinuationToken(string? continuationToken)
+    {
+        if (continuationToken is null)
+        {
+            return (0, 0, 0);
+        }
+
+        try
+        {
+            var value = Encoding.UTF8.GetString(Convert.FromBase64String(continuationToken));
+            var parts = value.Split(':');
+            if (parts.Length != 3
+                || !int.TryParse(parts[0], NumberStyles.None, CultureInfo.InvariantCulture, out var serverIndex)
+                || !long.TryParse(parts[1], NumberStyles.None, CultureInfo.InvariantCulture, out var cursor)
+                || !int.TryParse(parts[2], NumberStyles.None, CultureInfo.InvariantCulture, out var pageOffset)
+                || serverIndex < 0
+                || cursor < 0
+                || pageOffset < 0)
+            {
+                throw new FormatException();
+            }
+
+            return (serverIndex, cursor, pageOffset);
+        }
+        catch (FormatException exception)
+        {
+            throw new ArgumentException("The Redis journal catalog continuation token is invalid.", nameof(continuationToken), exception);
         }
     }
 

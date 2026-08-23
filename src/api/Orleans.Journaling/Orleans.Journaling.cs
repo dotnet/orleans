@@ -274,6 +274,11 @@ namespace Orleans.Journaling
         System.Collections.Generic.IAsyncEnumerable<JournalId> ListAsync(JournalId prefix = default, System.Threading.CancellationToken cancellationToken = default);
     }
 
+    public partial interface IPagedJournalStorageCatalog
+    {
+        System.Threading.Tasks.ValueTask<JournalStorageCatalogPage> ReadPageAsync(JournalId prefix, int pageSize, string? continuationToken = null, System.Threading.CancellationToken cancellationToken = default);
+    }
+
     public partial interface IJournalStorageConsumer
     {
         void Read(JournalBufferReader buffer, IJournalMetadata? metadata);
@@ -458,6 +463,15 @@ namespace Orleans.Journaling
         public readonly IJournaledState ResolveState(JournalStreamId streamId) { throw null; }
     }
 
+    public sealed partial class JournalStorageCatalogPage
+    {
+        public JournalStorageCatalogPage() { }
+
+        public string? ContinuationToken { get { throw null; } init { } }
+
+        public required System.Collections.Generic.IReadOnlyList<JournalId> JournalIds { get { throw null; } init { } }
+    }
+
     public static partial class JournalStorageConsumerExtensions
     {
         public static void Complete(this IJournalStorageConsumer consumer, IJournalMetadata? metadata) { }
@@ -532,7 +546,7 @@ namespace Orleans.Journaling
         public System.Threading.Tasks.ValueTask<IJournalMetadata?> UpdateMetadataAsync(System.Collections.Generic.IReadOnlyDictionary<string, string>? set = null, System.Collections.Generic.IEnumerable<string>? remove = null, string? expectedETag = null, System.Threading.CancellationToken cancellationToken = default) { throw null; }
     }
 
-    public sealed partial class VolatileJournalStorageProvider : IJournalStorageProvider, IJournalStorageCatalog
+    public sealed partial class VolatileJournalStorageProvider : IJournalStorageProvider, IJournalStorageCatalog, IPagedJournalStorageCatalog
     {
         public VolatileJournalStorageProvider() { }
 
@@ -541,6 +555,8 @@ namespace Orleans.Journaling
         public IJournalStorage CreateStorage(JournalId journalId) { throw null; }
 
         public System.Collections.Generic.IAsyncEnumerable<JournalId> ListAsync(JournalId prefix = default, System.Threading.CancellationToken cancellationToken = default) { throw null; }
+
+        public System.Threading.Tasks.ValueTask<JournalStorageCatalogPage> ReadPageAsync(JournalId prefix, int pageSize, string? continuationToken = null, System.Threading.CancellationToken cancellationToken = default) { throw null; }
     }
 }
 

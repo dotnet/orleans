@@ -8,8 +8,8 @@ namespace Orleans.AdvancedReminders;
 /// </summary>
 /// <remarks>
 /// Obtain the singleton grain reference using <see cref="ReminderManagementGrainExtensions.GetReminderManagementGrain(IGrainFactory)"/>.
-/// Paged methods return reminders in stable storage-hash-bucket order, then by due time, grain id,
-/// and reminder name within each bucket. They are not globally ordered by due time.
+/// Paged methods return reminders in stable storage-hash-bucket order, then by grain id and
+/// reminder name within each bucket.
 /// </remarks>
 public interface IReminderManagementGrain : IGrainWithIntegerKey
 {

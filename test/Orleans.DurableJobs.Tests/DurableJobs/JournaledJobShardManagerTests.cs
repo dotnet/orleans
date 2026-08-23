@@ -746,6 +746,47 @@ public class JournaledJobShardManagerTests
         }
     }
 
+    [Fact]
+    public async Task AssignJobShardsAsync_BoundsCatalogWorkAndResumes()
+    {
+        const int shardCount = 300;
+        var storageProvider = new CountingJournalStorageProvider(delayAppends: false);
+        using var services = CreateServices(storageProvider);
+        var membership = new TestClusterMembershipService();
+        var silo1 = SiloAddress.New(new IPEndPoint(IPAddress.Loopback, 5080), 0);
+        var silo2 = SiloAddress.New(new IPEndPoint(IPAddress.Loopback, 5081), 0);
+        membership.SetSiloStatus(silo1, SiloStatus.Active);
+        membership.SetSiloStatus(silo2, SiloStatus.Active);
+        var manager1 = CreateManager(services, membership, silo1);
+        var manager2 = CreateManager(services, membership, silo2);
+        var start = DateTimeOffset.UtcNow.AddSeconds(-5);
+        for (var i = 0; i < shardCount; i++)
+        {
+            var shard = await manager1.CreateShardAsync(
+                start,
+                start.AddHours(1),
+                new Dictionary<string, string> { ["Index"] = i.ToString() },
+                CancellationToken.None);
+            await ScheduleJobAsync(shard, $"catalog-job-{i}");
+            await manager1.UnregisterShardAsync(shard, CancellationToken.None);
+        }
+
+        var firstPage = await manager2.AssignJobShardsAsync(DateTimeOffset.UtcNow.AddHours(1), int.MaxValue, CancellationToken.None);
+        var secondPage = await manager2.AssignJobShardsAsync(DateTimeOffset.UtcNow.AddHours(1), int.MaxValue, CancellationToken.None);
+
+        Assert.Equal(256, firstPage.Count);
+        Assert.Equal(shardCount, secondPage.Count);
+        Assert.Equal(
+            shardCount - firstPage.Count,
+            secondPage.Select(static shard => shard.Id).Except(firstPage.Select(static shard => shard.Id), StringComparer.Ordinal).Count());
+        Assert.Equal(2, storageProvider.PageReadCount);
+
+        foreach (var shard in secondPage)
+        {
+            await DrainAndUnregisterAsync(manager2, shard);
+        }
+    }
+
     private static ServiceProvider CreateServices(IJournalStorageProvider storageProvider)
     {
         var builder = new TestSiloBuilder();
@@ -774,7 +815,7 @@ public class JournaledJobShardManagerTests
         return listener;
     }
 
-    private sealed class CountingJournalStorageProvider : IJournalStorageProvider, IJournalStorageCatalog
+    private sealed class CountingJournalStorageProvider : IJournalStorageProvider, IJournalStorageCatalog, IPagedJournalStorageCatalog
     {
         private readonly VolatileJournalStorageProvider _inner = new();
         private readonly object _appendGate = new();
@@ -782,6 +823,7 @@ public class JournaledJobShardManagerTests
         private TaskCompletionSource _appendStarted = new(TaskCreationOptions.RunContinuationsAsynchronously);
         private TaskCompletionSource _allowAppends = new(TaskCreationOptions.RunContinuationsAsynchronously);
         private int _appendCount;
+        private int _pageReadCount;
 
         public CountingJournalStorageProvider(bool delayAppends)
         {
@@ -800,6 +842,8 @@ public class JournaledJobShardManagerTests
         }
 
         public int AppendCount => Volatile.Read(ref _appendCount);
+
+        public int PageReadCount => Volatile.Read(ref _pageReadCount);
 
         public void BlockAppends()
         {
@@ -824,6 +868,16 @@ public class JournaledJobShardManagerTests
 
         public IAsyncEnumerable<JournalId> ListAsync(JournalId prefix = default, CancellationToken cancellationToken = default)
             => _inner.ListAsync(prefix, cancellationToken);
+
+        public ValueTask<JournalStorageCatalogPage> ReadPageAsync(
+            JournalId prefix,
+            int pageSize,
+            string? continuationToken = null,
+            CancellationToken cancellationToken = default)
+        {
+            Interlocked.Increment(ref _pageReadCount);
+            return _inner.ReadPageAsync(prefix, pageSize, continuationToken, cancellationToken);
+        }
 
         private async ValueTask OnAppendAsync(CancellationToken cancellationToken)
         {

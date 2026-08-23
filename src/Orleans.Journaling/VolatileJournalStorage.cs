@@ -2,6 +2,7 @@ using System.Buffers;
 using System.Collections.Concurrent;
 using System.Globalization;
 using System.Runtime.CompilerServices;
+using System.Text;
 using Microsoft.Extensions.Options;
 using Orleans.Journaling.Json;
 
@@ -10,10 +11,12 @@ namespace Orleans.Journaling;
 /// <summary>
 /// Provides shared in-memory journal storage instances identified by journal id.
 /// </summary>
-public sealed class VolatileJournalStorageProvider : IJournalStorageProvider, IJournalStorageCatalog
+public sealed class VolatileJournalStorageProvider : IJournalStorageProvider, IJournalStorageCatalog, IPagedJournalStorageCatalog
 {
     private readonly IOptions<JournaledStateManagerOptions>? _options;
     private readonly ConcurrentDictionary<string, VolatileJournalStorage.Store> _storage = new(StringComparer.Ordinal);
+    private readonly SortedSet<string> _catalog = new(StringComparer.Ordinal);
+    private readonly object _catalogLock = new();
 
     /// <summary>
     /// Initializes a new instance of the <see cref="VolatileJournalStorageProvider"/> class using the default journal format.
@@ -42,7 +45,7 @@ public sealed class VolatileJournalStorageProvider : IJournalStorageProvider, IJ
 
         var journalFormatKey = GetJournalFormatKey();
         var store = _storage.GetOrAdd(journalId.Value, static key => new VolatileJournalStorage.Store(key));
-        return new VolatileJournalStorage(store, journalFormatKey);
+        return new VolatileJournalStorage(store, journalFormatKey, OnExistenceChanged);
     }
 
     /// <inheritdoc/>
@@ -81,8 +84,64 @@ public sealed class VolatileJournalStorageProvider : IJournalStorageProvider, IJ
         await Task.CompletedTask.ConfigureAwait(false);
     }
 
+    public ValueTask<JournalStorageCatalogPage> ReadPageAsync(
+        JournalId prefix,
+        int pageSize,
+        string? continuationToken = null,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(pageSize);
+        cancellationToken.ThrowIfCancellationRequested();
+        var cursor = continuationToken is null
+            ? null
+            : Encoding.UTF8.GetString(Convert.FromBase64String(continuationToken));
+        var journalIds = new List<JournalId>(pageSize);
+        string? nextToken = null;
+        lock (_catalogLock)
+        {
+            foreach (var value in _catalog)
+            {
+                if (cursor is not null && string.CompareOrdinal(value, cursor) <= 0
+                    || !TryParseJournalId(value, out var journalId)
+                    || !prefix.IsPrefixOf(journalId))
+                {
+                    continue;
+                }
+
+                if (journalIds.Count == pageSize)
+                {
+                    nextToken = Convert.ToBase64String(Encoding.UTF8.GetBytes(journalIds[^1].Value));
+                    break;
+                }
+
+                journalIds.Add(journalId);
+            }
+        }
+
+        return new(new JournalStorageCatalogPage
+        {
+            JournalIds = journalIds,
+            ContinuationToken = nextToken,
+        });
+    }
+
     private string GetJournalFormatKey()
         => JournalFormatServices.ValidateJournalFormatKey(_options?.Value.JournalFormatKey ?? JsonJournalExtensions.JournalFormatKey);
+
+    private void OnExistenceChanged(string storageId, bool exists)
+    {
+        lock (_catalogLock)
+        {
+            if (exists)
+            {
+                _catalog.Add(storageId);
+            }
+            else
+            {
+                _catalog.Remove(storageId);
+            }
+        }
+    }
 
     private static bool TryParseJournalId(string value, out JournalId journalId)
     {
@@ -105,12 +164,13 @@ public sealed class VolatileJournalStorageProvider : IJournalStorageProvider, IJ
 public sealed class VolatileJournalStorage : IJournalStorage
 {
     private readonly Store _store;
+    private readonly Action<string, bool>? _onExistenceChanged;
     private string? _configuredJournalFormatKey;
 
     /// <summary>
     /// Initializes a new isolated in-memory journal storage instance using the default journal format.
     /// </summary>
-    public VolatileJournalStorage() : this(new Store(CreateVolatileStorageId()), journalFormatKey: null)
+    public VolatileJournalStorage() : this(new Store(CreateVolatileStorageId()), journalFormatKey: null, onExistenceChanged: null)
     {
     }
 
@@ -118,14 +178,15 @@ public sealed class VolatileJournalStorage : IJournalStorage
     /// Initializes a new instance of the <see cref="VolatileJournalStorage"/> class.
     /// </summary>
     /// <param name="journalFormatKey">The journal format key to stamp on writes.</param>
-    public VolatileJournalStorage(string? journalFormatKey) : this(new Store(CreateVolatileStorageId()), journalFormatKey)
+    public VolatileJournalStorage(string? journalFormatKey) : this(new Store(CreateVolatileStorageId()), journalFormatKey, onExistenceChanged: null)
     {
     }
 
-    internal VolatileJournalStorage(Store store, string? journalFormatKey)
+    internal VolatileJournalStorage(Store store, string? journalFormatKey, Action<string, bool>? onExistenceChanged)
     {
         ArgumentNullException.ThrowIfNull(store);
         _store = store;
+        _onExistenceChanged = onExistenceChanged;
         SetConfiguredJournalFormatKey(journalFormatKey);
     }
 
@@ -182,8 +243,10 @@ public sealed class VolatileJournalStorage : IJournalStorage
             }
 
             _store.Create(values);
-            return new(true);
+            _onExistenceChanged?.Invoke(_store.StorageId, true);
         }
+
+        return new(true);
     }
 
     /// <inheritdoc/>
@@ -250,10 +313,15 @@ public sealed class VolatileJournalStorage : IJournalStorage
         cancellationToken.ThrowIfCancellationRequested();
         lock (_store.SyncRoot)
         {
+            var created = !_store.Exists;
             _store.Exists = true;
             _store.StoredJournalFormatKey = _configuredJournalFormatKey;
             _store.Segments.Add(segment.ToArray());
             _store.RefreshETag();
+            if (created)
+            {
+                _onExistenceChanged?.Invoke(_store.StorageId, true);
+            }
         }
 
         return default;
@@ -265,11 +333,16 @@ public sealed class VolatileJournalStorage : IJournalStorage
         cancellationToken.ThrowIfCancellationRequested();
         lock (_store.SyncRoot)
         {
+            var created = !_store.Exists;
             _store.Exists = true;
             _store.StoredJournalFormatKey = _configuredJournalFormatKey;
             _store.Segments.Clear();
             _store.Segments.Add(snapshot.ToArray());
             _store.RefreshETag();
+            if (created)
+            {
+                _onExistenceChanged?.Invoke(_store.StorageId, true);
+            }
         }
 
         return default;
@@ -281,7 +354,11 @@ public sealed class VolatileJournalStorage : IJournalStorage
         cancellationToken.ThrowIfCancellationRequested();
         lock (_store.SyncRoot)
         {
-            _store.Delete();
+            if (_store.Exists)
+            {
+                _store.Delete();
+                _onExistenceChanged?.Invoke(_store.StorageId, false);
+            }
         }
 
         return default;
@@ -291,6 +368,8 @@ public sealed class VolatileJournalStorage : IJournalStorage
 
     internal sealed class Store(string storageId)
     {
+        public string StorageId { get; } = storageId;
+
         public object SyncRoot { get; } = new();
 
         public List<byte[]> Segments { get; } = [];
@@ -367,7 +446,7 @@ public sealed class VolatileJournalStorage : IJournalStorage
             return ETag;
         }
 
-        public override string ToString() => storageId;
+        public override string ToString() => StorageId;
     }
 
     private static IReadOnlySet<string> CopyRemove(IEnumerable<string>? remove, IReadOnlyDictionary<string, string> set)
