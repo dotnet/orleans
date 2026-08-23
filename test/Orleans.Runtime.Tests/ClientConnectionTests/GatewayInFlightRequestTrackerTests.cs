@@ -172,6 +172,7 @@ public class GatewayInFlightRequestTrackerTests
         timeProvider.Advance(TimeSpan.FromSeconds(1));
         tracker.RemoveExpired();
         Assert.Equal(0, tracker.Count);
+        Assert.Null(tracker.RemoveForSilo(Silo1));
     }
 
     [Fact]
@@ -179,7 +180,8 @@ public class GatewayInFlightRequestTrackerTests
     {
         var timeProvider = new FakeTimeProvider();
         var tracker = CreateTracker(timeProvider, TimeSpan.FromSeconds(20));
-        Assert.True(tracker.Track(CreateMessage(1, Message.Directions.Request, Silo1)));
+        var request = CreateMessage(1, Message.Directions.Request, Silo1);
+        Assert.True(tracker.Track(request));
 
         timeProvider.Advance(TimeSpan.FromSeconds(19));
         tracker.RemoveExpired();
@@ -188,6 +190,85 @@ public class GatewayInFlightRequestTrackerTests
         timeProvider.Advance(TimeSpan.FromSeconds(1));
         tracker.RemoveExpired();
         Assert.Equal(0, tracker.Count);
+        Assert.Null(tracker.RemoveForSilo(Silo1));
+        Assert.False(tracker.TryRemove(request.Id, out _));
+    }
+
+    [Fact]
+    public void TtlLessRejectionNearFallbackRetentionDeadlineRemainsSendable()
+    {
+        AssertTtlLessRejectionRemainsSendable(TimeSpan.FromSeconds(19));
+    }
+
+    [Fact]
+    public void TtlLessRejectionAfterFallbackRetentionDeadlineRemainsSendableFromOutboundQueue()
+    {
+        AssertTtlLessRejectionRemainsSendable(TimeSpan.FromSeconds(21));
+    }
+
+    private static void AssertTtlLessRejectionRemainsSendable(TimeSpan elapsed)
+    {
+        var timeProvider = new FakeTimeProvider();
+        var tracker = CreateTracker(timeProvider, TimeSpan.FromSeconds(20));
+        var request = CreateMessage(1, Message.Directions.Request, Silo1);
+        Assert.Null(request.TimeToLive);
+        Assert.True(tracker.Track(request));
+
+        timeProvider.Advance(elapsed);
+        var removed = tracker.RemoveForSilo(Silo1);
+
+        var snapshot = Assert.Single(removed!);
+        Assert.Null(snapshot.TimeToLive);
+        var rejection = CreateResponse(snapshot, Message.ResponseTypes.Rejection);
+        Assert.Null(rejection.TimeToLive);
+        Assert.False(rejection.IsExpired);
+        Assert.Equal(0, tracker.Count);
+    }
+
+    [Fact]
+    public void ExplicitTimeToLivePreservesOnlyTheOriginalRemainingDeadline()
+    {
+        var timeProvider = new FakeTimeProvider();
+        var tracker = CreateTracker(timeProvider, TimeSpan.FromMinutes(1));
+        var request = CreateMessage(1, Message.Directions.Request, Silo1);
+        request.TimeToLive = TimeSpan.FromSeconds(10);
+        Assert.True(tracker.Track(request));
+
+        timeProvider.Advance(TimeSpan.FromSeconds(9));
+        var removed = tracker.RemoveForSilo(Silo1);
+
+        var snapshot = Assert.Single(removed!);
+        Assert.NotNull(snapshot.TimeToLive);
+        Assert.InRange(snapshot.TimeToLive.Value, TimeSpan.FromMilliseconds(900), TimeSpan.FromSeconds(1));
+        var rejection = CreateResponse(snapshot, Message.ResponseTypes.Rejection);
+        Assert.NotNull(rejection.TimeToLive);
+        Assert.Equal(0, tracker.Count);
+    }
+
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void CancellationResponseAndShutdownClearRaceLeavesTrackerEmpty(bool clearFirst)
+    {
+        var tracker = CreateTracker();
+        var request = CreateMessage(1, Message.Directions.Request, Silo1);
+        var response = CreateResponse(request, Message.ResponseTypes.Error);
+        response.BodyObject = new OperationCanceledException();
+        Assert.True(tracker.Track(request));
+
+        if (clearFirst)
+        {
+            tracker.Clear();
+            Assert.False(tracker.TryComplete(response));
+        }
+        else
+        {
+            Assert.True(tracker.TryComplete(response));
+            tracker.Clear();
+        }
+
+        Assert.Equal(0, tracker.Count);
+        Assert.Null(tracker.RemoveForSilo(Silo1));
     }
 
     [Fact]
@@ -242,6 +323,7 @@ public class GatewayInFlightRequestTrackerTests
             Id = request.Id,
             Direction = Message.Directions.Response,
             Result = responseType,
+            TimeToLive = request.TimeToLive,
         };
 
 }
