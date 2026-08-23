@@ -65,6 +65,32 @@ public sealed class SqlServerDbContextModelTests
     }
 
     [Fact]
+    public void ClusteringModel_SuspectListConverterAndComparer_HandleNullValues()
+    {
+        using var context = CreateContext(Feature.Clustering);
+        var silo = context.Model.FindEntityType(typeof(SiloRecord<byte[]>))!;
+
+        foreach (var propertyName in new[] { "SuspectingTimes", "SuspectingSilos" })
+        {
+            var property = silo.FindProperty(propertyName)!;
+            var converter = Assert.IsAssignableFrom<Microsoft.EntityFrameworkCore.Storage.ValueConversion.ValueConverter>(
+                property.GetValueConverter());
+            var comparer = Assert.IsAssignableFrom<Microsoft.EntityFrameworkCore.ChangeTracking.ValueComparer>(
+                property.GetValueComparer());
+
+            Assert.Null(converter.ConvertToProvider(null));
+            Assert.Null(converter.ConvertFromProvider(null));
+            Assert.True(comparer.Equals(null, null));
+            Assert.Equal(0, comparer.GetHashCode(null));
+            Assert.Null(comparer.Snapshot(null));
+            Assert.Empty(Assert.IsType<List<string>>(
+                converter.ConvertFromProviderExpression.Compile().DynamicInvoke(new object?[] { null })));
+            Assert.Empty(Assert.IsType<List<string>>(
+                comparer.SnapshotExpression.Compile().DynamicInvoke(new object?[] { null })));
+        }
+    }
+
+    [Fact]
     public void GrainDirectoryModel_RetainsKeyAndLookupIndexes()
     {
         using var context = CreateContext(Feature.GrainDirectory);

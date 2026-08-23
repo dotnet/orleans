@@ -32,15 +32,16 @@ public sealed class SqlServerClusterDbContext : ClusterDbContext<SqlServerCluste
                 .HasForeignKey(r => r.ClusterId);
         });
 
-        var listToStringConverter = new ValueConverter<List<string>, string>(
-            v => string.Join(",", v),
-            v => v.Split(new[] {','}, StringSplitOptions.RemoveEmptyEntries).ToList());
-
+        var listToStringConverter = new ValueConverter<List<string>, string?>(
+            value => value == null ? null : string.Join(",", value),
+            value => string.IsNullOrEmpty(value)
+                ? new List<string>()
+                : value.Split(new[] {','}, StringSplitOptions.RemoveEmptyEntries).ToList());
 
         var listComparer = new ValueComparer<List<string>>(
-            (c1, c2) => (c1 == null && c2 == null) || (c1 != null && c2 != null && c1.SequenceEqual(c2)),
-            c => c.Aggregate(0, (a, v) => HashCode.Combine(a, v.GetHashCode())),
-            c => new List<string>(c));
+            (left, right) => ReferenceEquals(left, right) || left != null && right != null && left.SequenceEqual(right),
+            value => value == null ? 0 : value.Aggregate(0, (hash, item) => HashCode.Combine(hash, item)),
+            value => value == null ? new List<string>() : value.ToList());
 
         modelBuilder.Entity<SiloRecord<byte[]>>(c =>
         {
