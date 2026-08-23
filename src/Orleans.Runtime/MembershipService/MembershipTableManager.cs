@@ -117,11 +117,15 @@ namespace Orleans.Runtime.MembershipService
             CancellationToken cancellationToken = default,
             bool requireFresh = false)
         {
+            cancellationToken.ThrowIfCancellationRequested();
+
             if (requireFresh)
             {
+                _shutdownCts.Token.ThrowIfCancellationRequested();
+
                 // A concurrent write which publishes a full view could also satisfy this fence. Issue an
                 // independent read here so that the operation makes progress without relying on other activity.
-                await RefreshInternal(requireCleanup: false).WaitAsync(cancellationToken);
+                await RefreshInternal(requireCleanup: false, _shutdownCts.Token).WaitAsync(cancellationToken);
                 if (!targetVersion.HasValue || this.MembershipTableSnapshot.Version >= targetVersion.Value)
                 {
                     return;
@@ -165,9 +169,11 @@ namespace Orleans.Runtime.MembershipService
             this.TryProcessMembershipUpdate(MembershipTableSnapshot.Update, snapshot, nameof(RefreshFromSnapshot));
         }
 
-        private async Task<bool> RefreshInternal(bool requireCleanup)
+        private async Task<bool> RefreshInternal(bool requireCleanup, CancellationToken cancellationToken = default)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             var table = await this.membershipTableProvider.ReadAll();
+            cancellationToken.ThrowIfCancellationRequested();
 
             bool success;
             try
@@ -182,6 +188,7 @@ namespace Orleans.Runtime.MembershipService
 
             // Publish after cleanup so that other components do not observe
             // predecessor entries that are about to be declared dead.
+            cancellationToken.ThrowIfCancellationRequested();
             this.ProcessTableUpdate(table, "Refresh");
 
             // If cleanup was not required then the cleanup result is ignored.
@@ -199,7 +206,7 @@ namespace Orleans.Runtime.MembershipService
 
                 // Perform an initial table read
                 var refreshed = await AsyncExecutorWithRetries.ExecuteWithRetries(
-                    function: _ => this.RefreshInternal(requireCleanup: true),
+                    function: _ => this.RefreshInternal(requireCleanup: true, _shutdownCts.Token),
                     maxNumSuccessTries: NUM_CONDITIONAL_WRITE_CONTENTION_ATTEMPTS,
                     maxNumErrorTries: NUM_CONDITIONAL_WRITE_ERROR_ATTEMPTS,
                     retryValueFilter: (value, i) => !value,
