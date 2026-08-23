@@ -255,8 +255,9 @@ namespace Orleans.Configuration
         /// </summary>
         public int? PrefetchCount { get; set; }
         /// <summary>
-        /// In cases where no checkpoint is found, this indicates if service should read from the most recent data, or from the beginning of a partition.
+        /// Selects the receiver position when a checkpoint is unavailable, including after recovery from an invalid persisted offset.
         /// </summary>
+        /// <value><see langword="true"/> starts at the partition tail and reads newly enqueued events; <see langword="false"/> starts at the earliest retained event.</value>
         public bool StartFromNow { get; set; } = DEFAULT_START_FROM_NOW;
         private const bool DEFAULT_START_FROM_NOW = true;
     }
