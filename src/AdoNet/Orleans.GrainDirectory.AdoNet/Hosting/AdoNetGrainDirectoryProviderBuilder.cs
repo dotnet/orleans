@@ -1,6 +1,12 @@
 using static System.String;
+using Orleans.GrainDirectory.AdoNet.Storage;
 
 [assembly: RegisterProvider("AdoNet", "GrainDirectory", "Silo", typeof(AdoNetGrainDirectoryProviderBuilder))]
+[assembly: RegisterProvider("SqlServerDatabase", "GrainDirectory", "Silo", typeof(AdoNetGrainDirectoryProviderBuilder))]
+[assembly: RegisterProvider("AzureSqlDatabase", "GrainDirectory", "Silo", typeof(AdoNetGrainDirectoryProviderBuilder))]
+[assembly: RegisterProvider("PostgresDatabase", "GrainDirectory", "Silo", typeof(AdoNetGrainDirectoryProviderBuilder))]
+[assembly: RegisterProvider("AzurePostgresFlexibleServerDatabase", "GrainDirectory", "Silo", typeof(AdoNetGrainDirectoryProviderBuilder))]
+[assembly: RegisterProvider("MySqlDatabase", "GrainDirectory", "Silo", typeof(AdoNetGrainDirectoryProviderBuilder))]
 
 namespace Orleans.Hosting;
 
@@ -10,25 +16,16 @@ internal sealed class AdoNetGrainDirectoryProviderBuilder : IProviderBuilder<ISi
     {
         builder.AddAdoNetGrainDirectory(name ?? "Default", optionsBuilder => optionsBuilder.Configure<IServiceProvider>((options, services) =>
         {
-            var invariant = configurationSection["Invariant"];
+            var invariant = AdoNetProviderConfiguration.GetInvariant(configurationSection);
             if (!IsNullOrWhiteSpace(invariant))
             {
                 options.Invariant = invariant;
             }
 
-            var connectionString = configurationSection["ConnectionString"];
-            var connectionName = configurationSection["ConnectionName"];
+            var connectionString = AdoNetProviderConfiguration.GetConnectionString(configurationSection, services);
             if (!IsNullOrWhiteSpace(connectionString))
             {
                 options.ConnectionString = connectionString;
-            }
-            else if (!IsNullOrWhiteSpace(connectionName))
-            {
-                connectionString = services.GetRequiredService<IConfiguration>().GetConnectionString(connectionName);
-                if (!IsNullOrWhiteSpace(connectionString))
-                {
-                    options.ConnectionString = connectionString;
-                }
             }
         }));
     }
