@@ -20,5 +20,3 @@ CREATE TABLE OrleansTransactionStateTable (
   Timestamp TIMESTAMP (6) DEFAULT sys_extract_utc(systimestamp) NOT NULL ENABLE,
   PRIMARY KEY (StateId, SequenceId)
 );
-
-CREATE INDEX IX_State_Seq ON OrleansTransactionStateTable (StateId, SequenceId);
