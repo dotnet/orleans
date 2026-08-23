@@ -273,6 +273,83 @@ public sealed class SlowStartTests
     [TestSuite("BVT")]
     [TestProvider("None")]
     [Fact]
+    public async Task SlowStart_DoesNotRampBeforeDeliveryStarts()
+    {
+        var clock = new FakeTimeProvider(DateTimeOffset.UtcNow);
+        var config = new ReminderThrottleConfigBuilder()
+            .MaxConcurrent(4, ThrottleBlockMode.Wait)
+            .SlowStart(initialCapacity: 1, interval: TimeSpan.FromSeconds(1), onCapacityExceeded: ThrottleBlockMode.SkipImmediately)
+            .Build();
+        await using var throttle = new TestThrottle(config, clock, start: false);
+
+        clock.Advance(TimeSpan.FromMinutes(1));
+        Assert.Equal(1, throttle.SlowStartCurrentCapacity);
+
+        throttle.Start();
+        var first = await throttle.AcquireAsync(TestContext.Default(), CancellationToken.None);
+        var second = await throttle.AcquireAsync(TestContext.Default(), CancellationToken.None);
+        Assert.Equal(ReminderAdmissionOutcome.Admitted, first.Outcome);
+        Assert.Equal(ReminderAdmissionOutcome.Skipped, second.Outcome);
+        Assert.Equal(ReminderSkipReason.SlowStartLimited, second.SkipReason);
+        first.Dispose();
+
+        clock.Advance(TimeSpan.FromSeconds(1));
+        await WaitForCapacityAsync(throttle, expected: 2);
+    }
+
+    [TestSuite("BVT")]
+    [TestProvider("None")]
+    [Fact]
+    public async Task SlowStart_DirectConstructionStartsImmediately()
+    {
+        var clock = new FakeTimeProvider(DateTimeOffset.UtcNow);
+        var config = new ReminderThrottleConfigBuilder()
+            .MaxConcurrent(4, ThrottleBlockMode.Wait)
+            .SlowStart(initialCapacity: 1, interval: TimeSpan.FromSeconds(1), onCapacityExceeded: ThrottleBlockMode.SkipImmediately)
+            .Build();
+        using var throttle = new LocalReminderDeliveryThrottle(config, clock, "test");
+
+        clock.Advance(TimeSpan.FromSeconds(1));
+        var deadline = DateTime.UtcNow + TimeSpan.FromSeconds(2);
+        while (throttle.SlowStartCurrentCapacity != 2 && DateTime.UtcNow < deadline)
+        {
+            await Task.Delay(10);
+        }
+
+        Assert.Equal(2, throttle.SlowStartCurrentCapacity);
+    }
+
+    [TestSuite("BVT")]
+    [TestProvider("None")]
+    [Fact]
+    public async Task SlowStart_StopAndRestart_ResetRamp()
+    {
+        var clock = new FakeTimeProvider(DateTimeOffset.UtcNow);
+        var config = new ReminderThrottleConfigBuilder()
+            .MaxConcurrent(4, ThrottleBlockMode.Wait)
+            .SlowStart(initialCapacity: 1, interval: TimeSpan.FromSeconds(1), onCapacityExceeded: ThrottleBlockMode.SkipImmediately)
+            .Build();
+        await using var throttle = new TestThrottle(config, clock);
+
+        clock.Advance(TimeSpan.FromSeconds(1));
+        await WaitForCapacityAsync(throttle, expected: 2);
+        clock.Advance(TimeSpan.FromSeconds(1));
+        await WaitForCapacityAsync(throttle, expected: 4);
+
+        throttle.Stop();
+        Assert.Equal(1, throttle.SlowStartCurrentCapacity);
+        clock.Advance(TimeSpan.FromMinutes(1));
+        Assert.Equal(1, throttle.SlowStartCurrentCapacity);
+
+        throttle.Start();
+        Assert.Equal(1, throttle.SlowStartCurrentCapacity);
+        clock.Advance(TimeSpan.FromSeconds(1));
+        await WaitForCapacityAsync(throttle, expected: 2);
+    }
+
+    [TestSuite("BVT")]
+    [TestProvider("None")]
+    [Fact]
     public async Task SlowStart_StopsApplyingItsBlockModeAtTargetCapacity()
     {
         var clock = new FakeTimeProvider(DateTimeOffset.UtcNow);

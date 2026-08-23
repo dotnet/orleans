@@ -70,7 +70,12 @@ public static class SiloBuilderReminderConcurrencyExtensions
                                 "RespectOverload configuration.");
                     }
 
-                    return new LocalReminderDeliveryThrottle(perSilo, timeProvider, tierName: "per-silo", overloadDetector);
+                    return new LocalReminderDeliveryThrottle(
+                        perSilo,
+                        timeProvider,
+                        tierName: "per-silo",
+                        overloadDetector,
+                        startImmediately: false);
                 }
 
                 throw new OrleansConfigurationException(

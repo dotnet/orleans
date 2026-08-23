@@ -7,6 +7,8 @@ namespace Orleans.Reminders.Concurrency;
 
 internal interface IReminderAdmissionGate : IDisposable
 {
+    ThrottleBlockMode BlockMode { get; }
+
     ValueTask<GateAcquireResult> AcquireAsync(ReminderDeliveryContext context, ReminderAcquireBudget budget, CancellationToken cancellationToken);
 }
 
@@ -14,22 +16,206 @@ internal readonly struct GateAcquireResult
 {
     public static readonly GateAcquireResult Admitted = new(true, default, null);
 
-    private GateAcquireResult(bool admitted, ReminderSkipReason skipReason, Action? releaseAction)
+    private GateAcquireResult(bool admitted, ReminderSkipReason skipReason, ReminderAdmissionReservation? reservation)
     {
         AdmittedLease = admitted;
         SkipReason = skipReason;
-        ReleaseAction = releaseAction;
+        Reservation = reservation;
     }
 
     public bool AdmittedLease { get; }
 
     public ReminderSkipReason SkipReason { get; }
 
-    public Action? ReleaseAction { get; }
+    public ReminderAdmissionReservation? Reservation { get; }
 
-    public static GateAcquireResult AdmittedWithRelease(Action releaseAction) => new(true, default, releaseAction);
+    public static GateAcquireResult Reserved(ReminderAdmissionReservation reservation) => new(true, default, reservation);
 
     public static GateAcquireResult Skipped(ReminderSkipReason reason) => new(false, reason, null);
+}
+
+internal abstract class ReminderAdmissionReservation
+{
+    private const int Pending = 0;
+    private const int Committed = 1;
+    private const int RolledBack = 2;
+    private int _state;
+
+    public Action? Commit()
+    {
+        if (Interlocked.CompareExchange(ref _state, Committed, Pending) != Pending)
+        {
+            throw new InvalidOperationException("The reminder admission reservation is no longer pending.");
+        }
+
+        return CommitCore();
+    }
+
+    public void Rollback()
+    {
+        if (Interlocked.CompareExchange(ref _state, RolledBack, Pending) == Pending)
+        {
+            RollbackCore();
+        }
+    }
+
+    protected abstract Action? CommitCore();
+
+    protected abstract void RollbackCore();
+}
+
+internal sealed class CallbackReminderAdmissionReservation(
+    Action rollback,
+    Action? releaseAfterCommit,
+    Action? commit = null) : ReminderAdmissionReservation
+{
+    protected override Action? CommitCore()
+    {
+        commit?.Invoke();
+        return releaseAfterCommit;
+    }
+
+    protected override void RollbackCore() => rollback();
+}
+
+internal enum ReminderAdmissionCommitOutcome
+{
+    Committed,
+    Cancelled,
+    TimedOut,
+}
+
+internal sealed class ReminderAdmissionTransaction : IDisposable
+{
+    private const int Pending = 0;
+    private const int Committed = 1;
+    private const int RolledBack = 2;
+    private readonly object _lock = new();
+    private readonly CancellationTokenRegistration _cancellationRegistration;
+    private List<ReminderAdmissionReservation>? _reservations;
+    private int _state;
+
+    public ReminderAdmissionTransaction(CancellationToken cancellationToken)
+    {
+        _cancellationRegistration = cancellationToken.UnsafeRegister(
+            static state => ((ReminderAdmissionTransaction)state!).Rollback(),
+            this);
+    }
+
+    public bool TryAdd(ReminderAdmissionReservation? reservation)
+    {
+        lock (_lock)
+        {
+            if (_state == Pending)
+            {
+                if (reservation is not null)
+                {
+                    _reservations ??= new List<ReminderAdmissionReservation>(capacity: 3);
+                    _reservations.Add(reservation);
+                }
+
+                return true;
+            }
+        }
+
+        reservation?.Rollback();
+        return false;
+    }
+
+    public ReminderAdmissionCommitOutcome TryCommit(
+        ReminderAcquireBudget budget,
+        CancellationToken cancellationToken,
+        out List<Action>? releaseActions)
+    {
+        List<ReminderAdmissionReservation>? reservationsToRollback = null;
+        ReminderAdmissionCommitOutcome outcome;
+        releaseActions = null;
+
+        lock (_lock)
+        {
+            if (_state != Pending || cancellationToken.IsCancellationRequested)
+            {
+                if (_state == Pending)
+                {
+                    _state = RolledBack;
+                    reservationsToRollback = TakeReservations();
+                }
+
+                outcome = ReminderAdmissionCommitOutcome.Cancelled;
+            }
+            else if (budget.IsTimedOut)
+            {
+                _state = RolledBack;
+                reservationsToRollback = TakeReservations();
+                outcome = ReminderAdmissionCommitOutcome.TimedOut;
+            }
+            else
+            {
+                _state = Committed;
+                if (_reservations is { Count: > 0 } reservations)
+                {
+                    foreach (var reservation in reservations)
+                    {
+                        if (reservation.Commit() is { } releaseAction)
+                        {
+                            releaseActions ??= new List<Action>(capacity: reservations.Count);
+                            releaseActions.Add(releaseAction);
+                        }
+                    }
+
+                    _reservations = null;
+                }
+
+                outcome = ReminderAdmissionCommitOutcome.Committed;
+            }
+        }
+
+        Rollback(reservationsToRollback);
+        return outcome;
+    }
+
+    public void Rollback()
+    {
+        List<ReminderAdmissionReservation>? reservations;
+        lock (_lock)
+        {
+            if (_state != Pending)
+            {
+                return;
+            }
+
+            _state = RolledBack;
+            reservations = TakeReservations();
+        }
+
+        Rollback(reservations);
+    }
+
+    public void Dispose()
+    {
+        _cancellationRegistration.Dispose();
+        Rollback();
+    }
+
+    private List<ReminderAdmissionReservation>? TakeReservations()
+    {
+        var result = _reservations;
+        _reservations = null;
+        return result;
+    }
+
+    private static void Rollback(List<ReminderAdmissionReservation>? reservations)
+    {
+        if (reservations is null)
+        {
+            return;
+        }
+
+        for (var i = reservations.Count - 1; i >= 0; i--)
+        {
+            reservations[i].Rollback();
+        }
+    }
 }
 
 internal readonly struct ReminderWaitBudget
@@ -51,13 +237,16 @@ internal sealed class ReminderAcquireBudget
     private readonly long _startTimestamp;
     private TimeSpan? _sharedDeadlineFromStart;
 
-    public ReminderAcquireBudget(TimeProvider timeProvider)
+    public ReminderAcquireBudget(TimeProvider timeProvider, TimeSpan? timeout)
     {
         _timeProvider = timeProvider;
         _startTimestamp = timeProvider.GetTimestamp();
+        _sharedDeadlineFromStart = timeout;
     }
 
     public TimeSpan Elapsed => _timeProvider.GetElapsedTime(_startTimestamp);
+
+    public bool IsTimedOut => GetRemainingWaitBudget().TimedOut;
 
     public ReminderWaitBudget GetWaitBudget(ThrottleBlockMode blockMode)
     {
@@ -119,6 +308,8 @@ internal sealed class OverloadReminderAdmissionGate : IReminderAdmissionGate
         _overloadDetector = overloadDetector;
     }
 
+    public ThrottleBlockMode BlockMode => _config.BlockMode;
+
     public async ValueTask<GateAcquireResult> AcquireAsync(ReminderDeliveryContext context, ReminderAcquireBudget budget, CancellationToken cancellationToken)
     {
         _ = context;
@@ -164,26 +355,75 @@ internal sealed class SlowStartReminderAdmissionGate : IReminderAdmissionGate
 {
     private readonly SlowStartConfig _config;
     private readonly TimeProvider _timeProvider;
-    private readonly SemaphoreSlim _semaphore;
-    private readonly CancellationTokenSource _stopCts;
-    private readonly Task _rampUpTask;
     private readonly int _targetCapacity;
+    private readonly object _lifecycleLock = new();
+    private SemaphoreSlim _semaphore;
+    private CancellationTokenSource? _rampCancellation;
+    private Task _rampUpTask = Task.CompletedTask;
     private int _currentCapacity;
+    private bool _started;
+    private bool _disposed;
 
     public SlowStartReminderAdmissionGate(SlowStartConfig config, int targetCapacity, TimeProvider timeProvider)
     {
         _config = config;
         _timeProvider = timeProvider;
         _semaphore = new SemaphoreSlim(config.InitialCapacity, targetCapacity);
-        _stopCts = new CancellationTokenSource();
         _targetCapacity = targetCapacity;
         _currentCapacity = config.InitialCapacity;
-
-        // Register the first delay against the supplied TimeProvider before the constructor returns.
-        _rampUpTask = SlowStartRampUpAsync(_stopCts.Token);
     }
 
     public int CurrentCapacity => Volatile.Read(ref _currentCapacity);
+
+    public ThrottleBlockMode BlockMode => _config.BlockMode;
+
+    public void Start()
+    {
+        lock (_lifecycleLock)
+        {
+            ObjectDisposedException.ThrowIf(_disposed, this);
+            if (_started)
+            {
+                return;
+            }
+
+            _started = true;
+            _rampCancellation = new CancellationTokenSource();
+            _rampUpTask = SlowStartRampUpAsync(_semaphore, _rampCancellation.Token);
+        }
+    }
+
+    public void Stop()
+    {
+        lock (_lifecycleLock)
+        {
+            if (!_started)
+            {
+                return;
+            }
+
+            _started = false;
+            _rampCancellation!.Cancel();
+            try
+            {
+                _rampUpTask.GetAwaiter().GetResult();
+            }
+            catch (OperationCanceledException) when (_rampCancellation.IsCancellationRequested)
+            {
+            }
+            finally
+            {
+                _rampCancellation.Dispose();
+                _rampCancellation = null;
+                _rampUpTask = Task.CompletedTask;
+            }
+
+            var previousSemaphore = _semaphore;
+            _semaphore = new SemaphoreSlim(_config.InitialCapacity, _targetCapacity);
+            Volatile.Write(ref _currentCapacity, _config.InitialCapacity);
+            previousSemaphore.Dispose();
+        }
+    }
 
     public async ValueTask<GateAcquireResult> AcquireAsync(ReminderDeliveryContext context, ReminderAcquireBudget budget, CancellationToken cancellationToken)
     {
@@ -193,9 +433,10 @@ internal sealed class SlowStartReminderAdmissionGate : IReminderAdmissionGate
             return GateAcquireResult.Admitted;
         }
 
-        if (_semaphore.Wait(0))
+        var semaphore = Volatile.Read(ref _semaphore);
+        if (semaphore.Wait(0))
         {
-            return GateAcquireResult.AdmittedWithRelease(() => _semaphore.Release());
+            return GateAcquireResult.Reserved(CreateSemaphoreReservation(semaphore));
         }
 
         var waitBudget = budget.GetWaitBudget(_config.BlockMode);
@@ -206,58 +447,38 @@ internal sealed class SlowStartReminderAdmissionGate : IReminderAdmissionGate
 
         if (waitBudget.Duration == Timeout.InfiniteTimeSpan)
         {
-            await _semaphore.WaitAsync(cancellationToken).ConfigureAwait(false);
-            if (cancellationToken.IsCancellationRequested)
-            {
-                _semaphore.Release();
-                cancellationToken.ThrowIfCancellationRequested();
-            }
-
-            return GateAcquireResult.AdmittedWithRelease(() => _semaphore.Release());
+            await semaphore.WaitAsync(cancellationToken).ConfigureAwait(false);
+            return GateAcquireResult.Reserved(CreateSemaphoreReservation(semaphore));
         }
 
-        var acquired = await WaitSemaphoreWithTimeoutAsync(waitBudget.Duration, cancellationToken).ConfigureAwait(false);
-        if (acquired && cancellationToken.IsCancellationRequested)
-        {
-            _semaphore.Release();
-            cancellationToken.ThrowIfCancellationRequested();
-        }
-
-        if (acquired && budget.GetRemainingWaitBudget().TimedOut)
-        {
-            _semaphore.Release();
-            return GateAcquireResult.Skipped(ReminderSkipReason.SlowStartLimited);
-        }
-
+        var acquired = await WaitSemaphoreWithTimeoutAsync(semaphore, waitBudget.Duration, cancellationToken).ConfigureAwait(false);
         return acquired
-            ? GateAcquireResult.AdmittedWithRelease(() => _semaphore.Release())
+            ? GateAcquireResult.Reserved(CreateSemaphoreReservation(semaphore))
             : GateAcquireResult.Skipped(ReminderSkipReason.SlowStartLimited);
     }
 
     public void Dispose()
     {
-        _stopCts.Cancel();
-        try
+        Stop();
+        lock (_lifecycleLock)
         {
-            _rampUpTask.GetAwaiter().GetResult();
-        }
-        catch (OperationCanceledException)
-        {
-        }
-        finally
-        {
-            _stopCts.Dispose();
+            if (_disposed)
+            {
+                return;
+            }
+
+            _disposed = true;
             _semaphore.Dispose();
         }
     }
 
-    private async ValueTask<bool> WaitSemaphoreWithTimeoutAsync(TimeSpan timeout, CancellationToken cancellationToken)
+    private async ValueTask<bool> WaitSemaphoreWithTimeoutAsync(SemaphoreSlim semaphore, TimeSpan timeout, CancellationToken cancellationToken)
     {
         using var timeoutCts = new CancellationTokenSource(timeout, _timeProvider);
         using var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, timeoutCts.Token);
         try
         {
-            await _semaphore.WaitAsync(linkedCts.Token).ConfigureAwait(false);
+            await semaphore.WaitAsync(linkedCts.Token).ConfigureAwait(false);
             return true;
         }
         catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
@@ -266,7 +487,7 @@ internal sealed class SlowStartReminderAdmissionGate : IReminderAdmissionGate
         }
     }
 
-    private async Task SlowStartRampUpAsync(CancellationToken stopToken)
+    private async Task SlowStartRampUpAsync(SemaphoreSlim semaphore, CancellationToken stopToken)
     {
         try
         {
@@ -297,16 +518,22 @@ internal sealed class SlowStartReminderAdmissionGate : IReminderAdmissionGate
 
                     if (Interlocked.CompareExchange(ref _currentCapacity, newCapacity, current) == current)
                     {
-                        _semaphore.Release(toRelease);
+                        semaphore.Release(toRelease);
                         break;
                     }
                 }
             }
+
         }
         catch (OperationCanceledException) when (stopToken.IsCancellationRequested)
         {
         }
     }
+
+    private static ReminderAdmissionReservation CreateSemaphoreReservation(SemaphoreSlim semaphore)
+        => new CallbackReminderAdmissionReservation(
+            rollback: () => semaphore.Release(),
+            releaseAfterCommit: () => semaphore.Release());
 }
 
 internal sealed class LocalConcurrencyReminderAdmissionGate : IReminderAdmissionGate
@@ -324,12 +551,14 @@ internal sealed class LocalConcurrencyReminderAdmissionGate : IReminderAdmission
 
     public int AvailablePermits => _semaphore.CurrentCount;
 
+    public ThrottleBlockMode BlockMode => _config.BlockMode;
+
     public async ValueTask<GateAcquireResult> AcquireAsync(ReminderDeliveryContext context, ReminderAcquireBudget budget, CancellationToken cancellationToken)
     {
         _ = context;
         if (_semaphore.Wait(0))
         {
-            return GateAcquireResult.AdmittedWithRelease(() => _semaphore.Release());
+            return GateAcquireResult.Reserved(CreateSemaphoreReservation(_semaphore));
         }
 
         var waitBudget = budget.GetWaitBudget(_config.BlockMode);
@@ -341,30 +570,12 @@ internal sealed class LocalConcurrencyReminderAdmissionGate : IReminderAdmission
         if (waitBudget.Duration == Timeout.InfiniteTimeSpan)
         {
             await _semaphore.WaitAsync(cancellationToken).ConfigureAwait(false);
-            if (cancellationToken.IsCancellationRequested)
-            {
-                _semaphore.Release();
-                cancellationToken.ThrowIfCancellationRequested();
-            }
-
-            return GateAcquireResult.AdmittedWithRelease(() => _semaphore.Release());
+            return GateAcquireResult.Reserved(CreateSemaphoreReservation(_semaphore));
         }
 
         var acquired = await WaitSemaphoreWithTimeoutAsync(waitBudget.Duration, cancellationToken).ConfigureAwait(false);
-        if (acquired && cancellationToken.IsCancellationRequested)
-        {
-            _semaphore.Release();
-            cancellationToken.ThrowIfCancellationRequested();
-        }
-
-        if (acquired && budget.GetRemainingWaitBudget().TimedOut)
-        {
-            _semaphore.Release();
-            return GateAcquireResult.Skipped(ReminderSkipReason.AcquireTimeout);
-        }
-
         return acquired
-            ? GateAcquireResult.AdmittedWithRelease(() => _semaphore.Release())
+            ? GateAcquireResult.Reserved(CreateSemaphoreReservation(_semaphore))
             : GateAcquireResult.Skipped(ReminderSkipReason.AcquireTimeout);
     }
 
@@ -384,6 +595,11 @@ internal sealed class LocalConcurrencyReminderAdmissionGate : IReminderAdmission
             return false;
         }
     }
+
+    private static ReminderAdmissionReservation CreateSemaphoreReservation(SemaphoreSlim semaphore)
+        => new CallbackReminderAdmissionReservation(
+            rollback: () => semaphore.Release(),
+            releaseAfterCommit: () => semaphore.Release());
 }
 
 internal sealed class LocalRateReminderAdmissionGate : IReminderAdmissionGate
@@ -401,13 +617,14 @@ internal sealed class LocalRateReminderAdmissionGate : IReminderAdmissionGate
 
     public int AvailableTokens => _tokenBucket.SnapshotAvailable();
 
+    public ThrottleBlockMode BlockMode => _config.BlockMode;
+
     public async ValueTask<GateAcquireResult> AcquireAsync(ReminderDeliveryContext context, ReminderAcquireBudget budget, CancellationToken cancellationToken)
     {
         _ = context;
-        var waitFor = _tokenBucket.TryConsumeOrComputeWait(cancellationToken);
-        if (waitFor == TimeSpan.Zero)
+        if (_tokenBucket.TryReserve(cancellationToken, out var reservation, out var waitFor))
         {
-            return GateAcquireResult.Admitted;
+            return GateAcquireResult.Reserved(reservation);
         }
 
         var waitBudget = budget.GetWaitBudget(_config.BlockMode);
@@ -432,10 +649,9 @@ internal sealed class LocalRateReminderAdmissionGate : IReminderAdmissionGate
                 return GateAcquireResult.Skipped(ReminderSkipReason.AcquireTimeout);
             }
 
-            waitFor = _tokenBucket.TryConsumeOrComputeWait(cancellationToken);
-            if (waitFor == TimeSpan.Zero)
+            if (_tokenBucket.TryReserve(cancellationToken, out reservation, out waitFor))
             {
-                return GateAcquireResult.Admitted;
+                return GateAcquireResult.Reserved(reservation);
             }
 
         }
@@ -456,6 +672,7 @@ internal sealed class LocalRateReminderAdmissionGate : IReminderAdmissionGate
         private readonly TimeProvider _timeProvider;
         private readonly object _lock = new();
         private double _tokens;
+        private int _reservedTokens;
         private long _lastRefillTimestamp;
 
         public TokenBucket(double ratePerSecond, int capacity, TimeProvider timeProvider)
@@ -476,7 +693,10 @@ internal sealed class LocalRateReminderAdmissionGate : IReminderAdmissionGate
             }
         }
 
-        public TimeSpan TryConsumeOrComputeWait(CancellationToken cancellationToken)
+        public bool TryReserve(
+            CancellationToken cancellationToken,
+            out ReminderAdmissionReservation reservation,
+            out TimeSpan waitFor)
         {
             lock (_lock)
             {
@@ -485,11 +705,38 @@ internal sealed class LocalRateReminderAdmissionGate : IReminderAdmissionGate
                 if (_tokens >= 1.0)
                 {
                     _tokens -= 1.0;
-                    return TimeSpan.Zero;
+                    _reservedTokens++;
+                    reservation = new CallbackReminderAdmissionReservation(
+                        rollback: RestoreToken,
+                        releaseAfterCommit: null,
+                        commit: CommitToken);
+                    waitFor = TimeSpan.Zero;
+                    return true;
                 }
 
                 var missingTokens = 1.0 - _tokens;
-                return TimeSpan.FromSeconds(missingTokens / _ratePerSecond);
+                reservation = null!;
+                waitFor = TimeSpan.FromSeconds(missingTokens / _ratePerSecond);
+                return false;
+            }
+        }
+
+        private void RestoreToken()
+        {
+            lock (_lock)
+            {
+                Refill();
+                _reservedTokens--;
+                _tokens = Math.Min(_capacity - _reservedTokens, _tokens + 1.0);
+            }
+        }
+
+        private void CommitToken()
+        {
+            lock (_lock)
+            {
+                Refill();
+                _reservedTokens--;
             }
         }
 
@@ -502,7 +749,7 @@ internal sealed class LocalRateReminderAdmissionGate : IReminderAdmissionGate
             }
 
             var elapsed = _timeProvider.GetElapsedTime(_lastRefillTimestamp, now).TotalSeconds;
-            _tokens = Math.Min(_capacity, _tokens + (elapsed * _ratePerSecond));
+            _tokens = Math.Min(_capacity - _reservedTokens, _tokens + (elapsed * _ratePerSecond));
             _lastRefillTimestamp = now;
         }
     }

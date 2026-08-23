@@ -15,18 +15,19 @@ public abstract record ThrottleBlockMode
     }
 
     /// <summary>
-    /// Wait indefinitely for a permit to become available. Unless an earlier composed gate
-    /// established a shared <see cref="WaitUpTo(TimeSpan)"/> deadline, the acquire only completes
-    /// when either a permit is granted or the supplied cancellation token is cancelled. This is
-    /// the safest mode for not losing ticks when all composed gates use <see cref="Wait"/>, at the
-    /// cost of unbounded tardiness.
+    /// Wait for a permit to become available. If any composed gate uses
+    /// <see cref="WaitUpTo(TimeSpan)"/>, the shortest configured timeout establishes one deadline
+    /// for the complete acquire, including gates configured with <see cref="Wait"/>. When every
+    /// gate uses <see cref="Wait"/>, the acquire only completes when a permit is granted or the
+    /// supplied cancellation token is cancelled, at the cost of unbounded tardiness.
     /// </summary>
     public static ThrottleBlockMode Wait { get; } = new WaitForever();
 
     /// <summary>
-    /// Wait up to <paramref name="timeout"/> for a permit. If no permit becomes available
-    /// in time, the acquire returns <see cref="ReminderAdmissionOutcome.Skipped"/> with
-    /// the reason reported by the gate which exhausted the timeout, such as
+    /// Contributes <paramref name="timeout"/> to the composed acquire's absolute deadline. The
+    /// shortest configured timeout is measured from the beginning of the acquire and bounds every
+    /// gate and the final admission commit. If admission does not commit in time, the acquire
+    /// returns <see cref="ReminderAdmissionOutcome.Skipped"/> with a reason such as
     /// <see cref="ReminderSkipReason.AcquireTimeout"/>,
     /// <see cref="ReminderSkipReason.SiloOverloaded"/>, or
     /// <see cref="ReminderSkipReason.SlowStartLimited"/>.
