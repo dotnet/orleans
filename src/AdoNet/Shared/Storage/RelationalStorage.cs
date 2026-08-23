@@ -253,9 +253,9 @@ namespace Orleans.Tests.SqlUtils
                 await transaction.CommitAsync(cancellationToken).ConfigureAwait(continueOnCapturedContext: false);
                 return (first, second);
             }
-            catch
+            catch (Exception exception)
             {
-                await transaction.RollbackAsync(cancellationToken).ConfigureAwait(continueOnCapturedContext: false);
+                await RollbackPreservingOriginalExceptionAsync(transaction, exception, cancellationToken).ConfigureAwait(continueOnCapturedContext: false);
                 throw;
             }
         }
