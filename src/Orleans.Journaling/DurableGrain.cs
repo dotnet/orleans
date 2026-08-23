@@ -2,24 +2,22 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace Orleans.Journaling;
 
-public abstract class DurableGrain : Grain, IGrainBase
+public abstract class DurableGrain : Grain, IGrainBase, ILifecycleParticipant<IGrainLifecycle>
 {
     protected DurableGrain()
     {
         StateManager = ServiceProvider.GetRequiredService<IJournaledStateManager>();
-        if (StateManager is ILifecycleParticipant<IGrainLifecycle> participant)
-        {
-            participant.Participate(((IGrainBase)this).GrainContext.ObservableLifecycle);
-        }
-
-        var features = ServiceProvider.GetServices<IJournaledGrainParticipant>().ToArray();
-        foreach (var feature in features)
-        {
-            feature.Initialize();
-        }
     }
 
     protected IJournaledStateManager StateManager { get; }
+
+    void ILifecycleParticipant<IGrainLifecycle>.Participate(IGrainLifecycle lifecycle)
+    {
+        if (StateManager is ILifecycleParticipant<IGrainLifecycle> participant)
+        {
+            participant.Participate(lifecycle);
+        }
+    }
 
     protected TState GetOrCreateState<TState>(string name) where TState : class, IJournaledState
         => GetOrCreateState(name, static sp => sp.GetRequiredService<TState>(), ServiceProvider);

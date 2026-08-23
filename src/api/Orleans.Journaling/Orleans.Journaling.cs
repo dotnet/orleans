@@ -8,7 +8,7 @@
 //------------------------------------------------------------------------------
 namespace Orleans.Journaling
 {
-    public abstract partial class DurableGrain : Grain, IGrainBase
+    public abstract partial class DurableGrain : Grain, IGrainBase, ILifecycleParticipant<IGrainLifecycle>
     {
         protected IJournaledStateManager StateManager { get { throw null; } }
 
@@ -217,11 +217,6 @@ namespace Orleans.Journaling
         void OnWriteCompleted();
         void ReplayEntry(JournalEntry entry, JournalReplayContext context);
         void Reset(JournalStreamWriter writer);
-    }
-
-    public partial interface IJournaledGrainParticipant
-    {
-        void Initialize();
     }
 
     public partial interface IJournaledStateManager : System.IAsyncDisposable
