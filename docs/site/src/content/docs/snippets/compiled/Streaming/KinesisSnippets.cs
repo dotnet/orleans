@@ -16,10 +16,7 @@ internal static class KinesisSnippets
     internal static void ConfigureAspireSilo(HostApplicationBuilder builder)
     {
         // <configure_kinesis_aspire_silo>
-builder.UseOrleans(siloBuilder =>
-{
-    siloBuilder.AddMemoryGrainStorage("PubSubStore");
-});
+builder.UseOrleans();
         // </configure_kinesis_aspire_silo>
     }
 

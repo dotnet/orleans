@@ -208,7 +208,7 @@ public sealed class KinesisAspireIntegrationTests
         {
             [$"Orleans:Streaming:{ProviderName}:ProviderType"] = "Kinesis",
             [$"Orleans:Streaming:{ProviderName}:StreamArn"] = "arn:aws:kinesis:us-west-2:999888777666:stream/client-orders",
-        });
+        }, isClient: true);
         using var host = BuildClientHost(config);
         var options = Resolve(host);
 
@@ -440,24 +440,39 @@ public sealed class KinesisAspireIntegrationTests
         Assert.Contains(ProviderName, ex.ToString());
     }
 
-    private static IConfiguration BuildConfig(Dictionary<string, string?> values)
+    private static IConfiguration BuildConfig(
+        Dictionary<string, string?> values,
+        bool isClient = false)
     {
         var builder = DistributedApplicationTestingBuilder.Create();
         try
         {
             var provider = new TestKinesisProviderConfiguration(values);
+            var pubSubStore = new TestDynamoDBGrainStorageProviderConfiguration();
             var orleans = builder.AddOrleans($"cluster-{Guid.NewGuid():N}")
                 .WithDevelopmentClustering()
+                .WithGrainStorage("PubSubStore", pubSubStore)
                 .WithStreaming(ProviderName, provider);
-            var silo = builder.AddContainer($"silo-{Guid.NewGuid():N}", "unused")
-                .WithReference(orleans);
+            var project = builder.AddContainer(
+                $"{(isClient ? "client" : "silo")}-{Guid.NewGuid():N}",
+                "unused");
+            if (isClient)
+            {
+                project.WithReference(orleans.AsClient());
+            }
+            else
+            {
+                project.WithReference(orleans);
+            }
 
             using var services = builder.Services.BuildServiceProvider();
             return AspireResourceConfiguration.CreateAsync(
-                    silo.Resource,
+                    project.Resource,
                     services,
                     include: static key =>
-                        key.StartsWith("Orleans__Streaming__", StringComparison.Ordinal)
+                        key.StartsWith("Orleans__Clustering__", StringComparison.Ordinal)
+                        || key.StartsWith("Orleans__Streaming__", StringComparison.Ordinal)
+                        || key.StartsWith("Orleans__GrainStorage__", StringComparison.Ordinal)
                         || key.StartsWith("AWS_", StringComparison.Ordinal)
                         || key.StartsWith("AWS__", StringComparison.Ordinal)
                         || key.StartsWith("ConnectionStrings__", StringComparison.Ordinal))
@@ -474,11 +489,7 @@ public sealed class KinesisAspireIntegrationTests
     {
         var hostBuilder = Host.CreateApplicationBuilder();
         hostBuilder.Configuration.AddConfiguration(config);
-        hostBuilder.UseOrleans(siloBuilder =>
-        {
-            siloBuilder.UseLocalhostClustering();
-            siloBuilder.AddMemoryGrainStorage("PubSubStore");
-        });
+        hostBuilder.UseOrleans();
         return hostBuilder.Build();
     }
 
@@ -523,6 +534,23 @@ public sealed class KinesisAspireIntegrationTests
                     : key.Replace(":", "__", StringComparison.Ordinal);
                 resourceBuilder.WithEnvironment(environmentKey, value);
             }
+        }
+    }
+
+    private sealed class TestDynamoDBGrainStorageProviderConfiguration : IProviderConfiguration
+    {
+        public void ConfigureResource<T>(
+            IResourceBuilder<T> resourceBuilder,
+            string configurationSectionPath)
+            where T : IResourceWithEnvironment
+        {
+            var prefix = $"Orleans__{configurationSectionPath.Replace(":", "__", StringComparison.Ordinal)}";
+            resourceBuilder
+                .WithEnvironment($"{prefix}__ProviderType", "DynamoDB")
+                .WithEnvironment($"{prefix}__Service", "us-east-1")
+                .WithEnvironment($"{prefix}__TableName", "KinesisPubSubStore")
+                .WithEnvironment($"{prefix}__UseProvisionedThroughput", "false")
+                .WithEnvironment($"{prefix}__CreateIfNotExists", "true");
         }
     }
 }
