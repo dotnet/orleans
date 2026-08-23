@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.ChangeTracking;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
@@ -114,6 +115,30 @@ public sealed class GuidDbContextModelTests
             var converter = Assert.IsAssignableFrom<ValueConverter>(property.GetValueConverter());
             Assert.NotNull(property.GetValueComparer());
             Assert.Equal(typeof(string), converter.ProviderClrType);
+        }
+    }
+
+    [Fact]
+    public void ClusteringModel_SuspectListConverterAndComparer_HandleNullValues()
+    {
+        using var context = CreateContext(DatabaseProvider.PostgreSql, Feature.Clustering);
+        var silo = context.Model.FindEntityType(typeof(SiloRecord<Guid>))!;
+
+        foreach (var propertyName in new[] { "SuspectingTimes", "SuspectingSilos" })
+        {
+            var property = silo.FindProperty(propertyName)!;
+            var converter = Assert.IsAssignableFrom<ValueConverter>(property.GetValueConverter());
+            var comparer = Assert.IsAssignableFrom<ValueComparer>(property.GetValueComparer());
+
+            Assert.Null(converter.ConvertToProvider(null));
+            Assert.Null(converter.ConvertFromProvider(null));
+            Assert.True(comparer.Equals(null, null));
+            Assert.Equal(0, comparer.GetHashCode(null));
+            Assert.Null(comparer.Snapshot(null));
+            Assert.Empty(Assert.IsType<List<string>>(
+                converter.ConvertFromProviderExpression.Compile().DynamicInvoke(new object?[] { null })));
+            Assert.Empty(Assert.IsType<List<string>>(
+                comparer.SnapshotExpression.Compile().DynamicInvoke(new object?[] { null })));
         }
     }
 
