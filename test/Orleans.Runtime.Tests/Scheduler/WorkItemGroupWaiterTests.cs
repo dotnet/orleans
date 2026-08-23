@@ -173,10 +173,28 @@ public class WorkItemGroupWaiterTests
     {
         using var services = CreateServices();
         var workItemGroup = CreateWorkItemGroup(services);
-        var field = typeof(WorkItemGroup).GetField("_schedulerTask", BindingFlags.Instance | BindingFlags.NonPublic);
-        var schedulerTask = Assert.IsType<Task>(field!.GetValue(workItemGroup));
+        var schedulerTask = GetSchedulerTask(workItemGroup);
 
         Assert.True(schedulerTask.CreationOptions.HasFlag(TaskCreationOptions.DenyChildAttach));
+    }
+
+    [Fact]
+    public void SchedulerTaskDoesNotCaptureExecutionContext()
+    {
+        using var services = CreateServices();
+        var asyncLocal = new AsyncLocal<object?> { Value = new object() };
+        var workItemGroup = CreateWorkItemGroup(services);
+        var schedulerTask = GetSchedulerTask(workItemGroup);
+        var contingentPropertiesField = typeof(Task).GetField("m_contingentProperties", BindingFlags.Instance | BindingFlags.NonPublic);
+        var contingentProperties = contingentPropertiesField!.GetValue(schedulerTask);
+
+        if (contingentProperties is not null)
+        {
+            var capturedContextField = contingentProperties.GetType().GetField("m_capturedContext", BindingFlags.Instance | BindingFlags.NonPublic);
+            Assert.Null(capturedContextField!.GetValue(contingentProperties));
+        }
+
+        GC.KeepAlive(asyncLocal);
     }
 
     [Fact]
@@ -275,5 +293,11 @@ public class WorkItemGroupWaiterTests
     {
         var stateField = typeof(WorkItemGroup).GetField("_state", BindingFlags.Instance | BindingFlags.NonPublic);
         stateField!.SetValue(workItemGroup, Enum.Parse(stateField.FieldType, "Running"));
+    }
+
+    private static Task GetSchedulerTask(WorkItemGroup workItemGroup)
+    {
+        var field = typeof(WorkItemGroup).GetField("_schedulerTask", BindingFlags.Instance | BindingFlags.NonPublic);
+        return Assert.IsType<Task>(field!.GetValue(workItemGroup));
     }
 }
