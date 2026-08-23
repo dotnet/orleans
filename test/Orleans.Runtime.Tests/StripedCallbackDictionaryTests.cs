@@ -9,6 +9,7 @@ namespace Tester;
 public class StripedCallbackDictionaryTests
 {
     private static readonly GrainId Owner = GrainId.Create("test", "owner");
+    private static readonly Action<int, object?> EmptyVisitor = static (_, _) => { };
 
     [Fact]
     public void CorrelationIdsDistributeAcrossStripesAtOverflowAndWithStride()
@@ -68,7 +69,10 @@ public class StripedCallbackDictionaryTests
             Assert.True(dictionary.TryAdd(Owner, id, i));
         }
 
-        Assert.Equal(Enumerable.Range(0, 32), dictionary.Order());
+        var values = new List<int>();
+        dictionary.ForEach(values, static (value, values) => values.Add(value));
+
+        Assert.Equal(Enumerable.Range(0, 32), values.Order());
     }
 
     [Fact]
@@ -124,7 +128,7 @@ public class StripedCallbackDictionaryTests
     }
 
     [Fact]
-    public void DisposingPartialEnumerationLeavesDictionaryUsable()
+    public void SnapshotVisitorAllowsValuesToRemoveThemselves()
     {
         var dictionary = new StripedCallbackDictionary<int>();
         for (var i = 0; i < 32; i++)
@@ -132,12 +136,25 @@ public class StripedCallbackDictionaryTests
             Assert.True(dictionary.TryAdd(Owner, new CorrelationId(i), i));
         }
 
-        using (var enumerator = dictionary.GetEnumerator())
+        dictionary.ForEach((Dictionary: dictionary, Owner), static (value, state) =>
         {
-            Assert.True(enumerator.MoveNext());
-        }
+            Assert.True(state.Dictionary.TryRemove(state.Owner, new CorrelationId(value), out var removed));
+            Assert.Equal(value, removed);
+        });
 
-        Assert.True(dictionary.TryRemove(Owner, new CorrelationId(0), out var value));
-        Assert.Equal(0, value);
+        Assert.Equal(0, dictionary.Count);
+    }
+
+    [Fact]
+    public void EmptyVisitorDoesNotAllocate()
+    {
+        var dictionary = new StripedCallbackDictionary<int>();
+        dictionary.ForEach((object?)null, EmptyVisitor);
+
+        var allocatedBefore = GC.GetAllocatedBytesForCurrentThread();
+        dictionary.ForEach((object?)null, EmptyVisitor);
+        var allocated = GC.GetAllocatedBytesForCurrentThread() - allocatedBefore;
+
+        Assert.Equal(0, allocated);
     }
 }
