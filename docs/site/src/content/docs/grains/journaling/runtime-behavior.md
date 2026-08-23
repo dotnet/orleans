@@ -1,7 +1,7 @@
 ---
 title: Journaling runtime behavior and consistency
 description: Understand Orleans Journaling activation, write, recovery, compaction, concurrency, and failure semantics.
-ms.date: 08/21/2026
+ms.date: 08/23/2026
 ms.topic: conceptual
 ---
 
@@ -49,7 +49,9 @@ Design commands to tolerate retries at the application boundary. Use operation i
 
 A normal append failure leaves encoded pending entries available for a later write attempt.
 
-A compaction write has two storage stages: it first appends committed pending entries, then publishes a snapshot replacement. The append can succeed before the replacement fails. In that outcome, <xref:Orleans.Journaling.DurableGrain.WriteStateAsync*> faults even though the state mutation is durable in the append history. Treat every failed write as an uncertain application outcome and retry commands using an operation identifier or another idempotency mechanism.
+A snapshot failure leaves the previously published journal unchanged and keeps the captured in-memory changes available for a later write attempt. Commands added while the replacement is awaiting storage remain outside the captured snapshot and are persisted by a later operation.
+
+Storage acknowledgement can still have an uncertain network outcome. Treat a failed write as an uncertain application outcome and retry commands using an operation identifier or another idempotency mechanism.
 
 Recovery exceptions fault activation or queued work rather than replacing or truncating stored data. Restore the required format/codec registration or repair the backing data before retrying activation.
 
@@ -57,9 +59,10 @@ Recovery exceptions fault activation or queued work rather than replacing or tru
 
 Each provider reports when its journal crosses a configured storage threshold. The next <xref:Orleans.Journaling.DurableGrain.WriteStateAsync*>:
 
-1. Persists any already-buffered append data.
-1. Builds a snapshot containing the state directory and every active durable state.
-1. Atomically replaces the published journal with the snapshot.
+1. Captures the pending journal prefix and builds a snapshot containing the state directory and every active durable state.
+1. Atomically replaces the published journal with the complete snapshot.
+1. Consumes the captured pending prefix after storage acknowledges the replacement.
+1. Leaves commands added during the replacement pending for the next write.
 1. Clears the compaction request after storage acknowledges the replacement.
 
 Compaction bounds replay work and storage growth according to provider thresholds. Snapshot size still scales with the complete durable state owned by the grain, so capacity tests must include hot and large grain identities.
