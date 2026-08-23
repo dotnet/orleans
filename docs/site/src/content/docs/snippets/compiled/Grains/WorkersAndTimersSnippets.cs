@@ -125,25 +125,25 @@ if (reminder is not null)
             // </unregister_reminder>
         }
     }
+}
 
-    namespace Documentation.Grains.Reminders
+namespace Documentation.Grains.Reminders
+{
+    internal static class ReminderConcurrencyConfiguration
     {
-        internal static class ReminderConcurrencyConfiguration
+        internal static void Configure(ISiloBuilder siloBuilder)
         {
-            internal static void Configure(ISiloBuilder siloBuilder)
-            {
-                // <configure_reminder_concurrency>
-                siloBuilder.AddReminderConcurrencyControl(options => options
-                    .PerSilo(throttle => throttle
-                        .MaxConcurrent(
-                            value: 50,
-                            blockMode: ThrottleBlockMode.Wait)
-                        .PermitsPerSecond(
-                            value: 200,
-                            burstSize: 200,
-                            blockMode: ThrottleBlockMode.Wait)));
-                // </configure_reminder_concurrency>
-            }
+            // <configure_reminder_concurrency>
+            siloBuilder.AddReminderConcurrencyControl(options => options
+                .PerSilo(throttle => throttle
+                    .MaxConcurrent(
+                        value: 50,
+                        blockMode: ThrottleBlockMode.Wait)
+                    .PermitsPerSecond(
+                        value: 200,
+                        burstSize: 200,
+                        blockMode: ThrottleBlockMode.Wait)));
+            // </configure_reminder_concurrency>
         }
     }
 }
