@@ -325,8 +325,8 @@ public class ReminderTestsBase : OrleansTestingBase, IDisposable
             WaitForLivenessToStabilizeAsync().WaitAsync(cancellationToken));
         // Membership convergence does not await the reminder services' queued range-change reconciliation.
         var rangeChangeReconciliations = HostedCluster.GetActiveSilos().Select(silo =>
-            silo.ServiceProvider.GetRequiredService<LocalReminderService>().TestOnlyWaitForRangeChangeReconciliation());
-        await Task.WhenAll(rangeChangeReconciliations).WaitAsync(cancellationToken);
+            silo.ServiceProvider.GetRequiredService<LocalReminderService>().TestOnlyWaitForRangeChangeReconciliation(cancellationToken));
+        await Task.WhenAll(rangeChangeReconciliations);
         return result;
     }
 

@@ -411,7 +411,7 @@ namespace Orleans.Runtime.ReminderService
             return task;
         }
 
-        internal async Task TestOnlyWaitForRangeChangeReconciliation()
+        internal async Task TestOnlyWaitForRangeChangeReconciliation(CancellationToken cancellationToken)
         {
             while (true)
             {
@@ -424,16 +424,16 @@ namespace Orleans.Runtime.ReminderService
                     observedGeneration = rangeChangeGeneration;
                     observedTask = rangeChangeTask;
                     return Task.CompletedTask;
-                });
+                }).WaitAsync(cancellationToken);
 
-                await observedTask;
+                await observedTask.WaitAsync(cancellationToken);
 
                 var isCurrentGeneration = false;
                 await this.QueueTask(() =>
                 {
                     isCurrentGeneration = observedGeneration == rangeChangeGeneration;
                     return Task.CompletedTask;
-                });
+                }).WaitAsync(cancellationToken);
 
                 if (isCurrentGeneration)
                 {

@@ -275,7 +275,7 @@ public class LocalReminderServiceCompatibilityTests : IClassFixture<LocalReminde
             var secondRangeChangeTask = reminderService.TestOnlyChangeRange(intermediateRange, newRange, increased: false);
             await secondReadGate.WaitUntilBlockedAsync(cancellation.Token);
 
-            var reconciliationTask = reminderService.TestOnlyWaitForRangeChangeReconciliation();
+            var reconciliationTask = reminderService.TestOnlyWaitForRangeChangeReconciliation(cancellation.Token);
             Assert.False(reconciliationTask.IsCompleted);
 
             secondReadGate.Release();
