@@ -185,6 +185,21 @@ public class SiloConnectionAuthenticationProtocolTests
             StringComparer.Ordinal);
     }
 
+    [Theory]
+    [InlineData(SiloConnectionAuthenticationMode.Disabled, "Disabled")]
+    [InlineData(SiloConnectionAuthenticationMode.Audit, "Audit")]
+    [InlineData(SiloConnectionAuthenticationMode.Required, "Required")]
+    [InlineData((SiloConnectionAuthenticationMode)int.MaxValue, "Unknown")]
+    public void TelemetryModeName_ReturnsBoundedConstants(
+        SiloConnectionAuthenticationMode mode,
+        string expected)
+    {
+        var actual = SiloConnectionAuthenticationTelemetry.GetModeName(mode);
+
+        Assert.Equal(expected, actual);
+        Assert.Same(actual, SiloConnectionAuthenticationTelemetry.GetModeName(mode));
+    }
+
     [TestCategory("BVT")]
     [TestSuite("BVT")]
     [TestProvider("None")]
