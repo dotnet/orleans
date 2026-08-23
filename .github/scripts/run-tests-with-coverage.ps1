@@ -10,6 +10,8 @@ param(
     [ValidateSet('BVT', 'SlowBVT', 'Functional')]
     [string] $Suite,
 
+    [string] $CoverageToolPath,
+
     [switch] $DiscoverOnly
 )
 
@@ -92,6 +94,11 @@ if ($DiscoverOnly) {
     return
 }
 
+if ([string]::IsNullOrWhiteSpace($CoverageToolPath)) {
+    throw 'CoverageToolPath is required when collecting coverage'
+}
+$resolvedCoverageToolPath = (Resolve-Path -LiteralPath $CoverageToolPath).Path
+
 if (Test-Path -LiteralPath $coverageDirectory) {
     Remove-Item -LiteralPath $coverageDirectory -Recurse -Force
 }
@@ -101,7 +108,7 @@ $totalTests = 0
 foreach ($modulePath in $modules) {
     $index++
     $moduleName = [IO.Path]::GetFileNameWithoutExtension($modulePath)
-    $coverageOutput = Join-Path $coverageDirectory ('{0}-{1:D3}-{2}.coverage' -f $Suite, $index, $moduleName)
+    $coverageOutput = Join-Path $coverageDirectory ('{0}-{1:D3}-{2}.cobertura.xml' -f $Suite, $index, $moduleName)
     $reportDirectory = Join-Path ([IO.Path]::GetDirectoryName($modulePath)) 'TestResults'
     $reportPattern = "test_results_${Suite}_${Framework}_${moduleName}_${Framework}_*.trx"
     if (Test-Path -LiteralPath $reportDirectory) {
@@ -109,17 +116,18 @@ foreach ($modulePath in $modules) {
             Remove-Item -Force
     }
 
-    & dotnet exec $modulePath `
+    & $resolvedCoverageToolPath collect `
+        --settings $coverageSettings `
+        --output $coverageOutput `
+        --output-format cobertura `
+        --nologo `
+        dotnet exec $modulePath `
         --filter-query $filterQuery `
         --hangdump --hangdump-timeout 10m `
         --crashdump --crashdump-type Full `
         --hangdump-type Full `
         --report-trx --report-trx-filename "test_results_${Suite}_${Framework}_{asm}_{tfm}_{arch}.trx" `
-        --ignore-exit-code 8 `
-        --coverage `
-        --coverage-output $coverageOutput `
-        --coverage-output-format coverage `
-        --coverage-settings $coverageSettings
+        --ignore-exit-code 8
     if ($LASTEXITCODE -ne 0) {
         throw "Tests failed for $modulePath with exit code $LASTEXITCODE"
     }
@@ -142,6 +150,11 @@ foreach ($modulePath in $modules) {
     $totalTests += $moduleTestCount
     if ($moduleTestCount -eq 0 -and (Test-Path -LiteralPath $coverageOutput)) {
         Remove-Item -LiteralPath $coverageOutput -Force
+    } elseif ($moduleTestCount -gt 0) {
+        $coverageDocument = Read-XmlDocument -Path $coverageOutput
+        if (-not $coverageDocument.SelectSingleNode('//*[local-name()="line"]')) {
+            throw "$coverageOutput contains no measured lines for $moduleTestCount tests"
+        }
     }
 }
 
@@ -149,14 +162,7 @@ if ($totalTests -eq 0) {
     throw "No tests ran for the $Suite suite on $Framework"
 }
 
-$coverageFiles = @(Get-ChildItem -LiteralPath $coverageDirectory -File -Filter '*.coverage')
-foreach ($coverageFile in $coverageFiles) {
-    if ($coverageFile.Length -le 10) {
-        Remove-Item -LiteralPath $coverageFile.FullName -Force
-    }
-}
-
-$coverageFiles = @(Get-ChildItem -LiteralPath $coverageDirectory -File -Filter '*.coverage')
+$coverageFiles = @(Get-ChildItem -LiteralPath $coverageDirectory -File -Filter '*.cobertura.xml')
 if ($coverageFiles.Count -eq 0) {
     throw "The $Suite suite produced no measured coverage"
 }

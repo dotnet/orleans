@@ -264,8 +264,20 @@ try {
         $collectorScript = Get-Content -Raw -LiteralPath $collectorScriptPath
         Assert-Matches `
             $collectorScript `
-            "\('\{0\}-\{1:D3\}-\{2\}\.coverage' -f \`$Suite, \`$index, \`$moduleName\)" `
+            "\('\{0\}-\{1:D3\}-\{2\}\.cobertura\.xml' -f \`$Suite, \`$index, \`$moduleName\)" `
             'Coverage file names must include the suite.'
+    }
+
+    Invoke-Test 'uses external coverage collection for CI builds' {
+        $collectorScript = Get-Content -Raw -LiteralPath $collectorScriptPath
+        Assert-Matches `
+            $collectorScript `
+            '& \$resolvedCoverageToolPath collect' `
+            'Coverage must use the external collector with ContinuousIntegrationBuild.'
+        Assert-Matches `
+            $collectorScript `
+            'contains no measured lines for \$moduleTestCount tests' `
+            'Coverage collection must reject empty reports from successful test runs.'
     }
 
     Invoke-Test 'preserves coverage artifact directories during download' {

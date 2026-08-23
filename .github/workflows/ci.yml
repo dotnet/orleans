@@ -15,6 +15,7 @@ permissions:
 env:
   DOTNET_SKIP_FIRST_TIME_EXPERIENCE: 1
   DOTNET_NOLOGO: true
+  DOTNET_COVERAGE_VERSION: 18.5.2
   # Docker images started by workflow steps are centralized so pulls can be retried and mirrors can be swapped in one place.
   AZURITE_IMAGE: mcr.microsoft.com/azure-storage/azurite:3.35.0@sha256:647c63a91102a9d8e8000aab803436e1fc85fbb285e7ce830a82ee5d6661cf37
   EVENTHUBS_EMULATOR_IMAGE: mcr.microsoft.com/azure-messaging/eventhubs-emulator:2.2.0@sha256:2c8e0d4dd93a5fc078df2721eeb3e211442d555d61293ac3972df931c6d9333a
@@ -1100,11 +1101,13 @@ jobs:
         matrix.os == 'ubuntu-latest' &&
         matrix.framework == 'net10.0'
       shell: pwsh
-      run: >
-        ./.github/scripts/run-tests-with-coverage.ps1
-        -RepositoryRoot $env:GITHUB_WORKSPACE
-        -Framework ${{ matrix.framework }}
-        -Suite ${{ matrix.suite }}
+      run: |
+        dotnet tool install --tool-path .tools dotnet-coverage --version $env:DOTNET_COVERAGE_VERSION
+        ./.github/scripts/run-tests-with-coverage.ps1 `
+          -RepositoryRoot $env:GITHUB_WORKSPACE `
+          -Framework ${{ matrix.framework }} `
+          -Suite ${{ matrix.suite }} `
+          -CoverageToolPath (Join-Path $env:GITHUB_WORKSPACE '.tools/dotnet-coverage')
     - name: Archive Test Results
       if: always()
       continue-on-error: true
@@ -1128,7 +1131,7 @@ jobs:
         name: coverage_data_${{ matrix.suite }}
         if-no-files-found: error
         retention-days: 1
-        path: TestResults/coverage-${{ matrix.suite }}/*.coverage
+        path: TestResults/coverage-${{ matrix.suite }}/*.cobertura.xml
   coverage-merge:
     name: Merge code coverage
     if: github.event_name == 'pull_request' && needs.test.result == 'success'
@@ -1151,7 +1154,7 @@ jobs:
     - name: Merge coverage
       shell: pwsh
       run: |
-        dotnet tool install --tool-path .tools dotnet-coverage --version 18.5.2
+        dotnet tool install --tool-path .tools dotnet-coverage --version $env:DOTNET_COVERAGE_VERSION
         New-Item -ItemType Directory -Force -Path TestResults | Out-Null
 
         $coverageFiles = @(
@@ -1161,7 +1164,7 @@ jobs:
               throw "Coverage data for the $suite suite was not downloaded"
             }
 
-            $suiteFiles = @(Get-ChildItem -LiteralPath $suiteDirectory -Recurse -File -Filter '*.coverage')
+            $suiteFiles = @(Get-ChildItem -LiteralPath $suiteDirectory -Recurse -File -Filter '*.cobertura.xml')
             if ($suiteFiles.Count -eq 0) {
               throw "Coverage data for the $suite suite contains no reports"
             }
