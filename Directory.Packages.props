@@ -134,6 +134,7 @@
     <PackageVersion Update="Aspire.Azure.Storage.Blobs" Version="13.2.4" />
     <PackageVersion Update="Aspire.Azure.Storage.Queues" Version="13.2.4" />
     <PackageVersion Update="Aspire.Hosting.AppHost" Version="13.2.4" />
+    <PackageVersion Include="Aspire.Hosting.AWS" Version="13.6.0" />
     <PackageVersion Include="Aspire.Hosting.Azure.EventHubs" Version="13.2.4" />
     <PackageVersion Include="Aspire.Hosting.Azure.Storage" Version="13.2.4" />
     <PackageVersion Update="Aspire.Hosting.Orleans" Version="13.2.4" />
