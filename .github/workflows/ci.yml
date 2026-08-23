@@ -69,7 +69,6 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        provider: ["Redis"]
         framework: ["net8.0", "net10.0"]
     steps:
     - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
@@ -94,7 +93,7 @@ jobs:
       with:
         artifact-name: test_output_${{ github.job }}_${{ matrix.framework }}
         framework: ${{ matrix.framework }}
-        provider: ${{ matrix.provider }}
+        provider: Redis
       env:
         ORLEANSREDISCONNECTIONSTRING: "localhost:6379,ssl=False,abortConnect=False"
     - name: Clean up Redis
@@ -109,7 +108,6 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        provider: ["Cassandra"]
         dbversion: ["4.0", "4.1", "5.0"]
         framework: ["net8.0", "net10.0"]
     steps:
@@ -126,7 +124,7 @@ jobs:
       with:
         artifact-name: test_output_${{ github.job }}_${{ matrix.dbversion }}_${{ matrix.framework }}
         framework: ${{ matrix.framework }}
-        provider: ${{ matrix.provider }}
+        provider: Cassandra
       env:
         CASSANDRAVERSION: ${{ matrix.dbversion }}
   test-postgres:
@@ -139,7 +137,6 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        provider: ["PostgreSql"]
         framework: ["net8.0", "net10.0"]
     steps:
     - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
@@ -166,7 +163,7 @@ jobs:
       with:
         artifact-name: test_output_${{ github.job }}_${{ matrix.framework }}
         framework: ${{ matrix.framework }}
-        provider: ${{ matrix.provider }}
+        provider: PostgreSql
       env:
 # [SuppressMessage("Microsoft.Security", "CS002:SecretInNextLine", Justification="False positive")]
         ORLEANSPOSTGRESCONNECTIONSTRING: "Server=127.0.0.1;Port=5432;Pooling=false;User Id=postgres;Password=postgres;SSL Mode=Disable"
@@ -187,7 +184,6 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        provider: ["MySql"]
         framework: ["net8.0", "net10.0"]
     steps:
     - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
@@ -239,7 +235,7 @@ jobs:
       with:
         artifact-name: test_output_${{ github.job }}_${{ matrix.framework }}
         framework: ${{ matrix.framework }}
-        provider: ${{ matrix.provider }}
+        provider: MySql
       env:
 # [SuppressMessage("Microsoft.Security", "CS002:SecretInNextLine", Justification="Not a secret")]
         ORLEANSMYSQLCONNECTIONSTRING: "Server=127.0.0.1;Port=3306;UId=root;Pwd=mariadb;"
@@ -255,7 +251,6 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        provider: ["SqlServer"]
         framework: ["net8.0", "net10.0"]
     steps:
     - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
@@ -283,7 +278,7 @@ jobs:
       with:
         artifact-name: test_output_${{ github.job }}_${{ matrix.framework }}
         framework: ${{ matrix.framework }}
-        provider: ${{ matrix.provider }}
+        provider: SqlServer
       env:
 # [SuppressMessage("Microsoft.Security", "CS002:SecretInNextLine", Justification="Not a secret")]
         ORLEANSMSSQLCONNECTIONSTRING: "Server=127.0.0.1,1433;User Id=SA;Password=yourWeak(!)Password;TrustServerCertificate=True;"
@@ -303,7 +298,6 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        provider: ["Sqlite"]
         framework: ["net8.0", "net10.0"]
     steps:
     - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
@@ -312,7 +306,7 @@ jobs:
       with:
         artifact-name: test_output_${{ github.job }}_${{ matrix.framework }}
         framework: ${{ matrix.framework }}
-        provider: ${{ matrix.provider }}
+        provider: Sqlite
   test-azure-storage:
     name: Azure Storage provider tests
     runs-on: ubuntu-latest
@@ -322,7 +316,6 @@ jobs:
       fail-fast: false
       matrix:
         framework: ["net8.0", "net10.0"]
-        provider: ["AzureStorage"]
     steps:
     - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
     - name: Start Azurite
@@ -347,7 +340,7 @@ jobs:
       with:
         artifact-name: test_output_${{ github.job }}_${{ matrix.framework }}
         framework: ${{ matrix.framework }}
-        provider: ${{ matrix.provider }}
+        provider: AzureStorage
       env:
 # [SuppressMessage("Microsoft.Security", "CS002:SecretInNextLine", Justification="Not a secret")]
 # [SuppressMessage("Microsoft.Security", "CSCAN0090:ConfigFile", Justification="Not a secret")]
@@ -365,7 +358,6 @@ jobs:
       fail-fast: false
       matrix:
         framework: ["net8.0", "net10.0"]
-        provider: ["EventHub"]
     steps:
     - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
     - name: Start Azurite
@@ -409,7 +401,7 @@ jobs:
       with:
         artifact-name: test_output_${{ github.job }}_${{ matrix.framework }}
         framework: ${{ matrix.framework }}
-        provider: ${{ matrix.provider }}
+        provider: EventHub
       env:
 # [SuppressMessage("Microsoft.Security", "CS002:SecretInNextLine", Justification="Not a secret")]
 # [SuppressMessage("Microsoft.Security", "CSCAN0090:ConfigFile", Justification="Not a secret")]
@@ -432,7 +424,6 @@ jobs:
       fail-fast: false
       matrix:
         framework: ["net8.0", "net10.0"]
-        provider: ["Cosmos"]
     steps:
     - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
     - name: Start Azure Cosmos DB emulator
@@ -472,7 +463,7 @@ jobs:
       with:
         artifact-name: test_output_${{ github.job }}_${{ matrix.framework }}
         framework: ${{ matrix.framework }}
-        provider: ${{ matrix.provider }}
+        provider: Cosmos
         retry: 'true'
       env:
 # [SuppressMessage("Microsoft.Security", "CS002:SecretInNextLine", Justification="Not a secret")]
@@ -490,7 +481,6 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        provider: ["Consul"]
         framework: ["net8.0", "net10.0"]
     steps:
     - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
@@ -506,7 +496,7 @@ jobs:
       with:
         artifact-name: test_output_${{ github.job }}_${{ matrix.framework }}
         framework: ${{ matrix.framework }}
-        provider: ${{ matrix.provider }}
+        provider: Consul
   test-zookeeper:
     name: ZooKeeper provider tests
     runs-on: ubuntu-latest
@@ -515,7 +505,6 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        provider: ["ZooKeeper"]
         framework: ["net8.0", "net10.0"]
     steps:
     - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
@@ -538,7 +527,7 @@ jobs:
       with:
         artifact-name: test_output_${{ github.job }}_${{ matrix.framework }}
         framework: ${{ matrix.framework }}
-        provider: ${{ matrix.provider }}
+        provider: ZooKeeper
       env:
         ORLEANSZOOKEEPERCONNECTIONSTRING: "localhost:2181"
     - name: Clean up ZooKeeper
@@ -557,7 +546,6 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        provider: ["DynamoDB"]
         framework: ["net8.0", "net10.0"]
     steps:
     - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
@@ -583,7 +571,7 @@ jobs:
       with:
         artifact-name: test_output_${{ github.job }}_${{ matrix.framework }}
         framework: ${{ matrix.framework }}
-        provider: ${{ matrix.provider }}
+        provider: DynamoDB
       env:
         ORLEANSDYNAMODBSERVICE: "http://127.0.0.1:8000"
 # [SuppressMessage("Microsoft.Security", "CS002:SecretInNextLine", Justification="Not a secret")]
@@ -606,7 +594,6 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        provider: ["SQS"]
         framework: ["net8.0", "net10.0"]
     steps:
     - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
@@ -643,7 +630,7 @@ jobs:
       with:
         artifact-name: test_output_${{ github.job }}_${{ matrix.framework }}
         framework: ${{ matrix.framework }}
-        provider: ${{ matrix.provider }}
+        provider: SQS
       env:
         ORLEANSSQSCONNECTIONSTRING: "Service=http://127.0.0.1:9324"
         ORLEANSDYNAMODBSERVICE: "http://127.0.0.1:8000"
@@ -665,7 +652,6 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        provider: ["NATS"]
         framework: ["net8.0", "net10.0"]
 #    services:
 #      nats:
@@ -702,7 +688,7 @@ jobs:
       with:
         artifact-name: test_output_${{ github.job }}_${{ matrix.framework }}
         framework: ${{ matrix.framework }}
-        provider: ${{ matrix.provider }}
+        provider: NATS
     - name: Clean up container
       if: always()
       run: docker rm -f nats || true
@@ -719,7 +705,6 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        provider: ["Kinesis"]
         framework: ["net8.0", "net10.0"]
     steps:
     - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
@@ -757,7 +742,7 @@ jobs:
       with:
         artifact-name: test_output_${{ github.job }}_${{ matrix.framework }}
         framework: ${{ matrix.framework }}
-        provider: ${{ matrix.provider }}
+        provider: Kinesis
       env:
         ORLEANSKINESISCONNECTIONSTRING: "http://localhost:4566;test;test;us-east-1"
         ORLEANSDYNAMODBSERVICE: "http://localhost:8000"
@@ -792,9 +777,10 @@ jobs:
         artifact-name: test_output_${{ github.job }}_${{ matrix.suite }}_${{ matrix.os }}_${{ matrix.framework }}
         filter-query: /[(Provider=None)&(Suite=${{ matrix.suite }})&(Area!=CodeGen)]
         framework: ${{ matrix.framework }}
+        prebuild-solution: 'true'
   coverage-merge:
     name: Merge code coverage
-    if: github.event_name == 'pull_request' && !cancelled()
+    if: github.event_name == 'pull_request' && needs.ci.result == 'success'
     needs: ci
     runs-on: ubuntu-latest
     permissions:
@@ -810,17 +796,12 @@ jobs:
     - name: Download coverage data
       uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
       with:
-        pattern: test_output_*
+        pattern: coverage_test_output_*
         path: coverage-data
-        merge-multiple: false
+        merge-multiple: true
     - name: Merge coverage
       shell: pwsh
-      run: >
-        ./.github/scripts/merge-coverage.ps1
-        -CoverageToolPath ./.tools/dotnet-coverage
-        -ExpectedArtifactCount 60
-        -OutputPath TestResults/coverage.cobertura.xml
-        -ReportDirectory coverage-data
+      run: dotnet-coverage merge "coverage-data/*.cobertura.xml" --output TestResults/coverage.cobertura.xml --output-format cobertura --nologo
     - name: Archive coverage
       uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
       with:
@@ -851,7 +832,6 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        provider: ["GoogleCloud"]
         framework: ["net8.0", "net10.0"]
     steps:
     - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
@@ -904,7 +884,7 @@ jobs:
       with:
         artifact-name: test_output_${{ github.job }}_${{ matrix.framework }}
         framework: ${{ matrix.framework }}
-        provider: ${{ matrix.provider }}
+        provider: GoogleCloud
   ci:
     name: CI
     if: always()

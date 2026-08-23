@@ -16,6 +16,10 @@ inputs:
     description: Provider trait selected by the standard CI filter.
     required: false
     default: ''
+  prebuild-solution:
+    description: Build the complete solution before running tests.
+    required: false
+    default: 'false'
   retry:
     description: Retry the test partition once after a failure.
     required: false
@@ -29,6 +33,10 @@ runs:
   using: composite
   steps:
   - uses: ./.github/actions/setup-test-environment
+  - name: Build
+    if: inputs.prebuild-solution == 'true'
+    shell: pwsh
+    run: dotnet build Orleans.slnx -p:ContinuousIntegrationBuild=false
   - name: Test
     id: test
     continue-on-error: ${{ inputs.retry == 'true' }}
@@ -37,6 +45,7 @@ runs:
       coverage-id: ${{ inputs.artifact-name }}
       filter-query: ${{ inputs.filter-query || format('/[(Provider={0})&((Suite=BVT)|(Suite=SlowBVT)|(Suite=Functional))&(Category!=Performance)&(Category!=Stress)]', inputs.provider) }}
       framework: ${{ inputs.framework }}
+      no-build: ${{ inputs.prebuild-solution }}
       result-id: ${{ inputs.retry == 'true' && format('{0}-attempt1', inputs.artifact-name) || inputs.artifact-name }}
       static-instrumentation: ${{ inputs.static-instrumentation }}
   - name: Retry tests
@@ -46,6 +55,7 @@ runs:
       coverage-id: ${{ inputs.artifact-name }}
       filter-query: ${{ inputs.filter-query || format('/[(Provider={0})&((Suite=BVT)|(Suite=SlowBVT)|(Suite=Functional))&(Category!=Performance)&(Category!=Stress)]', inputs.provider) }}
       framework: ${{ inputs.framework }}
+      no-build: ${{ inputs.prebuild-solution }}
       result-id: ${{ format('{0}-attempt2', inputs.artifact-name) }}
       static-instrumentation: ${{ inputs.static-instrumentation }}
   - name: Archive test results

@@ -6,7 +6,7 @@ $ErrorActionPreference = 'Stop'
 
 $scriptPath = Join-Path $PSScriptRoot 'summarize-coverage.ps1'
 $coverageReportScriptPath = Join-Path $PSScriptRoot 'coverage-report.ps1'
-$mergeScriptPath = Join-Path $PSScriptRoot 'merge-coverage.ps1'
+$archiveTestResultsActionPath = Join-Path $PSScriptRoot '../actions/archive-test-results/action.yml'
 $dotnetTestActionPath = Join-Path $PSScriptRoot '../actions/dotnet-test/action.yml'
 $runTestsActionPath = Join-Path $PSScriptRoot '../actions/run-tests/action.yml'
 $setupCoverageScriptPath = Join-Path $PSScriptRoot 'setup-coverage.ps1'
@@ -313,21 +313,21 @@ try {
             'Test partitions must use native solution discovery.'
     }
 
-    Invoke-Test 'preserves coverage artifact directories during download' {
+    Invoke-Test 'downloads only coverage artifacts for merging' {
         $workflow = Get-Content -Raw -LiteralPath $workflowPath
         Assert-Matches `
             $workflow `
-            '(?s)pattern:\s*test_output_\*.*?merge-multiple:\s*false' `
-            'Coverage artifacts must not be flattened before merging.'
+            '(?s)pattern:\s*coverage_test_output_\*.*?merge-multiple:\s*true' `
+            'Coverage reports must download directly into the merge directory.'
     }
 
     Invoke-Test 'requires every test matrix job before merging' {
         $workflow = Get-Content -Raw -LiteralPath $workflowPath
-        $mergeScript = Get-Content -Raw -LiteralPath $mergeScriptPath
+        $archiveTestResultsAction = Get-Content -Raw -LiteralPath $archiveTestResultsActionPath
         Assert-Matches `
             $workflow `
-            "if: github\.event_name == 'pull_request' && !cancelled\(\)" `
-            'Coverage merge must run after test failures.'
+            "if: github\.event_name == 'pull_request' && needs\.ci\.result == 'success'" `
+            'Coverage merge must run only after every CI job succeeds.'
         Assert-Matches `
             $workflow `
             'needs: ci' `
@@ -337,13 +337,17 @@ try {
             '(?s)coverage-merge:.*?actions/checkout@.*?actions/setup-dotnet@.*?actions/setup-coverage' `
             'Coverage merge must check out scripts before running local actions.'
         Assert-Matches `
-            $mergeScript `
-            'ExpectedArtifactCount' `
-            'The merge must validate every test matrix artifact.'
+            $workflow `
+            'dotnet-coverage merge "coverage-data/\*\.cobertura\.xml"' `
+            'Coverage reports must be merged directly by dotnet-coverage.'
         Assert-Matches `
-            $mergeScript `
-            'contains no coverage report' `
-            'The merge must reject test artifacts without coverage.'
+            $archiveTestResultsAction `
+            'if-no-files-found: error' `
+            'Each successful pull request test job must publish coverage.'
+        Assert-Matches `
+            $archiveTestResultsAction `
+            'path: TestResults/\$\{\{ inputs\.name \}\}\.cobertura\.xml' `
+            'Each test job must publish its exact coverage report.'
     }
 
     Invoke-Test 'collects coverage from every test job' {
@@ -351,15 +355,18 @@ try {
         $runTestsAction = Get-Content -Raw -LiteralPath $runTestsActionPath
         $dotnetTestAction = Get-Content -Raw -LiteralPath $dotnetTestActionPath
         Assert-Equal 18 ([regex]::Matches($workflow, 'uses: \./\.github/actions/run-tests')).Count 'Test action count differs.'
-        Assert-Equal 16 ([regex]::Matches($workflow, 'provider: \$\{\{ matrix\.provider \}\}')).Count 'Provider-discovered test partition count differs.'
+        Assert-Equal 16 ([regex]::Matches($workflow, '(?m)^\s{8}provider: [A-Za-z]')).Count 'Provider-discovered test partition count differs.'
         Assert-Equal 2 ([regex]::Matches($runTestsAction, 'uses: \./\.github/actions/dotnet-test')).Count 'Native test action invocation count differs.'
         Assert-Equal 2 ([regex]::Matches($runTestsAction, "format\('/\[\(Provider=\{0\}\)")).Count 'Standard provider filter count differs.'
         Assert-Equal 3 ([regex]::Matches($dotnetTestAction, 'dotnet test --solution Orleans\.slnx')).Count 'Native test command count differs.'
+        Assert-Equal 1 ([regex]::Matches($workflow, "prebuild-solution: 'true'")).Count 'Core solution prebuild count differs.'
+        Assert-Matches $runTestsAction 'dotnet build Orleans\.slnx' 'Core tests must build non-test solution dependencies.'
         Assert-Equal 1 ([regex]::Matches($workflow, "retry: 'true'")).Count 'Cosmos retry configuration count differs.'
         Assert-Matches $runTestsAction 'attempt1' 'The first retryable attempt must retain distinct test results.'
         Assert-Matches $runTestsAction 'attempt2' 'The second retryable attempt must retain distinct test results.'
         Assert-Equal 0 ([regex]::Matches($workflow, 'test/.+\.(?:csproj|fsproj|dll)')).Count 'Workflow must not enumerate test projects or modules.'
         Assert-Equal 0 ([regex]::Matches($workflow, 'run-.+tests?\.ps1')).Count 'Workflow must not invoke a PowerShell test runner.'
+        Assert-Equal 0 ([regex]::Matches($workflow, 'merge-coverage\.ps1')).Count 'Workflow must use native coverage merging.'
         Assert-Equal 0 ([regex]::Matches($dotnetTestAction, '--project|--test-modules')).Count 'Native test action must discover projects from the solution.'
     }
 
