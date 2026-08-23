@@ -129,7 +129,9 @@ public sealed class SqsStreamProviderBuilder : IProviderBuilder<ISiloBuilder>, I
 
         var service = configurationSection["Service"];
         var region = configurationSection["Region"];
-        var serviceEndpoint = configurationSection["ServiceEndpoint"] ?? configurationSection["Endpoint"];
+        var serviceEndpoint = GetFirstNonWhiteSpace(
+            configurationSection["ServiceEndpoint"],
+            configurationSection["Endpoint"]);
         var configuredLocations = new[] { service, region, serviceEndpoint }
             .Count(value => !string.IsNullOrWhiteSpace(value));
         if (configuredLocations > 1)
@@ -143,7 +145,7 @@ public sealed class SqsStreamProviderBuilder : IProviderBuilder<ISiloBuilder>, I
             ValidateServiceEndpoint(serviceEndpoint);
         }
 
-        var configuredService = !string.IsNullOrWhiteSpace(service) ? service : region ?? serviceEndpoint;
+        var configuredService = GetFirstNonWhiteSpace(service, region, serviceEndpoint);
         if (!string.IsNullOrWhiteSpace(connectionString))
         {
             if (!string.IsNullOrWhiteSpace(configuredService))
@@ -263,6 +265,9 @@ public sealed class SqsStreamProviderBuilder : IProviderBuilder<ISiloBuilder>, I
             values.AddRange(configuredValues);
         }
     }
+
+    private static string? GetFirstNonWhiteSpace(params string?[] values)
+        => values.FirstOrDefault(value => !string.IsNullOrWhiteSpace(value));
 
     private static bool? GetBoolean(IConfigurationSection section, string key)
     {
