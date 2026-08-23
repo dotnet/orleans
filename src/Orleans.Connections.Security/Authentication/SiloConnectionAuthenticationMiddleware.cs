@@ -135,7 +135,7 @@ internal abstract class SiloConnectionAuthenticationMiddleware
             Logger,
             GetTargetName(Target),
             GetDirectionName(direction),
-            Options.Mode.ToString(),
+            SiloConnectionAuthenticationTelemetry.GetModeName(Options.Mode),
             SiloConnectionAuthenticationTelemetry.GetResultName(result));
 
         if (!feature.IsAuthenticated)
@@ -205,7 +205,7 @@ internal abstract class SiloConnectionAuthenticationMiddleware
             Logger,
             GetTargetName(Target),
             GetDirectionName(direction),
-            Options.Mode.ToString(),
+            SiloConnectionAuthenticationTelemetry.GetModeName(Options.Mode),
             SiloConnectionAuthenticationTelemetry.GetResultName(category));
         context.Abort(new ConnectionAbortedException(
             $"Orleans connection authentication failed ({SiloConnectionAuthenticationTelemetry.GetResultName(category)})."));

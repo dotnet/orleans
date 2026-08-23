@@ -46,7 +46,7 @@ internal sealed class AuthenticationWorkLimiter
 
             try
             {
-                await _semaphore.WaitAsync(cancellationToken);
+                await _semaphore.WaitAsync(cancellationToken).ConfigureAwait(false);
                 return new Releaser(_semaphore);
             }
             finally
