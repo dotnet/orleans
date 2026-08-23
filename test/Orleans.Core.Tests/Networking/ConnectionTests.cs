@@ -1,12 +1,17 @@
-using System.Net;
 using System.IO.Pipelines;
+using System.Net;
 using Microsoft.AspNetCore.Connections;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using NSubstitute;
 using Orleans.CodeGeneration;
+using Orleans.Configuration;
 using Orleans.Messaging;
+using Orleans.Networking.Shared;
+using Orleans.Placement.Repartitioning;
 using Orleans.Runtime;
 using Orleans.Runtime.Messaging;
+using Orleans.Serialization.Session;
 using TestExtensions;
 using Xunit;
 
@@ -20,9 +25,11 @@ public class ConnectionTests
 {
     private readonly MessageFactory _messageFactory;
     private readonly ConnectionCommon _connectionCommon;
+    private readonly TestEnvironmentFixture _fixture;
 
     public ConnectionTests(TestEnvironmentFixture fixture)
     {
+        _fixture = fixture;
         _messageFactory = fixture.Services.GetRequiredService<MessageFactory>();
         _connectionCommon = fixture.Services.GetRequiredService<ConnectionCommon>();
     }
@@ -74,14 +81,7 @@ public class ConnectionTests
     public async Task SerializationFailure_IsNotFailedAgainWhenConnectionCloses()
     {
         var messageCenter = new TestMessageCenter();
-        var input = new Pipe();
-        var output = new Pipe();
-        var context = new DefaultConnectionContext
-        {
-            LocalEndPoint = new IPEndPoint(IPAddress.Loopback, 11111),
-            RemoteEndPoint = new IPEndPoint(IPAddress.Loopback, 22222),
-            Transport = new DuplexPipe(input.Reader, output.Writer),
-        };
+        var context = CreateConnectionContext();
         var builder = new ConnectionBuilder(_connectionCommon.ServiceProvider);
         Connection.ConfigureBuilder(builder);
         var connection = new TestConnection(context, builder.Build(), _connectionCommon, messageCenter);
@@ -106,6 +106,46 @@ public class ConnectionTests
         Assert.Equal(0, connection.SendFailureCount);
     }
 
+    [Fact]
+    public async Task InvalidMessageFrame_RemainsOwnedUntilConnectionCloses()
+    {
+        var serializer = new MessageSerializer(
+            _fixture.Services.GetRequiredService<SerializerSessionPool>(),
+            _fixture.Services.GetRequiredService<SharedMemoryPool>(),
+            new SiloMessagingOptions { MaxMessageBodySize = 1 });
+        using var services = new ServiceCollection()
+            .AddSingleton(serializer)
+            .BuildServiceProvider();
+        var connectionCommon = new ConnectionCommon(
+            services,
+            _messageFactory,
+            _fixture.Services.GetRequiredService<MessagingTrace>(),
+            _fixture.Services.GetRequiredService<OrleansInstruments>(),
+            _fixture.Services.GetRequiredService<MessagingInstruments>(),
+            _fixture.Services.GetRequiredService<ILogger<Connection>>(),
+            _fixture.Services.GetRequiredService<IMessageStatisticsSink>());
+        var messageCenter = new TestMessageCenter();
+        var context = CreateConnectionContext();
+        var builder = new ConnectionBuilder(connectionCommon.ServiceProvider);
+        Connection.ConfigureBuilder(builder);
+        var connection = new TestConnection(context, builder.Build(), connectionCommon, messageCenter);
+        var request = _messageFactory.CreateMessage(new object[] { "too large" }, InvokeMethodOptions.None);
+        request.SendingSilo = SiloAddress.New(IPAddress.Loopback, 33333, 3);
+        request.SendingGrain = GrainId.Create("sender", "1");
+        request.TargetSilo = SiloAddress.New(IPAddress.Loopback, 44444, 4);
+        request.TargetGrain = GrainId.Create("target", "2");
+
+        var runTask = connection.Run();
+        await connection.Initialized.WaitAsync(TimeSpan.FromSeconds(30));
+        connection.Send(request);
+
+        Assert.Same(request, await connection.SendFailure.WaitAsync(TimeSpan.FromSeconds(30)));
+        await runTask.WaitAsync(TimeSpan.FromSeconds(30));
+
+        Assert.Equal(1, connection.SendFailureCount);
+        Assert.False(messageCenter.SentMessage.IsCompleted);
+    }
+
     [Theory]
     [InlineData(NetworkProtocolVersion.Version1, NetworkProtocolVersion.Version1, NetworkProtocolVersion.Version1)]
     [InlineData(NetworkProtocolVersion.Version1, NetworkProtocolVersion.Version2, NetworkProtocolVersion.Version1)]
@@ -125,6 +165,8 @@ public class ConnectionTests
 
     private sealed class TestConnection : Connection
     {
+        private readonly TaskCompletionSource<Message> _sendFailure = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
         public TestConnection(ConnectionCommon shared, IMessageCenter messageCenter)
             : this(new DefaultConnectionContext(), _ => Task.CompletedTask, shared, messageCenter)
         {
@@ -146,6 +188,8 @@ public class ConnectionTests
 
         public int SendFailureCount { get; private set; }
 
+        public Task<Message> SendFailure => _sendFailure.Task;
+
         public NetworkProtocolVersion ProtocolVersion => NetworkProtocolVersion;
 
         public bool HandleSendFailure(Message message, Exception exception) => HandleSendMessageFailure(message, exception);
@@ -162,6 +206,7 @@ public class ConnectionTests
         protected override void OnSendMessageFailure(Message message, string error)
         {
             SendFailureCount++;
+            _sendFailure.TrySetResult(message);
         }
 
         protected override void RecordMessageReceive(Message msg, int numTotalBytes, int headerBytes)
@@ -193,5 +238,17 @@ public class ConnectionTests
         public PipeReader Input { get; } = input;
 
         public PipeWriter Output { get; } = output;
+    }
+
+    private static DefaultConnectionContext CreateConnectionContext()
+    {
+        var input = new Pipe();
+        var output = new Pipe();
+        return new DefaultConnectionContext
+        {
+            LocalEndPoint = new IPEndPoint(IPAddress.Loopback, 11111),
+            RemoteEndPoint = new IPEndPoint(IPAddress.Loopback, 22222),
+            Transport = new DuplexPipe(input.Reader, output.Writer),
+        };
     }
 }
