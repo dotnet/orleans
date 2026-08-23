@@ -23,7 +23,7 @@ public class DispatcherEventsTests
 
         trace.OnDispatcherRejectMessage(message, Message.RejectionTypes.Transient, "reason", exception);
 
-        var rejected = Assert.Single(observer.Events.OfType<DispatcherEvents.Rejected>(), evt => ReferenceEquals(evt.Message, message));
+        var rejected = Assert.Single(observer.Events.OfType<DispatcherEvents.Rejected>(), evt => evt.Message == message);
         Assert.Equal(Message.RejectionTypes.Transient, rejected.RejectionType);
         Assert.Equal("reason", rejected.Reason);
         Assert.Same(exception, rejected.Exception);

@@ -180,7 +180,7 @@ namespace UnitTests.Serialization
             var reader = readResult.Buffer;
             var (requiredBytes, _, _) = this.messageSerializer.TryRead(ref reader, out var deserializedMessage);
             Assert.Equal(0, requiredBytes);
-            return deserializedMessage!;
+            return deserializedMessage!.Value;
         }
 
         private Message RoundTripMessage(

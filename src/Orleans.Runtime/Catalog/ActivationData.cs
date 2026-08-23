@@ -850,9 +850,9 @@ internal sealed partial class ActivationData :
                 return;
             }
 
-            if (_blockingRequest is not null)
+            if (_blockingRequest is { } blockingMessage)
             {
-                var message = _blockingRequest;
+                var message = blockingMessage;
                 TimeSpan? timeSinceQueued = default;
                 if (_runningRequests.TryGetValue(message, out var waitTime))
                 {
@@ -881,7 +881,7 @@ internal sealed partial class ActivationData :
             {
                 var message = running.Key;
                 var runDuration = running.Value;
-                if (ReferenceEquals(message, _blockingRequest) || message.IsLocalOnly)
+                if ((_blockingRequest is { } currentBlockingMessage && message == currentBlockingMessage) || message.IsLocalOnly)
                 {
                     continue;
                 }
@@ -1137,7 +1137,7 @@ internal sealed partial class ActivationData :
 
             do
             {
-                Message? message = null;
+                Message message = default;
                 lock (_lock)
                 {
                     if (_waitingRequests.Count <= i)
@@ -1162,7 +1162,7 @@ internal sealed partial class ActivationData :
                             // The activation is not able to process this message right now, so try the next message.
                             ++i;
 
-                            if (_blockingRequest != null)
+                            if (_blockingRequest is { } blockingRequest)
                             {
                                 var currentRequestActiveTime = _busyDuration.Elapsed;
                                 if (currentRequestActiveTime > _shared.MaxRequestProcessingTime && !IsStuckProcessingMessage)
@@ -1176,7 +1176,7 @@ internal sealed partial class ActivationData :
                                         _shared.Logger,
                                         currentRequestActiveTime,
                                         new(this),
-                                        _blockingRequest,
+                                        blockingRequest,
                                         message);
                                 }
                             }
@@ -1315,12 +1315,12 @@ internal sealed partial class ActivationData :
                 return true;
             }
 
-            if (_blockingRequest is null)
+            if (_blockingRequest is not { } blockingRequest)
             {
                 return true;
             }
 
-            if (_blockingRequest.IsReadOnly && incoming.IsReadOnly)
+            if (blockingRequest.IsReadOnly && incoming.IsReadOnly)
             {
                 return true;
             }
@@ -1337,7 +1337,7 @@ internal sealed partial class ActivationData :
                 try
                 {
                     return canInterleave.MayInterleave(GrainInstance, incoming)
-                        || canInterleave.MayInterleave(GrainInstance, _blockingRequest);
+                        || canInterleave.MayInterleave(GrainInstance, blockingRequest);
                 }
                 catch (Exception exception)
                 {
@@ -2385,6 +2385,7 @@ internal sealed partial class ActivationData :
         {
             Message? message = null;
             var wasWaiting = false;
+            var acquiredRunningMessage = false;
             lock (_lock)
             {
                 // Check the running requests.
@@ -2392,7 +2393,9 @@ internal sealed partial class ActivationData :
                 {
                     if (candidate.Id == messageId && candidate.SendingGrain == senderGrainId)
                     {
+                        candidate.Acquire();
                         message = candidate;
+                        acquiredRunningMessage = true;
                         break;
                     }
                 }
@@ -2414,29 +2417,39 @@ internal sealed partial class ActivationData :
                 }
             }
 
-            var didCancel = false;
-            if (message is not null && message.BodyObject is IInvokable request)
+            try
             {
-                if (wasWaiting)
+                var didCancel = false;
+                if (message is { } targetMessage && targetMessage.BodyObject is IInvokable request)
                 {
-                    // If the request was waiting, then we necessarily did manage to cancel it, so send the response now.
-                    try
+                    if (wasWaiting)
                     {
-                        _shared.InternalRuntime.RuntimeClient.SendResponse(message, Response.FromException(new OperationCanceledException()));
-                        didCancel = true;
+                        // If the request was waiting, then we necessarily did manage to cancel it, so send the response now.
+                        try
+                        {
+                            _shared.InternalRuntime.RuntimeClient.SendResponse(targetMessage, Response.FromException(new OperationCanceledException()));
+                            didCancel = true;
+                        }
+                        finally
+                        {
+                            targetMessage.ReleaseDropped("CanceledWhileWaiting");
+                        }
                     }
-                    finally
+                    else
                     {
-                        message.ReleaseDropped("CanceledWhileWaiting");
+                        didCancel = TryCancelInvokable(request) || !request.IsCancellable;
                     }
                 }
-                else
+
+                return didCancel;
+            }
+            finally
+            {
+                if (acquiredRunningMessage)
                 {
-                    didCancel = TryCancelInvokable(request) || !request.IsCancellable;
+                    message!.Value.Release();
                 }
             }
-
-            return didCancel;
         }
 
         bool TryCancelInvokable(IInvokable request)

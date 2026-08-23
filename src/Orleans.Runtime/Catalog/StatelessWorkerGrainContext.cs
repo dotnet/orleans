@@ -18,7 +18,7 @@ internal partial class StatelessWorkerGrainContext : IGrainContext, IAsyncDispos
     private readonly StatelessWorkerGrainTypeSharedContext _shared;
     private readonly IGrainContextActivator _innerActivator;
     private readonly List<ActivationData> _workers = [];
-    private readonly ConcurrentQueue<(WorkItemType Type, object State)> _workItems = new();
+    private readonly ConcurrentQueue<WorkItem> _workItems = new();
     private readonly SingleWaiterAutoResetEvent _workSignal = new() { RunContinuationsAsynchronously = false };
     private readonly TaskCompletionSource _disposalTask = new(TaskCreationOptions.RunContinuationsAsynchronously);
 
@@ -97,7 +97,13 @@ internal partial class StatelessWorkerGrainContext : IGrainContext, IAsyncDispos
 
     public void Activate(Dictionary<string, object>? requestContext, CancellationToken cancellationToken) { }
 
-    public void ReceiveMessage(object message) => EnqueueWorkItem(WorkItemType.Message, message);
+    public void ReceiveMessage(object message) => ReceiveMessage((Message)message);
+
+    public void ReceiveMessage(Message message)
+    {
+        _workItems.Enqueue(new(WorkItemType.Message, message, null));
+        _workSignal.Signal();
+    }
 
     public void Deactivate(DeactivationReason deactivationReason, CancellationToken cancellationToken) =>
         EnqueueWorkItem(WorkItemType.Deactivate, new DeactivateWorkItemState(deactivationReason, cancellationToken));
@@ -110,7 +116,7 @@ internal partial class StatelessWorkerGrainContext : IGrainContext, IAsyncDispos
 
     private void EnqueueWorkItem(WorkItemType type, object state)
     {
-        _workItems.Enqueue(new(type, state));
+        _workItems.Enqueue(new(type, default, state));
         _workSignal.Signal();
     }
 
@@ -145,17 +151,17 @@ internal partial class StatelessWorkerGrainContext : IGrainContext, IAsyncDispos
                     switch (workItem.Type)
                     {
                         case WorkItemType.Message:
-                            ReceiveMessageInternal(workItem.State);
+                            ReceiveMessageInternal(workItem.Message);
                             break;
                         case WorkItemType.Deactivate:
                             {
-                                var state = (DeactivateWorkItemState)workItem.State;
+                                var state = (DeactivateWorkItemState)workItem.State!;
                                 DeactivateInternal(state.DeactivationReason, state.CancellationToken);
                                 break;
                             }
                         case WorkItemType.DeactivatedTask:
                             {
-                                var state = (DeactivatedTaskWorkItemState)workItem.State;
+                                var state = (DeactivatedTaskWorkItemState)workItem.State!;
                                 _ = DeactivatedTaskInternal(state.Completion);
                                 break;
                             }
@@ -166,7 +172,7 @@ internal partial class StatelessWorkerGrainContext : IGrainContext, IAsyncDispos
                             }
                         case WorkItemType.OnDestroyActivation:
                             {
-                                var grainContext = (ActivationData)workItem.State;
+                                var grainContext = (ActivationData)workItem.State!;
                                 _workers.Remove(grainContext);
 
                                 if (_workers.Count == 0)
@@ -245,13 +251,13 @@ internal partial class StatelessWorkerGrainContext : IGrainContext, IAsyncDispos
         }
     }
 
-    private void ReceiveMessageInternal(object message)
+    private void ReceiveMessageInternal(Message message)
     {
         try
         {
             if (_terminated)
             {
-                ForwardToReplacementContext((Message)message);
+                ForwardToReplacementContext(message);
                 return;
             }
 
@@ -305,14 +311,14 @@ internal partial class StatelessWorkerGrainContext : IGrainContext, IAsyncDispos
 
             worker.ReceiveMessage(message);
         }
-        catch (Exception exception) when (message is Message msg)
+        catch (Exception exception)
         {
             _shared.Shared.InternalRuntime.MessageCenter.RejectMessage(
-                msg,
+                message,
                 Message.RejectionTypes.Transient,
                 exception,
                 "Exception while creating grain context");
-            msg.ReleaseDropped("ExceptionCreatingContext");
+            message.ReleaseDropped("ExceptionCreatingContext");
         }
     }
 
@@ -328,10 +334,10 @@ internal partial class StatelessWorkerGrainContext : IGrainContext, IAsyncDispos
             rehydrationContext: null)!;
         Debug.Assert(!ReferenceEquals(replacement, this), "Catalog must not resolve to a terminated stateless worker context.");
         StatelessWorkerEvents.EmitMessageForwarded(this, replacement, message);
-        replacement.ReceiveMessage(message);
+        RuntimeMessageDispatcher.Dispatch(replacement, message);
     }
 
-    private ActivationData CreateWorker(object? message)
+    private ActivationData CreateWorker(Message? message)
     {
         Debug.Assert(!_terminated, "CreateWorker must not be called on a terminated stateless worker context.");
         var address = GrainAddress.GetAddress(Address.SiloAddress, Address.GrainId, ActivationId.NewId());
@@ -341,7 +347,7 @@ internal partial class StatelessWorkerGrainContext : IGrainContext, IAsyncDispos
         newWorker.SetComponent<IActivationLifecycleObserver>(this);
 
         // If this is a new worker and there is a message in scope, try to get the request context and activate the worker
-        var requestContext = (message as Message)?.RequestContextData ?? [];
+        var requestContext = message is { } request ? request.RequestContextData ?? [] : [];
         var cancellation = new CancellationTokenSource(_shared.Shared.InternalRuntime.CollectionOptions.Value.ActivationTimeout);
 
         newWorker.Activate(requestContext, cancellation.Token);
@@ -440,6 +446,7 @@ internal partial class StatelessWorkerGrainContext : IGrainContext, IAsyncDispos
         CollectIdleWorkers
     }
 
+    private readonly record struct WorkItem(WorkItemType Type, Message Message, object? State);
     private record ActivateWorkItemState(Dictionary<string, object>? RequestContext, CancellationToken CancellationToken);
     private record DeactivateWorkItemState(DeactivationReason DeactivationReason, CancellationToken CancellationToken);
     private record DeactivatedTaskWorkItemState(TaskCompletionSource Completion);

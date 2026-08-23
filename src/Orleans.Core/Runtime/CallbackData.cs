@@ -16,6 +16,7 @@ namespace Orleans.Runtime
         private readonly SharedCallbackData shared;
         private readonly IResponseCompletionSource context;
         private readonly ApplicationRequestInstruments _applicationRequestInstruments;
+        private readonly TimeSpan? _defaultResponseTimeout;
         private int _state;
         private StatusResponse? lastKnownStatus;
         private ValueStopwatch stopwatch;
@@ -32,11 +33,18 @@ namespace Orleans.Runtime
             // CallbackData holds a reference to the request message while awaiting completion.
             msg.Acquire();
             this.Message = msg;
+            _defaultResponseTimeout = (msg.BodyObject as IInvokable)?.GetDefaultResponseTimeout();
             _applicationRequestInstruments = applicationRequestInstruments;
             this.stopwatch = ValueStopwatch.StartNew();
         }
 
         public Message Message { get; } // might hold metadata used by response pipeline
+
+        public bool TryAcquireMessage(out Message message)
+        {
+            message = Message;
+            return message.TryAcquire();
+        }
 
         public bool IsCompleted => (Volatile.Read(ref _state) & StateCompleted) != 0;
 
@@ -95,16 +103,15 @@ namespace Orleans.Runtime
 
         private long GetResponseTimeoutStopwatchTicks()
         {
-            var defaultResponseTimeout = (Message.BodyObject as IInvokable)?.GetDefaultResponseTimeout();
-            if (defaultResponseTimeout.HasValue)
+            if (_defaultResponseTimeout.HasValue)
             {
-                return (long)(defaultResponseTimeout.Value.TotalSeconds * Stopwatch.Frequency);
+                return (long)(_defaultResponseTimeout.Value.TotalSeconds * Stopwatch.Frequency);
             }
 
             return shared.ResponseTimeoutStopwatchTicks;
         }
 
-        private TimeSpan GetResponseTimeout() => (Message.BodyObject as IInvokable)?.GetDefaultResponseTimeout() ?? shared.ResponseTimeout;
+        private TimeSpan GetResponseTimeout() => _defaultResponseTimeout ?? shared.ResponseTimeout;
 
         private string GetTargetGrainType()
         {

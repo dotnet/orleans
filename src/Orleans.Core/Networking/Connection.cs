@@ -310,10 +310,11 @@ namespace Orleans.Runtime.Messaging
                                 if (requiredBytes == 0)
                                 {
                                     Debug.Assert(message is not null);
+                                    var receivedMessage = message.Value;
                                     MarkMessageReceived();
-                                    RecordMessageReceive(message, bodyLength + headerLength, headerLength);
+                                    RecordMessageReceive(receivedMessage, bodyLength + headerLength, headerLength);
                                     var handler = MessageHandlerPool.Get();
-                                    handler.Set(message, this);
+                                    handler.Set(receivedMessage, this);
                                     ThreadPool.UnsafeQueueUserWorkItem(handler, preferLocal: true);
                                 }
                             }
@@ -375,12 +376,18 @@ namespace Orleans.Runtime.Messaging
                     Message? message = default;
                     try
                     {
-                        while (inflight.Count < inflight.Capacity && reader.TryRead(out message) && this.PrepareMessageForSend(message))
+                        while (inflight.Count < inflight.Capacity && reader.TryRead(out var dequeuedMessage))
                         {
-                            inflight.Add(message);
-                            var (headerLength, bodyLength) = serializer.Write(output, message);
-                            RecordMessageSend(message, headerLength + bodyLength, headerLength);
-                            messageObserver?.Invoke(message);
+                            message = dequeuedMessage;
+                            if (!this.PrepareMessageForSend(dequeuedMessage))
+                            {
+                                break;
+                            }
+
+                            inflight.Add(dequeuedMessage);
+                            var (headerLength, bodyLength) = serializer.Write(output, dequeuedMessage);
+                            RecordMessageSend(dequeuedMessage, headerLength + bodyLength, headerLength);
+                            messageObserver?.Invoke(dequeuedMessage);
                             message = null;
                         }
                     }
@@ -391,9 +398,9 @@ namespace Orleans.Runtime.Messaging
                             throw;
                         }
 
-                        if (message is not null)
+                        if (message is { } failedMessage)
                         {
-                            inflight.Remove(message);
+                            inflight.Remove(failedMessage);
                             message = null;
                         }
                     }
@@ -469,37 +476,39 @@ namespace Orleans.Runtime.Messaging
                 return false;
             }
 
-            // The message body was not successfully decoded, but the headers were.
-            MessagingMetrics.OnRejectedMessage(message);
+            var failedMessage = message.Value;
 
-            if (message.HasDirection)
+            // The message body was not successfully decoded, but the headers were.
+            MessagingMetrics.OnRejectedMessage(failedMessage);
+
+            if (failedMessage.HasDirection)
             {
-                if (message.Direction == Message.Directions.Request)
+                if (failedMessage.Direction == Message.Directions.Request)
                 {
                     // Send a fast fail to the caller.
-                    var response = this.MessageFactory.CreateResponseMessage(message);
+                    var response = this.MessageFactory.CreateResponseMessage(failedMessage);
                     response.Result = Message.ResponseTypes.Error;
                     response.BodyObject = Response.FromException(exception);
 
                     // Send the error response and continue processing the next message.
                     this.Send(response);
-                    message.ReleaseDropped("ReceiveMessageDeserializationFailure");
+                    failedMessage.ReleaseDropped("ReceiveMessageDeserializationFailure");
                 }
-                else if (message.Direction == Message.Directions.Response)
+                else if (failedMessage.Direction == Message.Directions.Response)
                 {
                     // If the message was a response, propagate the exception to the intended recipient.
-                    message.Result = Message.ResponseTypes.Error;
-                    message.BodyObject = Response.FromException(exception);
-                    this.OnReceivedMessage(message);
+                    failedMessage.Result = Message.ResponseTypes.Error;
+                    failedMessage.BodyObject = Response.FromException(exception);
+                    this.OnReceivedMessage(failedMessage);
                 }
                 else
                 {
-                    message.ReleaseDropped("ReceiveMessageDeserializationFailure");
+                    failedMessage.ReleaseDropped("ReceiveMessageDeserializationFailure");
                 }
             }
             else
             {
-                message.ReleaseDropped("ReceiveMessageDeserializationFailure");
+                failedMessage.ReleaseDropped("ReceiveMessageDeserializationFailure");
             }
 
             // The exception has been handled by propagating it onwards.
@@ -519,38 +528,39 @@ namespace Orleans.Runtime.Messaging
                 return false;
             }
 
-            MessagingMetrics.OnFailedSentMessage(message);
+            var failedMessage = message.Value;
+            MessagingMetrics.OnFailedSentMessage(failedMessage);
 
-            if (message.Direction == Message.Directions.Request)
+            if (failedMessage.Direction == Message.Directions.Request)
             {
-                var response = this.MessageFactory.CreateResponseMessage(message);
+                var response = this.MessageFactory.CreateResponseMessage(failedMessage);
                 response.Result = Message.ResponseTypes.Error;
                 response.BodyObject = Response.FromException(exception);
 
                 this.MessageCenter.DispatchLocalMessage(response);
-                message.MarkTransferred("Connection.HandleSendMessageFailure:RequestFailed");
-                message.Release();
+                failedMessage.MarkTransferred("Connection.HandleSendMessageFailure:RequestFailed");
+                failedMessage.Release();
             }
-            else if (message.Direction == Message.Directions.Response && message.RetryCount < MessagingOptions.DEFAULT_MAX_MESSAGE_SEND_RETRIES)
+            else if (failedMessage.Direction == Message.Directions.Response && failedMessage.RetryCount < MessagingOptions.DEFAULT_MAX_MESSAGE_SEND_RETRIES)
             {
                 // If we failed sending an original response, turn the response body into an error and reply with it.
                 // unless we have already tried sending the response multiple times.
-                message.Result = Message.ResponseTypes.Error;
-                message.BodyObject = Response.FromException(exception);
-                ++message.RetryCount;
+                failedMessage.Result = Message.ResponseTypes.Error;
+                failedMessage.BodyObject = Response.FromException(exception);
+                ++failedMessage.RetryCount;
 
-                this.Send(message);
+                this.Send(failedMessage);
             }
             else
             {
                 LogWarningDroppingMessage(
                     this.Log,
                     exception,
-                    message);
+                    failedMessage);
 
-                MessagingMetrics.OnDroppedSentMessage(message);
-                message.MarkTransferred("Connection.HandleSendMessageFailure:Dropped");
-                message.Release();
+                MessagingMetrics.OnDroppedSentMessage(failedMessage);
+                failedMessage.MarkTransferred("Connection.HandleSendMessageFailure:Dropped");
+                failedMessage.Release();
             }
 
             return true;
@@ -580,7 +590,7 @@ namespace Orleans.Runtime.Messaging
 
             public void Execute()
             {
-                this.connection!.OnReceivedMessage(this.message!);
+                this.connection!.OnReceivedMessage(this.message!.Value);
                 MessageHandlerPool.Return(this);
             }
 

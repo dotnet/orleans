@@ -450,13 +450,19 @@ namespace Orleans.Runtime
             {
                 var status = (StatusResponse)message.BodyObject!;
                 callbacks.TryGetValue((message.TargetGrain, message.Id), out var callback);
-                var request = callback?.Message;
-                if (request is not null)
+                if (callback is not null && callback.TryAcquireMessage(out var requestMessage))
                 {
-                    callback!.OnStatusUpdate(status);
-                    if (status.Diagnostics != null && status.Diagnostics.Count > 0)
+                    try
                     {
-                        LogInformationReceivedStatusUpdate(this.logger, request, status.Diagnostics);
+                        callback.OnStatusUpdate(status);
+                        if (status.Diagnostics != null && status.Diagnostics.Count > 0)
+                        {
+                            LogInformationReceivedStatusUpdate(this.logger, requestMessage, status.Diagnostics);
+                        }
+                    }
+                    finally
+                    {
+                        requestMessage.Release();
                     }
                 }
                 else
@@ -585,9 +591,21 @@ namespace Orleans.Runtime
         {
             foreach (var callback in callbacks)
             {
-                if (deadSilo.Equals(callback.Value.Message.TargetSilo))
+                if (!callback.Value.TryAcquireMessage(out var message))
                 {
-                    callback.Value.OnTargetSiloFail();
+                    continue;
+                }
+
+                try
+                {
+                    if (deadSilo.Equals(message.TargetSilo))
+                    {
+                        callback.Value.OnTargetSiloFail();
+                    }
+                }
+                finally
+                {
+                    message.Release();
                 }
             }
         }
@@ -603,7 +621,30 @@ namespace Orleans.Runtime
         }
 
         public int GetRunningRequestsCount(GrainInterfaceType grainInterfaceType)
-            => this.callbacks.Count(c => c.Value.Message.InterfaceType == grainInterfaceType);
+        {
+            var count = 0;
+            foreach (var callback in callbacks.Values)
+            {
+                if (!callback.TryAcquireMessage(out var message))
+                {
+                    continue;
+                }
+
+                try
+                {
+                    if (message.InterfaceType == grainInterfaceType)
+                    {
+                        count++;
+                    }
+                }
+                finally
+                {
+                    message.Release();
+                }
+            }
+
+            return count;
+        }
 
         private async Task MonitorCallbackExpiry()
         {

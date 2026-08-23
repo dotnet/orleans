@@ -8,11 +8,11 @@ using System.Threading;
 namespace Orleans.Runtime;
 
 /// <summary>
-/// A thread-local object pool for <see cref="Message"/> instances.
+/// A thread-local object pool for the backing state used by generation-tagged <see cref="Message"/> handles.
 /// </summary>
 internal static class MessagePool
 {
-    private static readonly ThreadLocal<Stack<Message>> _messages = new(() => new());
+    private static readonly ThreadLocal<Stack<Message.MessageState>> _states = new(() => new());
 
 #if DEBUG
     /// <summary>
@@ -66,40 +66,46 @@ internal static class MessagePool
 #endif
 
     /// <summary>
-    /// The maximum number of messages to keep per thread.
+    /// The maximum number of reset message states to keep per thread.
     /// </summary>
     public static int MaxPoolSizePerThread { get; set; } = 128;
 
     /// <summary>
-    /// Gets a message from the pool, or creates a new one if the pool is empty.
+    /// Gets a generation-tagged message handle backed by cached state, or by new state when the cache is empty.
     /// </summary>
     public static Message Get()
     {
-        var stack = _messages.Value!;
-        if (!stack.TryPop(out var message))
+        var stack = _states.Value!;
+        while (true)
         {
-            message = new Message();
-        }
+            if (!stack.TryPop(out var state))
+            {
+                state = new Message.MessageState(isPoolable: true);
+            }
 
-        message.InitializeRefCount();
+            if (state.TryActivate(out var generation))
+            {
+                var message = new Message(state, generation);
 
 #if DEBUG
-        if (EnableLeakTracking)
-        {
-            var info = new MessageAllocationInfo(message, Environment.StackTrace);
-            _outstandingMessages[message] = info;
-        }
+                if (EnableLeakTracking)
+                {
+                    var info = new MessageAllocationInfo(message, Environment.StackTrace);
+                    _outstandingMessages[message] = info;
+                }
 #endif
 
-        return message;
+                return message;
+            }
+        }
     }
 
     /// <summary>
-    /// Returns a message to the pool after resetting it.
+    /// Releases the caller's ownership of a message handle.
     /// </summary>
     public static void Return(Message message) => message.Release();
 
-    internal static void ReturnCore(Message message)
+    internal static void ReturnCore(Message message, Message.MessageState state)
     {
 #if DEBUG
         if (EnableLeakTracking)
@@ -108,16 +114,20 @@ internal static class MessagePool
         }
 #endif
 
-        message.Reset();
+        state.Reset();
+        if (!state.IsPoolable)
+        {
+            return;
+        }
 
-        var stack = _messages.Value!;
+        var stack = _states.Value!;
         if (stack.Count < MaxPoolSizePerThread)
         {
-            stack.Push(message);
+            stack.Push(state);
         }
     }
 
-    internal static int GetCachedMessageCount() => _messages.Value!.Count;
+    internal static int GetCachedMessageCount() => _states.Value!.Count;
 
-    internal static void ClearCurrentThreadPool() => _messages.Value!.Clear();
+    internal static void ClearCurrentThreadPool() => _states.Value!.Clear();
 }

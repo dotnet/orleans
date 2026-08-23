@@ -353,7 +353,11 @@ namespace Orleans.Runtime
         /// <inheritdoc/>
         public void ReceiveMessage(object message)
         {
-            var msg = (Message)message;
+            ReceiveMessage((Message)message);
+        }
+
+        internal void ReceiveMessage(Message msg)
+        {
             switch (msg.Direction)
             {
                 case Message.Directions.Request:
@@ -493,6 +497,7 @@ namespace Orleans.Runtime
             bool TryCancelRequest()
             {
                 Message? message = null;
+                var acquiredRunningMessage = false;
 
                 lock (_runningRequests)
                 {
@@ -501,27 +506,39 @@ namespace Orleans.Runtime
                     {
                         if (runningRequest.Id == messageId && runningRequest.SendingGrain == senderGrainId)
                         {
+                            runningRequest.Acquire();
                             message = runningRequest;
+                            acquiredRunningMessage = true;
                             break;
                         }
                     }
                 }
 
-                var didCancel = false;
-                if (message is not null)
+                try
                 {
-                    if (message.BodyObject is IInvokable invokableRequest)
+                    var didCancel = false;
+                    if (message is { } targetMessage)
                     {
-                        didCancel = TryCancelInvokable(invokableRequest) || !invokableRequest.IsCancellable;
+                        if (targetMessage.BodyObject is IInvokable invokableRequest)
+                        {
+                            didCancel = TryCancelInvokable(invokableRequest) || !invokableRequest.IsCancellable;
+                        }
+                        else
+                        {
+                            // Assume the request is not cancellable.
+                            didCancel = true;
+                        }
                     }
-                    else
+
+                    return didCancel;
+                }
+                finally
+                {
+                    if (acquiredRunningMessage)
                     {
-                        // Assume the request is not cancellable.
-                        didCancel = true;
+                        message!.Value.Release();
                     }
                 }
-
-                return didCancel;
             }
 
             bool TryCancelInvokable(IInvokable request)

@@ -204,8 +204,11 @@ namespace Orleans.Runtime
 
         public void ReceiveMessage(object message)
         {
-            var msg = (Message)message;
+            ReceiveMessage((Message)message);
+        }
 
+        public void ReceiveMessage(Message msg)
+        {
             if (msg.Direction == Message.Directions.Response)
             {
                 // Requests are made through the runtime client, so deliver responses to the runtime client so that the request callback can be executed.

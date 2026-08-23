@@ -255,8 +255,8 @@ namespace Orleans.Messaging
                 int numGateways = gatewayAddresses.Count;
                 if (numGateways == 0)
                 {
-                    RejectMessage(msg, "No gateways available");
                     LogSendFailed(msg, gatewayManager);
+                    RejectMessage(msg, "No gateways available");
                     return new ValueTask<Connection?>(default(Connection));
                 }
 
@@ -289,8 +289,8 @@ namespace Orleans.Messaging
             var addr = gatewayManager.GetLiveGateway();
             if (addr == null)
             {
-                RejectMessage(msg, "No gateways available");
                 LogNoGatewayAvailableForMessage(msg, gatewayManager);
+                RejectMessage(msg, "No gateways available");
                 return new ValueTask<Connection?>(default(Connection));
             }
 

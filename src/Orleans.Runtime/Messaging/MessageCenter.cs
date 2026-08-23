@@ -581,7 +581,7 @@ namespace Orleans.Runtime.Messaging
                     }
 
                     _messageObserver?.Invoke(msg);
-                    targetActivation.ReceiveMessage(msg);
+                    RuntimeMessageDispatcher.Dispatch(targetActivation, msg);
                 }
             }
             catch (Exception ex)

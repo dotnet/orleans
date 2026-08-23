@@ -25,6 +25,7 @@ public class MessagePoolTests
     {
         MessagePool.ClearCurrentThreadPool();
         var message = MessagePool.Get();
+        var state = message.StateIdentity;
 
         Assert.Equal(0, MessagePool.GetCachedMessageCount());
 
@@ -32,7 +33,7 @@ public class MessagePoolTests
 
         Assert.Equal(1, MessagePool.GetCachedMessageCount());
         var reused = MessagePool.Get();
-        Assert.Same(message, reused);
+        Assert.Same(state, reused.StateIdentity);
         Assert.Equal(0, MessagePool.GetCachedMessageCount());
         reused.Release();
     }
@@ -74,7 +75,6 @@ public class MessagePoolTests
     {
         var message = _messageFactory.CreateMessage(null, InvokeMethodOptions.None);
 
-        Assert.NotNull(message);
         Assert.Equal(Message.Directions.Request, message.Direction);
 
         message.Release();
@@ -136,7 +136,7 @@ public class MessagePoolTests
 
             var info = outstanding.First();
 
-            Assert.Same(message, info.Message);
+            Assert.Equal(message, info.Message);
             Assert.NotNull(info.AllocationStack);
             Assert.True(info.AllocationTime <= DateTime.UtcNow);
 
@@ -196,6 +196,26 @@ public class MessagePoolTests
     }
 
     [Fact, TestCategory("BVT"), TestCategory("Messaging")]
+    public void Message_StaleHandleCannotAffectReusedState()
+    {
+        MessagePool.ClearCurrentThreadPool();
+        var stale = MessagePool.Get();
+        var state = stale.StateIdentity;
+        stale.BodyObject = "stale";
+        stale.Release();
+
+        var current = MessagePool.Get();
+        Assert.Same(state, current.StateIdentity);
+        current.BodyObject = "current";
+
+        Assert.Throws<InvalidOperationException>(() => stale.BodyObject = "corrupt");
+        Assert.Throws<InvalidOperationException>(() => stale.Release());
+        Assert.Equal("current", current.BodyObject);
+
+        current.Release();
+    }
+
+    [Fact, TestCategory("BVT"), TestCategory("Messaging")]
     public void Message_ConcurrentOwnersReturnStateOnce()
     {
         MessagePool.ClearCurrentThreadPool();
@@ -209,5 +229,43 @@ public class MessagePoolTests
 
         message.Release();
         Assert.Equal(1, MessagePool.GetCachedMessageCount());
+    }
+
+    [Fact, TestCategory("BVT"), TestCategory("Messaging")]
+    public async Task Message_FinalReleaseWaitsForActiveMutation()
+    {
+        MessagePool.ClearCurrentThreadPool();
+        var stale = MessagePool.Get();
+        var state = Assert.IsType<Message.MessageState>(stale.StateIdentity);
+        state.EnterMutation(stale.GenerationForTesting);
+
+        var releaseStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var releaseTask = Task.Run(() =>
+        {
+            releaseStarted.SetResult();
+            stale.Release();
+        });
+
+        try
+        {
+            await releaseStarted.Task;
+            Assert.True(SpinWait.SpinUntil(() => state.RefCountForTesting == 0, TimeSpan.FromSeconds(5)));
+            Assert.False(releaseTask.IsCompleted);
+        }
+        finally
+        {
+            state.ExitMutation();
+        }
+
+        await releaseTask.WaitAsync(TimeSpan.FromSeconds(5));
+        var current = MessagePool.Get();
+        Assert.Same(state, current.StateIdentity);
+        current.BodyObject = "current";
+
+        Assert.Throws<InvalidOperationException>(() => stale.BodyObject = "corrupt");
+        Assert.Throws<InvalidOperationException>(() => stale.Release());
+        Assert.Equal("current", current.BodyObject);
+
+        current.Release();
     }
 }

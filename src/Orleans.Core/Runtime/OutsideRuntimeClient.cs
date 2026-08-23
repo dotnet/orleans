@@ -335,13 +335,19 @@ namespace Orleans
             {
                 var status = (StatusResponse)response.BodyObject!;
                 callbacks.TryGetValue(response.Id, out var callback);
-                var request = callback?.Message;
-                if (request is not null)
+                if (callback is not null && callback.TryAcquireMessage(out var requestMessage))
                 {
-                    callback!.OnStatusUpdate(status);
-                    if (status.Diagnostics != null && status.Diagnostics.Count > 0)
+                    try
                     {
-                        LogReceivedStatusUpdateForPendingRequest(logger, request, new(status.Diagnostics));
+                        callback.OnStatusUpdate(status);
+                        if (status.Diagnostics != null && status.Diagnostics.Count > 0)
+                        {
+                            LogReceivedStatusUpdateForPendingRequest(logger, requestMessage, new(status.Diagnostics));
+                        }
+                    }
+                    finally
+                    {
+                        requestMessage.Release();
                     }
                 }
                 else
@@ -475,15 +481,50 @@ namespace Orleans
         {
             foreach (var callback in callbacks)
             {
-                if (deadSilo.Equals(callback.Value.Message.TargetSilo))
+                if (!callback.Value.TryAcquireMessage(out var message))
                 {
-                    callback.Value.OnTargetSiloFail();
+                    continue;
+                }
+
+                try
+                {
+                    if (deadSilo.Equals(message.TargetSilo))
+                    {
+                        callback.Value.OnTargetSiloFail();
+                    }
+                }
+                finally
+                {
+                    message.Release();
                 }
             }
         }
 
         public int GetRunningRequestsCount(GrainInterfaceType grainInterfaceType)
-            => this.callbacks.Count(c => c.Value.Message.InterfaceType == grainInterfaceType);
+        {
+            var count = 0;
+            foreach (var callback in callbacks.Values)
+            {
+                if (!callback.TryAcquireMessage(out var message))
+                {
+                    continue;
+                }
+
+                try
+                {
+                    if (message.InterfaceType == grainInterfaceType)
+                    {
+                        count++;
+                    }
+                }
+                finally
+                {
+                    message.Release();
+                }
+            }
+
+            return count;
+        }
 
         /// <inheritdoc />
         public void NotifyClusterConnectionLost()

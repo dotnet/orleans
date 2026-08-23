@@ -65,7 +65,8 @@ internal abstract partial class GrainTimer : IGrainTimer
 
     protected void ScheduleTickOnActivation()
     {
-        Message? msg = null;
+        Message msg = default;
+        var ownsMessage = false;
         try
         {
             // Indicate that the timer is firing so that the effect of the next change call is deferred until after the tick completes.
@@ -73,6 +74,7 @@ internal abstract partial class GrainTimer : IGrainTimer
 
             // Note: this does not execute on the activation's execution context.
             msg = _shared.MessageFactory.CreateMessage(body: _invoker, options: InvokeMethodOptions.OneWay);
+            ownsMessage = true;
             msg.SetInfiniteTimeToLive();
             msg.SendingGrain = _grainContext.GrainId;
             msg.TargetGrain = _grainContext.GrainId;
@@ -85,12 +87,16 @@ internal abstract partial class GrainTimer : IGrainTimer
             // Prevent the message from being forwarded in the case of deactivation.
             msg.IsLocalOnly = true;
 
-            _grainContext.ReceiveMessage(msg);
-            msg = null;
+            RuntimeMessageDispatcher.Dispatch(_grainContext, msg);
+            ownsMessage = false;
         }
         catch (Exception exception)
         {
-            msg?.ReleaseDropped("GrainTimerScheduleFailed");
+            if (ownsMessage)
+            {
+                msg.ReleaseDropped("GrainTimerScheduleFailed");
+            }
+
             try
             {
                 LogErrorScheduleTickOnActivation(Logger, exception, this);
