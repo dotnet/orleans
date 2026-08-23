@@ -169,6 +169,20 @@ public class WorkItemGroupWaiterTests
     }
 
     [Fact]
+    public void DirectCallbacksRunWithActivationTaskScheduler()
+    {
+        using var services = CreateServices();
+        var workItemGroup = CreateWorkItemGroup(services);
+        SetRunning(workItemGroup);
+        TaskScheduler? observedScheduler = null;
+
+        workItemGroup.QueueAction(() => observedScheduler = TaskScheduler.Current);
+        workItemGroup.Execute();
+
+        Assert.Same(workItemGroup.TaskScheduler, observedScheduler);
+    }
+
+    [Fact]
     public void SchedulerTaskDeniesChildAttachment()
     {
         using var services = CreateServices();
