@@ -184,6 +184,7 @@ namespace UnitTests.CancellationTests
             finally
             {
                 fixture.GrainFactory.DeleteObjectReference<ILongRunningTaskObserver>(observerReference);
+                GC.KeepAlive(observer);
             }
         }
 

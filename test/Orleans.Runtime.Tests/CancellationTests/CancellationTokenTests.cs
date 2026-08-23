@@ -97,6 +97,7 @@ public abstract class CancellationTokenTests(CancellationTokenTests.FixtureBase 
         finally
         {
             fixture.GrainFactory.DeleteObjectReference<ILongRunningTaskObserver>(observerReference);
+            GC.KeepAlive(observer);
         }
     }
 
@@ -142,6 +143,7 @@ public abstract class CancellationTokenTests(CancellationTokenTests.FixtureBase 
         finally
         {
             fixture.GrainFactory.DeleteObjectReference<ILongRunningTaskObserver>(observerReference);
+            GC.KeepAlive(observer);
         }
     }
 
@@ -195,6 +197,7 @@ public abstract class CancellationTokenTests(CancellationTokenTests.FixtureBase 
             }
 
             fixture.GrainFactory.DeleteObjectReference<ILongRunningTaskObserver>(observerReference);
+            GC.KeepAlive(observer);
         }
     }
 
@@ -476,6 +479,7 @@ public abstract class CancellationTokenTests(CancellationTokenTests.FixtureBase 
         finally
         {
             fixture.GrainFactory.DeleteObjectReference<ILongRunningTaskObserver>(observerReference);
+            GC.KeepAlive(observer);
         }
     }
 
