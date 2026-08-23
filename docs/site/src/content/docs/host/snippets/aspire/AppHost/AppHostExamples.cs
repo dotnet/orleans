@@ -273,7 +273,9 @@ public static class AppHostExamples
         builder.Build().Run();
     }
 
-    private sealed class DynamoDBProviderConfiguration(string serviceKey) : IProviderConfiguration
+    private sealed class DynamoDBProviderConfiguration(
+        string serviceKey,
+        bool infrastructureOwnsTable = false) : IProviderConfiguration
     {
         public void ConfigureResource<T>(
             IResourceBuilder<T> resourceBuilder,
@@ -284,6 +286,13 @@ public static class AppHostExamples
             resourceBuilder
                 .WithEnvironment($"{prefix}__ProviderType", "DynamoDB")
                 .WithEnvironment($"{prefix}__ServiceKey", serviceKey);
+            if (infrastructureOwnsTable)
+            {
+                resourceBuilder
+                    .WithEnvironment($"{prefix}__UseProvisionedThroughput", "false")
+                    .WithEnvironment($"{prefix}__CreateIfNotExists", "false")
+                    .WithEnvironment($"{prefix}__UpdateIfExists", "false");
+            }
         }
     }
     // </dynamodb_local_aspire>
@@ -388,17 +397,41 @@ public static class AppHostExamples
         var stack = builder.AddAWSCDKStack("streaming")
             .WithReference(aws);
         var stream = stack.AddKinesisStream("orders-stream");
+        var pubSubStore = stack.AddDynamoDBTable(
+            "pubsub-store",
+            new TableProps
+            {
+                BillingMode = BillingMode.PAY_PER_REQUEST,
+                PartitionKey = new Amazon.CDK.AWS.DynamoDB.Attribute
+                {
+                    Name = "GrainReference",
+                    Type = AttributeType.STRING,
+                },
+                SortKey = new Amazon.CDK.AWS.DynamoDB.Attribute
+                {
+                    Name = "GrainType",
+                    Type = AttributeType.STRING,
+                },
+            });
+        var orleans = builder.AddOrleans("cluster")
+            .WithDevelopmentClustering()
+            .WithGrainStorage(
+                "PubSubStore",
+                new DynamoDBProviderConfiguration(
+                    pubSubStore.Resource.Name,
+                    infrastructureOwnsTable: true))
+            .WithStreaming(
+                "Orders",
+                new KinesisProviderConfiguration(stream.Resource.Name, checkpointType: "Grain"));
 
         builder.AddProject<Projects.Silo>("silo")
+            .WithReference(orleans)
             .WithReference(stream)
-            .WithEnvironment("Orleans__Streaming__Orders__ProviderType", "Kinesis")
-            .WithEnvironment("Orleans__Streaming__Orders__ServiceKey", stream.Resource.Name)
-            .WithEnvironment("Orleans__Streaming__Orders__Checkpoint__Type", "Grain");
+            .WithReference(pubSubStore);
 
         builder.AddProject<Projects.Client>("client")
-            .WithReference(stream)
-            .WithEnvironment("Orleans__Streaming__Orders__ProviderType", "Kinesis")
-            .WithEnvironment("Orleans__Streaming__Orders__ServiceKey", stream.Resource.Name);
+            .WithReference(orleans.AsClient())
+            .WithReference(stream);
 
         builder.Build().Run();
     }
@@ -414,6 +447,22 @@ public static class AppHostExamples
         var stack = builder.AddAWSCDKStack("streaming")
             .WithReference(aws);
         var stream = stack.AddKinesisStream("orders-stream");
+        var pubSubStore = stack.AddDynamoDBTable(
+            "pubsub-store",
+            new TableProps
+            {
+                BillingMode = BillingMode.PAY_PER_REQUEST,
+                PartitionKey = new Amazon.CDK.AWS.DynamoDB.Attribute
+                {
+                    Name = "GrainReference",
+                    Type = AttributeType.STRING,
+                },
+                SortKey = new Amazon.CDK.AWS.DynamoDB.Attribute
+                {
+                    Name = "GrainType",
+                    Type = AttributeType.STRING,
+                },
+            });
         var checkpoints = stack.AddDynamoDBTable(
             "orders-checkpoints",
             new TableProps
@@ -430,20 +479,30 @@ public static class AppHostExamples
                     Type = AttributeType.STRING,
                 },
             });
+        var orleans = builder.AddOrleans("cluster")
+            .WithDevelopmentClustering()
+            .WithGrainStorage(
+                "PubSubStore",
+                new DynamoDBProviderConfiguration(
+                    pubSubStore.Resource.Name,
+                    infrastructureOwnsTable: true))
+            .WithStreaming(
+                "Orders",
+                new KinesisProviderConfiguration(
+                    stream.Resource.Name,
+                    checkpointType: "DynamoDB",
+                    checkpointServiceKey: checkpoints.Resource.Name));
 
         builder.AddProject<Projects.Silo>("silo")
+            .WithReference(orleans)
             .WithReference(stream)
+            .WithReference(pubSubStore)
             .WithReference(checkpoints)
-            .WithEnvironment("Orleans__Streaming__Orders__ProviderType", "Kinesis")
-            .WithEnvironment("Orleans__Streaming__Orders__ServiceKey", stream.Resource.Name)
-            .WithEnvironment("Orleans__Streaming__Orders__Checkpoint__Type", "DynamoDB")
-            .WithEnvironment("Orleans__Streaming__Orders__Checkpoint__ServiceKey", checkpoints.Resource.Name)
             .WithEnvironment("Orleans__Streaming__Orders__Checkpoint__CreateIfNotExists", "false");
 
         builder.AddProject<Projects.Client>("client")
-            .WithReference(stream)
-            .WithEnvironment("Orleans__Streaming__Orders__ProviderType", "Kinesis")
-            .WithEnvironment("Orleans__Streaming__Orders__ServiceKey", stream.Resource.Name);
+            .WithReference(orleans.AsClient())
+            .WithReference(stream);
 
         builder.Build().Run();
     }
@@ -622,6 +681,30 @@ public static class AppHostExamples
                 .WithEnvironment($"Orleans__{prefix}__Invariant", invariant)
                 .WithEnvironment($"Orleans__{prefix}__ServiceKey", database.Resource.Name)
                 .WithReference(database);
+        }
+    }
+
+    private sealed class KinesisProviderConfiguration(
+        string serviceKey,
+        string checkpointType,
+        string? checkpointServiceKey = null) : IProviderConfiguration
+    {
+        public void ConfigureResource<T>(
+            IResourceBuilder<T> resourceBuilder,
+            string configurationSectionPath)
+            where T : IResourceWithEnvironment
+        {
+            var prefix = $"Orleans__{configurationSectionPath.Replace(":", "__", StringComparison.Ordinal)}";
+            resourceBuilder
+                .WithEnvironment($"{prefix}__ProviderType", "Kinesis")
+                .WithEnvironment($"{prefix}__ServiceKey", serviceKey)
+                .WithEnvironment($"{prefix}__Checkpoint__Type", checkpointType);
+            if (checkpointServiceKey is not null)
+            {
+                resourceBuilder.WithEnvironment(
+                    $"{prefix}__Checkpoint__ServiceKey",
+                    checkpointServiceKey);
+            }
         }
     }
 
