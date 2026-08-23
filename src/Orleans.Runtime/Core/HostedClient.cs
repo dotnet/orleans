@@ -194,6 +194,7 @@ namespace Orleans.Runtime
             if (message.IsExpired)
             {
                 this.messagingTrace.OnDropExpiredMessage(message, MessagingInstruments.Phase.Receive);
+                message.ReleaseDropped("ExpiredAtDispatch");
                 return true;
             }
 
@@ -213,7 +214,10 @@ namespace Orleans.Runtime
             else
             {
                 // Requests against client objects are scheduled for execution on the client.
-                this.incomingMessages.Writer.TryWrite(msg);
+                if (!this.incomingMessages.Writer.TryWrite(msg))
+                {
+                    msg.ReleaseDropped("HostedClientStopped");
+                }
             }
         }
 
@@ -258,6 +262,7 @@ namespace Orleans.Runtime
                                 break;
                             default:
                                 LogErrorUnsupportedMessage(this.logger, message);
+                                message.ReleaseDropped("UnsupportedMessageDirection");
                                 break;
                         }
                     }

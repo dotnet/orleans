@@ -161,6 +161,9 @@ namespace Orleans.Runtime
                 {
                     _runningRequests.Remove(request);
                 }
+
+                request.MarkTransferred("SystemTarget.HandleNewRequest");
+                request.Release();
             }
         }
 

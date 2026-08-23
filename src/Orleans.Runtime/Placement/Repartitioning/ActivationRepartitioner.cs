@@ -78,7 +78,7 @@ internal sealed partial class ActivationRepartitioner : SystemTarget, IActivatio
     private readonly ActivationDirectory _activationDirectory;
     private readonly TimeProvider _timeProvider;
     private readonly ActivationRepartitionerOptions _options;
-    private readonly StripedMpscBuffer<Message> _pendingMessages;
+    private readonly StripedMpscBuffer<RecordedMessage> _pendingMessages;
     private readonly SingleWaiterAutoResetEvent _pendingMessageEvent = new() { RunContinuationsAsynchronously = true };
     private readonly FrequentEdgeCounter _edgeWeights;
     private readonly IGrainTimer _timer;
@@ -113,7 +113,7 @@ internal sealed partial class ActivationRepartitioner : SystemTarget, IActivatio
         _timeProvider = timeProvider;
         _edgeWeights = new(options.Value.MaxEdgeCount);
         _lastExchangedStopwatch = CoarseStopwatch.StartNew();
-        _pendingMessages = new StripedMpscBuffer<Message>(Environment.ProcessorCount, options.Value.MaxUnprocessedEdges / Environment.ProcessorCount);
+        _pendingMessages = new StripedMpscBuffer<RecordedMessage>(Environment.ProcessorCount, options.Value.MaxUnprocessedEdges / Environment.ProcessorCount);
         shared.ActivationDirectory.RecordNewTarget(this);
         _siloStatusOracle.SubscribeToSiloStatusEvents(this);
         _timer = RegisterTimer(

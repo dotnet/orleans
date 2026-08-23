@@ -177,6 +177,7 @@ namespace Orleans.Messaging
             if (!Running)
             {
                 LogNotRunning(msg);
+                msg.ReleaseDropped("ClientMessageCenterNotRunning");
                 return;
             }
 
@@ -368,11 +369,16 @@ namespace Orleans.Messaging
 
         public void RejectMessage(Message msg, string reason, Exception? exc = null)
         {
-            if (!Running) return;
+            if (!Running)
+            {
+                msg.ReleaseDropped("ClientMessageCenterNotRunning");
+                return;
+            }
 
             if (msg.Direction != Message.Directions.Request)
             {
                 LogDroppingMessage(msg, reason);
+                msg.ReleaseDropped("DroppedNonRequest");
             }
             else
             {
@@ -380,6 +386,7 @@ namespace Orleans.Messaging
                 _messagingInstruments.OnRejectedMessage(msg);
                 var error = this.messageFactory.CreateRejectionResponse(msg, Message.RejectionTypes.Unrecoverable, reason, exc);
                 DispatchLocalMessage(error);
+                msg.ReleaseDropped("RejectedRequest");
             }
         }
 

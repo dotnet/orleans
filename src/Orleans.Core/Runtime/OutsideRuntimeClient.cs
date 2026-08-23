@@ -160,11 +160,9 @@ namespace Orleans
         public async Task StopAsync(CancellationToken cancellationToken)
         {
             Volatile.Write(ref _isStopping, 1);
-            this.callbackTimer.Dispose();
-
-            // Fault callbacks before any cancellation-sensitive waits. Completing them can resume code
-            // which issues follow-up calls, so request admission must already be closed.
             BreakOutstandingMessages();
+
+            this.callbackTimer.Dispose();
 
             if (this.callbackTimerTask is { } task)
             {
@@ -198,13 +196,13 @@ namespace Orleans
             MessageCenter = ActivatorUtilities.CreateInstance<ClientMessageCenter>(this.ServiceProvider);
             MessageCenter.RegisterLocalMessageHandler(this.HandleMessage);
             await ExecuteWithRetries(
-                async () => await MessageCenter!.StartAsync(cancellationToken),
+                async () => await MessageCenter.StartAsync(cancellationToken),
                 retryFilter,
                 cancellationToken);
             CurrentActivationAddress = GrainAddress.NewActivationAddress(MessageCenter.MyAddress, _localClientDetails.ClientId.GrainId);
 
             this.gatewayObserver = new ClientGatewayObserver(gatewayManager);
-            this.InternalGrainFactory.CreateObjectReference<IClientGatewayObserver>(this.gatewayObserver!);
+            this.InternalGrainFactory.CreateObjectReference<IClientGatewayObserver>(this.gatewayObserver);
 
             await ExecuteWithRetries(
                 _manifestProvider!.StartAsync,
@@ -250,6 +248,7 @@ namespace Orleans
                     }
                 default:
                     LogMessageNotSupported(logger, message);
+                    message.ReleaseDropped("UnsupportedMessageDirection");
                     break;
             }
         }
@@ -298,6 +297,7 @@ namespace Orleans
                 if (Volatile.Read(ref _isStopping) != 0)
                 {
                     callbackData.OnHostShutdown();
+                    message.ReleaseDropped("ClientStoppingBeforeCallbackRegistration");
                     return;
                 }
 
@@ -307,6 +307,7 @@ namespace Orleans
                 if (Volatile.Read(ref _isStopping) != 0)
                 {
                     callbackData.OnHostShutdown();
+                    message.ReleaseDropped("ClientStoppingBeforeSend");
                     return;
                 }
             }
@@ -315,6 +316,7 @@ namespace Orleans
                 context?.Complete();
                 if (Volatile.Read(ref _isStopping) != 0)
                 {
+                    message.ReleaseDropped("ClientStoppingBeforeOneWaySend");
                     return;
                 }
             }
@@ -361,6 +363,8 @@ namespace Orleans
                     }
                 }
 
+                // Release the status response message - it's been fully processed
+                response.ReleaseDropped("StatusResponseHandled");
                 return;
             }
 
@@ -372,10 +376,13 @@ namespace Orleans
                 // Unfortunately, it is not enough, since CallContext.LogicalGetData will not flow "up" from task completion source into the resolved task.
                 // RequestContextExtensions.Import(response.RequestContextData);
                 callbackData!.DoCallback(response);
+                response.MarkTransferred("OutsideRuntimeClient.ReceiveResponse:AfterDoCallback");
+                response.Release();
             }
             else
             {
                 LogDebugNoCallbackForResponseMessage(logger, response);
+                response.ReleaseDropped("NoCallbackNotFound");
             }
         }
 
@@ -449,17 +456,6 @@ namespace Orleans
             disposed = true;
         }
 
-        public void BreakOutstandingMessagesToSilo(SiloAddress deadSilo)
-        {
-            foreach (var callback in callbacks)
-            {
-                if (deadSilo.Equals(callback.Value.Message.TargetSilo))
-                {
-                    callback.Value.OnTargetSiloFail();
-                }
-            }
-        }
-
         private void BreakOutstandingMessages()
         {
             foreach (var (_, callback) in callbacks)
@@ -471,6 +467,17 @@ namespace Orleans
                 catch (Exception exception)
                 {
                     LogErrorWhileProcessingCallbackExpiry(logger, exception);
+                }
+            }
+        }
+
+        public void BreakOutstandingMessagesToSilo(SiloAddress deadSilo)
+        {
+            foreach (var callback in callbacks)
+            {
+                if (deadSilo.Equals(callback.Value.Message.TargetSilo))
+                {
+                    callback.Value.OnTargetSiloFail();
                 }
             }
         }
@@ -542,7 +549,7 @@ namespace Orleans
 
         private void ThrowIfDisposed()
         {
-            if (disposed)
+            if (disposing || disposed)
             {
                 ThrowObjectDisposedException();
             }

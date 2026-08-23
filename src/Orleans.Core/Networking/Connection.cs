@@ -66,7 +66,8 @@ namespace Orleans.Runtime.Messaging
         protected ConnectionContext Context { get; }
         protected ILogger Log => this.shared.Logger;
         protected MessagingTrace MessagingTrace => this.shared.MessagingTrace;
-        protected MessagingInstruments MessagingInstrumentation => this.shared.MessagingInstruments;
+        protected MessagingInstruments MessagingMetrics => this.shared.MessagingInstruments;
+        protected NetworkingInstruments NetworkingMetrics => this.shared.NetworkingInstruments;
         protected abstract ConnectionDirection ConnectionDirection { get; }
         protected MessageFactory MessageFactory => this.shared.MessageFactory;
         protected abstract IMessageCenter MessageCenter { get; }
@@ -75,17 +76,12 @@ namespace Orleans.Runtime.Messaging
 
         public Task Initialized => _initializationTcs.Task;
 
-        /// <summary>
-        /// Gets the time elapsed since the last message was received on this connection,
-        /// or <see langword="null"/> if no message has been received yet.
-        /// </summary>
         public TimeSpan? ElapsedSinceLastMessageReceived
         {
             get
             {
                 var timestamp = Volatile.Read(ref _lastMessageReceivedTimestamp);
-                if (timestamp == 0) return null;
-                return TimeSpan.FromMilliseconds(CoarseStopwatch.GetTimestamp() - timestamp);
+                return timestamp == 0 ? null : TimeSpan.FromMilliseconds(CoarseStopwatch.GetTimestamp() - timestamp);
             }
         }
 
@@ -120,7 +116,7 @@ namespace Orleans.Runtime.Messaging
             var connection = context.Features.Get<Connection>();
             context.ConnectionClosed.Register(OnConnectionClosedDelegate, connection);
 
-            connection!.shared.NetworkingInstruments.OnOpenedSocket(connection.ConnectionDirection);
+            connection!.NetworkingMetrics.OnOpenedSocket(connection.ConnectionDirection);
             return connection.RunInternal();
         }
 
@@ -180,7 +176,7 @@ namespace Orleans.Runtime.Messaging
         /// </summary>
         private async Task CloseAsync()
         {
-            this.shared.NetworkingInstruments.OnClosedSocket(this.ConnectionDirection);
+            NetworkingMetrics.OnClosedSocket(this.ConnectionDirection);
 
             // Signal the outgoing message processor to exit gracefully.
             this.outgoingMessageWriter.TryComplete();
@@ -293,7 +289,6 @@ namespace Orleans.Runtime.Messaging
             Exception? error = default;
             using var serializerScope = this.shared.ServiceProvider.CreateScope();
             var serializer = serializerScope.ServiceProvider.GetRequiredService<MessageSerializer>();
-            var prevBufferLength = 0L;
             try
             {
                 var input = this._transport!.Input;
@@ -303,15 +298,8 @@ namespace Orleans.Runtime.Messaging
                     var readResult = await input.ReadAsync();
 
                     var buffer = readResult.Buffer;
-                    if (buffer.Length > prevBufferLength)
-                    {
-                        prevBufferLength = buffer.Length;
-                        MarkMessageReceived();
-                    }
-
                     if (buffer.Length >= requiredBytes)
                     {
-                        prevBufferLength = 0;
                         do
                         {
                             Message? message = default;
@@ -322,6 +310,7 @@ namespace Orleans.Runtime.Messaging
                                 if (requiredBytes == 0)
                                 {
                                     Debug.Assert(message is not null);
+                                    MarkMessageReceived();
                                     RecordMessageReceive(message, bodyLength + headerLength, headerLength);
                                     var handler = MessageHandlerPool.Get();
                                     handler.Set(message, this);
@@ -401,12 +390,25 @@ namespace Orleans.Runtime.Messaging
                         {
                             throw;
                         }
+
+                        if (message is not null)
+                        {
+                            inflight.Remove(message);
+                            message = null;
+                        }
                     }
 
                     var flushResult = await output.FlushAsync();
                     if (flushResult.IsCompleted || flushResult.IsCanceled)
                     {
                         break;
+                    }
+
+                    // Release the send pipeline's reference after bytes have been flushed.
+                    foreach (var msg in inflight)
+                    {
+                        msg.MarkTransferred("Connection.ProcessOutgoing:Sent");
+                        msg.Release();
                     }
 
                     inflight.Clear();
@@ -468,7 +470,7 @@ namespace Orleans.Runtime.Messaging
             }
 
             // The message body was not successfully decoded, but the headers were.
-            MessagingInstrumentation.OnRejectedMessage(message);
+            MessagingMetrics.OnRejectedMessage(message);
 
             if (message.HasDirection)
             {
@@ -481,6 +483,7 @@ namespace Orleans.Runtime.Messaging
 
                     // Send the error response and continue processing the next message.
                     this.Send(response);
+                    message.ReleaseDropped("ReceiveMessageDeserializationFailure");
                 }
                 else if (message.Direction == Message.Directions.Response)
                 {
@@ -489,6 +492,14 @@ namespace Orleans.Runtime.Messaging
                     message.BodyObject = Response.FromException(exception);
                     this.OnReceivedMessage(message);
                 }
+                else
+                {
+                    message.ReleaseDropped("ReceiveMessageDeserializationFailure");
+                }
+            }
+            else
+            {
+                message.ReleaseDropped("ReceiveMessageDeserializationFailure");
             }
 
             // The exception has been handled by propagating it onwards.
@@ -508,7 +519,7 @@ namespace Orleans.Runtime.Messaging
                 return false;
             }
 
-            MessagingInstrumentation.OnFailedSentMessage(message);
+            MessagingMetrics.OnFailedSentMessage(message);
 
             if (message.Direction == Message.Directions.Request)
             {
@@ -517,6 +528,8 @@ namespace Orleans.Runtime.Messaging
                 response.BodyObject = Response.FromException(exception);
 
                 this.MessageCenter.DispatchLocalMessage(response);
+                message.MarkTransferred("Connection.HandleSendMessageFailure:RequestFailed");
+                message.Release();
             }
             else if (message.Direction == Message.Directions.Response && message.RetryCount < MessagingOptions.DEFAULT_MAX_MESSAGE_SEND_RETRIES)
             {
@@ -535,7 +548,9 @@ namespace Orleans.Runtime.Messaging
                     exception,
                     message);
 
-                MessagingInstrumentation.OnDroppedSentMessage(message);
+                MessagingMetrics.OnDroppedSentMessage(message);
+                message.MarkTransferred("Connection.HandleSendMessageFailure:Dropped");
+                message.Release();
             }
 
             return true;
@@ -627,13 +642,13 @@ namespace Orleans.Runtime.Messaging
             Level = LogLevel.Warning,
             Message = "Exception while processing messages from remote endpoint {EndPoint}"
         )]
-        private static partial void LogWarningExceptionProcessingMessagesFromRemote(ILogger logger, Exception exception, EndPoint? endPoint);
+        private static partial void LogWarningExceptionProcessingMessagesFromRemote(ILogger logger, Exception exception, EndPoint endPoint);
 
         [LoggerMessage(
             Level = LogLevel.Warning,
             Message = "Exception while processing messages to remote endpoint {EndPoint}"
         )]
-        private static partial void LogWarningExceptionProcessingMessagesToRemote(ILogger logger, Exception exception, EndPoint? endPoint);
+        private static partial void LogWarningExceptionProcessingMessagesToRemote(ILogger logger, Exception exception, EndPoint endPoint);
 
         [LoggerMessage(
             Level = LogLevel.Information,
@@ -645,13 +660,13 @@ namespace Orleans.Runtime.Messaging
             Level = LogLevel.Error,
             Message = "Exception reading message {Message} from remote endpoint {Remote} to local endpoint {Local}"
         )]
-        private static partial void LogErrorExceptionReadingMessage(ILogger logger, Exception exception, Message? message, EndPoint? remote, EndPoint? local);
+        private static partial void LogErrorExceptionReadingMessage(ILogger logger, Exception exception, Message? message, EndPoint remote, EndPoint local);
 
         [LoggerMessage(
             Level = LogLevel.Error,
             Message = "Exception sending message {Message} to remote endpoint {Remote} from local endpoint {Local}"
         )]
-        private static partial void LogErrorExceptionSendingMessage(ILogger logger, Exception exception, Message? message, EndPoint? remote, EndPoint? local);
+        private static partial void LogErrorExceptionSendingMessage(ILogger logger, Exception exception, Message? message, EndPoint remote, EndPoint local);
 
         [LoggerMessage(
             EventId = (int)ErrorCode.Messaging_OutgoingMS_DroppingMessage,
