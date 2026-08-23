@@ -57,6 +57,9 @@ public sealed class SQSAspireIntegrationTests
         Assert.Equal(environment["AWS_REGION"], clientEnvironment["AWS_REGION"]);
         Assert.Equal(environment["AWS__Profile"], clientEnvironment["AWS__Profile"]);
         Assert.Equal(environment["AWS__Region"], clientEnvironment["AWS__Region"]);
+        Assert.DoesNotContain(
+            app.Model.Resources,
+            resource => resource.GetType().Name.Contains("AWS", StringComparison.OrdinalIgnoreCase));
     }
 
     [Fact]
@@ -132,6 +135,21 @@ public sealed class SQSAspireIntegrationTests
         Assert.Equal(SimpleQueueCacheOptions.DEFAULT_CACHE_SIZE, cacheOptions.CacheSize);
         Assert.IsType<SQSAdapterFactory>(adapterFactory);
         Assert.Equal(app.ProviderName, streamProvider.Name);
+    }
+
+    [Fact]
+    public async Task StreamingEnvironmentScope_PreservesTopologyAndAwsConfiguration()
+    {
+        await using var app = await CreateRegionAppAsync();
+        using var environment = await app.CreateEnvironmentScopeAsync(
+            SqsAspireResourceRole.Silo,
+            streamingOnly: true);
+
+        Assert.Equal(ServiceId, Environment.GetEnvironmentVariable("Orleans__ServiceId"));
+        Assert.NotNull(Environment.GetEnvironmentVariable("Orleans__ClusterId"));
+        Assert.Equal("integration-profile", Environment.GetEnvironmentVariable("AWS_PROFILE"));
+        Assert.Equal("us-east-1", Environment.GetEnvironmentVariable("AWS_REGION"));
+        Assert.Equal("us-east-1", Environment.GetEnvironmentVariable("AWS__Region"));
     }
 
     [Theory]
