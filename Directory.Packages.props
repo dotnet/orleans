@@ -7,6 +7,7 @@
     <PackageVersion Include="Aspire.Azure.Data.Tables" Version="13.0.0" />
     <PackageVersion Include="Aspire.Azure.Storage.Blobs" Version="13.0.0" />
     <PackageVersion Include="Aspire.Azure.Storage.Queues" Version="13.0.0" />
+    <PackageVersion Include="Aspire.Microsoft.Azure.Cosmos" Version="13.0.0" />
     <PackageVersion Include="Aspire.Hosting.AppHost" Version="13.1.1" />
     <PackageVersion Include="Aspire.Hosting.Orleans" Version="13.1.1" />
     <PackageVersion Include="Aspire.Hosting.Redis" Version="13.1.1" />
@@ -131,8 +132,11 @@
     <PackageVersion Update="Aspire.Azure.Data.Tables" Version="13.2.4" />
     <PackageVersion Update="Aspire.Azure.Storage.Blobs" Version="13.2.4" />
     <PackageVersion Update="Aspire.Azure.Storage.Queues" Version="13.2.4" />
+    <PackageVersion Update="Aspire.Microsoft.Azure.Cosmos" Version="13.2.4" />
     <PackageVersion Update="Aspire.Hosting.AppHost" Version="13.2.4" />
+    <PackageVersion Include="Aspire.Hosting.Azure.CosmosDB" Version="13.2.4" />
     <PackageVersion Include="Aspire.Hosting.Azure.EventHubs" Version="13.2.4" />
+    <PackageVersion Include="Aspire.Hosting.Azure.Redis" Version="13.2.4" />
     <PackageVersion Include="Aspire.Hosting.Azure.Storage" Version="13.2.4" />
     <PackageVersion Update="Aspire.Hosting.Orleans" Version="13.2.4" />
     <PackageVersion Update="Aspire.Hosting.Redis" Version="13.2.4" />

@@ -56,6 +56,14 @@ Register [Azure Event Hubs](https://learn.microsoft.com/azure/event-hubs/event-h
 
 New subscriptions can [begin with messages retained in the pulling agent's local cache](subscription-start-positions.md). This cache-local replay keeps the Event Hubs partition receiver and checkpoint at their current positions.
 
+Aspire can provision the Event Hubs namespace, hub, consumer group, and Azure Table checkpoint resource while emitting the Orleans stream-provider configuration:
+
+:::code language="csharp" source="../host/snippets/aspire/AppHost/AppHostExamples.cs" id="event_hubs_aspire":::
+
+Register the keyed checkpoint client before Orleans activates the stream provider:
+
+:::code language="csharp" source="../host/snippets/aspire/Silo/SiloProgram.cs" id="event_hubs_silo":::
+
 The Event Hubs provider supports a custom data adapter for provider-specific wire formats. See [Integrate external stream producers and consumers](external-streams.md) when a non-Orleans application must publish to or consume from the same Event Hub.
 
 ## Amazon Kinesis
