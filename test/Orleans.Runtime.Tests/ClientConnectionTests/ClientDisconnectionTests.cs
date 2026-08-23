@@ -4,6 +4,7 @@ using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.GrainReferences;
 using Orleans.Runtime;
+using Orleans.Runtime.Messaging;
 using Orleans.TestingHost;
 using UnitTests.GrainInterfaces;
 using Xunit;
@@ -25,7 +26,7 @@ public class ClientDisconnectionTests(ClientDisconnectionTests.Fixture fixture) 
 
         public async ValueTask InitializeAsync()
         {
-            var builder = new InProcessTestClusterBuilder();
+            var builder = new InProcessTestClusterBuilder(2);
             _cluster = builder.Build();
             await _cluster.DeployAsync();
         }
@@ -37,6 +38,61 @@ public class ClientDisconnectionTests(ClientDisconnectionTests.Fixture fixture) 
                 await _cluster.DisposeAsync();
             }
         }
+
+    }
+
+    [Fact]
+    public async Task ResponseAcrossMultipleGateways_ClearsOwningGatewayBeforeClientDrop()
+    {
+        var clientA = await _cluster.GetClientAsync("OwnerClientA");
+        var clientB = await _cluster.GetClientAsync("OwnerClientB");
+        var observerB = new EchoGrainObserver();
+        var observerBReference = clientB.CreateObjectReference<IEchoGrainObserver>(observerB);
+        observerB.SelfReference = observerBReference;
+        var observerBId = observerBReference.GetGrainId();
+        var aToB = (IEchoGrainObserver)clientA.ServiceProvider.GetRequiredService<GrainReferenceActivator>().CreateReference(
+            observerBId,
+            GrainInterfaceType.Create("IEchoGrainObserver"));
+        var responseTask = aToB.EchoAsync("owner-routed response");
+
+        await observerB.WaitForCallAsync().WaitAsync(TimeSpan.FromSeconds(10));
+        Assert.True(ClientGrainId.TryParse(observerBId, out var clientBId));
+        var gateways = _cluster.Silos
+            .Select(static silo => silo.ServiceProvider.GetRequiredService<MessageCenter>().Gateway!)
+            .ToArray();
+        await WaitUntilAsync(
+            () => gateways.Sum(gateway => gateway.GetOutstandingRequestCount(clientBId)) == 1,
+            TimeSpan.FromSeconds(10));
+
+        var ownerIndex = Array.FindIndex(gateways, gateway => gateway.GetOutstandingRequestCount(clientBId) == 1);
+        var ownerDetails = _cluster.Silos[ownerIndex].ServiceProvider.GetRequiredService<ILocalSiloDetails>();
+        var requestKey = gateways[ownerIndex].GetOutstandingRequestKeys(clientBId).Single();
+        var routingRequest = new Message
+        {
+            SendingSilo = ownerDetails.SiloAddress,
+        };
+        routingRequest.SetGatewayRequestOwner(ownerDetails.GatewayAddress, ownerDetails.SiloAddress);
+        var responseThroughOtherGateway = new Message
+        {
+            Direction = Message.Directions.Response,
+            Id = requestKey.CorrelationId,
+            SendingGrain = observerBId,
+            TargetGrain = requestKey.GrainId,
+        };
+        responseThroughOtherGateway.ApplyGatewayRequestOwner(routingRequest);
+        await gateways[1 - ownerIndex].RecordClientResponse(responseThroughOtherGateway);
+        Assert.Equal(ownerDetails.SiloAddress, gateways[1 - ownerIndex].TryToReroute(responseThroughOtherGateway));
+        Assert.All(gateways, gateway => Assert.Equal(0, gateway.GetOutstandingRequestCount(clientBId)));
+
+        observerB.UnblockResponse();
+        Assert.Equal("owner-routed response", await responseTask);
+        await WaitUntilAsync(
+            () => gateways.All(gateway => gateway.GetOutstandingRequestCount(clientBId) == 0),
+            TimeSpan.FromSeconds(10));
+
+        await _cluster.RemoveClientAsync("OwnerClientB");
+        await clientA.GetGrain<IManagementGrain>(0).DropDisconnectedClients(excludeRecent: false);
+        Assert.All(gateways, gateway => Assert.Equal(0, gateway.GetOutstandingRequestCount(clientBId)));
     }
 
     [Theory]
@@ -180,6 +236,7 @@ public class ClientDisconnectionTests(ClientDisconnectionTests.Fixture fixture) 
 
     public sealed class EchoGrainObserver : IEchoGrainObserver
     {
+        private TaskCompletionSource _entered = new(TaskCreationOptions.RunContinuationsAsynchronously);
         private TaskCompletionSource _tcs = new();
         public IEchoGrainObserver? SelfReference { get; set; }
         public IEchoGrainObserver? PeerReference { get; private set; }
@@ -188,10 +245,14 @@ public class ClientDisconnectionTests(ClientDisconnectionTests.Fixture fixture) 
             _tcs.SetResult();
         }
 
+        public Task WaitForCallAsync() => _entered.Task;
+
         public async Task<string> EchoAsync(string message)
         {
+            _entered.TrySetResult();
             await _tcs.Task;
             _tcs = new();
+            _entered = new(TaskCreationOptions.RunContinuationsAsynchronously);
             return message;
         }
 
@@ -204,6 +265,21 @@ public class ClientDisconnectionTests(ClientDisconnectionTests.Fixture fixture) 
         public async Task SendSelfReferenceToPeerAsync(IEchoGrainObserver peer)
         {
             await peer.SetPeerReferenceAsync(SelfReference!);
+        }
+
+    }
+
+    private static async Task WaitUntilAsync(Func<bool> condition, TimeSpan timeout)
+    {
+        var deadline = DateTime.UtcNow + timeout;
+        while (!condition())
+        {
+            if (DateTime.UtcNow >= deadline)
+            {
+                throw new TimeoutException("The expected gateway request-tracking state was not reached.");
+            }
+
+            await Task.Delay(10);
         }
     }
 }

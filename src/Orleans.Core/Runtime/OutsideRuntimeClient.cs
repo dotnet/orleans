@@ -281,11 +281,12 @@ namespace Orleans
                 message.TargetSilo = systemTargetGrainId.GetSiloAddress();
             }
 
+            var responseTimeout = request.GetDefaultResponseTimeout() ?? this.sharedCallbackData.ResponseTimeout;
+            message.SetGatewayRequestTimeout(responseTimeout);
             if (this.clientMessagingOptions.DropExpiredMessages && message.IsExpirableMessage())
             {
                 // don't set expiration for system target messages.
-                var ttl = request.GetDefaultResponseTimeout() ?? this.clientMessagingOptions.ResponseTimeout;
-                message.TimeToLive = ttl;
+                message.TimeToLive = responseTimeout;
             }
 
             if (!oneWay)

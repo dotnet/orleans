@@ -20,7 +20,9 @@ namespace Orleans.Runtime
         {
             var values = contextData switch
             {
-                { Count: > 0 } => contextData.ToDictionary(kvp => kvp.Key, kvp => kvp.Value),
+                { Count: > 0 } => contextData
+                    .Where(static kvp => !Message.IsGatewayRequestContextHeader(kvp.Key))
+                    .ToDictionary(kvp => kvp.Key, kvp => kvp.Value),
                 _ => null,
             };
 

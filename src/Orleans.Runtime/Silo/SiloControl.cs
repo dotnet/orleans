@@ -456,5 +456,11 @@ namespace Orleans.Runtime
             gateway.DropDisconnectedClients(excludeRecent);
             return Task.CompletedTask;
         }
+
+        public Task CompleteGatewayRequest(GrainId clientId, GrainId sourceId, CorrelationId correlationId)
+        {
+            this.services.GetRequiredService<MessageCenter>().Gateway?.CompleteTrackedClientRequest(clientId, sourceId, correlationId);
+            return Task.CompletedTask;
+        }
     }
 }

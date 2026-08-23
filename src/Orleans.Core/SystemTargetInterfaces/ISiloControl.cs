@@ -26,6 +26,7 @@ namespace Orleans
 
         [Alias("355CA3FA")] Task<object?> SendControlCommandToProvider<T>(string providerName, int command, object? arg, CancellationToken cancellationToken = default) where T : IControllable;
         [Alias("85797C87")] Task<List<GrainId>> GetActiveGrains(GrainType grainType, CancellationToken cancellationToken = default);
+        [Alias("16D39D91")] Task CompleteGatewayRequest(GrainId clientId, GrainId sourceId, CorrelationId correlationId, CancellationToken cancellationToken = default);
         [Alias("B99FB859")] Task DropDisconnectedClients(bool excludeRecent, CancellationToken cancellationToken = default);
     }
 }

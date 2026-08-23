@@ -9,12 +9,26 @@ namespace Orleans.Runtime
     [Id(101)]
     internal sealed class Message : ISpanFormattable
     {
+        private const string GatewayRequestOwnerHeader = "#orleans.gateway.request-owner";
+        private const string GatewayRequestOwnerSiloHeader = "#orleans.gateway.request-owner-silo";
+        private const string GatewayResponseTargetHeader = "#orleans.gateway.response-target";
+        private const string GatewayRequestTimeoutHeader = "#orleans.gateway.request-timeout";
+
         public const int LENGTH_HEADER_SIZE = 8;
         public const int LENGTH_META_HEADER = 4;
         internal const int MaxCacheInvalidationHeaderEntries = 16;
 
         [NonSerialized]
         private short _retryCount;
+
+        [NonSerialized]
+        private bool _hasGatewayRequestSource;
+
+        [NonSerialized]
+        private SiloAddress? _gatewayRequestSource;
+
+        [NonSerialized]
+        private bool _hasTrustedGatewayResponseTarget;
 
         public CoarseStopwatch _timeToExpiry;
 
@@ -255,6 +269,169 @@ namespace Orleans.Runtime
                 _requestContextData = value;
                 _headers.SetFlag(MessageFlags.HasRequestContextData, value is not null);
             }
+        }
+
+        internal static bool IsGatewayRequestContextHeader(string key)
+            => key is GatewayRequestOwnerHeader
+                or GatewayRequestOwnerSiloHeader
+                or GatewayResponseTargetHeader
+                or GatewayRequestTimeoutHeader;
+
+        internal void SetGatewayRequestTimeout(TimeSpan timeout)
+        {
+            var context = RequestContextData ??= [];
+            context[GatewayRequestTimeoutHeader] = timeout;
+        }
+
+        internal TimeSpan? GetGatewayRequestTimeout()
+            => RequestContextData is { } context
+                && context.TryGetValue(GatewayRequestTimeoutHeader, out var value)
+                && value is TimeSpan timeout
+                    ? timeout
+                    : null;
+
+        internal void ClearGatewayRequestOwner()
+        {
+            if (RequestContextData is { } context)
+            {
+                context.Remove(GatewayRequestOwnerHeader);
+                context.Remove(GatewayRequestOwnerSiloHeader);
+                context.Remove(GatewayResponseTargetHeader);
+                if (context.Count == 0)
+                {
+                    RequestContextData = null;
+                }
+            }
+
+            _gatewayRequestSource = null;
+            _hasGatewayRequestSource = false;
+        }
+
+        internal void SetGatewayRequestOwner(SiloAddress ownerGateway, SiloAddress ownerSilo)
+        {
+            var context = RequestContextData ??= [];
+            if (!_hasGatewayRequestSource)
+            {
+                _gatewayRequestSource = SendingSilo;
+                _hasGatewayRequestSource = true;
+            }
+
+            context.Remove(GatewayRequestOwnerHeader);
+            context.Remove(GatewayRequestOwnerSiloHeader);
+            context.Remove(GatewayResponseTargetHeader);
+            context[GatewayRequestOwnerHeader] = ownerGateway;
+            context[GatewayRequestOwnerSiloHeader] = ownerSilo;
+            if (_gatewayRequestSource is { } responseTarget)
+            {
+                context[GatewayResponseTargetHeader] = responseTarget;
+            }
+
+            SendingSilo = ownerGateway;
+        }
+
+        internal void RestoreGatewayRequestSource()
+        {
+            if (RequestContextData is not { } context
+                || !context.Remove(GatewayRequestOwnerHeader))
+            {
+                return;
+            }
+
+            SendingSilo = context.Remove(GatewayResponseTargetHeader, out var targetValue)
+                && targetValue is SiloAddress responseTarget
+                    ? responseTarget
+                    : null;
+            context.Remove(GatewayRequestOwnerSiloHeader);
+            _gatewayRequestSource = SendingSilo;
+
+            if (context.Count == 0)
+            {
+                RequestContextData = null;
+            }
+        }
+
+        internal void ApplyGatewayRequestOwner(Message request)
+        {
+            if (request.RequestContextData is not { } requestContext
+                || !requestContext.TryGetValue(GatewayRequestOwnerHeader, out var ownerValue)
+                || ownerValue is not SiloAddress ownerGateway)
+            {
+                return;
+            }
+
+            var responseContext = RequestContextData ??= [];
+            responseContext[GatewayRequestOwnerHeader] = ownerGateway;
+            if (requestContext.TryGetValue(GatewayRequestOwnerSiloHeader, out var ownerSiloValue)
+                && ownerSiloValue is SiloAddress ownerSilo)
+            {
+                responseContext[GatewayRequestOwnerSiloHeader] = ownerSilo;
+            }
+            else
+            {
+                responseContext.Remove(GatewayRequestOwnerSiloHeader);
+            }
+            if (requestContext.TryGetValue(GatewayResponseTargetHeader, out var targetValue)
+                && targetValue is SiloAddress responseTarget)
+            {
+                responseContext[GatewayResponseTargetHeader] = responseTarget;
+            }
+            else
+            {
+                responseContext.Remove(GatewayResponseTargetHeader);
+            }
+
+            TargetSilo = ownerGateway;
+        }
+
+        internal bool TryGetGatewayRequestOwner(out SiloAddress ownerGateway, out SiloAddress ownerSilo)
+        {
+            ownerGateway = default!;
+            ownerSilo = default!;
+            if (RequestContextData is not { } context
+                || !context.TryGetValue(GatewayRequestOwnerHeader, out var ownerValue)
+                || ownerValue is not SiloAddress gateway
+                || !context.TryGetValue(GatewayRequestOwnerSiloHeader, out var ownerSiloValue)
+                || ownerSiloValue is not SiloAddress silo)
+            {
+                return false;
+            }
+
+            ownerGateway = gateway;
+            ownerSilo = silo;
+            return true;
+        }
+
+        internal void RestoreGatewayResponseTarget(bool preserveRoute = false)
+        {
+            if (RequestContextData is not { } context)
+            {
+                return;
+            }
+
+            context.Remove(GatewayRequestOwnerHeader);
+            context.Remove(GatewayRequestOwnerSiloHeader);
+            TargetSilo = context.Remove(GatewayResponseTargetHeader, out var targetValue)
+                && targetValue is SiloAddress responseTarget
+                    ? responseTarget
+                    : null;
+            _hasTrustedGatewayResponseTarget = preserveRoute && TargetSilo is not null;
+
+            if (context.Count == 0)
+            {
+                RequestContextData = null;
+            }
+        }
+
+        internal bool TryTakeTrustedGatewayResponseTarget(out SiloAddress target)
+        {
+            target = TargetSilo!;
+            if (!_hasTrustedGatewayResponseTarget || target is null)
+            {
+                return false;
+            }
+
+            _hasTrustedGatewayResponseTarget = false;
+            return true;
         }
 
         public GrainInterfaceType InterfaceType

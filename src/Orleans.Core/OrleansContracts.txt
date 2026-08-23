@@ -16,6 +16,7 @@ interface [GrainInterfaceType("Orleans.ClientObservers.IClientGatewayObserver")]
 interface [GrainInterfaceType("Orleans.IMembershipTableSystemTarget")] Orleans.IMembershipTableSystemTarget [Version(0)]
 
 interface [GrainInterfaceType("Orleans.ISiloControl")] Orleans.ISiloControl [Version(0)]
+  16D39D91: CompleteGatewayRequest(Orleans.Runtime.GrainId, Orleans.Runtime.GrainId, Orleans.Runtime.CorrelationId, System.Threading.CancellationToken) -> Task
   B99FB859: DropDisconnectedClients(bool, System.Threading.CancellationToken) -> Task
   45D07D09: ForceActivationCollection(System.TimeSpan, System.Threading.CancellationToken) -> Task
   F388CED1: ForceGarbageCollection(System.Threading.CancellationToken) -> Task

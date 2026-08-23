@@ -39,8 +39,11 @@ namespace Orleans.Runtime.Messaging
         private readonly SiloMessagingOptions messagingOptions;
         private long clientsCollectionVersion = 0;
         private readonly TimeSpan clientDropTimeout;
+        private readonly TimeProvider timeProvider;
+        private readonly IServiceProvider serviceProvider;
 
         public Gateway(
+            IServiceProvider serviceProvider,
             MessageCenter messageCenter,
             ILocalSiloDetails siloDetails,
             ILoggerFactory loggerFactory,
@@ -50,12 +53,14 @@ namespace Orleans.Runtime.Messaging
             MessagingInstruments messagingInstruments,
             [FromKeyedServices(TimeProviderNames.SystemTimers)] TimeProvider timeProvider)
         {
+            this.serviceProvider = serviceProvider;
             this.messageCenter = messageCenter;
             _messagingInstruments = messagingInstruments;
             this.messagingOptions = options.Value;
             this.loggerFactory = loggerFactory;
             this.logger = this.loggerFactory.CreateLogger<Gateway>();
             this.clientDropTimeout = messagingOptions.ClientDropTimeout;
+            this.timeProvider = timeProvider;
             clientsReplyRoutingCache = new ClientsReplyRoutingCache(messagingOptions.ResponseTimeout);
             this.siloAddress = siloDetails.SiloAddress;
             this.gatewayAddress = siloDetails.GatewayAddress;
@@ -87,9 +92,9 @@ namespace Orleans.Runtime.Messaging
             {
                 try
                 {
+                    DropExpiredClientRequests();
                     DropDisconnectedClients();
                     DropExpiredRoutingCachedEntries();
-                    DropExpiredClientRequests();
                 }
                 catch (Exception exception)
                 {
@@ -178,6 +183,12 @@ namespace Orleans.Runtime.Messaging
 
         internal SiloAddress? TryToReroute(Message msg)
         {
+            if (msg.Direction == Message.Directions.Response
+                && msg.TryTakeTrustedGatewayResponseTarget(out var trustedResponseTarget))
+            {
+                return trustedResponseTarget;
+            }
+
             // ** Special routing rule for system target here **
             // When a client make a request/response to/from a SystemTarget, the TargetSilo can be set to either
             //  - the GatewayAddress of the target silo (for example, when the client want get the cluster typemap)
@@ -212,13 +223,55 @@ namespace Orleans.Runtime.Messaging
             return null;
         }
 
-        internal void RecordClientResponse(Message message)
+        internal ValueTask RecordClientResponse(Message message)
         {
-            if (message.Direction == Message.Directions.Response
-                && ClientGrainId.TryParse(message.SendingGrain, out var respondingClientId)
+            if (message.Direction != Message.Directions.Response)
+            {
+                return default;
+            }
+
+            if (message.TryGetGatewayRequestOwner(out var ownerGateway, out var ownerSilo))
+            {
+                if (!IsTargetingLocalGateway(ownerGateway))
+                {
+                    return CompleteRemoteGatewayRequest(message, ownerSilo);
+                }
+
+                message.RestoreGatewayResponseTarget();
+            }
+
+            if (ClientGrainId.TryParse(message.SendingGrain, out var respondingClientId)
                 && clients.TryGetValue(respondingClientId, out var respondingClient))
             {
                 respondingClient.OnClientResponse(message);
+            }
+
+            return default;
+
+            async ValueTask CompleteRemoteGatewayRequest(Message response, SiloAddress owner)
+            {
+                var grainFactory = serviceProvider.GetRequiredService<IInternalGrainFactory>();
+                var siloControl = grainFactory.GetSystemTarget<ISiloControl>(Constants.SiloControlType, owner);
+                await siloControl.CompleteGatewayRequest(response.SendingGrain, response.TargetGrain, response.Id);
+                response.RestoreGatewayResponseTarget(preserveRoute: true);
+            }
+        }
+
+        internal void RemoveTrackedClientRequest(Message message)
+        {
+            if (ClientGrainId.TryParse(message.TargetGrain, out var clientId)
+                && clients.TryGetValue(clientId, out var client))
+            {
+                client.RemoveRequest(message);
+            }
+        }
+
+        internal void CompleteTrackedClientRequest(GrainId clientId, GrainId sourceId, CorrelationId correlationId)
+        {
+            if (ClientGrainId.TryParse(clientId, out var parsedClientId)
+                && clients.TryGetValue(parsedClientId, out var client))
+            {
+                client.CompleteRequest(sourceId, correlationId);
             }
         }
 
@@ -237,6 +290,12 @@ namespace Orleans.Runtime.Messaging
                 client.DropExpiredRequests();
             }
         }
+
+        internal int GetOutstandingRequestCount(ClientGrainId clientId)
+            => clients.TryGetValue(clientId, out var client) ? client.OutstandingRequestCount : 0;
+
+        internal IReadOnlyCollection<(GrainId GrainId, CorrelationId CorrelationId)> GetOutstandingRequestKeys(ClientGrainId clientId)
+            => clients.TryGetValue(clientId, out var client) ? client.OutstandingRequestKeys : [];
 
         private bool IsTargetingLocalGateway(SiloAddress siloAddress)
         {
@@ -331,8 +390,8 @@ namespace Orleans.Runtime.Messaging
         {
             private readonly Gateway _gateway;
             private readonly Task _messageLoop;
-            private readonly Dictionary<(GrainId, CorrelationId), Message> _outstandingRequestsToClient = [];
-            private readonly ConcurrentQueue<WorkItem> _pendingToSend = new();
+            private readonly GatewayRequestTracker _requestTracker;
+            private readonly ConcurrentQueue<Message> _pendingToSend = new();
             private readonly object _lifecycleLock = new();
             private readonly SingleWaiterAutoResetEvent _signal = new()
             {
@@ -343,21 +402,13 @@ namespace Orleans.Runtime.Messaging
             private int _dropped;
             private CoarseStopwatch _disconnectedSince;
 
-            private enum WorkItemType
-            {
-                SendMessageToClient,
-                ReceivedResponseFromClient,
-                DropExpiredRequests,
-            }
-
-            private readonly record struct WorkItem(WorkItemType Type, Message? Message);
-
             internal ClientState(Gateway gateway, ClientGrainId id)
             {
                 // Ensure that the client does not capture any AsyncLocal state, etc
                 using var suppressExecutionContext = new ExecutionContextSuppressor();
 
                 _gateway = gateway;
+                _requestTracker = new(gateway.timeProvider, gateway.messagingOptions.ResponseTimeout);
                 Id = id;
                 _disconnectedSince.Restart();
                 _messageLoop = Task.Run(RunMessageLoop);
@@ -372,6 +423,10 @@ namespace Orleans.Runtime.Messaging
             public TimeSpan DisconnectedSince => _disconnectedSince.Elapsed;
 
             public ClientGrainId Id { get; }
+
+            internal int OutstandingRequestCount => _requestTracker.Count;
+
+            internal IReadOnlyCollection<(GrainId GrainId, CorrelationId CorrelationId)> OutstandingRequestKeys => _requestTracker.Keys;
 
             public void RecordDisconnection()
             {
@@ -432,7 +487,7 @@ namespace Orleans.Runtime.Messaging
                         return;
                     }
 
-                    _pendingToSend.Enqueue(new(WorkItemType.SendMessageToClient, msg));
+                    _pendingToSend.Enqueue(msg);
                 }
 
                 _signal.Signal();
@@ -454,47 +509,34 @@ namespace Orleans.Runtime.Messaging
                         }
 
                         var pendingCount = _pendingToSend.Count;
-                        while (pendingCount-- > 0 && _pendingToSend.TryDequeue(out var workItem))
+                        while (pendingCount-- > 0 && _pendingToSend.TryDequeue(out var message))
                         {
-                            if (workItem.Type is WorkItemType.DropExpiredRequests)
+                            var connection = Volatile.Read(ref _connection);
+                            if (connection is null)
                             {
-                                RemoveExpiredRequests();
+                                _pendingToSend.Enqueue(message);
                                 continue;
                             }
 
-                            var message = workItem.Message!;
-                            if (workItem.Type is WorkItemType.SendMessageToClient)
+                            var isRequest = message.Direction == Message.Directions.Request;
+                            if (isRequest)
                             {
-                                var connection = Volatile.Read(ref _connection);
-                                if (connection is null)
-                                {
-                                    _pendingToSend.Enqueue(workItem);
-                                    continue;
-                                }
+                                message.SetGatewayRequestOwner(_gateway.gatewayAddress, _gateway.siloAddress);
+                                _requestTracker.Register(message);
+                            }
 
-                                var requestKey = (message.SendingGrain, message.Id);
-                                var isRequest = message.Direction == Message.Directions.Request;
-                                if (isRequest)
-                                {
-                                    _outstandingRequestsToClient[requestKey] = message;
-                                }
-
-                                if (TrySend(connection, message))
-                                {
-                                    LogTraceSentQueuedMessage(_gateway.logger, message, Id);
-                                }
-                                else
-                                {
-                                    if (isRequest)
-                                    {
-                                        _outstandingRequestsToClient.Remove(requestKey);
-                                    }
-                                    _pendingToSend.Enqueue(workItem);
-                                }
+                            if (TrySend(connection, message))
+                            {
+                                LogTraceSentQueuedMessage(_gateway.logger, message, Id);
                             }
                             else
                             {
-                                _outstandingRequestsToClient.Remove((message.TargetGrain, message.Id));
+                                if (isRequest)
+                                {
+                                    _requestTracker.Remove(message);
+                                }
+
+                                _pendingToSend.Enqueue(message);
                             }
                         }
                     }
@@ -508,28 +550,19 @@ namespace Orleans.Runtime.Messaging
             private void RejectDroppedClientMessages()
             {
                 ClientNotAvailableException? exception = null;
-                while (_pendingToSend.TryDequeue(out var workItem))
-                {
-                    if (workItem.Type == WorkItemType.SendMessageToClient)
-                    {
-                        RejectMessage(ref exception, workItem.Message!);
-                    }
-                    else if (workItem.Type == WorkItemType.ReceivedResponseFromClient)
-                    {
-                        var message = workItem.Message!;
-                        _outstandingRequestsToClient.Remove((message.TargetGrain, message.Id));
-                    }
-                }
-
-                foreach (var message in _outstandingRequestsToClient.Values)
+                while (_pendingToSend.TryDequeue(out var message))
                 {
                     RejectMessage(ref exception, message);
                 }
 
-                _outstandingRequestsToClient.Clear();
+                foreach (var message in _requestTracker.Drain())
+                {
+                    RejectMessage(ref exception, message);
+                }
 
                 void RejectMessage(ref ClientNotAvailableException? error, Message message)
                 {
+                    message.RestoreGatewayRequestSource();
                     error ??= new ClientNotAvailableException(Id.GrainId);
                     _gateway.messageCenter.RejectMessage(message, Message.RejectionTypes.Transient, exc: error, rejectInfo: "Client dropped");
                 }
@@ -537,48 +570,22 @@ namespace Orleans.Runtime.Messaging
 
             internal void OnClientResponse(Message message)
             {
-                EnqueueIfActive(new(WorkItemType.ReceivedResponseFromClient, message));
+                _requestTracker.Complete(message);
             }
 
             internal void DropExpiredRequests()
             {
-                EnqueueIfActive(new(WorkItemType.DropExpiredRequests, null));
+                _requestTracker.RemoveExpired();
             }
 
-            private void EnqueueIfActive(WorkItem workItem)
+            internal void RemoveRequest(Message message)
             {
-                lock (_lifecycleLock)
-                {
-                    if (IsDropped)
-                    {
-                        return;
-                    }
-
-                    _pendingToSend.Enqueue(workItem);
-                }
-
-                _signal.Signal();
+                _requestTracker.Remove(message);
             }
 
-            private void RemoveExpiredRequests()
+            internal void CompleteRequest(GrainId sourceId, CorrelationId correlationId)
             {
-                List<(GrainId, CorrelationId)>? expiredRequests = null;
-                foreach (var (key, message) in _outstandingRequestsToClient)
-                {
-                    if (message.IsExpired)
-                    {
-                        expiredRequests ??= [];
-                        expiredRequests.Add(key);
-                    }
-                }
-
-                if (expiredRequests is not null)
-                {
-                    foreach (var key in expiredRequests)
-                    {
-                        _outstandingRequestsToClient.Remove(key);
-                    }
-                }
+                _requestTracker.Complete(sourceId, correlationId);
             }
 
             private bool TrySend(GatewayInboundConnection connection, Message message)
