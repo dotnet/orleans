@@ -157,6 +157,15 @@ internal static class ReminderTableModelBasedConformance
                 },
                 AfterEach = info =>
                 {
+                    try
+                    {
+                        reminderTable.TestOnlyClearTable().GetAwaiter().GetResult();
+                    }
+                    catch when (!info.Success)
+                    {
+                        // Preserve the generated failure, which identifies the operation sequence and state mismatch.
+                    }
+
                     if (!info.Success)
                     {
                         output?.Invoke(info.FailureMessage);
@@ -824,6 +833,14 @@ internal static class ReminderTableModelBasedConformance
                     _previousETags[request.Key] = null;
                     _currentETags[request.Key] = null;
                     _currentEntries.Remove(request.Key);
+
+                    var expectedRemaining = _currentEntries.Values.ToList();
+                    await ReadUntilAsync(
+                        () => _reminderTable.ReadRows(0, 0),
+                        value => value is not null && Matches(expectedRemaining, value.Reminders),
+                        "RemoveRow/ReadRows(0, 0)",
+                        $"{expectedRemaining.Count} unchanged rows after removing '{request.Key}'");
+                    return ReminderOperationResult.Success(null, true, []);
                 }
 
                 ReminderTableEntrySnapshot? expected = _currentEntries.TryGetValue(request.Key, out var current)
@@ -836,7 +853,7 @@ internal static class ReminderTableModelBasedConformance
                     removed ? $"no row for '{request.Key}'" : $"the unchanged row '{request.Key}'");
                 return ReminderOperationResult.Success(
                     readBack?.ETag,
-                    removed,
+                    false,
                     ToObservedEntries(readBack is null ? [] : [readBack]));
             }
             catch (Exception exception)

@@ -397,6 +397,33 @@ public sealed class IdealizedReminderTableTests : ReminderTableTestRunner
         Assert.Equal(0, _oracle.OperationCount(ReminderTableOperationKind.Stop));
     }
 
+    [Theory]
+    [InlineData(ReminderTableOperationKind.Start)]
+    [InlineData(ReminderTableOperationKind.Stop)]
+    public async Task Oracle_CancellationInterruptsBlockedLifecycleOperation(ReminderTableOperationKind operationKind)
+    {
+        if (operationKind == ReminderTableOperationKind.Stop)
+        {
+            await ReminderTable.StartAsync();
+        }
+
+        var expectedStarted = operationKind == ReminderTableOperationKind.Stop;
+        using var operationCancellation = new CancellationTokenSource();
+        using var waitCancellation = new CancellationTokenSource(TestConstants.InitTimeout);
+        await using var gate = _oracle.BlockNext(operationKind);
+
+        var operation = operationKind == ReminderTableOperationKind.Start
+            ? ReminderTable.StartAsync(operationCancellation.Token)
+            : ReminderTable.StopAsync(operationCancellation.Token);
+        await gate.WaitUntilBlockedAsync(waitCancellation.Token);
+
+        await operationCancellation.CancelAsync();
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => operation);
+
+        Assert.Equal(expectedStarted, _oracle.IsStarted);
+        Assert.Equal(0, _oracle.OperationCount(operationKind));
+    }
+
     [Fact]
     public static void Oracle_InRange_ImplementsExclusiveBeginInclusiveEndAndWrapAround()
     {

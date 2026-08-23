@@ -98,13 +98,20 @@ public abstract class ReminderTableTestFixture
         ConfigureTestCluster(builder);
 
         var cluster = builder.Build();
-        await cluster.DeployAsync().ConfigureAwait(false);
-        _cluster = cluster;
-
-        var reminderTable = ResolveReminderTable(cluster.Silos[0].ServiceProvider);
-        using var cancellation = new CancellationTokenSource(TimeSpan.FromMinutes(1));
-        await reminderTable.StartAsync(cancellation.Token).ConfigureAwait(false);
-        _reminderTable = reminderTable;
+        try
+        {
+            await cluster.DeployAsync().ConfigureAwait(false);
+            var reminderTable = ResolveReminderTable(cluster.Silos[0].ServiceProvider);
+            using var cancellation = new CancellationTokenSource(TimeSpan.FromMinutes(1));
+            await reminderTable.StartAsync(cancellation.Token).ConfigureAwait(false);
+            _cluster = cluster;
+            _reminderTable = reminderTable;
+        }
+        catch
+        {
+            await cluster.DisposeAsync().ConfigureAwait(false);
+            throw;
+        }
     }
 
     /// <summary>

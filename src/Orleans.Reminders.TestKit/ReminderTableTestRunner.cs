@@ -903,10 +903,10 @@ public abstract class ReminderTableTestRunner
         const int Count = 5;
         var grainId = NewGrainId("concurrent-upsert");
 
-        var etags = await Task.WhenAll(Enumerable.Range(0, Count).Select(index =>
+        var writes = await Task.WhenAll(Enumerable.Range(0, Count).Select(async index =>
         {
             var entry = NewEntry(grainId, "concurrent-upsert", BaseTime.AddSeconds(index), TimeSpan.FromMinutes(1));
-            return ReminderTableRetryPolicy.MutateUntilAsync(
+            var etag = await ReminderTableRetryPolicy.MutateUntilAsync(
                 () => ReminderTable.UpsertRow(entry),
                 etag => !string.IsNullOrEmpty(etag),
                 ProviderName,
@@ -914,8 +914,10 @@ public abstract class ReminderTableTestRunner
                 "UpsertRow",
                 $"a non-empty ETag for ({grainId}, '{entry.ReminderName}')",
                 FormatETag);
+            return (Entry: entry, ETag: etag);
         }));
 
+        var etags = writes.Select(write => write.ETag).ToArray();
         var distinct = etags.Where(etag => !string.IsNullOrEmpty(etag)).Distinct(StringComparer.Ordinal).Count();
         if (distinct != Count)
         {
@@ -926,14 +928,18 @@ public abstract class ReminderTableTestRunner
                 .Throw();
         }
 
-        var read = await ReadRequiredAsync(grainId, "concurrent-upsert", Guarantee);
-        if (!etags.Contains(read.ETag, StringComparer.Ordinal))
+        var read = await ReadUntilAsync(
+            () => ReminderTable.ReadRow(grainId, "concurrent-upsert"),
+            value => value is not null && writes.Any(write => EntryMatches(write.Entry, write.ETag, value)),
+            Guarantee,
+            "ReadRow",
+            $"one complete entry matching its returned ETag from [{string.Join(", ", writes.Select(write => $"{Describe(write.Entry)} => {FormatETag(write.ETag)}"))}]");
+        if (read is null)
         {
             Report(Guarantee, "ReadRow")
                 .WithIdentity(grainId, "concurrent-upsert")
-                .WithExpected("the stored ETag to be one returned by the concurrent writes")
-                .WithObserved($"stored ETag {FormatETag(read.ETag)}; returned [{string.Join(", ", etags.Select(FormatETag))}]")
-                .WithETags(read.ETag)
+                .WithExpected("one complete entry matching the schedule associated with its returned ETag")
+                .WithObserved("ReadRow returned null")
                 .Throw();
         }
 
@@ -955,7 +961,7 @@ public abstract class ReminderTableTestRunner
                 .Throw();
         }
 
-        await RemoveAsync(grainId, "concurrent-upsert", read.ETag!);
+        await RemoveAsync(grainId, "concurrent-upsert", read!.ETag!);
     }
 
     /// <summary>

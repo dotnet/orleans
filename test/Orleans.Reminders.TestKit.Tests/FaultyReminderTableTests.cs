@@ -71,6 +71,22 @@ public sealed class FaultyReminderTableTests : IDisposable
     }
 
     [Fact]
+    public async Task TornConcurrentWrite_IsDetectedBy_ConcurrentUpsertGuarantee()
+    {
+        var runner = CreateRunner(new TornConcurrentWriteReminderTable(), "TornConcurrentWrite");
+
+        var exception = await Assert.ThrowsAsync<ReminderConformanceException>(
+            runner.ReminderTable_ConcurrentUpserts_ProduceDistinctETags);
+
+        AssertDiagnostics(
+            exception.Message,
+            "TornConcurrentWrite",
+            nameof(ReminderTableTestRunner.ReminderTable_ConcurrentUpserts_ProduceDistinctETags),
+            "ReadRow");
+        Assert.Contains("complete entry matching its returned ETag", exception.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public async Task OneTimeETagReuse_IsRejectedWithoutRetryingTheSuccessfulWrite()
     {
         var table = new OneTimeReusedETagReminderTable();
@@ -182,14 +198,42 @@ public sealed class FaultyReminderTableTests : IDisposable
     }
 
     [Fact, TestCategory("ModelBased")]
+    public async Task CollateralDeletion_IsDetectedBy_ModelBasedSequences()
+    {
+        string? failureOutput = null;
+        var runner = new ReminderTableModelBasedTestRunner(
+            new CollateralDeletingReminderTable(),
+            new ReminderTableModelBasedConformanceOptions
+            {
+                ProviderName = "CollateralDeleting",
+                MaxDepth = 4,
+                MaxSequenceLength = 4
+            },
+            message => failureOutput = message);
+
+        var exception = await Assert.ThrowsAsync<ReminderConformanceException>(runner.RunGeneratedConformanceTests);
+
+        Assert.Contains(
+            "Model-based reminder table conformance test failed [provider=CollateralDeleting, seed=0]",
+            exception.Message,
+            StringComparison.Ordinal);
+        Assert.NotNull(failureOutput);
+        Assert.Contains("operation=Remove", failureOutput, StringComparison.Ordinal);
+        Assert.Contains("RemoveRow/ReadRows(0, 0)", failureOutput, StringComparison.Ordinal);
+    }
+
+    [Fact, TestCategory("ModelBased")]
     public async Task CorrectImplementation_PassesTheSameGeneratedSequences()
     {
         // The negative tests above are only meaningful if the identical generated sequences pass for a correct table.
+        var table = new IdealizedReminderTable("Control");
         var runner = new ReminderTableModelBasedTestRunner(
-            new IdealizedReminderTable("Control"),
+            table,
             "Control");
 
         await runner.RunGeneratedConformanceTests();
+
+        Assert.Empty((await table.ReadRows(0, 0)).Reminders);
     }
 
     [Fact, TestCategory("ModelBased")]
@@ -333,6 +377,55 @@ public sealed class FaultyReminderTableTests : IDisposable
         }
     }
 
+    /// <summary>Fault: point reads combine the current ETag with the schedule from a different concurrent write.</summary>
+    private sealed class TornConcurrentWriteReminderTable() : DecoratedReminderTable("TornConcurrentWrite")
+    {
+        private readonly object _gate = new();
+        private readonly Dictionary<string, ReminderEntry> _writes = new(StringComparer.Ordinal);
+
+        public override async Task<string?> UpsertRow(ReminderEntry entry)
+        {
+            var etag = await Inner.UpsertRow(entry);
+            lock (_gate)
+            {
+                _writes[etag!] = Copy(entry);
+            }
+
+            return etag;
+        }
+
+        public override async Task<ReminderEntry?> ReadRow(GrainId grainId, string reminderName)
+        {
+            var current = await Inner.ReadRow(grainId, reminderName);
+            if (current is null)
+            {
+                return null;
+            }
+
+            lock (_gate)
+            {
+                var differentWrite = _writes.FirstOrDefault(pair => !string.Equals(pair.Key, current.ETag, StringComparison.Ordinal));
+                if (differentWrite.Value is not null)
+                {
+                    var result = Copy(differentWrite.Value);
+                    result.ETag = current.ETag;
+                    return result;
+                }
+            }
+
+            return current;
+        }
+
+        private static ReminderEntry Copy(ReminderEntry entry) => new()
+        {
+            GrainId = entry.GrainId,
+            ReminderName = entry.ReminderName,
+            StartAt = entry.StartAt,
+            Period = entry.Period,
+            ETag = entry.ETag
+        };
+    }
+
     /// <summary>Fault: removal ignores the supplied ETag, so stale-ETag removals succeed.</summary>
     private sealed class ETagIgnoringRemoveReminderTable() : DecoratedReminderTable("ETagIgnoringRemove")
     {
@@ -391,6 +484,22 @@ public sealed class FaultyReminderTableTests : IDisposable
         {
             var current = Inner.Find(grainId, reminderName);
             return Task.FromResult(current is not null && string.Equals(current.ETag, eTag, StringComparison.Ordinal));
+        }
+
+    }
+
+    /// <summary>Fault: successful removal also deletes every unrelated reminder.</summary>
+    private sealed class CollateralDeletingReminderTable() : DecoratedReminderTable("CollateralDeleting")
+    {
+        public override async Task<bool> RemoveRow(GrainId grainId, string reminderName, string eTag)
+        {
+            var removed = await Inner.RemoveRow(grainId, reminderName, eTag);
+            if (removed)
+            {
+                await Inner.TestOnlyClearTable();
+            }
+
+            return removed;
         }
     }
 

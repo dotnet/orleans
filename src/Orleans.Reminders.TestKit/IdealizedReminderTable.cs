@@ -254,7 +254,7 @@ public sealed class IdealizedReminderTable : IReminderTable
     public async Task StartAsync(CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
-        await BeforeOperationAsync(ReminderTableOperationKind.Start);
+        await BeforeOperationAsync(ReminderTableOperationKind.Start, cancellationToken: cancellationToken);
         cancellationToken.ThrowIfCancellationRequested();
 
         lock (_gate)
@@ -268,7 +268,7 @@ public sealed class IdealizedReminderTable : IReminderTable
     public async Task StopAsync(CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
-        await BeforeOperationAsync(ReminderTableOperationKind.Stop);
+        await BeforeOperationAsync(ReminderTableOperationKind.Stop, cancellationToken: cancellationToken);
         cancellationToken.ThrowIfCancellationRequested();
 
         lock (_gate)
@@ -396,7 +396,8 @@ public sealed class IdealizedReminderTable : IReminderTable
         GrainId? grainId = null,
         string? reminderName = null,
         uint? begin = null,
-        uint? end = null)
+        uint? end = null,
+        CancellationToken cancellationToken = default)
     {
         ReminderTableOperationGate? gate = null;
         lock (_gate)
@@ -415,7 +416,7 @@ public sealed class IdealizedReminderTable : IReminderTable
         if (gate is not null)
         {
             gate.MarkBlocked();
-            await gate.WaitForReleaseAsync();
+            await gate.WaitForReleaseAsync(cancellationToken);
         }
 
         Func<Exception>? failure = null;

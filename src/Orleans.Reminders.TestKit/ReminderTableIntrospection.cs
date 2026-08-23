@@ -221,5 +221,5 @@ public sealed class ReminderTableOperationGate : IAsyncDisposable
 
     internal void MarkBlocked() => _blocked.TrySetResult();
 
-    internal Task WaitForReleaseAsync() => _release.Task;
+    internal Task WaitForReleaseAsync(CancellationToken cancellationToken) => _release.Task.WaitAsync(cancellationToken);
 }

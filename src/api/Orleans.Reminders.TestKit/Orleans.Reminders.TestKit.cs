@@ -109,7 +109,7 @@ namespace Orleans.Reminders.TestKit
 
     public abstract partial class ReminderServiceTestRunner
     {
-        protected ReminderServiceTestRunner(IGrainFactory grainFactory, IReminderTable reminderTable, string providerName, int seed = 0) { }
+        protected ReminderServiceTestRunner(IGrainFactory grainFactory, IReminderTable reminderTable, string providerName, int seed = 0, System.TimeProvider? reminderTimeProvider = null) { }
 
         protected IGrainFactory GrainFactory { get { throw null; } }
 

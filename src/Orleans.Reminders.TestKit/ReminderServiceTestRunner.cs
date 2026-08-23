@@ -32,6 +32,7 @@ public interface IReminderServiceTestGrain : IGrainWithGuidKey
 public abstract class ReminderServiceTestRunner
 {
     private readonly int _seed;
+    private readonly TimeProvider _reminderTimeProvider;
     private int _grainCounter;
 
     /// <summary>
@@ -41,17 +42,20 @@ public abstract class ReminderServiceTestRunner
     /// <param name="reminderTable">The provider resolved from the deployed cluster.</param>
     /// <param name="providerName">The provider name used in failures.</param>
     /// <param name="seed">The deterministic identity seed.</param>
+    /// <param name="reminderTimeProvider">The clock registered for the reminder subsystem.</param>
     protected ReminderServiceTestRunner(
         IGrainFactory grainFactory,
         IReminderTable reminderTable,
         string providerName,
-        int seed = 0)
+        int seed = 0,
+        TimeProvider? reminderTimeProvider = null)
     {
         GrainFactory = grainFactory ?? throw new ArgumentNullException(nameof(grainFactory));
         ReminderTable = reminderTable ?? throw new ArgumentNullException(nameof(reminderTable));
         ArgumentException.ThrowIfNullOrWhiteSpace(providerName);
         ProviderName = providerName;
         _seed = seed;
+        _reminderTimeProvider = reminderTimeProvider ?? TimeProvider.System;
     }
 
     /// <summary>Gets the deployed cluster's grain factory.</summary>
@@ -145,25 +149,36 @@ public abstract class ReminderServiceTestRunner
         var grain = CreateGrain(Guarantee);
         var grainId = grain.GetGrainId();
         const string Name = "service-update";
+        var originalDueTime = TimeSpan.FromMinutes(5);
+        var originalPeriod = TimeSpan.FromMinutes(7);
+        var originalNotBefore = _reminderTimeProvider.GetUtcNow().UtcDateTime.Add(originalDueTime);
 
-        await grain.RegisterOrUpdateAsync(Name, TimeSpan.FromMinutes(5), TimeSpan.FromMinutes(5));
+        await grain.RegisterOrUpdateAsync(Name, originalDueTime, originalPeriod);
+        var originalNotAfter = _reminderTimeProvider.GetUtcNow().UtcDateTime.Add(originalDueTime);
         var original = await ReminderTableRetryPolicy.ReadUntilAsync(
             () => ReminderTable.ReadRow(grainId, Name),
-            entry => entry is not null && !string.IsNullOrEmpty(entry.ETag),
+            entry => entry is not null
+                && !string.IsNullOrEmpty(entry.ETag)
+                && entry.Period == originalPeriod
+                && IsWithinWholeSecondWindow(entry.StartAt, originalNotBefore, originalNotAfter),
             ProviderName,
             Guarantee,
             "RegisterOrUpdateReminder/ReadOriginal",
-            "the initially registered reminder with a non-empty ETag",
+            $"the initially registered reminder with Period={originalPeriod} and StartAt within the requested due-time window",
             Describe);
         var originalEntry = original!;
-        await grain.RegisterOrUpdateAsync(Name, TimeSpan.FromMinutes(9), TimeSpan.FromMinutes(9));
+        var updatedDueTime = TimeSpan.FromMinutes(9);
+        var updatedPeriod = TimeSpan.FromMinutes(11);
+        var updatedNotBefore = _reminderTimeProvider.GetUtcNow().UtcDateTime.Add(updatedDueTime);
+        await grain.RegisterOrUpdateAsync(Name, updatedDueTime, updatedPeriod);
+        var updatedNotAfter = _reminderTimeProvider.GetUtcNow().UtcDateTime.Add(updatedDueTime);
         var updateState = await ReminderTableRetryPolicy.ReadUntilAsync(
             async () =>
             {
                 var updated = await ReminderTable.ReadRow(grainId, Name);
                 if (updated is not null
                     && updated.StartAt != originalEntry.StartAt
-                    && updated.Period == TimeSpan.FromMinutes(9)
+                    && updated.Period == updatedPeriod
                     && string.Equals(updated.ETag, originalEntry.ETag, StringComparison.Ordinal))
                 {
                     Failure(Guarantee, "RegisterOrUpdateReminder")
@@ -182,7 +197,8 @@ public abstract class ReminderServiceTestRunner
                 && !string.IsNullOrEmpty(updated.ETag)
                 && updated.ETag != originalEntry.ETag
                 && updated.StartAt != originalEntry.StartAt
-                && updated.Period == TimeSpan.FromMinutes(9)
+                && updated.Period == updatedPeriod
+                && IsWithinWholeSecondWindow(updated.StartAt, updatedNotBefore, updatedNotAfter)
                 && state.Rows.Reminders.Count == 1
                 && state.Rows.Reminders[0] is { } enumerated
                 && enumerated.GrainId == grainId
@@ -193,7 +209,7 @@ public abstract class ReminderServiceTestRunner
             ProviderName,
             Guarantee,
             "RegisterOrUpdateReminder/ReadUpdated",
-            "one exact updated row with a changed StartAt, Period=00:09:00, and a new ETag",
+            $"one exact updated row with StartAt within the requested due-time window, Period={updatedPeriod}, and a new ETag",
             state => $"updated={Describe(state.Updated)}, rowCount={state.Rows.Reminders.Count}, enumerated={Describe(state.Rows.Reminders.Count == 1 ? state.Rows.Reminders[0] : null)}");
         var updated = updateState.Updated;
         var rows = updateState.Rows;
@@ -205,7 +221,10 @@ public abstract class ReminderServiceTestRunner
             || string.IsNullOrEmpty(updated.ETag)
             || original.ETag == updated.ETag
             || original.StartAt == updated.StartAt
-            || updated.Period != TimeSpan.FromMinutes(9)
+            || original.Period != originalPeriod
+            || !IsWithinWholeSecondWindow(original.StartAt, originalNotBefore, originalNotAfter)
+            || updated.Period != updatedPeriod
+            || !IsWithinWholeSecondWindow(updated.StartAt, updatedNotBefore, updatedNotAfter)
             || enumerated is null
             || enumerated.GrainId != grainId
             || enumerated.ReminderName != Name
@@ -215,7 +234,7 @@ public abstract class ReminderServiceTestRunner
         {
             Failure(Guarantee, "RegisterOrUpdateReminder")
                 .WithIdentity(grainId, Name)
-                .WithExpected("one exact row with a changed StartAt, Period=00:09:00, and an ETag different from the original")
+                .WithExpected($"one exact row with StartAt within the requested due-time window, Period={updatedPeriod}, and an ETag different from the original")
                 .WithObserved(
                     $"original={Describe(original)}, updated={Describe(updated)}, rowCount={rows.Reminders.Count}, enumerated={Describe(enumerated)}")
                 .WithETags(updated?.ETag, originalEntry.ETag)
@@ -240,6 +259,19 @@ public abstract class ReminderServiceTestRunner
         => entry is null
             ? "<null>"
             : $"(GrainId={entry.GrainId}, ReminderName='{entry.ReminderName}', StartAt={entry.StartAt:O}, Period={entry.Period}, ETag='{entry.ETag}')";
+
+    private static bool IsWithinWholeSecondWindow(DateTime value, DateTime notBefore, DateTime notAfter)
+    {
+        var normalized = NormalizeToWholeSecond(value);
+        return normalized >= NormalizeToWholeSecond(notBefore)
+            && normalized <= NormalizeToWholeSecond(notAfter);
+    }
+
+    private static DateTime NormalizeToWholeSecond(DateTime value)
+    {
+        var utc = value.Kind == DateTimeKind.Utc ? value : DateTime.SpecifyKind(value, DateTimeKind.Utc);
+        return new DateTime(utc.Ticks - (utc.Ticks % TimeSpan.TicksPerSecond), DateTimeKind.Utc);
+    }
 }
 
 internal sealed class ReminderServiceTestGrain : Grain, IReminderServiceTestGrain, IRemindable

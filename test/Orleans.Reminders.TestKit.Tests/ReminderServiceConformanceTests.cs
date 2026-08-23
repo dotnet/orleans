@@ -286,7 +286,7 @@ public sealed class StaleScheduleReminderServiceTests
 
         Assert.Contains("provider=StaleScheduleEnumeration", exception.Message, StringComparison.Ordinal);
         Assert.Contains("rowCount=1", exception.Message, StringComparison.Ordinal);
-        Assert.Contains("Period=00:10:00", exception.Message, StringComparison.Ordinal);
+        Assert.Contains("Period=00:12:00", exception.Message, StringComparison.Ordinal);
     }
 }
 
