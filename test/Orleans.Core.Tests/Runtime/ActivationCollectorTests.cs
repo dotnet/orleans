@@ -1,4 +1,5 @@
 using System.Collections.Concurrent;
+using System.Reflection;
 using System.Runtime.CompilerServices;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -1137,6 +1138,43 @@ namespace UnitTests.Runtime
         }
 
         [Fact, TestCategory("Activation")]
+        public void WorkingSetScan_SkipsRemovedMember()
+        {
+            var timer = Substitute.For<IAsyncTimer>();
+            var timerFactory = Substitute.For<IAsyncTimerFactory>();
+            timerFactory.Create(Arg.Any<TimeSpan>(), Arg.Any<string>(), Arg.Any<TimeProvider>()).Returns(timer);
+            var observer = Substitute.For<IActivationWorkingSetObserver>();
+            var workingSet = new ActivationWorkingSet(
+                timerFactory,
+                NullLogger<ActivationWorkingSet>.Instance,
+                [observer],
+                CreateCatalogInstruments(),
+                TimeProvider.System);
+            var visits = 0;
+            var member = new TestWorkingSetMember(_ =>
+            {
+                visits++;
+                return true;
+            });
+            workingSet.OnActivated(member);
+            workingSet.OnEvicted(member);
+
+            var visitMember = typeof(ActivationWorkingSet).GetMethod(
+                "VisitMember",
+                BindingFlags.Instance | BindingFlags.NonPublic,
+                [typeof(IActivationWorkingSetMember)])
+                ?? throw new InvalidOperationException("Could not find the working-set scan method.");
+            visitMember.Invoke(workingSet, [member]);
+
+            Assert.Equal(0, visits);
+            Assert.Equal(0, workingSet.Count);
+            observer.Received(1).OnAdded(member);
+            observer.Received(1).OnEvicted(member);
+            observer.DidNotReceive().OnIdle(member);
+            observer.DidNotReceive().OnActive(member);
+        }
+
+        [Fact, TestCategory("Activation")]
         public void ActivationStatus_PreservesLifecycleStateAcrossWorkingSetTransitions()
         {
             var activation = (ActivationData)RuntimeHelpers.GetUninitializedObject(typeof(ActivationData));
@@ -1145,13 +1183,17 @@ namespace UnitTests.Runtime
             lock (activation)
             {
                 activation.SetState(ActivationState.Valid);
+                workingSetState.IsInWorkingSet = true;
                 workingSetState.IsIdle = true;
                 Assert.Equal(ActivationState.Valid, activation.State);
+                Assert.True(workingSetState.IsInWorkingSet);
                 Assert.True(workingSetState.IsIdle);
 
                 activation.SetState(ActivationState.Deactivating);
+                workingSetState.IsInWorkingSet = false;
                 workingSetState.IsIdle = false;
                 Assert.Equal(ActivationState.Deactivating, activation.State);
+                Assert.False(workingSetState.IsInWorkingSet);
                 Assert.False(workingSetState.IsIdle);
             }
         }
@@ -1201,6 +1243,7 @@ namespace UnitTests.Runtime
         private sealed class TestWorkingSetMember(Func<bool, bool>? isCandidateForRemoval = null) : IActivationWorkingSetMember
         {
             private bool _isIdle;
+            private bool _isInWorkingSet;
 
             public bool IsIdle
             {
@@ -1209,6 +1252,16 @@ namespace UnitTests.Runtime
                 {
                     Assert.True(Monitor.IsEntered(this));
                     _isIdle = value;
+                }
+            }
+
+            public bool IsInWorkingSet
+            {
+                get => Volatile.Read(ref _isInWorkingSet);
+                set
+                {
+                    Assert.True(Monitor.IsEntered(this));
+                    _isInWorkingSet = value;
                 }
             }
 

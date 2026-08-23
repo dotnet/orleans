@@ -756,6 +756,8 @@ namespace Orleans.Runtime
     {
         bool IsIdle { get; set; }
 
+        bool IsInWorkingSet { get; set; }
+
         bool IsCandidateForRemoval(bool wouldRemove);
     }
 

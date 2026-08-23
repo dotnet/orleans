@@ -90,6 +90,7 @@ public class DeactivatedGrainQueueTests
         public IWorkItemScheduler Scheduler => throw new NotImplementedException();
         public Task Deactivated => Task.CompletedTask;
         public bool IsIdle { get; set; }
+        public bool IsInWorkingSet { get; set; }
 
         public bool IsCandidateForRemoval(bool wouldRemove) => false;
         public void SetComponent<TComponent>(TComponent? value) where TComponent : class => throw new NotImplementedException();
