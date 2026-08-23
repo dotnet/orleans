@@ -1,8 +1,8 @@
+using System.Collections.Generic;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.DurableMessaging;
 using Orleans.Runtime;
 using Orleans.Serialization.Session;
-using System.Collections.Generic;
 
 namespace Orleans.Journaling.Tests;
 
