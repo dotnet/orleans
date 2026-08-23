@@ -61,6 +61,7 @@ internal sealed partial class ActivationWorkingSet : IActivationWorkingSet, ILif
             throw new InvalidOperationException($"Member {member} is already a member of the working set");
         }
 
+        member.IsInWorkingSet = true;
         member.IsIdle = false;
         Interlocked.Increment(ref _activeCount);
         foreach (var observer in _observers)
@@ -71,6 +72,7 @@ internal sealed partial class ActivationWorkingSet : IActivationWorkingSet, ILif
 
     public void OnActive(IActivationWorkingSetMember member)
     {
+        member.IsInWorkingSet = true;
         member.IsIdle = false;
         if (_members.TryAdd(member, 0))
         {
@@ -87,6 +89,7 @@ internal sealed partial class ActivationWorkingSet : IActivationWorkingSet, ILif
     {
         if (_members.TryRemove(member, out _))
         {
+            member.IsInWorkingSet = false;
             member.IsIdle = false;
             OnEvictedCore(member);
         }
@@ -142,32 +145,40 @@ internal sealed partial class ActivationWorkingSet : IActivationWorkingSet, ILif
         MemberVisitResult result;
         // Enumeration can retain a member across removal and re-addition. CLOCK state is advisory, so visit the
         // member's current state instead of adding a dictionary validation to every scan.
-        var wouldRemove = member.IsIdle;
-        if (member.IsCandidateForRemoval(wouldRemove))
+        if (!member.IsInWorkingSet)
         {
-            if (wouldRemove)
+            result = MemberVisitResult.None;
+        }
+        else
+        {
+            var wouldRemove = member.IsIdle;
+            if (member.IsCandidateForRemoval(wouldRemove))
             {
-                if (_members.TryRemove(member, out _))
+                if (wouldRemove)
                 {
-                    member.IsIdle = false;
-                    Interlocked.Decrement(ref _activeCount);
-                    result = MemberVisitResult.Evicted;
+                    if (_members.TryRemove(member, out _))
+                    {
+                        member.IsInWorkingSet = false;
+                        member.IsIdle = false;
+                        Interlocked.Decrement(ref _activeCount);
+                        result = MemberVisitResult.Evicted;
+                    }
+                    else
+                    {
+                        result = MemberVisitResult.None;
+                    }
                 }
                 else
                 {
-                    result = MemberVisitResult.None;
+                    member.IsIdle = true;
+                    result = MemberVisitResult.Idle;
                 }
             }
             else
             {
-                member.IsIdle = true;
-                result = MemberVisitResult.Idle;
+                member.IsIdle = false;
+                result = MemberVisitResult.Active;
             }
-        }
-        else
-        {
-            member.IsIdle = false;
-            result = MemberVisitResult.Active;
         }
 
         foreach (var observer in _observers)
@@ -264,6 +275,11 @@ public interface IActivationWorkingSet
 /// </summary>
 public interface IActivationWorkingSetMember
 {
+    /// <summary>
+    /// Gets or sets whether this member is registered in the working set.
+    /// </summary>
+    bool IsInWorkingSet { get; set; }
+
     /// <summary>
     /// Gets or sets whether this member was idle during the previous working-set scan.
     /// </summary>
