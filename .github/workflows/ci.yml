@@ -1147,13 +1147,37 @@ jobs:
       with:
         pattern: coverage_data_*
         path: coverage-data
-        merge-multiple: true
+        merge-multiple: false
     - name: Merge coverage
       shell: pwsh
       run: |
         dotnet tool install --tool-path .tools dotnet-coverage --version 18.5.2
         New-Item -ItemType Directory -Force -Path TestResults | Out-Null
-        ./.tools/dotnet-coverage merge "coverage-data/**/*.coverage" `
+
+        $coverageFiles = @(
+          foreach ($suite in 'BVT', 'SlowBVT', 'Functional') {
+            $suiteDirectory = Join-Path 'coverage-data' "coverage_data_$suite"
+            if (-not (Test-Path -LiteralPath $suiteDirectory -PathType Container)) {
+              throw "Coverage data for the $suite suite was not downloaded"
+            }
+
+            $suiteFiles = @(Get-ChildItem -LiteralPath $suiteDirectory -Recurse -File -Filter '*.coverage')
+            if ($suiteFiles.Count -eq 0) {
+              throw "Coverage data for the $suite suite contains no reports"
+            }
+
+            Write-Host "Merging $($suiteFiles.Count) coverage reports from the $suite suite."
+            $suiteFiles
+          }
+        )
+
+        $duplicateNames = @($coverageFiles | Group-Object Name | Where-Object Count -gt 1)
+        if ($duplicateNames.Count -gt 0) {
+          $names = $duplicateNames.Name -join ', '
+          throw "Coverage report names must be unique across suites: $names"
+        }
+
+        ./.tools/dotnet-coverage merge $coverageFiles.FullName `
           --output TestResults/coverage.cobertura.xml `
           --output-format cobertura `
           --remove-input-files `

@@ -5,6 +5,8 @@ Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
 $scriptPath = Join-Path $PSScriptRoot 'summarize-coverage.ps1'
+$collectorScriptPath = Join-Path $PSScriptRoot 'run-tests-with-coverage.ps1'
+$workflowPath = Join-Path $PSScriptRoot '../workflows/ci.yml'
 $temporaryRoot = Join-Path ([IO.Path]::GetTempPath()) "orleans-coverage-tests-$([guid]::NewGuid())"
 $testsRun = 0
 
@@ -38,6 +40,18 @@ function Assert-Throws {
 
     if (-not $threw) {
         throw "Expected error matching '$Pattern'."
+    }
+}
+
+function Assert-Matches {
+    param(
+        [string] $Value,
+        [string] $Pattern,
+        [string] $Message
+    )
+
+    if ($Value -notmatch $Pattern) {
+        throw "$Message Expected content matching '$Pattern'."
     }
 }
 
@@ -244,6 +258,34 @@ try {
         )
         [void] (New-Item -ItemType SymbolicLink -Path (Join-Path $testCase.ReportDirectory 'coverage.cobertura.xml') -Target $target)
         Assert-Throws { Invoke-Summarizer $testCase } 'must not be a symbolic link'
+    }
+
+    Invoke-Test 'keeps suite coverage files distinct' {
+        $collectorScript = Get-Content -Raw -LiteralPath $collectorScriptPath
+        Assert-Matches `
+            $collectorScript `
+            "\('\{0\}-\{1:D3\}-\{2\}\.coverage' -f \`$Suite, \`$index, \`$moduleName\)" `
+            'Coverage file names must include the suite.'
+    }
+
+    Invoke-Test 'preserves coverage artifact directories during download' {
+        $workflow = Get-Content -Raw -LiteralPath $workflowPath
+        Assert-Matches `
+            $workflow `
+            '(?s)pattern:\s*coverage_data_\*.*?merge-multiple:\s*false' `
+            'Coverage artifacts must not be flattened before merging.'
+    }
+
+    Invoke-Test 'requires every covered suite before merging' {
+        $workflow = Get-Content -Raw -LiteralPath $workflowPath
+        Assert-Matches `
+            $workflow `
+            "foreach \(\`$suite in 'BVT', 'SlowBVT', 'Functional'\)" `
+            'The merge must validate every covered suite.'
+        Assert-Matches `
+            $workflow `
+            'Coverage data for the \$suite suite contains no reports' `
+            'The merge must reject empty suite artifacts.'
     }
 
     Write-Output "$testsRun coverage tests passed."

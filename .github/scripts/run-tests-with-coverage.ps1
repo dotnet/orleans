@@ -101,7 +101,7 @@ $totalTests = 0
 foreach ($modulePath in $modules) {
     $index++
     $moduleName = [IO.Path]::GetFileNameWithoutExtension($modulePath)
-    $coverageOutput = Join-Path $coverageDirectory ('{0:D3}-{1}.coverage' -f $index, $moduleName)
+    $coverageOutput = Join-Path $coverageDirectory ('{0}-{1:D3}-{2}.coverage' -f $Suite, $index, $moduleName)
     $reportDirectory = Join-Path ([IO.Path]::GetDirectoryName($modulePath)) 'TestResults'
     $reportPattern = "test_results_${Suite}_${Framework}_${moduleName}_${Framework}_*.trx"
     if (Test-Path -LiteralPath $reportDirectory) {

@@ -104,8 +104,8 @@ jobs:
             '<summary>Coverage details</summary>'
             ''
             ('- **Source files:** {0}' -f $sourceFiles)
-            '- **Scope:** BVT, SlowBVT, and Functional tests on Linux with .NET 10'
-            '- **Sources:** maintained repository code under `src/`'
+            '- **Scope:** `Provider=None` BVT, SlowBVT, and Functional tests on Linux with .NET 10; CodeGen tests run separately'
+            '- **Sources:** maintained repository code under `src/` loaded by the covered test scope'
             ('- **Commit:** [`{0}`]({1}/commit/{2})' -f $env:HEAD_SHA.Substring(0, 10), $env:REPOSITORY_URL, $env:HEAD_SHA)
             ('- [View the test run and merged coverage artifact]({0})' -f $env:SOURCE_RUN_URL)
             ('- [View the coverage reporting run]({0})' -f $env:REPORT_RUN_URL)
