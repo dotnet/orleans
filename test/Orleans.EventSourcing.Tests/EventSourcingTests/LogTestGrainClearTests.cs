@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 using Orleans.Storage;
+using TestGrains;
 using UnitTests.GrainInterfaces;
 using Xunit;
 using Assert = Xunit.Assert;
@@ -68,6 +69,28 @@ namespace Tester.EventSourcingTests
             await grain.SetAGlobal(7);
             Assert.Equal(7, await grain.GetAGlobal());
             Assert.Equal(1, await grain.GetConfirmedVersion());
+        }
+
+        [Fact, TestCategory("EventSourcing"), TestCategory("Functional")]
+        public async Task FactoryBackedCustomStorage_RetrievesConfirmedEvents()
+        {
+            var grain = this.fixture.GrainFactory.GetGrain<ILogTestGrain>(
+                721005L,
+                "TestGrains.LogTestGrainSeparateCustomStorage");
+
+            await grain.Clear();
+            await grain.SetAGlobal(10);
+            await grain.IncrementAGlobal();
+
+            var events = await grain.GetEventLog();
+
+            Assert.Equal(2, events.Count);
+            Assert.Equal(10, Assert.IsType<UpdateA>(events[0]).Val);
+            Assert.IsType<IncrementA>(events[1]);
+
+            await grain.Clear();
+
+            Assert.Empty(await grain.GetEventLog());
         }
 
         private static async Task<List<Exception>> RunConcurrentOperationsAroundClear(ILogTestGrain grain)

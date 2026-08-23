@@ -158,6 +158,7 @@ namespace TestGrains
     public sealed class SeparateCustomStorage<TState, TDelta> : ICustomStorageInterface<TState, TDelta>
     {
         private readonly DeepCopier copier;
+        private readonly List<TDelta> events = [];
 
         // We use fake in-memory state as the storage.
         private TState? state;
@@ -192,16 +193,27 @@ namespace TestGrains
             foreach (var update in updates)
             {
                 TransitionState(state, update);
+                events.Add(copier.Copy(update)!);
                 version++;
             }
 
             return Task.FromResult(true);
         }
 
+        public Task<IReadOnlyList<TDelta>> RetrieveLogSegment(int fromVersion, int toVersion)
+        {
+            IReadOnlyList<TDelta> result = events
+                .GetRange(fromVersion, toVersion - fromVersion)
+                .Select(copier.Copy)
+                .ToList();
+            return Task.FromResult(result);
+        }
+
         public Task ClearStoredState()
         {
             state = default;
             version = 0;
+            events.Clear();
             return Task.CompletedTask;
         }
 
