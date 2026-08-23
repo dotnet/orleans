@@ -113,21 +113,50 @@ internal sealed partial class WorkItemGroup : SynchronizationContext, IThreadPoo
         _state = WorkGroupStatus.Waiting;
         TaskScheduler = new ActivationTaskScheduler(this);
 
-        // Create a dummy task associated with our scheduler (never actually runs)
-        // We set m_taskScheduler directly so TaskScheduler.Current returns our scheduler
-        _schedulerTask = CreateSchedulerTask();
-        GetTaskSchedulerRef(_schedulerTask) = TaskScheduler;
+        _schedulerTask = CreateSchedulerTask(TaskScheduler);
     }
 
-    private static Task CreateSchedulerTask()
+    private static Task CreateSchedulerTask(TaskScheduler scheduler)
     {
+        Task task;
         if (ExecutionContext.IsFlowSuppressed())
         {
-            return new Task(static () => { }, TaskCreationOptions.DenyChildAttach);
+            task = new Task(static () => { }, TaskCreationOptions.DenyChildAttach);
+        }
+        else
+        {
+            using var suppressExecutionContext = ExecutionContext.SuppressFlow();
+            task = new Task(static () => { }, TaskCreationOptions.DenyChildAttach);
         }
 
-        using var suppressExecutionContext = ExecutionContext.SuppressFlow();
-        return new Task(static () => { }, TaskCreationOptions.DenyChildAttach);
+        // UnsafeAccessor is compatible with trimming and NativeAOT. Validate the runtime's Task layout and
+        // TaskScheduler.Current semantics during initialization so unsupported runtime changes fail fast.
+        try
+        {
+            GetTaskSchedulerRef(task) = scheduler;
+            var previousTask = GetCurrentTask();
+            try
+            {
+                SetCurrentTask(task);
+                if (!ReferenceEquals(System.Threading.Tasks.TaskScheduler.Current, scheduler))
+                {
+                    throw new PlatformNotSupportedException(
+                        "The current runtime does not support Orleans activation scheduler context.");
+                }
+            }
+            finally
+            {
+                SetCurrentTask(previousTask);
+            }
+        }
+        catch (Exception exception) when (exception is MissingFieldException or MissingMethodException)
+        {
+            throw new PlatformNotSupportedException(
+                "The current runtime does not expose the Task internals required for Orleans activation scheduler context.",
+                exception);
+        }
+
+        return task;
     }
 
     /// <summary>
@@ -504,9 +533,8 @@ internal sealed partial class WorkItemGroup : SynchronizationContext, IThreadPoo
     /// </summary>
     public override SynchronizationContext CreateCopy() => this;
 
-    /// <summary>
-    /// Gets a reference to the thread-static Task.t_currentTask field.
-    /// </summary>
+    // TaskScheduler.Current derives its value from Task.t_currentTask. These accessors preserve the
+    // established activation scheduler context for allocation-free callbacks and are validated above.
     [UnsafeAccessor(UnsafeAccessorKind.StaticField, Name = "t_currentTask")]
     private static extern ref Task? GetCurrentTaskRef(Task? _);
 
@@ -516,9 +544,6 @@ internal sealed partial class WorkItemGroup : SynchronizationContext, IThreadPoo
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static void SetCurrentTask(Task? task) => GetCurrentTaskRef(null) = task;
 
-    /// <summary>
-    /// Sets the internal m_taskScheduler field on a Task.
-    /// </summary>
     [UnsafeAccessor(UnsafeAccessorKind.Field, Name = "m_taskScheduler")]
     private static extern ref TaskScheduler? GetTaskSchedulerRef(Task task);
 }
