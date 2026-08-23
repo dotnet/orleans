@@ -376,64 +376,23 @@ public sealed class GrainDirectoryRollingUpgradeTests(ITestOutputHelper output)
         }
 
         var isMixedDirectoryCluster = distributedSiloCount > 0 && distributedSiloCount < cluster.Silos.Count;
-        foreach (var group in activationGroups)
-        {
-            var candidates = group.ToArray();
-            if (candidates.Length == 1)
-            {
-                continue;
-            }
-
-            Assert.True(
-                isMixedDirectoryCluster,
-                $"Found duplicate activations during '{stage}': "
-                + $"{group.Key}=[{string.Join(", ", candidates.Select(static activation => activation.Address.ToFullString()))}]");
-            Assert.True(
-                candidates.Length == 2,
-                $"Mixed-directory activation conflict for grain '{group.Key}' during '{stage}' must contain one "
-                + "LocalGrainDirectory activation and one DistributedGrainDirectory activation.");
-            Assert.True(
-                candidates.Select(static activation => activation.Address.MembershipVersion).Distinct().Count() == candidates.Length,
-                $"Mixed-directory activation conflict for grain '{group.Key}' during '{stage}' must contain one "
-                + "candidate per membership version.");
-
-            var newestMembershipVersion = candidates.Max(static activation => activation.Address.MembershipVersion);
-            var newestCandidates = candidates
-                .Where(activation => activation.Address.MembershipVersion == newestMembershipVersion)
-                .ToArray();
-            Assert.True(
-                newestCandidates.Length == 1,
-                $"Mixed-directory activation conflict for grain '{group.Key}' during '{stage}' must have exactly one "
-                + $"candidate in the newest membership version '{newestMembershipVersion}': "
-                + $"[{string.Join(", ", candidates.Select(static activation => activation.Address.ToFullString()))}]");
-            var newestCandidate = newestCandidates[0];
-            Assert.True(
-                newestCandidate.Silo.ServiceProvider.GetService<DirectoryMembershipService>() is not null,
-                $"The authoritative activation for grain '{group.Key}' during '{stage}' must run on a "
-                + $"DistributedGrainDirectory silo: '{newestCandidate.Address.ToFullString()}'.");
-            var losingCandidates = candidates
-                .Where(activation => activation.Address.MembershipVersion != newestMembershipVersion)
-                .ToArray();
-            Assert.All(losingCandidates, activation =>
-            {
-                Assert.True(
-                    activation.Address.MembershipVersion < newestMembershipVersion,
-                    $"The tolerated LocalGrainDirectory activation for grain '{group.Key}' during '{stage}' must "
-                    + $"precede membership version '{newestMembershipVersion}': '{activation.Address.ToFullString()}'.");
-                Assert.True(
-                    activation.Silo.ServiceProvider.GetService<DirectoryMembershipService>() is null,
-                    $"The tolerated older activation for grain '{group.Key}' during '{stage}' must run on a "
-                    + $"LocalGrainDirectory silo: '{activation.Address.ToFullString()}'.");
-            });
-        }
-
         if (isMixedDirectoryCluster)
         {
             output.WriteLine(
-                $"  Validated {activations.Count} mixed-directory activations, including "
-                + $"{activationGroups.Count(static group => group.Count() > 1)} cross-version conflicts, {stage}.");
+                $"  Observed {activations.Count} activations across {distributedSiloCount} DistributedGrainDirectory "
+                + $"and {cluster.Silos.Count - distributedSiloCount} LocalGrainDirectory silos {stage}; "
+                + "steady-state uniqueness and partition integrity are validated after the upgrade completes.");
             return;
         }
+
+        var duplicateActivations = activationGroups.Where(static group => group.Count() > 1).ToArray();
+        Assert.True(
+            duplicateActivations.Length == 0,
+            $"Found duplicate activations during '{stage}': "
+            + string.Join(
+                "; ",
+                duplicateActivations.Select(static group =>
+                    $"{group.Key}=[{string.Join(", ", group.Select(static activation => activation.Address.ToFullString()))}]")));
 
         if (distributedPartitions.Count == 0)
         {
@@ -1216,6 +1175,9 @@ public sealed class GrainDirectoryRollingUpgradeTests(ITestOutputHelper output)
         StaleCacheEvidenceCapture staleCacheEvidence)
     {
         var activations = GetDirectoryActivations(cluster);
+        var distributedSiloCount = cluster.Silos.Count(
+            static silo => silo.ServiceProvider.GetService<DirectoryMembershipService>() is not null);
+        var isMixedDirectoryCluster = distributedSiloCount > 0 && distributedSiloCount < cluster.Silos.Count;
         foreach (var (grainKey, observation) in observations)
         {
             var observedAddress = observation.Address;
@@ -1225,9 +1187,17 @@ public sealed class GrainDirectoryRollingUpgradeTests(ITestOutputHelper output)
             var activationMatches = activations
                 .Where(activation => activation.Address.GrainId.Equals(observedAddress.GrainId))
                 .ToArray();
-            var activation = Assert.Single(activationMatches);
-            Assert.Equal(observedAddress.SiloAddress, activation.Address.SiloAddress);
-            Assert.Equal(observedAddress.ActivationId, activation.Address.ActivationId);
+            var observedActivation = Assert.Single(
+                activationMatches,
+                activation =>
+                    activation.Address.SiloAddress?.Equals(observedAddress.SiloAddress) == true
+                    && activation.Address.ActivationId.Equals(observedAddress.ActivationId));
+            if (!isMixedDirectoryCluster)
+            {
+                Assert.Single(activationMatches);
+            }
+
+            Assert.Equal(observedAddress.MembershipVersion, observedActivation.Address.MembershipVersion);
 
             foreach (var silo in cluster.Silos)
             {

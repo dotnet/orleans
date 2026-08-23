@@ -49,7 +49,6 @@ internal sealed partial class GrainDirectoryPartition : SystemTarget, IGrainDire
 
     // Tracked for diagnostic purposes only.
     private readonly List<Task> _viewChangeTasks = [];
-    private readonly List<(RingRange Range, MembershipVersion Version, Task Cleanup)> _recoveryCleanupTasks = [];
     private CancellationToken ShutdownToken => _owner.OnStoppedToken;
 
     private RingRange _currentRange;
@@ -512,8 +511,6 @@ internal sealed partial class GrainDirectoryPartition : SystemTarget, IGrainDire
         // Suspend the range and transfer state from the previous owners.
         // If the predecessor becomes unavailable or membership advances quickly, we will declare data loss and unlock the range.
         var (tcs, sw) = LockRange(addedRange, current.Version, GrainDirectoryEvents.AcquireOperationName);
-        List<GrainAddress> duplicateActivations = [];
-        Task cleanupTask = Task.CompletedTask;
 
         try
         {
@@ -575,7 +572,7 @@ internal sealed partial class GrainDirectoryPartition : SystemTarget, IGrainDire
 
                 // Proceed to recovery (fetching from other silos),
                 // but register calls will now be blocked by range lease holds.
-                duplicateActivations = await RecoverPartitionRange(current, addedRange);
+                await RecoverPartitionRange(current, addedRange);
 
                 recovered = true;
             }
@@ -585,21 +582,6 @@ internal sealed partial class GrainDirectoryPartition : SystemTarget, IGrainDire
         finally
         {
             UnlockRange(addedRange, current.Version, tcs, sw.Elapsed, GrainDirectoryEvents.AcquireOperationName);
-
-            if (duplicateActivations.Count > 0)
-            {
-                cleanupTask = DeleteDuplicateActivationsAsync(duplicateActivations);
-                _recoveryCleanupTasks.Add((addedRange, current.Version, cleanupTask));
-            }
-        }
-
-        try
-        {
-            await cleanupTask;
-        }
-        finally
-        {
-            _recoveryCleanupTasks.Remove((addedRange, current.Version, cleanupTask));
         }
     }
 
@@ -793,12 +775,11 @@ internal sealed partial class GrainDirectoryPartition : SystemTarget, IGrainDire
         }
     }
 
-    private async Task<List<GrainAddress>> RecoverPartitionRange(DirectoryMembershipSnapshot current, RingRange addedRange)
+    private async Task RecoverPartitionRange(DirectoryMembershipSnapshot current, RingRange addedRange)
     {
         var stopwatch = ValueStopwatch.StartNew();
         GrainRuntime.CheckRuntimeContext(this);
         LogDebugRecoveringActivations(_logger, addedRange, current.Version);
-        List<GrainAddress> recoveredEntries = [];
 
         await foreach (var activations in GetRegisteredActivations(current, addedRange, isValidation: false))
         {
@@ -808,14 +789,12 @@ internal sealed partial class GrainDirectoryPartition : SystemTarget, IGrainDire
                 DebugAssertOwnership(current, entry.GrainId);
                 LogTraceRecoveredEntry(_logger, entry, current.Version);
                 RecoverEntry(_directory, entry);
-                recoveredEntries.Add(entry);
             }
         }
 
         _directoryInstruments.RangeRecoveryCount.Add(1);
         _directoryInstruments.RangeRecoveryDuration.Record((long)stopwatch.Elapsed.TotalMilliseconds);
         LogDebugCompletedRecoveringActivations(_logger, addedRange, current.Version, stopwatch.Elapsed);
-        return GetDuplicateActivations(_directory, recoveredEntries);
     }
 
     internal static void RecoverEntry(Dictionary<GrainId, GrainAddress> directory, GrainAddress recovered)
@@ -829,68 +808,6 @@ internal sealed partial class GrainDirectoryPartition : SystemTarget, IGrainDire
         {
             directory[recovered.GrainId] = recovered;
         }
-    }
-
-    internal static List<GrainAddress> GetDuplicateActivations(
-        Dictionary<GrainId, GrainAddress> directory,
-        List<GrainAddress> recoveredEntries)
-    {
-        List<GrainAddress> result = [];
-        foreach (var recovered in recoveredEntries)
-        {
-            if (!directory.TryGetValue(recovered.GrainId, out var winner) || !winner.Equals(recovered))
-            {
-                result.Add(recovered);
-            }
-        }
-
-        return result;
-    }
-
-    private async Task DeleteDuplicateActivationsAsync(List<GrainAddress> duplicateActivations)
-    {
-        Dictionary<SiloAddress, List<GrainAddress>> activationsBySilo = [];
-        foreach (var activation in duplicateActivations)
-        {
-            if (activation.SiloAddress is not { } siloAddress)
-            {
-                continue;
-            }
-
-            if (!activationsBySilo.TryGetValue(siloAddress, out var activations))
-            {
-                activations = [];
-                activationsBySilo.Add(siloAddress, activations);
-            }
-
-            activations.Add(activation);
-        }
-
-        foreach (var (siloAddress, activations) in activationsBySilo)
-        {
-            var remoteCatalog = _grainFactory.GetSystemTarget<ICatalog>(Constants.CatalogType, siloAddress);
-            await InvokeOnClusterMember(
-                siloAddress,
-                async cancellationToken =>
-                {
-                    await remoteCatalog.DeleteActivations(
-                        activations,
-                        DeactivationReasonCode.DuplicateActivation,
-                        "This grain has been activated elsewhere").WaitAsync(cancellationToken);
-                    return true;
-                },
-                false,
-                nameof(ICatalog.DeleteActivations));
-        }
-    }
-
-    private async Task WaitForRecoveryCleanup(RingRange range, MembershipVersion version)
-    {
-        var cleanupTasks = _recoveryCleanupTasks
-            .Where(cleanup => cleanup.Version <= version && cleanup.Range.Intersects(range))
-            .Select(static cleanup => cleanup.Cleanup)
-            .ToArray();
-        await Task.WhenAll(cleanupTasks).WaitAsync(ShutdownToken);
     }
 
     private async IAsyncEnumerable<List<GrainAddress>> GetRegisteredActivations(DirectoryMembershipSnapshot current, RingRange range, bool isValidation)
@@ -1069,7 +986,6 @@ internal sealed partial class GrainDirectoryPartition : SystemTarget, IGrainDire
         Debug.Assert(range.Equals(current.GetRange(_id, _partitionIndex)));
 
         await WaitForRange(RingRange.Full, current.Version);
-        await WaitForRecoveryCleanup(RingRange.Full, current.Version);
         var tcs = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         _rangeLocks.Add((RingRange.Full, current.Version, tcs));
         try
@@ -1139,8 +1055,7 @@ internal sealed partial class GrainDirectoryPartition : SystemTarget, IGrainDire
                 continue;
             }
 
-            var duplicateActivations = await RecoverPartitionRange(current, _currentRange);
-            await DeleteDuplicateActivationsAsync(duplicateActivations);
+            await RecoverPartitionRange(current, _currentRange);
             break;
         }
 
@@ -1151,7 +1066,6 @@ internal sealed partial class GrainDirectoryPartition : SystemTarget, IGrainDire
     {
         GrainRuntime.CheckRuntimeContext(this);
         await WaitForRange(RingRange.Full, version);
-        await WaitForRecoveryCleanup(RingRange.Full, version);
     }
 
     async ValueTask<Immutable<List<GrainId>>> IGrainDirectoryTestHooks.CheckActivationsAsync(Immutable<List<GrainAddress>> activations)
