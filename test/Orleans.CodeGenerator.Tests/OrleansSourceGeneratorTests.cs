@@ -1118,6 +1118,28 @@ public class BasicGrain : Grain, IBasicGrain
     }
 }");
 
+    [Fact]
+    public Task TestGrainRequestReturnShapes() => AssertSuccessfulSourceGeneration(
+@"using Orleans;
+using Orleans.Concurrency;
+using System.Threading.Tasks;
+
+namespace TestProject;
+
+public interface IRequestShapeGrain : IGrainWithIntegerKey
+{
+    ValueTask ValueTaskMethod(int value);
+
+    ValueTask<int> ValueTaskOfTMethod(string value);
+
+    Task TaskMethod(object value);
+
+    Task<int> TaskOfTMethod(byte[] value);
+
+    [OneWay]
+    void OneWayMethod(long value);
+}");
+
     /// <summary>
     /// Tests proxy generation for grains with different key types.
     /// Orleans supports multiple grain key types:
