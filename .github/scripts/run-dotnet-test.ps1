@@ -102,16 +102,8 @@ if ($IsMacOS) {
     }
 
     if (-not [string]::IsNullOrWhiteSpace($Project)) {
-        $metadataJson = & dotnet msbuild $Project `
-            -nologo `
-            '-getProperty:TargetPath' `
-            "-property:TargetFramework=$Framework"
-        if ($LASTEXITCODE -ne 0) {
-            throw "Failed to evaluate coverage module metadata for $Project"
-        }
-
-        $metadata = $metadataJson | ConvertFrom-Json
-        $staticInstrumentationFiles = Join-Path ([IO.Path]::GetDirectoryName($metadata.Properties.TargetPath)) '*.dll'
+        $projectDirectory = [IO.Path]::GetDirectoryName((Resolve-Path -LiteralPath $Project).Path)
+        $staticInstrumentationFiles = Join-Path $projectDirectory "bin/Debug/$Framework/*.dll"
     } else {
         $staticInstrumentationFiles = Join-Path $repositoryRoot "test/**/bin/Debug/$Framework/*.dll"
     }
@@ -135,8 +127,7 @@ $coverageArguments.Add('--output-format')
 $coverageArguments.Add('cobertura')
 $coverageArguments.Add('--nologo')
 if ($staticInstrumentationFiles) {
-    $coverageArguments.Add('--include-files')
-    $coverageArguments.Add($staticInstrumentationFiles)
+    $coverageArguments.Add("--include-files=$staticInstrumentationFiles")
 }
 $coverageArguments.Add('dotnet')
 
