@@ -76,7 +76,7 @@ if ($env:GITHUB_EVENT_NAME -ne 'pull_request') {
 }
 
 $repositoryRoot = (Resolve-Path (Join-Path $PSScriptRoot '../..')).Path
-$coverageSettings = Join-Path $repositoryRoot '.github/coverage.config.xml'
+$coverageSettings = Join-Path $repositoryRoot $(if ($IsMacOS) { '.github/coverage.static.config.xml' } else { '.github/coverage.config.xml' })
 $coverageDirectory = Join-Path $repositoryRoot 'TestResults'
 $coverageOutput = Join-Path $coverageDirectory "$CoverageId.cobertura.xml"
 Assert-NotReparsePoint $coverageDirectory

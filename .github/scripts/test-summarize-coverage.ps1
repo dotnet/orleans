@@ -284,6 +284,10 @@ try {
             'macOS coverage must specify files for static instrumentation.'
         Assert-Matches `
             $collectorScript `
+            'coverage\.static\.config\.xml' `
+            'macOS coverage must use static-only instrumentation settings.'
+        Assert-Matches `
+            $collectorScript `
             '\$testArguments\.Add\(''--no-build''\)' `
             'Coverage tests must execute the statically instrumented build.'
         Assert-Matches `
