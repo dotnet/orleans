@@ -26,7 +26,7 @@ internal sealed class AdvancedReminderRecoveryGrain(
     [FromKeyedServices(DurableJobTimeProviderNames.DurableJobs)] TimeProvider? timeProvider = null) : Grain, IAdvancedReminderRecoveryGrain
 {
     private const int BatchSize = 32;
-    private const int JobIdCacheCapacity = 32;
+    private const int MembershipBatchSize = 1_024;
     internal const int RecoveryPageSize = 256;
     private const int ScanBucketCount = 4_096;
     internal const int ScanBucketsPerReconciliation = 256;
@@ -69,7 +69,8 @@ internal sealed class AdvancedReminderRecoveryGrain(
     internal async Task ReconcileAsync(bool force, CancellationToken cancellationToken)
     {
         var tasks = new List<Task>(BatchSize);
-        var jobIdsByShard = new BoundedJobIdCache(JobIdCacheCapacity);
+        var membershipBatch = new Dictionary<string, List<ReminderEntry>>(StringComparer.Ordinal);
+        var membershipBatchCount = 0;
         var bucketsScanned = 0;
         while (bucketsScanned < ScanBucketsPerReconciliation)
         {
@@ -99,27 +100,25 @@ internal sealed class AdvancedReminderRecoveryGrain(
                             continue;
                         }
 
-                        if (!jobIdsByShard.TryGet(entry.JobShardId, out var existingJobIds))
+                        if (!membershipBatch.TryGetValue(entry.JobShardId, out var shardEntries))
                         {
-                            existingJobIds = await _jobShardManager.GetJobIdsAsync(entry.JobShardId, cancellationToken);
-                            jobIdsByShard.Set(entry.JobShardId, existingJobIds);
+                            shardEntries = [];
+                            membershipBatch.Add(entry.JobShardId, shardEntries);
                         }
 
-                        if (existingJobIds is null || existingJobIds.Contains(entry.JobId))
+                        shardEntries.Add(entry);
+                        membershipBatchCount++;
+                        if (membershipBatchCount == MembershipBatchSize)
                         {
-                            continue;
+                            await ReconcileMembershipBatchAsync(membershipBatch, tasks, cancellationToken);
+                            membershipBatchCount = 0;
                         }
 
-                        entryForce = true;
+                        continue;
                     }
 
                     tasks.Add(ReconcileEntryAsync(entry, entryForce, cancellationToken));
-
-                    if (tasks.Count == BatchSize)
-                    {
-                        await Task.WhenAll(tasks);
-                        tasks.Clear();
-                    }
+                    await FlushTasksIfFullAsync(tasks);
                 }
 
                 continuationToken = page.ContinuationToken;
@@ -133,57 +132,51 @@ internal sealed class AdvancedReminderRecoveryGrain(
             }
         }
 
+        await ReconcileMembershipBatchAsync(membershipBatch, tasks, cancellationToken);
         if (tasks.Count > 0)
         {
             await Task.WhenAll(tasks);
         }
     }
 
-    private sealed class BoundedJobIdCache(int capacity)
+    private async Task ReconcileMembershipBatchAsync(
+        Dictionary<string, List<ReminderEntry>> membershipBatch,
+        List<Task> tasks,
+        CancellationToken cancellationToken)
     {
-        private readonly Dictionary<string, CacheEntry> _entries = new(StringComparer.Ordinal);
-        private readonly LinkedList<string> _recency = new();
-
-        public bool TryGet(string shardId, out HashSet<string>? jobIds)
+        if (_jobShardManager is null || membershipBatch.Count == 0)
         {
-            if (!_entries.TryGetValue(shardId, out var entry))
-            {
-                jobIds = null;
-                return false;
-            }
-
-            _recency.Remove(entry.Node);
-            _recency.AddLast(entry.Node);
-            jobIds = entry.JobIds;
-            return true;
+            membershipBatch.Clear();
+            return;
         }
 
-        public void Set(string shardId, HashSet<string>? jobIds)
+        foreach (var (shardId, entries) in membershipBatch)
         {
-            if (_entries.TryGetValue(shardId, out var existing))
+            var existingJobIds = await _jobShardManager.GetJobIdsAsync(shardId, cancellationToken);
+            if (existingJobIds is null)
             {
-                existing.JobIds = jobIds;
-                _recency.Remove(existing.Node);
-                _recency.AddLast(existing.Node);
-                return;
+                continue;
             }
 
-            if (_entries.Count == capacity)
+            foreach (var entry in entries)
             {
-                var leastRecent = _recency.First!;
-                _recency.RemoveFirst();
-                _entries.Remove(leastRecent.Value);
+                if (!existingJobIds.Contains(entry.JobId))
+                {
+                    tasks.Add(ReconcileEntryAsync(entry, force: true, cancellationToken));
+                    await FlushTasksIfFullAsync(tasks);
+                }
             }
-
-            var node = _recency.AddLast(shardId);
-            _entries.Add(shardId, new CacheEntry(node, jobIds));
         }
 
-        private sealed class CacheEntry(LinkedListNode<string> node, HashSet<string>? jobIds)
-        {
-            public LinkedListNode<string> Node { get; } = node;
+        membershipBatch.Clear();
+    }
 
-            public HashSet<string>? JobIds { get; set; } = jobIds;
+    private static async Task FlushTasksIfFullAsync(List<Task> tasks)
+    {
+        if (tasks.Count == BatchSize)
+        {
+            await Task.WhenAll(tasks);
+            tasks.Clear();
         }
     }
 

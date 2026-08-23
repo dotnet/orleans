@@ -55,7 +55,7 @@ internal static class TimeZoneHelper
 
         var dstOffset = zone.GetUtcOffset(dstTransitionDateTime);
 
-        return new DateTimeOffset(dstTransitionDateTime, dstOffset);
+        return new DateTimeOffset(AsUnspecified(dstTransitionDateTime), dstOffset);
     }
 
     public static DateTimeOffset GetStandardTimeStart(TimeZoneInfo zone, DateTime ambiguousTime, TimeSpan daylightOffset)
@@ -63,7 +63,7 @@ internal static class TimeZoneHelper
         var dstTransitionEnd = GetDstTransitionEndDateTime(zone, ambiguousTime);
         var baseOffset = zone.GetUtcOffset(ambiguousTime);
 
-        return new DateTimeOffset(dstTransitionEnd, daylightOffset).ToOffset(baseOffset);
+        return new DateTimeOffset(AsUnspecified(dstTransitionEnd), daylightOffset).ToOffset(baseOffset);
     }
 
     public static DateTimeOffset GetAmbiguousIntervalEnd(TimeZoneInfo zone, DateTime ambiguousTime)
@@ -71,20 +71,23 @@ internal static class TimeZoneHelper
         var dstTransitionEnd = GetDstTransitionEndDateTime(zone, ambiguousTime);
         var baseOffset = zone.GetUtcOffset(ambiguousTime);
 
-        return new DateTimeOffset(dstTransitionEnd, baseOffset);
+        return new DateTimeOffset(AsUnspecified(dstTransitionEnd), baseOffset);
     }
 
     public static DateTimeOffset GetDaylightTimeEnd(TimeZoneInfo zone, DateTime ambiguousTime, TimeSpan daylightOffset)
     {
         var daylightTransitionEnd = GetDstTransitionEndDateTime(zone, ambiguousTime);
 
-        return new DateTimeOffset(daylightTransitionEnd.AddTicks(-1), daylightOffset);
+        return new DateTimeOffset(AsUnspecified(daylightTransitionEnd.AddTicks(-1)), daylightOffset);
     }
 
     private static TimeSpan[] GetAmbiguousOffsets(TimeZoneInfo zone, DateTime ambiguousTime)
     {
         return zone.GetAmbiguousTimeOffsets(ambiguousTime);
     }
+
+    private static DateTime AsUnspecified(DateTime value)
+        => DateTime.SpecifyKind(value, DateTimeKind.Unspecified);
 
     private static DateTime GetDstTransitionEndDateTime(TimeZoneInfo zone, DateTime ambiguousDateTime)
     {

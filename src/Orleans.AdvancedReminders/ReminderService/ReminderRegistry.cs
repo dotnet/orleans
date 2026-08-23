@@ -143,6 +143,11 @@ internal static class ReminderValidation
             throw new ArgumentOutOfRangeException(nameof(schedule), "Cannot use negative period to create a reminder");
         }
 
+        if (!schedule.IsOneShot && period == TimeSpan.Zero)
+        {
+            throw new ArgumentOutOfRangeException(nameof(schedule), "Recurring interval reminders require a positive period");
+        }
+
         if (!schedule.IsOneShot && period < options.MinimumReminderPeriod)
         {
             throw new ArgumentException(

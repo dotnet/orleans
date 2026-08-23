@@ -96,6 +96,25 @@ public class LocalDurableJobManagerTests
     }
 
     [Fact]
+    public async Task PeriodicShardCheck_SignalConsumedDuringTimerCycle_TriggersImmediateSecondCycle()
+    {
+        var timeProvider = new FakeTimeProvider(new DateTimeOffset(2026, 1, 1, 0, 0, 0, TimeSpan.Zero));
+        var shardManager = new BlockingFirstAssignJobShardManager();
+        var manager = CreateManager(shardManager, timeProvider, CreateOptions());
+        var accessor = new LocalDurableJobManager.TestAccessor(manager);
+        var timerTask = Task.CompletedTask;
+        var signal = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var processing = accessor.ProcessTriggeredShardChecksAsync(timerTask, signal.Task, CancellationToken.None);
+        await shardManager.FirstAssignStarted.Task.WaitAsync(TimeSpan.FromSeconds(5));
+
+        signal.TrySetResult(true);
+        shardManager.ReleaseFirstAssign.TrySetResult();
+
+        await processing.WaitAsync(TimeSpan.FromSeconds(5));
+        await shardManager.WaitForAssignCallCountAsync(2).WaitAsync(TimeSpan.FromSeconds(5));
+    }
+
+    [Fact]
     public async Task Stop_WhenActiveShardWaitsForQueueChange_CompletesAfterCleanupWithoutLifecycleError()
     {
         var timeProvider = new FakeTimeProvider(new DateTimeOffset(2026, 1, 1, 0, 0, 0, TimeSpan.Zero));
@@ -1793,6 +1812,56 @@ public class LocalDurableJobManagerTests
         {
             _assignCalls.Writer.TryWrite(Interlocked.Increment(ref _assignCallCount));
             return Task.FromResult(new List<IJobShard>());
+        }
+
+        public override Task<IJobShard> CreateShardAsync(
+            DateTimeOffset minDueTime,
+            DateTimeOffset maxDueTime,
+            IDictionary<string, string> metadata,
+            CancellationToken cancellationToken)
+            => throw new NotSupportedException();
+
+        public override Task UnregisterShardAsync(IJobShard shard, CancellationToken cancellationToken)
+            => Task.CompletedTask;
+
+        public async Task WaitForAssignCallCountAsync(int expected)
+        {
+            while (true)
+            {
+                var actual = await _assignCalls.Reader.ReadAsync();
+                if (actual == expected)
+                {
+                    return;
+                }
+
+                Assert.True(actual < expected, $"Observed {actual} shard assignment calls while waiting for {expected}.");
+            }
+        }
+    }
+
+    private sealed class BlockingFirstAssignJobShardManager() : JobShardManager(SiloAddress.New(new IPEndPoint(IPAddress.Loopback, 5000), 0))
+    {
+        private readonly Channel<int> _assignCalls = Channel.CreateUnbounded<int>();
+        private int _assignCallCount;
+
+        public TaskCompletionSource FirstAssignStarted { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        public TaskCompletionSource ReleaseFirstAssign { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        public override async Task<List<IJobShard>> AssignJobShardsAsync(
+            DateTimeOffset maxDueTime,
+            int maxNewClaims,
+            CancellationToken cancellationToken)
+        {
+            var callCount = Interlocked.Increment(ref _assignCallCount);
+            _assignCalls.Writer.TryWrite(callCount);
+            if (callCount == 1)
+            {
+                FirstAssignStarted.TrySetResult();
+                await ReleaseFirstAssign.Task.WaitAsync(cancellationToken);
+            }
+
+            return [];
         }
 
         public override Task<IJobShard> CreateShardAsync(

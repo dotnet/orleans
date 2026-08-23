@@ -119,7 +119,7 @@ Use `GetAdvancedReminder`, `GetAdvancedReminders`, and `UnregisterAdvancedRemind
 
 Use <xref:Orleans.AdvancedReminders.ReminderCronBuilder> for common schedules or <xref:Orleans.AdvancedReminders.ReminderCronExpression.Parse*> to validate an expression. Time-zone-aware schedules persist the time-zone identifier and evaluate future occurrences using that zone, including daylight-saving transitions. Use identifiers available on every silo operating system, and verify them before deployment.
 
-<xref:Orleans.AdvancedReminders.ReminderOptions.MinimumReminderPeriod?displayProperty=nameWithType> applies to interval and cron schedules. The default is one minute. An absolute `DateTime` must have `DateTimeKind.Utc`.
+<xref:Orleans.AdvancedReminders.ReminderOptions.MinimumReminderPeriod?displayProperty=nameWithType> applies to interval and cron schedules. The default is one minute, and recurring interval periods remain strictly positive when the configured minimum is zero. An absolute `DateTime` must have `DateTimeKind.Utc`.
 
 ## Schedule one-shot work
 
@@ -333,7 +333,7 @@ Get the singleton <xref:Orleans.AdvancedReminders.IReminderManagementGrain> thro
 
 :::code language="csharp" source="../snippets/compiled/Grains/AdvancedSchedulingSnippets.cs" id="query_advanced_reminders":::
 
-Continuation tokens are opaque and belong to the query which produced them. Paging order is stable storage-hash-bucket order, then due time, grain ID, and reminder name inside each bucket; it isn't globally ordered by due time. The Dashboard deliberately does not run a separate exact-count query for every page because that would read the entire reminder table. Its advanced-reminder counter therefore reports `Paged`; follow continuation tokens until they end when an exact count is operationally necessary.
+Continuation tokens are opaque and belong to the query which produced them. Paging order is stable storage-hash-bucket order, then immutable grain ID and reminder name inside each bucket. Due-time filters are evaluated against current row values without making mutable due timestamps part of the cursor. The Dashboard deliberately does not run a separate exact-count query for every page because that would read the entire reminder table. Its advanced-reminder counter therefore reports `Paged`; follow continuation tokens until they end when an exact count is operationally necessary.
 
 The management grain consumes provider continuation pages of at most 256 rows and retains only the best `pageSize + 1` candidates needed for the public response. A skewed bucket therefore increases provider reads without increasing retained reminder memory. A subsequent public continuation page rescans that bucket after the management cursor so ordering remains stable without caching the full bucket. Capacity-plan administrative scans against provider throughput and use narrow filters when possible.
 
@@ -350,7 +350,7 @@ Configure the grace threshold and cleanup guards deliberately. The grace period 
 
 :::code language="csharp" source="../snippets/compiled/Grains/AdvancedSchedulingSnippets.cs" id="configure_advanced_reminder_cleanup":::
 
-The recovery service divides reminder storage into 4,096 hash ranges and advances through 256 ranges per one-minute reconciliation cycle instead of scanning the whole table during startup. Each provider returns continuation pages of at most 256 rows. Entries are repaired in batches of 32, and a 32-shard LRU reuses bounded durable-job membership sets across hash ranges during each reconciliation cycle. Far-future entries are deferred until they enter `ShardLoadLookaheadPeriod`. The caller observes registration failures, Durable Jobs owns persisted delivery retries, and the singleton reconciliation cursor repairs persisted rows with missing handles. Persisted job handles remain authoritative while Durable Jobs executes or retries an occurrence. A forced repair rotates the occurrence token before replacing the job, so an older job becomes a harmless no-op if it later runs.
+The recovery service divides reminder storage into 4,096 hash ranges and advances through 256 ranges per one-minute reconciliation cycle instead of scanning the whole table during startup. Each provider returns continuation pages of at most 256 rows. Entries are repaired in batches of 32. Persisted job handles are grouped into bounded batches of 1,024 entries, then verified shard by shard so each shard journal is loaded once per batch without an eviction cliff. Far-future entries are deferred until they enter `ShardLoadLookaheadPeriod`. The caller observes registration failures, Durable Jobs owns persisted delivery retries, and the singleton reconciliation cursor repairs persisted rows with missing handles. Persisted job handles remain authoritative while Durable Jobs executes or retries an occurrence. A forced repair rotates the occurrence token before replacing the job, so an older job becomes a harmless no-op if it later runs.
 
 Deletion occurs only through a defined policy or an explicit administrative action:
 

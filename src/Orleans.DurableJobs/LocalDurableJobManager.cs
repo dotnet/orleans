@@ -430,9 +430,12 @@ internal partial class LocalDurableJobManager : SystemTarget, ILocalDurableJobMa
                     signalTask = _shardCheckSignals.Reader.ReadAsync(_cts.Token).AsTask();
                 }
 
-                await Task.WhenAny(timerTask, signalTask);
-
-                await ProcessShardCheckCycleAsync(_cts.Token);
+                var completedTask = await Task.WhenAny(timerTask, signalTask);
+                await ProcessTriggeredShardChecksAsync(completedTask, signalTask, _cts.Token);
+                if (signalTask.IsCompleted)
+                {
+                    signalTask = Task.FromResult(false);
+                }
             }
             catch (OperationCanceledException)
             {
@@ -443,6 +446,21 @@ internal partial class LocalDurableJobManager : SystemTarget, ILocalDurableJobMa
                 LogErrorInPeriodicCheck(_logger, ex);
                 await Task.Delay(TimeSpan.FromSeconds(5), _cts.Token).SuppressThrowing();
             }
+        }
+    }
+
+    private async Task ProcessTriggeredShardChecksAsync(
+        Task completedTask,
+        Task<bool> signalTask,
+        CancellationToken cancellationToken)
+    {
+        await ProcessShardCheckCycleAsync(cancellationToken);
+        if (!ReferenceEquals(completedTask, signalTask) && signalTask.IsCompleted)
+        {
+            // The pending channel read already consumed the membership signal while the
+            // timer-triggered cycle was running. Process the newer topology before arming
+            // another read so the signal cannot be lost.
+            await ProcessShardCheckCycleAsync(cancellationToken);
         }
     }
 
@@ -730,6 +748,14 @@ internal partial class LocalDurableJobManager : SystemTarget, ILocalDurableJobMa
 
         public Task CreateWritableShardAsync(DateTimeOffset shardKey, int stripe = 0)
             => manager.CreateWritableShardAsync(new WritableShardKey(shardKey, stripe));
+
+        public void SignalShardCheck() => manager._shardCheckSignals.Writer.TryWrite(true);
+
+        public Task ProcessTriggeredShardChecksAsync(
+            Task completedTask,
+            Task<bool> signalTask,
+            CancellationToken cancellationToken)
+            => manager.ProcessTriggeredShardChecksAsync(completedTask, signalTask, cancellationToken);
     }
 
     private WritableShardKey GetWritableShardKey(ScheduleJobRequest request)

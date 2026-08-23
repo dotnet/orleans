@@ -803,6 +803,19 @@ public class ReminderRegistryValidationTests
     }
 
     [Fact]
+    public async Task RegisterInterval_RejectsZeroPeriodWhenConfiguredMinimumIsZero()
+    {
+        var registry = CreateRegistry(new AdvancedReminderOptions { MinimumReminderPeriod = TimeSpan.Zero });
+
+        await Assert.ThrowsAsync<ArgumentOutOfRangeException>(
+            async () => await registry.RegisterOrUpdateReminder(
+                GrainId.Create("test", "g"),
+                "r",
+                TimeSpan.Zero,
+                TimeSpan.Zero));
+    }
+
+    [Fact]
     public async Task RegisterInterval_RejectsPeriodBelowMinimum()
     {
         var registry = CreateRegistry(new AdvancedReminderOptions { MinimumReminderPeriod = TimeSpan.FromMinutes(2) });
@@ -1390,15 +1403,23 @@ public class AdvancedReminderRecoveryGrainTests
     }
 
     [Fact]
-    public async Task ReconcileAsync_SharedShardAcrossHashBuckets_LoadsMembershipOnce()
+    public async Task ReconcileAsync_ThirtyThreeInterleavedShards_LoadEachShardOncePerBatch()
     {
-        var grainIds = Enumerable.Range(0, 100_000)
-            .Select(index => GrainId.Create("test", $"shared-shard-{index}"))
-            .GroupBy(grainId => grainId.GetUniformHashCode() >> 20)
-            .Take(2)
-            .Select(group => group.First())
-            .ToArray();
-        Assert.Equal(2, grainIds.Length);
+        const int ShardCount = 33;
+        const int EntryCount = ShardCount * 2;
+        var grainIdsByBucket = new Dictionary<uint, GrainId>();
+        for (var index = 0; index < 1_000_000 && grainIdsByBucket.Count < EntryCount; index++)
+        {
+            var grainId = GrainId.Create("test", $"interleaved-shard-{index}");
+            var bucket = grainId.GetUniformHashCode() >> 20;
+            if (bucket < AdvancedReminderRecoveryGrain.ScanBucketsPerReconciliation)
+            {
+                grainIdsByBucket.TryAdd(bucket, grainId);
+            }
+        }
+
+        var grainIds = grainIdsByBucket.Values.ToArray();
+        Assert.Equal(EntryCount, grainIds.Length);
         var entries = grainIds.Select((grainId, index) => new ReminderEntry
         {
             GrainId = grainId,
@@ -1408,7 +1429,7 @@ public class AdvancedReminderRecoveryGrainTests
             Period = TimeSpan.FromMinutes(1),
             ScheduleId = $"schedule-{index}",
             JobId = $"job-{index}",
-            JobShardId = "shared-shard",
+            JobShardId = $"shared-shard-{index % ShardCount}",
         }).ToArray();
         var reminderTable = Substitute.For<Orleans.AdvancedReminders.IReminderTable>();
         reminderTable.ReadRows(
@@ -1432,7 +1453,7 @@ public class AdvancedReminderRecoveryGrainTests
 
         await recovery.ReconcileAsync(force: false, CancellationToken.None);
 
-        Assert.Equal(1, shardManager.GetJobIdsCallCount);
+        Assert.Equal(ShardCount, shardManager.GetJobIdsCallCount);
         Assert.Empty(dispatcher.ReceivedCalls());
     }
 

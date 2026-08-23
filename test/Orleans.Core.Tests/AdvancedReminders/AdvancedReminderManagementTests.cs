@@ -318,6 +318,44 @@ public class ReminderManagementGrainTests
     }
 
     [Fact]
+    public async Task ListAllAsync_ContinuationDoesNotRepeatReminderWhenDueTimeAdvances()
+    {
+        var grainId = GrainId.Create("test", "mutable-due");
+        var table = new InMemoryManagementReminderTable(
+            new ReminderEntry
+            {
+                GrainId = grainId,
+                ReminderName = "a",
+                StartAt = DateTime.UtcNow,
+                NextDueUtc = DateTime.UtcNow,
+                Period = TimeSpan.FromMinutes(1),
+                ETag = "a-1",
+            },
+            new ReminderEntry
+            {
+                GrainId = grainId,
+                ReminderName = "b",
+                StartAt = DateTime.UtcNow.AddMinutes(1),
+                NextDueUtc = DateTime.UtcNow.AddMinutes(1),
+                Period = TimeSpan.FromMinutes(1),
+                ETag = "b-1",
+            });
+        var grain = new ReminderManagementGrain(table);
+
+        var first = await grain.ListAllAsync(pageSize: 1);
+        Assert.Equal("a", Assert.Single(first.Reminders).ReminderName);
+        var advanced = await table.ReadRow(grainId, "a");
+        Assert.NotNull(advanced);
+        advanced.NextDueUtc = DateTime.UtcNow.AddDays(1);
+        await table.UpsertRow(advanced);
+
+        var second = await grain.ListAllAsync(pageSize: 1, first.ContinuationToken);
+
+        Assert.Equal("b", Assert.Single(second.Reminders).ReminderName);
+        Assert.Null(second.ContinuationToken);
+    }
+
+    [Fact]
     public async Task ListFilteredAsync_AppliesPriorityScheduleAndStatus()
     {
         var now = DateTime.UtcNow;

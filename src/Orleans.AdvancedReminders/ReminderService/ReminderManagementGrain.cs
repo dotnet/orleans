@@ -369,15 +369,12 @@ public sealed class ReminderManagementGrain(
 
     private sealed class ReminderCursor
     {
-        private ReminderCursor(int bucket, DateTime dueUtc, GrainId grainId, string reminderName)
+        private ReminderCursor(int bucket, GrainId grainId, string reminderName)
         {
             Bucket = bucket;
-            DueUtc = dueUtc;
             GrainId = grainId;
             ReminderName = reminderName;
         }
-
-        public DateTime DueUtc { get; }
 
         public int Bucket { get; }
 
@@ -389,7 +386,7 @@ public sealed class ReminderManagementGrain(
         {
             var payload = string.Create(
                 CultureInfo.InvariantCulture,
-                $"1\n{bucket}\n{GetDueTime(entry).Ticks}\n{entry.GrainId}\n{entry.ReminderName}");
+                $"2\n{bucket}\n{entry.GrainId}\n{entry.ReminderName}");
             return Convert.ToBase64String(Encoding.UTF8.GetBytes(payload));
         }
 
@@ -403,8 +400,8 @@ public sealed class ReminderManagementGrain(
             try
             {
                 var payload = Encoding.UTF8.GetString(Convert.FromBase64String(continuationToken));
-                var parts = payload.Split('\n', 5);
-                if (parts.Length != 5 || parts[0] != "1")
+                var parts = payload.Split('\n', 4);
+                if (parts.Length != 4 || parts[0] != "2")
                 {
                     throw new FormatException("Continuation token payload is incomplete.");
                 }
@@ -416,21 +413,15 @@ public sealed class ReminderManagementGrain(
                     throw new FormatException("Continuation token scan bucket is invalid.");
                 }
 
-                if (!long.TryParse(parts[2], NumberStyles.Integer, CultureInfo.InvariantCulture, out var dueTicks))
-                {
-                    throw new FormatException("Continuation token due timestamp is invalid.");
-                }
-
-                if (string.IsNullOrEmpty(parts[3]) || string.IsNullOrEmpty(parts[4]))
+                if (string.IsNullOrEmpty(parts[2]) || string.IsNullOrEmpty(parts[3]))
                 {
                     throw new FormatException("Continuation token identity is invalid.");
                 }
 
                 return new ReminderCursor(
                     bucket,
-                    new DateTime(dueTicks, DateTimeKind.Utc),
-                    GrainId.Parse(parts[3]),
-                    parts[4]);
+                    GrainId.Parse(parts[2]),
+                    parts[3]);
             }
             catch (Exception exception) when (exception is FormatException or ArgumentException)
             {
@@ -440,12 +431,6 @@ public sealed class ReminderManagementGrain(
 
         public static int Compare(ReminderEntry reminder, ReminderCursor cursor)
         {
-            var dueCompare = GetDueTime(reminder).CompareTo(cursor.DueUtc);
-            if (dueCompare != 0)
-            {
-                return dueCompare;
-            }
-
             var grainCompare = reminder.GrainId.CompareTo(cursor.GrainId);
             if (grainCompare != 0)
             {
@@ -477,12 +462,6 @@ public sealed class ReminderManagementGrain(
             if (y is null)
             {
                 return 1;
-            }
-
-            var dueCompare = GetDueTime(x).CompareTo(GetDueTime(y));
-            if (dueCompare != 0)
-            {
-                return dueCompare;
             }
 
             var grainCompare = x.GrainId.CompareTo(y.GrainId);

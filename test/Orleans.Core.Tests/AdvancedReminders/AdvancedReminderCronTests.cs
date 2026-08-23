@@ -466,6 +466,42 @@ public class ReminderCronExpressionTimeZoneTests
 
         Assert.Null(result);
     }
+
+    [Fact]
+    public void GetDaylightTimeEnd_WithLocalKind_UsesWallClockKindForExplicitOffset()
+    {
+        var daylightStart = TimeZoneInfo.TransitionTime.CreateFloatingDateRule(
+            new DateTime(1, 1, 1, 2, 0, 0),
+            month: 3,
+            week: 2,
+            dayOfWeek: DayOfWeek.Sunday);
+        var daylightEnd = TimeZoneInfo.TransitionTime.CreateFloatingDateRule(
+            new DateTime(1, 1, 1, 2, 0, 0),
+            month: 11,
+            week: 1,
+            dayOfWeek: DayOfWeek.Sunday);
+        var adjustment = TimeZoneInfo.AdjustmentRule.CreateAdjustmentRule(
+            new DateTime(2025, 1, 1),
+            new DateTime(2025, 12, 31),
+            TimeSpan.FromHours(1),
+            daylightStart,
+            daylightEnd);
+        var zone = TimeZoneInfo.CreateCustomTimeZone(
+            "UTC+13 with DST",
+            TimeSpan.FromHours(13),
+            "UTC+13 with DST",
+            "UTC+13",
+            "UTC+14",
+            [adjustment]);
+        var ambiguousTime = DateTime.SpecifyKind(
+            new DateTime(2025, 11, 2, 1, 30, 0),
+            DateTimeKind.Local);
+
+        var result = TimeZoneHelper.GetDaylightTimeEnd(zone, ambiguousTime, TimeSpan.FromHours(14));
+
+        Assert.Equal(TimeSpan.FromHours(14), result.Offset);
+        Assert.Equal(DateTimeKind.Unspecified, result.DateTime.Kind);
+    }
 }
 
 [TestSuite("BVT")]
