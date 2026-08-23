@@ -23,7 +23,7 @@ public sealed class StringEncodedWriteVectorTests
         var writeVector = ",cluster10,cluster1";
 
         Assert.False(StringEncodedWriteVector.FlipBit(ref writeVector, "cluster1"));
-        Assert.Equal(",cluster10", writeVector);
+        Assert.StartsWith("v1:", writeVector, StringComparison.Ordinal);
         Assert.True(StringEncodedWriteVector.GetBit(writeVector, "cluster10"));
     }
 
@@ -133,6 +133,7 @@ public sealed class StringEncodedWriteVectorTests
         Assert.True(StringEncodedWriteVector.GetBit(writeVector, "clusterB"));
 
         Assert.True(StringEncodedWriteVector.FlipBit(ref writeVector, "cluster:blue/1"));
+        Assert.StartsWith("v1:", writeVector, StringComparison.Ordinal);
         Assert.True(StringEncodedWriteVector.GetBit(writeVector, "cluster:blue/1"));
         Assert.True(StringEncodedWriteVector.GetBit(writeVector, "clusterA"));
         Assert.True(StringEncodedWriteVector.GetBit(writeVector, "clusterB"));
@@ -141,5 +142,28 @@ public sealed class StringEncodedWriteVectorTests
         Assert.False(StringEncodedWriteVector.GetBit(writeVector, "cluster:blue/1"));
         Assert.True(StringEncodedWriteVector.GetBit(writeVector, "clusterA"));
         Assert.True(StringEncodedWriteVector.GetBit(writeVector, "clusterB"));
+    }
+
+    [Fact, TestCategory("EventSourcing"), TestCategory("BVT")]
+    public void FlipBit_CurrentFormat_UsesVersionedUtf16LengthPrefixes()
+    {
+        var writeVector = string.Empty;
+
+        Assert.True(StringEncodedWriteVector.FlipBit(ref writeVector, "west,prod"));
+        Assert.Equal("v1:9:west,prod", writeVector);
+
+        Assert.True(StringEncodedWriteVector.FlipBit(ref writeVector, "cluster:blue/1"));
+        Assert.Equal("v1:9:west,prod14:cluster:blue/1", writeVector);
+    }
+
+    [Theory, TestCategory("EventSourcing"), TestCategory("BVT")]
+    [InlineData("v2:1:A")]
+    [InlineData("v1:")]
+    [InlineData("v1:x:A")]
+    [InlineData("v1:5:abc")]
+    [InlineData("missing-prefix")]
+    public void VersionedFormat_MalformedOrUnsupportedValueThrows(string writeVector)
+    {
+        Assert.Throws<FormatException>(() => StringEncodedWriteVector.GetBit(writeVector, "A"));
     }
 }
