@@ -6,7 +6,14 @@ using Orleans.Configuration;
 
 namespace Orleans.Connections.Security.Entra;
 
-internal sealed class EntraTokenProvider
+internal interface IEntraTokenProvider
+{
+    ValueTask<AccessToken> GetTokenAsync(
+        SiloConnectionTokenRequestContext context,
+        CancellationToken cancellationToken);
+}
+
+internal sealed class EntraTokenProvider : IEntraTokenProvider
 {
     private readonly TokenCredential _credential;
     private readonly EntraSiloConnectionOptions _options;
@@ -21,8 +28,12 @@ internal sealed class EntraTokenProvider
 
     public async ValueTask<AccessToken> GetTokenAsync(CancellationToken cancellationToken)
     {
+        var configuredScope = _options.TokenScope!;
+        var requestScope = configuredScope.EndsWith("/.default", StringComparison.Ordinal)
+            ? configuredScope
+            : $"{configuredScope.TrimEnd('/')}/.default";
         var token = await _credential.GetTokenAsync(
-            new TokenRequestContext([_options.TokenScope!]),
+            new TokenRequestContext([requestScope]),
             cancellationToken).ConfigureAwait(false);
 
         if (string.IsNullOrEmpty(token.Token)
@@ -33,4 +44,8 @@ internal sealed class EntraTokenProvider
 
         return token;
     }
+
+    ValueTask<AccessToken> IEntraTokenProvider.GetTokenAsync(
+        SiloConnectionTokenRequestContext context,
+        CancellationToken cancellationToken) => GetTokenAsync(cancellationToken);
 }

@@ -448,11 +448,7 @@ internal class InboundSiloConnectionAuthenticationMiddleware : SiloConnectionAut
                     state.Move(SiloConnectionAuthenticationState.WorkAdmitted, SiloConnectionAuthenticationState.TokenTransferred);
                     var validation = await ValidateAsync(context, token, linked.Token);
                     var isAuthenticated = TryNormalizeValidation(validation, out var principal, out var expiresAt, out var failure);
-                    var resultCode = isAuthenticated
-                        ? AuthenticatedResult
-                        : Options.Mode == SiloConnectionAuthenticationMode.Audit
-                            ? AcceptedUnauthenticatedResult
-                            : RejectedResult;
+                    var resultCode = isAuthenticated ? AuthenticatedResult : RejectedResult;
 
                     await ConnectionFrameHelper.WriteFrameAsync(
                         context,
@@ -485,7 +481,7 @@ internal class InboundSiloConnectionAuthenticationMiddleware : SiloConnectionAut
                         direction,
                         feature,
                         started,
-                        isAuthenticated ? AuthenticationResultCategory.Authenticated : AuthenticationResultCategory.AcceptedUnauthenticated);
+                        AuthenticationResultCategory.Authenticated);
                 }
             }
             catch (OperationCanceledException) when (state.State != SiloConnectionAuthenticationState.Accepted)
@@ -744,27 +740,6 @@ internal class OutboundSiloConnectionAuthenticationMiddleware : SiloConnectionAu
                                 started,
                                 AuthenticationResultCategory.Authenticated);
                             return;
-                        case AcceptedUnauthenticatedResult when Options.Mode == SiloConnectionAuthenticationMode.Audit:
-                            state.Move(SiloConnectionAuthenticationState.ResultTransferred, SiloConnectionAuthenticationState.Accepted);
-                            admission.Dispose();
-                            linked.Dispose();
-                            timeout.Dispose();
-                            await RunAcceptedAsync(
-                                context,
-                                next,
-                                direction,
-                                new SiloConnectionAuthenticationFeature(
-                                    true,
-                                    false,
-                                    null,
-                                    null,
-                                    localFailure == SiloConnectionAuthenticationFailure.None
-                                        ? SiloConnectionAuthenticationFailure.InvalidToken
-                                        : localFailure,
-                                    SiloConnectionAuthenticationProtocol.Version2),
-                                started,
-                                AuthenticationResultCategory.AcceptedUnauthenticated);
-                            return;
                         case RejectedResult:
                         case AcceptedUnauthenticatedResult:
                             state.Move(SiloConnectionAuthenticationState.ResultTransferred, SiloConnectionAuthenticationState.Rejected);
@@ -797,9 +772,7 @@ internal class OutboundSiloConnectionAuthenticationMiddleware : SiloConnectionAu
     {
         if (_provider is null)
         {
-            return Options.Mode == SiloConnectionAuthenticationMode.Audit
-                ? ([], null, SiloConnectionAuthenticationFailure.ProviderUnavailable)
-                : (null, null, SiloConnectionAuthenticationFailure.ProviderUnavailable);
+            return (null, null, SiloConnectionAuthenticationFailure.ProviderUnavailable);
         }
 
         SiloConnectionToken token;
@@ -820,9 +793,7 @@ internal class OutboundSiloConnectionAuthenticationMiddleware : SiloConnectionAu
         }
         catch
         {
-            return Options.Mode == SiloConnectionAuthenticationMode.Audit
-                ? ([], null, SiloConnectionAuthenticationFailure.ProviderUnavailable)
-                : (null, null, SiloConnectionAuthenticationFailure.ProviderUnavailable);
+            return (null, null, SiloConnectionAuthenticationFailure.ProviderUnavailable);
         }
 
         var value = token.Value ?? string.Empty;
@@ -831,40 +802,30 @@ internal class OutboundSiloConnectionAuthenticationMiddleware : SiloConnectionAu
         {
             if (StrictUtf8.GetByteCount(value) > Options.MaxTokenSize)
             {
-                return Options.Mode == SiloConnectionAuthenticationMode.Audit
-                    ? ([], null, SiloConnectionAuthenticationFailure.InvalidToken)
-                    : (null, null, SiloConnectionAuthenticationFailure.InvalidToken);
+                return (null, null, SiloConnectionAuthenticationFailure.InvalidToken);
             }
 
             payload = StrictUtf8.GetBytes(value);
         }
         catch (EncoderFallbackException)
         {
-            return Options.Mode == SiloConnectionAuthenticationMode.Audit
-                ? ([], null, SiloConnectionAuthenticationFailure.InvalidToken)
-                : (null, null, SiloConnectionAuthenticationFailure.InvalidToken);
+            return (null, null, SiloConnectionAuthenticationFailure.InvalidToken);
         }
 
         if (payload.Length == 0)
         {
-            return Options.Mode == SiloConnectionAuthenticationMode.Audit
-                ? ([], null, SiloConnectionAuthenticationFailure.MissingToken)
-                : (null, null, SiloConnectionAuthenticationFailure.MissingToken);
+            return (null, null, SiloConnectionAuthenticationFailure.MissingToken);
         }
 
         if (token.ExpiresAt is null && !Options.AllowNonExpiringCredentials)
         {
-            return Options.Mode == SiloConnectionAuthenticationMode.Audit
-                ? ([], null, SiloConnectionAuthenticationFailure.ValidationError)
-                : (null, null, SiloConnectionAuthenticationFailure.ValidationError);
+            return (null, null, SiloConnectionAuthenticationFailure.ValidationError);
         }
 
         if (token.ExpiresAt is { } expiresAt
             && expiresAt <= Options.TimeProvider.GetUtcNow() + Options.MinimumRemainingTokenLifetime)
         {
-            return Options.Mode == SiloConnectionAuthenticationMode.Audit
-                ? ([], null, SiloConnectionAuthenticationFailure.ExpiredToken)
-                : (null, null, SiloConnectionAuthenticationFailure.ExpiredToken);
+            return (null, null, SiloConnectionAuthenticationFailure.ExpiredToken);
         }
 
         return (payload, token.ExpiresAt, SiloConnectionAuthenticationFailure.None);

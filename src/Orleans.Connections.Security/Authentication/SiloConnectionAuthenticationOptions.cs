@@ -7,7 +7,10 @@ namespace Orleans.Connections.Security;
 /// </summary>
 public sealed class SiloConnectionAuthenticationOptions
 {
-    /// <summary>Gets or sets the authentication enforcement mode.</summary>
+    /// <summary>
+    /// Gets or sets the authentication enforcement mode. Audit mode permits baseline protocol fallback,
+    /// but does not permit a failed negotiated authentication exchange to continue.
+    /// </summary>
     public SiloConnectionAuthenticationMode Mode { get; set; } = SiloConnectionAuthenticationMode.Required;
 
     /// <summary>Gets or sets the total token exchange timeout.</summary>

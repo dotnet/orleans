@@ -71,14 +71,14 @@ internal sealed class EntraJwtValidator
 
         ValidateUntrustedClaims(document, clusterId);
         var snapshot = await _configurationProvider.GetConfigurationAsync(cancellationToken).ConfigureAwait(false);
-        var result = await ValidateSignatureAndStandardClaimsAsync(token, clusterId, snapshot).ConfigureAwait(false);
+        var result = await ValidateSignatureAndStandardClaimsAsync(token, snapshot).ConfigureAwait(false);
 
         if (!result.IsValid && result.Exception is SecurityTokenSignatureKeyNotFoundException)
         {
             snapshot = await _configurationProvider.RefreshForUnknownSigningKeyAsync(
                 snapshot.Generation,
                 cancellationToken).ConfigureAwait(false);
-            result = await ValidateSignatureAndStandardClaimsAsync(token, clusterId, snapshot).ConfigureAwait(false);
+            result = await ValidateSignatureAndStandardClaimsAsync(token, snapshot).ConfigureAwait(false);
         }
 
         if (!result.IsValid)
@@ -97,15 +97,12 @@ internal sealed class EntraJwtValidator
 
     private Task<TokenValidationResult> ValidateSignatureAndStandardClaimsAsync(
         string token,
-        string clusterId,
         EntraOpenIdConfigurationSnapshot snapshot)
     {
         var validAudiences = new HashSet<string>(_options.ValidAudiences, StringComparer.Ordinal);
-        if (!string.IsNullOrWhiteSpace(_options.ClusterAudienceFormat))
+        if (!string.IsNullOrWhiteSpace(_options.ResourceApplicationId))
         {
-            // The cluster-specific audience was already checked against the raw payload and is
-            // also included in the cryptographically validated audience set.
-            validAudiences.Add(JwtDocument.FormatClusterValue(_options.ClusterAudienceFormat, clusterId));
+            validAudiences.Add(_options.ResourceApplicationId);
         }
 
         var parameters = new TokenValidationParameters
@@ -218,13 +215,12 @@ internal sealed class EntraJwtValidator
             throw new EntraAuthenticationException(EntraAuthenticationError.UnauthorizedCaller);
         }
 
-        if (!string.IsNullOrWhiteSpace(_options.ClusterAudienceFormat)
-            && !document.Audiences.Contains(
-                JwtDocument.FormatClusterValue(_options.ClusterAudienceFormat, clusterId),
-                StringComparer.Ordinal))
+        if (!string.IsNullOrWhiteSpace(_options.ClusterRole)
+            && !document.Roles.Contains(_options.ClusterRole, StringComparer.Ordinal))
         {
             throw new EntraAuthenticationException(EntraAuthenticationError.UnauthorizedCaller);
         }
+
     }
 
     private void ValidateTrustedClaims(JwtDocument document, string issuer, string clusterId)
@@ -235,6 +231,13 @@ internal sealed class EntraJwtValidator
                 .Contains(document.TenantId, StringComparer.OrdinalIgnoreCase))
         {
             throw new EntraAuthenticationException(EntraAuthenticationError.InvalidToken);
+        }
+
+        if (string.IsNullOrWhiteSpace(_options.ClusterClaimType)
+            && string.IsNullOrWhiteSpace(_options.ClusterRole)
+            && string.IsNullOrWhiteSpace(_options.ClusterRoleFormat))
+        {
+            throw new EntraAuthenticationException(EntraAuthenticationError.UnauthorizedCaller);
         }
 
         ValidateUntrustedClaims(document, clusterId);

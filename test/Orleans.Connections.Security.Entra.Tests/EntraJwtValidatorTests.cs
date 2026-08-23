@@ -127,20 +127,29 @@ public sealed class EntraJwtValidatorTests
         Assert.True(result.Principal.Identity?.IsAuthenticated);
     }
 
-    [Fact]
-    public async Task SupportsClusterSpecificAudienceBinding()
+    [Theory]
+    [InlineData("legacy-format", "InvalidToken")]
+    [InlineData("token-scope", "InvalidToken")]
+    [InlineData("resource-application-id", "UnauthorizedCaller")]
+    public async Task RejectsLegacyClusterAudienceBinding(
+        string audienceSource,
+        string expectedError)
     {
         using var fixture = new EntraTestFixture();
         fixture.Options.ClusterClaimType = null;
+#pragma warning disable CS0618
         fixture.Options.ClusterAudienceFormat = "api://orleans-silos/{0}";
-        var token = fixture.CreateToken(audience: "api://orleans-silos/cluster-a");
+#pragma warning restore CS0618
+        var audience = audienceSource switch
+        {
+            "legacy-format" => "api://orleans-silos/cluster-a",
+            "token-scope" => fixture.Options.TokenScope!,
+            "resource-application-id" => fixture.Options.ResourceApplicationId!,
+            _ => throw new ArgumentOutOfRangeException(nameof(audienceSource)),
+        };
+        var token = fixture.CreateToken(audience: audience);
 
-        var result = await fixture.CreateValidator().ValidateAsync(
-            token,
-            EntraTestFixture.ClusterId,
-            CancellationToken.None);
-
-        Assert.True(result.Principal.Identity?.IsAuthenticated);
+        await AssertErrorAsync(fixture, token, Enum.Parse<EntraAuthenticationError>(expectedError));
     }
 
     [Fact]
@@ -311,5 +320,143 @@ public sealed class EntraJwtValidatorTests
                 .ValidateAsync(token, EntraTestFixture.ClusterId, CancellationToken.None)
                 .AsTask());
         Assert.Equal(expected, exception.Error);
+    }
+
+    [Fact]
+    public async Task AcceptsV2TokenWithGuidAudienceAndExactClusterRole()
+    {
+        using var fixture = new EntraTestFixture();
+        ConfigureExactClusterRole(fixture);
+        fixture.Options.ValidAudiences.Clear();
+        var token = fixture.CreateToken(roles: [EntraTestFixture.Role, ExactClusterRole]);
+
+        var result = await fixture.CreateValidator().ValidateAsync(
+            token,
+            EntraTestFixture.ClusterId,
+            CancellationToken.None);
+
+        var identity = Assert.IsType<System.Security.Claims.ClaimsIdentity>(result.Principal.Identity);
+        Assert.True(identity.IsAuthenticated);
+        Assert.Equal("Entra", identity.AuthenticationType);
+        Assert.Equal(EntraTestFixture.ClientId, result.Principal.FindFirst("azp")?.Value);
+        Assert.Equal(EntraTestFixture.Audience, result.Principal.FindFirst("aud")?.Value);
+        Assert.Contains(result.Principal.FindAll("roles"), claim => claim.Value == ExactClusterRole);
+        Assert.Equal(fixture.TimeProvider.GetUtcNow().AddMinutes(30), result.ExpiresAt);
+    }
+
+    [Fact]
+    public async Task RejectsV2TokenWithUriAudience()
+    {
+        using var fixture = new EntraTestFixture();
+        ConfigureExactClusterRole(fixture);
+        fixture.Options.ValidAudiences.Clear();
+#pragma warning disable CS0618
+        fixture.Options.ClusterAudienceFormat = "api://11111111-1111-1111-1111-111111111111/{0}";
+#pragma warning restore CS0618
+        var token = fixture.CreateToken(
+            audience: fixture.Options.TokenScope!,
+            roles: [EntraTestFixture.Role, ExactClusterRole]);
+
+        await AssertErrorAsync(fixture, token, EntraAuthenticationError.InvalidToken);
+    }
+
+    [Theory]
+    [InlineData("missing")]
+    [InlineData("unrelated")]
+    [InlineData("prefix")]
+    [InlineData("other-cluster")]
+    [InlineData("case-mismatch")]
+    public async Task RejectsMissingOrWrongClusterRole(string roleCase)
+    {
+        using var fixture = new EntraTestFixture();
+        ConfigureExactClusterRole(fixture);
+        string[] roles = roleCase switch
+        {
+            "missing" => [EntraTestFixture.Role],
+            "unrelated" => [EntraTestFixture.Role, "Unrelated.Role"],
+            "prefix" => [EntraTestFixture.Role, "Orleans.Silo.Connect.cluster"],
+            "other-cluster" => [EntraTestFixture.Role, "Orleans.Silo.Connect.cluster-b"],
+            "case-mismatch" => [EntraTestFixture.Role, "orleans.silo.connect.cluster-a"],
+            _ => throw new ArgumentOutOfRangeException(nameof(roleCase)),
+        };
+        var token = fixture.CreateToken(roles: roles);
+
+        await AssertErrorAsync(fixture, token, EntraAuthenticationError.UnauthorizedCaller);
+    }
+
+    [Fact]
+    public async Task AcceptsMultipleRolesIncludingExactClusterRole()
+    {
+        using var fixture = new EntraTestFixture();
+        ConfigureExactClusterRole(fixture);
+        var token = fixture.CreateToken(
+            roles: [EntraTestFixture.Role, "Unrelated.Before", ExactClusterRole, "Unrelated.After"]);
+
+        var result = await fixture.CreateValidator().ValidateAsync(
+            token,
+            EntraTestFixture.ClusterId,
+            CancellationToken.None);
+
+        Assert.True(result.Principal.Identity?.IsAuthenticated);
+        Assert.Equal(
+            [EntraTestFixture.Role, "Unrelated.Before", ExactClusterRole, "Unrelated.After"],
+            result.Principal.FindAll("roles").Select(claim => claim.Value));
+        Assert.Equal(fixture.TimeProvider.GetUtcNow().AddMinutes(30), result.ExpiresAt);
+    }
+
+    [Theory]
+    [InlineData("wrong-tenant")]
+    [InlineData("issuer-mismatch")]
+    public async Task RejectsWrongTenantOrIssuer(string failureCase)
+    {
+        using var fixture = new EntraTestFixture();
+        ConfigureExactClusterRole(fixture);
+        var token = failureCase switch
+        {
+            "wrong-tenant" => fixture.CreateToken(
+                tenantId: "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb",
+                roles: [EntraTestFixture.Role, ExactClusterRole]),
+            "issuer-mismatch" => fixture.CreateToken(
+                issuer: "https://login.microsoftonline.com/bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb/v2.0",
+                roles: [EntraTestFixture.Role, ExactClusterRole]),
+            _ => throw new ArgumentOutOfRangeException(nameof(failureCase)),
+        };
+
+        await AssertErrorAsync(fixture, token, EntraAuthenticationError.InvalidToken);
+    }
+
+    [Theory]
+    [InlineData(EntraTestFixture.ClusterId, true)]
+    [InlineData("Cluster-A", false)]
+    [InlineData("cluster", false)]
+    [InlineData("cluster-a-suffix", false)]
+    public async Task ConfiguredCustomClusterClaimRequiresExactOrdinalValue(string claimValue, bool succeeds)
+    {
+        using var fixture = new EntraTestFixture();
+        var token = fixture.CreateToken(clusterId: claimValue);
+
+        if (succeeds)
+        {
+            var result = await fixture.CreateValidator().ValidateAsync(
+                token,
+                EntraTestFixture.ClusterId,
+                CancellationToken.None);
+
+            Assert.True(result.Principal.Identity?.IsAuthenticated);
+            Assert.Equal(claimValue, result.Principal.FindFirst("orleans_cluster")?.Value);
+            Assert.Equal(fixture.TimeProvider.GetUtcNow().AddMinutes(30), result.ExpiresAt);
+        }
+        else
+        {
+            await AssertErrorAsync(fixture, token, EntraAuthenticationError.UnauthorizedCaller);
+        }
+    }
+
+    private const string ExactClusterRole = "Orleans.Silo.Connect.cluster-a";
+
+    private static void ConfigureExactClusterRole(EntraTestFixture fixture)
+    {
+        fixture.Options.ClusterClaimType = null;
+        fixture.Options.ClusterRole = ExactClusterRole;
     }
 }

@@ -14,7 +14,7 @@ namespace Orleans.Connections.Security.Entra.Tests;
 
 internal sealed class EntraTestFixture : IDisposable
 {
-    public const string Audience = "api://orleans-silos";
+    public const string Audience = "44444444-4444-4444-4444-444444444444";
     public const string ClientId = "11111111-1111-1111-1111-111111111111";
     public const string ClusterId = "cluster-a";
     public const string Issuer = "https://login.microsoftonline.com/aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa/v2.0";
@@ -47,7 +47,8 @@ internal sealed class EntraTestFixture : IDisposable
         var options = new EntraSiloConnectionOptions
         {
             Authority = new Uri(authority),
-            TokenScope = $"{audience}/.default",
+            TokenScope = $"api://11111111-1111-1111-1111-111111111111/{ClusterId}",
+            ResourceApplicationId = audience,
             ClusterClaimType = "orleans_cluster",
             MetadataRefreshJitterRatio = 0,
         };
@@ -235,6 +236,8 @@ internal sealed class TestTokenCredential(Func<TokenRequestContext, Cancellation
 {
     public int CallCount { get; private set; }
 
+    public TokenRequestContext? LastRequestContext { get; private set; }
+
     public override AccessToken GetToken(TokenRequestContext requestContext, CancellationToken cancellationToken)
         => GetTokenAsync(requestContext, cancellationToken).AsTask().GetAwaiter().GetResult();
 
@@ -243,6 +246,7 @@ internal sealed class TestTokenCredential(Func<TokenRequestContext, Cancellation
         CancellationToken cancellationToken)
     {
         CallCount++;
+        LastRequestContext = requestContext;
         return getToken(requestContext, cancellationToken);
     }
 }

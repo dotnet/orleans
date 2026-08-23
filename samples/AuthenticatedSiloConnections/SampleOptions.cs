@@ -96,7 +96,13 @@ internal sealed class EntraOptions
 {
     public string TenantId { get; set; } = "";
 
+    public string TokenScope { get; set; } = "";
+
     public string ResourceApplicationId { get; set; } = "";
+
+    public string SiloClusterRole { get; set; } = "";
+
+    public string ClientClusterRole { get; set; } = "";
 
     public string WorkloadClientId { get; set; } = "";
 
@@ -109,18 +115,25 @@ internal sealed class EntraOptions
     public Uri Authority
         => new($"https://login.microsoftonline.com/{TenantId}/v2.0");
 
-    public string Audience
-        => $"api://{ResourceApplicationId}/{_clusterId}";
-
-    private string _clusterId = "";
-
     public void Validate(string clusterId)
     {
-        _clusterId = clusterId;
         RequireGuid(TenantId, nameof(TenantId));
         RequireGuid(ResourceApplicationId, nameof(ResourceApplicationId));
         RequireGuid(WorkloadClientId, nameof(WorkloadClientId));
+        SampleOptions.RequireValue(TokenScope, nameof(TokenScope));
+        SampleOptions.RequireValue(SiloClusterRole, nameof(SiloClusterRole));
+        SampleOptions.RequireValue(ClientClusterRole, nameof(ClientClusterRole));
         SampleOptions.RequireValue(FederatedTokenFile, nameof(FederatedTokenFile));
+
+        var expectedTokenScope = $"api://{ResourceApplicationId}/{clusterId}";
+        if (!string.Equals(TokenScope, expectedTokenScope, StringComparison.Ordinal))
+        {
+            throw new InvalidOperationException(
+                $"{SampleOptions.SectionName}:Entra:{nameof(TokenScope)} must be '{expectedTokenScope}'.");
+        }
+
+        ValidateClusterRole(SiloClusterRole, $"Orleans.Silo.Connect.{clusterId}", nameof(SiloClusterRole));
+        ValidateClusterRole(ClientClusterRole, $"Orleans.Client.Connect.{clusterId}", nameof(ClientClusterRole));
 
         if (!File.Exists(FederatedTokenFile))
         {
@@ -160,6 +173,15 @@ internal sealed class EntraOptions
         {
             throw new InvalidOperationException(
                 $"{SampleOptions.SectionName}:Entra:{name} must be a GUID.");
+        }
+    }
+
+    private static void ValidateClusterRole(string value, string expected, string name)
+    {
+        if (!string.Equals(value, expected, StringComparison.Ordinal))
+        {
+            throw new InvalidOperationException(
+                $"{SampleOptions.SectionName}:Entra:{name} must be the exact role '{expected}'.");
         }
     }
 }

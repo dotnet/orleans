@@ -14,7 +14,10 @@ public enum SiloConnectionAuthenticationMode
     /// <summary>Disables connection authentication.</summary>
     Disabled,
 
-    /// <summary>Attempts authentication when supported and records failures without rejecting policy failures.</summary>
+    /// <summary>
+    /// Allows a peer which did not negotiate token authentication to continue unauthenticated.
+    /// Once token authentication is negotiated, any authentication failure rejects the connection.
+    /// </summary>
     Audit,
 
     /// <summary>Requires every configured connection to be authenticated.</summary>
@@ -46,6 +49,7 @@ public enum SiloConnectionAuthenticationDirection
 
 /// <summary>
 /// Identifies a bounded connection-authentication failure category.
+/// Categories do not contain token, claim, or other peer-controlled values.
 /// </summary>
 public enum SiloConnectionAuthenticationFailure
 {
@@ -201,14 +205,18 @@ public sealed class SiloConnectionTokenValidationResult
     /// <summary>Gets the validated credential expiration time.</summary>
     public DateTimeOffset? ExpiresAt { get; }
 
-    /// <summary>Gets the failure category.</summary>
+    /// <summary>
+    /// Gets the bounded failure category. This value does not expose token or claim content.
+    /// </summary>
     public SiloConnectionAuthenticationFailure Failure { get; }
 
     /// <summary>Creates a successful validation result.</summary>
     public static SiloConnectionTokenValidationResult Success(ClaimsPrincipal principal, DateTimeOffset? expiresAt) =>
         new(true, principal ?? throw new ArgumentNullException(nameof(principal)), expiresAt, SiloConnectionAuthenticationFailure.None);
 
-    /// <summary>Creates a failed validation result.</summary>
+    /// <summary>
+    /// Creates a failed validation result using a bounded category which does not contain remote token or claim content.
+    /// </summary>
     public static SiloConnectionTokenValidationResult Fail(SiloConnectionAuthenticationFailure failure)
     {
         if (failure == SiloConnectionAuthenticationFailure.None)

@@ -28,9 +28,12 @@ namespace Orleans.Configuration
 
         public System.TimeSpan ClockSkew { get { throw null; } set { } }
 
+        [System.Obsolete("Use ResourceApplicationId with ClusterRole or ClusterClaimType instead. TokenScope is not a JWT audience.")]
         public string? ClusterAudienceFormat { get { throw null; } set { } }
 
         public string? ClusterClaimType { get { throw null; } set { } }
+
+        public string? ClusterRole { get { throw null; } set { } }
 
         public string? ClusterRoleFormat { get { throw null; } set { } }
 
@@ -55,6 +58,8 @@ namespace Orleans.Configuration
         public System.TimeSpan MinimumRemainingTokenLifetime { get { throw null; } set { } }
 
         public System.Collections.Generic.ISet<string> RequiredRoles { get { throw null; } }
+
+        public string? ResourceApplicationId { get { throw null; } set { } }
 
         public System.Collections.Generic.ISet<string> SupportedTokenVersions { get { throw null; } }
 
