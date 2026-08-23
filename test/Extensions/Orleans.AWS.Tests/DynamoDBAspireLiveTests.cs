@@ -297,6 +297,10 @@ public sealed class DynamoDBAspireLiveTests
         var orleans = builder.AddOrleans($"orleans-{Guid.NewGuid():N}")
             .WithClusterId(clusterId)
             .WithServiceId(serviceId);
+        if (surface != ProviderSurface.Clustering)
+        {
+            orleans.WithDevelopmentClustering();
+        }
 
         switch (surface)
         {
