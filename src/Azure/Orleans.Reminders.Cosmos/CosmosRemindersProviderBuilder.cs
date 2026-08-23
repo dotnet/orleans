@@ -1,6 +1,7 @@
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
+using Orleans.Configuration;
 using Orleans.Providers;
 using Orleans.Reminders.Cosmos;
 
@@ -32,7 +33,8 @@ internal sealed class CosmosRemindersProviderBuilder : IProviderBuilder<ISiloBui
                     connectionString = services.GetRequiredService<IConfiguration>().GetConnectionString(connectionName);
                     if (string.IsNullOrEmpty(connectionString))
                     {
-                        throw new InvalidOperationException($"Connection string '{connectionName}' was not found.");
+                        throw new OrleansConfigurationException(
+                            $"Cosmos reminder provider configuration '{configurationSection.Path}' references connection string '{connectionName}', but it was not found.");
                     }
                 }
 
