@@ -1,6 +1,10 @@
 using System;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Options;
 using Orleans;
+using Orleans.Clustering.DynamoDB;
+using Orleans.Configuration;
 using Orleans.Hosting;
 using Orleans.Providers;
 
@@ -13,40 +17,14 @@ internal sealed class DynamoDBClusteringProviderBuilder : IProviderBuilder<ISilo
 {
     public void Configure(ISiloBuilder builder, string? name, IConfigurationSection configurationSection)
     {
-        builder.UseDynamoDBClustering(options =>
+        builder.UseDynamoDBClustering((OptionsBuilder<DynamoDBClusteringOptions> optionsBuilder) =>
+            optionsBuilder.Configure<IConfiguration>((options, configuration) =>
             {
-                var accessKey = configurationSection[nameof(options.AccessKey)];
-                if (!string.IsNullOrEmpty(accessKey))
-                {
-                    options.AccessKey = accessKey;
-                }
+                var providerConfiguration = DynamoDBProviderConfiguration.Create(configurationSection, configuration);
+                providerConfiguration.ConfigureClientOptions(options);
 
-                var secretKey = configurationSection[nameof(options.SecretKey)];
-                if (!string.IsNullOrEmpty(secretKey))
-                {
-                    options.SecretKey = secretKey;
-                }
-
-                var region = configurationSection[nameof(options.Service)] ?? configurationSection["Region"];
-                if (!string.IsNullOrEmpty(region))
-                {
-                    options.Service = region;
-                }
-
-                var token = configurationSection[nameof(options.SecretKey)];
-                if (!string.IsNullOrEmpty(token))
-                {
-                    options.Token = token;
-                }
-
-                var profileName = configurationSection[nameof(options.SecretKey)];
-                if (!string.IsNullOrEmpty(profileName))
-                {
-                    options.ProfileName = profileName;
-                }
-
-                var tableName = configurationSection[nameof(options.TableName)];
-                if (!string.IsNullOrEmpty(tableName))
+                var tableName = providerConfiguration.GetValue(nameof(options.TableName));
+                if (tableName is not null)
                 {
                     options.TableName = tableName;
                 }
@@ -75,45 +53,19 @@ internal sealed class DynamoDBClusteringProviderBuilder : IProviderBuilder<ISilo
                 {
                     options.UpdateIfExists = uie;
                 }
-            });
+            }));
     }
 
     public void Configure(IClientBuilder builder, string? name, IConfigurationSection configurationSection)
     {
-        builder.UseDynamoDBClustering(options =>
+        builder.UseDynamoDBClustering((OptionsBuilder<DynamoDBGatewayOptions> optionsBuilder) =>
+            optionsBuilder.Configure<IConfiguration>((options, configuration) =>
             {
-                var accessKey = configurationSection[nameof(options.AccessKey)];
-                if (!string.IsNullOrEmpty(accessKey))
-                {
-                    options.AccessKey = accessKey;
-                }
+                var providerConfiguration = DynamoDBProviderConfiguration.Create(configurationSection, configuration);
+                providerConfiguration.ConfigureClientOptions(options);
 
-                var secretKey = configurationSection[nameof(options.SecretKey)];
-                if (!string.IsNullOrEmpty(secretKey))
-                {
-                    options.SecretKey = secretKey;
-                }
-
-                var region = configurationSection[nameof(options.Service)] ?? configurationSection["Region"];
-                if (!string.IsNullOrEmpty(region))
-                {
-                    options.Service = region;
-                }
-
-                var token = configurationSection[nameof(options.SecretKey)];
-                if (!string.IsNullOrEmpty(token))
-                {
-                    options.Token = token;
-                }
-
-                var profileName = configurationSection[nameof(options.SecretKey)];
-                if (!string.IsNullOrEmpty(profileName))
-                {
-                    options.ProfileName = profileName;
-                }
-
-                var tableName = configurationSection[nameof(options.TableName)];
-                if (!string.IsNullOrEmpty(tableName))
+                var tableName = providerConfiguration.GetValue(nameof(options.TableName));
+                if (tableName is not null)
                 {
                     options.TableName = tableName;
                 }
@@ -142,6 +94,6 @@ internal sealed class DynamoDBClusteringProviderBuilder : IProviderBuilder<ISilo
                 {
                     options.UpdateIfExists = uie;
                 }
-            });
+            }));
     }
 }

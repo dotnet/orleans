@@ -1,4 +1,5 @@
 using Orleans.Clustering.DynamoDB;
+using Orleans.Runtime;
 
 namespace Orleans.Configuration
 {
@@ -37,5 +38,17 @@ namespace Orleans.Configuration
         /// Defaults to 'OrleansSilos'.
         /// </summary>
         public string TableName { get; set; } = "OrleansSilos";
+    }
+
+    internal sealed class DynamoDBClusteringOptionsValidator(DynamoDBClusteringOptions options) : IConfigurationValidator
+    {
+        public void ValidateConfiguration()
+            => DynamoDBProviderConfiguration.ValidateTableOptions(
+                options,
+                options.TableName,
+                options.UseProvisionedThroughput,
+                options.ReadCapacityUnits,
+                options.WriteCapacityUnits,
+                "DynamoDB clustering");
     }
 }
