@@ -87,7 +87,7 @@ namespace Orleans.Runtime
 
             var callbackDataLogger = loggerFactory.CreateLogger<CallbackData>();
             this.sharedCallbackData = new SharedCallbackData(
-                msg => this.UnregisterCallback(msg.Id),
+                msg => this.UnregisterCallback(msg.SendingGrain, msg.Id),
                 callbackDataLogger,
                 this.messagingOptions.ResponseTimeout,
                 this.messagingOptions.CancelRequestOnTimeout,
@@ -95,7 +95,7 @@ namespace Orleans.Runtime
                 cancellationManager: null!);
 
             this.systemSharedCallbackData = new SharedCallbackData(
-                msg => this.UnregisterCallback(msg.Id),
+                msg => this.UnregisterCallback(msg.SendingGrain, msg.Id),
                 callbackDataLogger,
                 this.messagingOptions.SystemResponseTimeout,
                 cancelOnTimeout: false,
@@ -194,7 +194,7 @@ namespace Orleans.Runtime
                     return;
                 }
 
-                callbacks.TryAdd(message.Id, callbackData);
+                callbacks.TryAdd(message.SendingGrain, message.Id, callbackData);
                 callbackData.SubscribeForCancellation(cancellationToken);
             }
             else
@@ -235,9 +235,9 @@ namespace Orleans.Runtime
         /// <summary>
         /// UnRegister a callback.
         /// </summary>
-        private void UnregisterCallback(CorrelationId correlationId)
+        private void UnregisterCallback(GrainId owner, CorrelationId correlationId)
         {
-            callbacks.TryRemove(correlationId, out _);
+            callbacks.TryRemove(owner, correlationId, out _);
         }
 
         public void SniffIncomingMessage(Message message)
@@ -467,7 +467,7 @@ namespace Orleans.Runtime
 
         private void ProcessResponseCallback(Message message)
         {
-            if (callbacks.TryRemove(message.Id, out var callbackData))
+            if (callbacks.TryRemove(message.TargetGrain, message.Id, out var callbackData))
             {
                 // IMPORTANT: we do not schedule the response callback via the scheduler, since the only thing it does
                 // is to resolve/break the resolver. The continuations/waits that are based on this resolution will be scheduled as work items.
@@ -482,7 +482,7 @@ namespace Orleans.Runtime
         private void ProcessStatusResponse(Message message)
         {
             var status = (StatusResponse)message.BodyObject!;
-            callbacks.TryGetValue(message.Id, out var callback);
+            callbacks.TryGetValue(message.TargetGrain, message.Id, out var callback);
             var request = callback?.Message;
             if (request is not null)
             {
@@ -565,7 +565,7 @@ namespace Orleans.Runtime
 
         private void BreakOutstandingMessages()
         {
-            foreach (var (_, callback) in callbacks)
+            foreach (var callback in callbacks)
             {
                 try
                 {
@@ -601,9 +601,9 @@ namespace Orleans.Runtime
         {
             foreach (var callback in callbacks)
             {
-                if (deadSilo.Equals(callback.Value.Message.TargetSilo))
+                if (deadSilo.Equals(callback.Message.TargetSilo))
                 {
-                    callback.Value.OnTargetSiloFail();
+                    callback.OnTargetSiloFail();
                 }
             }
         }
@@ -615,7 +615,7 @@ namespace Orleans.Runtime
         }
 
         public int GetRunningRequestsCount(GrainInterfaceType grainInterfaceType)
-            => this.callbacks.CountWhere(c => c.Value.Message.InterfaceType == grainInterfaceType);
+            => this.callbacks.CountWhere(c => c.Message.InterfaceType == grainInterfaceType);
 
         private async Task MonitorCallbackExpiry()
         {
@@ -624,7 +624,7 @@ namespace Orleans.Runtime
                 try
                 {
                     var currentStopwatchTicks = ValueStopwatch.GetTimestamp();
-                    foreach (var (_, callback) in callbacks)
+                    foreach (var callback in callbacks)
                     {
                         if (callback.IsCompleted)
                         {
