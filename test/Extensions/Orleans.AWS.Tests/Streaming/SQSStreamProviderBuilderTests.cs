@@ -226,6 +226,27 @@ public sealed class SQSStreamProviderBuilderTests
     }
 
     [Fact]
+    public void ConfigureClient_EquivalentReferenceAliases_ResolveConnectionString()
+    {
+        const string serviceKey = "shared-sqs";
+        const string connectionString = "Service=http://localhost:9324";
+        var builder = CreateClientBuilder(
+            ProviderName,
+            [
+                ("ServiceKey", serviceKey.ToUpperInvariant()),
+                ("ConnectionName", serviceKey),
+            ],
+            [($"ConnectionStrings:{serviceKey}", connectionString)]);
+
+        ConfigureClient(builder, ProviderName);
+
+        using var services = builder.Services.BuildServiceProvider();
+        var options = GetOptions<SqsOptions>(services, ProviderName);
+
+        Assert.Equal(connectionString, options.ConnectionString);
+    }
+
+    [Fact]
     public void ConfigureSilo_AwsRegionEnvironment_UsesSdkCredentialChainConfiguration()
     {
         string[] variableNames =
