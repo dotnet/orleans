@@ -88,6 +88,7 @@ public class EventHubCheckpointerTests
         public object Cursor { get; } = new();
         public object? RefreshedCursor { get; private set; }
         public StreamSequenceToken? RefreshToken { get; private set; }
+        public int GetCursorCount { get; private set; }
 
         public int GetMaxAddCount() => 1_000;
 
@@ -97,7 +98,11 @@ public class EventHubCheckpointerTests
             return [];
         }
 
-        public object GetCursor(StreamId streamId, StreamSequenceToken? sequenceToken) => Cursor;
+        public object GetCursor(StreamId streamId, StreamSequenceToken? sequenceToken)
+        {
+            GetCursorCount++;
+            return Cursor;
+        }
 
         public void Refresh(object cursor, StreamSequenceToken? sequenceToken)
         {
@@ -232,7 +237,8 @@ public class EventHubCheckpointerTests
         TestEventHubQueueCache? cache = null,
         IEventHubReceiver? eventHubReceiver = null,
         Action<string>? onReceiverCreated = null,
-        Func<string, IEventHubReceiver>? receiverFactory = null)
+        Func<string, IEventHubReceiver>? receiverFactory = null,
+        Func<IEventHubQueueCache>? cacheFactory = null)
     {
         var settings = new EventHubPartitionSettings
         {
@@ -248,7 +254,7 @@ public class EventHubCheckpointerTests
 
         var receiver = new EventHubAdapterReceiver(
             settings,
-            cacheFactory: (_, createdCheckpointer, _) => cache ?? new TestEventHubQueueCache(createdCheckpointer),
+            cacheFactory: (_, createdCheckpointer, _) => cacheFactory?.Invoke() ?? cache ?? new TestEventHubQueueCache(createdCheckpointer),
             checkpointerFactory: _ => Task.FromResult<IStreamQueueCheckpointer<string>>(checkpointer),
             loggerFactory: Microsoft.Extensions.Logging.Abstractions.NullLoggerFactory.Instance,
             monitor: new Orleans.Streaming.EventHubs.DefaultEventHubReceiverMonitor(
@@ -312,23 +318,30 @@ public class EventHubCheckpointerTests
         {
             LoadedOffset = "123",
         };
-        var cache = new TestEventHubQueueCache();
+        var initialCache = new TestEventHubQueueCache();
+        var replacementCache = new TestEventHubQueueCache();
+        var caches = new Queue<IEventHubQueueCache>([initialCache, replacementCache]);
         var invalidReceiver = new InvalidOffsetEventHubReceiver();
         var offsets = new List<string>();
         var receiver = await CreateReceiver(
             checkpointer,
-            cache,
             onReceiverCreated: offsets.Add,
-            receiverFactory: offset => offset == "123" ? invalidReceiver : new TestEventHubReceiver());
+            receiverFactory: offset => offset == "123" ? invalidReceiver : new TestEventHubReceiver(),
+            cacheFactory: caches.Dequeue);
+        var cursor = receiver.GetCacheCursor(StreamId.Create("namespace", Guid.NewGuid()), MakeToken(1));
 
         await Assert.ThrowsAsync<ArgumentException>(
             () => receiver.GetQueueMessagesAsync(10, CancellationToken.None));
         Assert.Equal(1, checkpointer.ResetCount);
         Assert.Equal(1, invalidReceiver.CloseCount);
-        Assert.Equal(1, cache.DisposeCount);
+        Assert.Equal(1, initialCache.DisposeCount);
 
         Assert.Empty(await receiver.GetQueueMessagesAsync(10, CancellationToken.None));
         Assert.Equal(["123", EventHubConstants.StartOfStream], offsets);
+
+        var refreshToken = MakeToken(2);
+        cursor.Refresh(refreshToken);
+        Assert.Equal(1, replacementCache.GetCursorCount);
     }
 
     [TestSuite("BVT")]
@@ -342,6 +355,7 @@ public class EventHubCheckpointerTests
         };
         var invalidReceiver = new InvalidOffsetEventHubReceiver();
         var receiver = await CreateReceiver(checkpointer, eventHubReceiver: invalidReceiver);
+        checkpointer.CheckpointExists = true;
 
         await Assert.ThrowsAsync<ArgumentException>(
             () => receiver.GetQueueMessagesAsync(10, CancellationToken.None));
