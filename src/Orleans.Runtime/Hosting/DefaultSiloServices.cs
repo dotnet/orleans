@@ -482,6 +482,7 @@ namespace Orleans.Hosting
 
             ApplySubsection(builder, cfg, knownProviderTypes, "Clustering");
             ApplySubsection(builder, cfg, knownProviderTypes, "Reminders");
+            ApplySubsection(builder, cfg, knownProviderTypes, "GrainJournaling");
             ApplyNamedSubsections(builder, cfg, knownProviderTypes, "BroadcastChannel");
             ApplyNamedSubsections(builder, cfg, knownProviderTypes, "Streaming");
             ApplyNamedSubsections(builder, cfg, knownProviderTypes, "GrainStorage");
