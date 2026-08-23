@@ -3,7 +3,7 @@
 ## Summary
 
 - Scope: seven requested EF Core runtime and identifier contracts.
-- Tests added: 17 methods, producing 29 focused executions per target framework.
+- Tests added: 18 methods, producing 30 focused executions per target framework.
 - Production changes: runtime providers, shared identifier hashing, EF models, migrations, snapshots, SQL scripts, and operator documentation.
 - Final state: focused provider-free and real-provider matrices pass on `net8.0` and `net10.0`.
 
@@ -24,7 +24,7 @@
 
 - `dotnet build Orleans.slnx -bl`: passed.
 - Provider-free BVT: 124/124 passed on each target framework.
-- Docker-backed focused matrix: 29/29 passed with 0 skips on each target framework across MariaDB, PostgreSQL, and SQL Server.
+- Docker-backed focused matrix: 30/30 passed with 0 skips on each target framework across MariaDB, PostgreSQL, and SQL Server.
 - All nine provider migration snapshots report no pending model changes.
 - Documentation validation: `npm run validate` from `docs/site`.
 
@@ -43,3 +43,4 @@
 - Every requested contract maps to a dedicated test with exact state, ETag, row-count, and identifier assertions.
 - The non-duplicate database-failure guard prevents broad exception translation.
 - The provider identity tests perform independent create, read, update, remove, and raw-row checks.
+- Final high-confidence review found no remaining issues after the bounded batch-query fix.
