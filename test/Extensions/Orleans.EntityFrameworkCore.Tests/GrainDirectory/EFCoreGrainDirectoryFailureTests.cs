@@ -55,7 +55,7 @@ public sealed class EFCoreGrainDirectoryFailureTests
 
         await fixture.Directory.UnregisterSilos(silos);
 
-        Assert.Equal(3, fixture.Interceptor.ReaderCommandCount);
+        Assert.Equal(1, fixture.Interceptor.ReaderCommandCount);
         fixture.Interceptor.Reset();
         var addresses = Enumerable.Range(0, 600)
             .Select(index => new GrainAddress
@@ -68,7 +68,7 @@ public sealed class EFCoreGrainDirectoryFailureTests
 
         await fixture.Directory.UnregisterMany(addresses);
 
-        Assert.Equal(3, fixture.Interceptor.ReaderCommandCount);
+        Assert.Equal(1, fixture.Interceptor.ReaderCommandCount);
     }
 
     private static EFCoreGrainDirectory<FailureDbContext, Guid> CreateDirectory(
