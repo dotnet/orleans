@@ -54,6 +54,56 @@ public sealed class InProcessTestClusterDirectoryTests
             static participant => participant.GetType().Name == "DistributedGrainDirectory");
     }
 
+    [TestSuite("BVT")]
+    [TestProvider("None")]
+    [Fact, TestCategory("BVT")]
+    public async Task DistributedDirectoryCanBeRegisteredWithMultipleNames()
+    {
+        var builder = new InProcessTestClusterBuilder(1);
+        builder.ConfigureSilo(static (_, siloBuilder) =>
+        {
+            siloBuilder.AddDistributedGrainDirectory("first");
+            siloBuilder.AddDistributedGrainDirectory("second");
+        });
+
+        await using var cluster = builder.Build();
+        await cluster.DeployAsync();
+
+        var services = cluster.Silos[0].ServiceProvider;
+        var first = services.GetRequiredKeyedService<IGrainDirectory>("first");
+        var second = services.GetRequiredKeyedService<IGrainDirectory>("second");
+        Assert.Same(first, second);
+        Assert.Equal("InProcessGrainDirectory", GetDefaultDirectory(cluster).GetType().Name);
+        Assert.Single(
+            services.GetServices<ILifecycleParticipant<ISiloLifecycle>>(),
+            static participant => participant.GetType().Name == "DistributedGrainDirectory");
+    }
+
+    [TestSuite("BVT")]
+    [TestProvider("None")]
+    [Fact, TestCategory("BVT")]
+    public async Task DistributedDirectoryCanBeRegisteredAsDefaultBeforeNamed()
+    {
+        var builder = new InProcessTestClusterBuilder(1);
+        builder.Options.UseDistributedGrainDirectory = true;
+        builder.ConfigureSilo(static (_, siloBuilder) =>
+        {
+            siloBuilder.AddDistributedGrainDirectory();
+            siloBuilder.AddDistributedGrainDirectory("named");
+        });
+
+        await using var cluster = builder.Build();
+        await cluster.DeployAsync();
+
+        var services = cluster.Silos[0].ServiceProvider;
+        var defaultDirectory = GetDefaultDirectory(cluster);
+        var namedDirectory = services.GetRequiredKeyedService<IGrainDirectory>("named");
+        Assert.Same(defaultDirectory, namedDirectory);
+        Assert.Single(
+            services.GetServices<ILifecycleParticipant<ISiloLifecycle>>(),
+            static participant => participant.GetType().Name == "DistributedGrainDirectory");
+    }
+
     private static IGrainDirectory GetDefaultDirectory(InProcessTestCluster cluster) =>
         cluster.Silos[0].ServiceProvider.GetRequiredKeyedService<IGrainDirectory>(
             GrainDirectoryAttribute.DEFAULT_GRAIN_DIRECTORY);
