@@ -80,8 +80,11 @@ public class ClientDisconnectionTests(ClientDisconnectionTests.Fixture fixture) 
             TargetGrain = requestKey.GrainId,
         };
         responseThroughOtherGateway.ApplyGatewayRequestOwner(routingRequest);
-        await gateways[1 - ownerIndex].RecordClientResponse(responseThroughOtherGateway);
+        gateways[1 - ownerIndex].RecordClientResponse(responseThroughOtherGateway);
         Assert.Equal(ownerDetails.SiloAddress, gateways[1 - ownerIndex].TryToReroute(responseThroughOtherGateway));
+        await WaitUntilAsync(
+            () => gateways[ownerIndex].GetOutstandingRequestCount(clientBId) == 0,
+            TimeSpan.FromSeconds(10));
         Assert.All(gateways, gateway => Assert.Equal(0, gateway.GetOutstandingRequestCount(clientBId)));
 
         observerB.UnblockResponse();

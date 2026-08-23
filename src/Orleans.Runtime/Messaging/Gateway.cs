@@ -223,18 +223,22 @@ namespace Orleans.Runtime.Messaging
             return null;
         }
 
-        internal ValueTask RecordClientResponse(Message message)
+        internal void RecordClientResponse(Message message)
         {
             if (message.Direction != Message.Directions.Response)
             {
-                return default;
+                return;
             }
 
             if (message.TryGetGatewayRequestOwner(out var ownerGateway, out var ownerSilo))
             {
                 if (!IsTargetingLocalGateway(ownerGateway))
                 {
-                    return CompleteRemoteGatewayRequest(message, ownerSilo);
+                    var grainFactory = serviceProvider.GetRequiredService<IInternalGrainFactory>();
+                    var siloControl = grainFactory.GetSystemTarget<ISiloControl>(Constants.SiloControlType, ownerSilo);
+                    siloControl.CompleteGatewayRequest(message.SendingGrain, message.TargetGrain, message.Id).Ignore();
+                    message.RestoreGatewayResponseTarget(preserveRoute: true);
+                    return;
                 }
 
                 message.RestoreGatewayResponseTarget();
@@ -244,16 +248,6 @@ namespace Orleans.Runtime.Messaging
                 && clients.TryGetValue(respondingClientId, out var respondingClient))
             {
                 respondingClient.OnClientResponse(message);
-            }
-
-            return default;
-
-            async ValueTask CompleteRemoteGatewayRequest(Message response, SiloAddress owner)
-            {
-                var grainFactory = serviceProvider.GetRequiredService<IInternalGrainFactory>();
-                var siloControl = grainFactory.GetSystemTarget<ISiloControl>(Constants.SiloControlType, owner);
-                await siloControl.CompleteGatewayRequest(response.SendingGrain, response.TargetGrain, response.Id);
-                response.RestoreGatewayResponseTarget(preserveRoute: true);
             }
         }
 

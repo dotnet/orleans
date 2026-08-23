@@ -60,36 +60,15 @@ namespace Orleans.Runtime.Messaging
 
         protected override void OnReceivedMessage(Message msg)
         {
-            var completion = this.gateway.RecordClientResponse(msg);
-            if (!completion.IsCompletedSuccessfully)
-            {
-                CompleteRequestTrackingAndProcessMessage(completion, msg).Ignore();
-                return;
-            }
-
+            this.gateway.RecordClientResponse(msg);
             ProcessReceivedMessage(msg);
-        }
-
-        private async Task CompleteRequestTrackingAndProcessMessage(ValueTask completion, Message message)
-        {
-            try
-            {
-                await completion;
-            }
-            catch (Exception exception)
-            {
-                message.RestoreGatewayResponseTarget(preserveRoute: true);
-                LogWarningUnableToCompleteGatewayRequest(this.Log, exception, message);
-            }
-
-            ProcessReceivedMessage(message);
         }
 
         private void ProcessReceivedMessage(Message msg)
         {
             if (msg.Direction is Message.Directions.Request or Message.Directions.OneWay)
             {
-                msg.ClearGatewayRequestOwner();
+                msg.ClearGatewayRequestRouting();
             }
 
             // Don't process messages that have already timed out
@@ -203,7 +182,7 @@ namespace Orleans.Runtime.Messaging
                 this.messageCenter.SendRejection(
                     msg,
                     Message.RejectionTypes.Transient,
-                    $"Silo {this.myAddress} is rejecting message: {msg}. Reason = {reason}",
+                    $"Target client {msg.TargetGrain} is unavailable. Message: {msg}. Reason = {reason}",
                     new ClientNotAvailableException($"Target client {msg.TargetGrain} is unavailable. {reason ?? "Connection terminated."}"));
             }
             else
@@ -239,11 +218,6 @@ namespace Orleans.Runtime.Messaging
         {
             this.FailMessage(message, error);
         }
-
-        [LoggerMessage(
-            Level = LogLevel.Warning,
-            Message = "Unable to complete gateway request ownership before routing response {Message}.")]
-        private static partial void LogWarningUnableToCompleteGatewayRequest(ILogger logger, Exception exception, Message message);
 
         [LoggerMessage(
             Level = LogLevel.Debug,

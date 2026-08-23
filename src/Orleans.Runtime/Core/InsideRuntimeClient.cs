@@ -36,7 +36,7 @@ namespace Orleans.Runtime
         private readonly SharedCallbackData sharedCallbackData;
         private readonly SharedCallbackData systemSharedCallbackData;
         private readonly PeriodicTimer callbackTimer;
-        private readonly object _requestAdmissionLock = new();
+        private readonly ReaderWriterLockSlim _requestAdmissionLock = new(LockRecursionPolicy.SupportsRecursion);
         private int _isStopping;
 
         private GrainLocator grainLocator = null!;
@@ -211,7 +211,8 @@ namespace Orleans.Runtime
             }
 
             var rejectForShutdown = false;
-            lock (_requestAdmissionLock)
+            _requestAdmissionLock.EnterReadLock();
+            try
             {
                 // Completing callbacks during shutdown can resume application code which issues follow-up
                 // calls. Admission and sending are serialized with the stopping transition so that no
@@ -225,6 +226,10 @@ namespace Orleans.Runtime
                     this.messagingTrace.OnSendRequest(message);
                     this.MessageCenter.AddressAndSendMessage(message);
                 }
+            }
+            finally
+            {
+                _requestAdmissionLock.ExitReadLock();
             }
 
             if (rejectForShutdown)
@@ -668,10 +673,15 @@ namespace Orleans.Runtime
 
         private void StopRequestAdmission()
         {
-            lock (_requestAdmissionLock)
+            _requestAdmissionLock.EnterWriteLock();
+            try
             {
                 Volatile.Write(ref _isStopping, 1);
                 this.callbackTimer.Dispose();
+            }
+            finally
+            {
+                _requestAdmissionLock.ExitWriteLock();
             }
         }
 

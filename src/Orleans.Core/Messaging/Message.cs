@@ -292,6 +292,19 @@ namespace Orleans.Runtime
 
         internal void ClearGatewayRequestOwner()
         {
+            ClearGatewayRequestRouting();
+            if (RequestContextData is { } context)
+            {
+                context.Remove(GatewayRequestTimeoutHeader);
+                if (context.Count == 0)
+                {
+                    RequestContextData = null;
+                }
+            }
+        }
+
+        internal void ClearGatewayRequestRouting()
+        {
             if (RequestContextData is { } context)
             {
                 context.Remove(GatewayRequestOwnerHeader);
@@ -305,6 +318,7 @@ namespace Orleans.Runtime
 
             _gatewayRequestSource = null;
             _hasGatewayRequestSource = false;
+            _hasTrustedGatewayResponseTarget = false;
         }
 
         internal void SetGatewayRequestOwner(SiloAddress ownerGateway, SiloAddress ownerSilo)
@@ -365,10 +379,6 @@ namespace Orleans.Runtime
                 && ownerSiloValue is SiloAddress ownerSilo)
             {
                 responseContext[GatewayRequestOwnerSiloHeader] = ownerSilo;
-            }
-            else
-            {
-                responseContext.Remove(GatewayRequestOwnerSiloHeader);
             }
             if (requestContext.TryGetValue(GatewayResponseTargetHeader, out var targetValue)
                 && targetValue is SiloAddress responseTarget)

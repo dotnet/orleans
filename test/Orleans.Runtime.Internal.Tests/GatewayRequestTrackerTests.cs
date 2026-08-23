@@ -47,6 +47,7 @@ public class GatewayRequestTrackerTests
             ["#orleans.gateway.response-target"] = spoofedGateway,
         };
         request.ClearGatewayRequestOwner();
+        Assert.Null(request.GetGatewayRequestTimeout());
         request.SetGatewayRequestOwner(ownerGateway, CreateSiloAddress(44444));
         Assert.Equal(ownerGateway, request.SendingSilo);
         tracker.Register(request);
