@@ -1,7 +1,7 @@
 ---
 title: Event sourcing configuration
 description: Configure JournaledGrain log consistency and storage in Orleans.
-ms.date: 08/02/2026
+ms.date: 08/22/2026
 ms.topic: how-to
 ---
 
@@ -31,9 +31,15 @@ State storage and log storage use a standard grain storage provider:
 
 The provider names must exactly match registrations on every silo capable of activating the grain.
 
-Custom storage doesn't use <xref:Orleans.Storage.IGrainStorage>. The grain implements <xref:Orleans.EventSourcing.CustomStorage.ICustomStorageInterface`2> and owns the storage operations:
+Custom storage uses an application-defined <xref:Orleans.EventSourcing.CustomStorage.ICustomStorageInterface`2> instead of <xref:Orleans.Storage.IGrainStorage>. The grain can implement the interface directly. The following grain instead selects the keyed factory registered with the `"custom"` log-consistency provider:
 
 :::code language="csharp" source="../../snippets/compiled/EventSourcing/EventSourcingSnippets.cs" id="custom_storage_grain":::
+
+The generic registration overload creates the keyed <xref:Orleans.EventSourcing.CustomStorage.ICustomStorageFactory> registration. Its provider name is the key used by <xref:Orleans.Providers.LogConsistencyProviderAttribute>:
+
+:::code language="csharp" source="../../snippets/compiled/EventSourcing/EventSourcingSnippets.cs" id="custom_storage_factory":::
+
+The factory receives the activated grain's <xref:Orleans.Runtime.GrainId> and returns the storage instance used for reads, writes, event retrieval, and clearing throughout that activation.
 
 ## Multi-cluster responsibility
 
