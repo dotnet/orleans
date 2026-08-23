@@ -105,6 +105,8 @@ public sealed class KinesisAspireIntegrationTests
             [$"Orleans:Streaming:{ProviderName}:ProviderType"] = "Kinesis",
             [$"Orleans:Streaming:{ProviderName}:ConnectionString"] = "http://localhost:4566;AKID;SKval;ap-south-1",
             [$"Orleans:Streaming:{ProviderName}:StreamName"] = "direct-stream",
+            ["AWS_ENDPOINT_URL_KINESIS"] = "http://localhost:9999",
+            ["AWS_REGION"] = "us-east-1",
         });
         using var host = BuildSiloHost(config);
         var options = Resolve(host);
