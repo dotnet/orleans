@@ -527,7 +527,7 @@ public partial class TransactionalStateStorage<TState> : ITransactionalStateStor
                 }
             }
 
-            await storage.ExecuteTransactionAsync(multipleQuery).ConfigureAwait(continueOnCapturedContext: false);
+            await storage.ExecuteTransactionAsync(multipleQuery, previousETag).ConfigureAwait(continueOnCapturedContext: false);
         }
     }
 

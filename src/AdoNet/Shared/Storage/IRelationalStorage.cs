@@ -118,7 +118,10 @@ namespace Orleans.Tests.SqlUtils
         Task<int> ExecuteAsync(string query, Action<IDbCommand>? parameterProvider, CommandBehavior commandBehavior = CommandBehavior.Default, CancellationToken cancellationToken = default);
 
 #if TRANSACTIONS_ADONET
-        Task<int> ExecuteTransactionAsync(List<Tuple<string, Action<DbCommand>>> multipleQuery, CancellationToken cancellationToken = default);
+        Task<int> ExecuteTransactionAsync(
+            List<Tuple<string, Action<DbCommand>>> multipleQuery,
+            string? currentETag,
+            CancellationToken cancellationToken = default);
 #endif
 
         /// <summary>
