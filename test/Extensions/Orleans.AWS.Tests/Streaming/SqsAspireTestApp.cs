@@ -1,8 +1,6 @@
 #if NET10_0
-using Amazon;
 using Aspire.Hosting;
 using Aspire.Hosting.ApplicationModel;
-using Aspire.Hosting.AWS;
 using Aspire.Hosting.Orleans;
 using Aspire.Hosting.Testing;
 using Microsoft.Extensions.DependencyInjection;
@@ -70,24 +68,9 @@ internal sealed class SqsAspireTestApp : IAsyncDisposable
             }
         }
 
-        IAWSSDKConfig? aws = null;
-        if (awsProfile is not null || awsRegion is not null)
-        {
-            aws = builder.AddAWSSDKConfig()
-                .WithSdkValidation(false);
-            if (awsProfile is not null)
-            {
-                aws.WithProfile(awsProfile);
-            }
-
-            if (awsRegion is not null)
-            {
-                aws.WithRegion(RegionEndpoint.GetBySystemName(awsRegion));
-            }
-        }
-
         var provider = new SqsProviderConfiguration(
-            aws,
+            awsProfile,
+            awsRegion,
             connectionResources,
             providerValues,
             environmentValues);
@@ -252,7 +235,8 @@ internal sealed class SqsAspireTestApp : IAsyncDisposable
     }
 
     private sealed class SqsProviderConfiguration(
-        IAWSSDKConfig? aws,
+        string? awsProfile,
+        string? awsRegion,
         IReadOnlyList<IResourceBuilder<IResourceWithConnectionString>> connections,
         IEnumerable<(string Key, string? Value)> providerValues,
         IEnumerable<(string Key, string? Value)> environmentValues) : IProviderConfiguration
@@ -267,9 +251,18 @@ internal sealed class SqsAspireTestApp : IAsyncDisposable
         {
             var prefix = $"Orleans__{configSectionPath.Replace(":", "__", StringComparison.Ordinal)}";
             resourceBuilder.WithEnvironment($"{prefix}__ProviderType", "SQS");
-            if (aws is not null)
+            if (awsProfile is not null)
             {
-                resourceBuilder.WithReference(aws);
+                resourceBuilder
+                    .WithEnvironment("AWS_PROFILE", awsProfile)
+                    .WithEnvironment("AWS__Profile", awsProfile);
+            }
+
+            if (awsRegion is not null)
+            {
+                resourceBuilder
+                    .WithEnvironment("AWS_REGION", awsRegion)
+                    .WithEnvironment("AWS__Region", awsRegion);
             }
 
             foreach (var connection in connections)
