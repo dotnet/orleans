@@ -118,11 +118,14 @@ internal sealed class DurableState<T> : IPersistentState<T>, IJournaledState, IP
         {
             WriteClear(writer);
             _stagedChangeVersion = _changeVersion;
+            _clearRequested = false;
+            _isDirty = false;
         }
         else if (_hasState && _isDirty)
         {
             WriteState(writer);
             _stagedChangeVersion = _changeVersion;
+            _isDirty = false;
         }
     }
 
