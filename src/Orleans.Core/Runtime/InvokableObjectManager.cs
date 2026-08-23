@@ -68,6 +68,7 @@ namespace Orleans
             if (!ObserverGrainId.TryParse(message.TargetGrain, out var observerId))
             {
                 LogNotAddressedToAnObserver(logger, message);
+                message.DisposeOwnedBody();
                 return;
             }
 
@@ -78,6 +79,7 @@ namespace Orleans
             else
             {
                 LogUnexpectedTargetInRequest(logger, message.TargetGrain, message);
+                message.DisposeOwnedBody();
             }
         }
 
@@ -160,6 +162,7 @@ namespace Orleans
                     LogObserverGarbageCollected(_manager.logger, this.ObserverId, message);
                     // Try to remove. If it's not there, we don't care.
                     _manager.TryDeregister(this.ObserverId);
+                    message.DisposeOwnedBody();
                     return;
                 }
 
@@ -344,19 +347,21 @@ namespace Orleans
                     {
                         this.ReportException(message, exc);
                     }
-                    finally
-                    {
-                        // Clear the running request when done.
-                        lock (Messages)
-                        {
-                            _runningRequests.Remove(message);
-                        }
-                    }
                 }
                 catch (Exception outerException)
                 {
                     // Ignore and keep looping.
                     LogErrorProcessingMessage(_manager.logger, outerException, message);
+                }
+                finally
+                {
+                    message.DisposeOwnedBody();
+
+                    // Clear the running request when done.
+                    lock (Messages)
+                    {
+                        _runningRequests.Remove(message);
+                    }
                 }
             }
 
@@ -390,8 +395,17 @@ namespace Orleans
                 }
             }
 
-            private void SendCanceledResponse(Message message) =>
-                _manager.runtimeClient.SendResponse(message, Response.FromException(new OperationCanceledException()));
+            private void SendCanceledResponse(Message message)
+            {
+                try
+                {
+                    _manager.runtimeClient.SendResponse(message, Response.FromException(new OperationCanceledException()));
+                }
+                finally
+                {
+                    message.DisposeOwnedBody();
+                }
+            }
 
             private void SendResponseAsync(Message message, Response resultObject)
             {

@@ -149,6 +149,7 @@ internal class ProxyMethodDescription : IEquatable<ProxyMethodDescription>
         public bool IsImmutable => _invokableDescription.IsImmutable;
         public bool IsExceptionType => _invokableDescription.IsExceptionType;
         public List<TypeSyntax> ActivatorConstructorParameters => _invokableDescription.ActivatorConstructorParameters;
+        public bool UsesInvokablePool => _invokableDescription.UsesInvokablePool;
         public bool HasActivatorConstructor => UseActivator;
         public string? ReturnValueInitializerMethod => _invokableDescription.ReturnValueInitializerMethod;
 

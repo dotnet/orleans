@@ -40,10 +40,7 @@ namespace Orleans.Runtime
             // TODO: Remove expensive interface type check
             if (this.filters.Length == 0 && request is not IOutgoingGrainCallFilter)
             {
-                SetGrainCancellationTokensTarget(reference, request);
-                var responseCompletionSource = ResponseCompletionSourcePool.Get<TResult>();
-                this.RuntimeClient.SendRequest(reference, request, responseCompletionSource, options);
-                return responseCompletionSource.AsValueTask();
+                return InvokeMethodAsyncCore<TResult>(reference, request, options);
             }
             else
             {
@@ -56,10 +53,7 @@ namespace Orleans.Runtime
             // TODO: Remove expensive interface type check
             if (filters.Length == 0 && request is not IOutgoingGrainCallFilter)
             {
-                SetGrainCancellationTokensTarget(reference, request);
-                var responseCompletionSource = ResponseCompletionSourcePool.Get();
-                this.RuntimeClient.SendRequest(reference, request, responseCompletionSource, options);
-                return responseCompletionSource.AsVoidValueTask();
+                return InvokeMethodAsyncCore(reference, request, options);
             }
             else
             {
@@ -70,32 +64,124 @@ namespace Orleans.Runtime
         public void InvokeMethod(GrainReference reference, IInvokable request, InvokeMethodOptions options)
         {
             Debug.Assert((options & InvokeMethodOptions.OneWay) != 0);
+            var disposeRequest = true;
 
-            // TODO: Remove expensive interface type check
-            if (filters.Length == 0 && request is not IOutgoingGrainCallFilter)
+            try
             {
-                SetGrainCancellationTokensTarget(reference, request);
-                this.RuntimeClient.SendRequest(reference, request, context: null, options);
+                // TODO: Remove expensive interface type check
+                if (filters.Length == 0 && request is not IOutgoingGrainCallFilter)
+                {
+                    SetGrainCancellationTokensTarget(reference, request);
+                    this.RuntimeClient.SendRequest(reference, request, context: null, options);
+                }
+                else
+                {
+                    InvokeMethodWithFiltersAsync(reference, request, options).AsTask().Ignore();
+                    disposeRequest = false;
+                }
             }
-            else
+            finally
             {
-                InvokeMethodWithFiltersAsync(reference, request, options).AsTask().Ignore();
+                if (disposeRequest)
+                {
+                    DisposeRequest(request);
+                }
             }
         }
 
         private async ValueTask<TResult?> InvokeMethodWithFiltersAsync<TResult>(GrainReference reference, IInvokable request, InvokeMethodOptions options)
         {
-            SetGrainCancellationTokensTarget(reference, request);
-            var invoker = new OutgoingCallInvoker<TResult>(reference, request, options, this.sendRequest, this.filters);
-            await invoker.Invoke();
-            return invoker.TypedResult;
+            try
+            {
+                SetGrainCancellationTokensTarget(reference, request);
+                var invoker = new OutgoingCallInvoker<TResult>(reference, request, options, this.sendRequest, this.filters);
+                await invoker.Invoke();
+                return invoker.TypedResult;
+            }
+            finally
+            {
+                DisposeRequest(request);
+            }
         }
 
         private async ValueTask InvokeMethodWithFiltersAsync(GrainReference reference, IInvokable request, InvokeMethodOptions options)
         {
-            SetGrainCancellationTokensTarget(reference, request);
-            var invoker = new OutgoingCallInvoker<object>(reference, request, options, this.sendRequest, this.filters);
-            await invoker.Invoke();
+            try
+            {
+                SetGrainCancellationTokensTarget(reference, request);
+                var invoker = new OutgoingCallInvoker<object>(reference, request, options, this.sendRequest, this.filters);
+                await invoker.Invoke();
+            }
+            finally
+            {
+                DisposeRequest(request);
+            }
+        }
+
+        private ValueTask<TResult?> InvokeMethodAsyncCore<TResult>(GrainReference reference, IInvokable request, InvokeMethodOptions options)
+        {
+            ResponseCompletionSource<TResult> responseCompletionSource;
+            try
+            {
+                SetGrainCancellationTokensTarget(reference, request);
+                responseCompletionSource = ResponseCompletionSourcePool.Get<TResult>();
+                this.RuntimeClient.SendRequest(reference, request, responseCompletionSource, options);
+                return CompleteInvokeAsync(responseCompletionSource, request, options);
+            }
+            catch
+            {
+                DisposeRequest(request);
+                throw;
+            }
+        }
+
+        private static async ValueTask<TResult?> CompleteInvokeAsync<TResult>(ResponseCompletionSource<TResult> responseCompletionSource, IInvokable request, InvokeMethodOptions options)
+        {
+            try
+            {
+                return await responseCompletionSource.AsValueTask();
+            }
+            finally
+            {
+                DisposeRequest(request);
+            }
+        }
+
+        private ValueTask InvokeMethodAsyncCore(GrainReference reference, IInvokable request, InvokeMethodOptions options)
+        {
+            ResponseCompletionSource responseCompletionSource;
+            try
+            {
+                SetGrainCancellationTokensTarget(reference, request);
+                responseCompletionSource = ResponseCompletionSourcePool.Get();
+                this.RuntimeClient.SendRequest(reference, request, responseCompletionSource, options);
+                return CompleteInvokeAsync(responseCompletionSource, request, options);
+            }
+            catch
+            {
+                DisposeRequest(request);
+                throw;
+            }
+        }
+
+        private static async ValueTask CompleteInvokeAsync(ResponseCompletionSource responseCompletionSource, IInvokable request, InvokeMethodOptions options)
+        {
+            try
+            {
+                await responseCompletionSource.AsVoidValueTask();
+            }
+            finally
+            {
+                DisposeRequest(request);
+            }
+        }
+
+        private static void DisposeRequest(IInvokable request)
+        {
+            if (request is RequestBase)
+            {
+                request.Dispose();
+            }
         }
 
         public object Cast(IAddressable grain, Type grainInterface)

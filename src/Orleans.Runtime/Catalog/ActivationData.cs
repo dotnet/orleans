@@ -1212,6 +1212,7 @@ internal sealed partial class ActivationData :
                         }
 
                         _waitingRequests.RemoveAt(i);
+                        message.DisposeOwnedBody();
                         continue;
                     }
 
@@ -1630,6 +1631,7 @@ internal sealed partial class ActivationData :
         {
             _shared.MessagingProcessingInstruments.OnDispatcherMessageProcessedError(message);
             _shared.InternalRuntime.MessagingTrace.OnDropExpiredMessage(message, MessagingInstruments.Phase.Dispatch);
+            message.DisposeOwnedBody();
             return;
         }
 
@@ -1666,6 +1668,7 @@ internal sealed partial class ActivationData :
         {
             _shared.MessagingProcessingInstruments.OnDispatcherMessageProcessedError(message);
             _shared.InternalRuntime.MessageCenter.RejectMessage(message, Message.RejectionTypes.Overloaded, overloadException, "Target activation is overloaded " + this);
+            message.DisposeOwnedBody();
             return;
         }
 
@@ -2411,8 +2414,15 @@ internal sealed partial class ActivationData :
                 if (wasWaiting)
                 {
                     // If the request was waiting, then we necessarily did manage to cancel it, so send the response now.
-                    _shared.InternalRuntime.RuntimeClient.SendResponse(message, Response.FromException(new OperationCanceledException()));
-                    didCancel = true;
+                    try
+                    {
+                        _shared.InternalRuntime.RuntimeClient.SendResponse(message, Response.FromException(new OperationCanceledException()));
+                        didCancel = true;
+                    }
+                    finally
+                    {
+                        message.DisposeOwnedBody();
+                    }
                 }
                 else
                 {

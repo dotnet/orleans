@@ -166,6 +166,7 @@ namespace Orleans.Runtime.Messaging
                     this.messagingTrace.OnDropBlockedApplicationMessage(msg);
                 }
 
+                msg.DisposeOwnedBody();
                 return;
             }
             else
@@ -176,6 +177,7 @@ namespace Orleans.Runtime.Messaging
                 {
                     LogInformationMessageQueuedAfterStop(log, msg);
                     SendRejection(msg, Message.RejectionTypes.Unrecoverable, "Message was queued for sending after outbound queue was stopped");
+                    msg.DisposeOwnedBody();
                     return;
                 }
 
@@ -183,6 +185,7 @@ namespace Orleans.Runtime.Messaging
                 if (msg.IsExpired)
                 {
                     this.messagingTrace.OnDropExpiredMessage(msg, MessagingInstruments.Phase.Send);
+                    msg.DisposeOwnedBody();
                     return;
                 }
 
@@ -197,6 +200,7 @@ namespace Orleans.Runtime.Messaging
                 {
                     LogErrorMessageNoTargetSilo(log, msg, new());
                     SendRejection(msg, Message.RejectionTypes.Unrecoverable, "Message to be sent does not have a target silo.");
+                    msg.DisposeOwnedBody();
                     return;
                 }
 
@@ -224,6 +228,7 @@ namespace Orleans.Runtime.Messaging
                             this.SendRejection(msg, Message.RejectionTypes.Transient, "Target silo is known to be dead", new SiloUnavailableException());
                         }
 
+                        msg.DisposeOwnedBody();
                         return;
                     }
                     else
@@ -248,6 +253,7 @@ namespace Orleans.Runtime.Messaging
                                 catch (Exception exception)
                                 {
                                     messageCenter.SendRejection(msg, Message.RejectionTypes.Transient, $"Exception while sending message: {exception}");
+                                    msg.DisposeOwnedBody();
                                 }
                             }
                         }
@@ -309,6 +315,7 @@ namespace Orleans.Runtime.Messaging
                     }
 
                     RejectMessage(message, Message.RejectionTypes.Transient, exc, failedOperation);
+                    message.DisposeOwnedBody();
                 }
             }
             else
@@ -356,6 +363,7 @@ namespace Orleans.Runtime.Messaging
                 }
 
                 this.RejectMessage(message, Message.RejectionTypes.Transient, exc, failedOperation);
+                message.DisposeOwnedBody();
             }
             else
             {
@@ -418,6 +426,8 @@ namespace Orleans.Runtime.Messaging
                         var str = $"Forwarding failed: tried to forward message {message} for {message.ForwardCount} times after \"{failedOperation}\" to invalid activation. Rejecting now.";
                         RejectMessage(message, Message.RejectionTypes.Transient, exc, str);
                     }
+
+                    message.DisposeOwnedBody();
                 }
             }
         }
@@ -515,6 +525,7 @@ namespace Orleans.Runtime.Messaging
             {
                 this.messagingTrace.OnDispatcherSelectTargetFailed(m, ex);
                 RejectMessage(m, Message.RejectionTypes.Unrecoverable, ex);
+                m.DisposeOwnedBody();
             }
         }
 
@@ -574,6 +585,7 @@ namespace Orleans.Runtime.Messaging
                 LogErrorCreatingActivation(log, ex, msg.TargetGrain, msg.InterfaceType, msg);
 
                 this.RejectMessage(msg, Message.RejectionTypes.Transient, ex);
+                msg.DisposeOwnedBody();
             }
         }
 
@@ -595,6 +607,8 @@ namespace Orleans.Runtime.Messaging
 
                     SendMessage(response);
                 }
+
+                msg.DisposeOwnedBody();
             }
             else
             {

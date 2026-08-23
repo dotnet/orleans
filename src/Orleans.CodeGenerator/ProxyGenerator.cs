@@ -29,9 +29,11 @@ internal class ProxyGenerator(IGeneratorServices generatorServices, CopierGenera
 
         var fieldDescriptions = GetFieldDescriptions(interfaceDescription);
         var fieldDeclarations = GetFieldDeclarations(fieldDescriptions);
-        var proxyMethods = CreateProxyMethods(fieldDescriptions, interfaceDescription);
+        var activators = GetActivators(interfaceDescription);
+        var activatorFields = GetActivatorFieldDeclarations(activators);
+        var proxyMethods = CreateProxyMethods(fieldDescriptions, interfaceDescription, activators);
 
-        var ctors = GenerateConstructors(generatedClassName, fieldDescriptions, interfaceDescription.ProxyBaseType);
+        var ctors = GenerateConstructors(generatedClassName, fieldDescriptions, interfaceDescription, activators);
 
         var classDeclaration = ClassDeclaration(generatedClassName)
             .AddBaseListTypes(
@@ -40,6 +42,7 @@ internal class ProxyGenerator(IGeneratorServices generatorServices, CopierGenera
             .AddModifiers(Token(SyntaxKind.InternalKeyword), Token(SyntaxKind.SealedKeyword))
             .AddAttributeLists(GeneratedCodeUtilities.GetGeneratedCodeAttributes())
             .AddMembers(fieldDeclarations)
+            .AddMembers(activatorFields)
             .AddMembers(ctors)
             .AddMembers(proxyMethods);
 
@@ -84,7 +87,8 @@ internal class ProxyGenerator(IGeneratorServices generatorServices, CopierGenera
 
     private MemberDeclarationSyntax[] CreateProxyMethods(
         List<GeneratedFieldDescription> fieldDescriptions,
-        ProxyInterfaceDescription interfaceDescription)
+        ProxyInterfaceDescription interfaceDescription,
+        List<ActivatorDescription> activators)
     {
         var res = new List<MemberDeclarationSyntax>();
         foreach (var methodDescription in interfaceDescription.Methods)
@@ -100,7 +104,7 @@ internal class ProxyGenerator(IGeneratorServices generatorServices, CopierGenera
             ProxyMethodDescription? forwardingMethod)
         {
             var (isAsync, body) = forwardingMethod is null
-                ? CreateAsyncProxyMethodBody(fieldDescriptions, methodDescription)
+                ? CreateAsyncProxyMethodBody(fieldDescriptions, methodDescription, activators)
                 : (false, CreateCompatibilityForwardingBody(methodDescription, forwardingMethod));
             var method = methodDescription.Method;
             var declaration = MethodDeclaration(method.ReturnType.ToTypeSyntax(methodDescription.TypeParameterSubstitutions), method.Name.EscapeIdentifier())
@@ -278,17 +282,22 @@ internal class ProxyGenerator(IGeneratorServices generatorServices, CopierGenera
 
     private (bool IsAsync, BlockSyntax body) CreateAsyncProxyMethodBody(
         List<GeneratedFieldDescription> fieldDescriptions,
-        ProxyMethodDescription methodDescription)
+        ProxyMethodDescription methodDescription,
+        List<ActivatorDescription> activators)
     {
         var statements = new List<StatementSyntax>();
         var requestVar = IdentifierName("request");
         var methodSymbol = methodDescription.Method;
         var invokable = methodDescription.GeneratedInvokable;
-        ExpressionSyntax createRequestExpr = (!invokable.IsEmptyConstructable || invokable.UseActivator) switch
+        ExpressionSyntax createRequestExpr = TryGetActivatorIndex(activators, methodDescription, out var activatorIndex) switch
         {
-            true => InvocationExpression(ThisExpression().Member("GetInvokable", invokable.TypeSyntax))
-            .WithArgumentList(ArgumentList(SeparatedList<ArgumentSyntax>())),
-            _ => ObjectCreationExpression(invokable.TypeSyntax).WithArgumentList(ArgumentList())
+            true => InvocationExpression(IdentifierName($"_activator{activatorIndex}").Member("Create")),
+            _ => (!invokable.IsEmptyConstructable || invokable.UseActivator) switch
+            {
+                true => InvocationExpression(ThisExpression().Member("GetInvokable", invokable.TypeSyntax))
+                    .WithArgumentList(ArgumentList(SeparatedList<ArgumentSyntax>())),
+                _ => ObjectCreationExpression(invokable.TypeSyntax).WithArgumentList(ArgumentList())
+            }
         };
 
         statements.Add(
@@ -438,8 +447,10 @@ internal class ProxyGenerator(IGeneratorServices generatorServices, CopierGenera
     private MemberDeclarationSyntax[] GenerateConstructors(
         string simpleClassName,
         List<GeneratedFieldDescription> fieldDescriptions,
-        INamedTypeSymbol baseType)
+        ProxyInterfaceDescription interfaceDescription,
+        List<ActivatorDescription> activators)
     {
+        var baseType = interfaceDescription.ProxyBaseType;
         if (baseType is null)
         {
             return [];
@@ -543,6 +554,18 @@ internal class ProxyGenerator(IGeneratorServices generatorServices, CopierGenera
                         break;
                 }
             }
+
+            foreach (var activator in activators)
+            {
+                res.Add(
+                    ExpressionStatement(
+                        AssignmentExpression(
+                            SyntaxKind.SimpleAssignmentExpression,
+                            IdentifierName($"_activator{activator.Index}"),
+                            InvocationExpression(
+                                IdentifierName(CodecProviderMemberName).Member("GetActivator", activator.Method.GeneratedInvokable.TypeSyntax)))));
+            }
+
             return res;
 
             static ExpressionSyntax Unwrapped(ExpressionSyntax expr)
@@ -559,6 +582,61 @@ internal class ProxyGenerator(IGeneratorServices generatorServices, CopierGenera
                     ArgumentList(SeparatedList([Argument(ThisExpression()), Argument(IdentifierName(CodecProviderMemberName))])));
             }
         }
+    }
+
+    private List<ActivatorDescription> GetActivators(ProxyInterfaceDescription interfaceDescription)
+    {
+        var result = new List<ActivatorDescription>();
+        foreach (var method in interfaceDescription.Methods)
+        {
+            if (method.MethodTypeParameters.Count == 0
+                && method.GeneratedInvokable.UsesInvokablePool)
+            {
+                result.Add(new(method, result.Count));
+            }
+        }
+
+        return result;
+    }
+
+    private MemberDeclarationSyntax[] GetActivatorFieldDeclarations(List<ActivatorDescription> activators)
+    {
+        var result = new List<MemberDeclarationSyntax>();
+        foreach (var activator in activators)
+        {
+            result.Add(
+                FieldDeclaration(
+                    VariableDeclaration(
+                        LibraryTypes.IActivator_1.ToTypeSyntax(activator.Method.GeneratedInvokable.TypeSyntax),
+                        SingletonSeparatedList(VariableDeclarator($"_activator{activator.Index}"))))
+                .AddModifiers(Token(SyntaxKind.PrivateKeyword), Token(SyntaxKind.ReadOnlyKeyword)));
+        }
+
+        return [.. result];
+    }
+
+    private static bool TryGetActivatorIndex(
+        List<ActivatorDescription> activators,
+        ProxyMethodDescription method,
+        out int index)
+    {
+        foreach (var activator in activators)
+        {
+            if (ReferenceEquals(activator.Method, method))
+            {
+                index = activator.Index;
+                return true;
+            }
+        }
+
+        index = default;
+        return false;
+    }
+
+    private sealed class ActivatorDescription(ProxyMethodDescription method, int index)
+    {
+        public ProxyMethodDescription Method { get; } = method;
+        public int Index { get; } = index;
     }
 
     private static ParameterSyntax GetParameterSyntax(int index, IParameterSymbol parameter, Dictionary<ITypeParameterSymbol, string>? typeParameterSubstitutions)
