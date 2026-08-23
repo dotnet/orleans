@@ -1654,6 +1654,397 @@ public class StateManagerTests : JournalingTestBase
         Assert.Empty(storage.Replaces);
         Assert.Empty(storage.OperationLog);
         await sut.Lifecycle.OnStop(TestContext.Current.CancellationToken);
+    public async Task WriteStateAsync_OrdinarySnapshotReplaceFails_DoesNotAppendAndRetryRecoversMixedStateExactlyOnce()
+    {
+        var storage = new CheckpointingJournalStorage();
+        var sut = CreateMixedStateTestSystem(storage);
+        await sut.Lifecycle.OnStart().WaitAsync(TimeSpan.FromSeconds(10));
+
+        sut.List.Add("baseline");
+        sut.Value.Value = 10;
+        await sut.Manager.WriteStateAsync(CancellationToken.None).AsTask().WaitAsync(TimeSpan.FromSeconds(10));
+        var baselineCheckpoint = storage.GetDurableCheckpoint();
+        storage.ClearOperationHistory();
+
+        sut.List.Add("new");
+        sut.Value.Value = 20;
+        storage.IsCompactionRequested = true;
+        var expected = new IOException("Expected ordinary snapshot replacement failure.");
+        storage.NextReplaceException = expected;
+
+        var exception = await Assert.ThrowsAsync<IOException>(
+            () => sut.Manager.WriteStateAsync(CancellationToken.None).AsTask().WaitAsync(TimeSpan.FromSeconds(10)));
+        var pendingAfterFailure = sut.Manager.HasPendingWrites;
+        var pendingBytesAfterFailure = sut.Manager.PendingWriteByteCount;
+        var failedCheckpoint = storage.GetDurableCheckpoint();
+        var appendAttemptsAfterFailure = storage.AppendAttempts.Count;
+        var committedAppendsAfterFailure = storage.CommittedAppends.Count;
+        var replaceAttemptsAfterFailure = storage.ReplaceAttempts.Count;
+        var committedReplacesAfterFailure = storage.CommittedReplaces.Count;
+        var failedRecovery = await RecoverMixedStateAsync(new CheckpointingJournalStorage(failedCheckpoint));
+
+        await sut.Manager.WriteStateAsync(CancellationToken.None).AsTask().WaitAsync(TimeSpan.FromSeconds(10));
+        var finalRecovery = await RecoverMixedStateAsync(storage.CreateRecoveryStorage());
+
+        Assert.Same(expected, exception);
+        Assert.Equal(1, replaceAttemptsAfterFailure);
+        Assert.Equal(0, committedReplacesAfterFailure);
+        Assert.Equal(0, appendAttemptsAfterFailure);
+        Assert.Equal(0, committedAppendsAfterFailure);
+        Assert.True(pendingAfterFailure);
+        Assert.True(pendingBytesAfterFailure > 0);
+        Assert.Equal(Flatten(baselineCheckpoint), Flatten(failedCheckpoint));
+        Assert.Equal(["baseline"], failedRecovery.List.ToArray());
+        Assert.Equal(10, failedRecovery.Value.Value);
+        Assert.Equal(2, storage.ReplaceAttempts.Count);
+        Assert.Single(storage.CommittedReplaces);
+        Assert.Empty(storage.AppendAttempts);
+        Assert.Empty(storage.CommittedAppends);
+        Assert.Equal(["baseline", "new"], finalRecovery.List.ToArray());
+        Assert.Equal(20, finalRecovery.Value.Value);
+    }
+
+    [Fact]
+    public async Task WriteStateAsync_MutationsDuringBlockedReplace_RemainPendingForNextWrite()
+    {
+        var storage = new CheckpointingJournalStorage();
+        var sut = CreateMixedStateTestSystem(storage);
+        await sut.Lifecycle.OnStart().WaitAsync(TimeSpan.FromSeconds(10));
+
+        sut.List.Add("baseline");
+        sut.Value.Value = 10;
+        await sut.Manager.WriteStateAsync(CancellationToken.None).AsTask().WaitAsync(TimeSpan.FromSeconds(10));
+        storage.ClearOperationHistory();
+
+        sut.List.Add("before-capture");
+        sut.Value.Value = 20;
+        storage.IsCompactionRequested = true;
+        storage.DelayReplace = true;
+        var firstWrite = sut.Manager.WriteStateAsync(CancellationToken.None).AsTask();
+        await storage.ReplaceStarted.Task.WaitAsync(TimeSpan.FromSeconds(10));
+
+        var capturedRecovery = await RecoverMixedStateAsync(storage.CreateCapturedReplacementStorage());
+        sut.List.Add("during-replace");
+        sut.Value.Value = 30;
+
+        storage.AllowReplace.TrySetResult();
+        await firstWrite.WaitAsync(TimeSpan.FromSeconds(10));
+        await storage.ReplaceCompleted.Task.WaitAsync(TimeSpan.FromSeconds(10));
+        var pendingAfterFirstWrite = sut.Manager.HasPendingWrites;
+        var pendingBytesAfterFirstWrite = sut.Manager.PendingWriteByteCount;
+        var replacementsAfterFirstWrite = storage.CommittedReplaces.Count;
+
+        storage.DelayReplace = false;
+        storage.IsCompactionRequested = false;
+        await sut.Manager.WriteStateAsync(CancellationToken.None).AsTask().WaitAsync(TimeSpan.FromSeconds(10));
+        var finalRecovery = await RecoverMixedStateAsync(storage.CreateRecoveryStorage());
+
+        Assert.Equal(["baseline", "before-capture"], capturedRecovery.List.ToArray());
+        Assert.Equal(20, capturedRecovery.Value.Value);
+        Assert.DoesNotContain("during-replace", capturedRecovery.List);
+        Assert.True(pendingAfterFirstWrite);
+        Assert.True(pendingBytesAfterFirstWrite > 0);
+        Assert.Equal(1, replacementsAfterFirstWrite);
+        Assert.Equal(["baseline", "before-capture", "during-replace"], finalRecovery.List.ToArray());
+        Assert.Equal(30, finalRecovery.Value.Value);
+    }
+
+    [Fact]
+    public async Task WriteStateAsync_ReplaceOperationCanceled_DoesNotAppendAndRemainsRetryable()
+    {
+        var storage = new CheckpointingJournalStorage();
+        var sut = CreateMixedStateTestSystem(storage);
+        await sut.Lifecycle.OnStart().WaitAsync(TimeSpan.FromSeconds(10));
+
+        sut.List.Add("baseline");
+        sut.Value.Value = 10;
+        await sut.Manager.WriteStateAsync(CancellationToken.None).AsTask().WaitAsync(TimeSpan.FromSeconds(10));
+        var baselineCheckpoint = storage.GetDurableCheckpoint();
+        storage.ClearOperationHistory();
+
+        sut.List.Add("new");
+        sut.Value.Value = 20;
+        storage.IsCompactionRequested = true;
+        var expected = new OperationCanceledException("Expected storage-side cancellation.");
+        storage.NextReplaceException = expected;
+
+        var exception = await Assert.ThrowsAsync<OperationCanceledException>(
+            () => sut.Manager.WriteStateAsync(CancellationToken.None).AsTask().WaitAsync(TimeSpan.FromSeconds(10)));
+        var pendingAfterFailure = sut.Manager.HasPendingWrites;
+        var pendingBytesAfterFailure = sut.Manager.PendingWriteByteCount;
+        var failedCheckpoint = storage.GetDurableCheckpoint();
+        var appendAttemptsAfterFailure = storage.AppendAttempts.Count;
+        var committedAppendsAfterFailure = storage.CommittedAppends.Count;
+        var replaceAttemptsAfterFailure = storage.ReplaceAttempts.Count;
+        var committedReplacesAfterFailure = storage.CommittedReplaces.Count;
+        var failedRecovery = await RecoverMixedStateAsync(new CheckpointingJournalStorage(failedCheckpoint));
+
+        await sut.Manager.WriteStateAsync(CancellationToken.None).AsTask().WaitAsync(TimeSpan.FromSeconds(10));
+        var finalRecovery = await RecoverMixedStateAsync(storage.CreateRecoveryStorage());
+
+        Assert.Same(expected, exception);
+        Assert.Equal(1, replaceAttemptsAfterFailure);
+        Assert.Equal(0, committedReplacesAfterFailure);
+        Assert.Equal(0, appendAttemptsAfterFailure);
+        Assert.Equal(0, committedAppendsAfterFailure);
+        Assert.Equal(Flatten(baselineCheckpoint), Flatten(failedCheckpoint));
+        Assert.True(pendingAfterFailure);
+        Assert.True(pendingBytesAfterFailure > 0);
+        Assert.Equal(["baseline"], failedRecovery.List.ToArray());
+        Assert.Equal(10, failedRecovery.Value.Value);
+        Assert.Equal(2, storage.ReplaceAttempts.Count);
+        Assert.Single(storage.CommittedReplaces);
+        Assert.Empty(storage.AppendAttempts);
+        Assert.Empty(storage.CommittedAppends);
+        Assert.Equal(["baseline", "new"], finalRecovery.List.ToArray());
+        Assert.Equal(20, finalRecovery.Value.Value);
+    }
+
+    [Fact]
+    public async Task WriteStateAsync_CallerCancellationWhileReplaceBlocked_DoesNotCancelStorageReplace()
+    {
+        var storage = new CheckpointingJournalStorage
+        {
+            IsCompactionRequested = true,
+            DelayReplace = true
+        };
+        var sut = CreateMixedStateTestSystem(storage);
+        await sut.Lifecycle.OnStart().WaitAsync(TimeSpan.FromSeconds(10));
+
+        sut.List.Add("direct");
+        sut.Value.Value = 42;
+        using var callerCancellation = new CancellationTokenSource();
+        var callerWrite = sut.Manager.WriteStateAsync(callerCancellation.Token).AsTask();
+        await storage.ReplaceStarted.Task.WaitAsync(TimeSpan.FromSeconds(10));
+
+        callerCancellation.Cancel();
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(
+            () => callerWrite.WaitAsync(TimeSpan.FromSeconds(10)));
+        var storageTokenCanceledByCaller = storage.LastReplaceCancellationToken.IsCancellationRequested;
+        var replacementCompletedBeforeRelease = storage.ReplaceCompleted.Task.IsCompleted;
+        var committedReplacesBeforeRelease = storage.CommittedReplaces.Count;
+
+        storage.AllowReplace.TrySetResult();
+        await storage.ReplaceCompleted.Task.WaitAsync(TimeSpan.FromSeconds(10));
+        storage.IsCompactionRequested = false;
+        await sut.Manager.WriteStateAsync(CancellationToken.None).AsTask().WaitAsync(TimeSpan.FromSeconds(10));
+        var recovered = await RecoverMixedStateAsync(storage.CreateRecoveryStorage());
+
+        Assert.False(storageTokenCanceledByCaller);
+        Assert.False(replacementCompletedBeforeRelease);
+        Assert.Equal(0, committedReplacesBeforeRelease);
+        Assert.Single(storage.CommittedReplaces);
+        Assert.Empty(storage.CommittedAppends);
+        Assert.False(sut.Manager.HasPendingWrites);
+        Assert.Equal(["direct"], recovered.List.ToArray());
+        Assert.Equal(42, recovered.Value.Value);
+    }
+
+    [Fact]
+    public async Task WriteStateAsync_AppendFails_RecoveryNeverObservesMixedState()
+    {
+        var storage = new CheckpointingJournalStorage();
+        var sut = CreateMixedStateTestSystem(storage);
+        await sut.Lifecycle.OnStart().WaitAsync(TimeSpan.FromSeconds(10));
+
+        sut.List.Add("baseline");
+        sut.Value.Value = 10;
+        await sut.Manager.WriteStateAsync(CancellationToken.None).AsTask().WaitAsync(TimeSpan.FromSeconds(10));
+        var baselineCheckpoint = storage.GetDurableCheckpoint();
+        storage.ClearOperationHistory();
+
+        sut.List.Add("new");
+        sut.Value.Value = 20;
+        var expected = new IOException("Expected append failure.");
+        storage.NextAppendException = expected;
+
+        var exception = await Assert.ThrowsAsync<IOException>(
+            () => sut.Manager.WriteStateAsync(CancellationToken.None).AsTask().WaitAsync(TimeSpan.FromSeconds(10)));
+        var failedCheckpoint = storage.GetDurableCheckpoint();
+        var failedRecovery = await RecoverMixedStateAsync(new CheckpointingJournalStorage(failedCheckpoint));
+        var appendAttemptsAfterFailure = storage.AppendAttempts.Count;
+        var committedAppendsAfterFailure = storage.CommittedAppends.Count;
+        var replaceAttemptsAfterFailure = storage.ReplaceAttempts.Count;
+        var committedReplacesAfterFailure = storage.CommittedReplaces.Count;
+
+        await sut.Manager.WriteStateAsync(CancellationToken.None).AsTask().WaitAsync(TimeSpan.FromSeconds(10));
+        var finalRecovery = await RecoverMixedStateAsync(storage.CreateRecoveryStorage());
+
+        Assert.Same(expected, exception);
+        Assert.Equal(1, appendAttemptsAfterFailure);
+        Assert.Equal(0, committedAppendsAfterFailure);
+        Assert.Equal(0, replaceAttemptsAfterFailure);
+        Assert.Equal(0, committedReplacesAfterFailure);
+        Assert.Equal(Flatten(baselineCheckpoint), Flatten(failedCheckpoint));
+        Assert.Equal(["baseline"], failedRecovery.List.ToArray());
+        Assert.DoesNotContain("new", failedRecovery.List);
+        Assert.Equal(10, failedRecovery.Value.Value);
+        Assert.Equal(2, storage.AppendAttempts.Count);
+        Assert.Single(storage.CommittedAppends);
+        Assert.Empty(storage.ReplaceAttempts);
+        Assert.Empty(storage.CommittedReplaces);
+        Assert.Equal(["baseline", "new"], finalRecovery.List.ToArray());
+        Assert.Equal(20, finalRecovery.Value.Value);
+    }
+
+    private (
+        IJournaledStateManager Manager,
+        ILifecycleSubject Lifecycle,
+        DurableList<string> List,
+        DurableValue<int> Value) CreateMixedStateTestSystem(IJournalStorage storage)
+    {
+        var sut = CreateTestSystem(storage: storage);
+        var list = new DurableList<string>("list", sut.Manager, new OrleansBinaryDurableListCommandCodec<string>(CodecProvider.GetCodec<string>(), SessionPool));
+        var value = new DurableValue<int>("value", sut.Manager, CreateValueCodec<int>());
+        return (sut.Manager, sut.Lifecycle, list, value);
+    }
+
+    private async Task<(
+        IJournaledStateManager Manager,
+        ILifecycleSubject Lifecycle,
+        DurableList<string> List,
+        DurableValue<int> Value)> RecoverMixedStateAsync(IJournalStorage storage)
+    {
+        var recovered = CreateMixedStateTestSystem(storage);
+        await recovered.Lifecycle.OnStart().WaitAsync(TimeSpan.FromSeconds(10));
+        return recovered;
+    }
+
+    private static byte[] Flatten(IEnumerable<byte[]> segments) => segments.SelectMany(static segment => segment).ToArray();
+
+    private sealed class CheckpointingJournalStorage : IJournalStorage
+    {
+        private readonly object _lock = new();
+        private readonly List<byte[]> _segments = [];
+
+        public CheckpointingJournalStorage()
+        {
+        }
+
+        public CheckpointingJournalStorage(IEnumerable<byte[]> segments)
+        {
+            foreach (var segment in segments)
+            {
+                _segments.Add(segment.ToArray());
+            }
+        }
+
+        public List<byte[]> AppendAttempts { get; } = [];
+
+        public List<byte[]> ReplaceAttempts { get; } = [];
+
+        public List<byte[]> CommittedAppends { get; } = [];
+
+        public List<byte[]> CommittedReplaces { get; } = [];
+
+        public Exception? NextAppendException { get; set; }
+
+        public Exception? NextReplaceException { get; set; }
+
+        public bool IsCompactionRequested { get; set; }
+
+        public bool DelayReplace { get; set; }
+
+        public TaskCompletionSource ReplaceStarted { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        public TaskCompletionSource AllowReplace { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        public TaskCompletionSource ReplaceCompleted { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        public CancellationToken LastReplaceCancellationToken { get; private set; }
+
+        public byte[][] GetDurableCheckpoint()
+        {
+            lock (_lock)
+            {
+                return _segments.Select(static segment => segment.ToArray()).ToArray();
+            }
+        }
+
+        public CheckpointingJournalStorage CreateRecoveryStorage() => new(GetDurableCheckpoint());
+
+        public CheckpointingJournalStorage CreateCapturedReplacementStorage()
+        {
+            var replacement = Assert.Single(ReplaceAttempts);
+            return new CheckpointingJournalStorage([replacement]);
+        }
+
+        public void ClearOperationHistory()
+        {
+            AppendAttempts.Clear();
+            ReplaceAttempts.Clear();
+            CommittedAppends.Clear();
+            CommittedReplaces.Clear();
+        }
+
+        public ValueTask ReadAsync(IJournalStorageConsumer consumer, CancellationToken cancellationToken)
+        {
+            ArgumentNullException.ThrowIfNull(consumer);
+            cancellationToken.ThrowIfCancellationRequested();
+            consumer.Read(GetDurableCheckpoint().Select(static segment => (ReadOnlyMemory<byte>)segment.AsMemory()), metadata: null, complete: true);
+            return default;
+        }
+
+        public async ValueTask ReplaceAsync(ReadOnlySequence<byte> value, CancellationToken cancellationToken)
+        {
+            LastReplaceCancellationToken = cancellationToken;
+            var bytes = value.ToArray();
+            ReplaceAttempts.Add(bytes);
+
+            if (NextReplaceException is { } exception)
+            {
+                NextReplaceException = null;
+                throw exception;
+            }
+
+            if (DelayReplace)
+            {
+                ReplaceStarted.TrySetResult();
+                await AllowReplace.Task.WaitAsync(TimeSpan.FromSeconds(10), cancellationToken);
+            }
+
+            cancellationToken.ThrowIfCancellationRequested();
+            lock (_lock)
+            {
+                _segments.Clear();
+                _segments.Add(bytes.ToArray());
+            }
+
+            CommittedReplaces.Add(bytes);
+            ReplaceCompleted.TrySetResult();
+        }
+
+        public ValueTask AppendAsync(ReadOnlySequence<byte> value, CancellationToken cancellationToken)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            var bytes = value.ToArray();
+            AppendAttempts.Add(bytes);
+
+            if (NextAppendException is { } exception)
+            {
+                NextAppendException = null;
+                return ValueTask.FromException(exception);
+            }
+
+            lock (_lock)
+            {
+                _segments.Add(bytes.ToArray());
+            }
+
+            CommittedAppends.Add(bytes);
+            return default;
+        }
+
+        public ValueTask DeleteAsync(CancellationToken cancellationToken)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            lock (_lock)
+            {
+                _segments.Clear();
+            }
+
+            return default;
+        }
     }
 
     private sealed class StreamingOnlyStorage : IJournalStorage

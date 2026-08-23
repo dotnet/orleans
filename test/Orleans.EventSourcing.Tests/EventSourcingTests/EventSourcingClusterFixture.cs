@@ -206,3 +206,14 @@ public class EventSourcingClusterFixture : BaseTestClusterFixture
 [JsonSerializable(typeof(RemoveReservation))]
 internal sealed partial class EventSourcingTestsJsonContext : JsonSerializerContext;
 #pragma warning restore ORLEANSEXP005
+
+public sealed class CommaClusterIdEventSourcingClusterFixture : EventSourcingClusterFixture
+{
+    public const string ClusterId = "west,prod-v2.canary";
+
+    protected override void ConfigureTestCluster(TestClusterBuilder builder)
+    {
+        base.ConfigureTestCluster(builder);
+        builder.Options.ClusterId = ClusterId;
+    }
+}

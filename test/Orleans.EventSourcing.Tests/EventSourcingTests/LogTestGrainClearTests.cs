@@ -322,3 +322,65 @@ public class LogTestGrainClearTests : IClassFixture<EventSourcingClusterFixture>
         return exceptions;
     }
 }
+
+[TestSuite("Functional")]
+[TestProvider("None")]
+[TestArea("EventSourcing")]
+public class LogTestGrainClearCommaClusterIdTests : IClassFixture<CommaClusterIdEventSourcingClusterFixture>
+{
+    private const long GrainId = 721016L;
+    private const string GrainClass = "TestGrains.LogTestGrainJournaledStateStorageWithAuxiliaryState";
+    private readonly CommaClusterIdEventSourcingClusterFixture fixture;
+
+    public LogTestGrainClearCommaClusterIdTests(CommaClusterIdEventSourcingClusterFixture fixture)
+    {
+        this.fixture = fixture;
+    }
+
+    [Fact, TestCategory("EventSourcing"), TestCategory("Functional")]
+    public async Task JournaledStateLogStorage_AmbiguousConflictWithCommaClusterId_RecognizesCommittedBatchBeforeAndAfterReactivation()
+    {
+        Assert.Equal("west,prod-v2.canary", this.fixture.HostedCluster.Options.ClusterId);
+
+        var grain = this.fixture.GrainFactory.GetGrain<ILogTestGrainWithAuxiliaryState>(GrainId, GrainClass);
+
+        await grain.Clear();
+        await grain.SetAuxiliaryValueAndAGlobal(17, 10);
+
+        Assert.Equal(17, await grain.GetAuxiliaryValue());
+        Assert.Equal(10, await grain.GetAGlobal());
+        Assert.Equal(1, await grain.GetConfirmedVersion());
+        AssertEventLog(await grain.GetEventLog(), 10);
+
+        this.fixture.FailNextJournalAppend(
+            grain,
+            new InconsistentStateException(
+                $"Expected post-commit conflict for ClusterId '{CommaClusterIdEventSourcingClusterFixture.ClusterId}'."),
+            afterWrite: true);
+
+        await grain.SetAuxiliaryValueAndAGlobal(23, 41);
+
+        Assert.Equal(23, await grain.GetAuxiliaryValue());
+        Assert.Equal(41, await grain.GetAGlobal());
+        Assert.Equal(2, await grain.GetConfirmedVersion());
+        AssertEventLog(await grain.GetEventLog(), 10, 41);
+
+        await this.fixture.HostedCluster.DeactivateAsync(grain);
+        grain = this.fixture.GrainFactory.GetGrain<ILogTestGrainWithAuxiliaryState>(GrainId, GrainClass);
+
+        Assert.Equal(23, await grain.GetAuxiliaryValue());
+        Assert.Equal(41, await grain.GetAGlobal());
+        Assert.Equal(2, await grain.GetConfirmedVersion());
+        AssertEventLog(await grain.GetEventLog(), 10, 41);
+    }
+
+    private static void AssertEventLog(IReadOnlyList<object> eventLog, params int[] expectedValues)
+    {
+        Assert.Equal(expectedValues.Length, eventLog.Count);
+        for (var index = 0; index < expectedValues.Length; index++)
+        {
+            var update = Assert.IsType<TestGrains.UpdateA>(eventLog[index]);
+            Assert.Equal(expectedValues[index], update.Val);
+        }
+    }
+}
