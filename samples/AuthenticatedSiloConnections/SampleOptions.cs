@@ -158,12 +158,10 @@ internal sealed class EntraOptions
             RequireGuid(clientId, "AllowedCallerClientIds");
         }
 
-        if (!AllowedSiloCallerClientIds
-                .Concat(AllowedClientCallerClientIds)
-                .Contains(WorkloadClientId, StringComparer.OrdinalIgnoreCase))
+        if (!AllowedSiloCallerClientIds.Contains(WorkloadClientId, StringComparer.OrdinalIgnoreCase))
         {
             throw new InvalidOperationException(
-                "This process's workload client ID must be in an allowed caller list.");
+                "This silo process's workload client ID must be in the allowed silo caller list.");
         }
     }
 

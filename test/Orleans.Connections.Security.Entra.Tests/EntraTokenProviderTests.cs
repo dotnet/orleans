@@ -87,6 +87,27 @@ public sealed class EntraTokenProviderTests
     }
 
     [Fact]
+    public async Task RequestsConfiguredClusterScope_WhenDefaultSuffixHasTrailingSlash_NormalizesBeforeCheckingSuffix()
+    {
+        var options = EntraTestFixture.CreateOptions();
+        options.TokenScope = "api://11111111-1111-1111-1111-111111111111/cluster-a/.default/";
+        var timeProvider = new TestTimeProvider(new DateTimeOffset(2026, 8, 23, 12, 0, 0, TimeSpan.Zero));
+        var credential = new TestTokenCredential(
+            (_, _) => ValueTask.FromResult(new AccessToken("normalized-suffix-token", timeProvider.GetUtcNow().AddMinutes(10))));
+        var provider = new EntraTokenProvider(credential, options, timeProvider);
+
+        var token = await provider.GetTokenAsync(CancellationToken.None);
+
+        var requestContext = credential.LastRequestContext;
+        Assert.True(requestContext.HasValue);
+        Assert.Equal(
+            ["api://11111111-1111-1111-1111-111111111111/cluster-a/.default"],
+            requestContext.Value.Scopes);
+        Assert.Equal(1, credential.CallCount);
+        Assert.Equal("normalized-suffix-token", token.Token);
+    }
+
+    [Fact]
     public async Task RequestsConfiguredClusterScope_WhenTrailingSlash_NormalizesBeforeDefaultSuffix()
     {
         var options = EntraTestFixture.CreateOptions();
