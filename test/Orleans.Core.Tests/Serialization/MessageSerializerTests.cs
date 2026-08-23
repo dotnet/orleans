@@ -448,6 +448,42 @@ namespace UnitTests.Serialization
         [TestSuite("BVT")]
         [TestProvider("None")]
         [Fact]
+        public void Message_OneWayUnresolvableInvokableAlias_IsPreservedVerbatim()
+        {
+            var grainReference = RuntimeTypeNameFormatter.Format(typeof(GrainReference));
+            var alias = $"(\"inv\",[{grainReference}],[{grainReference}],\"DEADBEEF\")";
+            var body = EncodeBodyWithFieldType(alias);
+            var request = this.messageFactory.CreateMessage(null, InvokeMethodOptions.OneWay);
+            var (header, _) = WriteMessage(request);
+
+            var message = ReadMessage(header, body);
+
+            Assert.Equal(Message.Directions.OneWay, message.Direction);
+            Assert.IsType<UndecodedRequestBody>(message.BodyObject);
+            var (_, rewritten) = WriteMessage(message);
+            Assert.Equal(body, rewritten);
+        }
+
+        [TestSuite("BVT")]
+        [TestProvider("None")]
+        [Fact]
+        public void Message_UnresolvableInvokableAlias_DoesNotContaminateNextMessage()
+        {
+            var grainReference = RuntimeTypeNameFormatter.Format(typeof(GrainReference));
+            var alias = $"(\"inv\",[{grainReference}],[{grainReference}],\"DEADBEEF\")";
+            _ = ReadMessageWithBody(EncodeBodyWithFieldType(alias));
+
+            var expected = this.messageFactory.CreateMessage(new object[] { "next" }, InvokeMethodOptions.None);
+            var (header, body) = WriteMessage(expected);
+            var actual = ReadMessage(header, body);
+
+            var arguments = Assert.IsType<object[]>(actual.BodyObject);
+            Assert.Equal("next", arguments[0]);
+        }
+
+        [TestSuite("BVT")]
+        [TestProvider("None")]
+        [Fact]
         public void Message_Version1_BodyStillNamesATypeFromTheHeaders()
         {
             try

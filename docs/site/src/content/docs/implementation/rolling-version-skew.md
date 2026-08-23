@@ -1,7 +1,7 @@
 ---
 title: Rolling version skew
 description: Explain how Orleans routes grain interface versions and preserves compatibility while silos run different builds.
-ms.date: 08/11/2026
+ms.date: 08/23/2026
 ms.topic: concept-article
 ---
 
@@ -32,7 +32,11 @@ Placement chooses a suitable silo, and an activation validates the incoming inte
 
 ## Wire compatibility is a separate contract
 
-Version routing requires request and response types readable by both old and new builds for as long as mixed traffic, queued messages, reminders, streams, or persisted state can cross the boundary. Keep serialization IDs stable, add fields with new IDs, retain aliases when CLR names move, and ensure custom codecs skip unknown fields. See [serialization and code generation internals](serialization.md) for the wire-level rules.
+Connections using <xref:Orleans.Runtime.Messaging.NetworkProtocolVersion.Version2> encode each message body with independent type references. When an application-version-old silo lacks a generated invocation type for a request, it preserves the original body bytes and returns the same logical message to version-aware routing. A compatible destination then decodes and invokes the request.
+
+Connections negotiate the highest protocol version supported by both endpoints. Stage Orleans runtime upgrades before deploying application contracts which depend on forwarding unknown invocation types, so every relevant connection negotiates version 2.
+
+The destination must deserialize the request payload, and the caller must deserialize the response. Keep serialization IDs stable, add fields with new IDs, retain aliases when CLR names move, and ensure custom codecs skip unknown fields. These rules also apply to mixed traffic, queued messages, reminders, streams, and persisted state. See [serialization and code generation internals](serialization.md) for the wire-level rules.
 
 Grain-state compatibility remains an application schema responsibility. Both implementations read the stored representation and tolerate writes from the other while rollback or mixed placement remains possible.
 
@@ -40,6 +44,7 @@ Grain-state compatibility remains an application schema responsibility. Both imp
 
 - An empty compatible-silo set causes placement to reject or time out the request.
 - A stale activation triggers cache invalidation and routing repair for the same logical message; the runtime preserves its message identity while locating a compatible activation.
+- A connection which negotiates protocol version 1 surfaces an unknown invocation decode or forwarding failure to the caller.
 - Changing a selector or compatibility strategy resets the suitable-silo cache, so subsequent placements reflect the new policy.
 - Removing the old implementation before all callers and durable data are compatible can turn a planned rolling deployment into an outage.
 
