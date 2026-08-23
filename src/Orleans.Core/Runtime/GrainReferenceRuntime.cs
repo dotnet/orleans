@@ -120,7 +120,7 @@ namespace Orleans.Runtime
 
         private ValueTask<TResult?> InvokeMethodAsyncCore<TResult>(GrainReference reference, IInvokable request, InvokeMethodOptions options)
         {
-            ResponseCompletionSource<TResult> responseCompletionSource;
+            ResponseCompletionSource<TResult>? responseCompletionSource = null;
             try
             {
                 SetGrainCancellationTokensTarget(reference, request);
@@ -130,6 +130,7 @@ namespace Orleans.Runtime
             }
             catch
             {
+                responseCompletionSource?.Reset();
                 DisposeRequest(request);
                 throw;
             }
@@ -149,7 +150,7 @@ namespace Orleans.Runtime
 
         private ValueTask InvokeMethodAsyncCore(GrainReference reference, IInvokable request, InvokeMethodOptions options)
         {
-            ResponseCompletionSource responseCompletionSource;
+            ResponseCompletionSource? responseCompletionSource = null;
             try
             {
                 SetGrainCancellationTokensTarget(reference, request);
@@ -159,6 +160,7 @@ namespace Orleans.Runtime
             }
             catch
             {
+                responseCompletionSource?.Reset();
                 DisposeRequest(request);
                 throw;
             }
