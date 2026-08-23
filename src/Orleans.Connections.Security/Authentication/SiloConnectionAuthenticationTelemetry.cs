@@ -83,11 +83,19 @@ internal static partial class SiloConnectionAuthenticationTelemetry
         {
             { "connection.type", target == SiloConnectionAuthenticationTarget.Silo ? "silo" : "client" },
             { "direction", direction == SiloConnectionAuthenticationDirection.Inbound ? "inbound" : "outbound" },
-            { "mode", mode.ToString() },
+            { "mode", GetModeName(mode) },
             { "protocol.version", protocol },
             { "result", GetResultName(result) },
         };
     }
+
+    public static string GetModeName(SiloConnectionAuthenticationMode mode) => mode switch
+    {
+        SiloConnectionAuthenticationMode.Disabled => "Disabled",
+        SiloConnectionAuthenticationMode.Audit => "Audit",
+        SiloConnectionAuthenticationMode.Required => "Required",
+        _ => "Unknown",
+    };
 
     public static string GetResultName(AuthenticationResultCategory result) => result switch
     {
