@@ -41,44 +41,16 @@ public abstract class ReminderServiceTestRunner
     /// <param name="reminderTable">The provider resolved from the deployed cluster.</param>
     /// <param name="providerName">The provider name used in failures.</param>
     /// <param name="seed">The deterministic identity seed.</param>
-    /// <remarks>
-    /// This compatibility overload uses <see cref="ReminderTableCapabilities.Portable(string)"/>, so it does not
-    /// require optional provider guarantees such as ETag rotation. Provider suites should use the capability-aware
-    /// overload when they have a reviewed manifest.
-    /// </remarks>
     protected ReminderServiceTestRunner(
         IGrainFactory grainFactory,
         IReminderTable reminderTable,
         string providerName,
         int seed = 0)
-        : this(
-            grainFactory,
-            ReminderTableCapabilities.Portable(
-                string.IsNullOrWhiteSpace(providerName)
-                    ? (reminderTable ?? throw new ArgumentNullException(nameof(reminderTable))).GetType().Name
-                    : providerName),
-            reminderTable ?? throw new ArgumentNullException(nameof(reminderTable)),
-            seed)
-    {
-    }
-
-    /// <summary>
-    /// Initializes a new instance of the <see cref="ReminderServiceTestRunner"/> class.
-    /// </summary>
-    /// <param name="grainFactory">The deployed cluster's grain factory.</param>
-    /// <param name="reminderTable">The provider resolved from the deployed cluster.</param>
-    /// <param name="capabilities">The capabilities declared by the provider.</param>
-    /// <param name="seed">The deterministic identity seed.</param>
-    protected ReminderServiceTestRunner(
-        IGrainFactory grainFactory,
-        ReminderTableCapabilities capabilities,
-        IReminderTable reminderTable,
-        int seed = 0)
     {
         GrainFactory = grainFactory ?? throw new ArgumentNullException(nameof(grainFactory));
         ReminderTable = reminderTable ?? throw new ArgumentNullException(nameof(reminderTable));
-        Capabilities = capabilities ?? throw new ArgumentNullException(nameof(capabilities));
-        ProviderName = string.IsNullOrWhiteSpace(capabilities.ProviderName) ? reminderTable.GetType().Name : capabilities.ProviderName;
+        ArgumentException.ThrowIfNullOrWhiteSpace(providerName);
+        ProviderName = providerName;
         _seed = seed;
     }
 
@@ -90,9 +62,6 @@ public abstract class ReminderServiceTestRunner
 
     /// <summary>Gets the provider name used in failures.</summary>
     protected string ProviderName { get; }
-
-    /// <summary>Gets the capabilities declared by the provider under test.</summary>
-    protected ReminderTableCapabilities Capabilities { get; }
 
     /// <summary>
     /// Guarantee: registration is visible through lookup and enumeration, and unregister is explicitly observed by
@@ -107,8 +76,23 @@ public abstract class ReminderServiceTestRunner
         var period = TimeSpan.FromMinutes(5);
 
         var registeredName = await grain.RegisterOrUpdateAsync(Name, period, period);
-        var persisted = await ReminderTable.ReadRow(grainId, Name);
-        var names = await grain.GetReminderNamesAsync();
+        var registrationState = await ReminderTableRetryPolicy.ReadUntilAsync(
+            async () => (
+                Persisted: await ReminderTable.ReadRow(grainId, Name),
+                Names: await grain.GetReminderNamesAsync()),
+            state => state.Persisted is { } persisted
+                && persisted.GrainId == grainId
+                && persisted.ReminderName == Name
+                && persisted.Period == period
+                && !string.IsNullOrEmpty(persisted.ETag)
+                && state.Names.SequenceEqual([Name], StringComparer.Ordinal),
+            ProviderName,
+            Guarantee,
+            "RegisterOrUpdateReminder/Read",
+            $"one persisted row and one enumerated reminder named '{Name}'",
+            state => $"names=[{string.Join(", ", state.Names)}], row={Describe(state.Persisted)}");
+        var persisted = registrationState.Persisted;
+        var names = registrationState.Names;
 
         if (registeredName != Name
             || persisted is null
@@ -128,8 +112,18 @@ public abstract class ReminderServiceTestRunner
 
         var removed = await grain.UnregisterAsync(Name);
         var removedAgain = await grain.UnregisterAsync(Name);
-        var afterRemoval = await ReminderTable.ReadRow(grainId, Name);
-        var namesAfterRemoval = await grain.GetReminderNamesAsync();
+        var removalState = await ReminderTableRetryPolicy.ReadUntilAsync(
+            async () => (
+                Persisted: await ReminderTable.ReadRow(grainId, Name),
+                Names: await grain.GetReminderNamesAsync()),
+            state => state.Persisted is null && state.Names.Length == 0,
+            ProviderName,
+            Guarantee,
+            "UnregisterReminder/Read",
+            "no persisted or enumerated reminder after unregister",
+            state => $"names=[{string.Join(", ", state.Names)}], row={Describe(state.Persisted)}");
+        var afterRemoval = removalState.Persisted;
+        var namesAfterRemoval = removalState.Names;
         if (!removed || removedAgain || afterRemoval is not null || namesAfterRemoval.Length != 0)
         {
             Failure(Guarantee, "UnregisterReminder")
@@ -153,17 +147,63 @@ public abstract class ReminderServiceTestRunner
         const string Name = "service-update";
 
         await grain.RegisterOrUpdateAsync(Name, TimeSpan.FromMinutes(5), TimeSpan.FromMinutes(5));
-        var original = await ReminderTable.ReadRow(grainId, Name);
+        var original = await ReminderTableRetryPolicy.ReadUntilAsync(
+            () => ReminderTable.ReadRow(grainId, Name),
+            entry => entry is not null && !string.IsNullOrEmpty(entry.ETag),
+            ProviderName,
+            Guarantee,
+            "RegisterOrUpdateReminder/ReadOriginal",
+            "the initially registered reminder with a non-empty ETag",
+            Describe);
+        var originalEntry = original!;
         await grain.RegisterOrUpdateAsync(Name, TimeSpan.FromMinutes(9), TimeSpan.FromMinutes(9));
-        var updated = await ReminderTable.ReadRow(grainId, Name);
-        var rows = await ReminderTable.ReadRows(grainId);
+        var updateState = await ReminderTableRetryPolicy.ReadUntilAsync(
+            async () =>
+            {
+                var updated = await ReminderTable.ReadRow(grainId, Name);
+                if (updated is not null
+                    && updated.StartAt != originalEntry.StartAt
+                    && updated.Period == TimeSpan.FromMinutes(9)
+                    && string.Equals(updated.ETag, originalEntry.ETag, StringComparison.Ordinal))
+                {
+                    Failure(Guarantee, "RegisterOrUpdateReminder")
+                        .WithIdentity(grainId, Name)
+                        .WithExpected($"a replacement ETag different from '{originalEntry.ETag}'")
+                        .WithObserved($"the updated schedule is visible with the reused ETag '{updated.ETag}'")
+                        .WithETags(updated.ETag, originalEntry.ETag)
+                        .Throw();
+                }
+
+                return (
+                    Updated: updated,
+                    Rows: await ReminderTable.ReadRows(grainId));
+            },
+            state => state.Updated is { } updated
+                && !string.IsNullOrEmpty(updated.ETag)
+                && updated.ETag != originalEntry.ETag
+                && updated.StartAt != originalEntry.StartAt
+                && updated.Period == TimeSpan.FromMinutes(9)
+                && state.Rows.Reminders.Count == 1
+                && state.Rows.Reminders[0] is { } enumerated
+                && enumerated.GrainId == grainId
+                && enumerated.ReminderName == Name
+                && enumerated.StartAt == updated.StartAt
+                && enumerated.Period == updated.Period
+                && enumerated.ETag == updated.ETag,
+            ProviderName,
+            Guarantee,
+            "RegisterOrUpdateReminder/ReadUpdated",
+            "one exact updated row with a changed StartAt, Period=00:09:00, and a new ETag",
+            state => $"updated={Describe(state.Updated)}, rowCount={state.Rows.Reminders.Count}, enumerated={Describe(state.Rows.Reminders.Count == 1 ? state.Rows.Reminders[0] : null)}");
+        var updated = updateState.Updated;
+        var rows = updateState.Rows;
         var enumerated = rows.Reminders.Count == 1 ? rows.Reminders[0] : null;
 
         if (original is null
             || updated is null
             || string.IsNullOrEmpty(original.ETag)
             || string.IsNullOrEmpty(updated.ETag)
-            || Capabilities.SupportsETagRotation && original.ETag == updated.ETag
+            || original.ETag == updated.ETag
             || original.StartAt == updated.StartAt
             || updated.Period != TimeSpan.FromMinutes(9)
             || enumerated is null
@@ -175,13 +215,10 @@ public abstract class ReminderServiceTestRunner
         {
             Failure(Guarantee, "RegisterOrUpdateReminder")
                 .WithIdentity(grainId, Name)
-                .WithExpected(
-                    Capabilities.SupportsETagRotation
-                        ? "one exact row with a changed StartAt, Period=00:09:00, and an ETag different from the original"
-                        : "one exact row with a changed StartAt and Period=00:09:00; ETag rotation is not required")
+                .WithExpected("one exact row with a changed StartAt, Period=00:09:00, and an ETag different from the original")
                 .WithObserved(
                     $"original={Describe(original)}, updated={Describe(updated)}, rowCount={rows.Reminders.Count}, enumerated={Describe(enumerated)}")
-                .WithETags(updated?.ETag, original?.ETag)
+                .WithETags(updated?.ETag, originalEntry.ETag)
                 .Throw();
         }
 

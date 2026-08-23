@@ -45,11 +45,6 @@ public abstract class ReminderTableTestFixture
     }
 
     /// <summary>
-    /// Gets the capabilities declared by the provider under test.
-    /// </summary>
-    public virtual ReminderTableCapabilities Capabilities => ReminderTableCapabilities.Portable(GetType().Name);
-
-    /// <summary>
     /// Configures the silo with the reminder provider to test.
     /// </summary>
     /// <param name="siloBuilder">The silo builder.</param>

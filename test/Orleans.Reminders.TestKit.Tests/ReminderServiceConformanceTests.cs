@@ -48,7 +48,7 @@ public sealed class IdealizedReminderServiceFixture : IAsyncLifetime
 public sealed class ReminderServiceConformanceTests : ReminderServiceTestRunner, IClassFixture<IdealizedReminderServiceFixture>
 {
     public ReminderServiceConformanceTests(IdealizedReminderServiceFixture fixture)
-        : base(fixture.GrainFactory, ReminderTableProviderProfiles.Oracle("IdealizedReminderTable"), fixture.Oracle)
+        : base(fixture.GrainFactory, fixture.Oracle, "IdealizedReminderTable")
     {
     }
 
@@ -59,6 +59,74 @@ public sealed class ReminderServiceConformanceTests : ReminderServiceTestRunner,
     [Fact]
     public override Task ReminderService_UpdateReplacesScheduleAndETagWithoutDuplicate()
         => base.ReminderService_UpdateReplacesScheduleAndETagWithoutDuplicate();
+}
+
+public sealed class EventuallyVisibleReminderServiceFixture : IAsyncLifetime
+{
+    private InProcessTestCluster? _cluster;
+
+    public EventuallyVisibleReminderTable Table { get; } = new();
+
+    public IGrainFactory GrainFactory => _cluster?.Client
+        ?? throw new InvalidOperationException("The cluster has not been initialized.");
+
+    public async ValueTask InitializeAsync()
+    {
+        var builder = new InProcessTestClusterBuilder(1);
+        builder.ConfigureSilo((_, siloBuilder) =>
+        {
+            siloBuilder.AddReminders();
+            siloBuilder.Services.AddSingleton(Table);
+            siloBuilder.Services.AddSingleton<IReminderTable>(Table);
+        });
+        _cluster = builder.Build();
+        await _cluster.DeployAsync();
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        if (_cluster is not { } cluster)
+        {
+            return;
+        }
+
+        await cluster.StopAllSilosAsync();
+        await cluster.DisposeAsync();
+    }
+}
+
+[TestSuite("BVT")]
+[TestProvider("None")]
+[TestArea("Reminders")]
+[TestCategory("BVT"), TestCategory("Reminders"), TestCategory("ReminderTestKit")]
+public sealed class EventuallyVisibleReminderServiceTests
+    : ReminderServiceTestRunner, IClassFixture<EventuallyVisibleReminderServiceFixture>
+{
+    private readonly EventuallyVisibleReminderTable _table;
+
+    public EventuallyVisibleReminderServiceTests(EventuallyVisibleReminderServiceFixture fixture)
+        : base(fixture.GrainFactory, fixture.Table, "EventuallyVisibleReminderTable")
+    {
+        _table = fixture.Table;
+    }
+
+    [Fact]
+    public override async Task ReminderService_RegisterLookupEnumerateAndUnregister()
+    {
+        await base.ReminderService_RegisterLookupEnumerateAndUnregister();
+
+        Assert.True(_table.HiddenPointReads > 0);
+        Assert.True(_table.HiddenEnumerationReads > 0);
+    }
+
+    [Fact]
+    public override async Task ReminderService_UpdateReplacesScheduleAndETagWithoutDuplicate()
+    {
+        await base.ReminderService_UpdateReplacesScheduleAndETagWithoutDuplicate();
+
+        Assert.True(_table.HiddenPointReads > 0);
+        Assert.True(_table.HiddenEnumerationReads > 0);
+    }
 }
 
 public sealed class NonRotatingReminderServiceFixture : IAsyncLifetime
@@ -111,8 +179,8 @@ public sealed class NonRotatingReminderServiceConformanceTests
     public NonRotatingReminderServiceConformanceTests(NonRotatingReminderServiceFixture fixture)
         : base(
             fixture.GrainFactory,
-            ReminderTableCapabilities.Portable("NonRotatingReminderTable"),
-            fixture.Table)
+            fixture.Table,
+            "NonRotatingReminderTable")
     {
         _table = fixture.Table;
     }
@@ -120,10 +188,12 @@ public sealed class NonRotatingReminderServiceConformanceTests
     [Fact]
     public override async Task ReminderService_UpdateReplacesScheduleAndETagWithoutDuplicate()
     {
-        await base.ReminderService_UpdateReplacesScheduleAndETagWithoutDuplicate();
+        var exception = await Assert.ThrowsAsync<ReminderConformanceException>(
+            base.ReminderService_UpdateReplacesScheduleAndETagWithoutDuplicate);
 
         Assert.Equal(2, _table.UpsertCount);
         Assert.Equal(["non-rotating-etag", "non-rotating-etag"], _table.ReturnedETags);
+        Assert.Contains("updated schedule is visible with the reused ETag", exception.Message, StringComparison.Ordinal);
     }
 }
 
@@ -133,10 +203,10 @@ public abstract class CorruptingReminderServiceFixture : IAsyncLifetime
 
     protected CorruptingReminderServiceFixture(ServiceEnumerationMutation mutation)
     {
-        Table = new NonRotatingReminderTable(mutation);
+        Table = new CorruptingEnumerationReminderTable(mutation);
     }
 
-    public NonRotatingReminderTable Table { get; }
+    public CorruptingEnumerationReminderTable Table { get; }
 
     public IGrainFactory GrainFactory => _cluster?.Client
         ?? throw new InvalidOperationException("The cluster has not been initialized.");
@@ -180,12 +250,12 @@ public sealed class DuplicateEnumerationReminderServiceTests
     : ReminderServiceTestRunner, IClassFixture<DuplicateEnumerationReminderServiceFixture>
 {
     public DuplicateEnumerationReminderServiceTests(DuplicateEnumerationReminderServiceFixture fixture)
-        : base(fixture.GrainFactory, ReminderTableCapabilities.Portable("DuplicateEnumeration"), fixture.Table)
+        : base(fixture.GrainFactory, fixture.Table, "DuplicateEnumeration")
     {
     }
 
     [Fact]
-    public async Task ReminderService_UpdateRejectsDuplicateEnumeratedIdentityEvenWithoutETagRotation()
+    public async Task ReminderService_UpdateRejectsDuplicateEnumeratedIdentity()
     {
         var exception = await Assert.ThrowsAsync<ReminderConformanceException>(
             ReminderService_UpdateReplacesScheduleAndETagWithoutDuplicate);
@@ -204,12 +274,12 @@ public sealed class StaleScheduleReminderServiceTests
     : ReminderServiceTestRunner, IClassFixture<StaleScheduleReminderServiceFixture>
 {
     public StaleScheduleReminderServiceTests(StaleScheduleReminderServiceFixture fixture)
-        : base(fixture.GrainFactory, ReminderTableCapabilities.Portable("StaleScheduleEnumeration"), fixture.Table)
+        : base(fixture.GrainFactory, fixture.Table, "StaleScheduleEnumeration")
     {
     }
 
     [Fact]
-    public async Task ReminderService_UpdateRejectsStaleEnumeratedScheduleEvenWithoutETagRotation()
+    public async Task ReminderService_UpdateRejectsStaleEnumeratedSchedule()
     {
         var exception = await Assert.ThrowsAsync<ReminderConformanceException>(
             ReminderService_UpdateReplacesScheduleAndETagWithoutDuplicate);
@@ -225,6 +295,145 @@ public enum ServiceEnumerationMutation
     None,
     Duplicate,
     StaleSchedule
+}
+
+public sealed class CorruptingEnumerationReminderTable(ServiceEnumerationMutation mutation) : IReminderTable
+{
+    private readonly IdealizedReminderTable _inner = new(nameof(CorruptingEnumerationReminderTable));
+
+    public Task StartAsync(CancellationToken cancellationToken = default) => _inner.StartAsync(cancellationToken);
+
+    public Task StopAsync(CancellationToken cancellationToken = default) => _inner.StopAsync(cancellationToken);
+
+    public Task<ReminderEntry?> ReadRow(GrainId grainId, string reminderName) => _inner.ReadRow(grainId, reminderName);
+
+    public async Task<ReminderTableData> ReadRows(GrainId grainId)
+    {
+        var entries = (await _inner.ReadRows(grainId)).Reminders.Select(entry => Copy(entry)).ToList();
+        if (entries.Count == 1)
+        {
+            if (mutation == ServiceEnumerationMutation.Duplicate)
+            {
+                entries.Add(Copy(entries[0]));
+            }
+            else if (mutation == ServiceEnumerationMutation.StaleSchedule)
+            {
+                entries[0] = Copy(entries[0], entries[0].Period.Add(TimeSpan.FromMinutes(1)));
+            }
+        }
+
+        return new ReminderTableData(entries);
+    }
+
+    public Task<ReminderTableData> ReadRows(uint begin, uint end) => _inner.ReadRows(begin, end);
+
+    public Task<string?> UpsertRow(ReminderEntry entry) => _inner.UpsertRow(entry);
+
+    public Task<bool> RemoveRow(GrainId grainId, string reminderName, string eTag)
+        => _inner.RemoveRow(grainId, reminderName, eTag);
+
+    public Task TestOnlyClearTable() => _inner.TestOnlyClearTable();
+
+    private static ReminderEntry Copy(ReminderEntry entry, TimeSpan? period = null) => new()
+    {
+        GrainId = entry.GrainId,
+        ReminderName = entry.ReminderName,
+        StartAt = entry.StartAt,
+        Period = period ?? entry.Period,
+        ETag = entry.ETag
+    };
+}
+
+public sealed class EventuallyVisibleReminderTable : IReminderTable
+{
+    private const int HiddenReadsPerMutation = 2;
+    private readonly IdealizedReminderTable _inner = new(nameof(EventuallyVisibleReminderTable));
+    private int _remainingHiddenPointReads;
+    private int _remainingHiddenEnumerationReads;
+
+    public int HiddenPointReads { get; private set; }
+
+    public int HiddenEnumerationReads { get; private set; }
+
+    public Task StartAsync(CancellationToken cancellationToken = default) => _inner.StartAsync(cancellationToken);
+
+    public Task StopAsync(CancellationToken cancellationToken = default) => _inner.StopAsync(cancellationToken);
+
+    public async Task<ReminderEntry?> ReadRow(GrainId grainId, string reminderName)
+    {
+        if (TryConsumeHiddenRead(ref _remainingHiddenPointReads))
+        {
+            HiddenPointReads++;
+            return null;
+        }
+
+        return await _inner.ReadRow(grainId, reminderName);
+    }
+
+    public async Task<ReminderTableData> ReadRows(GrainId grainId)
+    {
+        if (TryConsumeHiddenRead(ref _remainingHiddenEnumerationReads))
+        {
+            HiddenEnumerationReads++;
+            return new ReminderTableData();
+        }
+
+        return await _inner.ReadRows(grainId);
+    }
+
+    public async Task<ReminderTableData> ReadRows(uint begin, uint end)
+    {
+        if (TryConsumeHiddenRead(ref _remainingHiddenEnumerationReads))
+        {
+            HiddenEnumerationReads++;
+            return new ReminderTableData();
+        }
+
+        return await _inner.ReadRows(begin, end);
+    }
+
+    public async Task<string?> UpsertRow(ReminderEntry entry)
+    {
+        var result = await _inner.UpsertRow(entry);
+        HideReads();
+        return result;
+    }
+
+    public async Task<bool> RemoveRow(GrainId grainId, string reminderName, string eTag)
+    {
+        var result = await _inner.RemoveRow(grainId, reminderName, eTag);
+        if (result)
+        {
+            HideReads();
+        }
+
+        return result;
+    }
+
+    public Task TestOnlyClearTable() => _inner.TestOnlyClearTable();
+
+    private void HideReads()
+    {
+        Volatile.Write(ref _remainingHiddenPointReads, HiddenReadsPerMutation);
+        Volatile.Write(ref _remainingHiddenEnumerationReads, HiddenReadsPerMutation);
+    }
+
+    private static bool TryConsumeHiddenRead(ref int remaining)
+    {
+        while (true)
+        {
+            var current = Volatile.Read(ref remaining);
+            if (current <= 0)
+            {
+                return false;
+            }
+
+            if (Interlocked.CompareExchange(ref remaining, current - 1, current) == current)
+            {
+                return true;
+            }
+        }
+    }
 }
 
 public sealed class NonRotatingReminderTable(ServiceEnumerationMutation mutation = ServiceEnumerationMutation.None) : IReminderTable

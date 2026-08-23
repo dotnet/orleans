@@ -3,7 +3,6 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration;
 using Orleans.Reminders.DynamoDB;
-using Orleans.Reminders.TestKit;
 using TestExtensions;
 using UnitTests;
 using UnitTests.RemindersTest;
@@ -38,9 +37,6 @@ namespace AWSUtils.Tests.RemindersTest
                 this.clusterOptions,
                 Options.Create(options));
         }
-
-        protected override ReminderTableCapabilities CreateReminderTableCapabilities()
-            => ReminderTableProviderProfiles.DynamoDB(GetType().Name);
 
         protected override Task<string> GetConnectionString()
         {

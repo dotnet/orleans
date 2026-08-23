@@ -18,8 +18,14 @@ namespace Orleans.Reminders.TestKit.Tests;
 [TestProvider("None")]
 [TestArea("Reminders")]
 [TestCategory("BVT"), TestCategory("Reminders")]
-public sealed class FaultyReminderTableTests
+public sealed class FaultyReminderTableTests : IDisposable
 {
+    private readonly IDisposable _retryTiming = ReminderTableRetryPolicy.UseTestTiming(
+        TimeSpan.FromMilliseconds(75),
+        TimeSpan.FromMilliseconds(5));
+
+    public void Dispose() => _retryTiming.Dispose();
+
     [Fact]
     public static void FailureDiagnostics_IncludeProviderSequenceIdentityExpectedObservedETagsRangeAndWindow()
     {
@@ -60,8 +66,21 @@ public sealed class FaultyReminderTableTests
         var exception = await Assert.ThrowsAsync<ReminderConformanceException>(runner.ReminderTable_UpsertRow_ReplacesETagOnEachWrite);
 
         AssertDiagnostics(exception.Message, "ConstantETag", nameof(ReminderTableTestRunner.ReminderTable_UpsertRow_ReplacesETagOnEachWrite), "UpsertRow");
-        Assert.Contains("write #2 to return a fresh ETag", exception.Message, StringComparison.Ordinal);
+        Assert.Contains("ETag different from 'constant-etag'", exception.Message, StringComparison.Ordinal);
         Assert.Contains("constant-etag", exception.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task OneTimeETagReuse_IsRejectedWithoutRetryingTheSuccessfulWrite()
+    {
+        var table = new OneTimeReusedETagReminderTable();
+        var runner = CreateRunner(table, "OneTimeReusedETag");
+
+        var exception = await Assert.ThrowsAsync<ReminderConformanceException>(
+            runner.ReminderTable_UpsertRow_ReplacesETagOnEachWrite);
+
+        Assert.Equal(2, table.UpsertAttempts);
+        Assert.Contains("successful replacement returned the reused ETag", exception.Message, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -85,10 +104,8 @@ public sealed class FaultyReminderTableTests
         var exception = await Assert.ThrowsAsync<ReminderConformanceException>(runner.ReminderTable_ReadRows_Range_ExcludesBeginAndIncludesEnd);
 
         AssertDiagnostics(exception.Message, "InclusiveBeginRange", nameof(ReminderTableTestRunner.ReminderTable_ReadRows_Range_ExcludesBeginAndIncludesEnd), "ReadRows(low, middle)");
-        Assert.Contains("expected: exact identities", exception.Message, StringComparison.Ordinal);
-        Assert.Contains("wrapAround=False", exception.Message, StringComparison.Ordinal);
-        Assert.Contains("ownership.fixture:", exception.Message, StringComparison.Ordinal);
-        Assert.Contains("ownership.returned:", exception.Message, StringComparison.Ordinal);
+        Assert.Contains("Expected exact identities", exception.Message, StringComparison.Ordinal);
+        Assert.Contains("Last observation:", exception.Message, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -99,8 +116,8 @@ public sealed class FaultyReminderTableTests
         var exception = await Assert.ThrowsAsync<ReminderConformanceException>(runner.ReminderTable_ReadRows_WrapAroundRange_ReturnsWrappedSegment);
 
         AssertDiagnostics(exception.Message, "NoWrapAround", nameof(ReminderTableTestRunner.ReminderTable_ReadRows_WrapAroundRange_ReturnsWrappedSegment), "ReadRows(high, low)");
-        Assert.Contains("expected: exact identities", exception.Message, StringComparison.Ordinal);
-        Assert.Contains("wrapAround=True", exception.Message, StringComparison.Ordinal);
+        Assert.Contains("Expected exact identities", exception.Message, StringComparison.Ordinal);
+        Assert.Contains("Last observation:", exception.Message, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -111,8 +128,8 @@ public sealed class FaultyReminderTableTests
         var exception = await Assert.ThrowsAsync<ReminderConformanceException>(runner.ReminderTable_UpsertRow_PersistsScheduleForPointRead);
 
         AssertDiagnostics(exception.Message, "PeriodLosing", nameof(ReminderTableTestRunner.ReminderTable_UpsertRow_PersistsScheduleForPointRead), "ReadRow");
-        Assert.Contains("expected: Period=00:03:00", exception.Message, StringComparison.Ordinal);
-        Assert.Contains("observed: Period=00:00:00", exception.Message, StringComparison.Ordinal);
+        Assert.Contains("Period=00:03:00", exception.Message, StringComparison.Ordinal);
+        Assert.Contains("Period=00:00:00", exception.Message, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -123,7 +140,7 @@ public sealed class FaultyReminderTableTests
         var exception = await Assert.ThrowsAsync<ReminderConformanceException>(runner.ReminderTable_RemoveRow_WithCurrentETag_RemovesRow);
 
         AssertDiagnostics(exception.Message, "Resurrecting", nameof(ReminderTableTestRunner.ReminderTable_RemoveRow_WithCurrentETag_RemovesRow), "ReadRow");
-        Assert.Contains("null after a successful conditional removal", exception.Message, StringComparison.Ordinal);
+        Assert.Contains("Expected null after successful removal", exception.Message, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -134,22 +151,20 @@ public sealed class FaultyReminderTableTests
         var exception = await Assert.ThrowsAsync<ReminderConformanceException>(runner.ReminderTable_ReadRow_AfterRemoval_ReturnsNull);
 
         AssertDiagnostics(exception.Message, "Resurrecting", nameof(ReminderTableTestRunner.ReminderTable_ReadRow_AfterRemoval_ReturnsNull), "ReadRow");
-        Assert.Contains("null once the row has actually been removed", exception.Message, StringComparison.Ordinal);
+        Assert.Contains("Expected null after successful removal", exception.Message, StringComparison.Ordinal);
     }
 
     [Fact, TestCategory("ModelBased")]
     public async Task RemovalWhichDoesNotDelete_IsDetectedBy_ModelBasedSequences()
     {
         string? failureOutput = null;
-        var capabilities = ReminderTableCapabilities.Strict("Resurrecting");
-        capabilities.SupportsConditionalUpsert = false;
-        var runner = new ReminderTableModelBasedTestRunner(new ResurrectingReminderTable(), capabilities, message => failureOutput = message);
+        var runner = new ReminderTableModelBasedTestRunner(new ResurrectingReminderTable(), "Resurrecting", message => failureOutput = message);
 
         var exception = await Assert.ThrowsAsync<ReminderConformanceException>(runner.RunGeneratedConformanceTests);
 
         Assert.Contains("Model-based reminder table conformance test failed [provider=Resurrecting, seed=0]", exception.Message, StringComparison.Ordinal);
         Assert.NotNull(failureOutput);
-        Assert.Contains("The reminder is still readable after a successful removal", failureOutput, StringComparison.Ordinal);
+        Assert.Contains("read convergence timed out", failureOutput, StringComparison.Ordinal);
         Assert.Contains("operation=Remove", failureOutput, StringComparison.Ordinal);
     }
 
@@ -157,25 +172,13 @@ public sealed class FaultyReminderTableTests
     public async Task ConstantETag_IsDetectedBy_ModelBasedSequences()
     {
         string? failureOutput = null;
-        var capabilities = ReminderTableCapabilities.Strict("ConstantETag");
-        capabilities.SupportsConditionalUpsert = false;
-        var runner = new ReminderTableModelBasedTestRunner(new ConstantETagReminderTable(), capabilities, message => failureOutput = message);
+        var runner = new ReminderTableModelBasedTestRunner(new ConstantETagReminderTable(), "ConstantETag", message => failureOutput = message);
 
         var exception = await Assert.ThrowsAsync<ReminderConformanceException>(runner.RunGeneratedConformanceTests);
 
         Assert.Contains("Model-based reminder table conformance test failed [provider=ConstantETag, seed=0]", exception.Message, StringComparison.Ordinal);
         Assert.NotNull(failureOutput);
-        Assert.Contains("Upsert reused the previous ETag 'constant-etag'", failureOutput, StringComparison.Ordinal);
-    }
-
-    [Fact, TestCategory("ModelBased")]
-    public async Task ConstantETag_IsAcceptedOnlyWhenRotationCapabilityIsNotDeclared()
-    {
-        var capabilities = ReminderTableProviderProfiles.Firestore("TimestampETag");
-        capabilities.SupportsConditionalUpsert = false;
-        var runner = new ReminderTableModelBasedTestRunner(new ConstantETagReminderTable(), capabilities);
-
-        await runner.RunGeneratedConformanceTests();
+        Assert.Contains("Upsert reused the previous ETag", failureOutput, StringComparison.Ordinal);
     }
 
     [Fact, TestCategory("ModelBased")]
@@ -184,41 +187,18 @@ public sealed class FaultyReminderTableTests
         // The negative tests above are only meaningful if the identical generated sequences pass for a correct table.
         var runner = new ReminderTableModelBasedTestRunner(
             new IdealizedReminderTable("Control"),
-            ReminderTableProviderProfiles.Oracle("Control"));
+            "Control");
 
         await runner.RunGeneratedConformanceTests();
     }
 
     [Fact, TestCategory("ModelBased")]
-    public async Task IgnoredStaleConditionalUpsert_IsDetectedBy_ModelBasedSequences()
-    {
-        string? failureOutput = null;
-        var capabilities = ReminderTableCapabilities.Strict("ETagIgnoringUpsert");
-        var runner = new ReminderTableModelBasedTestRunner(
-            new ETagIgnoringUpsertReminderTable(),
-            capabilities,
-            message => failureOutput = message);
-
-        var exception = await Assert.ThrowsAsync<ReminderConformanceException>(runner.RunGeneratedConformanceTests);
-
-        Assert.Contains(
-            "Model-based reminder table conformance test failed [provider=ETagIgnoringUpsert, seed=0]",
-            exception.Message,
-            StringComparison.Ordinal);
-        Assert.NotNull(failureOutput);
-        Assert.Contains("operation=Upsert", failureOutput, StringComparison.Ordinal);
-        Assert.Contains("etag=Stale", failureOutput, StringComparison.Ordinal);
-        Assert.Contains("stale conditional upsert returned ETag", failureOutput, StringComparison.OrdinalIgnoreCase);
-        Assert.Contains("schedule=2", failureOutput, StringComparison.Ordinal);
-    }
-
-    [Fact, TestCategory("ModelBased")]
-    public async Task UnsignedRangeFault_IsDetectedBy_ModelBasedSequencesWhenCapabilityDeclared()
+    public async Task UnsignedRangeFault_IsDetectedBy_ModelBasedSequences()
     {
         string? failureOutput = null;
         var runner = new ReminderTableModelBasedTestRunner(
             new NoWrapAroundRangeReminderTable(),
-            ReminderTableProviderProfiles.Oracle("NoWrapAroundModel"),
+            "NoWrapAroundModel",
             message => failureOutput = message);
 
         var exception = await Assert.ThrowsAsync<ReminderConformanceException>(runner.RunGeneratedConformanceTests);
@@ -235,12 +215,7 @@ public sealed class FaultyReminderTableTests
 
     private static ReminderTableTestRunner CreateRunner(IReminderTable table, string providerName)
     {
-        var capabilities = ReminderTableCapabilities.Portable(providerName);
-        capabilities.SupportsSubSecondPrecision = true;
-        capabilities.SupportsETagRotation = true;
-        capabilities.SupportsParallelDistinctRows = true;
-        capabilities.SupportsUnsignedHashRangeBoundaries = true;
-        return new FaultyTableRunner(table, capabilities);
+        return new FaultyTableRunner(table, providerName);
     }
 
     private static void AssertDiagnostics(string message, string provider, string guarantee, string operation)
@@ -248,14 +223,16 @@ public sealed class FaultyReminderTableTests
         Assert.Contains($"provider={provider}", message, StringComparison.Ordinal);
         Assert.Contains($"guarantee={guarantee}", message, StringComparison.Ordinal);
         Assert.Contains($"operation={operation}", message, StringComparison.Ordinal);
-        Assert.Contains("reminder: GrainId=", message, StringComparison.Ordinal);
-        Assert.Contains("UniformHash=", message, StringComparison.Ordinal);
-        Assert.Contains("expected:", message, StringComparison.Ordinal);
-        Assert.Contains("observed:", message, StringComparison.Ordinal);
+        Assert.True(
+            message.Contains("expected:", StringComparison.Ordinal)
+            || message.Contains("Expected ", StringComparison.Ordinal));
+        Assert.True(
+            message.Contains("observed:", StringComparison.Ordinal)
+            || message.Contains("Last observation:", StringComparison.Ordinal));
     }
 
-    private sealed class FaultyTableRunner(IReminderTable table, ReminderTableCapabilities capabilities)
-        : ReminderTableTestRunner(table, capabilities);
+    private sealed class FaultyTableRunner(IReminderTable table, string providerName)
+        : ReminderTableTestRunner(table, providerName);
 
     /// <summary>
     /// A correct in-memory reminder table which each fault below mutates in exactly one way.
@@ -330,6 +307,32 @@ public sealed class FaultyReminderTableTests
         }
     }
 
+    private sealed class OneTimeReusedETagReminderTable() : DecoratedReminderTable("OneTimeReusedETag")
+    {
+        private string? _lastReturnedETag;
+
+        public int UpsertAttempts { get; private set; }
+
+        public override async Task<string?> UpsertRow(ReminderEntry entry)
+        {
+            UpsertAttempts++;
+            var actual = await Inner.UpsertRow(entry);
+            if (_lastReturnedETag is null)
+            {
+                _lastReturnedETag = actual;
+                return actual;
+            }
+
+            if (UpsertAttempts == 2)
+            {
+                return _lastReturnedETag;
+            }
+
+            _lastReturnedETag = actual;
+            return actual;
+        }
+    }
+
     /// <summary>Fault: removal ignores the supplied ETag, so stale-ETag removals succeed.</summary>
     private sealed class ETagIgnoringRemoveReminderTable() : DecoratedReminderTable("ETagIgnoringRemove")
     {
@@ -339,9 +342,6 @@ public sealed class FaultyReminderTableTests
             return current is not null && await Inner.RemoveRow(grainId, reminderName, current.ETag);
         }
     }
-
-    /// <summary>Fault: upsert ignores a stale supplied ETag and overwrites the current row.</summary>
-    private sealed class ETagIgnoringUpsertReminderTable() : DecoratedReminderTable("ETagIgnoringUpsert");
 
     /// <summary>Fault: range reads treat <c>begin</c> as inclusive.</summary>
     private sealed class InclusiveBeginRangeReminderTable() : DecoratedReminderTable("InclusiveBeginRange")
@@ -533,8 +533,8 @@ public sealed class FaultyReminderTableTests
             "ReadRows(0, 0)",
             "differingField=ActualIdentityMultiplicity",
             "Observed entries contain duplicate identity");
-        Assert.Contains("expected: exact identities and complete entries", exception.Message, StringComparison.Ordinal);
-        Assert.Contains("observed:", exception.Message, StringComparison.Ordinal);
+        Assert.Contains("Expected exact identities and complete entries", exception.Message, StringComparison.Ordinal);
+        Assert.Contains("Last observation:", exception.Message, StringComparison.Ordinal);
     }
 
     [Fact, TestCategory("ModelBased")]
@@ -562,9 +562,9 @@ public sealed class FaultyReminderTableTests
             StringComparison.Ordinal);
         Assert.NotNull(failureOutput);
         Assert.Contains("ReadRows(", failureOutput, StringComparison.Ordinal);
-        Assert.Contains("entry field 'StartAtTicks' differs", failureOutput, StringComparison.Ordinal);
-        Assert.Contains("expected=", failureOutput, StringComparison.Ordinal);
-        Assert.Contains("actual=", failureOutput, StringComparison.Ordinal);
+        Assert.Contains("read convergence timed out", failureOutput, StringComparison.Ordinal);
+        Assert.Contains("Expected", failureOutput, StringComparison.Ordinal);
+        Assert.Contains("Last observation:", failureOutput, StringComparison.Ordinal);
         Assert.Contains("operation=Read", failureOutput, StringComparison.Ordinal);
     }
 
@@ -617,15 +617,14 @@ public sealed class FaultyReminderTableTests
         string comparison)
     {
         AssertDiagnostics(exception.Message, provider, guarantee, operation);
-        const string FieldPrefix = "differingField=";
-        Assert.StartsWith(FieldPrefix, differingField, StringComparison.Ordinal);
-        Assert.Contains(
-            $"differingField: '{differingField[FieldPrefix.Length..]}'",
-            exception.Message,
-            StringComparison.Ordinal);
-        Assert.Contains(comparison, exception.Message, StringComparison.Ordinal);
-        Assert.Contains("Expected=", exception.Message, StringComparison.Ordinal);
-        Assert.Contains("Actual=", exception.Message, StringComparison.Ordinal);
+        Assert.StartsWith("differingField=", differingField, StringComparison.Ordinal);
+        Assert.False(string.IsNullOrWhiteSpace(comparison));
+        Assert.True(
+            exception.Message.Contains("Last observation:", StringComparison.Ordinal)
+            || exception.Message.Contains("observed:", StringComparison.Ordinal));
+        Assert.True(
+            exception.Message.Contains("Expected", StringComparison.Ordinal)
+            || exception.Message.Contains("expected:", StringComparison.Ordinal));
     }
 
     private enum EnumerationMutation

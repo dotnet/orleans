@@ -2,7 +2,6 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration;
 using Orleans.Runtime.ReminderService;
-using Orleans.Reminders.TestKit;
 using Orleans.Tests.SqlUtils;
 using TestExtensions;
 using UnitTests.General;
@@ -42,9 +41,6 @@ namespace UnitTests.RemindersTest
                 this.clusterOptions,
                 Options.Create(options));
         }
-
-        protected override ReminderTableCapabilities CreateReminderTableCapabilities()
-            => ReminderTableProviderProfiles.AdoNet(GetType().Name);
 
         protected override string GetAdoInvariant()
         {

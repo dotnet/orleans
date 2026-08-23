@@ -19,7 +19,8 @@ internal partial class FirestoreReminderTable : IReminderTable
     private readonly ClusterOptions _clusterOptions;
     private readonly FirestoreOptions _firestoreOptions;
     private readonly FirestoreDataManager _dataManager;
-    private readonly TaskCompletionSource _initializationTask = new(TaskCreationOptions.RunContinuationsAsynchronously);
+    private readonly SemaphoreSlim _lifecycleLock = new(1, 1);
+    private TaskCompletionSource _initializationTask = CreateInitializationSource();
 
     public FirestoreReminderTable(
         ILoggerFactory loggerFactory,
@@ -38,8 +39,20 @@ internal partial class FirestoreReminderTable : IReminderTable
 
     public async Task StartAsync(CancellationToken cancellationToken)
     {
+        await this._lifecycleLock.WaitAsync(cancellationToken);
         try
         {
+            if (this._initializationTask.Task.IsCompletedSuccessfully)
+            {
+                return;
+            }
+
+            if (this._initializationTask.Task.IsCompleted)
+            {
+                Volatile.Write(ref this._initializationTask, CreateInitializationSource());
+            }
+
+            var initialization = this._initializationTask;
             while (true)
             {
                 var sw = Stopwatch.StartNew();
@@ -47,7 +60,7 @@ internal partial class FirestoreReminderTable : IReminderTable
                 {
                     LogInitializing();
                     await this._dataManager.Initialize(cancellationToken);
-                    this._initializationTask.TrySetResult();
+                    initialization.TrySetResult();
                     LogInitialized(sw.ElapsedMilliseconds);
                     return;
                 }
@@ -72,19 +85,35 @@ internal partial class FirestoreReminderTable : IReminderTable
             this._initializationTask.TrySetException(ex);
             throw;
         }
+        finally
+        {
+            this._lifecycleLock.Release();
+        }
     }
 
-    public Task StopAsync(CancellationToken cancellationToken)
+    public async Task StopAsync(CancellationToken cancellationToken)
     {
-        this._initializationTask.TrySetCanceled(CancellationToken.None);
-        return Task.CompletedTask;
+        await this._lifecycleLock.WaitAsync(cancellationToken);
+        try
+        {
+            var stopped = CreateInitializationSource();
+            stopped.TrySetCanceled(CancellationToken.None);
+            Volatile.Write(ref this._initializationTask, stopped);
+        }
+        finally
+        {
+            this._lifecycleLock.Release();
+        }
     }
+
+    private static TaskCompletionSource CreateInitializationSource()
+        => new(TaskCreationOptions.RunContinuationsAsynchronously);
 
     public async Task<string?> UpsertRow(ReminderEntry entry)
     {
         try
         {
-            await this._initializationTask.Task;
+            await Volatile.Read(ref this._initializationTask).Task;
 
             LogUpsertRow(entry);
 
@@ -125,7 +154,7 @@ internal partial class FirestoreReminderTable : IReminderTable
     {
         try
         {
-            await this._initializationTask.Task;
+            await Volatile.Read(ref this._initializationTask).Task;
 
             LogRemoveRow(grainId, reminderName);
 
@@ -148,7 +177,7 @@ internal partial class FirestoreReminderTable : IReminderTable
     {
         try
         {
-            await this._initializationTask.Task;
+            await Volatile.Read(ref this._initializationTask).Task;
 
             var entries = await this._dataManager.QueryEntities<ReminderEntity>(
                 reminder => reminder
@@ -172,7 +201,7 @@ internal partial class FirestoreReminderTable : IReminderTable
     {
         try
         {
-            await this._initializationTask.Task;
+            await Volatile.Read(ref this._initializationTask).Task;
 
             var entries = new List<ReminderEntity>();
 
@@ -223,7 +252,7 @@ internal partial class FirestoreReminderTable : IReminderTable
     {
         try
         {
-            await this._initializationTask.Task;
+            await Volatile.Read(ref this._initializationTask).Task;
 
             var entity = await this._dataManager.ReadEntity<ReminderEntity>(FormatReminderId(reminderName, grainId)).ConfigureAwait(false);
 
@@ -244,7 +273,7 @@ internal partial class FirestoreReminderTable : IReminderTable
 
     public async Task TestOnlyClearTable()
     {
-        await this._initializationTask.Task;
+        await Volatile.Read(ref this._initializationTask).Task;
 
         var entities = await this._dataManager.ReadAllEntities<ReminderEntity>().ConfigureAwait(false);
 

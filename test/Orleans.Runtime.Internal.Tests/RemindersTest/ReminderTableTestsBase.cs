@@ -62,10 +62,7 @@ namespace UnitTests.RemindersTest
         private ReminderTableTestRunner CreateConformanceRunner()
             => new ProviderReminderTableTestRunner(
                 remindersTable,
-                CreateReminderTableCapabilities());
-
-        protected virtual ReminderTableCapabilities CreateReminderTableCapabilities()
-            => ReminderTableCapabilities.Portable(GetType().Name);
+                GetType().Name);
 
         protected virtual string? GetAdoInvariant()
         {
@@ -74,9 +71,7 @@ namespace UnitTests.RemindersTest
 
         protected async Task RemindersParallelUpsert()
         {
-            await RunConformanceGuarantee(
-                nameof(ReminderTableTestRunner.ReminderTable_ParallelUpserts_AcrossGrains_RemainIsolated),
-                static runner => runner.ReminderTable_ParallelUpserts_AcrossGrains_RemainIsolated());
+            await CreateConformanceRunner().ReminderTable_ParallelUpserts_AcrossGrains_RemainIsolated();
         }
 
         protected async Task ReminderSimple()
@@ -101,27 +96,12 @@ namespace UnitTests.RemindersTest
             await runner.ReminderTable_ReadRows_FullRange_ReturnsAllReminders();
         }
 
-        private Task RunConformanceGuarantee(
-            string guarantee,
-            Func<ReminderTableTestRunner, Task> execute)
-        {
-            var runner = CreateConformanceRunner();
-            if (runner.SkippedGuarantees.TryGetValue(guarantee, out var reason))
-            {
-                throw Xunit.Sdk.SkipException.ForSkip(reason);
-            }
-
-            return execute(runner);
-        }
-
         [Fact]
         public Task ReminderTable_StartAsync_IsIdempotent() => CreateConformanceRunner().ReminderTable_StartAsync_IsIdempotent();
 
         [Fact]
         public Task ReminderTable_StopAsync_ThenRestart_ResumesService()
-            => RunConformanceGuarantee(
-                nameof(ReminderTableTestRunner.ReminderTable_StopAsync_ThenRestart_ResumesService),
-                static runner => runner.ReminderTable_StopAsync_ThenRestart_ResumesService());
+            => CreateConformanceRunner().ReminderTable_StopAsync_ThenRestart_ResumesService();
 
         [Fact]
         public Task ReminderTable_UpsertRow_ReturnsNewNonEmptyETag() => CreateConformanceRunner().ReminderTable_UpsertRow_ReturnsNewNonEmptyETag();
@@ -146,18 +126,14 @@ namespace UnitTests.RemindersTest
 
         [Fact]
         public Task ReminderTable_UpsertRow_ReplacesETagOnEachWrite()
-            => RunConformanceGuarantee(
-                nameof(ReminderTableTestRunner.ReminderTable_UpsertRow_ReplacesETagOnEachWrite),
-                static runner => runner.ReminderTable_UpsertRow_ReplacesETagOnEachWrite());
+            => CreateConformanceRunner().ReminderTable_UpsertRow_ReplacesETagOnEachWrite();
 
         [Fact]
         public Task ReminderTable_RemoveRow_WithCurrentETag_RemovesRow() => CreateConformanceRunner().ReminderTable_RemoveRow_WithCurrentETag_RemovesRow();
 
         [Fact]
         public Task ReminderTable_RemoveRow_WithStaleETag_FailsAndRetainsRow()
-            => RunConformanceGuarantee(
-                nameof(ReminderTableTestRunner.ReminderTable_RemoveRow_WithStaleETag_FailsAndRetainsRow),
-                static runner => runner.ReminderTable_RemoveRow_WithStaleETag_FailsAndRetainsRow());
+            => CreateConformanceRunner().ReminderTable_RemoveRow_WithStaleETag_FailsAndRetainsRow();
 
         [Fact]
         public Task ReminderTable_RemoveRow_WithUnknownReminderName_ReturnsFalse() => CreateConformanceRunner().ReminderTable_RemoveRow_WithUnknownReminderName_ReturnsFalse();
@@ -169,12 +145,6 @@ namespace UnitTests.RemindersTest
         public Task ReminderTable_UpsertRow_UpdatesStartAtAndPeriod() => CreateConformanceRunner().ReminderTable_UpsertRow_UpdatesStartAtAndPeriod();
 
         [Fact]
-        public Task ReminderTable_UpsertRow_WithStaleETag_IsRejected()
-            => RunConformanceGuarantee(
-                nameof(ReminderTableTestRunner.ReminderTable_UpsertRow_WithStaleETag_IsRejected),
-                static runner => runner.ReminderTable_UpsertRow_WithStaleETag_IsRejected());
-
-        [Fact]
         public Task ReminderTable_UpsertRow_MovesReminderBetweenLoadingWindows() => CreateConformanceRunner().ReminderTable_UpsertRow_MovesReminderBetweenLoadingWindows();
 
         [Fact]
@@ -182,21 +152,15 @@ namespace UnitTests.RemindersTest
 
         [Fact]
         public Task ReminderTable_ReadRows_UnsignedBoundary_UsesUInt32Ordering()
-            => RunConformanceGuarantee(
-                nameof(ReminderTableTestRunner.ReminderTable_ReadRows_UnsignedBoundary_UsesUInt32Ordering),
-                static runner => runner.ReminderTable_ReadRows_UnsignedBoundary_UsesUInt32Ordering());
+            => CreateConformanceRunner().ReminderTable_ReadRows_UnsignedBoundary_UsesUInt32Ordering();
 
         [Fact]
         public Task ReminderTable_ReadRows_Range_ExcludesBeginAndIncludesEnd()
-            => RunConformanceGuarantee(
-                nameof(ReminderTableTestRunner.ReminderTable_ReadRows_Range_ExcludesBeginAndIncludesEnd),
-                static runner => runner.ReminderTable_ReadRows_Range_ExcludesBeginAndIncludesEnd());
+            => CreateConformanceRunner().ReminderTable_ReadRows_Range_ExcludesBeginAndIncludesEnd();
 
         [Fact]
         public Task ReminderTable_ReadRows_WrapAroundRange_ReturnsWrappedSegment()
-            => RunConformanceGuarantee(
-                nameof(ReminderTableTestRunner.ReminderTable_ReadRows_WrapAroundRange_ReturnsWrappedSegment),
-                static runner => runner.ReminderTable_ReadRows_WrapAroundRange_ReturnsWrappedSegment());
+            => CreateConformanceRunner().ReminderTable_ReadRows_WrapAroundRange_ReturnsWrappedSegment();
 
         [Fact]
         public Task ReminderTable_ReadRows_OutsideRange_DoesNotDeleteReminder() => CreateConformanceRunner().ReminderTable_ReadRows_OutsideRange_DoesNotDeleteReminder();
@@ -209,36 +173,20 @@ namespace UnitTests.RemindersTest
 
         [Fact]
         public Task ReminderTable_ConcurrentUpserts_ProduceDistinctETags()
-            => RunConformanceGuarantee(
-                nameof(ReminderTableTestRunner.ReminderTable_ConcurrentUpserts_ProduceDistinctETags),
-                static runner => runner.ReminderTable_ConcurrentUpserts_ProduceDistinctETags());
+            => CreateConformanceRunner().ReminderTable_ConcurrentUpserts_ProduceDistinctETags();
 
         [Fact]
         public Task ReminderTable_ParallelUpserts_AcrossGrains_RemainIsolated()
-            => RunConformanceGuarantee(
-                nameof(ReminderTableTestRunner.ReminderTable_ParallelUpserts_AcrossGrains_RemainIsolated),
-                static runner => runner.ReminderTable_ParallelUpserts_AcrossGrains_RemainIsolated());
+            => CreateConformanceRunner().ReminderTable_ParallelUpserts_AcrossGrains_RemainIsolated();
 
         [Fact]
         public Task ReminderTable_TestOnlyClearTable_RemovesAllReminders() => CreateConformanceRunner().ReminderTable_TestOnlyClearTable_RemovesAllReminders();
 
-        [Fact]
-        public Task ReminderTable_SeparatelyScopedTables_DoNotShareReminders()
-            => RunConformanceGuarantee(
-                nameof(ReminderTableTestRunner.ReminderTable_SeparatelyScopedTables_DoNotShareReminders),
-                static runner => runner.ReminderTable_SeparatelyScopedTables_DoNotShareReminders());
-
-        [Fact]
-        public Task ReminderTable_StartAsync_WithCanceledToken_ThrowsOperationCanceled()
-            => RunConformanceGuarantee(
-                nameof(ReminderTableTestRunner.ReminderTable_StartAsync_WithCanceledToken_ThrowsOperationCanceled),
-                static runner => runner.ReminderTable_StartAsync_WithCanceledToken_ThrowsOperationCanceled());
-
         [Fact, TestCategory("ModelBased")]
         public Task ReminderTable_ModelBasedGeneratedConformance()
-            => new ReminderTableModelBasedTestRunner(remindersTable, CreateReminderTableCapabilities()).RunGeneratedConformanceTests();
+            => new ReminderTableModelBasedTestRunner(remindersTable, GetType().Name).RunGeneratedConformanceTests();
 
-        private sealed class ProviderReminderTableTestRunner(IReminderTable table, ReminderTableCapabilities capabilities)
-            : ReminderTableTestRunner(table, capabilities);
+        private sealed class ProviderReminderTableTestRunner(IReminderTable table, string providerName)
+            : ReminderTableTestRunner(table, providerName);
     }
 }

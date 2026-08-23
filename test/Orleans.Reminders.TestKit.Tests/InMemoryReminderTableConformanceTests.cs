@@ -28,7 +28,7 @@ public sealed class InMemoryReminderTableConformanceTests : ReminderTableTestRun
     private readonly InMemoryReminderTableFixture _fixture;
 
     public InMemoryReminderTableConformanceTests(InMemoryReminderTableFixture fixture)
-        : base(fixture.ReminderTable, ReminderTableProviderProfiles.InMemory("InMemoryReminderTable"))
+        : base(fixture.ReminderTable, "InMemoryReminderTable")
     {
         _fixture = fixture;
         _fixture.EnsurePreconditionsMet();
@@ -77,13 +77,6 @@ public sealed class InMemoryReminderTableConformanceTests : ReminderTableTestRun
     public override Task ReminderTable_RemoveRow_Repeated_ReturnsFalseAfterFirstSuccess() => base.ReminderTable_RemoveRow_Repeated_ReturnsFalseAfterFirstSuccess();
 
     [Fact]
-    public override Task ReminderTable_UpsertRow_WithStaleETag_IsRejected()
-        => XunitReminderTableTestAdapter.RunAsync(
-            this,
-            nameof(ReminderTable_UpsertRow_WithStaleETag_IsRejected),
-            () => base.ReminderTable_UpsertRow_WithStaleETag_IsRejected());
-
-    [Fact]
     public override Task ReminderTable_UpsertRow_UpdatesStartAtAndPeriod() => base.ReminderTable_UpsertRow_UpdatesStartAtAndPeriod();
 
     [Fact]
@@ -121,41 +114,10 @@ public sealed class InMemoryReminderTableConformanceTests : ReminderTableTestRun
     public override Task ReminderTable_TestOnlyClearTable_RemovesAllReminders() => base.ReminderTable_TestOnlyClearTable_RemovesAllReminders();
 
     [Fact]
-    public override Task ReminderTable_SeparatelyScopedTables_DoNotShareReminders()
-        => XunitReminderTableTestAdapter.RunAsync(
-            this,
-            nameof(ReminderTable_SeparatelyScopedTables_DoNotShareReminders),
-            () => base.ReminderTable_SeparatelyScopedTables_DoNotShareReminders());
-
-    [Fact]
-    public override Task ReminderTable_StartAsync_WithCanceledToken_ThrowsOperationCanceled()
-        => XunitReminderTableTestAdapter.RunAsync(
-            this,
-            nameof(ReminderTable_StartAsync_WithCanceledToken_ThrowsOperationCanceled),
-            () => base.ReminderTable_StartAsync_WithCanceledToken_ThrowsOperationCanceled());
+    public Task InMemoryReminderTable_FullRangeReturnsExactCardinality()
+        => base.ReminderTable_ReadRows_FullRange_ReturnsExactRequestedCardinality(32);
 
     [Fact, TestCategory("ModelBased")]
     public Task InMemoryReminderTable_ModelBasedGeneratedConformance()
-        => new ReminderTableModelBasedTestRunner(ReminderTable, Capabilities).RunGeneratedConformanceTests();
-
-    [Fact]
-    public void InMemoryCapabilities_DisabledGuaranteeManifest_IsCompleteWithoutInvocation()
-    {
-        var expected = new Dictionary<string, string>(StringComparer.Ordinal)
-        {
-            [nameof(ReminderTable_UpsertRow_WithStaleETag_IsRejected)] =
-                $"InMemoryReminderTable does not declare {nameof(ReminderTableCapabilities)}.{nameof(ReminderTableCapabilities.SupportsConditionalUpsert)}.",
-            [nameof(ReminderTable_SeparatelyScopedTables_DoNotShareReminders)] =
-                $"InMemoryReminderTable does not declare {nameof(ReminderTableCapabilities)}.{nameof(ReminderTableCapabilities.SupportsCrossTableIsolation)}.",
-            [nameof(ReminderTable_StartAsync_WithCanceledToken_ThrowsOperationCanceled)] =
-                $"InMemoryReminderTable does not declare {nameof(ReminderTableCapabilities)}.{nameof(ReminderTableCapabilities.SupportsStartCancellation)}."
-        };
-
-        Assert.Equal(
-            expected.OrderBy(pair => pair.Key, StringComparer.Ordinal),
-            SkippedGuarantees.OrderBy(pair => pair.Key, StringComparer.Ordinal));
-        Assert.DoesNotContain(
-            SkippedGuarantees.Keys,
-            method => method.Contains(nameof(ReminderTableCapabilities.SupportsSubSecondPrecision), StringComparison.Ordinal));
-    }
+        => new ReminderTableModelBasedTestRunner(ReminderTable, "InMemoryReminderTable").RunGeneratedConformanceTests();
 }

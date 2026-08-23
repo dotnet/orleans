@@ -36,5 +36,5 @@ public class ReminderTableTestsBaseTests
     }
 
     private sealed class IdealizedRunner(IdealizedReminderTable table)
-        : ReminderTableTestRunner(table, ReminderTableCapabilities.Strict(nameof(IdealizedRunner)));
+        : ReminderTableTestRunner(table, nameof(IdealizedRunner));
 }

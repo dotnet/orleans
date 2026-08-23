@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.Collections.ObjectModel;
 using System.Globalization;
 using System.Linq;
 using System.Threading;
@@ -13,36 +12,26 @@ namespace Orleans.Reminders.TestKit;
 /// The executable definition of the observable <see cref="IReminderTable"/> correctness contract.
 /// </summary>
 /// <remarks>
-/// <para>
 /// This runner is deliberately framework neutral: no test attributes are applied and failures are reported by
 /// throwing <see cref="ReminderConformanceException"/> carrying a structured <see cref="ReminderFailureReport"/>.
 /// Derive from it in a provider suite, apply your test framework's attributes to overrides, and call the base
 /// implementation, exactly as <c>Orleans.Persistence.TestKit.GrainStorageTestRunner</c> is consumed.
-/// </para>
-/// <para>
-/// Guarantees which are not universal across the built-in providers are gated by a single property of
-/// <see cref="ReminderTableCapabilities"/>. A gated guarantee which is disabled records an explicit entry in
-/// <see cref="SkippedGuarantees"/> instead of silently passing.
-/// </para>
 /// </remarks>
 public abstract class ReminderTableTestRunner
 {
-    private readonly IReadOnlyDictionary<string, string> _skipped;
     private int _grainCounter;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="ReminderTableTestRunner"/> class.
     /// </summary>
     /// <param name="reminderTable">The reminder table under test.</param>
-    /// <param name="capabilities">The capabilities declared by the provider, or <see langword="null"/> for the portable set.</param>
+    /// <param name="providerName">The provider name reported in conformance diagnostics.</param>
     /// <param name="seed">The deterministic seed used to generate reminder identities.</param>
-    protected ReminderTableTestRunner(IReminderTable reminderTable, ReminderTableCapabilities? capabilities = null, int seed = 0)
+    protected ReminderTableTestRunner(IReminderTable reminderTable, string providerName, int seed = 0)
     {
         ReminderTable = reminderTable ?? throw new ArgumentNullException(nameof(reminderTable));
-        Capabilities = capabilities ?? ReminderTableCapabilities.Portable(reminderTable.GetType().Name);
-        var disabledGuarantees = Capabilities.CreateDisabledGuarantees();
-        _skipped = new ReadOnlyDictionary<string, string>(
-            disabledGuarantees.ToDictionary(guarantee => guarantee.MethodName, guarantee => guarantee.Reason, StringComparer.Ordinal));
+        ArgumentException.ThrowIfNullOrWhiteSpace(providerName);
+        ProviderName = providerName;
         Seed = seed;
     }
 
@@ -52,38 +41,20 @@ public abstract class ReminderTableTestRunner
     public IReminderTable ReminderTable { get; }
 
     /// <summary>
-    /// Gets the capabilities declared by the provider under test.
-    /// </summary>
-    public ReminderTableCapabilities Capabilities { get; }
-
-    /// <summary>
     /// Gets the deterministic seed used to generate reminder identities.
     /// </summary>
     public int Seed { get; }
 
     /// <summary>
-    /// Gets the guarantees which are disabled, keyed by guarantee name, with the capability which disabled them.
-    /// </summary>
-    /// <remarks>The complete, read-only manifest is created when this runner is constructed.</remarks>
-    public IReadOnlyDictionary<string, string> SkippedGuarantees => _skipped;
-
-    /// <summary>
     /// Gets the provider name reported in failure messages.
     /// </summary>
-    protected string ProviderName => Capabilities.ProviderName;
+    protected string ProviderName { get; }
 
     /// <summary>
     /// Gets a deterministic base time used by schedule-sensitive guarantees.
     /// </summary>
     /// <remarks>The value is truncated to whole seconds so it round-trips through every built-in provider.</remarks>
     protected virtual DateTime BaseTime { get; } = new(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc);
-
-    /// <summary>
-    /// Creates a second, independently scoped reminder table for cross-table isolation checks.
-    /// </summary>
-    /// <returns>The isolated table, or <see langword="null"/> when the provider cannot create one.</returns>
-    /// <remarks>Override together with <see cref="ReminderTableCapabilities.SupportsCrossTableIsolation"/>.</remarks>
-    protected virtual Task<IReminderTable?> CreateIsolatedTableAsync() => Task.FromResult<IReminderTable?>(null);
 
     // ---------------------------------------------------------------------------------------------------------
     // Lifecycle
@@ -103,18 +74,9 @@ public abstract class ReminderTableTestRunner
 
         var grainId = NewGrainId("start-idempotent");
         var entry = NewEntry(grainId, "start-idempotent");
-        var etag = await ReminderTable.UpsertRow(entry);
-        if (string.IsNullOrEmpty(etag))
-        {
-            Report(Guarantee, "UpsertRow")
-                .WithIdentity(grainId, entry.ReminderName)
-                .WithExpected("a non-empty ETag after a repeated StartAsync")
-                .WithObserved($"ETag={FormatETag(etag)}")
-                .WithETags(etag)
-                .Throw();
-        }
+        var etag = await UpsertAsync(entry, Guarantee);
 
-        await RemoveAsync(grainId, entry.ReminderName, etag!);
+        await RemoveAsync(grainId, entry.ReminderName, etag);
     }
 
     /// <summary>
@@ -124,11 +86,6 @@ public abstract class ReminderTableTestRunner
     public virtual async Task ReminderTable_StopAsync_ThenRestart_ResumesService()
     {
         const string Guarantee = nameof(ReminderTable_StopAsync_ThenRestart_ResumesService);
-        if (!Require(Guarantee, Capabilities.SupportsRestartAfterStop, nameof(ReminderTableCapabilities.SupportsRestartAfterStop)))
-        {
-            return;
-        }
-
         var grainId = NewGrainId("restart");
         var entry = NewEntry(grainId, "restart");
         var etag = await UpsertAsync(entry, Guarantee);
@@ -171,8 +128,8 @@ public abstract class ReminderTableTestRunner
         const string Guarantee = nameof(ReminderTable_UpsertRow_ReturnsNewNonEmptyETag);
 
         var grainId = NewGrainId("upsert-etag");
-        await UpsertAsync(NewEntry(grainId, "upsert-etag"), Guarantee);
-        var second = await UpsertAsync(NewEntry(grainId, "upsert-etag", BaseTime.AddMinutes(5)), Guarantee);
+        var first = await UpsertAsync(NewEntry(grainId, "upsert-etag"), Guarantee);
+        var second = await UpsertAsync(NewEntry(grainId, "upsert-etag", BaseTime.AddMinutes(5)), Guarantee, first);
 
         await RemoveAsync(grainId, "upsert-etag", second);
     }
@@ -246,8 +203,8 @@ public abstract class ReminderTableTestRunner
             Guarantee,
             "ReadRows(GrainId)",
             [
-                ReminderTableEntrySnapshot.Create(first, firstETag, Capabilities.SupportsSubSecondPrecision),
-                ReminderTableEntrySnapshot.Create(second, secondETag, Capabilities.SupportsSubSecondPrecision)
+                ReminderTableEntrySnapshot.Create(first, firstETag, supportsSubSecondPrecision: false),
+                ReminderTableEntrySnapshot.Create(second, secondETag, supportsSubSecondPrecision: false)
             ],
             requiredRows.Reminders);
 
@@ -361,11 +318,6 @@ public abstract class ReminderTableTestRunner
     public virtual async Task ReminderTable_UpsertRow_ReplacesETagOnEachWrite()
     {
         const string Guarantee = nameof(ReminderTable_UpsertRow_ReplacesETagOnEachWrite);
-        if (!Require(Guarantee, Capabilities.SupportsETagRotation, nameof(ReminderTableCapabilities.SupportsETagRotation)))
-        {
-            return;
-        }
-
         var grainId = NewGrainId("etag-replace");
         var observed = new List<string>();
         var previous = (string?)null;
@@ -373,7 +325,7 @@ public abstract class ReminderTableTestRunner
         for (var i = 0; i < 3; i++)
         {
             var entry = NewEntry(grainId, "etag-replace", BaseTime.AddMinutes(i), TimeSpan.FromMinutes(1 + i));
-            var etag = await UpsertAsync(entry, Guarantee);
+            var etag = await UpsertAsync(entry, Guarantee, previous);
             if (previous is not null && string.Equals(previous, etag, StringComparison.Ordinal))
             {
                 Report(Guarantee, "UpsertRow")
@@ -461,15 +413,10 @@ public abstract class ReminderTableTestRunner
     public virtual async Task ReminderTable_RemoveRow_WithStaleETag_FailsAndRetainsRow()
     {
         const string Guarantee = nameof(ReminderTable_RemoveRow_WithStaleETag_FailsAndRetainsRow);
-        if (!Require(Guarantee, Capabilities.SupportsETagRotation, nameof(ReminderTableCapabilities.SupportsETagRotation)))
-        {
-            return;
-        }
-
         var grainId = NewGrainId("remove-stale");
         var staleETag = await UpsertAsync(NewEntry(grainId, "remove-stale", BaseTime, TimeSpan.FromMinutes(1)), Guarantee);
         var updated = NewEntry(grainId, "remove-stale", BaseTime.AddMinutes(9), TimeSpan.FromMinutes(4));
-        var currentETag = await UpsertAsync(updated, Guarantee);
+        var currentETag = await UpsertAsync(updated, Guarantee, staleETag);
 
         var removed = await ReminderTable.RemoveRow(grainId, "remove-stale", staleETag);
         if (removed)
@@ -542,69 +489,6 @@ public abstract class ReminderTableTestRunner
         }
     }
 
-    /// <summary>
-    /// Guarantee: an upsert carrying a stale ETag is rejected by providers which implement conditional upsert.
-    /// </summary>
-    /// <returns>A task which represents the asynchronous operation.</returns>
-    public virtual async Task ReminderTable_UpsertRow_WithStaleETag_IsRejected()
-    {
-        const string Guarantee = nameof(ReminderTable_UpsertRow_WithStaleETag_IsRejected);
-        if (!Require(Guarantee, Capabilities.SupportsConditionalUpsert, nameof(ReminderTableCapabilities.SupportsConditionalUpsert)))
-        {
-            return;
-        }
-
-        var grainId = NewGrainId("conditional-upsert");
-        var staleETag = await UpsertAsync(NewEntry(grainId, "conditional-upsert", BaseTime, TimeSpan.FromMinutes(1)), Guarantee);
-        var current = NewEntry(grainId, "conditional-upsert", BaseTime.AddMinutes(3), TimeSpan.FromMinutes(2));
-        var currentETag = await ReminderTableConvergence.ReadUntilAsync(
-            () => UpsertAsync(current, Guarantee),
-            etag => !string.Equals(etag, staleETag, StringComparison.Ordinal),
-            Capabilities,
-            Guarantee,
-            "UpsertRow",
-            "a current ETag which supersedes the stale ETag",
-            FormatETag);
-        if (string.Equals(currentETag, staleETag, StringComparison.Ordinal))
-        {
-            Report(Guarantee, "UpsertRow")
-                .WithIdentity(grainId, "conditional-upsert")
-                .WithExpected("a current ETag which supersedes the stale ETag")
-                .WithObserved($"both writes returned {FormatETag(currentETag)}")
-                .WithETags(currentETag, staleETag)
-                .WithSchedule(current.StartAt, current.Period)
-                .Throw();
-        }
-
-        var rejected = NewEntry(grainId, "conditional-upsert", BaseTime.AddMinutes(6), TimeSpan.FromMinutes(8));
-        rejected.ETag = staleETag;
-
-        Exception? failure = null;
-        string? returnedETag = null;
-        try
-        {
-            returnedETag = await ReminderTable.UpsertRow(rejected);
-        }
-        catch (Exception exception)
-        {
-            failure = exception;
-        }
-
-        if (failure is null && returnedETag is not null)
-        {
-            Report(Guarantee, "UpsertRow")
-                .WithIdentity(grainId, "conditional-upsert")
-                .WithExpected("a conditional upsert carrying a stale ETag to return null or throw")
-                .WithObserved($"the upsert succeeded and returned {FormatETag(returnedETag)}")
-                .WithETags(currentETag, staleETag, staleETag)
-                .WithSchedule(rejected.StartAt, rejected.Period)
-                .Throw();
-        }
-
-        AssertEntry(Guarantee, "ReadRow", current, currentETag, await ReadRequiredAsync(grainId, "conditional-upsert", Guarantee, current, currentETag));
-        await RemoveAsync(grainId, "conditional-upsert", currentETag);
-    }
-
     // ---------------------------------------------------------------------------------------------------------
     // Schedule updates and window movement
     // ---------------------------------------------------------------------------------------------------------
@@ -619,16 +503,16 @@ public abstract class ReminderTableTestRunner
         const string Guarantee = nameof(ReminderTable_UpsertRow_UpdatesStartAtAndPeriod);
 
         var grainId = NewGrainId("schedule-update");
-        await UpsertAsync(NewEntry(grainId, "schedule-update", BaseTime, TimeSpan.FromMinutes(1)), Guarantee);
+        var originalETag = await UpsertAsync(NewEntry(grainId, "schedule-update", BaseTime, TimeSpan.FromMinutes(1)), Guarantee);
 
         var updated = NewEntry(grainId, "schedule-update", BaseTime.AddHours(2), TimeSpan.FromMinutes(17));
-        var updatedETag = await UpsertAsync(updated, Guarantee);
+        var updatedETag = await UpsertAsync(updated, Guarantee, originalETag);
 
         AssertEntry(Guarantee, "ReadRow", updated, updatedETag, await ReadRequiredAsync(grainId, "schedule-update", Guarantee, updated, updatedETag));
 
         var rows = await ReadRowsUntilExactAsync(
             () => ReminderTable.ReadRows(grainId),
-            [ReminderTableEntrySnapshot.Create(updated, updatedETag, Capabilities.SupportsSubSecondPrecision)],
+            [ReminderTableEntrySnapshot.Create(updated, updatedETag, supportsSubSecondPrecision: false)],
             Guarantee,
             "ReadRows(GrainId)");
         if (rows.Reminders.Count != 1)
@@ -670,14 +554,14 @@ public abstract class ReminderTableTestRunner
         }
 
         var outside = NewEntry(grainId, "window-move", BaseTime.AddHours(3), TimeSpan.FromMinutes(30));
-        var outsideETag = await UpsertAsync(outside, Guarantee);
+        var outsideETag = await UpsertAsync(outside, Guarantee, insideETag);
 
         var read = await ReadRequiredAsync(grainId, "window-move", Guarantee, outside, outsideETag);
         AssertEntry(Guarantee, "ReadRow", outside, outsideETag, read);
 
         var expectedRows = new[]
         {
-            ReminderTableEntrySnapshot.Create(outside, outsideETag, Capabilities.SupportsSubSecondPrecision)
+            ReminderTableEntrySnapshot.Create(outside, outsideETag, supportsSubSecondPrecision: false)
         };
         var rows = await ReadRowsUntilExactAsync(
             () => ReminderTable.ReadRows(0, 0),
@@ -738,14 +622,6 @@ public abstract class ReminderTableTestRunner
     public virtual async Task ReminderTable_ReadRows_UnsignedBoundary_UsesUInt32Ordering()
     {
         const string Guarantee = nameof(ReminderTable_ReadRows_UnsignedBoundary_UsesUInt32Ordering);
-        if (!Require(
-            Guarantee,
-            Capabilities.SupportsUnsignedHashRangeBoundaries,
-            nameof(ReminderTableCapabilities.SupportsUnsignedHashRangeBoundaries)))
-        {
-            return;
-        }
-
         var fixtureState = await CreateRangeFixtureAsync(Guarantee);
         try
         {
@@ -778,8 +654,6 @@ public abstract class ReminderTableTestRunner
             throw new ArgumentOutOfRangeException(nameof(reminderCount), reminderCount, "The requested reminder count must be positive.");
         }
 
-        var batchSize = Math.Max(1, Capabilities.CardinalityMutationBatchSize);
-        var pending = new List<(ReminderEntry Entry, Task<string?> Upsert)>(batchSize);
         var created = new List<(ReminderEntry Entry, string ETag)>(reminderCount);
         try
         {
@@ -790,18 +664,13 @@ public abstract class ReminderTableTestRunner
                     $"requested-cardinality-{index}",
                     BaseTime.AddMinutes(index),
                     TimeSpan.FromMinutes((index % 17) + 1));
-                pending.Add((entry, ReminderTable.UpsertRow(entry)));
-
-                if (pending.Count == batchSize || index == reminderCount - 1)
-                {
-                    await CompleteUpsertBatchAsync(pending, created, Guarantee);
-                }
+                created.Add((entry, await UpsertAsync(entry, Guarantee)));
             }
 
             var expected = created.Select(item => ReminderTableEntrySnapshot.Create(
                     item.Entry,
                     item.ETag,
-                    Capabilities.SupportsSubSecondPrecision)).ToList();
+                    supportsSubSecondPrecision: false)).ToList();
             var rows = await ReadRowsUntilExactAsync(
                 () => ReminderTable.ReadRows(0, 0),
                 expected,
@@ -811,10 +680,9 @@ public abstract class ReminderTableTestRunner
         }
         finally
         {
-            for (var offset = 0; offset < created.Count; offset += batchSize)
+            foreach (var item in created)
             {
-                var batch = created.Skip(offset).Take(batchSize);
-                await Task.WhenAll(batch.Select(item => RemoveAsync(item.Entry.GrainId, item.Entry.ReminderName, item.ETag)));
+                await RemoveAsync(item.Entry.GrainId, item.Entry.ReminderName, item.ETag);
             }
         }
     }
@@ -826,14 +694,6 @@ public abstract class ReminderTableTestRunner
     public virtual async Task ReminderTable_ReadRows_Range_ExcludesBeginAndIncludesEnd()
     {
         const string Guarantee = nameof(ReminderTable_ReadRows_Range_ExcludesBeginAndIncludesEnd);
-        if (!Require(
-            Guarantee,
-            Capabilities.SupportsUnsignedHashRangeBoundaries,
-            nameof(ReminderTableCapabilities.SupportsUnsignedHashRangeBoundaries)))
-        {
-            return;
-        }
-
         var fixtureState = await CreateRangeFixtureAsync(Guarantee);
         try
         {
@@ -868,14 +728,6 @@ public abstract class ReminderTableTestRunner
     public virtual async Task ReminderTable_ReadRows_WrapAroundRange_ReturnsWrappedSegment()
     {
         const string Guarantee = nameof(ReminderTable_ReadRows_WrapAroundRange_ReturnsWrappedSegment);
-        if (!Require(
-            Guarantee,
-            Capabilities.SupportsUnsignedHashRangeBoundaries,
-            nameof(ReminderTableCapabilities.SupportsUnsignedHashRangeBoundaries)))
-        {
-            return;
-        }
-
         var fixtureState = await CreateRangeFixtureAsync(Guarantee);
         try
         {
@@ -1048,26 +900,28 @@ public abstract class ReminderTableTestRunner
     public virtual async Task ReminderTable_ConcurrentUpserts_ProduceDistinctETags()
     {
         const string Guarantee = nameof(ReminderTable_ConcurrentUpserts_ProduceDistinctETags);
-        if (!Require(
-            Guarantee,
-            Capabilities.SupportsSameIdentityConcurrentUpserts,
-            nameof(ReminderTableCapabilities.SupportsSameIdentityConcurrentUpserts)))
-        {
-            return;
-        }
-
-        var count = Math.Max(2, Capabilities.ConcurrentUpsertCount);
+        const int Count = 5;
         var grainId = NewGrainId("concurrent-upsert");
 
-        var etags = await Task.WhenAll(Enumerable.Range(0, count).Select(index =>
-            ReminderTable.UpsertRow(NewEntry(grainId, "concurrent-upsert", BaseTime.AddSeconds(index), TimeSpan.FromMinutes(1)))));
+        var etags = await Task.WhenAll(Enumerable.Range(0, Count).Select(index =>
+        {
+            var entry = NewEntry(grainId, "concurrent-upsert", BaseTime.AddSeconds(index), TimeSpan.FromMinutes(1));
+            return ReminderTableRetryPolicy.MutateUntilAsync(
+                () => ReminderTable.UpsertRow(entry),
+                etag => !string.IsNullOrEmpty(etag),
+                ProviderName,
+                Guarantee,
+                "UpsertRow",
+                $"a non-empty ETag for ({grainId}, '{entry.ReminderName}')",
+                FormatETag);
+        }));
 
         var distinct = etags.Where(etag => !string.IsNullOrEmpty(etag)).Distinct(StringComparer.Ordinal).Count();
-        if (distinct != count)
+        if (distinct != Count)
         {
             Report(Guarantee, "UpsertRow")
                 .WithIdentity(grainId, "concurrent-upsert")
-                .WithExpected($"{count} distinct ETags from {count} concurrent upserts")
+                .WithExpected($"{Count} distinct ETags from {Count} concurrent upserts")
                 .WithObserved($"{distinct} distinct ETags: [{string.Join(", ", etags.Select(FormatETag))}]")
                 .Throw();
         }
@@ -1105,71 +959,72 @@ public abstract class ReminderTableTestRunner
     }
 
     /// <summary>
-    /// Guarantee: parallel upserts across distinct grains remain isolated: every grain observes exactly its own
-    /// reminders and its own ETag stream.
+    /// Guarantee: concurrent replacement streams across distinct grains remain isolated: every grain observes
+    /// exactly one row from its own ETag stream.
     /// </summary>
     /// <returns>A task which represents the asynchronous operation.</returns>
     public virtual async Task ReminderTable_ParallelUpserts_AcrossGrains_RemainIsolated()
     {
         const string Guarantee = nameof(ReminderTable_ParallelUpserts_AcrossGrains_RemainIsolated);
-        if (!Require(
-            Guarantee,
-            Capabilities.SupportsParallelDistinctRows,
-            nameof(ReminderTableCapabilities.SupportsParallelDistinctRows)))
-        {
-            return;
-        }
-
-        var grainCount = Math.Max(2, Capabilities.ParallelGrainCount);
-        var perGrain = Math.Max(2, Capabilities.ConcurrentUpsertCount);
-        var grains = Enumerable.Range(0, grainCount).Select(index => NewGrainId($"parallel-{index}")).ToList();
+        const int GrainCount = 5;
+        const int PerGrain = 5;
+        var grains = Enumerable.Range(0, GrainCount).Select(index => NewGrainId($"parallel-{index}")).ToList();
 
         var results = await Task.WhenAll(grains.Select(async grainId =>
         {
-            var entries = Enumerable.Range(0, perGrain)
-                .Select(index => NewEntry(grainId, $"parallel-{index}", BaseTime.AddSeconds(index), TimeSpan.FromMinutes(1)))
+            var entries = Enumerable.Range(0, PerGrain)
+                .Select(index => NewEntry(grainId, "parallel", BaseTime.AddSeconds(index), TimeSpan.FromMinutes(index + 1)))
                 .ToList();
-            var etags = await Task.WhenAll(entries.Select(ReminderTable.UpsertRow));
+            var etags = await Task.WhenAll(entries.Select(entry =>
+                ReminderTableRetryPolicy.MutateUntilAsync(
+                    () => ReminderTable.UpsertRow(entry),
+                    etag => !string.IsNullOrEmpty(etag),
+                    ProviderName,
+                    Guarantee,
+                    "UpsertRow",
+                    $"a non-empty ETag within the replacement stream for grain {grainId}",
+                    FormatETag)));
             return (GrainId: grainId, Entries: entries, ETags: etags);
         }));
 
         foreach (var (grainId, entries, etags) in results)
         {
-            if (etags.Any(string.IsNullOrEmpty))
+            if (etags.Any(string.IsNullOrEmpty) || etags.Distinct(StringComparer.Ordinal).Count() != PerGrain)
             {
                 Report(Guarantee, "UpsertRow")
-                    .WithIdentity(grainId, "parallel-*")
-                    .WithExpected($"{perGrain} successful writes with non-empty ETags for distinct reminder rows")
+                    .WithIdentity(grainId, "parallel")
+                    .WithExpected($"{PerGrain} successful replacements with distinct non-empty ETags")
                     .WithObserved($"ETags: [{string.Join(", ", etags.Select(FormatETag))}]")
                     .Throw();
             }
 
-            var expected = entries.Select((entry, index) =>
-                ReminderTableEntrySnapshot.Create(entry, etags[index]!, Capabilities.SupportsSubSecondPrecision)).ToList();
-            var rows = await ReadRowsUntilExactAsync(
+            var rows = await ReadUntilAsync(
                 () => ReminderTable.ReadRows(grainId),
-                expected,
+                value => value is not null
+                    && value.Reminders.Count == 1
+                    && etags.Contains(value.Reminders[0].ETag, StringComparer.Ordinal),
                 Guarantee,
-                "ReadRows(GrainId)");
-            if (rows.Reminders.Count != perGrain || rows.Reminders.Any(reminder => !reminder.GrainId.Equals(grainId)))
+                "ReadRows(GrainId)",
+                $"one durable replacement for grain {grainId} with an ETag from its own stream");
+            var row = RequireRows(Guarantee, "ReadRows(GrainId)", rows).Reminders.Single();
+            var expectedIndex = Array.FindIndex(etags, etag => string.Equals(etag, row.ETag, StringComparison.Ordinal));
+            if (expectedIndex < 0 || !row.GrainId.Equals(grainId))
             {
                 Report(Guarantee, "ReadRows(GrainId)")
-                    .WithIdentity(grainId, "parallel-*")
-                    .WithExpected($"exactly {perGrain} reminders, all owned by {grainId}")
-                    .WithObserved($"{rows.Reminders.Count} reminders: {string.Join(", ", rows.Reminders.Select(Describe))}")
+                    .WithIdentity(grainId, "parallel")
+                    .WithExpected($"one reminder owned by {grainId} with an ETag from its replacement stream")
+                    .WithObserved(Describe(row))
                     .WithOwnership("grain", [grainId.GetUniformHashCode()])
                     .Throw();
             }
 
-            foreach (var reminder in rows.Reminders)
-            {
-                await ReminderTable.RemoveRow(grainId, reminder.ReminderName, reminder.ETag!);
-            }
+            AssertEntry(Guarantee, "ReadRows(GrainId)", entries[expectedIndex], etags[expectedIndex]!, row);
+            await ReminderTable.RemoveRow(grainId, row.ReminderName, row.ETag!);
         }
     }
 
     // ---------------------------------------------------------------------------------------------------------
-    // Clear, isolation, and cancellation
+    // Clear
     // ---------------------------------------------------------------------------------------------------------
 
     /// <summary>
@@ -1223,85 +1078,6 @@ public abstract class ReminderTableTestRunner
         }
     }
 
-    /// <summary>
-    /// Guarantee: two independently scoped tables (different service or cluster identity) do not share reminders.
-    /// </summary>
-    /// <returns>A task which represents the asynchronous operation.</returns>
-    public virtual async Task ReminderTable_SeparatelyScopedTables_DoNotShareReminders()
-    {
-        const string Guarantee = nameof(ReminderTable_SeparatelyScopedTables_DoNotShareReminders);
-        if (!Require(Guarantee, Capabilities.SupportsCrossTableIsolation, nameof(ReminderTableCapabilities.SupportsCrossTableIsolation)))
-        {
-            return;
-        }
-
-        var isolated = await CreateIsolatedTableAsync();
-        if (isolated is null)
-        {
-            Report(Guarantee, "CreateIsolatedTableAsync")
-                .WithExpected($"an isolated table because {nameof(ReminderTableCapabilities.SupportsCrossTableIsolation)} is enabled")
-                .WithObserved("CreateIsolatedTableAsync returned null")
-                .Throw();
-        }
-
-        using var cancellation = new CancellationTokenSource(TimeSpan.FromMinutes(1));
-        await isolated!.StartAsync(cancellation.Token);
-
-        var grainId = NewGrainId("isolation");
-        var entry = NewEntry(grainId, "isolation", BaseTime.AddMinutes(13), TimeSpan.FromMinutes(9));
-        var etag = await UpsertAsync(entry, Guarantee);
-
-        var foreign = await isolated.ReadRow(grainId, entry.ReminderName);
-        if (foreign is not null)
-        {
-            Report(Guarantee, "ReadRow")
-                .WithIdentity(grainId, entry.ReminderName)
-                .WithExpected("an independently scoped table not to observe reminders written to the table under test")
-                .WithObserved($"entry {Describe(foreign)}")
-                .WithETags(etag, supplied: foreign.ETag)
-                .Throw();
-        }
-
-        await RemoveAsync(grainId, entry.ReminderName, etag);
-    }
-
-    /// <summary>
-    /// Guarantee: providers which observe cancellation surface it from <see cref="IReminderTable.StartAsync"/>.
-    /// </summary>
-    /// <returns>A task which represents the asynchronous operation.</returns>
-    public virtual async Task ReminderTable_StartAsync_WithCanceledToken_ThrowsOperationCanceled()
-    {
-        const string Guarantee = nameof(ReminderTable_StartAsync_WithCanceledToken_ThrowsOperationCanceled);
-        if (!Require(Guarantee, Capabilities.SupportsStartCancellation, nameof(ReminderTableCapabilities.SupportsStartCancellation)))
-        {
-            return;
-        }
-
-        using var cancellation = new CancellationTokenSource();
-        await cancellation.CancelAsync();
-
-        Exception? failure = null;
-        try
-        {
-            await ReminderTable.StartAsync(cancellation.Token);
-        }
-        catch (Exception exception)
-        {
-            failure = exception;
-        }
-
-        if (failure is not OperationCanceledException)
-        {
-            Report(Guarantee, "StartAsync")
-                .WithExpected($"{nameof(OperationCanceledException)} for an already-canceled token")
-                .WithObserved(failure is null ? "StartAsync completed successfully" : $"{failure.GetType().FullName}: {failure.Message}")
-                .Throw();
-        }
-
-        using var restart = new CancellationTokenSource(TimeSpan.FromMinutes(1));
-        await ReminderTable.StartAsync(restart.Token);
-    }
-
     // ---------------------------------------------------------------------------------------------------------
     // Shared helpers
     // ---------------------------------------------------------------------------------------------------------
@@ -1315,29 +1091,6 @@ public abstract class ReminderTableTestRunner
     protected ReminderFailureReport Report(string guarantee, string operation)
         => ReminderFailureReport.Create(ProviderName, guarantee, operation)
             .WithDetail("seed", Seed.ToString(CultureInfo.InvariantCulture));
-
-    /// <summary>
-    /// Records an explicit skip when a capability-gated guarantee is disabled.
-    /// </summary>
-    /// <param name="guarantee">The guarantee being verified.</param>
-    /// <param name="enabled">Whether the capability is enabled.</param>
-    /// <param name="capabilityName">The capability which gates the guarantee.</param>
-    /// <returns><see langword="true"/> when the guarantee should execute.</returns>
-    protected bool Require(string guarantee, bool enabled, string capabilityName)
-    {
-        if (_skipped.ContainsKey(guarantee))
-        {
-            return false;
-        }
-
-        if (!enabled)
-        {
-            throw new InvalidOperationException(
-                $"{nameof(ReminderTableCapabilities)}.{capabilityName} was disabled after the guarantee manifest was constructed.");
-        }
-
-        return true;
-    }
 
     /// <summary>
     /// Creates a grain identifier which is unique to this runner instance.
@@ -1355,7 +1108,7 @@ public abstract class ReminderTableTestRunner
     }
 
     /// <summary>
-    /// Creates a reminder entry with a schedule normalized to the precision the provider guarantees.
+    /// Creates a reminder entry with a whole-second UTC schedule supported by every built-in provider.
     /// </summary>
     /// <param name="grainId">The grain identifier.</param>
     /// <param name="reminderName">The reminder name.</param>
@@ -1371,16 +1124,14 @@ public abstract class ReminderTableTestRunner
     };
 
     /// <summary>
-    /// Normalizes a timestamp to UTC at the precision the provider guarantees.
+    /// Normalizes a timestamp to whole-second UTC precision supported by every built-in provider.
     /// </summary>
     /// <param name="value">The timestamp.</param>
     /// <returns>The normalized timestamp.</returns>
     protected DateTime Normalize(DateTime value)
     {
         var utc = value.Kind == DateTimeKind.Utc ? value : DateTime.SpecifyKind(value, DateTimeKind.Utc);
-        return Capabilities.SupportsSubSecondPrecision
-            ? utc
-            : new DateTime(utc.Ticks - (utc.Ticks % TimeSpan.TicksPerSecond), DateTimeKind.Utc);
+        return new DateTime(utc.Ticks - (utc.Ticks % TimeSpan.TicksPerSecond), DateTimeKind.Utc);
     }
 
     /// <summary>
@@ -1388,22 +1139,31 @@ public abstract class ReminderTableTestRunner
     /// </summary>
     /// <param name="entry">The entry to upsert.</param>
     /// <param name="guarantee">The guarantee being verified.</param>
+    /// <param name="previousETag">The ETag which a replacement must rotate, or <see langword="null"/> for a new row.</param>
     /// <returns>The new ETag.</returns>
-    protected async Task<string> UpsertAsync(ReminderEntry entry, string guarantee)
+    protected async Task<string> UpsertAsync(ReminderEntry entry, string guarantee, string? previousETag = null)
     {
-        var etag = await ReminderTable.UpsertRow(entry);
-        if (string.IsNullOrEmpty(etag))
+        var etag = (await ReminderTableRetryPolicy.MutateUntilAsync(
+            () => ReminderTable.UpsertRow(entry),
+            etag => !string.IsNullOrEmpty(etag),
+            ProviderName,
+            guarantee,
+            "UpsertRow",
+            "a non-empty provider-issued ETag",
+            FormatETag))!;
+
+        if (previousETag is not null && string.Equals(previousETag, etag, StringComparison.Ordinal))
         {
             Report(guarantee, "UpsertRow")
                 .WithIdentity(entry.GrainId, entry.ReminderName)
-                .WithExpected("a non-empty ETag from a successful upsert")
-                .WithObserved($"UpsertRow returned {FormatETag(etag)}")
-                .WithETags(etag)
+                .WithExpected($"a replacement ETag different from {FormatETag(previousETag)}")
+                .WithObserved($"the successful replacement returned the reused ETag {FormatETag(etag)}")
+                .WithETags(etag, previousETag)
                 .WithSchedule(entry.StartAt, entry.Period)
                 .Throw();
         }
 
-        return etag!;
+        return etag;
     }
 
     /// <summary>
@@ -1446,10 +1206,10 @@ public abstract class ReminderTableTestRunner
         string guarantee,
         string operation,
         string expected)
-        => ReminderTableConvergence.ReadUntilAsync(
+        => ReminderTableRetryPolicy.ReadUntilAsync(
             read,
             hasConverged,
-            Capabilities,
+            ProviderName,
             guarantee,
             operation,
             expected,
@@ -1469,7 +1229,7 @@ public abstract class ReminderTableTestRunner
             && string.Equals(actual.ETag, expectedETag, StringComparison.Ordinal);
 
     /// <summary>
-    /// Removes a reminder, ignoring failures which only affect cleanup.
+    /// Removes a reminder during test cleanup.
     /// </summary>
     /// <param name="grainId">The grain identifier.</param>
     /// <param name="reminderName">The reminder name.</param>
@@ -1477,14 +1237,7 @@ public abstract class ReminderTableTestRunner
     /// <returns>A task which represents the asynchronous operation.</returns>
     protected async Task RemoveAsync(GrainId grainId, string reminderName, string etag)
     {
-        try
-        {
-            await ReminderTable.RemoveRow(grainId, reminderName, etag);
-        }
-        catch (Exception)
-        {
-            // Cleanup is best effort: a provider-specific cleanup failure must not mask the guarantee's result.
-        }
+        await ReminderTable.RemoveRow(grainId, reminderName, etag);
     }
 
     /// <summary>
@@ -1513,15 +1266,31 @@ public abstract class ReminderTableTestRunner
         string guarantee,
         string operation)
     {
-        var rows = await ReadUntilAsync(
+        var rows = await ReminderTableRetryPolicy.ReadUntilAsync(
             read,
             value => value is not null
                 && ReminderTableEntrySnapshotComparer.CompareExact(
                     expected,
-                    value.Reminders.Select(entry => ReminderTableEntrySnapshot.Observe(entry, Capabilities.SupportsSubSecondPrecision)).ToList()) is null,
+                    value.Reminders.Select(entry => ReminderTableEntrySnapshot.Observe(entry, supportsSubSecondPrecision: false)).ToList()) is null,
+            ProviderName,
             guarantee,
             operation,
-            $"exact identities and complete entries [{string.Join(", ", expected)}]");
+            $"exact identities and complete entries [{string.Join(", ", expected)}]",
+            value =>
+            {
+                if (value is null)
+                {
+                    return "null";
+                }
+
+                var actual = value.Reminders
+                    .Select(entry => ReminderTableEntrySnapshot.Observe(entry, supportsSubSecondPrecision: false))
+                    .ToList();
+                var difference = ReminderTableEntrySnapshotComparer.CompareExact(expected, actual);
+                return difference is null
+                    ? $"[{string.Join(", ", actual)}]"
+                    : $"differingField: '{difference.Field}'. {difference}. Expected=[{string.Join(", ", expected)}], Actual=[{string.Join(", ", actual)}]";
+            });
         return RequireRows(guarantee, operation, rows);
     }
 
@@ -1535,7 +1304,7 @@ public abstract class ReminderTableTestRunner
             expected.Select(item => ReminderTableEntrySnapshot.Create(
                 item.Entry,
                 item.ETag,
-                Capabilities.SupportsSubSecondPrecision)).ToList(),
+                supportsSubSecondPrecision: false)).ToList(),
             guarantee,
             operation);
 
@@ -1569,7 +1338,7 @@ public abstract class ReminderTableTestRunner
                 .WithObserved($"StartAt={actualStart:O} (raw {actual.StartAt:O}, Kind={actual.StartAt.Kind})")
                 .WithETags(actual.ETag, supplied: expectedETag)
                 .WithSchedule(actual.StartAt, actual.Period)
-                .WithDetail("precision", Capabilities.SupportsSubSecondPrecision ? "sub-second" : "whole-second")
+                .WithDetail("precision", "whole-second")
                 .Throw();
         }
 
@@ -1663,7 +1432,7 @@ public abstract class ReminderTableTestRunner
         IReadOnlyList<RangeItem> expectedExcluded)
     {
         var expectedSnapshots = expectedIncluded
-            .Select(item => ReminderTableEntrySnapshot.Create(item.Entry, item.ETag, Capabilities.SupportsSubSecondPrecision))
+            .Select(item => ReminderTableEntrySnapshot.Create(item.Entry, item.ETag, supportsSubSecondPrecision: false))
             .ToList();
         AssertExactEntries(guarantee, operation, expectedSnapshots, rows.Reminders, begin, end, fixtureState);
         var returnedIdentities = rows.Reminders
@@ -1714,7 +1483,7 @@ public abstract class ReminderTableTestRunner
         {
             var actualEntryList = actualEntries.ToList();
             var actual = actualEntryList
-                .Select(entry => ReminderTableEntrySnapshot.Observe(entry, Capabilities.SupportsSubSecondPrecision))
+                .Select(entry => ReminderTableEntrySnapshot.Observe(entry, supportsSubSecondPrecision: false))
                 .ToList();
             var difference = ReminderTableEntrySnapshotComparer.CompareExact(expected, actual);
             if (difference is null)
@@ -1757,32 +1526,6 @@ public abstract class ReminderTableTestRunner
 
             report.Throw();
         }
-
-    private async Task CompleteUpsertBatchAsync(
-            List<(ReminderEntry Entry, Task<string?> Upsert)> pending,
-            List<(ReminderEntry Entry, string ETag)> created,
-            string guarantee)
-        {
-            var etags = await Task.WhenAll(pending.Select(item => item.Upsert));
-            for (var index = 0; index < pending.Count; index++)
-            {
-                var entry = pending[index].Entry;
-                var etag = etags[index];
-                if (string.IsNullOrEmpty(etag))
-                {
-                    Report(guarantee, "UpsertRow")
-                        .WithIdentity(entry.GrainId, entry.ReminderName)
-                        .WithExpected("a non-empty ETag from every bounded-batch upsert")
-                        .WithObserved($"UpsertRow returned {FormatETag(etag)}")
-                        .WithSchedule(entry.StartAt, entry.Period)
-                        .Throw();
-                }
-
-                created.Add((entry, etag!));
-            }
-
-            pending.Clear();
-    }
 
     /// <summary>
     /// A reminder created by the hash-range fixture.

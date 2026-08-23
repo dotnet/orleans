@@ -26,8 +26,6 @@ namespace Orleans.Reminders.TestKit
 
         public void ClearOperations() { }
 
-        public ReminderTableCapabilities CreateCapabilities() { throw null; }
-
         public ReminderTableRecord? Find(Runtime.GrainId grainId, string reminderName) { throw null; }
 
         public System.IDisposable FreezeReads() { throw null; }
@@ -111,11 +109,7 @@ namespace Orleans.Reminders.TestKit
 
     public abstract partial class ReminderServiceTestRunner
     {
-        protected ReminderServiceTestRunner(IGrainFactory grainFactory, ReminderTableCapabilities capabilities, IReminderTable reminderTable, int seed = 0) { }
-
         protected ReminderServiceTestRunner(IGrainFactory grainFactory, IReminderTable reminderTable, string providerName, int seed = 0) { }
-
-        protected ReminderTableCapabilities Capabilities { get { throw null; } }
 
         protected IGrainFactory GrainFactory { get { throw null; } }
 
@@ -128,66 +122,8 @@ namespace Orleans.Reminders.TestKit
         public virtual System.Threading.Tasks.Task ReminderService_UpdateReplacesScheduleAndETagWithoutDuplicate() { throw null; }
     }
 
-    public sealed partial class ReminderTableCapabilities
-    {
-        public int CardinalityMutationBatchSize { get { throw null; } set { } }
-
-        public int ConcurrentUpsertCount { get { throw null; } set { } }
-
-        public int ParallelGrainCount { get { throw null; } set { } }
-
-        public string ProviderName { get { throw null; } set { } }
-
-        public System.TimeSpan ReadConvergenceDelay { get { throw null; } set { } }
-
-        public System.TimeSpan ReadConvergenceTimeout { get { throw null; } set { } }
-
-        public bool SupportsConditionalUpsert { get { throw null; } set { } }
-
-        public bool SupportsCrossTableIsolation { get { throw null; } set { } }
-
-        public bool SupportsETagRotation { get { throw null; } set { } }
-
-        public bool SupportsParallelDistinctRows { get { throw null; } set { } }
-
-        public bool SupportsRestartAfterStop { get { throw null; } set { } }
-
-        public bool SupportsSameIdentityConcurrentUpserts { get { throw null; } set { } }
-
-        public bool SupportsStartCancellation { get { throw null; } set { } }
-
-        public bool SupportsSubSecondPrecision { get { throw null; } set { } }
-
-        public bool SupportsUnsignedHashRangeBoundaries { get { throw null; } set { } }
-
-        public static ReminderTableCapabilities Portable(string providerName) { throw null; }
-
-        public static ReminderTableCapabilities Strict(string providerName) { throw null; }
-    }
-
-    public static partial class ReminderTableProviderProfiles
-    {
-        public static ReminderTableCapabilities AdoNet(string providerName) { throw null; }
-
-        public static ReminderTableCapabilities AzureStorage(string providerName) { throw null; }
-
-        public static ReminderTableCapabilities Cosmos(string providerName) { throw null; }
-
-        public static ReminderTableCapabilities DynamoDB(string providerName) { throw null; }
-
-        public static ReminderTableCapabilities Firestore(string providerName) { throw null; }
-
-        public static ReminderTableCapabilities InMemory(string providerName) { throw null; }
-
-        public static ReminderTableCapabilities Oracle(string providerName) { throw null; }
-
-        public static ReminderTableCapabilities Redis(string providerName) { throw null; }
-    }
-
     public sealed partial class ReminderTableModelBasedConformanceOptions
     {
-        public ReminderTableCapabilities Capabilities { get { throw null; } set { } }
-
         public string GrainType { get { throw null; } set { } }
 
         public string? KeyPrefix { get { throw null; } set { } }
@@ -203,8 +139,6 @@ namespace Orleans.Reminders.TestKit
 
     public sealed partial class ReminderTableModelBasedTestRunner
     {
-        public ReminderTableModelBasedTestRunner(IReminderTable reminderTable, ReminderTableCapabilities capabilities, System.Action<string>? output = null) { }
-
         public ReminderTableModelBasedTestRunner(IReminderTable reminderTable, ReminderTableModelBasedConformanceOptions options, System.Action<string>? output = null) { }
 
         public ReminderTableModelBasedTestRunner(IReminderTable reminderTable, string providerName, System.Action<string>? output = null) { }
@@ -275,8 +209,6 @@ namespace Orleans.Reminders.TestKit
 
     public abstract partial class ReminderTableTestFixture
     {
-        public virtual ReminderTableCapabilities Capabilities { get { throw null; } }
-
         protected TestingHost.InProcessTestCluster Cluster { get { throw null; } }
 
         public IGrainFactory GrainFactory { get { throw null; } }
@@ -299,11 +231,9 @@ namespace Orleans.Reminders.TestKit
 
     public abstract partial class ReminderTableTestRunner
     {
-        protected ReminderTableTestRunner(IReminderTable reminderTable, ReminderTableCapabilities? capabilities = null, int seed = 0) { }
+        protected ReminderTableTestRunner(IReminderTable reminderTable, string providerName, int seed = 0) { }
 
         protected virtual System.DateTime BaseTime { get { throw null; } }
-
-        public ReminderTableCapabilities Capabilities { get { throw null; } }
 
         protected string ProviderName { get { throw null; } }
 
@@ -311,11 +241,7 @@ namespace Orleans.Reminders.TestKit
 
         public int Seed { get { throw null; } }
 
-        public System.Collections.Generic.IReadOnlyDictionary<string, string> SkippedGuarantees { get { throw null; } }
-
         protected void AssertEntry(string guarantee, string operation, ReminderEntry expected, string expectedETag, ReminderEntry actual) { }
-
-        protected virtual System.Threading.Tasks.Task<IReminderTable?> CreateIsolatedTableAsync() { throw null; }
 
         protected static string Describe(ReminderEntry entry) { throw null; }
 
@@ -369,11 +295,7 @@ namespace Orleans.Reminders.TestKit
 
         public virtual System.Threading.Tasks.Task ReminderTable_RemoveRow_WithUnknownReminderName_ReturnsFalse() { throw null; }
 
-        public virtual System.Threading.Tasks.Task ReminderTable_SeparatelyScopedTables_DoNotShareReminders() { throw null; }
-
         public virtual System.Threading.Tasks.Task ReminderTable_StartAsync_IsIdempotent() { throw null; }
-
-        public virtual System.Threading.Tasks.Task ReminderTable_StartAsync_WithCanceledToken_ThrowsOperationCanceled() { throw null; }
 
         public virtual System.Threading.Tasks.Task ReminderTable_StopAsync_ThenRestart_ResumesService() { throw null; }
 
@@ -389,17 +311,13 @@ namespace Orleans.Reminders.TestKit
 
         public virtual System.Threading.Tasks.Task ReminderTable_UpsertRow_UpdatesStartAtAndPeriod() { throw null; }
 
-        public virtual System.Threading.Tasks.Task ReminderTable_UpsertRow_WithStaleETag_IsRejected() { throw null; }
-
         protected System.Threading.Tasks.Task RemoveAsync(Runtime.GrainId grainId, string reminderName, string etag) { throw null; }
 
         protected ReminderFailureReport Report(string guarantee, string operation) { throw null; }
 
-        protected bool Require(string guarantee, bool enabled, string capabilityName) { throw null; }
-
         protected ReminderTableData RequireRows(string guarantee, string operation, ReminderTableData? rows) { throw null; }
 
-        protected System.Threading.Tasks.Task<string> UpsertAsync(ReminderEntry entry, string guarantee) { throw null; }
+        protected System.Threading.Tasks.Task<string> UpsertAsync(ReminderEntry entry, string guarantee, string? previousETag = null) { throw null; }
     }
 
     [GenerateSerializer]

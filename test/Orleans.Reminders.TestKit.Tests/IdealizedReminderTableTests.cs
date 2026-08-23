@@ -29,13 +29,10 @@ public sealed class IdealizedReminderTableTests : ReminderTableTestRunner
     }
 
     private IdealizedReminderTableTests(IdealizedReminderTable oracle)
-        : base(oracle, oracle.CreateCapabilities())
+        : base(oracle, "Oracle")
     {
         _oracle = oracle;
     }
-
-    protected override Task<IReminderTable?> CreateIsolatedTableAsync()
-        => Task.FromResult<IReminderTable?>(new IdealizedReminderTable("Oracle-Isolated"));
 
     // -------------------------------------------------------------------------------------------------------------
     // The complete direct conformance suite.
@@ -84,13 +81,6 @@ public sealed class IdealizedReminderTableTests : ReminderTableTestRunner
     public override Task ReminderTable_RemoveRow_Repeated_ReturnsFalseAfterFirstSuccess() => base.ReminderTable_RemoveRow_Repeated_ReturnsFalseAfterFirstSuccess();
 
     [Fact]
-    public override Task ReminderTable_UpsertRow_WithStaleETag_IsRejected()
-        => XunitReminderTableTestAdapter.RunAsync(
-            this,
-            nameof(ReminderTable_UpsertRow_WithStaleETag_IsRejected),
-            () => base.ReminderTable_UpsertRow_WithStaleETag_IsRejected());
-
-    [Fact]
     public override Task ReminderTable_UpsertRow_UpdatesStartAtAndPeriod() => base.ReminderTable_UpsertRow_UpdatesStartAtAndPeriod();
 
     [Fact]
@@ -127,12 +117,6 @@ public sealed class IdealizedReminderTableTests : ReminderTableTestRunner
     [Fact]
     public override Task ReminderTable_TestOnlyClearTable_RemovesAllReminders() => base.ReminderTable_TestOnlyClearTable_RemovesAllReminders();
 
-    [Fact]
-    public override Task ReminderTable_SeparatelyScopedTables_DoNotShareReminders() => base.ReminderTable_SeparatelyScopedTables_DoNotShareReminders();
-
-    [Fact]
-    public override Task ReminderTable_StartAsync_WithCanceledToken_ThrowsOperationCanceled() => base.ReminderTable_StartAsync_WithCanceledToken_ThrowsOperationCanceled();
-
     // -------------------------------------------------------------------------------------------------------------
     // Model-based conformance.
     // -------------------------------------------------------------------------------------------------------------
@@ -140,7 +124,7 @@ public sealed class IdealizedReminderTableTests : ReminderTableTestRunner
     [Fact, TestCategory("ModelBased")]
     public Task Oracle_ModelBasedGeneratedConformance()
     {
-        var runner = new ReminderTableModelBasedTestRunner(_oracle, Capabilities);
+        var runner = new ReminderTableModelBasedTestRunner(_oracle, "Oracle");
         return runner.RunGeneratedConformanceTests();
     }
 
@@ -180,51 +164,6 @@ public sealed class IdealizedReminderTableTests : ReminderTableTestRunner
                 operation.Succeeded.ToString(CultureInfo.InvariantCulture),
                 operation.ResultCount.ToString(CultureInfo.InvariantCulture),
                 operation.Failure ?? "<none>");
-    }
-
-    // -------------------------------------------------------------------------------------------------------------
-    // Capability gating is explicit, never silent.
-    // -------------------------------------------------------------------------------------------------------------
-
-    [Fact]
-    public void Oracle_CapabilityGating_RecordsAnExplicitSkipReason()
-    {
-        // The oracle models the contract every built-in provider implements, in which upsert is a blind write.
-        Assert.False(Capabilities.SupportsConditionalUpsert);
-
-        var reason = Assert.Contains(nameof(ReminderTable_UpsertRow_WithStaleETag_IsRejected), (IDictionary<string, string>)SkippedGuarantees);
-        Assert.Equal(
-            $"Oracle does not declare {nameof(ReminderTableCapabilities)}.{nameof(ReminderTableCapabilities.SupportsConditionalUpsert)}.",
-            reason);
-    }
-
-    [Fact]
-    public void Oracle_Capabilities_DeclareStrictPortableDifferencesExplicitly()
-    {
-        Assert.Equal("Oracle", Capabilities.ProviderName);
-        Assert.True(Capabilities.SupportsSubSecondPrecision);
-        Assert.False(Capabilities.SupportsConditionalUpsert);
-        Assert.True(Capabilities.SupportsStartCancellation);
-        Assert.True(Capabilities.SupportsRestartAfterStop);
-        Assert.True(Capabilities.SupportsSameIdentityConcurrentUpserts);
-        Assert.True(Capabilities.SupportsParallelDistinctRows);
-        Assert.True(Capabilities.SupportsETagRotation);
-        Assert.True(Capabilities.SupportsUnsignedHashRangeBoundaries);
-        Assert.True(Capabilities.SupportsCrossTableIsolation);
-        Assert.Equal(5, Capabilities.ConcurrentUpsertCount);
-        Assert.Equal(5, Capabilities.ParallelGrainCount);
-
-        var portable = ReminderTableCapabilities.Portable("Portable");
-        Assert.Equal("Portable", portable.ProviderName);
-        Assert.False(portable.SupportsSubSecondPrecision);
-        Assert.False(portable.SupportsConditionalUpsert);
-        Assert.False(portable.SupportsStartCancellation);
-        Assert.False(portable.SupportsRestartAfterStop);
-        Assert.False(portable.SupportsSameIdentityConcurrentUpserts);
-        Assert.False(portable.SupportsParallelDistinctRows);
-        Assert.False(portable.SupportsETagRotation);
-        Assert.False(portable.SupportsUnsignedHashRangeBoundaries);
-        Assert.False(portable.SupportsCrossTableIsolation);
     }
 
     // -------------------------------------------------------------------------------------------------------------
@@ -498,55 +437,4 @@ public sealed class IdealizedReminderTableTests : ReminderTableTestRunner
         Assert.Equal(7, _oracle.Operations.Count(operation => operation.Kind == ReminderTableOperationKind.RemoveRow && operation.Succeeded));
     }
 
-    [Fact]
-    public void IdealizedCapabilities_DisabledGuaranteeManifest_IsCompleteWithoutInvocation()
-    {
-        AssertDisabledGuarantees(
-            SkippedGuarantees,
-            "Oracle",
-            (nameof(ReminderTable_UpsertRow_WithStaleETag_IsRejected), nameof(ReminderTableCapabilities.SupportsConditionalUpsert)));
-    }
-
-    [Fact]
-    public static void PortableCapabilities_DisabledGuaranteeManifest_IsCompleteWithoutInvocation()
-    {
-        var capabilities = ReminderTableCapabilities.Portable("Portable");
-        var runner = new CapabilityManifestRunner(new IdealizedReminderTable("Portable"), capabilities);
-
-        AssertDisabledGuarantees(
-            runner.SkippedGuarantees,
-            "Portable",
-            (nameof(ReminderTable_StopAsync_ThenRestart_ResumesService), nameof(ReminderTableCapabilities.SupportsRestartAfterStop)),
-            (nameof(ReminderTable_UpsertRow_ReplacesETagOnEachWrite), nameof(ReminderTableCapabilities.SupportsETagRotation)),
-            (nameof(ReminderTable_RemoveRow_WithStaleETag_FailsAndRetainsRow), nameof(ReminderTableCapabilities.SupportsETagRotation)),
-            (nameof(ReminderTable_UpsertRow_WithStaleETag_IsRejected), nameof(ReminderTableCapabilities.SupportsConditionalUpsert)),
-            (nameof(ReminderTable_ConcurrentUpserts_ProduceDistinctETags), nameof(ReminderTableCapabilities.SupportsSameIdentityConcurrentUpserts)),
-            (nameof(ReminderTable_ParallelUpserts_AcrossGrains_RemainIsolated), nameof(ReminderTableCapabilities.SupportsParallelDistinctRows)),
-            (nameof(ReminderTable_ReadRows_UnsignedBoundary_UsesUInt32Ordering), nameof(ReminderTableCapabilities.SupportsUnsignedHashRangeBoundaries)),
-            (nameof(ReminderTable_ReadRows_Range_ExcludesBeginAndIncludesEnd), nameof(ReminderTableCapabilities.SupportsUnsignedHashRangeBoundaries)),
-            (nameof(ReminderTable_ReadRows_WrapAroundRange_ReturnsWrappedSegment), nameof(ReminderTableCapabilities.SupportsUnsignedHashRangeBoundaries)),
-            (nameof(ReminderTable_SeparatelyScopedTables_DoNotShareReminders), nameof(ReminderTableCapabilities.SupportsCrossTableIsolation)),
-            (nameof(ReminderTable_StartAsync_WithCanceledToken_ThrowsOperationCanceled), nameof(ReminderTableCapabilities.SupportsStartCancellation)));
-    }
-
-    private static void AssertDisabledGuarantees(
-        IReadOnlyDictionary<string, string> actual,
-        string providerName,
-        params (string Method, string Capability)[] expected)
-    {
-        var expectedManifest = expected.ToDictionary(
-            item => item.Method,
-            item => $"{providerName} does not declare {nameof(ReminderTableCapabilities)}.{item.Capability}.",
-            StringComparer.Ordinal);
-
-        Assert.Equal(
-            expectedManifest.OrderBy(pair => pair.Key, StringComparer.Ordinal),
-            actual.OrderBy(pair => pair.Key, StringComparer.Ordinal));
-        Assert.DoesNotContain(
-            actual.Keys,
-            method => method.Contains(nameof(ReminderTableCapabilities.SupportsSubSecondPrecision), StringComparison.Ordinal));
-    }
-
-    private sealed class CapabilityManifestRunner(IReminderTable table, ReminderTableCapabilities capabilities)
-        : ReminderTableTestRunner(table, capabilities);
 }

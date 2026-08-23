@@ -88,13 +88,6 @@ public sealed class IdealizedReminderTable : IReminderTable
     }
 
     /// <summary>
-    /// Gets the capability set which this reference implementation satisfies.
-    /// </summary>
-    /// <returns>A strict capability set naming this instance.</returns>
-    public ReminderTableCapabilities CreateCapabilities()
-        => ReminderTableProviderProfiles.Oracle(Name);
-
-    /// <summary>
     /// Returns a deterministically ordered snapshot of every durable record.
     /// </summary>
     /// <returns>The records ordered by uniform hash code, grain identifier and reminder name.</returns>
