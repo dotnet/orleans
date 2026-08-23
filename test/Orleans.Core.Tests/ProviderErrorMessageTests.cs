@@ -121,5 +121,33 @@ namespace NonSilo.Tests
             // Verify the error message includes information about known providers
             Assert.Contains("This can indicate that either the 'Microsoft.Orleans.Sdk' or the provider's package are not referenced", exception.Message);
         }
+
+        [Fact]
+        public void SiloBuilder_ConfiguresGrainJournalingProviderFromConfiguration()
+        {
+            var configDict = new Dictionary<string, string?>
+            {
+                { "Orleans:ClusterId", "test-cluster" },
+                { "Orleans:ServiceId", "test-service" },
+                { "Orleans:GrainJournaling:ProviderType", "InvalidJournalingProvider" }
+            };
+
+            var exception = Assert.Throws<InvalidOperationException>(() =>
+            {
+                _ = new HostBuilder()
+                    .ConfigureAppConfiguration(configBuilder =>
+                    {
+                        configBuilder.AddInMemoryCollection(configDict);
+                    })
+                    .UseOrleans(siloBuilder =>
+                    {
+                        siloBuilder.UseLocalhostClustering();
+                    })
+                    .Build();
+            });
+
+            Assert.Contains("Could not find GrainJournaling provider named 'InvalidJournalingProvider'", exception.Message);
+            Assert.Contains("This can indicate that either the 'Microsoft.Orleans.Sdk' or the provider's package are not referenced", exception.Message);
+        }
     }
 }
