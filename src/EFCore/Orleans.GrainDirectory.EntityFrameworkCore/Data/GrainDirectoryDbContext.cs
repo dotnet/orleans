@@ -20,7 +20,7 @@ public class GrainDirectoryDbContext<TDbContext, TETag> : DbContext where TDbCon
             c.Property(p => p.SiloAddress).IsRequired();
             c.Property(p => p.ActivationId).IsRequired();
             c.Property(p => p.MembershipVersion).IsRequired();
-            c.Property(p => p.ETag).IsRequired().IsRowVersion();
+            c.Property(p => p.ETag).IsRequired().IsConcurrencyToken();
         });
     }
 }
