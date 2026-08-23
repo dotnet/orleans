@@ -21,9 +21,6 @@
   </ItemGroup>
 
   <ItemGroup>
-  </ItemGroup>
-
-  <ItemGroup>
     <Compile Include="$(SourceRoot)src\AdoNet\Shared\Storage\*.cs" LinkBase="Storage" />
   </ItemGroup>
 
