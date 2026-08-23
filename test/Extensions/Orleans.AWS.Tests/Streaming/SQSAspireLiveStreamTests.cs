@@ -3,6 +3,7 @@ using AWSUtils.Tests.StorageTests;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging.Abstractions;
 using Orleans.Hosting;
+using Orleans.Persistence.FileStorage;
 using Orleans.TestingHost;
 using OrleansAWSUtils.Streams;
 using TestExtensions;
@@ -20,8 +21,10 @@ namespace AWSUtils.Tests.Streaming;
 public sealed class SQSAspireLiveStreamTests : TestClusterPerTest
 {
     private const string ProviderName = "AspireSQS";
+    private const string PubSubStoreRootDirectoryKey = "AspireSQS:PubSubStoreRootDirectory";
     private SqsAspireTestApp _app = null!;
     private EnvironmentVariableScope _environment = null!;
+    private string? _ownedDirectory;
     private SingleStreamTestRunner _runner = null!;
 
     protected override void CheckPreconditionsOrThrow()
@@ -34,6 +37,12 @@ public sealed class SQSAspireLiveStreamTests : TestClusterPerTest
 
     protected override void ConfigureTestCluster(TestClusterBuilder builder)
     {
+        var ownedDirectory = _ownedDirectory
+            ?? throw new InvalidOperationException("The PubSubStore directory has not been initialized.");
+        builder.Options.InitialSilosCount = 1;
+        builder.Properties[PubSubStoreRootDirectoryKey] = Path.Combine(
+            ownedDirectory,
+            "PubSubStore");
         builder.ConfigureHostConfiguration(configuration => configuration.AddEnvironmentVariables());
         builder.AddSiloBuilderConfigurator<SiloConfigurator>();
     }
@@ -41,6 +50,11 @@ public sealed class SQSAspireLiveStreamTests : TestClusterPerTest
     public override async ValueTask InitializeAsync()
     {
         EnsurePreconditionsMet();
+        _ownedDirectory = Path.Combine(
+            Path.GetTempPath(),
+            nameof(SQSAspireLiveStreamTests),
+            Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(_ownedDirectory);
         _app = await SqsAspireTestApp.CreateAsync(
             ProviderName,
             [
@@ -87,13 +101,23 @@ public sealed class SQSAspireLiveStreamTests : TestClusterPerTest
             {
                 await _app.DisposeAsync();
             }
+
+            if (_ownedDirectory is not null && Directory.Exists(_ownedDirectory))
+            {
+                Directory.Delete(_ownedDirectory, recursive: true);
+            }
         }
     }
 
     private sealed class SiloConfigurator : ISiloConfigurator
     {
         public void Configure(ISiloBuilder siloBuilder)
-            => siloBuilder.AddMemoryGrainStorage("PubSubStore");
+            => siloBuilder.AddFileGrainStorage(
+                "PubSubStore",
+                options => options.RootDirectory =
+                    siloBuilder.Configuration[PubSubStoreRootDirectoryKey]
+                    ?? throw new InvalidOperationException(
+                        $"Missing {PubSubStoreRootDirectoryKey} configuration."));
     }
 }
 #endif
