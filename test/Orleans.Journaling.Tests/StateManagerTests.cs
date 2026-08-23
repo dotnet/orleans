@@ -440,6 +440,7 @@ public class StateManagerTests : JournalingTestBase
 
         var replacement = Assert.Single(storage.Replaces);
         Assert.Empty(storage.Appends);
+        Assert.DoesNotContain(observedBytes, measurement => measurement.Operation == "append");
         Assert.Contains(observedBytes, measurement => measurement.Operation == "replace" && measurement.Status == "ok" && measurement.Value == replacement.Length);
     }
 
