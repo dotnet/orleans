@@ -48,6 +48,7 @@ internal sealed partial class ActivationData :
     private const int ActivationStateMask = 0b0000_0111;
     private const int IsInWorkingSetMask = 0b0000_1000;
     private const int IsIdleInWorkingSetMask = 0b0001_0000;
+    private const int WasRemovedByCollectionMask = 0b0010_0000;
     private readonly GrainTypeSharedContext _shared;
     private readonly IServiceScope _serviceScope;
     private readonly WorkItemGroup _workItemGroup;
@@ -191,6 +192,18 @@ internal sealed partial class ActivationData :
     {
         get => (Volatile.Read(ref _status) & IsIdleInWorkingSetMask) != 0;
         set => SetStatusFlag(IsIdleInWorkingSetMask, value);
+    }
+
+    private bool WasRemovedByCollection
+    {
+        get => (Volatile.Read(ref _status) & WasRemovedByCollectionMask) != 0;
+        set => SetStatusFlag(WasRemovedByCollectionMask, value);
+    }
+
+    private bool WasRemovedByCollection
+    {
+        get => (Volatile.Read(ref _status) & WasRemovedByCollectionMask) != 0;
+        set => SetStatusFlag(WasRemovedByCollectionMask, value);
     }
 
     // Currently, the only supported multi-activation grain is one using the StatelessWorkerPlacement strategy.
@@ -1116,9 +1129,21 @@ internal sealed partial class ActivationData :
         {
             var inactive = IsInactive && _idleDuration.ElapsedMilliseconds > IdlenessLowerBound;
 
-            // This instance will remain in the working set if it is either not pending removal or if it is currently active.
-            IsInWorkingSet = !wouldRemove || !inactive;
+            WasRemovedByCollection = wouldRemove && inactive;
             return inactive;
+        }
+    }
+
+    bool IActivationWorkingSetMember.IsInWorkingSet
+    {
+        get => IsInWorkingSet;
+        set
+        {
+            IsInWorkingSet = value;
+            if (value)
+            {
+                WasRemovedByCollection = false;
+            }
         }
     }
 
@@ -2186,7 +2211,7 @@ internal sealed partial class ActivationData :
                 deactivationMetrics = deactivationMetrics.Migration();
                 _shared.CatalogInstruments.ActivationShutdownViaMigration();
             }
-            else if (IsInWorkingSet)
+            else if (!WasRemovedByCollection)
             {
                 deactivationMetrics = deactivationMetrics.DeactivateOnIdle();
                 _shared.CatalogInstruments.ActivationShutdownViaDeactivateOnIdle();
