@@ -1,45 +1,53 @@
 name: Run tests
-description: Set up, run, cover, and archive a standard CI test partition.
+description: Set up, run, cover, and archive a trait-selected CI test partition.
 
 inputs:
   artifact-name:
     description: Test output artifact name.
     required: true
-  coverage-id:
-    description: Unique coverage report identifier.
-    required: true
   filter-query:
-    description: Microsoft Testing Platform query filter.
-    required: true
+    description: Optional Microsoft Testing Platform query filter.
+    required: false
+    default: ''
   framework:
     description: Target framework.
     required: true
-  modules:
-    description: Optional semicolon-separated prebuilt test module paths.
+  provider:
+    description: Provider trait selected by the standard CI filter.
     required: false
     default: ''
-  projects:
-    description: Optional semicolon-separated test project paths.
+  retry:
+    description: Retry the test partition once after a failure.
     required: false
-    default: ''
-  report-trx-filename:
-    description: TRX report filename template.
-    required: true
+    default: 'false'
+  static-instrumentation:
+    description: Use static coverage instrumentation.
+    required: false
+    default: 'false'
 
 runs:
   using: composite
   steps:
   - uses: ./.github/actions/setup-test-environment
   - name: Test
-    shell: pwsh
-    run: >
-      ./.github/scripts/run-test-projects.ps1
-      -CoverageId "${{ inputs.coverage-id }}"
-      -Framework "${{ inputs.framework }}"
-      -FilterQuery "${{ inputs.filter-query }}"
-      -Modules "${{ inputs.modules }}"
-      -Projects "${{ inputs.projects }}"
-      -ReportTrxFilename "${{ inputs.report-trx-filename }}"
+    id: test
+    continue-on-error: ${{ inputs.retry == 'true' }}
+    uses: ./.github/actions/dotnet-test
+    with:
+      coverage-id: ${{ inputs.artifact-name }}
+      filter-query: ${{ inputs.filter-query || format('/[(Provider={0})&((Suite=BVT)|(Suite=SlowBVT)|(Suite=Functional))&(Category!=Performance)&(Category!=Stress)]', inputs.provider) }}
+      framework: ${{ inputs.framework }}
+      result-id: ${{ inputs.retry == 'true' && format('{0}-attempt1', inputs.artifact-name) || inputs.artifact-name }}
+      static-instrumentation: ${{ inputs.static-instrumentation }}
+  - name: Retry tests
+    if: inputs.retry == 'true' && steps.test.outcome == 'failure'
+    uses: ./.github/actions/dotnet-test
+    with:
+      coverage-id: ${{ inputs.artifact-name }}
+      filter-query: ${{ inputs.filter-query || format('/[(Provider={0})&((Suite=BVT)|(Suite=SlowBVT)|(Suite=Functional))&(Category!=Performance)&(Category!=Stress)]', inputs.provider) }}
+      framework: ${{ inputs.framework }}
+      result-id: ${{ format('{0}-attempt2', inputs.artifact-name) }}
+      static-instrumentation: ${{ inputs.static-instrumentation }}
   - name: Archive test results
     if: always()
     uses: ./.github/actions/archive-test-results

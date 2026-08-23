@@ -1,0 +1,48 @@
+name: Run dotnet test
+description: Run a trait-selected solution test partition with optional coverage.
+
+inputs:
+  coverage-id:
+    description: Unique coverage report identifier.
+    required: true
+  filter-query:
+    description: Microsoft Testing Platform query filter.
+    required: true
+  framework:
+    description: Target framework.
+    required: true
+  result-id:
+    description: Unique test result identifier.
+    required: true
+  static-instrumentation:
+    description: Use static coverage instrumentation.
+    required: false
+    default: 'false'
+
+runs:
+  using: composite
+  steps:
+  - name: Prepare coverage report
+    if: github.event_name == 'pull_request'
+    shell: pwsh
+    run: ./.github/scripts/coverage-report.ps1 -Action Prepare -CoverageId "${{ inputs.coverage-id }}"
+  - name: Build for static coverage
+    if: github.event_name == 'pull_request' && (runner.os == 'macOS' || inputs.static-instrumentation == 'true')
+    shell: pwsh
+    run: dotnet build Orleans.slnx -p:ContinuousIntegrationBuild=false
+  - name: Test
+    if: github.event_name != 'pull_request'
+    shell: pwsh
+    run: dotnet test --solution Orleans.slnx --framework "${{ inputs.framework }}" --filter-query "${{ inputs.filter-query }}" --minimum-expected-tests 1 --hangdump --hangdump-timeout 10m --crashdump --crashdump-type Full --hangdump-type Full --report-trx --report-trx-filename "test_results_${{ inputs.result-id }}_{asm}_{tfm}_{arch}.trx" --max-parallel-test-modules 1
+  - name: Test with dynamic coverage
+    if: github.event_name == 'pull_request' && runner.os != 'macOS' && inputs.static-instrumentation != 'true'
+    shell: pwsh
+    run: dotnet-coverage collect --settings ./.github/coverage.config.xml --output "TestResults/${{ inputs.coverage-id }}.cobertura.xml" --output-format cobertura --nologo dotnet test --solution Orleans.slnx --framework "${{ inputs.framework }}" --filter-query "${{ inputs.filter-query }}" --minimum-expected-tests 1 --hangdump --hangdump-timeout 10m --crashdump --crashdump-type Full --hangdump-type Full --report-trx --report-trx-filename "test_results_${{ inputs.result-id }}_{asm}_{tfm}_{arch}.trx" --max-parallel-test-modules 1 -p:ContinuousIntegrationBuild=false
+  - name: Test with static coverage
+    if: github.event_name == 'pull_request' && (runner.os == 'macOS' || inputs.static-instrumentation == 'true')
+    shell: pwsh
+    run: dotnet-coverage collect --settings ./.github/coverage.static.config.xml --output "TestResults/${{ inputs.coverage-id }}.cobertura.xml" --output-format cobertura --nologo "--include-files=${{ github.workspace }}/test/**/bin/Debug/${{ inputs.framework }}/*.dll" dotnet test --solution Orleans.slnx --framework "${{ inputs.framework }}" --filter-query "${{ inputs.filter-query }}" --minimum-expected-tests 1 --hangdump --hangdump-timeout 10m --crashdump --crashdump-type Full --hangdump-type Full --report-trx --report-trx-filename "test_results_${{ inputs.result-id }}_{asm}_{tfm}_{arch}.trx" --max-parallel-test-modules 1 --no-build
+  - name: Validate coverage report
+    if: github.event_name == 'pull_request'
+    shell: pwsh
+    run: ./.github/scripts/coverage-report.ps1 -Action Validate -CoverageId "${{ inputs.coverage-id }}"

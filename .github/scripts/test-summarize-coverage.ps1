@@ -5,12 +5,9 @@ Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
 $scriptPath = Join-Path $PSScriptRoot 'summarize-coverage.ps1'
-$collectorScriptPath = Join-Path $PSScriptRoot 'run-dotnet-test.ps1'
-$codeGeneratorScriptPath = Join-Path $PSScriptRoot 'run-codegenerator-tests.ps1'
-$cosmosScriptPath = Join-Path $PSScriptRoot 'run-cosmos-tests.ps1'
-$providerBuildScriptPath = Join-Path $PSScriptRoot 'build-provider-test-assets.ps1'
+$coverageReportScriptPath = Join-Path $PSScriptRoot 'coverage-report.ps1'
 $mergeScriptPath = Join-Path $PSScriptRoot 'merge-coverage.ps1'
-$runTestProjectsScriptPath = Join-Path $PSScriptRoot 'run-test-projects.ps1'
+$dotnetTestActionPath = Join-Path $PSScriptRoot '../actions/dotnet-test/action.yml'
 $runTestsActionPath = Join-Path $PSScriptRoot '../actions/run-tests/action.yml'
 $setupCoverageScriptPath = Join-Path $PSScriptRoot 'setup-coverage.ps1'
 $workflowPath = Join-Path $PSScriptRoot '../workflows/ci.yml'
@@ -268,56 +265,52 @@ try {
     }
 
     Invoke-Test 'keeps coverage runs distinct' {
-        $collectorScript = Get-Content -Raw -LiteralPath $collectorScriptPath
+        $coverageReportScript = Get-Content -Raw -LiteralPath $coverageReportScriptPath
         Assert-Matches `
-            $collectorScript `
+            $coverageReportScript `
             '"\$CoverageId\.cobertura\.xml"' `
             'Coverage file names must include the complete matrix identity.'
     }
 
     Invoke-Test 'uses external coverage collection for CI builds' {
-        $collectorScript = Get-Content -Raw -LiteralPath $collectorScriptPath
-        $codeGeneratorScript = Get-Content -Raw -LiteralPath $codeGeneratorScriptPath
+        $dotnetTestAction = Get-Content -Raw -LiteralPath $dotnetTestActionPath
+        $coverageReportScript = Get-Content -Raw -LiteralPath $coverageReportScriptPath
         Assert-Matches `
-            $collectorScript `
-            '& \$coverageTool @coverageArguments @testArguments' `
+            $dotnetTestAction `
+            'dotnet-coverage collect' `
             'Coverage must use the external collector with ContinuousIntegrationBuild.'
         Assert-Matches `
-            $collectorScript `
+            $dotnetTestAction `
             '-p:ContinuousIntegrationBuild=false' `
             'Coverage builds must disable deterministic CI instrumentation.'
         Assert-Matches `
-            $collectorScript `
-            '\$staticInstrumentationFiles = Join-Path' `
+            $dotnetTestAction `
+            '--include-files=' `
             'macOS coverage must specify files for static instrumentation.'
         Assert-Matches `
-            $collectorScript `
+            $dotnetTestAction `
             'coverage\.static\.config\.xml' `
             'macOS coverage must use static-only instrumentation settings.'
         Assert-Matches `
-            $codeGeneratorScript `
-            '(?s)-UseStaticInstrumentation.*?-UseStaticInstrumentation' `
-            'Both CodeGen runs must use static instrumentation.'
-        Assert-Matches `
-            $collectorScript `
-            '\$testArguments\.Add\(''--no-build''\)' `
+            $dotnetTestAction `
+            '--no-build' `
             'Coverage tests must execute the statically instrumented build.'
         Assert-Matches `
-            $collectorScript `
+            $coverageReportScript `
             'Assert-NotReparsePoint \$coverageDirectory' `
             'Coverage collection must reject a linked output directory.'
         Assert-Matches `
-            $collectorScript `
+            $coverageReportScript `
             'Assert-NotReparsePoint \$coverageOutput' `
             'Coverage collection must reject a linked output file.'
         Assert-Matches `
-            $collectorScript `
+            $coverageReportScript `
             'contains no measured lines' `
             'Coverage collection must reject empty reports from successful test runs.'
         Assert-Matches `
-            $collectorScript `
-            'Push-Location \$testWorkingDirectory' `
-            'Prebuilt test modules must execute from their output directory.'
+            $dotnetTestAction `
+            'dotnet test --solution Orleans\.slnx' `
+            'Test partitions must use native solution discovery.'
     }
 
     Invoke-Test 'preserves coverage artifact directories during download' {
@@ -356,17 +349,18 @@ try {
     Invoke-Test 'collects coverage from every test job' {
         $workflow = Get-Content -Raw -LiteralPath $workflowPath
         $runTestsAction = Get-Content -Raw -LiteralPath $runTestsActionPath
-        $runTestProjectsScript = Get-Content -Raw -LiteralPath $runTestProjectsScriptPath
-        $codeGeneratorScript = Get-Content -Raw -LiteralPath $codeGeneratorScriptPath
-        $cosmosScript = Get-Content -Raw -LiteralPath $cosmosScriptPath
-        Assert-Equal 15 ([regex]::Matches($workflow, 'uses: \./\.github/actions/run-tests')).Count 'Standard test action count differs.'
-        Assert-Equal 3 ([regex]::Matches($workflow, 'uses: \./\.github/actions/setup-test-environment')).Count 'Special test setup count differs.'
-        Assert-Equal 1 ([regex]::Matches($runTestsAction, 'run-test-projects\.ps1')).Count 'Standard test action command count differs.'
-        Assert-Equal 1 ([regex]::Matches($runTestProjectsScript, 'run-dotnet-test\.ps1')).Count 'Standard test command count differs.'
-        Assert-Equal 2 ([regex]::Matches($codeGeneratorScript, 'run-dotnet-test\.ps1')).Count 'CodeGen test command count differs.'
-        Assert-Equal 1 ([regex]::Matches($cosmosScript, 'run-dotnet-test\.ps1')).Count 'Cosmos test command count differs.'
-        Assert-Equal 1 ([regex]::Matches($workflow, 'run-dotnet-test\.ps1')).Count 'Core matrix test command count differs.'
-        Assert-Equal 6 ([regex]::Matches($workflow, 'uses: \./\.github/actions/restore-provider-test-assets')).Count 'Shared provider build consumer count differs.'
+        $dotnetTestAction = Get-Content -Raw -LiteralPath $dotnetTestActionPath
+        Assert-Equal 18 ([regex]::Matches($workflow, 'uses: \./\.github/actions/run-tests')).Count 'Test action count differs.'
+        Assert-Equal 16 ([regex]::Matches($workflow, 'provider: \$\{\{ matrix\.provider \}\}')).Count 'Provider-discovered test partition count differs.'
+        Assert-Equal 2 ([regex]::Matches($runTestsAction, 'uses: \./\.github/actions/dotnet-test')).Count 'Native test action invocation count differs.'
+        Assert-Equal 2 ([regex]::Matches($runTestsAction, "format\('/\[\(Provider=\{0\}\)")).Count 'Standard provider filter count differs.'
+        Assert-Equal 3 ([regex]::Matches($dotnetTestAction, 'dotnet test --solution Orleans\.slnx')).Count 'Native test command count differs.'
+        Assert-Equal 1 ([regex]::Matches($workflow, "retry: 'true'")).Count 'Cosmos retry configuration count differs.'
+        Assert-Matches $runTestsAction 'attempt1' 'The first retryable attempt must retain distinct test results.'
+        Assert-Matches $runTestsAction 'attempt2' 'The second retryable attempt must retain distinct test results.'
+        Assert-Equal 0 ([regex]::Matches($workflow, 'test/.+\.(?:csproj|fsproj|dll)')).Count 'Workflow must not enumerate test projects or modules.'
+        Assert-Equal 0 ([regex]::Matches($workflow, 'run-.+tests?\.ps1')).Count 'Workflow must not invoke a PowerShell test runner.'
+        Assert-Equal 0 ([regex]::Matches($dotnetTestAction, '--project|--test-modules')).Count 'Native test action must discover projects from the solution.'
     }
 
     Invoke-Test 'validates the coverage tool version' {
@@ -376,18 +370,6 @@ try {
             'DOTNET_COVERAGE_VERSION must specify' `
             'Coverage setup must reject a missing tool version.'
         Assert-Equal 2 ([regex]::Matches($setupCoverageScript, 'Assert-NotReparsePoint \$toolPath')).Count 'Coverage tool path validation count differs.'
-    }
-
-    Invoke-Test 'protects provider build staging paths' {
-        $providerBuildScript = Get-Content -Raw -LiteralPath $providerBuildScriptPath
-        Assert-Matches `
-            $providerBuildScript `
-            'must be within \$repositoryRoot' `
-            'Provider build output must remain inside the repository.'
-        Assert-Matches `
-            $providerBuildScript `
-            'Assert-NotReparsePoint \$currentPath' `
-            'Provider build output must reject linked path segments.'
     }
 
     Write-Output "$testsRun coverage tests passed."
