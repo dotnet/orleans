@@ -10,6 +10,11 @@ public record RabbitMQClientOptions
 {
     private static readonly TimeSpan DEFAULT_INTERVAL_TO_UPDATE_OFFSET = TimeSpan.FromMinutes(30);
 
+    /// <summary>
+    /// The default maximum length of each RabbitMQ stream, in bytes.
+    /// </summary>
+    public const ulong DEFAULT_STREAM_MAX_LENGTH_BYTES = 200UL * 1024 * 1024;
+
     public TimeSpan IntervalToUpdateOffset { get; set; } = DEFAULT_INTERVAL_TO_UPDATE_OFFSET;
 
     public List<string> QueueNames { get; set; } = [];
@@ -35,11 +40,16 @@ public record RabbitMQClientOptions
     public RabbitMQConnectionRetryOptions ConnectionRetry { get; set; } = new();
 
     /// <summary>
-    ///     The Stream Options used to create streams.
-    ///     Default queue max length 200mb
-    ///     <see cref="StreamOptions" />
+    /// Gets or sets the options used to create RabbitMQ streams.
     /// </summary>
-    public StreamSpec StreamOptions { get; set; } = new(string.Empty);
+    /// <remarks>
+    /// Each stream is limited to <see cref="DEFAULT_STREAM_MAX_LENGTH_BYTES"/> by default.
+    /// Set <see cref="StreamSpec.MaxLengthBytes"/> to select a different retention capacity.
+    /// </remarks>
+    public StreamSpec StreamOptions { get; set; } = new(string.Empty)
+    {
+        MaxLengthBytes = DEFAULT_STREAM_MAX_LENGTH_BYTES
+    };
 }
 
 public record RabbitMQQueueCacheOptions

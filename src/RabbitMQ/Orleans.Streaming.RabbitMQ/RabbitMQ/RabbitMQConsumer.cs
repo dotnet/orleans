@@ -50,7 +50,6 @@ internal sealed class RabbitMQQueueProvider
 internal sealed class RabbitMQConsumer
 {
     private readonly ConcurrentQueue<RawMessage> _messages = new();
-    private readonly CancellationTokenSource _bufferCancellation = new();
     private readonly SemaphoreSlim _bufferSlots;
     private readonly SemaphoreSlim _dequeueLock = new(1);
     private readonly object _lock = new();
@@ -62,8 +61,10 @@ internal sealed class RabbitMQConsumer
     private readonly RabbitMQStreamSystemProvider _streamSystemProvider;
     private IConsumer _consumer;
     private Task<IConsumer> _consumerTask;
+    private ConsumerGeneration _activeGeneration;
     private string _queueName;
     private long _lastReceivedOffset = -1;
+    private long _nextGenerationId;
     private bool _stopping = true;
 
     public RabbitMQConsumer(
@@ -87,15 +88,19 @@ internal sealed class RabbitMQConsumer
     public async Task CloseConsumer()
     {
         IConsumer consumer;
+        ConsumerGeneration generation;
         lock (_lock)
         {
             _stopping = true;
-            _bufferCancellation.Cancel();
             consumer = _consumer;
+            generation = _activeGeneration;
             _consumer = null;
             _consumerTask = null;
+            _activeGeneration = null;
             _lastReceivedOffset = -1;
         }
+
+        generation?.Cancel();
 
         await _dequeueLock.WaitAsync().ConfigureAwait(false);
         try
@@ -124,7 +129,11 @@ internal sealed class RabbitMQConsumer
 
     public async Task StartConsumingMessages()
     {
-        StartBuffering();
+        lock (_lock)
+        {
+            _stopping = false;
+        }
+
         await EnsureConsumer().ConfigureAwait(false);
     }
 
@@ -222,6 +231,7 @@ internal sealed class RabbitMQConsumer
         _queueName = await _rabbitMqQueueProvider.CreateOrGetQueue(_queueId, streamSystem).ConfigureAwait(false);
         var initialOffset = GetResumeOffset(
             await GetOffset(streamSystem, _queueName, _queueName).ConfigureAwait(false));
+        var generation = BeginConsumerGeneration();
 
         IConsumer createdConsumer = null;
         var connectionClosed = false;
@@ -244,39 +254,72 @@ internal sealed class RabbitMQConsumer
                     await GetOffset(currentStreamSystem, reference, stream).ConfigureAwait(false));
                 return new OffsetTypeOffset(activationOffset);
             },
-            MessageHandler = (_, context, message) => BufferMessage(message, context.Offset),
+            MessageHandler = (_, context, message) => BufferMessage(generation, message, context.Offset),
             ConnectionClosedHandler = _ =>
             {
                 Volatile.Write(ref connectionClosed, true);
-                InvalidateConsumer(createdConsumer);
+                InvalidateConsumer(createdConsumer, generation);
                 return Task.CompletedTask;
             },
             MetadataHandler = update => _logger.LogInformation(
                 "RabbitMQ metadata update {Code} received for {Stream}", update.Code, update.Stream)
         };
 
-        createdConsumer = await streamSystem.CreateRawConsumer(
-            config,
-            _loggerFactory.CreateLogger<IConsumer>()).ConfigureAwait(false);
-
-        lock (_lock)
+        try
         {
-            if (Volatile.Read(ref connectionClosed))
-            {
-                throw new InvalidOperationException("The RabbitMQ consumer connection closed during initialization.");
-            }
-
-            if (_stopping)
-            {
-                _ = createdConsumer.Close();
-                throw new InvalidOperationException("The RabbitMQ consumer was stopped during initialization.");
-            }
-
-            _consumer = createdConsumer;
+            createdConsumer = await streamSystem.CreateRawConsumer(
+                config,
+                _loggerFactory.CreateLogger<IConsumer>()).ConfigureAwait(false);
         }
+        catch
+        {
+            InvalidateConsumer(null, generation);
+            throw;
+        }
+
+        await CompleteConsumerCreation(
+            createdConsumer,
+            generation,
+            Volatile.Read(ref connectionClosed)).ConfigureAwait(false);
 
         _logger.LogInformation("Consumer created, now consuming {QueueName}", _queueName);
         return createdConsumer;
+    }
+
+    internal async Task CompleteConsumerCreation(
+        IConsumer createdConsumer,
+        ConsumerGeneration generation,
+        bool connectionClosed)
+    {
+        string rejection;
+        lock (_lock)
+        {
+            if (connectionClosed || !ReferenceEquals(_activeGeneration, generation))
+            {
+                rejection = "The RabbitMQ consumer connection closed during initialization.";
+            }
+            else if (_stopping)
+            {
+                rejection = "The RabbitMQ consumer was stopped during initialization.";
+            }
+            else
+            {
+                _consumer = createdConsumer;
+                return;
+            }
+        }
+
+        var rejectionException = new InvalidOperationException(rejection);
+        try
+        {
+            await createdConsumer.Close().ConfigureAwait(false);
+        }
+        catch (Exception closeException)
+        {
+            throw new AggregateException(rejectionException, closeException);
+        }
+
+        throw rejectionException;
     }
 
     private async Task<ulong> GetOffset(StreamSystem streamSystem, string reference, string stream)
@@ -308,10 +351,31 @@ internal sealed class RabbitMQConsumer
         }
     }
 
-    private void InvalidateConsumer(IConsumer consumer)
+    private ConsumerGeneration BeginConsumerGeneration()
     {
         lock (_lock)
         {
+            if (_stopping)
+            {
+                throw new InvalidOperationException("The RabbitMQ consumer is stopped.");
+            }
+
+            _activeGeneration?.Cancel();
+            return _activeGeneration = new ConsumerGeneration(++_nextGenerationId);
+        }
+    }
+
+    private void InvalidateConsumer(IConsumer consumer, ConsumerGeneration generation)
+    {
+        lock (_lock)
+        {
+            if (!ReferenceEquals(_activeGeneration, generation))
+            {
+                return;
+            }
+
+            generation.Cancel();
+            _activeGeneration = null;
             if (consumer is null || ReferenceEquals(_consumer, consumer))
             {
                 _consumer = null;
@@ -322,54 +386,99 @@ internal sealed class RabbitMQConsumer
 
     internal int BufferedMessageCount => _messages.Count;
 
-    internal void StartBuffering()
+    internal long LastReceivedOffset
     {
-        lock (_lock)
+        get
         {
-            ObjectDisposedException.ThrowIf(_bufferCancellation.IsCancellationRequested, this);
-            _stopping = false;
+            lock (_lock)
+            {
+                return _lastReceivedOffset;
+            }
         }
     }
 
-    internal async Task BufferMessage(byte[] body, string createdAt, ulong offset)
+    internal ConsumerGeneration StartBuffering()
     {
-        await WaitForBufferSlot().ConfigureAwait(false);
-        EnqueueBufferedMessage(new RawMessage(body, createdAt, offset));
+        lock (_lock)
+        {
+            _stopping = false;
+        }
+
+        return BeginConsumerGeneration();
     }
 
-    private async Task BufferMessage(Message message, ulong offset)
+    internal Task BufferMessage(byte[] body, string createdAt, ulong offset)
     {
-        await WaitForBufferSlot().ConfigureAwait(false);
+        ConsumerGeneration generation;
+        lock (_lock)
+        {
+            generation = _activeGeneration
+                ?? throw new InvalidOperationException("No RabbitMQ consumer generation is active.");
+        }
+
+        return BufferMessage(generation, body, createdAt, offset);
+    }
+
+    internal async Task BufferMessage(
+        ConsumerGeneration generation,
+        byte[] body,
+        string createdAt,
+        ulong offset)
+    {
+        await WaitForBufferSlot(generation).ConfigureAwait(false);
+        EnqueueBufferedMessage(generation, new RawMessage(body, createdAt, offset));
+    }
+
+    internal void DisconnectGeneration(ConsumerGeneration generation) =>
+        InvalidateConsumer(null, generation);
+
+    private async Task BufferMessage(ConsumerGeneration generation, Message message, ulong offset)
+    {
+        await WaitForBufferSlot(generation).ConfigureAwait(false);
         object createdAt = null;
         message.ApplicationProperties?.TryGetValue(RabbitMQMessage.CreatedAtFieldName, out createdAt);
-        EnqueueBufferedMessage(new RawMessage(message.Data.Contents.ToArray(), createdAt?.ToString(), offset));
+        EnqueueBufferedMessage(
+            generation,
+            new RawMessage(message.Data.Contents.ToArray(), createdAt?.ToString(), offset));
     }
 
-    private async Task WaitForBufferSlot()
+    private async Task WaitForBufferSlot(ConsumerGeneration generation)
     {
         try
         {
-            await _bufferSlots.WaitAsync(_bufferCancellation.Token).ConfigureAwait(false);
+            await _bufferSlots.WaitAsync(generation.Cancellation.Token).ConfigureAwait(false);
         }
-        catch (OperationCanceledException) when (_bufferCancellation.IsCancellationRequested)
+        catch (OperationCanceledException) when (generation.Cancellation.IsCancellationRequested)
         {
-            throw new OperationCanceledException("The RabbitMQ consumer is closing.", _bufferCancellation.Token);
+            throw new OperationCanceledException(
+                $"RabbitMQ consumer generation {generation.Id} is no longer active.",
+                generation.Cancellation.Token);
         }
     }
 
-    private void EnqueueBufferedMessage(RawMessage message)
+    private void EnqueueBufferedMessage(ConsumerGeneration generation, RawMessage message)
     {
         lock (_lock)
         {
-            if (_stopping)
+            if (_stopping || !ReferenceEquals(_activeGeneration, generation))
             {
                 _bufferSlots.Release();
-                throw new OperationCanceledException("The RabbitMQ consumer is closing.", _bufferCancellation.Token);
+                throw new OperationCanceledException(
+                    $"RabbitMQ consumer generation {generation.Id} is no longer active.",
+                    generation.Cancellation.Token);
             }
 
             _messages.Enqueue(message);
-            _lastReceivedOffset = checked((long)message.Offset);
+            _lastReceivedOffset = Math.Max(_lastReceivedOffset, checked((long)message.Offset));
         }
+    }
+
+    internal sealed class ConsumerGeneration(long id)
+    {
+        public long Id { get; } = id;
+        public CancellationTokenSource Cancellation { get; } = new();
+
+        public void Cancel() => Cancellation.Cancel();
     }
 
     private sealed record RawMessage(byte[] Body, string CreatedAt, ulong Offset);

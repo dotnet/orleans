@@ -9,7 +9,11 @@ using Orleans.Streams;
 
 namespace Orleans.Streaming.RabbitMQ.Adapters;
 
-internal class RabbitMQAdapterFactory : IQueueAdapterFactory, ILifecycleParticipant<ISiloLifecycle>, IAsyncDisposable
+internal class RabbitMQAdapterFactory :
+    IQueueAdapterFactory,
+    ILifecycleParticipant<ISiloLifecycle>,
+    ILifecycleParticipant<IClusterClientLifecycle>,
+    IAsyncDisposable
 {
     private readonly object _adapterLock = new();
     private readonly ILoggerFactory _loggerFactory;
@@ -67,11 +71,11 @@ internal class RabbitMQAdapterFactory : IQueueAdapterFactory, ILifecycleParticip
 
     public static RabbitMQAdapterFactory Create(IServiceProvider serviceProvider, string providerName)
     {
-        var loggerFactory = serviceProvider.GetService<ILoggerFactory>();
+        var loggerFactory = serviceProvider.GetRequiredService<ILoggerFactory>();
         var rabbitMqClientOptions = serviceProvider.GetOptionsByName<RabbitMQClientOptions>(providerName);
         var rabbitMqQueueCacheOptions = serviceProvider.GetOptionsByName<RabbitMQQueueCacheOptions>(providerName);
         var receiverFactory = serviceProvider.GetRequiredKeyedService<RabbitMQAdapterReceiverFactory>(providerName);
-        var serializer = serviceProvider.GetService<Serializer>();
+        var serializer = serviceProvider.GetRequiredService<Serializer>();
         var streamProvider = serviceProvider.GetRequiredKeyedService<RabbitMQStreamSystemProvider>(providerName);
         var rabbitMqQueueProvider = serviceProvider.GetRequiredKeyedService<RabbitMQQueueProvider>(providerName);
         var hashRingStreamQueueMapperOptions = serviceProvider.GetOptionsByName<HashRingStreamQueueMapperOptions>(providerName);
@@ -81,6 +85,13 @@ internal class RabbitMQAdapterFactory : IQueueAdapterFactory, ILifecycleParticip
     }
 
     public void Participate(ISiloLifecycle lifecycle) =>
+        lifecycle.Subscribe(
+            $"{nameof(RabbitMQAdapterFactory)}-{_providerName}",
+            ServiceLifecycleStage.ApplicationServices,
+            _ => Task.CompletedTask,
+            _ => DisposeAsync().AsTask());
+
+    public void Participate(IClusterClientLifecycle lifecycle) =>
         lifecycle.Subscribe(
             $"{nameof(RabbitMQAdapterFactory)}-{_providerName}",
             ServiceLifecycleStage.ApplicationServices,
@@ -102,9 +113,31 @@ internal class RabbitMQAdapterFactory : IQueueAdapterFactory, ILifecycleParticip
             _adapter = null;
         }
 
+        Exception failure = null;
         if (adapter is not null)
         {
-            await adapter.DisposeAsync().ConfigureAwait(false);
+            try
+            {
+                await adapter.DisposeAsync().ConfigureAwait(false);
+            }
+            catch (Exception exception)
+            {
+                failure = exception;
+            }
+        }
+
+        try
+        {
+            await _streamSystemProvider.DisposeAsync().ConfigureAwait(false);
+        }
+        catch (Exception exception)
+        {
+            failure = failure is null ? exception : new AggregateException(failure, exception);
+        }
+
+        if (failure is not null)
+        {
+            throw failure;
         }
     }
 }

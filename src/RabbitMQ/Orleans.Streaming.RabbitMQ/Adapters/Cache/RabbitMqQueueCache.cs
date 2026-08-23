@@ -149,7 +149,11 @@ internal sealed class RabbitMqQueueCache : IQueueCache
     {
         if (_purgedHighWatermarks.TryGetValue(streamId, out var existing))
         {
-            existing.Value = new PurgedHighWatermark(streamId, token);
+            if (token.Newer(existing.Value.Token))
+            {
+                existing.Value = new PurgedHighWatermark(streamId, token);
+            }
+
             _purgedHighWatermarkOrder.Remove(existing);
             _purgedHighWatermarkOrder.AddLast(existing);
         }

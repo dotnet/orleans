@@ -4,6 +4,7 @@ using Orleans.Runtime;
 using Orleans.Streaming.RabbitMQ.Adapters;
 using Orleans.Streaming.RabbitMQ.RabbitMQ;
 using Orleans.Streams;
+using RabbitMQ.Stream.Client;
 using Xunit;
 
 namespace RabbitMQ.Tests;
@@ -127,4 +128,73 @@ public class RabbitMQRuntimeTests
 
     private static RabbitMqBatchContainer CreateBatch(StreamId streamId, long sequenceNumber) =>
         new(streamId, [new object()], new EventSequenceTokenV2(sequenceNumber));
+
+    [Fact]
+    public async Task DisconnectGeneration_CancelsBlockedWriterAndRejectsStaleDelivery()
+    {
+        var consumer = new RabbitMQConsumer(
+            null!,
+            null!,
+            NullLoggerFactory.Instance,
+            default,
+            null!,
+            new RabbitMQQueueCacheOptions { CacheSize = 1 });
+        var oldGeneration = consumer.StartBuffering();
+        await consumer.BufferMessage(oldGeneration, [10], null!, 10);
+
+        var blockedWrite = consumer.BufferMessage(oldGeneration, [11], null!, 11);
+        await Task.Yield();
+        Assert.False(blockedWrite.IsCompleted);
+
+        consumer.DisconnectGeneration(oldGeneration);
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(async () => await blockedWrite);
+
+        var newGeneration = consumer.StartBuffering();
+        Assert.Equal(oldGeneration.Id + 1, newGeneration.Id);
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(
+            async () => await consumer.BufferMessage(oldGeneration, [8], null!, 8));
+
+        Assert.Equal(1, consumer.BufferedMessageCount);
+        Assert.Equal(10, consumer.LastReceivedOffset);
+        Assert.Equal(11UL, consumer.GetResumeOffset(0));
+    }
+
+    [Fact]
+    public async Task ShutdownDuringConsumerCreationClosesRejectedConsumer()
+    {
+        var consumer = new RabbitMQConsumer(
+            null!,
+            null!,
+            NullLoggerFactory.Instance,
+            default,
+            null!,
+            new RabbitMQQueueCacheOptions { CacheSize = 1 });
+        var generation = consumer.StartBuffering();
+        var createdConsumer = new TrackingConsumer();
+
+        await consumer.CloseConsumer();
+
+        await Assert.ThrowsAsync<InvalidOperationException>(
+            () => consumer.CompleteConsumerCreation(createdConsumer, generation, connectionClosed: false));
+        Assert.Equal(1, createdConsumer.CloseCount);
+    }
+
+    private sealed class TrackingConsumer : IConsumer
+    {
+        public int CloseCount { get; private set; }
+
+        public Task StoreOffset(ulong offset) => Task.CompletedTask;
+
+        public Task<ResponseCode> Close()
+        {
+            CloseCount++;
+            return Task.FromResult(ResponseCode.Ok);
+        }
+
+        public void Dispose()
+        {
+        }
+    }
 }
