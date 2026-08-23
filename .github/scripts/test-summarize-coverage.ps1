@@ -341,6 +341,10 @@ try {
             'dotnet-coverage merge "coverage-data/\*\.cobertura\.xml"' `
             'Coverage reports must be merged directly by dotnet-coverage.'
         Assert-Matches `
+            $workflow `
+            'New-Item -ItemType Directory -Force TestResults' `
+            'Coverage merge must create its output directory.'
+        Assert-Matches `
             $archiveTestResultsAction `
             'if-no-files-found: error' `
             'Each successful pull request test job must publish coverage.'
@@ -358,9 +362,8 @@ try {
         Assert-Equal 16 ([regex]::Matches($workflow, '(?m)^\s{8}provider: [A-Za-z]')).Count 'Provider-discovered test partition count differs.'
         Assert-Equal 2 ([regex]::Matches($runTestsAction, 'uses: \./\.github/actions/dotnet-test')).Count 'Native test action invocation count differs.'
         Assert-Equal 2 ([regex]::Matches($runTestsAction, "format\('/\[\(Provider=\{0\}\)")).Count 'Standard provider filter count differs.'
-        Assert-Equal 3 ([regex]::Matches($dotnetTestAction, 'dotnet test --solution Orleans\.slnx')).Count 'Native test command count differs.'
-        Assert-Equal 1 ([regex]::Matches($workflow, "prebuild-solution: 'true'")).Count 'Core solution prebuild count differs.'
-        Assert-Matches $runTestsAction 'dotnet build Orleans\.slnx' 'Core tests must build non-test solution dependencies.'
+        Assert-Equal 4 ([regex]::Matches($dotnetTestAction, 'dotnet test --solution Orleans\.slnx')).Count 'Native test command count differs.'
+        Assert-Matches $dotnetTestAction '--framework "\$\{\{ inputs\.framework \}\}".*?--list-tests' 'Static coverage builds must target and discover the selected framework.'
         Assert-Equal 1 ([regex]::Matches($workflow, "retry: 'true'")).Count 'Cosmos retry configuration count differs.'
         Assert-Matches $runTestsAction 'attempt1' 'The first retryable attempt must retain distinct test results.'
         Assert-Matches $runTestsAction 'attempt2' 'The second retryable attempt must retain distinct test results.'

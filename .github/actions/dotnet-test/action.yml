@@ -11,10 +11,6 @@ inputs:
   framework:
     description: Target framework.
     required: true
-  no-build:
-    description: Run tests from an existing build.
-    required: false
-    default: 'false'
   result-id:
     description: Unique test result identifier.
     required: true
@@ -30,18 +26,18 @@ runs:
     if: github.event_name == 'pull_request'
     shell: pwsh
     run: ./.github/scripts/coverage-report.ps1 -Action Prepare -CoverageId "${{ inputs.coverage-id }}"
-  - name: Build for static coverage
-    if: github.event_name == 'pull_request' && inputs.no-build != 'true' && (runner.os == 'macOS' || inputs.static-instrumentation == 'true')
+  - name: Build and discover tests for static coverage
+    if: github.event_name == 'pull_request' && (runner.os == 'macOS' || inputs.static-instrumentation == 'true')
     shell: pwsh
-    run: dotnet build Orleans.slnx -p:ContinuousIntegrationBuild=false
+    run: dotnet test --solution Orleans.slnx --framework "${{ inputs.framework }}" --filter-query "${{ inputs.filter-query }}" --list-tests --minimum-expected-tests 1 --max-parallel-test-modules 1 -p:ContinuousIntegrationBuild=false
   - name: Test
     if: github.event_name != 'pull_request'
     shell: pwsh
-    run: dotnet test --solution Orleans.slnx --framework "${{ inputs.framework }}" --filter-query "${{ inputs.filter-query }}" --minimum-expected-tests 1 --hangdump --hangdump-timeout 10m --crashdump --crashdump-type Full --hangdump-type Full --report-trx --report-trx-filename "test_results_${{ inputs.result-id }}_{asm}_{tfm}_{arch}.trx" --max-parallel-test-modules 1 ${{ inputs.no-build == 'true' && '--no-build' || '' }}
+    run: dotnet test --solution Orleans.slnx --framework "${{ inputs.framework }}" --filter-query "${{ inputs.filter-query }}" --minimum-expected-tests 1 --hangdump --hangdump-timeout 10m --crashdump --crashdump-type Full --hangdump-type Full --report-trx --report-trx-filename "test_results_${{ inputs.result-id }}_{asm}_{tfm}_{arch}.trx" --max-parallel-test-modules 1
   - name: Test with dynamic coverage
     if: github.event_name == 'pull_request' && runner.os != 'macOS' && inputs.static-instrumentation != 'true'
     shell: pwsh
-    run: dotnet-coverage collect --settings ./.github/coverage.config.xml --output "TestResults/${{ inputs.coverage-id }}.cobertura.xml" --output-format cobertura --nologo dotnet test --solution Orleans.slnx --framework "${{ inputs.framework }}" --filter-query "${{ inputs.filter-query }}" --minimum-expected-tests 1 --hangdump --hangdump-timeout 10m --crashdump --crashdump-type Full --hangdump-type Full --report-trx --report-trx-filename "test_results_${{ inputs.result-id }}_{asm}_{tfm}_{arch}.trx" --max-parallel-test-modules 1 -p:ContinuousIntegrationBuild=false ${{ inputs.no-build == 'true' && '--no-build' || '' }}
+    run: dotnet-coverage collect --settings ./.github/coverage.config.xml --output "TestResults/${{ inputs.coverage-id }}.cobertura.xml" --output-format cobertura --nologo dotnet test --solution Orleans.slnx --framework "${{ inputs.framework }}" --filter-query "${{ inputs.filter-query }}" --minimum-expected-tests 1 --hangdump --hangdump-timeout 10m --crashdump --crashdump-type Full --hangdump-type Full --report-trx --report-trx-filename "test_results_${{ inputs.result-id }}_{asm}_{tfm}_{arch}.trx" --max-parallel-test-modules 1 -p:ContinuousIntegrationBuild=false
   - name: Test with static coverage
     if: github.event_name == 'pull_request' && (runner.os == 'macOS' || inputs.static-instrumentation == 'true')
     shell: pwsh

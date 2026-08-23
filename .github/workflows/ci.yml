@@ -777,7 +777,6 @@ jobs:
         artifact-name: test_output_${{ github.job }}_${{ matrix.suite }}_${{ matrix.os }}_${{ matrix.framework }}
         filter-query: /[(Provider=None)&(Suite=${{ matrix.suite }})&(Area!=CodeGen)]
         framework: ${{ matrix.framework }}
-        prebuild-solution: 'true'
   coverage-merge:
     name: Merge code coverage
     if: github.event_name == 'pull_request' && needs.ci.result == 'success'
@@ -801,7 +800,7 @@ jobs:
         merge-multiple: true
     - name: Merge coverage
       shell: pwsh
-      run: dotnet-coverage merge "coverage-data/*.cobertura.xml" --output TestResults/coverage.cobertura.xml --output-format cobertura --nologo
+      run: New-Item -ItemType Directory -Force TestResults | Out-Null; dotnet-coverage merge "coverage-data/*.cobertura.xml" --output TestResults/coverage.cobertura.xml --output-format cobertura --nologo
     - name: Archive coverage
       uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
       with:
