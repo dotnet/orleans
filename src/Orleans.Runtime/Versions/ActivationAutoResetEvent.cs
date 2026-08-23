@@ -13,18 +13,14 @@ using Orleans.Runtime.Scheduler;
 namespace Orleans.Runtime;
 
 /// <summary>
-/// Represents a synchronization event that, when signaled, resets automatically after releasing a single waiter.
-/// This type supports concurrent signalers but only a single waiter.
+/// Coalesces concurrent signals and resumes its single waiter on the owning activation scheduler.
 /// </summary>
 internal sealed class ActivationAutoResetEvent(WorkItemGroup scheduler) : IValueTaskSource
 {
-    // Signaled indicates that the event has been signaled and not yet reset.
+    // The status word defines the current event epoch. Interlocked transitions ensure that exactly one
+    // signaler completes a registered waiter and that signals remain visible until the waiter resets the epoch.
     private const uint SignaledFlag = 1;
-
-    // Waiting indicates that a waiter is present and waiting for the event to be signaled.
     private const uint WaitingFlag = 1 << 1;
-
-    // ResetMask is used to clear both status flags.
     private const uint ResetMask = ~SignaledFlag & ~WaitingFlag;
 
     private ActivationValueTaskSource _waitSource = new(scheduler);
@@ -33,7 +29,11 @@ internal sealed class ActivationAutoResetEvent(WorkItemGroup scheduler) : IValue
     ValueTaskSourceStatus IValueTaskSource.GetStatus(short token) => _waitSource.GetStatus(token);
 
     void IValueTaskSource.OnCompleted(Action<object?> continuation, object? state, short token, ValueTaskSourceOnCompletedFlags flags)
-        => _waitSource.OnCompleted(continuation, state, token, flags);
+    {
+        // The owning activation scheduler is always the continuation target. QueueAction also suppresses the
+        // signaling thread's ExecutionContext, so the generic ValueTaskSource scheduling flags do not apply.
+        _waitSource.OnCompleted(continuation, state, token);
+    }
 
     void IValueTaskSource.GetResult(short token)
     {
@@ -94,13 +94,15 @@ internal sealed class ActivationAutoResetEvent(WorkItemGroup scheduler) : IValue
     [StructLayout(LayoutKind.Auto)]
     private struct ActivationValueTaskSource
     {
+        // The continuation slot is the source state: null before registration, the continuation after registration,
+        // and Sentinel after completion. CompareExchange and Exchange provide the publication order between the
+        // continuation state and its callback state, and exactly one side of the registration/completion race queues.
         private static readonly Action<object?> Sentinel = CompletionSentinel;
 
         private Action<object?>? _continuation;
         private object? _continuationState;
         private readonly WorkItemGroup _scheduler;
         private short _version;
-        private bool _completed;
 
         public ActivationValueTaskSource(WorkItemGroup scheduler) : this()
         {
@@ -112,23 +114,21 @@ internal sealed class ActivationAutoResetEvent(WorkItemGroup scheduler) : IValue
         public ValueTaskSourceStatus GetStatus(short token)
         {
             ValidateToken(token);
-
-            // If completion wins the race but has not yet stored the sentinel, force OnCompleted to schedule the continuation.
-            return Volatile.Read(ref _continuation) is null || !_completed
-                ? ValueTaskSourceStatus.Pending
-                : ValueTaskSourceStatus.Succeeded;
+            return ReferenceEquals(Volatile.Read(ref _continuation), Sentinel)
+                ? ValueTaskSourceStatus.Succeeded
+                : ValueTaskSourceStatus.Pending;
         }
 
         [StackTraceHidden]
-        public readonly void GetResult(short token)
+        public void GetResult(short token)
         {
-            if (token != _version || !_completed)
+            if (token != _version || !ReferenceEquals(Volatile.Read(ref _continuation), Sentinel))
             {
                 ThrowInvalidOperationException();
             }
         }
 
-        public void OnCompleted(Action<object?> continuation, object? state, short token, ValueTaskSourceOnCompletedFlags flags)
+        public void OnCompleted(Action<object?> continuation, object? state, short token)
         {
             ArgumentNullException.ThrowIfNull(continuation);
             ValidateToken(token);
@@ -154,16 +154,11 @@ internal sealed class ActivationAutoResetEvent(WorkItemGroup scheduler) : IValue
 
         public void SetResult()
         {
-            if (_completed)
+            var continuation = Interlocked.Exchange(ref _continuation, Sentinel);
+            if (ReferenceEquals(continuation, Sentinel))
             {
                 ThrowInvalidOperationException();
             }
-
-            _completed = true;
-
-            var continuation =
-                Volatile.Read(ref _continuation) ??
-                Interlocked.CompareExchange(ref _continuation, Sentinel, null);
 
             if (continuation is not null)
             {
@@ -174,9 +169,8 @@ internal sealed class ActivationAutoResetEvent(WorkItemGroup scheduler) : IValue
         public void Reset()
         {
             _version++;
-            _continuation = null;
             _continuationState = null;
-            _completed = false;
+            Volatile.Write(ref _continuation, null);
         }
 
         private readonly void QueueContinuation(Action<object?> continuation, object? state)
