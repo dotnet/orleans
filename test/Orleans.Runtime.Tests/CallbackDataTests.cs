@@ -36,7 +36,7 @@ public class CallbackDataTests
         using var lease = owner.Acquire();
         var callback = lease.Value;
 
-        callback.SubscribeForCancellation(cancellation.Token);
+        callback.SubscribeForCancellation(cancellation.Token, owner);
 
         Assert.True(callback.IsCompleted);
         Assert.Equal(1, unregisterCount);
@@ -131,7 +131,7 @@ public class CallbackDataTests
             instruments);
         var completedLease = completedOwner.Acquire();
         var completedCallback = completedLease.Value;
-        completedCallback.SubscribeForCancellation(cancellation.Token);
+        completedCallback.SubscribeForCancellation(cancellation.Token, completedOwner);
         completedCallback.OnHostShutdown();
         completedLease.Dispose();
 
@@ -183,9 +183,9 @@ public class CallbackDataTests
     [TestProvider("None")]
     [Fact, TestCategory("BVT")]
     public void CancellationAndResponseRaceCompletesExactlyOnce() =>
-        RunTerminalRace(static (callback, cancellation) =>
+        RunTerminalRace(static (callback, owner, cancellation) =>
         {
-            callback.SubscribeForCancellation(cancellation.Token);
+            callback.SubscribeForCancellation(cancellation.Token, owner);
             cancellation.Cancel();
         });
 
@@ -193,13 +193,13 @@ public class CallbackDataTests
     [TestProvider("None")]
     [Fact, TestCategory("BVT")]
     public void TimeoutAndResponseRaceCompletesExactlyOnce() =>
-        RunTerminalRace(static (callback, _) => callback.OnTimeout());
+        RunTerminalRace(static (callback, _, _) => callback.OnTimeout());
 
     [TestSuite("BVT")]
     [TestProvider("None")]
     [Fact, TestCategory("BVT")]
     public void ShutdownAndResponseRaceCompletesExactlyOnce() =>
-        RunTerminalRace(static (callback, _) => callback.OnHostShutdown());
+        RunTerminalRace(static (callback, _, _) => callback.OnHostShutdown());
 
     [TestSuite("BVT")]
     [TestProvider("None")]
@@ -269,12 +269,12 @@ public class CallbackDataTests
         var callback = lease.Value;
 
         callback.OnHostShutdown();
-        callback.SubscribeForCancellation(cancellationToken);
+        callback.SubscribeForCancellation(cancellationToken, owner);
 
         return new WeakReference(completion);
     }
 
-    private static void RunTerminalRace(Action<CallbackData, CancellationTokenSource> complete)
+    private static void RunTerminalRace(Action<CallbackData, CallbackDataOwner, CancellationTokenSource> complete)
     {
         using var serviceProvider = CreateServiceProvider();
         var instruments = CreateInstruments(serviceProvider);
@@ -304,7 +304,7 @@ public class CallbackDataTests
             var completionTask = Task.Run(() =>
             {
                 start.SignalAndWait();
-                complete(callback, cancellation);
+                complete(callback, owner, cancellation);
             });
             var responseTask = Task.Run(() =>
             {

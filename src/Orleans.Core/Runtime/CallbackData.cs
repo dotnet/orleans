@@ -179,7 +179,7 @@ namespace Orleans.Runtime
 
         public bool IsCompleted => (Volatile.Read(ref _state) & StateCompleted) != 0;
 
-        public void SubscribeForCancellation(CancellationToken cancellationToken)
+        public void SubscribeForCancellation(CancellationToken cancellationToken, CallbackDataOwner owner)
         {
             if (!cancellationToken.CanBeCanceled)
             {
@@ -196,9 +196,12 @@ namespace Orleans.Runtime
 
             var registration = cancellationToken.UnsafeRegister(static (arg, token) =>
             {
-                var callbackData = (CallbackData)arg!;
-                callbackData.OnCancellation(token);
-            }, this);
+                using var lease = ((CallbackDataOwner)arg!).Acquire();
+                if (lease.TryGetValue(out var callbackData))
+                {
+                    callbackData.OnCancellation(token);
+                }
+            }, owner);
 
             _cancellationTokenRegistration = registration;
             if (Interlocked.CompareExchange(
@@ -249,24 +252,6 @@ namespace Orleans.Runtime
         }
 
         private void OnCancellation(CancellationToken cancellationToken)
-        {
-            var generation = GetGeneration(Volatile.Read(ref _referenceState));
-            if (!TryAcquireLease(generation))
-            {
-                return;
-            }
-
-            try
-            {
-                OnCancellationCore(cancellationToken);
-            }
-            finally
-            {
-                ReleaseLease(generation);
-            }
-        }
-
-        private void OnCancellationCore(CancellationToken cancellationToken)
         {
             // If waiting for acknowledgement is enabled, simply signal to the remote grain that cancellation
             // is requested and return.
