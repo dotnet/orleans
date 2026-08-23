@@ -103,7 +103,7 @@ public sealed class SqsStreamProviderBuilder : IProviderBuilder<ISiloBuilder>, I
         var connectionName = configurationSection["ConnectionName"];
         if (!string.IsNullOrWhiteSpace(serviceKey)
             && !string.IsNullOrWhiteSpace(connectionName)
-            && !string.Equals(serviceKey, connectionName, StringComparison.Ordinal))
+            && !string.Equals(serviceKey, connectionName, StringComparison.OrdinalIgnoreCase))
         {
             throw new OrleansConfigurationException(
                 "SQS streaming configuration specifies different ServiceKey and ConnectionName values. Configure one referenced SQS service.");
