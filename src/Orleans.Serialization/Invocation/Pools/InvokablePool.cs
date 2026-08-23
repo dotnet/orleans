@@ -10,6 +10,10 @@ namespace Orleans.Serialization.Invocation;
 /// Provides bounded thread-local reuse for <see cref="IInvokable"/> implementations.
 /// </summary>
 /// <typeparam name="T">The invokable type.</typeparam>
+/// <remarks>
+/// A returned instance becomes available to one subsequent rental on the current thread.
+/// Callers reset mutable state before returning an instance and transfer exclusive ownership to the pool.
+/// </remarks>
 public sealed class InvokablePool<T> : IDisposable where T : class, IInvokable
 {
     private const int MaxPoolSizePerThread = 128;
@@ -48,7 +52,7 @@ public sealed class InvokablePool<T> : IDisposable where T : class, IInvokable
     /// <summary>
     /// Makes an instance available for reuse by the current thread.
     /// </summary>
-    /// <param name="item">The instance to return.</param>
+    /// <param name="item">The reset instance whose ownership is transferred to the pool.</param>
     public void Return(T item)
     {
         if (TryGetStack(out var stack) && stack.Count < MaxPoolSizePerThread)

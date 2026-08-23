@@ -958,8 +958,7 @@ internal class InvokableGenerator(ProxyGenerationContext generationContext)
                 && type.MetadataName is "Request"
                     or "Request`1"
                     or "TaskRequest"
-                    or "TaskRequest`1"
-                    or "VoidRequest";
+                    or "TaskRequest`1";
     }
 
     internal abstract class InvokerFieldDescription(ITypeSymbol fieldType, string fieldName)
