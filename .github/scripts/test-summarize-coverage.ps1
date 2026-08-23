@@ -8,6 +8,7 @@ $scriptPath = Join-Path $PSScriptRoot 'summarize-coverage.ps1'
 $collectorScriptPath = Join-Path $PSScriptRoot 'run-dotnet-test.ps1'
 $codeGeneratorScriptPath = Join-Path $PSScriptRoot 'run-codegenerator-tests.ps1'
 $cosmosScriptPath = Join-Path $PSScriptRoot 'run-cosmos-tests.ps1'
+$providerBuildScriptPath = Join-Path $PSScriptRoot 'build-provider-test-assets.ps1'
 $mergeScriptPath = Join-Path $PSScriptRoot 'merge-coverage.ps1'
 $runTestProjectsScriptPath = Join-Path $PSScriptRoot 'run-test-projects.ps1'
 $runTestsActionPath = Join-Path $PSScriptRoot '../actions/run-tests/action.yml'
@@ -375,6 +376,18 @@ try {
             'DOTNET_COVERAGE_VERSION must specify' `
             'Coverage setup must reject a missing tool version.'
         Assert-Equal 2 ([regex]::Matches($setupCoverageScript, 'Assert-NotReparsePoint \$toolPath')).Count 'Coverage tool path validation count differs.'
+    }
+
+    Invoke-Test 'protects provider build staging paths' {
+        $providerBuildScript = Get-Content -Raw -LiteralPath $providerBuildScriptPath
+        Assert-Matches `
+            $providerBuildScript `
+            'must be within \$repositoryRoot' `
+            'Provider build output must remain inside the repository.'
+        Assert-Matches `
+            $providerBuildScript `
+            'Assert-NotReparsePoint \$currentPath' `
+            'Provider build output must reject linked path segments.'
     }
 
     Write-Output "$testsRun coverage tests passed."
