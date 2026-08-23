@@ -29,7 +29,6 @@ public static class AppHostExamples
                 new SqsProviderConfiguration(
                     aws,
                     partitionCount: 16,
-                    cacheSize: 8192,
                     fifoQueue: true,
                     receiveWaitTimeSeconds: 20,
                     visibilityTimeoutSeconds: 60));
@@ -306,7 +305,6 @@ public static class AppHostExamples
     private sealed class SqsProviderConfiguration(
         IAWSSDKConfig aws,
         int partitionCount,
-        int cacheSize,
         bool fifoQueue,
         int receiveWaitTimeSeconds,
         int visibilityTimeoutSeconds) : IProviderConfiguration
@@ -324,7 +322,6 @@ public static class AppHostExamples
                 .WithEnvironment($"{environmentPrefix}__ProviderType", "SQS")
                 .WithEnvironment($"{environmentPrefix}__Region", region)
                 .WithEnvironment($"{environmentPrefix}__PartitionCount", partitionCount.ToString(CultureInfo.InvariantCulture))
-                .WithEnvironment($"{environmentPrefix}__CacheSize", cacheSize.ToString(CultureInfo.InvariantCulture))
                 .WithEnvironment($"{environmentPrefix}__FifoQueue", fifoQueue.ToString())
                 .WithEnvironment($"{environmentPrefix}__ReceiveWaitTimeSeconds", receiveWaitTimeSeconds.ToString(CultureInfo.InvariantCulture))
                 .WithEnvironment($"{environmentPrefix}__VisibilityTimeoutSeconds", visibilityTimeoutSeconds.ToString(CultureInfo.InvariantCulture));
