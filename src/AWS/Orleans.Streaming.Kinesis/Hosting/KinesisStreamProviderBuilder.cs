@@ -76,6 +76,7 @@ internal sealed class KinesisStreamProviderBuilder : IProviderBuilder<ISiloBuild
             options.StreamName = streamName;
             options.Region = region
                 ?? options.Region
+                ?? configuration["AWS:Region"]
                 ?? configuration["AWS_REGION"]
                 ?? configuration["AWS_DEFAULT_REGION"];
             options.Service = configurationSection[nameof(options.Service)]
@@ -166,6 +167,7 @@ internal sealed class KinesisStreamProviderBuilder : IProviderBuilder<ISiloBuild
         options.Service = checkpointSection[nameof(options.Service)]
             ?? checkpointSection["Region"]
             ?? configuration["AWS_ENDPOINT_URL_DYNAMODB"]
+            ?? configuration["AWS:Region"]
             ?? configuration["AWS_REGION"]
             ?? configuration["AWS_DEFAULT_REGION"]
             ?? options.Service;

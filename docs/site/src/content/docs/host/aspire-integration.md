@@ -105,7 +105,7 @@ For automatically configured external resources, the AppHost needs the correspon
 | PostgreSQL and Azure Database for PostgreSQL | Database-resource inference and injected connection string | Clustering, grain storage, reminders, grain directory, streaming | [ADO.NET configuration](configuration-guide/configuring-ado-dot-net-providers.md) |
 | MySQL and MariaDB | Database-resource inference and injected connection string | Clustering, grain storage, reminders, grain directory, streaming | [ADO.NET configuration](configuration-guide/configuring-ado-dot-net-providers.md) |
 | Oracle Database | Database-resource inference and injected connection string | Clustering, grain storage, reminders | [ADO.NET configuration](configuration-guide/configuring-ado-dot-net-providers.md) |
-| Azure Event Hubs | Resource inference, keyed Event Hubs clients, and Azure Table checkpoints | Streaming | [Stream providers](../streaming/stream-providers.md) |
+| Azure Event Hubs | Resource inference, injected Event Hubs connection metadata, and a keyed Azure Tables checkpoint client | Streaming | [Stream providers](../streaming/stream-providers.md) |
 | NATS JetStream | Resource inference and keyed `INatsConnection` | Streaming | [Stream providers](../streaming/stream-providers.md) |
 | Amazon DynamoDB | Explicit `IProviderConfiguration` mapping for AWS endpoints and structured outputs | Clustering, grain storage, reminders | [DynamoDB with Aspire](dynamodb-aspire.md) |
 | Amazon SQS | Explicit partition-topology configuration from the AppHost | Streaming | [SQS streaming](../streaming/sqs-streaming.md) and prerequisite [#10797](https://github.com/dotnet/orleans/pull/10797) |

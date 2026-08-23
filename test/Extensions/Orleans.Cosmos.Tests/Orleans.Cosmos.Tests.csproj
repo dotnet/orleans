@@ -41,4 +41,7 @@
     <ProjectReference Include="$(SourceRoot)test\Orleans.Runtime.Internal.Tests\Orleans.Runtime.Internal.Tests.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <Compile Include="$(SourceRoot)test\Extensions\AspireTestInfrastructure\AspireResourceConfiguration.cs" Link="AspireResourceConfiguration.cs" />
+  </ItemGroup>
 </Project>
