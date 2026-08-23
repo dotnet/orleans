@@ -276,6 +276,10 @@ try {
             'Coverage must use the external collector with ContinuousIntegrationBuild.'
         Assert-Matches `
             $collectorScript `
+            '-p:ContinuousIntegrationBuild=false' `
+            'Coverage builds must disable deterministic CI instrumentation.'
+        Assert-Matches `
+            $collectorScript `
             'contains no measured lines' `
             'Coverage collection must reject empty reports from successful test runs.'
     }

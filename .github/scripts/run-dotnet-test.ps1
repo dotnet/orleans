@@ -60,6 +60,7 @@ if ($env:GITHUB_EVENT_NAME -ne 'pull_request') {
     return
 }
 
+$testArguments.Add('-p:ContinuousIntegrationBuild=false')
 $coverageTool = (Get-Command dotnet-coverage -ErrorAction Stop).Source
 $repositoryRoot = (Resolve-Path (Join-Path $PSScriptRoot '../..')).Path
 $coverageSettings = Join-Path $repositoryRoot '.github/coverage.config.xml'
