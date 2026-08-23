@@ -1,5 +1,9 @@
+using Amazon;
 using Aspire.Hosting;
+using Aspire.Hosting.ApplicationModel;
+using Aspire.Hosting.AWS;
 using Aspire.Hosting.Azure;
+using Aspire.Hosting.Orleans;
 
 namespace Orleans.Docs.Snippets.Aspire;
 
@@ -8,6 +12,39 @@ namespace Orleans.Docs.Snippets.Aspire;
 
 public static class AppHostExamples
 {
+    // <sqs_streaming_apphost>
+    public static void SqsStreaming(string[] args)
+    {
+        var builder = DistributedApplication.CreateBuilder(args);
+
+        var aws = builder.AddAWSSDKConfig()
+            .WithRegion(RegionEndpoint.USEast1);
+
+        var orleans = builder.AddOrleans("cluster")
+            .WithDevelopmentClustering()
+            .WithMemoryGrainStorage("PubSubStore")
+            .WithStreaming(
+                "Orders",
+                new SqsProviderConfiguration(
+                    aws,
+                    partitionCount: 16,
+                    cacheSize: 8192,
+                    fifoQueue: true,
+                    receiveWaitTimeSeconds: 20,
+                    visibilityTimeoutSeconds: 60));
+
+        var silo = builder.AddProject<Projects.Silo>("silo")
+            .WithReference(orleans)
+            .WithReplicas(3);
+
+        builder.AddProject<Projects.Client>("client")
+            .WithReference(orleans.AsClient())
+            .WaitFor(silo);
+
+        builder.Build().Run();
+    }
+    // </sqs_streaming_apphost>
+
     // <basic_orleans_cluster>
     public static void BasicOrleansCluster(string[] args)
     {
@@ -263,4 +300,31 @@ public static class AppHostExamples
         builder.Build().Run();
     }
     // </explicit_cluster_ids>
+
+    // <sqs_provider_configuration>
+    private sealed class SqsProviderConfiguration(
+        IAWSSDKConfig aws,
+        int partitionCount,
+        int cacheSize,
+        bool fifoQueue,
+        int receiveWaitTimeSeconds,
+        int visibilityTimeoutSeconds) : IProviderConfiguration
+    {
+        public void ConfigureResource<T>(
+            IResourceBuilder<T> resourceBuilder,
+            string configSectionPath)
+            where T : IResourceWithEnvironment
+        {
+            var environmentPrefix = configSectionPath.Replace(":", "__", StringComparison.Ordinal);
+            resourceBuilder
+                .WithReference(aws)
+                .WithEnvironment($"{environmentPrefix}__ProviderType", "SQS")
+                .WithEnvironment($"{environmentPrefix}__PartitionCount", partitionCount.ToString())
+                .WithEnvironment($"{environmentPrefix}__CacheSize", cacheSize.ToString())
+                .WithEnvironment($"{environmentPrefix}__FifoQueue", fifoQueue.ToString())
+                .WithEnvironment($"{environmentPrefix}__ReceiveWaitTimeSeconds", receiveWaitTimeSeconds.ToString())
+                .WithEnvironment($"{environmentPrefix}__VisibilityTimeoutSeconds", visibilityTimeoutSeconds.ToString());
+        }
+    }
+    // </sqs_provider_configuration>
 }

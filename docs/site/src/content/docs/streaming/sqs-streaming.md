@@ -25,6 +25,30 @@ Configure each Orleans client which publishes through the provider with the same
 
 The `Service` connection value accepts an AWS region such as `us-east-1` or an SQS-compatible endpoint such as `http://localhost:4566`. With a region, the provider uses the [AWS SDK for .NET credential resolution chain](https://docs.aws.amazon.com/sdk-for-net/v4/developer-guide/creds-assign.html) when the connection string contains no explicit credentials. Prefer workload credentials such as an IAM role. A protected connection string can supply `AccessKey`, `SecretKey`, and `SessionToken` when the deployment requires explicit temporary credentials.
 
+## Configure SQS streams with Aspire
+
+The Aspire application model represents the shared SQS service configuration and complete topology settings for an Orleans stream provider. Orleans derives the physical queue topology from the service ID, provider name, and configured partition count, then creates each mapped queue when its partition is first used.
+
+Configure the AWS SDK region and identify the Orleans provider type as `SQS`:
+
+:::code language="csharp" source="../host/snippets/aspire/AppHost/AppHostExamples.cs" id="sqs_streaming_apphost":::
+
+The provider configuration connects the AWS SDK resource and emits identical topology settings for each silo or client resource:
+
+:::code language="csharp" source="../host/snippets/aspire/AppHost/AppHostExamples.cs" id="sqs_provider_configuration":::
+
+The AppHost supplies the same provider name, partition count, and FIFO mode to silos and clients. `CacheSize` applies to silo pulling agents. The AWS SDK reference supplies `AWS_REGION` and can supply `AWS_PROFILE`; workload identity and shared AWS configuration remain available through the SDK credential chain.
+
+The silo activates generated `Orleans:Streaming:Orders` configuration through <xref:Microsoft.Extensions.Hosting.OrleansSiloGenericHostExtensions.UseOrleans*>:
+
+:::code language="csharp" source="../host/snippets/aspire/Silo/SiloProgram.cs" id="sqs_streaming_silo":::
+
+The client activates the matching publishing provider through <xref:Microsoft.Extensions.Hosting.OrleansClientGenericHostExtensions.UseOrleansClient*>:
+
+:::code language="csharp" source="../host/snippets/aspire/Client/ClientProgram.cs" id="sqs_streaming_client":::
+
+For SQS-compatible local services, emit `ServiceEndpoint=http://localhost:9324` in the provider configuration. Provider configuration also accepts `Region`, `ConnectionString`, `ReceiveWaitTimeSeconds`, `VisibilityTimeoutSeconds`, indexed `ReceiveMessageAttributes` and `ReceiveMessageSystemAttributes`, and a keyed `ISQSDataAdapter` through `DataAdapterKey`.
+
 ## Preserve per-stream order with FIFO queues
 
 Set <xref:Orleans.Configuration.SqsOptions.FifoQueue> to use SQS FIFO queues:
