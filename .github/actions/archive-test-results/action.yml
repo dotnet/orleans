@@ -1,0 +1,29 @@
+name: Archive test results
+description: Upload diagnostics and require a coverage report for pull requests.
+
+inputs:
+  name:
+    description: Artifact name.
+    required: true
+
+runs:
+  using: composite
+  steps:
+  - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+    continue-on-error: true
+    with:
+      name: ${{ inputs.name }}
+      if-no-files-found: warn
+      retention-days: 1
+      path: |
+        **/TestResults/*
+        !TestResults/*.cobertura.xml
+        **/logs/*
+  - name: Archive coverage
+    if: github.event_name == 'pull_request'
+    uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+    with:
+      name: coverage_${{ inputs.name }}
+      if-no-files-found: error
+      retention-days: 1
+      path: TestResults/${{ inputs.name }}.cobertura.xml

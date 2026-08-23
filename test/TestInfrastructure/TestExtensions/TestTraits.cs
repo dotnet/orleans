@@ -20,7 +20,7 @@ internal static class TestTraitNames
 /// [TestSuite("BVT")]
 /// </code>
 /// </example>
-[AttributeUsage(AttributeTargets.Class | AttributeTargets.Method, AllowMultiple = true)]
+[AttributeUsage(AttributeTargets.Assembly | AttributeTargets.Class | AttributeTargets.Method, AllowMultiple = true)]
 public sealed class TestSuiteAttribute : Attribute, ITraitAttribute
 {
     public TestSuiteAttribute(string suite)
@@ -45,7 +45,7 @@ public sealed class TestSuiteAttribute : Attribute, ITraitAttribute
 /// [TestProvider("None")]
 /// </code>
 /// </example>
-[AttributeUsage(AttributeTargets.Class | AttributeTargets.Method, AllowMultiple = true)]
+[AttributeUsage(AttributeTargets.Assembly | AttributeTargets.Class | AttributeTargets.Method, AllowMultiple = true)]
 public sealed class TestProviderAttribute : Attribute, ITraitAttribute
 {
     public TestProviderAttribute(string provider)
@@ -67,7 +67,7 @@ public sealed class TestProviderAttribute : Attribute, ITraitAttribute
 /// [TestArea("Streaming")]
 /// </code>
 /// </example>
-[AttributeUsage(AttributeTargets.Class | AttributeTargets.Method, AllowMultiple = true)]
+[AttributeUsage(AttributeTargets.Assembly | AttributeTargets.Class | AttributeTargets.Method, AllowMultiple = true)]
 public sealed class TestAreaAttribute : Attribute, ITraitAttribute
 {
     public TestAreaAttribute(string area)

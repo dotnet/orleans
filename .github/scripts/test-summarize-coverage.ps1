@@ -5,6 +5,12 @@ Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
 $scriptPath = Join-Path $PSScriptRoot 'summarize-coverage.ps1'
+$coverageReportScriptPath = Join-Path $PSScriptRoot 'coverage-report.ps1'
+$archiveTestResultsActionPath = Join-Path $PSScriptRoot '../actions/archive-test-results/action.yml'
+$dotnetTestActionPath = Join-Path $PSScriptRoot '../actions/dotnet-test/action.yml'
+$runTestsActionPath = Join-Path $PSScriptRoot '../actions/run-tests/action.yml'
+$setupCoverageScriptPath = Join-Path $PSScriptRoot 'setup-coverage.ps1'
+$workflowPath = Join-Path $PSScriptRoot '../workflows/ci.yml'
 $temporaryRoot = Join-Path ([IO.Path]::GetTempPath()) "orleans-coverage-tests-$([guid]::NewGuid())"
 $testsRun = 0
 
@@ -38,6 +44,18 @@ function Assert-Throws {
 
     if (-not $threw) {
         throw "Expected error matching '$Pattern'."
+    }
+}
+
+function Assert-Matches {
+    param(
+        [string] $Value,
+        [string] $Pattern,
+        [string] $Message
+    )
+
+    if ($Value -notmatch $Pattern) {
+        throw "$Message Expected content matching '$Pattern'."
     }
 }
 
@@ -244,6 +262,124 @@ try {
         )
         [void] (New-Item -ItemType SymbolicLink -Path (Join-Path $testCase.ReportDirectory 'coverage.cobertura.xml') -Target $target)
         Assert-Throws { Invoke-Summarizer $testCase } 'must not be a symbolic link'
+    }
+
+    Invoke-Test 'keeps coverage runs distinct' {
+        $coverageReportScript = Get-Content -Raw -LiteralPath $coverageReportScriptPath
+        Assert-Matches `
+            $coverageReportScript `
+            '"\$CoverageId\.cobertura\.xml"' `
+            'Coverage file names must include the complete matrix identity.'
+    }
+
+    Invoke-Test 'uses external coverage collection for CI builds' {
+        $dotnetTestAction = Get-Content -Raw -LiteralPath $dotnetTestActionPath
+        $coverageReportScript = Get-Content -Raw -LiteralPath $coverageReportScriptPath
+        Assert-Matches `
+            $dotnetTestAction `
+            'dotnet-coverage collect' `
+            'Coverage must use the external collector with ContinuousIntegrationBuild.'
+        Assert-Matches `
+            $dotnetTestAction `
+            '-p:ContinuousIntegrationBuild=false' `
+            'Coverage builds must disable deterministic CI instrumentation.'
+        Assert-Matches `
+            $dotnetTestAction `
+            '--include-files=' `
+            'macOS coverage must specify files for static instrumentation.'
+        Assert-Matches `
+            $dotnetTestAction `
+            'coverage\.static\.config\.xml' `
+            'macOS coverage must use static-only instrumentation settings.'
+        Assert-Matches `
+            $dotnetTestAction `
+            '--no-build' `
+            'Coverage tests must execute the statically instrumented build.'
+        Assert-Matches `
+            $coverageReportScript `
+            'Assert-NotReparsePoint \$coverageDirectory' `
+            'Coverage collection must reject a linked output directory.'
+        Assert-Matches `
+            $coverageReportScript `
+            'Assert-NotReparsePoint \$coverageOutput' `
+            'Coverage collection must reject a linked output file.'
+        Assert-Matches `
+            $coverageReportScript `
+            'contains no measured lines' `
+            'Coverage collection must reject empty reports from successful test runs.'
+        Assert-Matches `
+            $dotnetTestAction `
+            'dotnet test --solution Orleans\.slnx' `
+            'Test partitions must use native solution discovery.'
+    }
+
+    Invoke-Test 'downloads only coverage artifacts for merging' {
+        $workflow = Get-Content -Raw -LiteralPath $workflowPath
+        Assert-Matches `
+            $workflow `
+            '(?s)pattern:\s*coverage_test_output_\*.*?merge-multiple:\s*true' `
+            'Coverage reports must download directly into the merge directory.'
+    }
+
+    Invoke-Test 'requires every test matrix job before merging' {
+        $workflow = Get-Content -Raw -LiteralPath $workflowPath
+        $archiveTestResultsAction = Get-Content -Raw -LiteralPath $archiveTestResultsActionPath
+        Assert-Matches `
+            $workflow `
+            "if: github\.event_name == 'pull_request' && needs\.ci\.result == 'success'" `
+            'Coverage merge must run only after every CI job succeeds.'
+        Assert-Matches `
+            $workflow `
+            'needs: ci' `
+            'Coverage merge must depend on the aggregate CI job.'
+        Assert-Matches `
+            $workflow `
+            '(?s)coverage-merge:.*?actions/checkout@.*?actions/setup-dotnet@.*?actions/setup-coverage' `
+            'Coverage merge must check out scripts before running local actions.'
+        Assert-Matches `
+            $workflow `
+            'dotnet-coverage merge "coverage-data/\*\.cobertura\.xml"' `
+            'Coverage reports must be merged directly by dotnet-coverage.'
+        Assert-Matches `
+            $workflow `
+            'New-Item -ItemType Directory -Force TestResults' `
+            'Coverage merge must create its output directory.'
+        Assert-Matches `
+            $archiveTestResultsAction `
+            'if-no-files-found: error' `
+            'Each successful pull request test job must publish coverage.'
+        Assert-Matches `
+            $archiveTestResultsAction `
+            'path: TestResults/\$\{\{ inputs\.name \}\}\.cobertura\.xml' `
+            'Each test job must publish its exact coverage report.'
+    }
+
+    Invoke-Test 'collects coverage from every test job' {
+        $workflow = Get-Content -Raw -LiteralPath $workflowPath
+        $runTestsAction = Get-Content -Raw -LiteralPath $runTestsActionPath
+        $dotnetTestAction = Get-Content -Raw -LiteralPath $dotnetTestActionPath
+        Assert-Equal 18 ([regex]::Matches($workflow, 'uses: \./\.github/actions/run-tests')).Count 'Test action count differs.'
+        Assert-Equal 16 ([regex]::Matches($workflow, '(?m)^\s{8}provider: [A-Za-z]')).Count 'Provider-discovered test partition count differs.'
+        Assert-Equal 2 ([regex]::Matches($runTestsAction, 'uses: \./\.github/actions/dotnet-test')).Count 'Native test action invocation count differs.'
+        Assert-Equal 2 ([regex]::Matches($runTestsAction, "format\('/\[\(Provider=\{0\}\)")).Count 'Standard provider filter count differs.'
+        Assert-Equal 4 ([regex]::Matches($dotnetTestAction, 'dotnet test --solution Orleans\.slnx')).Count 'Native test command count differs.'
+        Assert-Matches $dotnetTestAction '--framework "\$\{\{ inputs\.framework \}\}".*?--list-tests' 'Static coverage builds must target and discover the selected framework.'
+        Assert-Equal 1 ([regex]::Matches($workflow, "retry: 'true'")).Count 'Cosmos retry configuration count differs.'
+        Assert-Matches $runTestsAction 'attempt1' 'The first retryable attempt must retain distinct test results.'
+        Assert-Matches $runTestsAction 'attempt2' 'The second retryable attempt must retain distinct test results.'
+        Assert-Equal 0 ([regex]::Matches($workflow, 'test/.+\.(?:csproj|fsproj|dll)')).Count 'Workflow must not enumerate test projects or modules.'
+        Assert-Equal 0 ([regex]::Matches($workflow, 'run-.+tests?\.ps1')).Count 'Workflow must not invoke a PowerShell test runner.'
+        Assert-Equal 0 ([regex]::Matches($workflow, 'merge-coverage\.ps1')).Count 'Workflow must use native coverage merging.'
+        Assert-Equal 0 ([regex]::Matches($dotnetTestAction, '--project|--test-modules')).Count 'Native test action must discover projects from the solution.'
+    }
+
+    Invoke-Test 'validates the coverage tool version' {
+        $setupCoverageScript = Get-Content -Raw -LiteralPath $setupCoverageScriptPath
+        Assert-Matches `
+            $setupCoverageScript `
+            'DOTNET_COVERAGE_VERSION must specify' `
+            'Coverage setup must reject a missing tool version.'
+        Assert-Equal 2 ([regex]::Matches($setupCoverageScript, 'Assert-NotReparsePoint \$toolPath')).Count 'Coverage tool path validation count differs.'
     }
 
     Write-Output "$testsRun coverage tests passed."

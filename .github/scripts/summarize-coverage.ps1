@@ -181,7 +181,7 @@ $markdown = @(
     ''
     "Measured $sourceFileDisplay source files from the merged coverage report."
     ''
-    'Coverage combines the BVT, SlowBVT, and Functional suites on Linux with .NET 10 and measures repository source under `src/`.'
+    'Coverage combines every CI test matrix job, including providers, CodeGen, .NET 8/10, Linux, Windows, and macOS, and measures loaded repository source under `src/`.'
     ''
 ) -join "`n"
 Set-Content -LiteralPath $MarkdownOutput -Value $markdown -Encoding utf8NoBOM
