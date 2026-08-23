@@ -17,6 +17,9 @@ namespace Orleans.Runtime;
 /// </summary>
 internal sealed partial class ActivationWorkingSet : IActivationWorkingSet, ILifecycleParticipant<ISiloLifecycle>
 {
+    // The low bit stores idle state and the remaining 63 bits identify the membership generation.
+    // Comparing the complete state prevents stale scan entries from changing a member after removal and re-addition.
+    // A generation is reused only after 2^63 successful additions within one process lifetime.
     private const long IdleMask = 1;
     private readonly ConcurrentDictionary<IActivationWorkingSetMember, long> _members = new();
     private readonly ILogger _logger;
