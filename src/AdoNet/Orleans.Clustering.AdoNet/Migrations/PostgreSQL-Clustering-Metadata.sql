@@ -1,6 +1,8 @@
 ALTER TABLE OrleansMembershipTable ADD COLUMN IF NOT EXISTS MetadataJson text NULL;
+ALTER TABLE OrleansMembershipTable ALTER COLUMN MetadataJson TYPE text USING MetadataJson::text;
+ALTER TABLE OrleansMembershipTable ALTER COLUMN MetadataJson DROP NOT NULL;
 
-CREATE OR REPLACE FUNCTION insert_membership(
+CREATE OR REPLACE FUNCTION insert_membership_v2(
     DeploymentIdArg OrleansMembershipTable.DeploymentId%TYPE,
     AddressArg      OrleansMembershipTable.Address%TYPE,
     PortArg         OrleansMembershipTable.Port%TYPE,
@@ -68,7 +70,7 @@ BEGIN
 END
 $func$ LANGUAGE plpgsql;
 
-CREATE OR REPLACE FUNCTION update_membership(
+CREATE OR REPLACE FUNCTION update_membership_v2(
     DeploymentIdArg OrleansMembershipTable.DeploymentId%TYPE,
     AddressArg      OrleansMembershipTable.Address%TYPE,
     PortArg         OrleansMembershipTable.Port%TYPE,
@@ -118,9 +120,12 @@ BEGIN
 END
 $func$ LANGUAGE plpgsql;
 
-UPDATE OrleansQuery
-SET QueryText = $query$
-    SELECT * FROM insert_membership(
+INSERT INTO OrleansQuery(QueryKey, QueryText)
+VALUES
+(
+    'InsertMembershipV2Key',
+    $query$
+    SELECT * FROM insert_membership_v2(
         @DeploymentId,
         @Address,
         @Port,
@@ -134,12 +139,16 @@ SET QueryText = $query$
         @MetadataJson,
         @Version
     );
-$query$
-WHERE QueryKey = 'InsertMembershipKey';
+    $query$
+)
+ON CONFLICT (QueryKey) DO UPDATE SET QueryText = EXCLUDED.QueryText;
 
-UPDATE OrleansQuery
-SET QueryText = $query$
-    SELECT * FROM update_membership(
+INSERT INTO OrleansQuery(QueryKey, QueryText)
+VALUES
+(
+    'UpdateMembershipV2Key',
+    $query$
+    SELECT * FROM update_membership_v2(
         @DeploymentId,
         @Address,
         @Port,
@@ -150,11 +159,15 @@ SET QueryText = $query$
         @MetadataJson,
         @Version
     );
-$query$
-WHERE QueryKey = 'UpdateMembershipKey';
+    $query$
+)
+ON CONFLICT (QueryKey) DO UPDATE SET QueryText = EXCLUDED.QueryText;
 
-UPDATE OrleansQuery
-SET QueryText = $query$
+INSERT INTO OrleansQuery(QueryKey, QueryText)
+VALUES
+(
+    'MembershipReadRowV2Key',
+    $query$
     SELECT
         v.DeploymentId,
         m.Address,
@@ -177,11 +190,15 @@ SET QueryText = $query$
         AND Generation = @Generation AND @Generation IS NOT NULL
     WHERE
         v.DeploymentId = @DeploymentId AND @DeploymentId IS NOT NULL;
-$query$
-WHERE QueryKey = 'MembershipReadRowKey';
+    $query$
+)
+ON CONFLICT (QueryKey) DO UPDATE SET QueryText = EXCLUDED.QueryText;
 
-UPDATE OrleansQuery
-SET QueryText = $query$
+INSERT INTO OrleansQuery(QueryKey, QueryText)
+VALUES
+(
+    'MembershipReadAllV2Key',
+    $query$
     SELECT
         v.DeploymentId,
         m.Address,
@@ -201,5 +218,6 @@ SET QueryText = $query$
         ON v.DeploymentId = m.DeploymentId
     WHERE
         v.DeploymentId = @DeploymentId AND @DeploymentId IS NOT NULL;
-$query$
-WHERE QueryKey = 'MembershipReadAllKey';
+    $query$
+)
+ON CONFLICT (QueryKey) DO UPDATE SET QueryText = EXCLUDED.QueryText;

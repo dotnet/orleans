@@ -91,6 +91,8 @@ namespace Orleans.Runtime
         /// <remarks>
         /// A <see langword="null"/> value indicates that metadata is unavailable. An empty
         /// <see cref="SiloMetadata"/> value indicates that metadata is available and empty.
+        /// Metadata is fixed for the lifetime of a silo instance. Equal-version membership
+        /// updates can enrich unavailable metadata and preserve the first available value.
         /// </remarks>
         [Id(4)]
         public SiloMetadata? Metadata { get; }
@@ -121,7 +123,7 @@ namespace Orleans.Runtime
         bool ISpanFormattable.TryFormat(Span<char> destination, out int charsWritten, ReadOnlySpan<char> format, IFormatProvider? provider)
             => destination.TryWrite($"{this.SiloAddress}/{this.Name}/{this.Status}/MetadataAvailable={this.IsMetadataAvailable}/MetadataCount={this.Metadata?.Metadata.Count ?? 0}", out charsWritten);
 
-        private static bool MetadataEquals(SiloMetadata? left, SiloMetadata? right)
+        internal static bool MetadataEquals(SiloMetadata? left, SiloMetadata? right)
         {
             if (ReferenceEquals(left, right))
             {

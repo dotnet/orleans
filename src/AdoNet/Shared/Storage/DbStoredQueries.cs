@@ -34,9 +34,29 @@ namespace Orleans.Tests.SqlUtils
     internal class DbStoredQueries
     {
         private readonly Dictionary<string, string> queries;
+#if CLUSTERING_ADONET || TESTER_SQLUTILS
+        private static readonly string[] MembershipMetadataQueryKeys =
+        [
+            "InsertMembershipV2Key",
+            "UpdateMembershipV2Key",
+            "MembershipReadRowV2Key",
+            "MembershipReadAllV2Key"
+        ];
+        private readonly bool supportsMembershipMetadata;
+#endif
 
         internal DbStoredQueries(Dictionary<string, string> queries)
         {
+#if CLUSTERING_ADONET || TESTER_SQLUTILS
+            var membershipMetadataQueryCount = MembershipMetadataQueryKeys.Count(queries.ContainsKey);
+            if (membershipMetadataQueryCount != 0 && membershipMetadataQueryCount != MembershipMetadataQueryKeys.Length)
+            {
+                throw new ArgumentException(
+                    $"Membership metadata queries must be provided as a complete bundle. Missing are: {string.Join(",", MembershipMetadataQueryKeys.Except(queries.Keys))}");
+            }
+
+            supportsMembershipMetadata = membershipMetadataQueryCount == MembershipMetadataQueryKeys.Length;
+#endif
             var fields = typeof(DbStoredQueries).GetProperties(BindingFlags.Instance | BindingFlags.NonPublic)
                 .Select(p => p.Name);
             var missingQueryKeys = fields.Except(queries.Keys).ToArray();
@@ -64,12 +84,12 @@ namespace Orleans.Tests.SqlUtils
         /// <summary>
         /// A query template to retrieve a single row of membership data.
         /// </summary>        
-        internal string MembershipReadRowKey => queries[nameof(MembershipReadRowKey)];
+        internal string MembershipReadRowKey => queries[supportsMembershipMetadata ? "MembershipReadRowV2Key" : nameof(MembershipReadRowKey)];
 
         /// <summary>
         /// A query template to retrieve all membership data.
         /// </summary>        
-        internal string MembershipReadAllKey => queries[nameof(MembershipReadAllKey)];
+        internal string MembershipReadAllKey => queries[supportsMembershipMetadata ? "MembershipReadAllV2Key" : nameof(MembershipReadAllKey)];
 
         /// <summary>
         /// A query template to insert a membership version row.
@@ -84,18 +104,15 @@ namespace Orleans.Tests.SqlUtils
         /// <summary>
         /// A query template to insert a membership row.
         /// </summary>
-        internal string InsertMembershipKey => queries[nameof(InsertMembershipKey)];
+        internal string InsertMembershipKey => queries[supportsMembershipMetadata ? "InsertMembershipV2Key" : nameof(InsertMembershipKey)];
 
         /// <summary>
         /// A query template to update a membership row.
         /// </summary>
-        internal string UpdateMembershipKey => queries[nameof(UpdateMembershipKey)];
+        internal string UpdateMembershipKey => queries[supportsMembershipMetadata ? "UpdateMembershipV2Key" : nameof(UpdateMembershipKey)];
 
         internal bool SupportsMembershipMetadata()
-            => MembershipReadAllKey.Contains(nameof(Columns.MetadataJson), StringComparison.OrdinalIgnoreCase)
-            && MembershipReadRowKey.Contains(nameof(Columns.MetadataJson), StringComparison.OrdinalIgnoreCase)
-            && InsertMembershipKey.Contains(nameof(Columns.MetadataJson), StringComparison.OrdinalIgnoreCase)
-            && UpdateMembershipKey.Contains(nameof(Columns.MetadataJson), StringComparison.OrdinalIgnoreCase);
+            => supportsMembershipMetadata;
 
         /// <summary>
         /// A query template to delete membership entries.

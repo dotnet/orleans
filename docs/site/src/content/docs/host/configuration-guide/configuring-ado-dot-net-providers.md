@@ -1,7 +1,7 @@
 ---
 title: Configure ADO.NET providers
 description: Configure Orleans clustering, reminders, storage, and grain directories with ADO.NET.
-ms.date: 08/10/2026
+ms.date: 08/23/2026
 ms.topic: how-to
 ---
 
@@ -30,6 +30,8 @@ Run the main script for the database first, followed by each capability script. 
 See [ADO.NET database configuration](adonet-configuration.md) for schema script and invariant links.
 
 Apply schema changes as a controlled deployment step. Don't grant silos schema-owner permissions solely so they can create tables at runtime.
+
+When upgrading clustering to a release which persists silo metadata, apply the provider's clustering metadata migration before rolling the binaries. The migration preserves the legacy membership query contract for older silos and adds a versioned contract for metadata-aware silos. A new binary which initializes before the migration uses the legacy contract for that process lifetime; restart it after the migration to enable metadata persistence. This sequencing supports both old-before-new and new-before-old initialization during a rolling upgrade.
 
 The scripts create tables and the `OrleansQuery` table using the database user's
 default schema, and the provider queries refer to those objects by unqualified

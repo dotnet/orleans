@@ -32,6 +32,67 @@ CREATE TABLE "ORLEANSMEMBERSHIPTABLE"
 /
 
 CREATE OR REPLACE FUNCTION InsertMembership(PARAM_DEPLOYMENTID IN NVARCHAR2, PARAM_IAMALIVETIME IN TIMESTAMP, PARAM_SILONAME IN NVARCHAR2, PARAM_HOSTNAME IN NVARCHAR2, PARAM_ADDRESS IN VARCHAR2,
+                                    PARAM_PORT IN NUMBER, PARAM_GENERATION IN NUMBER, PARAM_STARTTIME IN TIMESTAMP, PARAM_STATUS IN NUMBER, PARAM_PROXYPORT IN NUMBER, PARAM_VERSION IN NUMBER)
+  RETURN NUMBER IS
+  rowcount NUMBER;
+  PRAGMA AUTONOMOUS_TRANSACTION;
+  BEGIN
+    INSERT INTO OrleansMembershipTable
+    (
+      DeploymentId,
+      Address,
+      Port,
+      Generation,
+      SiloName,
+      HostName,
+      Status,
+      ProxyPort,
+      StartTime,
+      IAmAliveTime
+    )
+    SELECT
+      PARAM_DEPLOYMENTID,
+      PARAM_ADDRESS,
+      PARAM_PORT,
+      PARAM_GENERATION,
+      PARAM_SILONAME,
+      PARAM_HOSTNAME,
+      PARAM_STATUS,
+      PARAM_PROXYPORT,
+      PARAM_STARTTIME,
+      PARAM_IAMALIVETIME
+    FROM DUAL WHERE NOT EXISTS
+    (
+      SELECT 1 FROM OrleansMembershipTable WHERE
+        DeploymentId = PARAM_DEPLOYMENTID AND PARAM_DEPLOYMENTID IS NOT NULL
+        AND Address = PARAM_ADDRESS AND PARAM_ADDRESS IS NOT NULL
+        AND Port = PARAM_PORT AND PARAM_PORT IS NOT NULL
+        AND Generation = PARAM_GENERATION AND PARAM_GENERATION IS NOT NULL
+    );
+    rowcount :=	SQL%ROWCOUNT;
+    UPDATE OrleansMembershipVersionTable
+    SET Timestamp = sys_extract_utc(systimestamp),
+        Version = Version + 1
+    WHERE
+  		DeploymentId = PARAM_DEPLOYMENTID AND PARAM_DEPLOYMENTID IS NOT NULL
+    	AND Version = PARAM_VERSION AND PARAM_VERSION IS NOT NULL
+      AND rowcount > 0;
+    rowcount :=	SQL%ROWCOUNT;
+    IF rowcount = 0 THEN
+      ROLLBACK;
+    ELSE
+      COMMIT;
+    END IF;
+
+    IF rowcount > 0 THEN
+      RETURN(1);
+    ELSE
+      RETURN(0);
+    END IF;
+  END;
+/
+
+CREATE OR REPLACE FUNCTION InsertMembershipV2(PARAM_DEPLOYMENTID IN NVARCHAR2, PARAM_IAMALIVETIME IN TIMESTAMP, PARAM_SILONAME IN NVARCHAR2, PARAM_HOSTNAME IN NVARCHAR2, PARAM_ADDRESS IN VARCHAR2,
                                     PARAM_PORT IN NUMBER, PARAM_GENERATION IN NUMBER, PARAM_STARTTIME IN TIMESTAMP, PARAM_STATUS IN NUMBER, PARAM_PROXYPORT IN NUMBER, PARAM_METADATAJSON IN NCLOB, PARAM_VERSION IN NUMBER)
   RETURN NUMBER IS
   rowcount NUMBER;
@@ -71,15 +132,15 @@ CREATE OR REPLACE FUNCTION InsertMembership(PARAM_DEPLOYMENTID IN NVARCHAR2, PAR
         AND Port = PARAM_PORT AND PARAM_PORT IS NOT NULL
         AND Generation = PARAM_GENERATION AND PARAM_GENERATION IS NOT NULL
     );
-    rowcount :=	SQL%ROWCOUNT;
+    rowcount := SQL%ROWCOUNT;
     UPDATE OrleansMembershipVersionTable
     SET Timestamp = sys_extract_utc(systimestamp),
         Version = Version + 1
     WHERE
-  		DeploymentId = PARAM_DEPLOYMENTID AND PARAM_DEPLOYMENTID IS NOT NULL
-    	AND Version = PARAM_VERSION AND PARAM_VERSION IS NOT NULL
+        DeploymentId = PARAM_DEPLOYMENTID AND PARAM_DEPLOYMENTID IS NOT NULL
+        AND Version = PARAM_VERSION AND PARAM_VERSION IS NOT NULL
       AND rowcount > 0;
-    rowcount :=	SQL%ROWCOUNT;
+    rowcount := SQL%ROWCOUNT;
     IF rowcount = 0 THEN
       ROLLBACK;
     ELSE
@@ -95,7 +156,7 @@ CREATE OR REPLACE FUNCTION InsertMembership(PARAM_DEPLOYMENTID IN NVARCHAR2, PAR
 /
 
 CREATE OR REPLACE FUNCTION UpdateMembership(PARAM_DEPLOYMENTID IN NVARCHAR2, PARAM_ADDRESS IN VARCHAR2, PARAM_PORT IN NUMBER, PARAM_GENERATION IN NUMBER,
-                                               PARAM_IAMALIVETIME IN TIMESTAMP, PARAM_STATUS IN NUMBER, PARAM_SUSPECTTIMES IN VARCHAR2, PARAM_METADATAJSON IN NCLOB, PARAM_VERSION IN NUMBER
+                                               PARAM_IAMALIVETIME IN TIMESTAMP, PARAM_STATUS IN NUMBER, PARAM_SUSPECTTIMES IN VARCHAR2, PARAM_VERSION IN NUMBER
                                               )
   RETURN NUMBER IS
   rowcount NUMBER;
@@ -108,6 +169,37 @@ CREATE OR REPLACE FUNCTION UpdateMembership(PARAM_DEPLOYMENTID IN NVARCHAR2, PAR
     WHERE
 		DeploymentId = PARAM_DEPLOYMENTID AND PARAM_DEPLOYMENTID IS NOT NULL
 		AND Version = PARAM_VERSION AND PARAM_VERSION IS NOT NULL;
+    rowcount := SQL%ROWCOUNT;
+    UPDATE OrleansMembershipTable
+      SET
+        Status = PARAM_STATUS,
+        SuspectTimes = PARAM_SUSPECTTIMES,
+        IAmAliveTime = PARAM_IAMALIVETIME
+      WHERE DeploymentId = PARAM_DEPLOYMENTID AND PARAM_DEPLOYMENTID IS NOT NULL
+        AND Address = PARAM_ADDRESS AND PARAM_ADDRESS IS NOT NULL
+        AND Port = PARAM_PORT AND PARAM_PORT IS NOT NULL
+        AND Generation = PARAM_GENERATION AND PARAM_GENERATION IS NOT NULL
+        AND rowcount > 0;
+    rowcount := SQL%ROWCOUNT;
+    COMMIT;
+    RETURN(rowcount);
+  END;
+/
+
+CREATE OR REPLACE FUNCTION UpdateMembershipV2(PARAM_DEPLOYMENTID IN NVARCHAR2, PARAM_ADDRESS IN VARCHAR2, PARAM_PORT IN NUMBER, PARAM_GENERATION IN NUMBER,
+                                               PARAM_IAMALIVETIME IN TIMESTAMP, PARAM_STATUS IN NUMBER, PARAM_SUSPECTTIMES IN VARCHAR2, PARAM_METADATAJSON IN NCLOB, PARAM_VERSION IN NUMBER
+                                              )
+  RETURN NUMBER IS
+  rowcount NUMBER;
+  PRAGMA AUTONOMOUS_TRANSACTION;
+  BEGIN
+    UPDATE OrleansMembershipVersionTable
+      SET
+        Timestamp = sys_extract_utc(systimestamp),
+        Version = Version + 1
+    WHERE
+        DeploymentId = PARAM_DEPLOYMENTID AND PARAM_DEPLOYMENTID IS NOT NULL
+        AND Version = PARAM_VERSION AND PARAM_VERSION IS NOT NULL;
     rowcount := SQL%ROWCOUNT;
     UPDATE OrleansMembershipTable
       SET
@@ -186,7 +278,15 @@ INSERT INTO OrleansQuery(QueryKey, QueryText)
 VALUES
 (
     'InsertMembershipKey','
-    SELECT INSERTMEMBERSHIP(:DeploymentId,:IAmAliveTime,:SiloName,:Hostname,:Address,:Port,:Generation,:StartTime,:Status,:ProxyPort,:MetadataJson,:Version) FROM DUAL
+    SELECT INSERTMEMBERSHIP(:DeploymentId,:IAmAliveTime,:SiloName,:Hostname,:Address,:Port,:Generation,:StartTime,:Status,:ProxyPort,:Version) FROM DUAL
+');
+/
+
+INSERT INTO OrleansQuery(QueryKey, QueryText)
+VALUES
+(
+    'InsertMembershipV2Key','
+    SELECT InsertMembershipV2(:DeploymentId,:IAmAliveTime,:SiloName,:Hostname,:Address,:Port,:Generation,:StartTime,:Status,:ProxyPort,:MetadataJson,:Version) FROM DUAL
 ');
 /
 
@@ -194,7 +294,15 @@ INSERT INTO OrleansQuery(QueryKey, QueryText)
 VALUES
 (
     'UpdateMembershipKey','
-    SELECT UpdateMembership(:DeploymentId, :Address, :Port, :Generation, :IAmAliveTime, :Status, :SuspectTimes, :MetadataJson, :Version) AS RESULT FROM DUAL
+    SELECT UpdateMembership(:DeploymentId, :Address, :Port, :Generation, :IAmAliveTime, :Status, :SuspectTimes, :Version) AS RESULT FROM DUAL
+');
+/
+
+INSERT INTO OrleansQuery(QueryKey, QueryText)
+VALUES
+(
+    'UpdateMembershipV2Key','
+    SELECT UpdateMembershipV2(:DeploymentId, :Address, :Port, :Generation, :IAmAliveTime, :Status, :SuspectTimes, :MetadataJson, :Version) AS RESULT FROM DUAL
 ');
 /
 
@@ -202,6 +310,23 @@ INSERT INTO OrleansQuery(QueryKey, QueryText)
 VALUES
 (
     'MembershipReadRowKey','
+    SELECT v.DeploymentId, m.Address, m.Port, m.Generation, m.SiloName, m.HostName,
+       m.Status, m.ProxyPort, m.SuspectTimes, m.StartTime, m.IAmAliveTime, v.Version
+    FROM
+        OrleansMembershipVersionTable v
+        LEFT OUTER JOIN OrleansMembershipTable m ON v.DeploymentId = m.DeploymentId
+        AND Address = :Address AND :Address IS NOT NULL
+        AND Port = :Port AND :Port IS NOT NULL
+        AND Generation = :Generation AND :Generation IS NOT NULL
+    WHERE
+        v.DeploymentId = :DeploymentId AND :DeploymentId IS NOT NULL
+');
+/
+
+INSERT INTO OrleansQuery(QueryKey, QueryText)
+VALUES
+(
+    'MembershipReadRowV2Key','
     SELECT v.DeploymentId, m.Address, m.Port, m.Generation, m.SiloName, m.HostName,
        m.Status, m.ProxyPort, m.SuspectTimes, m.MetadataJson, m.StartTime, m.IAmAliveTime, v.Version
     FROM
@@ -219,6 +344,20 @@ INSERT INTO OrleansQuery(QueryKey, QueryText)
 VALUES
 (
     'MembershipReadAllKey','
+    SELECT v.DeploymentId, m.Address, m.Port, m.Generation, m.SiloName, m.HostName, m.Status,
+       m.ProxyPort, m.SuspectTimes, m.StartTime, m.IAmAliveTime, v.Version
+    FROM
+        OrleansMembershipVersionTable v
+        LEFT OUTER JOIN OrleansMembershipTable m ON v.DeploymentId = m.DeploymentId
+    WHERE
+        v.DeploymentId = :DeploymentId AND :DeploymentId IS NOT NULL
+');
+/
+
+INSERT INTO OrleansQuery(QueryKey, QueryText)
+VALUES
+(
+    'MembershipReadAllV2Key','
     SELECT v.DeploymentId, m.Address, m.Port, m.Generation, m.SiloName, m.HostName, m.Status,
        m.ProxyPort, m.SuspectTimes, m.MetadataJson, m.StartTime, m.IAmAliveTime, v.Version
     FROM

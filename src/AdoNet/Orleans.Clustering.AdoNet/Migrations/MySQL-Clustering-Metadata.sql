@@ -1,10 +1,25 @@
-ALTER TABLE OrleansMembershipTable ADD COLUMN IF NOT EXISTS MetadataJson TEXT NULL;
+SET @metadata_column_exists = (
+    SELECT COUNT(*)
+    FROM INFORMATION_SCHEMA.COLUMNS
+    WHERE TABLE_SCHEMA = DATABASE()
+      AND TABLE_NAME = 'OrleansMembershipTable'
+      AND COLUMN_NAME = 'MetadataJson'
+);
+SET @metadata_column_statement = IF(
+    @metadata_column_exists = 0,
+    'ALTER TABLE OrleansMembershipTable ADD COLUMN MetadataJson LONGTEXT NULL',
+    'SELECT 1'
+);
+PREPARE metadata_column_command FROM @metadata_column_statement;
+EXECUTE metadata_column_command;
+DEALLOCATE PREPARE metadata_column_command;
+ALTER TABLE OrleansMembershipTable MODIFY COLUMN MetadataJson LONGTEXT NULL;
 
-DROP PROCEDURE IF EXISTS InsertMembershipKey;
+DROP PROCEDURE IF EXISTS InsertMembershipV2Key;
 
 DELIMITER $$
 
-CREATE PROCEDURE InsertMembershipKey(
+CREATE PROCEDURE InsertMembershipV2Key(
     in    _DeploymentId NVARCHAR(150),
     in    _Address VARCHAR(45),
     in    _Port INT,
@@ -16,7 +31,7 @@ CREATE PROCEDURE InsertMembershipKey(
     in    _ProxyPort INT,
     in    _StartTime DATETIME,
     in    _IAmAliveTime DATETIME,
-    in    _MetadataJson TEXT
+    in    _MetadataJson LONGTEXT
 )
 BEGIN
     DECLARE _ROWCOUNT INT;
@@ -80,13 +95,20 @@ END$$
 
 DELIMITER ;
 
-UPDATE OrleansQuery
-SET QueryText = 'call InsertMembershipKey(@DeploymentId, @Address, @Port, @Generation,
+INSERT INTO OrleansQuery(QueryKey, QueryText)
+VALUES
+(
+    'InsertMembershipV2Key','
+    call InsertMembershipV2Key(@DeploymentId, @Address, @Port, @Generation,
     @Version, @SiloName, @HostName, @Status, @ProxyPort, @StartTime, @IAmAliveTime, @MetadataJson);'
-WHERE QueryKey = 'InsertMembershipKey';
+)
+ON DUPLICATE KEY UPDATE QueryText = VALUES(QueryText);
 
-UPDATE OrleansQuery
-SET QueryText = 'START TRANSACTION;
+INSERT INTO OrleansQuery(QueryKey, QueryText)
+VALUES
+(
+    'UpdateMembershipV2Key','
+    START TRANSACTION;
 
     UPDATE OrleansMembershipVersionTable
     SET
@@ -110,11 +132,14 @@ SET QueryText = 'START TRANSACTION;
 
     SELECT ROW_COUNT();
     COMMIT;
-'
-WHERE QueryKey = 'UpdateMembershipKey';
+')
+ON DUPLICATE KEY UPDATE QueryText = VALUES(QueryText);
 
-UPDATE OrleansQuery
-SET QueryText = 'SELECT
+INSERT INTO OrleansQuery(QueryKey, QueryText)
+VALUES
+(
+    'MembershipReadRowV2Key','
+    SELECT
         v.DeploymentId,
         m.Address,
         m.Port,
@@ -136,11 +161,14 @@ SET QueryText = 'SELECT
         AND Generation = @Generation AND @Generation IS NOT NULL
     WHERE
         v.DeploymentId = @DeploymentId AND @DeploymentId IS NOT NULL;
-'
-WHERE QueryKey = 'MembershipReadRowKey';
+')
+ON DUPLICATE KEY UPDATE QueryText = VALUES(QueryText);
 
-UPDATE OrleansQuery
-SET QueryText = 'SELECT
+INSERT INTO OrleansQuery(QueryKey, QueryText)
+VALUES
+(
+    'MembershipReadAllV2Key','
+    SELECT
         v.DeploymentId,
         m.Address,
         m.Port,
@@ -159,5 +187,5 @@ SET QueryText = 'SELECT
         ON v.DeploymentId = m.DeploymentId
     WHERE
         v.DeploymentId = @DeploymentId AND @DeploymentId IS NOT NULL;
-'
-WHERE QueryKey = 'MembershipReadAllKey';
+')
+ON DUPLICATE KEY UPDATE QueryText = VALUES(QueryText);

@@ -1,7 +1,7 @@
 ---
 title: ADO.NET database configuration
 description: Find Orleans ADO.NET schema scripts and provider invariants.
-ms.date: 08/02/2026
+ms.date: 08/23/2026
 ms.topic: reference
 ---
 
@@ -66,6 +66,17 @@ Not every capability supports every database. The presence of a script in the pr
 3. Apply the script for each configured Orleans capability.
 4. Review and apply scripts under the provider's `Migrations` directory when upgrading from an older schema.
 5. Validate with a staging cluster using the same driver and database engine version.
+
+### Roll out clustering metadata
+
+The clustering metadata migration adds a nullable metadata column and a complete set of versioned membership queries. Existing query keys and database routine signatures remain available for older silos.
+
+1. Apply the clustering metadata migration before deploying binaries which publish membership metadata.
+2. Roll the new binaries through the cluster. Older silos continue using the legacy membership queries, while newly initialized silos select the versioned metadata queries.
+3. Restart any new binary which initialized before the migration. A silo caches its selected query contract during initialization and begins publishing metadata after restarting against the migrated schema.
+4. Retain the versioned queries, legacy queries, routines, and metadata column through the rollback window.
+
+Membership metadata is fixed for each silo instance. A cluster view can move from unavailable metadata to an available value, and the first available value remains authoritative for that instance. The ADO.NET scripts use `nvarchar(max)`, `text`/`LONGTEXT`, or `NCLOB` storage so Orleans does not impose a 64-KiB metadata limit. Database request, row, and operational limits still apply.
 
 ## Production database layout
 

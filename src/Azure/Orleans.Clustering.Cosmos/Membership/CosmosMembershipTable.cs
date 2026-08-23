@@ -1,4 +1,6 @@
 using System.Net;
+using System.Security.Cryptography;
+using System.Text;
 using System.Collections.Immutable;
 using Orleans.Clustering.Cosmos.Models;
 
@@ -8,6 +10,7 @@ internal partial class CosmosMembershipTable : IMembershipTable
 {
     private const string PARTITION_KEY = "/ClusterId";
     private const string CLUSTER_VERSION_ID = "ClusterVersion";
+    internal static readonly TimeSpan MetadataOrphanGracePeriod = TimeSpan.FromMinutes(5);
     private readonly ILogger _logger;
     private readonly CosmosClusteringOptions _options;
     private readonly IServiceProvider _serviceProvider;
@@ -16,6 +19,8 @@ internal partial class CosmosMembershipTable : IMembershipTable
     private readonly QueryRequestOptions _queryRequestOptions;
     private CosmosClient _client = default!;
     private Container _container = default!;
+    private Container _metadataContainer = default!;
+    private string _metadataContainerName = default!;
     private SiloEntity? _self = null;
 
     public CosmosMembershipTable(
@@ -31,6 +36,7 @@ internal partial class CosmosMembershipTable : IMembershipTable
         _partitionKey = new(_clusterId);
 
         _queryRequestOptions = new() { PartitionKey = _partitionKey };
+        _metadataContainerName = GetMetadataContainerName(_options);
     }
 
     public async Task InitializeMembershipTable(bool tryInitTableVersion)
@@ -48,6 +54,8 @@ internal partial class CosmosMembershipTable : IMembershipTable
         }
 
         _container = _client.GetContainer(_options.DatabaseName, _options.ContainerName);
+        _metadataContainer = _client.GetContainer(_options.DatabaseName, _metadataContainerName);
+        await ValidateContainers().ConfigureAwait(false);
 
         ClusterVersionEntity? versionEntity = null;
 
@@ -91,7 +99,13 @@ internal partial class CosmosMembershipTable : IMembershipTable
 
             batch = batch.DeleteItem(CLUSTER_VERSION_ID);
 
-            await batch.ExecuteAsync().ConfigureAwait(false);
+            var response = await batch.ExecuteAsync().ConfigureAwait(false);
+            if (!response.IsSuccessStatusCode)
+            {
+                throw new OrleansException($"Unable to delete Cosmos DB membership entries. Status code: {response.StatusCode}.");
+            }
+
+            await DeleteMetadata((await ReadMetadata().ConfigureAwait(false)).Keys).ConfigureAwait(false);
         }
         catch (Exception ex)
         {
@@ -123,19 +137,25 @@ internal partial class CosmosMembershipTable : IMembershipTable
                 .Where(s => Math.Max(s.IAmAliveTime.Ticks, s.StartTime.Ticks) < beforeDate.Ticks)
                 .ToList();
 
-            if (silos.Count == 0)
+            if (silos.Count > 0)
             {
-                return;
+                var batch = _container.CreateTransactionalBatch(_partitionKey);
+
+                foreach (var silo in silos)
+                {
+                    batch = batch.DeleteItem(silo.Id);
+                }
+
+                var response = await batch.ExecuteAsync().ConfigureAwait(false);
+                if (!response.IsSuccessStatusCode)
+                {
+                    throw new OrleansException($"Unable to clean up defunct Cosmos DB membership entries. Status code: {response.StatusCode}.");
+                }
+
+                await DeleteMetadata(silos.Select(silo => silo.Id)).ConfigureAwait(false);
             }
 
-            var batch = _container.CreateTransactionalBatch(_partitionKey);
-
-            foreach (var silo in silos)
-            {
-                batch = batch.DeleteItem(silo.Id);
-            }
-
-            await batch.ExecuteAsync().ConfigureAwait(false);
+            await DeleteOrphanedMetadata().ConfigureAwait(false);
         }
         catch (Exception ex)
         {
@@ -152,11 +172,13 @@ internal partial class CosmosMembershipTable : IMembershipTable
         {
             var readClusterVersionTask = ReadClusterVersion();
             var readSiloTask = _container.ReadItemAsync<SiloEntity>(id, _partitionKey);
+            var readMetadataTask = ReadMetadata(id);
 
-            await Task.WhenAll(readClusterVersionTask, readSiloTask).ConfigureAwait(false);
+            await Task.WhenAll(readClusterVersionTask, readSiloTask, readMetadataTask).ConfigureAwait(false);
 
             var clusterVersion = await readClusterVersionTask;
             var silo = await readSiloTask;
+            var metadata = await readMetadataTask;
 
             TableVersion? version = null;
             if (clusterVersion is not null)
@@ -172,7 +194,7 @@ internal partial class CosmosMembershipTable : IMembershipTable
             var memEntries = new List<Tuple<MembershipEntry, string>>
             {
                 // Cosmos populates ETag on resources returned from reads.
-                Tuple.Create(ParseEntity(silo.Resource), silo.Resource.ETag!)
+                Tuple.Create(ParseEntity(silo.Resource, metadata), silo.Resource.ETag!)
             };
 
             // A cluster version record is created during provider initialization.
@@ -192,11 +214,13 @@ internal partial class CosmosMembershipTable : IMembershipTable
         {
             var readClusterVersionTask = ReadClusterVersion();
             var readSilosTask = ReadSilos();
+            var readMetadataTask = ReadMetadata();
 
-            await Task.WhenAll(readClusterVersionTask, readSilosTask).ConfigureAwait(false);
+            await Task.WhenAll(readClusterVersionTask, readSilosTask, readMetadataTask).ConfigureAwait(false);
 
             var clusterVersion = await readClusterVersionTask;
             var silos = await readSilosTask;
+            var metadata = await readMetadataTask;
 
             TableVersion? version = null;
             if (clusterVersion is not null)
@@ -214,7 +238,8 @@ internal partial class CosmosMembershipTable : IMembershipTable
             {
                 try
                 {
-                    var membershipEntry = ParseEntity(entity);
+                    metadata.TryGetValue(entity.Id, out var siloMetadata);
+                    var membershipEntry = ParseEntity(entity, siloMetadata);
                     // Cosmos populates ETag on resources returned from reads.
                     memEntries.Add(new Tuple<MembershipEntry, string>(membershipEntry, entity.ETag!));
                 }
@@ -242,6 +267,7 @@ internal partial class CosmosMembershipTable : IMembershipTable
         try
         {
             var siloEntity = ConvertToEntity(entry, _clusterId);
+            siloEntity.Metadata = await EnsureMetadata(siloEntity.Id, siloEntity.Metadata).ConfigureAwait(false) ?? siloEntity.Metadata;
             var versionEntity = BuildVersionEntity(tableVersion);
 
             var response = await _container.CreateTransactionalBatch(_partitionKey)
@@ -264,6 +290,10 @@ internal partial class CosmosMembershipTable : IMembershipTable
         try
         {
             var siloEntity = ConvertToEntity(entry, _clusterId);
+            siloEntity.Metadata = await EnsureMetadata(
+                siloEntity.Id,
+                siloEntity.Metadata,
+                preserveInlineMetadata: true).ConfigureAwait(false) ?? siloEntity.Metadata;
             siloEntity.ETag = etag;
 
             var versionEntity = BuildVersionEntity(tableVersion);
@@ -382,6 +412,208 @@ internal partial class CosmosMembershipTable : IMembershipTable
             }
             await Task.Delay(1000);
         }
+
+        var metadataContainerProperties = new ContainerProperties(_metadataContainerName, PARTITION_KEY);
+        metadataContainerProperties.IndexingPolicy.IndexingMode = IndexingMode.Consistent;
+        metadataContainerProperties.IndexingPolicy.IncludedPaths.Add(new IncludedPath { Path = "/ClusterId/?" });
+        metadataContainerProperties.IndexingPolicy.ExcludedPaths.Add(new ExcludedPath { Path = "/*" });
+        await db.CreateContainerIfNotExistsAsync(
+            metadataContainerProperties,
+            _options.ContainerThroughputProperties).ConfigureAwait(false);
+    }
+
+    internal static string GetMetadataContainerName(CosmosClusteringOptions options)
+    {
+        string result;
+        if (!string.IsNullOrWhiteSpace(options.MetadataContainerName))
+        {
+            result = options.MetadataContainerName;
+        }
+        else
+        {
+            const string suffix = "-Metadata";
+            if (options.ContainerName.Length + suffix.Length <= 255)
+            {
+                result = options.ContainerName + suffix;
+            }
+            else
+            {
+                var hash = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(options.ContainerName)));
+                result = options.ContainerName[..229] + suffix + "-" + hash[..16];
+            }
+        }
+
+        if (string.Equals(result, options.ContainerName, StringComparison.Ordinal))
+        {
+            throw new OrleansConfigurationException(
+                $"{nameof(CosmosClusteringOptions.MetadataContainerName)} must differ from {nameof(CosmosOptions.ContainerName)}.");
+        }
+
+        return result;
+    }
+
+    private async Task ValidateContainers()
+    {
+        try
+        {
+            await _container.ReadContainerAsync().ConfigureAwait(false);
+            var metadataContainer = await _metadataContainer.ReadContainerAsync().ConfigureAwait(false);
+            if (!string.Equals(metadataContainer.Resource.PartitionKeyPath, PARTITION_KEY, StringComparison.Ordinal))
+            {
+                throw new OrleansConfigurationException(
+                    $"Cosmos DB companion metadata container '{_metadataContainerName}' must use partition key path '{PARTITION_KEY}', "
+                    + $"but uses '{metadataContainer.Resource.PartitionKeyPath}'.");
+            }
+        }
+        catch (CosmosException exception) when (exception.StatusCode == HttpStatusCode.NotFound)
+        {
+            throw new OrleansException(
+                $"Cosmos DB membership requires both container '{_options.ContainerName}' and companion metadata container '{_metadataContainerName}' in database '{_options.DatabaseName}'. "
+                + $"Enable {nameof(CosmosOptions.IsResourceCreationEnabled)} or provision both containers with partition key '{PARTITION_KEY}'.",
+                exception);
+        }
+    }
+
+    private async Task<Dictionary<string, string>?> EnsureMetadata(
+        string id,
+        Dictionary<string, string>? metadata,
+        bool preserveInlineMetadata = false)
+    {
+        if (preserveInlineMetadata)
+        {
+            var existingMetadata = await ReadMetadata(id).ConfigureAwait(false);
+            if (existingMetadata is not null)
+            {
+                return existingMetadata;
+            }
+
+            try
+            {
+                var existingMembership = await _container.ReadItemAsync<SiloEntity>(id, _partitionKey).ConfigureAwait(false);
+                metadata = existingMembership.Resource.Metadata ?? metadata;
+            }
+            catch (CosmosException exception) when (exception.StatusCode == HttpStatusCode.NotFound)
+            {
+            }
+        }
+
+        if (metadata is not null)
+        {
+            try
+            {
+                var entity = new SiloMetadataEntity
+                {
+                    Id = id,
+                    ClusterId = _clusterId,
+                    Metadata = metadata,
+                    CreatedAt = DateTimeOffset.UtcNow
+                };
+                await _metadataContainer.CreateItemAsync(entity, _partitionKey).ConfigureAwait(false);
+                return metadata;
+            }
+            catch (CosmosException exception) when (exception.StatusCode == HttpStatusCode.Conflict)
+            {
+                var existing = await ReadMetadataEntity(id).ConfigureAwait(false);
+                if (existing is not null)
+                {
+                    existing.CreatedAt = DateTimeOffset.UtcNow;
+                    try
+                    {
+                        var response = await _metadataContainer.ReplaceItemAsync(
+                            existing,
+                            id,
+                            _partitionKey,
+                            new ItemRequestOptions { IfMatchEtag = existing.ETag }).ConfigureAwait(false);
+                        return response.Resource.Metadata;
+                    }
+                    catch (CosmosException updateException) when (updateException.StatusCode == HttpStatusCode.PreconditionFailed)
+                    {
+                        return (await ReadMetadataEntity(id).ConfigureAwait(false))?.Metadata;
+                    }
+                }
+            }
+        }
+
+        return await ReadMetadata(id).ConfigureAwait(false);
+    }
+
+    private async Task<Dictionary<string, string>?> ReadMetadata(string id)
+        => (await ReadMetadataEntity(id).ConfigureAwait(false))?.Metadata;
+
+    private async Task<SiloMetadataEntity?> ReadMetadataEntity(string id)
+    {
+        try
+        {
+            var response = await _metadataContainer.ReadItemAsync<SiloMetadataEntity>(id, _partitionKey).ConfigureAwait(false);
+            return response.Resource;
+        }
+        catch (CosmosException exception) when (exception.StatusCode == HttpStatusCode.NotFound)
+        {
+            return null;
+        }
+    }
+
+    private async Task<Dictionary<string, Dictionary<string, string>>> ReadMetadata()
+    {
+        var query = _metadataContainer
+            .GetItemLinqQueryable<SiloMetadataEntity>(requestOptions: _queryRequestOptions)
+            .Where(entity => entity.ClusterId == _clusterId);
+        var iterator = query.ToFeedIterator();
+        var result = new Dictionary<string, Dictionary<string, string>>(StringComparer.Ordinal);
+        do
+        {
+            var items = await iterator.ReadNextAsync().ConfigureAwait(false);
+            foreach (var item in items)
+            {
+                result[item.Id] = item.Metadata;
+            }
+        } while (iterator.HasMoreResults);
+
+        return result;
+    }
+
+    private async Task DeleteMetadata(IEnumerable<string> ids)
+    {
+        foreach (var id in ids)
+        {
+            try
+            {
+                await _metadataContainer.DeleteItemAsync<SiloMetadataEntity>(id, _partitionKey).ConfigureAwait(false);
+            }
+            catch (CosmosException exception) when (exception.StatusCode == HttpStatusCode.NotFound)
+            {
+            }
+        }
+    }
+
+    private async Task DeleteOrphanedMetadata()
+    {
+        var membershipIds = (await ReadSilos().ConfigureAwait(false))
+            .Select(silo => silo.Id)
+            .ToHashSet(StringComparer.Ordinal);
+        var cutoff = DateTimeOffset.UtcNow - MetadataOrphanGracePeriod;
+        var query = _metadataContainer
+            .GetItemLinqQueryable<SiloMetadataEntity>(requestOptions: _queryRequestOptions)
+            .Where(entity => entity.ClusterId == _clusterId);
+        var iterator = query.ToFeedIterator();
+        do
+        {
+            var items = await iterator.ReadNextAsync().ConfigureAwait(false);
+            foreach (var item in items.Where(item => item.CreatedAt <= cutoff && !membershipIds.Contains(item.Id)))
+            {
+                try
+                {
+                    await _metadataContainer.DeleteItemAsync<SiloMetadataEntity>(
+                        item.Id,
+                        _partitionKey,
+                        new ItemRequestOptions { IfMatchEtag = item.ETag }).ConfigureAwait(false);
+                }
+                catch (CosmosException exception) when (
+                    exception.StatusCode is HttpStatusCode.NotFound or HttpStatusCode.PreconditionFailed)
+                {
+                }
+            }
+        } while (iterator.HasMoreResults);
     }
 
     private async Task<ClusterVersionEntity?> ReadClusterVersion()
@@ -440,7 +672,7 @@ internal partial class CosmosMembershipTable : IMembershipTable
 
     private static string ConstructSiloEntityId(SiloAddress silo) => $"{silo.Endpoint.Address}-{silo.Endpoint.Port}-{silo.Generation}";
 
-    private static MembershipEntry ParseEntity(SiloEntity entity)
+    private static MembershipEntry ParseEntity(SiloEntity entity, Dictionary<string, string>? companionMetadata)
     {
         var entry = new MembershipEntry
         {
@@ -459,7 +691,7 @@ internal partial class CosmosMembershipTable : IMembershipTable
 
         entry.IAmAliveTime = entity.IAmAliveTime.UtcDateTime;
 
-        entry.Metadata = entity.Metadata?.ToImmutableDictionary();
+        entry.Metadata = (companionMetadata ?? entity.Metadata)?.ToImmutableDictionary();
 
         var suspectingSilos = new List<SiloAddress>();
         var suspectingTimes = new List<DateTime>();

@@ -1,3 +1,7 @@
+using System.Collections.Immutable;
+using System.Net;
+using Azure;
+using Azure.Data.Tables;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Orleans.AzureUtils;
@@ -147,6 +151,106 @@ namespace Tester.AzureUtils
         public async Task MembershipTable_Azure_UpdateIAmAlive()
         {
             await MembershipTable_UpdateIAmAlive();
+        }
+
+        [Fact, TestCategory("Functional")]
+        public async Task MembershipMetadata_SurvivesLegacyReplacement_RejectsConflict_AndIsCleanedUp()
+        {
+            var options = new AzureStorageClusteringOptions();
+            options.ConfigureTestDefaults();
+            var membership = new AzureBasedMembershipTable(loggerFactory, Options.Create(options), _clusterOptions);
+            await membership.InitializeMembershipTable(false);
+
+            var entry = CreateMetadataEntry();
+            var initial = await membership.ReadAll();
+            Assert.True(await membership.InsertRow(entry, initial.Version.Next()));
+
+            var table = options.TableServiceClient!.GetTableClient(options.TableName);
+            var rowKey = SiloInstanceTableEntry.ConstructRowKey(entry.SiloAddress);
+            var legacyEntity = (await table.GetEntityAsync<TableEntity>(clusterId, rowKey)).Value;
+            legacyEntity.Remove(nameof(SiloInstanceTableEntry.Metadata));
+            await table.UpdateEntityAsync(legacyEntity, ETag.All, TableUpdateMode.Replace);
+
+            var afterLegacyWrite = await membership.ReadRow(entry.SiloAddress);
+            var stored = Assert.Single(afterLegacyWrite.Members).Item1;
+            Assert.Equal(entry.Metadata, stored.Metadata);
+
+            stored.Metadata = ImmutableDictionary<string, string>.Empty.Add("region", "conflict");
+            stored.Status = SiloStatus.Dead;
+            Assert.True(await membership.UpdateRow(
+                stored,
+                Assert.Single(afterLegacyWrite.Members).Item2,
+                afterLegacyWrite.Version.Next()));
+
+            var afterConflict = await membership.ReadRow(entry.SiloAddress);
+            Assert.Equal(entry.Metadata, Assert.Single(afterConflict.Members).Item1.Metadata);
+
+            await membership.CleanupDefunctSiloEntries(DateTimeOffset.UtcNow.AddDays(1));
+            Assert.Empty((await membership.ReadAll()).Members);
+
+            var metadataTable = options.TableServiceClient.GetTableClient(
+                OrleansSiloInstanceManager.GetMetadataTableName(options.TableName));
+            var exception = await Assert.ThrowsAsync<RequestFailedException>(
+                () => metadataTable.GetEntityAsync<MembershipMetadataTableEntry>(clusterId, rowKey));
+            Assert.Equal(404, exception.Status);
+        }
+
+        [Fact, TestCategory("Functional")]
+        public async Task MembershipMetadata_LegacyCleanupOrphanIsReconciled()
+        {
+            var options = new AzureStorageClusteringOptions();
+            options.ConfigureTestDefaults();
+            var membership = new AzureBasedMembershipTable(loggerFactory, Options.Create(options), _clusterOptions);
+            await membership.InitializeMembershipTable(false);
+            var entry = CreateMetadataEntry();
+            var initial = await membership.ReadAll();
+            Assert.True(await membership.InsertRow(entry, initial.Version.Next()));
+
+            var rowKey = SiloInstanceTableEntry.ConstructRowKey(entry.SiloAddress);
+            var membershipTable = options.TableServiceClient!.GetTableClient(options.TableName);
+            var metadataTable = options.TableServiceClient.GetTableClient(
+                OrleansSiloInstanceManager.GetMetadataTableName(options.TableName));
+            await membershipTable.DeleteEntityAsync(clusterId, rowKey, ETag.All);
+            var metadataEntity = (await metadataTable.GetEntityAsync<MembershipMetadataTableEntry>(clusterId, rowKey)).Value;
+            metadataEntity.CreatedAt = DateTimeOffset.UtcNow - OrleansSiloInstanceManager.MetadataOrphanGracePeriod - TimeSpan.FromMinutes(1);
+            await metadataTable.UpdateEntityAsync(metadataEntity, ETag.All, TableUpdateMode.Replace);
+
+            await membership.CleanupDefunctSiloEntries(DateTimeOffset.UtcNow);
+
+            var exception = await Assert.ThrowsAsync<RequestFailedException>(
+                () => metadataTable.GetEntityAsync<MembershipMetadataTableEntry>(clusterId, rowKey));
+            Assert.Equal(404, exception.Status);
+        }
+
+        private static MembershipEntry CreateMetadataEntry() => new()
+        {
+            SiloAddress = SiloAddress.New(new IPEndPoint(IPAddress.Loopback, 12345), 123456),
+            HostName = "host",
+            SiloName = "silo",
+            Status = SiloStatus.Joining,
+            StartTime = DateTime.UtcNow,
+            IAmAliveTime = DateTime.UtcNow,
+            Metadata = ImmutableDictionary<string, string>.Empty.Add("region", "west")
+        };
+    }
+
+    [TestSuite("BVT")]
+    [TestProvider("AzureStorage")]
+    [TestArea("Membership")]
+    public class AzureMembershipMetadataContractTests
+    {
+        [Fact]
+        public void CompanionTableName_IsValidAndDeterministicAtMaximumLength()
+        {
+            var membershipTableName = "A" + new string('b', 62);
+
+            var first = OrleansSiloInstanceManager.GetMetadataTableName(membershipTableName);
+            var second = OrleansSiloInstanceManager.GetMetadataTableName(membershipTableName);
+
+            Assert.Equal(first, second);
+            Assert.Equal(63, first.Length);
+            Assert.Matches("^[A-Za-z][A-Za-z0-9]{2,62}$", first);
+            Assert.NotEqual(membershipTableName, first);
         }
     }
 }
