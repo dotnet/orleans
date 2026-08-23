@@ -178,8 +178,8 @@ public class TransactionRecoveryLatencyTests
 
         remoteOneDispatchGate.TrySetResult();
         await queue.WaitForCancelInvocationAsync(TestContext.Current.CancellationToken);
-        Assert.Equal(TransactionalStatus.PrepareTimeout, await promise.Task);
-        var (status, exception) = await resolution;
+        Assert.Equal(TransactionalStatus.PrepareTimeout, await promise.Task.WaitAsync(TestContext.Current.CancellationToken));
+        var (status, exception) = await resolution.WaitAsync(TestContext.Current.CancellationToken);
 
         var managerFanOut = Assert.IsAssignableFrom<Task>(protocol.ManagerFanOutTask);
         Assert.False(managerFanOut.IsCompleted);
