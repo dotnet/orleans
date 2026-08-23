@@ -311,8 +311,8 @@ public class CallbackDataTests
                 start.SignalAndWait();
                 if (Interlocked.Exchange(ref registered, 0) == 1)
                 {
-                    CallbackDataPool.Return(owner);
-                    callback.DoCallback(response);
+                    using var responseLease = owner.TransferToLease();
+                    responseLease.Value.DoCallback(response);
                 }
             });
 

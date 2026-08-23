@@ -40,20 +40,23 @@ public class CallbackDataPoolingBenchmark
     public void GlobalCleanup() => _serviceProvider.Dispose();
 
     [Benchmark(Baseline = true)]
-    public void AllocateAndInitialize()
+    public void AllocatedRequestLifecycle()
     {
         var callback = new CallbackData();
         callback.Initialize(_shared, _completion, _message, _instruments);
         _consumer.Consume(callback);
+        _consumer.Consume(callback);
     }
 
     [Benchmark]
-    public void RentLeaseAndReturn()
+    public void PooledRequestLifecycle()
     {
-        var owner = CallbackDataPool.Rent(_shared, _completion, _message, _instruments, out var lease);
-        _consumer.Consume(lease.Value);
-        CallbackDataPool.Return(owner);
-        lease.Dispose();
+        var owner = CallbackDataPool.Rent(_shared, _completion, _message, _instruments, out var senderLease);
+        _consumer.Consume(senderLease.Value);
+        senderLease.Dispose();
+
+        using var responseLease = owner.TransferToLease();
+        _consumer.Consume(responseLease.Value);
     }
 
     private sealed class NoOpResponseCompletionSource : IResponseCompletionSource
