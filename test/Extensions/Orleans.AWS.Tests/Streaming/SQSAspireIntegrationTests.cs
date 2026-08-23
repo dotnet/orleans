@@ -277,20 +277,34 @@ public sealed class SQSAspireIntegrationTests
                 || key.StartsWith("ConnectionStrings__", StringComparison.Ordinal)
                     ? key.Replace("__", ":", StringComparison.Ordinal)
                     : key;
-            result[normalizedKey] = value switch
+            if (value is not IValueProvider provider)
             {
-                IValueProvider provider => await provider
+                result[normalizedKey] = value.ToString();
+                continue;
+            }
+
+            try
+            {
+                result[normalizedKey] = await provider
                     .GetValueAsync(valueContext)
-                    .WaitAsync(TimeSpan.FromSeconds(10)),
-                _ => value.ToString(),
-            };
+                    .AsTask()
+                    .WaitAsync(TimeSpan.FromSeconds(10));
+            }
+            catch (TimeoutException exception)
+            {
+                throw new TimeoutException(
+                    $"Timed out resolving environment variable '{key}' for resource '{resource.Name}'.",
+                    exception);
+            }
         }
 
         return result;
     }
 
     private static bool IsRelevantEnvironmentVariable(string name)
-        => name.StartsWith("Orleans__", StringComparison.Ordinal)
+        => name.StartsWith("Orleans__Streaming__", StringComparison.Ordinal)
+            || name.StartsWith("Orleans__Clustering__", StringComparison.Ordinal)
+            || name is "Orleans__ClusterId" or "Orleans__ServiceId"
             || name.StartsWith("ConnectionStrings__", StringComparison.Ordinal)
             || name.StartsWith("AWS_", StringComparison.Ordinal);
 
@@ -312,7 +326,9 @@ public sealed class SQSAspireIntegrationTests
         IReadOnlyDictionary<string, string?> actual)
     {
         var expected = expectedValues.ToDictionary(StringComparer.Ordinal);
-        Assert.Equal(expected.Count, actual.Count);
+        Assert.True(
+            expected.Count == actual.Count,
+            $"Expected {expected.Count} provider values, found {actual.Count}: {string.Join(", ", actual.Keys.Order())}");
         foreach (var (key, expectedValue) in expected)
         {
             Assert.True(actual.TryGetValue(key, out var actualValue), $"Missing generated key '{key}'.");
@@ -383,7 +399,7 @@ public sealed class SQSAspireIntegrationTests
             string configSectionPath)
             where T : IResourceWithEnvironment
         {
-            var prefix = configSectionPath.Replace(":", "__", StringComparison.Ordinal);
+            var prefix = $"Orleans__{configSectionPath.Replace(":", "__", StringComparison.Ordinal)}";
             resourceBuilder
                 .WithReference(connection)
                 .WithEnvironment($"{prefix}__ProviderType", "SQS")
@@ -444,7 +460,7 @@ public sealed class SQSAspireIntegrationTests
             string configSectionPath)
             where T : IResourceWithEnvironment
         {
-            var prefix = configSectionPath.Replace(":", "__", StringComparison.Ordinal);
+            var prefix = $"Orleans__{configSectionPath.Replace(":", "__", StringComparison.Ordinal)}";
             resourceBuilder.WithEnvironment($"{prefix}__ProviderType", "Development");
             if (resourceBuilder.Resource.Name == SiloResourceName)
             {

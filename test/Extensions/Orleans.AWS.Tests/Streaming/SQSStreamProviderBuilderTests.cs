@@ -125,6 +125,41 @@ public sealed class SQSStreamProviderBuilderTests
             descriptor => descriptor.ServiceType == typeof(IConfigureOptions<SimpleQueueCacheOptions>));
     }
 
+    [Fact]
+    public void ConfigureClient_WhitespaceLocationAliases_UsesConfiguredEndpoint()
+    {
+        const string endpoint = "http://127.0.0.1:9324";
+        var builder = CreateClientBuilder(
+            ProviderName,
+            [
+                ("Region", " "),
+                ("ServiceEndpoint", " "),
+                ("Endpoint", endpoint),
+            ]);
+
+        ConfigureClient(builder, ProviderName);
+
+        using var services = builder.Services.BuildServiceProvider();
+        var options = GetOptions<SqsOptions>(services, ProviderName);
+
+        Assert.Equal($"Service={endpoint}", options.ConnectionString);
+    }
+
+    [Fact]
+    public void ConfigureClient_ConnectionStringWithWhitespaceSegment_IsAccepted()
+    {
+        var builder = CreateClientBuilder(
+            ProviderName,
+            [("ConnectionString", "Service=us-east-1; ")]);
+
+        ConfigureClient(builder, ProviderName);
+
+        using var services = builder.Services.BuildServiceProvider();
+        var options = GetOptions<SqsOptions>(services, ProviderName);
+
+        Assert.Equal("Service=us-east-1; ", options.ConnectionString);
+    }
+
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
