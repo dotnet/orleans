@@ -87,18 +87,30 @@ public sealed class S3JournalStorageOptions
     /// and retry in place after observing a metadata-only conflict. Defaults to 5.
     /// </summary>
     public int MaxMetadataOnlyConflictRetries { get; set; } = DEFAULT_MAX_METADATA_ONLY_CONFLICT_RETRIES;
+
+    /// <summary>
+    /// The default maximum number of metadata-only conflict retries.
+    /// </summary>
     public const int DEFAULT_MAX_METADATA_ONLY_CONFLICT_RETRIES = 5;
 
     /// <summary>
     /// Gets or sets the initial delay applied before retrying after a metadata-only conflict. Defaults to 10 ms.
     /// </summary>
     public TimeSpan MetadataOnlyConflictInitialBackoff { get; set; } = DEFAULT_METADATA_ONLY_CONFLICT_INITIAL_BACKOFF;
+
+    /// <summary>
+    /// The default initial delay applied before retrying a metadata-only conflict.
+    /// </summary>
     public static readonly TimeSpan DEFAULT_METADATA_ONLY_CONFLICT_INITIAL_BACKOFF = TimeSpan.FromMilliseconds(10);
 
     /// <summary>
     /// Gets or sets the upper bound on metadata-only conflict retry backoff. Defaults to 200 ms.
     /// </summary>
     public TimeSpan MetadataOnlyConflictMaxBackoff { get; set; } = DEFAULT_METADATA_ONLY_CONFLICT_MAX_BACKOFF;
+
+    /// <summary>
+    /// The default upper bound on metadata-only conflict retry backoff.
+    /// </summary>
     public static readonly TimeSpan DEFAULT_METADATA_ONLY_CONFLICT_MAX_BACKOFF = TimeSpan.FromMilliseconds(200);
 
     /// <summary>
