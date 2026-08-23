@@ -26,6 +26,7 @@ namespace Orleans.Runtime
         private StatusResponse? lastKnownStatus;
         private ValueStopwatch stopwatch;
         private CancellationTokenRegistration _cancellationTokenRegistration;
+        private long _cancellationGeneration;
         private long _referenceState;
 
         internal CallbackData()
@@ -53,6 +54,7 @@ namespace Orleans.Runtime
             stopwatch = default;
             _cancellationTokenRegistration.Dispose();
             _cancellationTokenRegistration = default;
+            Volatile.Write(ref _cancellationGeneration, 0);
             Message = null!;
         }
 
@@ -179,7 +181,7 @@ namespace Orleans.Runtime
 
         public bool IsCompleted => (Volatile.Read(ref _state) & StateCompleted) != 0;
 
-        public void SubscribeForCancellation(CancellationToken cancellationToken, CallbackDataOwner owner)
+        public void SubscribeForCancellation(CancellationToken cancellationToken)
         {
             if (!cancellationToken.CanBeCanceled)
             {
@@ -194,14 +196,19 @@ namespace Orleans.Runtime
                 return;
             }
 
+            Volatile.Write(ref _cancellationGeneration, GetGeneration(Volatile.Read(ref _referenceState)));
             var registration = cancellationToken.UnsafeRegister(static (arg, token) =>
             {
-                using var lease = ((CallbackDataOwner)arg!).Acquire();
+                var callback = (CallbackData)arg!;
+                var generation = Volatile.Read(ref callback._cancellationGeneration);
+                using var lease = callback.TryAcquireLease(generation)
+                    ? new CallbackDataLease(callback, generation)
+                    : default;
                 if (lease.TryGetValue(out var callbackData))
                 {
                     callbackData.OnCancellation(token);
                 }
-            }, owner);
+            }, this);
 
             _cancellationTokenRegistration = registration;
             if (Interlocked.CompareExchange(
@@ -364,6 +371,8 @@ namespace Orleans.Runtime
         private void DisposeCancellationRegistration()
         {
             // If registration is still pending, its publisher observes completion and disposes it.
+            // Dispose waits for a concurrently executing callback, so its captured generation remains
+            // stable until that callback releases its lease and this instance can return to the pool.
             if ((Volatile.Read(ref _state) & StateCancellationRegistrationPublished) != 0)
             {
                 _cancellationTokenRegistration.Dispose();

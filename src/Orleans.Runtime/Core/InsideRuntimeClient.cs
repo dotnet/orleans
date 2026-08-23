@@ -209,7 +209,7 @@ namespace Orleans.Runtime
 
                     try
                     {
-                        callbackData.SubscribeForCancellation(cancellationToken, owner);
+                        callbackData.SubscribeForCancellation(cancellationToken);
                     }
                     catch
                     {

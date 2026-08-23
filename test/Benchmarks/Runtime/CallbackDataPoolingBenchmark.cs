@@ -17,6 +17,7 @@ public class CallbackDataPoolingBenchmark
     private ApplicationRequestInstruments _instruments = null!;
     private IResponseCompletionSource _completion = null!;
     private Message _message = null!;
+    private CancellationTokenSource _cancellation = null!;
 
     [GlobalSetup]
     public void GlobalSetup()
@@ -34,24 +35,32 @@ public class CallbackDataPoolingBenchmark
         _instruments = new(new OrleansInstruments(_serviceProvider.GetRequiredService<IMeterFactory>()));
         _completion = new NoOpResponseCompletionSource();
         _message = new Message();
+        _cancellation = new CancellationTokenSource();
     }
 
     [GlobalCleanup]
-    public void GlobalCleanup() => _serviceProvider.Dispose();
+    public void GlobalCleanup()
+    {
+        _cancellation.Dispose();
+        _serviceProvider.Dispose();
+    }
 
     [Benchmark(Baseline = true)]
     public void AllocatedRequestLifecycle()
     {
         var callback = new CallbackData();
         callback.Initialize(_shared, _completion, _message, _instruments);
+        callback.SubscribeForCancellation(_cancellation.Token);
         _consumer.Consume(callback);
         _consumer.Consume(callback);
+        callback.Reset();
     }
 
     [Benchmark]
     public void PooledRequestLifecycle()
     {
         var owner = CallbackDataPool.Rent(_shared, _completion, _message, _instruments, out var senderLease);
+        senderLease.Value.SubscribeForCancellation(_cancellation.Token);
         _consumer.Consume(senderLease.Value);
         senderLease.Dispose();
 

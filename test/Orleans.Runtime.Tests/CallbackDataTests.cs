@@ -36,7 +36,7 @@ public class CallbackDataTests
         using var lease = owner.Acquire();
         var callback = lease.Value;
 
-        callback.SubscribeForCancellation(cancellation.Token, owner);
+        callback.SubscribeForCancellation(cancellation.Token);
 
         Assert.True(callback.IsCompleted);
         Assert.Equal(1, unregisterCount);
@@ -131,7 +131,7 @@ public class CallbackDataTests
             instruments);
         var completedLease = completedOwner.Acquire();
         var completedCallback = completedLease.Value;
-        completedCallback.SubscribeForCancellation(cancellation.Token, completedOwner);
+        completedCallback.SubscribeForCancellation(cancellation.Token);
         completedCallback.OnHostShutdown();
         completedLease.Dispose();
 
@@ -183,9 +183,9 @@ public class CallbackDataTests
     [TestProvider("None")]
     [Fact, TestCategory("BVT")]
     public void CancellationAndResponseRaceCompletesExactlyOnce() =>
-        RunTerminalRace(static (callback, owner, cancellation) =>
+        RunTerminalRace(static (callback, _, cancellation) =>
         {
-            callback.SubscribeForCancellation(cancellation.Token, owner);
+            callback.SubscribeForCancellation(cancellation.Token);
             cancellation.Cancel();
         });
 
@@ -269,7 +269,7 @@ public class CallbackDataTests
         var callback = lease.Value;
 
         callback.OnHostShutdown();
-        callback.SubscribeForCancellation(cancellationToken, owner);
+        callback.SubscribeForCancellation(cancellationToken);
 
         return new WeakReference(completion);
     }
