@@ -12,7 +12,4 @@ runs:
       sudo apt-get install --yes libxml2
   - name: Install dotnet-coverage
     shell: pwsh
-    run: |
-      $toolPath = Join-Path $env:GITHUB_WORKSPACE '.tools'
-      dotnet tool install --tool-path $toolPath dotnet-coverage --version $env:DOTNET_COVERAGE_VERSION
-      $toolPath >> $env:GITHUB_PATH
+    run: ./.github/scripts/setup-coverage.ps1

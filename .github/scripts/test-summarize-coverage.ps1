@@ -10,6 +10,7 @@ $codeGeneratorScriptPath = Join-Path $PSScriptRoot 'run-codegenerator-tests.ps1'
 $cosmosScriptPath = Join-Path $PSScriptRoot 'run-cosmos-tests.ps1'
 $mergeScriptPath = Join-Path $PSScriptRoot 'merge-coverage.ps1'
 $runTestsActionPath = Join-Path $PSScriptRoot '../actions/run-tests/action.yml'
+$setupCoverageScriptPath = Join-Path $PSScriptRoot 'setup-coverage.ps1'
 $workflowPath = Join-Path $PSScriptRoot '../workflows/ci.yml'
 $temporaryRoot = Join-Path ([IO.Path]::GetTempPath()) "orleans-coverage-tests-$([guid]::NewGuid())"
 $testsRun = 0
@@ -357,6 +358,14 @@ try {
         Assert-Equal 2 ([regex]::Matches($codeGeneratorScript, 'run-dotnet-test\.ps1')).Count 'CodeGen test command count differs.'
         Assert-Equal 1 ([regex]::Matches($cosmosScript, 'run-dotnet-test\.ps1')).Count 'Cosmos test command count differs.'
         Assert-Equal 1 ([regex]::Matches($workflow, 'run-dotnet-test\.ps1')).Count 'Core matrix test command count differs.'
+    }
+
+    Invoke-Test 'validates the coverage tool version' {
+        $setupCoverageScript = Get-Content -Raw -LiteralPath $setupCoverageScriptPath
+        Assert-Matches `
+            $setupCoverageScript `
+            'DOTNET_COVERAGE_VERSION must specify' `
+            'Coverage setup must reject a missing tool version.'
     }
 
     Write-Output "$testsRun coverage tests passed."
