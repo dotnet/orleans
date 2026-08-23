@@ -51,6 +51,8 @@ A normal append failure leaves encoded pending entries available for a later wri
 
 A snapshot failure leaves the previously published journal unchanged and keeps the captured in-memory changes available for a later write attempt. Commands added while the replacement is awaiting storage remain outside the captured snapshot and are persisted by a later operation.
 
+An optimistic-concurrency conflict identifies a competing journal generation. The manager recovers that winning generation and discards the losing activation's uncommitted in-memory changes before reporting the conflict.
+
 Storage acknowledgement can still have an uncertain network outcome. Treat a failed write as an uncertain application outcome and retry commands using an operation identifier or another idempotency mechanism.
 
 Recovery exceptions fault activation or queued work rather than replacing or truncating stored data. Restore the required format/codec registration or repair the backing data before retrying activation.
