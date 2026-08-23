@@ -1,3 +1,7 @@
+using Aspire.Hosting;
+using Aspire.Hosting.ApplicationModel;
+using Aspire.Hosting.Orleans;
+using Aspire.Hosting.Testing;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
@@ -6,6 +10,7 @@ using Orleans.Configuration;
 using Orleans.GrainDirectory.AdoNet;
 using Orleans.Hosting;
 using Orleans.Runtime;
+using TestExtensions;
 
 namespace UnitTests.AdoNet;
 
@@ -27,10 +32,9 @@ public sealed class AdoNetAspireIntegrationTests
     {
         var capabilities = GetSupportedCapabilities(databaseType);
         using var generated = await AdoNetAspireTestConfiguration.CreateAsync(databaseType, capabilities);
-        var rawConnectionStringKey = $"ConnectionStrings__{generated.DatabaseName}";
         var normalizedConnectionStringKey = $"ConnectionStrings:{generated.DatabaseName}";
 
-        Assert.True(generated.RawEnvironment.TryGetValue(rawConnectionStringKey, out var connectionString));
+        var connectionString = generated.HostConfiguration.GetConnectionString(generated.DatabaseName);
         Assert.False(string.IsNullOrWhiteSpace(connectionString));
         Assert.Equal(connectionString, generated.HostConfiguration[normalizedConnectionStringKey]);
         Assert.Contains(generated.DatabaseName, connectionString, StringComparison.Ordinal);
@@ -38,15 +42,10 @@ public sealed class AdoNetAspireIntegrationTests
         foreach (var capability in capabilities)
         {
             var capabilityPath = GetCapabilityPath(generated, capability);
-            var rawPrefix = $"Orleans__{capabilityPath.Replace(":", "__", StringComparison.Ordinal)}";
             var normalizedPrefix = $"Orleans:{capabilityPath}";
 
-            Assert.Equal(expectedProviderType, generated.RawEnvironment[$"{rawPrefix}__ProviderType"]);
-            Assert.Equal(generated.DatabaseName, generated.RawEnvironment[$"{rawPrefix}__ServiceKey"]);
             Assert.Equal(expectedProviderType, generated.HostConfiguration[$"{normalizedPrefix}:ProviderType"]);
             Assert.Equal(generated.DatabaseName, generated.HostConfiguration[$"{normalizedPrefix}:ServiceKey"]);
-            Assert.DoesNotContain($"{normalizedPrefix}:ProviderType", generated.RawEnvironment.Keys);
-            Assert.Null(generated.HostConfiguration[$"{rawPrefix}__ProviderType"]);
         }
 
         using var siloHost = CreateSiloHost(generated.HostConfiguration);
@@ -76,15 +75,11 @@ public sealed class AdoNetAspireIntegrationTests
             [AdoNetAspireCapability.Clustering],
             invariant);
 
-        Assert.Equal("AdoNet", generated.RawEnvironment["Orleans__Clustering__ProviderType"]);
-        Assert.Equal(invariant, generated.RawEnvironment["Orleans__Clustering__Invariant"]);
-        Assert.Equal(generated.DatabaseName, generated.RawEnvironment["Orleans__Clustering__ServiceKey"]);
         Assert.Equal("AdoNet", generated.HostConfiguration["Orleans:Clustering:ProviderType"]);
         Assert.Equal(invariant, generated.HostConfiguration["Orleans:Clustering:Invariant"]);
         Assert.Equal(generated.DatabaseName, generated.HostConfiguration["Orleans:Clustering:ServiceKey"]);
-        Assert.Equal(
-            generated.RawEnvironment[$"ConnectionStrings__{generated.DatabaseName}"],
-            generated.HostConfiguration[$"ConnectionStrings:{generated.DatabaseName}"]);
+        Assert.False(string.IsNullOrWhiteSpace(
+            generated.HostConfiguration.GetConnectionString(generated.DatabaseName)));
     }
 
     private static void AssertSiloOptions(
@@ -125,14 +120,18 @@ public sealed class AdoNetAspireIntegrationTests
     }
 
     [Fact]
-    public void MissingConnectionReference_FailsStreamingValidation()
+    public async Task MissingConnectionReference_FailsStreamingValidation()
     {
-        var configuration = new ConfigurationBuilder()
-            .AddInMemoryCollection(new Dictionary<string, string?>
-            {
-                ["Orleans:Streaming:streams:ProviderType"] = "SqlServerDatabase",
-            })
-            .Build();
+        await using var builder = DistributedApplicationTestingBuilder.Create();
+        var orleans = builder.AddOrleans("cluster")
+            .WithDevelopmentClustering()
+            .WithStreaming("streams", new MissingConnectionProviderConfiguration());
+        var silo = builder.AddContainer("silo", "unused").WithReference(orleans);
+        await using var app = await builder.BuildAsync();
+        var configuration = await AspireResourceConfiguration.CreateAsync(
+            silo.Resource,
+            app.Services,
+            include: static key => key.StartsWith("Orleans__Streaming__", StringComparison.Ordinal));
         using var host = CreateSiloHost(configuration);
         var validator = host.Services
             .GetServices<IConfigurationValidator>()
@@ -155,13 +154,20 @@ public sealed class AdoNetAspireIntegrationTests
     private static IHost CreateClientHost(AdoNetAspireTestConfiguration.GeneratedConfiguration generated)
     {
         var builder = Host.CreateApplicationBuilder();
-        builder.Configuration.AddInMemoryCollection(
-            generated.HostConfiguration.AsEnumerable().Where(static pair =>
-                pair.Key.StartsWith("Orleans:Clustering", StringComparison.Ordinal)
-                || pair.Key.StartsWith("Orleans:Streaming", StringComparison.Ordinal)
-                || pair.Key.StartsWith("ConnectionStrings:", StringComparison.Ordinal)));
+        builder.Configuration.AddConfiguration(generated.ClientConfiguration);
         builder.UseOrleansClient();
         return builder.Build();
+    }
+
+    private sealed class MissingConnectionProviderConfiguration : IProviderConfiguration
+    {
+        public void ConfigureResource<T>(
+            IResourceBuilder<T> resourceBuilder,
+            string configurationSectionPath)
+            where T : IResourceWithEnvironment
+            => resourceBuilder.WithEnvironment(
+                $"Orleans__{configurationSectionPath.Replace(":", "__", StringComparison.Ordinal)}__ProviderType",
+                "SqlServerDatabase");
     }
 
     private static IReadOnlyList<AdoNetAspireCapability> GetSupportedCapabilities(AdoNetAspireDatabase databaseType)

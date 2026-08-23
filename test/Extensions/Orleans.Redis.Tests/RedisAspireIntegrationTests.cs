@@ -33,14 +33,14 @@ public sealed class RedisAspireIntegrationTests
         bool useAzureManagedRedis,
         string expectedProviderType)
     {
-        var environment = await CreateAspireEnvironmentAsync(useAzureManagedRedis, expectedProviderType);
+        var configuration = await CreateAspireConfigurationAsync(useAzureManagedRedis, expectedProviderType);
 
-        AssertProvider(environment, "Clustering", null, expectedProviderType);
-        AssertProvider(environment, "GrainStorage", "state", expectedProviderType);
-        AssertProvider(environment, "Reminders", null, expectedProviderType);
-        AssertProvider(environment, "GrainDirectory", "directory", expectedProviderType);
-        AssertProvider(environment, "Streaming", "stream", expectedProviderType);
-        AssertProvider(environment, "GrainJournaling", null, expectedProviderType);
+        AssertProvider(configuration, "Clustering", null, expectedProviderType);
+        AssertProvider(configuration, "GrainStorage", "state", expectedProviderType);
+        AssertProvider(configuration, "Reminders", null, expectedProviderType);
+        AssertProvider(configuration, "GrainDirectory", "directory", expectedProviderType);
+        AssertProvider(configuration, "Streaming", "stream", expectedProviderType);
+        AssertProvider(configuration, "GrainJournaling", null, expectedProviderType);
     }
 
     [Theory]
@@ -51,11 +51,13 @@ public sealed class RedisAspireIntegrationTests
         string expectedProviderType)
     {
         TestUtils.CheckForRedis();
-        var environment = await CreateAspireEnvironmentAsync(useAzureManagedRedis, expectedProviderType);
-        environment[$"ConnectionStrings:{ResourceName}"] = TestDefaultConfiguration.RedisConnectionString;
+        var configuration = await CreateAspireConfigurationAsync(
+            useAzureManagedRedis,
+            expectedProviderType,
+            TestDefaultConfiguration.RedisConnectionString);
 
         var hostBuilder = Host.CreateApplicationBuilder();
-        hostBuilder.Configuration.AddInMemoryCollection(environment);
+        hostBuilder.Configuration.AddConfiguration(configuration);
         hostBuilder.AddKeyedRedisClient(ResourceName, settings =>
         {
             settings.DisableAutoActivation = true;
@@ -105,9 +107,10 @@ public sealed class RedisAspireIntegrationTests
         Assert.True(actual.IsShared);
     }
 
-    private static async Task<Dictionary<string, string?>> CreateAspireEnvironmentAsync(
+    private static async Task<IConfigurationRoot> CreateAspireConfigurationAsync(
         bool useAzureManagedRedis,
-        string providerType)
+        string providerType,
+        string? connectionString = null)
     {
         await using var builder = DistributedApplicationTestingBuilder.Create();
         IResourceBuilder<IResourceWithConnectionString> redis;
@@ -124,10 +127,17 @@ public sealed class RedisAspireIntegrationTests
         var silo = builder.AddContainer("silo", "unused")
             .WithReference(orleans)
             .WithEnvironment("Orleans__GrainJournaling__ProviderType", providerType)
-            .WithEnvironment("Orleans__GrainJournaling__ServiceKey", ResourceName);
+            .WithEnvironment("Orleans__GrainJournaling__ServiceKey", ResourceName)
+            .WithEnvironment($"ConnectionStrings__{ResourceName}", connectionString);
 
         await using var app = await builder.BuildAsync();
-        return await GetEnvironmentVariablesAsync(silo.Resource, app.Services);
+        return await AspireResourceConfiguration.CreateAsync(
+            silo.Resource,
+            app.Services,
+            include: static key =>
+                key.StartsWith("Orleans__", StringComparison.Ordinal)
+                && !key.StartsWith("Orleans__Endpoints__", StringComparison.Ordinal)
+                || key.StartsWith("ConnectionStrings__", StringComparison.Ordinal));
     }
 
     private static OrleansService ConfigureOrleans(
@@ -141,55 +151,13 @@ public sealed class RedisAspireIntegrationTests
             .WithStreaming("stream", redis);
 
     private static void AssertProvider(
-        Dictionary<string, string?> environment,
+        IConfiguration configuration,
         string capability,
         string? name,
         string providerType)
     {
         var path = name is null ? $"Orleans:{capability}" : $"Orleans:{capability}:{name}";
-        Assert.Equal(providerType, environment[$"{path}:ProviderType"]);
-        Assert.Equal(ResourceName, environment[$"{path}:ServiceKey"]);
-    }
-
-    private static async Task<Dictionary<string, string?>> GetEnvironmentVariablesAsync(
-        IResource resource,
-        IServiceProvider services)
-    {
-        var executionContext = new DistributedApplicationExecutionContext(
-            new DistributedApplicationExecutionContextOptions(DistributedApplicationOperation.Run)
-            {
-                ServiceProvider = services,
-            });
-        var values = new Dictionary<string, object>();
-        var callbackContext = new EnvironmentCallbackContext(executionContext, resource, values);
-
-        foreach (var annotation in resource.Annotations.OfType<EnvironmentCallbackAnnotation>())
-        {
-            await annotation.Callback(callbackContext);
-        }
-
-        var valueContext = new ValueProviderContext
-        {
-            Caller = resource,
-            ExecutionContext = executionContext,
-            Network = KnownNetworkIdentifiers.LocalhostNetwork,
-        };
-        var result = new Dictionary<string, string?>();
-        foreach (var (key, value) in values)
-        {
-            if (!key.StartsWith("Orleans__", StringComparison.Ordinal)
-                || key.StartsWith("Orleans__Endpoints__", StringComparison.Ordinal))
-            {
-                continue;
-            }
-
-            result[key.Replace("__", ":", StringComparison.Ordinal)] = value switch
-            {
-                IValueProvider valueProvider => await valueProvider.GetValueAsync(valueContext),
-                _ => value.ToString(),
-            };
-        }
-
-        return result;
+        Assert.Equal(providerType, configuration[$"{path}:ProviderType"]);
+        Assert.Equal(ResourceName, configuration[$"{path}:ServiceKey"]);
     }
 }

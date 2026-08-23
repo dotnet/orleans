@@ -5,6 +5,7 @@ using Aspire.Hosting.ApplicationModel;
 using Aspire.Hosting.Orleans;
 using Aspire.Hosting.Testing;
 using Microsoft.Extensions.Configuration;
+using TestExtensions;
 
 namespace UnitTests.AdoNet;
 
@@ -66,24 +67,26 @@ internal sealed class AdoNetAspireTestConfiguration
 
         var silo = builder.AddContainer($"silo-{stem}", "unused")
             .WithReference(orleans);
+        var client = builder.AddContainer($"client-{stem}", "unused")
+            .WithReference(orleans.AsClient());
 
         await using var app = await builder.BuildAsync();
-        var rawEnvironment = await GetEnvironmentVariablesAsync(silo.Resource, app.Services);
-        var normalizedEnvironment = rawEnvironment.ToDictionary(
-            pair => pair.Key.Replace("__", ":", StringComparison.Ordinal),
-            pair => pair.Value,
-            StringComparer.Ordinal);
-        var hostConfiguration = new ConfigurationBuilder()
-            .AddInMemoryCollection(normalizedEnvironment)
-            .Build();
+        var hostConfiguration = await AspireResourceConfiguration.CreateAsync(
+            silo.Resource,
+            app.Services,
+            include: IsRelevantEnvironmentVariable);
+        var clientConfiguration = await AspireResourceConfiguration.CreateAsync(
+            client.Resource,
+            app.Services,
+            include: IsRelevantEnvironmentVariable);
 
         return new GeneratedConfiguration(
             databaseType,
             capabilities,
             databaseName,
             providerName,
-            rawEnvironment,
-            hostConfiguration);
+            hostConfiguration,
+            clientConfiguration);
     }
 
     private static IResourceBuilder<IResourceWithConnectionString> AddDatabase(
@@ -202,47 +205,6 @@ internal sealed class AdoNetAspireTestConfiguration
         }
     }
 
-    private static async Task<Dictionary<string, string?>> GetEnvironmentVariablesAsync(
-        IResource resource,
-        IServiceProvider services)
-    {
-        var executionContext = new DistributedApplicationExecutionContext(
-            new DistributedApplicationExecutionContextOptions(DistributedApplicationOperation.Run)
-            {
-                ServiceProvider = services,
-            });
-        var values = new Dictionary<string, object>();
-        var callbackContext = new EnvironmentCallbackContext(executionContext, resource, values);
-
-        foreach (var annotation in resource.Annotations.OfType<EnvironmentCallbackAnnotation>())
-        {
-            await annotation.Callback(callbackContext);
-        }
-
-        var valueContext = new ValueProviderContext
-        {
-            Caller = resource,
-            ExecutionContext = executionContext,
-            Network = KnownNetworkIdentifiers.LocalhostNetwork,
-        };
-        var result = new Dictionary<string, string?>(StringComparer.Ordinal);
-        foreach (var (key, value) in values)
-        {
-            if (!IsRelevantEnvironmentVariable(key))
-            {
-                continue;
-            }
-
-            result[key] = value switch
-            {
-                IValueProvider provider => await provider.GetValueAsync(valueContext),
-                _ => value.ToString(),
-            };
-        }
-
-        return result;
-    }
-
     private static bool IsRelevantEnvironmentVariable(string name)
         => name.StartsWith("Orleans__Clustering__", StringComparison.Ordinal)
             || name.StartsWith("Orleans__GrainStorage__", StringComparison.Ordinal)
@@ -274,11 +236,15 @@ internal sealed class AdoNetAspireTestConfiguration
         IReadOnlyList<AdoNetAspireCapability> Capabilities,
         string DatabaseName,
         string ProviderName,
-        IReadOnlyDictionary<string, string?> RawEnvironment,
-        IConfigurationRoot HostConfiguration) : IDisposable
+        IConfigurationRoot HostConfiguration,
+        IConfigurationRoot ClientConfiguration) : IDisposable
     {
         public AdoNetAspireCapability Capability => Capabilities.Single();
 
-        public void Dispose() => (HostConfiguration as IDisposable)?.Dispose();
+        public void Dispose()
+        {
+            (HostConfiguration as IDisposable)?.Dispose();
+            (ClientConfiguration as IDisposable)?.Dispose();
+        }
     }
 }

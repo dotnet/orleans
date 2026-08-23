@@ -3,6 +3,10 @@
 
 #if NET10_0_OR_GREATER
 
+using Aspire.Hosting;
+using Aspire.Hosting.ApplicationModel;
+using Aspire.Hosting.Orleans;
+using Aspire.Hosting.Testing;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
@@ -12,6 +16,7 @@ using Orleans.Hosting;
 using Orleans.Providers;
 using Orleans.Streaming.Kinesis;
 using Orleans.Streams;
+using TestExtensions;
 using Xunit;
 
 namespace Orleans.Streaming.Kinesis.Tests;
@@ -133,14 +138,16 @@ public sealed class KinesisAspireIntegrationTests
         Assert.Contains(ProviderName, ex.Message);
     }
 
-    [Fact]
-    public void UseOrleans_AwsRegionEnvFallback_PopulatesRegion()
+    [Theory]
+    [InlineData("AWS:Region")]
+    [InlineData("AWS_REGION")]
+    public void UseOrleans_AwsRegionFallback_PopulatesRegion(string configurationKey)
     {
         var config = BuildConfig(new Dictionary<string, string?>
         {
             [$"Orleans:Streaming:{ProviderName}:ProviderType"] = "Kinesis",
             [$"Orleans:Streaming:{ProviderName}:StreamName"] = "env-stream",
-            ["AWS_REGION"] = "sa-east-1",
+            [configurationKey] = "sa-east-1",
         });
         using var host = BuildSiloHost(config);
         var options = Resolve(host);
@@ -202,7 +209,7 @@ public sealed class KinesisAspireIntegrationTests
             [$"Orleans:Streaming:{ProviderName}:ProviderType"] = "Kinesis",
             [$"Orleans:Streaming:{ProviderName}:StreamArn"] = "arn:aws:kinesis:us-west-2:999888777666:stream/client-orders",
         });
-        using var host = BuildSiloHost(config);
+        using var host = BuildClientHost(config);
         var options = Resolve(host);
 
         Assert.Equal("client-orders", options.StreamName);
@@ -252,6 +259,26 @@ public sealed class KinesisAspireIntegrationTests
         Assert.Equal("us-west-2", dynamoOptions.Service);
         Assert.Equal("MyCheckpoints", dynamoOptions.TableName);
         Assert.Equal(TimeSpan.FromSeconds(10), dynamoOptions.PersistInterval);
+    }
+
+    [Fact]
+    public void UseOrleans_DynamoDBCheckpointerUsesAwsRegionFallback()
+    {
+        var config = BuildConfig(new Dictionary<string, string?>
+        {
+            [$"Orleans:Streaming:{ProviderName}:ProviderType"] = "Kinesis",
+            [$"Orleans:Streaming:{ProviderName}:StreamName"] = "dynamo-stream",
+            [$"Orleans:Streaming:{ProviderName}:Region"] = "us-east-1",
+            [$"Orleans:Streaming:{ProviderName}:Checkpoint:Type"] = "DynamoDB",
+            [$"Orleans:Streaming:{ProviderName}:Checkpoint:TableName"] = "MyCheckpoints",
+            ["AWS:Region"] = "eu-west-1",
+        });
+        using var host = BuildSiloHost(config);
+        var dynamoOptions = host.Services
+            .GetRequiredService<IOptionsMonitor<DynamoDBStreamQueueCheckpointerOptions>>()
+            .Get(ProviderName);
+
+        Assert.Equal("eu-west-1", dynamoOptions.Service);
     }
 
     [Fact]
@@ -414,7 +441,34 @@ public sealed class KinesisAspireIntegrationTests
     }
 
     private static IConfiguration BuildConfig(Dictionary<string, string?> values)
-        => new ConfigurationBuilder().AddInMemoryCollection(values).Build();
+    {
+        var builder = DistributedApplicationTestingBuilder.Create();
+        try
+        {
+            var provider = new TestKinesisProviderConfiguration(values);
+            var orleans = builder.AddOrleans($"cluster-{Guid.NewGuid():N}")
+                .WithDevelopmentClustering()
+                .WithStreaming(ProviderName, provider);
+            var silo = builder.AddContainer($"silo-{Guid.NewGuid():N}", "unused")
+                .WithReference(orleans);
+
+            using var services = builder.Services.BuildServiceProvider();
+            return AspireResourceConfiguration.CreateAsync(
+                    silo.Resource,
+                    services,
+                    include: static key =>
+                        key.StartsWith("Orleans__Streaming__", StringComparison.Ordinal)
+                        || key.StartsWith("AWS_", StringComparison.Ordinal)
+                        || key.StartsWith("AWS__", StringComparison.Ordinal)
+                        || key.StartsWith("ConnectionStrings__", StringComparison.Ordinal))
+                .GetAwaiter()
+                .GetResult();
+        }
+        finally
+        {
+            builder.DisposeAsync().AsTask().GetAwaiter().GetResult();
+        }
+    }
 
     private static IHost BuildSiloHost(IConfiguration config)
     {
@@ -428,8 +482,49 @@ public sealed class KinesisAspireIntegrationTests
         return hostBuilder.Build();
     }
 
+    private static IHost BuildClientHost(IConfiguration config)
+    {
+        var hostBuilder = Host.CreateApplicationBuilder();
+        hostBuilder.Configuration.AddConfiguration(config);
+        hostBuilder.UseOrleansClient(clientBuilder =>
+            clientBuilder.UseStaticClustering(
+                new System.Net.IPEndPoint(System.Net.IPAddress.Loopback, 30000)));
+        return hostBuilder.Build();
+    }
+
     private static KinesisStreamOptions Resolve(IHost host)
         => host.Services.GetRequiredService<IOptionsMonitor<KinesisStreamOptions>>().Get(ProviderName);
+
+    private sealed class TestKinesisProviderConfiguration(
+        IReadOnlyDictionary<string, string?> values) : IProviderConfiguration
+    {
+        private static readonly string ProviderPrefix = $"Orleans:Streaming:{ProviderName}:";
+
+        public void ConfigureResource<T>(
+            IResourceBuilder<T> resourceBuilder,
+            string configurationSectionPath)
+            where T : IResourceWithEnvironment
+        {
+            var sectionPrefix = $"Orleans__{configurationSectionPath.Replace(":", "__", StringComparison.Ordinal)}";
+            var providerType = values
+                .FirstOrDefault(static pair => pair.Key.EndsWith(":ProviderType", StringComparison.Ordinal))
+                .Value ?? "Kinesis";
+            resourceBuilder.WithEnvironment($"{sectionPrefix}__ProviderType", providerType);
+
+            foreach (var (key, value) in values)
+            {
+                if (key.EndsWith(":ProviderType", StringComparison.Ordinal))
+                {
+                    continue;
+                }
+
+                var environmentKey = key.StartsWith(ProviderPrefix, StringComparison.Ordinal)
+                    ? $"{sectionPrefix}__{key[ProviderPrefix.Length..].Replace(":", "__", StringComparison.Ordinal)}"
+                    : key.Replace(":", "__", StringComparison.Ordinal);
+                resourceBuilder.WithEnvironment(environmentKey, value);
+            }
+        }
+    }
 }
 
 #endif
