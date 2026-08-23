@@ -71,11 +71,11 @@ public sealed class SQSAspireLiveStreamTests : TestClusterPerTest
         {
             if (HostedCluster is not null)
             {
-                var clusterId = HostedCluster.Options.ClusterId;
+                var serviceId = HostedCluster.Options.ServiceId;
                 await base.DisposeAsync();
                 await SQSStreamProviderUtils.DeleteAllUsedQueues(
                     ProviderName,
-                    clusterId,
+                    serviceId,
                     AWSTestConstants.SqsConnectionString,
                     NullLoggerFactory.Instance);
             }
