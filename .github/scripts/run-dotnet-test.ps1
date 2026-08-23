@@ -14,6 +14,8 @@ param(
     [Parameter(Mandatory)]
     [string] $ReportTrxFilename,
 
+    [switch] $UseStaticInstrumentation,
+
     [switch] $NoBuild
 )
 
@@ -76,7 +78,8 @@ if ($env:GITHUB_EVENT_NAME -ne 'pull_request') {
 }
 
 $repositoryRoot = (Resolve-Path (Join-Path $PSScriptRoot '../..')).Path
-$coverageSettings = Join-Path $repositoryRoot $(if ($IsMacOS) { '.github/coverage.static.config.xml' } else { '.github/coverage.config.xml' })
+$useStaticInstrumentation = $IsMacOS -or $UseStaticInstrumentation
+$coverageSettings = Join-Path $repositoryRoot $(if ($useStaticInstrumentation) { '.github/coverage.static.config.xml' } else { '.github/coverage.config.xml' })
 $coverageDirectory = Join-Path $repositoryRoot 'TestResults'
 $coverageOutput = Join-Path $coverageDirectory "$CoverageId.cobertura.xml"
 Assert-NotReparsePoint $coverageDirectory
@@ -85,7 +88,7 @@ Assert-NotReparsePoint $coverageOutput
 Remove-Item -LiteralPath $coverageOutput -Force -ErrorAction SilentlyContinue
 
 $staticInstrumentationFiles = $null
-if ($IsMacOS) {
+if ($useStaticInstrumentation) {
     $buildArguments = [Collections.Generic.List[string]]::new()
     $buildArguments.Add('build')
     if (-not [string]::IsNullOrWhiteSpace($Project)) {

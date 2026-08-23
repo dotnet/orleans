@@ -270,6 +270,7 @@ try {
 
     Invoke-Test 'uses external coverage collection for CI builds' {
         $collectorScript = Get-Content -Raw -LiteralPath $collectorScriptPath
+        $workflow = Get-Content -Raw -LiteralPath $workflowPath
         Assert-Matches `
             $collectorScript `
             '& \$coverageTool @coverageArguments @testArguments' `
@@ -286,6 +287,10 @@ try {
             $collectorScript `
             'coverage\.static\.config\.xml' `
             'macOS coverage must use static-only instrumentation settings.'
+        Assert-Matches `
+            $workflow `
+            '(?s)Test Code Generator.*?-UseStaticInstrumentation.*?-UseStaticInstrumentation' `
+            'Both CodeGen runs must use static instrumentation.'
         Assert-Matches `
             $collectorScript `
             '\$testArguments\.Add\(''--no-build''\)' `

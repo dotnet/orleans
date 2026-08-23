@@ -1237,12 +1237,14 @@ jobs:
           -CoverageId "${{ github.job }}-generator-${{ matrix.os }}-${{ matrix.framework }}" `
           -Framework "${{ matrix.framework }}" `
           -Project "test/Orleans.CodeGenerator.Tests/Orleans.CodeGenerator.Tests.csproj" `
+          -UseStaticInstrumentation `
           -ReportTrxFilename "test_results_${{ matrix.framework }}_{asm}_{tfm}_{arch}.trx"
         ./.github/scripts/run-dotnet-test.ps1 `
           -CoverageId "${{ github.job }}-defaultcluster-${{ matrix.os }}-${{ matrix.framework }}" `
           -Framework "${{ matrix.framework }}" `
           -Project "test/Orleans.DefaultCluster.Tests/Orleans.DefaultCluster.Tests.csproj" `
           -FilterQuery "/[(Provider=None)&(Area=CodeGen)&((Suite=BVT)|(Suite=SlowBVT)|(Suite=Functional))]" `
+          -UseStaticInstrumentation `
           -ReportTrxFilename "test_results_defaultcluster_codegen_${{ matrix.framework }}_{asm}_{tfm}_{arch}.trx"
     - name: Archive Test Results
       if: always()
