@@ -2,7 +2,6 @@ using System.Net;
 using Amazon.DynamoDBv2.Model;
 using Aspire.Hosting;
 using Aspire.Hosting.ApplicationModel;
-using Aspire.Hosting.AWS.DynamoDB;
 using Aspire.Hosting.Orleans;
 using Aspire.Hosting.Testing;
 using AWSUtils.Tests.StorageTests;
@@ -269,18 +268,18 @@ public sealed class DynamoDBAspireLiveTests
         return endpoint;
     }
 
-    private static IHost BuildSiloHost(Dictionary<string, string?> environment)
+    private static IHost BuildSiloHost(IConfiguration configuration)
     {
         var builder = Host.CreateApplicationBuilder();
-        builder.Configuration.AddInMemoryCollection(ToConfigurationValues(environment));
+        builder.Configuration.AddConfiguration(configuration);
         builder.UseOrleans();
         return builder.Build();
     }
 
-    private static IHost BuildClientHost(Dictionary<string, string?> environment)
+    private static IHost BuildClientHost(IConfiguration configuration)
     {
         var builder = Host.CreateApplicationBuilder();
-        builder.Configuration.AddInMemoryCollection(ToConfigurationValues(environment));
+        builder.Configuration.AddConfiguration(configuration);
         builder.UseOrleansClient();
         return builder.Build();
     }
@@ -293,7 +292,7 @@ public sealed class DynamoDBAspireLiveTests
         string tableName)
     {
         await using var builder = DistributedApplicationTestingBuilder.Create();
-        var dynamodb = builder.AddAWSDynamoDBLocal("dynamodb");
+        var dynamodb = AddDynamoDBLocal(builder, "dynamodb");
         var provider = new DynamoDBProviderConfiguration("dynamodb", tableName, serviceId);
         var orleans = builder.AddOrleans($"orleans-{Guid.NewGuid():N}")
             .WithClusterId(clusterId)
@@ -316,28 +315,40 @@ public sealed class DynamoDBAspireLiveTests
 
         var silo = builder.AddContainer("silo", "unused")
             .WithReference(orleans)
-            .WithReference(dynamodb);
+            .WithEnvironment("AWS_ENDPOINT_URL_DYNAMODB", dynamodb.GetEndpoint("http"));
         IResource? clientResource = null;
         if (surface == ProviderSurface.Clustering)
         {
             clientResource = builder.AddContainer("client", "unused")
                 .WithReference(orleans.AsClient())
-                .WithReference(dynamodb)
+                .WithEnvironment("AWS_ENDPOINT_URL_DYNAMODB", dynamodb.GetEndpoint("http"))
                 .Resource;
         }
 
         AllocateEndpoint(dynamodb, endpoint);
 
         await using var app = await builder.BuildAsync();
-        var siloEnvironment = await GetEnvironmentVariablesAsync(silo.Resource, app.Services);
-        var clientEnvironment = clientResource is null
+        var siloConfiguration = await AspireResourceConfiguration.CreateAsync(
+            silo.Resource,
+            app.Services,
+            include: IncludeProviderConfiguration);
+        var clientConfiguration = clientResource is null
             ? null
-            : await GetEnvironmentVariablesAsync(clientResource, app.Services);
-        return new GeneratedConfiguration(siloEnvironment, clientEnvironment);
+            : await AspireResourceConfiguration.CreateAsync(
+                clientResource,
+                app.Services,
+                include: IncludeProviderConfiguration);
+        return new GeneratedConfiguration(siloConfiguration, clientConfiguration);
     }
 
+    private static IResourceBuilder<ContainerResource> AddDynamoDBLocal(
+        IDistributedApplicationBuilder builder,
+        string name)
+        => builder.AddContainer(name, "amazon/dynamodb-local")
+            .WithHttpEndpoint(targetPort: 8000, name: "http");
+
     private static void AllocateEndpoint(
-        IResourceBuilder<DynamoDBLocalResource> dynamodb,
+        IResourceBuilder<ContainerResource> dynamodb,
         Uri endpointUri)
     {
         var endpoint = dynamodb.Resource.Annotations
@@ -346,62 +357,18 @@ public sealed class DynamoDBAspireLiveTests
         endpoint.AllocatedEndpoint = new AllocatedEndpoint(endpoint, endpointUri.Host, endpointUri.Port);
     }
 
-    private static async Task<Dictionary<string, string?>> GetEnvironmentVariablesAsync(
-        IResource resource,
-        IServiceProvider services)
-    {
-        var executionContext = new DistributedApplicationExecutionContext(
-            new DistributedApplicationExecutionContextOptions(DistributedApplicationOperation.Run)
-            {
-                ServiceProvider = services,
-            });
-        var values = new Dictionary<string, object>();
-        var callbackContext = new EnvironmentCallbackContext(executionContext, resource, values);
-
-        foreach (var annotation in resource.Annotations.OfType<EnvironmentCallbackAnnotation>())
-        {
-            await annotation.Callback(callbackContext);
-        }
-
-        var valueContext = new ValueProviderContext
-        {
-            Caller = resource,
-            ExecutionContext = executionContext,
-            Network = KnownNetworkIdentifiers.LocalhostNetwork,
-        };
-        var result = new Dictionary<string, string?>();
-        foreach (var (key, value) in values)
-        {
-            if (key.StartsWith("Orleans__Endpoints__", StringComparison.Ordinal))
-            {
-                continue;
-            }
-
-            result[key] = value switch
-            {
-                IValueProvider valueProvider => await valueProvider.GetValueAsync(valueContext),
-                _ => value.ToString(),
-            };
-        }
-
-        return result;
-    }
-
-    private static Dictionary<string, string?> ToConfigurationValues(
-        Dictionary<string, string?> environment)
-        => environment.ToDictionary(
-            pair => pair.Key.StartsWith("Orleans__", StringComparison.Ordinal)
-                || pair.Key.StartsWith("AWS__", StringComparison.Ordinal)
-                    ? pair.Key.Replace("__", ":", StringComparison.Ordinal)
-                    : pair.Key,
-            pair => pair.Value);
+    private static bool IncludeProviderConfiguration(string key)
+        => !key.StartsWith("Orleans__Endpoints__", StringComparison.Ordinal)
+            && (key.StartsWith("Orleans__", StringComparison.Ordinal)
+                || key.StartsWith("AWS_", StringComparison.Ordinal)
+                || key.StartsWith("AWS__", StringComparison.Ordinal));
 
     private static void AssertGeneratedEndpoint(
-        Dictionary<string, string?> environment,
+        IConfiguration configuration,
         Uri endpoint)
         => Assert.Equal(
             endpoint.GetLeftPart(UriPartial.Authority).TrimEnd('/'),
-            environment["AWS_ENDPOINT_URL_DYNAMODB"]?.TrimEnd('/'));
+            configuration["AWS_ENDPOINT_URL_DYNAMODB"]?.TrimEnd('/'));
 
     private static void AssertProviderOptions(
         string? service,
@@ -437,8 +404,8 @@ public sealed class DynamoDBAspireLiveTests
     }
 
     private sealed record GeneratedConfiguration(
-        Dictionary<string, string?> Silo,
-        Dictionary<string, string?>? Client);
+        IConfigurationRoot Silo,
+        IConfigurationRoot? Client);
 
     private sealed class DynamoDBProviderConfiguration(
         string serviceKey,

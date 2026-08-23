@@ -55,7 +55,7 @@ internal sealed partial class NatsConnectionManager
                 SerializerRegistry = this._serializerRegistry
             };
             this._natsConnection = new NatsConnection(this._options.NatsClientOptions);
-            this._natsServer = this._options.NatsClientOptions.Url;
+            this._natsServer = GetLogSafeServerDescription(this._options.NatsClientOptions.Url);
         }
 
         this._natsContext = new NatsJSContext(this._natsConnection);
@@ -107,7 +107,8 @@ internal sealed partial class NatsConnectionManager
 
                     if (producerContext.Connection.ConnectionState != NatsConnectionState.Open)
                     {
-                        this.LogUnableToConnectToNatsServer(producerContext.Connection.Opts.Url);
+                        this.LogUnableToConnectToNatsServer(
+                            GetLogSafeServerDescription(producerContext.Connection.Opts.Url));
                         return;
                     }
                 }
@@ -140,6 +141,25 @@ internal sealed partial class NatsConnectionManager
             throw;
         }
     }
+
+    internal static string GetLogSafeServerDescription(string connectionUrls)
+        => string.Join(
+            ',',
+            connectionUrls.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+                .Select(static value =>
+                {
+                    if (!Uri.TryCreate(value, UriKind.Absolute, out var uri))
+                    {
+                        return "configured NATS endpoint";
+                    }
+
+                    var builder = new UriBuilder(uri)
+                    {
+                        UserName = string.Empty,
+                        Password = string.Empty,
+                    };
+                    return builder.Uri.ToString();
+                }));
 
     private StreamConfig BuildStreamConfig() => new(this._options.StreamName, [$"{this._providerName}.>"])
     {

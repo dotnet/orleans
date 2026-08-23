@@ -29,12 +29,9 @@ public sealed class AzureStorageAspireIntegrationTests
     [Fact]
     public async Task AspireAppModel_ActivatesAllAzureStorageProviders()
     {
-        var environment = await CreateAspireEnvironmentAsync();
-        environment[$"ConnectionStrings:{TablesResourceName}"] = "UseDevelopmentStorage=true";
-        environment[$"ConnectionStrings:{BlobsResourceName}"] = "UseDevelopmentStorage=true";
-        environment[$"ConnectionStrings:{QueuesResourceName}"] = "UseDevelopmentStorage=true";
+        var configuration = await CreateAspireConfigurationAsync("UseDevelopmentStorage=true");
 
-        using var host = CreateHost(environment);
+        using var host = CreateHost(configuration);
         var services = host.Services;
         var tableClient = services.GetRequiredKeyedService<TableServiceClient>(TablesResourceName);
         var blobClient = services.GetRequiredKeyedService<BlobServiceClient>(BlobsResourceName);
@@ -69,12 +66,9 @@ public sealed class AzureStorageAspireIntegrationTests
             throw Xunit.Sdk.SkipException.ForSkip("This test exercises the connection-string configuration used by the Azurite CI job.");
         }
 
-        var environment = await CreateAspireEnvironmentAsync();
-        environment[$"ConnectionStrings:{TablesResourceName}"] = TestDefaultConfiguration.DataConnectionString;
-        environment[$"ConnectionStrings:{BlobsResourceName}"] = TestDefaultConfiguration.DataConnectionString;
-        environment[$"ConnectionStrings:{QueuesResourceName}"] = TestDefaultConfiguration.DataConnectionString;
+        var configuration = await CreateAspireConfigurationAsync(TestDefaultConfiguration.DataConnectionString);
 
-        using var host = CreateHost(environment);
+        using var host = CreateHost(configuration);
         await host.Services
             .GetRequiredService<IOptions<AzureStorageClusteringOptions>>()
             .Value
@@ -92,10 +86,10 @@ public sealed class AzureStorageAspireIntegrationTests
             .GetPropertiesAsync();
     }
 
-    private static IHost CreateHost(Dictionary<string, string?> environment)
+    private static IHost CreateHost(IConfiguration configuration)
     {
         var hostBuilder = Host.CreateApplicationBuilder();
-        hostBuilder.Configuration.AddInMemoryCollection(environment);
+        hostBuilder.Configuration.AddConfiguration(configuration);
         hostBuilder.AddKeyedAzureTableServiceClient(TablesResourceName, settings =>
         {
             settings.DisableHealthChecks = true;
@@ -115,7 +109,7 @@ public sealed class AzureStorageAspireIntegrationTests
         return hostBuilder.Build();
     }
 
-    private static async Task<Dictionary<string, string?>> CreateAspireEnvironmentAsync()
+    private static async Task<IConfigurationRoot> CreateAspireConfigurationAsync(string? connectionString)
     {
         await using var builder = DistributedApplicationTestingBuilder.Create();
         var storage = builder.AddAzureStorage("storage");
@@ -129,71 +123,39 @@ public sealed class AzureStorageAspireIntegrationTests
             .WithReminders(tables)
             .WithGrainDirectory("directory", tables)
             .WithStreaming("queue-stream", queues);
-        var silo = builder.AddContainer("silo", "unused").WithReference(orleans);
+        var silo = builder.AddContainer("silo", "unused")
+            .WithReference(orleans)
+            .WithEnvironment($"ConnectionStrings__{TablesResourceName}", connectionString)
+            .WithEnvironment($"ConnectionStrings__{BlobsResourceName}", connectionString)
+            .WithEnvironment($"ConnectionStrings__{QueuesResourceName}", connectionString);
 
         await using var app = await builder.BuildAsync();
-        var environment = await GetEnvironmentVariablesAsync(silo.Resource, app.Services);
+        var configuration = await AspireResourceConfiguration.CreateAsync(
+            silo.Resource,
+            app.Services,
+            include: static key =>
+                key.StartsWith("Orleans__", StringComparison.Ordinal)
+                && !key.StartsWith("Orleans__Endpoints__", StringComparison.Ordinal)
+                || key.StartsWith("ConnectionStrings__", StringComparison.Ordinal));
 
-        AssertProvider(environment, "Clustering", null, "AzureTableStorage", TablesResourceName);
-        AssertProvider(environment, "GrainStorage", "table-state", "AzureTableStorage", TablesResourceName);
-        AssertProvider(environment, "GrainStorage", "blob-state", "AzureBlobStorage", BlobsResourceName);
-        AssertProvider(environment, "Reminders", null, "AzureTableStorage", TablesResourceName);
-        AssertProvider(environment, "GrainDirectory", "directory", "AzureTableStorage", TablesResourceName);
-        AssertProvider(environment, "Streaming", "queue-stream", "AzureQueueStorage", QueuesResourceName);
-        return environment;
+        AssertProvider(configuration, "Clustering", null, "AzureTableStorage", TablesResourceName);
+        AssertProvider(configuration, "GrainStorage", "table-state", "AzureTableStorage", TablesResourceName);
+        AssertProvider(configuration, "GrainStorage", "blob-state", "AzureBlobStorage", BlobsResourceName);
+        AssertProvider(configuration, "Reminders", null, "AzureTableStorage", TablesResourceName);
+        AssertProvider(configuration, "GrainDirectory", "directory", "AzureTableStorage", TablesResourceName);
+        AssertProvider(configuration, "Streaming", "queue-stream", "AzureQueueStorage", QueuesResourceName);
+        return configuration;
     }
 
     private static void AssertProvider(
-        Dictionary<string, string?> environment,
+        IConfiguration configuration,
         string capability,
         string? name,
         string providerType,
         string serviceKey)
     {
         var path = name is null ? $"Orleans:{capability}" : $"Orleans:{capability}:{name}";
-        Assert.Equal(providerType, environment[$"{path}:ProviderType"]);
-        Assert.Equal(serviceKey, environment[$"{path}:ServiceKey"]);
-    }
-
-    private static async Task<Dictionary<string, string?>> GetEnvironmentVariablesAsync(
-        IResource resource,
-        IServiceProvider services)
-    {
-        var executionContext = new DistributedApplicationExecutionContext(
-            new DistributedApplicationExecutionContextOptions(DistributedApplicationOperation.Run)
-            {
-                ServiceProvider = services,
-            });
-        var values = new Dictionary<string, object>();
-        var callbackContext = new EnvironmentCallbackContext(executionContext, resource, values);
-
-        foreach (var annotation in resource.Annotations.OfType<EnvironmentCallbackAnnotation>())
-        {
-            await annotation.Callback(callbackContext);
-        }
-
-        var valueContext = new ValueProviderContext
-        {
-            Caller = resource,
-            ExecutionContext = executionContext,
-            Network = KnownNetworkIdentifiers.LocalhostNetwork,
-        };
-        var result = new Dictionary<string, string?>();
-        foreach (var (key, value) in values)
-        {
-            if (!key.StartsWith("Orleans__", StringComparison.Ordinal)
-                || key.StartsWith("Orleans__Endpoints__", StringComparison.Ordinal))
-            {
-                continue;
-            }
-
-            result[key.Replace("__", ":", StringComparison.Ordinal)] = value switch
-            {
-                IValueProvider provider => await provider.GetValueAsync(valueContext),
-                _ => value.ToString(),
-            };
-        }
-
-        return result;
+        Assert.Equal(providerType, configuration[$"{path}:ProviderType"]);
+        Assert.Equal(serviceKey, configuration[$"{path}:ServiceKey"]);
     }
 }

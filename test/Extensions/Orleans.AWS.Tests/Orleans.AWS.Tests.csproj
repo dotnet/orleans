@@ -18,13 +18,8 @@
   </ItemGroup>
 
   <ItemGroup Condition="'$(TargetFramework)' == 'net10.0'">
-    <PackageReference Include="Aspire.Hosting.AWS" />
     <PackageReference Include="Aspire.Hosting.Orleans" />
     <PackageReference Include="Aspire.Hosting.Testing" />
-    <PackageReference Include="AWSSDK.Core" />
-    <PackageReference Include="AWSSDK.Lambda" />
-    <PackageReference Include="AWSSDK.SSO" />
-    <PackageReference Include="AWSSDK.SSOOIDC" />
   </ItemGroup>
 
   <ItemGroup Condition="'$(TargetFramework)' != 'net10.0'">
@@ -33,6 +28,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <Compile Include="$(SourceRoot)test\Extensions\AspireTestInfrastructure\AspireResourceConfiguration.cs" Link="AspireResourceConfiguration.cs" />
     <Compile Include="$(SourceRoot)src\AWS\Shared\AWSUtils.cs" Link="AWSUtils.cs" />
     <Compile Include="$(SourceRoot)src\AWS\Shared\Storage\DynamoDBStorage.cs" Link="Storage\DynamoDBStorage.cs" />
   </ItemGroup>

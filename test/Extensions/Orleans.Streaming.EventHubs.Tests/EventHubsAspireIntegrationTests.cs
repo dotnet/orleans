@@ -65,25 +65,31 @@ public sealed class EventHubsAspireIntegrationTests
         emulatorEndpoint.AllocatedEndpoint = new AllocatedEndpoint(emulatorEndpoint, "localhost", 5672);
 
         await using var app = await builder.BuildAsync(TestContext.Current.CancellationToken);
-        var environment = await GetEnvironmentVariablesAsync(silo.Resource, app.Services);
-        var clientEnvironment = await GetEnvironmentVariablesAsync(client.Resource, app.Services);
+        var configuration = await AspireResourceConfiguration.CreateAsync(
+            silo.Resource,
+            app.Services,
+            include: IsRelevantEnvironmentVariable);
+        var clientConfiguration = await AspireResourceConfiguration.CreateAsync(
+            client.Resource,
+            app.Services,
+            include: IsRelevantEnvironmentVariable);
 
-        Assert.Equal(expectedProviderType, environment[$"Orleans:Streaming:{providerName}:ProviderType"]);
-        Assert.Equal(serviceKey, environment[$"Orleans:Streaming:{providerName}:ServiceKey"]);
-        Assert.Equal(expectedProviderType, clientEnvironment[$"Orleans:Streaming:{providerName}:ProviderType"]);
-        Assert.Equal(serviceKey, clientEnvironment[$"Orleans:Streaming:{providerName}:ServiceKey"]);
-        Assert.Equal(eventHubName, environment[$"{serviceKey.ToUpperInvariant().Replace('-', '_')}_EVENTHUBNAME"]);
+        Assert.Equal(expectedProviderType, configuration[$"Orleans:Streaming:{providerName}:ProviderType"]);
+        Assert.Equal(serviceKey, configuration[$"Orleans:Streaming:{providerName}:ServiceKey"]);
+        Assert.Equal(expectedProviderType, clientConfiguration[$"Orleans:Streaming:{providerName}:ProviderType"]);
+        Assert.Equal(serviceKey, clientConfiguration[$"Orleans:Streaming:{providerName}:ServiceKey"]);
+        Assert.Equal(eventHubName, configuration[$"{serviceKey.ToUpperInvariant().Replace('-', '_')}_EVENTHUBNAME"]);
         if (useConsumerGroupResource)
         {
-            Assert.Equal(consumerGroupName, environment["ORDERS_CONSUMER_CONSUMERGROUPNAME"]);
+            Assert.Equal(consumerGroupName, configuration["ORDERS_CONSUMER_CONSUMERGROUPNAME"]);
         }
         else
         {
-            Assert.DoesNotContain("ORDERS_HUB_CONSUMERGROUPNAME", environment);
+            Assert.Null(configuration["ORDERS_HUB_CONSUMERGROUPNAME"]);
         }
 
         var hostBuilder = Host.CreateApplicationBuilder();
-        hostBuilder.Configuration.AddInMemoryCollection(environment);
+        hostBuilder.Configuration.AddConfiguration(configuration);
         hostBuilder.UseOrleans();
 
         using var host = hostBuilder.Build();
@@ -103,7 +109,7 @@ public sealed class EventHubsAspireIntegrationTests
         Assert.Equal("devstoreaccount1", checkpointerOptions.TableServiceClient.AccountName);
 
         var clientHostBuilder = Host.CreateApplicationBuilder();
-        clientHostBuilder.Configuration.AddInMemoryCollection(clientEnvironment);
+        clientHostBuilder.Configuration.AddConfiguration(clientConfiguration);
         clientHostBuilder.UseOrleansClient();
 
         using var clientHost = clientHostBuilder.Build();
@@ -139,7 +145,10 @@ public sealed class EventHubsAspireIntegrationTests
             .WithReference(orleans)
             .WithEnvironment(
                 $"Orleans__Streaming__{providerName}__CheckpointerConnectionString",
-                TestDefaultConfiguration.DataConnectionString);
+                TestDefaultConfiguration.DataConnectionString)
+            .WithEnvironment(
+                "ConnectionStrings__orders-consumer",
+                TestDefaultConfiguration.EventHubConnectionString);
 
         var emulatorEndpoint = eventHubs.Resource.Annotations
             .OfType<EndpointAnnotation>()
@@ -147,11 +156,13 @@ public sealed class EventHubsAspireIntegrationTests
         emulatorEndpoint.AllocatedEndpoint = new AllocatedEndpoint(emulatorEndpoint, "localhost", 5672);
 
         await using var app = await builder.BuildAsync();
-        var environment = await GetEnvironmentVariablesAsync(silo.Resource, app.Services);
-        environment["ConnectionStrings:orders-consumer"] = TestDefaultConfiguration.EventHubConnectionString;
+        var configuration = await AspireResourceConfiguration.CreateAsync(
+            silo.Resource,
+            app.Services,
+            include: IsRelevantEnvironmentVariable);
 
         var hostBuilder = Host.CreateApplicationBuilder();
-        hostBuilder.Configuration.AddInMemoryCollection(environment);
+        hostBuilder.Configuration.AddConfiguration(configuration);
         hostBuilder.UseOrleans();
 
         using var host = hostBuilder.Build();
@@ -166,51 +177,6 @@ public sealed class EventHubsAspireIntegrationTests
         await using var producer = new EventHubProducerClient(connection);
         Assert.NotEmpty(await producer.GetPartitionIdsAsync());
         await checkpointerOptions.TableServiceClient!.GetPropertiesAsync();
-    }
-
-    private static async Task<Dictionary<string, string?>> GetEnvironmentVariablesAsync(
-        IResource resource,
-        IServiceProvider services)
-    {
-        var executionContext = new DistributedApplicationExecutionContext(
-            new DistributedApplicationExecutionContextOptions(DistributedApplicationOperation.Run)
-            {
-                ServiceProvider = services,
-            });
-        var values = new Dictionary<string, object>();
-        var callbackContext = new EnvironmentCallbackContext(executionContext, resource, values);
-
-        foreach (var annotation in resource.Annotations.OfType<EnvironmentCallbackAnnotation>())
-        {
-            await annotation.Callback(callbackContext);
-        }
-
-        var valueContext = new ValueProviderContext
-        {
-            Caller = resource,
-            ExecutionContext = executionContext,
-            Network = KnownNetworkIdentifiers.LocalhostNetwork,
-        };
-        var result = new Dictionary<string, string?>();
-        foreach (var (key, value) in values)
-        {
-            if (!IsRelevantEnvironmentVariable(key))
-            {
-                continue;
-            }
-
-            var normalizedKey = key.StartsWith("Orleans__", StringComparison.Ordinal)
-                || key.StartsWith("ConnectionStrings__", StringComparison.Ordinal)
-                    ? key.Replace("__", ":", StringComparison.Ordinal)
-                    : key;
-            result[normalizedKey] = value switch
-            {
-                IValueProvider provider => await provider.GetValueAsync(valueContext),
-                _ => value.ToString(),
-            };
-        }
-
-        return result;
     }
 
     private static bool IsRelevantEnvironmentVariable(string name)
