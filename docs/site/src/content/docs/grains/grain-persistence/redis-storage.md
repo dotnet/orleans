@@ -1,7 +1,7 @@
 ---
 title: Redis grain persistence
 description: Configure Redis as an Orleans grain storage provider.
-ms.date: 08/07/2026
+ms.date: 08/23/2026
 ms.topic: how-to
 ---
 
@@ -16,6 +16,18 @@ Configure a provider with <xref:Orleans.Hosting.RedisSiloBuilderExtensions.AddRe
 :::code language="csharp" source="./snippets/persistence/StorageConfiguration.cs" id="configure_redis":::
 
 The provider name must match the storage name in `[PersistentState]`.
+
+## Use with Aspire
+
+Aspire can model either a Redis container or Azure Managed Redis. The same resource can supply clustering, grain storage, reminders, and grain directories:
+
+:::code language="csharp" source="../../host/snippets/aspire/AppHost/AppHostExamples.cs" id="redis_providers_aspire":::
+
+Register the keyed StackExchange.Redis client named by the AppHost resource:
+
+:::code language="csharp" source="../../host/snippets/aspire/Silo/SiloProgram.cs" id="redis_providers_silo":::
+
+The Orleans Redis packages recognize the `Redis`, `AzureRedisCache`, and `AzureManagedRedis` provider aliases emitted by first-party Aspire resources.
 
 ## Configure the default provider
 

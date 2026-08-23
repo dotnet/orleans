@@ -11,9 +11,11 @@ using System.Threading.Tasks;
 
 [assembly: RegisterProvider("Redis", "Clustering", "Silo", typeof(RedisClusteringProviderBuilder))]
 [assembly: RegisterProvider("AzureRedisCache", "Clustering", "Silo", typeof(RedisClusteringProviderBuilder))]
+[assembly: RegisterProvider("AzureManagedRedis", "Clustering", "Silo", typeof(RedisClusteringProviderBuilder))]
 
 [assembly: RegisterProvider("Redis", "Clustering", "Client", typeof(RedisClusteringProviderBuilder))]
 [assembly: RegisterProvider("AzureRedisCache", "Clustering", "Client", typeof(RedisClusteringProviderBuilder))]
+[assembly: RegisterProvider("AzureManagedRedis", "Clustering", "Client", typeof(RedisClusteringProviderBuilder))]
 
 namespace Orleans.Clustering.Redis.Hosting;
 
