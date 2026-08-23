@@ -314,17 +314,27 @@ namespace Orleans.Runtime
 
         public async Task DeleteActivations(List<GrainAddress> addresses, DeactivationReasonCode reasonCode, string reasonText)
         {
-            var tasks = new List<Task>(addresses.Count);
             var deactivationReason = new DeactivationReason(reasonCode, reasonText);
-            await Parallel.ForEachAsync(addresses, (activationAddress, cancellationToken) =>
+            await Parallel.ForEachAsync(addresses, async (activationAddress, cancellationToken) =>
             {
-                if (TryGetGrainContext(activationAddress.GrainId, out var grainContext))
+                if (!TryGetGrainContext(activationAddress.GrainId, out var grainContext))
                 {
-                    grainContext.Deactivate(deactivationReason);
-                    return new ValueTask(grainContext.Deactivated);
+                    return;
                 }
 
-                return ValueTask.CompletedTask;
+                if (grainContext is ActivationData activationData)
+                {
+                    if (await activationData.DeactivateIfAddressMatches(activationAddress, deactivationReason).WaitAsync(cancellationToken))
+                    {
+                        await activationData.Deactivated.WaitAsync(cancellationToken);
+                    }
+                }
+                else if (grainContext.Address.Equals(activationAddress)
+                    && grainContext.Address.MembershipVersion == activationAddress.MembershipVersion)
+                {
+                    grainContext.Deactivate(deactivationReason);
+                    await grainContext.Deactivated.WaitAsync(cancellationToken);
+                }
             });
         }
 

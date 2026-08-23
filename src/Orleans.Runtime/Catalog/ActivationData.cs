@@ -665,6 +665,29 @@ internal sealed partial class ActivationData :
 
     public void Deactivate(DeactivationReason reason, CancellationToken cancellationToken = default) => Deactivate(reason, Activity.Current?.Context, cancellationToken);
 
+    internal Task<bool> DeactivateIfAddressMatches(GrainAddress address, DeactivationReason reason)
+    {
+        lock (this)
+        {
+            if (State is ActivationState.Creating or ActivationState.Activating)
+            {
+                var command = new Command.DeactivateIfAddressMatches(address, reason);
+                ScheduleOperation(command);
+                return command.Completion.Task;
+            }
+
+            var matches = State == ActivationState.Valid
+                && Address.Equals(address)
+                && Address.MembershipVersion == address.MembershipVersion;
+            if (matches)
+            {
+                Deactivate(reason);
+            }
+
+            return Task.FromResult(matches);
+        }
+    }
+
     private void DeactivateStuckActivation()
     {
         IsStuckProcessingMessage = true;
@@ -1268,6 +1291,27 @@ internal sealed partial class ActivationData :
                             break;
                         case Command.Deactivate command:
                             await FinishDeactivating(command, command.CancellationToken).SuppressThrowing();
+                            break;
+                        case Command.DeactivateIfAddressMatches command:
+                            try
+                            {
+                                command.MarkExecuting();
+                                var matches = State == ActivationState.Valid
+                                    && Address.Equals(command.Address)
+                                    && Address.MembershipVersion == command.Address.MembershipVersion;
+                                if (matches)
+                                {
+                                    Deactivate(command.Reason);
+                                }
+
+                                command.Completion.TrySetResult(matches);
+                            }
+                            catch (Exception exception)
+                            {
+                                command.Completion.TrySetException(exception);
+                                throw;
+                            }
+
                             break;
                         case Command.Delay command:
                             await Task.Delay(command.Duration, GrainRuntime.TimeProvider, command.CancellationToken).SuppressThrowing();
@@ -2432,6 +2476,27 @@ internal sealed partial class ActivationData :
         {
             public ActivationState PreviousState { get; } = previousState;
             public Activity? Activity { get; } = activity;
+        }
+
+        public sealed class DeactivateIfAddressMatches(GrainAddress address, DeactivationReason reason) : Command(new())
+        {
+            private bool _isExecuting;
+
+            public GrainAddress Address { get; } = address;
+            public DeactivationReason Reason { get; } = reason;
+            public TaskCompletionSource<bool> Completion { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+            public void MarkExecuting() => Volatile.Write(ref _isExecuting, true);
+
+            public override void Cancel()
+            {
+                if (!Volatile.Read(ref _isExecuting))
+                {
+                    Completion.TrySetResult(false);
+                }
+
+                base.Cancel();
+            }
         }
 
         public sealed class Activate(Dictionary<string, object>? requestContext, CancellationTokenSource cts, CatalogInstruments.ActivationMetricTracker metrics) : Command(cts)
