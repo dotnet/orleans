@@ -14,6 +14,7 @@ namespace UnitTests.Grains
 
         public DeliveryRun StartRun(string deliveryId, int expectedDeliveries, bool blockDeliveries = false)
         {
+            _observerActivations.Clear();
             var run = new DeliveryRun(deliveryId, expectedDeliveries, blockDeliveries);
             Volatile.Write(ref _currentRun, run);
             return run;
