@@ -148,19 +148,26 @@ public sealed class NatsStreamProviderBuilder : IProviderBuilder<ISiloBuilder>, 
         }
 
         var connectionUrl = connectionString ?? url;
-        if (!Uri.TryCreate(connectionUrl, UriKind.Absolute, out var uri)
-            || !string.Equals(uri.Scheme, "nats", StringComparison.OrdinalIgnoreCase)
-                && !string.Equals(uri.Scheme, "tls", StringComparison.OrdinalIgnoreCase)
-                && !string.Equals(uri.Scheme, "ws", StringComparison.OrdinalIgnoreCase)
-                && !string.Equals(uri.Scheme, "wss", StringComparison.OrdinalIgnoreCase))
+        var connectionUris = connectionUrl?.Split(
+            ',',
+            StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+        if (connectionUris is not { Length: > 0 }
+            || connectionUris.Any(static value => !IsSupportedNatsUri(value)))
         {
             throw new OrleansConfigurationException(
-                $"NATS stream provider '{providerName}' requires an absolute nats, tls, ws, or wss connection URI.");
+                $"NATS stream provider '{providerName}' requires one or more absolute nats, tls, ws, or wss connection URIs.");
         }
 
         options.Connection = null;
-        options.NatsClientOptions = (options.NatsClientOptions ?? NatsOpts.Default) with { Url = connectionUrl };
+        options.NatsClientOptions = (options.NatsClientOptions ?? NatsOpts.Default) with { Url = connectionUrl! };
     }
+
+    private static bool IsSupportedNatsUri(string value)
+        => Uri.TryCreate(value, UriKind.Absolute, out var uri)
+            && (string.Equals(uri.Scheme, "nats", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(uri.Scheme, "tls", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(uri.Scheme, "ws", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(uri.Scheme, "wss", StringComparison.OrdinalIgnoreCase));
 
     private static int GetInt32(
         IConfigurationSection configurationSection,

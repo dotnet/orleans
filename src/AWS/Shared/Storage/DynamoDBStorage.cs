@@ -154,7 +154,7 @@ namespace Orleans.Transactions.DynamoDB
                 : new AmazonDynamoDBConfig { RegionEndpoint = AWSUtils.GetRegionEndpoint(this._service) };
             var credentials = GetExplicitCredentials();
 
-            if (credentials is null && isServiceUrl)
+            if (credentials is null && isServiceUrl && serviceUri!.IsLoopback)
             {
                 credentials = new BasicAWSCredentials("dummy", "dummyKey");
             }

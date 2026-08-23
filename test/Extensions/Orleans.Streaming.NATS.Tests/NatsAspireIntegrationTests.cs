@@ -48,19 +48,19 @@ public sealed class NatsAspireJetStreamTests
         }
 
         var streamName = $"aspire-{Guid.NewGuid():N}";
-        await using var model = await NatsAspireTestModel.CreateAsync(streamName);
-        model.SiloEnvironment["ConnectionStrings:nats"] = NatsTestConstants.NatsClientOptions.Url;
-        model.ClientEnvironment["ConnectionStrings:nats"] = NatsTestConstants.NatsClientOptions.Url;
+        await using var model = await NatsAspireTestModel.CreateAsync(
+            streamName,
+            NatsTestConstants.NatsClientOptions.Url);
 
         var clusterBuilder = new InProcessTestClusterBuilder(1);
         clusterBuilder.ConfigureSiloHost((_, hostBuilder) =>
         {
-            hostBuilder.Configuration.AddInMemoryCollection(model.SiloEnvironment);
+            hostBuilder.Configuration.AddConfiguration(model.SiloEnvironment);
             hostBuilder.AddKeyedNatsClient("nats");
         });
         clusterBuilder.ConfigureClientHost(hostBuilder =>
         {
-            hostBuilder.Configuration.AddInMemoryCollection(model.ClientEnvironment);
+            hostBuilder.Configuration.AddConfiguration(model.ClientEnvironment);
             hostBuilder.AddKeyedNatsClient("nats");
         });
         clusterBuilder.ConfigureSilo((_, siloBuilder) =>
@@ -116,19 +116,21 @@ internal sealed class NatsAspireTestModel : IAsyncDisposable
 
     private NatsAspireTestModel(
         DistributedApplication app,
-        Dictionary<string, string?> siloEnvironment,
-        Dictionary<string, string?> clientEnvironment)
+        IConfigurationRoot siloEnvironment,
+        IConfigurationRoot clientEnvironment)
     {
         _app = app;
         SiloEnvironment = siloEnvironment;
         ClientEnvironment = clientEnvironment;
     }
 
-    public Dictionary<string, string?> SiloEnvironment { get; }
+    public IConfigurationRoot SiloEnvironment { get; }
 
-    public Dictionary<string, string?> ClientEnvironment { get; }
+    public IConfigurationRoot ClientEnvironment { get; }
 
-    public static async Task<NatsAspireTestModel> CreateAsync(string streamName)
+    public static async Task<NatsAspireTestModel> CreateAsync(
+        string streamName,
+        string? connectionString = null)
     {
         var builder = DistributedApplicationTestingBuilder.Create();
         var nats = builder.AddNats("nats").WithJetStream();
@@ -137,58 +139,28 @@ internal sealed class NatsAspireTestModel : IAsyncDisposable
             .WithStreaming("orders", nats);
         var silo = builder.AddContainer("silo", "unused")
             .WithReference(orleans)
-            .WithEnvironment("Orleans__Streaming__orders__StreamName", streamName);
+            .WithEnvironment("Orleans__Streaming__orders__StreamName", streamName)
+            .WithEnvironment("ConnectionStrings__nats", connectionString);
         var client = builder.AddContainer("client", "unused")
             .WithReference(orleans.AsClient())
-            .WithEnvironment("Orleans__Streaming__orders__StreamName", streamName);
+            .WithEnvironment("Orleans__Streaming__orders__StreamName", streamName)
+            .WithEnvironment("ConnectionStrings__nats", connectionString);
 
         var app = await builder.BuildAsync();
-        var siloEnvironment = await GetEnvironmentVariablesAsync(silo.Resource, app.Services);
-        var clientEnvironment = await GetEnvironmentVariablesAsync(client.Resource, app.Services);
+        var siloEnvironment = await AspireResourceConfiguration.CreateAsync(
+            silo.Resource,
+            app.Services,
+            include: IsRelevantEnvironmentVariable);
+        var clientEnvironment = await AspireResourceConfiguration.CreateAsync(
+            client.Resource,
+            app.Services,
+            include: IsRelevantEnvironmentVariable);
         return new NatsAspireTestModel(app, siloEnvironment, clientEnvironment);
     }
 
     public ValueTask DisposeAsync() => _app.DisposeAsync();
 
-    private static async Task<Dictionary<string, string?>> GetEnvironmentVariablesAsync(
-        IResource resource,
-        IServiceProvider services)
-    {
-        var executionContext = new DistributedApplicationExecutionContext(
-            new DistributedApplicationExecutionContextOptions(DistributedApplicationOperation.Run)
-            {
-                ServiceProvider = services,
-            });
-        var values = new Dictionary<string, object>();
-        var callbackContext = new EnvironmentCallbackContext(executionContext, resource, values);
-
-        foreach (var annotation in resource.Annotations.OfType<EnvironmentCallbackAnnotation>())
-        {
-            await annotation.Callback(callbackContext);
-        }
-
-        var valueContext = new ValueProviderContext
-        {
-            Caller = resource,
-            ExecutionContext = executionContext,
-            Network = KnownNetworkIdentifiers.LocalhostNetwork,
-        };
-        var result = new Dictionary<string, string?>();
-        foreach (var (key, value) in values)
-        {
-            if (!key.StartsWith("Orleans__Streaming__", StringComparison.Ordinal))
-            {
-                continue;
-            }
-
-            var normalizedKey = key.Replace("__", ":", StringComparison.Ordinal);
-            result[normalizedKey] = value switch
-            {
-                IValueProvider provider => await provider.GetValueAsync(valueContext),
-                _ => value.ToString(),
-            };
-        }
-
-        return result;
-    }
+    private static bool IsRelevantEnvironmentVariable(string key)
+        => key.StartsWith("Orleans__Streaming__", StringComparison.Ordinal)
+            || key.StartsWith("ConnectionStrings__", StringComparison.Ordinal);
 }

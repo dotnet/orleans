@@ -70,6 +70,39 @@ public sealed class NatsStreamProviderBuilderTests
         Assert.Equal("nats://nats.example:4222", options.NatsClientOptions!.Url);
     }
 
+    [Fact]
+    public void ConfigureClient_MultipleServerUrls_PreservesSeedList()
+    {
+        const string providerName = "telemetry";
+        const string connectionString = "nats://first.example:4222,nats://second.example:4222";
+        var builder = new TestClientBuilder(CreateConfiguration(
+            ($"Orleans:Streaming:{providerName}:ConnectionString", connectionString),
+            ($"Orleans:Streaming:{providerName}:StreamName", "telemetry-stream")));
+
+        new NatsStreamProviderBuilder().Configure(
+            builder,
+            providerName,
+            builder.Configuration.GetSection($"Orleans:Streaming:{providerName}"));
+
+        using var services = builder.Services.BuildServiceProvider();
+        var options = services.GetRequiredService<IOptionsMonitor<NatsOptions>>().Get(providerName);
+
+        Assert.Equal(connectionString, options.NatsClientOptions!.Url);
+    }
+
+    [Fact]
+    public void LogSafeServerDescription_RedactsCredentials()
+    {
+        var description = NatsConnectionManager.GetLogSafeServerDescription(
+            "nats://user:password@first.example:4222,nats://token@second.example:4222");
+
+        Assert.DoesNotContain("user", description, StringComparison.Ordinal);
+        Assert.DoesNotContain("password", description, StringComparison.Ordinal);
+        Assert.DoesNotContain("token", description, StringComparison.Ordinal);
+        Assert.Contains("first.example", description, StringComparison.Ordinal);
+        Assert.Contains("second.example", description, StringComparison.Ordinal);
+    }
+
     [Theory]
     [InlineData("ServiceKey", "nats", "ConnectionString", "nats://localhost:4222")]
     [InlineData("ConnectionName", "nats", "Url", "nats://localhost:4222")]

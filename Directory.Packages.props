@@ -138,7 +138,6 @@
     <PackageVersion Include="Aspire.Hosting.Azure.EventHubs" Version="13.2.4" />
     <PackageVersion Include="Aspire.Hosting.Azure.Redis" Version="13.2.4" />
     <PackageVersion Include="Aspire.Hosting.Azure.Storage" Version="13.2.4" />
-    <PackageVersion Include="Aspire.Hosting.AWS" Version="13.0.0" />
     <PackageVersion Include="Aspire.Hosting.MySql" Version="13.2.4" />
     <PackageVersion Include="Aspire.Hosting.Nats" Version="13.2.4" />
     <PackageVersion Include="Aspire.Hosting.Oracle" Version="13.2.4" />
@@ -160,10 +159,6 @@
     <PackageVersion Update="Azure.Core" Version="1.51.1" />
     <PackageVersion Update="Azure.Identity" Version="1.18.0" />
     <PackageVersion Update="Azure.Security.KeyVault.Secrets" Version="4.8.0" />
-    <PackageVersion Include="AWSSDK.Core" Version="4.0.6.1" />
-    <PackageVersion Include="AWSSDK.Lambda" Version="4.0.15.2" />
-    <PackageVersion Include="AWSSDK.SSO" Version="4.0.2.27" />
-    <PackageVersion Include="AWSSDK.SSOOIDC" Version="4.0.3.28" />
     <PackageVersion Update="Microsoft.Data.Sqlite" Version="10.0.3" />
     <PackageVersion Update="Microsoft.Extensions.Configuration.Abstractions" Version="10.0.5" />
     <PackageVersion Update="Microsoft.Extensions.Configuration.Binder" Version="10.0.5" />

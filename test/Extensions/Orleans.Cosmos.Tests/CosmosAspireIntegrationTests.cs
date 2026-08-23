@@ -26,11 +26,10 @@ public sealed class CosmosAspireIntegrationTests
     [Fact]
     public async Task AspireAppModel_ActivatesClusteringStorageAndReminders()
     {
-        var environment = await CreateAspireEnvironmentAsync();
-        environment[$"ConnectionStrings:{ResourceName}"] =
-            $"AccountEndpoint=https://localhost:8081/;AccountKey={CreateEmulatorKey()};";
+        var configuration = await CreateAspireConfigurationAsync(
+            $"AccountEndpoint=https://localhost:8081/;AccountKey={CreateEmulatorKey()};");
 
-        using var host = CreateHost(environment);
+        using var host = CreateHost(configuration);
         var keyedClient = host.Services.GetRequiredKeyedService<CosmosClient>(ResourceName);
         var clustering = host.Services.GetRequiredService<IOptions<CosmosClusteringOptions>>().Value;
         var storage = host.Services.GetRequiredService<IOptionsMonitor<CosmosGrainStorageOptions>>().Get("state");
@@ -53,21 +52,20 @@ public sealed class CosmosAspireIntegrationTests
             throw Xunit.Sdk.SkipException.ForSkip("This test exercises the account-key configuration used by the Cosmos DB emulator CI job.");
         }
 
-        var environment = await CreateAspireEnvironmentAsync();
-        environment[$"ConnectionStrings:{ResourceName}"] =
-            $"AccountEndpoint={TestDefaultConfiguration.CosmosDBAccountEndpoint};AccountKey={TestDefaultConfiguration.CosmosDBAccountKey};";
+        var configuration = await CreateAspireConfigurationAsync(
+            $"AccountEndpoint={TestDefaultConfiguration.CosmosDBAccountEndpoint};AccountKey={TestDefaultConfiguration.CosmosDBAccountKey};");
 
-        using var host = CreateHost(environment);
+        using var host = CreateHost(configuration);
         var options = host.Services.GetRequiredService<IOptions<CosmosClusteringOptions>>().Value;
         using var client = await options.CreateClient(host.Services);
         var account = await client.ReadAccountAsync();
         Assert.NotNull(account);
     }
 
-    private static IHost CreateHost(Dictionary<string, string?> environment)
+    private static IHost CreateHost(IConfiguration configuration)
     {
         var hostBuilder = Host.CreateApplicationBuilder();
-        hostBuilder.Configuration.AddInMemoryCollection(environment);
+        hostBuilder.Configuration.AddConfiguration(configuration);
         hostBuilder.AddKeyedAzureCosmosClient(
             ResourceName,
             settings =>
@@ -87,7 +85,7 @@ public sealed class CosmosAspireIntegrationTests
         return hostBuilder.Build();
     }
 
-    private static async Task<Dictionary<string, string?>> CreateAspireEnvironmentAsync()
+    private static async Task<IConfigurationRoot> CreateAspireConfigurationAsync(string connectionString)
     {
         await using var builder = DistributedApplicationTestingBuilder.Create();
         var cosmos = builder.AddAzureCosmosDB(ResourceName);
@@ -105,65 +103,31 @@ public sealed class CosmosAspireIntegrationTests
             .WithEnvironment("Orleans__GrainStorage__state__IsResourceCreationEnabled", "true")
             .WithEnvironment("Orleans__Reminders__DatabaseName", DatabaseName)
             .WithEnvironment("Orleans__Reminders__ContainerName", "Reminders")
-            .WithEnvironment("Orleans__Reminders__IsResourceCreationEnabled", "true");
+            .WithEnvironment("Orleans__Reminders__IsResourceCreationEnabled", "true")
+            .WithEnvironment($"ConnectionStrings__{ResourceName}", connectionString);
 
         await using var app = await builder.BuildAsync();
-        var environment = await GetEnvironmentVariablesAsync(silo.Resource, app.Services);
+        var configuration = await AspireResourceConfiguration.CreateAsync(
+            silo.Resource,
+            app.Services,
+            include: static key =>
+                key.StartsWith("Orleans__", StringComparison.Ordinal)
+                && !key.StartsWith("Orleans__Endpoints__", StringComparison.Ordinal)
+                || key.StartsWith("ConnectionStrings__", StringComparison.Ordinal));
 
-        AssertProvider(environment, "Clustering", null);
-        AssertProvider(environment, "GrainStorage", "state");
-        AssertProvider(environment, "Reminders", null);
-        return environment;
+        AssertProvider(configuration, "Clustering", null);
+        AssertProvider(configuration, "GrainStorage", "state");
+        AssertProvider(configuration, "Reminders", null);
+        return configuration;
     }
 
-    private static void AssertProvider(Dictionary<string, string?> environment, string capability, string? name)
+    private static void AssertProvider(IConfiguration configuration, string capability, string? name)
     {
         var path = name is null ? $"Orleans:{capability}" : $"Orleans:{capability}:{name}";
-        Assert.Equal("AzureCosmosDB", environment[$"{path}:ProviderType"]);
-        Assert.Equal(ResourceName, environment[$"{path}:ServiceKey"]);
+        Assert.Equal("AzureCosmosDB", configuration[$"{path}:ProviderType"]);
+        Assert.Equal(ResourceName, configuration[$"{path}:ServiceKey"]);
     }
 
     private static string CreateEmulatorKey() => Convert.ToBase64String(new byte[64]);
 
-    private static async Task<Dictionary<string, string?>> GetEnvironmentVariablesAsync(
-        IResource resource,
-        IServiceProvider services)
-    {
-        var executionContext = new DistributedApplicationExecutionContext(
-            new DistributedApplicationExecutionContextOptions(DistributedApplicationOperation.Run)
-            {
-                ServiceProvider = services,
-            });
-        var values = new Dictionary<string, object>();
-        var callbackContext = new EnvironmentCallbackContext(executionContext, resource, values);
-
-        foreach (var annotation in resource.Annotations.OfType<EnvironmentCallbackAnnotation>())
-        {
-            await annotation.Callback(callbackContext);
-        }
-
-        var valueContext = new ValueProviderContext
-        {
-            Caller = resource,
-            ExecutionContext = executionContext,
-            Network = KnownNetworkIdentifiers.LocalhostNetwork,
-        };
-        var result = new Dictionary<string, string?>();
-        foreach (var (key, value) in values)
-        {
-            if (!key.StartsWith("Orleans__", StringComparison.Ordinal)
-                || key.StartsWith("Orleans__Endpoints__", StringComparison.Ordinal))
-            {
-                continue;
-            }
-
-            result[key.Replace("__", ":", StringComparison.Ordinal)] = value switch
-            {
-                IValueProvider provider => await provider.GetValueAsync(valueContext),
-                _ => value.ToString(),
-            };
-        }
-
-        return result;
-    }
 }

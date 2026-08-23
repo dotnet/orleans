@@ -50,4 +50,7 @@
   <ItemGroup>
     <Compile Include="$(SourceRoot)src\Azure\Shared\Utilities\ErrorCode.cs" Link="Utilities\ErrorCode.cs" />
   </ItemGroup>
+  <ItemGroup>
+    <Compile Include="$(SourceRoot)test\Extensions\AspireTestInfrastructure\AspireResourceConfiguration.cs" Link="AspireResourceConfiguration.cs" />
+  </ItemGroup>
 </Project>
