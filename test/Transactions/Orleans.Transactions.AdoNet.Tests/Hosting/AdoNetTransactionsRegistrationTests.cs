@@ -105,6 +105,47 @@ public sealed class AdoNetTransactionsRegistrationTests
         validator.ValidateConfiguration();
     }
 
+    [Theory]
+    [InlineData(AdoNetInvariants.InvariantNameMySql)]
+    [InlineData(AdoNetInvariants.InvariantNameMySqlConnector)]
+    [InlineData(AdoNetInvariants.InvariantNamePostgreSql)]
+    [InlineData(AdoNetInvariants.InvariantNameOracleDatabase)]
+    public void AddAdoNetTransactionalStateStorage_SupportedInvariantPassesValidation(string invariant)
+    {
+        var builder = new TestSiloBuilder();
+        builder.AddAdoNetTransactionalStateStorage(
+            "transactions",
+            options =>
+            {
+                options.Invariant = invariant;
+                options.ConnectionString = "Data Source=transactions";
+            });
+
+        using var services = builder.Services.BuildServiceProvider();
+        var validator = Assert.Single(services.GetServices<IConfigurationValidator>());
+
+        validator.ValidateConfiguration();
+    }
+
+    [Fact]
+    public void AddAdoNetTransactionalStateStorage_SqliteInvariantFailsValidation()
+    {
+        var builder = new TestSiloBuilder();
+        builder.AddAdoNetTransactionalStateStorage(
+            "transactions",
+            options =>
+            {
+                options.Invariant = AdoNetInvariants.InvariantNameSqlLite;
+                options.ConnectionString = "Data Source=transactions.db";
+            });
+
+        using var services = builder.Services.BuildServiceProvider();
+        var validator = Assert.Single(services.GetServices<IConfigurationValidator>());
+
+        var exception = Assert.Throws<OrleansConfigurationException>(validator.ValidateConfiguration);
+        Assert.Contains(AdoNetInvariants.InvariantNameSqlLite, exception.Message);
+    }
+
     [Fact]
     public void AddAdoNetTransactionalStateStorage_MissingConnectionStringFailsValidation()
     {

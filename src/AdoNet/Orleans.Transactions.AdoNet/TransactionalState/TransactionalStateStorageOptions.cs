@@ -66,7 +66,7 @@ internal sealed class TransactionalStateStorageOptionsValidator(
                 $"Invalid {nameof(TransactionalStateStorageOptions)} values for ADO.NET transactional state storage '{name}': {nameof(options.Invariant)} is required.");
         }
 
-        if (!AdoNetInvariants.Invariants.Contains(options.Invariant))
+        if (!IsSupportedInvariant(options.Invariant))
         {
             throw new OrleansConfigurationException(
                 $"Invalid {nameof(TransactionalStateStorageOptions)} values for ADO.NET transactional state storage '{name}': invariant '{options.Invariant}' is not supported.");
@@ -96,4 +96,12 @@ internal sealed class TransactionalStateStorageOptionsValidator(
                 $"Invalid {nameof(TransactionalStateStorageOptions)} values for ADO.NET transactional state storage '{name}': {nameof(options.StateIdKeyMaxLength)} must be at least {TransactionalStateStorageFactory.StateIdLength}.");
         }
     }
+
+    private static bool IsSupportedInvariant(string invariant) =>
+        invariant is
+            AdoNetInvariants.InvariantNameSqlServer or
+            AdoNetInvariants.InvariantNameMySql or
+            AdoNetInvariants.InvariantNameMySqlConnector or
+            AdoNetInvariants.InvariantNamePostgreSql or
+            AdoNetInvariants.InvariantNameOracleDatabase;
 }
