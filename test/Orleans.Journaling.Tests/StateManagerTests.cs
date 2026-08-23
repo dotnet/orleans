@@ -702,6 +702,17 @@ public class StateManagerTests : JournalingTestBase
     }
 
     [Fact]
+    public async Task StateManager_DefaultRevertPendingChanges_PreservesLegacyImplementations()
+    {
+        IJournaledStateManager manager = new LegacyStateManager();
+
+        var exception = await Assert.ThrowsAsync<NotSupportedException>(
+            () => manager.RevertPendingChangesAsync(CancellationToken.None).AsTask());
+
+        Assert.Contains("Rollback requires", exception.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public async Task StateManager_AwaitsObserverPreparationBeforeCapturingState()
     {
         var storage = new CapturingStorage();
@@ -1688,8 +1699,6 @@ public class StateManagerTests : JournalingTestBase
         }
 
         public ValueTask WriteStateAsync(CancellationToken cancellationToken) => default;
-
-        public ValueTask RevertPendingChangesAsync(CancellationToken cancellationToken) => default;
 
         public ValueTask DeleteStateAsync(CancellationToken cancellationToken) => default;
     }

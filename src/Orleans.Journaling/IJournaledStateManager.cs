@@ -56,7 +56,12 @@ public interface IJournaledStateManager : IAsyncDisposable
     /// </summary>
     /// <param name="cancellationToken">The cancellation token.</param>
     /// <returns>A <see cref="ValueTask"/> which represents the operation.</returns>
-    ValueTask RevertPendingChangesAsync(CancellationToken cancellationToken);
+    /// <remarks>
+    /// Implementations enable rollback support by overriding this method. The default implementation
+    /// throws <see cref="NotSupportedException"/>.
+    /// </remarks>
+    ValueTask RevertPendingChangesAsync(CancellationToken cancellationToken) =>
+        ValueTask.FromException(new NotSupportedException("Rollback requires a state manager implementation which supports rollback."));
 
     /// <summary>
     /// Resets this instance, removing any persistent state.
