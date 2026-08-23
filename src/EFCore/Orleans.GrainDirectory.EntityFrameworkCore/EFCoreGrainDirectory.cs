@@ -15,6 +15,7 @@ namespace Orleans.GrainDirectory.EntityFrameworkCore;
 
 public class EFCoreGrainDirectory<TDbContext, TETag> : IGrainDirectory, ILifecycleParticipant<ISiloLifecycle> where TDbContext : GrainDirectoryDbContext<TDbContext, TETag>
 {
+    private const int IdentifierBatchSize = 256;
     private readonly ILogger _logger;
     private readonly IDbContextFactory<TDbContext> _dbContextFactory;
     private readonly IEFGrainDirectoryETagConverter<TETag> _eTagConverter;
@@ -179,19 +180,25 @@ public class EFCoreGrainDirectory<TDbContext, TETag> : IGrainDirectory, ILifecyc
                 .Select(group => group.First())
                 .ToArray();
 
-            IQueryable<GrainActivationRecord<TETag>>? query = null;
-            foreach (var silo in siloIdentifiers)
+            var candidateRecords = new List<GrainActivationRecord<TETag>>();
+            foreach (var batch in siloIdentifiers.Chunk(IdentifierBatchSize))
             {
-                var siloHash = silo.Hash;
-                var candidateQuery = ctx.Activations.Where(r =>
-                    r.ClusterIdHash == this._clusterIdHash &&
-                    r.SiloAddressHash == siloHash);
-                query = query is null ? candidateQuery : query.Concat(candidateQuery);
+                IQueryable<GrainActivationRecord<TETag>>? query = null;
+                foreach (var silo in batch)
+                {
+                    var siloHash = silo.Hash;
+                    var candidateQuery = ctx.Activations.Where(r =>
+                        r.ClusterIdHash == this._clusterIdHash &&
+                        r.SiloAddressHash == siloHash);
+                    query = query is null ? candidateQuery : query.Concat(candidateQuery);
+                }
+
+                candidateRecords.AddRange(await query!
+                    .ToArrayAsync()
+                    .ConfigureAwait(false));
             }
 
-            var candidates = await query!
-                .ToArrayAsync()
-                .ConfigureAwait(false);
+            var candidates = candidateRecords.ToArray();
             if (candidates.Any(record =>
                 !string.Equals(record.ClusterId, this._clusterId, StringComparison.Ordinal) ||
                 !siloIdentifiers.Any(silo => string.Equals(record.SiloAddress, silo.Value, StringComparison.Ordinal))))
@@ -243,17 +250,25 @@ public class EFCoreGrainDirectory<TDbContext, TETag> : IGrainDirectory, ILifecyc
                 .Select(group => group.First())
                 .ToArray();
 
-            IQueryable<GrainActivationRecord<TETag>>? query = null;
-            foreach (var grain in distinctGrains)
+            var candidateRecords = new List<GrainActivationRecord<TETag>>();
+            foreach (var batch in distinctGrains.Chunk(IdentifierBatchSize))
             {
-                var grainIdHash = grain.GrainIdHash;
-                var candidateQuery = ctx.Activations.Where(r =>
-                    r.ClusterIdHash == this._clusterIdHash &&
-                    r.GrainIdHash == grainIdHash);
-                query = query is null ? candidateQuery : query.Concat(candidateQuery);
+                IQueryable<GrainActivationRecord<TETag>>? query = null;
+                foreach (var grain in batch)
+                {
+                    var grainIdHash = grain.GrainIdHash;
+                    var candidateQuery = ctx.Activations.Where(r =>
+                        r.ClusterIdHash == this._clusterIdHash &&
+                        r.GrainIdHash == grainIdHash);
+                    query = query is null ? candidateQuery : query.Concat(candidateQuery);
+                }
+
+                candidateRecords.AddRange(await query!
+                    .ToArrayAsync()
+                    .ConfigureAwait(false));
             }
 
-            var candidates = await query!.ToArrayAsync().ConfigureAwait(false);
+            var candidates = candidateRecords.ToArray();
             if (candidates.Any(record =>
                 !string.Equals(record.ClusterId, this._clusterId, StringComparison.Ordinal) ||
                 !identifiers.Any(identifier => string.Equals(record.GrainId, identifier.GrainId, StringComparison.Ordinal))))
