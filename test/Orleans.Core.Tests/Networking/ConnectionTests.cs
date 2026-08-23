@@ -1,4 +1,5 @@
 using System.Net;
+using System.IO.Pipelines;
 using Microsoft.AspNetCore.Connections;
 using Microsoft.Extensions.DependencyInjection;
 using NSubstitute;
@@ -69,14 +70,88 @@ public class ConnectionTests
         messageCenter.DidNotReceiveWithAnyArgs().SendMessage(default!);
     }
 
-    private sealed class TestConnection(ConnectionCommon shared, IMessageCenter messageCenter)
-        : Connection(new DefaultConnectionContext(), _ => Task.CompletedTask, shared)
+    [Fact]
+    public async Task SerializationFailure_IsNotFailedAgainWhenConnectionCloses()
     {
+        var messageCenter = new TestMessageCenter();
+        var input = new Pipe();
+        var output = new Pipe();
+        var context = new DefaultConnectionContext
+        {
+            LocalEndPoint = new IPEndPoint(IPAddress.Loopback, 11111),
+            RemoteEndPoint = new IPEndPoint(IPAddress.Loopback, 22222),
+            Transport = new DuplexPipe(input.Reader, output.Writer),
+        };
+        var builder = new ConnectionBuilder(_connectionCommon.ServiceProvider);
+        Connection.ConfigureBuilder(builder);
+        var connection = new TestConnection(context, builder.Build(), _connectionCommon, messageCenter);
+        var request = _messageFactory.CreateMessage(null, InvokeMethodOptions.None);
+        request.BodyObject = new UndecodedRequestBody([], "alias");
+        request.SendingSilo = SiloAddress.New(IPAddress.Loopback, 33333, 3);
+        request.SendingGrain = GrainId.Create("sender", "1");
+        request.TargetSilo = SiloAddress.New(IPAddress.Loopback, 44444, 4);
+        request.TargetGrain = GrainId.Create("target", "2");
+
+        var runTask = connection.Run();
+        await connection.Initialized.WaitAsync(TimeSpan.FromSeconds(30));
+        connection.Send(request);
+
+        var response = await messageCenter.SentMessage.WaitAsync(TimeSpan.FromSeconds(30));
+        Assert.Equal(Message.Directions.Response, response.Direction);
+        Assert.Equal(Message.ResponseTypes.Error, response.Result);
+
+        await connection.CloseAsync(null).WaitAsync(TimeSpan.FromSeconds(30));
+        await runTask.WaitAsync(TimeSpan.FromSeconds(30));
+
+        Assert.Equal(0, connection.SendFailureCount);
+    }
+
+    [Theory]
+    [InlineData(NetworkProtocolVersion.Version1, NetworkProtocolVersion.Version1, NetworkProtocolVersion.Version1)]
+    [InlineData(NetworkProtocolVersion.Version1, NetworkProtocolVersion.Version2, NetworkProtocolVersion.Version1)]
+    [InlineData(NetworkProtocolVersion.Version2, NetworkProtocolVersion.Version1, NetworkProtocolVersion.Version1)]
+    [InlineData(NetworkProtocolVersion.Version2, NetworkProtocolVersion.Version2, NetworkProtocolVersion.Version2)]
+    public void ProtocolNegotiation_SelectsHighestMutuallySupportedVersion(
+        NetworkProtocolVersion offered,
+        NetworkProtocolVersion remote,
+        NetworkProtocolVersion expected)
+    {
+        var connection = new TestConnection(_connectionCommon, Substitute.For<IMessageCenter>());
+
+        connection.Negotiate(offered, remote);
+
+        Assert.Equal(expected, connection.ProtocolVersion);
+    }
+
+    private sealed class TestConnection : Connection
+    {
+        public TestConnection(ConnectionCommon shared, IMessageCenter messageCenter)
+            : this(new DefaultConnectionContext(), _ => Task.CompletedTask, shared, messageCenter)
+        {
+        }
+
+        public TestConnection(
+            ConnectionContext context,
+            ConnectionDelegate middleware,
+            ConnectionCommon shared,
+            IMessageCenter messageCenter)
+            : base(context, middleware, shared)
+        {
+            MessageCenter = messageCenter;
+        }
+
         protected override ConnectionDirection ConnectionDirection => ConnectionDirection.SiloToSilo;
 
-        protected override IMessageCenter MessageCenter => messageCenter;
+        protected override IMessageCenter MessageCenter { get; }
+
+        public int SendFailureCount { get; private set; }
+
+        public NetworkProtocolVersion ProtocolVersion => NetworkProtocolVersion;
 
         public bool HandleSendFailure(Message message, Exception exception) => HandleSendMessageFailure(message, exception);
+
+        public void Negotiate(NetworkProtocolVersion offered, NetworkProtocolVersion remote)
+            => NegotiateProtocolVersion(offered, remote);
 
         protected override bool PrepareMessageForSend(Message msg) => true;
 
@@ -86,6 +161,7 @@ public class ConnectionTests
 
         protected override void OnSendMessageFailure(Message message, string error)
         {
+            SendFailureCount++;
         }
 
         protected override void RecordMessageReceive(Message msg, int numTotalBytes, int headerBytes)
@@ -99,5 +175,23 @@ public class ConnectionTests
         protected override void RetryMessage(Message msg, Exception? ex = null)
         {
         }
+    }
+
+    private sealed class TestMessageCenter : IMessageCenter
+    {
+        private readonly TaskCompletionSource<Message> _sentMessage = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        public Task<Message> SentMessage => _sentMessage.Task;
+
+        public void DispatchLocalMessage(Message message) => _sentMessage.TrySetResult(message);
+
+        public void SendMessage(Message msg) => _sentMessage.TrySetResult(msg);
+    }
+
+    private sealed class DuplexPipe(PipeReader input, PipeWriter output) : IDuplexPipe
+    {
+        public PipeReader Input { get; } = input;
+
+        public PipeWriter Output { get; } = output;
     }
 }
