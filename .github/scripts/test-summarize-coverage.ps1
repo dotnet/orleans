@@ -280,6 +280,18 @@ try {
             'Coverage builds must disable deterministic CI instrumentation.'
         Assert-Matches `
             $collectorScript `
+            '\$testArguments\.Add\(''--no-build''\)' `
+            'Coverage tests must execute the statically instrumented build.'
+        Assert-Matches `
+            $collectorScript `
+            'Assert-NotReparsePoint \$coverageDirectory' `
+            'Coverage collection must reject a linked output directory.'
+        Assert-Matches `
+            $collectorScript `
+            'Assert-NotReparsePoint \$coverageOutput' `
+            'Coverage collection must reject a linked output file.'
+        Assert-Matches `
+            $collectorScript `
             'contains no measured lines' `
             'Coverage collection must reject empty reports from successful test runs.'
     }

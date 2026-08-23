@@ -20,6 +20,20 @@ param(
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
+function Assert-NotReparsePoint {
+    param([string] $Path)
+
+    if (-not (Test-Path -LiteralPath $Path)) {
+        return
+    }
+
+    $item = Get-Item -LiteralPath $Path -Force
+    $linkType = $item.PSObject.Properties['LinkType']
+    if (($linkType -and $linkType.Value) -or ($item.Attributes -band [IO.FileAttributes]::ReparsePoint)) {
+        throw "$Path must not be a symbolic link"
+    }
+}
+
 $testArguments = [Collections.Generic.List[string]]::new()
 $testArguments.Add('test')
 if (-not [string]::IsNullOrWhiteSpace($Project)) {
@@ -47,11 +61,12 @@ $testArguments.Add('--report-trx-filename')
 $testArguments.Add($ReportTrxFilename)
 $testArguments.Add('--max-parallel-test-modules')
 $testArguments.Add('1')
-if ($NoBuild) {
-    $testArguments.Add('--no-build')
-}
 
 if ($env:GITHUB_EVENT_NAME -ne 'pull_request') {
+    if ($NoBuild) {
+        $testArguments.Add('--no-build')
+    }
+
     & dotnet @testArguments
     if ($LASTEXITCODE -ne 0) {
         throw "dotnet test failed with exit code $LASTEXITCODE"
@@ -60,14 +75,32 @@ if ($env:GITHUB_EVENT_NAME -ne 'pull_request') {
     return
 }
 
-$testArguments.Add('-p:ContinuousIntegrationBuild=false')
-$coverageTool = (Get-Command dotnet-coverage -ErrorAction Stop).Source
 $repositoryRoot = (Resolve-Path (Join-Path $PSScriptRoot '../..')).Path
 $coverageSettings = Join-Path $repositoryRoot '.github/coverage.config.xml'
 $coverageDirectory = Join-Path $repositoryRoot 'TestResults'
 $coverageOutput = Join-Path $coverageDirectory "$CoverageId.cobertura.xml"
+Assert-NotReparsePoint $coverageDirectory
 [void] (New-Item -ItemType Directory -Force -Path $coverageDirectory)
+Assert-NotReparsePoint $coverageOutput
 Remove-Item -LiteralPath $coverageOutput -Force -ErrorAction SilentlyContinue
+
+$buildArguments = [Collections.Generic.List[string]]::new()
+$buildArguments.Add('build')
+if (-not [string]::IsNullOrWhiteSpace($Project)) {
+    $buildArguments.Add($Project)
+}
+$buildArguments.Add('--framework')
+$buildArguments.Add($Framework)
+$buildArguments.Add('-p:ContinuousIntegrationBuild=false')
+if (-not $NoBuild) {
+    & dotnet @buildArguments
+    if ($LASTEXITCODE -ne 0) {
+        throw "Coverage build failed with exit code $LASTEXITCODE"
+    }
+}
+
+$testArguments.Add('--no-build')
+$coverageTool = (Get-Command dotnet-coverage -ErrorAction Stop).Source
 
 & $coverageTool collect `
     --settings $coverageSettings `
