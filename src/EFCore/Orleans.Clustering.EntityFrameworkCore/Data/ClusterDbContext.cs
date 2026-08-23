@@ -18,7 +18,7 @@ public class ClusterDbContext<TDbContext, TETag> : DbContext where TDbContext : 
             c.HasKey(p => p.Id);
             c.Property(p => p.Timestamp).IsRequired();
             c.Property(p => p.Version).IsRequired();
-            c.Property(p => p.ETag).IsRequired().IsRowVersion();
+            c.Property(p => p.ETag).IsRequired().IsConcurrencyToken();
 
             c
                 .HasMany(p => p.Silos)
@@ -40,7 +40,7 @@ public class ClusterDbContext<TDbContext, TETag> : DbContext where TDbContext : 
             c.Property(p => p.SuspectingSilos).IsRequired(false);
             c.Property(p => p.StartTime).IsRequired();
             c.Property(p => p.IAmAliveTime).IsRequired();
-            c.Property(p => p.ETag).IsRequired().IsRowVersion();
+            c.Property(p => p.ETag).IsRequired().IsConcurrencyToken();
 
             c
                 .HasOne(p => p.Cluster)

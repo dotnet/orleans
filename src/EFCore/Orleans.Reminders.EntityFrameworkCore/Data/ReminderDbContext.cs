@@ -23,7 +23,7 @@ public class ReminderDbContext<TDbContext, TETag> : DbContext where TDbContext :
                 .HasConversion(period => period.Ticks, ticks => TimeSpan.FromTicks(ticks))
                 .IsRequired();
             c.Property(p => p.GrainHash).IsRequired();
-            c.Property(p => p.ETag).IsRequired().IsRowVersion();
+            c.Property(p => p.ETag).IsRequired().IsConcurrencyToken();
         });
     }
 }

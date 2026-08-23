@@ -20,7 +20,7 @@ public class GrainStateDbContext<TDbContext, TETag> : DbContext where TDbContext
             c.Property(p => p.StateType).HasMaxLength(280).IsRequired();
             c.Property(p => p.GrainId).HasMaxLength(280).IsRequired();
             c.Property(p => p.Data).IsRequired(false);
-            c.Property(p => p.ETag).IsRequired().IsRowVersion();
+            c.Property(p => p.ETag).IsRequired().IsConcurrencyToken();
         });
     }
 }
