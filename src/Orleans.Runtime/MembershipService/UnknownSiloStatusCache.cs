@@ -14,7 +14,7 @@ namespace Orleans.Runtime.MembershipService;
 internal sealed partial class UnknownSiloStatusCache
 {
     private const int CacheCapacity = 1_024;
-    private readonly ConcurrentLruCache<SiloAddress, byte> _deadSilos = new(CacheCapacity);
+    private readonly ConcurrentLruCache<SiloAddress, SiloStatusCacheEntry> _siloStatuses = new(CacheCapacity);
     private readonly object _refreshLock = new();
     private readonly IMembershipManager _membershipManager;
     private readonly ILogger _logger;
@@ -41,10 +41,10 @@ internal sealed partial class UnknownSiloStatusCache
             var status = snapshot.GetSiloStatus(siloAddress);
             if (status != SiloStatus.None)
             {
-                _deadSilos.TryRemove(siloAddress);
-                result.Add(siloAddress, status);
+                result.Add(siloAddress, UpdateCachedStatus(siloAddress, status, snapshot.Version).Status);
             }
-            else if (_deadSilos.TryGet(siloAddress, out _))
+            else if (_siloStatuses.TryGet(siloAddress, out var cachedStatus)
+                && cachedStatus.Status == SiloStatus.Dead)
             {
                 result.Add(siloAddress, SiloStatus.Dead);
             }
@@ -66,9 +66,10 @@ internal sealed partial class UnknownSiloStatusCache
             var refreshedSnapshot = await refresh.Completion.Task.WaitAsync(cancellationToken);
             foreach (var siloAddress in unknownSilos)
             {
-                if (_deadSilos.TryGet(siloAddress, out _))
+                if (_siloStatuses.TryGet(siloAddress, out var cachedStatus)
+                    && cachedStatus.Version >= refreshedSnapshot.Version)
                 {
-                    result.Add(siloAddress, SiloStatus.Dead);
+                    result.Add(siloAddress, cachedStatus.Status);
                     continue;
                 }
 
@@ -76,10 +77,11 @@ internal sealed partial class UnknownSiloStatusCache
                 if (status == SiloStatus.None)
                 {
                     status = SiloStatus.Dead;
-                    _deadSilos.AddOrUpdate(siloAddress, 0);
                 }
 
-                result.Add(siloAddress, status);
+                result.Add(
+                    siloAddress,
+                    UpdateCachedStatus(siloAddress, status, refreshedSnapshot.Version).Status);
             }
         }
         catch (Exception) when (!cancellationToken.IsCancellationRequested)
@@ -161,12 +163,10 @@ internal sealed partial class UnknownSiloStatusCache
                     var status = snapshot.GetSiloStatus(siloAddress);
                     if (status == SiloStatus.None)
                     {
-                        _deadSilos.AddOrUpdate(siloAddress, 0);
+                        status = SiloStatus.Dead;
                     }
-                    else
-                    {
-                        _deadSilos.TryRemove(siloAddress);
-                    }
+
+                    UpdateCachedStatus(siloAddress, status, snapshot.Version);
                 }
             }
 
@@ -198,6 +198,32 @@ internal sealed partial class UnknownSiloStatusCache
             }
         }
     }
+
+    private SiloStatusCacheEntry UpdateCachedStatus(
+        SiloAddress siloAddress,
+        SiloStatus status,
+        MembershipVersion version)
+    {
+        lock (_refreshLock)
+        {
+            if (_siloStatuses.TryGet(siloAddress, out var existing)
+                && (existing.Version > version
+                    || (existing.Version == version
+                        && existing.Status != SiloStatus.Dead
+                        && status == SiloStatus.Dead)))
+            {
+                return existing;
+            }
+
+            var replacement = new SiloStatusCacheEntry(status, version);
+            _siloStatuses.AddOrUpdate(siloAddress, replacement);
+            return replacement;
+        }
+    }
+
+    private readonly record struct SiloStatusCacheEntry(
+        SiloStatus Status,
+        MembershipVersion Version);
 
     private sealed class RefreshOperation
     {

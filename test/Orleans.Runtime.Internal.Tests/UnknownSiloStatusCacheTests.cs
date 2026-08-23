@@ -148,6 +148,37 @@ public class UnknownSiloStatusCacheTests
     }
 
     [Fact]
+    public async Task OlderRefreshCannotOverwriteNewerActiveObservation()
+    {
+        var silo = CreateSiloAddress();
+        var membershipManager = new TestMembershipManager(CreateMembershipTableSnapshot(1))
+        {
+            AutoCompleteRefreshes = false,
+        };
+        var cache = new UnknownSiloStatusCache(membershipManager, NullLogger<UnknownSiloStatusCache>.Instance);
+        var olderSnapshot = CreateSnapshot(1);
+        var newerSnapshot = CreateSnapshot(2, new ClusterMember(silo, SiloStatus.Active, "silo"));
+
+        var olderValidation = cache.GetSiloStatuses(
+            olderSnapshot,
+            SiloAddresses(silo),
+            CancellationToken.None).AsTask();
+        var olderRefresh = await membershipManager.WaitForRefreshAttempt();
+
+        Assert.Equal(
+            SiloStatus.Active,
+            (await cache.GetSiloStatuses(
+                newerSnapshot,
+                SiloAddresses(silo),
+                CancellationToken.None))[silo]);
+
+        olderRefresh.Completion.TrySetResult();
+
+        Assert.Equal(SiloStatus.Active, (await olderValidation)[silo]);
+        Assert.Equal(1, membershipManager.SourceRefreshCount);
+    }
+
+    [Fact]
     public async Task FailedSharedRefreshAllowsNextValidationToRetry()
     {
         var membershipManager = new TestMembershipManager(CreateMembershipTableSnapshot(1))
@@ -259,13 +290,14 @@ public class UnknownSiloStatusCacheTests
         Assert.Equal(
             SiloStatus.Dead,
             (await cache.GetSiloStatuses(unknownSnapshot, SiloAddresses(silo), CancellationToken.None))[silo]);
-        var activeSnapshot = CreateSnapshot(1, new ClusterMember(silo, SiloStatus.Active, "silo"));
+        var activeSnapshot = CreateSnapshot(2, new ClusterMember(silo, SiloStatus.Active, "silo"));
         Assert.Equal(
             SiloStatus.Active,
             (await cache.GetSiloStatuses(activeSnapshot, SiloAddresses(silo), CancellationToken.None))[silo]);
+        membershipManager.SetCurrentSnapshot(CreateMembershipTableSnapshot(3));
         Assert.Equal(
             SiloStatus.Dead,
-            (await cache.GetSiloStatuses(unknownSnapshot, SiloAddresses(silo), CancellationToken.None))[silo]);
+            (await cache.GetSiloStatuses(CreateSnapshot(3), SiloAddresses(silo), CancellationToken.None))[silo]);
         Assert.Equal(2, membershipManager.SourceRefreshCount);
     }
 
@@ -361,6 +393,9 @@ public class UnknownSiloStatusCacheTests
         }
 
         public void Shutdown() => _shutdown.Cancel();
+
+        public void SetCurrentSnapshot(MembershipTableSnapshot snapshot) =>
+            Volatile.Write(ref _currentSnapshot, snapshot);
 
         public async Task<RefreshAttempt> WaitForRefreshAttempt() =>
             await _refreshAttempts.Reader.ReadAsync().AsTask().WaitAsync(TimeSpan.FromSeconds(30));
