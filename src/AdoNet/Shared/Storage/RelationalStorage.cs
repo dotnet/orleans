@@ -36,6 +36,10 @@ namespace Orleans.Tests.SqlUtils
     [DebuggerDisplay("InvariantName = {InvariantName}, ConnectionString = {ConnectionString}")]
     internal class RelationalStorage : IRelationalStorage
     {
+#if TRANSACTIONS_ADONET
+        internal const string RollbackExceptionDataKey = "Orleans.RelationalStorage.RollbackException";
+#endif
+
         /// <summary>
         /// The connection string to use.
         /// </summary>
@@ -498,16 +502,31 @@ namespace Orleans.Tests.SqlUtils
             }
             catch (DbException exception) when (IsUniqueConstraintViolation(_invariantName, exception))
             {
-                await transaction.RollbackAsync(cancellationToken).ConfigureAwait(continueOnCapturedContext: false);
+                await RollbackPreservingOriginalExceptionAsync(transaction, exception, cancellationToken).ConfigureAwait(continueOnCapturedContext: false);
                 throw CreateTransactionConflict(
                     $"Relational transaction insert conflicted with an existing record for provider '{_invariantName}'.",
                     currentETag,
                     exception);
             }
-            catch
+            catch (Exception exception)
+            {
+                await RollbackPreservingOriginalExceptionAsync(transaction, exception, cancellationToken).ConfigureAwait(continueOnCapturedContext: false);
+                throw;
+            }
+        }
+
+        internal static async Task RollbackPreservingOriginalExceptionAsync(
+            DbTransaction transaction,
+            Exception originalException,
+            CancellationToken cancellationToken)
+        {
+            try
             {
                 await transaction.RollbackAsync(cancellationToken).ConfigureAwait(continueOnCapturedContext: false);
-                throw;
+            }
+            catch (Exception rollbackException)
+            {
+                originalException.Data[RollbackExceptionDataKey] = rollbackException;
             }
         }
 
