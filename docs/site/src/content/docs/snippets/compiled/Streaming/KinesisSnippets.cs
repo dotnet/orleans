@@ -1,4 +1,5 @@
 // <kinesis_hosting_using>
+using Microsoft.Extensions.Hosting;
 using Orleans.Hosting;
 
 // </kinesis_hosting_using>
@@ -12,6 +13,23 @@ namespace Documentation.Streaming;
 
 internal static class KinesisSnippets
 {
+    internal static void ConfigureAspireSilo(HostApplicationBuilder builder)
+    {
+        // <configure_kinesis_aspire_silo>
+builder.UseOrleans(siloBuilder =>
+{
+    siloBuilder.AddMemoryGrainStorage("PubSubStore");
+});
+        // </configure_kinesis_aspire_silo>
+    }
+
+    internal static void ConfigureAspireClient(HostApplicationBuilder builder)
+    {
+        // <configure_kinesis_aspire_client>
+builder.UseOrleansClient();
+        // </configure_kinesis_aspire_client>
+    }
+
     internal static void ConfigureSilo(ISiloBuilder siloBuilder)
     {
         // <configure_kinesis_silo>

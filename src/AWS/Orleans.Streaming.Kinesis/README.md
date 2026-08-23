@@ -49,6 +49,21 @@ clientBuilder.AddKinesisStreams(
 
 When access and secret keys are not configured, the provider uses the standard AWS SDK credential chain.
 
+## Configuration-driven hosting
+
+The package registers `Kinesis`, `AmazonKinesis`, and `KinesisStream` aliases for silo and client streaming configuration. The canonical Aspire configuration uses `Kinesis`:
+
+```text
+Orleans__Streaming__Orders__ProviderType=Kinesis
+Orleans__Streaming__Orders__ServiceKey=orders-stream
+Orleans__Streaming__Orders__Checkpoint__Type=Grain
+AWS__Resources__orders-stream__StreamArn=arn:aws:kinesis:us-west-2:123456789012:stream/orders
+```
+
+`ServiceKey` selects the AWS Aspire resource under `AWS:Resources`. Set `ResourceConfigSection` when the resource reference uses a custom configuration section. Direct `StreamArn`, `StreamName`, `Region`, `Service`, `ConnectionName`, and `ConnectionString` values are also supported.
+
+Silos select `Checkpoint:Type` as `Grain` or `DynamoDB`. Grain checkpoints accept `Checkpoint:StorageProviderName` and `Checkpoint:PersistInterval`. DynamoDB checkpoints accept `Checkpoint:ServiceKey` for an AWS Aspire table output, `Checkpoint:ResourceConfigSection` for a custom output path, and the properties on `DynamoDBStreamQueueCheckpointerOptions`.
+
 ## Checkpoint persistence
 
 Kinesis shard iterators identify a position temporarily, but Kinesis does not store a committed consumer offset. A consumer must persist the last processed sequence number separately to resume after shutdown or reassignment.
