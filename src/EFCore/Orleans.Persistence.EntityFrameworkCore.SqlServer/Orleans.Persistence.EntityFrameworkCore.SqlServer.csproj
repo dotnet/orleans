@@ -4,7 +4,7 @@
     <PackageId>Microsoft.Orleans.Persistence.EntityFrameworkCore.SqlServer</PackageId>
     <Title>Microsoft Orleans Entity Framework Core (Sql Server) Persistence Provider</Title>
     <Description>Microsoft Orleans Persistence provider backed by Entity Framework Core for Sql Server</Description>
-    <PackageTags>$(PackageTags) Entity Framework Core SQL MySQL PostgreSQL Oracle</PackageTags>
+    <PackageTags>$(PackageTags) Entity Framework Core SQL SQLServer</PackageTags>
     <Nullable>enable</Nullable>
     <TargetFrameworks>$(DefaultTargetFrameworks)</TargetFrameworks>
   </PropertyGroup>

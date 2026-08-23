@@ -1,3 +1,4 @@
+using System.Globalization;
 using Orleans.EntityFrameworkCore.Tests.Infrastructure;
 using TestExtensions;
 
@@ -55,6 +56,42 @@ public sealed class SqlServerETagConverterTests
         var converter = CreateConverter(kind);
 
         Assert.Throws<ArgumentOutOfRangeException>(() => converter.FromDbETag([1, 2, 3, 4]));
+    }
+
+    [Theory]
+    [InlineData(ConverterKind.Persistence)]
+    [InlineData(ConverterKind.Reminders)]
+    public void Converter_UsesInvariantCulture(ConverterKind kind)
+    {
+        var converter = CreateConverter(kind);
+        var culture = (CultureInfo)CultureInfo.InvariantCulture.Clone();
+        culture.NumberFormat.PositiveSign = "p";
+        var previousCulture = CultureInfo.CurrentCulture;
+        try
+        {
+            CultureInfo.CurrentCulture = culture;
+
+            Assert.Throws<FormatException>(() => converter.ToDbETag("p42"));
+            Assert.Equal("42", converter.FromDbETag(BitConverter.GetBytes(42UL)));
+        }
+        finally
+        {
+            CultureInfo.CurrentCulture = previousCulture;
+        }
+    }
+
+    [Theory]
+    [InlineData(ConverterKind.Persistence)]
+    [InlineData(ConverterKind.Reminders)]
+    public void FromDbETag_InvalidRowVersionLength_HasDeterministicMessage(ConverterKind kind)
+    {
+        var converter = CreateConverter(kind);
+
+        var exception = Assert.Throws<ArgumentOutOfRangeException>(
+            () => converter.FromDbETag(new byte[sizeof(ulong) + 1]));
+
+        Assert.Contains("exactly 8 bytes", exception.Message, StringComparison.Ordinal);
+        Assert.Equal("etag", exception.ParamName);
     }
 
     private static ByteArrayConverter CreateConverter(ConverterKind kind) => kind switch

@@ -15,7 +15,6 @@ namespace Orleans.GrainDirectory.EntityFrameworkCore;
 
 public class EFCoreGrainDirectory<TDbContext, TETag> : IGrainDirectory, ILifecycleParticipant<ISiloLifecycle> where TDbContext : GrainDirectoryDbContext<TDbContext, TETag>
 {
-    private const int IdentifierBatchSize = 256;
     private readonly ILogger _logger;
     private readonly IDbContextFactory<TDbContext> _dbContextFactory;
     private readonly IEFGrainDirectoryETagConverter<TETag> _eTagConverter;
@@ -166,47 +165,19 @@ public class EFCoreGrainDirectory<TDbContext, TETag> : IGrainDirectory, ILifecyc
                 return;
             }
 
-            var siloIdentifierGroups = silos
-                .Select(silo => (Value: silo, Hash: EFCoreIdentifierHash.Compute(silo)))
-                .GroupBy(silo => Convert.ToHexString(silo.Hash), StringComparer.Ordinal)
-                .ToArray();
-            if (siloIdentifierGroups.Any(group =>
-                group.Select(silo => silo.Value).Distinct(StringComparer.Ordinal).Skip(1).Any()))
-            {
-                throw CreateHashCollisionException();
-            }
-
-            var siloIdentifiers = siloIdentifierGroups
-                .Select(group => group.First())
-                .ToArray();
-
-            var candidateRecords = new List<GrainActivationRecord<TETag>>();
-            foreach (var batch in siloIdentifiers.Chunk(IdentifierBatchSize))
-            {
-                IQueryable<GrainActivationRecord<TETag>>? query = null;
-                foreach (var silo in batch)
-                {
-                    var siloHash = silo.Hash;
-                    var candidateQuery = ctx.Activations.Where(r =>
-                        r.ClusterIdHash == this._clusterIdHash &&
-                        r.SiloAddressHash == siloHash);
-                    query = query is null ? candidateQuery : query.Concat(candidateQuery);
-                }
-
-                candidateRecords.AddRange(await query!
-                    .ToArrayAsync()
-                    .ConfigureAwait(false));
-            }
-
-            var candidates = candidateRecords.ToArray();
+            var siloIdentifiers = silos.ToHashSet(StringComparer.Ordinal);
+            var candidates = await ctx.Activations
+                .Where(record => record.ClusterIdHash == this._clusterIdHash)
+                .ToArrayAsync()
+                .ConfigureAwait(false);
             if (candidates.Any(record =>
-                !string.Equals(record.ClusterId, this._clusterId, StringComparison.Ordinal) ||
-                !siloIdentifiers.Any(silo => string.Equals(record.SiloAddress, silo.Value, StringComparison.Ordinal))))
+                !string.Equals(record.ClusterId, this._clusterId, StringComparison.Ordinal)))
             {
                 throw CreateHashCollisionException();
             }
 
             var records = candidates
+                .Where(record => siloIdentifiers.Contains(record.SiloAddress))
                 .ToArray();
 
             ctx.Activations.RemoveRange(records);
@@ -237,41 +208,12 @@ public class EFCoreGrainDirectory<TDbContext, TETag> : IGrainDirectory, ILifecyc
                     return (GrainId: grainId, ActivationId: address.ActivationId.ToParsableString(), GrainIdHash: EFCoreIdentifierHash.Compute(grainId));
                 })
                 .ToArray();
-            var grainIdentifierGroups = identifiers
-                .GroupBy(identifier => Convert.ToHexString(identifier.GrainIdHash), StringComparer.Ordinal)
-                .ToArray();
-            if (grainIdentifierGroups.Any(group =>
-                group.Select(identifier => identifier.GrainId).Distinct(StringComparer.Ordinal).Skip(1).Any()))
-            {
-                throw CreateHashCollisionException();
-            }
-
-            var distinctGrains = grainIdentifierGroups
-                .Select(group => group.First())
-                .ToArray();
-
-            var candidateRecords = new List<GrainActivationRecord<TETag>>();
-            foreach (var batch in distinctGrains.Chunk(IdentifierBatchSize))
-            {
-                IQueryable<GrainActivationRecord<TETag>>? query = null;
-                foreach (var grain in batch)
-                {
-                    var grainIdHash = grain.GrainIdHash;
-                    var candidateQuery = ctx.Activations.Where(r =>
-                        r.ClusterIdHash == this._clusterIdHash &&
-                        r.GrainIdHash == grainIdHash);
-                    query = query is null ? candidateQuery : query.Concat(candidateQuery);
-                }
-
-                candidateRecords.AddRange(await query!
-                    .ToArrayAsync()
-                    .ConfigureAwait(false));
-            }
-
-            var candidates = candidateRecords.ToArray();
+            var candidates = await ctx.Activations
+                .Where(record => record.ClusterIdHash == this._clusterIdHash)
+                .ToArrayAsync()
+                .ConfigureAwait(false);
             if (candidates.Any(record =>
-                !string.Equals(record.ClusterId, this._clusterId, StringComparison.Ordinal) ||
-                !identifiers.Any(identifier => string.Equals(record.GrainId, identifier.GrainId, StringComparison.Ordinal))))
+                !string.Equals(record.ClusterId, this._clusterId, StringComparison.Ordinal)))
             {
                 throw CreateHashCollisionException();
             }
