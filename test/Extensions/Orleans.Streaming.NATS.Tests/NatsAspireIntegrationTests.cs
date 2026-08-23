@@ -6,6 +6,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using NATS.Client.Core;
 using NATS.Client.JetStream;
+using Orleans.Persistence.FileStorage;
 using Orleans.Streams;
 using Orleans.TestingHost;
 using TestExtensions;
@@ -53,6 +54,10 @@ public sealed class NatsAspireJetStreamTests
             NatsTestConstants.NatsClientOptions.Url);
 
         var clusterBuilder = new InProcessTestClusterBuilder(1);
+        var storageDirectory = Path.Combine(
+            Path.GetTempPath(),
+            "orleans-nats-aspire",
+            Guid.NewGuid().ToString("N"));
         clusterBuilder.ConfigureSiloHost((_, hostBuilder) =>
         {
             hostBuilder.Configuration.AddConfiguration(model.SiloEnvironment);
@@ -64,9 +69,9 @@ public sealed class NatsAspireJetStreamTests
             hostBuilder.AddKeyedNatsClient("nats");
         });
         clusterBuilder.ConfigureSilo((_, siloBuilder) =>
-            siloBuilder
-                .AddMemoryGrainStorage("PubSubStore")
-                .AddMemoryGrainStorage("MemoryStore"));
+            siloBuilder.AddFileGrainStorage(
+                "PubSubStore",
+                options => options.RootDirectory = storageDirectory));
 
         await DeleteStreamIfPresent(streamName);
         await using var cluster = clusterBuilder.Build();
@@ -90,6 +95,10 @@ public sealed class NatsAspireJetStreamTests
         finally
         {
             await DeleteStreamIfPresent(streamName);
+            if (Directory.Exists(storageDirectory))
+            {
+                Directory.Delete(storageDirectory, recursive: true);
+            }
         }
     }
 

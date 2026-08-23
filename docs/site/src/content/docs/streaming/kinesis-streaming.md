@@ -30,11 +30,13 @@ When explicit credentials aren't configured, the provider uses the [AWS SDK for 
 
 The AWS Aspire integration publishes a CDK Kinesis resource as a structured `StreamArn` value under `AWS:Resources:<resource-name>`. The Orleans Kinesis provider resolves the stream name and AWS region from that ARN when its `ServiceKey` matches the Aspire resource name.
 
+Install `Microsoft.Orleans.Persistence.DynamoDB` in the silo when `PubSubStore` uses the DynamoDB resource shown below.
+
 `Aspire.Hosting.Orleans` currently models streaming providers through connection-string resources, while AWS CDK resources expose structured outputs. Configure the Orleans streaming section on the silo resource and reference the Kinesis resource so Aspire injects both values:
 
 :::code language="csharp" source="../host/snippets/aspire/AppHost/AppHostExamples.cs" id="kinesis_apphost_grain_checkpoints":::
 
-The silo registers `PubSubStore` for grain checkpoints and activates configuration-driven Orleans providers:
+The AppHost provisions a DynamoDB-backed `PubSubStore` for explicit subscriptions and grain checkpoints. The silo activates the generated Orleans provider configuration:
 
 :::code language="csharp" source="../snippets/compiled/Streaming/KinesisSnippets.cs" id="configure_kinesis_aspire_silo":::
 
