@@ -18,6 +18,7 @@
 | Split-query configuration cannot split membership snapshots | `PR8654_Membership_ReadAll_CallerSplitQueryReturnsOneAtomicSnapshot` |
 | Long identifiers round-trip across persistence, grain directory, and reminders | `PR8654_Persistence_LongGrainIdentifierRoundTripsPayloadAndRawKeyExactly`; `PR8654_GrainDirectory_LongGrainIdentifierRoundTripsAddressAndRawKeyExactly`; `PR8654_Reminder_LongGrainIdentifierRoundTripsReminderAndRawKeyExactly` |
 | MySQL and SQL Server preserve trailing-space identity | Provider-specific `PR8654_*_TrailingSpaceIdentifiersRemainDistinct` tests for persistence, grain directory, and reminders |
+| Large grain-directory cleanup inputs stay below provider parameter limits | `PR8654_GrainDirectory_LargeUnregisterBatchesAreChunked` |
 
 ## Validation
 
@@ -35,6 +36,7 @@
 4. Membership row reads return an empty result with the current version when the silo is absent, and all-member reads force one SQL query.
 5. Persistence, grain-directory, and reminder schemas use fixed-width SHA-256 identity keys while retaining complete identifier values.
 6. Runtime lookups verify full values ordinally after hash lookup, preserving long identifiers and trailing spaces and reporting hash collisions.
+7. Grain-directory batch removals use bounded 256-identifier query chunks.
 
 ## Quality Review
 
