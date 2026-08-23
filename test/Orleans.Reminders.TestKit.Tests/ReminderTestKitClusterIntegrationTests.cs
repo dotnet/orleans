@@ -1,4 +1,5 @@
 using Microsoft.Extensions.DependencyInjection;
+using Orleans.Configuration;
 using Orleans.Reminders.TestKit;
 using Orleans.Runtime;
 using Orleans.Testing.Reminders;
@@ -198,5 +199,245 @@ public sealed class ReminderTestKitClusterIntegrationTests
             await cluster.StopAllSilosAsync();
             await cluster.DisposeAsync();
         }
+    }
+
+    [Fact]
+    public async Task ReminderTestKit_DueTimeBeyondTimerLimitLoadsAndFiresOnPersistedSchedule()
+    {
+        var loadingWindow = TimeSpan.FromSeconds(5);
+        var builder = new InProcessTestClusterBuilder(1);
+        var oracle = builder.UseIdealizedReminderTable(
+            configureReminderOptions: options => options.ReminderLoadingWindow = loadingWindow);
+        using var clock = ReminderTestClock.Attach(
+            builder,
+            minimumReminderPeriod: TimeSpan.FromSeconds(1),
+            refreshReminderListPeriod: TimeSpan.FromSeconds(1));
+        using var observer = ReminderDiagnosticObserver.Create();
+        var cluster = builder.Build();
+
+        try
+        {
+            await cluster.DeployAsync();
+            var grain = cluster.Client.GetGrain<IReminderTestKitGrain>(Guid.NewGuid());
+            var grainId = grain.GetGrainId();
+            var timerLimit = TimeSpan.FromMilliseconds(0xfffffffe) + TimeSpan.FromMilliseconds(1);
+            var dueTime = timerLimit + TimeSpan.FromDays(1);
+            var firstTickTime = clock.UtcNow.UtcDateTime + dueTime;
+            using var cancellation = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+
+            await grain.RegisterReminderAsync("long-due", dueTime, dueTime);
+
+            Assert.Equal(0, observer.GetActiveReminderCount(grainId, "long-due"));
+            var activated = observer.WaitForActiveReminderCountAsync(grainId, 1, cancellation.Token, "long-due");
+            await clock.AdvanceAsync(dueTime - loadingWindow + clock.RefreshReminderListPeriod, cancellation.Token);
+            await activated;
+            await observer.WaitForLocalReminderScheduleAsync(grainId, "long-due", cancellation.Token);
+
+            var tick = observer.WaitForReminderTickAsync(grainId, cancellation.Token, "long-due");
+            var remaining = firstTickTime - clock.UtcNow.UtcDateTime;
+            Assert.True(remaining > TimeSpan.Zero);
+            await clock.AdvanceAsync(remaining, cancellation.Token);
+            var completed = await tick;
+
+            Assert.Equal(firstTickTime, completed.Status.FirstTickTime);
+            Assert.Equal(firstTickTime, completed.Status.CurrentTickTime);
+            Assert.Equal(1, observer.GetTickCount(grainId, "long-due"));
+            Assert.Equal(dueTime, Assert.Single(oracle.Snapshot()).Period);
+        }
+        finally
+        {
+            await cluster.StopAllSilosAsync();
+            await cluster.DisposeAsync();
+        }
+    }
+
+    [Fact]
+    public async Task ReminderTestKit_StorageRecoveryAtExactDueTimeDeliversDueOccurrence()
+    {
+        var loadingWindow = TimeSpan.FromSeconds(10);
+        var builder = new InProcessTestClusterBuilder(1);
+        var oracle = builder.UseIdealizedReminderTable(
+            configureReminderOptions: options => options.ReminderLoadingWindow = loadingWindow);
+        using var clock = ReminderTestClock.Attach(
+            builder,
+            minimumReminderPeriod: TimeSpan.FromSeconds(1),
+            refreshReminderListPeriod: TimeSpan.FromSeconds(1));
+        using var observer = ReminderDiagnosticObserver.Create();
+        var cluster = builder.Build();
+
+        try
+        {
+            await cluster.DeployAsync();
+            var grain = cluster.Client.GetGrain<IReminderTestKitGrain>(Guid.NewGuid());
+            var grainId = grain.GetGrainId();
+            var dueTime = loadingWindow + TimeSpan.FromMinutes(1);
+            var period = TimeSpan.FromSeconds(30);
+            var firstTickTime = clock.UtcNow.UtcDateTime + dueTime;
+            using var cancellation = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+
+            await grain.RegisterReminderAsync("exact-due-recovery", dueTime, period);
+            Assert.Equal(0, observer.GetActiveReminderCount(grainId, "exact-due-recovery"));
+
+            await using var blockedRead = oracle.BlockNext(ReminderTableOperationKind.ReadRange);
+            await AdvanceUntilAsync(clock, blockedRead.WaitUntilBlockedAsync(cancellation.Token), cancellation.Token);
+            var remaining = firstTickTime - clock.UtcNow.UtcDateTime;
+            Assert.True(remaining > TimeSpan.Zero);
+            await clock.AdvanceAsync(remaining, cancellation.Token);
+
+            var activated = observer.WaitForActiveReminderCountAsync(grainId, 1, cancellation.Token, "exact-due-recovery");
+            blockedRead.Release();
+            await activated;
+            await observer.WaitForLocalReminderScheduleAsync(grainId, "exact-due-recovery", cancellation.Token);
+            Assert.Equal(["exact-due-recovery"], await grain.GetReminderNamesAsync());
+
+            var tick = observer.WaitForReminderTickAsync(grainId, cancellation.Token, "exact-due-recovery");
+            await clock.AdvanceAsync(clock.RefreshReminderListPeriod, cancellation.Token);
+            var completed = await tick;
+
+            Assert.Equal(firstTickTime, completed.Status.FirstTickTime);
+            Assert.Equal(firstTickTime + clock.RefreshReminderListPeriod, completed.Status.CurrentTickTime);
+            Assert.Equal(1, observer.GetTickCount(grainId, "exact-due-recovery"));
+        }
+        finally
+        {
+            await cluster.StopAllSilosAsync();
+            await cluster.DisposeAsync();
+        }
+    }
+
+    [Fact]
+    public async Task ReminderTestKit_StaleRefreshCannotRestoreUnregisteredReminder()
+    {
+        var builder = new InProcessTestClusterBuilder(1);
+        var oracle = builder.UseIdealizedReminderTable(
+            configureReminderOptions: options => options.ReminderLoadingWindow = TimeSpan.FromHours(2));
+        using var clock = ReminderTestClock.Attach(
+            builder,
+            minimumReminderPeriod: TimeSpan.FromSeconds(1),
+            refreshReminderListPeriod: TimeSpan.FromSeconds(1));
+        using var observer = ReminderDiagnosticObserver.Create();
+        var cluster = builder.Build();
+
+        try
+        {
+            await cluster.DeployAsync();
+            var grain = cluster.Client.GetGrain<IReminderTestKitGrain>(Guid.NewGuid());
+            var grainId = grain.GetGrainId();
+            using var cancellation = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+
+            var activated = observer.WaitForActiveReminderCountAsync(grainId, 1, cancellation.Token, "stale-unregister");
+            await grain.RegisterReminderAsync("stale-unregister", TimeSpan.FromHours(1), TimeSpan.FromHours(2));
+            await activated;
+            await observer.WaitForLocalReminderScheduleAsync(grainId, "stale-unregister", cancellation.Token);
+
+            await using var staleRead = oracle.BlockNext(ReminderTableOperationKind.ReadRange);
+            await using var followingRead = oracle.BlockNext(ReminderTableOperationKind.ReadRange);
+            using (oracle.FreezeReads())
+            {
+                await AdvanceUntilAsync(clock, staleRead.WaitUntilBlockedAsync(cancellation.Token), cancellation.Token);
+
+                var quiescence = observer.WaitForReminderQuiescenceAsync(grainId, "stale-unregister", cancellation.Token);
+                Assert.True(await grain.UnregisterReminderAsync("stale-unregister"));
+                await quiescence;
+                staleRead.Release();
+
+                await AdvanceUntilAsync(clock, followingRead.WaitUntilBlockedAsync(cancellation.Token), cancellation.Token);
+
+                Assert.Equal(0, observer.GetActiveReminderCount(grainId, "stale-unregister"));
+                Assert.Equal(0, observer.GetTickCount(grainId, "stale-unregister"));
+                Assert.Empty(oracle.Snapshot());
+            }
+
+            followingRead.Release();
+            Assert.Empty(await grain.GetReminderNamesAsync());
+        }
+        finally
+        {
+            await cluster.StopAllSilosAsync();
+            await cluster.DisposeAsync();
+        }
+    }
+
+    [Fact]
+    public async Task ReminderTestKit_TwoSilosMaintainOneOwnerAndOneDelivery()
+    {
+        var builder = new InProcessTestClusterBuilder(2);
+        builder.ConfigureSilo((_, siloBuilder) =>
+            siloBuilder.Configure<ConsistentRingOptions>(options => options.UseVirtualBucketsConsistentRing = false));
+        var oracle = builder.UseIdealizedReminderTable();
+        using var clock = ReminderTestClock.Attach(
+            builder,
+            minimumReminderPeriod: TimeSpan.FromSeconds(1),
+            refreshReminderListPeriod: TimeSpan.FromSeconds(1));
+        using var observer = ReminderDiagnosticObserver.Create();
+        var cluster = builder.Build();
+
+        try
+        {
+            await cluster.DeployAsync();
+            var grain = cluster.Client.GetGrain<IReminderTestKitGrain>(Guid.NewGuid());
+            var grainId = grain.GetGrainId();
+            var dueTime = TimeSpan.FromMinutes(10);
+            var firstTickTime = clock.UtcNow.UtcDateTime + dueTime;
+            using var cancellation = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+
+            await using var firstRefreshA = oracle.BlockNext(ReminderTableOperationKind.ReadRange);
+            await using var firstRefreshB = oracle.BlockNext(ReminderTableOperationKind.ReadRange);
+            await using var followingRefreshA = oracle.BlockNext(ReminderTableOperationKind.ReadRange);
+            await using var followingRefreshB = oracle.BlockNext(ReminderTableOperationKind.ReadRange);
+            var oneOwner = observer.WaitForActiveReminderCountAsync(grainId, 1, cancellation.Token, "single-owner");
+            await grain.RegisterReminderAsync("single-owner", dueTime, TimeSpan.FromMinutes(2));
+
+            await AdvanceUntilAsync(
+                clock,
+                Task.WhenAll(
+                    firstRefreshA.WaitUntilBlockedAsync(cancellation.Token),
+                    firstRefreshB.WaitUntilBlockedAsync(cancellation.Token)),
+                cancellation.Token);
+            firstRefreshA.Release();
+            firstRefreshB.Release();
+            await AdvanceUntilAsync(
+                clock,
+                Task.WhenAll(
+                    followingRefreshA.WaitUntilBlockedAsync(cancellation.Token),
+                    followingRefreshB.WaitUntilBlockedAsync(cancellation.Token)),
+                cancellation.Token);
+            await oneOwner;
+            await observer.WaitForLocalReminderScheduleAsync(grainId, "single-owner", cancellation.Token);
+
+            Assert.Single(observer.GetActiveReminderSilos(grainId, "single-owner"));
+            var tick = observer.WaitForReminderTickAsync(grainId, cancellation.Token, "single-owner");
+            var remaining = firstTickTime - clock.UtcNow.UtcDateTime;
+            Assert.True(remaining > TimeSpan.Zero);
+            await clock.AdvanceAsync(remaining, cancellation.Token);
+            var completed = await tick;
+            await observer.WaitForLocalReminderScheduleAsync(grainId, "single-owner", cancellation.Token);
+
+            Assert.Equal(firstTickTime, completed.Status.CurrentTickTime);
+            Assert.Equal(1, observer.GetActiveReminderCount(grainId, "single-owner"));
+            Assert.Equal(1, observer.GetTickCount(grainId, "single-owner"));
+            Assert.Single(oracle.Snapshot());
+            followingRefreshA.Release();
+            followingRefreshB.Release();
+        }
+        finally
+        {
+            await cluster.StopAllSilosAsync();
+            await cluster.DisposeAsync();
+        }
+    }
+
+    private static async Task AdvanceUntilAsync(
+        ReminderTestClock clock,
+        Task condition,
+        CancellationToken cancellationToken)
+    {
+        while (!condition.IsCompleted)
+        {
+            await clock.AdvanceAsync(clock.RefreshReminderListPeriod, cancellationToken);
+            await Task.WhenAny(condition, Task.Delay(TimeSpan.FromMilliseconds(10), cancellationToken));
+        }
+
+        await condition;
     }
 }

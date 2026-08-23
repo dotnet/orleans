@@ -200,6 +200,10 @@ The oracle exposes:
 - `FreezeReads` for stale-read convergence scenarios; and
 - lifecycle cancellation and invariant checks.
 
+The TestKit cluster integration suite uses these controls to cover exact-due delivery, exact-due storage recovery,
+due times beyond the platform timer limit, stale-refresh suppression after unregister, and single-owner delivery in a
+multi-silo cluster.
+
 ## Diagnostics and cleanup
 
 Every conformance failure throws `ReminderConformanceException` with a `ReminderFailureReport`. Reports identify the
