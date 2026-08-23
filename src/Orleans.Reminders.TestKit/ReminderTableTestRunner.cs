@@ -976,20 +976,32 @@ public abstract class ReminderTableTestRunner
         const int PerGrain = 5;
         var grains = Enumerable.Range(0, GrainCount).Select(index => NewGrainId($"parallel-{index}")).ToList();
 
+        // Seed serially so this guarantee isolates parallel replacement streams from same-identity insert contention.
+        foreach (var grainId in grains)
+        {
+            await UpsertAsync(NewEntry(grainId, "parallel", BaseTime, TimeSpan.FromMinutes(1)), Guarantee);
+        }
+
         var results = await Task.WhenAll(grains.Select(async grainId =>
         {
             var entries = Enumerable.Range(0, PerGrain)
-                .Select(index => NewEntry(grainId, "parallel", BaseTime.AddSeconds(index), TimeSpan.FromMinutes(index + 1)))
+                .Select(index => NewEntry(grainId, "parallel", BaseTime.AddSeconds(index + 1), TimeSpan.FromMinutes(index + 2)))
                 .ToList();
-            var etags = await Task.WhenAll(entries.Select(entry =>
-                ReminderTableRetryPolicy.MutateUntilAsync(
+
+            var etags = new string?[entries.Count];
+            for (var index = 0; index < entries.Count; index++)
+            {
+                var entry = entries[index];
+                etags[index] = await ReminderTableRetryPolicy.MutateUntilAsync(
                     () => ReminderTable.UpsertRow(entry),
                     etag => !string.IsNullOrEmpty(etag),
                     ProviderName,
                     Guarantee,
                     "UpsertRow",
                     $"a non-empty ETag within the replacement stream for grain {grainId}",
-                    FormatETag)));
+                    FormatETag);
+            }
+
             return (GrainId: grainId, Entries: entries, ETags: etags);
         }));
 
