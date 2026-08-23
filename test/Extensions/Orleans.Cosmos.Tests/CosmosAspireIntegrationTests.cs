@@ -1,5 +1,6 @@
 using Aspire.Hosting;
 using Aspire.Hosting.ApplicationModel;
+using Aspire.Hosting.Orleans;
 using Aspire.Hosting.Testing;
 using Microsoft.Azure.Cosmos;
 using Microsoft.Extensions.Configuration;
@@ -7,6 +8,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Options;
 using Orleans.Clustering.Cosmos;
+using Orleans.Configuration;
 using Orleans.Hosting;
 using Orleans.Persistence.Cosmos;
 using Orleans.Reminders.Cosmos;
@@ -60,6 +62,32 @@ public sealed class CosmosAspireIntegrationTests
         using var client = await options.CreateClient(host.Services);
         var account = await client.ReadAccountAsync();
         Assert.NotNull(account);
+    }
+
+    [Fact]
+    public async Task AspireConfiguration_MissingConnectionName_ThrowsProviderSpecificError()
+    {
+        await using var builder = DistributedApplicationTestingBuilder.Create();
+        var orleans = builder.AddOrleans("cluster")
+            .WithDevelopmentClustering()
+            .WithReminders(new MissingConnectionCosmosProviderConfiguration());
+        var silo = builder.AddContainer("silo", "unused").WithReference(orleans);
+        await using var app = await builder.BuildAsync();
+        var configuration = await AspireResourceConfiguration.CreateAsync(
+            silo.Resource,
+            app.Services,
+            include: static key => key.StartsWith("Orleans__Reminders__", StringComparison.Ordinal));
+
+        var hostBuilder = Host.CreateApplicationBuilder();
+        hostBuilder.Configuration.AddConfiguration(configuration);
+        hostBuilder.UseOrleans();
+        using var host = hostBuilder.Build();
+
+        var exception = Assert.Throws<OrleansConfigurationException>(
+            () => host.Services.GetRequiredService<IOptions<CosmosReminderTableOptions>>().Value);
+
+        Assert.Contains("Orleans:Reminders", exception.Message, StringComparison.Ordinal);
+        Assert.Contains("missing-cosmos", exception.Message, StringComparison.Ordinal);
     }
 
     private static IHost CreateHost(IConfiguration configuration)
@@ -129,5 +157,19 @@ public sealed class CosmosAspireIntegrationTests
     }
 
     private static string CreateEmulatorKey() => Convert.ToBase64String(new byte[64]);
+
+    private sealed class MissingConnectionCosmosProviderConfiguration : IProviderConfiguration
+    {
+        public void ConfigureResource<T>(
+            IResourceBuilder<T> resourceBuilder,
+            string configurationSectionPath)
+            where T : IResourceWithEnvironment
+        {
+            var prefix = $"Orleans__{configurationSectionPath.Replace(":", "__", StringComparison.Ordinal)}";
+            resourceBuilder
+                .WithEnvironment($"{prefix}__ProviderType", "AzureCosmosDB")
+                .WithEnvironment($"{prefix}__ConnectionName", "missing-cosmos");
+        }
+    }
 
 }
