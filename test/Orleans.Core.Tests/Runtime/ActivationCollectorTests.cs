@@ -1,4 +1,5 @@
 using System.Collections.Concurrent;
+using System.Reflection;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
@@ -854,10 +855,11 @@ namespace UnitTests.Runtime
             timer.NextTick().Returns(Task.FromResult(true), Task.FromResult(false));
             var timerFactory = Substitute.For<IAsyncTimerFactory>();
             timerFactory.Create(Arg.Any<TimeSpan>(), Arg.Any<string>(), Arg.Any<TimeProvider>()).Returns(timer);
+            var observer = Substitute.For<IActivationWorkingSetObserver>();
             var workingSet = new ActivationWorkingSet(
                 timerFactory,
                 NullLogger<ActivationWorkingSet>.Instance,
-                Array.Empty<IActivationWorkingSetObserver>(),
+                [observer],
                 CreateCatalogInstruments(),
                 TimeProvider.System);
             var member = Substitute.For<IActivationWorkingSetMember>();
@@ -876,10 +878,229 @@ namespace UnitTests.Runtime
             await lifecycle.OnStart();
             await scanStarted.Task.WaitAsync(TimeSpan.FromSeconds(10));
 
-            workingSet.OnEvicted(member);
+            try
+            {
+                workingSet.OnEvicted(member);
+                workingSet.OnActivated(member);
+                var stopTask = lifecycle.OnStop();
+                Assert.False(stopTask.IsCompleted);
+                resumeScan.Set();
+                await stopTask;
+            }
+            finally
+            {
+                resumeScan.Set();
+            }
+
+            Assert.Equal(1, workingSet.Count);
+            Assert.Contains(member, workingSet.Members);
+            observer.Received(2).OnAdded(member);
+            observer.Received(1).OnEvicted(member);
+            observer.DidNotReceive().OnIdle(member);
+        }
+
+        [Fact, TestCategory("Activation")]
+        public async Task WorkingSetScan_DoesNotRemoveReaddedMember()
+        {
+            var timer = Substitute.For<IAsyncTimer>();
+            timer.NextTick().Returns(Task.FromResult(true), Task.FromResult(true), Task.FromResult(false));
+            var timerFactory = Substitute.For<IAsyncTimerFactory>();
+            timerFactory.Create(Arg.Any<TimeSpan>(), Arg.Any<string>(), Arg.Any<TimeProvider>()).Returns(timer);
+            var observer = Substitute.For<IActivationWorkingSetObserver>();
+            var workingSet = new ActivationWorkingSet(
+                timerFactory,
+                NullLogger<ActivationWorkingSet>.Instance,
+                [observer],
+                CreateCatalogInstruments(),
+                TimeProvider.System);
+            var removalScanStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            using var resumeScan = new ManualResetEventSlim();
+            var member = new TestWorkingSetMember(wouldRemove =>
+            {
+                if (!wouldRemove)
+                {
+                    return true;
+                }
+
+                removalScanStarted.TrySetResult();
+                resumeScan.Wait();
+                return true;
+            });
             workingSet.OnActivated(member);
-            resumeScan.Set();
+
+            var lifecycle = new SiloLifecycleSubject(NullLogger<SiloLifecycleSubject>.Instance);
+            ((ILifecycleParticipant<ISiloLifecycle>)workingSet).Participate(lifecycle);
+            await lifecycle.OnStart();
+            await removalScanStarted.Task.WaitAsync(TimeSpan.FromSeconds(10));
+
+            try
+            {
+                workingSet.OnEvicted(member);
+                workingSet.OnActivated(member);
+                var stopTask = lifecycle.OnStop();
+                Assert.False(stopTask.IsCompleted);
+                resumeScan.Set();
+                await stopTask;
+            }
+            finally
+            {
+                resumeScan.Set();
+            }
+
+            Assert.Equal(1, workingSet.Count);
+            Assert.Contains(member, workingSet.Members);
+            observer.Received(2).OnAdded(member);
+            observer.Received(1).OnIdle(member);
+            observer.Received(1).OnEvicted(member);
+        }
+
+        [Fact, TestCategory("Activation")]
+        public async Task WorkingSetScan_RepeatedCyclesPreserveCountAndObserverConsistency()
+        {
+            const int reactivationCycles = 64;
+            const int removalVisits = 2;
+            const int totalVisits = reactivationCycles * 2 + removalVisits;
+            var ticks = 0;
+            var timer = Substitute.For<IAsyncTimer>();
+            timer.NextTick().Returns(_ => Task.FromResult(Interlocked.Increment(ref ticks) <= totalVisits));
+            var timerFactory = Substitute.For<IAsyncTimerFactory>();
+            timerFactory.Create(Arg.Any<TimeSpan>(), Arg.Any<string>(), Arg.Any<TimeProvider>()).Returns(timer);
+            var observer = Substitute.For<IActivationWorkingSetObserver>();
+            var workingSet = new ActivationWorkingSet(
+                timerFactory,
+                NullLogger<ActivationWorkingSet>.Instance,
+                [observer],
+                CreateCatalogInstruments(),
+                TimeProvider.System);
+            var visits = 0;
+            var member = new TestWorkingSetMember(_ =>
+            {
+                var visit = visits++;
+                return visit >= reactivationCycles * 2 || (visit & 1) == 0;
+            });
+            workingSet.OnActivated(member);
+
+            var lifecycle = new SiloLifecycleSubject(NullLogger<SiloLifecycleSubject>.Instance);
+            ((ILifecycleParticipant<ISiloLifecycle>)workingSet).Participate(lifecycle);
+            await lifecycle.OnStart();
             await lifecycle.OnStop();
+
+            Assert.Equal(0, workingSet.Count);
+            Assert.DoesNotContain(member, workingSet.Members);
+            Assert.Equal(totalVisits, visits);
+            observer.Received(1).OnAdded(member);
+            observer.Received(reactivationCycles + 1).OnIdle(member);
+            observer.Received(reactivationCycles).OnActive(member);
+            observer.Received(1).OnEvicted(member);
+        }
+
+        [Fact, TestCategory("Activation")]
+        public async Task WorkingSetMembers_EnumerationToleratesConcurrentRemoveAndReadd()
+        {
+            var timer = Substitute.For<IAsyncTimer>();
+            timer.NextTick().Returns(Task.FromResult(false));
+            var timerFactory = Substitute.For<IAsyncTimerFactory>();
+            timerFactory.Create(Arg.Any<TimeSpan>(), Arg.Any<string>(), Arg.Any<TimeProvider>()).Returns(timer);
+            var observer = Substitute.For<IActivationWorkingSetObserver>();
+            var firstEviction = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            using var resumeWriter = new ManualResetEventSlim();
+            var evictionCount = 0;
+            observer.When(static observer => observer.OnEvicted(Arg.Any<IActivationWorkingSetMember>())).Do(_ =>
+            {
+                if (Interlocked.Increment(ref evictionCount) == 1)
+                {
+                    firstEviction.TrySetResult();
+                    resumeWriter.Wait();
+                }
+            });
+            var workingSet = new ActivationWorkingSet(
+                timerFactory,
+                NullLogger<ActivationWorkingSet>.Instance,
+                [observer],
+                CreateCatalogInstruments(),
+                TimeProvider.System);
+            var members = Enumerable.Range(0, 128).Select(_ => new TestWorkingSetMember()).ToArray();
+            foreach (var member in members)
+            {
+                workingSet.OnActivated(member);
+            }
+
+            using var enumerator = workingSet.Members.GetEnumerator();
+            Assert.True(enumerator.MoveNext());
+            var enumeratedMembers = new List<IActivationWorkingSetMember> { enumerator.Current };
+            var writer = Task.Run(() =>
+            {
+                foreach (var member in members)
+                {
+                    workingSet.OnEvicted(member);
+                    workingSet.OnActivated(member);
+                }
+            });
+            await firstEviction.Task.WaitAsync(TimeSpan.FromSeconds(10));
+
+            try
+            {
+                while (enumerator.MoveNext())
+                {
+                    enumeratedMembers.Add(enumerator.Current);
+                }
+            }
+            finally
+            {
+                resumeWriter.Set();
+            }
+
+            await writer.WaitAsync(TimeSpan.FromSeconds(10));
+
+            Assert.All(enumeratedMembers, member => Assert.Contains(member, members));
+            Assert.Equal(members.Length, workingSet.Count);
+            Assert.True(members.Cast<IActivationWorkingSetMember>().ToHashSet().SetEquals(workingSet.Members));
+            observer.Received(members.Length * 2).OnAdded(Arg.Any<IActivationWorkingSetMember>());
+            observer.Received(members.Length).OnEvicted(Arg.Any<IActivationWorkingSetMember>());
+        }
+
+        [Fact, TestCategory("Activation")]
+        public async Task WorkingSetGenerationWrap_DoesNotAliasAdjacentMembership()
+        {
+            var timer = Substitute.For<IAsyncTimer>();
+            timer.NextTick().Returns(Task.FromResult(true), Task.FromResult(false));
+            var timerFactory = Substitute.For<IAsyncTimerFactory>();
+            timerFactory.Create(Arg.Any<TimeSpan>(), Arg.Any<string>(), Arg.Any<TimeProvider>()).Returns(timer);
+            var workingSet = new ActivationWorkingSet(
+                timerFactory,
+                NullLogger<ActivationWorkingSet>.Instance,
+                Array.Empty<IActivationWorkingSetObserver>(),
+                CreateCatalogInstruments(),
+                TimeProvider.System);
+            var nextGeneration = typeof(ActivationWorkingSet).GetField("_nextGeneration", BindingFlags.Instance | BindingFlags.NonPublic)
+                ?? throw new InvalidOperationException("Could not find the working-set generation field.");
+            nextGeneration.SetValue(workingSet, long.MaxValue - 1);
+            var scanStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            using var resumeScan = new ManualResetEventSlim();
+            var member = new TestWorkingSetMember(_ =>
+            {
+                scanStarted.TrySetResult();
+                resumeScan.Wait();
+                return true;
+            });
+            workingSet.OnActivated(member);
+
+            var lifecycle = new SiloLifecycleSubject(NullLogger<SiloLifecycleSubject>.Instance);
+            ((ILifecycleParticipant<ISiloLifecycle>)workingSet).Participate(lifecycle);
+            await lifecycle.OnStart();
+            await scanStarted.Task.WaitAsync(TimeSpan.FromSeconds(10));
+
+            try
+            {
+                workingSet.OnEvicted(member);
+                workingSet.OnActivated(member);
+                resumeScan.Set();
+                await lifecycle.OnStop();
+            }
+            finally
+            {
+                resumeScan.Set();
+            }
 
             Assert.Equal(1, workingSet.Count);
             Assert.Contains(member, workingSet.Members);
@@ -925,6 +1146,11 @@ namespace UnitTests.Runtime
             activation.Deactivated.Returns(Task.CompletedTask).AndDoes(_ => { Interlocked.Decrement(ref collector._activationCount); });
 
             return (IActivationWorkingSetMember)activation;
+        }
+
+        private sealed class TestWorkingSetMember(Func<bool, bool>? isCandidateForRemoval = null) : IActivationWorkingSetMember
+        {
+            public bool IsCandidateForRemoval(bool wouldRemove) => isCandidateForRemoval?.Invoke(wouldRemove) ?? false;
         }
     }
 }
