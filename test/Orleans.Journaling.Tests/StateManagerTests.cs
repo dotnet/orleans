@@ -861,6 +861,54 @@ public class StateManagerTests : JournalingTestBase
     }
 
     [Fact]
+    public async Task StateManager_InitializeAsync_CallerCancellationAfterStart_WaitsForRecovery()
+    {
+        var storage = new CapturingStorage { BlockNextRead = true };
+        var sut = CreateTestSystem(storage: storage);
+        using var cancellation = new CancellationTokenSource();
+        var cancellationSignaled = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        using var registration = cancellation.Token.Register(static state => ((TaskCompletionSource)state!).TrySetResult(), cancellationSignaled);
+
+        var initialize = sut.Manager.InitializeAsync(cancellation.Token).AsTask();
+        await storage.BlockedReadStarted.Task.WaitAsync(TimeSpan.FromSeconds(10));
+
+        cancellation.Cancel();
+        await cancellationSignaled.Task.WaitAsync(TimeSpan.FromSeconds(10));
+        Assert.False(initialize.IsCompleted);
+
+        storage.AllowBlockedRead.SetResult();
+        await initialize.WaitAsync(TimeSpan.FromSeconds(10));
+    }
+
+    [Fact]
+    public async Task StateManager_DeleteStateAsync_CallerCancellationAfterStart_WaitsForDeletion()
+    {
+        var storage = new CapturingStorage();
+        var sut = CreateTestSystem(storage: storage);
+        var dictionary = new DurableDictionary<string, int>("dict", sut.Manager, CreateDictionaryCodec<string, int>());
+
+        await sut.Lifecycle.OnStart();
+        dictionary.Add("persisted", 1);
+        await sut.Manager.WriteStateAsync(CancellationToken.None);
+        storage.BlockNextDelete = true;
+
+        using var cancellation = new CancellationTokenSource();
+        var cancellationSignaled = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        using var registration = cancellation.Token.Register(static state => ((TaskCompletionSource)state!).TrySetResult(), cancellationSignaled);
+        var delete = sut.Manager.DeleteStateAsync(cancellation.Token).AsTask();
+        await storage.DeleteStarted.Task.WaitAsync(TimeSpan.FromSeconds(10));
+
+        cancellation.Cancel();
+        await cancellationSignaled.Task.WaitAsync(TimeSpan.FromSeconds(10));
+        Assert.False(delete.IsCompleted);
+
+        storage.AllowDelete.SetResult();
+        await delete.WaitAsync(TimeSpan.FromSeconds(10));
+        Assert.Equal(1, storage.DeleteCount);
+        Assert.Empty(dictionary);
+    }
+
+    [Fact]
     public async Task StateManager_WriteStateAsync_CoalescesQueuedWrites()
     {
         var storage = new BlockingAppendStorage();
@@ -1706,6 +1754,71 @@ public class StateManagerTests : JournalingTestBase
     }
 
     [Fact]
+    public async Task WriteStateAsync_SnapshotConflictRecoversWinningStateWithoutPartialAppend()
+    {
+        var storage = new CheckpointingJournalStorage();
+        var sut = CreateMixedStateTestSystem(storage);
+        await sut.Lifecycle.OnStart().WaitAsync(TimeSpan.FromSeconds(10));
+
+        sut.List.Add("baseline");
+        sut.Value.Value = 10;
+        await sut.Manager.WriteStateAsync(CancellationToken.None).AsTask().WaitAsync(TimeSpan.FromSeconds(10));
+        var baselineCheckpoint = storage.GetDurableCheckpoint();
+        storage.ClearOperationHistory();
+
+        sut.List.Add("losing");
+        sut.Value.Value = 20;
+        storage.IsCompactionRequested = true;
+        var expected = new InconsistentStateException("Expected snapshot conflict.");
+        storage.NextReplaceException = expected;
+
+        var exception = await Assert.ThrowsAsync<InconsistentStateException>(
+            () => sut.Manager.WriteStateAsync(CancellationToken.None).AsTask().WaitAsync(TimeSpan.FromSeconds(10)));
+
+        Assert.Same(expected, exception);
+        Assert.Single(storage.ReplaceAttempts);
+        Assert.Empty(storage.CommittedReplaces);
+        Assert.Empty(storage.AppendAttempts);
+        Assert.Empty(storage.CommittedAppends);
+        Assert.Equal(Flatten(baselineCheckpoint), Flatten(storage.GetDurableCheckpoint()));
+        Assert.Equal(["baseline"], sut.List.ToArray());
+        Assert.Equal(10, sut.Value.Value);
+        Assert.False(sut.Manager.HasPendingWrites);
+    }
+
+    [Fact]
+    public async Task WriteStateAsync_SnapshotConflictWithEmptyWinnerResetsAllRegisteredState()
+    {
+        var storage = new CheckpointingJournalStorage();
+        var sut = CreateMixedStateTestSystem(storage);
+        await sut.Lifecycle.OnStart().WaitAsync(TimeSpan.FromSeconds(10));
+
+        sut.List.Add("baseline");
+        sut.Value.Value = 10;
+        await sut.Manager.WriteStateAsync(CancellationToken.None).AsTask().WaitAsync(TimeSpan.FromSeconds(10));
+        storage.ClearOperationHistory();
+
+        sut.List.Add("losing");
+        sut.Value.Value = 20;
+        storage.IsCompactionRequested = true;
+        storage.ClearDurableCheckpoint();
+        var expected = new InconsistentStateException("Expected conflict with an empty winning generation.");
+        storage.NextReplaceException = expected;
+
+        var exception = await Assert.ThrowsAsync<InconsistentStateException>(
+            () => sut.Manager.WriteStateAsync(CancellationToken.None).AsTask().WaitAsync(TimeSpan.FromSeconds(10)));
+
+        Assert.Same(expected, exception);
+        Assert.Empty(storage.GetDurableCheckpoint());
+        Assert.Empty(storage.AppendAttempts);
+        Assert.Empty(storage.CommittedAppends);
+        Assert.Empty(storage.CommittedReplaces);
+        Assert.Empty(sut.List);
+        Assert.Equal(0, sut.Value.Value);
+        Assert.True(sut.Manager.HasPendingWrites);
+    }
+
+    [Fact]
     public async Task WriteStateAsync_MutationsDuringBlockedReplace_RemainPendingForNextWrite()
     {
         var storage = new CheckpointingJournalStorage();
@@ -1976,6 +2089,14 @@ public class StateManagerTests : JournalingTestBase
             ReplaceAttempts.Clear();
             CommittedAppends.Clear();
             CommittedReplaces.Clear();
+        }
+
+        public void ClearDurableCheckpoint()
+        {
+            lock (_lock)
+            {
+                _segments.Clear();
+            }
         }
 
         public ValueTask ReadAsync(IJournalStorageConsumer consumer, CancellationToken cancellationToken)
@@ -2548,6 +2669,8 @@ public class StateManagerTests : JournalingTestBase
 
         public bool BlockNextRead { get; set; }
 
+        public bool BlockNextDelete { get; set; }
+
         public TaskCompletionSource BlockedReadStarted { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
 
         public TaskCompletionSource AllowBlockedRead { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -2555,6 +2678,10 @@ public class StateManagerTests : JournalingTestBase
         public Exception? NextReplaceException { get; set; }
 
         public int ReplaceAttemptCount { get; private set; }
+
+        public TaskCompletionSource DeleteStarted { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        public TaskCompletionSource AllowDelete { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
 
         public int ReadConsumeCount { get; private set; }
 
@@ -2740,7 +2867,7 @@ public class StateManagerTests : JournalingTestBase
             }
         }
 
-        public ValueTask DeleteAsync(CancellationToken cancellationToken)
+        public async ValueTask DeleteAsync(CancellationToken cancellationToken)
         {
             cancellationToken.ThrowIfCancellationRequested();
             lock (_lock)
@@ -2753,6 +2880,15 @@ public class StateManagerTests : JournalingTestBase
 
             DeleteEntered.TrySetResult();
             return default;
+            if (BlockNextDelete)
+            {
+                BlockNextDelete = false;
+                DeleteStarted.SetResult();
+                await AllowDelete.Task.WaitAsync(cancellationToken);
+            }
+
+            DeleteCount++;
+            _segments.Clear();
         }
     }
 

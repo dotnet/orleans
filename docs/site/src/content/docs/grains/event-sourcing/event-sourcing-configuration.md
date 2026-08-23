@@ -42,7 +42,9 @@ The journaled-state provider stores the event log in the same Orleans journal as
 
 This provider runs on a single turn-serialized grain activation. Grain types configured for reentrancy, selective interleaving, always-interleaved methods, or stateless-worker placement are rejected during activation.
 
-The provider's persisted write marker uses a versioned length-prefixed encoding, so every valid `ClusterId`, including identifiers containing commas and punctuation, has an exact identity. Existing comma-token markers remain readable and are upgraded automatically the next time a bit changes. Legacy commas retain their original delimiter meaning; no operator migration step is required.
+The provider's persisted write marker supports a versioned length-prefixed encoding, so every valid `ClusterId`, including identifiers containing commas and punctuation, has an exact identity. Existing comma-token markers remain readable and continue using that representation while all cluster identifiers are delimiter-safe, preserving rolling upgrades with previous Orleans versions.
+
+Complete the Orleans rolling upgrade before configuring a comma-containing `ClusterId`. The first write from that cluster upgrades the marker to the versioned representation, which previous Orleans versions don't understand. After that upgrade, rollback requires restoring a journal generation written with the legacy marker format.
 
 ## Multi-cluster responsibility
 

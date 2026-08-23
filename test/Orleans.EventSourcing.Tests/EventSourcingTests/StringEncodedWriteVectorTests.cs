@@ -23,7 +23,7 @@ public sealed class StringEncodedWriteVectorTests
         var writeVector = ",cluster10,cluster1";
 
         Assert.False(StringEncodedWriteVector.FlipBit(ref writeVector, "cluster1"));
-        Assert.StartsWith("v1:", writeVector, StringComparison.Ordinal);
+        Assert.Equal(",cluster10", writeVector);
         Assert.True(StringEncodedWriteVector.GetBit(writeVector, "cluster10"));
     }
 
@@ -133,7 +133,7 @@ public sealed class StringEncodedWriteVectorTests
         Assert.True(StringEncodedWriteVector.GetBit(writeVector, "clusterB"));
 
         Assert.True(StringEncodedWriteVector.FlipBit(ref writeVector, "cluster:blue/1"));
-        Assert.StartsWith("v1:", writeVector, StringComparison.Ordinal);
+        Assert.StartsWith(",", writeVector, StringComparison.Ordinal);
         Assert.True(StringEncodedWriteVector.GetBit(writeVector, "cluster:blue/1"));
         Assert.True(StringEncodedWriteVector.GetBit(writeVector, "clusterA"));
         Assert.True(StringEncodedWriteVector.GetBit(writeVector, "clusterB"));
@@ -142,6 +142,22 @@ public sealed class StringEncodedWriteVectorTests
         Assert.False(StringEncodedWriteVector.GetBit(writeVector, "cluster:blue/1"));
         Assert.True(StringEncodedWriteVector.GetBit(writeVector, "clusterA"));
         Assert.True(StringEncodedWriteVector.GetBit(writeVector, "clusterB"));
+    }
+
+    [Fact, TestCategory("EventSourcing"), TestCategory("BVT")]
+    public void FlipBit_LegacySafeIds_RemainsReadableByPreviousFormat()
+    {
+        var writeVector = ",clusterA";
+
+        Assert.True(StringEncodedWriteVector.FlipBit(ref writeVector, "clusterB"));
+        Assert.Equal(",clusterA,clusterB", writeVector);
+        Assert.True(GetBitUsingLegacyReader(writeVector, "clusterA"));
+        Assert.True(GetBitUsingLegacyReader(writeVector, "clusterB"));
+
+        Assert.False(StringEncodedWriteVector.FlipBit(ref writeVector, "clusterA"));
+        Assert.Equal(",clusterB", writeVector);
+        Assert.False(GetBitUsingLegacyReader(writeVector, "clusterA"));
+        Assert.True(GetBitUsingLegacyReader(writeVector, "clusterB"));
     }
 
     [Fact, TestCategory("EventSourcing"), TestCategory("BVT")]
@@ -165,5 +181,11 @@ public sealed class StringEncodedWriteVectorTests
     public void VersionedFormat_MalformedOrUnsupportedValueThrows(string writeVector)
     {
         Assert.Throws<FormatException>(() => StringEncodedWriteVector.GetBit(writeVector, "A"));
+    }
+
+    private static bool GetBitUsingLegacyReader(string writeVector, string replica)
+    {
+        var position = writeVector.IndexOf(replica, StringComparison.Ordinal);
+        return position > 0 && writeVector[position - 1] == ',';
     }
 }

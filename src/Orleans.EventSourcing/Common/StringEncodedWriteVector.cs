@@ -9,7 +9,9 @@ namespace Orleans.EventSourcing.Common;
 /// <remarks>
 /// New values use the versioned format <c>v1:</c> followed by UTF-16 length-prefixed replica identifiers.
 /// This representation supports every valid cluster identifier without delimiter restrictions. Legacy values
-/// containing comma-prefixed tokens remain readable and are upgraded to the current format by <see cref="FlipBit"/>.
+/// containing comma-prefixed tokens remain readable. Updates remain in the legacy format while every identifier
+/// is representable by it, preserving rolling-upgrade compatibility. A comma-containing identifier upgrades the
+/// value to the current format.
 /// In legacy values, commas are interpreted as token delimiters because the previous format did not escape them.
 /// Malformed or unsupported versioned values throw <see cref="FormatException"/>.
 /// </remarks>
@@ -27,7 +29,7 @@ public static class StringEncodedWriteVector
     {
         ArgumentNullException.ThrowIfNull(writeVector);
         ArgumentException.ThrowIfNullOrEmpty(Replica);
-        return Decode(writeVector).Contains(Replica, StringComparer.Ordinal);
+        return Decode(writeVector, out _).Contains(Replica, StringComparer.Ordinal);
     }
 
     /// <summary>
@@ -41,7 +43,7 @@ public static class StringEncodedWriteVector
         ArgumentNullException.ThrowIfNull(writeVector);
         ArgumentException.ThrowIfNullOrEmpty(Replica);
 
-        var replicas = Decode(writeVector);
+        var replicas = Decode(writeVector, out var isLegacy);
         var removed = false;
         for (var index = replicas.Count - 1; index >= 0; index--)
         {
@@ -57,22 +59,27 @@ public static class StringEncodedWriteVector
             replicas.Add(Replica);
         }
 
-        writeVector = Encode(replicas);
+        writeVector = isLegacy && replicas.All(static replica => !replica.Contains(','))
+            ? EncodeLegacy(replicas)
+            : EncodeCurrent(replicas);
         return !removed;
     }
 
-    private static List<string> Decode(string writeVector)
+    private static List<string> Decode(string writeVector, out bool isLegacy)
     {
         if (writeVector.Length == 0)
         {
+            isLegacy = true;
             return [];
         }
 
         if (!writeVector.StartsWith(CurrentFormatPrefix, StringComparison.Ordinal))
         {
+            isLegacy = true;
             return DecodeLegacy(writeVector);
         }
 
+        isLegacy = false;
         var result = new List<string>();
         var position = CurrentFormatPrefix.Length;
         if (position == writeVector.Length)
@@ -120,7 +127,7 @@ public static class StringEncodedWriteVector
         return [.. tokens];
     }
 
-    private static string Encode(List<string> replicas)
+    private static string EncodeCurrent(List<string> replicas)
     {
         if (replicas.Count == 0)
         {
@@ -136,5 +143,15 @@ public static class StringEncodedWriteVector
         }
 
         return builder.ToString();
+    }
+
+    private static string EncodeLegacy(List<string> replicas)
+    {
+        if (replicas.Count == 0)
+        {
+            return string.Empty;
+        }
+
+        return string.Concat(",", string.Join(',', replicas));
     }
 }
