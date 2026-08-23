@@ -15,9 +15,12 @@ namespace Orleans.Reminders.EntityFrameworkCore.SqlServer.Data.Migrations
                 name: "Reminders",
                 columns: table => new
                 {
-                    ServiceId = table.Column<string>(type: "nvarchar(150)", maxLength: 150, nullable: false, collation: "Latin1_General_100_BIN2"),
-                    GrainId = table.Column<string>(type: "nvarchar(512)", maxLength: 512, nullable: false, collation: "Latin1_General_100_BIN2"),
-                    Name = table.Column<string>(type: "nvarchar(150)", maxLength: 150, nullable: false, collation: "Latin1_General_100_BIN2"),
+                    ServiceIdHash = table.Column<byte[]>(type: "binary(32)", maxLength: 32, nullable: false),
+                    GrainIdHash = table.Column<byte[]>(type: "binary(32)", maxLength: 32, nullable: false),
+                    ReminderNameHash = table.Column<byte[]>(type: "binary(32)", maxLength: 32, nullable: false),
+                    ServiceId = table.Column<string>(type: "nvarchar(max)", nullable: false, collation: "Latin1_General_100_BIN2"),
+                    GrainId = table.Column<string>(type: "nvarchar(max)", nullable: false, collation: "Latin1_General_100_BIN2"),
+                    Name = table.Column<string>(type: "nvarchar(max)", nullable: false, collation: "Latin1_General_100_BIN2"),
                     StartAt = table.Column<DateTimeOffset>(type: "datetimeoffset", nullable: false),
                     Period = table.Column<long>(type: "bigint", nullable: false),
                     GrainHash = table.Column<long>(type: "bigint", nullable: false),
@@ -25,20 +28,20 @@ namespace Orleans.Reminders.EntityFrameworkCore.SqlServer.Data.Migrations
                 },
                 constraints: table =>
                 {
-                    table.PrimaryKey("PK_Reminders", x => new { x.ServiceId, x.GrainId, x.Name })
+                    table.PrimaryKey("PK_Reminders", x => new { x.ServiceIdHash, x.GrainIdHash, x.ReminderNameHash })
                         .Annotation("SqlServer:Clustered", false);
                 });
 
             migrationBuilder.CreateIndex(
-                name: "IDX_Reminders_ServiceId_GrainHash",
+                name: "IDX_Reminders_ServiceIdHash_GrainHash",
                 table: "Reminders",
-                columns: new[] { "ServiceId", "GrainHash" })
+                columns: new[] { "ServiceIdHash", "GrainHash" })
                 .Annotation("SqlServer:Clustered", false);
 
             migrationBuilder.CreateIndex(
-                name: "IDX_Reminders_ServiceId_GrainId",
+                name: "IDX_Reminders_ServiceIdHash_GrainIdHash",
                 table: "Reminders",
-                columns: new[] { "ServiceId", "GrainId" })
+                columns: new[] { "ServiceIdHash", "GrainIdHash" })
                 .Annotation("SqlServer:Clustered", false);
         }
 

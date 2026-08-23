@@ -17,13 +17,16 @@ IF NOT EXISTS (
 )
 BEGIN
     CREATE TABLE [Activations] (
-        [ClusterId] nvarchar(150) COLLATE Latin1_General_100_BIN2 NOT NULL,
-        [GrainId] nvarchar(512) COLLATE Latin1_General_100_BIN2 NOT NULL,
-        [SiloAddress] nvarchar(256) COLLATE Latin1_General_100_BIN2 NOT NULL,
-        [ActivationId] nvarchar(64) COLLATE Latin1_General_100_BIN2 NOT NULL,
+        [ClusterIdHash] binary(32) NOT NULL,
+        [GrainIdHash] binary(32) NOT NULL,
+        [SiloAddressHash] binary(32) NOT NULL,
+        [ClusterId] nvarchar(max) COLLATE Latin1_General_100_BIN2 NOT NULL,
+        [GrainId] nvarchar(max) COLLATE Latin1_General_100_BIN2 NOT NULL,
+        [SiloAddress] nvarchar(max) COLLATE Latin1_General_100_BIN2 NOT NULL,
+        [ActivationId] nvarchar(max) COLLATE Latin1_General_100_BIN2 NOT NULL,
         [MembershipVersion] bigint NOT NULL,
         [ETag] rowversion NOT NULL,
-        CONSTRAINT [PK_Activations] PRIMARY KEY NONCLUSTERED ([ClusterId], [GrainId])
+        CONSTRAINT [PK_Activations] PRIMARY KEY NONCLUSTERED ([ClusterIdHash], [GrainIdHash])
     );
 END;
 GO
@@ -33,16 +36,7 @@ IF NOT EXISTS (
     WHERE [MigrationId] = N'20260811210058_InitialGrainDirectorySchema'
 )
 BEGIN
-    CREATE NONCLUSTERED INDEX [IDX_Activations_ClusterId_GrainId_ActivationId] ON [Activations] ([ClusterId], [GrainId], [ActivationId]);
-END;
-GO
-
-IF NOT EXISTS (
-    SELECT * FROM [__EFMigrationsHistory]
-    WHERE [MigrationId] = N'20260811210058_InitialGrainDirectorySchema'
-)
-BEGIN
-    CREATE NONCLUSTERED INDEX [IDX_Activations_ClusterId_SiloAddress] ON [Activations] ([ClusterId], [SiloAddress]);
+    CREATE NONCLUSTERED INDEX [IDX_Activations_ClusterIdHash_SiloAddressHash] ON [Activations] ([ClusterIdHash], [SiloAddressHash]);
 END;
 GO
 

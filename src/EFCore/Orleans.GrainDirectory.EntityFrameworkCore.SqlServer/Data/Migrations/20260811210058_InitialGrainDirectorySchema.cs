@@ -14,29 +14,26 @@ namespace Orleans.GrainDirectory.EntityFrameworkCore.SqlServer.Data.Migrations
                 name: "Activations",
                 columns: table => new
                 {
-                    ClusterId = table.Column<string>(type: "nvarchar(150)", maxLength: 150, nullable: false, collation: "Latin1_General_100_BIN2"),
-                    GrainId = table.Column<string>(type: "nvarchar(512)", maxLength: 512, nullable: false, collation: "Latin1_General_100_BIN2"),
-                    SiloAddress = table.Column<string>(type: "nvarchar(256)", maxLength: 256, nullable: false, collation: "Latin1_General_100_BIN2"),
-                    ActivationId = table.Column<string>(type: "nvarchar(64)", maxLength: 64, nullable: false, collation: "Latin1_General_100_BIN2"),
+                    ClusterIdHash = table.Column<byte[]>(type: "binary(32)", maxLength: 32, nullable: false),
+                    GrainIdHash = table.Column<byte[]>(type: "binary(32)", maxLength: 32, nullable: false),
+                    SiloAddressHash = table.Column<byte[]>(type: "binary(32)", maxLength: 32, nullable: false),
+                    ClusterId = table.Column<string>(type: "nvarchar(max)", nullable: false, collation: "Latin1_General_100_BIN2"),
+                    GrainId = table.Column<string>(type: "nvarchar(max)", nullable: false, collation: "Latin1_General_100_BIN2"),
+                    SiloAddress = table.Column<string>(type: "nvarchar(max)", nullable: false, collation: "Latin1_General_100_BIN2"),
+                    ActivationId = table.Column<string>(type: "nvarchar(max)", nullable: false, collation: "Latin1_General_100_BIN2"),
                     MembershipVersion = table.Column<long>(type: "bigint", nullable: false),
                     ETag = table.Column<byte[]>(type: "rowversion", rowVersion: true, nullable: false)
                 },
                 constraints: table =>
                 {
-                    table.PrimaryKey("PK_Activations", x => new { x.ClusterId, x.GrainId })
+                    table.PrimaryKey("PK_Activations", x => new { x.ClusterIdHash, x.GrainIdHash })
                         .Annotation("SqlServer:Clustered", false);
                 });
 
             migrationBuilder.CreateIndex(
-                name: "IDX_Activations_ClusterId_GrainId_ActivationId",
+                name: "IDX_Activations_ClusterIdHash_SiloAddressHash",
                 table: "Activations",
-                columns: new[] { "ClusterId", "GrainId", "ActivationId" })
-                .Annotation("SqlServer:Clustered", false);
-
-            migrationBuilder.CreateIndex(
-                name: "IDX_Activations_ClusterId_SiloAddress",
-                table: "Activations",
-                columns: new[] { "ClusterId", "SiloAddress" })
+                columns: new[] { "ClusterIdHash", "SiloAddressHash" })
                 .Annotation("SqlServer:Clustered", false);
         }
 

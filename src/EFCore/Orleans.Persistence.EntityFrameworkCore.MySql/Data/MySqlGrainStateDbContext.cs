@@ -17,10 +17,11 @@ public class MySqlGrainStateDbContext : GuidGrainStateDbContext<MySqlGrainStateD
 
         modelBuilder.Entity<GrainStateRecord<Guid>>(entity =>
         {
-            entity.Property(record => record.ServiceId).HasMaxLength(191).UseCollation(IdentifierCollation);
-            entity.Property(record => record.GrainType).HasMaxLength(191).UseCollation(IdentifierCollation);
-            entity.Property(record => record.StateType).HasMaxLength(191).UseCollation(IdentifierCollation);
-            entity.Property(record => record.GrainId).HasMaxLength(191).UseCollation(IdentifierCollation);
+            entity.Property(record => record.KeyHash).HasColumnType("binary(32)");
+            entity.Property(record => record.ServiceId).HasColumnType("longtext").UseCollation(IdentifierCollation);
+            entity.Property(record => record.GrainType).HasColumnType("longtext").UseCollation(IdentifierCollation);
+            entity.Property(record => record.StateType).HasColumnType("longtext").UseCollation(IdentifierCollation);
+            entity.Property(record => record.GrainId).HasColumnType("longtext").UseCollation(IdentifierCollation);
         });
     }
 }

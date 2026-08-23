@@ -7,6 +7,7 @@ using Orleans.EntityFrameworkCore.Tests.Infrastructure;
 using Orleans.Persistence.EntityFrameworkCore.Data;
 using Orleans.Runtime;
 using Orleans.Serialization;
+using Orleans.Serialization.Serializers;
 using Orleans.Storage;
 using UnitTests.Persistence;
 
@@ -49,7 +50,6 @@ public abstract class EFCorePersistenceProviderTestsBase<TDbContext, TETag, TPro
         });
         services.AddSingleton(_databaseFixture.Factory);
         services.AddSingleton(provider.CreateGrainStorageETagConverter());
-        services.AddSingleton(new ConstructorDependency("resolved-from-di"));
         services.AddSerializer();
         services.AddSingleton<IGrainStorageSerializer, OrleansGrainStorageSerializer>();
         services.AddKeyedSingleton<IGrainStorageSerializer>(
@@ -76,9 +76,9 @@ public abstract class EFCorePersistenceProviderTestsBase<TDbContext, TETag, TPro
     }
 
     [Fact, TestSuite(EFCoreTestCategories.Functional)]
-    public async Task ReadMissingState_UsesDependencyInjectionAndMarksRecordMissing()
+    public async Task ReadMissingState_UsesOrleansActivatorAndMarksRecordMissing()
     {
-        var state = new GrainState<DependencyConstructedState> { ETag = "stale-caller-value" };
+        var state = new GrainState<PersistenceState> { ETag = "stale-caller-value" };
 
         await Storage.ReadStateAsync(
             "missing-state",
@@ -87,7 +87,10 @@ public abstract class EFCorePersistenceProviderTestsBase<TDbContext, TETag, TPro
 
         Assert.False(state.RecordExists);
         Assert.Null(state.ETag);
-        Assert.Equal("resolved-from-di", Assert.IsType<DependencyConstructedState>(state.State).Value);
+        var reset = Assert.IsType<PersistenceState>(state.State);
+        Assert.Null(reset.Name);
+        Assert.Equal(0, reset.Revision);
+        Assert.Equal(0, reset.Checksum);
         Assert.Empty(await ReadAllRecords());
     }
 
@@ -171,16 +174,18 @@ public abstract class EFCorePersistenceProviderTestsBase<TDbContext, TETag, TPro
     }
 
     [Fact, TestSuite(EFCoreTestCategories.Functional)]
-    public async Task DuplicateInsertWithoutETag_FailsAndPreservesOriginal()
+    public async Task DuplicateInsertWithoutETag_ThrowsInconsistentStateAndPreservesOriginal()
     {
         var grainId = NewGrainId("duplicate");
         var original = CreateState("original");
         await Storage.WriteStateAsync("profile", grainId, original);
         var duplicate = CreateState("duplicate");
 
-        await Assert.ThrowsAsync<DbUpdateException>(
+        var exception = await Assert.ThrowsAsync<InconsistentStateException>(
             () => Storage.WriteStateAsync("profile", grainId, duplicate));
 
+        Assert.Equal(original.ETag, exception.StoredEtag);
+        Assert.Null(exception.CurrentEtag);
         Assert.False(duplicate.RecordExists);
         Assert.Null(duplicate.ETag);
         var read = await Read("profile", grainId);
@@ -345,7 +350,7 @@ public abstract class EFCorePersistenceProviderTestsBase<TDbContext, TETag, TPro
             Factory,
             new TProvider().CreateGrainStorageETagConverter(),
             services.GetRequiredService<IGrainStorageSerializer>(),
-            services);
+            services.GetRequiredService<IActivatorProvider>());
     }
 
     private async Task<GrainState<PersistenceState>> Read(string stateName, GrainId grainId) =>
@@ -460,18 +465,6 @@ public abstract class EFCorePersistenceProviderTestsBase<TDbContext, TETag, TPro
         public long Checksum { get; set; }
     }
 
-    public sealed class DependencyConstructedState
-    {
-        public DependencyConstructedState(ConstructorDependency dependency)
-        {
-            Value = dependency.Value;
-        }
-
-        public string Value { get; }
-    }
-
-    public sealed record ConstructorDependency(string Value);
-
     [GenerateSerializer]
     public sealed class PrivateSerializedState
     {
@@ -554,5 +547,141 @@ public abstract class EFCorePersistenceProviderTestsBase<TDbContext, TETag, TPro
         public void Dispose()
         {
         }
+    }
+
+    [Fact, TestSuite(EFCoreTestCategories.Functional)]
+    public async Task PR8654_Persistence_ClearStateAsync_MissingCallerLosesInsertRace_PreservesWinnerAndResetsCaller()
+    {
+        var grainId = NewGrainId("missing-clear-race");
+        var stale = CreateState("stale-observation");
+        await Storage.ReadStateAsync("profile", grainId, stale);
+        var staleStateBeforeClear = stale.State;
+        Assert.False(stale.RecordExists);
+        Assert.Null(stale.ETag);
+
+        var winner = CreateState("winner-after-missing-observation");
+        await Storage.WriteStateAsync("profile", grainId, winner);
+        var winnerBeforeClear = Assert.Single(await ReadAllRecords());
+        var winnerETag = winner.ETag;
+        var winnerData = Assert.IsType<byte[]>(winnerBeforeClear.Data).ToArray();
+
+        await Storage.ClearStateAsync("profile", grainId, stale);
+
+        Assert.False(stale.RecordExists);
+        Assert.Null(stale.ETag);
+        Assert.NotSame(staleStateBeforeClear, stale.State);
+        var reset = Assert.IsType<PersistenceState>(stale.State);
+        Assert.Null(reset.Name);
+        Assert.Equal(0, reset.Revision);
+        Assert.Equal(0, reset.Checksum);
+
+        var read = await Read("profile", grainId);
+        AssertState(winner, read);
+        Assert.Equal(winnerETag, read.ETag);
+        var winnerAfterClear = Assert.Single(await ReadAllRecords());
+        Assert.Equal(winnerBeforeClear.GrainId, winnerAfterClear.GrainId);
+        Assert.Equal(
+            new TProvider().CreateGrainStorageETagConverter().FromDbETag(winnerBeforeClear.ETag),
+            new TProvider().CreateGrainStorageETagConverter().FromDbETag(winnerAfterClear.ETag));
+        Assert.True(winnerData.AsSpan().SequenceEqual(Assert.IsType<byte[]>(winnerAfterClear.Data)));
+    }
+
+    [Fact, TestSuite(EFCoreTestCategories.Functional)]
+    public async Task PR8654_Persistence_ClearStateAsync_UnversionedCallerLosesInsertRace_PreservesWinnerAndResetsCaller()
+    {
+        var grainId = NewGrainId("unversioned-clear-race");
+        var stale = CreateState("unversioned-stale-caller");
+        stale.RecordExists = true;
+        stale.ETag = null;
+        var staleStateBeforeClear = stale.State;
+
+        var winner = CreateState("winner-after-unversioned-caller");
+        await Storage.WriteStateAsync("profile", grainId, winner);
+        var winnerBeforeClear = Assert.Single(await ReadAllRecords());
+        var winnerETag = winner.ETag;
+        var winnerData = Assert.IsType<byte[]>(winnerBeforeClear.Data).ToArray();
+
+        await Storage.ClearStateAsync("profile", grainId, stale);
+
+        Assert.False(stale.RecordExists);
+        Assert.Null(stale.ETag);
+        Assert.NotSame(staleStateBeforeClear, stale.State);
+        var reset = Assert.IsType<PersistenceState>(stale.State);
+        Assert.Null(reset.Name);
+        Assert.Equal(0, reset.Revision);
+        Assert.Equal(0, reset.Checksum);
+
+        var read = await Read("profile", grainId);
+        AssertState(winner, read);
+        Assert.Equal(winnerETag, read.ETag);
+        var winnerAfterClear = Assert.Single(await ReadAllRecords());
+        Assert.Equal(winnerBeforeClear.GrainId, winnerAfterClear.GrainId);
+        Assert.Equal(
+            new TProvider().CreateGrainStorageETagConverter().FromDbETag(winnerBeforeClear.ETag),
+            new TProvider().CreateGrainStorageETagConverter().FromDbETag(winnerAfterClear.ETag));
+        Assert.True(winnerData.AsSpan().SequenceEqual(Assert.IsType<byte[]>(winnerAfterClear.Data)));
+    }
+
+    [Fact, TestSuite(EFCoreTestCategories.Functional)]
+    public async Task PR8654_Persistence_WriteStateAsync_DuplicateInitialWriteThrowsInconsistentStateAndPreservesWinner()
+    {
+        var grainId = NewGrainId("duplicate-initial-write");
+        var winner = CreateState("duplicate-write-winner");
+        await Storage.WriteStateAsync("profile", grainId, winner);
+        var winnerBeforeDuplicate = Assert.Single(await ReadAllRecords());
+        var winnerData = Assert.IsType<byte[]>(winnerBeforeDuplicate.Data).ToArray();
+        var losingCaller = CreateState("duplicate-write-loser");
+        var losingState = losingCaller.State;
+
+        var exception = await Assert.ThrowsAsync<InconsistentStateException>(
+            () => Storage.WriteStateAsync("profile", grainId, losingCaller));
+
+        Assert.IsType<InconsistentStateException>(exception);
+        Assert.Equal(winner.ETag, exception.StoredEtag);
+        Assert.Null(exception.CurrentEtag);
+        Assert.False(losingCaller.RecordExists);
+        Assert.Null(losingCaller.ETag);
+        Assert.Same(losingState, losingCaller.State);
+        Assert.Equal("duplicate-write-loser", losingCaller.State?.Name);
+        Assert.Equal(101, losingCaller.State?.Revision);
+        Assert.Equal(8_002, losingCaller.State?.Checksum);
+
+        var read = await Read("profile", grainId);
+        AssertState(winner, read);
+        Assert.Equal(winner.ETag, read.ETag);
+        var winnerAfterDuplicate = Assert.Single(await ReadAllRecords());
+        Assert.Equal(
+            new TProvider().CreateGrainStorageETagConverter().FromDbETag(winnerBeforeDuplicate.ETag),
+            new TProvider().CreateGrainStorageETagConverter().FromDbETag(winnerAfterDuplicate.ETag));
+        Assert.True(winnerData.AsSpan().SequenceEqual(Assert.IsType<byte[]>(winnerAfterDuplicate.Data)));
+    }
+
+    [Fact, TestSuite(EFCoreTestCategories.Functional)]
+    public async Task PR8654_Persistence_LongGrainIdentifierRoundTripsPayloadAndRawKeyExactly()
+    {
+        var identifier = string.Concat(
+            Enumerable.Repeat("0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz", 10))[..600];
+        var grainId = GrainId.Create("persistence-matrix", identifier);
+        var state = CreateState("long-identifier-payload");
+        var services = _services ?? throw new InvalidOperationException("The services have not been initialized.");
+        var expectedData = services.GetRequiredService<IGrainStorageSerializer>()
+            .Serialize(state.State)
+            .ToArray();
+
+        await Storage.WriteStateAsync("profile", grainId, state);
+
+        Assert.Equal(600, identifier.Length);
+        Assert.Equal(identifier, grainId.Key.ToString());
+        AssertProviderETag(state.ETag);
+        var read = await Read("profile", grainId);
+        AssertState(state, read);
+        Assert.Equal(state.ETag, read.ETag);
+        var record = Assert.Single(await ReadAllRecords());
+        Assert.Equal(identifier, record.GrainId);
+        Assert.Equal(600, record.GrainId.Length);
+        Assert.True(expectedData.AsSpan().SequenceEqual(Assert.IsType<byte[]>(record.Data)));
+        Assert.Equal(
+            state.ETag,
+            new TProvider().CreateGrainStorageETagConverter().FromDbETag(record.ETag));
     }
 }

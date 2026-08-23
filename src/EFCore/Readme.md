@@ -11,6 +11,8 @@ This directory contains provider-neutral Entity Framework Core implementations a
 
 SQL Server uses database-generated `rowversion` ETags. MySQL and PostgreSQL use application-managed `Guid` ETags which are replaced on every insert and update. The ETag mappings must remain concurrency tokens when extending a context.
 
+Persistence, grain-directory, and reminder models store complete Orleans identifiers alongside fixed-width SHA-256 identity keys. Queries match the hash and then verify the full values ordinally, preserving long identifiers and trailing spaces across all supported databases.
+
 ## Migrations
 
 Database-specific projects own their migrations and idempotent SQL scripts. After changing a model, run these commands from that project directory:

@@ -18,20 +18,21 @@ namespace Orleans.Persistence.EntityFrameworkCore.MySql.Data.Migrations
                 name: "GrainState",
                 columns: table => new
                 {
-                    ServiceId = table.Column<string>(type: "varchar(191)", maxLength: 191, nullable: false, collation: "utf8mb4_bin")
+                    KeyHash = table.Column<byte[]>(type: "binary(32)", maxLength: 32, nullable: false),
+                    ServiceId = table.Column<string>(type: "longtext", nullable: false, collation: "utf8mb4_bin")
                         .Annotation("MySql:CharSet", "utf8mb4"),
-                    GrainType = table.Column<string>(type: "varchar(191)", maxLength: 191, nullable: false, collation: "utf8mb4_bin")
+                    GrainType = table.Column<string>(type: "longtext", nullable: false, collation: "utf8mb4_bin")
                         .Annotation("MySql:CharSet", "utf8mb4"),
-                    StateType = table.Column<string>(type: "varchar(191)", maxLength: 191, nullable: false, collation: "utf8mb4_bin")
+                    StateType = table.Column<string>(type: "longtext", nullable: false, collation: "utf8mb4_bin")
                         .Annotation("MySql:CharSet", "utf8mb4"),
-                    GrainId = table.Column<string>(type: "varchar(191)", maxLength: 191, nullable: false, collation: "utf8mb4_bin")
+                    GrainId = table.Column<string>(type: "longtext", nullable: false, collation: "utf8mb4_bin")
                         .Annotation("MySql:CharSet", "utf8mb4"),
                     Data = table.Column<byte[]>(type: "longblob", nullable: true),
                     ETag = table.Column<Guid>(type: "char(36)", nullable: false, collation: "ascii_general_ci")
                 },
                 constraints: table =>
                 {
-                    table.PrimaryKey("PK_GrainState", x => new { x.ServiceId, x.GrainType, x.StateType, x.GrainId });
+                    table.PrimaryKey("PK_GrainState", x => x.KeyHash);
                 })
                 .Annotation("MySql:CharSet", "utf8mb4");
         }

@@ -13,21 +13,21 @@ public class SqlServerReminderDbContext : ReminderDbContext<SqlServerReminderDbC
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
+        base.OnModelCreating(modelBuilder);
+
         modelBuilder.Entity<ReminderRecord<byte[]>>(c =>
         {
-            c.HasKey(p => new {p.ServiceId, p.GrainId, p.Name}).IsClustered(false).HasName("PK_Reminders");
-            c.Property(p => p.ServiceId).HasMaxLength(150).UseCollation(IdentifierCollation).IsRequired();
-            c.Property(p => p.GrainId).HasMaxLength(512).UseCollation(IdentifierCollation).IsRequired();
-            c.Property(p => p.Name).HasMaxLength(150).UseCollation(IdentifierCollation).IsRequired();
-            c.Property(p => p.StartAt).IsRequired();
-            c.Property(p => p.Period)
-                .HasConversion(period => period.Ticks, ticks => TimeSpan.FromTicks(ticks))
-                .IsRequired();
-            c.Property(p => p.GrainHash).IsRequired();
+            c.HasKey(p => new {p.ServiceIdHash, p.GrainIdHash, p.ReminderNameHash}).IsClustered(false).HasName("PK_Reminders");
+            c.Property(p => p.ServiceIdHash).HasColumnType("binary(32)");
+            c.Property(p => p.GrainIdHash).HasColumnType("binary(32)");
+            c.Property(p => p.ReminderNameHash).HasColumnType("binary(32)");
+            c.Property(p => p.ServiceId).HasColumnType("nvarchar(max)").UseCollation(IdentifierCollation);
+            c.Property(p => p.GrainId).HasColumnType("nvarchar(max)").UseCollation(IdentifierCollation);
+            c.Property(p => p.Name).HasColumnType("nvarchar(max)").UseCollation(IdentifierCollation);
             c.Property(p => p.ETag).IsRequired().IsRowVersion();
 
-            c.HasIndex(p => new {p.ServiceId, p.GrainHash}).IsClustered(false).HasDatabaseName("IDX_Reminders_ServiceId_GrainHash");
-            c.HasIndex(p => new {p.ServiceId, p.GrainId}).IsClustered(false).HasDatabaseName("IDX_Reminders_ServiceId_GrainId");
+            c.HasIndex(p => new {p.ServiceIdHash, p.GrainHash}).IsClustered(false).HasDatabaseName("IDX_Reminders_ServiceIdHash_GrainHash");
+            c.HasIndex(p => new {p.ServiceIdHash, p.GrainIdHash}).IsClustered(false).HasDatabaseName("IDX_Reminders_ServiceIdHash_GrainIdHash");
         });
     }
 }

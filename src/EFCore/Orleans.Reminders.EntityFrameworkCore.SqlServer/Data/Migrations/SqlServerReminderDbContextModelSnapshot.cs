@@ -24,20 +24,17 @@ namespace Orleans.Reminders.EntityFrameworkCore.SqlServer.Data.Migrations
 
             modelBuilder.Entity("Orleans.Reminders.EntityFrameworkCore.Data.ReminderRecord<byte[]>", b =>
                 {
-                    b.Property<string>("ServiceId")
-                        .HasMaxLength(150)
-                        .HasColumnType("nvarchar(150)")
-                        .UseCollation("Latin1_General_100_BIN2");
+                    b.Property<byte[]>("ServiceIdHash")
+                        .HasMaxLength(32)
+                        .HasColumnType("binary(32)");
 
-                    b.Property<string>("GrainId")
-                        .HasMaxLength(512)
-                        .HasColumnType("nvarchar(512)")
-                        .UseCollation("Latin1_General_100_BIN2");
+                    b.Property<byte[]>("GrainIdHash")
+                        .HasMaxLength(32)
+                        .HasColumnType("binary(32)");
 
-                    b.Property<string>("Name")
-                        .HasMaxLength(150)
-                        .HasColumnType("nvarchar(150)")
-                        .UseCollation("Latin1_General_100_BIN2");
+                    b.Property<byte[]>("ReminderNameHash")
+                        .HasMaxLength(32)
+                        .HasColumnType("binary(32)");
 
                     b.Property<byte[]>("ETag")
                         .IsConcurrencyToken()
@@ -48,26 +45,41 @@ namespace Orleans.Reminders.EntityFrameworkCore.SqlServer.Data.Migrations
                     b.Property<long>("GrainHash")
                         .HasColumnType("bigint");
 
+                    b.Property<string>("GrainId")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)")
+                        .UseCollation("Latin1_General_100_BIN2");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)")
+                        .UseCollation("Latin1_General_100_BIN2");
+
                     b.Property<long>("Period")
                         .HasColumnType("bigint");
+
+                    b.Property<string>("ServiceId")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)")
+                        .UseCollation("Latin1_General_100_BIN2");
 
                     b.Property<DateTimeOffset>("StartAt")
                         .HasColumnType("datetimeoffset");
 
-                    b.HasKey("ServiceId", "GrainId", "Name")
+                    b.HasKey("ServiceIdHash", "GrainIdHash", "ReminderNameHash")
                         .HasName("PK_Reminders");
 
-                    SqlServerKeyBuilderExtensions.IsClustered(b.HasKey("ServiceId", "GrainId", "Name"), false);
+                    SqlServerKeyBuilderExtensions.IsClustered(b.HasKey("ServiceIdHash", "GrainIdHash", "ReminderNameHash"), false);
 
-                    b.HasIndex("ServiceId", "GrainHash")
-                        .HasDatabaseName("IDX_Reminders_ServiceId_GrainHash");
+                    b.HasIndex("ServiceIdHash", "GrainHash")
+                        .HasDatabaseName("IDX_Reminders_ServiceIdHash_GrainHash");
 
-                    SqlServerIndexBuilderExtensions.IsClustered(b.HasIndex("ServiceId", "GrainHash"), false);
+                    SqlServerIndexBuilderExtensions.IsClustered(b.HasIndex("ServiceIdHash", "GrainHash"), false);
 
-                    b.HasIndex("ServiceId", "GrainId")
-                        .HasDatabaseName("IDX_Reminders_ServiceId_GrainId");
+                    b.HasIndex("ServiceIdHash", "GrainIdHash")
+                        .HasDatabaseName("IDX_Reminders_ServiceIdHash_GrainIdHash");
 
-                    SqlServerIndexBuilderExtensions.IsClustered(b.HasIndex("ServiceId", "GrainId"), false);
+                    SqlServerIndexBuilderExtensions.IsClustered(b.HasIndex("ServiceIdHash", "GrainIdHash"), false);
 
                     b.ToTable("Reminders");
                 });
