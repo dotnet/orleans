@@ -787,6 +787,37 @@ public class JournaledJobShardManagerTests
         }
     }
 
+    [Fact]
+    public async Task CreateShardAsync_CoalescesWithConcurrentCatalogDiscovery()
+    {
+        var storageProvider = new CountingJournalStorageProvider(
+            delayAppends: false,
+            delayFirstMetadataRead: true);
+        using var services = CreateServices(storageProvider);
+        var membership = new TestClusterMembershipService();
+        var silo = SiloAddress.New(new IPEndPoint(IPAddress.Loopback, 5082), 0);
+        membership.SetSiloStatus(silo, SiloStatus.Active);
+        var manager = CreateManager(services, membership, silo);
+        var start = DateTimeOffset.UtcNow.AddSeconds(-5);
+
+        var createTask = manager.CreateShardAsync(
+            start,
+            start.AddHours(1),
+            new Dictionary<string, string>(),
+            CancellationToken.None);
+        await storageProvider.FirstMetadataReadStarted;
+
+        var assigned = await manager.AssignJobShardsAsync(
+            DateTimeOffset.UtcNow.AddHours(1),
+            int.MaxValue,
+            CancellationToken.None);
+        storageProvider.AllowFirstMetadataRead();
+        var created = await createTask;
+
+        Assert.Same(created, Assert.Single(assigned));
+        await manager.UnregisterShardAsync(created, CancellationToken.None);
+    }
+
     private static ServiceProvider CreateServices(IJournalStorageProvider storageProvider)
     {
         var builder = new TestSiloBuilder();
@@ -822,12 +853,21 @@ public class JournaledJobShardManagerTests
         private bool _delayAppends;
         private TaskCompletionSource _appendStarted = new(TaskCreationOptions.RunContinuationsAsynchronously);
         private TaskCompletionSource _allowAppends = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        private readonly bool _delayFirstMetadataRead;
+        private readonly TaskCompletionSource _firstMetadataReadStarted = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        private readonly TaskCompletionSource _allowFirstMetadataRead = new(TaskCreationOptions.RunContinuationsAsynchronously);
         private int _appendCount;
+        private int _metadataReadCount;
         private int _pageReadCount;
 
-        public CountingJournalStorageProvider(bool delayAppends)
+        public CountingJournalStorageProvider(bool delayAppends, bool delayFirstMetadataRead = false)
         {
             _delayAppends = delayAppends;
+            _delayFirstMetadataRead = delayFirstMetadataRead;
+            if (!delayFirstMetadataRead)
+            {
+                _allowFirstMetadataRead.SetResult();
+            }
         }
 
         public Task AppendStarted
@@ -844,6 +884,8 @@ public class JournaledJobShardManagerTests
         public int AppendCount => Volatile.Read(ref _appendCount);
 
         public int PageReadCount => Volatile.Read(ref _pageReadCount);
+
+        public Task FirstMetadataReadStarted => _firstMetadataReadStarted.Task;
 
         public void BlockAppends()
         {
@@ -863,6 +905,8 @@ public class JournaledJobShardManagerTests
                 _allowAppends.TrySetResult();
             }
         }
+
+        public void AllowFirstMetadataRead() => _allowFirstMetadataRead.TrySetResult();
 
         public IJournalStorage CreateStorage(JournalId journalId) => new CountingJournalStorage(this, _inner.CreateStorage(journalId));
 
@@ -895,6 +939,19 @@ public class JournaledJobShardManagerTests
             }
         }
 
+        private async ValueTask<IJournalMetadata?> GetMetadataAsync(
+            IJournalStorage storage,
+            CancellationToken cancellationToken)
+        {
+            if (_delayFirstMetadataRead && Interlocked.Increment(ref _metadataReadCount) == 1)
+            {
+                _firstMetadataReadStarted.TrySetResult();
+                await _allowFirstMetadataRead.Task.WaitAsync(cancellationToken).ConfigureAwait(false);
+            }
+
+            return await storage.GetMetadataAsync(cancellationToken).ConfigureAwait(false);
+        }
+
         private sealed class CountingJournalStorage(CountingJournalStorageProvider owner, IJournalStorage inner) : IJournalStorage
         {
             public bool IsCompactionRequested => inner.IsCompactionRequested;
@@ -903,7 +960,7 @@ public class JournaledJobShardManagerTests
                 => inner.CreateIfNotExistsAsync(metadata, cancellationToken);
 
             public ValueTask<IJournalMetadata?> GetMetadataAsync(CancellationToken cancellationToken = default)
-                => inner.GetMetadataAsync(cancellationToken);
+                => owner.GetMetadataAsync(inner, cancellationToken);
 
             public ValueTask<IJournalMetadata?> UpdateMetadataAsync(
                 IReadOnlyDictionary<string, string>? set = null,
