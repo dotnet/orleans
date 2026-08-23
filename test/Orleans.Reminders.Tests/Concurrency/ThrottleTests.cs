@@ -117,6 +117,131 @@ public sealed class ReminderThrottleInstrumentsTests
     }
 }
 
+public sealed class AdmissionTransactionTests
+{
+    [TestSuite("BVT")]
+    [TestProvider("None")]
+    [Fact]
+    public async Task CancellationAfterRateReservation_RestoresToken()
+    {
+        var clock = new FakeTimeProvider(DateTimeOffset.UtcNow);
+        var config = new ReminderThrottleConfigBuilder()
+            .PermitsPerSecond(1, 1, ThrottleBlockMode.Wait)
+            .Build();
+        using var gate = new LocalRateReminderAdmissionGate(config.Rate!, clock);
+        using var cancellation = new CancellationTokenSource();
+        using var transaction = new ReminderAdmissionTransaction(cancellation.Token);
+        var budget = new ReminderAcquireBudget(clock, timeout: null);
+
+        var result = await gate.AcquireAsync(TestContext.Default(), budget, cancellation.Token);
+        Assert.True(result.AdmittedLease);
+        Assert.True(transaction.TryAdd(result.Reservation));
+        Assert.Equal(0, gate.AvailableTokens);
+
+        cancellation.Cancel();
+
+        Assert.Equal(1, gate.AvailableTokens);
+        Assert.Equal(
+            ReminderAdmissionCommitOutcome.Cancelled,
+            transaction.TryCommit(budget, cancellation.Token, out _));
+    }
+
+    [TestSuite("BVT")]
+    [TestProvider("None")]
+    [Fact]
+    public async Task MixedReservations_RollBackSemaphoreAndRateCapacity()
+    {
+        var clock = new FakeTimeProvider(DateTimeOffset.UtcNow);
+        var config = new ReminderThrottleConfigBuilder()
+            .MaxConcurrent(1, ThrottleBlockMode.Wait)
+            .PermitsPerSecond(1, 1, ThrottleBlockMode.Wait)
+            .Build();
+        using var concurrencyGate = new LocalConcurrencyReminderAdmissionGate(config.Concurrency!, clock);
+        using var rateGate = new LocalRateReminderAdmissionGate(config.Rate!, clock);
+        using var transaction = new ReminderAdmissionTransaction(CancellationToken.None);
+        var budget = new ReminderAcquireBudget(clock, timeout: null);
+
+        var concurrency = await concurrencyGate.AcquireAsync(TestContext.Default(), budget, CancellationToken.None);
+        var rate = await rateGate.AcquireAsync(TestContext.Default(), budget, CancellationToken.None);
+        Assert.True(transaction.TryAdd(concurrency.Reservation));
+        Assert.True(transaction.TryAdd(rate.Reservation));
+        Assert.Equal(0, concurrencyGate.AvailablePermits);
+        Assert.Equal(0, rateGate.AvailableTokens);
+
+        transaction.Rollback();
+
+        Assert.Equal(1, concurrencyGate.AvailablePermits);
+        Assert.Equal(1, rateGate.AvailableTokens);
+    }
+
+    [TestSuite("BVT")]
+    [TestProvider("None")]
+    [Fact]
+    public async Task FinalDeadlineCheck_RollsBackFastFinalGate()
+    {
+        var clock = new FakeTimeProvider(DateTimeOffset.UtcNow);
+        var config = new ReminderThrottleConfigBuilder()
+            .MaxConcurrent(1, ThrottleBlockMode.Wait)
+            .PermitsPerSecond(1, 1, ThrottleBlockMode.WaitUpTo(TimeSpan.FromMilliseconds(500)))
+            .Build();
+        using var concurrencyGate = new LocalConcurrencyReminderAdmissionGate(config.Concurrency!, clock);
+        using var rateGate = new LocalRateReminderAdmissionGate(config.Rate!, clock);
+        using var transaction = new ReminderAdmissionTransaction(CancellationToken.None);
+        var budget = new ReminderAcquireBudget(clock, TimeSpan.FromMilliseconds(500));
+
+        var concurrency = await concurrencyGate.AcquireAsync(TestContext.Default(), budget, CancellationToken.None);
+        Assert.True(transaction.TryAdd(concurrency.Reservation));
+        clock.Advance(TimeSpan.FromMilliseconds(500));
+        var rate = await rateGate.AcquireAsync(TestContext.Default(), budget, CancellationToken.None);
+        Assert.True(transaction.TryAdd(rate.Reservation));
+
+        Assert.Equal(
+            ReminderAdmissionCommitOutcome.TimedOut,
+            transaction.TryCommit(budget, CancellationToken.None, out _));
+        Assert.Equal(1, concurrencyGate.AvailablePermits);
+        Assert.Equal(1, rateGate.AvailableTokens);
+    }
+
+    [TestSuite("BVT")]
+    [TestProvider("None")]
+    [Fact]
+    public async Task RateRollback_DoesNotMintFractionalCapacity()
+    {
+        var clock = new FakeTimeProvider(DateTimeOffset.UtcNow);
+        var config = new ReminderThrottleConfigBuilder()
+            .PermitsPerSecond(1, 2, ThrottleBlockMode.SkipImmediately)
+            .Build();
+        using var gate = new LocalRateReminderAdmissionGate(config.Rate!, clock);
+        var budget = new ReminderAcquireBudget(clock, timeout: null);
+
+        using var transactionA = new ReminderAdmissionTransaction(CancellationToken.None);
+        var reservationA = await gate.AcquireAsync(TestContext.Default(), budget, CancellationToken.None);
+        Assert.True(transactionA.TryAdd(reservationA.Reservation));
+
+        clock.Advance(TimeSpan.FromMilliseconds(500));
+        using var transactionB = new ReminderAdmissionTransaction(CancellationToken.None);
+        var reservationB = await gate.AcquireAsync(TestContext.Default(), budget, CancellationToken.None);
+        Assert.True(transactionB.TryAdd(reservationB.Reservation));
+        Assert.Equal(
+            ReminderAdmissionCommitOutcome.Committed,
+            transactionB.TryCommit(budget, CancellationToken.None, out _));
+
+        transactionA.Rollback();
+
+        using var transactionC = new ReminderAdmissionTransaction(CancellationToken.None);
+        var reservationC = await gate.AcquireAsync(TestContext.Default(), budget, CancellationToken.None);
+        Assert.True(transactionC.TryAdd(reservationC.Reservation));
+        Assert.Equal(
+            ReminderAdmissionCommitOutcome.Committed,
+            transactionC.TryCommit(budget, CancellationToken.None, out _));
+
+        clock.Advance(TimeSpan.FromMilliseconds(500));
+        var next = await gate.AcquireAsync(TestContext.Default(), budget, CancellationToken.None);
+        Assert.False(next.AdmittedLease);
+        Assert.Equal(ReminderSkipReason.LocalLimiterFull, next.SkipReason);
+    }
+}
+
 public sealed class ThrottleConfigTests
 {
     [TestSuite("BVT")]
@@ -548,19 +673,38 @@ internal sealed class TestThrottle : IAsyncDisposable
 {
     private readonly LocalReminderDeliveryThrottle _inner;
 
-    public TestThrottle(ThrottleConfig config, TimeProvider? timeProvider = null, Orleans.Runtime.Messaging.IOverloadDetector? overloadDetector = null)
+    public TestThrottle(
+        ThrottleConfig config,
+        TimeProvider? timeProvider = null,
+        Orleans.Runtime.Messaging.IOverloadDetector? overloadDetector = null,
+        bool start = true)
     {
-        _inner = new LocalReminderDeliveryThrottle(config, timeProvider ?? TimeProvider.System, tierName: "test", overloadDetector);
+        _inner = new LocalReminderDeliveryThrottle(
+            config,
+            timeProvider ?? TimeProvider.System,
+            tierName: "test",
+            overloadDetector,
+            startImmediately: false);
+        if (start)
+        {
+            _inner.Start();
+        }
     }
 
     public int AvailableConcurrencyPermits => _inner.AvailableConcurrencyPermits;
+    public int AvailableRateTokens => _inner.AvailableRateTokens;
     public int SlowStartCurrentCapacity => _inner.SlowStartCurrentCapacity;
+
+    public void Start() => _inner.Start();
+
+    public void Stop() => _inner.Stop();
 
     public ValueTask<ReminderDeliveryLease> AcquireAsync(ReminderDeliveryContext ctx, CancellationToken ct)
         => _inner.AcquireAsync(ctx, ct);
 
     public ValueTask DisposeAsync()
     {
+        _inner.Stop();
         _inner.Dispose();
         return ValueTask.CompletedTask;
     }

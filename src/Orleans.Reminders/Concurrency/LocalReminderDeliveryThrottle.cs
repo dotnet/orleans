@@ -6,6 +6,13 @@ using Orleans.Runtime.Messaging;
 
 namespace Orleans.Reminders.Concurrency;
 
+internal interface IReminderDeliveryThrottleLifecycle
+{
+    void Start();
+
+    void Stop();
+}
+
 /// <summary>
 /// An in-process <see cref="IReminderDeliveryThrottle"/> implementation that bounds reminder
 /// dispatch through a composed pipeline of admission gates.
@@ -16,10 +23,13 @@ namespace Orleans.Reminders.Concurrency;
 /// Earlier gates run first so that broad protection (for example, overload) is honored before
 /// local permits or tokens are consumed.</para>
 /// <para>Any <see cref="ThrottleBlockMode.WaitUpTo"/> used by the composed gates contributes to a
-/// single shared end-to-end deadline. A later gate never restarts the timeout budget after an
-/// earlier gate has already spent part of it.</para>
+/// single shared end-to-end deadline measured from the start of the acquire. The shortest configured
+/// timeout bounds every gate and the final admission commit.</para>
+/// <para>Capacity acquired from individual gates remains a reversible reservation until every gate
+/// admits and the shared deadline and cancellation token are checked. Cancellation, timeout, or a
+/// later gate rejection rolls back all reservations, including rate tokens.</para>
 /// </remarks>
-public sealed class LocalReminderDeliveryThrottle : IReminderDeliveryThrottle, IDisposable
+public sealed class LocalReminderDeliveryThrottle : IReminderDeliveryThrottle, IReminderDeliveryThrottleLifecycle, IDisposable
 {
     private readonly TimeProvider _timeProvider;
     private readonly string _tierName;
@@ -27,6 +37,7 @@ public sealed class LocalReminderDeliveryThrottle : IReminderDeliveryThrottle, I
     private readonly LocalConcurrencyReminderAdmissionGate? _concurrencyGate;
     private readonly LocalRateReminderAdmissionGate? _rateGate;
     private readonly SlowStartReminderAdmissionGate? _slowStartGate;
+    private readonly TimeSpan? _acquireTimeout;
 
     /// <summary>
     /// Initializes a new instance with the supplied configuration. Used by tests; production
@@ -37,6 +48,16 @@ public sealed class LocalReminderDeliveryThrottle : IReminderDeliveryThrottle, I
     /// <param name="tierName">A name for this tier reported in observability output.</param>
     /// <param name="overloadDetector">Optional silo overload detector. Required when <see cref="ThrottleConfig.Overload"/> is configured.</param>
     public LocalReminderDeliveryThrottle(ThrottleConfig config, TimeProvider timeProvider, string tierName, IOverloadDetector? overloadDetector = null)
+        : this(config, timeProvider, tierName, overloadDetector, startImmediately: true)
+    {
+    }
+
+    internal LocalReminderDeliveryThrottle(
+        ThrottleConfig config,
+        TimeProvider timeProvider,
+        string tierName,
+        IOverloadDetector? overloadDetector,
+        bool startImmediately)
     {
         ArgumentNullException.ThrowIfNull(config);
         ArgumentNullException.ThrowIfNull(timeProvider);
@@ -78,6 +99,11 @@ public sealed class LocalReminderDeliveryThrottle : IReminderDeliveryThrottle, I
         }
 
         _gates = gates.ToArray();
+        _acquireTimeout = GetAcquireTimeout(_gates);
+        if (startImmediately)
+        {
+            Start();
+        }
     }
 
     /// <summary>The tier name reported on leases produced by this throttle.</summary>
@@ -94,60 +120,68 @@ public sealed class LocalReminderDeliveryThrottle : IReminderDeliveryThrottle, I
     /// <summary>The current slow-start capacity (ramps up over time toward <c>MaxConcurrent</c>).</summary>
     public int SlowStartCurrentCapacity => _slowStartGate?.CurrentCapacity ?? int.MaxValue;
 
+    void IReminderDeliveryThrottleLifecycle.Start() => _slowStartGate?.Start();
+
+    void IReminderDeliveryThrottleLifecycle.Stop() => _slowStartGate?.Stop();
+
+    internal void Start() => _slowStartGate?.Start();
+
+    internal void Stop() => _slowStartGate?.Stop();
+
     /// <inheritdoc />
     public async ValueTask<ReminderDeliveryLease> AcquireAsync(ReminderDeliveryContext context, CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
 
-        var budget = new ReminderAcquireBudget(_timeProvider);
-        List<Action>? releaseActions = null;
+        var budget = new ReminderAcquireBudget(_timeProvider, _acquireTimeout);
+        using var transaction = new ReminderAdmissionTransaction(cancellationToken);
 
         foreach (var gate in _gates)
         {
-            GateAcquireResult result;
-            try
+            if (budget.IsTimedOut)
             {
-                result = await gate.AcquireAsync(context, budget, cancellationToken).ConfigureAwait(false);
-            }
-            catch
-            {
-                ReleaseAcquired(releaseActions);
-                throw;
+                transaction.Rollback();
+                return ReminderDeliveryLease.Skipped(_tierName, budget.Elapsed, ReminderSkipReason.AcquireTimeout);
             }
 
-            if (cancellationToken.IsCancellationRequested)
+            cancellationToken.ThrowIfCancellationRequested();
+            var result = await gate.AcquireAsync(context, budget, cancellationToken).ConfigureAwait(false);
+            if (!transaction.TryAdd(result.Reservation))
             {
-                try
-                {
-                    result.ReleaseAction?.Invoke();
-                }
-                finally
-                {
-                    ReleaseAcquired(releaseActions);
-                }
-
                 cancellationToken.ThrowIfCancellationRequested();
+                return ReminderDeliveryLease.Skipped(_tierName, budget.Elapsed, ReminderSkipReason.AcquireTimeout);
             }
 
             if (!result.AdmittedLease)
             {
-                ReleaseAcquired(releaseActions);
+                cancellationToken.ThrowIfCancellationRequested();
+                transaction.Rollback();
                 return ReminderDeliveryLease.Skipped(_tierName, budget.Elapsed, result.SkipReason);
             }
 
-            if (result.ReleaseAction is not null)
+            if (budget.IsTimedOut)
             {
-                releaseActions ??= new List<Action>(capacity: 2);
-                releaseActions.Add(result.ReleaseAction);
+                transaction.Rollback();
+                return ReminderDeliveryLease.Skipped(_tierName, budget.Elapsed, ReminderSkipReason.AcquireTimeout);
             }
         }
 
-        return ReminderDeliveryLease.Admitted(_tierName, budget.Elapsed, CreateReleaseAction(releaseActions));
+        switch (transaction.TryCommit(budget, cancellationToken, out var releaseActions))
+        {
+            case ReminderAdmissionCommitOutcome.Cancelled:
+                cancellationToken.ThrowIfCancellationRequested();
+                throw new OperationCanceledException(cancellationToken);
+            case ReminderAdmissionCommitOutcome.TimedOut:
+                return ReminderDeliveryLease.Skipped(_tierName, budget.Elapsed, ReminderSkipReason.AcquireTimeout);
+            default:
+                return ReminderDeliveryLease.Admitted(_tierName, budget.Elapsed, CreateReleaseAction(releaseActions));
+        }
     }
 
     /// <inheritdoc />
     public void Dispose()
     {
+        Stop();
         for (var i = _gates.Length - 1; i >= 0; i--)
         {
             _gates[i].Dispose();
@@ -175,5 +209,20 @@ public sealed class LocalReminderDeliveryThrottle : IReminderDeliveryThrottle, I
         {
             releaseActions[i]();
         }
+    }
+
+    private static TimeSpan? GetAcquireTimeout(IReminderAdmissionGate[] gates)
+    {
+        TimeSpan? result = null;
+        foreach (var gate in gates)
+        {
+            if (gate.BlockMode is ThrottleBlockMode.WaitWithTimeout waitWithTimeout
+                && (result is null || waitWithTimeout.Timeout < result))
+            {
+                result = waitWithTimeout.Timeout;
+            }
+        }
+
+        return result;
     }
 }

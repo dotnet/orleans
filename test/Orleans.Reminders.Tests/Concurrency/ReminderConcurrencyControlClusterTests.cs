@@ -727,6 +727,53 @@ public sealed class ReminderConcurrencyControlClusterTests
         }
     }
 
+    [Fact]
+    public async Task SlowStart_RampBeginsAfterInitialReminderLoad()
+    {
+        var observer = ReminderDiagnosticObserver.Create();
+        using var _o = observer;
+        var reminderTable = new BlockingInitialReadReminderTable();
+        var builder = new InProcessTestClusterBuilder(initialSilosCount: 1);
+        var clock = builder.AddReminderTestClock(minimumReminderPeriod: TimeSpan.FromMilliseconds(100));
+        builder.ConfigureSilo((_, sb) =>
+        {
+            sb.AddMemoryGrainStorageAsDefault()
+                .AddReminders()
+                .AddReminderConcurrencyControl(c => c
+                    .PerSilo(t => t
+                        .MaxConcurrent(4, ThrottleBlockMode.Wait)
+                        .SlowStart(
+                            initialCapacity: 1,
+                            interval: TimeSpan.FromSeconds(1),
+                            onCapacityExceeded: ThrottleBlockMode.SkipImmediately)));
+            sb.Services.RemoveAll<IReminderTable>();
+            sb.Services.AddSingleton<IReminderTable>(reminderTable);
+        });
+
+        await using var cluster = builder.Build();
+        using var cts = new CancellationTokenSource(TimeSpan.FromMinutes(2));
+        var deployTask = cluster.DeployAsync();
+        await reminderTable.WaitForInitialReadAsync(cts.Token);
+
+        await clock.AdvanceAsync(TimeSpan.FromMinutes(1), cts.Token);
+
+        reminderTable.ReleaseInitialRead();
+        await deployTask.WaitAsync(cts.Token);
+        var silo = Assert.Single(cluster.Silos);
+        await observer.WaitForReminderServiceStartedAsync(cts.Token, silo.SiloAddress);
+        var throttle = Assert.IsType<LocalReminderDeliveryThrottle>(
+            cluster.GetSiloServiceProvider(silo.SiloAddress).GetRequiredService<IReminderDeliveryThrottle>());
+        Assert.Equal(1, throttle.SlowStartCurrentCapacity);
+
+        await clock.AdvanceAsync(TimeSpan.FromSeconds(1), cts.Token);
+        for (var i = 0; i < 100 && throttle.SlowStartCurrentCapacity != 2; i++)
+        {
+            await Task.Delay(10, cts.Token);
+        }
+
+        Assert.Equal(2, throttle.SlowStartCurrentCapacity);
+    }
+
     private static string FlattenMessages(Exception ex)
     {
         var sb = new System.Text.StringBuilder();
@@ -803,4 +850,35 @@ internal sealed class DelayedSkipReminderDeliveryThrottle : IReminderDeliveryThr
         await _release.Task;
         return ReminderDeliveryLease.Skipped("test", TimeSpan.Zero, ReminderSkipReason.LocalLimiterFull);
     }
+}
+
+internal sealed class BlockingInitialReadReminderTable : IReminderTable
+{
+    private readonly TaskCompletionSource _initialReadStarted = new(TaskCreationOptions.RunContinuationsAsynchronously);
+    private readonly TaskCompletionSource _releaseInitialRead = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+    public Task WaitForInitialReadAsync(CancellationToken cancellationToken) => _initialReadStarted.Task.WaitAsync(cancellationToken);
+
+    public void ReleaseInitialRead() => _releaseInitialRead.TrySetResult();
+
+    public Task StartAsync(CancellationToken cancellationToken = default) => Task.CompletedTask;
+
+    public Task StopAsync(CancellationToken cancellationToken = default) => Task.CompletedTask;
+
+    public async Task<ReminderTableData> ReadRows(uint begin, uint end)
+    {
+        _initialReadStarted.TrySetResult();
+        await _releaseInitialRead.Task;
+        return new ReminderTableData();
+    }
+
+    public Task<ReminderTableData> ReadRows(GrainId grainId) => Task.FromResult(new ReminderTableData());
+
+    public Task<ReminderEntry?> ReadRow(GrainId grainId, string reminderName) => Task.FromResult<ReminderEntry?>(null);
+
+    public Task<string?> UpsertRow(ReminderEntry entry) => Task.FromResult<string?>(Guid.NewGuid().ToString());
+
+    public Task<bool> RemoveRow(GrainId grainId, string reminderName, string eTag) => Task.FromResult(false);
+
+    public Task TestOnlyClearTable() => Task.CompletedTask;
 }

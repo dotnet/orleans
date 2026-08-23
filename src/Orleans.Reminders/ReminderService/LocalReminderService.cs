@@ -144,19 +144,9 @@ namespace Orleans.Runtime.ReminderService
 
             try
             {
-                lock (_deliveryLock)
+                if (Status == GrainServiceStatus.Started)
                 {
-                    if (_isDeliveringReminders)
-                    {
-                        return;
-                    }
-
-                    _isDeliveringReminders = true;
-                }
-
-                foreach (var reminderData in localReminders.Values)
-                {
-                    reminderData.TryStart();
+                    StartDeliveringReminders();
                 }
 
                 await base.Start();
@@ -208,7 +198,14 @@ namespace Orleans.Runtime.ReminderService
                 await deliveryQuiescedTask;
             }
 
-            await Task.WhenAll(tasks);
+            try
+            {
+                await Task.WhenAll(tasks);
+            }
+            finally
+            {
+                (_deliveryThrottle as IReminderDeliveryThrottleLifecycle)?.Stop();
+            }
         }
 
         private async Task StopReminderService()
@@ -608,6 +605,7 @@ namespace Orleans.Runtime.ReminderService
                 await this.ReadAndUpdateReminders();
 
                 Status = GrainServiceStatus.Started;
+                StartDeliveringReminders();
                 startedTask.TrySetResult(true);
                 ReminderEvents.EmitReminderServiceStarted(Silo);
             }
@@ -915,6 +913,26 @@ namespace Orleans.Runtime.ReminderService
 
                 ++_activeReminderDeliveries;
                 return true;
+            }
+        }
+
+        private void StartDeliveringReminders()
+        {
+            (_deliveryThrottle as IReminderDeliveryThrottleLifecycle)?.Start();
+
+            lock (_deliveryLock)
+            {
+                if (_isDeliveringReminders)
+                {
+                    return;
+                }
+
+                _isDeliveringReminders = true;
+            }
+
+            foreach (var reminderData in localReminders.Values)
+            {
+                reminderData.TryStart();
             }
         }
 

@@ -27,11 +27,14 @@ public interface IReminderDeliveryThrottle
     /// <param name="context">Information about the reminder tick being delivered.</param>
     /// <param name="cancellationToken">
     /// Cancelled when the silo is shutting down or when the reminder's schedule has changed.
-    /// A cancellation while waiting must not consume a permit and should return promptly.
+    /// A cancellation before admission commits must restore every reserved permit or rate token
+    /// and should return promptly.
     /// </param>
     /// <returns>
     /// A <see cref="ReminderDeliveryLease"/> whose <see cref="ReminderDeliveryLease.Outcome"/>
-    /// indicates whether the caller may dispatch the tick.
+    /// indicates whether the caller may dispatch the tick. Returning an admitted lease commits
+    /// admission ownership: rate capacity is consumed and lease-scoped capacity remains held
+    /// until the lease is disposed.
     /// </returns>
     ValueTask<ReminderDeliveryLease> AcquireAsync(ReminderDeliveryContext context, CancellationToken cancellationToken);
 }

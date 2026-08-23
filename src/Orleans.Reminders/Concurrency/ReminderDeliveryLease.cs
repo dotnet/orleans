@@ -9,6 +9,11 @@ namespace Orleans.Reminders.Concurrency;
 /// regardless of dispatch success or failure. A lease whose outcome is
 /// <see cref="ReminderAdmissionOutcome.Skipped"/> may be disposed but does so as a no-op.
 /// </summary>
+/// <remarks>
+/// Returning an admitted lease is the admission commit point. Reversible capacity reserved while
+/// composing gates is restored if cancellation, a schedule update, a gate rejection, or the shared
+/// deadline wins before this point. Lease-scoped capacity is released by <see cref="Dispose"/>.
+/// </remarks>
 public abstract class ReminderDeliveryLease : IDisposable
 {
     /// <summary>

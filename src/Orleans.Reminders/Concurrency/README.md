@@ -39,9 +39,9 @@ A configuration that also wants to honor silo overload and ramp up gradually aft
         // the pressure to clear, then skip the tick if it still hasn't.
         .RespectOverload(ThrottleBlockMode.WaitUpTo(TimeSpan.FromSeconds(30)))
 
-        // After silo startup, only admit 10 dispatches concurrently for the first interval,
-        // doubling every 10 seconds until reaching MaxConcurrent. During ramp-up, callers
-        // that exceed the dynamic capacity wait for it to open.
+        // After the reminder service completes its initial storage load, only admit 10
+        // dispatches concurrently for the first interval, doubling every 10 seconds until
+        // reaching MaxConcurrent. During ramp-up, callers that exceed the dynamic capacity wait.
         .SlowStart(initialCapacity: 10, interval: TimeSpan.FromSeconds(10), onCapacityExceeded: ThrottleBlockMode.Wait)));
 ```
 
@@ -64,7 +64,7 @@ Turn it on when:
 
 - **`MaxConcurrent(N)`** caps the number of in-flight `ReceiveReminder` calls. This is the right knob when each tick holds an expensive resource (a database connection, a downstream HTTP call) and you know how many of those resources are available.
 - **`PermitsPerSecond(R)`** caps the sustained dispatch rate. This is the right knob when the downstream complaint is "too many requests per unit time" (a rate-limited API, a database that handles concurrency well but writes per second poorly).
-- **Both at once** is allowed and composes by AND: a dispatch must obtain both a concurrency permit and a rate token to be admitted. Use this when both constraints apply.
+- **Both at once** is allowed and composes by AND: a dispatch must reserve both a concurrency permit and a rate token to be admitted. Reservations roll back together until admission commits.
 
 You must specify at least one of `MaxConcurrent`, `PermitsPerSecond`, or `RespectOverload`. A configuration with none of them is rejected at startup rather than silently turning into a no-op.
 
@@ -76,11 +76,11 @@ Choose the limiter behavior by passing one of these block modes when you configu
 
 | Block mode | Behavior when no permit is available | Trade-off |
 |---|---|---|
-| `ThrottleBlockMode.Wait` | Wait indefinitely for a permit unless an earlier composed gate established a shared `WaitUpTo` deadline. | When all gates use `Wait`, no ticks are dropped, but tardiness is unbounded. The grain may see a tick arrive much later than scheduled. |
+| `ThrottleBlockMode.Wait` | Wait for a permit. The shortest configured `WaitUpTo` on any composed gate bounds the complete acquire; without one, waiting is indefinite. | When all gates use `Wait`, no ticks are dropped, but tardiness is unbounded. The grain may see a tick arrive much later than scheduled. |
 | `ThrottleBlockMode.WaitUpTo(timeout)` | Wait up to `timeout`, then skip the tick if no permit became available. | Bounded tardiness and skip rate. The skip reason identifies the gate: `AcquireTimeout`, `SiloOverloaded`, or `SlowStartLimited`. |
 | `ThrottleBlockMode.SkipImmediately` | Skip the tick if no permit is available right now. | Maximum downstream protection; minimum delivery guarantee. Best when "missing a tick" is materially better than "exceeding the limit". |
 
-A `WaitUpTo(500ms)` gate establishes a deadline which bounds that gate and every later waiting gate. Earlier gates configured with `Wait` can wait indefinitely before that deadline is established.
+The shortest configured `WaitUpTo` value establishes one deadline from the beginning of admission. It bounds every gate and the final commit. A cancellation, reminder schedule update, rejection, or timeout before commit restores every reservation, including rate tokens.
 
 **Reasoning prompts:**
 
@@ -109,9 +109,9 @@ The overload check runs **before** any concurrency permit or rate token is consu
 
 ### 5. Slow-start ramp-up after silo restart? (optional)
 
-After a silo starts, thousands of reminders can become due "now". Even with a configured `MaxConcurrent`, the cold-start phase is where the thundering herd bites hardest — caches are cold, connection pools are empty, JITs aren't warm, and the thread pool is still growing.
+After the reminder service completes its initial storage load, thousands of reminders can become due "now". Even with a configured `MaxConcurrent`, this first-delivery phase is where the thundering herd bites hardest — caches are cold, connection pools are empty, JITs aren't warm, and the thread pool is still growing.
 
-Slow-start mirrors the equivalent behavior in `DurableJobsOptions` (`SlowStartInitialConcurrency`, `SlowStartInterval`). The configured `MaxConcurrent` becomes a *target*; capacity starts low and doubles every `interval` until it reaches the target.
+Slow-start mirrors the equivalent behavior in `DurableJobsOptions` (`SlowStartInitialConcurrency`, `SlowStartInterval`). The configured `MaxConcurrent` becomes a *target*; capacity starts low when reminder delivery becomes ready and doubles every `interval` until it reaches the target. Stopping and restarting reminder delivery resets the ramp.
 
 ```csharp
 .MaxConcurrent(100, ThrottleBlockMode.Wait)
