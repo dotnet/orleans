@@ -1,4 +1,5 @@
 using System.Buffers;
+using System.Collections.Concurrent;
 using System.Net;
 using Amazon;
 using Amazon.Runtime;
@@ -298,6 +299,109 @@ public sealed class S3JournalStorageTests : IAsyncLifetime
             Assert.Equal("etag-2", requests[2].IfMatch);
             Assert.Equal(19, requests[2].WriteOffsetBytes);
             Assert.False(requests[2].UseChunkEncoding);
+        }
+
+        [Fact]
+        public async Task AppendAsync_TwoStorageInstancesWithSameETag_OneConditionalWriteWins()
+        {
+            var client = Substitute.For<IAmazonS3>();
+            var winnerCommitted = false;
+            var appendRequests = new ConcurrentBag<PutObjectRequest>();
+            var bothAppendsEntered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            var winnerCompleted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            var appendCalls = 0;
+            client.GetObjectAsync(Arg.Any<GetObjectRequest>(), Arg.Any<CancellationToken>())
+                .Returns(_ => Task.FromResult(CreateWalResponse()));
+            client.GetObjectMetadataAsync(Arg.Any<GetObjectMetadataRequest>(), Arg.Any<CancellationToken>())
+                .Returns(_ => Task.FromResult(CreateWalProperties(
+                    winnerCommitted ? "etag-2" : "etag-1",
+                    winnerCommitted ? 17 : 16,
+                    winnerCommitted ? 2 : 1)));
+            client.PutObjectAsync(
+                    Arg.Do<PutObjectRequest>(appendRequests.Add),
+                    Arg.Any<CancellationToken>())
+                .Returns(async _ =>
+                {
+                    var call = Interlocked.Increment(ref appendCalls);
+                    if (call == 2)
+                    {
+                        bothAppendsEntered.SetResult();
+                    }
+
+                    await bothAppendsEntered.Task;
+                    if (call == 1)
+                    {
+                        winnerCommitted = true;
+                        winnerCompleted.SetResult();
+                        return new PutObjectResponse { ETag = "etag-2" };
+                    }
+
+                    await winnerCompleted.Task;
+                    throw CreateS3Exception(HttpStatusCode.PreconditionFailed);
+                });
+            var first = CreateStorage(client, new S3JournalStorageOptions { BucketName = BucketName });
+            var second = CreateStorage(client, new S3JournalStorageOptions { BucketName = BucketName });
+            await first.ReadAsync(new CapturingJournalStorageConsumer(), CancellationToken.None);
+            await second.ReadAsync(new CapturingJournalStorageConsumer(), CancellationToken.None);
+
+            var errors = await Task.WhenAll(
+                CaptureExceptionAsync(() => first.AppendAsync(new ReadOnlySequence<byte>([1]), CancellationToken.None)),
+                CaptureExceptionAsync(() => second.AppendAsync(new ReadOnlySequence<byte>([2]), CancellationToken.None)));
+
+            Assert.Single(errors, static error => error is null);
+            Assert.Single(errors, static error => error is InconsistentStateException);
+            Assert.Equal(2, appendRequests.Count);
+            Assert.All(appendRequests, request =>
+            {
+                Assert.Equal("etag-1", request.IfMatch);
+                Assert.Equal(16, request.WriteOffsetBytes);
+            });
+
+            static GetObjectResponse CreateWalResponse()
+            {
+                var response = new GetObjectResponse
+                {
+                    ETag = "etag-1",
+                    ContentLength = 16,
+                    PartsCount = 1,
+                    ResponseStream = new MemoryStream(new byte[16], writable: false),
+                };
+                AddWalMetadata(response.Metadata);
+                return response;
+            }
+
+            static GetObjectMetadataResponse CreateWalProperties(string eTag, long contentLength, int partsCount)
+            {
+                var response = new GetObjectMetadataResponse
+                {
+                    ETag = eTag,
+                    ContentLength = contentLength,
+                    PartsCount = partsCount,
+                    LastModified = DateTime.UtcNow,
+                };
+                AddWalMetadata(response.Metadata);
+                return response;
+            }
+
+            static void AddWalMetadata(MetadataCollection metadata)
+            {
+                metadata.Add(S3JournalStorage.WalGenerationMetadataKey, "generation");
+                metadata.Add(S3JournalStorage.MetadataVersionMetadataKey, "version");
+                metadata.Add(S3JournalStorage.CheckpointOffsetMetadataKey, "16");
+            }
+
+            static async Task<Exception?> CaptureExceptionAsync(Func<ValueTask> operation)
+            {
+                try
+                {
+                    await operation();
+                    return null;
+                }
+                catch (Exception exception)
+                {
+                    return exception;
+                }
+            }
         }
 
         [Fact]
