@@ -272,12 +272,16 @@ try {
         $collectorScript = Get-Content -Raw -LiteralPath $collectorScriptPath
         Assert-Matches `
             $collectorScript `
-            '& \$coverageTool collect' `
+            '& \$coverageTool @coverageArguments @testArguments' `
             'Coverage must use the external collector with ContinuousIntegrationBuild.'
         Assert-Matches `
             $collectorScript `
             '-p:ContinuousIntegrationBuild=false' `
             'Coverage builds must disable deterministic CI instrumentation.'
+        Assert-Matches `
+            $collectorScript `
+            '\$staticInstrumentationFiles = Join-Path' `
+            'macOS coverage must specify files for static instrumentation.'
         Assert-Matches `
             $collectorScript `
             '\$testArguments\.Add\(''--no-build''\)' `

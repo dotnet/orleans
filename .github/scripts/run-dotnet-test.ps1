@@ -84,30 +84,63 @@ Assert-NotReparsePoint $coverageDirectory
 Assert-NotReparsePoint $coverageOutput
 Remove-Item -LiteralPath $coverageOutput -Force -ErrorAction SilentlyContinue
 
-$buildArguments = [Collections.Generic.List[string]]::new()
-$buildArguments.Add('build')
-if (-not [string]::IsNullOrWhiteSpace($Project)) {
-    $buildArguments.Add($Project)
-}
-$buildArguments.Add('--framework')
-$buildArguments.Add($Framework)
-$buildArguments.Add('-p:ContinuousIntegrationBuild=false')
-if (-not $NoBuild) {
-    & dotnet @buildArguments
-    if ($LASTEXITCODE -ne 0) {
-        throw "Coverage build failed with exit code $LASTEXITCODE"
+$staticInstrumentationFiles = $null
+if ($IsMacOS) {
+    $buildArguments = [Collections.Generic.List[string]]::new()
+    $buildArguments.Add('build')
+    if (-not [string]::IsNullOrWhiteSpace($Project)) {
+        $buildArguments.Add($Project)
+        $buildArguments.Add('--framework')
+        $buildArguments.Add($Framework)
     }
+    $buildArguments.Add('-p:ContinuousIntegrationBuild=false')
+    if (-not $NoBuild) {
+        & dotnet @buildArguments
+        if ($LASTEXITCODE -ne 0) {
+            throw "Coverage build failed with exit code $LASTEXITCODE"
+        }
+    }
+
+    if (-not [string]::IsNullOrWhiteSpace($Project)) {
+        $metadataJson = & dotnet msbuild $Project `
+            -nologo `
+            '-getProperty:TargetPath' `
+            "-property:TargetFramework=$Framework"
+        if ($LASTEXITCODE -ne 0) {
+            throw "Failed to evaluate coverage module metadata for $Project"
+        }
+
+        $metadata = $metadataJson | ConvertFrom-Json
+        $staticInstrumentationFiles = Join-Path ([IO.Path]::GetDirectoryName($metadata.Properties.TargetPath)) '*.dll'
+    } else {
+        $staticInstrumentationFiles = Join-Path $repositoryRoot "test/**/bin/Debug/$Framework/*.dll"
+    }
+
+    $testArguments.Add('--no-build')
+} elseif ($NoBuild) {
+    $testArguments.Add('--no-build')
+} else {
+    $testArguments.Add('-p:ContinuousIntegrationBuild=false')
 }
 
-$testArguments.Add('--no-build')
 $coverageTool = (Get-Command dotnet-coverage -ErrorAction Stop).Source
 
-& $coverageTool collect `
-    --settings $coverageSettings `
-    --output $coverageOutput `
-    --output-format cobertura `
-    --nologo `
-    dotnet @testArguments
+$coverageArguments = [Collections.Generic.List[string]]::new()
+$coverageArguments.Add('collect')
+$coverageArguments.Add('--settings')
+$coverageArguments.Add($coverageSettings)
+$coverageArguments.Add('--output')
+$coverageArguments.Add($coverageOutput)
+$coverageArguments.Add('--output-format')
+$coverageArguments.Add('cobertura')
+$coverageArguments.Add('--nologo')
+if ($staticInstrumentationFiles) {
+    $coverageArguments.Add('--include-files')
+    $coverageArguments.Add($staticInstrumentationFiles)
+}
+$coverageArguments.Add('dotnet')
+
+& $coverageTool @coverageArguments @testArguments
 if ($LASTEXITCODE -ne 0) {
     throw "Coverage test run failed with exit code $LASTEXITCODE"
 }
