@@ -192,6 +192,7 @@ namespace Orleans.Runtime
                 if (Volatile.Read(ref _isStopping) != 0)
                 {
                     callbackData.OnHostShutdown();
+                    message.DisposeOwnedBody();
                     return;
                 }
 
@@ -203,6 +204,7 @@ namespace Orleans.Runtime
                 context?.Complete();
                 if (Volatile.Read(ref _isStopping) != 0)
                 {
+                    message.DisposeOwnedBody();
                     return;
                 }
             }
@@ -212,6 +214,7 @@ namespace Orleans.Runtime
             if (Volatile.Read(ref _isStopping) != 0)
             {
                 callbackData?.OnHostShutdown();
+                message.DisposeOwnedBody();
                 return;
             }
 
@@ -324,7 +327,6 @@ namespace Orleans.Runtime
                                     response = this.responseCopier.Copy(response)!;
                                 }
 
-                                invokable.Dispose();
                                 break;
                             }
                         default:
@@ -375,6 +377,10 @@ namespace Orleans.Runtime
                 {
                     SafeSendExceptionResponse(message, exc2);
                 }
+            }
+            finally
+            {
+                message.DisposeOwnedBody();
             }
         }
 

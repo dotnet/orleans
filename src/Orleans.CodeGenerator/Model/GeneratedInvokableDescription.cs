@@ -18,6 +18,7 @@ internal sealed class GeneratedInvokableDescription : ISerializableTypeDescripti
         List<INamedTypeSymbol> serializationHooks,
         INamedTypeSymbol baseType,
         List<TypeSyntax> constructorArguments,
+        bool usesInvokablePool,
         List<CompoundTypeAliasComponent[]> compoundTypeAliases,
         string? returnValueInitializerMethod,
         ClassDeclarationSyntax classDeclarationSyntax)
@@ -39,6 +40,7 @@ internal sealed class GeneratedInvokableDescription : ISerializableTypeDescripti
         Accessibility = accessibility;
         SerializationHooks = serializationHooks;
         ActivatorConstructorParameters = constructorArguments;
+        UsesInvokablePool = usesInvokablePool;
         CompoundTypeAliases = compoundTypeAliases;
         ReturnValueInitializerMethod = returnValueInitializerMethod;
         ClassDeclarationSyntax = classDeclarationSyntax;
@@ -73,6 +75,7 @@ internal sealed class GeneratedInvokableDescription : ISerializableTypeDescripti
     public bool IsImmutable => false;
     public bool IsExceptionType => false;
     public List<TypeSyntax> ActivatorConstructorParameters { get; }
+    public bool UsesInvokablePool { get; }
     public bool HasActivatorConstructor => UseActivator;
     public List<CompoundTypeAliasComponent[]> CompoundTypeAliases { get; }
     public ClassDeclarationSyntax ClassDeclarationSyntax { get; }

@@ -298,6 +298,7 @@ namespace Orleans
                 if (Volatile.Read(ref _isStopping) != 0)
                 {
                     callbackData.OnHostShutdown();
+                    message.DisposeOwnedBody();
                     return;
                 }
 
@@ -307,6 +308,7 @@ namespace Orleans
                 if (Volatile.Read(ref _isStopping) != 0)
                 {
                     callbackData.OnHostShutdown();
+                    message.DisposeOwnedBody();
                     return;
                 }
             }
@@ -315,6 +317,7 @@ namespace Orleans
                 context?.Complete();
                 if (Volatile.Read(ref _isStopping) != 0)
                 {
+                    message.DisposeOwnedBody();
                     return;
                 }
             }

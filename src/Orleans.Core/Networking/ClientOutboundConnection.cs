@@ -164,6 +164,8 @@ namespace Orleans.Runtime.Messaging
                 LogInformationClientIsDroppingMessage(this.Log, msg, reason);
                 MessagingInstrumentation.OnDroppedSentMessage(msg);
             }
+
+            msg.DisposeOwnedBody();
         }
 
         protected override void OnSendMessageFailure(Message message, string error)

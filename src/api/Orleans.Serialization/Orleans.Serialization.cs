@@ -3532,6 +3532,18 @@ namespace Orleans.Serialization.Invocation
         bool TryCancel();
     }
 
+    public sealed partial class InvokablePool<T> : System.IDisposable
+        where T : class, IInvokable
+    {
+        public InvokablePool() { }
+
+        public void Dispose() { }
+
+        public void Return(T item) { }
+
+        public bool TryGet([System.Diagnostics.CodeAnalysis.NotNullWhenAttribute(true)] out T? item) { throw null; }
+    }
+
     public static partial class InvokablePool
     {
         public static T Get<T>()
