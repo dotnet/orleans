@@ -110,8 +110,10 @@ internal sealed class SqsAspireTestApp : IAsyncDisposable
             var streamingPrefix = $"Orleans__Streaming__{ProviderName}__";
             values = values
                 .Where(pair => pair.Key.StartsWith(streamingPrefix, StringComparison.Ordinal)
+                    || pair.Key is "Orleans__ClusterId" or "Orleans__ServiceId"
                     || pair.Key.StartsWith("ConnectionStrings__", StringComparison.Ordinal)
-                    || pair.Key.StartsWith("AWS_", StringComparison.Ordinal))
+                    || pair.Key.StartsWith("AWS_", StringComparison.Ordinal)
+                    || pair.Key.StartsWith("AWS__", StringComparison.Ordinal))
                 .ToDictionary(StringComparer.Ordinal);
         }
 
