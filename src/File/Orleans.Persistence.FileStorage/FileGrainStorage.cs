@@ -1,4 +1,3 @@
-﻿// <file_grain_storage>
 using System.Security.Cryptography;
 using System.Text;
 using Microsoft.Extensions.Options;
@@ -7,8 +6,15 @@ using Orleans.Runtime;
 using Orleans.Serialization.Serializers;
 using Orleans.Storage;
 
-namespace GrainStorage;
+namespace Orleans.Persistence.FileStorage;
 
+/// <summary>
+/// Stores grain state as files in a configured directory.
+/// </summary>
+/// <param name="storageName">The storage provider name.</param>
+/// <param name="options">The provider options.</param>
+/// <param name="clusterOptions">The cluster options.</param>
+/// <param name="activatorProvider">The grain state activator provider.</param>
 public sealed class FileGrainStorage(
     string storageName,
     FileGrainStorageOptions options,
@@ -20,7 +26,7 @@ public sealed class FileGrainStorage(
     private readonly string _serviceId = clusterOptions.Value.ServiceId;
     private readonly string _rootDirectory = Path.GetFullPath(options.RootDirectory);
 
-    // <clearstateasync>
+    /// <inheritdoc />
     public async Task ClearStateAsync<T>(
         string stateName,
         GrainId grainId,
@@ -36,9 +42,8 @@ public sealed class FileGrainStorage(
 
         ResetState(grainState);
     }
-    // </clearstateasync>
 
-    // <readstateasync>
+    /// <inheritdoc />
     public async Task ReadStateAsync<T>(
         string stateName,
         GrainId grainId,
@@ -55,9 +60,8 @@ public sealed class FileGrainStorage(
         grainState.ETag = record.Value.ETag;
         grainState.RecordExists = true;
     }
-    // </readstateasync>
 
-    // <writestateasync>
+    /// <inheritdoc />
     public async Task WriteStateAsync<T>(
         string stateName,
         GrainId grainId,
@@ -81,9 +85,8 @@ public sealed class FileGrainStorage(
         grainState.ETag = etag;
         grainState.RecordExists = true;
     }
-    // </writestateasync>
 
-    // <participate>
+    /// <inheritdoc />
     public void Participate(ISiloLifecycle lifecycle) =>
         lifecycle.Subscribe(
             observerName: OptionFormattingUtilities.Name<FileGrainStorage>(storageName),
@@ -93,7 +96,6 @@ public sealed class FileGrainStorage(
                 Directory.CreateDirectory(_rootDirectory);
                 return Task.CompletedTask;
             });
-    // </participate>
 
     private static byte[] CreateRecord(string etag, byte[] payload)
     {
@@ -152,7 +154,6 @@ public sealed class FileGrainStorage(
         GrainId grainId) =>
         new($"Version conflict ({operation}): ServiceId={_serviceId} ProviderName={storageName} GrainType={typeof(T)} GrainReference={grainId}.");
 
-    // <getkeystring>
     private string GetRecordPath(string stateName, GrainId grainId)
     {
         using var identity = new MemoryStream();
@@ -172,8 +173,6 @@ public sealed class FileGrainStorage(
         destination.Write(length);
         destination.Write(value);
     }
-    // </getkeystring>
 
     private readonly record struct StoredRecord(string ETag, ReadOnlyMemory<byte> Payload);
 }
-// </file_grain_storage>

@@ -1,17 +1,16 @@
-﻿// <file_grain_storage_factory>
+using System;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration.Overrides;
+using Orleans.Storage;
 
-namespace GrainStorage;
+namespace Orleans.Persistence.FileStorage;
 
 internal static class FileGrainStorageFactory
 {
-    internal static FileGrainStorage Create(
-        IServiceProvider services, string name)
+    internal static FileGrainStorage Create(IServiceProvider services, string name)
     {
-        var optionsMonitor =
-            services.GetRequiredService<IOptionsMonitor<FileGrainStorageOptions>>();
+        var optionsMonitor = services.GetRequiredService<IOptionsMonitor<FileGrainStorageOptions>>();
 
         return ActivatorUtilities.CreateInstance<FileGrainStorage>(
             services,
@@ -20,4 +19,3 @@ internal static class FileGrainStorageFactory
             services.GetProviderClusterOptions(name));
     }
 }
-// </file_grain_storage_factory>
