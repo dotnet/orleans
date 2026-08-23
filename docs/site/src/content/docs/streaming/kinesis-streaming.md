@@ -26,6 +26,28 @@ Configure every Orleans client which publishes through the provider with the sam
 
 When explicit credentials aren't configured, the provider uses the [AWS SDK for .NET credential resolution chain](https://docs.aws.amazon.com/sdk-for-net/v4/developer-guide/creds-assign.html). In production, prefer workload credentials such as an IAM role. Set <xref:Orleans.Streaming.Kinesis.KinesisStreamOptions.Service> when using a custom Kinesis-compatible endpoint.
 
+## Configure Kinesis with Aspire
+
+The AWS Aspire integration publishes a CDK Kinesis resource as a structured `StreamArn` value under `AWS:Resources:<resource-name>`. The Orleans Kinesis provider resolves the stream name and AWS region from that ARN when its `ServiceKey` matches the Aspire resource name.
+
+`Aspire.Hosting.Orleans` currently models streaming providers through connection-string resources, while AWS CDK resources expose structured outputs. Configure the Orleans streaming section on the silo resource and reference the Kinesis resource so Aspire injects both values:
+
+:::code language="csharp" source="../host/snippets/aspire/AppHost/AppHostExamples.cs" id="kinesis_apphost_grain_checkpoints":::
+
+The silo registers `PubSubStore` for grain checkpoints and activates configuration-driven Orleans providers:
+
+:::code language="csharp" source="../snippets/compiled/Streaming/KinesisSnippets.cs" id="configure_kinesis_aspire_silo":::
+
+Clients activate the same provider name and Kinesis resource configuration. Checkpoint configuration is silo-only:
+
+:::code language="csharp" source="../snippets/compiled/Streaming/KinesisSnippets.cs" id="configure_kinesis_aspire_client":::
+
+For infrastructure-owned DynamoDB checkpoints, provision the table with the key schema expected by Orleans and select it using the nested `Checkpoint` configuration:
+
+:::code language="csharp" source="../host/snippets/aspire/AppHost/AppHostExamples.cs" id="kinesis_apphost_dynamodb_checkpoints":::
+
+The provider also accepts `ResourceConfigSection` and `Checkpoint:ResourceConfigSection` when an AWS resource reference uses a custom configuration section. `AWS_ENDPOINT_URL_KINESIS` and `AWS_ENDPOINT_URL_DYNAMODB` configure local service endpoints, while `AWS_REGION` supplies the region when the structured output doesn't contain one.
+
 ## Choose checkpoint storage
 
 Kinesis shard iterators are temporary. Orleans therefore stores the last delivered sequence number outside Kinesis and uses it to resume after a restart or queue reassignment.
