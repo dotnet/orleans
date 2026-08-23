@@ -42,6 +42,18 @@ namespace NonSilo.Tests.Membership
         }
 
         [Fact]
+        public void GetTimestamp_UsesMembershipTimeProvider()
+        {
+            var monitor = CreateMonitor();
+
+            Assert.Equal(_startTimestamp, monitor.GetTimestamp());
+
+            _timeProvider.Advance(TimeSpan.FromMilliseconds(250));
+
+            Assert.Equal(TimestampAt(TimeSpan.FromMilliseconds(250)), monitor.GetTimestamp());
+        }
+
+        [Fact]
         public void GetLocalHealthStatus_RejectsNegativePeriod()
         {
             var participant = new TestHealthCheckParticipant(_ => (true, null));
@@ -350,9 +362,14 @@ namespace NonSilo.Tests.Membership
             var healthEvent = Assert.Single(
                 status.Events,
                 item => item.Kind == LocalSiloHealthCheckKind.RuntimeStall);
-            Assert.Equal(2, status.Score);
+            Assert.Equal(4, status.Score);
             Assert.Equal(TimestampAt(TimeSpan.FromSeconds(3)), healthEvent.Timestamp);
             Assert.Equal(TimeSpan.FromSeconds(2), healthEvent.Duration);
+            var stallEvent = Assert.Single(
+                status.Events,
+                item => item.Kind == LocalSiloHealthCheckKind.ThreadPoolStall);
+            Assert.Equal(2, stallEvent.Score);
+            Assert.Equal(TimeSpan.FromMilliseconds(2900), stallEvent.Duration);
         }
 
         [Fact]
@@ -554,14 +571,14 @@ namespace NonSilo.Tests.Membership
         }
 
         [Fact]
-        public void GetLocalHealthStatus_EmitsTypedThreadPoolQueueDelayEvent()
+        public void GetLocalHealthStatus_EmitsTypedThreadPoolStallEvent()
         {
             var monitor = CreateMonitor();
 
             var status = monitor.GetLocalHealthStatus(TimeSpan.Zero, LocalSiloHealthCheckCategory.Local);
             var threadPoolEvent = Assert.Single(
                 status.Events,
-                item => item.Kind == LocalSiloHealthCheckKind.ThreadPoolQueueDelay);
+                item => item.Kind == LocalSiloHealthCheckKind.ThreadPoolStall);
 
             Assert.Equal(_startTimestamp, threadPoolEvent.Timestamp);
             Assert.Equal(LocalSiloHealthCheckCategory.Local, threadPoolEvent.Category);
@@ -589,6 +606,18 @@ namespace NonSilo.Tests.Membership
             Assert.Equal("score", exception.ParamName);
             Assert.DoesNotContain(status.Events, item => item.Source == "negative-score");
             Assert.DoesNotContain(status.Complaints, complaint => complaint == "rejected");
+        }
+
+        [Fact]
+        public void Dispose_DisposesDegradationTimer()
+        {
+            var timer = new DelegateAsyncTimer(_ => Task.FromResult(false));
+            var monitor = CreateMonitor(
+                new DelegateAsyncTimerFactory((_, _) => timer));
+
+            monitor.Dispose();
+
+            Assert.Equal(1, timer.DisposedCounter);
         }
 
         private LocalSiloHealthMonitor CreateMonitor(params IHealthCheckParticipant[] participants)

@@ -27,7 +27,7 @@ namespace Orleans.Runtime.MembershipService
         MembershipStatus,
         SiloSuspected,
         HealthCheckParticipant,
-        ThreadPoolQueueDelay,
+        ThreadPoolStall,
         ProbeRequests,
         ProbeResponses,
         GarbageCollectionPause,
@@ -53,6 +53,24 @@ namespace Orleans.Runtime.MembershipService
 
     internal interface ILocalSiloHealthMonitor
     {
+        /// <summary>
+        /// Returns a timestamp from the stall detector's time source.
+        /// </summary>
+        /// <returns>A timestamp suitable for use with <see cref="GetStallDurationAsync"/>.</returns>
+        long GetTimestamp();
+
+        /// <summary>
+        /// Waits for the stall detector to sample past the end of the interval, then returns the detected stall duration.
+        /// </summary>
+        /// <param name="startTimestamp">The start of the interval.</param>
+        /// <param name="endTimestamp">The end of the interval.</param>
+        /// <param name="cancellationToken">A token which cancels the wait.</param>
+        /// <returns>The detected stall duration.</returns>
+        ValueTask<TimeSpan> GetStallDurationAsync(
+            long startTimestamp,
+            long endTimestamp,
+            CancellationToken cancellationToken);
+
         /// <summary>
         /// Returns the aggregate local health status over the provided interval.
         /// </summary>
@@ -101,7 +119,7 @@ namespace Orleans.Runtime.MembershipService
     ///   <item><description>Check that no other silo suspects this silo.</description></item>
     ///   <item><description>Check for recently received successful ping responses (via <see cref="IProbeHealthMonitor"/>).</description></item>
     ///   <item><description>Check for recently received ping requests (via <see cref="IProbeHealthMonitor"/>).</description></item>
-    ///   <item><description>Check that the .NET Thread Pool is able to process work items within one second.</description></item>
+    ///   <item><description>Check that the .NET Thread Pool executes periodic timer callbacks on schedule.</description></item>
     ///   <item><description>Check that local async timers have been firing on-time (within 3 seconds of their due time).</description></item>
     /// </list>
     /// </remarks>
@@ -109,7 +127,8 @@ namespace Orleans.Runtime.MembershipService
         ILifecycleParticipant<ISiloLifecycle>,
         ILifecycleObserver,
         ILocalSiloHealthMonitor,
-        ILocalSiloHealthEventRecorder
+        ILocalSiloHealthEventRecorder,
+        IDisposable
     {
         internal const int MaxScore = 8;
         private static readonly TimeSpan HistoryDuration = TimeSpan.FromMinutes(1);
@@ -122,7 +141,7 @@ namespace Orleans.Runtime.MembershipService
         private readonly ILogger<LocalSiloHealthMonitor> _log;
         private readonly ClusterMembershipOptions _clusterMembershipOptions;
         private readonly IAsyncTimer _degradationCheckTimer;
-        private readonly ThreadPoolMonitor _threadPoolMonitor;
+        private readonly ThreadPoolStallDetector _stallDetector;
         private readonly TimeProvider _timeProvider;
 #if NET9_0_OR_GREATER
         private readonly Lock _historyLock = new();
@@ -166,11 +185,31 @@ namespace Orleans.Runtime.MembershipService
                 MinimumCheckPeriod,
                 nameof(LocalSiloHealthMonitor),
                 timeProvider);
-            _threadPoolMonitor = new ThreadPoolMonitor(loggerFactory.CreateLogger<ThreadPoolMonitor>(), timeProvider);
+            var stallRetentionPeriod = _clusterMembershipOptions.MaxProbeTimeout + ThreadPoolStallDetector.DetectionPeriod;
+            if (stallRetentionPeriod < HistoryDuration)
+            {
+                stallRetentionPeriod = HistoryDuration;
+            }
+
+            _stallDetector = new(
+                loggerFactory.CreateLogger<ThreadPoolStallDetector>(),
+                timeProvider,
+                ThreadPoolStallDetector.DetectionPeriod,
+                stallRetentionPeriod);
         }
 
         /// <inheritdoc />
         public ImmutableArray<string> Complaints { get; private set; } = [];
+
+        /// <inheritdoc />
+        public long GetTimestamp() => _timeProvider.GetTimestamp();
+
+        /// <inheritdoc />
+        public ValueTask<TimeSpan> GetStallDurationAsync(
+            long startTimestamp,
+            long endTimestamp,
+            CancellationToken cancellationToken)
+            => _stallDetector.GetStallDurationAsync(startTimestamp, endTimestamp, cancellationToken);
 
         /// <inheritdoc />
         public LocalSiloHealthStatus GetLocalHealthStatus(
@@ -265,7 +304,7 @@ namespace Orleans.Runtime.MembershipService
                 var events = new List<LocalSiloHealthEvent>(_healthCheckParticipants.Count + 1);
                 var complaints = new List<string>();
                 CheckLocalHealthCheckParticipants(now.UtcDateTime, timestamp, events, complaints);
-                CheckThreadPoolQueueDelay(timestamp, events, complaints);
+                CheckThreadPoolStalls(timestamp, events, complaints);
                 AddEvents(timestamp, events);
 
                 var score = GetScore(events);
@@ -350,28 +389,30 @@ namespace Orleans.Runtime.MembershipService
             }
         }
 
-        private void CheckThreadPoolQueueDelay(
+        private void CheckThreadPoolStalls(
             long timestamp,
             List<LocalSiloHealthEvent> events,
             List<string> complaints)
         {
-            var delay = _threadPoolMonitor.MeasureQueueDelay();
-            var score = (int)delay.TotalSeconds;
+            var stallDuration = _stallDetector.GetMaximumStallDuration(
+                SubtractTimestamp(timestamp, MinimumCheckPeriod),
+                timestamp);
+            var score = (int)stallDuration.TotalSeconds;
             string? complaint = null;
             if (score >= 1)
             {
-                complaint = $".NET Thread Pool is exhibiting delays of {delay.TotalSeconds}s. This can indicate .NET Thread Pool starvation, very long .NET GC pauses, or other runtime or machine pauses.";
+                complaint = $".NET Thread Pool execution stalled for {stallDuration.TotalSeconds}s. This can indicate .NET Thread Pool starvation, very long .NET GC pauses, or other runtime or machine pauses.";
                 complaints.Add(complaint);
             }
 
             events.Add(new(
                 timestamp,
-                LocalSiloHealthCheckKind.ThreadPoolQueueDelay,
-                GetCategory(LocalSiloHealthCheckKind.ThreadPoolQueueDelay),
+                LocalSiloHealthCheckKind.ThreadPoolStall,
+                GetCategory(LocalSiloHealthCheckKind.ThreadPoolStall),
                 Source: null,
                 score,
                 complaint,
-                delay,
+                stallDuration,
                 score >= 10 ? LogLevel.Error : LogLevel.Warning));
         }
 
@@ -610,9 +651,9 @@ namespace Orleans.Runtime.MembershipService
                     continue;
                 }
 
-                if (healthEvent.Kind == LocalSiloHealthCheckKind.ThreadPoolQueueDelay)
+                if (healthEvent.Kind == LocalSiloHealthCheckKind.ThreadPoolStall)
                 {
-                    LogThreadPoolDelay(healthEvent.LogLevel, healthEvent.Duration?.TotalSeconds ?? 0);
+                    LogThreadPoolStall(healthEvent.LogLevel, healthEvent.Duration?.TotalSeconds ?? 0);
                 }
                 else
                 {
@@ -644,79 +685,16 @@ namespace Orleans.Runtime.MembershipService
             }
         }
 
-        /// <summary>
-        /// Measures queue delay on the .NET <see cref="ThreadPool"/>.
-        /// </summary>
-        private class ThreadPoolMonitor
+        public void Dispose()
         {
-            private static readonly WaitCallback Callback = state => ((ThreadPoolMonitor)state!).Execute();
-#if NET9_0_OR_GREATER
-            private readonly Lock _lockObj = new();
-#else
-            private readonly object _lockObj = new();
-#endif
-            private readonly ILogger<ThreadPoolMonitor> _log;
-            private readonly TimeProvider _timeProvider;
-            private bool _scheduled;
-            private TimeSpan _lastQueueDelay;
-            private long _queueDelayTimestamp;
-
-            public ThreadPoolMonitor(ILogger<ThreadPoolMonitor> log, TimeProvider timeProvider)
-            {
-                _log = log;
-                _timeProvider = timeProvider;
-            }
-
-            public TimeSpan MeasureQueueDelay()
-            {
-                bool shouldSchedule;
-                TimeSpan delay;
-                lock (_lockObj)
-                {
-                    var currentQueueDelay = _scheduled ? _timeProvider.GetElapsedTime(_queueDelayTimestamp) : TimeSpan.Zero;
-                    delay = currentQueueDelay > _lastQueueDelay ? currentQueueDelay : _lastQueueDelay;
-
-                    if (!_scheduled)
-                    {
-                        _scheduled = true;
-                        shouldSchedule = true;
-                        _queueDelayTimestamp = _timeProvider.GetTimestamp();
-                    }
-                    else
-                    {
-                        shouldSchedule = false;
-                    }
-                }
-
-                if (shouldSchedule)
-                {
-                    _ = ThreadPool.UnsafeQueueUserWorkItem(Callback, this);
-                }
-
-                return delay;
-            }
-
-            private void Execute()
-            {
-                try
-                {
-                    lock (_lockObj)
-                    {
-                        _scheduled = false;
-                        _lastQueueDelay = _timeProvider.GetElapsedTime(_queueDelayTimestamp);
-                    }
-                }
-                catch (Exception exception)
-                {
-                    LocalSiloHealthMonitor.LogThreadPoolDelayMonitorError(_log, exception);
-                }
-            }
+            _degradationCheckTimer.Dispose();
+            _stallDetector.Dispose();
         }
 
         [LoggerMessage(
-            Message = ".NET Thread Pool is exhibiting delays of {ThreadPoolQueueDelaySeconds}s. This can indicate .NET Thread Pool starvation, very long .NET GC pauses, or other runtime or machine pauses."
+            Message = ".NET Thread Pool execution stalled for {ThreadPoolStallSeconds}s. This can indicate .NET Thread Pool starvation, very long .NET GC pauses, or other runtime or machine pauses."
         )]
-        private partial void LogThreadPoolDelay(LogLevel logLevel, double threadPoolQueueDelaySeconds);
+        private partial void LogThreadPoolStall(LogLevel logLevel, double threadPoolStallSeconds);
 
         [LoggerMessage(
             Message = "{Kind} health check for {Source} reported: {Complaint}"
@@ -762,12 +740,6 @@ namespace Orleans.Runtime.MembershipService
             Message = "Self-monitoring determined that local health is degraded. Degradation score is {Score}/{MaxScore} (lower is better). Complaints: {Complaints}"
         )]
         private partial void LogSelfMonitoringDegraded(int score, int maxScore, string complaints);
-
-        [LoggerMessage(
-            Level = LogLevel.Error,
-            Message = "Exception monitoring .NET thread pool delay"
-        )]
-        private static partial void LogThreadPoolDelayMonitorError(ILogger logger, Exception exception);
 
         [LoggerMessage(
             Level = LogLevel.Error,

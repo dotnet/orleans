@@ -144,6 +144,7 @@ namespace NonSilo.Tests.Membership
             Assert.Equal(0, probeResult.FailedProbeCount);
             Assert.True(probeResult.IsDirectProbe);
             Assert.Equal(0, probeResult.IntermediaryHealthDegradationScore);
+            await _localSiloHealthMonitor.DidNotReceiveWithAnyArgs().GetStallDurationAsync(default, default, default);
 
             await Shutdown();
         }
@@ -219,8 +220,92 @@ namespace NonSilo.Tests.Membership
             Assert.True(probeResult.IsDirectProbe);
             Assert.Equal(0, probeResult.IntermediaryHealthDegradationScore);
             Assert.Equal(0, ((ITestAccessor)_monitor).ProbeTimeoutSampleCount);
-
+            await _localSiloHealthMonitor.Received(1).GetStallDurationAsync(
+                Arg.Any<long>(),
+                Arg.Any<long>(),
+                Arg.Any<CancellationToken>());
             await Shutdown();
+        }
+
+        [Fact]
+        public async Task SiloHealthMonitor_TimeoutDuringLocalStall_WaitsForDetectorCycleAndIsInconclusive()
+        {
+            var timeProvider = new Microsoft.Extensions.Time.Testing.FakeTimeProvider(
+                new DateTimeOffset(2026, 1, 1, 12, 0, 0, TimeSpan.Zero));
+            var options = new ClusterMembershipOptions
+            {
+                ProbeTimeout = TimeSpan.FromSeconds(5),
+                MaxProbeTimeout = TimeSpan.FromSeconds(45),
+                EnableIndirectProbes = false,
+            };
+            var optionsMonitor = Substitute.For<IOptionsMonitor<ClusterMembershipOptions>>();
+            optionsMonitor.CurrentValue.Returns(options);
+            var prober = Substitute.For<IRemoteSiloProber>();
+            var probeEntered = new TaskCompletionSource<CancellationToken>(TaskCreationOptions.RunContinuationsAsynchronously);
+            var pendingProbe = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            prober.Probe(default!, default, default).ReturnsForAnyArgs(call =>
+            {
+                probeEntered.TrySetResult(call.ArgAt<CancellationToken>(2));
+                return pendingProbe.Task;
+            });
+            var probeResult = new TaskCompletionSource<ProbeResult>(TaskCreationOptions.RunContinuationsAsynchronously);
+            var detectorQuery = new TaskCompletionSource<(long Start, long End)>(TaskCreationOptions.RunContinuationsAsynchronously);
+            var detectorResult = new TaskCompletionSource<TimeSpan>(TaskCreationOptions.RunContinuationsAsynchronously);
+            var timer = new DilationProbeTimer();
+            const long ExpectedStartTimestamp = 123;
+            const long ExpectedEndTimestamp = 456;
+            var monitor = new SiloHealthMonitor(
+                _targetSilo,
+                (_, result) =>
+                {
+                    probeResult.TrySetResult(result);
+                    return Task.CompletedTask;
+                },
+                optionsMonitor,
+                _loggerFactory,
+                prober,
+                new DelegateAsyncTimerFactory((_, _) => timer),
+                _localSiloHealthMonitor,
+                _membershipService,
+                _localSiloDetails,
+                timeProvider);
+            _localSiloHealthMonitor.GetTimestamp().Returns(ExpectedStartTimestamp, ExpectedEndTimestamp);
+            _localSiloHealthMonitor
+                .GetStallDurationAsync(default, default, default)
+                .ReturnsForAnyArgs(call =>
+                {
+                    detectorQuery.TrySetResult((call.ArgAt<long>(0), call.ArgAt<long>(1)));
+                    return new ValueTask<TimeSpan>(detectorResult.Task);
+                });
+
+            try
+            {
+                monitor.Start();
+                var firstTick = await timer.Ticks.ReadAsync();
+                firstTick.Completion.SetResult(true);
+                var cancellationToken = await probeEntered.Task;
+
+                timeProvider.Advance(options.ProbeTimeout);
+
+                Assert.True(cancellationToken.IsCancellationRequested);
+                var interval = await detectorQuery.Task;
+                Assert.Equal(ExpectedStartTimestamp, interval.Start);
+                Assert.Equal(ExpectedEndTimestamp, interval.End);
+                Assert.False(probeResult.Task.IsCompleted);
+
+                detectorResult.SetResult(options.ProbeTimeout.Multiply(0.25));
+                var result = await probeResult.Task;
+                Assert.Equal(ProbeResultStatus.Unknown, result.Status);
+                Assert.Equal(0, result.FailedProbeCount);
+                Assert.Equal(0, ((ITestAccessor)monitor).MissedProbes);
+
+                var nextTick = await timer.Ticks.ReadAsync();
+                nextTick.Completion.SetResult(false);
+            }
+            finally
+            {
+                await monitor.StopAsync(CancellationToken.None);
+            }
         }
 
         [Fact]
@@ -247,6 +332,7 @@ namespace NonSilo.Tests.Membership
             Assert.True(probeResult.IsDirectProbe);
             Assert.Equal(0, probeResult.IntermediaryHealthDegradationScore);
             Assert.Equal(0, ((ITestAccessor)_monitor).ProbeTimeoutSampleCount);
+            await _localSiloHealthMonitor.DidNotReceiveWithAnyArgs().GetStallDurationAsync(default, default, default);
 
             await Shutdown();
         }

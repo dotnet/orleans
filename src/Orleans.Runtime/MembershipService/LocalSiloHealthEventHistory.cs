@@ -242,7 +242,7 @@ internal sealed class LocalSiloHealthEventHistory
     private static bool IsStateful(LocalSiloHealthCheckKind kind)
         => kind is LocalSiloHealthCheckKind.MembershipStatus
             or LocalSiloHealthCheckKind.HealthCheckParticipant
-            or LocalSiloHealthCheckKind.ThreadPoolQueueDelay
+            or LocalSiloHealthCheckKind.ThreadPoolStall
             or LocalSiloHealthCheckKind.ProbeRequests
             or LocalSiloHealthCheckKind.ProbeResponses;
 
