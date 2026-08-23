@@ -134,11 +134,6 @@
     <PackageVersion Update="Aspire.Azure.Storage.Blobs" Version="13.2.4" />
     <PackageVersion Update="Aspire.Azure.Storage.Queues" Version="13.2.4" />
     <PackageVersion Update="Aspire.Hosting.AppHost" Version="13.2.4" />
-    <PackageVersion Include="Aspire.Hosting.AWS" Version="13.0.2" />
-    <PackageVersion Include="AWSSDK.Core" Version="4.0.6.1" />
-    <PackageVersion Include="AWSSDK.Lambda" Version="4.0.15.2" />
-    <PackageVersion Include="AWSSDK.SSO" Version="4.0.2.27" />
-    <PackageVersion Include="AWSSDK.SSOOIDC" Version="4.0.3.28" />
     <PackageVersion Include="Aspire.Hosting.Azure.EventHubs" Version="13.2.4" />
     <PackageVersion Include="Aspire.Hosting.Azure.Storage" Version="13.2.4" />
     <PackageVersion Update="Aspire.Hosting.Orleans" Version="13.2.4" />

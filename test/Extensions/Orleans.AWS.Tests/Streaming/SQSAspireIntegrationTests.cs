@@ -48,13 +48,15 @@ public sealed class SQSAspireIntegrationTests
             provider);
         Assert.Equal("integration-profile", environment["AWS_PROFILE"]);
         Assert.Equal("us-east-1", environment["AWS_REGION"]);
+        Assert.Equal("integration-profile", environment["AWS__Profile"]);
+        Assert.Equal("us-east-1", environment["AWS__Region"]);
         Assert.DoesNotContain(configuration.Keys, key => key.StartsWith("ConnectionStrings:", StringComparison.Ordinal));
         AssertSecretFree(environment);
-        Assert.All(
-            app.Model.Resources,
-            resource => Assert.Contains(
-                resource.Annotations,
-                annotation => annotation.GetType().Name == "SDKResourceAnnotation"));
+        var clientEnvironment = await app.GetClientEnvironmentAsync();
+        Assert.Equal(environment["AWS_PROFILE"], clientEnvironment["AWS_PROFILE"]);
+        Assert.Equal(environment["AWS_REGION"], clientEnvironment["AWS_REGION"]);
+        Assert.Equal(environment["AWS__Profile"], clientEnvironment["AWS__Profile"]);
+        Assert.Equal(environment["AWS__Region"], clientEnvironment["AWS__Region"]);
     }
 
     [Fact]
