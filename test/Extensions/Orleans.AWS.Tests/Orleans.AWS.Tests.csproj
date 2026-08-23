@@ -32,6 +32,7 @@
     <ProjectReference Include="$(SourceRoot)src\AWS\Orleans.Persistence.DynamoDB\Orleans.Persistence.DynamoDB.csproj" />
     <ProjectReference Include="$(SourceRoot)src\AWS\Orleans.Reminders.DynamoDB\Orleans.Reminders.DynamoDB.csproj" />
     <ProjectReference Include="$(SourceRoot)src\AWS\Orleans.Streaming.SQS\Orleans.Streaming.SQS.csproj" />
+    <ProjectReference Include="$(SourceRoot)src\File\Orleans.Persistence.FileStorage\Orleans.Persistence.FileStorage.csproj" />
     <ProjectReference Include="$(SourceRoot)src\Orleans.Persistence.TestKit\Orleans.Persistence.TestKit.csproj" PrivateAssets="all" />
     <ProjectReference Include="$(SourceRoot)src\Orleans.Reminders.TestKit\Orleans.Reminders.TestKit.csproj" PrivateAssets="all" />
     <ProjectReference Include="$(SourceRoot)test\Orleans.Runtime.Internal.Tests\Orleans.Runtime.Internal.Tests.csproj" />
