@@ -147,22 +147,33 @@ namespace UnitTests.MembershipTests
             Assert.NotNull(target);
 
             var observer = new LongRunningTaskObserver();
-            var observerReference = GrainFactory.CreateObjectReference<ILongRunningTaskObserver>(observer);
-            var callId = Guid.NewGuid();
-            var promise = target.LongWaitWithStartNotification(
-                TimeSpan.FromMinutes(1),
-                callId,
-                observerReference,
-                CancellationToken.None);
+            ILongRunningTaskObserver? observerReference = GrainFactory.CreateObjectReference<ILongRunningTaskObserver>(observer);
+            try
+            {
+                var callId = Guid.NewGuid();
+                var promise = target.LongWaitWithStartNotification(
+                    TimeSpan.FromMinutes(1),
+                    callId,
+                    observerReference,
+                    CancellationToken.None);
 
-            await observer.WaitForCallToStart(callId);
-            GrainFactory.DeleteObjectReference<ILongRunningTaskObserver>(observerReference);
-            Assert.Equal(1, gateway.TrackedRequestClientCount);
+                await observer.WaitForCallToStart(callId);
+                GrainFactory.DeleteObjectReference<ILongRunningTaskObserver>(observerReference);
+                observerReference = null;
+                Assert.Equal(1, gateway.TrackedRequestClientCount);
 
-            await HostedCluster.StopClusterClientAsync();
+                await HostedCluster.StopClusterClientAsync();
 
-            await Assert.ThrowsAsync<SiloUnavailableException>(() => promise);
-            Assert.Equal(0, gateway.TrackedRequestClientCount);
+                await Assert.ThrowsAsync<SiloUnavailableException>(() => promise);
+                Assert.Equal(0, gateway.TrackedRequestClientCount);
+            }
+            finally
+            {
+                if (observerReference is not null)
+                {
+                    GrainFactory.DeleteObjectReference<ILongRunningTaskObserver>(observerReference);
+                }
+            }
         }
 
         private async Task<ILongRunningTaskGrain<bool>?> GetGrainOnTargetSilo(SiloHandle siloHandle)
