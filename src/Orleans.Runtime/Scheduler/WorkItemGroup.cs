@@ -382,9 +382,23 @@ internal sealed partial class WorkItemGroup : SynchronizationContext, IThreadPoo
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static void ScheduleExecution(WorkItemGroup workItem) => ThreadPool.UnsafeQueueUserWorkItem(workItem, preferLocal: true);
 
-    public void QueueAction(Action action) => EnqueueWorkItem(new WorkItem((Action<object?>)(static state => ((Action)state!)()), action));
-    public void QueueAction(Action<object> action, object state) => EnqueueWorkItem(new WorkItem(Unsafe.As<Action<object?>>(action), state));
-    internal void QueueNullableAction(Action<object?> action, object? state) => EnqueueWorkItem(new WorkItem(action, state));
+    public void QueueAction(Action action)
+    {
+        ArgumentNullException.ThrowIfNull(action);
+        EnqueueWorkItem(new WorkItem((Action<object?>)(static state => ((Action)state!)()), action));
+    }
+
+    public void QueueAction(Action<object> action, object state)
+    {
+        ArgumentNullException.ThrowIfNull(action);
+        EnqueueWorkItem(new WorkItem(Unsafe.As<Action<object?>>(action), state));
+    }
+
+    internal void QueueNullableAction(Action<object?> action, object? state)
+    {
+        ArgumentNullException.ThrowIfNull(action);
+        EnqueueWorkItem(new WorkItem(action, state));
+    }
     public void QueueTask(Task task) => task.Start(TaskScheduler);
 
     private void ExecuteCurrentWorkItem()
@@ -474,7 +488,11 @@ internal sealed partial class WorkItemGroup : SynchronizationContext, IThreadPoo
     /// Asynchronously posts a callback to be executed on this WorkItemGroup.
     /// </summary>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public override void Post(SendOrPostCallback d, object? state) => EnqueueWorkItem(new WorkItem(d, state));
+    public override void Post(SendOrPostCallback d, object? state)
+    {
+        ArgumentNullException.ThrowIfNull(d);
+        EnqueueWorkItem(new WorkItem(d, state));
+    }
 
     /// <summary>
     /// Synchronously sends a callback. Not supported - throws.
