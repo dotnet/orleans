@@ -1120,7 +1120,7 @@ jobs:
           **/logs/*
   coverage-merge:
     name: Merge code coverage
-    if: github.event_name == 'pull_request'
+    if: github.event_name == 'pull_request' && !cancelled()
     needs:
       - test-redis
       - test-cassandra

@@ -321,6 +321,10 @@ try {
         $workflow = Get-Content -Raw -LiteralPath $workflowPath
         Assert-Matches `
             $workflow `
+            "if: github\.event_name == 'pull_request' && !cancelled\(\)" `
+            'Coverage merge must run after test failures.'
+        Assert-Matches `
+            $workflow `
             '\$expectedArtifactCount = 60' `
             'The merge must validate every test matrix artifact.'
         Assert-Matches `
