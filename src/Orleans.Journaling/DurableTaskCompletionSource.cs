@@ -199,6 +199,7 @@ internal sealed class DurableTaskCompletionSource<T> : IDurableTaskCompletionSou
         {
             WriteState(writer);
             _stagedChangeVersion = _changeVersion;
+            _isDirty = false;
         }
     }
 
