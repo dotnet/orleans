@@ -151,7 +151,7 @@ internal sealed partial class JournaledStateManager : IJournaledStateManager, IJ
             _workSignal.Signal();
         }
 
-        await task.WaitAsync(cancellationToken);
+        await task;
     }
 
     private Task Start()
@@ -714,7 +714,7 @@ internal sealed partial class JournaledStateManager : IJournaledStateManager, IJ
         var startTimestamp = _shared.TimeProvider.GetTimestamp();
         try
         {
-            await task.WaitAsync(cancellationToken);
+            await task;
             _shared.Instruments.OnStateDeleteRequest(_shared.TimeProvider.GetElapsedTime(startTimestamp), succeeded: true);
         }
         catch
@@ -747,6 +747,11 @@ internal sealed partial class JournaledStateManager : IJournaledStateManager, IJ
         {
             foreach ((var name, var state) in _states)
             {
+                if (state is not RetiredState && !_journalStreamDirectory.ContainsKey(name))
+                {
+                    _journalStreamDirectory.Set(name, _journalStreamDirectory.GetNextJournalStreamId());
+                }
+
                 state.OnRecoveryCompleted();
 
                 if (state is RetiredState)
@@ -775,6 +780,13 @@ internal sealed partial class JournaledStateManager : IJournaledStateManager, IJ
             if (state is RetiredState)
             {
                 (retiredNames ??= []).Add(name);
+            }
+            else
+            {
+                var streamId = _journalStreamDirectory.TryGetValue(name, out var id)
+                    ? new JournalStreamId(id)
+                    : new JournalStreamId(MinApplicationJournalStreamId);
+                state.Reset(CreateJournalStreamWriter(streamId));
             }
         }
 

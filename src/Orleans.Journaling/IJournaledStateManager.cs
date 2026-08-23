@@ -13,6 +13,10 @@ public interface IJournaledStateManager : IAsyncDisposable
     /// <summary>
     /// Initializes the state manager.
     /// </summary>
+    /// <remarks>
+    /// Cancellation is observed before initialization is queued. Once recovery begins, the operation completes
+    /// before returning so callers never observe state while recovery is still mutating it.
+    /// </remarks>
     /// <param name="cancellationToken">The cancellation token.</param>
     /// <returns>A <see cref="ValueTask"/> which represents the operation.</returns>
     ValueTask InitializeAsync(CancellationToken cancellationToken);
@@ -36,8 +40,9 @@ public interface IJournaledStateManager : IAsyncDisposable
     /// </summary>
     /// <remarks>
     /// When the operation writes a snapshot, the complete captured state is replaced atomically. If storage
-    /// does not complete the replacement, the captured changes remain pending and can be retried.
+    /// fails without reporting an optimistic-concurrency conflict, the captured changes remain pending and can be retried.
     /// Changes made while storage is awaiting are not consumed by the completed operation.
+    /// An optimistic-concurrency conflict recovers the winning journal generation and discards the losing in-memory changes.
     /// </remarks>
     /// <param name="cancellationToken">The cancellation token.</param>
     /// <returns>A <see cref="ValueTask"/> which represents the operation.</returns>
@@ -53,6 +58,9 @@ public interface IJournaledStateManager : IAsyncDisposable
     /// <summary>
     /// Resets this instance, removing any persistent state.
     /// </summary>
+    /// <remarks>
+    /// Cancellation is observed before deletion is queued. Once deletion begins, the operation completes before returning.
+    /// </remarks>
     /// <param name="cancellationToken">The cancellation token.</param>
     /// <returns>A <see cref="ValueTask"/> which represents the operation.</returns>
     ValueTask DeleteStateAsync(CancellationToken cancellationToken);
