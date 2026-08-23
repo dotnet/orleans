@@ -63,6 +63,45 @@ var builder = Host.CreateApplicationBuilder(args)
 await builder.RunAsync();
 ```
 
+## Aspire integration
+
+Add the `Aspire.Hosting.Nats` package to the AppHost and enable JetStream on the NATS resource:
+
+```csharp
+var builder = DistributedApplication.CreateBuilder(args);
+
+var nats = builder.AddNats("nats")
+    .WithJetStream()
+    .WithDataVolume();
+
+var orleans = builder.AddOrleans("cluster")
+    .WithDevelopmentClustering()
+    .WithStreaming("NatsStreamProvider", nats);
+
+builder.AddProject<Projects.Silo>("silo")
+    .WithReference(orleans)
+    .WaitFor(nats);
+
+builder.AddProject<Projects.Client>("client")
+    .WithReference(orleans.AsClient())
+    .WaitFor(nats);
+
+builder.Build().Run();
+```
+
+Add the `Aspire.NATS.Net` and `Microsoft.Orleans.Streaming.NATS` packages to each silo or client project. Register the keyed NATS connection using the AppHost resource name before Orleans reads the generated provider configuration:
+
+```csharp
+var builder = Host.CreateApplicationBuilder(args);
+
+builder.AddKeyedNatsClient("nats");
+builder.UseOrleans();
+
+await builder.Build().RunAsync();
+```
+
+The Aspire resource supplies the NATS connection and Orleans provider type. Configure `Orleans:Streaming:NatsStreamProvider:StreamName` in the application project or deployment environment. Orleans creates the JetStream stream on startup and uses the keyed Aspire connection for publishing and consumption.
+
 ## Example - Using NATS Streams in a Grain
 
 ```csharp
