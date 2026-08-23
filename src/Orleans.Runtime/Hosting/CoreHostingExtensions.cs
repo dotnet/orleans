@@ -150,7 +150,7 @@ namespace Orleans.Hosting
         /// Configures the distributed grain directory.
         /// </summary>
         /// <param name="siloBuilder">The silo builder to register the directory implementation with.</param>
-        /// <param name="name">The name of the directory to register, or null to register the directory as the default.</param>
+        /// <param name="name">The name to register the directory under, or null to register it as the default. Multiple names share one directory instance.</param>
         /// <returns>The provided silo builder.</returns>
         public static ISiloBuilder AddDistributedGrainDirectory(this ISiloBuilder siloBuilder, string? name = null)
         {
@@ -171,9 +171,13 @@ namespace Orleans.Hosting
             if (!services.Contains(DirectoryDescriptor))
             {
                 services.Add(DirectoryDescriptor);
-                services.AddGrainDirectory<DistributedGrainDirectory>(name, (sp, name) => sp.GetRequiredService<DistributedGrainDirectory>());
+                services.AddSingleton<ILifecycleParticipant<ISiloLifecycle>>(
+                    static sp => sp.GetRequiredService<DistributedGrainDirectory>());
             }
 
+            services.AddGrainDirectoryAlias<DistributedGrainDirectory>(
+                name,
+                static (sp, _) => sp.GetRequiredService<DistributedGrainDirectory>());
             return siloBuilder;
         }
     }
