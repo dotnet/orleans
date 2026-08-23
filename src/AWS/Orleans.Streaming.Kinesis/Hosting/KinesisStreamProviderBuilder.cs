@@ -75,12 +75,12 @@ internal sealed class KinesisStreamProviderBuilder : IProviderBuilder<ISiloBuild
 
             options.StreamName = streamName;
             options.Region = region
+                ?? options.Region
                 ?? configuration["AWS_REGION"]
-                ?? configuration["AWS_DEFAULT_REGION"]
-                ?? options.Region;
+                ?? configuration["AWS_DEFAULT_REGION"];
             options.Service = configurationSection[nameof(options.Service)]
-                ?? configuration["AWS_ENDPOINT_URL_KINESIS"]
-                ?? options.Service;
+                ?? options.Service
+                ?? configuration["AWS_ENDPOINT_URL_KINESIS"];
             options.AccessKey = configurationSection[nameof(options.AccessKey)] ?? options.AccessKey;
             options.SecretKey = configurationSection[nameof(options.SecretKey)] ?? options.SecretKey;
 
