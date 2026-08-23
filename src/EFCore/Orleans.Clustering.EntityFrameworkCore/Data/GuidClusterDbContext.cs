@@ -19,13 +19,15 @@ public abstract class GuidClusterDbContext<TDbContext> : ClusterDbContext<TDbCon
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
-        var listConverter = new ValueConverter<List<string>, string>(
-            value => JsonSerializer.Serialize(value, (JsonSerializerOptions?)null),
-            value => JsonSerializer.Deserialize<List<string>>(value, (JsonSerializerOptions?)null) ?? new List<string>());
+        var listConverter = new ValueConverter<List<string>, string?>(
+            value => value == null ? null : JsonSerializer.Serialize(value, (JsonSerializerOptions?)null),
+            value => string.IsNullOrEmpty(value)
+                ? new List<string>()
+                : JsonSerializer.Deserialize<List<string>>(value, (JsonSerializerOptions?)null) ?? new List<string>());
         var listComparer = new ValueComparer<List<string>>(
             (left, right) => ReferenceEquals(left, right) || left != null && right != null && left.SequenceEqual(right),
-            value => value.Aggregate(0, (hash, item) => HashCode.Combine(hash, item)),
-            value => value.ToList());
+            value => value == null ? 0 : value.Aggregate(0, (hash, item) => HashCode.Combine(hash, item)),
+            value => value == null ? new List<string>() : value.ToList());
 
         modelBuilder.Entity<ClusterRecord<Guid>>(entity =>
         {

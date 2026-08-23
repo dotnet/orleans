@@ -319,13 +319,14 @@ internal class EFMembershipTable<TDbContext, TETag> : IMembershipTable where TDb
 
         entry.SiloAddress = SiloAddress.New(new IPEndPoint(IPAddress.Parse(record.Address), record.Port), record.Generation);
 
-        var suspectingSilos = record.SuspectingSilos.Select(SiloAddress.FromParsableString).ToList();
+        var suspectingSilos = (record.SuspectingSilos ?? []).Select(SiloAddress.FromParsableString).ToList();
 
-        var suspectingTimes = record.SuspectingTimes.Select(LogFormatter.ParseDate).ToList();
+        var suspectingTimes = (record.SuspectingTimes ?? []).Select(LogFormatter.ParseDate).ToList();
 
         if (suspectingSilos.Count != suspectingTimes.Count)
         {
-            throw new OrleansException($"SuspectingSilos.Length of {suspectingSilos.Count} as read from Azure Cosmos DB is not equal to SuspectingTimes.Length of {suspectingTimes.Count}");
+            throw new OrleansException(
+                $"The Entity Framework Core membership record contains {suspectingSilos.Count} suspecting silo entries but {suspectingTimes.Count} suspecting time entries.");
         }
 
         for (var i = 0; i < suspectingSilos.Count; i++)
