@@ -8,15 +8,17 @@ namespace Orleans.Journaling;
 /// </summary>
 /// <remarks>
 /// <para>
-/// Callbacks run synchronously on the owning grain scheduler and must not block. Implementations
-/// should queue asynchronous follow-up work instead of performing it inline.
+/// The manager awaits <see cref="OnWritePreparingAsync"/>, which can perform short,
+/// cancellation-aware asynchronous preparation before state capture. The remaining callbacks run
+/// synchronously on the owning grain scheduler and must return promptly. Implementations should
+/// queue asynchronous follow-up work from those synchronous callbacks.
 /// </para>
 /// <para>
-/// Before each write, the manager awaits <see cref="OnWritePreparingAsync"/> and then invokes
-/// <see cref="OnWriteStarted"/> immediately before capturing registered states. Mutations remain
-/// provisional until <see cref="OnWriteCompleted"/> marks a successful commit. Restoring the last
-/// durable state, including through <see cref="IJournaledStateManager.RevertPendingChangesAsync"/>,
-/// invokes <see cref="OnRecoveryCompleted"/> after all registered states have been restored.
+/// Before each write, the manager invokes <see cref="OnWriteStarted"/> immediately before capturing
+/// registered states. Mutations remain provisional until <see cref="OnWriteCompleted"/> marks a
+/// successful commit. Restoring the last durable state, including through
+/// <see cref="IJournaledStateManager.RevertPendingChangesAsync"/>, invokes
+/// <see cref="OnRecoveryCompleted"/> after all registered states have been restored.
 /// </para>
 /// Exceptions from <see cref="OnWritePreparingAsync"/> abort the write before state is captured.
 /// Exceptions from the synchronous notification methods are logged and don't change the outcome

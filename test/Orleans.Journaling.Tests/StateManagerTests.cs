@@ -691,6 +691,43 @@ public class StateManagerTests : JournalingTestBase
     }
 
     [Fact]
+    public void StateManager_DefaultRegisterObserver_PreservesLegacyImplementations()
+    {
+        IJournaledStateManager manager = new LegacyStateManager();
+
+        var exception = Assert.Throws<NotSupportedException>(
+            () => manager.RegisterObserver(new RecordingStateObserver()));
+
+        Assert.Contains("Observer registration requires", exception.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task StateManager_AwaitsObserverPreparationBeforeCapturingState()
+    {
+        var storage = new CapturingStorage();
+        var sut = CreateTestSystem(storage: storage);
+        var value = new DurableValue<int>("value", sut.Manager, CreateValueCodec<int>());
+        var observer = new BlockingPreparingStateObserver(() => value.Value = 42);
+        sut.Manager.RegisterObserver(observer);
+        await sut.Lifecycle.OnStart();
+
+        var write = sut.Manager.WriteStateAsync(CancellationToken.None).AsTask();
+        await observer.PreparingStarted.Task.WaitAsync(TimeSpan.FromSeconds(10));
+
+        Assert.False(write.IsCompleted);
+        Assert.Empty(storage.Appends);
+
+        observer.AllowPreparation.SetResult();
+        await write.WaitAsync(TimeSpan.FromSeconds(10));
+
+        Assert.Single(storage.Appends);
+        var recovered = CreateTestSystem(storage: storage);
+        var recoveredValue = new DurableValue<int>("value", recovered.Manager, CreateValueCodec<int>());
+        await recovered.Lifecycle.OnStart();
+        Assert.Equal(42, recoveredValue.Value);
+    }
+
+    [Fact]
     public async Task StateManager_Observer_FailedWriteDoesNotCommitAndRevertNotifiesRecovery()
     {
         var storage = new CapturingStorage();
@@ -1634,6 +1671,29 @@ public class StateManagerTests : JournalingTestBase
         }
     }
 
+    private sealed class LegacyStateManager : IJournaledStateManager
+    {
+        public ValueTask InitializeAsync(CancellationToken cancellationToken) => default;
+
+        public void RegisterState(string name, IJournaledState state)
+        {
+        }
+
+        public bool TryGetState(
+            string name,
+            [System.Diagnostics.CodeAnalysis.NotNullWhen(true)] out IJournaledState? state)
+        {
+            state = null;
+            return false;
+        }
+
+        public ValueTask WriteStateAsync(CancellationToken cancellationToken) => default;
+
+        public ValueTask RevertPendingChangesAsync(CancellationToken cancellationToken) => default;
+
+        public ValueTask DeleteStateAsync(CancellationToken cancellationToken) => default;
+    }
+
     private sealed class RecordingStateObserver : IJournaledStateObserver
     {
         public List<string> WriteCalls { get; } = [];
@@ -1739,6 +1799,32 @@ public class StateManagerTests : JournalingTestBase
         }
 
         public void OnWriteStarted() => WriteStartedCount++;
+        public void OnWriteCompleted()
+        {
+        }
+
+        public void OnRecoveryCompleted()
+        {
+        }
+    }
+
+    private sealed class BlockingPreparingStateObserver(Action prepare) : IJournaledStateObserver
+    {
+        public TaskCompletionSource PreparingStarted { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        public TaskCompletionSource AllowPreparation { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        public async ValueTask OnWritePreparingAsync(CancellationToken cancellationToken)
+        {
+            PreparingStarted.SetResult();
+            await AllowPreparation.Task.WaitAsync(cancellationToken);
+            prepare();
+        }
+
+        public void OnWriteStarted()
+        {
+        }
+
         public void OnWriteCompleted()
         {
         }

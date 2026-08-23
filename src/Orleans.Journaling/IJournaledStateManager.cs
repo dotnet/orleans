@@ -31,8 +31,11 @@ public interface IJournaledStateManager : IAsyncDisposable
     /// <remarks>
     /// Each operation uses a stable snapshot of the registered observers. An observer registered
     /// from a callback participates in subsequent operations, not later phases of the current one.
+    /// Implementations enable observer support by overriding this method. The default implementation
+    /// throws <see cref="NotSupportedException"/>.
     /// </remarks>
-    void RegisterObserver(IJournaledStateObserver observer);
+    void RegisterObserver(IJournaledStateObserver observer) =>
+        throw new NotSupportedException("Observer registration requires a state manager implementation which supports observers.");
 
     /// <summary>
     /// Attempts to get a state registered with the manager.
