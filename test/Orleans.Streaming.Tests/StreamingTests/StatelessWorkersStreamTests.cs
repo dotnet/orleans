@@ -41,6 +41,8 @@ namespace UnitTests.StreamingTests
                             streams => streams.ConfigurePartitioning(PartitionCount))
                         .AddMemoryGrainStorage("PubSubStore");
                     hostBuilder.Services.AddSingleton<StatelessWorkerStreamConsumerState>();
+                    hostBuilder.Services.AddSingleton<StreamingDiagnosticEventRecorder>();
+                    hostBuilder.AddStartupTask<StreamingDiagnosticEventRecorder>(ServiceLifecycleStage.RuntimeInitialize);
                 }
             }
 
@@ -67,16 +69,18 @@ namespace UnitTests.StreamingTests
         [Fact, TestCategory("Functional")]
         public async Task ExplicitSubscription_DeliversToStatelessWorker_AndCanBeRemovedAtGrainScope()
         {
+            await WaitForStreamingProviderReadyAsync();
             var state = GetConsumerState();
-            state.Reset(expectedDeliveries: 1);
+            var deliveryId = Guid.NewGuid().ToString();
+            var run = state.StartRun(deliveryId, expectedDeliveries: 1);
             var streamId = Guid.NewGuid();
             var consumer = fixture.GrainFactory.GetGrain<IStatelessWorkerStreamConsumerGrain>(0);
 
             await consumer.BecomeConsumer([streamId], StreamProvider);
-            await GetStream(StatelessWorkerStreamConsumerGrain.ExplicitStreamNamespace, streamId).OnNextAsync("first");
-            await state.WaitForDeliveriesAsync(Timeout);
+            await GetStream(StatelessWorkerStreamConsumerGrain.ExplicitStreamNamespace, streamId).OnNextAsync(deliveryId);
+            await run.WaitForDeliveriesAsync(Timeout);
 
-            Assert.Equal(1, state.DeliveryCount);
+            Assert.Equal(1, run.DeliveryCount);
             Assert.Equal(1, await consumer.StopConsuming(streamId, StreamProvider));
             Assert.Equal(0, await consumer.StopConsuming(streamId, StreamProvider));
         }
@@ -84,38 +88,81 @@ namespace UnitTests.StreamingTests
         [Fact, TestCategory("Functional")]
         public async Task ImplicitSubscription_AttachesObserverBeforeFirstDelivery()
         {
+            await WaitForStreamingProviderReadyAsync();
             var state = GetConsumerState();
-            state.Reset(expectedDeliveries: 1);
+            var deliveryId = Guid.NewGuid().ToString();
+            var run = state.StartRun(deliveryId, expectedDeliveries: 1);
             var streamId = Guid.NewGuid();
 
-            await GetStream(ImplicitStatelessWorkerStreamConsumerGrain.StreamNamespace, streamId).OnNextAsync("first");
-            await state.WaitForDeliveriesAsync(Timeout);
+            await GetStream(ImplicitStatelessWorkerStreamConsumerGrain.StreamNamespace, streamId).OnNextAsync(deliveryId);
+            await run.WaitForDeliveriesAsync(Timeout);
 
-            Assert.Equal(1, state.DeliveryCount);
-            Assert.Equal(1, state.ObserverActivationCount);
+            Assert.Equal(1, run.DeliveryCount);
+            Assert.Equal(1, run.ObserverActivationCount);
         }
 
         [Fact, TestCategory("Functional")]
         public async Task ConcurrentQueueDeliveries_UseMultipleLocalWorkerActivations()
         {
+            await WaitForStreamingProviderReadyAsync();
             var state = GetConsumerState();
-            state.Reset(expectedDeliveries: PartitionCount, blockDeliveries: true);
+            var deliveryId = Guid.NewGuid().ToString();
+            var run = state.StartRun(deliveryId, expectedDeliveries: PartitionCount, blockDeliveries: true);
             var streamIds = CreateStreamIdsForDistinctQueues();
             var consumer = fixture.GrainFactory.GetGrain<IStatelessWorkerStreamConsumerGrain>(1);
             await consumer.BecomeConsumer(streamIds, StreamProvider);
 
-            await Task.WhenAll(streamIds.Select((streamId, index) =>
-                GetStream(StatelessWorkerStreamConsumerGrain.ExplicitStreamNamespace, streamId)
-                    .OnNextAsync($"item-{index}")));
-            await state.WaitForDeliveriesAsync(Timeout);
+            try
+            {
+                await Task.WhenAll(streamIds.Select(streamId =>
+                    GetStream(StatelessWorkerStreamConsumerGrain.ExplicitStreamNamespace, streamId)
+                        .OnNextAsync(deliveryId)));
+                await run.WaitForDeliveriesAsync(Timeout);
 
-            Assert.Equal(PartitionCount, state.WaitingDeliveryCount);
-            Assert.Equal(PartitionCount, state.DeliveryActivationCount);
-            Assert.Equal(PartitionCount, state.ObserverActivationCount);
+                Assert.Equal(PartitionCount, run.WaitingDeliveryCount);
+                Assert.Equal(PartitionCount, run.DeliveryActivationCount);
+                Assert.Equal(PartitionCount, run.ObserverActivationCount);
+            }
+            finally
+            {
+                await run.ReleaseDeliveriesAsync(Timeout);
+                await Task.WhenAll(streamIds.Select(streamId => consumer.StopConsuming(streamId, StreamProvider)));
+            }
 
-            state.ReleaseDeliveries();
-            await state.WaitForReleasedDeliveriesAsync(Timeout);
-            Assert.Equal(PartitionCount, state.DeliveryCount);
+            Assert.Equal(PartitionCount, run.DeliveryCount);
+        }
+
+        [Fact, TestCategory("Functional")]
+        public async Task DeliveryRunCleanup_ReleasesBlockedDelivery_AndIsolatesNextRun()
+        {
+            await WaitForStreamingProviderReadyAsync();
+            var state = GetConsumerState();
+            var firstDeliveryId = Guid.NewGuid().ToString();
+            var firstRun = state.StartRun(firstDeliveryId, expectedDeliveries: 1, blockDeliveries: true);
+            var streamId = Guid.NewGuid();
+            var consumer = fixture.GrainFactory.GetGrain<IStatelessWorkerStreamConsumerGrain>(3);
+            await consumer.BecomeConsumer([streamId], StreamProvider);
+
+            try
+            {
+                var stream = GetStream(StatelessWorkerStreamConsumerGrain.ExplicitStreamNamespace, streamId);
+                await stream.OnNextAsync(firstDeliveryId);
+                await firstRun.WaitForDeliveriesAsync(Timeout);
+                await firstRun.ReleaseDeliveriesAsync(Timeout);
+
+                var nextDeliveryId = Guid.NewGuid().ToString();
+                var nextRun = state.StartRun(nextDeliveryId, expectedDeliveries: 1);
+                await stream.OnNextAsync(firstDeliveryId);
+                await stream.OnNextAsync(nextDeliveryId);
+                await nextRun.WaitForDeliveriesAsync(Timeout);
+
+                Assert.Equal(1, nextRun.DeliveryCount);
+            }
+            finally
+            {
+                await firstRun.ReleaseDeliveriesAsync(Timeout);
+                await consumer.StopConsuming(streamId, StreamProvider);
+            }
         }
 
         [Fact, TestCategory("Functional")]
@@ -142,6 +189,11 @@ namespace UnitTests.StreamingTests
 
         private StatelessWorkerStreamConsumerState GetConsumerState() =>
             fixture.HostedCluster.GetSiloServiceProvider().GetRequiredService<StatelessWorkerStreamConsumerState>();
+
+        private Task WaitForStreamingProviderReadyAsync() =>
+            fixture.HostedCluster.GetSiloServiceProvider()
+                .GetRequiredService<StreamingDiagnosticEventRecorder>()
+                .WaitForProviderReady(StreamProvider, Timeout);
 
         private IAsyncStream<string> GetStream(string streamNamespace, Guid streamId) =>
             fixture.Client.GetStreamProvider(StreamProvider).GetStream<string>(streamNamespace, streamId);

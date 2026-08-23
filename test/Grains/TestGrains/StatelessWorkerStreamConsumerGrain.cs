@@ -9,79 +9,101 @@ namespace UnitTests.Grains
 {
     public sealed class StatelessWorkerStreamConsumerState
     {
-        private readonly ConcurrentDictionary<Guid, int> _deliveryCounts = new();
-        private readonly ConcurrentDictionary<Guid, int> _observerCounts = new();
-        private readonly SemaphoreSlim _deliverySemaphore = new(0);
-        private TaskCompletionSource _deliveriesReleased = CreateCompletionSource();
-        private TaskCompletionSource _deliveryTargetReached = CreateCompletionSource();
-        private bool _blockDeliveries;
-        private int _deliveryCount;
-        private int _expectedDeliveries;
-        private int _waitingDeliveryCount;
+        private readonly ConcurrentDictionary<Guid, byte> _observerActivations = new();
+        private DeliveryRun? _currentRun;
 
-        public int DeliveryCount => Volatile.Read(ref _deliveryCount);
-
-        public int DeliveryActivationCount => _deliveryCounts.Count;
-
-        public int ObserverActivationCount => _observerCounts.Count;
-
-        public int WaitingDeliveryCount => Volatile.Read(ref _waitingDeliveryCount);
-
-        public void Reset(int expectedDeliveries, bool blockDeliveries = false)
+        public DeliveryRun StartRun(string deliveryId, int expectedDeliveries, bool blockDeliveries = false)
         {
-            if (WaitingDeliveryCount != 0)
-            {
-                throw new InvalidOperationException("All blocked stream deliveries must be released before resetting the test state.");
-            }
-
-            while (_deliverySemaphore.Wait(0))
-            {
-            }
-
-            _deliveryCounts.Clear();
-            _observerCounts.Clear();
-            Interlocked.Exchange(ref _deliveryCount, 0);
-            _expectedDeliveries = expectedDeliveries;
-            Volatile.Write(ref _blockDeliveries, blockDeliveries);
-            _deliveriesReleased = CreateCompletionSource();
-            _deliveryTargetReached = CreateCompletionSource();
+            var run = new DeliveryRun(deliveryId, expectedDeliveries, blockDeliveries);
+            Volatile.Write(ref _currentRun, run);
+            return run;
         }
 
-        public Task WaitForDeliveriesAsync(TimeSpan timeout) => _deliveryTargetReached.Task.WaitAsync(timeout);
+        internal void RecordObserver(Guid activationId) => _observerActivations.TryAdd(activationId, 0);
 
-        public Task WaitForReleasedDeliveriesAsync(TimeSpan timeout) => _deliveriesReleased.Task.WaitAsync(timeout);
-
-        public void ReleaseDeliveries() => _deliverySemaphore.Release(_expectedDeliveries);
-
-        internal void RecordObserver(Guid activationId) => _observerCounts.AddOrUpdate(activationId, 1, static (_, count) => count + 1);
-
-        internal async Task RecordDelivery(Guid activationId)
+        internal Task RecordDelivery(Guid activationId, string deliveryId)
         {
-            _deliveryCounts.AddOrUpdate(activationId, 1, static (_, count) => count + 1);
-            var deliveryCount = Interlocked.Increment(ref _deliveryCount);
-            if (!Volatile.Read(ref _blockDeliveries))
+            var run = Volatile.Read(ref _currentRun);
+            return run is not null && string.Equals(run.DeliveryId, deliveryId, StringComparison.Ordinal)
+                ? run.RecordDelivery(activationId, _observerActivations.ContainsKey(activationId))
+                : Task.CompletedTask;
+        }
+
+        public sealed class DeliveryRun
+        {
+            private readonly ConcurrentDictionary<Guid, int> _deliveryCounts = new();
+            private readonly ConcurrentDictionary<Guid, int> _observerCounts = new();
+            private readonly TaskCompletionSource _deliveriesReleased = CreateCompletionSource();
+            private readonly TaskCompletionSource _deliveryRelease = CreateCompletionSource();
+            private readonly TaskCompletionSource _deliveryTargetReached = CreateCompletionSource();
+            private readonly bool _blockDeliveries;
+            private readonly int _expectedDeliveries;
+            private int _deliveryCount;
+            private int _waitingDeliveryCount;
+
+            internal DeliveryRun(string deliveryId, int expectedDeliveries, bool blockDeliveries)
             {
-                if (deliveryCount >= _expectedDeliveries)
+                DeliveryId = deliveryId;
+                _expectedDeliveries = expectedDeliveries;
+                _blockDeliveries = blockDeliveries;
+            }
+
+            internal string DeliveryId { get; }
+
+            public int DeliveryCount => Volatile.Read(ref _deliveryCount);
+
+            public int DeliveryActivationCount => _deliveryCounts.Count;
+
+            public int ObserverActivationCount => _observerCounts.Count;
+
+            public int WaitingDeliveryCount => Volatile.Read(ref _waitingDeliveryCount);
+
+            public Task WaitForDeliveriesAsync(TimeSpan timeout) => _deliveryTargetReached.Task.WaitAsync(timeout);
+
+            public async Task ReleaseDeliveriesAsync(TimeSpan timeout)
+            {
+                _deliveryRelease.TrySetResult();
+                if (WaitingDeliveryCount == 0)
+                {
+                    _deliveriesReleased.TrySetResult();
+                }
+
+                await _deliveriesReleased.Task.WaitAsync(timeout);
+            }
+
+            internal async Task RecordDelivery(Guid activationId, bool observerAttached)
+            {
+                _deliveryCounts.AddOrUpdate(activationId, 1, static (_, count) => count + 1);
+                if (observerAttached)
+                {
+                    _observerCounts.AddOrUpdate(activationId, 1, static (_, count) => count + 1);
+                }
+
+                var deliveryCount = Interlocked.Increment(ref _deliveryCount);
+                if (!_blockDeliveries)
+                {
+                    if (deliveryCount >= _expectedDeliveries)
+                    {
+                        _deliveryTargetReached.TrySetResult();
+                    }
+                    return;
+                }
+
+                if (Interlocked.Increment(ref _waitingDeliveryCount) >= _expectedDeliveries)
                 {
                     _deliveryTargetReached.TrySetResult();
                 }
-                return;
-            }
 
-            if (Interlocked.Increment(ref _waitingDeliveryCount) >= _expectedDeliveries)
-            {
-                _deliveryTargetReached.TrySetResult();
-            }
-
-            try
-            {
-                await _deliverySemaphore.WaitAsync();
-            }
-            finally
-            {
-                if (Interlocked.Decrement(ref _waitingDeliveryCount) == 0)
+                try
                 {
-                    _deliveriesReleased.TrySetResult();
+                    await _deliveryRelease.Task;
+                }
+                finally
+                {
+                    if (Interlocked.Decrement(ref _waitingDeliveryCount) == 0)
+                    {
+                        _deliveriesReleased.TrySetResult();
+                    }
                 }
             }
         }
@@ -109,7 +131,7 @@ namespace UnitTests.Grains
 
         public Task OnErrorAsync(Exception ex) => Task.CompletedTask;
 
-        public Task OnNextAsync(string item, StreamSequenceToken? token = null) => _state.RecordDelivery(_activationId);
+        public Task OnNextAsync(string item, StreamSequenceToken? token = null) => _state.RecordDelivery(_activationId, item);
 
         public async Task BecomeConsumer(Guid[] streamIds, string providerToUse)
         {
@@ -166,7 +188,7 @@ namespace UnitTests.Grains
         {
             _state.RecordObserver(_activationId);
             await handleFactory.Create<string>().ResumeAsync(
-                (item, token) => _state.RecordDelivery(_activationId),
+                (item, token) => _state.RecordDelivery(_activationId, item),
                 static exception => Task.CompletedTask,
                 static () => Task.CompletedTask);
         }
