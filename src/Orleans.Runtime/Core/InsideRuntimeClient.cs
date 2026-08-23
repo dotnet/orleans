@@ -565,7 +565,7 @@ namespace Orleans.Runtime
 
         private void BreakOutstandingMessages()
         {
-            foreach (var callback in callbacks)
+            callbacks.ForEach(this, static (callback, self) =>
             {
                 try
                 {
@@ -573,9 +573,9 @@ namespace Orleans.Runtime
                 }
                 catch (Exception exception)
                 {
-                    LogWarningWhileProcessingCallbackExpiry(this.logger, exception);
+                    LogWarningWhileProcessingCallbackExpiry(self.logger, exception);
                 }
-            }
+            });
         }
 
         private Task OnRuntimeInitializeStart(CancellationToken tc)
@@ -599,13 +599,13 @@ namespace Orleans.Runtime
 
         public void BreakOutstandingMessagesToSilo(SiloAddress deadSilo)
         {
-            foreach (var callback in callbacks)
+            callbacks.ForEach(deadSilo, static (callback, deadSilo) =>
             {
                 if (deadSilo.Equals(callback.Message.TargetSilo))
                 {
                     callback.OnTargetSiloFail();
                 }
-            }
+            });
         }
 
         public void Participate(ISiloLifecycle lifecycle)
@@ -624,18 +624,18 @@ namespace Orleans.Runtime
                 try
                 {
                     var currentStopwatchTicks = ValueStopwatch.GetTimestamp();
-                    foreach (var callback in callbacks)
+                    callbacks.ForEach(currentStopwatchTicks, static (callback, currentStopwatchTicks) =>
                     {
                         if (callback.IsCompleted)
                         {
-                            continue;
+                            return;
                         }
 
                         if (callback.IsExpired(currentStopwatchTicks))
                         {
                             callback.OnTimeout();
                         }
-                    }
+                    });
                 }
                 catch (Exception ex)
                 {

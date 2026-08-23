@@ -1,7 +1,6 @@
 #nullable enable
 using System;
 using System.Buffers;
-using System.Collections;
 using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
 using System.Runtime.CompilerServices;
@@ -13,7 +12,7 @@ namespace Orleans.Runtime;
 /// to reduce lock contention by hashing correlation ids across stripes.
 /// </summary>
 /// <typeparam name="TValue">The type of values stored in the dictionary.</typeparam>
-internal sealed class StripedCallbackDictionary<TValue> : IEnumerable<TValue>
+internal sealed class StripedCallbackDictionary<TValue>
     where TValue : notnull
 {
     private const int StripeBits = 7;
@@ -133,14 +132,46 @@ internal sealed class StripedCallbackDictionary<TValue> : IEnumerable<TValue>
     }
 
     /// <summary>
-    /// Returns an enumerator that iterates through all items in all stripes.
-    /// Note: This takes a snapshot of each stripe under its lock.
+    /// Visits a snapshot of the values in each stripe.
     /// </summary>
-    public Enumerator GetEnumerator() => new(this);
+    public void ForEach<TState>(TState state, Action<TValue, TState> action)
+    {
+        foreach (var stripe in _stripes)
+        {
+            TValue[]? snapshot = null;
+            var snapshotCount = 0;
+            try
+            {
+                lock (stripe.Lock)
+                {
+                    if (stripe.Dictionary.Count == 0)
+                    {
+                        continue;
+                    }
 
-    IEnumerator<TValue> IEnumerable<TValue>.GetEnumerator() => GetEnumerator();
+                    snapshot = ArrayPool<TValue>.Shared.Rent(stripe.Dictionary.Count);
+                    foreach (var value in stripe.Dictionary.Values)
+                    {
+                        snapshot[snapshotCount++] = value;
+                    }
+                }
 
-    IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
+                for (var i = 0; i < snapshotCount; i++)
+                {
+                    action(snapshot[i], state);
+                }
+            }
+            finally
+            {
+                if (snapshot is not null)
+                {
+                    ArrayPool<TValue>.Shared.Return(
+                        snapshot,
+                        clearArray: RuntimeHelpers.IsReferenceOrContainsReferences<TValue>());
+                }
+            }
+        }
+    }
 
     private sealed class Stripe
     {
@@ -149,93 +180,4 @@ internal sealed class StripedCallbackDictionary<TValue> : IEnumerable<TValue>
     }
 
     private readonly record struct CallbackKey(GrainId Owner, CorrelationId Id);
-
-    public sealed class Enumerator : IEnumerator<TValue>
-    {
-        private readonly StripedCallbackDictionary<TValue> _dictionary;
-        private int _stripeIndex;
-        private TValue[]? _currentSnapshot;
-        private int _snapshotCount;
-        private int _snapshotIndex;
-
-        internal Enumerator(StripedCallbackDictionary<TValue> dictionary)
-        {
-            _dictionary = dictionary;
-            _stripeIndex = -1;
-            _currentSnapshot = null;
-            _snapshotCount = 0;
-            _snapshotIndex = -1;
-        }
-
-        public TValue Current => _currentSnapshot![_snapshotIndex];
-
-        object IEnumerator.Current => Current;
-
-        public bool MoveNext()
-        {
-            while (true)
-            {
-                // Try to advance within current snapshot
-                if (_currentSnapshot != null)
-                {
-                    _snapshotIndex++;
-                    if (_snapshotIndex < _snapshotCount)
-                    {
-                        return true;
-                    }
-
-                    ReturnSnapshot();
-                }
-
-                // Move to next stripe
-                _stripeIndex++;
-                if (_stripeIndex >= _dictionary._stripes.Length)
-                {
-                    _currentSnapshot = null;
-                    return false;
-                }
-
-                // Take a snapshot of the next stripe
-                var stripe = _dictionary._stripes[_stripeIndex];
-                lock (stripe.Lock)
-                {
-                    if (stripe.Dictionary.Count > 0)
-                    {
-                        _currentSnapshot = ArrayPool<TValue>.Shared.Rent(stripe.Dictionary.Count);
-                        _snapshotCount = 0;
-                        foreach (var value in stripe.Dictionary.Values)
-                        {
-                            _currentSnapshot[_snapshotCount++] = value;
-                        }
-                        _snapshotIndex = -1;
-                    }
-                    else
-                    {
-                        _currentSnapshot = null;
-                    }
-                }
-            }
-        }
-
-        public void Reset()
-        {
-            _stripeIndex = -1;
-            ReturnSnapshot();
-            _snapshotIndex = -1;
-        }
-
-        public void Dispose() => ReturnSnapshot();
-
-        private void ReturnSnapshot()
-        {
-            if (_currentSnapshot is { } snapshot)
-            {
-                ArrayPool<TValue>.Shared.Return(
-                    snapshot,
-                    clearArray: RuntimeHelpers.IsReferenceOrContainsReferences<TValue>());
-                _currentSnapshot = null;
-                _snapshotCount = 0;
-            }
-        }
-    }
 }

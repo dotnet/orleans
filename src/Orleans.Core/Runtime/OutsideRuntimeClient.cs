@@ -446,18 +446,18 @@ namespace Orleans
 
         public void BreakOutstandingMessagesToSilo(SiloAddress deadSilo)
         {
-            foreach (var callback in callbacks)
+            callbacks.ForEach(deadSilo, static (callback, deadSilo) =>
             {
                 if (deadSilo.Equals(callback.Message.TargetSilo))
                 {
                     callback.OnTargetSiloFail();
                 }
-            }
+            });
         }
 
         private void BreakOutstandingMessages()
         {
-            foreach (var callback in callbacks)
+            callbacks.ForEach(this, static (callback, self) =>
             {
                 try
                 {
@@ -465,9 +465,9 @@ namespace Orleans
                 }
                 catch (Exception exception)
                 {
-                    LogErrorWhileProcessingCallbackExpiry(logger, exception);
+                    LogErrorWhileProcessingCallbackExpiry(self.logger, exception);
                 }
-            }
+            });
         }
 
         public int GetRunningRequestsCount(GrainInterfaceType grainInterfaceType)
@@ -515,18 +515,18 @@ namespace Orleans
                 try
                 {
                     var currentStopwatchTicks = ValueStopwatch.GetTimestamp();
-                    foreach (var callback in callbacks)
+                    callbacks.ForEach((Self: this, CurrentStopwatchTicks: currentStopwatchTicks), static (callback, state) =>
                     {
                         if (callback.IsCompleted)
                         {
-                            continue;
+                            return;
                         }
 
-                        if (callback.IsExpired(currentStopwatchTicks))
+                        if (callback.IsExpired(state.CurrentStopwatchTicks))
                         {
                             callback.OnTimeout();
                         }
-                    }
+                    });
                 }
                 catch (Exception ex)
                 {
