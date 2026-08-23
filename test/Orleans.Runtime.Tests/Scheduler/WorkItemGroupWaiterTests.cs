@@ -263,6 +263,29 @@ public class WorkItemGroupWaiterTests
         Assert.True(subsequentCallbackRan);
     }
 
+    [Fact]
+    public void QueueActionRejectsNullCallbacksSynchronously()
+    {
+        using var services = CreateServices();
+        var workItemGroup = CreateWorkItemGroup(services);
+        SetRunning(workItemGroup);
+
+        Assert.Throws<ArgumentNullException>("action", () => workItemGroup.QueueAction((Action)null!));
+        Assert.Throws<ArgumentNullException>("action", () => workItemGroup.QueueAction((Action<object>)null!, new object()));
+        Assert.Equal(0, workItemGroup.ExternalWorkItemCount);
+    }
+
+    [Fact]
+    public void PostRejectsNullCallbackSynchronously()
+    {
+        using var services = CreateServices();
+        var workItemGroup = CreateWorkItemGroup(services);
+        SetRunning(workItemGroup);
+
+        Assert.Throws<ArgumentNullException>("d", () => workItemGroup.Post(null!, null));
+        Assert.Equal(0, workItemGroup.ExternalWorkItemCount);
+    }
+
     private static ServiceProvider CreateServices(ILogger<WorkItemGroup>? logger = null)
     {
         var services = new ServiceCollection()
