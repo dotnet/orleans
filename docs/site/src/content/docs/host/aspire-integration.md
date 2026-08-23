@@ -13,7 +13,7 @@ ms.topic: how-to
 
 The `Aspire.Hosting.Orleans` package models an Orleans cluster and its backing services in an Aspire AppHost. [Aspire](https://aspire.dev/get-started/what-is-aspire/) supplies cluster identity, endpoints, provider configuration, service discovery, dependency ordering, and observability context to silo and client projects.
 
-Use Aspire when you want a repeatable local distributed environment or already use an AppHost to describe deployment resources. Aspire orchestrates Orleans; it doesn't replace Orleans clustering, storage, reminder, or stream providers. See [Install the Aspire CLI](https://aspire.dev/get-started/install-cli/) for the supported toolchain.
+Use Aspire when you want a repeatable local distributed environment or already use an AppHost to describe deployment resources. Aspire orchestrates the application resources and supplies configuration to the Orleans providers that implement clustering, storage, reminders, streaming, directories, and journaling. See [Install the Aspire CLI](https://aspire.dev/get-started/install-cli/) for the supported toolchain.
 
 ## Configure the AppHost
 
@@ -92,36 +92,60 @@ The same principle applies to Redis and databases: the AppHost resource can laun
 
 ## Provider wiring reference
 
-For automatically configured external resources, the AppHost needs the corresponding Aspire hosting integration. The silo or client needs both the Orleans provider package and the Aspire client integration, and it must register the client using the Aspire resource name.
+For automatically configured external resources, the AppHost needs the corresponding Aspire hosting integration. The silo or client needs the Orleans provider package and registers any keyed service client named by the generated `ServiceKey`. ADO.NET providers consume injected connection strings directly. AWS resources expose structured outputs, so their examples use `IProviderConfiguration` to map those outputs into Orleans configuration.
 
-| Resource | Application registration | Supported automatic Orleans configuration |
-|---|---|---|
-| Redis | `AddKeyedRedisClient` | Clustering, grain storage, reminders, and grain directories |
-| Azure Tables | `AddKeyedAzureTableServiceClient` | Clustering, grain storage, reminders, and grain directories |
-| Azure Blobs | `AddKeyedAzureBlobServiceClient` | Grain storage |
-| ADO.NET database | Configure the Orleans provider from the injected connection string | Clustering, grain storage, and reminders require manual configuration |
-| In-memory | None | Development clustering, grain storage, reminders, and streaming |
-
-The resulting provider support matrix is:
-
-| Capability | Redis | Azure Tables | Azure Blobs | ADO.NET | In-memory |
-|---|---|---|---|---|---|
-| Clustering | Automatic | Automatic | No | Manual | Development only |
-| Grain storage | Automatic | Automatic | Automatic | Manual | Development only |
-| Reminders | Automatic | Automatic | No | Manual | Development only |
-| Grain directory | Automatic | Automatic | No | No | No |
+| Backend | Aspire-to-Orleans mapping | Orleans capabilities | Provider guidance |
+|---|---|---|---|
+| Azure Tables | Resource inference and keyed `TableServiceClient` | Clustering, grain storage, reminders, grain directory; explicit grain journaling | [Azure Storage](../grains/grain-persistence/azure-storage.md) |
+| Azure Blobs | Resource inference and keyed `BlobServiceClient` | Grain storage; explicit grain journaling | [Azure Storage](../grains/grain-persistence/azure-storage.md) |
+| Azure Queues | Resource inference and keyed `QueueServiceClient` | Streaming | [Azure Queue streams](../implementation/streams-implementation/azure-queue-streams.md) |
+| Azure Cosmos DB | Resource inference and keyed `CosmosClient` | Clustering, grain storage, reminders | [Azure Cosmos DB storage](../grains/grain-persistence/azure-cosmos-db.md) |
+| Redis and Azure Managed Redis | Resource inference and keyed `IConnectionMultiplexer` | Clustering, grain storage, reminders, grain directory, streaming; explicit grain journaling | [Redis storage](../grains/grain-persistence/redis-storage.md) |
+| SQL Server and Azure SQL | Database-resource inference and injected connection string | Clustering, grain storage, reminders, grain directory, streaming | [ADO.NET configuration](configuration-guide/configuring-ado-dot-net-providers.md) |
+| PostgreSQL and Azure Database for PostgreSQL | Database-resource inference and injected connection string | Clustering, grain storage, reminders, grain directory, streaming | [ADO.NET configuration](configuration-guide/configuring-ado-dot-net-providers.md) |
+| MySQL and MariaDB | Database-resource inference and injected connection string | Clustering, grain storage, reminders, grain directory, streaming | [ADO.NET configuration](configuration-guide/configuring-ado-dot-net-providers.md) |
+| Oracle Database | Database-resource inference and injected connection string | Clustering, grain storage, reminders | [ADO.NET configuration](configuration-guide/configuring-ado-dot-net-providers.md) |
+| Azure Event Hubs | Resource inference, keyed Event Hubs clients, and Azure Table checkpoints | Streaming | [Stream providers](../streaming/stream-providers.md) |
+| NATS JetStream | Resource inference and keyed `INatsConnection` | Streaming | [Stream providers](../streaming/stream-providers.md) |
+| Amazon DynamoDB | Explicit `IProviderConfiguration` mapping for AWS endpoints and structured outputs | Clustering, grain storage, reminders | [DynamoDB with Aspire](dynamodb-aspire.md) |
+| Amazon SQS | Explicit partition-topology configuration from the AppHost | Streaming | [SQS streaming](../streaming/sqs-streaming.md) and prerequisite [#10797](https://github.com/dotnet/orleans/pull/10797) |
+| Amazon Kinesis | Explicit `IProviderConfiguration` mapping for stream and checkpoint outputs | Streaming with grain or DynamoDB checkpoints | [Kinesis streaming](../streaming/kinesis-streaming.md) |
+| In-memory | Orleans AppHost operations | Development clustering, grain storage, reminders, and streaming | This page |
 
 ### ADO.NET providers
 
-ADO.NET resource types don't infer the `AdoNet` provider name expected by Orleans, and `Aspire.Hosting.Orleans` doesn't expose an API to override the inferred name. Reference the database resource directly from the silo project so that Aspire injects its connection string:
+Orleans registers aliases for the Aspire SQL Server, Azure SQL, PostgreSQL, Azure PostgreSQL, MySQL, MariaDB, and Oracle database resource types. The provider builder selects the matching ADO.NET invariant and resolves the injected connection string through `ServiceKey`:
 
 :::code language="csharp" source="snippets/aspire/AppHost/AppHostExamples.cs" id="adonet_apphost":::
 
-Configure the Orleans ADO.NET providers from that connection string:
+The silo calls parameterless <xref:Microsoft.Extensions.Hosting.OrleansSiloGenericHostExtensions.UseOrleans*>. Register an Aspire database client separately when application code also consumes that client.
 
-:::code language="csharp" source="snippets/aspire/Silo/SiloProgram.cs" id="adonet_silo":::
+Generic connection-string resources can use an explicit `IProviderConfiguration` to select `AdoNet`, set the database invariant, and reference the connection:
 
-Register an Aspire database client separately only when application code also consumes that database client. Orleans ADO.NET providers use their configured connection string directly.
+:::code language="csharp" source="snippets/aspire/AppHost/AppHostExamples.cs" id="adonet_explicit_provider":::
+
+The `WithOrleansProviderType(...)` resource annotation is implemented upstream in [microsoft/aspire#13630](https://github.com/microsoft/aspire/pull/13630) and can replace the provider-name portion of this explicit mapping after it ships in the Aspire package used by the application.
+
+### Grain journaling
+
+Aspire provisions and starts the backing resource, then the silo configures the Orleans journal provider from the injected resource reference. The [Journaling with Azure Blob JSON sample](../grains/journaling/samples.md) demonstrates this explicit path with Azurite and verifies state recovery after grain reactivation.
+
+Configuration-driven journaling providers use the `Orleans:GrainJournaling` section:
+
+```json
+{
+  "Orleans": {
+    "GrainJournaling": {
+      "ProviderType": "AzureBlobStorage",
+      "ConnectionName": "blobs"
+    }
+  }
+}
+```
+
+Register the keyed Aspire client or inject the named connection used by the selected provider before calling <xref:Microsoft.Extensions.Hosting.OrleansSiloGenericHostExtensions.UseOrleans*>. Orleans activates the provider during silo startup and validates its connection and provider-specific options.
+
+Aspire resource-model support for emitting this section is tracked by [microsoft/aspire#19609](https://github.com/microsoft/aspire/issues/19609).
 
 ### Grain directories
 

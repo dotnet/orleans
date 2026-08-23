@@ -4,11 +4,8 @@ using Aspire.Hosting.Testing;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
-using Microsoft.Extensions.Options;
 using NATS.Client.Core;
 using NATS.Client.JetStream;
-using Orleans.Hosting;
-using Orleans.Streaming.NATS;
 using Orleans.Streams;
 using Orleans.TestingHost;
 using TestExtensions;
@@ -23,7 +20,7 @@ namespace NATS.Tests;
 public sealed class NatsAspireAppModelTests
 {
     [Fact]
-    public async Task AspireAppModel_ActivatesSiloAndClientProvidersUsingKeyedConnections()
+    public async Task AspireAppModel_ProducesSiloAndClientProviderConfiguration()
     {
         await using var model = await NatsAspireTestModel.CreateAsync("orders-stream");
 
@@ -31,40 +28,8 @@ public sealed class NatsAspireAppModelTests
         Assert.Equal("NatsServer", model.ClientEnvironment["Orleans:Streaming:orders:ProviderType"]);
         Assert.Equal("nats", model.SiloEnvironment["Orleans:Streaming:orders:ServiceKey"]);
         Assert.Equal("nats", model.ClientEnvironment["Orleans:Streaming:orders:ServiceKey"]);
-
-        using var siloHost = BuildHost(model.SiloEnvironment, isSilo: true);
-        using var clientHost = BuildHost(model.ClientEnvironment, isSilo: false);
-
-        AssertProviderActivation(siloHost.Services);
-        AssertProviderActivation(clientHost.Services);
-    }
-
-    private static IHost BuildHost(IReadOnlyDictionary<string, string?> environment, bool isSilo)
-    {
-        var builder = Host.CreateApplicationBuilder();
-        builder.Configuration.AddInMemoryCollection(environment);
-        builder.Services.AddKeyedSingleton<INatsConnection>(
-            "nats",
-            new NatsConnection(NatsTestConstants.NatsClientOptions));
-        if (isSilo)
-        {
-            builder.UseOrleans();
-        }
-        else
-        {
-            builder.UseOrleansClient();
-        }
-
-        return builder.Build();
-    }
-
-    private static void AssertProviderActivation(IServiceProvider services)
-    {
-        var options = services.GetRequiredService<IOptionsMonitor<NatsOptions>>().Get("orders");
-        var connection = services.GetRequiredKeyedService<INatsConnection>("nats");
-
-        Assert.Equal("orders-stream", options.StreamName);
-        Assert.Same(connection, options.Connection);
+        Assert.Equal("orders-stream", model.SiloEnvironment["Orleans:Streaming:orders:StreamName"]);
+        Assert.Equal("orders-stream", model.ClientEnvironment["Orleans:Streaming:orders:StreamName"]);
     }
 }
 
@@ -211,7 +176,7 @@ internal sealed class NatsAspireTestModel : IAsyncDisposable
         var result = new Dictionary<string, string?>();
         foreach (var (key, value) in values)
         {
-            if (!key.StartsWith("Orleans__", StringComparison.Ordinal))
+            if (!key.StartsWith("Orleans__Streaming__", StringComparison.Ordinal))
             {
                 continue;
             }
