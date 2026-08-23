@@ -12,6 +12,6 @@
       </Exclude>
     </Sources>
     <EnableDynamicManagedInstrumentation>True</EnableDynamicManagedInstrumentation>
-    <EnableStaticManagedInstrumentation>False</EnableStaticManagedInstrumentation>
+    <EnableStaticManagedInstrumentation>True</EnableStaticManagedInstrumentation>
   </CodeCoverage>
 </Configuration>

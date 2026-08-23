@@ -5,7 +5,7 @@ Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
 $scriptPath = Join-Path $PSScriptRoot 'summarize-coverage.ps1'
-$collectorScriptPath = Join-Path $PSScriptRoot 'run-tests-with-coverage.ps1'
+$collectorScriptPath = Join-Path $PSScriptRoot 'run-dotnet-test.ps1'
 $workflowPath = Join-Path $PSScriptRoot '../workflows/ci.yml'
 $temporaryRoot = Join-Path ([IO.Path]::GetTempPath()) "orleans-coverage-tests-$([guid]::NewGuid())"
 $testsRun = 0
@@ -260,23 +260,23 @@ try {
         Assert-Throws { Invoke-Summarizer $testCase } 'must not be a symbolic link'
     }
 
-    Invoke-Test 'keeps suite coverage files distinct' {
+    Invoke-Test 'keeps coverage runs distinct' {
         $collectorScript = Get-Content -Raw -LiteralPath $collectorScriptPath
         Assert-Matches `
             $collectorScript `
-            "\('\{0\}-\{1:D3\}-\{2\}\.cobertura\.xml' -f \`$Suite, \`$index, \`$moduleName\)" `
-            'Coverage file names must include the suite.'
+            '"\$CoverageId\.cobertura\.xml"' `
+            'Coverage file names must include the complete matrix identity.'
     }
 
     Invoke-Test 'uses external coverage collection for CI builds' {
         $collectorScript = Get-Content -Raw -LiteralPath $collectorScriptPath
         Assert-Matches `
             $collectorScript `
-            '& \$resolvedCoverageToolPath collect' `
+            '& \$coverageTool collect' `
             'Coverage must use the external collector with ContinuousIntegrationBuild.'
         Assert-Matches `
             $collectorScript `
-            'contains no measured lines for \$moduleTestCount tests' `
+            'contains no measured lines' `
             'Coverage collection must reject empty reports from successful test runs.'
     }
 
@@ -284,20 +284,28 @@ try {
         $workflow = Get-Content -Raw -LiteralPath $workflowPath
         Assert-Matches `
             $workflow `
-            '(?s)pattern:\s*coverage_data_\*.*?merge-multiple:\s*false' `
+            '(?s)pattern:\s*test_output_\*.*?merge-multiple:\s*false' `
             'Coverage artifacts must not be flattened before merging.'
     }
 
-    Invoke-Test 'requires every covered suite before merging' {
+    Invoke-Test 'requires every test matrix job before merging' {
         $workflow = Get-Content -Raw -LiteralPath $workflowPath
         Assert-Matches `
             $workflow `
-            "foreach \(\`$suite in 'BVT', 'SlowBVT', 'Functional'\)" `
-            'The merge must validate every covered suite.'
+            '\$expectedArtifactCount = 60' `
+            'The merge must validate every test matrix artifact.'
         Assert-Matches `
             $workflow `
-            'Coverage data for the \$suite suite contains no reports' `
-            'The merge must reject empty suite artifacts.'
+            'contains no coverage report' `
+            'The merge must reject test artifacts without coverage.'
+    }
+
+    Invoke-Test 'collects coverage from every test job' {
+        $workflow = Get-Content -Raw -LiteralPath $workflowPath
+        $setupCount = ([regex]::Matches($workflow, '- name: Setup code coverage')).Count
+        $runnerCount = ([regex]::Matches($workflow, 'run-dotnet-test\.ps1')).Count
+        Assert-Equal 18 $setupCount 'Coverage setup step count differs.'
+        Assert-Equal 19 $runnerCount 'Covered test command count differs.'
     }
 
     Write-Output "$testsRun coverage tests passed."

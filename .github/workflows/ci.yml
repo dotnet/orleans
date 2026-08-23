@@ -93,16 +93,17 @@ jobs:
       uses: actions/setup-dotnet@c2fa09f4bde5ebb9d1777cf28262a3eb3db3ced7 # v5
       with:
         global-json-file: global.json
+    - name: Setup code coverage
+      if: github.event_name == 'pull_request'
+      uses: ./.github/actions/setup-coverage
     - name: Test
-      run: dotnet test
-        --framework ${{ matrix.framework }}
-        --filter-query "/[(Provider=${{ matrix.provider }})&((Suite=BVT)|(Suite=SlowBVT)|(Suite=Functional))&(Category!=Performance)&(Category!=Stress)]"
-        --minimum-expected-tests 1
-        --hangdump --hangdump-timeout 10m
-        --crashdump --crashdump-type Full
-        --hangdump-type Full
-        --report-trx --report-trx-filename "test_results_${{ matrix.provider }}_${{ matrix.framework }}_{asm}_{tfm}_{arch}.trx"
-        --max-parallel-test-modules 1
+      shell: pwsh
+      run: >
+        ./.github/scripts/run-dotnet-test.ps1
+        -CoverageId "${{ github.job }}-${{ matrix.provider }}-${{ matrix.framework }}"
+        -Framework "${{ matrix.framework }}"
+        -FilterQuery "/[(Provider=${{ matrix.provider }})&((Suite=BVT)|(Suite=SlowBVT)|(Suite=Functional))&(Category!=Performance)&(Category!=Stress)]"
+        -ReportTrxFilename "test_results_${{ matrix.provider }}_${{ matrix.framework }}_{asm}_{tfm}_{arch}.trx"
       env:
         ORLEANSREDISCONNECTIONSTRING: "localhost:6379,ssl=False,abortConnect=False"
     - name: Clean up Redis
@@ -143,16 +144,17 @@ jobs:
       uses: actions/setup-dotnet@c2fa09f4bde5ebb9d1777cf28262a3eb3db3ced7 # v5
       with:
         global-json-file: global.json
+    - name: Setup code coverage
+      if: github.event_name == 'pull_request'
+      uses: ./.github/actions/setup-coverage
     - name: Test
-      run: dotnet test
-        --framework ${{ matrix.framework }}
-        --filter-query "/[(Provider=${{ matrix.provider }})&((Suite=BVT)|(Suite=SlowBVT)|(Suite=Functional))&(Category!=Performance)&(Category!=Stress)]"
-        --minimum-expected-tests 1
-        --hangdump --hangdump-timeout 10m
-        --crashdump --crashdump-type Full
-        --hangdump-type Full
-        --report-trx --report-trx-filename "test_results_${{ matrix.provider }}_${{ matrix.dbversion }}_${{ matrix.framework }}_{asm}_{tfm}_{arch}.trx"
-        --max-parallel-test-modules 1
+      shell: pwsh
+      run: >
+        ./.github/scripts/run-dotnet-test.ps1
+        -CoverageId "${{ github.job }}-${{ matrix.provider }}-${{ matrix.dbversion }}-${{ matrix.framework }}"
+        -Framework "${{ matrix.framework }}"
+        -FilterQuery "/[(Provider=${{ matrix.provider }})&((Suite=BVT)|(Suite=SlowBVT)|(Suite=Functional))&(Category!=Performance)&(Category!=Stress)]"
+        -ReportTrxFilename "test_results_${{ matrix.provider }}_${{ matrix.dbversion }}_${{ matrix.framework }}_{asm}_{tfm}_{arch}.trx"
       env:
         CASSANDRAVERSION: ${{ matrix.dbversion }}
     - name: Archive Test Results
@@ -201,16 +203,17 @@ jobs:
       uses: actions/setup-dotnet@c2fa09f4bde5ebb9d1777cf28262a3eb3db3ced7 # v5
       with:
         global-json-file: global.json
+    - name: Setup code coverage
+      if: github.event_name == 'pull_request'
+      uses: ./.github/actions/setup-coverage
     - name: Test
-      run: dotnet test
-        --framework ${{ matrix.framework }}
-        --filter-query "/[(Provider=${{ matrix.provider }})&((Suite=BVT)|(Suite=SlowBVT)|(Suite=Functional))&(Category!=Performance)&(Category!=Stress)]"
-        --minimum-expected-tests 1
-        --hangdump --hangdump-timeout 10m
-        --crashdump --crashdump-type Full
-        --hangdump-type Full
-        --report-trx --report-trx-filename "test_results_${{ matrix.provider }}_${{ matrix.framework }}_{asm}_{tfm}_{arch}.trx"
-        --max-parallel-test-modules 1
+      shell: pwsh
+      run: >
+        ./.github/scripts/run-dotnet-test.ps1
+        -CoverageId "${{ github.job }}-${{ matrix.provider }}-${{ matrix.framework }}"
+        -Framework "${{ matrix.framework }}"
+        -FilterQuery "/[(Provider=${{ matrix.provider }})&((Suite=BVT)|(Suite=SlowBVT)|(Suite=Functional))&(Category!=Performance)&(Category!=Stress)]"
+        -ReportTrxFilename "test_results_${{ matrix.provider }}_${{ matrix.framework }}_{asm}_{tfm}_{arch}.trx"
       env:
 # [SuppressMessage("Microsoft.Security", "CS002:SecretInNextLine", Justification="False positive")]
         ORLEANSPOSTGRESCONNECTIONSTRING: "Server=127.0.0.1;Port=5432;Pooling=false;User Id=postgres;Password=postgres;SSL Mode=Disable"
@@ -292,16 +295,17 @@ jobs:
         echo "MariaDB did not become healthy in time."
         docker logs mariadb
         exit 1
+    - name: Setup code coverage
+      if: github.event_name == 'pull_request'
+      uses: ./.github/actions/setup-coverage
     - name: Test
-      run: dotnet test
-        --framework ${{ matrix.framework }}
-        --filter-query "/[(Provider=${{ matrix.provider }})&((Suite=BVT)|(Suite=SlowBVT)|(Suite=Functional))&(Category!=Performance)&(Category!=Stress)]"
-        --minimum-expected-tests 1
-        --hangdump --hangdump-timeout 10m
-        --crashdump --crashdump-type Full
-        --hangdump-type Full
-        --report-trx --report-trx-filename "test_results_${{ matrix.provider }}_${{ matrix.framework }}_{asm}_{tfm}_{arch}.trx"
-        --max-parallel-test-modules 1
+      shell: pwsh
+      run: >
+        ./.github/scripts/run-dotnet-test.ps1
+        -CoverageId "${{ github.job }}-${{ matrix.provider }}-${{ matrix.framework }}"
+        -Framework "${{ matrix.framework }}"
+        -FilterQuery "/[(Provider=${{ matrix.provider }})&((Suite=BVT)|(Suite=SlowBVT)|(Suite=Functional))&(Category!=Performance)&(Category!=Stress)]"
+        -ReportTrxFilename "test_results_${{ matrix.provider }}_${{ matrix.framework }}_{asm}_{tfm}_{arch}.trx"
       env:
 # [SuppressMessage("Microsoft.Security", "CS002:SecretInNextLine", Justification="Not a secret")]
         ORLEANSMYSQLCONNECTIONSTRING: "Server=127.0.0.1;Port=3306;UId=root;Pwd=mariadb;"
@@ -354,16 +358,17 @@ jobs:
       uses: actions/setup-dotnet@c2fa09f4bde5ebb9d1777cf28262a3eb3db3ced7 # v5
       with:
         global-json-file: global.json
+    - name: Setup code coverage
+      if: github.event_name == 'pull_request'
+      uses: ./.github/actions/setup-coverage
     - name: Test
-      run: dotnet test
-        --framework ${{ matrix.framework }}
-        --filter-query "/[(Provider=${{ matrix.provider }})&((Suite=BVT)|(Suite=SlowBVT)|(Suite=Functional))&(Category!=Performance)&(Category!=Stress)]"
-        --minimum-expected-tests 1
-        --hangdump --hangdump-timeout 10m
-        --crashdump --crashdump-type Full
-        --hangdump-type Full
-        --report-trx --report-trx-filename "test_results_${{ matrix.provider }}_${{ matrix.framework }}_{asm}_{tfm}_{arch}.trx"
-        --max-parallel-test-modules 1
+      shell: pwsh
+      run: >
+        ./.github/scripts/run-dotnet-test.ps1
+        -CoverageId "${{ github.job }}-${{ matrix.provider }}-${{ matrix.framework }}"
+        -Framework "${{ matrix.framework }}"
+        -FilterQuery "/[(Provider=${{ matrix.provider }})&((Suite=BVT)|(Suite=SlowBVT)|(Suite=Functional))&(Category!=Performance)&(Category!=Stress)]"
+        -ReportTrxFilename "test_results_${{ matrix.provider }}_${{ matrix.framework }}_{asm}_{tfm}_{arch}.trx"
       env:
 # [SuppressMessage("Microsoft.Security", "CS002:SecretInNextLine", Justification="Not a secret")]
         ORLEANSMSSQLCONNECTIONSTRING: "Server=127.0.0.1,1433;User Id=SA;Password=yourWeak(!)Password;TrustServerCertificate=True;"
@@ -401,16 +406,17 @@ jobs:
       uses: actions/setup-dotnet@c2fa09f4bde5ebb9d1777cf28262a3eb3db3ced7 # v5
       with:
         global-json-file: global.json
+    - name: Setup code coverage
+      if: github.event_name == 'pull_request'
+      uses: ./.github/actions/setup-coverage
     - name: Test
-      run: dotnet test
-        --framework ${{ matrix.framework }}
-        --filter-query "/[(Provider=${{ matrix.provider }})&((Suite=BVT)|(Suite=SlowBVT)|(Suite=Functional))&(Category!=Performance)&(Category!=Stress)]"
-        --minimum-expected-tests 1
-        --hangdump --hangdump-timeout 10m
-        --crashdump --crashdump-type Full
-        --hangdump-type Full
-        --report-trx --report-trx-filename "test_results_${{ matrix.provider }}_${{ matrix.framework }}_{asm}_{tfm}_{arch}.trx"
-        --max-parallel-test-modules 1
+      shell: pwsh
+      run: >
+        ./.github/scripts/run-dotnet-test.ps1
+        -CoverageId "${{ github.job }}-${{ matrix.provider }}-${{ matrix.framework }}"
+        -Framework "${{ matrix.framework }}"
+        -FilterQuery "/[(Provider=${{ matrix.provider }})&((Suite=BVT)|(Suite=SlowBVT)|(Suite=Functional))&(Category!=Performance)&(Category!=Stress)]"
+        -ReportTrxFilename "test_results_${{ matrix.provider }}_${{ matrix.framework }}_{asm}_{tfm}_{arch}.trx"
     - name: Archive Test Results
       if: always()
       continue-on-error: true
@@ -454,16 +460,17 @@ jobs:
       uses: actions/setup-dotnet@c2fa09f4bde5ebb9d1777cf28262a3eb3db3ced7 # v5
       with:
         global-json-file: global.json
+    - name: Setup code coverage
+      if: github.event_name == 'pull_request'
+      uses: ./.github/actions/setup-coverage
     - name: Test
-      run: dotnet test
-        --filter-query "/[(Provider=${{ matrix.provider }})&((Suite=BVT)|(Suite=SlowBVT)|(Suite=Functional))&(Category!=Performance)&(Category!=Stress)]"
-        --minimum-expected-tests 1
-        --framework ${{ matrix.framework }}
-        --hangdump --hangdump-timeout 10m
-        --crashdump --crashdump-type Full
-        --hangdump-type Full
-        --report-trx --report-trx-filename "test_results_${{ matrix.provider }}_${{ matrix.framework }}_{asm}_{tfm}_{arch}.trx"
-        --max-parallel-test-modules 1
+      shell: pwsh
+      run: >
+        ./.github/scripts/run-dotnet-test.ps1
+        -CoverageId "${{ github.job }}-${{ matrix.provider }}-${{ matrix.framework }}"
+        -Framework "${{ matrix.framework }}"
+        -FilterQuery "/[(Provider=${{ matrix.provider }})&((Suite=BVT)|(Suite=SlowBVT)|(Suite=Functional))&(Category!=Performance)&(Category!=Stress)]"
+        -ReportTrxFilename "test_results_${{ matrix.provider }}_${{ matrix.framework }}_{asm}_{tfm}_{arch}.trx"
       env:
 # [SuppressMessage("Microsoft.Security", "CS002:SecretInNextLine", Justification="Not a secret")]
 # [SuppressMessage("Microsoft.Security", "CSCAN0090:ConfigFile", Justification="Not a secret")]
@@ -534,16 +541,17 @@ jobs:
       uses: actions/setup-dotnet@c2fa09f4bde5ebb9d1777cf28262a3eb3db3ced7 # v5
       with:
         global-json-file: global.json
+    - name: Setup code coverage
+      if: github.event_name == 'pull_request'
+      uses: ./.github/actions/setup-coverage
     - name: Test
-      run: dotnet test
-        --filter-query "/[(Provider=${{ matrix.provider }})&((Suite=BVT)|(Suite=SlowBVT)|(Suite=Functional))&(Category!=Performance)&(Category!=Stress)]"
-        --minimum-expected-tests 1
-        --framework ${{ matrix.framework }}
-        --hangdump --hangdump-timeout 10m
-        --crashdump --crashdump-type Full
-        --hangdump-type Full
-        --report-trx --report-trx-filename "test_results_${{ matrix.provider }}_${{ matrix.framework }}_{asm}_{tfm}_{arch}.trx"
-        --max-parallel-test-modules 1
+      shell: pwsh
+      run: >
+        ./.github/scripts/run-dotnet-test.ps1
+        -CoverageId "${{ github.job }}-${{ matrix.provider }}-${{ matrix.framework }}"
+        -Framework "${{ matrix.framework }}"
+        -FilterQuery "/[(Provider=${{ matrix.provider }})&((Suite=BVT)|(Suite=SlowBVT)|(Suite=Functional))&(Category!=Performance)&(Category!=Stress)]"
+        -ReportTrxFilename "test_results_${{ matrix.provider }}_${{ matrix.framework }}_{asm}_{tfm}_{arch}.trx"
       env:
 # [SuppressMessage("Microsoft.Security", "CS002:SecretInNextLine", Justification="Not a secret")]
 # [SuppressMessage("Microsoft.Security", "CSCAN0090:ConfigFile", Justification="Not a secret")]
@@ -583,6 +591,9 @@ jobs:
       uses: actions/setup-dotnet@c2fa09f4bde5ebb9d1777cf28262a3eb3db3ced7 # v5
       with:
         global-json-file: global.json
+    - name: Setup code coverage
+      if: github.event_name == 'pull_request'
+      uses: ./.github/actions/setup-coverage
     - name: Start Azure Cosmos DB emulator
       run: |
         set -euo pipefail
@@ -616,32 +627,31 @@ jobs:
           sleep 2
         done
     - name: Test
+      shell: pwsh
       run: |
-        cosmos_filter='/[(Provider=${{ matrix.provider }})&((Suite=BVT)|(Suite=SlowBVT)|(Suite=Functional))&(Category!=Performance)&(Category!=Stress)]'
-        for attempt in 1 2; do
-          logger_name="test_results_${{ matrix.provider }}_${{ matrix.framework }}_attempt${attempt}.trx"
-          extra_args=()
-          if [ "$attempt" -gt 1 ]; then
-            echo "Cosmos tests failed on attempt $((attempt - 1)); retrying once with the same filter."
-            extra_args+=(--no-build)
-          fi
+        $cosmosFilter = '/[(Provider=${{ matrix.provider }})&((Suite=BVT)|(Suite=SlowBVT)|(Suite=Functional))&(Category!=Performance)&(Category!=Stress)]'
+        foreach ($attempt in 1, 2) {
+          $arguments = @{
+            CoverageId = "${{ github.job }}-${{ matrix.provider }}-${{ matrix.framework }}"
+            Framework = "${{ matrix.framework }}"
+            Project = 'test/Extensions/Orleans.Cosmos.Tests/Orleans.Cosmos.Tests.csproj'
+            FilterQuery = $cosmosFilter
+            ReportTrxFilename = "test_results_${{ matrix.provider }}_${{ matrix.framework }}_attempt${attempt}.trx"
+          }
+          if ($attempt -gt 1) {
+            Write-Host "Cosmos tests failed on attempt $($attempt - 1); retrying once with the same filter."
+            $arguments.NoBuild = $true
+          }
 
-          if dotnet test \
-            --project test/Extensions/Orleans.Cosmos.Tests/Orleans.Cosmos.Tests.csproj \
-            --framework ${{ matrix.framework }} \
-            --filter-query "${cosmos_filter}" \
-            --minimum-expected-tests 1 \
-            --hangdump --hangdump-timeout 10m \
-            --crashdump --crashdump-type Full \
-            --hangdump-type Full \
-            --report-trx --report-trx-filename "${logger_name}" \
-            "${extra_args[@]}" \
-            --max-parallel-test-modules 1; then
-            exit 0
-          fi
-        done
-
-        exit 1
+          try {
+            ./.github/scripts/run-dotnet-test.ps1 @arguments
+            break
+          } catch {
+            if ($attempt -eq 2) {
+              throw
+            }
+          }
+        }
       env:
 # [SuppressMessage("Microsoft.Security", "CS002:SecretInNextLine", Justification="Not a secret")]
         #ORLEANSCOSMOSDBACCOUNTENDPOINT: "https://localhost:8081/"
@@ -683,16 +693,17 @@ jobs:
       uses: actions/setup-dotnet@c2fa09f4bde5ebb9d1777cf28262a3eb3db3ced7 # v5
       with:
         global-json-file: global.json
+    - name: Setup code coverage
+      if: github.event_name == 'pull_request'
+      uses: ./.github/actions/setup-coverage
     - name: Test
-      run: dotnet test
-        --framework ${{ matrix.framework }}
-        --filter-query "/[(Provider=${{ matrix.provider }})&((Suite=BVT)|(Suite=SlowBVT)|(Suite=Functional))&(Category!=Performance)&(Category!=Stress)]"
-        --minimum-expected-tests 1
-        --hangdump --hangdump-timeout 10m
-        --crashdump --crashdump-type Full
-        --hangdump-type Full
-        --report-trx --report-trx-filename "test_results_${{ matrix.provider }}_${{ matrix.framework }}_{asm}_{tfm}_{arch}.trx"
-        --max-parallel-test-modules 1
+      shell: pwsh
+      run: >
+        ./.github/scripts/run-dotnet-test.ps1
+        -CoverageId "${{ github.job }}-${{ matrix.provider }}-${{ matrix.framework }}"
+        -Framework "${{ matrix.framework }}"
+        -FilterQuery "/[(Provider=${{ matrix.provider }})&((Suite=BVT)|(Suite=SlowBVT)|(Suite=Functional))&(Category!=Performance)&(Category!=Stress)]"
+        -ReportTrxFilename "test_results_${{ matrix.provider }}_${{ matrix.framework }}_{asm}_{tfm}_{arch}.trx"
     - name: Archive Test Results
       if: always()
       continue-on-error: true
@@ -733,16 +744,17 @@ jobs:
       uses: actions/setup-dotnet@c2fa09f4bde5ebb9d1777cf28262a3eb3db3ced7 # v5
       with:
         global-json-file: global.json
+    - name: Setup code coverage
+      if: github.event_name == 'pull_request'
+      uses: ./.github/actions/setup-coverage
     - name: Test
-      run: dotnet test
-        --framework ${{ matrix.framework }}
-        --filter-query "/[(Provider=${{ matrix.provider }})&((Suite=BVT)|(Suite=SlowBVT)|(Suite=Functional))&(Category!=Performance)&(Category!=Stress)]"
-        --minimum-expected-tests 1
-        --hangdump --hangdump-timeout 10m
-        --crashdump --crashdump-type Full
-        --hangdump-type Full
-        --report-trx --report-trx-filename "test_results_${{ matrix.provider }}_${{ matrix.framework }}_{asm}_{tfm}_{arch}.trx"
-        --max-parallel-test-modules 1
+      shell: pwsh
+      run: >
+        ./.github/scripts/run-dotnet-test.ps1
+        -CoverageId "${{ github.job }}-${{ matrix.provider }}-${{ matrix.framework }}"
+        -Framework "${{ matrix.framework }}"
+        -FilterQuery "/[(Provider=${{ matrix.provider }})&((Suite=BVT)|(Suite=SlowBVT)|(Suite=Functional))&(Category!=Performance)&(Category!=Stress)]"
+        -ReportTrxFilename "test_results_${{ matrix.provider }}_${{ matrix.framework }}_{asm}_{tfm}_{arch}.trx"
       env:
         ORLEANSZOOKEEPERCONNECTIONSTRING: "localhost:2181"
     - name: Clean up ZooKeeper
@@ -796,16 +808,17 @@ jobs:
       uses: actions/setup-dotnet@c2fa09f4bde5ebb9d1777cf28262a3eb3db3ced7 # v5
       with:
         global-json-file: global.json
+    - name: Setup code coverage
+      if: github.event_name == 'pull_request'
+      uses: ./.github/actions/setup-coverage
     - name: Test
-      run: dotnet test
-        --framework ${{ matrix.framework }}
-        --filter-query "/[(Provider=${{ matrix.provider }})&((Suite=BVT)|(Suite=SlowBVT)|(Suite=Functional))&(Category!=Performance)&(Category!=Stress)]"
-        --minimum-expected-tests 1
-        --hangdump --hangdump-timeout 10m
-        --crashdump --crashdump-type Full
-        --hangdump-type Full
-        --report-trx --report-trx-filename "test_results_${{ matrix.provider }}_${{ matrix.framework }}_{asm}_{tfm}_{arch}.trx"
-        --max-parallel-test-modules 1
+      shell: pwsh
+      run: >
+        ./.github/scripts/run-dotnet-test.ps1
+        -CoverageId "${{ github.job }}-${{ matrix.provider }}-${{ matrix.framework }}"
+        -Framework "${{ matrix.framework }}"
+        -FilterQuery "/[(Provider=${{ matrix.provider }})&((Suite=BVT)|(Suite=SlowBVT)|(Suite=Functional))&(Category!=Performance)&(Category!=Stress)]"
+        -ReportTrxFilename "test_results_${{ matrix.provider }}_${{ matrix.framework }}_{asm}_{tfm}_{arch}.trx"
       env:
         ORLEANSDYNAMODBSERVICE: "http://127.0.0.1:8000"
 # [SuppressMessage("Microsoft.Security", "CS002:SecretInNextLine", Justification="Not a secret")]
@@ -874,17 +887,18 @@ jobs:
       uses: actions/setup-dotnet@v4
       with:
         global-json-file: global.json
+    - name: Setup code coverage
+      if: github.event_name == 'pull_request'
+      uses: ./.github/actions/setup-coverage
     - name: Test
-      run: dotnet test
-        --project test/Extensions/Orleans.AWS.Tests/Orleans.AWS.Tests.csproj
-        --framework ${{ matrix.framework }}
-        --filter-query "/[(Provider=${{ matrix.provider }})&((Suite=BVT)|(Suite=SlowBVT)|(Suite=Functional))&(Category!=Performance)&(Category!=Stress)]"
-        --minimum-expected-tests 1
-        --hangdump --hangdump-timeout 10m
-        --crashdump --crashdump-type Full
-        --hangdump-type Full
-        --report-trx --report-trx-filename "test_results_${{ matrix.provider }}_${{ matrix.framework }}_{asm}_{tfm}_{arch}.trx"
-        --max-parallel-test-modules 1
+      shell: pwsh
+      run: >
+        ./.github/scripts/run-dotnet-test.ps1
+        -CoverageId "${{ github.job }}-${{ matrix.provider }}-${{ matrix.framework }}"
+        -Framework "${{ matrix.framework }}"
+        -Project "test/Extensions/Orleans.AWS.Tests/Orleans.AWS.Tests.csproj"
+        -FilterQuery "/[(Provider=${{ matrix.provider }})&((Suite=BVT)|(Suite=SlowBVT)|(Suite=Functional))&(Category!=Performance)&(Category!=Stress)]"
+        -ReportTrxFilename "test_results_${{ matrix.provider }}_${{ matrix.framework }}_{asm}_{tfm}_{arch}.trx"
       env:
         ORLEANSSQSCONNECTIONSTRING: "Service=http://127.0.0.1:9324"
         ORLEANSDYNAMODBSERVICE: "http://127.0.0.1:8000"
@@ -952,17 +966,18 @@ jobs:
       uses: actions/setup-dotnet@c2fa09f4bde5ebb9d1777cf28262a3eb3db3ced7 # v5
       with:
         global-json-file: global.json
+    - name: Setup code coverage
+      if: github.event_name == 'pull_request'
+      uses: ./.github/actions/setup-coverage
     - name: Test
-      run: dotnet test
-        --project test/Extensions/Orleans.Streaming.NATS.Tests/Orleans.Streaming.NATS.Tests.csproj
-        --framework ${{ matrix.framework }}
-        --filter-query "/[(Provider=${{ matrix.provider }})&((Suite=BVT)|(Suite=SlowBVT)|(Suite=Functional))&(Category!=Performance)&(Category!=Stress)]"
-        --minimum-expected-tests 1
-        --hangdump --hangdump-timeout 10m
-        --crashdump --crashdump-type Full
-        --hangdump-type Full
-        --report-trx --report-trx-filename "test_results_${{ matrix.provider }}_${{ matrix.framework }}_{asm}_{tfm}_{arch}.trx"
-        --max-parallel-test-modules 1
+      shell: pwsh
+      run: >
+        ./.github/scripts/run-dotnet-test.ps1
+        -CoverageId "${{ github.job }}-${{ matrix.provider }}-${{ matrix.framework }}"
+        -Framework "${{ matrix.framework }}"
+        -Project "test/Extensions/Orleans.Streaming.NATS.Tests/Orleans.Streaming.NATS.Tests.csproj"
+        -FilterQuery "/[(Provider=${{ matrix.provider }})&((Suite=BVT)|(Suite=SlowBVT)|(Suite=Functional))&(Category!=Performance)&(Category!=Stress)]"
+        -ReportTrxFilename "test_results_${{ matrix.provider }}_${{ matrix.framework }}_{asm}_{tfm}_{arch}.trx"
     - name: Clean up container
       if: always()
       run: docker rm -f nats || true
@@ -1026,17 +1041,18 @@ jobs:
       uses: actions/setup-dotnet@c2fa09f4bde5ebb9d1777cf28262a3eb3db3ced7 # v5
       with:
         global-json-file: global.json
+    - name: Setup code coverage
+      if: github.event_name == 'pull_request'
+      uses: ./.github/actions/setup-coverage
     - name: Test
-      run: dotnet test
-        --project test/Extensions/Orleans.Streaming.Kinesis.Tests/Orleans.Streaming.Kinesis.Tests.csproj
-        --framework ${{ matrix.framework }}
-        --filter-query "/[(Provider=${{ matrix.provider }})&((Suite=BVT)|(Suite=SlowBVT)|(Suite=Functional))&(Category!=Performance)&(Category!=Stress)]"
-        --minimum-expected-tests 1
-        --hangdump --hangdump-timeout 10m
-        --crashdump --crashdump-type Full
-        --hangdump-type Full
-        --report-trx --report-trx-filename "test_results_${{ matrix.provider }}_${{ matrix.framework }}_{asm}_{tfm}_{arch}.trx"
-        --max-parallel-test-modules 1
+      shell: pwsh
+      run: >
+        ./.github/scripts/run-dotnet-test.ps1
+        -CoverageId "${{ github.job }}-${{ matrix.provider }}-${{ matrix.framework }}"
+        -Framework "${{ matrix.framework }}"
+        -Project "test/Extensions/Orleans.Streaming.Kinesis.Tests/Orleans.Streaming.Kinesis.Tests.csproj"
+        -FilterQuery "/[(Provider=${{ matrix.provider }})&((Suite=BVT)|(Suite=SlowBVT)|(Suite=Functional))&(Category!=Performance)&(Category!=Stress)]"
+        -ReportTrxFilename "test_results_${{ matrix.provider }}_${{ matrix.framework }}_{asm}_{tfm}_{arch}.trx"
       env:
         ORLEANSKINESISCONNECTIONSTRING: "http://localhost:4566;test;test;us-east-1"
         ORLEANSDYNAMODBSERVICE: "http://localhost:8000"
@@ -1079,35 +1095,19 @@ jobs:
       uses: actions/setup-dotnet@c2fa09f4bde5ebb9d1777cf28262a3eb3db3ced7 # v5
       with:
         global-json-file: global.json
+    - name: Setup code coverage
+      if: github.event_name == 'pull_request'
+      uses: ./.github/actions/setup-coverage
     - name: Build
       run: dotnet build
     - name: Test
-      if: >-
-        github.event_name != 'pull_request' ||
-        matrix.os != 'ubuntu-latest' ||
-        matrix.framework != 'net10.0'
-      run: dotnet test
-        --framework ${{ matrix.framework }}
-        --filter-query "/[(Provider=None)&(Suite=${{ matrix.suite }})&(Area!=CodeGen)]"
-        --minimum-expected-tests 1
-        --hangdump --hangdump-timeout 10m
-        --crashdump --crashdump-type Full
-        --hangdump-type Full
-        --report-trx --report-trx-filename "test_results_${{ matrix.suite }}_${{ matrix.framework }}_{asm}_{tfm}_{arch}.trx"
-        --max-parallel-test-modules 1
-    - name: Test with coverage
-      if: >-
-        github.event_name == 'pull_request' &&
-        matrix.os == 'ubuntu-latest' &&
-        matrix.framework == 'net10.0'
       shell: pwsh
-      run: |
-        dotnet tool install --tool-path .tools dotnet-coverage --version $env:DOTNET_COVERAGE_VERSION
-        ./.github/scripts/run-tests-with-coverage.ps1 `
-          -RepositoryRoot $env:GITHUB_WORKSPACE `
-          -Framework ${{ matrix.framework }} `
-          -Suite ${{ matrix.suite }} `
-          -CoverageToolPath (Join-Path $env:GITHUB_WORKSPACE '.tools/dotnet-coverage')
+      run: >
+        ./.github/scripts/run-dotnet-test.ps1
+        -CoverageId "${{ github.job }}-${{ matrix.suite }}-${{ matrix.os }}-${{ matrix.framework }}"
+        -Framework "${{ matrix.framework }}"
+        -FilterQuery "/[(Provider=None)&(Suite=${{ matrix.suite }})&(Area!=CodeGen)]"
+        -ReportTrxFilename "test_results_${{ matrix.suite }}_${{ matrix.framework }}_{asm}_{tfm}_{arch}.trx"
     - name: Archive Test Results
       if: always()
       continue-on-error: true
@@ -1117,25 +1117,29 @@ jobs:
         retention-days: 1
         path: |
           **/TestResults/*
-          !**/*.coverage
-          !**/*.cobertura.xml
           **/logs/*
-    - name: Archive coverage data
-      if: >-
-        success() &&
-        github.event_name == 'pull_request' &&
-        matrix.os == 'ubuntu-latest' &&
-        matrix.framework == 'net10.0'
-      uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
-      with:
-        name: coverage_data_${{ matrix.suite }}
-        if-no-files-found: error
-        retention-days: 1
-        path: TestResults/coverage-${{ matrix.suite }}/*.cobertura.xml
   coverage-merge:
     name: Merge code coverage
-    if: github.event_name == 'pull_request' && needs.test.result == 'success'
-    needs: test
+    if: github.event_name == 'pull_request'
+    needs:
+      - test-redis
+      - test-cassandra
+      - test-postgres
+      - test-mariadb
+      - test-sqlserver
+      - test-sqlite
+      - test-azure-storage
+      - test-azure-eventhubs
+      - test-azure-cosmosdb
+      - test-consul
+      - test-zookeeper
+      - test-dynamodb
+      - test-sqs
+      - test-nats
+      - test-kinesis
+      - test
+      - test-codegenerator
+      - test-google
     runs-on: ubuntu-latest
     permissions:
       actions: read
@@ -1148,7 +1152,7 @@ jobs:
     - name: Download coverage data
       uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
       with:
-        pattern: coverage_data_*
+        pattern: test_output_*
         path: coverage-data
         merge-multiple: false
     - name: Merge coverage
@@ -1157,27 +1161,28 @@ jobs:
         dotnet tool install --tool-path .tools dotnet-coverage --version $env:DOTNET_COVERAGE_VERSION
         New-Item -ItemType Directory -Force -Path TestResults | Out-Null
 
+        $artifactDirectories = @(Get-ChildItem -LiteralPath 'coverage-data' -Directory)
+        $expectedArtifactCount = 60
+        if ($artifactDirectories.Count -ne $expectedArtifactCount) {
+          throw "Expected coverage from $expectedArtifactCount test matrix jobs, found $($artifactDirectories.Count)"
+        }
+
         $coverageFiles = @(
-          foreach ($suite in 'BVT', 'SlowBVT', 'Functional') {
-            $suiteDirectory = Join-Path 'coverage-data' "coverage_data_$suite"
-            if (-not (Test-Path -LiteralPath $suiteDirectory -PathType Container)) {
-              throw "Coverage data for the $suite suite was not downloaded"
+          foreach ($artifactDirectory in $artifactDirectories) {
+            $reports = @(Get-ChildItem -LiteralPath $artifactDirectory.FullName -Recurse -File -Filter '*.cobertura.xml')
+            if ($reports.Count -eq 0) {
+              throw "$($artifactDirectory.Name) contains no coverage report"
             }
 
-            $suiteFiles = @(Get-ChildItem -LiteralPath $suiteDirectory -Recurse -File -Filter '*.cobertura.xml')
-            if ($suiteFiles.Count -eq 0) {
-              throw "Coverage data for the $suite suite contains no reports"
-            }
-
-            Write-Host "Merging $($suiteFiles.Count) coverage reports from the $suite suite."
-            $suiteFiles
+            Write-Host "Merging $($reports.Count) coverage report(s) from $($artifactDirectory.Name)."
+            $reports
           }
         )
 
         $duplicateNames = @($coverageFiles | Group-Object Name | Where-Object Count -gt 1)
         if ($duplicateNames.Count -gt 0) {
           $names = $duplicateNames.Name -join ', '
-          throw "Coverage report names must be unique across suites: $names"
+          throw "Coverage report names must be unique across test matrix jobs: $names"
         }
 
         ./.tools/dotnet-coverage merge $coverageFiles.FullName `
@@ -1222,27 +1227,23 @@ jobs:
       uses: actions/setup-dotnet@c2fa09f4bde5ebb9d1777cf28262a3eb3db3ced7 # v5
       with:
         global-json-file: global.json
+    - name: Setup code coverage
+      if: github.event_name == 'pull_request'
+      uses: ./.github/actions/setup-coverage
     - name: Test Code Generator
-      run: dotnet test
-        --project test/Orleans.CodeGenerator.Tests/Orleans.CodeGenerator.Tests.csproj
-        --framework ${{ matrix.framework }}
-        --minimum-expected-tests 1
-        --hangdump --hangdump-timeout 10m
-        --crashdump --crashdump-type Full
-        --hangdump-type Full
-        --report-trx --report-trx-filename "test_results_${{ matrix.framework }}_{asm}_{tfm}_{arch}.trx"
-        --max-parallel-test-modules 1
-        &&
-        dotnet test
-        --project test/Orleans.DefaultCluster.Tests/Orleans.DefaultCluster.Tests.csproj
-        --framework ${{ matrix.framework }}
-        --filter-query "/[(Provider=None)&(Area=CodeGen)&((Suite=BVT)|(Suite=SlowBVT)|(Suite=Functional))]"
-        --minimum-expected-tests 1
-        --hangdump --hangdump-timeout 10m
-        --crashdump --crashdump-type Full
-        --hangdump-type Full
-        --report-trx --report-trx-filename "test_results_defaultcluster_codegen_${{ matrix.framework }}_{asm}_{tfm}_{arch}.trx"
-        --max-parallel-test-modules 1
+      shell: pwsh
+      run: |
+        ./.github/scripts/run-dotnet-test.ps1 `
+          -CoverageId "${{ github.job }}-generator-${{ matrix.os }}-${{ matrix.framework }}" `
+          -Framework "${{ matrix.framework }}" `
+          -Project "test/Orleans.CodeGenerator.Tests/Orleans.CodeGenerator.Tests.csproj" `
+          -ReportTrxFilename "test_results_${{ matrix.framework }}_{asm}_{tfm}_{arch}.trx"
+        ./.github/scripts/run-dotnet-test.ps1 `
+          -CoverageId "${{ github.job }}-defaultcluster-${{ matrix.os }}-${{ matrix.framework }}" `
+          -Framework "${{ matrix.framework }}" `
+          -Project "test/Orleans.DefaultCluster.Tests/Orleans.DefaultCluster.Tests.csproj" `
+          -FilterQuery "/[(Provider=None)&(Area=CodeGen)&((Suite=BVT)|(Suite=SlowBVT)|(Suite=Functional))]" `
+          -ReportTrxFilename "test_results_defaultcluster_codegen_${{ matrix.framework }}_{asm}_{tfm}_{arch}.trx"
     - name: Archive Test Results
       if: always()
       continue-on-error: true
@@ -1271,6 +1272,9 @@ jobs:
       uses: actions/setup-dotnet@c2fa09f4bde5ebb9d1777cf28262a3eb3db3ced7 # v5
       with:
         global-json-file: global.json
+    - name: Setup code coverage
+      if: github.event_name == 'pull_request'
+      uses: ./.github/actions/setup-coverage
     - name: Setup Java
       uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961 # v5
       with:
@@ -1312,15 +1316,13 @@ jobs:
         cat firebase-emulators.log
         exit 1
     - name: Test
-      run: dotnet test
-        --framework ${{ matrix.framework }}
-        --filter-query "/[(Provider=${{ matrix.provider }})&((Suite=BVT)|(Suite=SlowBVT)|(Suite=Functional))&(Category!=Performance)&(Category!=Stress)]"
-        --minimum-expected-tests 1
-        --hangdump --hangdump-timeout 10m
-        --crashdump --crashdump-type Full
-        --hangdump-type Full
-        --report-trx --report-trx-filename "test_results_${{ matrix.provider }}_${{ matrix.framework }}_{asm}_{tfm}_{arch}.trx"
-        --max-parallel-test-modules 1
+      shell: pwsh
+      run: >
+        ./.github/scripts/run-dotnet-test.ps1
+        -CoverageId "${{ github.job }}-${{ matrix.provider }}-${{ matrix.framework }}"
+        -Framework "${{ matrix.framework }}"
+        -FilterQuery "/[(Provider=${{ matrix.provider }})&((Suite=BVT)|(Suite=SlowBVT)|(Suite=Functional))&(Category!=Performance)&(Category!=Stress)]"
+        -ReportTrxFilename "test_results_${{ matrix.provider }}_${{ matrix.framework }}_{asm}_{tfm}_{arch}.trx"
     - name: Archive Test Results
       if: always()
       continue-on-error: true
