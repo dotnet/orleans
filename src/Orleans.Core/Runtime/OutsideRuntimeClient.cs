@@ -290,36 +290,42 @@ namespace Orleans
 
             if (!oneWay)
             {
-                var owner = CallbackDataPool.Rent(this.sharedCallbackData, context!, message, _applicationRequestInstruments);
-                using var lease = owner.Acquire();
-                var callbackData = lease.Value;
-                if (!callbacks.TryAdd(message.Id, owner))
-                {
-                    CallbackDataPool.Return(owner);
-                    throw new InvalidOperationException($"Duplicate callback registration for message {message}.");
-                }
-
-                // Cancellation can run synchronously during registration.
-                if (Volatile.Read(ref _isStopping) != 0)
-                {
-                    callbackData.OnHostShutdown();
-                    return;
-                }
-
+                var owner = CallbackDataPool.Rent(this.sharedCallbackData, context!, message, _applicationRequestInstruments, out var lease);
                 try
                 {
-                    callbackData.SubscribeForCancellation(cancellationToken);
-                }
-                catch
-                {
-                    UnregisterCallback(message.Id);
-                    throw;
-                }
+                    var callbackData = lease.Value;
+                    if (!callbacks.TryAdd(message.Id, owner))
+                    {
+                        CallbackDataPool.Return(owner);
+                        throw new InvalidOperationException($"Duplicate callback registration for message {message}.");
+                    }
 
-                if (Volatile.Read(ref _isStopping) != 0)
+                    // Cancellation can run synchronously during registration.
+                    if (Volatile.Read(ref _isStopping) != 0)
+                    {
+                        callbackData.OnHostShutdown();
+                        return;
+                    }
+
+                    try
+                    {
+                        callbackData.SubscribeForCancellation(cancellationToken);
+                    }
+                    catch
+                    {
+                        UnregisterCallback(message.Id);
+                        throw;
+                    }
+
+                    if (Volatile.Read(ref _isStopping) != 0)
+                    {
+                        callbackData.OnHostShutdown();
+                        return;
+                    }
+                }
+                finally
                 {
-                    callbackData.OnHostShutdown();
-                    return;
+                    lease.Dispose();
                 }
             }
             else
@@ -382,14 +388,14 @@ namespace Orleans
             var found = callbacks.TryRemove(response.Id, out var removedOwner);
             if (found)
             {
-                using var removedLease = removedOwner.Acquire();
-                try
+                using var removedLease = removedOwner.TransferToLease();
+                if (removedLease.TryGetValue(out var callbackData))
                 {
-                    removedLease.Value.DoCallback(response);
+                    callbackData.DoCallback(response);
                 }
-                finally
+                else
                 {
-                    CallbackDataPool.Return(removedOwner);
+                    LogDebugNoCallbackForResponseMessage(logger, response);
                 }
             }
             else

@@ -191,8 +191,7 @@ namespace Orleans.Runtime
                     Debug.Assert(context is not null);
 
                     // Register a callback for the request.
-                    var owner = CallbackDataPool.Rent(sharedData, context!, message, _applicationRequestInstruments);
-                    callbackLease = owner.Acquire();
+                    var owner = CallbackDataPool.Rent(sharedData, context!, message, _applicationRequestInstruments, out callbackLease);
                     callbackData = callbackLease.Value;
                     var callbackKey = (message.SendingGrain, message.Id);
                     if (!callbacks.TryAdd(callbackKey, owner))
@@ -504,16 +503,16 @@ namespace Orleans.Runtime
         {
             if (callbacks.TryRemove((message.TargetGrain, message.Id), out var removedOwner))
             {
-                using var removedLease = removedOwner.Acquire();
-                try
+                using var removedLease = removedOwner.TransferToLease();
+                if (removedLease.TryGetValue(out var callbackData))
                 {
                     // IMPORTANT: we do not schedule the response callback via the scheduler, since the only thing it does
                     // is to resolve/break the resolver. The continuations/waits that are based on this resolution will be scheduled as work items.
-                    removedLease.Value.DoCallback(message);
+                    callbackData.DoCallback(message);
                 }
-                finally
+                else
                 {
-                    CallbackDataPool.Return(removedOwner);
+                    LogDebugNoCallbackForResponse(this.logger, message);
                 }
             }
             else

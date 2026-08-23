@@ -2,6 +2,7 @@ using System;
 using System.Diagnostics.Metrics;
 using System.Runtime.CompilerServices;
 using System.Threading;
+using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
 using Orleans.Runtime;
@@ -83,6 +84,8 @@ public class CallbackDataTests
 
         using var staleLease = staleOwner.Acquire();
         Assert.False(staleLease.TryGetValue(out _));
+        CallbackDataPool.Return(staleOwner);
+        Assert.Same(reusedCallback, currentLease.Value);
 
         CallbackDataPool.Return(currentOwner);
     }
@@ -144,6 +147,114 @@ public class CallbackDataTests
         CallbackDataPool.Return(currentOwner);
     }
 
+    [TestSuite("BVT")]
+    [TestProvider("None")]
+    [Fact, TestCategory("BVT")]
+    public void ConcurrentOwnerReturnsAreIdempotent()
+    {
+        using var serviceProvider = CreateServiceProvider();
+        var instruments = CreateInstruments(serviceProvider);
+
+        for (var iteration = 0; iteration < 1_000; iteration++)
+        {
+            var owner = CallbackDataPool.Rent(CreateSharedData(), new TestResponseCompletionSource(), new Message(), instruments);
+            var lease = owner.Acquire();
+            var callback = lease.Value;
+
+            Parallel.Invoke(
+                () => CallbackDataPool.Return(owner),
+                () => CallbackDataPool.Return(owner));
+            lease.Dispose();
+
+            var reusedOwner = CallbackDataPool.Rent(CreateSharedData(), new TestResponseCompletionSource(), new Message(), instruments);
+            using var reusedLease = reusedOwner.Acquire();
+            Assert.Same(callback, reusedLease.Value);
+
+            var concurrentOwner = CallbackDataPool.Rent(CreateSharedData(), new TestResponseCompletionSource(), new Message(), instruments);
+            using var concurrentLease = concurrentOwner.Acquire();
+            Assert.NotSame(callback, concurrentLease.Value);
+
+            CallbackDataPool.Return(concurrentOwner);
+            CallbackDataPool.Return(reusedOwner);
+        }
+    }
+
+    [TestSuite("BVT")]
+    [TestProvider("None")]
+    [Fact, TestCategory("BVT")]
+    public void CancellationAndResponseRaceCompletesExactlyOnce() =>
+        RunTerminalRace(static (callback, cancellation) =>
+        {
+            callback.SubscribeForCancellation(cancellation.Token);
+            cancellation.Cancel();
+        });
+
+    [TestSuite("BVT")]
+    [TestProvider("None")]
+    [Fact, TestCategory("BVT")]
+    public void TimeoutAndResponseRaceCompletesExactlyOnce() =>
+        RunTerminalRace(static (callback, _) => callback.OnTimeout());
+
+    [TestSuite("BVT")]
+    [TestProvider("None")]
+    [Fact, TestCategory("BVT")]
+    public void ShutdownAndResponseRaceCompletesExactlyOnce() =>
+        RunTerminalRace(static (callback, _) => callback.OnHostShutdown());
+
+    [TestSuite("BVT")]
+    [TestProvider("None")]
+    [Fact, TestCategory("BVT")]
+    public void CompletionExceptionDoesNotPreventCallbackReuse()
+    {
+        using var serviceProvider = CreateServiceProvider();
+        var instruments = CreateInstruments(serviceProvider);
+        var owner = CallbackDataPool.Rent(
+            CreateSharedData(),
+            new ThrowingResponseCompletionSource(),
+            new Message(),
+            instruments);
+        var lease = owner.TransferToLease();
+        var callback = lease.Value;
+
+        try
+        {
+            var response = new Message { BodyObject = Response.Completed };
+            Assert.Throws<InvalidOperationException>(() => callback.DoCallback(response));
+        }
+        finally
+        {
+            lease.Dispose();
+        }
+
+        var reusedOwner = CallbackDataPool.Rent(CreateSharedData(), new TestResponseCompletionSource(), new Message(), instruments);
+        using var reusedLease = reusedOwner.Acquire();
+        Assert.Same(callback, reusedLease.Value);
+        CallbackDataPool.Return(reusedOwner);
+    }
+
+    [TestSuite("BVT")]
+    [TestProvider("None")]
+    [Fact, TestCategory("BVT")]
+    public void OwnerTransferPreventsNewLeasesAndReturnsAfterLeaseDisposal()
+    {
+        using var serviceProvider = CreateServiceProvider();
+        var instruments = CreateInstruments(serviceProvider);
+        var owner = CallbackDataPool.Rent(CreateSharedData(), new TestResponseCompletionSource(), new Message(), instruments);
+        var transferLease = owner.TransferToLease();
+        var callback = transferLease.Value;
+
+        using var staleLease = owner.Acquire();
+        Assert.False(staleLease.TryGetValue(out _));
+        CallbackDataPool.Return(owner);
+
+        transferLease.Dispose();
+
+        var reusedOwner = CallbackDataPool.Rent(CreateSharedData(), new TestResponseCompletionSource(), new Message(), instruments);
+        using var reusedLease = reusedOwner.Acquire();
+        Assert.Same(callback, reusedLease.Value);
+        CallbackDataPool.Return(reusedOwner);
+    }
+
     [MethodImpl(MethodImplOptions.NoInlining)]
     private static WeakReference CreateCompletedCallback(CancellationToken cancellationToken, ApplicationRequestInstruments instruments)
     {
@@ -161,6 +272,57 @@ public class CallbackDataTests
         callback.SubscribeForCancellation(cancellationToken);
 
         return new WeakReference(completion);
+    }
+
+    private static void RunTerminalRace(Action<CallbackData, CancellationTokenSource> complete)
+    {
+        using var serviceProvider = CreateServiceProvider();
+        var instruments = CreateInstruments(serviceProvider);
+
+        for (var iteration = 0; iteration < 1_000; iteration++)
+        {
+            using var cancellation = new CancellationTokenSource();
+            using var start = new Barrier(3);
+            var completion = new TestResponseCompletionSource();
+            var registered = 1;
+            CallbackDataOwner owner = default;
+            owner = CallbackDataPool.Rent(
+                CreateSharedData(_ =>
+                {
+                    if (Interlocked.Exchange(ref registered, 0) == 1)
+                    {
+                        CallbackDataPool.Return(owner);
+                    }
+                }),
+                completion,
+                new Message(),
+                instruments);
+            using var lease = owner.Acquire();
+            var callback = lease.Value;
+            var response = new Message { BodyObject = Response.Completed };
+
+            var completionTask = Task.Run(() =>
+            {
+                start.SignalAndWait();
+                complete(callback, cancellation);
+            });
+            var responseTask = Task.Run(() =>
+            {
+                start.SignalAndWait();
+                if (Interlocked.Exchange(ref registered, 0) == 1)
+                {
+                    CallbackDataPool.Return(owner);
+                    callback.DoCallback(response);
+                }
+            });
+
+            start.SignalAndWait();
+            Task.WaitAll(completionTask, responseTask);
+
+            Assert.Equal(1, completion.CompletionCount);
+            Assert.NotNull(completion.Response);
+            Assert.Equal(0, Volatile.Read(ref registered));
+        }
     }
 
     private static SharedCallbackData CreateSharedData(Action<Message>? unregister = null) =>
@@ -184,10 +346,26 @@ public class CallbackDataTests
 
     private sealed class TestResponseCompletionSource : IResponseCompletionSource
     {
-        public Response? Response { get; private set; }
+        private int _completionCount;
+        private Response? _response;
 
-        public void Complete(Response value) => Response = value;
+        public int CompletionCount => Volatile.Read(ref _completionCount);
 
-        public void Complete() => Response = Orleans.Serialization.Invocation.Response.Completed;
+        public Response? Response => Volatile.Read(ref _response);
+
+        public void Complete(Response value)
+        {
+            Interlocked.Increment(ref _completionCount);
+            Interlocked.CompareExchange(ref _response, value, null);
+        }
+
+        public void Complete() => Complete(Orleans.Serialization.Invocation.Response.Completed);
+    }
+
+    private sealed class ThrowingResponseCompletionSource : IResponseCompletionSource
+    {
+        public void Complete(Response value) => throw new InvalidOperationException("Test completion failure.");
+
+        public void Complete() => throw new InvalidOperationException("Test completion failure.");
     }
 }
