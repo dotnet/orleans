@@ -31,6 +31,8 @@ namespace Orleans.Runtime.ReminderService
         private readonly TimeProvider _timeProvider;
         private readonly ReminderInstruments _reminderInstruments;
         private long localTableSequence;
+        private long rangeChangeGeneration;
+        private Task rangeChangeTask = Task.CompletedTask;
         private uint initialReadCallCount = 0;
         private Task? runTask;
         private readonly object _deliveryLock = new();
@@ -394,11 +396,54 @@ namespace Orleans.Runtime.ReminderService
             CheckRuntimeContext();
 
             _ = base.OnRangeChange(oldRange, newRange, increased);
-            if (Status == GrainServiceStatus.Started)
-                return ReadAndUpdateReminders();
-            LogIgnoringRangeChange(Status);
-            return Task.CompletedTask;
+            var task = Status == GrainServiceStatus.Started
+                ? ReadAndUpdateReminders()
+                : Task.CompletedTask;
+            if (Status != GrainServiceStatus.Started)
+            {
+                LogIgnoringRangeChange(Status);
+            }
+
+            rangeChangeGeneration++;
+            rangeChangeTask = rangeChangeTask.IsCompletedSuccessfully
+                ? task
+                : Task.WhenAll(rangeChangeTask, task);
+            return task;
         }
+
+        internal async Task TestOnlyWaitForRangeChangeReconciliation(CancellationToken cancellationToken)
+        {
+            while (true)
+            {
+                // Range-change turns can overlap after yielding to storage. Await every observed turn,
+                // then verify that no newer generation started while those reads were completing.
+                long observedGeneration = 0;
+                Task observedTask = Task.CompletedTask;
+                await this.QueueTask(() =>
+                {
+                    observedGeneration = rangeChangeGeneration;
+                    observedTask = rangeChangeTask;
+                    return Task.CompletedTask;
+                }).WaitAsync(cancellationToken);
+
+                await observedTask.WaitAsync(cancellationToken);
+
+                var isCurrentGeneration = false;
+                await this.QueueTask(() =>
+                {
+                    isCurrentGeneration = observedGeneration == rangeChangeGeneration;
+                    return Task.CompletedTask;
+                }).WaitAsync(cancellationToken);
+
+                if (isCurrentGeneration)
+                {
+                    return;
+                }
+            }
+        }
+
+        internal Task TestOnlyChangeRange(IRingRange oldRange, IRingRange newRange, bool increased)
+            => this.QueueTask(() => OnRangeChange(oldRange, newRange, increased));
 
         private async Task RunAsync()
         {
