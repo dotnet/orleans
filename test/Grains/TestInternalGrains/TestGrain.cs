@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Orleans.Runtime;
@@ -9,6 +10,7 @@ namespace UnitTests.Grains
 {
     public class TestGrain : Grain, ITestGrain
     {
+        private static readonly ConcurrentDictionary<long, TaskCompletionSource> DeferredLongActionStarted = new();
         private readonly string _id = Guid.NewGuid().ToString();
         private string label = null!;
         private readonly ILogger logger;
@@ -51,6 +53,20 @@ namespace UnitTests.Grains
             logger.LogInformation("DoLongAction {String} received", str);
             await Task.Delay(timespan);
         }
+
+        public async Task DoLongActionWithDeferredResolutionTimeout(TimeSpan timespan, string str)
+        {
+            logger.LogInformation("DoLongActionWithDeferredResolutionTimeout {String} received", str);
+            if (DeferredLongActionStarted.TryRemove(this.GetPrimaryKeyLong(), out var started))
+            {
+                started.TrySetResult();
+            }
+
+            await Task.Delay(timespan);
+        }
+
+        public static Task WaitForDeferredLongActionAsync(long grainKey)
+            => DeferredLongActionStarted.GetOrAdd(grainKey, static _ => new(TaskCreationOptions.RunContinuationsAsynchronously)).Task;
 
         public Task SetLabel(string label)
         {

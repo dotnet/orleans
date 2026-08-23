@@ -93,6 +93,25 @@ namespace Tester.HeterogeneousSilosTests
             this.cluster!.GrainFactory!.GetGrain<ISimpleGrainWithAsyncMethods>(0);
         }
 
+        [Fact]
+        public async Task DeferredResolutionPreservesResponseDeadline()
+        {
+            SetupAndDeployCluster(typeof(RandomPlacement), typeof(TestGrain));
+            var grainKey = Random.Shared.NextInt64();
+            var grain = this.cluster!.GrainFactory!.GetGrain<ITestGrain>(grainKey);
+            var invocationStarted = TestGrain.WaitForDeferredLongActionAsync(grainKey);
+            var call = grain.DoLongActionWithDeferredResolutionTimeout(TimeSpan.FromSeconds(8), nameof(DeferredResolutionPreservesResponseDeadline));
+
+            await Task.Delay(TimeSpan.FromSeconds(3), TestContext.Current.CancellationToken);
+            await cluster!.StartAdditionalSiloAsync();
+            await WaitForClusterStateToStabilizeAsync(restartClient: false);
+
+            var firstCompleted = await Task.WhenAny(invocationStarted, call);
+            Assert.Same(invocationStarted, firstCompleted);
+            await invocationStarted;
+            await Assert.ThrowsAsync<TimeoutException>(() => call);
+        }
+
 
         [Fact]
         public async Task MergeGrainResolverTests()
@@ -195,8 +214,11 @@ namespace Tester.HeterogeneousSilosTests
             if (pendingCalls is not null)
             {
                 await Task.WhenAll(pendingCalls).WaitAsync(TestConstants.InitTimeout);
-                Assert.Equal(unresolvedGrainId, grain.GetGrainId());
+                var resolvedGrain = this.cluster.GrainFactory!.GetGrain<T>(0);
+                Assert.NotEqual(unresolvedGrainId, grain.GetGrainId());
                 Assert.Equal(unresolvedGrainHashCode, grain.GetHashCode());
+                Assert.Equal(resolvedGrain, grain);
+                Assert.Equal(resolvedGrain.GetHashCode(), grain.GetHashCode());
             }
             else
             {
