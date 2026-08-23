@@ -19,8 +19,9 @@ namespace Orleans.Runtime.Messaging
                 return false;
             }
 
-            var timeToLive = request.TimeToLive ?? responseTimeout;
-            if (timeToLive <= TimeSpan.Zero)
+            var explicitTimeToLive = request.TimeToLive;
+            var retentionPeriod = explicitTimeToLive ?? responseTimeout;
+            if (retentionPeriod <= TimeSpan.Zero)
             {
                 return false;
             }
@@ -36,7 +37,8 @@ namespace Orleans.Runtime.Messaging
                 request.TargetGrain,
                 request.CacheInvalidationHeader is { } cacheInvalidationHeader ? new(cacheInvalidationHeader) : null,
                 timeProvider.GetTimestamp(),
-                timeToLive);
+                explicitTimeToLive.HasValue,
+                retentionPeriod);
 
             _requests ??= [];
             _requests[request.Id] = trackedRequest;
@@ -106,7 +108,7 @@ namespace Orleans.Runtime.Messaging
             List<CorrelationId>? expired = null;
             foreach (var (id, request) in requests)
             {
-                if (timeProvider.GetElapsedTime(request.StartTimestamp) >= request.TimeToLive)
+                if (timeProvider.GetElapsedTime(request.StartTimestamp) >= request.RetentionPeriod)
                 {
                     expired ??= [];
                     expired.Add(id);
@@ -126,10 +128,14 @@ namespace Orleans.Runtime.Messaging
 
         private Message CreateRequest(TrackedRequest request)
         {
-            var timeToLive = request.TimeToLive - timeProvider.GetElapsedTime(request.StartTimestamp);
-            if (timeToLive < TimeSpan.Zero)
+            TimeSpan? timeToLive = null;
+            if (request.HasTimeToLive)
             {
-                timeToLive = TimeSpan.Zero;
+                timeToLive = request.RetentionPeriod - timeProvider.GetElapsedTime(request.StartTimestamp);
+                if (timeToLive < TimeSpan.Zero)
+                {
+                    timeToLive = TimeSpan.Zero;
+                }
             }
 
             return new Message
@@ -159,6 +165,7 @@ namespace Orleans.Runtime.Messaging
             GrainId TargetGrain,
             List<GrainAddressCacheUpdate>? CacheInvalidationHeader,
             long StartTimestamp,
-            TimeSpan TimeToLive);
+            bool HasTimeToLive,
+            TimeSpan RetentionPeriod);
     }
 }
