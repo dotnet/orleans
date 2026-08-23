@@ -212,6 +212,8 @@ items:
             href: host/client.md
           - name: Aspire integration
             href: host/aspire-integration.md
+          - name: Amazon DynamoDB with Aspire
+            href: host/dynamodb-aspire.md
           - name: Silo lifecycle
             href: host/silo-lifecycle.md
           - name: Heterogeneous silos

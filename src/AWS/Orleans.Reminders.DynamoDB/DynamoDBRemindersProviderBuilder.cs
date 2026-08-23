@@ -1,7 +1,11 @@
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Options;
 using Orleans;
+using Orleans.Configuration;
 using Orleans.Hosting;
 using Orleans.Providers;
+using Orleans.Reminders.DynamoDB;
 
 [assembly: RegisterProvider("DynamoDB", "Reminders", "Silo", typeof(DynamoDBRemindersProviderBuilder))]
 
@@ -11,40 +15,17 @@ internal sealed class DynamoDBRemindersProviderBuilder : IProviderBuilder<ISiloB
 {
     public void Configure(ISiloBuilder builder, string? name, IConfigurationSection configurationSection)
     {
-        builder.UseDynamoDBReminderService(options =>
+        builder.ConfigureServices(services =>
+        {
+            services.UseDynamoDBReminderService(_ => { });
+            services.AddOptions<DynamoDBReminderStorageOptions>()
+                .Configure<IConfiguration>((options, configuration) =>
             {
-                var accessKey = configurationSection[nameof(options.AccessKey)];
-                if (!string.IsNullOrEmpty(accessKey))
-                {
-                    options.AccessKey = accessKey;
-                }
+                var providerConfiguration = DynamoDBProviderConfiguration.Create(configurationSection, configuration);
+                providerConfiguration.ConfigureClientOptions(options);
 
-                var secretKey = configurationSection[nameof(options.SecretKey)];
-                if (!string.IsNullOrEmpty(secretKey))
-                {
-                    options.SecretKey = secretKey;
-                }
-
-                var region = configurationSection[nameof(options.Service)] ?? configurationSection["Region"];
-                if (!string.IsNullOrEmpty(region))
-                {
-                    options.Service = region;
-                }
-
-                var token = configurationSection[nameof(options.SecretKey)];
-                if (!string.IsNullOrEmpty(token))
-                {
-                    options.Token = token;
-                }
-
-                var profileName = configurationSection[nameof(options.SecretKey)];
-                if (!string.IsNullOrEmpty(profileName))
-                {
-                    options.ProfileName = profileName;
-                }
-
-                var tableName = configurationSection[nameof(options.TableName)];
-                if (!string.IsNullOrEmpty(tableName))
+                var tableName = providerConfiguration.GetValue(nameof(options.TableName));
+                if (tableName is not null)
                 {
                     options.TableName = tableName;
                 }
@@ -74,5 +55,6 @@ internal sealed class DynamoDBRemindersProviderBuilder : IProviderBuilder<ISiloB
                     options.UpdateIfExists = uie;
                 }
             });
+        });
     }
 }
