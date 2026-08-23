@@ -37,7 +37,7 @@ The provider configuration connects the AWS SDK resource and emits identical top
 
 :::code language="csharp" source="../host/snippets/aspire/AppHost/AppHostExamples.cs" id="sqs_provider_configuration":::
 
-The AppHost supplies the same provider name, partition count, and FIFO mode to silos and clients. `CacheSize` applies to silo pulling agents. The AWS SDK reference supplies `AWS_REGION` and can supply `AWS_PROFILE`; workload identity and shared AWS configuration remain available through the SDK credential chain.
+The AppHost supplies the same provider name, region, partition count, and FIFO mode to silos and clients. `CacheSize` applies to silo pulling agents. The AWS SDK reference can supply `AWS_PROFILE`; workload identity and shared AWS configuration remain available through the SDK credential chain.
 
 The silo activates generated `Orleans:Streaming:Orders` configuration through <xref:Microsoft.Extensions.Hosting.OrleansSiloGenericHostExtensions.UseOrleans*>:
 
