@@ -14,7 +14,9 @@ internal static class SqsConnectionString
         }
 
         var result = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
-        foreach (var segment in connectionString.Split(';', StringSplitOptions.RemoveEmptyEntries))
+        foreach (var segment in connectionString.Split(
+            ';',
+            StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
         {
             var separator = segment.IndexOf('=');
             if (separator <= 0 || string.IsNullOrWhiteSpace(segment[(separator + 1)..]))
