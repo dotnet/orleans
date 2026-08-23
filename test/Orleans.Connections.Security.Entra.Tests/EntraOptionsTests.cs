@@ -83,4 +83,124 @@ public sealed class EntraOptionsTests
         Assert.False(result.Succeeded);
     }
 
+    [Fact]
+    public void Validate_AcceptsSeparateTokenScopeResourceApplicationIdAndClusterRole()
+    {
+        var options = EntraTestFixture.CreateOptions();
+        options.TokenScope = "api://11111111-1111-1111-1111-111111111111/cluster-a";
+        options.ResourceApplicationId = "44444444-4444-4444-4444-444444444444";
+        options.ValidAudiences.Clear();
+        options.ClusterClaimType = null;
+        options.ClusterRole = "Orleans.Silo.Connect.cluster-a";
+
+        var result = new EntraSiloConnectionOptionsValidator().Validate(Options.DefaultName, options);
+
+        Assert.True(result.Succeeded);
+    }
+
+    [Fact]
+    public void Validate_AcceptsExplicitClusterClaimBinding()
+    {
+        var options = EntraTestFixture.CreateOptions();
+        options.ResourceApplicationId = "44444444-4444-4444-4444-444444444444";
+        options.ClusterRole = null;
+        options.ClusterClaimType = "orleans_cluster";
+
+        var result = new EntraSiloConnectionOptionsValidator().Validate(Options.DefaultName, options);
+
+        Assert.True(result.Succeeded);
+    }
+
+    [Fact]
+    public void Validate_RejectsMissingResourceApplicationId()
+    {
+        var options = EntraTestFixture.CreateOptions();
+        options.ResourceApplicationId = null;
+
+        var result = new EntraSiloConnectionOptionsValidator().Validate(Options.DefaultName, options);
+
+        AssertValidationFailure(result, nameof(options.ResourceApplicationId), "must be configured");
+    }
+
+    [Theory]
+    [InlineData("api://11111111-1111-1111-1111-111111111111")]
+    [InlineData("not-an-application-id")]
+    public void Validate_RejectsNonGuidResourceApplicationId(string resourceApplicationId)
+    {
+        var options = EntraTestFixture.CreateOptions();
+        options.ResourceApplicationId = resourceApplicationId;
+
+        var result = new EntraSiloConnectionOptionsValidator().Validate(Options.DefaultName, options);
+
+        AssertValidationFailure(result, nameof(options.ResourceApplicationId), "must be a GUID");
+    }
+
+    [Fact]
+    public void Validate_RejectsMissingClusterBinding()
+    {
+        var options = EntraTestFixture.CreateOptions();
+        options.ClusterClaimType = null;
+        options.ClusterRole = null;
+
+        var result = new EntraSiloConnectionOptionsValidator().Validate(Options.DefaultName, options);
+
+        AssertValidationFailure(result, nameof(options.ClusterRole), "A cluster role");
+        Assert.Contains(nameof(options.ClusterClaimType), result.FailureMessage, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Validate_RejectsClusterAudienceAuthorization()
+    {
+        var options = EntraTestFixture.CreateOptions();
+        options.ClusterClaimType = null;
+        options.ClusterRole = null;
+#pragma warning disable CS0618
+        options.ClusterAudienceFormat = "api://orleans-silos/{0}";
+#pragma warning restore CS0618
+
+        var result = new EntraSiloConnectionOptionsValidator().Validate(Options.DefaultName, options);
+
+        AssertValidationFailure(result, nameof(options.ClusterRole), "A cluster role");
+        Assert.Contains(nameof(options.ClusterClaimType), result.FailureMessage, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Validate_RejectsAmbiguousRoleAndClaimBinding()
+    {
+        var options = EntraTestFixture.CreateOptions();
+        options.ClusterRole = "Orleans.Silo.Connect.cluster-a";
+        options.ClusterClaimType = "orleans_cluster";
+
+        var result = new EntraSiloConnectionOptionsValidator().Validate(Options.DefaultName, options);
+
+        AssertValidationFailure(result, nameof(options.ClusterRole), "either a cluster role");
+        Assert.Contains(nameof(options.ClusterClaimType), result.FailureMessage, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Validate_RejectsExactAndFormattedClusterRolesTogether()
+    {
+        var options = EntraTestFixture.CreateOptions();
+        options.ClusterClaimType = null;
+        options.ClusterRole = "Orleans.Silo.Connect.cluster-a";
+        options.ClusterRoleFormat = "Orleans.Silo.Connect.{0}";
+
+        var result = new EntraSiloConnectionOptionsValidator().Validate(Options.DefaultName, options);
+
+        AssertValidationFailure(result, nameof(options.ClusterRole), "Only one");
+        Assert.Contains(nameof(options.ClusterRoleFormat), result.FailureMessage, StringComparison.Ordinal);
+    }
+
+    private static void AssertValidationFailure(
+        Microsoft.Extensions.Options.ValidateOptionsResult result,
+        string memberName,
+        string reason)
+    {
+        Assert.False(result.Succeeded);
+        Assert.NotNull(result.Failures);
+        var failure = Assert.Single(result.Failures);
+        Assert.Contains(memberName, failure, StringComparison.Ordinal);
+        Assert.Contains(reason, failure, StringComparison.Ordinal);
+    }
+
 }

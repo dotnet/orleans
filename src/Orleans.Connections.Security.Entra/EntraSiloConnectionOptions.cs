@@ -18,13 +18,28 @@ public sealed class EntraSiloConnectionOptions
     public Uri? Authority { get; set; }
 
     /// <summary>
-    /// Gets or sets the scope requested from the configured <see cref="Azure.Core.TokenCredential"/>.
+    /// Gets or sets the cluster-qualified resource or scope identifier used to request a token.
     /// </summary>
+    /// <remarks>
+    /// The <c>/.default</c> suffix is added when requesting a token. This value is not a valid JWT audience.
+    /// </remarks>
     public string? TokenScope { get; set; }
 
     /// <summary>
-    /// Gets the exact token audiences which are accepted.
+    /// Gets or sets the resource application's client-ID GUID.
     /// </summary>
+    /// <remarks>
+    /// This value is compared with the JWT <c>aud</c> claim. It is not a scope URI.
+    /// </remarks>
+    public string? ResourceApplicationId { get; set; }
+
+    /// <summary>
+    /// Gets additional exact JWT audiences which are accepted.
+    /// </summary>
+    /// <remarks>
+    /// <see cref="ResourceApplicationId"/> is always accepted and is the normal Microsoft Entra v2 audience.
+    /// A scope or resource identifier URI must not be added for an Entra v2 token.
+    /// </remarks>
     public ISet<string> ValidAudiences { get; } = new HashSet<string>(StringComparer.Ordinal);
 
     /// <summary>
@@ -45,6 +60,10 @@ public sealed class EntraSiloConnectionOptions
     /// <summary>
     /// Gets the application roles, at least one of which must be present.
     /// </summary>
+    /// <remarks>
+    /// These roles authorize a caller but do not replace the exact cluster binding configured by
+    /// <see cref="ClusterRole"/> or <see cref="ClusterClaimType"/>.
+    /// </remarks>
     public ISet<string> RequiredRoles { get; } = new HashSet<string>(StringComparer.Ordinal);
 
     /// <summary>
@@ -89,7 +108,17 @@ public sealed class EntraSiloConnectionOptions
     /// <summary>
     /// Gets or sets the claim whose value must exactly match the local Orleans cluster identifier.
     /// </summary>
+    /// <remarks>Claim type and value matching is ordinal and exact.</remarks>
     public string? ClusterClaimType { get; set; }
+
+    /// <summary>
+    /// Gets or sets the exact application role required to connect to the local Orleans cluster.
+    /// </summary>
+    /// <remarks>
+    /// Matching is ordinal and exact. For example, a silo role can be
+    /// <c>Orleans.Silo.Connect.&lt;cluster-id&gt;</c>.
+    /// </remarks>
+    public string? ClusterRole { get; set; }
 
     /// <summary>
     /// Gets or sets a composite-format string used to construct a required cluster role.
@@ -98,9 +127,16 @@ public sealed class EntraSiloConnectionOptions
     public string? ClusterRoleFormat { get; set; }
 
     /// <summary>
-    /// Gets or sets a composite-format string used to construct a required cluster audience.
+    /// Gets or sets an obsolete composite-format string which formerly constructed a cluster audience.
     /// </summary>
-    /// <remarks><c>{0}</c> is replaced with the local Orleans cluster identifier.</remarks>
+    /// <remarks>
+    /// This property is retained for source compatibility and is not used to authorize a cluster.
+    /// Configure <see cref="ResourceApplicationId"/> for JWT audience validation and use
+    /// <see cref="ClusterRole"/> or <see cref="ClusterClaimType"/> for exact cluster authorization.
+    /// </remarks>
+    [Obsolete(
+        $"Use {nameof(ResourceApplicationId)} with {nameof(ClusterRole)} or {nameof(ClusterClaimType)} instead. " +
+        $"{nameof(TokenScope)} is not a JWT audience.")]
     public string? ClusterAudienceFormat { get; set; }
 
     /// <summary>

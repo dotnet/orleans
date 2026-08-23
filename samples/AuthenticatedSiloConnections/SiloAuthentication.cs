@@ -30,7 +30,7 @@ internal static class SiloAuthentication
                     options,
                     credential,
                     options.Entra.AllowedSiloCallerClientIds,
-                    "Orleans.Silo.Connect");
+                    options.Entra.SiloClusterRole);
             });
         // </AuthenticatedSiloConnections>
 
@@ -48,7 +48,7 @@ internal static class SiloAuthentication
                     options,
                     credential,
                     options.Entra.AllowedClientCallerClientIds,
-                    "Orleans.Client.Connect");
+                    options.Entra.ClientClusterRole);
             });
         // </AuthenticatedClientGateway>
     }
@@ -75,18 +75,15 @@ internal static class SiloAuthentication
             entra =>
             {
                 entra.Authority = options.Entra.Authority;
-                entra.TokenScope = $"{options.Entra.Audience}/.default";
-                entra.ValidAudiences.Add(options.Entra.Audience);
+                entra.TokenScope = options.Entra.TokenScope;
+                entra.ResourceApplicationId = options.Entra.ResourceApplicationId;
                 entra.ValidTenantIds.Add(options.Entra.TenantId);
-                entra.ClusterAudienceFormat =
-                    $"api://{options.Entra.ResourceApplicationId}/{{0}}";
+                entra.ClusterRole = requiredRole;
 
                 foreach (var clientId in allowedCallerClientIds)
                 {
                     entra.AllowedClientIds.Add(clientId);
                 }
-
-                entra.RequiredRoles.Add(requiredRole);
             });
     }
 }

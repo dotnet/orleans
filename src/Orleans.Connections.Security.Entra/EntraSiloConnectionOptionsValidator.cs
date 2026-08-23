@@ -30,7 +30,7 @@ internal sealed class EntraSiloConnectionOptionsValidator : IValidateOptions<Ent
         }
 
         RequireValue(options.TokenScope, nameof(options.TokenScope), errors);
-        RequireNonEmpty(options.ValidAudiences, nameof(options.ValidAudiences), errors);
+        RequireValue(options.ResourceApplicationId, nameof(options.ResourceApplicationId), errors);
         RequireNonEmpty(options.ValidTenantIds, nameof(options.ValidTenantIds), errors);
         RequireNonEmpty(options.AllowedAlgorithms, nameof(options.AllowedAlgorithms), errors);
         RequireNonEmpty(options.SupportedTokenVersions, nameof(options.SupportedTokenVersions), errors);
@@ -42,6 +42,12 @@ internal sealed class EntraSiloConnectionOptionsValidator : IValidateOptions<Ent
         ValidateEntries(options.AllowedAlgorithms, nameof(options.AllowedAlgorithms), errors);
         ValidateEntries(options.SupportedTokenVersions, nameof(options.SupportedTokenVersions), errors);
         ValidateEntries(options.AdditionalTrustedMetadataHosts, nameof(options.AdditionalTrustedMetadataHosts), errors);
+
+        if (!string.IsNullOrWhiteSpace(options.ResourceApplicationId)
+            && !Guid.TryParse(options.ResourceApplicationId, out _))
+        {
+            errors.Add($"{nameof(options.ResourceApplicationId)} must be a GUID.");
+        }
 
         if (options.Authority is { IsAbsoluteUri: true } configuredAuthority
             && TryGetAuthorityTenant(configuredAuthority, out var authorityTenant)
@@ -60,17 +66,30 @@ internal sealed class EntraSiloConnectionOptionsValidator : IValidateOptions<Ent
                 $"or {nameof(options.RequiredRoles)} must be configured unless {nameof(options.AllowAnyApplicationInTenant)} is enabled.");
         }
 
-        if (string.IsNullOrWhiteSpace(options.ClusterClaimType)
-            && string.IsNullOrWhiteSpace(options.ClusterRoleFormat)
-            && string.IsNullOrWhiteSpace(options.ClusterAudienceFormat))
+        var hasClusterClaim = !string.IsNullOrWhiteSpace(options.ClusterClaimType);
+        var hasExactClusterRole = !string.IsNullOrWhiteSpace(options.ClusterRole);
+        var hasFormattedClusterRole = !string.IsNullOrWhiteSpace(options.ClusterRoleFormat);
+        var hasClusterRole = hasExactClusterRole || hasFormattedClusterRole;
+        if (hasExactClusterRole && hasFormattedClusterRole)
         {
             errors.Add(
-                $"At least one of {nameof(options.ClusterClaimType)}, {nameof(options.ClusterRoleFormat)}, " +
-                $"or {nameof(options.ClusterAudienceFormat)} must bind credentials to the local cluster.");
+                $"Only one of {nameof(options.ClusterRole)} or {nameof(options.ClusterRoleFormat)} can configure cluster role binding.");
+        }
+
+        if (!hasClusterClaim && !hasClusterRole)
+        {
+            errors.Add(
+                $"A cluster role ({nameof(options.ClusterRole)} or {nameof(options.ClusterRoleFormat)}) " +
+                $"or {nameof(options.ClusterClaimType)} must bind credentials to the local cluster.");
+        }
+        else if (hasClusterClaim && hasClusterRole)
+        {
+            errors.Add(
+                $"Configure either a cluster role ({nameof(options.ClusterRole)} or {nameof(options.ClusterRoleFormat)}) " +
+                $"or {nameof(options.ClusterClaimType)}, but not both.");
         }
 
         ValidateFormat(options.ClusterRoleFormat, nameof(options.ClusterRoleFormat), errors);
-        ValidateFormat(options.ClusterAudienceFormat, nameof(options.ClusterAudienceFormat), errors);
         ValidatePositive(options.MinimumRemainingTokenLifetime, nameof(options.MinimumRemainingTokenLifetime), MaximumTokenDuration, errors);
         ValidatePositive(options.MaximumTokenLifetime, nameof(options.MaximumTokenLifetime), MaximumTokenDuration, errors);
         ValidateNonNegative(options.ClockSkew, nameof(options.ClockSkew), errors);

@@ -23,7 +23,7 @@ internal static class ClientAuthentication
                     options,
                     credential,
                     options.Entra.AllowedClientCallerClientIds,
-                    "Orleans.Client.Connect");
+                    options.Entra.ClientClusterRole);
             });
         // </AuthenticatedClient>
     }
