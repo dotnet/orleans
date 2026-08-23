@@ -1,5 +1,5 @@
 using System.Collections.Concurrent;
-using System.Reflection;
+using System.Runtime.CompilerServices;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
@@ -862,11 +862,11 @@ namespace UnitTests.Runtime
                 [observer],
                 CreateCatalogInstruments(),
                 TimeProvider.System);
-            var member = Substitute.For<IActivationWorkingSetMember>();
             var scanStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
             using var resumeScan = new ManualResetEventSlim();
-            member.IsCandidateForRemoval(false).Returns(_ =>
+            var member = new TestWorkingSetMember(wouldRemove =>
             {
+                Assert.False(wouldRemove);
                 scanStarted.TrySetResult();
                 resumeScan.Wait();
                 return true;
@@ -878,13 +878,21 @@ namespace UnitTests.Runtime
             await lifecycle.OnStart();
             await scanStarted.Task.WaitAsync(TimeSpan.FromSeconds(10));
 
-            try
+            var mutationStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            var mutationTask = Task.Run(() =>
             {
+                mutationStarted.SetResult();
                 workingSet.OnEvicted(member);
                 workingSet.OnActivated(member);
+            });
+            await mutationStarted.Task.WaitAsync(TimeSpan.FromSeconds(10));
+            try
+            {
                 var stopTask = lifecycle.OnStop();
                 Assert.False(stopTask.IsCompleted);
+                Assert.False(mutationTask.IsCompleted);
                 resumeScan.Set();
+                await mutationTask;
                 await stopTask;
             }
             finally
@@ -896,7 +904,7 @@ namespace UnitTests.Runtime
             Assert.Contains(member, workingSet.Members);
             observer.Received(2).OnAdded(member);
             observer.Received(1).OnEvicted(member);
-            observer.DidNotReceive().OnIdle(member);
+            observer.Received(1).OnIdle(member);
         }
 
         [Fact, TestCategory("Activation")]
@@ -933,13 +941,21 @@ namespace UnitTests.Runtime
             await lifecycle.OnStart();
             await removalScanStarted.Task.WaitAsync(TimeSpan.FromSeconds(10));
 
-            try
+            var mutationStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            var mutationTask = Task.Run(() =>
             {
+                mutationStarted.SetResult();
                 workingSet.OnEvicted(member);
                 workingSet.OnActivated(member);
+            });
+            await mutationStarted.Task.WaitAsync(TimeSpan.FromSeconds(10));
+            try
+            {
                 var stopTask = lifecycle.OnStop();
                 Assert.False(stopTask.IsCompleted);
+                Assert.False(mutationTask.IsCompleted);
                 resumeScan.Set();
+                await mutationTask;
                 await stopTask;
             }
             finally
@@ -1060,26 +1076,29 @@ namespace UnitTests.Runtime
         }
 
         [Fact, TestCategory("Activation")]
-        public async Task WorkingSetGenerationWrap_DoesNotAliasAdjacentMembership()
+        public async Task WorkingSetScan_SerializesRemovalWithReactivation()
         {
             var timer = Substitute.For<IAsyncTimer>();
-            timer.NextTick().Returns(Task.FromResult(true), Task.FromResult(false));
+            timer.NextTick().Returns(Task.FromResult(true), Task.FromResult(true), Task.FromResult(false));
             var timerFactory = Substitute.For<IAsyncTimerFactory>();
             timerFactory.Create(Arg.Any<TimeSpan>(), Arg.Any<string>(), Arg.Any<TimeProvider>()).Returns(timer);
+            var observer = Substitute.For<IActivationWorkingSetObserver>();
             var workingSet = new ActivationWorkingSet(
                 timerFactory,
                 NullLogger<ActivationWorkingSet>.Instance,
-                Array.Empty<IActivationWorkingSetObserver>(),
+                [observer],
                 CreateCatalogInstruments(),
                 TimeProvider.System);
-            var nextGeneration = typeof(ActivationWorkingSet).GetField("_nextGeneration", BindingFlags.Instance | BindingFlags.NonPublic)
-                ?? throw new InvalidOperationException("Could not find the working-set generation field.");
-            nextGeneration.SetValue(workingSet, long.MaxValue - 1);
-            var scanStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            var removalScanStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
             using var resumeScan = new ManualResetEventSlim();
-            var member = new TestWorkingSetMember(_ =>
+            var member = new TestWorkingSetMember(wouldRemove =>
             {
-                scanStarted.TrySetResult();
+                if (!wouldRemove)
+                {
+                    return true;
+                }
+
+                removalScanStarted.TrySetResult();
                 resumeScan.Wait();
                 return true;
             });
@@ -1088,13 +1107,20 @@ namespace UnitTests.Runtime
             var lifecycle = new SiloLifecycleSubject(NullLogger<SiloLifecycleSubject>.Instance);
             ((ILifecycleParticipant<ISiloLifecycle>)workingSet).Participate(lifecycle);
             await lifecycle.OnStart();
-            await scanStarted.Task.WaitAsync(TimeSpan.FromSeconds(10));
+            await removalScanStarted.Task.WaitAsync(TimeSpan.FromSeconds(10));
 
+            var reactivationStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            var reactivationTask = Task.Run(() =>
+            {
+                reactivationStarted.SetResult();
+                workingSet.OnActive(member);
+            });
+            await reactivationStarted.Task.WaitAsync(TimeSpan.FromSeconds(10));
             try
             {
-                workingSet.OnEvicted(member);
-                workingSet.OnActivated(member);
+                Assert.False(reactivationTask.IsCompleted);
                 resumeScan.Set();
+                await reactivationTask;
                 await lifecycle.OnStop();
             }
             finally
@@ -1104,6 +1130,30 @@ namespace UnitTests.Runtime
 
             Assert.Equal(1, workingSet.Count);
             Assert.Contains(member, workingSet.Members);
+            observer.Received(1).OnAdded(member);
+            observer.Received(1).OnIdle(member);
+            observer.Received(1).OnEvicted(member);
+            observer.Received(1).OnActive(member);
+        }
+
+        [Fact, TestCategory("Activation")]
+        public void ActivationStatus_PreservesLifecycleStateAcrossWorkingSetTransitions()
+        {
+            var activation = (ActivationData)RuntimeHelpers.GetUninitializedObject(typeof(ActivationData));
+            var workingSetState = (IActivationWorkingSetMember)activation;
+
+            lock (activation)
+            {
+                activation.SetState(ActivationState.Valid);
+                workingSetState.IsIdle = true;
+                Assert.Equal(ActivationState.Valid, activation.State);
+                Assert.True(workingSetState.IsIdle);
+
+                activation.SetState(ActivationState.Deactivating);
+                workingSetState.IsIdle = false;
+                Assert.Equal(ActivationState.Deactivating, activation.State);
+                Assert.False(workingSetState.IsIdle);
+            }
         }
 
         private IActivationWorkingSetMember PrepareActivation(int collectionAgeLimitMinutes, ActivationCollector collector)
@@ -1150,7 +1200,24 @@ namespace UnitTests.Runtime
 
         private sealed class TestWorkingSetMember(Func<bool, bool>? isCandidateForRemoval = null) : IActivationWorkingSetMember
         {
-            public bool IsCandidateForRemoval(bool wouldRemove) => isCandidateForRemoval?.Invoke(wouldRemove) ?? false;
+            private bool _isIdle;
+
+            public bool IsIdle
+            {
+                get => Volatile.Read(ref _isIdle);
+                set
+                {
+                    Assert.True(Monitor.IsEntered(this));
+                    _isIdle = value;
+                }
+            }
+
+            public bool IsCandidateForRemoval(bool wouldRemove)
+            {
+                Assert.True(Monitor.IsEntered(this));
+                return isCandidateForRemoval?.Invoke(wouldRemove) ?? false;
+            }
+
         }
     }
 }

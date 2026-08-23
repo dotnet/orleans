@@ -754,6 +754,8 @@ namespace Orleans.Runtime
 
     public partial interface IActivationWorkingSetMember
     {
+        bool IsIdle { get; set; }
+
         bool IsCandidateForRemoval(bool wouldRemove);
     }
 

@@ -17,17 +17,12 @@ namespace Orleans.Runtime;
 /// </summary>
 internal sealed partial class ActivationWorkingSet : IActivationWorkingSet, ILifecycleParticipant<ISiloLifecycle>
 {
-    // The low bit stores idle state and the remaining 63 bits identify the membership generation.
-    // Comparing the complete state prevents stale scan entries from changing a member after removal and re-addition.
-    // A generation is reused only after 2^63 successful additions within one process lifetime.
-    private const long IdleMask = 1;
-    private readonly ConcurrentDictionary<IActivationWorkingSetMember, long> _members = new();
+    private readonly ConcurrentDictionary<IActivationWorkingSetMember, byte> _members = new();
     private readonly ILogger _logger;
     private readonly IAsyncTimer _scanPeriodTimer;
     private readonly List<IActivationWorkingSetObserver> _observers;
 
     private int _activeCount;
-    private long _nextGeneration;
     private Task? _runTask;
 
     public ActivationWorkingSet(
@@ -51,7 +46,7 @@ internal sealed partial class ActivationWorkingSet : IActivationWorkingSet, ILif
     {
         foreach (var pair in _members)
         {
-            if (!IsIdle(pair.Value))
+            if (!pair.Key.IsIdle)
             {
                 yield return pair.Key;
             }
@@ -61,36 +56,25 @@ internal sealed partial class ActivationWorkingSet : IActivationWorkingSet, ILif
     public void OnActivated(IActivationWorkingSetMember member)
     {
         Debug.Assert(member is not ICollectibleGrainContext collectible || collectible.IsValid);
-        if (_members.TryAdd(member, GetNextActiveState()))
+        if (!_members.TryAdd(member, 0))
         {
-            Interlocked.Increment(ref _activeCount);
-            foreach (var observer in _observers)
-            {
-                observer.OnAdded(member);
-            }
-
-            return;
+            throw new InvalidOperationException($"Member {member} is already a member of the working set");
         }
 
-        throw new InvalidOperationException($"Member {member} is already a member of the working set");
+        member.IsIdle = false;
+        Interlocked.Increment(ref _activeCount);
+        foreach (var observer in _observers)
+        {
+            observer.OnAdded(member);
+        }
     }
 
     public void OnActive(IActivationWorkingSetMember member)
     {
-        while (true)
+        member.IsIdle = false;
+        if (_members.TryAdd(member, 0))
         {
-            if (_members.TryGetValue(member, out var state))
-            {
-                if (!IsIdle(state) || _members.TryUpdate(member, GetActiveState(state), comparisonValue: state))
-                {
-                    break;
-                }
-            }
-            else if (_members.TryAdd(member, GetNextActiveState()))
-            {
-                Interlocked.Increment(ref _activeCount);
-                break;
-            }
+            Interlocked.Increment(ref _activeCount);
         }
 
         foreach (var observer in _observers)
@@ -103,14 +87,7 @@ internal sealed partial class ActivationWorkingSet : IActivationWorkingSet, ILif
     {
         if (_members.TryRemove(member, out _))
         {
-            OnEvictedCore(member);
-        }
-    }
-
-    private void OnEvicted(IActivationWorkingSetMember member, long state)
-    {
-        if (_members.TryRemove(KeyValuePair.Create(member, state)))
-        {
+            member.IsIdle = false;
             OnEvictedCore(member);
         }
     }
@@ -150,7 +127,7 @@ internal sealed partial class ActivationWorkingSet : IActivationWorkingSet, ILif
             {
                 try
                 {
-                    VisitMember(pair.Key, pair.Value);
+                    VisitMember(pair.Key);
                 }
                 catch (Exception exception)
                 {
@@ -160,47 +137,63 @@ internal sealed partial class ActivationWorkingSet : IActivationWorkingSet, ILif
         }
     }
 
-    private void VisitMember(IActivationWorkingSetMember member, long state)
+    private void VisitMember(IActivationWorkingSetMember member)
     {
-        var wouldRemove = IsIdle(state);
+        MemberVisitResult result;
+        // Enumeration can retain a member across removal and re-addition. CLOCK state is advisory, so visit the
+        // member's current state instead of adding a dictionary validation to every scan.
+        var wouldRemove = member.IsIdle;
         if (member.IsCandidateForRemoval(wouldRemove))
         {
             if (wouldRemove)
             {
-                OnEvicted(member, state);
+                if (_members.TryRemove(member, out _))
+                {
+                    member.IsIdle = false;
+                    Interlocked.Decrement(ref _activeCount);
+                    result = MemberVisitResult.Evicted;
+                }
+                else
+                {
+                    result = MemberVisitResult.None;
+                }
             }
             else
             {
-                if (_members.TryUpdate(member, GetIdleState(state), comparisonValue: state))
-                {
-                    foreach (var observer in _observers)
-                    {
-                        observer.OnIdle(member);
-                    }
-                }
+                member.IsIdle = true;
+                result = MemberVisitResult.Idle;
             }
         }
         else
         {
-            if (wouldRemove)
-            {
-                _members.TryUpdate(member, GetActiveState(state), comparisonValue: state);
-            }
+            member.IsIdle = false;
+            result = MemberVisitResult.Active;
+        }
 
-            foreach (var observer in _observers)
+        foreach (var observer in _observers)
+        {
+            switch (result)
             {
-                observer.OnActive(member);
+                case MemberVisitResult.Active:
+                    observer.OnActive(member);
+                    break;
+                case MemberVisitResult.Idle:
+                    observer.OnIdle(member);
+                    break;
+                case MemberVisitResult.Evicted:
+                    observer.OnEvicted(member);
+                    break;
             }
         }
     }
 
-    private long GetNextActiveState() => unchecked(Interlocked.Increment(ref _nextGeneration) << 1);
-
-    private static bool IsIdle(long state) => (state & IdleMask) != 0;
-
-    private static long GetActiveState(long state) => state & ~IdleMask;
-
-    private static long GetIdleState(long state) => state | IdleMask;
+    private enum MemberVisitResult
+    {
+        None,
+        Active,
+        Idle,
+        Evicted
+    }
 
     void ILifecycleParticipant<ISiloLifecycle>.Participate(ISiloLifecycle lifecycle)
     {
@@ -271,6 +264,11 @@ public interface IActivationWorkingSet
 /// </summary>
 public interface IActivationWorkingSetMember
 {
+    /// <summary>
+    /// Gets or sets whether this member was idle during the previous working-set scan.
+    /// </summary>
+    bool IsIdle { get; set; }
+
     /// <summary>
     /// Returns <see langword="true"/> if the member is eligible for removal, <see langword="false"/> otherwise.
     /// </summary>
