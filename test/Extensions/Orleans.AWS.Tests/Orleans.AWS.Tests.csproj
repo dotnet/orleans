@@ -19,6 +19,7 @@
   </ItemGroup>
 
   <ItemGroup Condition="'$(TargetFramework)' == 'net10.0'">
+    <PackageReference Include="Aspire.Hosting.AWS" />
     <PackageReference Include="Aspire.Hosting.Testing" />
   </ItemGroup>
 
