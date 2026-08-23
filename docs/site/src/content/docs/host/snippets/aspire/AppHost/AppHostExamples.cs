@@ -1,3 +1,5 @@
+using Amazon;
+using Amazon.CDK.AWS.DynamoDB;
 using Aspire.Hosting;
 using Aspire.Hosting.ApplicationModel;
 using Aspire.Hosting.Azure;
@@ -375,6 +377,77 @@ public static class AppHostExamples
         builder.Build().Run();
     }
     // </reminders_inmemory_apphost>
+
+    // <kinesis_apphost_grain_checkpoints>
+    public static void KinesisWithGrainCheckpoints(string[] args)
+    {
+        var builder = DistributedApplication.CreateBuilder(args);
+
+        var aws = builder.AddAWSSDKConfig()
+            .WithRegion(RegionEndpoint.USWest2);
+        var stack = builder.AddAWSCDKStack("streaming")
+            .WithReference(aws);
+        var stream = stack.AddKinesisStream("orders-stream");
+
+        builder.AddProject<Projects.Silo>("silo")
+            .WithReference(stream)
+            .WithEnvironment("Orleans__Streaming__Orders__ProviderType", "Kinesis")
+            .WithEnvironment("Orleans__Streaming__Orders__ServiceKey", stream.Resource.Name)
+            .WithEnvironment("Orleans__Streaming__Orders__Checkpoint__Type", "Grain");
+
+        builder.AddProject<Projects.Client>("client")
+            .WithReference(stream)
+            .WithEnvironment("Orleans__Streaming__Orders__ProviderType", "Kinesis")
+            .WithEnvironment("Orleans__Streaming__Orders__ServiceKey", stream.Resource.Name);
+
+        builder.Build().Run();
+    }
+    // </kinesis_apphost_grain_checkpoints>
+
+    // <kinesis_apphost_dynamodb_checkpoints>
+    public static void KinesisWithDynamoDBCheckpoints(string[] args)
+    {
+        var builder = DistributedApplication.CreateBuilder(args);
+
+        var aws = builder.AddAWSSDKConfig()
+            .WithRegion(RegionEndpoint.USWest2);
+        var stack = builder.AddAWSCDKStack("streaming")
+            .WithReference(aws);
+        var stream = stack.AddKinesisStream("orders-stream");
+        var checkpoints = stack.AddDynamoDBTable(
+            "orders-checkpoints",
+            new TableProps
+            {
+                BillingMode = BillingMode.PAY_PER_REQUEST,
+                PartitionKey = new Amazon.CDK.AWS.DynamoDB.Attribute
+                {
+                    Name = "CheckpointNamespace",
+                    Type = AttributeType.STRING,
+                },
+                SortKey = new Amazon.CDK.AWS.DynamoDB.Attribute
+                {
+                    Name = "Partition",
+                    Type = AttributeType.STRING,
+                },
+            });
+
+        builder.AddProject<Projects.Silo>("silo")
+            .WithReference(stream)
+            .WithReference(checkpoints)
+            .WithEnvironment("Orleans__Streaming__Orders__ProviderType", "Kinesis")
+            .WithEnvironment("Orleans__Streaming__Orders__ServiceKey", stream.Resource.Name)
+            .WithEnvironment("Orleans__Streaming__Orders__Checkpoint__Type", "DynamoDB")
+            .WithEnvironment("Orleans__Streaming__Orders__Checkpoint__ServiceKey", checkpoints.Resource.Name)
+            .WithEnvironment("Orleans__Streaming__Orders__Checkpoint__CreateIfNotExists", "false");
+
+        builder.AddProject<Projects.Client>("client")
+            .WithReference(stream)
+            .WithEnvironment("Orleans__Streaming__Orders__ProviderType", "Kinesis")
+            .WithEnvironment("Orleans__Streaming__Orders__ServiceKey", stream.Resource.Name);
+
+        builder.Build().Run();
+    }
+    // </kinesis_apphost_dynamodb_checkpoints>
 
     // <adonet_apphost>
     public static void AdoNetAppHost(string[] args)
