@@ -80,7 +80,9 @@ Register [ADO.NET](https://learn.microsoft.com/dotnet/framework/data/adonet/ado-
 
 ## NATS JetStream streaming (alpha)
 
-Register [NATS JetStream](https://docs.nats.io/nats-concepts/jetstream) with `AddNatsStreams`. The provider creates or uses a JetStream stream and deterministic subject partitions. File-backed storage is the default; memory-backed JetStream storage is optional and not durable across server loss. Changes to `NatsOptions.PartitionCount` require corresponding server-side stream updates. The provider isn't rewindable.
+Register [NATS JetStream](https://docs.nats.io/nats-concepts/jetstream) with `AddNatsStreams`. The provider creates or uses a JetStream stream and deterministic subject partitions. File-backed storage is the default; memory-backed storage serves transient workloads. Changes to `NatsOptions.PartitionCount` require corresponding server-side stream updates. The provider delivers events through durable JetStream consumers.
+
+Aspire applications can model the server with `Aspire.Hosting.Nats`, enable JetStream with `WithJetStream`, and connect it to Orleans with `WithStreaming`. Silo and client projects register the matching keyed `INatsConnection` with `AddKeyedNatsClient` before calling `UseOrleans` or `UseOrleansClient`. The package [README](https://www.nuget.org/packages/Microsoft.Orleans.Streaming.NATS) contains the complete AppHost and application configuration.
 
 ## Redis Streams streaming (alpha)
 

@@ -139,12 +139,14 @@
     <PackageVersion Include="Aspire.Hosting.Azure.Redis" Version="13.2.4" />
     <PackageVersion Include="Aspire.Hosting.Azure.Storage" Version="13.2.4" />
     <PackageVersion Include="Aspire.Hosting.MySql" Version="13.2.4" />
+    <PackageVersion Include="Aspire.Hosting.Nats" Version="13.2.4" />
     <PackageVersion Include="Aspire.Hosting.Oracle" Version="13.2.4" />
     <PackageVersion Update="Aspire.Hosting.Orleans" Version="13.2.4" />
     <PackageVersion Include="Aspire.Hosting.PostgreSQL" Version="13.2.4" />
     <PackageVersion Update="Aspire.Hosting.Redis" Version="13.2.4" />
     <PackageVersion Include="Aspire.Hosting.SqlServer" Version="13.2.4" />
     <PackageVersion Include="Aspire.Hosting.Testing" Version="13.2.4" />
+    <PackageVersion Include="Aspire.NATS.Net" Version="13.2.4" />
     <PackageVersion Update="Aspire.StackExchange.Redis" Version="13.2.4" />
     <PackageVersion Update="BenchmarkDotNet" Version="0.15.6" />
     <PackageVersion Update="FSharp.Core" Version="10.0.103" />

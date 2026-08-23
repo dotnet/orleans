@@ -10,6 +10,8 @@ namespace Orleans.Streaming.NATS;
 /// </summary>
 public class NatsOptions
 {
+    internal INatsConnection? Connection { get; set; }
+
     /// <summary>
     /// Gets or sets the name of the NATS JetStream stream used by the provider.
     /// </summary>
@@ -96,6 +98,24 @@ public class NatsStreamOptionsValidator(NatsOptions options, string? name = null
         {
             throw new OrleansConfigurationException(
                 $"The {nameof(NatsOptions.NumReplicas)} must be at least 1 for the NATS stream provider '{name}'.");
+        }
+
+        if (options.BatchSize < 1)
+        {
+            throw new OrleansConfigurationException(
+                $"The {nameof(NatsOptions.BatchSize)} must be at least 1 for the NATS stream provider '{name}'.");
+        }
+
+        if (options.PartitionCount < 1)
+        {
+            throw new OrleansConfigurationException(
+                $"The {nameof(NatsOptions.PartitionCount)} must be at least 1 for the NATS stream provider '{name}'.");
+        }
+
+        if (options.ProducerCount < 1)
+        {
+            throw new OrleansConfigurationException(
+                $"The {nameof(NatsOptions.ProducerCount)} must be at least 1 for the NATS stream provider '{name}'.");
         }
 
         if (!Enum.IsDefined(typeof(StreamConfigStorage), options.StorageType))
