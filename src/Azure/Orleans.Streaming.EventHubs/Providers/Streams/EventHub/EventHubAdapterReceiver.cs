@@ -214,6 +214,10 @@ internal partial class EventHubAdapterReceiver : IQueueAdapterReceiver, IQueueCa
                 {
                     await ResetReceiver(cancellationToken);
                 }
+                catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+                {
+                    throw;
+                }
                 catch (Exception recoveryException)
                 {
                     throw new AggregateException(
@@ -262,6 +266,10 @@ internal partial class EventHubAdapterReceiver : IQueueAdapterReceiver, IQueueCa
                 await receiver.CloseAsync(cancellationToken);
             }
         }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
+        }
         catch (Exception exception)
         {
             exceptions.Add(exception);
@@ -270,6 +278,10 @@ internal partial class EventHubAdapterReceiver : IQueueAdapterReceiver, IQueueCa
         try
         {
             await Initialize(cancellationToken);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
         }
         catch (Exception exception)
         {

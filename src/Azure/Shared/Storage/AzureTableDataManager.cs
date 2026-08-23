@@ -80,7 +80,9 @@ namespace Orleans.GrainDirectory.AzureStorage
 
             try
             {
+                cancellationToken.ThrowIfCancellationRequested();
                 TableServiceClient tableCreationClient = await GetCloudTableCreationClientAsync();
+                cancellationToken.ThrowIfCancellationRequested();
                 var table = tableCreationClient.GetTableClient(TableName);
                 var response = await table.CreateIfNotExistsAsync(cancellationToken);
                 var alreadyExisted = response.GetRawResponse().Status == (int)HttpStatusCode.Conflict;

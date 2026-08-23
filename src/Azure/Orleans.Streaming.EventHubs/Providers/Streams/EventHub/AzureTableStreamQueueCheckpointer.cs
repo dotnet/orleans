@@ -83,8 +83,33 @@ public partial class AzureTableStreamQueueCheckpointer : IStreamQueueCheckpointe
         string partition,
         string serviceId,
         ILoggerFactory loggerFactory)
+        => Create(
+            options,
+            streamProviderName,
+            partition,
+            serviceId,
+            loggerFactory,
+            CancellationToken.None);
+
+    /// <summary>
+    /// Creates and initializes an Azure Table stream queue checkpointer.
+    /// </summary>
+    public static Task<IStreamQueueCheckpointer<string>> Create(
+        AzureTableStreamCheckpointerOptions options,
+        string streamProviderName,
+        string partition,
+        string serviceId,
+        ILoggerFactory loggerFactory,
+        CancellationToken cancellationToken)
     {
-        return Create(options, streamProviderName, partition, serviceId, loggerFactory, defaultComparer: null);
+        return Create(
+            options,
+            streamProviderName,
+            partition,
+            serviceId,
+            loggerFactory,
+            defaultComparer: null,
+            cancellationToken: cancellationToken);
     }
 
     internal static async Task<IStreamQueueCheckpointer<string>> Create(
@@ -94,7 +119,8 @@ public partial class AzureTableStreamQueueCheckpointer : IStreamQueueCheckpointe
         string serviceId,
         ILoggerFactory loggerFactory,
         IComparer<string>? defaultComparer,
-        string? partitionKeyPrefix = null)
+        string? partitionKeyPrefix = null,
+        CancellationToken cancellationToken = default)
     {
         var checkpointer = new AzureTableStreamQueueCheckpointer(
             options,
@@ -104,14 +130,21 @@ public partial class AzureTableStreamQueueCheckpointer : IStreamQueueCheckpointe
             loggerFactory,
             defaultComparer,
             partitionKeyPrefix);
-        await checkpointer._dataManager.InitTableAsync();
+        await checkpointer._dataManager.InitTableAsync(cancellationToken);
         return checkpointer;
     }
 
     /// <inheritdoc />
-    public async Task<string> Load()
+    [Obsolete("Use the overload which accepts a CancellationToken.")]
+    public Task<string> Load() => Load(CancellationToken.None);
+
+    /// <inheritdoc />
+    public async Task<string> Load(CancellationToken cancellationToken)
     {
-        var result = await _dataManager.ReadSingleTableEntryAsync(_entity.PartitionKey, _entity.RowKey);
+        var result = await _dataManager.ReadSingleTableEntryAsync(
+            _entity.PartitionKey,
+            _entity.RowKey,
+            cancellationToken);
         var checkpoint = result.Entity?.Offset ?? string.Empty;
         lock (_lock)
         {
