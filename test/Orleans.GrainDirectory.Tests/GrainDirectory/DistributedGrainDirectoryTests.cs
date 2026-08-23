@@ -36,6 +36,36 @@ public sealed class DefaultGrainDirectoryTests(DefaultClusterFixture fixture, IT
 public sealed class DistributedGrainDirectoryMembershipTests
 {
     [Fact]
+    public async Task NamedAliasesAreEnumeratedOnceForInstanceOperations()
+    {
+        var builder = new InProcessTestClusterBuilder(1);
+        builder.Options.UseDistributedGrainDirectory = true;
+        builder.ConfigureSilo((_, siloBuilder) =>
+        {
+            siloBuilder.AddDistributedGrainDirectory("first");
+            siloBuilder.AddDistributedGrainDirectory("second");
+        });
+        var cluster = builder.Build();
+
+        try
+        {
+            await cluster.DeployAsync();
+            var services = cluster.Silos[0].ServiceProvider;
+            var defaultDirectory = services.GetRequiredKeyedService<IGrainDirectory>(
+                GrainDirectoryAttribute.DEFAULT_GRAIN_DIRECTORY);
+            var first = services.GetRequiredKeyedService<IGrainDirectory>("first");
+            var second = services.GetRequiredKeyedService<IGrainDirectory>("second");
+            Assert.Same(defaultDirectory, first);
+            Assert.Same(defaultDirectory, second);
+            Assert.Single(services.GetRequiredService<GrainDirectoryResolver>().Directories, defaultDirectory);
+        }
+        finally
+        {
+            await cluster.DisposeAsync();
+        }
+    }
+
+    [Fact]
     public async Task OwnerResolutionWaitsForActiveDirectoryMembership()
     {
         var cancellationToken = TestContext.Current.CancellationToken;

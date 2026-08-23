@@ -72,7 +72,7 @@ Named directories can also be configured under `Orleans:GrainDirectory:{name}` w
 
 <xref:Orleans.Hosting.CoreHostingExtensions.AddDistributedGrainDirectory*> adds a strongly consistent in-cluster directory based on partitioned ranges and membership views.
 
-Configure it consistently on every silo in the cluster so all members use the same directory implementation.
+Register the same default and named directory mappings on every silo in the cluster. Multiple calls with different names register the same distributed directory instance for those grain types.
 
 :::code language="csharp" source="snippets/hosting/HostingExamples.cs" id="distributed_grain_directory":::
 
