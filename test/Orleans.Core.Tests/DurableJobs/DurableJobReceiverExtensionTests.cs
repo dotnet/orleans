@@ -220,7 +220,7 @@ public class DurableJobReceiverExtensionTests
         featureHandler.ExecuteJobAsync(Arg.Any<IJobRunContext>(), Arg.Any<CancellationToken>())
             .Returns(ValueTask.FromResult(DurableJobRunResult.Completed));
         var registry = new DurableJobHandlerRegistry();
-        registry.Register("feature", featureHandler);
+        RegisterFeatureHandler(registry, featureHandler);
         var extension = CreateExtension(grainHandler, registry: registry);
         var context = CreateJobContext("run-1", jobName: "feature");
 
@@ -238,7 +238,7 @@ public class DurableJobReceiverExtensionTests
         grainHandler.ExecuteJobAsync(Arg.Any<IJobRunContext>(), Arg.Any<CancellationToken>()).Returns(Task.CompletedTask);
         var featureHandler = Substitute.For<IDurableJobFeatureHandler>();
         var registry = new DurableJobHandlerRegistry();
-        registry.Register("other-feature", featureHandler);
+        RegisterFeatureHandler(registry, featureHandler, static job => job.Name == "other-feature");
         var extension = CreateExtension(grainHandler, registry: registry);
         var context = CreateJobContext("run-1", jobName: "grain-job");
 
@@ -247,6 +247,27 @@ public class DurableJobReceiverExtensionTests
         Assert.Equal(DurableJobRunStatus.Completed, result.Status);
         await grainHandler.Received(1).ExecuteJobAsync(context, Arg.Any<CancellationToken>());
         await featureHandler.DidNotReceive().ExecuteJobAsync(Arg.Any<IJobRunContext>(), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public void HandleDurableJobAsync_WhenMultipleFeatureHandlersMatch_RejectsAmbiguousDispatch()
+    {
+        var grainHandler = Substitute.For<IDurableJobHandler>();
+        var firstFeatureHandler = Substitute.For<IDurableJobFeatureHandler>();
+        var secondFeatureHandler = Substitute.For<IDurableJobFeatureHandler>();
+        var registry = new DurableJobHandlerRegistry();
+        RegisterFeatureHandler(registry, firstFeatureHandler);
+        RegisterFeatureHandler(registry, secondFeatureHandler);
+        var extension = CreateExtension(grainHandler, registry: registry);
+        var context = CreateJobContext("run-1", jobName: "feature");
+
+        var exception = Assert.Throws<InvalidOperationException>(
+            () => extension.HandleDurableJobAsync(context, CancellationToken.None));
+
+        Assert.Contains("Multiple durable job feature handlers match job 'feature'", exception.Message, StringComparison.Ordinal);
+        grainHandler.DidNotReceive().ExecuteJobAsync(Arg.Any<IJobRunContext>(), Arg.Any<CancellationToken>());
+        firstFeatureHandler.DidNotReceive().ExecuteJobAsync(Arg.Any<IJobRunContext>(), Arg.Any<CancellationToken>());
+        secondFeatureHandler.DidNotReceive().ExecuteJobAsync(Arg.Any<IJobRunContext>(), Arg.Any<CancellationToken>());
     }
 
     [Fact]
@@ -259,7 +280,7 @@ public class DurableJobReceiverExtensionTests
         featureHandler.ExecuteJobAsync(Arg.Any<IJobRunContext>(), Arg.Any<CancellationToken>())
             .Returns(ValueTask.FromResult(expected));
         var registry = new DurableJobHandlerRegistry();
-        registry.Register("feature", featureHandler);
+        RegisterFeatureHandler(registry, featureHandler);
         var extension = CreateExtension(
             Substitute.For<IDurableJobHandler>(),
             registry: registry,
@@ -286,7 +307,7 @@ public class DurableJobReceiverExtensionTests
         featureHandler.ExecuteJobAsync(Arg.Any<IJobRunContext>(), Arg.Any<CancellationToken>())
             .Returns(ValueTask.FromException<DurableJobRunResult>(exception));
         var registry = new DurableJobHandlerRegistry();
-        registry.Register("feature", featureHandler);
+        RegisterFeatureHandler(registry, featureHandler);
         var extension = CreateExtension(
             Substitute.For<IDurableJobHandler>(),
             registry: registry,
@@ -314,7 +335,7 @@ public class DurableJobReceiverExtensionTests
         featureHandler.ExecuteJobAsync(Arg.Any<IJobRunContext>(), Arg.Any<CancellationToken>())
             .Returns(ValueTask.FromResult<DurableJobRunResult>(null!));
         var registry = new DurableJobHandlerRegistry();
-        registry.Register("feature", featureHandler);
+        RegisterFeatureHandler(registry, featureHandler);
         var extension = CreateExtension(
             Substitute.For<IDurableJobHandler>(),
             registry: registry,
@@ -345,7 +366,7 @@ public class DurableJobReceiverExtensionTests
         featureHandler.ExecuteJobAsync(Arg.Any<IJobRunContext>(), Arg.Any<CancellationToken>())
             .Returns(ValueTask.FromCanceled<DurableJobRunResult>(cancellation.Token));
         var registry = new DurableJobHandlerRegistry();
-        registry.Register("feature", featureHandler);
+        RegisterFeatureHandler(registry, featureHandler);
         var extension = CreateExtension(
             Substitute.For<IDurableJobHandler>(),
             registry: registry,
@@ -372,7 +393,7 @@ public class DurableJobReceiverExtensionTests
         featureHandler.ExecuteJobAsync(Arg.Any<IJobRunContext>(), Arg.Any<CancellationToken>())
             .Returns(ValueTask.FromException<DurableJobRunResult>(exception));
         var registry = new DurableJobHandlerRegistry();
-        registry.Register("feature", featureHandler);
+        RegisterFeatureHandler(registry, featureHandler);
         var extension = CreateExtension(
             Substitute.For<IDurableJobHandler>(),
             registry: registry,
@@ -404,7 +425,7 @@ public class DurableJobReceiverExtensionTests
             featureHandler.ExecuteJobAsync(Arg.Any<IJobRunContext>(), Arg.Any<CancellationToken>())
                 .Returns(ValueTask.FromResult(outcome.Result));
             var registry = new DurableJobHandlerRegistry();
-            registry.Register("feature", featureHandler);
+            RegisterFeatureHandler(registry, featureHandler);
             var extension = CreateExtension(
                 Substitute.For<IDurableJobHandler>(),
                 registry: registry,
@@ -447,7 +468,7 @@ public class DurableJobReceiverExtensionTests
         featureHandler.ExecuteJobAsync(Arg.Any<IJobRunContext>(), Arg.Any<CancellationToken>())
             .Returns(_ => ExecuteAsync());
         var registry = new DurableJobHandlerRegistry();
-        registry.Register("feature", featureHandler);
+        RegisterFeatureHandler(registry, featureHandler);
         var extension = CreateExtension(
             Substitute.For<IDurableJobHandler>(),
             jobStatusPollInterval: TimeSpan.FromSeconds(1),
@@ -485,6 +506,16 @@ public class DurableJobReceiverExtensionTests
             await releaseSecondInvocation.Task;
             return DurableJobRunResult.Completed;
         }
+    }
+
+    private static void RegisterFeatureHandler(
+        DurableJobHandlerRegistry registry,
+        IDurableJobFeatureHandler handler,
+        Func<DurableJob, bool>? canHandle = null)
+    {
+        canHandle ??= static job => job.Name == "feature";
+        handler.CanHandle(Arg.Any<DurableJob>()).Returns(call => canHandle(call.Arg<DurableJob>()));
+        registry.Register(handler);
     }
 
     private static DurableJobReceiverExtension CreateExtension(

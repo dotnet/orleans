@@ -41,8 +41,10 @@ public class DurableJobsExtensionsTests
             .Returns(ValueTask.FromResult(DurableJobRunResult.Completed));
         handlerB.ExecuteJobAsync(Arg.Any<IJobRunContext>(), Arg.Any<CancellationToken>())
             .Returns(ValueTask.FromResult(DurableJobRunResult.Completed));
-        registryA.Register("feature", handlerA);
-        registryB.Register("feature", handlerB);
+        handlerA.CanHandle(Arg.Is<DurableJob>(static job => job.Name == "feature")).Returns(true);
+        handlerB.CanHandle(Arg.Is<DurableJob>(static job => job.Name == "feature")).Returns(true);
+        registryA.Register(handlerA);
+        registryB.Register(handlerB);
 
         var extensionA = scopeA.ServiceProvider.GetRequiredKeyedService<IGrainExtension>(typeof(IDurableJobReceiverExtension));
         var extensionB = scopeB.ServiceProvider.GetRequiredKeyedService<IGrainExtension>(typeof(IDurableJobReceiverExtension));
@@ -135,18 +137,18 @@ public class DurableJobsExtensionsTests
 
     private sealed class ReplacementRegistry : IDurableJobHandlerRegistry
     {
-        public void Register(string jobName, IDurableJobFeatureHandler handler)
+        public void Register(IDurableJobFeatureHandler handler)
         {
         }
     }
 
     private sealed class LookupReplacementRegistry : IDurableJobHandlerRegistry, IDurableJobHandlerLookup
     {
-        public void Register(string jobName, IDurableJobFeatureHandler handler)
+        public void Register(IDurableJobFeatureHandler handler)
         {
         }
 
-        public bool TryGetHandler(string jobName, [NotNullWhen(true)] out IDurableJobFeatureHandler? handler)
+        public bool TryGetHandler(DurableJob job, [NotNullWhen(true)] out IDurableJobFeatureHandler? handler)
         {
             handler = null;
             return false;

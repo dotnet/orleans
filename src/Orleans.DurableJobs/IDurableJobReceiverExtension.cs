@@ -79,7 +79,7 @@ internal sealed partial class DurableJobReceiverExtension : IDurableJobReceiverE
 
     private Task<DurableJobRunResult> StartJob(IJobRunContext context, CancellationToken attemptCancellationToken)
     {
-        if (_featureHandlers.TryGetHandler(context.Job.Name, out var featureHandler))
+        if (_featureHandlers.TryGetHandler(context.Job, out var featureHandler))
         {
             return ExecuteFeatureHandlerAsync(featureHandler, context, attemptCancellationToken);
         }

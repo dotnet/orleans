@@ -94,6 +94,8 @@ namespace Orleans.DurableJobs
 
     public partial interface IDurableJobFeatureHandler
     {
+        bool CanHandle(DurableJob job);
+
         System.Threading.Tasks.ValueTask<DurableJobRunResult> ExecuteJobAsync(IJobRunContext context, System.Threading.CancellationToken attemptCancellationToken);
     }
 
@@ -104,7 +106,7 @@ namespace Orleans.DurableJobs
 
     public partial interface IDurableJobHandlerRegistry
     {
-        void Register(string jobName, IDurableJobFeatureHandler handler);
+        void Register(IDurableJobFeatureHandler handler);
     }
 
     public partial interface IJobRunContext

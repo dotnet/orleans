@@ -9,8 +9,8 @@ namespace Orleans.DurableJobs;
 /// Registers framework-owned durable job handlers for a grain activation.
 /// </summary>
 /// <remarks>
-/// Registrations are activation-scoped and job names are compared using <see cref="StringComparer.Ordinal"/>.
-/// A registered feature handler takes precedence over <see cref="IDurableJobHandler"/> for the same job name.
+/// Registrations are activation-scoped. A matching feature handler takes precedence over
+/// <see cref="IDurableJobHandler"/>. Multiple matching feature handlers are rejected as ambiguous.
 /// The DurableJobs dependency injection registration is an infrastructure service and does not support
 /// replacement or decoration. Replacing it is rejected explicitly when DurableJobs is configured or the
 /// receiver is resolved so that registrations cannot be silently disconnected from dispatch.
@@ -18,12 +18,11 @@ namespace Orleans.DurableJobs;
 public interface IDurableJobHandlerRegistry
 {
     /// <summary>
-    /// Registers <paramref name="handler"/> for jobs with the supplied name.
+    /// Registers <paramref name="handler"/> for this grain activation.
     /// </summary>
-    /// <param name="jobName">The case-sensitive durable job name.</param>
     /// <param name="handler">The activation-scoped feature handler.</param>
-    /// <exception cref="InvalidOperationException">A handler is already registered for <paramref name="jobName"/>.</exception>
-    void Register(string jobName, IDurableJobFeatureHandler handler);
+    /// <exception cref="InvalidOperationException">The handler is already registered.</exception>
+    void Register(IDurableJobFeatureHandler handler);
 }
 
 /// <summary>
@@ -35,6 +34,17 @@ public interface IDurableJobHandlerRegistry
 /// </remarks>
 public interface IDurableJobFeatureHandler
 {
+    /// <summary>
+    /// Determines whether this handler handles the supplied durable job.
+    /// </summary>
+    /// <remarks>
+    /// Implementations must be deterministic and side-effect free. This method can be called more than once
+    /// for the same durable job.
+    /// </remarks>
+    /// <param name="job">The durable job.</param>
+    /// <returns><see langword="true"/> when this handler handles the job; otherwise, <see langword="false"/>.</returns>
+    bool CanHandle(DurableJob job);
+
     /// <summary>
     /// Executes a durable job and returns its explicit disposition.
     /// </summary>
@@ -49,24 +59,50 @@ public interface IDurableJobFeatureHandler
 
 internal interface IDurableJobHandlerLookup
 {
-    bool TryGetHandler(string jobName, [NotNullWhen(true)] out IDurableJobFeatureHandler? handler);
+    bool TryGetHandler(DurableJob job, [NotNullWhen(true)] out IDurableJobFeatureHandler? handler);
 }
 
 internal sealed class DurableJobHandlerRegistry : IDurableJobHandlerRegistry, IDurableJobHandlerLookup
 {
-    private readonly Dictionary<string, IDurableJobFeatureHandler> _handlers = new(StringComparer.Ordinal);
+    private readonly List<IDurableJobFeatureHandler> _handlers = [];
 
-    public void Register(string jobName, IDurableJobFeatureHandler handler)
+    public void Register(IDurableJobFeatureHandler handler)
     {
-        ArgumentException.ThrowIfNullOrWhiteSpace(jobName);
         ArgumentNullException.ThrowIfNull(handler);
 
-        if (!_handlers.TryAdd(jobName, handler))
+        foreach (var registeredHandler in _handlers)
         {
-            throw new InvalidOperationException($"A durable job feature handler is already registered for '{jobName}'.");
+            if (ReferenceEquals(registeredHandler, handler))
+            {
+                throw new InvalidOperationException("The durable job feature handler is already registered.");
+            }
         }
+
+        _handlers.Add(handler);
     }
 
-    public bool TryGetHandler(string jobName, [NotNullWhen(true)] out IDurableJobFeatureHandler? handler) =>
-        _handlers.TryGetValue(jobName, out handler);
+    public bool TryGetHandler(DurableJob job, [NotNullWhen(true)] out IDurableJobFeatureHandler? handler)
+    {
+        ArgumentNullException.ThrowIfNull(job);
+
+        handler = null;
+        foreach (var candidate in _handlers)
+        {
+            if (!candidate.CanHandle(job))
+            {
+                continue;
+            }
+
+            if (handler is not null)
+            {
+                throw new InvalidOperationException(
+                    $"Multiple durable job feature handlers match job '{job.Name}': "
+                    + $"'{handler.GetType().FullName}' and '{candidate.GetType().FullName}'.");
+            }
+
+            handler = candidate;
+        }
+
+        return handler is not null;
+    }
 }
