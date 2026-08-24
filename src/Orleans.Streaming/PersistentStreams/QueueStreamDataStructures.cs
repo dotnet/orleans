@@ -38,6 +38,7 @@ namespace Orleans.Streams
         public IBatchContainer? PendingBatch;
         [NonSerialized]
         public bool StartPositionIsProviderDefault;
+        public StreamSequenceToken? CursorStartToken;
 
         /// <summary>
         /// The sequence token of the last batch processed (delivered or filtered) by this subscription.
@@ -45,6 +46,14 @@ namespace Orleans.Streams
         /// </summary>
         [NonSerialized]
         public StreamSequenceToken? LastProcessedToken;
+
+        /// <summary>
+        /// The last contiguous partition record which is safe for this subscription.
+        /// This includes successfully processed matching records and scanned records
+        /// belonging to other streams.
+        /// </summary>
+        [NonSerialized]
+        public StreamSequenceToken? LastSafePartitionToken;
 
         public StreamConsumerData(GuidId subscriptionId, QualifiedStreamId streamId, IStreamConsumerExtension streamConsumer, string? filterData)
         {
