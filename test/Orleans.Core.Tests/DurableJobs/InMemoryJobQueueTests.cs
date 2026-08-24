@@ -211,6 +211,19 @@ public class InMemoryJobQueueTests
         Assert.Equal(0, queue.Count);
     }
 
+    [Theory]
+    [InlineData(null)]
+    [InlineData("")]
+    [InlineData(" ")]
+    public void RemoveJob_InvalidJobId_Throws(string? jobId)
+    {
+        var queue = new InMemoryJobQueue();
+
+        var exception = Assert.ThrowsAny<ArgumentException>(() => queue.RemoveJob(jobId!));
+
+        Assert.Equal("jobId", exception.ParamName);
+    }
+
     [Fact]
     public async Task RetryJobLater_AfterCancel_DoesNotResurrectJob()
     {

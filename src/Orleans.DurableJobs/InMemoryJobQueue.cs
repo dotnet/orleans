@@ -84,6 +84,7 @@ internal sealed class InMemoryJobQueue : IAsyncEnumerable<IJobRunContext>
     /// </remarks>
     public bool RemoveJob(string jobId)
     {
+        ArgumentException.ThrowIfNullOrWhiteSpace(jobId);
         lock (_syncLock)
         {
             if (_jobsIdToBucket.TryGetValue(jobId, out var bucket))
