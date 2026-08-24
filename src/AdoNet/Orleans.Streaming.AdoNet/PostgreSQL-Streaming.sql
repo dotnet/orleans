@@ -63,6 +63,7 @@ CREATE TABLE OrleansStreamMessage
     StreamIdBytes BYTEA NOT NULL,
     StreamNamespaceLength INT NOT NULL,
     CreatedOn TIMESTAMP(6) WITHOUT TIME ZONE NOT NULL,
+    CheckpointedOn TIMESTAMP(6) WITHOUT TIME ZONE NULL,
     Payload BYTEA NOT NULL,
 
     CONSTRAINT PK_OrleansStreamMessage PRIMARY KEY
@@ -246,6 +247,13 @@ BEGIN
         AND P.QueueId = _QueueId
     RETURNING P.OwnerEpoch INTO _OwnerEpoch;
 
+    UPDATE OrleansStreamMessage AS M
+    SET CheckpointedOn = COALESCE(M.CheckpointedOn, _Now)
+    WHERE M.ServiceId = _ServiceId
+        AND M.ProviderId = _ProviderId
+        AND M.QueueId = _QueueId
+        AND M.MessageId <= _Checkpoint;
+
     RETURN QUERY
     SELECT
         _ServiceId,
@@ -298,6 +306,12 @@ BEGIN
 
     IF FOUND THEN
         _Updated := TRUE;
+        UPDATE OrleansStreamMessage AS M
+        SET CheckpointedOn = COALESCE(M.CheckpointedOn, CURRENT_TIMESTAMP AT TIME ZONE 'UTC')
+        WHERE M.ServiceId = _ServiceId
+            AND M.ProviderId = _ProviderId
+            AND M.QueueId = _QueueId
+            AND M.MessageId <= _Checkpoint;
     ELSE
         SELECT P.OwnerEpoch, P.Checkpoint
         INTO _CurrentOwnerEpoch, _CurrentCheckpoint
@@ -407,7 +421,7 @@ BEGIN
                 (
                     _Checkpoint IS NOT NULL
                     AND M.MessageId <= _Checkpoint
-                    AND M.CreatedOn < _Now - make_interval(secs => _RetentionPeriodSeconds)
+                    AND M.CheckpointedOn < _Now - make_interval(secs => _RetentionPeriodSeconds)
                 )
                 OR
                 (
