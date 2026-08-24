@@ -12,6 +12,20 @@ dotnet add package Microsoft.Orleans.Runtime
 
 This package is automatically included when you reference the Orleans Server metapackage.
 
+## File grain storage
+
+The runtime includes a file-based grain storage provider for local, single-silo development and testing. It stores one binary file per grain state record and uses persisted ETags for optimistic concurrency.
+
+```csharp
+using Orleans.Persistence.FileStorage;
+
+siloBuilder.AddFileGrainStorage(
+    options: options => options.RootDirectory = Path.Combine(
+        AppContext.BaseDirectory,
+        "Orleans",
+        "GrainState"));
+```
+
 ## Example - Configuring a Silo
 
 ```csharp

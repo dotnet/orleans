@@ -103,9 +103,6 @@
   <Folder Name="/src/Extensions/Cassandra/">
     <Project Path="src/Cassandra/Orleans.Clustering.Cassandra/Orleans.Clustering.Cassandra.csproj" />
   </Folder>
-  <Folder Name="/src/Extensions/File/">
-    <Project Path="src/File/Orleans.Persistence.FileStorage/Orleans.Persistence.FileStorage.csproj" />
-  </Folder>
   <Folder Name="/src/Extensions/Google/">
     <Project Path="src/Google/Orleans.Clustering.Firestore/Orleans.Clustering.Firestore.csproj" />
     <Project Path="src/Google/Orleans.GrainDirectory.Firestore/Orleans.GrainDirectory.Firestore.csproj" />
@@ -144,6 +141,7 @@
     <Project Path="test/Orleans.Runtime.Internal.Tests/Orleans.Runtime.Internal.Tests.csproj" />
     <Project Path="test/Orleans.Reminders.Tests/Orleans.Reminders.Tests.csproj" />
     <Project Path="test/Orleans.Placement.Tests/Orleans.Placement.Tests.csproj" />
+    <Project Path="test/Orleans.Persistence.FileStorage.Tests/Orleans.Persistence.FileStorage.Tests.csproj" />
     <Project Path="test/Orleans.Persistence.TestKit.Tests/Orleans.Persistence.TestKit.Tests.csproj" />
     <Project Path="test/Orleans.Reminders.TestKit.Tests/Orleans.Reminders.TestKit.Tests.csproj" />
     <Project Path="test/Orleans.GrainDirectory.Tests/Orleans.GrainDirectory.Tests.csproj" />
@@ -182,7 +180,6 @@
     <Project Path="test/Extensions/Orleans.Redis.Tests/Orleans.Redis.Tests.csproj" />
     <Project Path="test/Extensions/Orleans.Clustering.Firestore.Tests/Orleans.Clustering.Firestore.Tests.csproj" />
     <Project Path="test/Extensions/Orleans.GrainDirectory.Firestore.Tests/Orleans.GrainDirectory.Firestore.Tests.csproj" />
-    <Project Path="test/Extensions/Orleans.Persistence.FileStorage.Tests/Orleans.Persistence.FileStorage.Tests.csproj" />
     <Project Path="test/Extensions/Orleans.Persistence.Firestore.Tests/Orleans.Persistence.Firestore.Tests.csproj" />
     <Project Path="test/Extensions/Orleans.Reminders.Firestore.Tests/Orleans.Reminders.Firestore.Tests.csproj" />
     <Project Path="test/Extensions/Orleans.AdoNet.Tests/Orleans.AdoNet.Tests.csproj" />
