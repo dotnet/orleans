@@ -76,6 +76,7 @@ CREATE TABLE OrleansStreamMessage
     StreamIdBytes LONGBLOB NOT NULL,
     StreamNamespaceLength INT NOT NULL,
     CreatedOn DATETIME(6) NOT NULL,
+    CheckpointedOn DATETIME(6) NULL,
     Payload LONGBLOB NOT NULL,
 
     PRIMARY KEY (ServiceId, ProviderId, QueueId, MessageId)
@@ -270,6 +271,13 @@ BEGIN
         AND ProviderId = _ProviderId
         AND QueueId = _QueueId;
 
+    UPDATE OrleansStreamMessage
+    SET CheckpointedOn = COALESCE(CheckpointedOn, _Now)
+    WHERE ServiceId = _ServiceId
+        AND ProviderId = _ProviderId
+        AND QueueId = _QueueId
+        AND MessageId <= _Checkpoint;
+
     SELECT OwnerEpoch
     INTO _OwnerEpoch
     FROM OrleansStreamPartition
@@ -329,6 +337,15 @@ BEGIN
         AND _Checkpoint < NextMessageId;
 
     SET _Updated = ROW_COUNT() = 1;
+
+    IF _Updated THEN
+        UPDATE OrleansStreamMessage
+        SET CheckpointedOn = COALESCE(CheckpointedOn, UTC_TIMESTAMP(6))
+        WHERE ServiceId = _ServiceId
+            AND ProviderId = _ProviderId
+            AND QueueId = _QueueId
+            AND MessageId <= _Checkpoint;
+    END IF;
 
     SELECT OwnerEpoch, Checkpoint
     INTO _CurrentOwnerEpoch, _CurrentCheckpoint
@@ -446,7 +463,7 @@ BEGIN
                 (
                     _Checkpoint IS NOT NULL
                     AND MessageId <= _Checkpoint
-                    AND CreatedOn < DATE_SUB(_Now, INTERVAL _RetentionPeriodSeconds SECOND)
+                    AND CheckpointedOn < DATE_SUB(_Now, INTERVAL _RetentionPeriodSeconds SECOND)
                 )
                 OR
                 (

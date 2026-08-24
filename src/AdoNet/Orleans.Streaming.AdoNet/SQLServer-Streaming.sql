@@ -61,6 +61,7 @@ CREATE TABLE OrleansStreamMessage
     StreamIdBytes VARBINARY(MAX) NOT NULL,
     StreamNamespaceLength INT NOT NULL,
     CreatedOn DATETIME2(7) NOT NULL,
+    CheckpointedOn DATETIME2(7) NULL,
     Payload VARBINARY(MAX) NOT NULL,
 
     CONSTRAINT PK_OrleansStreamMessage PRIMARY KEY CLUSTERED
@@ -360,6 +361,13 @@ BEGIN
             AND ProviderId = @ProviderId
             AND QueueId = @QueueId;
 
+        UPDATE OrleansStreamMessage
+        SET CheckpointedOn = COALESCE(CheckpointedOn, @Now)
+        WHERE ServiceId = @ServiceId
+            AND ProviderId = @ProviderId
+            AND QueueId = @QueueId
+            AND MessageId <= @Checkpoint;
+
         SELECT @OwnerEpoch = OwnerEpoch
         FROM OrleansStreamPartition
         WHERE ServiceId = @ServiceId
@@ -400,6 +408,7 @@ CREATE PROCEDURE AdvanceStreamCheckpoint
 AS
 BEGIN
     SET NOCOUNT ON;
+    SET XACT_ABORT ON;
 
     DECLARE @Result TABLE
     (
@@ -410,44 +419,76 @@ BEGIN
         [Checkpoint] BIGINT NULL,
         Updated BIT NOT NULL
     );
+    DECLARE @Now DATETIME2(7) = SYSUTCDATETIME();
+    DECLARE @StartedTransaction BIT = 0;
 
-    UPDATE OrleansStreamPartition WITH (UPDLOCK, ROWLOCK)
-    SET
-        [Checkpoint] = @Checkpoint,
-        ModifiedOn = SYSUTCDATETIME()
-    OUTPUT
-        Inserted.ServiceId,
-        Inserted.ProviderId,
-        Inserted.QueueId,
-        Inserted.OwnerEpoch,
-        Inserted.[Checkpoint],
-        CAST(1 AS BIT)
-    INTO @Result
-    WHERE ServiceId = @ServiceId
-        AND ProviderId = @ProviderId
-        AND QueueId = @QueueId
-        AND OwnerEpoch = @OwnerEpoch
-        AND ([Checkpoint] IS NULL OR [Checkpoint] < @Checkpoint)
-        AND @Checkpoint < NextMessageId;
+    BEGIN TRY
+        IF @@TRANCOUNT = 0
+        BEGIN
+            BEGIN TRANSACTION;
+            SET @StartedTransaction = 1;
+        END;
 
-    IF EXISTS (SELECT 1 FROM @Result)
-    BEGIN
-        SELECT ServiceId, ProviderId, QueueId, OwnerEpoch, [Checkpoint], Updated
-        FROM @Result;
-        RETURN;
-    END;
+        UPDATE OrleansStreamPartition WITH (UPDLOCK, ROWLOCK)
+        SET
+            [Checkpoint] = @Checkpoint,
+            ModifiedOn = @Now
+        OUTPUT
+            Inserted.ServiceId,
+            Inserted.ProviderId,
+            Inserted.QueueId,
+            Inserted.OwnerEpoch,
+            Inserted.[Checkpoint],
+            CAST(1 AS BIT)
+        INTO @Result
+        WHERE ServiceId = @ServiceId
+            AND ProviderId = @ProviderId
+            AND QueueId = @QueueId
+            AND OwnerEpoch = @OwnerEpoch
+            AND ([Checkpoint] IS NULL OR [Checkpoint] < @Checkpoint)
+            AND @Checkpoint < NextMessageId;
 
-    SELECT
-        ServiceId,
-        ProviderId,
-        QueueId,
-        OwnerEpoch,
-        [Checkpoint],
-        CAST(0 AS BIT) AS Updated
-    FROM OrleansStreamPartition
-    WHERE ServiceId = @ServiceId
-        AND ProviderId = @ProviderId
-        AND QueueId = @QueueId;
+        IF EXISTS (SELECT 1 FROM @Result)
+        BEGIN
+            UPDATE OrleansStreamMessage
+            SET CheckpointedOn = COALESCE(CheckpointedOn, @Now)
+            WHERE ServiceId = @ServiceId
+                AND ProviderId = @ProviderId
+                AND QueueId = @QueueId
+                AND MessageId <= @Checkpoint;
+        END;
+
+        IF @StartedTransaction = 1
+        BEGIN
+            COMMIT TRANSACTION;
+        END;
+
+        IF EXISTS (SELECT 1 FROM @Result)
+        BEGIN
+            SELECT ServiceId, ProviderId, QueueId, OwnerEpoch, [Checkpoint], Updated
+            FROM @Result;
+            RETURN;
+        END;
+
+        SELECT
+            ServiceId,
+            ProviderId,
+            QueueId,
+            OwnerEpoch,
+            [Checkpoint],
+            CAST(0 AS BIT) AS Updated
+        FROM OrleansStreamPartition
+        WHERE ServiceId = @ServiceId
+            AND ProviderId = @ProviderId
+            AND QueueId = @QueueId;
+    END TRY
+    BEGIN CATCH
+        IF @StartedTransaction = 1 AND XACT_STATE() <> 0
+        BEGIN
+            ROLLBACK TRANSACTION;
+        END;
+        THROW;
+    END CATCH;
 END;
 GO
 
@@ -521,7 +562,7 @@ BEGIN
         (
             SELECT TOP (@CleanupBatchSize)
                 MessageId
-            FROM OrleansStreamMessage WITH (UPDLOCK, READPAST, ROWLOCK)
+            FROM OrleansStreamMessage WITH (UPDLOCK, READPAST, READCOMMITTEDLOCK, ROWLOCK)
             WHERE ServiceId = @ServiceId
                 AND ProviderId = @ProviderId
                 AND QueueId = @QueueId
@@ -530,7 +571,7 @@ BEGIN
                     (
                         @Checkpoint IS NOT NULL
                         AND MessageId <= @Checkpoint
-                        AND CreatedOn < DATEADD(SECOND, -@RetentionPeriodSeconds, @Now)
+                        AND CheckpointedOn < DATEADD(SECOND, -@RetentionPeriodSeconds, @Now)
                     )
                     OR
                     (

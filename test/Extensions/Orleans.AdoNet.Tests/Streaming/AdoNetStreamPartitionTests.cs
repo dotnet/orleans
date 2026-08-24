@@ -148,6 +148,21 @@ public abstract class AdoNetStreamPartitionTests(string invariant) : IAsyncLifet
                 AddParameter(command, "QueueId", queueId);
             });
 
+    private Task AgeCheckpointedMessagesAsync(string serviceId, string providerId, string queueId) =>
+        _storage.ExecuteAsync(
+            """
+            UPDATE OrleansStreamMessage
+            SET CheckpointedOn = @CheckpointedOn
+            WHERE ServiceId = @ServiceId AND ProviderId = @ProviderId AND QueueId = @QueueId
+            """,
+            command =>
+            {
+                AddParameter(command, "CheckpointedOn", DateTime.UtcNow.AddDays(-2));
+                AddParameter(command, "ServiceId", serviceId);
+                AddParameter(command, "ProviderId", providerId);
+                AddParameter(command, "QueueId", queueId);
+            });
+
     private Task MakeCleanupDueAsync(string serviceId, string providerId, string queueId) =>
         _storage.ExecuteAsync(
             """
@@ -660,7 +675,7 @@ public abstract class AdoNetStreamPartitionTests(string invariant) : IAsyncLifet
         var state = await _queries.AcquireStreamPartitionAsync(serviceId, providerId, queueId, startFromNow: true);
         await _queries.AdvanceStreamCheckpointAsync(serviceId, providerId, queueId, state.OwnerEpoch, acks[^1].MessageId);
 
-        await AgePartitionMessagesAsync(serviceId, providerId, queueId);
+        await AgeCheckpointedMessagesAsync(serviceId, providerId, queueId);
 
         var result = await _queries.CleanupStreamMessagesAsync(
             serviceId, providerId, queueId,
@@ -680,6 +695,42 @@ public abstract class AdoNetStreamPartitionTests(string invariant) : IAsyncLifet
 
         var remaining = await _queries.ReadStreamMessagesAsync(serviceId, providerId, queueId, afterMessageId: 0, maxCount: 100);
         Assert.Empty(remaining);
+    }
+
+    [Fact]
+    public async Task CleanupStreamMessages_RetentionStartsWhenCheckpointAdvances()
+    {
+        var serviceId = RandomServiceId();
+        var providerId = RandomProviderId();
+        var queueId = RandomQueueId();
+        var appended = await AppendAsync(serviceId, providerId, queueId);
+        await AgePartitionMessagesAsync(serviceId, providerId, queueId);
+        var state = await _queries.AcquireStreamPartitionAsync(serviceId, providerId, queueId, startFromNow: false);
+
+        await _queries.AdvanceStreamCheckpointAsync(
+            serviceId,
+            providerId,
+            queueId,
+            state.OwnerEpoch,
+            appended.MessageId);
+        await MakeCleanupDueAsync(serviceId, providerId, queueId);
+        var cleanup = await _queries.CleanupStreamMessagesAsync(
+            serviceId,
+            providerId,
+            queueId,
+            retentionPeriodSeconds: 60,
+            maximumRetentionPeriodSeconds: null,
+            cleanupIntervalSeconds: 60,
+            cleanupBatchSize: 100);
+
+        Assert.True(cleanup.Ran);
+        Assert.Equal(0, cleanup.DeletedCount);
+        Assert.Single(await _queries.ReadStreamMessagesAsync(
+            serviceId,
+            providerId,
+            queueId,
+            afterMessageId: 0,
+            maxCount: 100));
     }
 
     [Fact]
@@ -731,7 +782,7 @@ public abstract class AdoNetStreamPartitionTests(string invariant) : IAsyncLifet
         var state = await _queries.AcquireStreamPartitionAsync(serviceId, providerId, queueId, startFromNow: true);
         await _queries.AdvanceStreamCheckpointAsync(serviceId, providerId, queueId, state.OwnerEpoch, acks[^1].MessageId);
 
-        await AgePartitionMessagesAsync(serviceId, providerId, queueId);
+        await AgeCheckpointedMessagesAsync(serviceId, providerId, queueId);
 
         var first = await _queries.CleanupStreamMessagesAsync(serviceId, providerId, queueId, 1, null, cleanupIntervalSeconds: 1, cleanupBatchSize: 2);
         Assert.True(first.Ran);
