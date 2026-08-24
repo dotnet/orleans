@@ -36,6 +36,7 @@ internal sealed partial class ActivationData :
     IGrainManagementExtension,
     IGrainCallCancellationExtension,
     ICallChainReentrantGrainContext,
+    IGrainContextStartup,
     IAsyncDisposable,
     IDisposable
 {
@@ -135,7 +136,7 @@ internal sealed partial class ActivationData :
         return _activationActivity?.Context;
     }
 
-    public IDisposable? Start()
+    IDisposable IGrainContextStartup.Start()
     {
         if (Interlocked.Exchange(ref _started, 1) != 0 || _startup is not { } startup)
         {
@@ -182,7 +183,7 @@ internal sealed partial class ActivationData :
         }
     }
 
-    public void Abort()
+    void IGrainContextStartup.Abort()
     {
         if (Interlocked.Exchange(ref _startup, null) is { } startup)
         {
@@ -771,7 +772,7 @@ internal sealed partial class ActivationData :
     {
         lock (_lock)
         {
-            if (State is not (ActivationState.Activating or ActivationState.Valid or ActivationState.Deactivating))
+            if (State is not (ActivationState.Valid or ActivationState.Deactivating))
             {
                 return false;
             }
