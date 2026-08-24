@@ -303,7 +303,6 @@ namespace Orleans.Streaming.EventHubs
 
         public static EventHubAdapterFactory Create(System.IServiceProvider services, string name) { throw null; }
 
-        [System.Diagnostics.DebuggerStepThrough]
         public System.Threading.Tasks.Task<Streams.IQueueAdapter> CreateAdapter() { throw null; }
 
         protected virtual IEventHubQueueCacheFactory CreateCacheFactory(Configuration.EventHubStreamCachePressureOptions eventHubCacheOptions) { throw null; }
@@ -314,7 +313,6 @@ namespace Orleans.Streaming.EventHubs
 
         public System.Threading.Tasks.Task<Streams.IStreamFailureHandler> GetDeliveryFailureHandler(Streams.QueueId queueId) { throw null; }
 
-        [System.Diagnostics.DebuggerStepThrough]
         protected virtual System.Threading.Tasks.Task<string[]> GetPartitionIdsAsync() { throw null; }
 
         public Streams.IQueueAdapterCache GetQueueAdapterCache() { throw null; }
@@ -370,10 +368,6 @@ namespace Orleans.Streaming.EventHubs
 
         public bool CheckpointExists { get { throw null; } }
 
-        [System.Diagnostics.DebuggerStepThrough]
-        public static System.Threading.Tasks.Task<Streams.IStreamQueueCheckpointer<string>> Create(Configuration.AzureTableStreamCheckpointerOptions options, string streamProviderName, string partition, string serviceId, Microsoft.Extensions.Logging.ILoggerFactory loggerFactory, System.Threading.CancellationToken cancellationToken) { throw null; }
-
-        [System.Diagnostics.DebuggerStepThrough]
         public static System.Threading.Tasks.Task<Streams.IStreamQueueCheckpointer<string>> Create(Configuration.AzureTableStreamCheckpointerOptions options, string streamProviderName, string partition, string serviceId, Microsoft.Extensions.Logging.ILoggerFactory loggerFactory) { throw null; }
 
         public System.Threading.Tasks.Task FlushAsync(System.Threading.CancellationToken cancellationToken) { throw null; }
@@ -381,7 +375,6 @@ namespace Orleans.Streaming.EventHubs
         [System.Obsolete("Use the overload which accepts a CancellationToken.")]
         public System.Threading.Tasks.Task<string> Load() { throw null; }
 
-        [System.Diagnostics.DebuggerStepThrough]
         public System.Threading.Tasks.Task<string> Load(System.Threading.CancellationToken cancellationToken) { throw null; }
 
         public void Update(string offset, System.DateTime utcNow, System.Threading.CancellationToken cancellationToken) { }
@@ -393,8 +386,6 @@ namespace Orleans.Streaming.EventHubs
     public partial class EventHubCheckpointerFactory : Streams.IStreamQueueCheckpointerFactory
     {
         public EventHubCheckpointerFactory(string providerName, Configuration.AzureTableStreamCheckpointerOptions options, Microsoft.Extensions.Options.IOptions<Configuration.ClusterOptions> clusterOptions, Microsoft.Extensions.Logging.ILoggerFactory loggerFactory) { }
-
-        public System.Threading.Tasks.Task<Streams.IStreamQueueCheckpointer<string>> Create(string partition, System.Threading.CancellationToken cancellationToken) { throw null; }
 
         public System.Threading.Tasks.Task<Streams.IStreamQueueCheckpointer<string>> Create(string partition) { throw null; }
 
@@ -787,17 +778,11 @@ namespace Orleans.Streams
 
         public bool CheckpointExists { get { throw null; } }
 
-        public static System.Threading.Tasks.Task<IStreamQueueCheckpointer<string>> Create(Configuration.AzureTableStreamCheckpointerOptions options, string streamProviderName, string partition, string serviceId, Microsoft.Extensions.Logging.ILoggerFactory loggerFactory, System.Threading.CancellationToken cancellationToken) { throw null; }
-
         public static System.Threading.Tasks.Task<IStreamQueueCheckpointer<string>> Create(Configuration.AzureTableStreamCheckpointerOptions options, string streamProviderName, string partition, string serviceId, Microsoft.Extensions.Logging.ILoggerFactory loggerFactory) { throw null; }
 
         public System.Threading.Tasks.Task FlushAsync(System.Threading.CancellationToken cancellationToken) { throw null; }
 
         public System.Threading.Tasks.Task<string> Load() { throw null; }
-
-        public System.Threading.Tasks.Task<string> Load(System.Threading.CancellationToken cancellationToken) { throw null; }
-
-        public void Update(string offset, System.DateTime utcNow, System.Threading.CancellationToken cancellationToken) { }
 
         public void Update(string offset, System.DateTime utcNow) { }
     }
@@ -806,9 +791,6 @@ namespace Orleans.Streams
     {
         public AzureTableStreamQueueCheckpointerFactory(string providerName, Configuration.AzureTableStreamCheckpointerOptions options, Microsoft.Extensions.Options.IOptions<Configuration.ClusterOptions> clusterOptions, Microsoft.Extensions.Logging.ILoggerFactory loggerFactory) { }
 
-        public System.Threading.Tasks.Task<IStreamQueueCheckpointer<string>> Create(string partition, System.Threading.CancellationToken cancellationToken) { throw null; }
-
-        [System.Obsolete("Use the overload which accepts a CancellationToken.")]
         public System.Threading.Tasks.Task<IStreamQueueCheckpointer<string>> Create(string partition) { throw null; }
 
         public static IStreamQueueCheckpointerFactory CreateFactory(System.IServiceProvider services, string providerName) { throw null; }

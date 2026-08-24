@@ -84,16 +84,19 @@ namespace Orleans.Providers.Streams.Common
 
                 if (_initializeTask is null || _initializeTask.IsCompleted)
                 {
-                    _initializeTask = InitializeCore();
+                    _initializeTask = InitializeCore(cancellationToken);
                 }
 
                 return _initializeTask.WaitAsync(cancellationToken);
             }
         }
 
-        private async Task InitializeCore()
+        private async Task InitializeCore(CancellationToken initializationToken)
         {
-            var lifecycleToken = _lifecycleCancellation.Token;
+            using var cancellation = CancellationTokenSource.CreateLinkedTokenSource(
+                _lifecycleCancellation.Token,
+                initializationToken);
+            var lifecycleToken = cancellation.Token;
             var checkpoint = await _checkpointer.Load(lifecycleToken);
             await _source.Initialize(
                 new RecoverableStreamStartPosition(

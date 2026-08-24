@@ -54,6 +54,9 @@ public class AdoNetStreamOptions
     /// <summary>
     /// Gets or sets the minimum amount of time that a stream record is retained after it is checkpointed.
     /// </summary>
+    /// <remarks>
+    /// Storage routines use whole seconds. Fractional values are rounded upward so configured retention is never shortened.
+    /// </remarks>
     public TimeSpan RetentionPeriod { get; set; } = TimeSpan.FromDays(1);
 
     /// <summary>
@@ -62,12 +65,14 @@ public class AdoNetStreamOptions
     /// <remarks>
     /// Stream records older than this value can be deleted even when they are newer than the checkpoint.
     /// Such deletions are reported by storage so that the receiver can emit gap diagnostics.
+    /// Fractional values are rounded upward to whole seconds.
     /// </remarks>
     public TimeSpan? MaximumRetentionPeriod { get; set; }
 
     /// <summary>
     /// Gets or sets the interval between cleanup attempts for a partition.
     /// </summary>
+    /// <remarks>Fractional values are rounded upward to whole seconds.</remarks>
     public TimeSpan CleanupInterval { get; set; } = TimeSpan.FromMinutes(1);
 
     /// <summary>

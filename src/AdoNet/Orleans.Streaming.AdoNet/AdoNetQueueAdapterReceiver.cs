@@ -9,6 +9,8 @@ internal sealed class AdoNetQueueAdapterReceiver : IQueueAdapterReceiver, IQueue
 {
     private const int BufferSize = 1024 * 1024;
     private readonly RecoverableStreamReceiver<AdoNetStreamMessage> _inner;
+    private readonly AdoNetRecoverableStream _source;
+    private int _shutdownNotified;
 
     internal Action<AdoNetQueueAdapterReceiver>? OnShutdown { get; set; }
 
@@ -22,7 +24,7 @@ internal sealed class AdoNetQueueAdapterReceiver : IQueueAdapterReceiver, IQueue
         Serializer<AdoNetBatchContainer> serializer,
         ILogger<AdoNetQueueAdapterReceiver> logger)
     {
-        var source = new AdoNetRecoverableStream(
+        _source = new AdoNetRecoverableStream(
             clusterOptions.ServiceId,
             providerId,
             queueId,
@@ -30,7 +32,7 @@ internal sealed class AdoNetQueueAdapterReceiver : IQueueAdapterReceiver, IQueue
             queries,
             logger);
         var checkpointer = new StreamQueueCheckpointer(
-            source,
+            _source,
             new StreamQueueCheckpointerOptions
             {
                 CheckpointComparer = StreamCheckpointComparers.Numeric,
@@ -51,7 +53,7 @@ internal sealed class AdoNetQueueAdapterReceiver : IQueueAdapterReceiver, IQueue
             logger,
             maxCacheSize: cacheOptions.CacheSize);
         _inner = new RecoverableStreamReceiver<AdoNetStreamMessage>(
-            source,
+            _source,
             dataAdapter,
             cache,
             checkpointer,
@@ -67,6 +69,32 @@ internal sealed class AdoNetQueueAdapterReceiver : IQueueAdapterReceiver, IQueue
             await _inner.Shutdown(timeout);
         }
         finally
+        {
+            var acquisitionCompletion = _source.AcquisitionCompletion;
+            if (acquisitionCompletion.IsCompleted)
+            {
+                NotifyShutdown();
+            }
+            else
+            {
+                _ = NotifyShutdownAfterAcquisition(acquisitionCompletion, NotifyShutdown);
+            }
+        }
+    }
+
+    internal static async Task NotifyShutdownAfterAcquisition(
+        Task acquisitionCompletion,
+        Action notifyShutdown)
+    {
+        ArgumentNullException.ThrowIfNull(acquisitionCompletion);
+        ArgumentNullException.ThrowIfNull(notifyShutdown);
+        await acquisitionCompletion.ConfigureAwait(ConfigureAwaitOptions.SuppressThrowing);
+        notifyShutdown();
+    }
+
+    private void NotifyShutdown()
+    {
+        if (Interlocked.Exchange(ref _shutdownNotified, 1) == 0)
         {
             OnShutdown?.Invoke(this);
         }

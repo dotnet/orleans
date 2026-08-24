@@ -5,6 +5,7 @@ using Orleans.Configuration;
 using Orleans.GrainDirectory.AdoNet;
 using Orleans.Runtime;
 using Orleans.Storage;
+using Orleans.Streaming.AdoNet;
 using Orleans.Tests.SqlUtils;
 using UnitTests.StorageTests.Relational;
 
@@ -250,6 +251,18 @@ public sealed class AdoNetOptionsValidatorTests
         AssertStreamingValidation(false, options, nameof(AdoNetStreamOptions.RetentionPeriod));
     }
 
+    [Theory]
+    [InlineData(1.1)]
+    [InlineData(1.9)]
+    public void Streaming_AllowsFractionalRetentionWhichRoundsUp(double seconds)
+    {
+        var options = ValidStreamOptions();
+        options.RetentionPeriod = TimeSpan.FromSeconds(seconds);
+
+        new AdoNetStreamOptionsValidator(options, "stream").ValidateConfiguration();
+        Assert.Equal(2, AdoNetStreamTime.ToSqlSeconds(options.RetentionPeriod));
+    }
+
     [Fact]
     public void Streaming_AllowsNullMaximumRetentionPeriod()
     {
@@ -301,6 +314,15 @@ public sealed class AdoNetOptionsValidatorTests
         options.CleanupInterval = TimeSpan.FromMilliseconds(500);
 
         AssertStreamingValidation(false, options, nameof(AdoNetStreamOptions.CleanupInterval));
+    }
+
+    [Fact]
+    public void Streaming_RejectsRetentionWhoseCeilingExceedsSqlIntegerRange()
+    {
+        var options = ValidStreamOptions();
+        options.RetentionPeriod = TimeSpan.FromSeconds(int.MaxValue) + TimeSpan.FromTicks(1);
+
+        AssertStreamingValidation(false, options, nameof(AdoNetStreamOptions.RetentionPeriod));
     }
 
     [Theory]
