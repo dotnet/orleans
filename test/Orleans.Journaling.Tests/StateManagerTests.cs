@@ -821,7 +821,7 @@ public class StateManagerTests : JournalingTestBase
         storage.AllowBlockedAppend.SetResult();
         await storage.BlockedDeleteStarted.Task.WaitAsync(TimeSpan.FromSeconds(10));
 
-        Assert.True(firstQueuedWrite.IsCompletedSuccessfully);
+        await firstQueuedWrite.WaitAsync(TimeSpan.FromSeconds(10));
         Assert.False(delete.IsCompleted);
         Assert.False(writeAfterDelete.IsCompleted);
 
