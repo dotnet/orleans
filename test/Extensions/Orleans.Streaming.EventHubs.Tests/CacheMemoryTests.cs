@@ -119,6 +119,7 @@ public sealed class CacheMemoryTests : IDisposable
 
         Assert.True(attempts < 10);
         Assert.NotNull(checkpointer.LastOffset);
+        Assert.True(cache.GetMaxAddCount() > 0);
     }
 
     [Fact]
