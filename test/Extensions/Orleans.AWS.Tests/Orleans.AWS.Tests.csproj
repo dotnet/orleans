@@ -15,10 +15,10 @@
 
   <ItemGroup>
     <PackageReference Include="Aspire.Hosting.AppHost" />
+    <PackageReference Include="Aspire.Hosting.Orleans" />
   </ItemGroup>
 
-  <ItemGroup>
-    <PackageReference Include="Aspire.Hosting.Orleans" />
+  <ItemGroup Condition="'$(TargetFramework)' == 'net10.0'">
     <PackageReference Include="Aspire.Hosting.Testing" />
   </ItemGroup>
 
