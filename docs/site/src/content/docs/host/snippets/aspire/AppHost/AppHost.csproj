@@ -6,12 +6,10 @@
     <TargetFramework>net10.0</TargetFramework>
     <OutputType>Exe</OutputType>
     <IsAspireHost>true</IsAspireHost>
-    <NoWarn>$(NoWarn);CS8002</NoWarn>
   </PropertyGroup>
 
   <!-- <apphost_packages> -->
   <ItemGroup>
-    <PackageReference Include="Amazon.CDK.Lib" Version="2.262.0" />
     <PackageReference Include="Aspire.Hosting.AppHost" Version="13.4.6" />
     <PackageReference Include="Aspire.Hosting.AWS" Version="13.4.0" />
     <PackageReference Include="Aspire.Hosting.Orleans" Version="13.4.6" />
