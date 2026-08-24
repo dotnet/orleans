@@ -93,13 +93,14 @@ internal sealed class ActivationAutoResetEvent(WorkItemGroup scheduler) : IValue
     private struct ActivationValueTaskSource
     {
         // The continuation slot is the source state: null before registration, the continuation after registration,
-        // and Sentinel after completion. CompareExchange and Exchange provide the publication order between the
-        // continuation state and its callback state, and exactly one side of the registration/completion race queues.
+        // and Sentinel after completion. The spin lock publishes the continuation and callback state as one claim
+        // and ensures that exactly one side of the registration/completion race queues the continuation.
         private static readonly Action<object?> Sentinel = CompletionSentinel;
 
         private Action<object?>? _continuation;
         private object? _continuationState;
         private readonly WorkItemGroup _scheduler;
+        private SpinLock _continuationLock;
         private short _version;
 
         public ActivationValueTaskSource(WorkItemGroup scheduler) : this()
@@ -131,20 +132,29 @@ internal sealed class ActivationAutoResetEvent(WorkItemGroup scheduler) : IValue
             ArgumentNullException.ThrowIfNull(continuation);
             ValidateToken(token);
 
-            object? storedContinuation = _continuation;
-            if (storedContinuation is null)
+            var lockTaken = false;
+            try
             {
-                _continuationState = state;
-                storedContinuation = Interlocked.CompareExchange(ref _continuation, continuation, null);
+                _continuationLock.Enter(ref lockTaken);
+                var storedContinuation = _continuation;
                 if (storedContinuation is null)
                 {
+                    _continuationState = state;
+                    Volatile.Write(ref _continuation, continuation);
                     return;
                 }
-            }
 
-            if (!ReferenceEquals(storedContinuation, Sentinel))
+                if (!ReferenceEquals(storedContinuation, Sentinel))
+                {
+                    ThrowInvalidOperationException();
+                }
+            }
+            finally
             {
-                ThrowInvalidOperationException();
+                if (lockTaken)
+                {
+                    _continuationLock.Exit(useMemoryBarrier: true);
+                }
             }
 
             QueueContinuation(continuation, state);
@@ -152,15 +162,32 @@ internal sealed class ActivationAutoResetEvent(WorkItemGroup scheduler) : IValue
 
         public void SetResult()
         {
-            var continuation = Interlocked.Exchange(ref _continuation, Sentinel);
-            if (ReferenceEquals(continuation, Sentinel))
+            Action<object?>? continuation;
+            object? continuationState;
+            var lockTaken = false;
+            try
             {
-                ThrowInvalidOperationException();
+                _continuationLock.Enter(ref lockTaken);
+                continuation = _continuation;
+                if (ReferenceEquals(continuation, Sentinel))
+                {
+                    ThrowInvalidOperationException();
+                }
+
+                continuationState = _continuationState;
+                Volatile.Write(ref _continuation, Sentinel);
+            }
+            finally
+            {
+                if (lockTaken)
+                {
+                    _continuationLock.Exit(useMemoryBarrier: true);
+                }
             }
 
             if (continuation is not null)
             {
-                QueueContinuation(continuation, _continuationState);
+                QueueContinuation(continuation, continuationState);
             }
         }
 
