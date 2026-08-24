@@ -120,6 +120,17 @@ public class HierarchicalKeyTests
     }
 
     [Fact]
+    public void CreateEscaped_EscapesEveryRawSeparatorAndBackslashInjectively()
+    {
+        Assert.NotEqual(
+            global::Orleans.HierarchicalKey.CreateEscaped("a/b"),
+            global::Orleans.HierarchicalKey.CreateEscaped(@"a\/b"));
+        Assert.NotEqual(
+            global::Orleans.HierarchicalKey.CreateEscaped(@"a\b"),
+            global::Orleans.HierarchicalKey.CreateEscaped(@"a\\b"));
+    }
+
+    [Fact]
     public void GetParent_ReturnsParentKey()
     {
         var key = global::Orleans.HierarchicalKey.Create("foo/bar/baz");

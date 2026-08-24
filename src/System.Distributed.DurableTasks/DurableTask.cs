@@ -24,7 +24,7 @@ public abstract class DurableTask
     public static DurableTask Run<TState>(Func<TState, CancellationToken, Task> func, TState state) => new AsyncTaskDelegateDurableTaskWithState<TState>(func, state);
     public static DurableTask<TResult> Run<TState, TResult>(Func<TState, CancellationToken, Task<TResult>> func, TState state) => new AsyncTaskDelegateDurableTaskWithState<TState, TResult>(func, state);
 
-    public static DurableTask<List<ScheduledTask>> WhenAll(List<DurableTask> tasks)
+    public static DurableTask WhenAll(List<DurableTask> tasks)
         => Run(async (tasks, cancellationToken) =>
     {
         if (DurableExecutionContext.CurrentContext is null)
@@ -43,10 +43,9 @@ public abstract class DurableTask
             await task.GetResponseAsync(cancellationToken);
         }
 
-        return result;
     }, tasks);
 
-    public static DurableTask<List<ScheduledTask<TResult>>> WhenAll<TResult>(List<DurableTask<TResult>> tasks)
+    public static DurableTask<List<TResult>> WhenAll<TResult>(List<DurableTask<TResult>> tasks)
         => Run(async (tasks, cancellationToken) =>
     {
         if (DurableExecutionContext.CurrentContext is null)
@@ -60,15 +59,17 @@ public abstract class DurableTask
             result.Add(await tasks[i].ScheduleAsync($"{i}", cancellationToken: cancellationToken));
         }
 
+        var values = new List<TResult>(result.Count);
         foreach (var task in result)
         {
-            await task.GetResponseAsync(cancellationToken);
+            var response = await task.GetResponseAsync(cancellationToken);
+            values.Add(response.GetResult<TResult>());
         }
 
-        return result;
+        return values;
     }, tasks);
 
-    public static DurableTask<ScheduledTask> WhenAny(List<DurableTask> tasks)
+    public static DurableTask<int> WhenAny(List<DurableTask> tasks)
     => Run(async (tasks, cancellationToken) =>
     {
         if (DurableExecutionContext.CurrentContext is null)
@@ -89,11 +90,12 @@ public abstract class DurableTask
         }
 
         var completed = await Task.WhenAny(completions);
-
-        return result[completions.IndexOf(completed)];
+        var index = completions.IndexOf(completed);
+        (await result[index].GetResponseAsync(cancellationToken)).ThrowIfExceptionResponse();
+        return index;
     }, tasks);
 
-    public static DurableTask<ScheduledTask<TResult>> WhenAny<TResult>(List<DurableTask<TResult>> tasks)
+    public static DurableTask<int> WhenAny<TResult>(List<DurableTask<TResult>> tasks)
     => Run(async (tasks, cancellationToken) =>
     {
         if (DurableExecutionContext.CurrentContext is null)
@@ -114,8 +116,9 @@ public abstract class DurableTask
         }
 
         var completed = await Task.WhenAny(completions);
-
-        return result[completions.IndexOf(completed)];
+        var index = completions.IndexOf(completed);
+        _ = (await result[index].GetResponseAsync(cancellationToken)).GetResult<TResult>();
+        return index;
     }, tasks);
 
     /// <summary>

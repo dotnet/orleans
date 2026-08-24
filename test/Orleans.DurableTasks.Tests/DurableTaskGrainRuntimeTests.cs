@@ -1444,6 +1444,25 @@ public class DurableTaskGrainRuntimeTests
     }
 
     [Fact]
+    public async Task ScheduleChildAsync_ReplacesRehydratedLocalHandle()
+    {
+        var fixture = CreateFixture();
+        var taskId = TaskId.Create("root").Child("local-child");
+        fixture.Storage.GetOrCreateTask(taskId, request: null);
+        await fixture.Storage.WriteAsync(CancellationToken.None);
+        var rehydrated = fixture.Runtime.GetScheduledTaskHandle(taskId);
+
+        var scheduled = await fixture.Runtime.ScheduleChildAsync(
+            taskId,
+            DurableTask.Run<int>(static _ => 42),
+            CancellationToken.None);
+        var response = await scheduled.WaitAsync(BoundedWait());
+
+        Assert.NotSame(rehydrated, scheduled);
+        Assert.Equal(42, response.GetResult<int>());
+    }
+
+    [Fact]
     public void CaptureRequestContext_ExceedingEntryLimitFailsWithoutDroppingValues()
     {
         var fixture = CreateFixture();

@@ -96,13 +96,13 @@ namespace System.Distributed.DurableTasks
         public static DurableTask<TResult> Run<TState, TResult>(Func<TState, Threading.CancellationToken, Threading.Tasks.Task<TResult>> func, TState state) { throw null; }
 
         protected internal abstract Threading.Tasks.ValueTask<DurableTaskResponse> RunAsync(DurableExecutionContext context);
-        public static DurableTask<Collections.Generic.List<ScheduledTask>> WhenAll(Collections.Generic.List<DurableTask> tasks) { throw null; }
+        public static DurableTask WhenAll(Collections.Generic.List<DurableTask> tasks) { throw null; }
 
-        public static DurableTask<Collections.Generic.List<ScheduledTask<TResult>>> WhenAll<TResult>(Collections.Generic.List<DurableTask<TResult>> tasks) { throw null; }
+        public static DurableTask<Collections.Generic.List<TResult>> WhenAll<TResult>(Collections.Generic.List<DurableTask<TResult>> tasks) { throw null; }
 
-        public static DurableTask<ScheduledTask> WhenAny(Collections.Generic.List<DurableTask> tasks) { throw null; }
+        public static DurableTask<int> WhenAny(Collections.Generic.List<DurableTask> tasks) { throw null; }
 
-        public static DurableTask<ScheduledTask<TResult>> WhenAny<TResult>(Collections.Generic.List<DurableTask<TResult>> tasks) { throw null; }
+        public static DurableTask<int> WhenAny<TResult>(Collections.Generic.List<DurableTask<TResult>> tasks) { throw null; }
     }
 
     public readonly partial struct DurableTaskAwaiter : Runtime.CompilerServices.INotifyCompletion, Runtime.CompilerServices.ICriticalNotifyCompletion
