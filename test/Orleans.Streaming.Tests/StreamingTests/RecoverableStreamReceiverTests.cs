@@ -470,6 +470,34 @@ public sealed class RecoverableStreamReceiverTests
     }
 
     [Fact]
+    public void Cache_DeliveredThroughScansIntermediatePartitionRecordsWithoutRedelivery()
+    {
+        var streamA = StreamId.Create("namespace", Guid.NewGuid());
+        var streamB = StreamId.Create("namespace", Guid.NewGuid());
+        var cache = new RecoverableStreamQueueCache<TestQueueMessage>(
+            100,
+            new ObjectPool<FixedSizeBuffer>(() => new FixedSizeBuffer(4 * 1024)),
+            new TestDataAdapter(),
+            new NoOpEvictionStrategy(),
+            NullLogger.Instance);
+        var positions = cache.Add(
+        [
+            new TestQueueMessage(streamB, 2, "b-2"),
+            new TestQueueMessage(streamB, 3, "b-3"),
+            new TestQueueMessage(streamA, 10, "a-10"),
+            new TestQueueMessage(streamA, 11, "a-11"),
+        ],
+            DateTime.UnixEpoch);
+        using var cursor = cache.GetCacheCursor(streamA, positions[0].SequenceToken);
+        var progress = Assert.IsAssignableFrom<IQueueCacheCursorProgress>(cursor);
+        progress.SetDeliveredThrough(new EventSequenceTokenV2(10));
+
+        Assert.True(cursor.MoveNext());
+        Assert.Equal(11, cursor.GetCurrent(out _)!.SequenceToken.SequenceNumber);
+        Assert.Equal(10, progress.SafeSequenceToken?.SequenceNumber);
+    }
+
+    [Fact]
     public async Task Receiver_MidInitializationCancellationReachesLoadAndAllowsRetry()
     {
         var source = new TestSource([]);

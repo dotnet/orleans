@@ -557,6 +557,7 @@ namespace UnitTests.StreamingTests
             private IBatchContainer? current;
             private StreamSequenceToken? pendingSequenceToken;
             private bool hasPendingDelivery;
+            private StreamSequenceToken? deliveredThroughToken;
 
             public StreamSequenceToken? SafeSequenceToken { get; private set; }
 
@@ -582,6 +583,21 @@ namespace UnitTests.StreamingTests
 
                     if (candidate.StreamId.Equals(streamId))
                     {
+                        if (deliveredThroughToken is not null
+                            && candidate.SequenceToken.CompareTo(deliveredThroughToken) <= 0)
+                        {
+                            if (hasPendingDelivery)
+                            {
+                                pendingSequenceToken = candidate.SequenceToken;
+                            }
+                            else
+                            {
+                                SafeSequenceToken = candidate.SequenceToken;
+                            }
+
+                            continue;
+                        }
+
                         hasPendingDelivery = true;
                         pendingSequenceToken = candidate.SequenceToken;
                         current = candidate;
@@ -611,18 +627,8 @@ namespace UnitTests.StreamingTests
             {
             }
 
-            public void AdvancePast(StreamSequenceToken deliveredToken)
-            {
-                while (index + 1 < messages.Count
-                    && messages[index + 1].SequenceToken.CompareTo(deliveredToken) <= 0)
-                {
-                    index++;
-                    SafeSequenceToken = messages[index].SequenceToken;
-                }
-
-                hasPendingDelivery = false;
-                pendingSequenceToken = null;
-            }
+            public void SetDeliveredThrough(StreamSequenceToken deliveredToken)
+                => deliveredThroughToken = deliveredToken;
 
             public void RecordDeliverySuccess()
             {
@@ -2064,6 +2070,7 @@ namespace UnitTests.StreamingTests
             consumerData.IsRegistered = true;
             consumerData.LastToken = rewindToken;
             consumerData.LastProcessedToken = previousToken;
+            consumerData.LastSafePartitionToken = previousToken;
             consumerData.Cursor = queueCache.GetCacheCursor(qualifiedStreamId, previousToken);
 
             queueCache.ClearDeliveryProgress();
@@ -2813,13 +2820,73 @@ namespace UnitTests.StreamingTests
             Assert.True(await testAccessor.DoHandshakeWithConsumer(consumerData, cacheToken: null));
             consumerData.IsRegistered = true;
             Assert.Equal(deliveredToken, consumerData.LastProcessedToken);
-            Assert.Equal(deliveredToken, consumerData.LastSafePartitionToken);
+            Assert.Null(consumerData.LastSafePartitionToken);
             queueCache.ClearDeliveryProgress();
 
             timeProvider.Advance(options.DeliveryProgressUpdateInterval);
             await queueCache.DeliveryProgressUpdated.WaitAsync(TimeSpan.FromSeconds(5));
 
             Assert.Equal(deliveredToken, Assert.Single(queueCache.DeliveryProgressTokens));
+            await testAccessor.Shutdown();
+        }
+
+        [TestSuite("BVT")]
+        [TestProvider("None")]
+        [TestArea("Streaming")]
+        [Fact, TestCategory("BVT"), TestCategory("Streaming")]
+        public async Task DeliveryProgress_DeliveryTokenWaitsForPartitionScanInProgressAwareCache()
+        {
+            var timeProvider = new FakeTimeProvider(DateTimeOffset.UtcNow);
+            var options = new StreamPullingAgentOptions();
+            var queueId = QueueId.GetQueueId("queue", 0u, 0u);
+            var streamA = StreamId.Create("namespace", Guid.NewGuid());
+            var streamB = StreamId.Create("namespace", Guid.NewGuid());
+            var qualifiedA = new QualifiedStreamId("provider", streamA);
+            var qualifiedB = new QualifiedStreamId("provider", streamB);
+            var queueCache = new ScriptedQueueCache();
+            queueCache.AddToCache(
+            [
+                .. Enumerable.Range(2, 8)
+                    .Select(sequence => (IBatchContainer)new TestBatchContainer(
+                        streamB,
+                        new EventSequenceTokenV2(sequence))),
+                new TestBatchContainer(streamA, new EventSequenceTokenV2(10)),
+            ]);
+            var queueAdapterCache = Substitute.For<IQueueAdapterCache>();
+            queueAdapterCache.CreateQueueCache(Arg.Any<QueueId>()).Returns(queueCache);
+            var pubSub = Substitute.For<IStreamPubSub>();
+            pubSub.RegisterProducer(default, default)
+                .ReturnsForAnyArgs(Task.FromResult<ISet<PubSubSubscriptionState>>(new HashSet<PubSubSubscriptionState>()));
+            var agent = CreateAgent(pubSub, queueId, receiver: null, queueAdapterCache, timeProvider, options);
+            var testAccessor = (PersistentStreamPullingAgent.ITestAccessor)agent;
+            await InitializeAgent(agent);
+            await testAccessor.RegisterStream(qualifiedA, new EventSequenceTokenV2(2), timeProvider.GetUtcNow().UtcDateTime);
+            await testAccessor.RegisterStream(qualifiedB, new EventSequenceTokenV2(2), timeProvider.GetUtcNow().UtcDateTime);
+            var streamData = (await testAccessor.GetPubSubCache())[qualifiedA];
+            var consumerData = streamData.AddConsumer(
+                GuidId.GetGuidId(Guid.NewGuid()),
+                qualifiedA,
+                new StartingConsumer(StreamHandshakeToken.CreateDeliveyToken(new EventSequenceTokenV2(10))),
+                filterData: null,
+                now: timeProvider.GetUtcNow().UtcDateTime);
+
+            Assert.True(await testAccessor.DoHandshakeWithConsumer(
+                consumerData,
+                cacheToken: new EventSequenceTokenV2(2)));
+            consumerData.IsRegistered = true;
+            Assert.Equal(10, consumerData.LastProcessedToken?.SequenceNumber);
+            Assert.Null(consumerData.LastSafePartitionToken);
+            queueCache.ClearDeliveryProgress();
+
+            timeProvider.Advance(options.DeliveryProgressUpdateInterval);
+            await testAccessor.GetPubSubCache();
+            Assert.Empty(queueCache.DeliveryProgressTokens);
+
+            await testAccessor.RunConsumerCursor(consumerData);
+            Assert.Equal(10, consumerData.LastSafePartitionToken?.SequenceNumber);
+            timeProvider.Advance(options.DeliveryProgressUpdateInterval);
+            await queueCache.DeliveryProgressUpdated.WaitAsync(TimeSpan.FromSeconds(5));
+            Assert.Equal(10, Assert.Single(queueCache.DeliveryProgressTokens)?.SequenceNumber);
             await testAccessor.Shutdown();
         }
 
@@ -3004,6 +3071,7 @@ namespace UnitTests.StreamingTests
                 now: timeProvider.GetUtcNow().UtcDateTime);
             consumerData.IsRegistered = true;
             consumerData.LastProcessedToken = previousToken;
+            consumerData.LastSafePartitionToken = previousToken;
             consumerData.Cursor = queueCache.GetCacheCursor(streamId, previousToken);
             queueCache.ClearDeliveryProgress();
 
@@ -3055,6 +3123,7 @@ namespace UnitTests.StreamingTests
                 now: timeProvider.GetUtcNow().UtcDateTime);
             slowConsumerData.IsRegistered = true;
             slowConsumerData.LastProcessedToken = previousToken;
+            slowConsumerData.LastSafePartitionToken = previousToken;
             slowConsumerData.Cursor = queueCache.GetCacheCursor(streamId, previousToken);
 
             var fastConsumer = new ImmediateConsumer();
@@ -3066,6 +3135,7 @@ namespace UnitTests.StreamingTests
                 now: timeProvider.GetUtcNow().UtcDateTime);
             fastConsumerData.IsRegistered = true;
             fastConsumerData.LastProcessedToken = previousToken;
+            fastConsumerData.LastSafePartitionToken = previousToken;
             fastConsumerData.Cursor = queueCache.GetCacheCursor(streamId, previousToken);
             queueCache.ClearDeliveryProgress();
 

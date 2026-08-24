@@ -485,6 +485,13 @@ namespace Orleans.Providers.Streams.Common
                 // check if this message is in the cursor's stream
                 if (currentMessage.CompareStreamId(cursor.StreamId))
                 {
+                    if (cursor.DeliveredThroughToken is { } deliveredThrough
+                        && cacheDataAdapter.Compare(ref currentMessage, deliveredThrough) <= 0)
+                    {
+                        cursor.RecordScanned(currentToken);
+                        continue;
+                    }
+
                     cursor.RecordPending(currentToken);
                     message = cacheDataAdapter.GetBatchContainer(ref currentMessage);
                     return true;
@@ -499,30 +506,8 @@ namespace Orleans.Providers.Streams.Common
         internal StreamSequenceToken? GetSafeSequenceToken(object cursorObj)
             => GetCursor(cursorObj).SafeSequenceToken;
 
-        internal void AdvanceCursorPast(object cursorObj, StreamSequenceToken token)
-        {
-            ArgumentNullException.ThrowIfNull(token);
-            var cursor = GetCursor(cursorObj);
-            if (cursor.State != CursorStates.Set)
-            {
-                SetCursor(cursor, cursor.SequenceToken);
-            }
-
-            while (cursor.State == CursorStates.Set)
-            {
-                var currentMessage = cursor.Message;
-                if (cacheDataAdapter.Compare(ref currentMessage, token) > 0)
-                {
-                    break;
-                }
-
-                var currentToken = cacheDataAdapter.GetSequenceToken(ref currentMessage);
-                MoveCursorForward(cursor, currentToken);
-                cursor.SafeSequenceToken = currentToken;
-            }
-
-            cursor.ClearPending();
-        }
+        internal void SetCursorDeliveredThrough(object cursorObj, StreamSequenceToken token)
+            => GetCursor(cursorObj).DeliveredThroughToken = token;
 
         internal void RecordDeliverySuccess(object cursorObj)
             => GetCursor(cursorObj).RecordDeliverySuccess();
@@ -637,6 +622,7 @@ namespace Orleans.Providers.Streams.Common
             public StreamSequenceToken? SequenceToken;
             public long BlockGeneration;
             public StreamSequenceToken? SafeSequenceToken;
+            public StreamSequenceToken? DeliveredThroughToken;
             private StreamSequenceToken? pendingSequenceToken;
             private bool hasPendingDelivery;
 
@@ -679,11 +665,6 @@ namespace Orleans.Providers.Streams.Common
                 hasPendingDelivery = false;
             }
 
-            public void ClearPending()
-            {
-                pendingSequenceToken = null;
-                hasPendingDelivery = false;
-            }
         }
     }
 }
