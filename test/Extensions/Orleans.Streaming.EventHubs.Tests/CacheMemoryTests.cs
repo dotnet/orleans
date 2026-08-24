@@ -88,6 +88,38 @@ public sealed class CacheMemoryTests : IDisposable
         Assert.True(second.GetMaxAddCount() > 0);
     }
 
+    [Fact, TestCategory("BVT")]
+    public void MemoryPressurePurgeStopsAtDeliveryProgress()
+    {
+        const int maxActiveMemory = 100 * 1024;
+        var controller = new EventHubCacheMemoryController(maxActiveMemory);
+        var pool = new EventHubCacheBufferPool(controller, 64 * 1024, null, TimeSpan.FromMinutes(1));
+        var checkpointer = new TestCheckpointer();
+        using var cache = CreateCache("0", pool, controller, checkpointer: checkpointer);
+        var positions = cache.Add(
+            Enumerable.Range(0, 20).Select(i => MakeEventData(i, 8 * 1024)).ToList(),
+            DateTime.UtcNow);
+        Assert.True(controller.ActiveCacheMemory > maxActiveMemory);
+
+        cache.UpdateDeliveryProgress(positions[0].SequenceToken);
+
+        Assert.Equal(0, cache.GetMaxAddCount());
+        Assert.Equal(((IEventHubPartitionLocation)positions[0].SequenceToken).EventHubOffset, checkpointer.LastOffset);
+        var nextCursor = cache.GetCursor(positions[1].StreamId, positions[1].SequenceToken);
+        Assert.True(cache.TryGetNextMessage(nextCursor, out var next));
+        Assert.Equal(positions[1].SequenceToken, next.SequenceToken);
+
+        cache.UpdateDeliveryProgress(positions[^1].SequenceToken);
+
+        var attempts = 0;
+        while (cache.GetMaxAddCount() == 0 && attempts++ < 10)
+        {
+        }
+
+        Assert.True(attempts < 10);
+        Assert.NotEqual(((IEventHubPartitionLocation)positions[0].SequenceToken).EventHubOffset, checkpointer.LastOffset);
+    }
+
     [Fact]
     public void SparseCachesRemainSmallAcross1024Partitions()
     {
@@ -163,7 +195,8 @@ public sealed class CacheMemoryTests : IDisposable
         string partition,
         IObjectPool<FixedSizeBuffer> pool,
         EventHubCacheMemoryController controller,
-        IEvictionStrategy? evictionStrategy = null)
+        IEvictionStrategy? evictionStrategy = null,
+        IStreamQueueCheckpointer<string>? checkpointer = null)
     {
         var adapter = new TestEventHubDataAdapter(serializer);
         evictionStrategy ??= new EventHubQueueCacheFactory.EventHubCacheEvictionStrategy(
@@ -177,7 +210,7 @@ public sealed class CacheMemoryTests : IDisposable
             pool,
             adapter,
             evictionStrategy,
-            NoOpCheckpointer.Instance,
+            checkpointer ?? NoOpCheckpointer.Instance,
             NullLogger.Instance,
             null,
             null,
@@ -226,6 +259,19 @@ public sealed class CacheMemoryTests : IDisposable
 
         public void PerformPurge(DateTime utcNow)
         {
+        }
+    }
+
+    private sealed class TestCheckpointer : IStreamQueueCheckpointer<string>
+    {
+        public bool CheckpointExists => LastOffset is not null;
+        public string? LastOffset { get; private set; }
+
+        public Task<string> Load() => Task.FromResult(LastOffset ?? EventHubConstants.StartOfStream);
+
+        public void Update(string offset, DateTime utcNow)
+        {
+            LastOffset = offset;
         }
     }
 
