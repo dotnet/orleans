@@ -23,6 +23,10 @@ public sealed class AdoNetStreamSchemaTests
         Assert.Contains("CREATE TABLE OrleansStreamMessage", script, StringComparison.Ordinal);
         Assert.Contains("StreamIdBytes", script, StringComparison.Ordinal);
         Assert.Contains("StreamNamespaceLength INT NOT NULL", script, StringComparison.Ordinal);
+        Assert.Contains("CheckpointedOn", script, StringComparison.Ordinal);
+        Assert.Contains("CheckpointedOn = COALESCE", script, StringComparison.Ordinal);
+        Assert.Contains("CheckpointedOn <", script, StringComparison.Ordinal);
+        Assert.Contains("CreatedOn <", script, StringComparison.Ordinal);
         Assert.Contains("Payload", script, StringComparison.Ordinal);
 
         Assert.Contains("'StreamSchemaVersionKey', '2'", script, StringComparison.Ordinal);
@@ -46,6 +50,7 @@ public sealed class AdoNetStreamSchemaTests
         Assert.Contains("UPDATE OrleansStreamPartition WITH (UPDLOCK, ROWLOCK)", script, StringComparison.Ordinal);
         Assert.Contains("OUTPUT Inserted.NextMessageId - 1", script, StringComparison.Ordinal);
         Assert.Contains("@LockOwner = 'Transaction'", script, StringComparison.Ordinal);
+        Assert.Contains("READPAST, READCOMMITTEDLOCK", script, StringComparison.Ordinal);
     }
 
     [Fact]
