@@ -1,3 +1,4 @@
+using System.Buffers;
 using Orleans.Serialization.Buffers;
 using Orleans.Serialization.Codecs;
 using Orleans.Serialization.Session;
@@ -22,12 +23,10 @@ internal sealed class OrleansBinaryDurableDictionaryCommandCodec<TKey, TValue>(
     {
         using var entry = writer.BeginEntry();
         var output = entry.Writer;
-        using var session = sessionPool.GetSession();
-        var payloadWriter = Writer.Create(output, session);
+        var payloadWriter = Writer.Create(output, session: null!);
         payloadWriter.WriteVarUInt32(SetCommand);
-        keyCodec.WriteField(ref payloadWriter, 0, typeof(TKey), key);
-        valueCodec.WriteField(ref payloadWriter, 1, typeof(TValue), value);
         payloadWriter.Commit();
+        WriteKeyValue(key, value, output);
         entry.Commit();
     }
 
@@ -67,8 +66,7 @@ internal sealed class OrleansBinaryDurableDictionaryCommandCodec<TKey, TValue>(
         foreach (var (key, value) in items)
         {
             CollectionCodecHelpers.ThrowIfSnapshotItemCountExceeded(count, written);
-            OrleansBinaryCommandCodecHelpers.WriteValue(keyCodec, key, output, sessionPool);
-            OrleansBinaryCommandCodecHelpers.WriteValue(valueCodec, value, output, sessionPool);
+            WriteKeyValue(key, value, output);
             written++;
         }
 
@@ -97,8 +95,7 @@ internal sealed class OrleansBinaryDurableDictionaryCommandCodec<TKey, TValue>(
         {
             case SetCommand:
             {
-                var key = OrleansBinaryCommandCodecHelpers.ReadValue(keyCodec, ref reader);
-                var value = OrleansBinaryCommandCodecHelpers.ReadValue(valueCodec, ref reader);
+                var (key, value) = ReadKeyValue(ref reader);
                 consumer.ApplySet(key, value);
                 break;
             }
@@ -123,10 +120,34 @@ internal sealed class OrleansBinaryDurableDictionaryCommandCodec<TKey, TValue>(
         consumer.Reset(count);
         for (var i = 0; i < count; i++)
         {
-            var key = OrleansBinaryCommandCodecHelpers.ReadValue(keyCodec, ref reader);
-            var value = OrleansBinaryCommandCodecHelpers.ReadValue(valueCodec, ref reader);
+            var (key, value) = ReadKeyValue(ref reader);
             consumer.ApplySet(key, value);
         }
     }
 
+    private void WriteKeyValue(TKey key, TValue value, IBufferWriter<byte> output)
+    {
+        using var session = sessionPool.GetSession();
+        var writer = Writer.Create(output, session);
+        keyCodec.WriteField(ref writer, 0, typeof(TKey), key);
+        valueCodec.WriteField(ref writer, 1, typeof(TValue), value);
+        writer.Commit();
+    }
+
+    private (TKey Key, TValue Value) ReadKeyValue<TInput>(ref Reader<TInput> reader)
+    {
+        reader.Session.Reset();
+        try
+        {
+            var keyField = reader.ReadFieldHeader();
+            var key = keyCodec.ReadValue(ref reader, keyField)!;
+            var valueField = reader.ReadFieldHeader();
+            var value = valueCodec.ReadValue(ref reader, valueField)!;
+            return (key, value);
+        }
+        finally
+        {
+            reader.Session.Reset();
+        }
+    }
 }
