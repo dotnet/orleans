@@ -130,15 +130,6 @@ internal sealed class HierarchicalKey : ISpanFormattable, IEquatable<Hierarchica
             for (var i = 0; i < value.Length; i++)
             {
                 var c = value[i];
-                if (c == EscapeCharacter
-                    && i + 1 < value.Length
-                    && value[i + 1] is EscapeCharacter or SegmentSeparator)
-                {
-                    destination[written++] = c;
-                    destination[written++] = value[++i];
-                    continue;
-                }
-
                 if (c is EscapeCharacter or SegmentSeparator)
                 {
                     destination[written++] = EscapeCharacter;
@@ -161,14 +152,6 @@ internal sealed class HierarchicalKey : ISpanFormattable, IEquatable<Hierarchica
         for (var i = 0; i < value.Length; i++)
         {
             var c = value[i];
-            if (c == EscapeCharacter
-                && i + 1 < value.Length
-                && value[i + 1] is EscapeCharacter or SegmentSeparator)
-            {
-                i++;
-                continue;
-            }
-
             if (c is EscapeCharacter or SegmentSeparator)
             {
                 result++;

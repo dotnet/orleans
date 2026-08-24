@@ -40,7 +40,6 @@ public class HierarchicalKeyTests
         }
 
         Assert.Equal(aSegments.Count, bSegments.Count);
-
         Assert.Equal(aSegments, bSegments);
     }
 
@@ -131,13 +130,12 @@ public class HierarchicalKeyTests
         var aParent = HierarchicalKey.Create("foo/bar\\/");
         var a = aParent.CreateEscapedChildKey("baz/boz");
         var b = aParent.CreateEscapedChildKey("baz\\/boz");
-        Assert.Equal(a, b);
-
-        Assert.Equal(a.ToString(), b.ToString());
-        Assert.Equal(a.GetHashCode(), b.GetHashCode());
+        Assert.NotEqual(a, b);
+        Assert.NotEqual(a.ToString(), b.ToString());
+        Assert.Equal(a, HierarchicalKey.Parse(a.ToString(), provider: null));
+        Assert.Equal(b, HierarchicalKey.Parse(b.ToString(), provider: null));
         Assert.Equal(a.ToString().Length, a.Length);
         Assert.Equal(b.ToString().Length, b.Length);
-        Assert.Equal(a.Length, b.Length);
 
         var aSegments = new List<string>();
         foreach (var segment in a)
@@ -152,8 +150,8 @@ public class HierarchicalKeyTests
         }
 
         Assert.Equal(aSegments.Count, bSegments.Count);
-
-        Assert.Equal(aSegments, bSegments);
+        Assert.Equal(aSegments.Take(aSegments.Count - 1), bSegments.Take(bSegments.Count - 1));
+        Assert.NotEqual(aSegments[^1], bSegments[^1]);
     }
 
     [Fact]

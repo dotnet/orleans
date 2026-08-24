@@ -37,6 +37,13 @@ public class TaskIdExtensionsTests
     }
 
     [Fact, TestCategory("BVT")]
+    public void Create_EscapesEveryRawSeparatorAndBackslashInjectively()
+    {
+        Assert.NotEqual(TaskId.Create("a/b"), TaskId.Create(@"a\/b"));
+        Assert.NotEqual(TaskId.Create(@"a\b"), TaskId.Create(@"a\\b"));
+    }
+
+    [Fact, TestCategory("BVT")]
     public void CreateAndChild_RejectEmptyValuesAndPreserveEscapedChildRelationship()
     {
         Assert.Throws<ArgumentNullException>(() => TaskId.Create(null!));

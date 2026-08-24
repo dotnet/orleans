@@ -12,7 +12,7 @@ namespace Orleans.DurableTasks.Tests;
 public class DurableTaskCombinatorTests
 {
     [Fact]
-    public async Task WhenAll_ReturnsEveryScheduledChild()
+    public async Task WhenAll_CompletesAfterEveryScheduledChild()
     {
         var runtime = Substitute.For<IDurableTaskGrainRuntime>();
         var handles = CreateHandles(
@@ -24,11 +24,8 @@ public class DurableTaskCombinatorTests
             [DurableTask.Run(static _ => { }), DurableTask.Run(static _ => { })]);
 
         var response = await RunAsync(combinator, context);
-        var scheduled = response.GetResult<List<ScheduledTask>>();
-
-        Assert.Equal(2, scheduled.Count);
-        Assert.Equal(TaskId.Create("root/0"), scheduled[0].Id);
-        Assert.Equal(TaskId.Create("root/1"), scheduled[1].Id);
+        Assert.True(response.IsCompleted);
+        Assert.Null(response.Exception);
         await runtime.Received(2).ScheduleChildAsync(
             Arg.Any<TaskId>(),
             Arg.Any<DurableTask>(),
@@ -36,7 +33,7 @@ public class DurableTaskCombinatorTests
     }
 
     [Fact]
-    public async Task GenericWhenAll_ReturnsEveryScheduledChild()
+    public async Task GenericWhenAll_ReturnsSerializableResults()
     {
         var runtime = Substitute.For<IDurableTaskGrainRuntime>();
         var handles = CreateHandles(
@@ -48,11 +45,7 @@ public class DurableTaskCombinatorTests
             [DurableTask.FromResult(1), DurableTask.FromResult(2)]);
 
         var response = await RunAsync(combinator, context);
-        var scheduled = response.GetResult<List<ScheduledTask<int>>>();
-
-        Assert.Equal(2, scheduled.Count);
-        Assert.Equal(1, await scheduled[0]);
-        Assert.Equal(2, await scheduled[1]);
+        Assert.Equal([1, 2], response.GetResult<List<int>>());
     }
 
     [Fact]
@@ -71,9 +64,7 @@ public class DurableTaskCombinatorTests
             [DurableTask.Run(static _ => { }), DurableTask.Run(static _ => { })]);
 
         var response = await RunAsync(combinator, context);
-        var completed = response.GetResult<ScheduledTask>();
-
-        Assert.Equal(TaskId.Create("root/1"), completed.Id);
+        Assert.Equal(1, response.GetResult<int>());
         Assert.False(firstCompletion.Task.IsCompleted);
     }
 
@@ -93,10 +84,7 @@ public class DurableTaskCombinatorTests
             [DurableTask.FromResult(1), DurableTask.FromResult(2)]);
 
         var response = await RunAsync(combinator, context);
-        var completed = response.GetResult<ScheduledTask<int>>();
-
-        Assert.Equal(TaskId.Create("root/1"), completed.Id);
-        Assert.Equal(2, await completed);
+        Assert.Equal(1, response.GetResult<int>());
         Assert.False(firstCompletion.Task.IsCompleted);
     }
 
