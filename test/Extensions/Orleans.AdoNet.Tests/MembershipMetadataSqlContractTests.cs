@@ -176,8 +176,20 @@ public class MembershipMetadataSqlContractTests
         var migration = ReadScript("MySQL-Clustering-Metadata.sql");
 
         Assert.Contains("INFORMATION_SCHEMA.COLUMNS", migration, StringComparison.OrdinalIgnoreCase);
-        Assert.Contains("PREPARE metadata_column_command", migration, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("CREATE PROCEDURE EnsureMembershipMetadataColumn()", migration, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("CALL EnsureMembershipMetadataColumn()", migration, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("ADD COLUMN IF NOT EXISTS", migration, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("@metadata_column", migration, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void MySqlScriptSplitter_DiscardsWhitespaceOnlyBatches()
+    {
+        var storage = new UnitTests.General.MySqlStorageForTesting("Server=localhost;Database=test");
+        var batches = storage.SplitScript("SELECT 1;\nDELIMITER ;\n\nDELIMITER $$\nSELECT 2;").ToArray();
+
+        Assert.Equal(2, batches.Length);
+        Assert.All(batches, batch => Assert.False(string.IsNullOrWhiteSpace(batch)));
     }
 
     [Fact]

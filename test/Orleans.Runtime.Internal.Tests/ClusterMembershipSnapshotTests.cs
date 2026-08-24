@@ -127,6 +127,12 @@ public class ClusterMembershipSnapshotTests
     }
 
     [Fact]
+    public void SiloMetadata_ConstructorRejectsNullMetadata()
+    {
+        Assert.Throws<ArgumentNullException>(() => new SiloMetadata(null!));
+    }
+
+    [Fact]
     public void CreateUpdate_IncludesMetadataOnlyChanges()
     {
         var silo = CreateSiloAddress(1);

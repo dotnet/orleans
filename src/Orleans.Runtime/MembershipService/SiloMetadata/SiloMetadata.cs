@@ -33,6 +33,7 @@ public record SiloMetadata
     /// <param name="metadata">The metadata key-value pairs associated with the silo.</param>
     public SiloMetadata(IEnumerable<KeyValuePair<string, string>> metadata)
     {
+        ArgumentNullException.ThrowIfNull(metadata);
         AddMetadata(metadata);
     }
 

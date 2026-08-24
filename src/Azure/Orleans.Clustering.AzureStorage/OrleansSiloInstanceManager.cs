@@ -34,6 +34,7 @@ namespace Orleans.AzureUtils
         private readonly ILogger logger;
         private readonly AzureStoragePolicyOptions storagePolicyOptions;
         private TableClient metadataTable = null!;
+        private bool IsMetadataStorageInitialized => metadataTable is not null;
 
         public string DeploymentId { get; private set; }
 
@@ -229,7 +230,10 @@ namespace Orleans.AzureUtils
             var entries = await storage.ReadAllTableEntriesForPartitionAsync(clusterId);
 
             await DeleteEntriesBatch(entries);
-            await DeleteMetadataEntries(clusterId);
+            if (IsMetadataStorageInitialized)
+            {
+                await DeleteMetadataEntries(clusterId);
+            }
 
             return entries.Count;
         }
@@ -244,8 +248,11 @@ namespace Orleans.AzureUtils
 
             // Defunct-row cleanup intentionally does not advance the membership snapshot fence.
             await DeleteEntriesBatch(entriesList);
-            await DeleteMetadataEntries(entriesList.Select(entry => entry.Item1.RowKey));
-            await DeleteOrphanedMetadataEntries();
+            if (IsMetadataStorageInitialized)
+            {
+                await DeleteMetadataEntries(entriesList.Select(entry => entry.Item1.RowKey));
+                await DeleteOrphanedMetadataEntries();
+            }
         }
 
         internal async Task<string?> EnsureMetadataEntry(
