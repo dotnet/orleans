@@ -30,8 +30,15 @@ internal abstract class ConnectionFactory
         var transport = await _transportConnector.CreateAsync(GetEndPoint(address), cancellationToken);
 
         // Create a connection object to represent the connection.
-        var connection = CreateConnection(address, transport);
-        return connection;
+        try
+        {
+            return CreateConnection(address, transport);
+        }
+        catch
+        {
+            await transport.DisposeAsync();
+            throw;
+        }
     }
 
     protected abstract EndPoint GetEndPoint(SiloAddress address);
