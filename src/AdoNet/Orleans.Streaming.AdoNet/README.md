@@ -54,11 +54,13 @@ The provider stores each queue as an immutable, ordered stream partition. Its st
 - `FaultOnDeliveryFailure`: optionally fault a failing subscription while preserving the shared partition records.
 - `MaxMessagesPerRead`: bound each ordered storage read.
 - `CheckpointPersistInterval`: throttle durable checkpoint updates.
-- `RetentionPeriod`: retain checkpointed records for at least this period (one day by default).
-- `MaximumRetentionPeriod`: optionally delete older records even when they are not checkpointed. This is a hard capacity ceiling and can create a diagnosed retention gap.
-- `CleanupInterval` and `CleanupBatchSize`: bound cleanup frequency and work.
+- `RetentionPeriod`: retain checkpointed records for at least this period (one day by default). Fractional seconds round upward.
+- `MaximumRetentionPeriod`: optionally delete older records even when they are not checkpointed. This is a hard capacity ceiling and can create a diagnosed retention gap. Fractional seconds round upward.
+- `CleanupInterval` and `CleanupBatchSize`: bound cleanup frequency and work. Fractional cleanup intervals round upward.
 
-The partitioned stream provider is rewindable while requested records remain retained. It resumes strictly after its durable, ownership-fenced checkpoint and can redeliver records after a crash without skipping uncheckpointed data.
+The partitioned stream provider is rewindable while requested records remain retained. Inclusive subscription start positions remain pending until the corresponding record is delivered or intentionally filtered. The queue checkpoint advances through the earliest contiguous position which is safe for every subscription, including unrelated partition records which quiet-stream cursors have scanned. It resumes strictly after that durable, ownership-fenced checkpoint and can redeliver records after a crash without skipping uncheckpointed data.
+
+Partition acquisition is cancellation-aware. A receiver whose acquisition command is still completing retains its queue reservation, so a late database result settles before a replacement receiver acquires a newer ownership epoch.
 
 ## Alpha schema upgrade
 
