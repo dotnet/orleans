@@ -370,6 +370,11 @@ internal sealed partial class DurableInboxExtension :
 
     private async ValueTask<DurableJobRunResult> ExecuteJobCoreAsync(IJobRunContext context, CancellationToken cancellationToken)
     {
+        if (Volatile.Read(ref _admissionStopped) != 0)
+        {
+            return DurableJobRunResult.Completed;
+        }
+
         await _gate.WaitAsync(cancellationToken).ConfigureAwait(true);
         try
         {
@@ -422,6 +427,11 @@ internal sealed partial class DurableInboxExtension :
 
     private async Task ProcessPendingMessagesAsync(CancellationToken cancellationToken)
     {
+        if (Volatile.Read(ref _admissionStopped) != 0)
+        {
+            return;
+        }
+
         var now = _timeProvider.GetUtcNow();
         var pending = _inboxDict
             .Where(pair => !_messageStates.TryGetValue(pair.Key, out var state) || state.NextAttemptAt is null || state.NextAttemptAt <= now)
@@ -522,7 +532,7 @@ internal sealed partial class DurableInboxExtension :
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
             await _stateManager.RevertPendingChangesAsync(CancellationToken.None).ConfigureAwait(true);
-            throw;
+            return DeliveryResult.Pending();
         }
         catch (Exception ex)
         {
