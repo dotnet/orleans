@@ -9,6 +9,7 @@ namespace Orleans.Runtime.Dissemination;
 // The protocol coordinates routing and application while namespaces remain authoritative for values and repair history.
 internal sealed partial class DisseminationProtocol
 {
+    private static readonly TimeSpan MaxAntiEntropyRoundLifetime = TimeSpan.FromMilliseconds(uint.MaxValue - 1);
     private readonly SiloAddress _localSilo;
     private readonly IInternalGrainFactory _grainFactory;
     private readonly DisseminationMembership _membership;
@@ -92,6 +93,7 @@ internal sealed partial class DisseminationProtocol
         DisseminationBroadcastBatch batch,
         CancellationToken cancellationToken)
     {
+        cancellationToken.ThrowIfCancellationRequested();
         var options = _options.CurrentValue;
         if (!options.Enabled)
         {
@@ -117,6 +119,7 @@ internal sealed partial class DisseminationProtocol
             receivedKeys.Add(disseminationNamespace, namespaceKeys);
             foreach (var item in values)
             {
+                cancellationToken.ThrowIfCancellationRequested();
                 namespaceKeys.Add(item.Value.Key);
                 // The sender necessarily owns this version; use that fact only if an outbound ledger already exists.
                 _broadcastQueue.ObservePeerVersion(
@@ -208,9 +211,47 @@ internal sealed partial class DisseminationProtocol
             Digests = requestDigests,
         };
         var requestDigestCount = GetDigestCount(requestDigests);
-        var responses = await Task.WhenAll(peers.Select(
-            peer => ExchangeAntiEntropyRequest(peer, request, requestDigestCount, cancellationToken)));
+        var roundLifetime = GetAntiEntropyRoundLifetime(requestDigests);
+        using var lifetimeCancellation = new CancellationTokenSource(roundLifetime, _timeProvider);
+        using var exchangeCancellation = CancellationTokenSource.CreateLinkedTokenSource(
+            cancellationToken,
+            lifetimeCancellation.Token);
+        var responseTasks = peers
+            .Select(peer => ExchangeAntiEntropyRequest(peer, request, requestDigestCount, exchangeCancellation.Token))
+            .ToArray();
+        DisseminationAntiEntropyResponse?[] responses;
+        try
+        {
+            responses = await Task.WhenAll(responseTasks)
+                .WaitAsync(roundLifetime, _timeProvider, cancellationToken);
+        }
+        catch (TimeoutException)
+        {
+            await lifetimeCancellation.CancelAsync();
+            responses = responseTasks
+                .Where(static response => response.IsCompletedSuccessfully)
+                .Select(static response => response.Result)
+                .ToArray();
+        }
+
+        cancellationToken.ThrowIfCancellationRequested();
         await ApplyAntiEntropyResponses(responses, options, cancellationToken);
+    }
+
+    private TimeSpan GetAntiEntropyRoundLifetime(
+        Dictionary<DisseminationNamespace, List<DigestEntry>> requestDigests)
+    {
+        var result = MaxAntiEntropyRoundLifetime;
+        foreach (var namespaceName in requestDigests.Keys)
+        {
+            if (_namespaces.TryGetValue(namespaceName, out var disseminationNamespace)
+                && disseminationNamespace.Options.StaleItemTtl < result)
+            {
+                result = disseminationNamespace.Options.StaleItemTtl;
+            }
+        }
+
+        return result;
     }
 
     private Dictionary<DisseminationNamespace, List<DigestEntry>> CreateAntiEntropyRequestDigests(long now)
@@ -296,7 +337,7 @@ internal sealed partial class DisseminationProtocol
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
-            throw;
+            return null;
         }
         catch (Exception exception)
         {
@@ -311,7 +352,7 @@ internal sealed partial class DisseminationProtocol
         DisseminationOptions options,
         CancellationToken cancellationToken)
     {
-        // Keep each sender's chain intact; competing repairs are ranked only after all responses are collected.
+        // Keep each sender's chain intact and rank all repairs which completed within the round's hop lifetime.
         Dictionary<DigestKey, List<AntiEntropyRepair>>? repairs = null;
         foreach (var response in responses)
         {
@@ -786,7 +827,7 @@ internal sealed partial class DisseminationProtocol
     }
 
     private bool IsExpired(DisseminationBroadcastValue item) =>
-        item.ExpiresAt <= _timeProvider.GetUtcNow();
+        item.TimeToLive <= TimeSpan.Zero;
 
     private DisseminationBroadcastValue CreateBroadcastValue(
         IDisseminationNamespace disseminationNamespace,
@@ -794,7 +835,7 @@ internal sealed partial class DisseminationProtocol
         new()
         {
             Value = value,
-            ExpiresAt = DisseminationExpiration.Get(_timeProvider, disseminationNamespace.Options.StaleItemTtl),
+            TimeToLive = disseminationNamespace.Options.StaleItemTtl,
         };
 
     private void EmitApplyResult(DisseminationNamespace namespaceName, DisseminationBroadcastValue item, SiloAddress sender, DisseminationApplyResult result)

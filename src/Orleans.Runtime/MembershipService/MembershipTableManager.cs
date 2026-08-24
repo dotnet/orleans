@@ -38,6 +38,7 @@ namespace Orleans.Runtime.MembershipService
         private readonly ILogger log;
         private readonly SiloLifecycleSubject siloLifecycle;
         private readonly ClusterMembershipOptions clusterMembershipOptions;
+        private readonly TimeProvider timeProvider;
         private readonly DateTime siloStartTime = DateTime.UtcNow;
         private readonly SiloAddress myAddress;
         private readonly AsyncEnumerable<MembershipTableSnapshot> updates;
@@ -66,6 +67,7 @@ namespace Orleans.Runtime.MembershipService
             this.fatalErrorHandler = fatalErrorHandler;
             this.gossiper = gossiper;
             this.clusterMembershipOptions = clusterMembershipOptions.Value;
+            this.timeProvider = timeProvider;
             this.myAddress = this.localSiloDetails.SiloAddress;
             this.log = log;
             this.siloLifecycle = siloLifecycle;
@@ -104,7 +106,8 @@ namespace Orleans.Runtime.MembershipService
         Task<bool> IMembershipManager.TryKillSilo(SiloAddress silo, CancellationToken cancellationToken) => this.TryKill(silo);
         Task<bool> IMembershipManager.TrySuspectSilo(SiloAddress silo, SiloAddress? indirectProbingSilo, CancellationToken cancellationToken) => this.TryToSuspectOrKill(silo, indirectProbingSilo);
         Task IMembershipManager.Refresh(MembershipVersion? targetVersion, CancellationToken cancellationToken) => this.Refresh(targetVersion, cancellationToken);
-        Task IMembershipManager.ProcessGossipSnapshot(MembershipTableSnapshot snapshot, CancellationToken cancellationToken) => this.RefreshFromSnapshot(snapshot);
+        Task IMembershipManager.ProcessGossipSnapshot(MembershipTableSnapshot snapshot, CancellationToken cancellationToken) =>
+            this.RefreshFromSnapshot(snapshot, cancellationToken);
         Task IMembershipManager.UpdateIAmAlive(CancellationToken cancellationToken) => this.UpdateIAmAlive();
 
         private bool IsStopping => this.siloLifecycle.IsStopping;
@@ -133,7 +136,9 @@ namespace Orleans.Runtime.MembershipService
             }
         }
 
-        public async Task RefreshFromSnapshot(MembershipTableSnapshot snapshot)
+        public async Task RefreshFromSnapshot(
+            MembershipTableSnapshot snapshot,
+            CancellationToken cancellationToken = default)
         {
             if (snapshot.Version == MembershipVersion.MinValue)
                 throw new ArgumentException("Cannot call RefreshFromSnapshot with Version == MembershipVersion.MinValue");
@@ -142,9 +147,10 @@ namespace Orleans.Runtime.MembershipService
             var pending = this.pendingRefresh;
             if (pending != null && !pending.IsCompleted)
             {
-                await pending;
+                await pending.WaitAsync(cancellationToken);
             }
 
+            cancellationToken.ThrowIfCancellationRequested();
             LogInformationReceivedClusterMembershipSnapshot(this.log, snapshot);
 
             this.TryProcessMembershipUpdate(MembershipTableSnapshot.Update, snapshot, nameof(RefreshFromSnapshot));
@@ -337,11 +343,9 @@ namespace Orleans.Runtime.MembershipService
                     // the status before continuing regardless of the outcome.
                     var updateTask = UpdateMyStatusTask(0);
                     updateTask.Ignore();
-                    await Task.WhenAny(Task.Delay(TimeSpan.FromMilliseconds(500)), updateTask);
+                    await Task.WhenAny(Task.Delay(TimeSpan.FromMilliseconds(500), this.timeProvider), updateTask);
 
-                    var gossipTask = this.GossipToOthers(this.myAddress, status);
-                    gossipTask.Ignore();
-                    await Task.WhenAny(Task.Delay(TimeSpan.FromMilliseconds(500)), gossipTask);
+                    await this.GossipToOthers(this.myAddress, status, TimeSpan.FromMilliseconds(500));
 
                     return;
                 }
@@ -352,26 +356,7 @@ namespace Orleans.Runtime.MembershipService
                 {
                     LogDebugSuccessfullyUpdatedMyStatus(this.log, myAddress, status);
 
-                    var gossipTask = this.GossipToOthers(this.myAddress, status);
-                    gossipTask.Ignore();
-                    using var cancellation = new CancellationTokenSource();
-                    var timeoutTask = Task.Delay(GossipTimeout, cancellation.Token);
-                    var task = await Task.WhenAny(gossipTask, timeoutTask);
-                    if (ReferenceEquals(task, timeoutTask))
-                    {
-                        if (status.IsTerminating())
-                        {
-                            LogWarningTimedOutWhileGossipingStatus(this.log, GossipTimeout);
-                        }
-                        else
-                        {
-                            LogDebugTimedOutWhileGossipingStatus(this.log, GossipTimeout);
-                        }
-                    }
-                    else
-                    {
-                        cancellation.Cancel();
-                    }
+                    await this.GossipToOthers(this.myAddress, status, GossipTimeout);
                 }
                 else
                 {
@@ -650,7 +635,10 @@ namespace Orleans.Runtime.MembershipService
 
         private sealed record MembershipState(MembershipTableSnapshot Snapshot, SiloStatus LocalSiloStatus);
 
-        private async Task GossipToOthers(SiloAddress updatedSilo, SiloStatus updatedStatus)
+        private async Task GossipToOthers(
+            SiloAddress updatedSilo,
+            SiloStatus updatedStatus,
+            TimeSpan timeout)
         {
             if (!this.clusterMembershipOptions.UseLivenessGossip) return;
 
@@ -673,7 +661,24 @@ namespace Orleans.Runtime.MembershipService
 
             try
             {
-                await this.gossiper.GossipToRemoteSilos(gossipPartners, MembershipTableSnapshot, updatedSilo, updatedStatus);
+                using var cancellation = new CancellationTokenSource(timeout, this.timeProvider);
+                await this.gossiper.GossipToRemoteSilos(
+                    gossipPartners,
+                    MembershipTableSnapshot,
+                    updatedSilo,
+                    updatedStatus,
+                    cancellation.Token);
+            }
+            catch (OperationCanceledException)
+            {
+                if (updatedStatus.IsTerminating())
+                {
+                    LogWarningTimedOutWhileGossipingStatus(this.log, timeout);
+                }
+                else
+                {
+                    LogDebugTimedOutWhileGossipingStatus(this.log, timeout);
+                }
             }
             catch (Exception exception)
             {
@@ -923,7 +928,7 @@ namespace Orleans.Runtime.MembershipService
                 this.ProcessTableUpdate(table, "TrySuspectOrKill");
 
                 // Gossip using the local silo status, since this is just informational to propagate the suspicion vote.
-                GossipToOthers(this.myAddress, this.CurrentStatus).Ignore();
+                GossipToOthers(this.myAddress, this.CurrentStatus, GossipTimeout).Ignore();
             }
 
             return ok;
@@ -952,7 +957,7 @@ namespace Orleans.Runtime.MembershipService
 
                     var table = await membershipTableProvider.ReadAll();
                     this.ProcessTableUpdate(table, "DeclareDead");
-                    GossipToOthers(entry.SiloAddress, entry.Status).Ignore();
+                    GossipToOthers(entry.SiloAddress, entry.Status, GossipTimeout).Ignore();
                     return true;
                 }
 

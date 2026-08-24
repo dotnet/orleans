@@ -11,6 +11,8 @@ namespace Orleans.Runtime.Dissemination;
 // Payloads are materialized from namespace state only when a peer is ready to send.
 internal sealed partial class DisseminationBroadcastQueue
 {
+    private static readonly TimeSpan DefaultSchedulingDelay = TimeSpan.FromMilliseconds(100);
+    private static readonly TimeSpan MaxTransportLifetime = TimeSpan.FromMilliseconds(uint.MaxValue - 1);
     private readonly TimeProvider _timeProvider;
     private readonly SiloAddress _localSilo;
     private readonly IInternalGrainFactory _grainFactory;
@@ -200,7 +202,7 @@ internal sealed partial class DisseminationBroadcastQueue
             }
         }
 
-        return result;
+        return result == TimeSpan.MaxValue ? GetBoundedFallbackDelay() : result;
     }
 
     private TimeSpan GetRetryDelay(int attempt)
@@ -221,7 +223,7 @@ internal sealed partial class DisseminationBroadcastQueue
 
         if (floor == TimeSpan.MaxValue)
         {
-            floor = TimeSpan.FromMilliseconds(100);
+            floor = GetBoundedFallbackDelay();
         }
 
         var cap = _options.CurrentValue.Overlay.AntiEntropyInterval;
@@ -234,6 +236,12 @@ internal sealed partial class DisseminationBroadcastQueue
         return TimeSpan.FromTicks((long)Math.Min(cap.Ticks, floor.Ticks * multiplier));
     }
 
+    private TimeSpan GetBoundedFallbackDelay()
+    {
+        var antiEntropyInterval = _options.CurrentValue.Overlay.AntiEntropyInterval;
+        return antiEntropyInterval < DefaultSchedulingDelay ? antiEntropyInterval : DefaultSchedulingDelay;
+    }
+
     private sealed class PeerQueuePump
     {
         private readonly DisseminationBroadcastQueue _owner;
@@ -243,7 +251,8 @@ internal sealed partial class DisseminationBroadcastQueue
         private readonly Task _flushTask;
         private Dictionary<DisseminationNamespace, PeerNamespaceState> _statesByNamespace = [];
         private TaskCompletionSource _nextFlushCompletion = new(TaskCreationOptions.RunContinuationsAsynchronously);
-        private Task? _activeFlushCompletion;
+        private TaskCompletionSource? _activeFlushCompletion;
+        private Exception? _pumpFailure;
         private IDisseminationSystemTarget? _target;
         // Notifications arriving during a send advance the epoch and remain dirty for the next pass.
         private long _notificationEpoch;
@@ -270,6 +279,11 @@ internal sealed partial class DisseminationBroadcastQueue
             lock (_lock)
             {
                 ObjectDisposedException.ThrowIf(_stopping, this);
+                if (_pumpFailure is { } pumpFailure)
+                {
+                    throw new InvalidOperationException($"The dissemination broadcast pump for {Peer} has failed.", pumpFailure);
+                }
+
                 var namespaceState = GetOrCreateNamespaceStateUnsafe(disseminationNamespace);
                 var keyState = namespaceState.GetOrCreateKey(key);
                 // A notification is only a wake-up. The namespace will choose the latest repair when this key is drained.
@@ -312,7 +326,14 @@ internal sealed partial class DisseminationBroadcastQueue
         {
             if (scheduled is { } info)
             {
-                DisseminationEvents.EmitBroadcastScheduled(_owner._localSilo, Peer, info.Reason, info.DueTime, info.Attempt, info.Epoch);
+                try
+                {
+                    DisseminationEvents.EmitBroadcastScheduled(_owner._localSilo, Peer, info.Reason, info.DueTime, info.Attempt, info.Epoch);
+                }
+                catch (Exception exception)
+                {
+                    LogDebugBroadcastDiagnosticFailed(_owner._logger, exception, Peer);
+                }
             }
         }
 
@@ -376,6 +397,11 @@ internal sealed partial class DisseminationBroadcastQueue
             var wake = false;
             lock (_lock)
             {
+                if (_pumpFailure is { } pumpFailure)
+                {
+                    throw new InvalidOperationException($"The dissemination broadcast pump for {Peer} has failed.", pumpFailure);
+                }
+
                 if (DirtyCount > 0)
                 {
                     flushCompletion = _nextFlushCompletion.Task;
@@ -384,7 +410,7 @@ internal sealed partial class DisseminationBroadcastQueue
                 }
                 else
                 {
-                    flushCompletion = _activeFlushCompletion;
+                    flushCompletion = _activeFlushCompletion?.Task;
                 }
             }
 
@@ -419,7 +445,11 @@ internal sealed partial class DisseminationBroadcastQueue
                     _stopping = true;
                     if (drain)
                     {
-                        if (DirtyCount > 0)
+                        if (_pumpFailure is { } pumpFailure)
+                        {
+                            flushCompletion = Task.FromException(pumpFailure);
+                        }
+                        else if (DirtyCount > 0)
                         {
                             flushCompletion = _nextFlushCompletion.Task;
                             wake = true;
@@ -427,7 +457,7 @@ internal sealed partial class DisseminationBroadcastQueue
                         }
                         else
                         {
-                            flushCompletion = _activeFlushCompletion;
+                            flushCompletion = _activeFlushCompletion?.Task;
                         }
                     }
                     else
@@ -481,34 +511,14 @@ internal sealed partial class DisseminationBroadcastQueue
 
         private async Task RunScheduledFlush()
         {
+            var cancellationToken = _shutdownCts.Token;
             try
             {
-                var cancellationToken = _shutdownCts.Token;
                 while (await _flushTimer.WaitAsync(cancellationToken))
                 {
-                    TaskCompletionSource flushCompletion;
-                    List<PendingKeyWork> work;
-                    long notificationEpoch;
-                    // Move one dirty generation to in-flight atomically; a concurrent notification can mark it dirty again.
-                    lock (_lock)
-                    {
-                        _wakeScheduled = false;
-                        if (DirtyCount == 0)
-                        {
-                            continue;
-                        }
-
-                        flushCompletion = _nextFlushCompletion;
-                        _nextFlushCompletion = new(TaskCreationOptions.RunContinuationsAsynchronously);
-                        _activeFlushCompletion = flushCompletion.Task;
-                        notificationEpoch = _notificationEpoch;
-                        work = DrainDirtyUnsafe();
-                    }
-
-                    var result = SendWorkResult.None;
                     try
                     {
-                        result = await SendValues(work, cancellationToken);
+                        await RunScheduledFlushIteration(cancellationToken);
                     }
                     catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
                     {
@@ -516,84 +526,174 @@ internal sealed partial class DisseminationBroadcastQueue
                     }
                     catch (Exception exception)
                     {
-                        LogDebugBroadcastFlushFailed(_owner._logger, exception);
-                        Requeue(work);
-                        result = new(RequiresBackoff: true, MadeProgress: false);
-                    }
-                    finally
-                    {
-                        // Complete callers waiting on this generation before scheduling unresolved or newly arrived work.
-                        flushCompletion.TrySetResult();
-                        ScheduledFlush? scheduled = null;
-                        lock (_lock)
+                        if (!TryRecoverFromUnexpectedIterationFailure(exception))
                         {
-                            if (ReferenceEquals(_activeFlushCompletion, flushCompletion.Task))
-                            {
-                                _activeFlushCompletion = null;
-                            }
-
-                            if (result.MadeProgress)
-                            {
-                                _retryAttempt = 0;
-                            }
-
-                            if (DirtyCount > 0 && !_stopping)
-                            {
-                                // Do not overwrite a timer which a newer notification already chose.
-                                if (notificationEpoch == _notificationEpoch)
-                                {
-                                    if (result.RequiresBackoff)
-                                    {
-                                        _retryAttempt++;
-                                        var delay = _owner.GetRetryDelay(_retryAttempt);
-                                        _flushTimer.Change(delay);
-                                        scheduled = new(DisseminationBroadcastScheduleReason.Retry, delay, _retryAttempt, _notificationEpoch);
-                                    }
-                                    else if (HasHighPriorityDirtyUnsafe())
-                                    {
-                                        // Leftover high-priority work must not wait for another coalescing window.
-                                        _flushTimer.Change(TimeSpan.Zero);
-                                        scheduled = new(DisseminationBroadcastScheduleReason.Priority, TimeSpan.Zero, _retryAttempt, _notificationEpoch);
-                                    }
-                                    else
-                                    {
-                                        var delay = _owner.GetCoalescingDelay(TimeSpan.MaxValue);
-                                        _flushTimer.Change(delay);
-                                        scheduled = new(DisseminationBroadcastScheduleReason.Coalesce, delay, _retryAttempt, _notificationEpoch);
-                                    }
-
-                                    _wakeScheduled = true;
-                                }
-                                else if (!_wakeScheduled)
-                                {
-                                    if (HasHighPriorityDirtyUnsafe())
-                                    {
-                                        _flushTimer.Change(TimeSpan.Zero);
-                                        scheduled = new(DisseminationBroadcastScheduleReason.Priority, TimeSpan.Zero, _retryAttempt, _notificationEpoch);
-                                    }
-                                    else
-                                    {
-                                        var delay = _owner.GetCoalescingDelay(TimeSpan.MaxValue);
-                                        _flushTimer.Change(delay);
-                                        scheduled = new(DisseminationBroadcastScheduleReason.Coalesce, delay, _retryAttempt, _notificationEpoch);
-                                    }
-
-                                    _wakeScheduled = true;
-                                }
-                            }
+                            return;
                         }
-
-                        EmitScheduled(scheduled);
                     }
                 }
             }
-            catch (OperationCanceledException) when (_shutdownCts.IsCancellationRequested)
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
             {
+            }
+        }
+
+        private async Task RunScheduledFlushIteration(CancellationToken cancellationToken)
+        {
+            TaskCompletionSource flushCompletion;
+            List<PendingKeyWork> work;
+            long notificationEpoch;
+            // Move one dirty generation to in-flight atomically; a concurrent notification can mark it dirty again.
+            lock (_lock)
+            {
+                _wakeScheduled = false;
+                if (DirtyCount == 0)
+                {
+                    return;
+                }
+
+                flushCompletion = _nextFlushCompletion;
+                _nextFlushCompletion = new(TaskCreationOptions.RunContinuationsAsynchronously);
+                _activeFlushCompletion = flushCompletion;
+                notificationEpoch = _notificationEpoch;
+                work = DrainDirtyUnsafe();
+            }
+
+            var result = SendWorkResult.None;
+            try
+            {
+                result = await SendValues(work, cancellationToken);
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                throw;
             }
             catch (Exception exception)
             {
                 LogDebugBroadcastFlushFailed(_owner._logger, exception);
+                Requeue(work);
+                result = new(RequiresBackoff: true, MadeProgress: false);
             }
+            finally
+            {
+                ScheduledFlush? scheduled = null;
+                lock (_lock)
+                {
+                    if (result.MadeProgress)
+                    {
+                        _retryAttempt = 0;
+                    }
+
+                    if (DirtyCount > 0 && !_stopping)
+                    {
+                        // Do not overwrite a timer which a newer notification already chose.
+                        if (notificationEpoch == _notificationEpoch)
+                        {
+                            if (result.RequiresBackoff)
+                            {
+                                _retryAttempt++;
+                                var delay = _owner.GetRetryDelay(_retryAttempt);
+                                _flushTimer.Change(delay);
+                                scheduled = new(DisseminationBroadcastScheduleReason.Retry, delay, _retryAttempt, _notificationEpoch);
+                            }
+                            else if (HasHighPriorityDirtyUnsafe())
+                            {
+                                // Leftover high-priority work must not wait for another coalescing window.
+                                _flushTimer.Change(TimeSpan.Zero);
+                                scheduled = new(DisseminationBroadcastScheduleReason.Priority, TimeSpan.Zero, _retryAttempt, _notificationEpoch);
+                            }
+                            else
+                            {
+                                var delay = _owner.GetCoalescingDelay(TimeSpan.MaxValue);
+                                _flushTimer.Change(delay);
+                                scheduled = new(DisseminationBroadcastScheduleReason.Coalesce, delay, _retryAttempt, _notificationEpoch);
+                            }
+
+                            _wakeScheduled = true;
+                        }
+                        else if (!_wakeScheduled)
+                        {
+                            if (HasHighPriorityDirtyUnsafe())
+                            {
+                                _flushTimer.Change(TimeSpan.Zero);
+                                scheduled = new(DisseminationBroadcastScheduleReason.Priority, TimeSpan.Zero, _retryAttempt, _notificationEpoch);
+                            }
+                            else
+                            {
+                                var delay = _owner.GetCoalescingDelay(TimeSpan.MaxValue);
+                                _flushTimer.Change(delay);
+                                scheduled = new(DisseminationBroadcastScheduleReason.Coalesce, delay, _retryAttempt, _notificationEpoch);
+                            }
+
+                            _wakeScheduled = true;
+                        }
+                    }
+
+                    if (ReferenceEquals(_activeFlushCompletion, flushCompletion))
+                    {
+                        _activeFlushCompletion = null;
+                    }
+                }
+
+                EmitScheduled(scheduled);
+                flushCompletion.TrySetResult();
+            }
+        }
+
+        private bool TryRecoverFromUnexpectedIterationFailure(Exception exception)
+        {
+            try
+            {
+                ScheduledFlush? scheduled = null;
+                TaskCompletionSource? activeFlushCompletion;
+                lock (_lock)
+                {
+                    if (DirtyCount > 0 && !_stopping)
+                    {
+                        _retryAttempt++;
+                        var delay = _owner.GetRetryDelay(_retryAttempt);
+                        _flushTimer.Change(delay);
+                        _wakeScheduled = true;
+                        scheduled = new(DisseminationBroadcastScheduleReason.Retry, delay, _retryAttempt, _notificationEpoch);
+                    }
+
+                    activeFlushCompletion = _activeFlushCompletion;
+                    _activeFlushCompletion = null;
+                }
+
+                LogWarningBroadcastPumpIterationFailed(_owner._logger, exception, Peer, scheduled?.DueTime);
+                EmitScheduled(scheduled);
+                activeFlushCompletion?.TrySetResult();
+                return true;
+            }
+            catch (Exception recoveryException)
+            {
+                var failure = new AggregateException(
+                    $"The dissemination broadcast pump for {Peer} could not recover from an iteration failure.",
+                    exception,
+                    recoveryException);
+                FailPump(failure);
+                LogErrorBroadcastPumpFailed(_owner._logger, failure, Peer);
+                return false;
+            }
+        }
+
+        private void FailPump(Exception exception)
+        {
+            TaskCompletionSource nextFlushCompletion;
+            TaskCompletionSource? activeFlushCompletion;
+            lock (_lock)
+            {
+                _pumpFailure = exception;
+                nextFlushCompletion = _nextFlushCompletion;
+                _nextFlushCompletion = new(TaskCreationOptions.RunContinuationsAsynchronously);
+                activeFlushCompletion = _activeFlushCompletion;
+                _activeFlushCompletion = null;
+                ClearPendingUnsafe();
+            }
+
+            activeFlushCompletion?.TrySetException(exception);
+            nextFlushCompletion.TrySetException(exception);
         }
 
         private async ValueTask<SendWorkResult> SendValues(
@@ -691,7 +791,7 @@ internal sealed partial class DisseminationBroadcastQueue
                         namespaceValues.Add(new DisseminationBroadcastValue
                         {
                             Value = value,
-                            ExpiresAt = DisseminationExpiration.Get(_owner._timeProvider, work.Namespace.Options.StaleItemTtl),
+                            TimeToLive = work.Namespace.Options.StaleItemTtl,
                         });
                         itemCount++;
                         byteCount += value.Payload.Length;
@@ -760,10 +860,26 @@ internal sealed partial class DisseminationBroadcastQueue
             CancellationToken cancellationToken)
         {
             cancellationToken.ThrowIfCancellationRequested();
+            var transportLifetime = valuesByNamespace.Values
+                .SelectMany(static values => values)
+                .Min(static value => value.TimeToLive);
+            if (transportLifetime <= TimeSpan.Zero)
+            {
+                return null;
+            }
 
+            if (transportLifetime > MaxTransportLifetime)
+            {
+                transportLifetime = MaxTransportLifetime;
+            }
+
+            using var lifetimeCancellation = new CancellationTokenSource(transportLifetime, _owner._timeProvider);
+            using var sendCancellation = CancellationTokenSource.CreateLinkedTokenSource(
+                cancellationToken,
+                lifetimeCancellation.Token);
             try
             {
-                await _owner._sendGate.WaitAsync(cancellationToken);
+                await _owner._sendGate.WaitAsync(sendCancellation.Token);
                 try
                 {
                     var batch = new DisseminationBroadcastBatch
@@ -772,7 +888,7 @@ internal sealed partial class DisseminationBroadcastQueue
                         Values = valuesByNamespace,
                     };
 
-                    var response = await GetTarget().PushBroadcast(batch, cancellationToken);
+                    var response = await GetTarget().PushBroadcast(batch, sendCancellation.Token);
                     DisseminationInstruments.OnBroadcastSent(batch.Values, "tree");
                     return response;
                 }
@@ -784,6 +900,11 @@ internal sealed partial class DisseminationBroadcastQueue
             catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
             {
                 throw;
+            }
+            catch (OperationCanceledException) when (lifetimeCancellation.IsCancellationRequested)
+            {
+                LogDebugBroadcastTransportLifetimeExpired(_owner._logger, Peer, transportLifetime);
+                return null;
             }
             catch (Exception exception)
             {
@@ -1224,4 +1345,37 @@ internal sealed partial class DisseminationBroadcastQueue
     private static partial void LogDebugBroadcastFlushFailed(
         ILogger logger,
         Exception exception);
+
+    [LoggerMessage(
+        Level = LogLevel.Warning,
+        Message = "Dissemination broadcast pump for {Peer} encountered an unexpected iteration failure and will retry after {RetryDelay}.")]
+    private static partial void LogWarningBroadcastPumpIterationFailed(
+        ILogger logger,
+        Exception exception,
+        SiloAddress peer,
+        TimeSpan? retryDelay);
+
+    [LoggerMessage(
+        Level = LogLevel.Error,
+        Message = "Dissemination broadcast pump for {Peer} failed permanently. Pending flush and drain waiters will fail explicitly.")]
+    private static partial void LogErrorBroadcastPumpFailed(
+        ILogger logger,
+        Exception exception,
+        SiloAddress peer);
+
+    [LoggerMessage(
+        Level = LogLevel.Debug,
+        Message = "Dissemination broadcast scheduling diagnostic for {Peer} failed.")]
+    private static partial void LogDebugBroadcastDiagnosticFailed(
+        ILogger logger,
+        Exception exception,
+        SiloAddress peer);
+
+    [LoggerMessage(
+        Level = LogLevel.Debug,
+        Message = "Dissemination broadcast transport to {Peer} exceeded its remaining hop lifetime of {Lifetime}.")]
+    private static partial void LogDebugBroadcastTransportLifetimeExpired(
+        ILogger logger,
+        SiloAddress peer,
+        TimeSpan lifetime);
 }

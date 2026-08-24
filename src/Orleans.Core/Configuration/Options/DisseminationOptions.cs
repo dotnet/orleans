@@ -137,6 +137,10 @@ public sealed class DisseminationNamespaceOptions
     /// <summary>
     /// Gets or sets how long a namespace value remains useful.
     /// </summary>
+    /// <remarks>
+    /// The lifetime bounds transport and application independently for each dissemination hop. Forwarding
+    /// re-materializes the value with a new hop lifetime.
+    /// </remarks>
     /// <value>The lifetime is 30 seconds by default and must be greater than zero.</value>
     public TimeSpan StaleItemTtl { get; set; } = TimeSpan.FromSeconds(30);
 

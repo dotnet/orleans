@@ -115,10 +115,9 @@ namespace Orleans.Runtime
 
                 // Inform other cluster members about our refreshed statistics.
                 var members = _siloStatusOracle.GetApproximateSiloStatuses(true).Keys.ToArray();
-                await TryPublishStatisticsViaDissemination(myStats);
-
-                // Direct publication keeps runtime statistics available to every silo during rolling upgrades.
-                await PublishStatisticsDirectly(myStats, members, cancellationToken);
+                var directPublication = PublishStatisticsDirectly(myStats, members, cancellationToken);
+                TryPublishStatisticsViaDissemination(myStats).Ignore();
+                await directPublication;
 
                 DeploymentLoadPublisherEvents.EmitClusterRefreshed(_siloDetails.SiloAddress, _periodicStats);
             }
@@ -160,6 +159,7 @@ namespace Orleans.Runtime
 
         private async Task TryPublishStatisticsViaDissemination(SiloRuntimeStatistics myStats)
         {
+            using var cancellation = new CancellationTokenSource(_statisticsRefreshTime);
             try
             {
                 var dissemination = _serviceProvider.GetService<IDisseminationService>();
@@ -173,7 +173,11 @@ namespace Orleans.Runtime
                     disseminationNamespace,
                     _siloDetails.SiloAddress,
                     myStats.DateTime.Ticks,
-                    CancellationToken.None);
+                    cancellation.Token);
+            }
+            catch (OperationCanceledException) when (cancellation.IsCancellationRequested)
+            {
+                LogDebugRuntimeStatisticsDisseminationTimedOut(_logger, _statisticsRefreshTime);
             }
             catch (Exception exception)
             {
@@ -372,6 +376,12 @@ namespace Orleans.Runtime
             Message = "An unexpected exception was thrown by PublishStatistics.UpdateRuntimeStatistics(). Ignored"
         )]
         private static partial void LogWarningRuntimeStatisticsUpdateFailure1(ILogger logger, Exception exception);
+
+        [LoggerMessage(
+            Level = LogLevel.Debug,
+            Message = "Runtime statistics dissemination exceeded {Timeout}. Direct publication continues delivery."
+        )]
+        private static partial void LogDebugRuntimeStatisticsDisseminationTimedOut(ILogger logger, TimeSpan timeout);
 
         [LoggerMessage(
             EventId = (int)ErrorCode.Placement_RuntimeStatisticsUpdateFailure_2,

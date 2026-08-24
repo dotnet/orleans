@@ -1,5 +1,4 @@
 using System;
-using System.Globalization;
 using System.Linq;
 using System.Security.Cryptography;
 using System.Text;
@@ -13,18 +12,24 @@ internal static class ManifestHashCalculator
     {
         using var hash = IncrementalHash.CreateHash(HashAlgorithmName.SHA256);
         AppendSection(hash, "grains", manifest.Grains.Count);
-        foreach (var grain in manifest.Grains.OrderBy(static entry => entry.Key.ToString(), StringComparer.Ordinal))
+        var grains = manifest.Grains.ToArray();
+        Array.Sort(grains, static (left, right) => left.Key.AsSpan().SequenceCompareTo(right.Key.AsSpan()));
+        foreach (var grain in grains)
         {
             AppendString(hash, "grain");
-            AppendString(hash, grain.Key.ToString() ?? string.Empty);
+            AppendBytes(hash, grain.Key.AsSpan());
             AppendProperties(hash, grain.Value.Properties);
         }
 
         AppendSection(hash, "interfaces", manifest.Interfaces.Count);
-        foreach (var grainInterface in manifest.Interfaces.OrderBy(static entry => entry.Key.ToString(), StringComparer.Ordinal))
+        var interfaces = manifest.Interfaces.ToArray();
+        Array.Sort(
+            interfaces,
+            static (left, right) => left.Key.Value.AsSpan().SequenceCompareTo(right.Key.Value.AsSpan()));
+        foreach (var grainInterface in interfaces)
         {
             AppendString(hash, "interface");
-            AppendString(hash, grainInterface.Key.ToString() ?? string.Empty);
+            AppendBytes(hash, grainInterface.Key.Value.AsSpan());
             AppendProperties(hash, grainInterface.Value.Properties);
         }
 
@@ -33,7 +38,7 @@ internal static class ManifestHashCalculator
 
     private static void AppendProperties(IncrementalHash hash, System.Collections.Immutable.ImmutableDictionary<string, string> properties)
     {
-        AppendString(hash, properties.Count.ToString(CultureInfo.InvariantCulture));
+        AppendInt32(hash, properties.Count);
         foreach (var property in properties.OrderBy(static entry => entry.Key, StringComparer.Ordinal))
         {
             AppendString(hash, "property");
@@ -45,16 +50,31 @@ internal static class ManifestHashCalculator
     private static void AppendSection(IncrementalHash hash, string section, int count)
     {
         AppendString(hash, section);
-        AppendString(hash, count.ToString(CultureInfo.InvariantCulture));
+        AppendInt32(hash, count);
     }
 
-    private static void AppendString(IncrementalHash hash, string value)
+    private static void AppendString(IncrementalHash hash, string? value)
     {
-        var bytes = Encoding.UTF8.GetBytes(value ?? string.Empty);
-        var length = Encoding.UTF8.GetBytes(bytes.Length.ToString(CultureInfo.InvariantCulture));
-        hash.AppendData(length);
-        hash.AppendData(new byte[] { 0 });
+        if (value is null)
+        {
+            AppendInt32(hash, -1);
+            return;
+        }
+
+        var bytes = Encoding.UTF8.GetBytes(value);
+        AppendBytes(hash, bytes);
+    }
+
+    private static void AppendBytes(IncrementalHash hash, ReadOnlySpan<byte> value)
+    {
+        AppendInt32(hash, value.Length);
+        hash.AppendData(value);
+    }
+
+    private static void AppendInt32(IncrementalHash hash, int value)
+    {
+        Span<byte> bytes = stackalloc byte[sizeof(int)];
+        System.Buffers.Binary.BinaryPrimitives.WriteInt32LittleEndian(bytes, value);
         hash.AppendData(bytes);
-        hash.AppendData(new byte[] { 0xff });
     }
 }

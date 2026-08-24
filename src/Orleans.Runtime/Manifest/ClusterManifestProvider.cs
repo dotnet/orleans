@@ -19,11 +19,14 @@ namespace Orleans.Runtime.Metadata
 {
     internal partial class ClusterManifestProvider : IClusterManifestProvider, IAsyncDisposable, IDisposable, ILifecycleParticipant<ISiloLifecycle>
     {
+        private const int MaxConcurrentPeerManifestProbes = 3;
+        private static readonly TimeSpan PeerManifestProbeTimeout = TimeSpan.FromSeconds(1);
         private readonly SiloAddress _localSiloAddress;
         private readonly ILogger<ClusterManifestProvider> _logger;
         private readonly IServiceProvider _services;
         private readonly IClusterMembershipService _clusterMembershipService;
         private readonly IFatalErrorHandler _fatalErrorHandler;
+        private readonly TimeProvider _timeProvider;
         private readonly CancellationTokenSource _shutdownCts = new();
         private readonly AsyncEnumerable<ClusterManifest> _updates;
 #if NET9_0_OR_GREATER
@@ -34,6 +37,7 @@ namespace Orleans.Runtime.Metadata
         private ClusterManifest _current;
         private IInternalGrainFactory? _grainFactory;
         private Task? _runTask;
+        private int _peerProbeRound;
         private readonly ConcurrentDictionary<ManifestHash, GrainManifest> _manifestCache = new();
 
         public ClusterManifestProvider(
@@ -42,13 +46,15 @@ namespace Orleans.Runtime.Metadata
             IClusterMembershipService clusterMembershipService,
             IFatalErrorHandler fatalErrorHandler,
             ILogger<ClusterManifestProvider> logger,
-            IServiceProvider services)
+            IServiceProvider services,
+            TimeProvider timeProvider)
         {
             _localSiloAddress = localSiloDetails.SiloAddress;
             _logger = logger;
             _services = services;
             _clusterMembershipService = clusterMembershipService;
             _fatalErrorHandler = fatalErrorHandler;
+            _timeProvider = timeProvider;
             LocalGrainManifest = siloManifestProvider.SiloManifest;
             _manifestCache[ManifestHashCalculator.ComputeHash(LocalGrainManifest)] = LocalGrainManifest;
             _current = CreateClusterManifest(
@@ -191,17 +197,29 @@ namespace Orleans.Runtime.Metadata
                 missingSilos.Add(siloAddress);
             }
 
-            if (missingSilos.Count > 1 && await TryFillMissingManifestsFromPeers(clusterMembership, existingManifest.Version, builder, missingSilos))
-            {
-                modified = true;
-            }
+            var peerRepairTask = missingSilos.Count > 1
+                ? TryFillMissingManifestsFromPeers(clusterMembership, builder, missingSilos)
+                : Task.FromResult(false);
 
             var tasks = new List<Task<(SiloAddress Key, GrainManifest? Value, Exception? Exception)>>();
             foreach (var siloAddress in missingSilos)
             {
-                if (!builder.ContainsKey(siloAddress))
+                tasks.Add(GetManifest(siloAddress));
+            }
+
+            if (await peerRepairTask)
+            {
+                modified = true;
+                if (missingSilos.All(builder.ContainsKey))
                 {
-                    tasks.Add(GetManifest(siloAddress));
+                    // Peer repair already supplied every missing manifest. Publish immediately while redundant
+                    // direct fetches continue independently, so a hung direct target cannot delay convergence.
+                    var repairedSilos = builder.ToImmutable();
+                    PruneManifestCache(repairedSilos);
+                    var repairedManifest = CreateClusterManifest(
+                        new MajorMinorVersion(clusterMembership.Version.Value, existingManifest.Version.Minor + 1),
+                        repairedSilos);
+                    return TryPublishManifest(repairedManifest);
                 }
             }
 
@@ -290,47 +308,46 @@ namespace Orleans.Runtime.Metadata
 
         private async Task<bool> TryFillMissingManifestsFromPeers(
             ClusterMembershipSnapshot clusterMembership,
-            MajorMinorVersion previousVersion,
             ImmutableDictionary<SiloAddress, GrainManifest>.Builder builder,
             List<SiloAddress> missingSilos)
         {
             var missing = new HashSet<SiloAddress>(missingSilos);
             var modified = false;
-            foreach (var peer in clusterMembership.Members.Values
+            var peers = clusterMembership.Members.Values
                 .Where(static member => member.Status == SiloStatus.Active)
                 .Select(static member => member.SiloAddress)
-                .OrderBy(static silo => silo))
+                .Where(peer => !peer.Equals(_localSiloAddress))
+                .OrderBy(static silo => silo)
+                .ToArray();
+            if (peers.Length == 0)
             {
-                if (missing.Count == 0)
-                {
-                    break;
-                }
+                return false;
+            }
 
-                if (peer.Equals(_localSiloAddress))
+            var round = Interlocked.Increment(ref _peerProbeRound);
+            var start = (int)((uint)(_localSiloAddress.GetConsistentHashCode() + round) % (uint)peers.Length);
+            var probeCount = Math.Min(MaxConcurrentPeerManifestProbes, peers.Length);
+            var probes = new Task<PeerManifestProbeResult?>[probeCount];
+            for (var i = 0; i < probeCount; i++)
+            {
+                probes[i] = ProbePeerForManifests(peers[(start + i) % peers.Length], missingSilos);
+            }
+
+            var results = await Task.WhenAll(probes);
+            foreach (var result in results)
+            {
+                if (result is null || missing.Count == 0)
                 {
                     continue;
                 }
 
-                try
+                FillFromCachedHashes(result.Summary, missing, builder, ref modified);
+                if (result.Update?.SiloManifests is { } manifests)
                 {
-                    var remoteManifestProvider = _grainFactory!.GetSystemTarget<IClusterManifestSystemTarget>(Constants.ManifestProviderType, peer);
-                    var summary = await remoteManifestProvider.GetClusterManifestHashSummary().AsTask().WaitAsync(_shutdownCts.Token);
-                    FillFromCachedHashes(summary, missing, builder, ref modified);
-                    if (missing.Count == 0)
-                    {
-                        break;
-                    }
-
-                    var update = await remoteManifestProvider.GetClusterManifestUpdate(previousVersion).AsTask().WaitAsync(_shutdownCts.Token);
-                    if (update?.SiloManifests is null)
-                    {
-                        continue;
-                    }
-
                     foreach (var silo in missing.ToArray())
                     {
-                        if (!summary.SiloManifestHashes.TryGetValue(silo, out var expectedHash)
-                            || !update.SiloManifests.TryGetValue(silo, out var manifest)
+                        if (!result.Summary.SiloManifestHashes.TryGetValue(silo, out var expectedHash)
+                            || !manifests.TryGetValue(silo, out var manifest)
                             || ManifestHashCalculator.ComputeHash(manifest) != expectedHash)
                         {
                             continue;
@@ -342,14 +359,57 @@ namespace Orleans.Runtime.Metadata
                         modified = true;
                     }
                 }
-                catch (Exception exception) when (exception is not OperationCanceledException)
-                {
-                    LogDebugErrorRetrievingClusterManifestFromPeer(exception, peer);
-                }
             }
 
             return modified;
         }
+
+        private async Task<PeerManifestProbeResult?> ProbePeerForManifests(
+            SiloAddress peer,
+            IReadOnlyCollection<SiloAddress> missingSilos)
+        {
+            var startedAt = _timeProvider.GetTimestamp();
+            try
+            {
+                var remoteManifestProvider = _grainFactory!.GetSystemTarget<IClusterManifestSystemTarget>(Constants.ManifestProviderType, peer);
+                var summary = await remoteManifestProvider.GetClusterManifestHashSummary()
+                    .AsTask()
+                    .WaitAsync(PeerManifestProbeTimeout, _timeProvider, _shutdownCts.Token);
+                if (missingSilos.All(silo =>
+                    summary.SiloManifestHashes.TryGetValue(silo, out var hash)
+                    && _manifestCache.ContainsKey(hash)))
+                {
+                    return new(summary, Update: null);
+                }
+
+                var remaining = PeerManifestProbeTimeout - _timeProvider.GetElapsedTime(startedAt);
+                if (remaining <= TimeSpan.Zero)
+                {
+                    throw new TimeoutException();
+                }
+
+                // No per-peer manifest body is retained, so request a complete update instead of synthesizing a
+                // baseline from the local provider's version.
+                var update = await remoteManifestProvider.GetClusterManifestUpdate(MajorMinorVersion.MinValue)
+                    .AsTask()
+                    .WaitAsync(remaining, _timeProvider, _shutdownCts.Token);
+                return new(summary, update);
+            }
+            catch (TimeoutException)
+            {
+                LogDebugClusterManifestPeerProbeTimedOut(peer, PeerManifestProbeTimeout);
+                return null;
+            }
+            catch (Exception exception) when (exception is not OperationCanceledException)
+            {
+                LogDebugErrorRetrievingClusterManifestFromPeer(exception, peer);
+                return null;
+            }
+        }
+
+        private sealed record PeerManifestProbeResult(
+            ClusterManifestHashSummary Summary,
+            ClusterManifestUpdate? Update);
 
         private void FillFromCachedHashes(
             ClusterManifestHashSummary summary,
@@ -505,6 +565,12 @@ namespace Orleans.Runtime.Metadata
             Message = "Error retrieving cluster manifest from peer {SiloAddress}. Falling back to direct manifest fetch."
         )]
         private partial void LogDebugErrorRetrievingClusterManifestFromPeer(Exception exception, SiloAddress siloAddress);
+
+        [LoggerMessage(
+            Level = LogLevel.Debug,
+            Message = "Cluster manifest peer probe to {SiloAddress} exceeded {Timeout}. Direct manifest fetch continues."
+        )]
+        private partial void LogDebugClusterManifestPeerProbeTimedOut(SiloAddress siloAddress, TimeSpan timeout);
 
         [LoggerMessage(
             Level = LogLevel.Debug,

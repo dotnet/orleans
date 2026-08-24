@@ -213,7 +213,7 @@ internal readonly struct DisseminationValue
     public ReadOnlyMemory<byte> Payload { get; }
 }
 
-// Expiry is hop-local so forwarding re-materializes both the payload and its delivery window.
+// Lifetime is hop-local so forwarding re-materializes both the payload and its delivery window.
 [GenerateSerializer, Immutable]
 internal sealed class DisseminationBroadcastValue
 {
@@ -221,7 +221,7 @@ internal sealed class DisseminationBroadcastValue
     public DisseminationValue Value { get; init; }
 
     [Id(1)]
-    public DateTimeOffset ExpiresAt { get; init; }
+    public TimeSpan TimeToLive { get; init; }
 }
 
 // Sender is the immediate hop, not the original publisher.

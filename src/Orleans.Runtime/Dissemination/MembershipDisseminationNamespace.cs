@@ -205,12 +205,8 @@ internal sealed class MembershipDisseminationNamespace(
             return DisseminationApplyResult.Obsolete;
         }
 
-        if (current.Version.Value == diff.Version.Value)
-        {
-            return DisseminationApplyResult.Duplicate;
-        }
-
-        if (current.Version.Value != diff.BaseVersion.Value)
+        if (current.Version.Value != diff.Version.Value
+            && current.Version.Value != diff.BaseVersion.Value)
         {
             return DisseminationApplyResult.Rejected;
         }
@@ -227,8 +223,13 @@ internal sealed class MembershipDisseminationNamespace(
         }
 
         var snapshot = new MembershipTableSnapshot(diff.Version, entries.ToImmutable());
+        if (current.Version.Value == diff.Version.Value && !snapshot.IsSuccessorTo(current))
+        {
+            return DisseminationApplyResult.Duplicate;
+        }
+
         await membershipManager.ProcessGossipSnapshot(snapshot, cancellationToken);
-        RememberSnapshot(snapshot);
+        RememberSnapshot(membershipManager.CurrentSnapshot);
         return DisseminationApplyResult.Applied;
     }
 
