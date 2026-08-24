@@ -27,6 +27,23 @@ public class ActivationAutoResetEventTests
     }
 
     [Fact]
+    public async Task MultipleSignalsBeforeWaitCoalesceIntoOneCompletion()
+    {
+        using var context = UnitTestSchedulingContext.Create(NullLoggerFactory.Instance);
+        var signal = new ActivationAutoResetEvent(context.WorkItemGroup);
+
+        signal.Signal();
+        signal.Signal();
+
+        await signal.WaitAsync();
+        var nextWait = signal.WaitAsync();
+        Assert.False(nextWait.IsCompleted);
+
+        signal.Signal();
+        await nextWait.AsTask().WaitAsync(TimeSpan.FromSeconds(5));
+    }
+
+    [Fact]
     public async Task WaitBeforeSignalCompletesAfterSignal()
     {
         using var context = UnitTestSchedulingContext.Create(NullLoggerFactory.Instance);
@@ -170,6 +187,22 @@ public class ActivationAutoResetEventTests
         await continuationRan.Task.WaitAsync(TimeSpan.FromSeconds(5));
         awaiter.GetResult();
         Assert.Equal(1, continuationCount);
+    }
+
+    [Fact]
+    public async Task SecondContinuationRegistrationIsRejectedWithoutReplacingFirst()
+    {
+        using var context = UnitTestSchedulingContext.Create(NullLoggerFactory.Instance);
+        var signal = new ActivationAutoResetEvent(context.WorkItemGroup);
+        var awaiter = signal.WaitAsync().GetAwaiter();
+        var firstContinuationRan = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        awaiter.UnsafeOnCompleted(firstContinuationRan.SetResult);
+        Assert.Throws<InvalidOperationException>(() => awaiter.UnsafeOnCompleted(static () => { }));
+
+        signal.Signal();
+        await firstContinuationRan.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        awaiter.GetResult();
     }
 
     [Fact]
