@@ -201,7 +201,7 @@ namespace Orleans.Runtime
                 }
 
                 startAttempted = true;
-                activationStartup = preparedContext.Start();
+                activationStartup = StartPreparedContext(preparedContext, result, activations);
             }
             catch (Exception exception)
             {
@@ -300,6 +300,22 @@ namespace Orleans.Runtime
                 }
 
                 return null;
+            }
+        }
+
+        internal static IDisposable StartPreparedContext(
+            PreparedGrainContext preparedContext,
+            IGrainContext context,
+            ActivationDirectory activations)
+        {
+            try
+            {
+                return preparedContext.Start();
+            }
+            catch
+            {
+                activations.RemoveTarget(context);
+                throw;
             }
         }
 

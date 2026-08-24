@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
+using Microsoft.Extensions.DependencyInjection;
 using NSubstitute;
 using Orleans.Metadata;
 using Orleans.Runtime;
@@ -83,6 +84,36 @@ public class GrainContextActivatorTests
         var actual = Assert.Throws<InvalidOperationException>(preparedContext.Start);
 
         Assert.Same(expected, actual);
+        Assert.Equal(["start", "abort"], events);
+    }
+
+    [Fact]
+    public void CatalogStartPreparedContext_StartFailureRemovesRecordedTarget()
+    {
+        var events = new List<string>();
+        var grainId = GrainId.Create("test", "grain");
+        var context = Substitute.For<IGrainContext>();
+        context.GrainId.Returns(grainId);
+        context.Equals(Arg.Any<IGrainContext>())
+            .Returns(call => ReferenceEquals(context, call.Arg<IGrainContext>()));
+        var expected = new InvalidOperationException("start-fault");
+        var preparedContext = new PreparedGrainContext(
+            context,
+            new ThrowingGrainContextStartup(events, expected));
+        using var services = new ServiceCollection()
+            .AddMetrics()
+            .AddSingleton<OrleansInstruments>()
+            .AddSingleton<CatalogInstruments>()
+            .BuildServiceProvider();
+        var activations = new ActivationDirectory(services.GetRequiredService<CatalogInstruments>());
+        activations.RecordNewTarget(context);
+
+        var actual = Assert.Throws<InvalidOperationException>(
+            () => Catalog.StartPreparedContext(preparedContext, context, activations));
+
+        Assert.Same(expected, actual);
+        Assert.Null(activations.FindTarget(grainId));
+        Assert.Equal(0, activations.Count);
         Assert.Equal(["start", "abort"], events);
     }
 
