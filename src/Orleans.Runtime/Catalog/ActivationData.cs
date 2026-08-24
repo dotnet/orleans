@@ -1089,7 +1089,11 @@ internal sealed partial class ActivationData :
 
         try
         {
-            _shared.OnDestroyActivation(this);
+            if (GrainInstance is not null)
+            {
+                _shared.OnDestroyActivation(this);
+            }
+
             GetComponent<IActivationLifecycleObserver>()?.OnDestroyActivation(this);
         }
         catch (ObjectDisposedException)
