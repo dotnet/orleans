@@ -497,7 +497,8 @@ namespace Orleans.Streams
                     else if (effectiveHandshakeToken is StartToken or DeliveryToken
                         && effectiveHandshakeToken.Token is { } requestedToken)
                     {
-                        cursorStartToken = requestedHandshakeToken is DeliveryToken
+                        var isDeliveryToken = requestedHandshakeToken is DeliveryToken;
+                        cursorStartToken = isDeliveryToken
                             ? cacheToken ?? consumerData.PendingStartToken ?? requestedToken
                             : requestedToken;
                         consumerData.SafeDisposeCursor(logger);
@@ -521,6 +522,7 @@ namespace Orleans.Streams
                                     cacheToken,
                                     out consumerData.PendingBatch);
                             }
+
                             cursorRepositioned = true;
                         }
                         else
@@ -539,6 +541,12 @@ namespace Orleans.Streams
                                 QueueCacheCursorResultKind.CacheMiss => throw result.CacheMiss!.Value.ToException(),
                                 _ => throw new InvalidOperationException($"Unexpected cursor result: {result.Kind}."),
                             };
+                            if (requestedHandshakeToken is DeliveryToken
+                                && consumerData.Cursor is IQueueCacheCursorProgress progressCursor)
+                            {
+                                progressCursor.SetDeliveredThrough(requestedToken);
+                            }
+
                             cursorRepositioned = true;
                         }
                     }
