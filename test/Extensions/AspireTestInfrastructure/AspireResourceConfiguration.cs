@@ -49,7 +49,7 @@ internal sealed class AspireResourceConfiguration : ConfigurationProvider, IConf
 
             configuration[key.Replace("__", ":", StringComparison.Ordinal)] = value switch
             {
-                null => null,
+                null => string.Empty,
                 IValueProvider provider => await provider.GetValueAsync(valueContext),
                 _ => value.ToString(),
             };
