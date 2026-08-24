@@ -144,6 +144,8 @@ public sealed class KinesisBatchContainerTests
         var adapter = new KinesisRecoverableStreamDataAdapter(serializer);
 
         var position = adapter.GetStreamPosition(queueMessage);
+        var rawPayload = queueMessage.RawPayload;
+        record.Data = null!;
         var cached = adapter.FromQueueMessage(
             position,
             queueMessage,
@@ -151,6 +153,7 @@ public sealed class KinesisBatchContainerTests
             size => new byte[size]);
 
         Assert.Equal(streamId, cached.StreamId);
+        Assert.Same(rawPayload, queueMessage.RawPayload);
         Assert.Equal(record.SequenceNumber, adapter.GetOffset(ref cached));
         Assert.True(adapter.Compare(
             ref cached,
