@@ -1,4 +1,3 @@
-#if NET10_0
 using System.Reflection;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
@@ -340,4 +339,3 @@ public sealed class SQSStreamProviderBuilderTests
             => throw new NotSupportedException();
     }
 }
-#endif

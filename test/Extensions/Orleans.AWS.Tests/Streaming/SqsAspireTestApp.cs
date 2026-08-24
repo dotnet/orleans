@@ -1,4 +1,3 @@
-#if NET10_0
 using Aspire.Hosting;
 using Aspire.Hosting.ApplicationModel;
 using Aspire.Hosting.Orleans;
@@ -333,4 +332,3 @@ internal sealed class EnvironmentVariableScope : IDisposable
         Environment.SetEnvironmentVariable(key, value);
     }
 }
-#endif
