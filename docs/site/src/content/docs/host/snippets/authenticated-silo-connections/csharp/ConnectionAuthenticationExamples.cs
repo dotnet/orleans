@@ -7,7 +7,6 @@ using Microsoft.Extensions.Logging;
 using OpenTelemetry.Metrics;
 using OpenTelemetry.Resources;
 using Orleans.Connections.Security;
-using Orleans.Connections.Security.Entra;
 using Orleans.Hosting;
 
 namespace Orleans.Docs.ConnectionSecurity;
