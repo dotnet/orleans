@@ -169,9 +169,7 @@ public class TransactionRecoveryLatencyTests
         using var subscription = TransactionDiagnosticEvents.AllEvents.Subscribe(observer);
 
         var resolution = Task.Run(async () => await agent.Resolve(transaction));
-        Assert.True(SpinWait.SpinUntil(
-            () => protocol.ManagerPromise is not null && queue.CancelSendCount == 1,
-            TimeSpan.FromSeconds(1)));
+        await queue.WaitForCancelInvocationAsync(TestContext.Current.CancellationToken);
 
         var promise = Assert.IsType<TaskCompletionSource<TransactionalStatus>>(protocol.ManagerPromise);
         Assert.False(promise.Task.IsCompleted);
@@ -179,17 +177,12 @@ public class TransactionRecoveryLatencyTests
         Assert.Equal(remoteOne.Name, Assert.Single(queue.CancelInvocations).Target.Name);
 
         remoteOneDispatchGate.TrySetResult();
-        Assert.True(SpinWait.SpinUntil(
-            () => queue.CancelSendCount == 2
-                && protocol.ManagerFanOutTask is not null
-                && promise.Task.IsCompleted
-                && resolution.IsCompleted,
-            TimeSpan.FromSeconds(1)));
+        await queue.WaitForCancelInvocationAsync(TestContext.Current.CancellationToken);
+        Assert.Equal(TransactionalStatus.PrepareTimeout, await promise.Task.WaitAsync(TestContext.Current.CancellationToken));
+        var (status, exception) = await resolution.WaitAsync(TestContext.Current.CancellationToken);
 
         var managerFanOut = Assert.IsAssignableFrom<Task>(protocol.ManagerFanOutTask);
         Assert.False(managerFanOut.IsCompleted);
-        Assert.Equal(TransactionalStatus.PrepareTimeout, await promise.Task);
-        var (status, exception) = await resolution;
         Assert.Equal(TransactionalStatus.PrepareTimeout, status);
         Assert.Null(exception);
         Assert.Equal(0, protocol.TransactionAgentCancelCount);
@@ -561,9 +554,12 @@ public class TransactionRecoveryLatencyTests
         private readonly IReadOnlyDictionary<string, Task> cancelGates;
         private readonly IReadOnlyDictionary<string, Task> dispatchGates;
         private readonly ConcurrentQueue<CancelInvocation> cancelInvocations = new();
+        private readonly SemaphoreSlim cancelInvocationSignal = new(0);
 
         public int CancelSendCount => cancelInvocations.Count;
         public IReadOnlyList<CancelInvocation> CancelInvocations => cancelInvocations.ToArray();
+        public Task WaitForCancelInvocationAsync(CancellationToken cancellationToken)
+            => cancelInvocationSignal.WaitAsync(cancellationToken);
 
         public GatedCancelTransactionQueue(
             ParticipantId resource,
@@ -602,6 +598,7 @@ public class TransactionRecoveryLatencyTests
                 : Task.CompletedTask;
             var invocation = new CancelInvocation(target, status, reason, isSelf);
             cancelInvocations.Enqueue(invocation);
+            cancelInvocationSignal.Release();
             if (dispatchGates.TryGetValue(target.Name, out var dispatchGate))
             {
                 dispatchGate.GetAwaiter().GetResult();
