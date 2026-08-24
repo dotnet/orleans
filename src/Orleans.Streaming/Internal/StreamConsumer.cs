@@ -150,12 +150,21 @@ namespace Orleans.Streams
             if (token != null && !IsRewindable)
                 throw new ArgumentNullException(nameof(token), "Passing a non-null token to a non-rewindable IAsyncObservable.");
 
+            oldHandleImpl.ValidateResumeToken(token);
+
             LogDebugResumeToken(token);
             await BindExtensionLazy();
 
             LogDebugResumeRendezvous(pubSub, myGrainReference, token);
 
-            StreamSubscriptionHandle<T> newHandle = myExtension!.SetObserver(oldHandleImpl.SubscriptionId, stream, observer, batchObserver, token, null);
+            StreamSubscriptionHandle<T> newHandle = myExtension!.SetObserver(
+                oldHandleImpl.SubscriptionId,
+                stream,
+                observer,
+                batchObserver,
+                token,
+                oldHandleImpl.FilterData,
+                handshakeState: token is null ? oldHandleImpl.SharedHandshake : null);
 
             // On failure caller should be able to retry using the original handle, so invalidate old handle only if everything succeeded.
             oldHandleImpl.Invalidate();

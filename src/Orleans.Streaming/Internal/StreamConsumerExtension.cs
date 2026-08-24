@@ -58,7 +58,8 @@ namespace Orleans.Streams
             IAsyncObserver<T>? observer,
             IAsyncBatchObserver<T>? batchObserver,
             StreamSequenceToken? token,
-            string? filterData)
+            string? filterData,
+            StreamSubscriptionHandleImpl<T>.SharedHandshakeState? handshakeState = null)
         {
             if (null == stream) throw new ArgumentNullException(nameof(stream));
             if (IsStatelessWorker && token is not null)
@@ -78,7 +79,8 @@ namespace Orleans.Streams
                     stream,
                     token,
                     filterData,
-                    disableHandshake: IsStatelessWorker);
+                    disableHandshake: IsStatelessWorker,
+                    handshakeState: handshakeState);
                 allStreamObservers[subscriptionId] = handle;
                 return handle;
             }
