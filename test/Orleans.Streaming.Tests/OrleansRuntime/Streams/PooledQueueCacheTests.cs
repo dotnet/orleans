@@ -1,4 +1,5 @@
 using System.Globalization;
+using System.Reflection;
 using Microsoft.Extensions.Logging.Abstractions;
 using Orleans.Providers.Streams.Common;
 using Orleans.Runtime;
@@ -458,6 +459,49 @@ namespace UnitTests.OrleansRuntime.Streams
             Assert.Equal(0, cache.AllocatedSizeInBytes);
             var cursor = cache.GetCursor(streamId, null);
             Assert.False(cache.TryGetNextMessage(cursor, out _));
+        }
+
+        [Fact, TestCategory("BVT"), TestCategory("Streaming")]
+        public void RemoveOldestMessageDetachesBlockBeforeConcurrentPoolReuse()
+        {
+            var cache = new PooledQueueCache(new TestCacheDataAdapter(), NullLogger.Instance, null, null, null, 1, 1, 1);
+            var now = DateTime.UtcNow;
+            cache.Add([new CachedMessage { StreamId = StreamId.Create("test", "stream"), DequeueTimeUtc = now }], now);
+            var messageBlocks = GetMessageBlocks(cache);
+            var block = Assert.Single(messageBlocks);
+            var reusePool = new ConcurrentReusePool();
+            block.Pool = reusePool;
+
+            cache.RemoveOldestMessage();
+
+            Assert.Empty(messageBlocks);
+            Assert.Same(block, Assert.Single(reusePool.ReusedBlocks));
+        }
+
+        [Fact, TestCategory("BVT"), TestCategory("Streaming")]
+        public void DisposeDetachesBlocksBeforeConcurrentPoolReuse()
+        {
+            var cache = new PooledQueueCache(new TestCacheDataAdapter(), NullLogger.Instance, null, null, null, 1, 1, 2);
+            var now = DateTime.UtcNow;
+            cache.Add(
+                [
+                    new CachedMessage { StreamId = StreamId.Create("test", "stream-1"), DequeueTimeUtc = now },
+                    new CachedMessage { StreamId = StreamId.Create("test", "stream-2"), DequeueTimeUtc = now },
+                ],
+                now);
+            var messageBlocks = GetMessageBlocks(cache);
+            var blocks = messageBlocks.ToArray();
+            var reusePool = new ConcurrentReusePool();
+            foreach (var block in blocks)
+            {
+                block.Pool = reusePool;
+            }
+
+            cache.Dispose();
+
+            Assert.Empty(messageBlocks);
+            Assert.Equal(blocks.Length, reusePool.ReusedBlocks.Count);
+            Assert.All(blocks, block => Assert.Contains(block, reusePool.ReusedBlocks));
         }
 
         [Fact, TestCategory("BVT"), TestCategory("Streaming")]
@@ -990,6 +1034,24 @@ namespace UnitTests.OrleansRuntime.Streams
                 Assert.Equal((sequenceNumber - startOfCache) / 2, stream2EventCount);
             }
             return sequenceNumber;
+        }
+
+        private static LinkedList<CachedMessageBlock> GetMessageBlocks(PooledQueueCache cache)
+        {
+            var field = typeof(PooledQueueCache).GetField("messageBlocks", BindingFlags.Instance | BindingFlags.NonPublic);
+            return Assert.IsType<LinkedList<CachedMessageBlock>>(field?.GetValue(cache));
+        }
+
+        private sealed class ConcurrentReusePool : IObjectPool<CachedMessageBlock>
+        {
+            public LinkedList<CachedMessageBlock> ReusedBlocks { get; } = new();
+
+            public CachedMessageBlock Allocate() => throw new NotSupportedException();
+
+            public void Free(CachedMessageBlock resource)
+            {
+                Task.Run(() => ReusedBlocks.AddFirst(resource.Node)).GetAwaiter().GetResult();
+            }
         }
     }
 }
