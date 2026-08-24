@@ -203,16 +203,19 @@ internal sealed class KinesisPooledAdapterReceiver : IQueueAdapterReceiver, IQue
 
             if (_initializationTask is null || _initializationTask.IsCompleted)
             {
-                _initializationTask = InitializeCore();
+                _initializationTask = InitializeCore(cancellationToken);
             }
 
             return _initializationTask.WaitAsync(cancellationToken);
         }
     }
 
-    private async Task InitializeCore()
+    private async Task InitializeCore(CancellationToken initializationToken)
     {
-        var lifecycleToken = _lifecycleCancellation.Token;
+        using var cancellation = CancellationTokenSource.CreateLinkedTokenSource(
+            _lifecycleCancellation.Token,
+            initializationToken);
+        var lifecycleToken = cancellation.Token;
         if (_inner is null)
         {
             var checkpointer = await _checkpointerFactory.Create(_partition, lifecycleToken);
