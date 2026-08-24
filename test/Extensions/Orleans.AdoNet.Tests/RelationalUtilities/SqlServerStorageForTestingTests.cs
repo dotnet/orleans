@@ -79,12 +79,20 @@ public class SqlServerStorageForTestingTests
                 await using var command = connection.CreateCommand();
                 command.CommandText = "SELECT 1";
                 _ = await command.ExecuteScalarAsync(cancellationToken);
+                await Task.Delay(TimeSpan.FromMilliseconds(10), cancellationToken);
             }
             catch (SqlException)
             {
                 if (!cancellationToken.IsCancellationRequested)
                 {
-                    await Task.Delay(TimeSpan.FromMilliseconds(10));
+                    try
+                    {
+                        await Task.Delay(TimeSpan.FromMilliseconds(10), cancellationToken);
+                    }
+                    catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+                    {
+                        return;
+                    }
                 }
             }
             catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
