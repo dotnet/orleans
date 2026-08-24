@@ -1,7 +1,6 @@
 using System.Security.Cryptography.X509Certificates;
 using Azure.Core;
 using Orleans.Connections.Security;
-using Orleans.Connections.Security.Entra;
 using Orleans.Hosting;
 
 namespace AuthenticatedSiloConnections;
