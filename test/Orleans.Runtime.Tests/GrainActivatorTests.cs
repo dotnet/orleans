@@ -1,5 +1,7 @@
 using System.Diagnostics.CodeAnalysis;
+using System.Diagnostics.Metrics;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Diagnostics.Metrics.Testing;
 using Microsoft.Extensions.Logging.Abstractions;
 using Orleans.Metadata;
 using Orleans.Runtime;
@@ -50,6 +52,7 @@ namespace UnitTests.General
                         // This allows it to selectively apply to specific grain types
                         services.AddSingleton<IConfigureGrainTypeComponents, HardcodedGrainActivator>();
                         services.AddSingleton<IConfigureGrainContextProvider, ActivationOrderingConfiguratorProvider>();
+                        services.AddSingleton<IConfigureGrainContextProvider, ConfigurationFailureConfiguratorProvider>();
                     });
                 }
             }
@@ -182,6 +185,40 @@ namespace UnitTests.General
             }
         }
 
+        [Fact]
+        public void ConfigurationFailureBeforeConstructionDoesNotDecrementActiveGrainCount()
+        {
+            var primary = Assert.IsType<InProcessSiloHandle>(fixture.HostedCluster.Primary);
+            var services = primary.ServiceProvider;
+            var grainType = services.GetRequiredService<GrainTypeResolver>()
+                .GetGrainType(typeof(ExplicitlyRegisteredSimpleDIGrain));
+            var grainId = GrainId.Create(grainType, Guid.NewGuid().ToString());
+            var address = GrainAddress.NewActivationAddress(primary.SiloAddress, grainId);
+            var grainTypeName = services.GetRequiredService<GrainTypeSharedContextResolver>()
+                .GetComponents(grainType)
+                .GrainTypeName;
+            using var collector = new MetricCollector<int>(
+                services.GetRequiredService<IMeterFactory>(),
+                "Microsoft.Orleans",
+                InstrumentNames.GRAIN_COUNTS);
+
+            ConfigurationFailureState.Arm(grainId);
+            try
+            {
+                var exception = Assert.Throws<InvalidOperationException>(
+                    () => services.GetRequiredService<GrainContextActivator>().CreateInstance(address));
+                Assert.Equal("configuration-fault", exception.Message);
+            }
+            finally
+            {
+                ConfigurationFailureState.Clear();
+            }
+
+            Assert.DoesNotContain(
+                collector.GetMeasurementSnapshot(),
+                measurement => Equals(measurement.Tags["type"], grainTypeName));
+        }
+
         /// <summary>
         /// Custom grain activator that bypasses dependency injection entirely.
         /// Implements both IGrainActivator (for creation/disposal) and IConfigureGrainTypeComponents
@@ -246,6 +283,71 @@ namespace UnitTests.General
 
                 configurator = null;
                 return false;
+            }
+        }
+
+        private sealed class ConfigurationFailureConfiguratorProvider(GrainClassMap grainClassMap) : IConfigureGrainContextProvider
+        {
+            public bool TryGetConfigurator(
+                GrainType grainType,
+                GrainProperties properties,
+                [NotNullWhen(true)] out IConfigureGrainContext? configurator)
+            {
+                if (grainClassMap.TryGetGrainClass(grainType, out var grainClass)
+                    && grainClass == typeof(ExplicitlyRegisteredSimpleDIGrain))
+                {
+                    configurator = ConfigurationFailureConfigurator.Instance;
+                    return true;
+                }
+
+                configurator = null;
+                return false;
+            }
+        }
+
+        private sealed class ConfigurationFailureConfigurator : IConfigureGrainContext
+        {
+            public static ConfigurationFailureConfigurator Instance { get; } = new();
+
+            public void Configure(IGrainContext context)
+            {
+                if (ConfigurationFailureState.ShouldFail(context.GrainId))
+                {
+                    throw new InvalidOperationException("configuration-fault");
+                }
+            }
+        }
+
+        private static class ConfigurationFailureState
+        {
+            private static readonly object Lock = new();
+            private static GrainId _grainId;
+            private static bool _armed;
+
+            public static void Arm(GrainId grainId)
+            {
+                lock (Lock)
+                {
+                    _grainId = grainId;
+                    _armed = true;
+                }
+            }
+
+            public static bool ShouldFail(GrainId grainId)
+            {
+                lock (Lock)
+                {
+                    return _armed && _grainId.Equals(grainId);
+                }
+            }
+
+            public static void Clear()
+            {
+                lock (Lock)
+                {
+                    _armed = false;
+                    _grainId = default;
+                }
             }
         }
 
