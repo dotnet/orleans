@@ -224,7 +224,7 @@ namespace Orleans.Runtime
 
                     try
                     {
-                        using var startup = preparedContext.Start();
+                        preparedContext.Abort();
                     }
                     catch (Exception cleanupException)
                     {

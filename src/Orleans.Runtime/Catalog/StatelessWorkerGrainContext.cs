@@ -334,23 +334,29 @@ internal partial class StatelessWorkerGrainContext : IGrainContext, IAsyncDispos
     {
         Debug.Assert(!_terminated, "CreateWorker must not be called on a terminated stateless worker context.");
         var address = GrainAddress.GetAddress(Address.SiloAddress, Address.GrainId, ActivationId.NewId());
-        var preparedContext = ((IPreparedGrainContextActivator)_innerActivator).CreatePreparedContext(address, []);
+        var preparedContext = PreparedGrainContext.Create(_innerActivator, address, []);
         var newWorker = (ActivationData)preparedContext.Context;
         IDisposable activationStartup;
-        var startAttempted = false;
+        var startInvoked = false;
         try
         {
             // Observe the create/destroy lifecycle of the activation
             newWorker.SetComponent<IActivationLifecycleObserver>(this);
             _workers.Add(newWorker);
-            startAttempted = true;
+            startInvoked = true;
             activationStartup = preparedContext.Start();
         }
         catch
         {
-            if (!startAttempted)
+            try
             {
-                preparedContext.Abort();
+                if (!startInvoked)
+                {
+                    preparedContext.Abort();
+                }
+            }
+            finally
+            {
                 _workers.Remove(newWorker);
             }
 
@@ -363,8 +369,7 @@ internal partial class StatelessWorkerGrainContext : IGrainContext, IAsyncDispos
             {
                 // If this is a new worker and there is a message in scope, try to get the request context and activate the worker
                 var requestContext = (message as Message)?.RequestContextData ?? [];
-                var cancellation = new CancellationTokenSource(_shared.Shared.InternalRuntime.CollectionOptions.Value.ActivationTimeout);
-                newWorker.Activate(requestContext, cancellation.Token);
+                newWorker.Activate(requestContext, CancellationToken.None);
                 StatelessWorkerEvents.EmitWorkerCreated(this, newWorker, _workers.Count);
 
                 return newWorker;

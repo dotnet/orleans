@@ -71,9 +71,7 @@ namespace Orleans.Runtime
                 activator = this.CreateActivator(grainId.Type);
             }
 
-            return activator.Activator is IPreparedGrainContextActivator preparedActivator
-                ? preparedActivator.CreatePreparedContext(address, activator.ConfigureActions)
-                : new(activator.Activator.CreateContext(address, activator.ConfigureActions), startup: null);
+            return PreparedGrainContext.Create(activator.Activator, address, activator.ConfigureActions);
         }
 
         private (IGrainContextActivator, IConfigureGrainContext[]) CreateActivator(GrainType grainType)
@@ -158,7 +156,31 @@ namespace Orleans.Runtime
         public IGrainContext Context
             => _context ?? throw new InvalidOperationException("The grain context activation is not initialized.");
 
-        public IDisposable Start() => _startup?.Start() ?? NoopDisposable.Instance;
+        public static PreparedGrainContext Create(
+            IGrainContextActivator activator,
+            GrainAddress address,
+            IConfigureGrainContext[] configureActions) =>
+            activator is IPreparedGrainContextActivator preparedActivator
+                ? preparedActivator.CreatePreparedContext(address, configureActions)
+                : new(activator.CreateContext(address, configureActions), startup: null);
+
+        public IDisposable Start()
+        {
+            if (_startup is not { } startup)
+            {
+                return NoopDisposable.Instance;
+            }
+
+            try
+            {
+                return startup.Start();
+            }
+            catch
+            {
+                startup.Abort();
+                throw;
+            }
+        }
 
         public void Abort() => _startup?.Abort();
 
