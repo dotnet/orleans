@@ -27,9 +27,9 @@ The `Service` connection value accepts an AWS region such as `us-east-1` or an S
 
 ## Configure SQS streams with Aspire
 
-The Aspire application model uses the AWS-supported [`Aspire.Hosting.AWS`](https://www.nuget.org/packages/Aspire.Hosting.AWS) integration to configure AWS SDK for .NET v4 and provision the complete Orleans queue topology through AWS CDK. The CDK stack creates one queue for each Orleans partition using the stable service ID, provider name, partition count, and FIFO mode.
+The Aspire application model represents the shared SQS service configuration and complete topology settings for an Orleans stream provider. Orleans derives the physical queue topology from the service ID, provider name, and configured partition count, then creates each mapped queue when its partition is first used.
 
-Configure the AWS SDK region, create the partition queues in a CDK stack, and identify the Orleans provider type as `SQS`:
+Configure the AWS SDK region and identify the Orleans provider type as `SQS`:
 
 :::code language="csharp" source="../host/snippets/aspire/AppHost/AppHostExamples.cs" id="sqs_streaming_apphost":::
 
@@ -37,9 +37,7 @@ The provider configuration connects the AWS SDK resource and emits identical top
 
 :::code language="csharp" source="../host/snippets/aspire/AppHost/AppHostExamples.cs" id="sqs_provider_configuration":::
 
-The AppHost supplies the same service ID, provider name, region, partition count, FIFO mode, long-poll duration, and visibility timeout to CDK and Orleans. This gives the provisioned queues the exact names and settings that the Orleans runtime resolves. The AWS SDK reference supplies `AWS_PROFILE` and `AWS_REGION`; workload identity and shared AWS configuration remain available through the SDK credential chain.
-
-The silo and client wait for the CDK stack before starting. The stack uses CloudFormation in the account and region selected by the AWS SDK configuration. Grant the AppHost credentials permission to create and update the stack; bootstrap the environment when added constructs use CDK assets. See [Provisioning application resources with AWS CDK](https://github.com/aws/integrations-on-dotnet-aspire-for-aws/blob/main/src/Aspire.Hosting.AWS/README.md#provisioning-application-resources-with-aws-cdk) for the integration contract.
+The AppHost supplies the same provider name, region, partition count, and FIFO mode to silos and clients. The AWS SDK reference can supply `AWS_PROFILE`; workload identity and shared AWS configuration remain available through the SDK credential chain.
 
 The silo activates generated `Orleans:Streaming:Orders` configuration through <xref:Microsoft.Extensions.Hosting.OrleansSiloGenericHostExtensions.UseOrleans*>:
 
@@ -86,7 +84,7 @@ List every application-defined attribute required by the decoder in <xref:Orlean
 | <xref:Orleans.Configuration.SqsOptions.ReceiveMessageAttributes> | Requests the application-defined attributes consumed by a custom data adapter. |
 | <xref:Orleans.Configuration.SqsOptions.ReceiveMessageSystemAttributes> | Requests SQS system attributes consumed by the provider or application adapter. |
 
-The CDK stack owns queue creation and updates for AWS deployments. Manage retention, visibility, encryption, access policy, and dead-letter redrive policy in the queue constructs so CloudFormation applies the declared configuration consistently.
+Queue-creation settings apply when the queue is absent. Manage changes to retention, visibility, encryption, access policy, and dead-letter redrive policy through SQS administration for existing queues.
 
 Serialized Orleans batches must fit within the [SQS message quotas](https://docs.aws.amazon.com/AWSSimpleQueueService/latest/SQSDeveloperGuide/quotas-messages.html). Bound batch size before messages approach the service limit, and include custom envelope and message-attribute overhead in that calculation.
 
