@@ -3,6 +3,7 @@ using System.Reflection;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration;
+using Orleans.Hosting;
 using Orleans.Providers;
 using Orleans.Streaming.SQS.Streams;
 using Orleans.Streams;
@@ -166,6 +167,7 @@ public sealed class SQSStreamProviderBuilderTests
         Assert.Contains("service location", exception.Message, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("ServiceKey", exception.Message, StringComparison.Ordinal);
         Assert.Contains("AWS_REGION", exception.Message, StringComparison.Ordinal);
+        Assert.Contains("AWS_DEFAULT_REGION", exception.Message, StringComparison.Ordinal);
     }
 
     public static TheoryData<string, string[], string[], string> InvalidConfigurations => new()

@@ -176,7 +176,7 @@ public sealed class SqsStreamProviderBuilder : IProviderBuilder<ISiloBuilder>, I
         if (string.IsNullOrWhiteSpace(configuredService))
         {
             throw new OrleansConfigurationException(
-                "SQS streaming requires a service location. Configure ServiceKey, ConnectionName, ConnectionString, Region, ServiceEndpoint, or AWS_REGION.");
+                "SQS streaming requires a service location. Configure ServiceKey, ConnectionName, ConnectionString, Region, ServiceEndpoint, AWS_REGION, or AWS_DEFAULT_REGION.");
         }
 
         ValidateServiceLocation(configuredService);
