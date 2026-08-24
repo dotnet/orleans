@@ -1,4 +1,3 @@
-#if NET10_0
 using AWSUtils.Tests.StorageTests;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -120,4 +119,3 @@ public sealed class SQSAspireLiveStreamTests : TestClusterPerTest
                         $"Missing {PubSubStoreRootDirectoryKey} configuration."));
     }
 }
-#endif
