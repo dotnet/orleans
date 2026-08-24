@@ -252,7 +252,8 @@ BEGIN
     WHERE M.ServiceId = _ServiceId
         AND M.ProviderId = _ProviderId
         AND M.QueueId = _QueueId
-        AND M.MessageId <= _Checkpoint;
+        AND M.MessageId <= _Checkpoint
+        AND M.CheckpointedOn IS NULL;
 
     RETURN QUERY
     SELECT
@@ -311,7 +312,8 @@ BEGIN
         WHERE M.ServiceId = _ServiceId
             AND M.ProviderId = _ProviderId
             AND M.QueueId = _QueueId
-            AND M.MessageId <= _Checkpoint;
+            AND M.MessageId <= _Checkpoint
+            AND M.CheckpointedOn IS NULL;
     ELSE
         SELECT P.OwnerEpoch, P.Checkpoint
         INTO _CurrentOwnerEpoch, _CurrentCheckpoint
