@@ -24,6 +24,8 @@ namespace Orleans.Providers.Streams.Common
             int maxBlockSize,
             int maxRetainedBlocks)
         {
+            ArgumentNullException.ThrowIfNull(cacheDataAdapter);
+
             messagePool = new ObjectPool<CachedMessageBlock>(
                 () => new CachedMessageBlock(initialBlockSize, maxBlockSize),
                 maxRetainedBlocks);
