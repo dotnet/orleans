@@ -102,7 +102,9 @@ namespace Orleans.Streams
         /// Updates the cache with the current delivery progress of all active subscriptions.
         /// </summary>
         /// <param name="earliestSubscriptionToken">
-        /// The earliest last processed sequence token across registered subscriptions.
+        /// The earliest contiguous partition position which is safe across registered subscriptions.
+        /// A position becomes safe after a matching record is delivered or intentionally filtered,
+        /// or after a cursor scans an unrelated record without an earlier pending delivery.
         /// When caught-up progress is known, drained subscriptions can instead advance to the queue's read boundary.
         /// A <see langword="null"/> value indicates that there are no active subscriptions.
         /// The token is only valid for the duration of the call and must not be stored.
