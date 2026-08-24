@@ -971,6 +971,20 @@ namespace NonSilo.Tests.Membership
             return new TestConnection(context, middleware, shared);
         }
 
+        [Fact]
+        public void Connection_PartialReadMarksReceiveActivity()
+        {
+            var connection = CreateTestConnection(this.loggerFactory);
+
+            Assert.False(connection.SimulateBytesReceived(availableBytes: 0, retainedBytes: 0));
+            Assert.Null(connection.ElapsedSinceLastMessageReceived);
+
+            Assert.True(connection.SimulateBytesReceived(availableBytes: 1, retainedBytes: 0));
+            Assert.NotNull(connection.ElapsedSinceLastMessageReceived);
+
+            Assert.False(connection.SimulateBytesReceived(availableBytes: 1, retainedBytes: 1));
+        }
+
         private sealed class TestConnection(ConnectionContext context, ConnectionDelegate middleware, ConnectionCommon shared)
             : Connection(context, middleware, shared)
         {
@@ -983,6 +997,7 @@ namespace NonSilo.Tests.Membership
             protected override void OnSendMessageFailure(Message message, string error) { }
             protected override void RetryMessage(Message msg, Exception? ex = null) { }
             public void SimulateMessageReceived() => MarkMessageReceived();
+            public bool SimulateBytesReceived(long availableBytes, long retainedBytes) => MarkBytesReceived(availableBytes, retainedBytes);
         }
 
         [Fact]

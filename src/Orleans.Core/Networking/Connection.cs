@@ -87,6 +87,17 @@ namespace Orleans.Runtime.Messaging
 
         protected void MarkMessageReceived() => Volatile.Write(ref _lastMessageReceivedTimestamp, CoarseStopwatch.GetTimestamp());
 
+        protected bool MarkBytesReceived(long availableBytes, long retainedBytes)
+        {
+            if (availableBytes > retainedBytes)
+            {
+                MarkMessageReceived();
+                return true;
+            }
+
+            return false;
+        }
+
         public static void ConfigureBuilder(ConnectionBuilder builder) => builder.Run(OnConnectedDelegate);
 
         /// <summary>
@@ -293,11 +304,13 @@ namespace Orleans.Runtime.Messaging
             {
                 var input = this._transport!.Input;
                 var requiredBytes = 0;
+                var retainedBytes = 0L;
                 while (true)
                 {
                     var readResult = await input.ReadAsync();
 
                     var buffer = readResult.Buffer;
+                    MarkBytesReceived(buffer.Length, retainedBytes);
                     if (buffer.Length >= requiredBytes)
                     {
                         do
@@ -311,7 +324,6 @@ namespace Orleans.Runtime.Messaging
                                 {
                                     Debug.Assert(message is not null);
                                     var receivedMessage = message.Value;
-                                    MarkMessageReceived();
                                     RecordMessageReceive(receivedMessage, bodyLength + headerLength, headerLength);
                                     var handler = MessageHandlerPool.Get();
                                     handler.Set(receivedMessage, this);
@@ -328,6 +340,7 @@ namespace Orleans.Runtime.Messaging
                         } while (requiredBytes == 0);
                     }
 
+                    retainedBytes = buffer.Length;
                     if (readResult.IsCanceled || readResult.IsCompleted)
                     {
                         break;
