@@ -10,8 +10,8 @@ namespace Orleans.Providers.Streams.Common
     /// </summary>
     /// <remarks>
     /// The exact <see cref="EventSequenceToken"/> and <see cref="EventSequenceTokenV2"/>
-    /// types compare across versions. Derived provider tokens define their own equality,
-    /// ordering, and hashing contract and are not comparable with these base tokens.
+    /// types compare across versions. Derived tokens compare only with the same concrete
+    /// runtime type unless they override equality, ordering, and hashing together.
     /// </remarks>
     [Serializable]
     [GenerateSerializer]
@@ -111,13 +111,16 @@ namespace Orleans.Providers.Streams.Common
 
         private bool IsCompatibleLegacyToken(StreamSequenceToken? other)
         {
-            if (other is null || GetType() != typeof(EventSequenceToken))
+            if (other is null)
             {
                 return false;
             }
 
+            var currentType = GetType();
             var otherType = other.GetType();
-            return otherType == typeof(EventSequenceToken) || otherType == typeof(EventSequenceTokenV2);
+            return currentType == otherType
+                || currentType == typeof(EventSequenceToken)
+                && otherType == typeof(EventSequenceTokenV2);
         }
     }
 }

@@ -2555,6 +2555,18 @@ namespace UnitTests.StreamingTests
             Assert.False(v1Derived.Equals(v1Base));
             Assert.Throws<ArgumentOutOfRangeException>(() => v1Base.CompareTo(v1Derived));
             Assert.Throws<ArgumentOutOfRangeException>(() => v1Derived.CompareTo(v1Base));
+
+            StreamSequenceToken v2DerivedPeer = new DerivedEventSequenceToken(10, 2);
+            Assert.True(derivedToken.Equals(v2DerivedPeer));
+            Assert.True(v2DerivedPeer.Equals(derivedToken));
+            Assert.Equal(0, derivedToken.CompareTo(v2DerivedPeer));
+            Assert.Equal(derivedToken.GetHashCode(), v2DerivedPeer.GetHashCode());
+
+            StreamSequenceToken v1DerivedPeer = new DerivedEventSequenceTokenV1(10, 2);
+            Assert.True(v1Derived.Equals(v1DerivedPeer));
+            Assert.True(v1DerivedPeer.Equals(v1Derived));
+            Assert.Equal(0, v1Derived.CompareTo(v1DerivedPeer));
+            Assert.Equal(v1Derived.GetHashCode(), v1DerivedPeer.GetHashCode());
         }
 
         [TestSuite("BVT")]
