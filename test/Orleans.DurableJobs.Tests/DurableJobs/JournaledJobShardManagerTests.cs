@@ -289,6 +289,44 @@ public class JournaledJobShardManagerTests
     }
 
     [Fact]
+    public async Task AttemptReservation_WaitsForPrecedingRemovalToPersist()
+    {
+        var storageProvider = new CountingJournalStorageProvider(delayAppends: false);
+        using var services = CreateServices(storageProvider);
+        var membership = new TestClusterMembershipService();
+        var silo = SiloAddress.New(new IPEndPoint(IPAddress.Loopback, 5018), 0);
+        membership.SetSiloStatus(silo, SiloStatus.Active);
+        var manager = CreateManager(
+            services,
+            membership,
+            silo,
+            new DurableJobsOptions { ShardBatchLingerDelay = TimeSpan.FromMilliseconds(100) });
+        var start = DateTimeOffset.UtcNow.AddMinutes(-1);
+        var shard = await manager.CreateShardAsync(
+            start,
+            start.AddHours(1),
+            new Dictionary<string, string> { ["Purpose"] = "AttemptReservationPersistence" },
+            CancellationToken.None);
+        var scheduled = await ScheduleJobAsync(shard, "attempt-reservation-persistence");
+        await using var enumerator = shard.ConsumeDurableJobsAsync().GetAsyncEnumerator(TestContext.Current.CancellationToken);
+        Assert.True(await enumerator.MoveNextAsync());
+        var jobContext = enumerator.Current;
+
+        storageProvider.BlockAppends();
+        var removeTask = shard.RemoveJobAsync(scheduled.Id, CancellationToken.None);
+        var startAttemptTask = shard.TryStartAttemptAsync(jobContext, CancellationToken.None);
+
+        await storageProvider.AppendStarted.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+        Assert.False(startAttemptTask.IsCompleted);
+
+        storageProvider.AllowAppends();
+        Assert.Equal(DurableJobMutationResult.Applied, await removeTask);
+        Assert.Equal(DurableJobMutationResult.JobNotFound, await startAttemptTask);
+
+        await manager.UnregisterShardAsync(shard, CancellationToken.None);
+    }
+
+    [Fact]
     public async Task DeadOwnerShard_IsAdoptedClosedAndReplayedFromJournal()
     {
         var storageProvider = new VolatileJournalStorageProvider();
@@ -548,25 +586,48 @@ public class JournaledJobShardManagerTests
     private sealed class CountingJournalStorageProvider : IJournalStorageProvider, IJournalStorageCatalog
     {
         private readonly VolatileJournalStorageProvider _inner = new();
-        private readonly bool _delayAppends;
-        private readonly TaskCompletionSource _appendStarted = new(TaskCreationOptions.RunContinuationsAsynchronously);
-        private readonly TaskCompletionSource _allowAppends = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        private readonly object _appendGate = new();
+        private bool _delayAppends;
+        private TaskCompletionSource _appendStarted = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        private TaskCompletionSource _allowAppends = new(TaskCreationOptions.RunContinuationsAsynchronously);
         private int _appendCount;
 
         public CountingJournalStorageProvider(bool delayAppends)
         {
             _delayAppends = delayAppends;
-            if (!delayAppends)
+        }
+
+        public Task AppendStarted
+        {
+            get
             {
-                _allowAppends.SetResult();
+                lock (_appendGate)
+                {
+                    return _appendStarted.Task;
+                }
             }
         }
 
-        public Task AppendStarted => _appendStarted.Task;
-
         public int AppendCount => Volatile.Read(ref _appendCount);
 
-        public void AllowAppends() => _allowAppends.TrySetResult();
+        public void BlockAppends()
+        {
+            lock (_appendGate)
+            {
+                _appendStarted = new(TaskCreationOptions.RunContinuationsAsynchronously);
+                _allowAppends = new(TaskCreationOptions.RunContinuationsAsynchronously);
+                _delayAppends = true;
+            }
+        }
+
+        public void AllowAppends()
+        {
+            lock (_appendGate)
+            {
+                _delayAppends = false;
+                _allowAppends.TrySetResult();
+            }
+        }
 
         public IJournalStorage CreateStorage(JournalId journalId) => new CountingJournalStorage(this, _inner.CreateStorage(journalId));
 
@@ -576,10 +637,16 @@ public class JournaledJobShardManagerTests
         private async ValueTask OnAppendAsync(CancellationToken cancellationToken)
         {
             Interlocked.Increment(ref _appendCount);
-            _appendStarted.TrySetResult();
-            if (_delayAppends)
+            Task? waitTask;
+            lock (_appendGate)
             {
-                await _allowAppends.Task.WaitAsync(cancellationToken).ConfigureAwait(false);
+                _appendStarted.TrySetResult();
+                waitTask = _delayAppends ? _allowAppends.Task : null;
+            }
+
+            if (waitTask is not null)
+            {
+                await waitTask.WaitAsync(cancellationToken).ConfigureAwait(false);
             }
         }
 

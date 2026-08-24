@@ -384,6 +384,7 @@ internal sealed class JournaledJobShard : IJobShard
     {
         var startedOperations = new List<PendingMutationOperation>(operations.Count);
         var appliedOperations = new List<PendingMutationOperation>(operations.Count);
+        var operationsAwaitingWrite = new List<PendingMutationOperation>(operations.Count);
 
         try
         {
@@ -434,9 +435,15 @@ internal sealed class JournaledJobShard : IJobShard
             {
                 try
                 {
-                    if (operation.Apply(this))
+                    var hasPendingWrite = appliedOperations.Count > 0;
+                    if (operation.Apply(this, hasPendingWrite))
                     {
                         appliedOperations.Add(operation);
+                        operationsAwaitingWrite.Add(operation);
+                    }
+                    else if (hasPendingWrite && !operation.Completion.IsCompleted)
+                    {
+                        operationsAwaitingWrite.Add(operation);
                     }
                 }
                 catch (Exception exception)
@@ -463,7 +470,7 @@ internal sealed class JournaledJobShard : IJobShard
                 await _stateManager.WriteStateAsync(_shutdownCancellation.Token).ConfigureAwait(false);
                 _durableJobsInstruments.OnStorageBatchWritten(appliedOperations.Count, operationCanceled: false, error: false);
                 batchActivity?.SetStatus(System.Diagnostics.ActivityStatusCode.Ok);
-                foreach (var operation in appliedOperations)
+                foreach (var operation in operationsAwaitingWrite)
                 {
                     operation.CompleteAfterWrite();
                 }
@@ -471,7 +478,7 @@ internal sealed class JournaledJobShard : IJobShard
             catch (OperationCanceledException exception) when (_shutdownCancellation.IsCancellationRequested)
             {
                 _durableJobsInstruments.OnStorageBatchWritten(appliedOperations.Count, operationCanceled: true, error: false);
-                foreach (var operation in appliedOperations)
+                foreach (var operation in operationsAwaitingWrite)
                 {
                     operation.TrySetCanceled(exception.CancellationToken);
                 }
@@ -479,7 +486,7 @@ internal sealed class JournaledJobShard : IJobShard
             catch (Exception exception)
             {
                 _durableJobsInstruments.OnStorageBatchWritten(appliedOperations.Count, operationCanceled: false, error: true);
-                foreach (var operation in appliedOperations)
+                foreach (var operation in operationsAwaitingWrite)
                 {
                     operation.TrySetException(exception);
                 }
@@ -637,7 +644,7 @@ internal sealed class JournaledJobShard : IJobShard
 
         public abstract void CompleteNotOwned();
 
-        public abstract bool Apply(JournaledJobShard shard);
+        public abstract bool Apply(JournaledJobShard shard, bool deferCompletion);
 
         public abstract void CompleteAfterWrite();
     }
@@ -665,10 +672,10 @@ internal sealed class JournaledJobShard : IJobShard
 
         public override void CompleteNotOwned() => _completion.TrySetResult(NotOwnedResult);
 
-        public override bool Apply(JournaledJobShard shard)
+        public override bool Apply(JournaledJobShard shard, bool deferCompletion)
         {
             var writeRequired = Apply(shard, out _result);
-            if (!writeRequired)
+            if (!writeRequired && !deferCompletion)
             {
                 _completion.TrySetResult(_result);
             }
