@@ -124,7 +124,7 @@ namespace Orleans.Configuration
 
     public partial class DevelopmentClusterMembershipOptions
     {
-        public System.Net.IPEndPoint PrimarySiloEndpoint { get { throw null; } set { } }
+        public System.Net.IPEndPoint? PrimarySiloEndpoint { get { throw null; } set { } }
     }
 
     public partial class EndpointOptions
@@ -133,11 +133,11 @@ namespace Orleans.Configuration
         public const int DEFAULT_SILO_PORT = 11111;
         public System.Net.IPAddress AdvertisedIPAddress { get { throw null; } set { } }
 
-        public System.Net.IPEndPoint GatewayListeningEndpoint { get { throw null; } set { } }
+        public System.Net.IPEndPoint? GatewayListeningEndpoint { get { throw null; } set { } }
 
         public int GatewayPort { get { throw null; } set { } }
 
-        public System.Net.IPEndPoint SiloListeningEndpoint { get { throw null; } set { } }
+        public System.Net.IPEndPoint? SiloListeningEndpoint { get { throw null; } set { } }
 
         public int SiloPort { get { throw null; } set { } }
     }
@@ -386,7 +386,7 @@ namespace Orleans.Hosting
 
         public static ISiloBuilder UseDevelopmentClustering(this ISiloBuilder builder, System.Action<Configuration.DevelopmentClusterMembershipOptions> configureOptions) { throw null; }
 
-        public static ISiloBuilder UseDevelopmentClustering(this ISiloBuilder builder, System.Net.IPEndPoint primarySiloEndpoint) { throw null; }
+        public static ISiloBuilder UseDevelopmentClustering(this ISiloBuilder builder, System.Net.IPEndPoint? primarySiloEndpoint) { throw null; }
 
         public static ISiloBuilder UseLocalhostClustering(this ISiloBuilder builder, int siloPort = 11111, int gatewayPort = 30000, System.Net.IPEndPoint? primarySiloEndpoint = null, string serviceId = "dev", string clusterId = "dev") { throw null; }
     }
@@ -397,7 +397,7 @@ namespace Orleans.Hosting
 
         public static ISiloBuilder ConfigureEndpoints(this ISiloBuilder builder, System.Net.IPAddress advertisedIP, int siloPort, int gatewayPort, bool listenOnAnyHostAddress = false) { throw null; }
 
-        public static ISiloBuilder ConfigureEndpoints(this ISiloBuilder builder, string hostname, int siloPort, int gatewayPort, System.Net.Sockets.AddressFamily addressFamily = System.Net.Sockets.AddressFamily.InterNetwork, bool listenOnAnyHostAddress = false) { throw null; }
+        public static ISiloBuilder ConfigureEndpoints(this ISiloBuilder builder, string? hostname, int siloPort, int gatewayPort, System.Net.Sockets.AddressFamily addressFamily = System.Net.Sockets.AddressFamily.InterNetwork, bool listenOnAnyHostAddress = false) { throw null; }
     }
 
     public static partial class GrainCallFilterSiloBuilderExtensions
@@ -487,11 +487,6 @@ namespace Orleans.Hosting
             where TStartup : class, Runtime.IStartupTask { throw null; }
     }
 
-    public static partial class SystemTextJsonSerializerExtensions
-    {
-        public static ISiloBuilder UseSystemTextJsonGrainStorageSerializer(this ISiloBuilder siloBuilder) { throw null; }
-    }
-
     public static partial class SiloTlsHostingExtensions
     {
         public static ISiloBuilder UseTls(this ISiloBuilder builder, System.Action<Connections.Transport.Security.TlsOptions> configureOptions) { throw null; }
@@ -499,8 +494,13 @@ namespace Orleans.Hosting
         public static ISiloBuilder UseTls(this ISiloBuilder builder, System.Security.Cryptography.X509Certificates.StoreName storeName, string subject, bool allowInvalid, System.Security.Cryptography.X509Certificates.StoreLocation location, System.Action<Connections.Transport.Security.TlsOptions> configureOptions) { throw null; }
 
         public static ISiloBuilder UseTls(this ISiloBuilder builder, System.Security.Cryptography.X509Certificates.X509Certificate2 certificate, System.Action<Connections.Transport.Security.TlsOptions> configureOptions) { throw null; }
+
         public static ISiloBuilder UseTls(this ISiloBuilder builder, System.Security.Cryptography.X509Certificates.X509Certificate2 certificate) { throw null; }
-        public static ISiloBuilder UseTls(this ISiloBuilder builder, System.Security.Cryptography.X509Certificates.X509Certificate2 certificate) { throw null; }
+    }
+
+    public static partial class SystemTextJsonSerializerExtensions
+    {
+        public static ISiloBuilder UseSystemTextJsonGrainStorageSerializer(this ISiloBuilder siloBuilder) { throw null; }
     }
 }
 
@@ -510,7 +510,7 @@ namespace Orleans.Metadata
     {
         public GrainClassMap(Serialization.TypeSystem.TypeConverter typeConverter, System.Collections.Immutable.ImmutableDictionary<Runtime.GrainType, System.Type> classes) { }
 
-        public bool TryGetGrainClass(Runtime.GrainType grainType, out System.Type grainClass) { throw null; }
+        public bool TryGetGrainClass(Runtime.GrainType grainType, out System.Type? grainClass) { throw null; }
     }
 }
 
@@ -558,7 +558,7 @@ namespace Orleans.Runtime
 {
     [GenerateSerializer]
     [Immutable]
-    public sealed partial class ClusterMember : System.IEquatable<ClusterMember>
+    public sealed partial class ClusterMember : System.IEquatable<ClusterMember>, System.ISpanFormattable, System.IFormattable
     {
         public ClusterMember(SiloAddress siloAddress, SiloStatus status, string name) { }
 
@@ -571,18 +571,22 @@ namespace Orleans.Runtime
         [Id(1)]
         public SiloStatus Status { get { throw null; } }
 
-        public bool Equals(ClusterMember other) { throw null; }
+        public bool Equals(ClusterMember? other) { throw null; }
 
-        public override bool Equals(object obj) { throw null; }
+        public override bool Equals(object? obj) { throw null; }
 
         public override int GetHashCode() { throw null; }
+
+        string System.IFormattable.ToString(string? format, System.IFormatProvider? formatProvider) { throw null; }
+
+        bool System.ISpanFormattable.TryFormat(System.Span<char> destination, out int charsWritten, System.ReadOnlySpan<char> format, System.IFormatProvider? provider) { throw null; }
 
         public override string ToString() { throw null; }
     }
 
     [GenerateSerializer]
     [Immutable]
-    public sealed partial class ClusterMembershipSnapshot
+    public sealed partial class ClusterMembershipSnapshot : System.ISpanFormattable, System.IFormattable
     {
         public ClusterMembershipSnapshot(System.Collections.Immutable.ImmutableDictionary<SiloAddress, ClusterMember> members, MembershipVersion version) { }
 
@@ -596,7 +600,13 @@ namespace Orleans.Runtime
 
         public ClusterMembershipUpdate CreateUpdate(ClusterMembershipSnapshot previous) { throw null; }
 
+        public SiloStatus GetSiloStatus(SiloAddress silo, MembershipVersion seenAtVersion) { throw null; }
+
         public SiloStatus GetSiloStatus(SiloAddress silo) { throw null; }
+
+        string System.IFormattable.ToString(string? format, System.IFormatProvider? formatProvider) { throw null; }
+
+        bool System.ISpanFormattable.TryFormat(System.Span<char> destination, out int charsWritten, System.ReadOnlySpan<char> format, System.IFormatProvider? provider) { throw null; }
 
         public override string ToString() { throw null; }
     }
@@ -685,7 +695,7 @@ namespace Orleans.Runtime
 
         public GrainReferences.GrainReferenceActivator GrainReferenceActivator { get { throw null; } }
 
-        public string? GrainTypeName { get { throw null; } }
+        public string GrainTypeName { get { throw null; } }
 
         public Microsoft.Extensions.Logging.ILogger Logger { get { throw null; } }
 
@@ -769,7 +779,7 @@ namespace Orleans.Runtime
 
     public partial interface IConfigureGrainContextProvider
     {
-        bool TryGetConfigurator(GrainType grainType, Orleans.Metadata.GrainProperties properties, out IConfigureGrainContext configurator);
+        bool TryGetConfigurator(GrainType grainType, Orleans.Metadata.GrainProperties properties, out IConfigureGrainContext? configurator);
     }
 
     public partial interface IConfigureGrainTypeComponents
@@ -780,7 +790,7 @@ namespace Orleans.Runtime
     public partial interface IFatalErrorHandler
     {
         bool IsUnexpected(System.Exception exception);
-        void OnFatalException(object sender = null, string context = null, System.Exception exception = null);
+        void OnFatalException(object? sender = null, string? context = null, System.Exception? exception = null);
     }
 
     public partial interface IGrainActivator
@@ -791,12 +801,12 @@ namespace Orleans.Runtime
 
     public partial interface IGrainContextActivator
     {
-        IGrainContext CreateContext(GrainAddress address);
+        IGrainContext CreateContext(GrainAddress address, IConfigureGrainContext[] configureActions);
     }
 
     public partial interface IGrainContextActivatorProvider
     {
-        bool TryGet(GrainType grainType, out IGrainContextActivator activator);
+        bool TryGet(GrainType grainType, out IGrainContextActivator? activator);
     }
 
     public partial interface IGrainServiceFactory
@@ -813,7 +823,7 @@ namespace Orleans.Runtime
     {
         string StateName { get; }
 
-        string StorageName { get; }
+        string? StorageName { get; }
     }
 
     public partial interface IPersistentStateFactory
@@ -849,13 +859,13 @@ namespace Orleans.Runtime
 
         string SiloName { get; }
 
-        System.Collections.Immutable.ImmutableArray<SiloAddress> GetActiveSilos();
+        SiloAddress[] GetActiveSilos();
         SiloStatus GetApproximateSiloStatus(SiloAddress siloAddress);
         System.Collections.Generic.Dictionary<SiloAddress, SiloStatus> GetApproximateSiloStatuses(bool onlyActive = false);
         bool IsDeadSilo(SiloAddress silo);
         bool IsFunctionalDirectory(SiloAddress siloAddress);
         bool SubscribeToSiloStatusEvents(ISiloStatusListener observer);
-        bool TryGetSiloName(SiloAddress siloAddress, out string siloName);
+        bool TryGetSiloName(SiloAddress siloAddress, out string? siloName);
         bool UnSubscribeFromSiloStatusEvents(ISiloStatusListener observer);
     }
 
@@ -867,11 +877,11 @@ namespace Orleans.Runtime
     [System.AttributeUsage(System.AttributeTargets.Parameter)]
     public partial class PersistentStateAttribute : System.Attribute, IFacetMetadata, IPersistentStateConfiguration
     {
-        public PersistentStateAttribute(string stateName, string storageName = null) { }
+        public PersistentStateAttribute(string stateName, string? storageName = null) { }
 
         public string StateName { get { throw null; } }
 
-        public string StorageName { get { throw null; } }
+        public string? StorageName { get { throw null; } }
     }
 
     public partial class PersistentStateFactory : IPersistentStateFactory
@@ -1098,7 +1108,7 @@ namespace Orleans.Runtime.Diagnostics
 
     public static partial class GrainLifecycleEvents
     {
-        public const string ListenerName = "Orleans.GrainsLifecycle";
+        public const string ListenerName = "Orleans.GrainLifecycle";
         public static System.IObservable<LifecycleEvent> AllEvents { get { throw null; } }
 
         public sealed partial class Activated : LifecycleEvent
@@ -1267,14 +1277,14 @@ namespace Orleans.Runtime.GrainDirectory
 
         void AddOrUpdate(GrainAddress value, int version);
         void Clear();
-        bool LookUp(GrainId key, out GrainAddress result, out int version);
+        bool LookUp(GrainId key, out GrainAddress? result, out int version);
         bool Remove(GrainAddress key);
         bool Remove(GrainId key);
     }
 
     public partial interface IGrainDirectoryResolver
     {
-        bool TryResolveGrainDirectory(GrainType grainType, Orleans.Metadata.GrainProperties properties, out Orleans.GrainDirectory.IGrainDirectory grainDirectory);
+        bool TryResolveGrainDirectory(GrainType grainType, Orleans.Metadata.GrainProperties? properties, out Orleans.GrainDirectory.IGrainDirectory? grainDirectory);
     }
 }
 
@@ -1360,7 +1370,7 @@ namespace Orleans.Runtime.Placement
 {
     public partial interface IPlacementStrategyResolver
     {
-        bool TryResolvePlacementStrategy(GrainType grainType, Orleans.Metadata.GrainProperties properties, out PlacementStrategy result);
+        bool TryResolvePlacementStrategy(GrainType grainType, Orleans.Metadata.GrainProperties? properties, out PlacementStrategy result);
     }
 
     public sealed partial class PlacementDirectorResolver
@@ -1457,7 +1467,7 @@ namespace Orleans.Runtime.Utilities
 {
     public static partial class OrleansDebuggerHelper
     {
-        public static object GetGrainInstance(object grainReference) { throw null; }
+        public static object? GetGrainInstance(object? grainReference) { throw null; }
     }
 }
 

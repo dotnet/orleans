@@ -41,6 +41,7 @@ public sealed class InProcessTestCluster : IDisposable, IAsyncDisposable
     private readonly StringBuilder _log = new();
     private readonly object _logLock = new();
     private readonly InMemoryTransportConnectionHub _transportHub = new();
+    private readonly GrainDirectoryObserver _grainDirectoryObserver = new();
     private readonly InProcessGrainDirectory _grainDirectory;
     private readonly InProcessMembershipTable _membershipTable;
     private bool _disposed;
@@ -386,11 +387,29 @@ public sealed class InProcessTestCluster : IDisposable, IAsyncDisposable
     /// <param name="didKill">Whether recent membership changes we done by graceful Stop.</param>
     public async Task WaitForLivenessToStabilizeAsync(bool didKill = false)
     {
-        var clusterMembershipOptions = Client.ServiceProvider.GetRequiredService<IOptions<ClusterMembershipOptions>>().Value;
+        var clusterMembershipOptions = Client!.ServiceProvider.GetRequiredService<IOptions<ClusterMembershipOptions>>().Value;
         TimeSpan stabilizationTime = GetLivenessStabilizationTime(clusterMembershipOptions, didKill);
-        WriteLog(Environment.NewLine + Environment.NewLine + "WaitForLivenessToStabilize is about to sleep for {0}", stabilizationTime);
-        await Task.Delay(stabilizationTime);
-        WriteLog("WaitForLivenessToStabilize is done sleeping");
+        var activeSilos = GetActiveSilos().ToArray();
+        var testHooks = activeSilos.Select(static silo => (ITestHooks)silo.ServiceProvider.GetRequiredService<TestHooksSystemTarget>()).ToArray();
+        var gatewayManager = Client.ServiceProvider.GetRequiredService<GatewayManager>();
+        Func<TimeSpan, Task<bool>>? waitForGrainDirectoryConvergence =
+            GrainDirectoryObserver.CanObserve(activeSilos)
+                ? timeout => _grainDirectoryObserver.WaitForConvergenceAsync(activeSilos, timeout)
+                : null;
+        WriteLog(Environment.NewLine + Environment.NewLine + "WaitForLivenessToStabilize is waiting up to {0} for {1} active silo(s)", stabilizationTime, activeSilos.Length);
+        if (await LivenessStabilizationHelper.WaitForExpectedActiveSilosAndGatewaysAsync(
+            activeSilos,
+            testHooks,
+            gatewayManager,
+            stabilizationTime,
+            waitForGrainDirectoryConvergence))
+        {
+            WriteLog("WaitForLivenessToStabilize observed stable active silo and gateway views");
+        }
+        else
+        {
+            WriteLog("WaitForLivenessToStabilize reached the fallback wait of {0}", stabilizationTime);
+        }
     }
 
     /// <summary>
@@ -476,7 +495,7 @@ public sealed class InProcessTestCluster : IDisposable, IAsyncDisposable
         if (didKill)
         {
             // in case of hard kill (kill and not Stop), we should give silos time to detect failures first.
-            stabilizationTime = TestingUtils.Multiply(clusterMembershipOptions.ProbeTimeout, clusterMembershipOptions.NumMissedProbesLimit);
+            stabilizationTime = TestingUtils.Multiply(clusterMembershipOptions.MaxProbeTimeout, clusterMembershipOptions.NumMissedProbesLimit);
         }
         if (clusterMembershipOptions.UseLivenessGossip)
         {
@@ -1158,6 +1177,7 @@ public sealed class InProcessTestCluster : IDisposable, IAsyncDisposable
             ClientHost = null;
 
             PortAllocator?.Dispose();
+            _grainDirectoryObserver.Dispose();
         });
 
         _disposed = true;
@@ -1177,7 +1197,9 @@ public sealed class InProcessTestCluster : IDisposable, IAsyncDisposable
         }
 
         ClientHost?.Dispose();
+        ClientHost = null;
         PortAllocator?.Dispose();
+        _grainDirectoryObserver.Dispose();
 
         _disposed = true;
     }

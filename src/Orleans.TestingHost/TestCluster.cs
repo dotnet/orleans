@@ -25,6 +25,7 @@ using Orleans.TestingHost.InMemoryTransport;
 using Orleans.Messaging;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using Orleans.Runtime.TestHooks;
 
 #nullable disable
 namespace Orleans.TestingHost
@@ -474,9 +475,38 @@ namespace Orleans.TestingHost
         {
             var clusterMembershipOptions = this.ServiceProvider.GetRequiredService<IOptions<ClusterMembershipOptions>>().Value;
             TimeSpan stabilizationTime = GetLivenessStabilizationTime(clusterMembershipOptions, didKill);
-            WriteLog(Environment.NewLine + Environment.NewLine + "WaitForLivenessToStabilize is about to sleep for {0}", stabilizationTime);
-            await Task.Delay(stabilizationTime);
-            WriteLog("WaitForLivenessToStabilize is done sleeping");
+            var activeSilos = GetActiveSilos().ToArray();
+            var testHooks = activeSilos.Select(GetTestHooks).ToArray();
+            var gatewayManager = this.InternalClient!.ServiceProvider.GetRequiredService<GatewayManager>();
+            var inProcessSilos = activeSilos.OfType<InProcessSiloHandle>().ToArray();
+            Func<TimeSpan, Task<bool>>? waitForGrainDirectoryConvergence =
+                inProcessSilos.Length == activeSilos.Length && GrainDirectoryObserver.CanObserve(inProcessSilos)
+                    ? timeout => _grainDirectoryObserver.WaitForConvergenceAsync(inProcessSilos, timeout)
+                    : null;
+            WriteLog(Environment.NewLine + Environment.NewLine + "WaitForLivenessToStabilize is waiting up to {0} for {1} active silo(s)", stabilizationTime, activeSilos.Length);
+            if (await LivenessStabilizationHelper.WaitForExpectedActiveSilosAndGatewaysAsync(
+                activeSilos,
+                testHooks,
+                gatewayManager,
+                stabilizationTime,
+                waitForGrainDirectoryConvergence))
+            {
+                WriteLog("WaitForLivenessToStabilize observed stable active silo and gateway views");
+            }
+            else
+            {
+                WriteLog("WaitForLivenessToStabilize reached the fallback wait of {0}", stabilizationTime);
+            }
+        }
+
+        private ITestHooks GetTestHooks(SiloHandle silo)
+        {
+            if (silo is InProcessSiloHandle inProcessSilo)
+            {
+                return inProcessSilo.ServiceProvider.GetRequiredService<TestHooksSystemTarget>();
+            }
+
+            return this.InternalClient!.GetTestHooks(silo);
         }
 
         /// <summary>
@@ -510,7 +540,7 @@ namespace Orleans.TestingHost
             if (didKill)
             {
                 // in case of hard kill (kill and not Stop), we should give silos time to detect failures first.
-                stabilizationTime = TestingUtils.Multiply(clusterMembershipOptions.ProbeTimeout, clusterMembershipOptions.NumMissedProbesLimit);
+                stabilizationTime = TestingUtils.Multiply(clusterMembershipOptions.MaxProbeTimeout, clusterMembershipOptions.NumMissedProbesLimit);
             }
             if (clusterMembershipOptions.UseLivenessGossip)
             {
@@ -1058,7 +1088,13 @@ namespace Orleans.TestingHost
         public static async Task<SiloHandle> StartSiloAsync(TestCluster cluster, int instanceNumber, TestClusterOptions clusterOptions, IReadOnlyList<IConfigurationSource>? configurationOverrides = null, bool startSiloOnNewPort = false)
         {
             if (cluster == null) throw new ArgumentNullException(nameof(cluster));
-            return await cluster.StartSiloAsync(instanceNumber, clusterOptions, configurationOverrides, startSiloOnNewPort);
+            var silo = await cluster.StartSiloAsync(instanceNumber, clusterOptions, configurationOverrides, startSiloOnNewPort);
+            lock (cluster.additionalSilos)
+            {
+                cluster.additionalSilos.Add(silo);
+            }
+
+            return silo;
         }
 
         /// <summary>
@@ -1204,6 +1240,7 @@ namespace Orleans.TestingHost
                 ClientHost = null;
 
                 PortAllocator?.Dispose();
+                _grainDirectoryObserver.Dispose();
             });
 
             _disposed = true;
