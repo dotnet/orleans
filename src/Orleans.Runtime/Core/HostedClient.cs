@@ -256,7 +256,6 @@ namespace Orleans.Runtime
 
                     while (reader.TryRead(out var message))
                     {
-                        if (message == null) continue;
                         switch (message.Direction)
                         {
                             case Message.Directions.OneWay:

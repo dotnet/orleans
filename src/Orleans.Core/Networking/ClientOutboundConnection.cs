@@ -121,8 +121,6 @@ namespace Orleans.Runtime.Messaging
 
         protected override void RetryMessage(Message msg, Exception? ex = null)
         {
-            if (msg == null) return;
-
             if (msg.RetryCount < MessagingOptions.DEFAULT_MAX_MESSAGE_SEND_RETRIES)
             {
                 ++msg.RetryCount;
