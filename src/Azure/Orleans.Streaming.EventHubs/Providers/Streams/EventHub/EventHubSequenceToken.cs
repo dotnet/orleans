@@ -115,7 +115,8 @@ namespace Orleans.Streaming.EventHubs
 
             var currentType = GetType();
             var otherType = other.GetType();
-            return (currentType == typeof(EventHubSequenceToken) || currentType == typeof(EventHubSequenceTokenV2))
+            return currentType == otherType
+                || (currentType == typeof(EventHubSequenceToken) || currentType == typeof(EventHubSequenceTokenV2))
                 && (otherType == typeof(EventHubSequenceToken) || otherType == typeof(EventHubSequenceTokenV2));
         }
     }
