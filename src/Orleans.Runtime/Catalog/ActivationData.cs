@@ -1658,7 +1658,7 @@ internal sealed partial class ActivationData :
 
             // If the message is meant to keep the activation active, reset the idle timer and ensure the activation
             // is in the activation working set.
-            if (message.IsKeepAlive)
+            if (message.IsKeepAlive && State is ActivationState.Valid)
             {
                 _idleDuration = CoarseStopwatch.StartNew();
                 IsIdleInWorkingSet = false;
