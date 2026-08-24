@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Diagnostics.Metrics;
@@ -102,7 +103,15 @@ internal static class DisseminationInstruments
             return;
         }
 
-        ValuesApplied.Add(1, Tag("topic", topic), Tag("result", result.ToString()));
+        var resultTag = result switch
+        {
+            DisseminationApplyResult.Applied => "Applied",
+            DisseminationApplyResult.Duplicate => "Duplicate",
+            DisseminationApplyResult.Obsolete => "Obsolete",
+            DisseminationApplyResult.Rejected => "Rejected",
+            _ => throw new ArgumentOutOfRangeException(nameof(result), result, null)
+        };
+        ValuesApplied.Add(1, Tag("topic", topic), Tag("result", resultTag));
     }
 
     public static void OnAntiEntropyExchange(string direction, int digestCount, int itemCount, bool truncated)
