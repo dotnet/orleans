@@ -64,6 +64,24 @@ public sealed class ReusableStreamQueueCheckpointerTests : StreamQueueCheckpoint
         Assert.Equal("10", (await store.Load(CancellationToken.None)).Checkpoint);
     }
 
+    [Fact]
+    public async Task SamePendingCheckpoint_RetriesAfterFailedWriteAtPersistInterval()
+    {
+        var store = new ControllableCheckpointStore("10");
+        var checkpointer = await CreateCheckpointer(store);
+        Assert.Equal("10", await checkpointer.Load(CancellationToken.None));
+        store.FailNextWrite(new InvalidOperationException("checkpoint write failed"));
+
+        checkpointer.Update("20", DateTime.UtcNow, CancellationToken.None);
+        await store.WaitForWriteAttempts(1);
+        checkpointer.Update("20", DateTime.UtcNow + PersistInterval, CancellationToken.None);
+        await store.WaitForCompletedWrites(1);
+
+        Assert.Equal(["20", "20"], store.WriteAttempts);
+        Assert.Equal(["20"], store.CompletedWrites);
+        Assert.Equal("20", store.PersistedCheckpoint);
+    }
+
     private sealed class TestCheckpointStore(ControllableCheckpointStore store) : IStreamCheckpointStore
     {
         public async ValueTask<StreamCheckpointStoreState> Load(CancellationToken cancellationToken)

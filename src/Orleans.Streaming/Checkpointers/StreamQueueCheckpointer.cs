@@ -81,10 +81,24 @@ namespace Orleans.Streams
 
             lock (_lock)
             {
-                if (string.Equals(_latestCheckpoint, offset, StringComparison.Ordinal)
-                    || (_options.CheckpointComparer is { } comparer
+                if (string.Equals(_latestCheckpoint, offset, StringComparison.Ordinal))
+                {
+                    if (string.Equals(_persistedState.Checkpoint, offset, StringComparison.Ordinal)
+                        || !_inProgressSave.IsCompleted
+                        || (_throttleSavesUntilUtc.HasValue && _throttleSavesUntilUtc.Value > utcNow))
+                    {
+                        return;
+                    }
+
+                    _throttleSavesUntilUtc = utcNow + _options.PersistInterval;
+                    _inProgressSave = Save(offset, cancellationToken);
+                    _inProgressSave.Ignore();
+                    return;
+                }
+
+                if (_options.CheckpointComparer is { } comparer
                         && !string.IsNullOrEmpty(_latestCheckpoint)
-                        && comparer.Compare(offset, _latestCheckpoint) <= 0))
+                        && comparer.Compare(offset, _latestCheckpoint) <= 0)
                 {
                     return;
                 }
