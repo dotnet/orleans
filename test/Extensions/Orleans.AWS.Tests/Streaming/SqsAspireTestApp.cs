@@ -1,12 +1,25 @@
+using System.Globalization;
+#if NET10_0
+using Amazon;
+using Amazon.CDK.AWS.SQS;
+#endif
 using Aspire.Hosting;
 using Aspire.Hosting.ApplicationModel;
+#if NET10_0
+using Aspire.Hosting.AWS;
+using Aspire.Hosting.AWS.CDK;
+#endif
 using Aspire.Hosting.Orleans;
 #if NET10_0
 using Aspire.Hosting.Testing;
 #endif
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using Orleans.Configuration;
 using Orleans.Hosting;
+#if NET10_0
+using CdkDuration = Amazon.CDK.Duration;
+#endif
 
 namespace AWSUtils.Tests.Streaming;
 
@@ -62,6 +75,7 @@ internal sealed class SqsAspireTestApp : IAsyncDisposable
             });
         IAsyncDisposable? builderLifetime = null;
 #endif
+        var providerValueArray = providerValues.ToArray();
         var connectionResources = new List<IResourceBuilder<IResourceWithConnectionString>>();
         var environmentValues = new List<(string Key, string? Value)>();
         foreach (var (key, value) in rootValues ?? [])
@@ -80,11 +94,40 @@ internal sealed class SqsAspireTestApp : IAsyncDisposable
             }
         }
 
+        SqsAwsConfiguration? aws = null;
+#if NET10_0
+        if (awsProfile is not null || awsRegion is not null)
+        {
+            var awsSdkConfig = builder.AddAWSSDKConfig();
+            if (awsProfile is not null)
+            {
+                awsSdkConfig.WithProfile(awsProfile);
+            }
+
+            if (awsRegion is not null)
+            {
+                awsSdkConfig.WithRegion(RegionEndpoint.GetBySystemName(awsRegion));
+            }
+
+            aws = new OfficialAwsConfiguration(awsSdkConfig);
+            if (awsRegion is not null)
+            {
+                var stack = builder.AddAWSCDKStack($"{providerName.ToLowerInvariant()}-sqs")
+                    .WithReference(awsSdkConfig);
+                AddSqsQueues(stack, providerName, serviceId, providerValueArray);
+            }
+        }
+#else
+        if (awsProfile is not null || awsRegion is not null)
+        {
+            aws = new EnvironmentAwsConfiguration(awsProfile, awsRegion);
+        }
+#endif
+
         var provider = new SqsProviderConfiguration(
-            awsProfile,
-            awsRegion,
+            aws,
             connectionResources,
-            providerValues,
+            providerValueArray,
             environmentValues);
         var orleans = builder.AddOrleans("cluster")
             .WithClustering(new TestClusteringConfiguration())
@@ -231,6 +274,64 @@ internal sealed class SqsAspireTestApp : IAsyncDisposable
             || name.StartsWith("AWS_", StringComparison.Ordinal)
             || name.StartsWith("AWS__", StringComparison.Ordinal);
 
+#if NET10_0
+    private static void AddSqsQueues(
+        IResourceBuilder<IStackResource> stack,
+        string providerName,
+        string serviceId,
+        IReadOnlyList<(string Key, string? Value)> providerValues)
+    {
+        var values = providerValues.ToDictionary(
+            pair => pair.Key,
+            pair => pair.Value,
+            StringComparer.OrdinalIgnoreCase);
+        var partitionCount = GetInt(values, "PartitionCount")
+            ?? HashRingStreamQueueMapperOptions.DEFAULT_NUM_QUEUES;
+        var fifoQueue = GetBool(values, "FifoQueue") ?? false;
+        var receiveWaitTimeSeconds = GetInt(values, "ReceiveWaitTimeSeconds");
+        var visibilityTimeoutSeconds = GetInt(values, "VisibilityTimeoutSeconds");
+        var resourcePrefix = providerName.ToLowerInvariant();
+
+        for (var partition = 0; partition < partitionCount; partition++)
+        {
+            stack.AddSQSQueue(
+                $"{resourcePrefix}-{partition}",
+                new QueueProps
+                {
+                    QueueName = GetQueueName(serviceId, providerName, partition, fifoQueue),
+                    Fifo = fifoQueue,
+                    ContentBasedDeduplication = fifoQueue,
+                    DeduplicationScope = fifoQueue ? DeduplicationScope.MESSAGE_GROUP : null,
+                    FifoThroughputLimit = fifoQueue ? FifoThroughputLimit.PER_MESSAGE_GROUP_ID : null,
+                    ReceiveMessageWaitTime = receiveWaitTimeSeconds is { } waitTime
+                        ? CdkDuration.Seconds(waitTime)
+                        : null,
+                    VisibilityTimeout = visibilityTimeoutSeconds is { } visibilityTimeout
+                        ? CdkDuration.Seconds(visibilityTimeout)
+                        : null,
+                });
+        }
+    }
+
+    private static int? GetInt(IReadOnlyDictionary<string, string?> values, string key)
+        => values.TryGetValue(key, out var value)
+            && int.TryParse(value, NumberStyles.Integer, CultureInfo.InvariantCulture, out var result)
+                ? result
+                : null;
+
+    private static bool? GetBool(IReadOnlyDictionary<string, string?> values, string key)
+        => values.TryGetValue(key, out var value) && bool.TryParse(value, out var result)
+            ? result
+            : null;
+
+    private static string GetQueueName(
+        string serviceId,
+        string providerName,
+        int partition,
+        bool fifoQueue)
+        => $"{serviceId}-{providerName.ToLowerInvariant()}-{partition}{(fifoQueue ? ".fifo" : string.Empty)}";
+#endif
+
     private sealed class TestClusteringConfiguration : IProviderConfiguration
     {
         public void ConfigureResource<T>(
@@ -256,8 +357,7 @@ internal sealed class SqsAspireTestApp : IAsyncDisposable
     }
 
     private sealed class SqsProviderConfiguration(
-        string? awsProfile,
-        string? awsRegion,
+        SqsAwsConfiguration? aws,
         IReadOnlyList<IResourceBuilder<IResourceWithConnectionString>> connections,
         IEnumerable<(string Key, string? Value)> providerValues,
         IEnumerable<(string Key, string? Value)> environmentValues) : IProviderConfiguration
@@ -272,18 +372,13 @@ internal sealed class SqsAspireTestApp : IAsyncDisposable
         {
             var prefix = $"Orleans__{configSectionPath.Replace(":", "__", StringComparison.Ordinal)}";
             resourceBuilder.WithEnvironment($"{prefix}__ProviderType", "SQS");
-            if (awsProfile is not null)
+            if (aws is not null)
             {
-                resourceBuilder
-                    .WithEnvironment("AWS_PROFILE", awsProfile)
-                    .WithEnvironment("AWS__Profile", awsProfile);
-            }
-
-            if (awsRegion is not null)
-            {
-                resourceBuilder
-                    .WithEnvironment("AWS_REGION", awsRegion)
-                    .WithEnvironment("AWS__Region", awsRegion);
+                aws.ConfigureResource(resourceBuilder);
+                if (aws.Region is { } region)
+                {
+                    resourceBuilder.WithEnvironment($"{prefix}__Region", region);
+                }
             }
 
             foreach (var connection in connections)
@@ -306,6 +401,42 @@ internal sealed class SqsAspireTestApp : IAsyncDisposable
             }
         }
     }
+
+    private abstract class SqsAwsConfiguration
+    {
+        public abstract string? Region { get; }
+
+        public abstract void ConfigureResource<T>(IResourceBuilder<T> resourceBuilder)
+            where T : IResourceWithEnvironment;
+    }
+
+#if NET10_0
+    private sealed class OfficialAwsConfiguration(IAWSSDKConfig aws) : SqsAwsConfiguration
+    {
+        public override string? Region => aws.Region?.SystemName;
+
+        public override void ConfigureResource<T>(IResourceBuilder<T> resourceBuilder)
+            => resourceBuilder.WithReference(aws);
+    }
+#else
+    private sealed class EnvironmentAwsConfiguration(string? profile, string? region) : SqsAwsConfiguration
+    {
+        public override string? Region => region;
+
+        public override void ConfigureResource<T>(IResourceBuilder<T> resourceBuilder)
+        {
+            if (profile is not null)
+            {
+                resourceBuilder.WithEnvironment("AWS_PROFILE", profile);
+            }
+
+            if (region is not null)
+            {
+                resourceBuilder.WithEnvironment("AWS_REGION", region);
+            }
+        }
+    }
+#endif
 }
 
 internal enum SqsAspireResourceRole

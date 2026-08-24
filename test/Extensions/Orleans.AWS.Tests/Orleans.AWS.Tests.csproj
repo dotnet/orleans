@@ -7,10 +7,17 @@
     <OrleansBuildTimeCodeGen>true</OrleansBuildTimeCodeGen>
     <IsAspireHost>false</IsAspireHost>
     <Nullable>enable</Nullable>
+    <NoWarn>$(NoWarn);CS8002</NoWarn>
   </PropertyGroup>
 
   <ItemGroup>
     <ProjectCapability Include="Aspire" />
+  </ItemGroup>
+
+  <!-- net10 exercises the official AWS SDK/CDK integration; net8 exercises the same generated configuration through core Aspire. -->
+  <ItemGroup Condition="'$(TargetFramework)' == 'net10.0'">
+    <PackageReference Include="Amazon.CDK.Lib" />
+    <PackageReference Include="Aspire.Hosting.AWS" />
   </ItemGroup>
 
   <ItemGroup>
