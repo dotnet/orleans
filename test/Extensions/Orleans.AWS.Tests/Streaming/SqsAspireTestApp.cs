@@ -1,7 +1,9 @@
 using Aspire.Hosting;
 using Aspire.Hosting.ApplicationModel;
 using Aspire.Hosting.Orleans;
+#if NET10_0
 using Aspire.Hosting.Testing;
+#endif
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Orleans.Hosting;
@@ -12,13 +14,13 @@ internal sealed class SqsAspireTestApp : IAsyncDisposable
 {
     private const string SiloResourceName = "silo";
     private const string ClientResourceName = "client";
-    private readonly IAsyncDisposable _builder;
+    private readonly IAsyncDisposable? _builder;
     private readonly DistributedApplication _application;
     private readonly IResource _silo;
     private readonly IResource _client;
 
     private SqsAspireTestApp(
-        IAsyncDisposable builder,
+        IAsyncDisposable? builder,
         DistributedApplication application,
         IResource silo,
         IResource client,
@@ -48,7 +50,18 @@ internal sealed class SqsAspireTestApp : IAsyncDisposable
         string? awsProfile = null,
         string? awsRegion = null)
     {
+#if NET10_0
         var builder = DistributedApplicationTestingBuilder.Create();
+        IAsyncDisposable? builderLifetime = builder;
+#else
+        var builder = DistributedApplication.CreateBuilder(
+            new DistributedApplicationOptions
+            {
+                Args = [],
+                DisableDashboard = true,
+            });
+        IAsyncDisposable? builderLifetime = null;
+#endif
         var connectionResources = new List<IResourceBuilder<IResourceWithConnectionString>>();
         var environmentValues = new List<(string Key, string? Value)>();
         foreach (var (key, value) in rootValues ?? [])
@@ -81,10 +94,14 @@ internal sealed class SqsAspireTestApp : IAsyncDisposable
             .WithReference(orleans);
         var client = builder.AddContainer(ClientResourceName, "unused")
             .WithReference(orleans.AsClient());
+#if NET10_0
         var application = await builder.BuildAsync();
+#else
+        var application = builder.Build();
+#endif
 
         return new SqsAspireTestApp(
-            builder,
+            builderLifetime,
             application,
             silo.Resource,
             client.Resource,
@@ -140,7 +157,10 @@ internal sealed class SqsAspireTestApp : IAsyncDisposable
     public async ValueTask DisposeAsync()
     {
         await _application.DisposeAsync();
-        await _builder.DisposeAsync();
+        if (_builder is not null)
+        {
+            await _builder.DisposeAsync();
+        }
     }
 
     public static IReadOnlyDictionary<string, string?> NormalizeConfiguration(
