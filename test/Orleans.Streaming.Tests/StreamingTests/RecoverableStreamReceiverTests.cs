@@ -344,6 +344,31 @@ public sealed class RecoverableStreamReceiverTests
     }
 
     [Fact]
+    public void Cache_FailedPackingReturnsUncommittedPooledBuffers()
+    {
+        var streamId = StreamId.Create("namespace", Guid.NewGuid());
+        var bufferPool = new TrackingBufferPool();
+        var cache = new RecoverableStreamQueueCache<TestQueueMessage>(
+            100,
+            bufferPool,
+            new ThrowingDataAdapter(),
+            new ChronologicalEvictionStrategy(
+                NullLogger.Instance,
+                new TimePurgePredicate(TimeSpan.MaxValue, TimeSpan.MaxValue),
+                cacheMonitor: null,
+                monitorWriteInterval: null),
+            NullLogger.Instance);
+        var message = new TestQueueMessage(streamId, 1, "payload");
+
+        Assert.Throws<InvalidOperationException>(() => cache.Add([message], DateTime.UnixEpoch));
+        Assert.Throws<InvalidOperationException>(() => cache.Add([message], DateTime.UnixEpoch));
+
+        Assert.Equal(0, cache.ItemCount);
+        Assert.Equal(2, bufferPool.AllocateCount);
+        Assert.Equal(2, bufferPool.FreeCount);
+    }
+
+    [Fact]
     public void Cache_AddsRawRecordsInOrderAndDecodesLazily()
     {
         var streamA = StreamId.Create("namespace", Guid.NewGuid());
@@ -668,6 +693,40 @@ public sealed class RecoverableStreamReceiverTests
             var offset = 0;
             return SegmentBuilder.ReadNextString(cachedMessage.Segment, ref offset)!;
         }
+
+        public bool TryGetOffset(StreamSequenceToken token, out string offset)
+        {
+            offset = token.SequenceNumber.ToString(CultureInfo.InvariantCulture);
+            return true;
+        }
+    }
+
+    private sealed class ThrowingDataAdapter : IRecoverableStreamDataAdapter<TestQueueMessage>
+    {
+        public StreamPosition GetStreamPosition(TestQueueMessage queueMessage)
+            => new(queueMessage.StreamId, new EventSequenceTokenV2(queueMessage.SequenceNumber));
+
+        public CachedMessage FromQueueMessage(
+            StreamPosition streamPosition,
+            TestQueueMessage queueMessage,
+            DateTime dequeueTimeUtc,
+            Func<int, ArraySegment<byte>> getSegment)
+        {
+            _ = getSegment(16);
+            throw new InvalidOperationException("packing failed");
+        }
+
+        public IBatchContainer GetBatchContainer(ref CachedMessage cachedMessage)
+            => throw new NotSupportedException();
+
+        public StreamSequenceToken GetSequenceToken(ref CachedMessage cachedMessage)
+            => new EventSequenceTokenV2(cachedMessage.SequenceNumber);
+
+        public int Compare(ref CachedMessage cachedMessage, StreamSequenceToken token)
+            => cachedMessage.SequenceNumber.CompareTo(token.SequenceNumber);
+
+        public string GetOffset(ref CachedMessage cachedMessage)
+            => cachedMessage.SequenceNumber.ToString(CultureInfo.InvariantCulture);
 
         public bool TryGetOffset(StreamSequenceToken token, out string offset)
         {

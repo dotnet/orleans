@@ -102,15 +102,55 @@ namespace Orleans.Providers.Streams.Common
             ArgumentNullException.ThrowIfNull(messages);
             var positions = new List<StreamPosition>(messages.Count);
             var cachedMessages = new List<CachedMessage>(messages.Count);
-            foreach (var message in messages)
+            var allocatedBuffers = new List<FixedSizeBuffer>();
+            FixedSizeBuffer? batchBuffer = null;
+            try
             {
-                var position = _dataAdapter.GetStreamPosition(message);
-                cachedMessages.Add(_dataAdapter.FromQueueMessage(position, message, dequeueTimeUtc, GetSegment));
-                positions.Add(position);
+                foreach (var message in messages)
+                {
+                    var position = _dataAdapter.GetStreamPosition(message);
+                    cachedMessages.Add(_dataAdapter.FromQueueMessage(position, message, dequeueTimeUtc, GetBatchSegment));
+                    positions.Add(position);
+                }
+            }
+            catch
+            {
+                foreach (var buffer in allocatedBuffers)
+                {
+                    buffer.Dispose();
+                }
+
+                throw;
             }
 
             _cache.Add(cachedMessages, dequeueTimeUtc);
+            foreach (var buffer in allocatedBuffers)
+            {
+                _evictionStrategy.OnBlockAllocated(buffer);
+            }
+
+            _currentBuffer = batchBuffer;
             return positions;
+
+            ArraySegment<byte> GetBatchSegment(int size)
+            {
+                if (batchBuffer is not null && batchBuffer.TryGetSegment(size, out var segment))
+                {
+                    return segment;
+                }
+
+                var buffer = _bufferPool.Allocate();
+                if (!buffer.TryGetSegment(size, out segment))
+                {
+                    buffer.Dispose();
+                    buffer = new FixedSizeBuffer(size);
+                    _ = buffer.TryGetSegment(size, out segment);
+                }
+
+                allocatedBuffers.Add(buffer);
+                batchBuffer = buffer;
+                return segment;
+            }
         }
 
         /// <inheritdoc />
@@ -211,26 +251,6 @@ namespace Orleans.Providers.Streams.Common
             {
                 LastPurgedOffset = _dataAdapter.GetOffset(ref message);
             }
-        }
-
-        private ArraySegment<byte> GetSegment(int size)
-        {
-            if (_currentBuffer is not null && _currentBuffer.TryGetSegment(size, out var segment))
-            {
-                return segment;
-            }
-
-            var buffer = _bufferPool.Allocate();
-            if (!buffer.TryGetSegment(size, out segment))
-            {
-                buffer.Dispose();
-                buffer = new FixedSizeBuffer(size);
-                _ = buffer.TryGetSegment(size, out segment);
-            }
-
-            _currentBuffer = buffer;
-            _evictionStrategy.OnBlockAllocated(buffer);
-            return segment;
         }
 
         private sealed class Cursor : IQueueCacheCursor, IQueueCacheCursorProgress
