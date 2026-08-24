@@ -699,7 +699,7 @@ internal sealed partial class JournaledStateManager : IJournaledStateManager, IJ
         bool didEnqueue;
         lock (_lock)
         {
-            ThrowIfWriteOperationsUnavailable();
+            ThrowIfStateOperationsUnavailable();
             task = EnqueueOrGetPendingWorkItem<DeleteStateWorkItem>(out didEnqueue);
         }
 
@@ -874,7 +874,7 @@ internal sealed partial class JournaledStateManager : IJournaledStateManager, IJ
         string operation;
         lock (_lock)
         {
-            ThrowIfWriteOperationsUnavailable();
+            ThrowIfStateOperationsUnavailable();
             var isSnapshot = _migrationSnapshotRequired || _storage.IsCompactionRequested;
             operation = isSnapshot ? JournalingInstruments.OperationSnapshot : JournalingInstruments.OperationAppend;
             pendingWrite = isSnapshot
@@ -925,7 +925,7 @@ internal sealed partial class JournaledStateManager : IJournaledStateManager, IJ
         await pendingRecovery.WaitAsync(cancellationToken);
     }
 
-    private void ThrowIfWriteOperationsUnavailable()
+    private void ThrowIfStateOperationsUnavailable()
     {
         _shutdownCancellation.Token.ThrowIfCancellationRequested();
         switch (_state)
@@ -935,9 +935,9 @@ internal sealed partial class JournaledStateManager : IJournaledStateManager, IJ
             case ManagerState.Ready:
                 return;
             case ManagerState.Recovering:
-                throw new InvalidOperationException("Journaled state writes are unavailable while recovery is in progress.");
+                throw new InvalidOperationException("Journaled state operations are unavailable while recovery is in progress.");
             case ManagerState.Fenced:
-                throw new InvalidOperationException("Journaled state writes are fenced because recovery failed. Call RevertPendingChangesAsync to retry recovery.");
+                throw new InvalidOperationException("Journaled state operations are fenced because recovery failed. Call RevertPendingChangesAsync to retry recovery.");
             default:
                 throw new UnreachableException();
         }

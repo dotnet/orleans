@@ -669,7 +669,7 @@ public class StateManagerTests : JournalingTestBase
     }
 
     [Fact]
-    public async Task StateManager_FencesWritesUntilFailedRevertIsRetriedSuccessfully()
+    public async Task StateManager_FencesStateOperationsUntilFailedRevertIsRetriedSuccessfully()
     {
         var storage = new CapturingStorage();
         var sut = CreateTestSystem(storage: storage);
@@ -688,10 +688,12 @@ public class StateManagerTests : JournalingTestBase
 
         var writeException = await Assert.ThrowsAsync<InvalidOperationException>(
             () => sut.Manager.WriteStateAsync(CancellationToken.None).AsTask());
+        Assert.Contains("state operations are fenced", writeException.Message, StringComparison.Ordinal);
         Assert.Contains("fenced", writeException.Message, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("Call RevertPendingChangesAsync", writeException.Message, StringComparison.Ordinal);
         var deleteException = await Assert.ThrowsAsync<InvalidOperationException>(
             () => sut.Manager.DeleteStateAsync(CancellationToken.None).AsTask());
+        Assert.Contains("state operations are fenced", deleteException.Message, StringComparison.Ordinal);
         Assert.Contains("Call RevertPendingChangesAsync", deleteException.Message, StringComparison.Ordinal);
 
         await sut.Manager.RevertPendingChangesAsync(CancellationToken.None);
@@ -703,7 +705,7 @@ public class StateManagerTests : JournalingTestBase
     }
 
     [Fact]
-    public async Task StateManager_WriteOperations_ReportRecoveryInProgress()
+    public async Task StateManager_StateOperations_ReportRecoveryInProgress()
     {
         var storage = new BlockingRecoveryStorage();
         var sut = CreateTestSystem(storage: storage);
@@ -717,8 +719,8 @@ public class StateManagerTests : JournalingTestBase
         var deleteException = await Assert.ThrowsAsync<InvalidOperationException>(
             () => sut.Manager.DeleteStateAsync(CancellationToken.None).AsTask());
 
-        Assert.Contains("recovery is in progress", writeException.Message, StringComparison.Ordinal);
-        Assert.Contains("recovery is in progress", deleteException.Message, StringComparison.Ordinal);
+        Assert.Contains("state operations are unavailable while recovery is in progress", writeException.Message, StringComparison.Ordinal);
+        Assert.Contains("state operations are unavailable while recovery is in progress", deleteException.Message, StringComparison.Ordinal);
         Assert.DoesNotContain("RevertPendingChangesAsync", writeException.Message, StringComparison.Ordinal);
         Assert.DoesNotContain("RevertPendingChangesAsync", deleteException.Message, StringComparison.Ordinal);
 
