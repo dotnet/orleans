@@ -628,12 +628,20 @@ namespace Orleans.Streams
                 while (!IsShutdown && !cancellationToken.IsCancellationRequested) // shutdown sets IsShutdown and cancels the timer token.
                 {
                     // Flow controllers can purge while calculating capacity, so publish the safe delivery boundary first.
-                    if (HasPendingStreamRegistration() || !TryUpdateDeliveryProgress())
+                    if (HasPendingStreamRegistration())
                     {
                         return;
                     }
 
-                    int maxCacheAddCount = queueCache?.GetMaxAddCount() ?? QueueAdapterConstants.UNLIMITED_GET_QUEUE_MSG;
+                    var canUsePurgeAndFlowControl = TryUpdateDeliveryProgress(out var canReadWithoutPurge);
+                    if (!canUsePurgeAndFlowControl && !canReadWithoutPurge)
+                    {
+                        return;
+                    }
+
+                    int maxCacheAddCount = canUsePurgeAndFlowControl
+                        ? queueCache?.GetMaxAddCount() ?? QueueAdapterConstants.UNLIMITED_GET_QUEUE_MSG
+                        : 1;
                     if (maxCacheAddCount != QueueAdapterConstants.UNLIMITED_GET_QUEUE_MSG && maxCacheAddCount <= 0)
                         return;
 
@@ -686,7 +694,13 @@ namespace Orleans.Streams
             }
 
             // Pause all queue reads so a cold stream's first batch stays pinned until registration completes.
-            if (HasPendingStreamRegistration() || !TryUpdateDeliveryProgress())
+            if (HasPendingStreamRegistration())
+            {
+                return false;
+            }
+
+            var canUsePurgeAndFlowControl = TryUpdateDeliveryProgress(out var canReadWithoutPurge);
+            if (!canUsePurgeAndFlowControl && !canReadWithoutPurge)
             {
                 return false;
             }
@@ -706,7 +720,7 @@ namespace Orleans.Streams
                 return false;
             }
 
-            if (queueCache is not null)
+            if (canUsePurgeAndFlowControl && queueCache is not null)
             {
                 if (queueCache.TryPurgeFromCache(out var purgedItems))
                 {
@@ -730,7 +744,7 @@ namespace Orleans.Streams
                 return false;
             }
 
-            if (queueCache is not null && queueCache.IsUnderPressure())
+            if (canUsePurgeAndFlowControl && queueCache is not null && queueCache.IsUnderPressure())
             {
                 // Under back pressure. Exit the loop. Will attempt again in the next timer callback.
                 LogInfoStreamCacheUnderPressure();
@@ -811,17 +825,18 @@ namespace Orleans.Streams
         /// </summary>
         private void NotifyDeliveryProgress()
         {
-            TryUpdateDeliveryProgress();
+            TryUpdateDeliveryProgress(out _);
         }
 
-        private bool TryUpdateDeliveryProgress()
+        private bool TryUpdateDeliveryProgress(out bool canReadWithoutPurge)
         {
+            canReadWithoutPurge = false;
             if (queueCache is null)
             {
                 return true;
             }
 
-            if (!TryGetDeliveryProgress(out var earliest))
+            if (!TryGetDeliveryProgress(out var earliest, out canReadWithoutPurge))
             {
                 return !queueCache.UsesDeliveryProgressForPurgeProtection;
             }
@@ -830,9 +845,10 @@ namespace Orleans.Streams
             return true;
         }
 
-        private bool TryGetDeliveryProgress(out StreamSequenceToken? earliest)
+        private bool TryGetDeliveryProgress(out StreamSequenceToken? earliest, out bool canReadWithoutPurge)
         {
             earliest = null;
+            canReadWithoutPurge = false;
 
             foreach (var streamConsumers in pubSubCache.Values)
             {
@@ -856,7 +872,8 @@ namespace Orleans.Streams
                     var current = consumer.LastProcessedToken;
                     if (current is null)
                     {
-                        return false;
+                        canReadWithoutPurge = true;
+                        continue;
                     }
 
                     if (earliest is null || IsBefore(current, earliest))
@@ -866,7 +883,7 @@ namespace Orleans.Streams
                 }
             }
 
-            return true;
+            return !canReadWithoutPurge;
         }
 
         private static bool IsBefore(StreamSequenceToken current, StreamSequenceToken other)
