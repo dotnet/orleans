@@ -24,7 +24,7 @@ internal sealed class OrleansBinaryDurableSetCommandCodec<T>(
         var payloadWriter = Writer.Create(output, session: null!);
         payloadWriter.WriteVarUInt32(AddCommand);
         payloadWriter.Commit();
-        OrleansBinaryCommandCodecHelpers.WriteIndependentValue(codec, item, output, sessionPool);
+        OrleansBinaryCommandCodecHelpers.WriteValue(codec, item, output, sessionPool);
         entry.Commit();
     }
 
@@ -36,7 +36,7 @@ internal sealed class OrleansBinaryDurableSetCommandCodec<T>(
         var payloadWriter = Writer.Create(output, session: null!);
         payloadWriter.WriteVarUInt32(RemoveCommand);
         payloadWriter.Commit();
-        OrleansBinaryCommandCodecHelpers.WriteIndependentValue(codec, item, output, sessionPool);
+        OrleansBinaryCommandCodecHelpers.WriteValue(codec, item, output, sessionPool);
         entry.Commit();
     }
 
@@ -64,7 +64,7 @@ internal sealed class OrleansBinaryDurableSetCommandCodec<T>(
         foreach (var item in items)
         {
             CollectionCodecHelpers.ThrowIfSnapshotItemCountExceeded(count, written);
-            OrleansBinaryCommandCodecHelpers.WriteIndependentValue(codec, item, output, sessionPool);
+            OrleansBinaryCommandCodecHelpers.WriteValue(codec, item, output, sessionPool);
             written++;
         }
 
@@ -92,10 +92,10 @@ internal sealed class OrleansBinaryDurableSetCommandCodec<T>(
         switch (command)
         {
             case AddCommand:
-                consumer.ApplyAdd(OrleansBinaryCommandCodecHelpers.ReadIndependentValue(codec, ref reader));
+                consumer.ApplyAdd(OrleansBinaryCommandCodecHelpers.ReadValue(codec, ref reader));
                 break;
             case RemoveCommand:
-                consumer.ApplyRemove(OrleansBinaryCommandCodecHelpers.ReadIndependentValue(codec, ref reader));
+                consumer.ApplyRemove(OrleansBinaryCommandCodecHelpers.ReadValue(codec, ref reader));
                 break;
             case ClearCommand:
                 consumer.ApplyClear();
@@ -115,7 +115,7 @@ internal sealed class OrleansBinaryDurableSetCommandCodec<T>(
         consumer.Reset(count);
         for (var i = 0; i < count; i++)
         {
-            consumer.ApplyAdd(OrleansBinaryCommandCodecHelpers.ReadIndependentValue(codec, ref reader));
+            consumer.ApplyAdd(OrleansBinaryCommandCodecHelpers.ReadValue(codec, ref reader));
         }
     }
 }

@@ -22,7 +22,7 @@ internal sealed class OrleansBinaryPersistentStateCommandCodec<T>(
         var headerWriter = Writer.Create(output, session: null!);
         headerWriter.WriteVarUInt32(SetValueCommand);
         headerWriter.Commit();
-        OrleansBinaryCommandCodecHelpers.WriteIndependentValue(codec, state, output, sessionPool);
+        OrleansBinaryCommandCodecHelpers.WriteValue(codec, state, output, sessionPool);
         var versionWriter = Writer.Create(output, session: null!);
         versionWriter.WriteVarUInt64(version);
         versionWriter.Commit();
@@ -59,7 +59,7 @@ internal sealed class OrleansBinaryPersistentStateCommandCodec<T>(
         switch (command)
         {
             case SetValueCommand:
-                var state = OrleansBinaryCommandCodecHelpers.ReadIndependentValue(codec, ref reader);
+                var state = OrleansBinaryCommandCodecHelpers.ReadValue(codec, ref reader);
                 var version = reader.ReadVarUInt64();
                 consumer.ApplySet(state, version);
                 break;

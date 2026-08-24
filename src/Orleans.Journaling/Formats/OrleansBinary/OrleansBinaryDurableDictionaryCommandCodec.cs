@@ -25,8 +25,8 @@ internal sealed class OrleansBinaryDurableDictionaryCommandCodec<TKey, TValue>(
         var payloadWriter = Writer.Create(output, session: null!);
         payloadWriter.WriteVarUInt32(SetCommand);
         payloadWriter.Commit();
-        OrleansBinaryCommandCodecHelpers.WriteIndependentValue(keyCodec, key, output, sessionPool);
-        OrleansBinaryCommandCodecHelpers.WriteIndependentValue(valueCodec, value, output, sessionPool);
+        OrleansBinaryCommandCodecHelpers.WriteValue(keyCodec, key, output, sessionPool);
+        OrleansBinaryCommandCodecHelpers.WriteValue(valueCodec, value, output, sessionPool);
         entry.Commit();
     }
 
@@ -38,7 +38,7 @@ internal sealed class OrleansBinaryDurableDictionaryCommandCodec<TKey, TValue>(
         var payloadWriter = Writer.Create(output, session: null!);
         payloadWriter.WriteVarUInt32(RemoveCommand);
         payloadWriter.Commit();
-        OrleansBinaryCommandCodecHelpers.WriteIndependentValue(keyCodec, key, output, sessionPool);
+        OrleansBinaryCommandCodecHelpers.WriteValue(keyCodec, key, output, sessionPool);
         entry.Commit();
     }
 
@@ -66,8 +66,8 @@ internal sealed class OrleansBinaryDurableDictionaryCommandCodec<TKey, TValue>(
         foreach (var (key, value) in items)
         {
             CollectionCodecHelpers.ThrowIfSnapshotItemCountExceeded(count, written);
-            OrleansBinaryCommandCodecHelpers.WriteIndependentValue(keyCodec, key, output, sessionPool);
-            OrleansBinaryCommandCodecHelpers.WriteIndependentValue(valueCodec, value, output, sessionPool);
+            OrleansBinaryCommandCodecHelpers.WriteValue(keyCodec, key, output, sessionPool);
+            OrleansBinaryCommandCodecHelpers.WriteValue(valueCodec, value, output, sessionPool);
             written++;
         }
 
@@ -96,13 +96,13 @@ internal sealed class OrleansBinaryDurableDictionaryCommandCodec<TKey, TValue>(
         {
             case SetCommand:
             {
-                var key = OrleansBinaryCommandCodecHelpers.ReadIndependentValue(keyCodec, ref reader);
-                var value = OrleansBinaryCommandCodecHelpers.ReadIndependentValue(valueCodec, ref reader);
+                var key = OrleansBinaryCommandCodecHelpers.ReadValue(keyCodec, ref reader);
+                var value = OrleansBinaryCommandCodecHelpers.ReadValue(valueCodec, ref reader);
                 consumer.ApplySet(key, value);
                 break;
             }
             case RemoveCommand:
-                consumer.ApplyRemove(OrleansBinaryCommandCodecHelpers.ReadIndependentValue(keyCodec, ref reader));
+                consumer.ApplyRemove(OrleansBinaryCommandCodecHelpers.ReadValue(keyCodec, ref reader));
                 break;
             case ClearCommand:
                 consumer.ApplyClear();
@@ -122,8 +122,8 @@ internal sealed class OrleansBinaryDurableDictionaryCommandCodec<TKey, TValue>(
         consumer.Reset(count);
         for (var i = 0; i < count; i++)
         {
-            var key = OrleansBinaryCommandCodecHelpers.ReadIndependentValue(keyCodec, ref reader);
-            var value = OrleansBinaryCommandCodecHelpers.ReadIndependentValue(valueCodec, ref reader);
+            var key = OrleansBinaryCommandCodecHelpers.ReadValue(keyCodec, ref reader);
+            var value = OrleansBinaryCommandCodecHelpers.ReadValue(valueCodec, ref reader);
             consumer.ApplySet(key, value);
         }
     }

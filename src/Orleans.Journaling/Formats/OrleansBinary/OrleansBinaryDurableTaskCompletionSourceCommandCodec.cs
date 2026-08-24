@@ -35,7 +35,7 @@ internal sealed class OrleansBinaryDurableTaskCompletionSourceCommandCodec<T>(
         var span = output.GetSpan(1);
         span[0] = (byte)DurableTaskCompletionSourceStatus.Completed;
         output.Advance(1);
-        OrleansBinaryCommandCodecHelpers.WriteIndependentValue(codec, value, output, sessionPool);
+        OrleansBinaryCommandCodecHelpers.WriteValue(codec, value, output, sessionPool);
         entry.Commit();
     }
 
@@ -47,7 +47,7 @@ internal sealed class OrleansBinaryDurableTaskCompletionSourceCommandCodec<T>(
         var span = output.GetSpan(1);
         span[0] = (byte)DurableTaskCompletionSourceStatus.Faulted;
         output.Advance(1);
-        OrleansBinaryCommandCodecHelpers.WriteIndependentValue(exceptionCodec, exception, output, sessionPool);
+        OrleansBinaryCommandCodecHelpers.WriteValue(exceptionCodec, exception, output, sessionPool);
         entry.Commit();
     }
 
@@ -90,10 +90,10 @@ internal sealed class OrleansBinaryDurableTaskCompletionSourceCommandCodec<T>(
                 consumer.ApplyPending();
                 break;
             case DurableTaskCompletionSourceStatus.Completed:
-                consumer.ApplyCompleted(OrleansBinaryCommandCodecHelpers.ReadIndependentValue(codec, ref reader));
+                consumer.ApplyCompleted(OrleansBinaryCommandCodecHelpers.ReadValue(codec, ref reader));
                 break;
             case DurableTaskCompletionSourceStatus.Faulted:
-                consumer.ApplyFaulted(OrleansBinaryCommandCodecHelpers.ReadIndependentValue(exceptionCodec, ref reader));
+                consumer.ApplyFaulted(OrleansBinaryCommandCodecHelpers.ReadValue(exceptionCodec, ref reader));
                 break;
             case DurableTaskCompletionSourceStatus.Canceled:
                 consumer.ApplyCanceled();

@@ -6,11 +6,11 @@ using Orleans.Serialization.Session;
 namespace Orleans.Journaling;
 
 /// <summary>
-/// Helpers shared by the Orleans binary durable command codecs.
+/// Reads and writes Orleans binary command values using an isolated serializer session for each value.
 /// </summary>
 internal static class OrleansBinaryCommandCodecHelpers
 {
-    public static void WriteIndependentValue<T>(
+    public static void WriteValue<T>(
         IFieldCodec<T> codec,
         T value,
         IBufferWriter<byte> output,
@@ -22,7 +22,7 @@ internal static class OrleansBinaryCommandCodecHelpers
         writer.Commit();
     }
 
-    public static T ReadIndependentValue<T, TInput>(IFieldCodec<T> codec, ref Reader<TInput> reader)
+    public static T ReadValue<T, TInput>(IFieldCodec<T> codec, ref Reader<TInput> reader)
     {
         reader.Session.Reset();
         try
