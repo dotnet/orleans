@@ -47,7 +47,11 @@ public class DurableTaskGrainRuntimeTests
             timeProvider);
 
         var grainContext = new TestGrainContext(grainId);
-        var shared = new DurableTaskGrainRuntimeShared(new TestGrainContextAccessor(grainContext), timeProvider, NullLogger<DurableTaskGrainRuntime>.Instance);
+        var shared = new DurableTaskGrainRuntimeShared(
+            new TestGrainContextAccessor(grainContext),
+            timeProvider,
+            NullLogger<DurableTaskGrainRuntime>.Instance,
+            services.GetRequiredService<Serializer>());
         var transport = withTransport ? new RecordingDurableTaskMessageTransport() : null;
         IEnumerable<IDurableTaskMessageTransport> transports = transport is null ? [] : [transport];
         var runtime = new DurableTaskGrainRuntime(storage, shared, transports);
@@ -404,7 +408,7 @@ public class DurableTaskGrainRuntimeTests
         await fixture.Runtime.SignalCancellationAsync(taskId, CancellationToken.None);
         Assert.True(fixture.Storage.TryGetTask(taskId, out var stateBeforeRestart));
         Assert.NotNull(stateBeforeRestart.CancellationRequestedAt);
-        Assert.Null(stateBeforeRestart.Result);
+        Assert.Equal(DurableTaskStatus.Canceled, stateBeforeRestart.Result!.Status);
 
         var restarted = CreateSecondRuntime(fixture);
         await restarted.ResumePendingTasksAsync(CancellationToken.None);
@@ -628,9 +632,9 @@ public class DurableTaskGrainRuntimeTests
         Assert.NotNull(grandchildState.CancellationRequestedAt);
         Assert.NotNull(siblingState.CancellationRequestedAt);
 
-        // Cancellation was only *requested* (via the execution-context callback path): the underlying tasks used here
-        // ignore their internal cancellation token, so none of them have actually completed yet.
-        Assert.Null(parentState.Result);
+        // The requested root reaches a terminal canceled result before acknowledgement. Descendants retain their
+        // cancellation requests and can finish cleanup independently.
+        Assert.Equal(DurableTaskStatus.Canceled, parentState.Result!.Status);
         Assert.Null(childState.Result);
         Assert.Null(grandchildState.Result);
         Assert.Null(siblingState.Result);
@@ -1147,6 +1151,430 @@ public class DurableTaskGrainRuntimeTests
         var response = await handle.PollAsync(new PollingOptions { PollTimeout = TimeSpan.Zero }, CancellationToken.None);
 
         Assert.False(response.IsCompleted);
+    }
+
+    [Fact]
+    public async Task CancelRemoteAsync_AfterPersistedIntentIsNotDelivered_RestartResendsUntilAcknowledged()
+    {
+        var fixture = CreateFixture(withTransport: true);
+        var taskId = TaskId.Create("recoverable-cancellation");
+        var target = GrainId.Create("remote-target", "1");
+        fixture.Storage.GetOrCreateTask(taskId, request: null);
+
+        await fixture.Runtime.CancelRemoteAsync(taskId, target, CancellationToken.None);
+        await fixture.Storage.WriteAsync(CancellationToken.None);
+        Assert.True(fixture.Storage.TryGetTask(taskId, out var persisted));
+        Assert.NotNull(persisted.CancellationRequestedAt);
+        Assert.Equal(target, Assert.IsType<DurableTaskState>(persisted).PendingCancellationDestination);
+
+        // The journal commit succeeded, but delivery did not occur before the activation was lost.
+        fixture.Transport!.Cancellations.Clear();
+        await fixture.Storage.ReadAsync(CancellationToken.None);
+        var restarted = CreateSecondRuntime(fixture);
+
+        await restarted.ResumePendingTasksAsync(CancellationToken.None);
+
+        var resent = Assert.Single(fixture.Transport.Cancellations);
+        Assert.Equal((fixture.GrainId, target, taskId), resent);
+
+        await restarted.AcceptCancellationAcknowledgementAsync(
+            taskId,
+            target,
+            DurableTaskResponse.FromException(new OperationCanceledException()),
+            CancellationToken.None);
+        fixture.Transport.Cancellations.Clear();
+        await CreateSecondRuntime(fixture).ResumePendingTasksAsync(CancellationToken.None);
+
+        Assert.Empty(fixture.Transport.Cancellations);
+        Assert.True(fixture.Storage.TryGetTask(taskId, out var acknowledged));
+        Assert.True(acknowledged.Result!.IsCompleted);
+        Assert.Equal(DurableTaskStatus.Canceled, acknowledged.Result.Status);
+        Assert.True(Assert.IsType<DurableTaskState>(acknowledged).PendingCancellationDestination.IsDefault);
+    }
+
+    [Fact]
+    public async Task CancellationAcknowledgement_UsesReceiverTerminalResponse()
+    {
+        var fixture = CreateFixture(withTransport: true);
+        var taskId = TaskId.Create("completed-before-cancellation-ack");
+        var target = GrainId.Create("remote-target", "completed");
+        fixture.Storage.GetOrCreateTask(taskId, request: null);
+        await fixture.Runtime.CancelRemoteAsync(taskId, target, CancellationToken.None);
+        var authoritative = DurableTaskResponse.FromResult(73);
+
+        await fixture.Runtime.AcceptCancellationAcknowledgementAsync(
+            taskId,
+            target,
+            authoritative,
+            CancellationToken.None);
+        fixture.Runtime.AcceptResponse(taskId, authoritative);
+
+        Assert.True(fixture.Storage.TryGetTask(taskId, out var state));
+        Assert.Equal(73, state.Result!.GetResult<int>());
+        Assert.True(Assert.IsType<DurableTaskState>(state).PendingCancellationDestination.IsDefault);
+    }
+
+    [Fact]
+    public async Task ScheduleAsync_TaskIdReuseWhileRunning_AcceptsEquivalentAndRejectsConflictBeforeMutation()
+    {
+        var fixture = CreateFixture(withTransport: true);
+        var taskId = TaskId.Create("running-collision");
+        var completion = new TaskCompletionSource<int>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var original = new RuntimeTestDurableTaskRequest(() => DurableTask.Run<int>(_ => completion.Task))
+        {
+            Context = new DurableTaskRequestContext { TargetId = fixture.GrainId },
+        };
+        await ((IDurableTaskServer)fixture.Runtime).ScheduleAsync(taskId, original, CancellationToken.None);
+
+        var observer = GrainId.Create("observer", "equivalent");
+        var equivalent = new RuntimeTestDurableTaskRequest(
+            () => throw new InvalidOperationException("An equivalent retry must not invoke a second request."))
+        {
+            Context = new DurableTaskRequestContext { CallerId = observer, TargetId = fixture.GrainId },
+        };
+        var retryResponse = await ((IDurableTaskServer)fixture.Runtime).ScheduleAsync(taskId, equivalent, CancellationToken.None);
+        Assert.Same(DurableTaskResponse.Subscribed, retryResponse);
+
+        var conflictObserver = GrainId.Create("observer", "conflict");
+        var conflict = new RuntimeTestDurableTaskRequest(methodName: "DifferentMethod")
+        {
+            Context = new DurableTaskRequestContext { CallerId = conflictObserver, TargetId = fixture.GrainId },
+        };
+        var exception = await Assert.ThrowsAsync<InvalidOperationException>(
+            async () => await ((IDurableTaskServer)fixture.Runtime).ScheduleAsync(taskId, conflict, CancellationToken.None));
+
+        Assert.Contains(taskId.ToString(), exception.Message);
+        Assert.True(fixture.Storage.TryGetTask(taskId, out var state));
+        Assert.Same(original, state.Request);
+        Assert.Contains(observer, state.CompletionDestinations);
+        Assert.DoesNotContain(conflictObserver, state.CompletionDestinations);
+        completion.SetResult(1);
+        await fixture.Runtime.GetScheduledTaskHandle(taskId).WaitAsync(BoundedWait());
+    }
+
+    [Fact]
+    public async Task ScheduleAsync_CompletedTaskIdReuse_ReturnsEquivalentResultAndRejectsConflict()
+    {
+        var fixture = CreateFixture();
+        var taskId = TaskId.Create("completed-collision");
+        var original = new RuntimeTestDurableTaskRequest(() => DurableTask.FromResult(17))
+        {
+            Context = new DurableTaskRequestContext { TargetId = fixture.GrainId },
+        };
+        await ((IDurableTaskServer)fixture.Runtime).ScheduleAsync(taskId, original, CancellationToken.None);
+        await fixture.Runtime.GetScheduledTaskHandle(taskId).WaitAsync(BoundedWait());
+
+        var equivalent = new RuntimeTestDurableTaskRequest
+        {
+            Context = new DurableTaskRequestContext { TargetId = fixture.GrainId },
+        };
+        var response = await ((IDurableTaskServer)fixture.Runtime).ScheduleAsync(taskId, equivalent, CancellationToken.None);
+        Assert.Equal(17, response.GetResult<int>());
+
+        var conflict = new RuntimeTestDurableTaskRequest(interfaceName: "IConflictingInterface")
+        {
+            Context = new DurableTaskRequestContext { TargetId = fixture.GrainId },
+        };
+        await Assert.ThrowsAsync<InvalidOperationException>(
+            async () => await ((IDurableTaskServer)fixture.Runtime).ScheduleAsync(taskId, conflict, CancellationToken.None));
+        Assert.Equal(0, equivalent.CreateTaskCallCount);
+        Assert.Equal(0, conflict.CreateTaskCallCount);
+    }
+
+    [Fact]
+    public async Task ScheduleAsync_RecoveredTaskIdReuse_UsesSerializedArrayAndRecordEquivalenceAndRejectsConflict()
+    {
+        var fixture = CreateFixture();
+        var taskId = TaskId.Create("recovered-collision");
+        var persisted = new RuntimeTestDurableTaskRequest(
+            () => DurableTask.FromResult(29),
+            arguments:
+            [
+                new[] { 1, 2, 3 },
+                new RuntimeTestComplexArgument { Name = "persisted", Values = [4, 5] },
+            ])
+        {
+            Context = new DurableTaskRequestContext { TargetId = fixture.GrainId },
+        };
+        fixture.Storage.GetOrCreateTask(taskId, persisted);
+        await fixture.Storage.WriteAsync(CancellationToken.None);
+        await fixture.Storage.ReadAsync(CancellationToken.None);
+        var restarted = CreateSecondRuntime(fixture);
+
+        var equivalent = new RuntimeTestDurableTaskRequest(
+            arguments:
+            [
+                new[] { 1, 2, 3 },
+                new RuntimeTestComplexArgument { Name = "persisted", Values = [4, 5] },
+            ])
+        {
+            Context = new DurableTaskRequestContext { TargetId = fixture.GrainId },
+        };
+        await ((IDurableTaskServer)restarted).ScheduleAsync(taskId, equivalent, CancellationToken.None);
+        var response = await restarted.GetScheduledTaskHandle(taskId).WaitAsync(BoundedWait());
+
+        Assert.Equal(29, response.GetResult<int>());
+        Assert.Equal(1, persisted.CreateTaskCallCount);
+        Assert.Equal(0, equivalent.CreateTaskCallCount);
+
+        var conflict = new RuntimeTestDurableTaskRequest(
+            arguments:
+            [
+                new[] { 1, 2, 3 },
+                new RuntimeTestComplexArgument { Name = "conflict", Values = [4, 5] },
+            ])
+        {
+            Context = new DurableTaskRequestContext { TargetId = fixture.GrainId },
+        };
+        await Assert.ThrowsAsync<InvalidOperationException>(
+            async () => await ((IDurableTaskServer)restarted).ScheduleAsync(taskId, conflict, CancellationToken.None));
+        Assert.Equal(0, conflict.CreateTaskCallCount);
+    }
+
+    [Fact]
+    public async Task ResumePendingTasksAsync_RestoresApplicationContextExcludesReservedEntriesAndRestoresAmbientContext()
+    {
+        var fixture = CreateFixture();
+        var taskId = TaskId.Create("request-context-recovery");
+        RequestContext.Clear();
+        try
+        {
+            var scheduledReentrancyId = Guid.NewGuid();
+            RequestContext.Set("tenant", "scheduled-tenant");
+            RequestContext.ReentrancyId = scheduledReentrancyId;
+            RequestContext.Set("Ping", true);
+            RequestContext.Set("Orleans.DurableJobs.TurnIsolation", "scheduled-owner");
+            var capturedValues = DurableTaskRequestContext.CaptureRequestContext(fixture.Shared.Serializer)!;
+            Assert.DoesNotContain("#CCR", capturedValues.Keys);
+            Assert.DoesNotContain("Ping", capturedValues.Keys);
+            Assert.DoesNotContain("Orleans.DurableJobs.TurnIsolation", capturedValues.Keys);
+
+            // Defensively verify that framework values from older/corrupt persisted state are not replayed either.
+            var values = new Dictionary<string, byte[]>(capturedValues, StringComparer.Ordinal)
+            {
+                ["#CCR"] = fixture.Shared.Serializer.SerializeToArray<object>(scheduledReentrancyId),
+                ["Ping"] = fixture.Shared.Serializer.SerializeToArray<object>(true),
+                ["Orleans.DurableJobs.TurnIsolation"] = fixture.Shared.Serializer.SerializeToArray<object>("scheduled-owner"),
+            };
+            RequestContext.Clear();
+            string? observedTenant = null;
+            var observedReentrancyId = Guid.Empty;
+            object? observedPing = null;
+            object? observedTurnIsolation = null;
+            var request = new RuntimeTestDurableTaskRequest(() => DurableTask.Run(_ =>
+            {
+                observedTenant = RequestContext.Get("tenant") as string;
+                observedReentrancyId = RequestContext.ReentrancyId;
+                observedPing = RequestContext.Get("Ping");
+                observedTurnIsolation = RequestContext.Get("Orleans.DurableJobs.TurnIsolation");
+                RequestContext.Set("tenant", "invocation-mutated");
+                return 41;
+            }))
+            {
+                Context = new DurableTaskRequestContext { TargetId = fixture.GrainId, Values = values },
+            };
+            fixture.Storage.GetOrCreateTask(taskId, request);
+            await fixture.Storage.WriteAsync(CancellationToken.None);
+            await fixture.Storage.ReadAsync(CancellationToken.None);
+            var ambientReentrancyId = Guid.NewGuid();
+            RequestContext.Set("tenant", "ambient-tenant");
+            RequestContext.ReentrancyId = ambientReentrancyId;
+            RequestContext.Set("Ping", "ambient-ping");
+            RequestContext.Set("Orleans.DurableJobs.TurnIsolation", "ambient-owner");
+
+            var restarted = CreateSecondRuntime(fixture);
+            await restarted.ResumePendingTasksAsync(CancellationToken.None);
+            var response = await restarted.GetScheduledTaskHandle(taskId).WaitAsync(BoundedWait());
+
+            Assert.Equal(41, response.GetResult<int>());
+            Assert.Equal("scheduled-tenant", observedTenant);
+            Assert.Equal(Guid.Empty, observedReentrancyId);
+            Assert.Null(observedPing);
+            Assert.Equal("ambient-owner", observedTurnIsolation);
+            Assert.Equal("ambient-tenant", RequestContext.Get("tenant"));
+            Assert.Equal(ambientReentrancyId, RequestContext.ReentrancyId);
+            Assert.Equal("ambient-ping", RequestContext.Get("Ping"));
+            Assert.Equal("ambient-owner", RequestContext.Get("Orleans.DurableJobs.TurnIsolation"));
+        }
+        finally
+        {
+            RequestContext.Clear();
+        }
+    }
+
+    [Fact]
+    public async Task ScheduleAsync_InitialExecutionUsesPersistedApplicationContextWithoutReservedMarkers()
+    {
+        var fixture = CreateFixture();
+        var taskId = TaskId.Create("initial-request-context");
+        string? observedTenant = null;
+        var observedReentrancyId = Guid.NewGuid();
+        var request = new RuntimeTestDurableTaskRequest(() => DurableTask.Run(_ =>
+        {
+            observedTenant = RequestContext.Get("tenant") as string;
+            observedReentrancyId = RequestContext.ReentrancyId;
+        }))
+        {
+            Context = new DurableTaskRequestContext
+            {
+                TargetId = fixture.GrainId,
+                Values = new Dictionary<string, byte[]>(StringComparer.Ordinal)
+                {
+                    ["tenant"] = fixture.Shared.Serializer.SerializeToArray<object>("persisted-tenant"),
+                    ["#CCR"] = fixture.Shared.Serializer.SerializeToArray<object>(Guid.NewGuid()),
+                },
+            },
+        };
+        RequestContext.Clear();
+        try
+        {
+            RequestContext.Set("tenant", "ambient-tenant");
+            RequestContext.ReentrancyId = Guid.NewGuid();
+
+            await ((IDurableTaskServer)fixture.Runtime).ScheduleAsync(taskId, request, CancellationToken.None);
+            _ = await fixture.Runtime.GetScheduledTaskHandle(taskId).WaitAsync(BoundedWait());
+
+            Assert.Equal("persisted-tenant", observedTenant);
+            Assert.Equal(Guid.Empty, observedReentrancyId);
+        }
+        finally
+        {
+            RequestContext.Clear();
+        }
+    }
+
+    [Fact]
+    public void CaptureRequestContext_ExceedingEntryLimitFailsWithoutDroppingValues()
+    {
+        var fixture = CreateFixture();
+        RequestContext.Clear();
+        try
+        {
+            for (var i = 0; i <= DurableTaskRequestContext.MaxEntryCount; i++)
+            {
+                RequestContext.Set($"key-{i}", i);
+            }
+
+            var exception = Assert.Throws<InvalidOperationException>(
+                () => DurableTaskRequestContext.CaptureRequestContext(fixture.Shared.Serializer));
+            Assert.Contains(DurableTaskRequestContext.MaxEntryCount.ToString(), exception.Message);
+        }
+        finally
+        {
+            RequestContext.Clear();
+        }
+    }
+
+    [Fact]
+    public async Task ScheduleAsync_OversizedReservedContextFailsBeforeStorageMutation()
+    {
+        var fixture = CreateFixture();
+        var request = new RuntimeTestDurableTaskRequest
+        {
+            Context = new DurableTaskRequestContext
+            {
+                TargetId = fixture.GrainId,
+                Values = new Dictionary<string, byte[]>(StringComparer.Ordinal)
+                {
+                    ["#CCR"] = new byte[DurableTaskRequestContext.MaxSerializedValueLength + 1],
+                },
+            },
+        };
+
+        var exception = await Assert.ThrowsAsync<InvalidOperationException>(
+            async () => await ((IDurableTaskServer)fixture.Runtime).ScheduleAsync(
+                TaskId.Create("oversized-reserved-context"),
+                request,
+                CancellationToken.None));
+
+        Assert.Contains(DurableTaskRequestContext.MaxSerializedValueLength.ToString(), exception.Message);
+        Assert.Empty(fixture.Storage.Tasks);
+    }
+
+    [Fact]
+    public async Task StopAsync_StopsAdmissionHandsOffPendingRequestAndPreventsOldActivationFromOutlivingStop()
+    {
+        var fixture = CreateFixture();
+        var taskId = TaskId.Create("deactivation-handoff");
+        var firstAttemptStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var attempts = 0;
+        var request = new RuntimeTestDurableTaskRequest(() =>
+        {
+            if (Interlocked.Increment(ref attempts) == 1)
+            {
+                return DurableTask.Run(async cancellationToken =>
+                {
+                    firstAttemptStarted.SetResult();
+                    await Task.Delay(Timeout.InfiniteTimeSpan, cancellationToken);
+                });
+            }
+
+            return DurableTask.FromResult(53);
+        })
+        {
+            Context = new DurableTaskRequestContext { TargetId = fixture.GrainId },
+        };
+        await ((IDurableTaskServer)fixture.Runtime).ScheduleAsync(taskId, request, CancellationToken.None);
+        await firstAttemptStarted.Task.WaitAsync(BoundedWait());
+
+        await fixture.Runtime.StopAsync(BoundedWait());
+
+        Assert.True(fixture.Storage.TryGetTask(taskId, out var handedOff));
+        Assert.Null(handedOff.Result);
+        await Assert.ThrowsAsync<InvalidOperationException>(
+            async () => await ((IDurableTaskServer)fixture.Runtime).ScheduleAsync(
+                TaskId.Create("rejected-after-stop"),
+                new RuntimeTestDurableTaskRequest { Context = new DurableTaskRequestContext { TargetId = fixture.GrainId } },
+                CancellationToken.None));
+
+        var restarted = CreateSecondRuntime(fixture);
+        await restarted.ResumePendingTasksAsync(CancellationToken.None);
+        var response = await restarted.GetScheduledTaskHandle(taskId).WaitAsync(BoundedWait());
+
+        Assert.Equal(53, response.GetResult<int>());
+        Assert.Equal(2, attempts);
+    }
+
+    [Fact]
+    public async Task StopAsync_NonCooperativeWorkBlocksTeardownUntilExecutionIsTerminal()
+    {
+        var fixture = CreateFixture();
+        fixture.Shared.DeactivationDrainTimeout = TimeSpan.FromMinutes(1);
+        var taskId = TaskId.Create("non-cooperative-stop");
+        var started = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var release = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var request = new RuntimeTestDurableTaskRequest(() => DurableTask.Run(async _ =>
+        {
+            started.TrySetResult();
+            await release.Task;
+        }))
+        {
+            Context = new DurableTaskRequestContext { TargetId = fixture.GrainId },
+        };
+        await ((IDurableTaskServer)fixture.Runtime).ScheduleAsync(taskId, request, CancellationToken.None);
+        await started.Task.WaitAsync(BoundedWait());
+
+        var timedStop = fixture.Runtime.StopAsync(CancellationToken.None);
+        fixture.TimeProvider.Advance(fixture.Shared.DeactivationDrainTimeout);
+        await Task.Yield();
+        Assert.False(timedStop.IsCompleted);
+
+        var runningAfterTimeout = await ((IDurableTaskGrainExtension)fixture.Runtime)
+            .GetRunningTasksAsync()
+            .ToListAsync();
+        Assert.Contains(taskId, runningAfterTimeout);
+        Assert.True(fixture.Storage.TryGetTask(taskId, out var pendingAfterTimeout));
+        Assert.Null(pendingAfterTimeout.Result);
+
+        release.SetResult();
+        var response = await fixture.Runtime.GetScheduledTaskHandle(taskId).WaitAsync(BoundedWait());
+        Assert.True(response.IsCompleted);
+
+        await timedStop.WaitAsync(BoundedWait());
+        var runningAfterTerminalStop = await ((IDurableTaskGrainExtension)fixture.Runtime)
+            .GetRunningTasksAsync()
+            .ToListAsync();
+        Assert.Empty(runningAfterTerminalStop);
     }
 
     private sealed class StubScheduledTaskHandle(TaskId taskId) : IScheduledTaskHandle

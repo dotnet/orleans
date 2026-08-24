@@ -160,9 +160,9 @@ public interface IInboxHandlerContext
     /// <param name="envelope">The envelope to send.</param>
     /// <remarks>
     /// <para>
-    /// The message is added to the grain's outbox and will be persisted atomically with grain state
-    /// when <c>IJournaledStateManager.WriteStateAsync()</c> is called. The message will remain in the
-    /// outbox until it is successfully delivered to the target grain's inbox.
+    /// The message is staged in the grain's outbox. While an inbox handler is running, direct
+    /// <c>IJournaledStateManager.WriteStateAsync()</c> calls are deferred. Handler state, outbox messages,
+    /// inbox removal, and deduplication completion are persisted by one commit after the handler succeeds.
     /// </para>
     /// <para>
     /// Delivery is handled by the outbox's background pump, which

@@ -19,6 +19,8 @@ internal sealed class GrainDurableExecutionContext(TaskId taskId, IDurableTaskGr
     // The sequence number for unnamed children.
     private int _nextSequenceNumber = 0;
 
+    internal Task DeactivateForActivationAsync(CancellationToken cancellationToken) => DeactivateAsync(cancellationToken);
+
     protected override ValueTask<IScheduledTaskHandle> ScheduleChildTaskAsync(TaskId taskId, DurableTask task, CancellationToken cancellationToken)
     {
         ArgumentOutOfRangeException.ThrowIfEqual(taskId, default);

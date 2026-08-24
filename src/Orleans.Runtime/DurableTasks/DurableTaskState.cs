@@ -44,6 +44,9 @@ public class DurableTaskState : IDurableTaskState
     [Id(5)]
     public DateTimeOffset? CancellationRequestedAt { get; set; }
 
+    [Id(7)]
+    internal GrainId PendingCancellationDestination { get; set; }
+
     IReadOnlySet<GrainId> IDurableTaskState.CompletionDestinations => CompletionDestinations;
     IDurableTaskRequest? IDurableTaskState.Request => Request;
     DateTimeOffset? IDurableTaskState.CompletedAt => CompletedAt;

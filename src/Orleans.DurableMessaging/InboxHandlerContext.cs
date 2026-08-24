@@ -119,10 +119,9 @@ internal sealed class InboxHandlerContext : IInboxHandlerContext
     /// <inheritdoc />
     /// <remarks>
     /// <para>
-    /// The envelope is added to the outbox immediately, but persistence is deferred until
-    /// <c>IStateMachineManager.WriteStateAsync()</c> is called (typically after the handler completes
-    /// successfully). This ensures that outbound messages are persisted atomically with any grain
-    /// state changes made during handler execution.
+    /// The envelope is added to the outbox immediately. Persistence is owned by the inbox handler context:
+    /// direct state writes made by the handler are deferred, then handler state, outbound messages, inbox
+    /// removal, and deduplication completion are committed together after successful return.
     /// </para>
     /// <para>
     /// If the handler throws an exception before state is persisted, the message will not be sent.

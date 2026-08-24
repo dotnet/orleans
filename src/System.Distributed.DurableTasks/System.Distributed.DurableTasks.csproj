@@ -9,6 +9,7 @@
     <AnalysisLevel>preview</AnalysisLevel>
     <IsOrleansFrameworkPart>false</IsOrleansFrameworkPart>
     <OrleansBuildTimeCodeGen>false</OrleansBuildTimeCodeGen>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
   </PropertyGroup>
 
   <ItemGroup>

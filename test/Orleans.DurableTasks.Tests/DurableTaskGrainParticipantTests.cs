@@ -110,14 +110,12 @@ public class DurableTaskGrainParticipantTests
     }
 
     [Fact]
-    public void OnStop_ReturnsTheCompletedTaskSingletonWithNoSideEffects()
+    public async Task OnStop_WithNoRunningWork_CompletesWithoutPersistingState()
     {
         var (participant, _, storage) = CreateParticipant();
 
-        var task = participant.OnStop(CancellationToken.None);
+        await participant.OnStop(CancellationToken.None);
 
-        Assert.Same(Task.CompletedTask, task);
-        Assert.True(task.IsCompletedSuccessfully);
         Assert.Empty(storage.Tasks);
         Assert.Equal(0, storage.WriteAsyncCallCount);
     }

@@ -569,6 +569,7 @@ internal sealed partial class JournaledStateManager : IJournaledStateManager, IJ
                     {
                         storageActivity?.Dispose();
                     }
+
                 }
             }
             catch (Exception exception)
@@ -724,36 +725,73 @@ internal sealed partial class JournaledStateManager : IJournaledStateManager, IJ
     private async Task RecoverAsync(CancellationToken cancellationToken)
     {
         var startTimestamp = _shared.TimeProvider.GetTimestamp();
-        lock (_lock)
-        {
-            ResetForRecovery();
-        }
-
         try
         {
-            await ReadStorageAsync(this, cancellationToken).ConfigureAwait(true);
-            _shared.Instruments.OnRecovery(_shared.TimeProvider.GetElapsedTime(startTimestamp), succeeded: true);
-        }
-        catch
-        {
-            _shared.Instruments.OnRecovery(_shared.TimeProvider.GetElapsedTime(startTimestamp), succeeded: false);
-            throw;
-        }
-
-        lock (_lock)
-        {
-            foreach ((var name, var state) in _states)
+            lock (_lock)
             {
-                state.OnRecoveryCompleted();
+                ResetForRecovery();
+            }
 
-                if (state is RetiredState)
+            await ReadStorageAsync(this, cancellationToken).ConfigureAwait(true);
+
+            lock (_lock)
+            {
+                RebindRegisteredStatesAfterRecovery();
+                foreach ((var name, var state) in _states)
                 {
-                    // We can use TryAdd since recovery has finished.
-                    if (_retirementTracker.TryAdd(name, _shared.TimeProvider.GetUtcNow().UtcDateTime))
+                    state.OnRecoveryCompleted();
+
+                    if (state is RetiredState)
                     {
-                        LogRetiredStateDetected(_shared.Logger, name);
+                        // We can use TryAdd since recovery has finished.
+                        if (_retirementTracker.TryAdd(name, _shared.TimeProvider.GetUtcNow().UtcDateTime))
+                        {
+                            LogRetiredStateDetected(_shared.Logger, name);
+                        }
                     }
                 }
+            }
+
+            _shared.Instruments.OnRecovery(_shared.TimeProvider.GetElapsedTime(startTimestamp), succeeded: true);
+        }
+        catch (Exception recoveryException)
+        {
+            _shared.Instruments.OnRecovery(_shared.TimeProvider.GetElapsedTime(startTimestamp), succeeded: false);
+            try
+            {
+                lock (_lock)
+                {
+                    ResetForRecovery();
+                }
+            }
+            catch (Exception resetException)
+            {
+                throw new AggregateException("Recovery failed and the partially rebuilt state could not be reset.", recoveryException, resetException);
+            }
+
+            throw;
+        }
+    }
+
+    private void RebindRegisteredStatesAfterRecovery()
+    {
+        foreach (var (name, state) in _states)
+        {
+            if (state is RetiredState)
+            {
+                continue;
+            }
+
+            if (!_journalStreamDirectory.TryGetValue(name, out var id))
+            {
+                _journalStreamDirectory.Set(name, _journalStreamDirectory.GetNextJournalStreamId());
+                continue;
+            }
+
+            if (!_statesMap.TryGetValue(id, out var mappedState) || !ReferenceEquals(mappedState, state))
+            {
+                _statesMap[id] = state;
+                state.Reset(CreateJournalStreamWriter(new(id)));
             }
         }
     }
@@ -762,6 +800,14 @@ internal sealed partial class JournaledStateManager : IJournaledStateManager, IJ
     {
         _journalWriter.Reset();
         _migrationSnapshotRequired = false;
+        foreach (var (name, state) in _states)
+        {
+            if (state is not RetiredState && _journalStreamDirectory.TryGetValue(name, out var id))
+            {
+                state.Reset(CreateJournalStreamWriter(new(id)));
+            }
+        }
+
         _statesMap.Clear();
         _statesMap[StateDirectory.Id] = _journalStreamDirectory;
         _statesMap[RetiredStateTracker.Id] = _retirementTracker;
@@ -1006,17 +1052,18 @@ internal sealed partial class JournaledStateManager : IJournaledStateManager, IJ
     private Task EnqueueOrGetPendingWorkItem<TWorkItem>(out bool didEnqueue)
         where TWorkItem : WorkItem, new()
     {
+        WorkItem? tail = null;
         foreach (var workItem in _workQueue)
         {
-            if (workItem.GetType() != typeof(TWorkItem))
-            {
-                continue;
-            }
+            tail = workItem;
+        }
 
-            workItem.RecordTraceContext();
-            workItem.AddCaller();
+        if (tail?.GetType() == typeof(TWorkItem))
+        {
+            tail.RecordTraceContext();
+            tail.AddCaller();
             didEnqueue = false;
-            return workItem.Task;
+            return tail.Task;
         }
 
         var newWorkItem = new TWorkItem();

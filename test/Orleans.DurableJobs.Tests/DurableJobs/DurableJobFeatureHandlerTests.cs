@@ -100,23 +100,123 @@ public class DurableJobFeatureHandlerTests
     }
 
     [Fact]
-    public async Task FeatureReceiver_RejectsInProgressFromTurnIsolatedHandler()
+    public async Task FeatureReceiver_ReentersTurnIsolatedHandlerUntilTerminal()
     {
         var registry = new DurableJobHandlerRegistry();
+        var calls = 0;
         registry.Register(
             new TestHandler(
                 static jobName => jobName == "feature",
-                static () => DurableJobRunResult.InProgress(TimeSpan.FromSeconds(1))),
+                () => ++calls < 3
+                ? DurableJobRunResult.InProgress(TimeSpan.FromMilliseconds(1))
+                : DurableJobRunResult.Completed),
             requiresTurnIsolation: true);
         var extension = new DurableJobFeatureReceiverExtension(registry, CreateShared());
+        var context = new TestJobRunContext("feature");
 
-        var result = await extension.TryHandleFeatureJobAsync(
-            new TestJobRunContext("feature"),
-            CancellationToken.None);
+        var first = await extension.TryHandleFeatureJobAsync(context, CancellationToken.None);
+        var second = await extension.TryHandleFeatureJobAsync(context, CancellationToken.None);
+        var result = await extension.TryHandleFeatureJobAsync(context, CancellationToken.None);
+        var terminalPoll = await extension.TryHandleFeatureJobAsync(context, CancellationToken.None);
 
-        Assert.NotNull(result);
-        Assert.True(result.IsFailed);
-        Assert.Contains("returned InProgress", result.Exception!.Message);
+        Assert.True(first!.IsInProgress);
+        Assert.True(second!.IsInProgress);
+        Assert.Same(DurableJobRunResult.Completed, result);
+        Assert.Same(result, terminalPoll);
+        Assert.Equal(3, calls);
+    }
+
+    [Fact]
+    public async Task TurnIsolation_NestedCallChainRetainsLeaseUntilDurableWorkCompletes()
+    {
+        var isolation = new DurableJobTurnIsolation();
+        isolation.Enable();
+        var ordinary = await isolation.EnterOrdinaryAsync();
+        ordinary.Activate();
+        var durableWork = await isolation.EnterIsolatedAsync(CancellationToken.None);
+        durableWork.Activate();
+        ordinary.Dispose();
+
+        var concurrent = isolation.EnterOrdinaryAsync();
+        Assert.False(concurrent.IsCompleted);
+
+        durableWork.Dispose();
+        using var concurrentLease = await concurrent.AsTask().WaitAsync(TimeSpan.FromSeconds(10));
+    }
+
+    [Fact]
+    public async Task TurnIsolation_CanceledWaitDoesNotPoisonGate()
+    {
+        var isolation = new DurableJobTurnIsolation();
+        isolation.Enable();
+        var ordinary = await isolation.EnterOrdinaryAsync();
+        ordinary.Activate();
+        RequestContext.Remove(DurableJobTurnIsolation.RequestContextKey);
+        using var cancellation = new CancellationTokenSource();
+        cancellation.Cancel();
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(
+            () => isolation.EnterIsolatedAsync(cancellation.Token).AsTask());
+
+        ordinary.Dispose();
+        using var recovered = await isolation.EnterIsolatedAsync(CancellationToken.None);
+        recovered.Activate();
+    }
+
+    [Fact]
+    public async Task FeatureReceiver_CanceledPollStopsGateWaitWithoutStartingExecution()
+    {
+        var isolation = new DurableJobTurnIsolation();
+        isolation.Enable();
+        var registry = new DurableJobHandlerRegistry(isolation);
+        var calls = 0;
+        registry.Register(
+            new TestHandler(
+                static jobName => jobName == "feature",
+                () =>
+            {
+                calls++;
+                return DurableJobRunResult.Completed;
+            }),
+            requiresTurnIsolation: true);
+        var extension = new DurableJobFeatureReceiverExtension(registry, CreateShared(), isolation);
+        using var active = await isolation.EnterOrdinaryAsync();
+        active.Activate();
+        RequestContext.Remove(DurableJobTurnIsolation.RequestContextKey);
+        using var cancellation = new CancellationTokenSource();
+        cancellation.Cancel();
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(
+            () => extension.TryHandleFeatureJobAsync(new TestJobRunContext("feature"), cancellation.Token).AsTask());
+
+        Assert.Equal(0, calls);
+    }
+
+    [Fact]
+    public async Task TurnIsolation_StaleOwnerFromPriorTurnCannotEnterCurrentTurn()
+    {
+        var isolation = new DurableJobTurnIsolation();
+        isolation.Enable();
+        string priorOwner;
+        using (var prior = await isolation.EnterOrdinaryAsync())
+        {
+            prior.Activate();
+            priorOwner = Assert.IsType<string>(RequestContext.Get(DurableJobTurnIsolation.RequestContextKey));
+        }
+
+        using var current = await isolation.EnterOrdinaryAsync();
+        current.Activate();
+        var currentOwner = Assert.IsType<string>(RequestContext.Get(DurableJobTurnIsolation.RequestContextKey));
+        Assert.NotEqual(priorOwner, currentOwner);
+        RequestContext.Set(DurableJobTurnIsolation.RequestContextKey, priorOwner);
+
+        var staleEntry = isolation.EnterOrdinaryAsync();
+        Assert.False(staleEntry.IsCompleted);
+
+        RequestContext.Set(DurableJobTurnIsolation.RequestContextKey, currentOwner);
+        current.Dispose();
+        using var admitted = await staleEntry.AsTask().WaitAsync(TimeSpan.FromSeconds(10));
+        admitted.Activate();
     }
 
     private static DurableJobReceiverExtensionShared CreateShared() =>

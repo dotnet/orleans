@@ -330,7 +330,18 @@ internal sealed partial class ShardExecutor
 
                 var featureTarget = _grainFactory.GetGrain<IDurableJobFeatureReceiverExtension>(jobContext.Job.TargetGrainId);
                 var result = await featureTarget.TryHandleFeatureJobAsync(jobContext, attemptCancellationToken);
-                if (result is null)
+                if (result is not null)
+                {
+                    while (result.IsInProgress)
+                    {
+                        LogPollingJob(_logger, jobContext.Job.Id, jobContext.Job.Name, result.PollAfterDelay.Value);
+                        await Task.Delay(result.PollAfterDelay.Value, _timeProvider, attemptCancellationToken);
+                        result = await featureTarget.TryHandleFeatureJobAsync(jobContext, attemptCancellationToken)
+                            ?? throw new InvalidOperationException(
+                                $"Durable feature job '{jobContext.Job.Id}' was no longer registered while it was in progress.");
+                    }
+                }
+                else
                 {
                     var target = _grainFactory.GetGrain<IDurableJobReceiverExtension>(jobContext.Job.TargetGrainId);
                     result = await target.HandleDurableJobAsync(jobContext, attemptCancellationToken);

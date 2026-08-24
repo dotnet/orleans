@@ -17,6 +17,7 @@ internal sealed class DurableTaskMessageTransport(
     internal const string InvocationRoute = "durable-rpc/invoke";
     internal const string CompletionRoute = "durable-rpc/complete";
     internal const string CancellationRoute = "durable-rpc/cancel";
+    internal const string CancellationAcknowledgementRoute = "durable-rpc/cancel-ack";
     internal const string ResumeRoute = "durable-rpc/resume";
 
     public void SendInvocation(GrainId sender, GrainId target, TaskId taskId, IDurableTaskRequest request) =>
@@ -27,6 +28,19 @@ internal sealed class DurableTaskMessageTransport(
 
     public void SendCancellation(GrainId sender, GrainId target, TaskId taskId) =>
         Send(sender, target, taskId, CancellationRoute, new DurableTaskCancellationMessage { TaskId = taskId }, replyTo: null);
+
+    public void SendCancellationAcknowledgement(
+        GrainId sender,
+        GrainId target,
+        TaskId taskId,
+        DurableTaskResponse response) =>
+        Send(
+            sender,
+            target,
+            taskId,
+            CancellationAcknowledgementRoute,
+            new DurableTaskCancellationAcknowledgementMessage { TaskId = taskId, Response = response },
+            replyTo: null);
 
     public ValueTask ScheduleResumeAsync(
         GrainId target,

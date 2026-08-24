@@ -67,9 +67,11 @@ public interface IDurableOutbox
     /// <param name="envelope">The envelope to send.</param>
     /// <remarks>
     /// <para>
-    /// The message is persisted atomically with grain state when <c>IJournaledStateManager.WriteStateAsync()</c>
-    /// is called. The message will remain in the outbox until it is successfully delivered and removed via
-    /// <see cref="RemoveMessage"/>.
+    /// Outside inbox handling, the message is persisted atomically with grain state when
+    /// <c>IJournaledStateManager.WriteStateAsync()</c> is called. During inbox handling, direct writes are
+    /// deferred and the inbox infrastructure commits handler state, outbox messages, inbox removal, and
+    /// deduplication completion together after successful handler return. The message remains in the outbox
+    /// until it is successfully delivered and removed via <see cref="RemoveMessage"/>.
     /// </para>
     /// <para>
     /// To create an envelope, use <c>context.CreateEnvelope()</c> in a handler, or create a

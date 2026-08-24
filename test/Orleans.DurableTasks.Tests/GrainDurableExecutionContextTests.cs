@@ -89,6 +89,30 @@ public class GrainDurableExecutionContextTests
     }
 
     [Fact]
+    public async Task RegisterCancellationCallback_AfterCancellationIsRejected()
+    {
+        var (context, _) = CreateContext();
+
+        await context.CancelAsync(CancellationToken.None);
+
+        Assert.Throws<OperationCanceledException>(
+            () => context.RegisterCancellationCallback(static _ => Task.CompletedTask));
+    }
+
+    [Fact]
+    public async Task RegisterDeactivationCallback_AfterDeactivationIsRejected()
+    {
+        var (context, _) = CreateContext();
+
+        await ((GrainDurableExecutionContext)context).DeactivateForActivationAsync(CancellationToken.None);
+
+        Assert.Throws<OperationCanceledException>(
+            () => context.RegisterDeactivationCallback(
+                static (object? _, CancellationToken _) => Task.CompletedTask,
+                state: null));
+    }
+
+    [Fact]
     public async Task ScheduleChildTaskAsync_NotAChildOfOwnTaskId_ThrowsInvalidOperationException()
     {
         var ownTaskId = TaskId.Create("root");

@@ -51,6 +51,10 @@ public static class DurableJobsExtensions
         services.AddFromExisting<ILifecycleParticipant<ISiloLifecycle>, LocalDurableJobManager>();
         services.AddScoped<DurableJobHandlerRegistry>();
         services.AddScoped<IDurableJobHandlerRegistry>(sp => sp.GetRequiredService<DurableJobHandlerRegistry>());
+        services.TryAddScoped<DurableJobTurnIsolation>();
+        services.TryAddScoped(sp => new DurableJobExecutionLifetime(sp.GetRequiredService<IGrainContextAccessor>().GrainContext));
+        services.TryAddEnumerable(
+            ServiceDescriptor.Singleton<IIncomingGrainCallFilter, DurableJobTurnIsolationFilter>());
         services.AddSingleton(sp => new DurableJobReceiverExtensionShared(
             sp.GetRequiredService<ILogger<DurableJobReceiverExtension>>(),
             sp.GetRequiredService<IOptions<DurableJobsOptions>>(),
@@ -75,7 +79,8 @@ public static class DurableJobsExtensions
         services.AddKeyedTransient<IGrainExtension>(typeof(IDurableJobFeatureReceiverExtension), (sp, _) =>
             new DurableJobFeatureReceiverExtension(
                 sp.GetRequiredService<DurableJobHandlerRegistry>(),
-                sp.GetRequiredService<DurableJobReceiverExtensionShared>()));
+                sp.GetRequiredService<DurableJobReceiverExtensionShared>(),
+                sp.GetRequiredService<DurableJobTurnIsolation>()));
     }
 
     /// <summary>

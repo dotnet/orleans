@@ -1,5 +1,6 @@
 #nullable enable
 using System;
+using System.Collections.Generic;
 using System.Distributed.DurableTasks;
 using System.Threading;
 using System.Threading.Tasks;
@@ -201,5 +202,143 @@ public class ConfiguredDurableTaskTests
         Assert.Equal(expectedChildTaskId, capturedTaskId);
         _ = Assert.IsType<ScheduledDurableTask<int>>(scheduled);
         await runtime.Received(1).ScheduleChildAsync(expectedChildTaskId, configured.Task, Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task StructCopies_NonGenericStandalone_SchedulePollAndCancelUseOneStableId()
+    {
+        var task = new RecordingSchedulableTask();
+        var configured = new ConfiguredDurableTask(task);
+        var copy = configured;
+
+        var scheduled = await configured.ScheduleAsync();
+        _ = await copy.PollAsync(new PollingOptions(), CancellationToken.None);
+        _ = await configured.CancelAsync(CancellationToken.None);
+
+        Assert.Equal(scheduled.Id, configured.TaskId);
+        Assert.Equal(configured.TaskId, copy.TaskId);
+        Assert.All(task.ObservedIds, id => Assert.Equal(configured.TaskId, id));
+    }
+
+    [Fact]
+    public async Task StructCopies_GenericStandalone_SchedulePollAndCancelUseOneStableId()
+    {
+        var task = new RecordingSchedulableTask<int>();
+        var configured = new ConfiguredDurableTask<int>(task);
+        var copy = configured;
+
+        var scheduled = await copy.ScheduleAsync();
+        _ = await configured.PollAsync(new PollingOptions(), CancellationToken.None);
+        _ = await copy.CancelAsync(CancellationToken.None);
+
+        Assert.Equal(scheduled.Id, configured.TaskId);
+        Assert.Equal(configured.TaskId, copy.TaskId);
+        Assert.All(task.ObservedIds, id => Assert.Equal(configured.TaskId, id));
+    }
+
+    [Fact]
+    public async Task StructCopies_NonGenericParent_SchedulePollAndCancelUseOneStableChildId()
+    {
+        var runtime = Substitute.For<IDurableTaskGrainRuntime>();
+        var context = new GrainDurableExecutionContext(TaskId.Create("parent"), runtime);
+        var handle = new RecordingScheduledTaskHandle();
+        runtime.ScheduleChildAsync(Arg.Any<TaskId>(), Arg.Any<DurableTask>(), Arg.Any<CancellationToken>())
+            .Returns(call =>
+            {
+                handle.TaskId = call.Arg<TaskId>();
+                return new ValueTask<IScheduledTaskHandle>(handle);
+            });
+        runtime.GetScheduledTaskHandle(Arg.Any<TaskId>()).Returns(handle);
+        var configured = CreateWithAmbientParent(context, DurableTask.Run(static _ => { }));
+        var copy = configured;
+
+        var scheduled = await copy.ScheduleAsync();
+        _ = await configured.PollAsync(new PollingOptions(), CancellationToken.None);
+        _ = await copy.CancelAsync(CancellationToken.None);
+
+        Assert.Equal(scheduled.Id, configured.TaskId);
+        Assert.Equal(configured.TaskId, copy.TaskId);
+        runtime.Received(2).GetScheduledTaskHandle(configured.TaskId);
+    }
+
+    [Fact]
+    public async Task StructCopies_GenericParent_SchedulePollAndCancelUseOneStableChildId()
+    {
+        var runtime = Substitute.For<IDurableTaskGrainRuntime>();
+        var context = new GrainDurableExecutionContext(TaskId.Create("parent"), runtime);
+        var handle = new RecordingScheduledTaskHandle();
+        runtime.ScheduleChildAsync(Arg.Any<TaskId>(), Arg.Any<DurableTask>(), Arg.Any<CancellationToken>())
+            .Returns(call =>
+            {
+                handle.TaskId = call.Arg<TaskId>();
+                return new ValueTask<IScheduledTaskHandle>(handle);
+            });
+        runtime.GetScheduledTaskHandle(Arg.Any<TaskId>()).Returns(handle);
+        var configured = CreateWithAmbientParent(context, DurableTask.FromResult(1));
+        var copy = configured;
+
+        var scheduled = await configured.ScheduleAsync();
+        _ = await copy.PollAsync(new PollingOptions(), CancellationToken.None);
+        _ = await configured.CancelAsync(CancellationToken.None);
+
+        Assert.Equal(scheduled.Id, configured.TaskId);
+        Assert.Equal(configured.TaskId, copy.TaskId);
+        runtime.Received(2).GetScheduledTaskHandle(configured.TaskId);
+    }
+
+    private sealed class RecordingSchedulableTask : DurableTask, ISchedulableTask
+    {
+        private readonly RecordingScheduledTaskHandle _handle = new();
+        public List<TaskId> ObservedIds { get; } = [];
+        public bool CommitsDurableState => false;
+
+        public ValueTask<DurableTaskResponse> ScheduleAsync(TaskId taskId, CancellationToken cancellationToken)
+        {
+            ObservedIds.Add(taskId);
+            _handle.TaskId = taskId;
+            return ValueTask.FromResult<DurableTaskResponse>(DurableTaskResponse.Pending);
+        }
+
+        public IScheduledTaskHandle GetHandle(TaskId taskId)
+        {
+            ObservedIds.Add(taskId);
+            return _handle;
+        }
+
+        protected internal override ValueTask<DurableTaskResponse> RunAsync(DurableExecutionContext context) =>
+            throw new NotSupportedException();
+    }
+
+    private sealed class RecordingSchedulableTask<TResult> : DurableTask<TResult>, ISchedulableTask
+    {
+        private readonly RecordingScheduledTaskHandle _handle = new();
+        public List<TaskId> ObservedIds { get; } = [];
+        public bool CommitsDurableState => false;
+
+        public ValueTask<DurableTaskResponse> ScheduleAsync(TaskId taskId, CancellationToken cancellationToken)
+        {
+            ObservedIds.Add(taskId);
+            _handle.TaskId = taskId;
+            return ValueTask.FromResult<DurableTaskResponse>(DurableTaskResponse.Pending);
+        }
+
+        public IScheduledTaskHandle GetHandle(TaskId taskId)
+        {
+            ObservedIds.Add(taskId);
+            return _handle;
+        }
+
+        protected internal override ValueTask<DurableTaskResponse> RunAsync(DurableExecutionContext context) =>
+            throw new NotSupportedException();
+    }
+
+    private sealed class RecordingScheduledTaskHandle : IScheduledTaskHandle
+    {
+        public TaskId TaskId { get; set; }
+        public ValueTask CancelAsync(CancellationToken cancellationToken) => ValueTask.CompletedTask;
+        public ValueTask<DurableTaskResponse> PollAsync(PollingOptions options, CancellationToken cancellationToken) =>
+            ValueTask.FromResult<DurableTaskResponse>(DurableTaskResponse.Pending);
+        public ValueTask<DurableTaskResponse> WaitAsync(CancellationToken cancellationToken) =>
+            ValueTask.FromResult<DurableTaskResponse>(DurableTaskResponse.Pending);
     }
 }

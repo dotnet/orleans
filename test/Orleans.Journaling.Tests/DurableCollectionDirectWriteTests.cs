@@ -1,5 +1,6 @@
 using System.Buffers;
 using System.Diagnostics.CodeAnalysis;
+using Orleans.Serialization.Buffers;
 using Xunit;
 
 namespace Orleans.Journaling.Tests;
@@ -191,6 +192,89 @@ public sealed class DurableCollectionDirectWriteTests
         Assert.True(writer.Length > 0);
     }
 
+    [Fact]
+    public void Dictionary_SetReplacement_DisposesPreviousValueExactlyOnce()
+    {
+        using var writer = new TestJournalStreamWriter();
+        var dictionary = new DurableDictionary<int, CountingDisposable>(
+            "dictionary",
+            new TestJournalManager(writer),
+            new DirectDictionaryCodec<int, CountingDisposable>());
+        var first = new CountingDisposable();
+        var second = new CountingDisposable();
+
+        dictionary.Add(1, first);
+        dictionary[1] = second;
+        dictionary[1] = second;
+
+        Assert.Equal(1, first.DisposeCount);
+        Assert.Equal(0, second.DisposeCount);
+        Assert.Same(second, dictionary[1]);
+    }
+
+    [Fact]
+    public void Dictionary_RemoveSharedValue_DisposesAfterLastOwnedReference()
+    {
+        using var writer = new TestJournalStreamWriter();
+        var dictionary = new DurableDictionary<int, CountingDisposable>(
+            "dictionary",
+            new TestJournalManager(writer),
+            new DirectDictionaryCodec<int, CountingDisposable>());
+        var value = new CountingDisposable();
+        dictionary.Add(1, value);
+        dictionary.Add(2, value);
+
+        Assert.True(dictionary.Remove(1));
+        Assert.Equal(0, value.DisposeCount);
+
+        Assert.True(dictionary.Remove(new KeyValuePair<int, CountingDisposable>(2, value)));
+        Assert.Equal(1, value.DisposeCount);
+    }
+
+    [Fact]
+    public void Dictionary_ClearAndReset_DisposeEachOwnedValueExactlyOnce()
+    {
+        using var writer = new TestJournalStreamWriter();
+        var dictionary = new DurableDictionary<int, CountingDisposable>(
+            "dictionary",
+            new TestJournalManager(writer),
+            new DirectDictionaryCodec<int, CountingDisposable>());
+        var shared = new CountingDisposable();
+        var unique = new CountingDisposable();
+        dictionary.Add(1, shared);
+        dictionary.Add(2, shared);
+        dictionary.Add(3, unique);
+
+        dictionary.Clear();
+        Assert.Equal(1, shared.DisposeCount);
+        Assert.Equal(1, unique.DisposeCount);
+
+        var replayed = new CountingDisposable();
+        ((IDurableDictionaryCommandHandler<int, CountingDisposable>)dictionary).ApplySet(4, replayed);
+        ((IDurableDictionaryCommandHandler<int, CountingDisposable>)dictionary).Reset(1);
+        ((IJournaledState)dictionary).Reset(writer.CreateWriter());
+
+        Assert.Equal(1, replayed.DisposeCount);
+        Assert.Empty(dictionary);
+    }
+
+    [Fact]
+    public void Dictionary_Clear_DisposesOwnedArcBuffer()
+    {
+        using var writer = new TestJournalStreamWriter();
+        var dictionary = new DurableDictionary<int, ArcBufferOwner>(
+            "dictionary",
+            new TestJournalManager(writer),
+            new DirectDictionaryCodec<int, ArcBufferOwner>());
+        var owner = new ArcBufferOwner();
+        dictionary.Add(1, owner);
+
+        dictionary.Clear();
+
+        Assert.Equal(1, owner.DisposeCount);
+        Assert.Empty(dictionary);
+    }
+
     private sealed class TestJournalManager(TestJournalStreamWriter writer) : IJournaledStateManager
     {
         public ValueTask InitializeAsync(CancellationToken cancellationToken) => default;
@@ -363,6 +447,8 @@ public sealed class DurableCollectionDirectWriteTests
         public override void WriteSet(TKey key, TValue value, JournalStreamWriter writer) => WriteCommittedByte(writer);
 
         public override void WriteRemove(TKey key, JournalStreamWriter writer) => WriteCommittedByte(writer);
+
+        public override void WriteClear(JournalStreamWriter writer) => WriteCommittedByte(writer);
     }
 
     private sealed class ThrowingDictionaryCodec<TKey, TValue>(bool throwOnSet = false, bool throwOnRemove = false, bool throwOnClear = false) : TestDictionaryCodec<TKey, TValue> where TKey : notnull
@@ -429,5 +515,32 @@ public sealed class DurableCollectionDirectWriteTests
         var span = output.GetSpan(1);
         span[0] = 1;
         output.Advance(1);
+    }
+
+    private sealed class CountingDisposable : IDisposable
+    {
+        public int DisposeCount { get; private set; }
+
+        public void Dispose() => DisposeCount++;
+    }
+
+    private sealed class ArcBufferOwner : IDisposable
+    {
+        private ArcBuffer _buffer;
+
+        public ArcBufferOwner()
+        {
+            using var writer = new ArcBufferWriter();
+            writer.Write([1, 2, 3]);
+            _buffer = writer.PeekSlice(writer.Length);
+        }
+
+        public int DisposeCount { get; private set; }
+
+        public void Dispose()
+        {
+            DisposeCount++;
+            _buffer.Dispose();
+        }
     }
 }

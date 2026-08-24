@@ -152,6 +152,12 @@ internal sealed partial class DurableOutbox :
     /// </remarks>
     public void Send(DurableEnvelope envelope)
     {
+        if (TryGetValue(envelope.MessageId, out var existing)
+            && ReferenceEquals(existing.Data, envelope.Data))
+        {
+            return;
+        }
+
         EnsureMetricsActive();
         var isNewMessage = !ContainsKey(envelope.MessageId);
 
@@ -202,15 +208,9 @@ internal sealed partial class DurableOutbox :
     {
         _pendingMessageIds.Remove(messageId);
         _messageStates.Remove(messageId);
-        _ = TryGetValue(messageId, out var envelope);
-        var removed = Remove(messageId);
+        var removed = Remove(messageId, disposeEnvelope);
         if (removed)
         {
-            if (disposeEnvelope)
-            {
-                envelope.Data.Dispose();
-            }
-
             if (Volatile.Read(ref _metricsActive) != 0)
             {
                 _instruments.OnOutboxDepthChanged(-1);
@@ -554,7 +554,7 @@ internal sealed partial class DurableOutbox :
             }
 
             LogPumpStartingOnActivation(_logger, Count);
-            await EnsureJobScheduledAsync(callerIsIsolated: true).ConfigureAwait(true);
+            await EnsureJobScheduledAsync().ConfigureAwait(true);
         }
     }
 
@@ -580,7 +580,7 @@ internal sealed partial class DurableOutbox :
         }
     }
 
-    private async Task EnsureJobScheduledAsync(bool callerIsIsolated = false)
+    private async Task EnsureJobScheduledAsync()
     {
         while (!_shutdown.IsCancellationRequested)
         {
@@ -608,7 +608,20 @@ internal sealed partial class DurableOutbox :
                     },
                     _shutdown.Token).ConfigureAwait(true);
 
-                _ = await TryClaimJobAsync(job.Id, _shutdown.Token, callerIsIsolated).ConfigureAwait(true);
+                await _gate.WaitAsync(_shutdown.Token).ConfigureAwait(true);
+                try
+                {
+                    if (string.IsNullOrEmpty(_jobId.Value) && Count - _pendingMessageIds.Count > 0)
+                    {
+                        _jobId.Value = job.Id;
+                        await _stateManager.WriteStateAsync(_shutdown.Token).ConfigureAwait(true);
+                    }
+                }
+                finally
+                {
+                    _gate.Release();
+                }
+
                 return;
             }
             catch (OperationCanceledException) when (_shutdown.IsCancellationRequested)

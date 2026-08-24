@@ -122,6 +122,27 @@ public class DurableTaskMessageTransportTests
     }
 
     [Fact]
+    public void SendCancellationAcknowledgement_SendsCorrelatedAcknowledgementEnvelope()
+    {
+        var (transport, outbox, _, _) = CreateTransport();
+        var sender = GrainId.Create("rpc-target", "ack-sender");
+        var target = GrainId.Create("rpc-sender", "ack-target");
+        var taskId = TaskId.Create("workflow-ack");
+        var response = DurableTaskResponse.FromResult(42);
+
+        transport.SendCancellationAcknowledgement(sender, target, taskId, response);
+
+        var envelope = Assert.Single(outbox.SentEnvelopes);
+        Assert.Equal(DurableTaskMessageTransport.CancellationAcknowledgementRoute, envelope.RouteKey);
+        Assert.Equal(sender, envelope.SenderId);
+        Assert.Equal(target, envelope.ReceiverId);
+        Assert.Equal(taskId.ToHierarchicalKey(), envelope.CorrelationKey);
+        Assert.True(envelope.Data.TryGetBody<DurableTaskCancellationAcknowledgementMessage>(out var body));
+        Assert.Equal(taskId, body!.TaskId);
+        Assert.Equal(42, body.Response.GetResult<int>());
+    }
+
+    [Fact]
     public async Task ScheduleResumeAsync_CallsSchedulerWithResumeRouteAndDueTime()
     {
         var (transport, _, scheduler, _) = CreateTransport();

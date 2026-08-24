@@ -7,12 +7,14 @@ using System.Linq;
 using System.Reflection;
 using System.Threading;
 using System.Threading.Tasks;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
 using Orleans.CodeGeneration;
 using Orleans.DurableMessaging;
 using Orleans.Journaling;
 using Orleans.Runtime;
 using Orleans.Runtime.DurableTasks;
+using Orleans.Serialization;
 using Orleans.Serialization.Invocation;
 
 namespace Orleans.DurableTasks.Tests;
@@ -186,6 +188,7 @@ internal sealed class RpcTestMessageTransport : IDurableTaskMessageTransport
     public List<(GrainId Sender, GrainId Target, TaskId TaskId, IDurableTaskRequest Request)> Invocations { get; } = [];
     public List<(GrainId Sender, GrainId Target, TaskId TaskId, DurableTaskResponse Response)> Completions { get; } = [];
     public List<(GrainId Sender, GrainId Target, TaskId TaskId)> Cancellations { get; } = [];
+    public List<(GrainId Sender, GrainId Target, TaskId TaskId, DurableTaskResponse Response)> CancellationAcknowledgements { get; } = [];
     public List<(GrainId Target, TaskId TaskId, DateTimeOffset DueTime)> ScheduledResumes { get; } = [];
     public int CommitAsyncCallCount { get; private set; }
 
@@ -197,6 +200,13 @@ internal sealed class RpcTestMessageTransport : IDurableTaskMessageTransport
 
     public void SendCancellation(GrainId sender, GrainId target, TaskId taskId) =>
         Cancellations.Add((sender, target, taskId));
+
+    public void SendCancellationAcknowledgement(
+        GrainId sender,
+        GrainId target,
+        TaskId taskId,
+        DurableTaskResponse response) =>
+        CancellationAcknowledgements.Add((sender, target, taskId, response));
 
     public ValueTask ScheduleResumeAsync(GrainId target, TaskId taskId, DateTimeOffset dueTime, CancellationToken cancellationToken)
     {
@@ -325,7 +335,8 @@ internal static class RpcTestRuntimeFactory
         var shared = new DurableTaskGrainRuntimeShared(
             new TestGrainContextAccessor(grainContext),
             TimeProvider.System,
-            NullLogger<DurableTaskGrainRuntime>.Instance);
+            NullLogger<DurableTaskGrainRuntime>.Instance,
+            new ServiceCollection().AddSerializer().BuildServiceProvider().GetRequiredService<Serializer>());
         IEnumerable<IDurableTaskMessageTransport> transports = transport is null
             ? []
             : [transport];

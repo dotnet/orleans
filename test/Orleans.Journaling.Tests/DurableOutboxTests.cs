@@ -140,6 +140,21 @@ public class DurableOutboxTests : JournalingTestBase
     }
 
     [Fact]
+    public void Send_SameEnvelopeTwice_PreservesPayloadOwnership()
+    {
+        var h = CreateOutbox();
+        var envelope = CreateEnvelope();
+
+        h.Outbox.Send(envelope);
+        h.Outbox.Send(envelope);
+
+        Assert.Single(h.Outbox.Messages);
+        Assert.True(h.Outbox.TryGetMessage(envelope.MessageId, out var stored));
+        Assert.True(stored.Data.TryGetBody<string>(out var body));
+        Assert.Equal("payload", body);
+    }
+
+    [Fact]
     public async Task DeliverPendingMessagesAsync_WhenReceiverReportsBackpressure_KeepsMessageAndSchedulesRetry()
     {
         var h = CreateOutbox();
@@ -216,6 +231,8 @@ public class DurableOutboxTests : JournalingTestBase
         Assert.Equal(1, deadLetter.AttemptCount);
         Assert.True(deadLetter.Envelope.Data.TryGetBody<string>(out var body));
         Assert.Equal("payload", body);
+        deadLetter.Dispose();
+        Assert.False(deadLetter.Envelope.Data.TryGetBody<string>(out _));
         // The message state itself is cleaned up as part of RemoveMessage.
         Assert.False(h.MessageStates.ContainsKey(envelope.MessageId));
     }

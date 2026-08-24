@@ -55,7 +55,6 @@
     <Project Path="src/Orleans.Persistence.Memory/Orleans.Persistence.Memory.csproj" />
     <Project Path="src/Orleans.Persistence.TestKit/Orleans.Persistence.TestKit.csproj" />
     <Project Path="src/Orleans.Reminders/Orleans.Reminders.csproj" />
-    <Project Path="src/Orleans.Reminders.Abstractions/Orleans.Reminders.Abstractions.csproj" />
     <Project Path="src/Orleans.Reminders.TestKit/Orleans.Reminders.TestKit.csproj" />
     <Project Path="src/Orleans.Runtime/Orleans.Runtime.csproj" />
     <Project Path="src/Orleans.DurableJobs/Orleans.DurableJobs.csproj" Id="ab4cc723-b3cf-4c32-be4c-1a180a49797c" />

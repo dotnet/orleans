@@ -113,14 +113,11 @@ internal sealed class DurableInbox : IDurableInbox, ILifecycleObserver
     {
         var key = (senderId, messageId);
 
-        // Get the envelope before removing to dispose its data
-        if (_inbox.TryGetValue(key, out var envelope))
+        if (_inbox.ContainsKey(key))
         {
             var removed = _inbox.Remove(key);
             if (removed)
             {
-                // Dispose ArcBuffer resources
-                envelope.Data.Dispose();
                 _instruments?.OnInboxDepthChanged(-1);
             }
             return removed;
@@ -200,13 +197,19 @@ internal sealed class DurableInbox : IDurableInbox, ILifecycleObserver
         ArgumentException.ThrowIfNullOrWhiteSpace(routeKey);
         ArgumentNullException.ThrowIfNull(handler);
 
-        // Store in legacy dictionary
+        if (_legacyRouteHandlers.ContainsKey(routeKey))
+        {
+            var wrapper = _handlers
+                .OfType<LegacyRouteKeyHandlerWrapper>()
+                .Single(candidate => string.Equals(candidate.RouteKey, routeKey, StringComparison.Ordinal));
+            wrapper.Replace(handler);
+        }
+        else
+        {
+            _handlers.Add(new LegacyRouteKeyHandlerWrapper(routeKey, handler));
+        }
+
         _legacyRouteHandlers[routeKey] = handler;
-
-        // Wrap in a RouteKeyHandler and add to new handlers list
-        var wrappedHandler = new LegacyRouteKeyHandlerWrapper(routeKey, handler);
-        _handlers.Add(wrappedHandler);
-
     }
 
     /// <summary>
@@ -239,10 +242,12 @@ internal sealed class DurableInbox : IDurableInbox, ILifecycleObserver
         }
     }
 
-    public Task OnStop(CancellationToken cancellationToken = default)
+    public async Task OnStop(CancellationToken cancellationToken = default)
     {
-        _extension?.StopProcessing();
-        return Task.CompletedTask;
+        if (_extension is not null)
+        {
+            await _extension.OnStop(cancellationToken).ConfigureAwait(true);
+        }
     }
 }
 
@@ -252,13 +257,17 @@ internal sealed class DurableInbox : IDurableInbox, ILifecycleObserver
 internal sealed class LegacyRouteKeyHandlerWrapper : IInboxHandler
 {
     private readonly string _routeKey;
-    private readonly IInboxHandler _innerHandler;
+    private IInboxHandler _innerHandler;
 
     public LegacyRouteKeyHandlerWrapper(string routeKey, IInboxHandler innerHandler)
     {
         _routeKey = routeKey;
         _innerHandler = innerHandler;
     }
+
+    internal string RouteKey => _routeKey;
+
+    internal void Replace(IInboxHandler handler) => _innerHandler = handler;
 
     public bool CanHandle(IInboxHandlerContext context)
     {

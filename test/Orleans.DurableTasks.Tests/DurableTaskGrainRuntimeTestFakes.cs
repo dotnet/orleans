@@ -27,6 +27,7 @@ internal sealed class RecordingDurableTaskMessageTransport : IDurableTaskMessage
     public List<(GrainId Sender, GrainId Target, TaskId TaskId, IDurableTaskRequest Request)> Invocations { get; } = [];
     public List<(GrainId Sender, GrainId Target, TaskId TaskId, DurableTaskResponse Response)> Completions { get; } = [];
     public List<(GrainId Sender, GrainId Target, TaskId TaskId)> Cancellations { get; } = [];
+    public List<(GrainId Sender, GrainId Target, TaskId TaskId, DurableTaskResponse Response)> CancellationAcknowledgements { get; } = [];
     public List<(GrainId Target, TaskId TaskId, DateTimeOffset DueTime)> ScheduledResumes { get; } = [];
     public int CommitCount { get; private set; }
 
@@ -35,6 +36,13 @@ internal sealed class RecordingDurableTaskMessageTransport : IDurableTaskMessage
     public void SendCompletion(GrainId sender, GrainId target, TaskId taskId, DurableTaskResponse response) => Completions.Add((sender, target, taskId, response));
 
     public void SendCancellation(GrainId sender, GrainId target, TaskId taskId) => Cancellations.Add((sender, target, taskId));
+
+    public void SendCancellationAcknowledgement(
+        GrainId sender,
+        GrainId target,
+        TaskId taskId,
+        DurableTaskResponse response) =>
+        CancellationAcknowledgements.Add((sender, target, taskId, response));
 
     public ValueTask ScheduleResumeAsync(GrainId target, TaskId taskId, DateTimeOffset dueTime, CancellationToken cancellationToken)
     {
@@ -60,8 +68,13 @@ internal sealed class RecordingDurableTaskMessageTransport : IDurableTaskMessage
 /// <see cref="RuntimeTestDurableTaskRequestCopier"/> below avoids that problem entirely while still letting tests fully control
 /// and observe request behavior.
 /// </remarks>
-internal sealed class RuntimeTestDurableTaskRequest(Func<DurableTask>? createTask = null, string interfaceName = "ITestInterface", string methodName = "TestMethod") : IDurableTaskRequest
+internal sealed class RuntimeTestDurableTaskRequest(
+    Func<DurableTask>? createTask = null,
+    string interfaceName = "ITestInterface",
+    string methodName = "TestMethod",
+    object?[]? arguments = null) : IDurableTaskRequest
 {
+    private readonly object?[] _arguments = arguments ?? [];
     public DurableTaskRequestContext? Context { get; set; }
 
     public string InterfaceName { get; set; } = interfaceName;
@@ -86,11 +99,11 @@ internal sealed class RuntimeTestDurableTaskRequest(Func<DurableTask>? createTas
 
     public ValueTask<Response> Invoke() => throw new NotSupportedException("Durable task requests can not be invoked directly.");
 
-    public int GetArgumentCount() => 0;
+    public int GetArgumentCount() => _arguments.Length;
 
-    public object GetArgument(int index) => throw new ArgumentOutOfRangeException(nameof(index));
+    public object GetArgument(int index) => _arguments[index]!;
 
-    public void SetArgument(int index, object value) => throw new ArgumentOutOfRangeException(nameof(index));
+    public void SetArgument(int index, object value) => _arguments[index] = value;
 
     public void Dispose()
     {
@@ -104,9 +117,26 @@ internal sealed class RuntimeTestDurableTaskRequest(Func<DurableTask>? createTas
 
     public Type GetInterfaceType() => typeof(object);
 
-    public MethodInfo GetMethod() => null!;
+    public MethodInfo GetMethod() =>
+        typeof(RuntimeTestDurableTaskRequest).GetMethod(
+            nameof(TestMethodSignature),
+            BindingFlags.NonPublic | BindingFlags.Static)!;
 
     public void AddInvokeMethodOptions(InvokeMethodOptions options) => Options |= options;
+
+    private static void TestMethodSignature()
+    {
+    }
+}
+
+[GenerateSerializer]
+internal sealed record RuntimeTestComplexArgument
+{
+    [Id(0)]
+    public string Name { get; set; } = "";
+
+    [Id(1)]
+    public int[] Values { get; set; } = [];
 }
 
 /// <summary>

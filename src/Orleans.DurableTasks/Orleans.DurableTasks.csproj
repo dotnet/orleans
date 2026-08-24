@@ -10,6 +10,7 @@
     <OrleansBuildTimeCodeGen>true</OrleansBuildTimeCodeGen>
     <EmitCompilerGeneratedFiles>true</EmitCompilerGeneratedFiles>
     <NoWarn>$(NoWarn);ORLEANSEXP005</NoWarn>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
   </PropertyGroup>
 
   <ItemGroup>
@@ -26,6 +27,10 @@
     <ProjectReference Include="..\Orleans.Serialization\Orleans.Serialization.csproj" />
     <ProjectReference Include="..\Orleans.Server\Orleans.Server.csproj" />
     <ProjectReference Include="..\System.Distributed.DurableTasks\System.Distributed.DurableTasks.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="README.md" Pack="true" PackagePath="\" />
   </ItemGroup>
 
 </Project>

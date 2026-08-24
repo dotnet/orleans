@@ -241,7 +241,7 @@ public class DurableTaskMessageHandlerTests
     [Fact]
     public async Task CancellationRoute_DelegatesToRuntimeSignalCancellationAsync()
     {
-        var (handler, storage, _, _, grainId, sessionPool) = CreateHandler();
+        var (handler, storage, handlerTransport, _, grainId, sessionPool) = CreateHandler();
         var sender = GrainId.Create("rpc-caller", "caller-8");
         var taskId = TaskId.CreateRandom();
         var context = CreateContext(sessionPool, sender, grainId, DurableTaskMessageTransport.CancellationRoute,
@@ -253,6 +253,10 @@ public class DurableTaskMessageHandlerTests
 
         Assert.True(storage.TryGetTask(taskId, out var state));
         Assert.True(state!.CancellationRequestedAt.HasValue);
+        var acknowledgement = Assert.Single(handlerTransport.CancellationAcknowledgements);
+        Assert.Equal((grainId, sender, taskId), (acknowledgement.Sender, acknowledgement.Target, acknowledgement.TaskId));
+        Assert.Equal(DurableTaskStatus.Canceled, acknowledgement.Response.Status);
+        Assert.Equal(1, handlerTransport.CommitAsyncCallCount);
     }
 
     [Fact]

@@ -54,7 +54,11 @@ internal sealed class HierarchicalKey : ISpanFormattable, IEquatable<Hierarchica
         return new(value.AsMemory());
     }
 
-    public static HierarchicalKey Create(HierarchicalKey? parent, string value) => new(parent, value.AsMemory());
+    public static HierarchicalKey Create(HierarchicalKey? parent, string value)
+    {
+        Validate(value);
+        return new(parent, value.AsMemory());
+    }
 
     public HierarchicalKey? GetParent() => WithoutLastSegment(_value) switch
     {
@@ -102,56 +106,72 @@ internal sealed class HierarchicalKey : ISpanFormattable, IEquatable<Hierarchica
 
     public static HierarchicalKey CreateEscaped(HierarchicalKey? parent, ReadOnlyMemory<char> value)
     {
-        var unescapedChars = UnescapedCharCount(value.Span);
-        if (unescapedChars == 0)
+        if (value.IsEmpty)
+        {
+            throw new ArgumentException("Value must not be empty.", nameof(value));
+        }
+
+        var charactersToEscape = CharactersToEscape(value.Span);
+        if (charactersToEscape == 0)
         {
             return new HierarchicalKey(parent, value);
         }
 
-        return new HierarchicalKey(parent, Escape(value.Span, unescapedChars).AsMemory());
+        return new HierarchicalKey(parent, Escape(value.Span, charactersToEscape).AsMemory());
     }
 
-    private static string Escape(ReadOnlySpan<char> value, int unescapedChars)
+    private static string Escape(ReadOnlySpan<char> value, int charactersToEscape)
     {
-        var resultArray = ArrayPool<char>.Shared.Rent(value.Length + unescapedChars);
-        var isEscaped = false;
-        var insertions = 0;
+        var resultArray = ArrayPool<char>.Shared.Rent(value.Length + charactersToEscape);
+        try
+        {
+            var destination = resultArray.AsSpan();
+            var written = 0;
+            for (var i = 0; i < value.Length; i++)
+            {
+                var c = value[i];
+                if (c == EscapeCharacter
+                    && i + 1 < value.Length
+                    && value[i + 1] is EscapeCharacter or SegmentSeparator)
+                {
+                    destination[written++] = c;
+                    destination[written++] = value[++i];
+                    continue;
+                }
+
+                if (c is EscapeCharacter or SegmentSeparator)
+                {
+                    destination[written++] = EscapeCharacter;
+                }
+
+                destination[written++] = c;
+            }
+
+            return new string(destination[..written]);
+        }
+        finally
+        {
+            ArrayPool<char>.Shared.Return(resultArray);
+        }
+    }
+
+    private static int CharactersToEscape(ReadOnlySpan<char> value)
+    {
+        var result = 0;
         for (var i = 0; i < value.Length; i++)
         {
             var c = value[i];
-            if (!isEscaped && c == SegmentSeparator)
+            if (c == EscapeCharacter
+                && i + 1 < value.Length
+                && value[i + 1] is EscapeCharacter or SegmentSeparator)
             {
-                resultArray[i + insertions] = EscapeCharacter;
-                ++insertions;
-                isEscaped = false;
+                i++;
+                continue;
             }
 
-            if (c == EscapeCharacter)
+            if (c is EscapeCharacter or SegmentSeparator)
             {
-                isEscaped = !isEscaped;
-            }
-
-            resultArray[i + insertions] = c;
-        }
-
-        return new string(resultArray.AsSpan(0, value.Length + unescapedChars));
-    }
-
-    private static int UnescapedCharCount(ReadOnlySpan<char> value)
-    {
-        var isEscaped = false;
-        var result = 0;
-        foreach (var c in value)
-        {
-            if (!isEscaped && c == SegmentSeparator)
-            {
-                ++result;
-                isEscaped = false;
-            }
-
-            if (c == EscapeCharacter)
-            {
-                isEscaped = !isEscaped;
+                result++;
             }
         }
 
@@ -260,6 +280,15 @@ internal sealed class HierarchicalKey : ISpanFormattable, IEquatable<Hierarchica
         return true;
     }
 
+    private static void Validate(string value)
+    {
+        ArgumentException.ThrowIfNullOrEmpty(value);
+        if (!IsSegmentationValid(value))
+        {
+            throw new ArgumentException("Value must contain only non-empty, validly escaped segments.", nameof(value));
+        }
+    }
+
     /// <summary>
     /// Returns <value>true</value> if this key is direct descendant of the provided key, <value>false</value> otherwise.
     /// </summary>
@@ -346,20 +375,28 @@ internal sealed class HierarchicalKey : ISpanFormattable, IEquatable<Hierarchica
     /// Creates a new key, escaping any unescaped segment separators in <paramref name="value"/>, and returns it.
     /// </summary>
     /// <param name="value">The value.</param>
-    public static HierarchicalKey CreateEscaped(string value) => CreateEscaped(null, value.AsMemory());
+    public static HierarchicalKey CreateEscaped(string value)
+    {
+        ArgumentNullException.ThrowIfNull(value);
+        return CreateEscaped(null, value.AsMemory());
+    }
 
     /// <summary>
     /// Creates a key which is a child of this key, escaping any unescaped segment separators in <paramref name="value"/>, and returns it.
     /// </summary>
     /// <param name="value">The value for the child segments.</param>
-    public HierarchicalKey CreateEscapedChildKey(string value) => CreateEscaped(this, value.AsMemory());
+    public HierarchicalKey CreateEscapedChildKey(string value)
+    {
+        ArgumentNullException.ThrowIfNull(value);
+        return CreateEscaped(this, value.AsMemory());
+    }
 
     /// <summary>
     /// Creates a key which is a child of this key and returns it.
     /// </summary>
     /// <param name="value">The value for the child segments.</param>
     /// <returns></returns>
-    public HierarchicalKey CreateChildKey(string value) => new(this, value.AsMemory());
+    public HierarchicalKey CreateChildKey(string value) => Create(this, value);
 
     /// <inheritdoc/>
     public override string ToString() => $"{this}";

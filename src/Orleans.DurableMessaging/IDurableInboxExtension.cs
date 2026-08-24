@@ -17,7 +17,10 @@ public interface IDurableInboxExtension : IGrainExtension
     /// </summary>
     /// <param name="envelope">The message envelope.</param>
     /// <param name="options">Delivery options including poll timeout.</param>
-    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <param name="cancellationToken">
+    /// Cancels only this delivery/poll request. After the envelope is durably accepted, cancellation does not
+    /// cancel or roll back handler execution.
+    /// </param>
     /// <returns>Result indicating delivery/processing status.</returns>
     [Alias("DeliverAsync")]
     ValueTask<DeliveryResult> DeliverAsync(DurableEnvelope envelope, DeliveryOptions options, CancellationToken cancellationToken = default);
