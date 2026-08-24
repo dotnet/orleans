@@ -445,7 +445,8 @@ namespace Orleans.Streams
                     else if (effectiveHandshakeToken is StartToken or DeliveryToken
                         && effectiveHandshakeToken.Token is { } requestedToken)
                     {
-                        cursorStartToken = requestedHandshakeToken is DeliveryToken
+                        var isDeliveryToken = requestedHandshakeToken is DeliveryToken;
+                        cursorStartToken = isDeliveryToken
                             ? cacheToken ?? consumerData.PendingStartToken ?? requestedToken
                             : requestedToken;
                         consumerData.SafeDisposeCursor(logger);
