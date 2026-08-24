@@ -549,18 +549,26 @@ public sealed class RecoverableStreamReceiverTests
     {
         const int participantCount = 3;
         var queue = QueueId.GetQueueId("queue", 0, 0);
-        using var barrier = new Barrier(participantCount);
+        var factoryStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var releaseFactory = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var created = 0;
         var registry = new QueueAdapterReceiverRegistry<TestCombinedReceiver>(_ =>
         {
-            barrier.SignalAndWait();
+            Interlocked.Increment(ref created);
+            factoryStarted.TrySetResult();
+            releaseFactory.Task.GetAwaiter().GetResult();
             return new TestCombinedReceiver();
         });
 
-        var results = await Task.WhenAll(
-            Enumerable.Range(0, participantCount)
-                .Select(_ => Task.Run(() => registry.GetOrCreate(queue))));
+        var requests = Enumerable.Range(0, participantCount)
+            .Select(_ => Task.Run(() => registry.GetOrCreate(queue)))
+            .ToArray();
+        await factoryStarted.Task;
+        releaseFactory.SetResult();
+        var results = await Task.WhenAll(requests);
 
         Assert.All(results, result => Assert.Same(results[0], result));
+        Assert.Equal(1, created);
         Assert.Same(results[0], Assert.Single(registry.Receivers).Value);
     }
 
