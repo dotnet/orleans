@@ -65,6 +65,148 @@ public sealed class RecoverableStreamReceiverTests
         Assert.True(source.IsShutdown);
     }
 
+    private sealed class BlockingInitializationCheckpointer : IStreamQueueCheckpointer<string>
+    {
+        public TaskCompletionSource FirstLoadStarted { get; } =
+            new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        public CancellationToken FirstLoadCancellation { get; private set; }
+
+        public int LoadCount { get; private set; }
+
+        public bool CheckpointExists => false;
+
+        public Task<string> Load() => Load(CancellationToken.None);
+
+        public async Task<string> Load(CancellationToken cancellationToken)
+        {
+            LoadCount++;
+            if (LoadCount == 1)
+            {
+                FirstLoadCancellation = cancellationToken;
+                FirstLoadStarted.TrySetResult();
+                await Task.Delay(Timeout.InfiniteTimeSpan, cancellationToken);
+            }
+
+            return string.Empty;
+        }
+
+        public void Update(string offset, DateTime utcNow) { }
+
+        public void Update(string offset, DateTime utcNow, CancellationToken cancellationToken)
+            => cancellationToken.ThrowIfCancellationRequested();
+
+        public Task FlushAsync(CancellationToken cancellationToken)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            return Task.CompletedTask;
+        }
+    }
+
+    [Fact]
+    public async Task Receiver_RestartRedeliversInclusiveBatchWhenCheckpointDidNotAdvance()
+    {
+        var streamId = StreamId.Create("namespace", Guid.NewGuid());
+        var messages = new[]
+        {
+            new TestQueueMessage(streamId, 9, "old-9"),
+            new TestQueueMessage(streamId, 10, "old-10"),
+            new TestQueueMessage(streamId, 11, "payload"),
+        };
+        var store = new TestCheckpointStore("10");
+        var firstSource = new ReplaySource(messages);
+        var firstReceiver = CreateReceiver(
+            firstSource,
+            new StreamQueueCheckpointer(
+                store,
+                new StreamQueueCheckpointerOptions
+                {
+                    CheckpointComparer = StreamCheckpointComparers.Numeric,
+                    PersistInterval = TimeSpan.FromSeconds(1),
+                }));
+        await firstReceiver.Initialize(TimeSpan.FromSeconds(5));
+        var firstNotification = Assert.Single(await firstReceiver.GetQueueMessagesAsync(10, CancellationToken.None));
+        using (var cursor = firstReceiver.GetCacheCursor(streamId, firstNotification.SequenceToken))
+        {
+            Assert.True(cursor.MoveNext());
+            Assert.Equal(11, cursor.GetCurrent(out _)!.SequenceToken.SequenceNumber);
+            // The inclusive first batch was observed but never confirmed as delivered.
+        }
+
+        await firstReceiver.Shutdown(TimeSpan.FromSeconds(5));
+        Assert.Equal("10", store.State.Checkpoint);
+
+        var secondSource = new ReplaySource(messages);
+        var secondReceiver = CreateReceiver(
+            secondSource,
+            new StreamQueueCheckpointer(
+                store,
+                new StreamQueueCheckpointerOptions
+                {
+                    CheckpointComparer = StreamCheckpointComparers.Numeric,
+                    PersistInterval = TimeSpan.FromSeconds(1),
+                }));
+        await secondReceiver.Initialize(TimeSpan.FromSeconds(5));
+
+        var redelivered = Assert.Single(await secondReceiver.GetQueueMessagesAsync(10, CancellationToken.None));
+        Assert.Equal(11, redelivered.SequenceToken.SequenceNumber);
+        await secondReceiver.Shutdown(TimeSpan.FromSeconds(5));
+    }
+
+    [Fact]
+    public async Task Receiver_QuietScanCheckpointRestartsAfterBusyTail()
+    {
+        var quietStream = StreamId.Create("namespace", Guid.NewGuid());
+        var busyStream = StreamId.Create("namespace", Guid.NewGuid());
+        var initialMessages = new[]
+        {
+            new TestQueueMessage(quietStream, 1, "quiet"),
+            new TestQueueMessage(busyStream, 2, "busy-2"),
+            new TestQueueMessage(busyStream, 3, "busy-3"),
+        };
+        var store = new TestCheckpointStore(string.Empty);
+        var receiver = CreateReceiver(
+            new ReplaySource(initialMessages),
+            new StreamQueueCheckpointer(
+                store,
+                new StreamQueueCheckpointerOptions
+                {
+                    CheckpointComparer = StreamCheckpointComparers.Numeric,
+                    PersistInterval = TimeSpan.FromSeconds(1),
+                }));
+        await receiver.Initialize(TimeSpan.FromSeconds(5));
+        var notifications = await receiver.GetQueueMessagesAsync(10, CancellationToken.None);
+        using var cursor = receiver.GetCacheCursor(quietStream, notifications[0].SequenceToken);
+        var progress = Assert.IsAssignableFrom<IQueueCacheCursorProgress>(cursor);
+        Assert.True(cursor.MoveNext());
+        progress.RecordDeliverySuccess();
+        Assert.False(cursor.MoveNext());
+        Assert.Equal(3, progress.SafeSequenceToken?.SequenceNumber);
+
+        receiver.UpdateDeliveryProgress(progress.SafeSequenceToken, DateTime.UtcNow);
+        await receiver.Shutdown(TimeSpan.FromSeconds(5));
+        Assert.Equal("3", store.State.Checkpoint);
+
+        var restarted = CreateReceiver(
+            new ReplaySource(
+            [
+                .. initialMessages,
+                new TestQueueMessage(busyStream, 4, "busy-4"),
+            ]),
+            new StreamQueueCheckpointer(
+                store,
+                new StreamQueueCheckpointerOptions
+                {
+                    CheckpointComparer = StreamCheckpointComparers.Numeric,
+                    PersistInterval = TimeSpan.FromSeconds(1),
+                }));
+        await restarted.Initialize(TimeSpan.FromSeconds(5));
+
+        var next = Assert.Single(await restarted.GetQueueMessagesAsync(10, CancellationToken.None));
+        Assert.Equal(4, next.SequenceToken.SequenceNumber);
+        await restarted.Shutdown(TimeSpan.FromSeconds(5));
+    }
+
     [Fact]
     public void Registry_ReturnsSameReceiverAndCacheInstanceForQueue()
     {
@@ -239,6 +381,120 @@ public sealed class RecoverableStreamReceiverTests
     }
 
     [Fact]
+    public void Cache_CursorProgressRequiresDeliveryAndIncludesUnrelatedScans()
+    {
+        var streamA = StreamId.Create("namespace", Guid.NewGuid());
+        var streamB = StreamId.Create("namespace", Guid.NewGuid());
+        var cache = new RecoverableStreamQueueCache<TestQueueMessage>(
+            100,
+            new ObjectPool<FixedSizeBuffer>(() => new FixedSizeBuffer(4 * 1024)),
+            new TestDataAdapter(),
+            new NoOpEvictionStrategy(),
+            NullLogger.Instance);
+        var positions = cache.Add(
+        [
+            new TestQueueMessage(streamA, 1, "a-1"),
+            new TestQueueMessage(streamB, 2, "b-2"),
+            new TestQueueMessage(streamB, 3, "b-3"),
+            new TestQueueMessage(streamA, 4, "a-4"),
+        ],
+            DateTime.UnixEpoch);
+        using var cursor = cache.GetCacheCursor(streamA, positions[0].SequenceToken);
+        var progress = Assert.IsAssignableFrom<IQueueCacheCursorProgress>(cursor);
+
+        Assert.True(cursor.MoveNext());
+        Assert.Null(progress.SafeSequenceToken);
+
+        progress.RecordDeliverySuccess();
+        Assert.Equal(1, progress.SafeSequenceToken?.SequenceNumber);
+
+        Assert.True(cursor.MoveNext());
+        Assert.Equal(3, progress.SafeSequenceToken?.SequenceNumber);
+
+        progress.RecordDeliverySuccess();
+        Assert.Equal(4, progress.SafeSequenceToken?.SequenceNumber);
+    }
+
+    [Fact]
+    public void Cache_BatchedMatchesRemainPendingUntilWholeDeliverySucceeds()
+    {
+        var streamA = StreamId.Create("namespace", Guid.NewGuid());
+        var streamB = StreamId.Create("namespace", Guid.NewGuid());
+        var cache = new RecoverableStreamQueueCache<TestQueueMessage>(
+            100,
+            new ObjectPool<FixedSizeBuffer>(() => new FixedSizeBuffer(4 * 1024)),
+            new TestDataAdapter(),
+            new NoOpEvictionStrategy(),
+            NullLogger.Instance);
+        var positions = cache.Add(
+        [
+            new TestQueueMessage(streamA, 1, "a-1"),
+            new TestQueueMessage(streamB, 2, "b-2"),
+            new TestQueueMessage(streamA, 3, "a-3"),
+        ],
+            DateTime.UnixEpoch);
+        using var cursor = cache.GetCacheCursor(streamA, positions[0].SequenceToken);
+        var progress = Assert.IsAssignableFrom<IQueueCacheCursorProgress>(cursor);
+
+        Assert.True(cursor.MoveNext());
+        Assert.True(cursor.MoveNext());
+        Assert.Null(progress.SafeSequenceToken);
+
+        progress.RecordDeliverySuccess();
+        Assert.Equal(3, progress.SafeSequenceToken?.SequenceNumber);
+    }
+
+    [Fact]
+    public async Task Receiver_MidInitializationCancellationReachesLoadAndAllowsRetry()
+    {
+        var source = new TestSource([]);
+        var checkpointer = new BlockingInitializationCheckpointer();
+        var receiver = CreateReceiver(source, checkpointer);
+        using var cancellation = new CancellationTokenSource();
+
+        var initialization = receiver.Initialize(cancellation.Token);
+        await checkpointer.FirstLoadStarted.Task;
+        cancellation.Cancel();
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => initialization);
+        Assert.True(checkpointer.FirstLoadCancellation.IsCancellationRequested);
+
+        Assert.Empty(await receiver.GetQueueMessagesAsync(10, CancellationToken.None));
+        Assert.Equal(2, checkpointer.LoadCount);
+        Assert.Equal(1, source.InitializeCount);
+        await receiver.Shutdown(TimeSpan.FromSeconds(5));
+    }
+
+    [Fact]
+    public void Cache_QuietCursorAdvancesAcrossUnrelatedRecords()
+    {
+        var quietStream = StreamId.Create("namespace", Guid.NewGuid());
+        var busyStream = StreamId.Create("namespace", Guid.NewGuid());
+        var cache = new RecoverableStreamQueueCache<TestQueueMessage>(
+            100,
+            new ObjectPool<FixedSizeBuffer>(() => new FixedSizeBuffer(4 * 1024)),
+            new TestDataAdapter(),
+            new NoOpEvictionStrategy(),
+            NullLogger.Instance);
+        var positions = cache.Add(
+        [
+            new TestQueueMessage(quietStream, 1, "quiet"),
+            new TestQueueMessage(busyStream, 2, "busy-2"),
+            new TestQueueMessage(busyStream, 3, "busy-3"),
+            new TestQueueMessage(busyStream, 4, "busy-4"),
+        ],
+            DateTime.UnixEpoch);
+        using var cursor = cache.GetCacheCursor(quietStream, positions[0].SequenceToken);
+        var progress = Assert.IsAssignableFrom<IQueueCacheCursorProgress>(cursor);
+        Assert.True(cursor.MoveNext());
+        progress.RecordDeliverySuccess();
+
+        Assert.False(cursor.MoveNext());
+
+        Assert.Equal(4, progress.SafeSequenceToken?.SequenceNumber);
+    }
+
+    [Fact]
     public async Task Receiver_RetriesInitializationOnNextRead()
     {
         var streamId = StreamId.Create("namespace", Guid.NewGuid());
@@ -324,8 +580,8 @@ public sealed class RecoverableStreamReceiverTests
     }
 
     private static RecoverableStreamReceiver<TestQueueMessage> CreateReceiver(
-        TestSource source,
-        TestCheckpointer checkpointer)
+        IRecoverableStreamSource<TestQueueMessage> source,
+        IStreamQueueCheckpointer<string> checkpointer)
     {
         var adapter = new TestDataAdapter();
         var cache = new RecoverableStreamQueueCache<TestQueueMessage>(
@@ -506,6 +762,63 @@ public sealed class RecoverableStreamReceiverTests
                 return Task.FromException(FlushException);
             }
 
+            return Task.CompletedTask;
+        }
+    }
+
+    private sealed class TestCheckpointStore(string checkpoint) : IStreamCheckpointStore
+    {
+        public StreamCheckpointStoreState State { get; private set; } = new(checkpoint, "1");
+
+        public ValueTask<StreamCheckpointStoreState> Load(CancellationToken cancellationToken)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            return ValueTask.FromResult(State);
+        }
+
+        public ValueTask<StreamCheckpointStoreState> Update(
+            string checkpoint,
+            string expectedVersion,
+            CancellationToken cancellationToken)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            Assert.Equal(State.Version, expectedVersion);
+            State = new(checkpoint, (int.Parse(State.Version) + 1).ToString(CultureInfo.InvariantCulture));
+            return ValueTask.FromResult(State);
+        }
+    }
+
+    private sealed class ReplaySource(IReadOnlyList<TestQueueMessage> messages)
+        : IRecoverableStreamSource<TestQueueMessage>
+    {
+        private long checkpoint;
+        private bool read;
+
+        public Task Initialize(RecoverableStreamStartPosition position, CancellationToken cancellationToken)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            checkpoint = string.IsNullOrEmpty(position.Checkpoint)
+                ? 0
+                : long.Parse(position.Checkpoint, CultureInfo.InvariantCulture);
+            return Task.CompletedTask;
+        }
+
+        public Task<IReadOnlyList<TestQueueMessage>> Read(int maxCount, CancellationToken cancellationToken)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            if (read)
+            {
+                return Task.FromResult<IReadOnlyList<TestQueueMessage>>([]);
+            }
+
+            read = true;
+            return Task.FromResult<IReadOnlyList<TestQueueMessage>>(
+                messages.Where(message => message.SequenceNumber > checkpoint).Take(maxCount).ToList());
+        }
+
+        public Task Shutdown(CancellationToken cancellationToken)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
             return Task.CompletedTask;
         }
     }

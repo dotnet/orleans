@@ -2,6 +2,8 @@ using System;
 using Microsoft.Extensions.DependencyInjection;
 using Newtonsoft.Json;
 using Orleans.Serialization;
+using Orleans.Providers.Streams.Common;
+using Orleans.Streams;
 using Orleans.Streaming.Kinesis;
 using TestExtensions;
 using Xunit;
@@ -76,6 +78,37 @@ public sealed class KinesisSequenceTokenTests
         Assert.True(zeroPadded.Equals(unpadded));
         Assert.True(zeroPadded.Equals((object)unpadded));
         Assert.Equal(zeroPadded.GetHashCode(), unpadded.GetHashCode());
+    }
+
+    [Fact]
+    public void EquivalentTokensCoalesceInHashAndSortedCollections()
+    {
+        StreamSequenceToken zeroPadded = new KinesisSequenceToken("007", sequenceNumber: 1, eventIndex: 2);
+        StreamSequenceToken unpadded = new KinesisSequenceToken("7", sequenceNumber: 999, eventIndex: 2);
+
+        Assert.Single(new HashSet<StreamSequenceToken> { zeroPadded, unpadded });
+        Assert.Single(new SortedSet<StreamSequenceToken> { unpadded, zeroPadded });
+    }
+
+    [Fact]
+    public void KinesisAndBaseTokensAreIncompatibleInBothDirections()
+    {
+        StreamSequenceToken kinesis = new KinesisSequenceToken("7", sequenceNumber: 1, eventIndex: 2);
+        StreamSequenceToken baseToken = new EventSequenceTokenV2(1, 2);
+
+        Assert.False(kinesis.Equals(baseToken));
+        Assert.False(baseToken.Equals(kinesis));
+        Assert.Throws<ArgumentOutOfRangeException>(() => kinesis.CompareTo(baseToken));
+        Assert.Throws<ArgumentOutOfRangeException>(() => baseToken.CompareTo(kinesis));
+        Assert.Equal(2, new Dictionary<StreamSequenceToken, string>
+        {
+            [kinesis] = "kinesis",
+            [baseToken] = "base",
+        }.Count);
+        Assert.Throws<ArgumentOutOfRangeException>(
+            () => new SortedSet<StreamSequenceToken> { kinesis, baseToken });
+        Assert.Throws<ArgumentOutOfRangeException>(
+            () => new SortedSet<StreamSequenceToken> { baseToken, kinesis });
     }
 
     [Fact]
