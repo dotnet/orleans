@@ -22,6 +22,7 @@ namespace Orleans.Providers.Streams.Common
         private readonly object _lifecycleLock = new();
         private readonly CancellationTokenSource _lifecycleCancellation = new();
         private Task? _initializeTask;
+        private CancellationToken _initializeTaskOwnerToken;
         private int _running;
         private int _shutdown;
 
@@ -72,22 +73,44 @@ namespace Orleans.Providers.Streams.Common
         public Task Initialize(CancellationToken cancellationToken)
             => EnsureInitialized(cancellationToken);
 
-        private Task EnsureInitialized(CancellationToken cancellationToken)
+        private async Task EnsureInitialized(CancellationToken cancellationToken)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            lock (_lifecycleLock)
+            while (true)
             {
-                if (Volatile.Read(ref _running) != 0 || Volatile.Read(ref _shutdown) != 0)
+                Task initializeTask;
+                CancellationToken initializeTaskOwnerToken;
+                lock (_lifecycleLock)
                 {
-                    return Task.CompletedTask;
+                    if (Volatile.Read(ref _running) != 0 || Volatile.Read(ref _shutdown) != 0)
+                    {
+                        return;
+                    }
+
+                    if (_initializeTask is null || _initializeTask.IsCompleted)
+                    {
+                        _initializeTaskOwnerToken = cancellationToken;
+                        _initializeTask = InitializeCore(cancellationToken);
+                    }
+
+                    initializeTask = _initializeTask;
+                    initializeTaskOwnerToken = _initializeTaskOwnerToken;
                 }
 
-                if (_initializeTask is null || _initializeTask.IsCompleted)
+                try
                 {
-                    _initializeTask = InitializeCore(cancellationToken);
+                    await initializeTask.WaitAsync(cancellationToken);
+                    return;
                 }
-
-                return _initializeTask.WaitAsync(cancellationToken);
+                catch (OperationCanceledException)
+                    when (!cancellationToken.IsCancellationRequested
+                        && Volatile.Read(ref _shutdown) == 0
+                        && initializeTaskOwnerToken.IsCancellationRequested
+                        && initializeTask.IsCanceled)
+                {
+                    // The caller which started this shared initialization canceled it. Once that
+                    // task has settled, loop and create a fresh attempt for this still-active caller.
+                }
             }
         }
 
