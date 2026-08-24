@@ -127,11 +127,17 @@ namespace Orleans.Streaming.EventHubs
         public void SignalPurge()
         {
             var previousMetadataSize = cache.AllocatedSizeInBytes;
-            if (memoryController?.IsUnderPressure == true
-                && !hasActiveSubscriptions
-                && evictionStrategy is IMemoryPressureEvictionStrategy memoryPressureEvictionStrategy)
+            if (!hasActiveSubscriptions)
             {
-                memoryPressureEvictionStrategy.PerformMemoryPressurePurge(DateTime.UtcNow);
+                if (memoryController?.IsUnderPressure == true
+                    && evictionStrategy is IMemoryPressureEvictionStrategy memoryPressureEvictionStrategy)
+                {
+                    memoryPressureEvictionStrategy.PerformMemoryPressurePurge(DateTime.UtcNow);
+                }
+                else
+                {
+                    this.evictionStrategy.PerformPurge(DateTime.UtcNow);
+                }
             }
             else
             {
@@ -191,10 +197,14 @@ namespace Orleans.Streaming.EventHubs
         /// <returns>The maximum number of items which can currently be added.</returns>
         public int GetMaxAddCount()
         {
-            if (memoryController?.IsUnderPressure == true && !hasActiveSubscriptions)
+            if (!hasActiveSubscriptions)
             {
-                SignalPurge();
-                return memoryController.IsUnderPressure ? 0 : defaultMaxAddCount;
+                if (memoryController?.IsUnderPressure == true)
+                {
+                    SignalPurge();
+                }
+
+                return memoryController?.IsUnderPressure == true ? 0 : defaultMaxAddCount;
             }
 
             if (cachePressureMonitor.IsUnderPressure(DateTime.UtcNow))
