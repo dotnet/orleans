@@ -792,21 +792,14 @@ namespace Orleans.Streams
                 // loop through the queue until it is empty.
                 while (!IsShutdown && !cancellationToken.IsCancellationRequested) // shutdown sets IsShutdown and cancels the timer token.
                 {
-                    // Flow controllers can purge while calculating capacity, so publish the safe delivery boundary first.
+                    // Flow controllers can purge while calculating capacity, so publish subscription protection first.
                     if (HasPendingStreamRegistration())
                     {
                         return;
                     }
 
-                    var canUsePurgeAndFlowControl = TryUpdateDeliveryProgress(out var canReadWithoutPurge);
-                    if (!canUsePurgeAndFlowControl && !canReadWithoutPurge)
-                    {
-                        return;
-                    }
-
-                    int maxCacheAddCount = canUsePurgeAndFlowControl
-                        ? queueCache?.GetMaxAddCount() ?? QueueAdapterConstants.UNLIMITED_GET_QUEUE_MSG
-                        : 1;
+                    queueCache?.UpdatePurgeProtection(HasActiveSubscriptions());
+                    int maxCacheAddCount = queueCache?.GetMaxAddCount() ?? QueueAdapterConstants.UNLIMITED_GET_QUEUE_MSG;
                     if (maxCacheAddCount != QueueAdapterConstants.UNLIMITED_GET_QUEUE_MSG && maxCacheAddCount <= 0)
                         return;
 
@@ -864,12 +857,6 @@ namespace Orleans.Streams
                 return false;
             }
 
-            var canUsePurgeAndFlowControl = TryUpdateDeliveryProgress(out var canReadWithoutPurge);
-            if (!canUsePurgeAndFlowControl && !canReadWithoutPurge)
-            {
-                return false;
-            }
-
             var now = _timeProvider.GetUtcNow().UtcDateTime;
             TagList? tags = null;
 
@@ -885,8 +872,9 @@ namespace Orleans.Streams
                 return false;
             }
 
-            if (canUsePurgeAndFlowControl && queueCache is not null)
+            if (queueCache is not null)
             {
+                queueCache.UpdatePurgeProtection(HasActiveSubscriptions());
                 if (queueCache.TryPurgeFromCache(out var purgedItems))
                 {
                     try
@@ -909,7 +897,7 @@ namespace Orleans.Streams
                 return false;
             }
 
-            if (canUsePurgeAndFlowControl && queueCache is not null && queueCache.IsUnderPressure())
+            if (queueCache is not null && queueCache.IsUnderPressure())
             {
                 // Under back pressure. Exit the loop. Will attempt again in the next timer callback.
                 LogInfoStreamCacheUnderPressure();
@@ -958,6 +946,9 @@ namespace Orleans.Streams
         private bool HasPendingStreamRegistration()
             => pubSubCache.Values.Any(static stream => stream.RegistrationTask is { IsCompleted: false });
 
+        private bool HasActiveSubscriptions()
+            => pubSubCache.Values.Any(static stream => stream.Count > 0);
+
         private void CleanupPubSubCache(DateTime now)
         {
             List<QualifiedStreamId>? inactiveStreams = null;
@@ -990,30 +981,20 @@ namespace Orleans.Streams
         /// </summary>
         private void NotifyDeliveryProgress()
         {
-            TryUpdateDeliveryProgress(out _);
-        }
-
-        private bool TryUpdateDeliveryProgress(out bool canReadWithoutPurge)
-        {
-            canReadWithoutPurge = false;
             if (queueCache is null)
             {
-                return true;
+                return;
             }
 
-            if (!TryGetDeliveryProgress(out var earliest, out canReadWithoutPurge))
+            if (TryGetDeliveryProgress(out var earliest))
             {
-                return !queueCache.UsesDeliveryProgressForPurgeProtection;
+                queueCache.UpdateDeliveryProgress(earliest, _timeProvider.GetUtcNow().UtcDateTime);
             }
-
-            queueCache.UpdateDeliveryProgress(earliest, _timeProvider.GetUtcNow().UtcDateTime);
-            return true;
         }
 
-        private bool TryGetDeliveryProgress(out StreamSequenceToken? earliest, out bool canReadWithoutPurge)
+        private bool TryGetDeliveryProgress(out StreamSequenceToken? earliest)
         {
             earliest = null;
-            canReadWithoutPurge = false;
 
             foreach (var streamConsumers in pubSubCache.Values)
             {
@@ -1037,8 +1018,7 @@ namespace Orleans.Streams
                     var current = consumer.LastProcessedToken;
                     if (current is null)
                     {
-                        canReadWithoutPurge = true;
-                        continue;
+                        return false;
                     }
 
                     if (earliest is null || IsBefore(current, earliest))
@@ -1048,7 +1028,7 @@ namespace Orleans.Streams
                 }
             }
 
-            return !canReadWithoutPurge;
+            return true;
         }
 
         private static bool IsBefore(StreamSequenceToken current, StreamSequenceToken other)
