@@ -70,7 +70,7 @@ internal sealed partial class DurableJobReceiverExtension : IDurableJobReceiverE
         }
 
         Debug.Assert(state is not null);
-        return GetJobStatusAsync(key, context, state, newJob);
+        return GetJobStatusAsync(key, context, state, newJob, attemptCancellationToken);
     }
 
     private bool IsReadyToPoll(JobAttemptState state) =>
@@ -150,7 +150,8 @@ internal sealed partial class DurableJobReceiverExtension : IDurableJobReceiverE
         (string JobId, long ExecutionGeneration, int DequeueCount) key,
         IJobRunContext context,
         JobAttemptState state,
-        bool newJob)
+        bool newJob,
+        CancellationToken attemptCancellationToken)
     {
         // Cancellation is cooperative: only terminal task state is authoritative for job outcome.
         if (!state.Task.IsCompleted)
@@ -159,7 +160,7 @@ internal sealed partial class DurableJobReceiverExtension : IDurableJobReceiverE
             {
                 // For the first attempt, to reduce RPC, we wait for the polling interval or half the response timeout for the task to complete.
                 // This saves a back-and-forth for the common case where a job completes quickly.
-                return LongPollGetJobStatusAsync(key, context, state);
+                return LongPollGetJobStatusAsync(key, context, state, attemptCancellationToken);
             }
 
             return new(DurableJobRunResult.InProgress(_shared.Options.JobStatusPollInterval));
@@ -184,11 +185,12 @@ internal sealed partial class DurableJobReceiverExtension : IDurableJobReceiverE
         async ValueTask<DurableJobRunResult> LongPollGetJobStatusAsync(
             (string JobId, long ExecutionGeneration, int DequeueCount) key,
             IJobRunContext context,
-            JobAttemptState state)
+            JobAttemptState state,
+            CancellationToken attemptCancellationToken)
         {
             if (!state.Task.IsCompleted)
             {
-                using var cts = new CancellationTokenSource();
+                using var cts = CancellationTokenSource.CreateLinkedTokenSource(attemptCancellationToken);
                 var longPollDuration = TimeSpan.FromTicks(Math.Min(_shared.MessagingOptions.ResponseTimeout.Divide(2).Ticks, _shared.Options.JobStatusPollInterval.Ticks));
                 await Task.WhenAny(Task.Delay(longPollDuration, _shared.TimeProvider, cts.Token), state.Task);
                 cts.Cancel();

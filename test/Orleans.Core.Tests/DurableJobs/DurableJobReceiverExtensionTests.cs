@@ -98,23 +98,34 @@ public class DurableJobReceiverExtensionTests
     }
 
     [Fact]
-    public async Task HandleDurableJobAsync_WhenAttemptCancellationIsRequestedButExecutionIsStillRunning_RemainsRunning()
+    public async Task HandleDurableJobAsync_WhenAttemptCancellationIsRequestedButExecutionIsStillRunning_EndsLongPollAndRemainsRunning()
     {
         var executionTask = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
         var handler = Substitute.For<IDurableJobHandler>();
         handler.ExecuteJobAsync(Arg.Any<IJobRunContext>(), Arg.Any<CancellationToken>())
             .Returns(executionTask.Task);
 
-        var extension = CreateExtension(handler);
+        var timeProvider = new TimerTrackingFakeTimeProvider(DateTimeOffset.UtcNow);
+        var extension = CreateExtension(
+            handler,
+            jobStatusPollInterval: TimeSpan.FromHours(1),
+            timeProvider: timeProvider);
         var context = CreateJobContext("run-1");
         using var cts = new CancellationTokenSource();
-        cts.Cancel();
 
-        var first = await extension.HandleDurableJobAsync(context, cts.Token);
+        var firstCall = extension.HandleDurableJobAsync(context, cts.Token).AsTask();
+        await timeProvider.TimerCreated;
+        Assert.False(firstCall.IsCompleted);
+        Assert.Equal(1, timeProvider.ActiveTimerCount);
+
+        cts.Cancel();
+        var first = await firstCall.WaitAsync(TimeSpan.FromSeconds(5));
         var second = await extension.HandleDurableJobAsync(context, cts.Token);
 
         Assert.True(first.IsInProgress);
         Assert.True(second.IsInProgress);
+        Assert.Equal(0, timeProvider.ActiveTimerCount);
+        Assert.False(executionTask.Task.IsCompleted);
         await handler.Received(1).ExecuteJobAsync(Arg.Any<IJobRunContext>(), Arg.Any<CancellationToken>());
 
         executionTask.SetResult(true);
