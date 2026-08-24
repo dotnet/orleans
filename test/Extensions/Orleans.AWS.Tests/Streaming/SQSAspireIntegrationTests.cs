@@ -3,6 +3,7 @@ using System.Reflection;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration;
+using Orleans.Hosting;
 using Orleans.Streaming.SQS.Streams;
 using Orleans.Streams;
 using OrleansAWSUtils.Streams;
