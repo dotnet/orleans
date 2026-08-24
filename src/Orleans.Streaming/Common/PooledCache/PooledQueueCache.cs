@@ -706,8 +706,8 @@ namespace Orleans.Providers.Streams.Common
             if (lastCachedMessageBlock.IsEmpty && !lastCachedMessageBlock.HasCapacity)
             {
                 this.AllocatedSizeInBytes -= lastCachedMessageBlock.AllocatedSizeInBytes;
-                lastCachedMessageBlock.Dispose();
                 this.messageBlocks.RemoveLast();
+                lastCachedMessageBlock.Dispose();
             }
             else if (lastCachedMessageBlock.IsEmpty)
             {
@@ -720,12 +720,13 @@ namespace Orleans.Providers.Streams.Common
         /// <inheritdoc />
         public void Dispose()
         {
-            foreach (var block in messageBlocks)
+            var blocks = messageBlocks.ToArray();
+            messageBlocks.Clear();
+            foreach (var block in blocks)
             {
                 block.Dispose();
             }
 
-            messageBlocks.Clear();
             ItemCount = 0;
             AllocatedSizeInBytes = 0;
         }
