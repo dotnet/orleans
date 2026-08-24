@@ -126,11 +126,6 @@ namespace Orleans.Streaming.EventHubs
         /// <inheritdoc />
         public void SignalPurge()
         {
-            if (this.cachePressureMonitor.IsUnderPressure(DateTime.UtcNow))
-            {
-                return;
-            }
-
             var previousMetadataSize = cache.AllocatedSizeInBytes;
             if (memoryController?.IsUnderPressure == true
                 && !hasActiveSubscriptions
@@ -140,6 +135,11 @@ namespace Orleans.Streaming.EventHubs
             }
             else
             {
+                if (this.cachePressureMonitor.IsUnderPressure(DateTime.UtcNow))
+                {
+                    return;
+                }
+
                 this.evictionStrategy.PerformPurge(DateTime.UtcNow);
             }
 
@@ -191,6 +191,12 @@ namespace Orleans.Streaming.EventHubs
         /// <returns>The maximum number of items which can currently be added.</returns>
         public int GetMaxAddCount()
         {
+            if (memoryController?.IsUnderPressure == true && !hasActiveSubscriptions)
+            {
+                SignalPurge();
+                return memoryController.IsUnderPressure ? 0 : defaultMaxAddCount;
+            }
+
             if (cachePressureMonitor.IsUnderPressure(DateTime.UtcNow))
             {
                 return 0;
