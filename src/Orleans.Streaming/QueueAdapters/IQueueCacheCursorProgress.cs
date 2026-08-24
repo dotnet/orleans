@@ -4,7 +4,7 @@ internal interface IQueueCacheCursorProgress
 {
     StreamSequenceToken? SafeSequenceToken { get; }
 
-    void AdvancePast(StreamSequenceToken token);
+    void SetDeliveredThrough(StreamSequenceToken token);
 
     void RecordDeliverySuccess();
 }
