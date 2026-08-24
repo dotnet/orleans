@@ -1,6 +1,7 @@
 #nullable enable
 
 using System.Collections.Concurrent;
+using System.Threading.Tasks.Sources;
 using Microsoft.Extensions.Logging.Abstractions;
 using Orleans.Runtime;
 using UnitTests.TesterInternal;
@@ -194,15 +195,77 @@ public class ActivationAutoResetEventTests
     {
         using var context = UnitTestSchedulingContext.Create(NullLoggerFactory.Instance);
         var signal = new ActivationAutoResetEvent(context.WorkItemGroup);
-        var awaiter = signal.WaitAsync().GetAwaiter();
+        var source = (IValueTaskSource)signal;
+        var wait = signal.WaitAsync();
         var firstContinuationRan = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var secondContinuationRan = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
 
-        awaiter.UnsafeOnCompleted(firstContinuationRan.SetResult);
-        Assert.Throws<InvalidOperationException>(() => awaiter.UnsafeOnCompleted(static () => { }));
+        source.OnCompleted(
+            static state => ((TaskCompletionSource)state!).SetResult(),
+            firstContinuationRan,
+            token: 0,
+            ValueTaskSourceOnCompletedFlags.None);
+        Assert.Throws<InvalidOperationException>(() => source.OnCompleted(
+            static state => ((TaskCompletionSource)state!).SetResult(),
+            secondContinuationRan,
+            token: 0,
+            ValueTaskSourceOnCompletedFlags.None));
 
         signal.Signal();
         await firstContinuationRan.Task.WaitAsync(TimeSpan.FromSeconds(5));
-        awaiter.GetResult();
+        Assert.False(secondContinuationRan.Task.IsCompleted);
+        await wait;
+    }
+
+    [Fact]
+    public async Task ConcurrentContinuationRegistrationsPreserveWinningState()
+    {
+        using var context = UnitTestSchedulingContext.Create(NullLoggerFactory.Instance);
+
+        for (var i = 0; i < 100; i++)
+        {
+            var signal = new ActivationAutoResetEvent(context.WorkItemGroup);
+            var source = (IValueTaskSource)signal;
+            var wait = signal.WaitAsync();
+            var firstContinuationRan = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            var secondContinuationRan = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            using var start = new Barrier(3);
+
+            var firstRegistered = Register(firstContinuationRan);
+            var secondRegistered = Register(secondContinuationRan);
+
+            start.SignalAndWait();
+            var registrations = await Task.WhenAll(firstRegistered, secondRegistered).WaitAsync(TimeSpan.FromSeconds(5));
+            Assert.Equal(1, registrations.Count(static registered => registered));
+
+            signal.Signal();
+            var winningContinuation = registrations[0] ? firstContinuationRan : secondContinuationRan;
+            var losingContinuation = registrations[0] ? secondContinuationRan : firstContinuationRan;
+            await winningContinuation.Task.WaitAsync(TimeSpan.FromSeconds(5));
+            Assert.False(losingContinuation.Task.IsCompleted);
+            await wait;
+
+            Task<bool> Register(TaskCompletionSource completion)
+            {
+                return Task.Run(() =>
+                {
+                    start.SignalAndWait();
+                    try
+                    {
+                        source.OnCompleted(
+                            static state => ((TaskCompletionSource)state!).SetResult(),
+                            completion,
+                            token: 0,
+                            ValueTaskSourceOnCompletedFlags.None);
+                        return true;
+                    }
+                    catch (InvalidOperationException)
+                    {
+                        return false;
+                    }
+                });
+            }
+        }
     }
 
     [Fact]
