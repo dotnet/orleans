@@ -17,6 +17,8 @@ internal sealed partial class DisseminationProtocol
     private readonly TimeProvider _timeProvider;
     private readonly ILogger<DisseminationProtocol> _logger;
     private readonly DisseminationBroadcastQueue _broadcastQueue;
+    private readonly object _antiEntropyResponseCursorLock = new();
+    private readonly Dictionary<SiloAddress, int> _antiEntropyResponseCursors = [];
     private readonly object _valueUpdateLock = new();
     private readonly Dictionary<DigestKey, ValueUpdate> _lastValueUpdates = [];
     private readonly FrozenDictionary<DisseminationNamespace, IDisseminationNamespace> _namespaces;
@@ -420,6 +422,7 @@ internal sealed partial class DisseminationProtocol
         CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
+        PruneAntiEntropyResponseCursors(_membership.CurrentSnapshot);
         // Incoming digests are passive evidence for existing peer pumps, not a reason to create new ones.
         foreach (var (namespaceName, entries) in request.Digests)
         {
@@ -456,7 +459,7 @@ internal sealed partial class DisseminationProtocol
         var byteCount = 0;
         var truncated = false;
         var valuesByNamespace = new Dictionary<DisseminationNamespace, List<DisseminationBroadcastValue>>();
-        // Walk the caller's digest order and spend one shared response budget across namespaces.
+        var candidates = new List<AntiEntropyResponseCandidate>();
         foreach (var (namespaceName, remoteDigest) in request.Digests)
         {
             cancellationToken.ThrowIfCancellationRequested();
@@ -470,7 +473,6 @@ internal sealed partial class DisseminationProtocol
                 continue;
             }
 
-            var namespaceValues = new List<DisseminationBroadcastValue>();
             var remoteVersions = CreateDigestLookup(remoteDigest);
             foreach (var localDigest in requestedNamespace.Digests)
             {
@@ -487,73 +489,93 @@ internal sealed partial class DisseminationProtocol
                     continue;
                 }
 
-                // Ask the namespace to reconstruct a repair from the caller's version to its latest state.
-                var repairRequest = new DisseminationRepairRequest(
-                    localDigest.Key,
-                    peerDigest.Version,
-                    toVersion: null,
-                    options.MaxBatchItems - valueCount,
-                    options.MaxBatchBytes - byteCount,
-                    requestedNamespace.Options.MaxPayloadBytes);
-                var repair = requestedNamespace.CreateRepair(repairRequest);
-                if (repair.Status is DisseminationRepairStatus.InsufficientCapacity)
+                candidates.Add(new(requestedNamespace, localDigest, peerDigest));
+            }
+        }
+
+        var start = GetAntiEntropyResponseStart(request.Sender, candidates.Count);
+        var examined = 0;
+        for (var i = 0; i < candidates.Count; i++)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            var candidate = candidates[(start + i) % candidates.Count];
+            examined++;
+            var requestedNamespace = candidate.Namespace;
+            var localDigest = candidate.LocalDigest;
+            var peerDigest = candidate.PeerDigest;
+            var repairRequest = new DisseminationRepairRequest(
+                localDigest.Key,
+                peerDigest.Version,
+                toVersion: null,
+                options.MaxBatchItems - valueCount,
+                options.MaxBatchBytes - byteCount,
+                requestedNamespace.Options.MaxPayloadBytes);
+            var repair = requestedNamespace.CreateRepair(repairRequest);
+            if (repair.Status is DisseminationRepairStatus.InsufficientCapacity)
+            {
+                if (valueCount > 0)
                 {
-                    if (valueCount > 0)
+                    // Probe with a fresh batch budget to distinguish truncation from a permanently oversized key.
+                    var emptyBatchRequest = new DisseminationRepairRequest(
+                        localDigest.Key,
+                        peerDigest.Version,
+                        toVersion: null,
+                        options.MaxBatchItems,
+                        options.MaxBatchBytes,
+                        requestedNamespace.Options.MaxPayloadBytes);
+                    var emptyBatchRepair = requestedNamespace.CreateRepair(emptyBatchRequest);
+                    if (emptyBatchRepair.Status is DisseminationRepairStatus.Produced
+                        && ValidateRepair(
+                            requestedNamespace,
+                            emptyBatchRequest,
+                            emptyBatchRepair,
+                            options))
                     {
-                        // Probe with a fresh batch budget to distinguish truncation from a permanently oversized key.
-                        var emptyBatchRequest = new DisseminationRepairRequest(
-                            localDigest.Key,
-                            peerDigest.Version,
-                            toVersion: null,
-                            options.MaxBatchItems,
-                            options.MaxBatchBytes,
-                            requestedNamespace.Options.MaxPayloadBytes);
-                        var emptyBatchRepair = requestedNamespace.CreateRepair(emptyBatchRequest);
-                        if (emptyBatchRepair.Status is DisseminationRepairStatus.Produced
-                            && ValidateRepair(
-                                requestedNamespace,
-                                emptyBatchRequest,
-                                emptyBatchRepair,
-                                options))
-                        {
-                            truncated = true;
-                            break;
-                        }
+                        // Resume with this candidate next round because the current response budget, not the
+                        // candidate itself, prevented it from being included.
+                        examined--;
+                        truncated = true;
+                        break;
                     }
-
-                    continue;
                 }
 
-                if (repair.Status is not DisseminationRepairStatus.Produced
-                    || !ValidateRepair(requestedNamespace, repairRequest, repair, options))
-                {
-                    continue;
-                }
-
-                foreach (var value in repair.Values)
-                {
-                    namespaceValues.Add(CreateBroadcastValue(requestedNamespace, value));
-                    ++valueCount;
-                    byteCount += value.Payload.Length;
-                }
-
-                if (!repair.IsComplete)
-                {
-                    // A valid prefix consumes this response; the caller can continue in its next round.
-                    truncated = true;
-                    break;
-                }
+                continue;
             }
 
-            if (namespaceValues.Count > 0)
+            if (repair.Status is not DisseminationRepairStatus.Produced
+                || !ValidateRepair(requestedNamespace, repairRequest, repair, options))
             {
-                valuesByNamespace[requestedNamespace.Name] = namespaceValues;
+                continue;
             }
 
-            if (truncated)
+            if (!valuesByNamespace.TryGetValue(requestedNamespace.Name, out var namespaceValues))
             {
+                namespaceValues = [];
+                valuesByNamespace.Add(requestedNamespace.Name, namespaceValues);
+            }
+
+            foreach (var value in repair.Values)
+            {
+                namespaceValues.Add(CreateBroadcastValue(requestedNamespace, value));
+                ++valueCount;
+                byteCount += value.Payload.Length;
+            }
+
+            if (!repair.IsComplete)
+            {
+                // A valid prefix consumes this response; the caller can continue in its next round.
+                truncated = true;
                 break;
             }
+        }
+
+        if (truncated)
+        {
+            AdvanceAntiEntropyResponseCursor(request.Sender, start, examined, candidates.Count);
+        }
+        else
+        {
+            ClearAntiEntropyResponseCursor(request.Sender);
         }
 
         DisseminationInstruments.OnAntiEntropyExchange("in", GetDigestCount(request.Digests), valueCount, truncated);
@@ -563,6 +585,62 @@ internal sealed partial class DisseminationProtocol
             Values = valuesByNamespace,
             Truncated = truncated,
         };
+    }
+
+    private int GetAntiEntropyResponseStart(SiloAddress peer, int candidateCount)
+    {
+        if (candidateCount == 0)
+        {
+            return 0;
+        }
+
+        lock (_antiEntropyResponseCursorLock)
+        {
+            return _antiEntropyResponseCursors.TryGetValue(peer, out var cursor)
+                ? cursor % candidateCount
+                : 0;
+        }
+    }
+
+    private void AdvanceAntiEntropyResponseCursor(
+        SiloAddress peer,
+        int start,
+        int examined,
+        int candidateCount)
+    {
+        lock (_antiEntropyResponseCursorLock)
+        {
+            if (candidateCount == 0)
+            {
+                _antiEntropyResponseCursors.Remove(peer);
+            }
+            else
+            {
+                _antiEntropyResponseCursors[peer] = (start + Math.Max(1, examined)) % candidateCount;
+            }
+        }
+    }
+
+    private void ClearAntiEntropyResponseCursor(SiloAddress peer)
+    {
+        lock (_antiEntropyResponseCursorLock)
+        {
+            _antiEntropyResponseCursors.Remove(peer);
+        }
+    }
+
+    private void PruneAntiEntropyResponseCursors(DisseminationMembershipSnapshot membership)
+    {
+        lock (_antiEntropyResponseCursorLock)
+        {
+            foreach (var peer in _antiEntropyResponseCursors.Keys.ToArray())
+            {
+                if (!membership.ContainsMember(peer))
+                {
+                    _antiEntropyResponseCursors.Remove(peer);
+                }
+            }
+        }
     }
 
     private async ValueTask<DisseminationApplyResult> ApplyReceivedValue(
@@ -886,6 +964,11 @@ internal sealed partial class DisseminationProtocol
         IDisseminationNamespace Namespace,
         List<DisseminationBroadcastValue> Items,
         SiloAddress Sender);
+
+    private readonly record struct AntiEntropyResponseCandidate(
+        IDisseminationNamespace Namespace,
+        DigestEntry LocalDigest,
+        DigestEntry PeerDigest);
 
     [LoggerMessage(
         Level = LogLevel.Debug,

@@ -2120,6 +2120,40 @@ public class DisseminationProtocolTests
     }
 
     [Fact]
+    public async Task AntiEntropyTruncationRotatesPastContinuouslyAdvancingKey()
+    {
+        var local = CreateSilo(11111);
+        var peer = CreateSilo(11112);
+        var transport = new FakeTransport(local, peer);
+        var ns = new FakeNamespace(local);
+        DisseminationKey hotKey = "hot";
+        DisseminationKey waitingKey = "waiting";
+        ns.SetValue(hotKey, version: 1);
+        ns.SetValue(waitingKey, version: 1);
+        var protocol = CreateProtocol(
+            transport,
+            ns,
+            options => options.MaxBatchItems = 1);
+        var request = new DisseminationAntiEntropyRequest
+        {
+            Sender = peer,
+            Digests = CreateAntiEntropyRequestDigest(
+                ns.Name,
+                (hotKey, 0),
+                (waitingKey, 0)),
+        };
+
+        var first = await protocol.ReceiveAntiEntropy(request, CancellationToken.None);
+        ns.SetValue(hotKey, version: 2);
+        var second = await protocol.ReceiveAntiEntropy(request, CancellationToken.None);
+
+        Assert.True(first.Truncated);
+        Assert.True(second.Truncated);
+        Assert.Equal(hotKey, Assert.Single(GetAntiEntropyResponseValues(first)).Value.Key);
+        Assert.Equal(waitingKey, Assert.Single(GetAntiEntropyResponseValues(second)).Value.Key);
+    }
+
+    [Fact]
     public async Task AntiEntropyAppliesValidItemsAfterFailedRepairItem()
     {
         var local = CreateSilo(11111);
