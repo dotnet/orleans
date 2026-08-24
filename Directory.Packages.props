@@ -9,7 +9,6 @@
     <PackageVersion Include="Aspire.Azure.Storage.Queues" Version="13.0.0" />
     <PackageVersion Include="Aspire.Hosting.AppHost" Version="13.1.1" />
     <PackageVersion Include="Aspire.Hosting.Orleans" Version="13.1.1" />
-    <PackageVersion Include="Aspire.Hosting.Testing" Version="13.1.1" />
     <PackageVersion Include="Aspire.Hosting.Redis" Version="13.1.1" />
     <PackageVersion Include="Aspire.StackExchange.Redis" Version="13.1.1" />
     <PackageVersion Include="Autofac.Extensions.DependencyInjection" Version="10.0.0" />
@@ -68,7 +67,7 @@
     <PackageVersion Include="Microsoft.Extensions.Diagnostics.Testing" Version="8.10.0" />
     <PackageVersion Include="Microsoft.Extensions.Hosting.Abstractions" Version="8.0.1" />
     <PackageVersion Include="Microsoft.Extensions.Hosting" Version="8.0.1" />
-    <PackageVersion Include="Microsoft.Extensions.Http.Resilience" Version="10.1.0" />
+    <PackageVersion Include="Microsoft.Extensions.Http.Resilience" Version="9.0.0" />
     <PackageVersion Include="Microsoft.Extensions.Http" Version="8.0.1" />
     <PackageVersion Include="Microsoft.Extensions.Logging.Abstractions" Version="8.0.3" />
     <PackageVersion Include="Microsoft.Extensions.Logging.Console" Version="8.0.1" />
@@ -139,7 +138,7 @@
     <PackageVersion Include="Aspire.Hosting.Azure.Storage" Version="13.2.4" />
     <PackageVersion Update="Aspire.Hosting.Orleans" Version="13.2.4" />
     <PackageVersion Update="Aspire.Hosting.Redis" Version="13.2.4" />
-    <PackageVersion Update="Aspire.Hosting.Testing" Version="13.2.4" />
+    <PackageVersion Include="Aspire.Hosting.Testing" Version="13.2.4" />
     <PackageVersion Update="Aspire.StackExchange.Redis" Version="13.2.4" />
     <PackageVersion Update="BenchmarkDotNet" Version="0.15.6" />
     <PackageVersion Update="FSharp.Core" Version="10.0.103" />
