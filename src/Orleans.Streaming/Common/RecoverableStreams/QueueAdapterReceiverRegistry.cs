@@ -1,6 +1,8 @@
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.Linq;
+using System.Threading;
 using Orleans.Streams;
 
 namespace Orleans.Providers.Streams.Common
@@ -12,7 +14,7 @@ namespace Orleans.Providers.Streams.Common
     public sealed class QueueAdapterReceiverRegistry<TReceiver>
         where TReceiver : class, IQueueAdapterReceiver, IQueueCache
     {
-        private readonly ConcurrentDictionary<QueueId, TReceiver> _receivers = new();
+        private readonly ConcurrentDictionary<QueueId, Lazy<TReceiver>> _receivers = new();
         private readonly Func<QueueId, TReceiver> _factory;
 
         /// <summary>
@@ -26,18 +28,36 @@ namespace Orleans.Providers.Streams.Common
         /// <summary>
         /// Gets the registered receiver instances.
         /// </summary>
-        public IReadOnlyDictionary<QueueId, TReceiver> Receivers => _receivers;
+        public IReadOnlyDictionary<QueueId, TReceiver> Receivers
+            => _receivers
+                .Where(pair => pair.Value.IsValueCreated)
+                .ToDictionary(pair => pair.Key, pair => pair.Value.Value);
 
         /// <summary>
         /// Gets or creates the coordinator for a queue.
         /// </summary>
-        public TReceiver GetOrCreate(QueueId queueId) => _receivers.GetOrAdd(queueId, _factory);
+        public TReceiver GetOrCreate(QueueId queueId)
+            => _receivers.GetOrAdd(
+                queueId,
+                static (id, factory) => new(
+                    () => factory(id),
+                    LazyThreadSafetyMode.ExecutionAndPublication),
+                _factory).Value;
 
         /// <summary>
         /// Removes a receiver if it is still the registered instance for the queue.
         /// </summary>
         public bool Remove(QueueId queueId, TReceiver receiver)
-            => ((ICollection<KeyValuePair<QueueId, TReceiver>>)_receivers)
-                .Remove(new(queueId, receiver));
+        {
+            if (!_receivers.TryGetValue(queueId, out var registered)
+                || !registered.IsValueCreated
+                || !ReferenceEquals(registered.Value, receiver))
+            {
+                return false;
+            }
+
+            return ((ICollection<KeyValuePair<QueueId, Lazy<TReceiver>>>)_receivers)
+                .Remove(new(queueId, registered));
+        }
     }
 }
