@@ -100,7 +100,7 @@ public class MessageTransportLifecycleTests
     }
 
     [Fact]
-    public void MessageSerializer_Write_CopiesBufferedRawResponse()
+    public void MessageSerializer_Write_PreservesBufferedRawResponseForRetry()
     {
         using var serviceProvider = CreateServiceProvider();
         var sessionPool = serviceProvider.GetRequiredService<SerializerSessionPool>();
@@ -122,14 +122,21 @@ public class MessageTransportLifecycleTests
             BodyObject = readRequest
         };
 
-        using var output = new ArcBufferWriter();
-        var (headerLength, bodyLength) = serializer.Write(output, message);
+        using var firstOutput = new ArcBufferWriter();
+        using var secondOutput = new ArcBufferWriter();
+        var firstLengths = serializer.Write(firstOutput, message);
+        var secondLengths = serializer.Write(secondOutput, message);
 
-        Assert.Equal(bodyBytes.Length, bodyLength);
-        var outputBytes = new byte[output.Length];
-        output.Peek(outputBytes);
-        Assert.Equal(bodyBytes, outputBytes[headerLength..(headerLength + bodyLength)]);
-        Assert.Null(message._bodyObject);
+        Assert.Equal(bodyBytes.Length, firstLengths.BodyLength);
+        Assert.Equal(firstLengths, secondLengths);
+        var firstBytes = new byte[firstOutput.Length];
+        var secondBytes = new byte[secondOutput.Length];
+        firstOutput.Peek(firstBytes);
+        secondOutput.Peek(secondBytes);
+        Assert.Equal(firstBytes, secondBytes);
+        Assert.Equal(bodyBytes, firstBytes[firstLengths.HeaderLength..(firstLengths.HeaderLength + firstLengths.BodyLength)]);
+        Assert.Same(readRequest, message._bodyObject);
+        message.Dispose();
     }
 
     [Fact]
@@ -334,6 +341,20 @@ public class MessageTransportLifecycleTests
     }
 
     [Fact]
+    public void MessageTransportStream_SynchronousRead_ReturnsTransportBytes()
+    {
+        byte[] bytes = [1, 2, 3];
+        var transport = new ImmediateReadTransport(bytes);
+        using var stream = new MessageTransportStream(transport, MemoryPool<byte>.Shared);
+        Span<byte> destination = stackalloc byte[bytes.Length];
+
+        var bytesRead = stream.Read(destination);
+
+        Assert.Equal(bytes.Length, bytesRead);
+        Assert.Equal(bytes, destination.ToArray());
+    }
+
+    [Fact]
     public async Task SocketMessageTransport_ZeroLengthWrite_Completes()
     {
         var listener = new TcpListener(IPAddress.Loopback, 0);
@@ -463,6 +484,31 @@ public class MessageTransportLifecycleTests
         }
 
         public override ValueTask CloseAsync(Exception? closeException, CancellationToken cancellationToken = default) => default;
+    }
+
+    private sealed class ImmediateReadTransport : MessageTransport
+    {
+        private readonly ArcBufferWriter _buffer = new();
+
+        public ImmediateReadTransport(ReadOnlySpan<byte> bytes) => _buffer.Write(bytes);
+
+        public override IFeatureCollection Features { get; } = new FeatureCollection();
+
+        public override bool EnqueueRead(ReadRequest request)
+        {
+            request.OnRead(new ArcBufferReader(_buffer));
+            return true;
+        }
+
+        public override bool EnqueueWrite(WriteRequest request) => false;
+
+        public override ValueTask CloseAsync(Exception? closeException, CancellationToken cancellationToken = default) => default;
+
+        public override ValueTask DisposeAsync()
+        {
+            _buffer.Dispose();
+            return default;
+        }
     }
 
     private sealed class EmptyWriteRequest : WriteRequest, IDisposable

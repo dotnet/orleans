@@ -146,8 +146,6 @@ namespace Orleans.Runtime.Messaging
                 {
                     bodyLength = readRequest.BodyLength;
                     readRequest.Body.CopyTo(buffer);
-                    message._bodyObject = null;
-                    readRequest.Reset();
                 }
                 else if (bodyCodec is not null)
                 {

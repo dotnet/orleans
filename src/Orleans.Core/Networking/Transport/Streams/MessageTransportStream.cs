@@ -53,13 +53,20 @@ public class MessageTransportStream(MessageTransport transport, MemoryPool<byte>
     public override Task WriteAsync(byte[] buffer, int offset, int count, CancellationToken cancellationToken) => WriteAsync(new Memory<byte>(buffer, offset, count), cancellationToken).AsTask();
 
     /// <inheritdoc/>
-    public override int Read(byte[] buffer, int offset, int count) => Read(new Span<byte>(buffer, offset, count));
+    public override int Read(byte[] buffer, int offset, int count) =>
+        ReadAsync(new Memory<byte>(buffer, offset, count), CancellationToken.None).AsTask().GetAwaiter().GetResult();
 
     /// <inheritdoc/>
     public override void Write(byte[] buffer, int offset, int count) => Write(new ReadOnlySpan<byte>(buffer, offset, count));
 
     /// <inheritdoc/>
-    public override int Read(Span<byte> buffer) => base.Read(buffer);
+    public override int Read(Span<byte> buffer)
+    {
+        using var bytes = MemoryPool.Rent(buffer.Length);
+        var bytesRead = ReadAsync(bytes.Memory[..buffer.Length], CancellationToken.None).AsTask().GetAwaiter().GetResult();
+        bytes.Memory.Span[..bytesRead].CopyTo(buffer);
+        return bytesRead;
+    }
 
     /// <inheritdoc/>
     public override async ValueTask<int> ReadAsync(Memory<byte> buffer, CancellationToken cancellationToken = default)

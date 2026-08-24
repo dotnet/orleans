@@ -70,6 +70,11 @@ internal sealed class MessageWriteRequest : WriteRequest
         }
         finally
         {
+            foreach (var message in Messages)
+            {
+                message.ReleaseBodyBuffer();
+            }
+
             Reset();
         }
     }

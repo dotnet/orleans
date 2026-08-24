@@ -134,6 +134,13 @@ internal class UnixDomainSocketMessageTransportListener : MessageTransportListen
     {
         DisposeCore();
         GC.SuppressFinalize(this);
-        await base.DisposeAsync();
+        try
+        {
+            await base.DisposeAsync();
+        }
+        finally
+        {
+            _closingCts.Dispose();
+        }
     }
 }
