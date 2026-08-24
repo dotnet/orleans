@@ -1,9 +1,11 @@
 #nullable enable
 using System;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Time.Testing;
 using Orleans.Runtime;
 using Orleans.Runtime.DurableTasks;
+using Orleans.Serialization;
 using Xunit;
 
 namespace Orleans.DurableTasks.Tests;
@@ -11,6 +13,9 @@ namespace Orleans.DurableTasks.Tests;
 [TestCategory("BVT")]
 public class DurableTaskGrainRuntimeSharedTests
 {
+    private static Serializer CreateSerializer() =>
+        new ServiceCollection().AddSerializer().BuildServiceProvider().GetRequiredService<Serializer>();
+
     [Fact]
     public void CleanupPolicy_CleanupAge_GetSetRoundTrips()
     {
@@ -32,11 +37,13 @@ public class DurableTaskGrainRuntimeSharedTests
         var timeProvider = new FakeTimeProvider(new DateTimeOffset(2025, 6, 1, 0, 0, 0, TimeSpan.Zero));
         var logger = NullLogger<DurableTaskGrainRuntime>.Instance;
 
-        var shared = new DurableTaskGrainRuntimeShared(accessor, timeProvider, logger);
+        var serializer = CreateSerializer();
+        var shared = new DurableTaskGrainRuntimeShared(accessor, timeProvider, logger, serializer);
 
         Assert.Same(accessor, shared.GrainContextAccessor);
         Assert.Same(timeProvider, shared.TimeProvider);
         Assert.Same(logger, shared.Logger);
+        Assert.Same(serializer, shared.Serializer);
         Assert.Same(grainContext, shared.GrainContextAccessor.GrainContext);
     }
 
@@ -47,7 +54,7 @@ public class DurableTaskGrainRuntimeSharedTests
         var timeProvider = new FakeTimeProvider();
         var logger = NullLogger<DurableTaskGrainRuntime>.Instance;
 
-        var shared = new DurableTaskGrainRuntimeShared(accessor, timeProvider, logger);
+        var shared = new DurableTaskGrainRuntimeShared(accessor, timeProvider, logger, CreateSerializer());
 
         Assert.Equal(TimeSpan.FromDays(1), shared.DefaultCleanupPolicy.CleanupAge);
     }
@@ -59,8 +66,8 @@ public class DurableTaskGrainRuntimeSharedTests
         var timeProvider = new FakeTimeProvider();
         var logger = NullLogger<DurableTaskGrainRuntime>.Instance;
 
-        var sharedA = new DurableTaskGrainRuntimeShared(accessor, timeProvider, logger);
-        var sharedB = new DurableTaskGrainRuntimeShared(accessor, timeProvider, logger);
+        var sharedA = new DurableTaskGrainRuntimeShared(accessor, timeProvider, logger, CreateSerializer());
+        var sharedB = new DurableTaskGrainRuntimeShared(accessor, timeProvider, logger, CreateSerializer());
 
         sharedA.DefaultCleanupPolicy.CleanupAge = TimeSpan.FromMinutes(1);
 

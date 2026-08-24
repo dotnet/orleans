@@ -356,4 +356,34 @@ public class HierarchicalKeyTests
         var key = global::Orleans.HierarchicalKey.Create(null, "bar");
         Assert.Equal("bar", key.ToString());
     }
+
+    [Fact]
+    public void EveryChildFactory_RejectsNullEmptyAndMalformedChildren()
+    {
+        var parent = global::Orleans.HierarchicalKey.Create("parent");
+
+        Assert.Throws<ArgumentNullException>(() => global::Orleans.HierarchicalKey.Create(parent, null!));
+        Assert.Throws<ArgumentException>(() => global::Orleans.HierarchicalKey.Create(parent, ""));
+        Assert.Throws<ArgumentException>(() => global::Orleans.HierarchicalKey.Create(parent, "child\\"));
+        Assert.Throws<ArgumentNullException>(() => parent.CreateChildKey(null!));
+        Assert.Throws<ArgumentException>(() => parent.CreateChildKey(""));
+        Assert.Throws<ArgumentException>(() => parent.CreateChildKey("child\\q"));
+        Assert.Throws<ArgumentNullException>(() => parent.CreateEscapedChildKey(null!));
+        Assert.Throws<ArgumentException>(() => parent.CreateEscapedChildKey(""));
+        Assert.Throws<ArgumentNullException>(() => global::Orleans.HierarchicalKey.CreateEscaped(null!));
+        Assert.Throws<ArgumentException>(() => global::Orleans.HierarchicalKey.CreateEscaped(""));
+    }
+
+    [Fact]
+    public void ChildFactories_PreserveEqualityFormattingAndHashAcrossRepresentations()
+    {
+        var parent = global::Orleans.HierarchicalKey.Create("root");
+        var composed = parent.CreateEscapedChildKey("slash/and\\escape");
+        var parsed = global::Orleans.HierarchicalKey.Parse(composed.ToString(), provider: null);
+
+        Assert.Equal(composed, parsed);
+        Assert.Equal(composed.ToString(), parsed.ToString());
+        Assert.Equal(composed.GetHashCode(), parsed.GetHashCode());
+        Assert.True(composed.IsChildOf(parent));
+    }
 }

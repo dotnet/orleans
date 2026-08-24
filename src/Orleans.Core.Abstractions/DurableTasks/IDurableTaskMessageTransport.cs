@@ -11,6 +11,12 @@ internal interface IDurableTaskMessageTransport
 
     void SendCancellation(GrainId sender, GrainId target, TaskId taskId);
 
+    void SendCancellationAcknowledgement(
+        GrainId sender,
+        GrainId target,
+        TaskId taskId,
+        DurableTaskResponse response);
+
     ValueTask ScheduleResumeAsync(GrainId target, TaskId taskId, DateTimeOffset dueTime, CancellationToken cancellationToken);
 
     ValueTask CommitAsync(CancellationToken cancellationToken);

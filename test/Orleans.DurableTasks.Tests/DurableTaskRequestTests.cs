@@ -1,11 +1,13 @@
 #nullable enable
 using System.Reflection;
 using System.Distributed.DurableTasks;
+using Microsoft.Extensions.DependencyInjection;
 using NSubstitute;
 using NSubstitute.Core;
 using Orleans.Runtime;
 using Orleans.Runtime.DurableTasks;
 using Orleans.Serialization.Invocation;
+using Orleans.Serialization;
 using Xunit;
 
 namespace Orleans.DurableTasks.Tests;
@@ -177,19 +179,133 @@ public class DurableTaskRequestTests
 
         Assert.True(IDurableTaskRequest.AreRequestsEquivalent(
             baseline,
-            new TestRequest(shared, "ITest", "Run", ["a", 1])));
+            new TestRequest(shared, "ITest", "Run", ["a", 1]),
+            shared.Serializer));
         Assert.False(IDurableTaskRequest.AreRequestsEquivalent(
             baseline,
-            new TestRequest(shared, "IOther", "Run", ["a", 1])));
+            new TestRequest(shared, "IOther", "Run", ["a", 1]),
+            shared.Serializer));
         Assert.False(IDurableTaskRequest.AreRequestsEquivalent(
             baseline,
-            new TestRequest(shared, "ITest", "Other", ["a", 1])));
+            new TestRequest(shared, "ITest", "Other", ["a", 1]),
+            shared.Serializer));
         Assert.False(IDurableTaskRequest.AreRequestsEquivalent(
             baseline,
-            new TestRequest(shared, "ITest", "Run", ["a"])));
+            new TestRequest(shared, "ITest", "Run", ["a"]),
+            shared.Serializer));
         Assert.False(IDurableTaskRequest.AreRequestsEquivalent(
             baseline,
-            new TestRequest(shared, "ITest", "Run", ["a", 2])));
+            new TestRequest(shared, "ITest", "Run", ["a", 2]),
+            shared.Serializer));
+    }
+
+    [Fact]
+    public void AreRequestsEquivalent_UsesSerializedValuesForArraysAndRecords()
+    {
+        var shared = CreateShared(Substitute.For<IGrainFactory>());
+        var left = new TestRequest(
+            shared,
+            arguments:
+            [
+                new[] { 1, 2, 3 },
+                new ComplexArgument { Name = "value", Numbers = [4, 5] },
+            ]);
+        var equivalent = new TestRequest(
+            shared,
+            arguments:
+            [
+                new[] { 1, 2, 3 },
+                new ComplexArgument { Name = "value", Numbers = [4, 5] },
+            ]);
+        var conflict = new TestRequest(
+            shared,
+            arguments:
+            [
+                new[] { 1, 2, 3 },
+                new ComplexArgument { Name = "different", Numbers = [4, 5] },
+            ]);
+
+        Assert.True(IDurableTaskRequest.AreRequestsEquivalent(left, equivalent, shared.Serializer));
+        Assert.False(IDurableTaskRequest.AreRequestsEquivalent(left, conflict, shared.Serializer));
+    }
+
+    [Fact]
+    public void AreRequestsEquivalent_RequiresEquivalentApplicationContext()
+    {
+        var shared = CreateShared(Substitute.For<IGrainFactory>());
+        var left = new TestRequest(shared);
+        var equivalent = new TestRequest(shared);
+        var conflict = new TestRequest(shared);
+        SetContext(left, CreateContext("tenant-a", "caller-a", shared.Serializer));
+        SetContext(equivalent, CreateContext("tenant-a", "caller-b", shared.Serializer));
+        SetContext(conflict, CreateContext("tenant-b", "caller-a", shared.Serializer));
+
+        Assert.True(IDurableTaskRequest.AreRequestsEquivalent(left, equivalent, shared.Serializer));
+        Assert.False(IDurableTaskRequest.AreRequestsEquivalent(left, conflict, shared.Serializer));
+
+        static DurableTaskRequestContext CreateContext(string tenant, string caller, Serializer serializer) => new()
+        {
+            Values = new Dictionary<string, byte[]>(StringComparer.Ordinal)
+            {
+                ["tenant"] = serializer.SerializeToArray<object>(tenant),
+                ["#CCR"] = serializer.SerializeToArray<object>(caller),
+            },
+        };
+    }
+
+    [Fact]
+    public void AreRequestsEquivalent_DistinguishesOverloadSignatures()
+    {
+        var shared = CreateShared(Substitute.For<IGrainFactory>());
+        var stringOverload = typeof(OverloadedMethods).GetMethod(
+            nameof(OverloadedMethods.Run),
+            [typeof(string)])!;
+        var objectOverload = typeof(OverloadedMethods).GetMethod(
+            nameof(OverloadedMethods.Run),
+            [typeof(object)])!;
+        var left = new TestRequest(shared, arguments: ["value"], method: stringOverload);
+        var right = new TestRequest(shared, arguments: ["value"], method: objectOverload);
+
+        Assert.False(IDurableTaskRequest.AreRequestsEquivalent(left, right, shared.Serializer));
+    }
+
+    [Fact]
+    public async Task ScheduleAsync_RefreshesPersistedContextAtSubmission()
+    {
+        var grainFactory = Substitute.For<IGrainFactory>();
+        var targetId = GrainId.Create("target", "context-refresh");
+        var remote = Substitute.For<IDurableTaskGrainExtension>();
+        grainFactory.GetGrain<IDurableTaskGrainExtension>(targetId).Returns(remote);
+        remote.ScheduleAsync(Arg.Any<TaskId>(), Arg.Any<IDurableTaskRequest>(), Arg.Any<CancellationToken>())
+            .Returns(new ValueTask<DurableTaskResponse>(DurableTaskResponse.Pending));
+        var request = CreateRequest(grainFactory, targetId);
+        RequestContext.Clear();
+        try
+        {
+            RequestContext.Set("tenant", "at-submission");
+
+            await ((ISchedulableTask)request).ScheduleAsync(TaskId.Create("context-refresh"), CancellationToken.None);
+
+            Assert.True(request.Context!.Values!.TryGetValue("tenant", out var bytes));
+            Assert.Equal("at-submission", CreateShared(grainFactory).Serializer.Deserialize<object>(bytes));
+        }
+        finally
+        {
+            RequestContext.Clear();
+        }
+    }
+
+    [Fact]
+    public void AreRequestsEquivalent_OversizedSerializedArgumentFailsDeterministically()
+    {
+        var shared = CreateShared(Substitute.For<IGrainFactory>());
+        var left = new TestRequest(shared, arguments: [new byte[300 * 1024]]);
+        var right = new TestRequest(shared, arguments: [new byte[300 * 1024]]);
+
+        var exception = Assert.Throws<InvalidOperationException>(
+            () => IDurableTaskRequest.AreRequestsEquivalent(left, right, shared.Serializer));
+
+        Assert.Contains("262144-byte equivalence limit", exception.Message);
     }
 
     [Fact]
@@ -208,6 +324,21 @@ public class DurableTaskRequestTests
         Assert.Contains("The request has zero arguments.", setException.Message);
     }
 
+    [Theory]
+    [InlineData("plain")]
+    [InlineData("slash/value")]
+    [InlineData("backslash\\value")]
+    public void TaskId_SurrogateSerializationRoundTrip_PreservesCreatedValue(string value)
+    {
+        var serializer = new ServiceCollection().AddSerializer().BuildServiceProvider().GetRequiredService<Serializer>();
+        var taskId = TaskId.Create(value);
+
+        var roundTripped = serializer.Deserialize<TaskId>(serializer.SerializeToArray(taskId));
+
+        Assert.Equal(taskId, roundTripped);
+        Assert.Equal(taskId.ToString(), roundTripped.ToString());
+    }
+
     private static TestRequest CreateRequest(IGrainFactory grainFactory, GrainId targetId)
     {
         var result = new TestRequest(CreateShared(grainFactory));
@@ -223,7 +354,10 @@ public class DurableTaskRequestTests
     }
 
     private static DurableTaskRequestShared CreateShared(IGrainFactory grainFactory)
-        => new(Substitute.For<IGrainContextAccessor>(), grainFactory);
+        => new(
+            Substitute.For<IGrainContextAccessor>(),
+            grainFactory,
+            new ServiceCollection().AddSerializer().BuildServiceProvider().GetRequiredService<Serializer>());
 
     private static GrainDurableExecutionContext CreateExecutionContext(TaskId taskId)
         => new(taskId, Substitute.For<IDurableTaskGrainRuntime>());
@@ -244,7 +378,8 @@ public class DurableTaskRequestTests
         DurableTaskRequestShared shared,
         string interfaceName = "ITest",
         string methodName = "Run",
-        object?[]? arguments = null) : DurableTaskRequest(shared)
+        object?[]? arguments = null,
+        MethodInfo? method = null) : DurableTaskRequest(shared)
     {
         private readonly object?[] _arguments = arguments ?? [];
 
@@ -258,7 +393,7 @@ public class DurableTaskRequestTests
         public override string GetInterfaceName() => interfaceName;
         public override string GetActivityName() => $"{interfaceName}/{methodName}";
         public override Type GetInterfaceType() => typeof(TestRequest);
-        public override MethodInfo GetMethod() => typeof(TestRequest).GetMethod(nameof(GetMethod))!;
+        public override MethodInfo GetMethod() => method ?? typeof(TestRequest).GetMethod(nameof(GetMethod))!;
         protected override DurableTask InvokeInner() => DurableTask.Run(static _ => { });
     }
 
@@ -273,5 +408,26 @@ public class DurableTaskRequestTests
         public override Type GetInterfaceType() => typeof(TestRequest<TResult>);
         public override MethodInfo GetMethod() => typeof(TestRequest<TResult>).GetMethod(nameof(GetMethod))!;
         protected override DurableTask<TResult> InvokeInner() => DurableTask.FromResult(default(TResult)!);
+    }
+
+    [GenerateSerializer]
+    internal sealed record ComplexArgument
+    {
+        [Id(0)]
+        public string Name { get; set; } = "";
+
+        [Id(1)]
+        public int[] Numbers { get; set; } = [];
+    }
+
+    private static class OverloadedMethods
+    {
+        public static void Run(string value)
+        {
+        }
+
+        public static void Run(object value)
+        {
+        }
     }
 }

@@ -128,6 +128,8 @@ public class DurableInboxOptions
     /// <para>
     /// If the handler completes before the timeout, <c>DeliverAsync</c> returns <c>DeliveryResult.Processed()</c>
     /// immediately. If the timeout expires, <c>DeliverAsync</c> returns <c>DeliveryResult.Pending()</c>.
+    /// Timeout and caller cancellation affect only the poll. Durable handler execution continues until completion
+    /// or activation shutdown.
     /// </para>
     /// </remarks>
     /// <value>

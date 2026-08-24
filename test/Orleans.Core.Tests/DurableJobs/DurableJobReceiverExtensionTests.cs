@@ -109,7 +109,7 @@ public class DurableJobReceiverExtensionTests
     }
 
     [Fact]
-    public async Task HandleDurableJobAsync_WhenAttemptCancellationIsRequestedButExecutionIsStillRunning_EndsLongPollAndRemainsRunning()
+    public async Task HandleDurableJobAsync_WhenPollTokenIsCanceled_StopsPollButExecutionRemainsRunning()
     {
         var executionTask = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
         var handler = Substitute.For<IDurableJobHandler>();
@@ -130,10 +130,10 @@ public class DurableJobReceiverExtensionTests
         Assert.Equal(1, timeProvider.ActiveTimerCount);
 
         cts.Cancel();
-        var first = await firstCall.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
-        var second = await extension.HandleDurableJobAsync(context, cts.Token);
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(
+            () => firstCall);
+        var second = await extension.HandleDurableJobAsync(context, CancellationToken.None);
 
-        Assert.True(first.IsInProgress);
         Assert.True(second.IsInProgress);
         Assert.Equal(0, timeProvider.ActiveTimerCount);
         Assert.False(executionTask.Task.IsCompleted);

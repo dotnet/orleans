@@ -52,6 +52,8 @@ public static class DurableMessagingExtensions
         services.Configure<JournaledStateManagerOptions>(
             options => options.JournalFormatKey = OrleansBinaryJournalFormat.JournalFormatKey);
         services.TryAddSingleton<DurableMessagingInstruments>();
+        services.TryAddScoped<DurableMessagingCommitCoordinator>();
+        DecorateJournaledStateManager(services);
 
         services.TryAddScoped<DurableInboxExtension>(sp =>
         {
@@ -72,7 +74,10 @@ public static class DurableMessagingExtensions
                 sp.GetRequiredService<ILocalDurableJobManager>(),
                 sp.GetRequiredService<IDurableJobHandlerRegistry>(),
                 sp.GetRequiredService<TimeProvider>(),
-                options);
+                options,
+                sp.GetRequiredService<DurableMessagingCommitCoordinator>(),
+                sp.GetService<IDurableInboxFaultInjector>(),
+                sp.GetRequiredService<DurableJobTurnIsolation>());
         });
 
         services.TryAddKeyedScoped<IGrainExtension>(
@@ -107,5 +112,56 @@ public static class DurableMessagingExtensions
         services.TryAddEnumerable(
             ServiceDescriptor.Scoped<IJournaledGrainParticipant, DurableMessagingGrainParticipant>());
         return services;
+    }
+
+    private static void DecorateJournaledStateManager(IServiceCollection services)
+    {
+        if (services.Any(static service => service.ServiceType == typeof(DurableMessagingStateManagerRegistration)))
+        {
+            return;
+        }
+
+        services.AddSingleton<DurableMessagingStateManagerRegistration>();
+        var descriptor = services.LastOrDefault(
+            static service => service.ServiceType == typeof(IJournaledStateManager) && !service.IsKeyedService);
+        if (descriptor is null)
+        {
+            services.AddScoped<IJournaledStateManager, CoordinatedJournaledStateManager>();
+            return;
+        }
+
+        services.Remove(descriptor);
+        services.Add(CreateUncoordinatedStateManagerDescriptor(descriptor));
+        services.AddScoped<IJournaledStateManager>(static serviceProvider =>
+            new CoordinatedJournaledStateManager(
+                serviceProvider.GetRequiredService<UncoordinatedJournaledStateManager>().Value,
+                serviceProvider.GetRequiredService<DurableMessagingCommitCoordinator>()));
+    }
+
+    private static ServiceDescriptor CreateUncoordinatedStateManagerDescriptor(ServiceDescriptor descriptor)
+    {
+        if (descriptor.ImplementationInstance is IJournaledStateManager instance)
+        {
+            return ServiceDescriptor.Singleton(
+                typeof(UncoordinatedJournaledStateManager),
+                new UncoordinatedJournaledStateManager(instance));
+        }
+
+        if (descriptor.ImplementationFactory is { } factory)
+        {
+            return ServiceDescriptor.Describe(
+                typeof(UncoordinatedJournaledStateManager),
+                serviceProvider => new UncoordinatedJournaledStateManager(
+                    (IJournaledStateManager)factory(serviceProvider)),
+                descriptor.Lifetime);
+        }
+
+        return ServiceDescriptor.Describe(
+            typeof(UncoordinatedJournaledStateManager),
+            serviceProvider => new UncoordinatedJournaledStateManager(
+                (IJournaledStateManager)ActivatorUtilities.CreateInstance(
+                    serviceProvider,
+                    descriptor.ImplementationType!)),
+            descriptor.Lifetime);
     }
 }

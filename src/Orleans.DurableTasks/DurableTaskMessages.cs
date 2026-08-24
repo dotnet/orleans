@@ -30,6 +30,16 @@ internal sealed class DurableTaskCancellationMessage
 }
 
 [GenerateSerializer]
+internal sealed class DurableTaskCancellationAcknowledgementMessage
+{
+    [Id(0)]
+    public TaskId TaskId { get; init; }
+
+    [Id(1)]
+    public required DurableTaskResponse Response { get; init; }
+}
+
+[GenerateSerializer]
 internal sealed class DurableTaskResumeMessage
 {
     [Id(0)]

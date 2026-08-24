@@ -10,7 +10,7 @@ public readonly struct TaskId : ISpanFormattable, IEquatable<TaskId>, IParsable<
 
     private TaskId(string value)
     {
-        _key = HierarchicalKey.CreateEscaped(value);
+        _key = HierarchicalKey.Parse(value, provider: null);
     }
 
     private TaskId(HierarchicalKey key)
@@ -20,7 +20,11 @@ public readonly struct TaskId : ISpanFormattable, IEquatable<TaskId>, IParsable<
 
     public bool IsDefault => Equals(None);
 
+    /// <summary>Formats a task identifier using its escaped hierarchical representation.</summary>
     public static explicit operator string(TaskId taskId) => taskId.ToString();
+
+    /// <summary>Parses an escaped hierarchical task identifier.</summary>
+    /// <exception cref="ArgumentException">The value is empty or malformed.</exception>
     public static explicit operator TaskId(string taskId) => new(taskId);
 
     public override string ToString() => _key is null ? "" : _key.ToString();
@@ -75,7 +79,19 @@ public readonly struct TaskId : ISpanFormattable, IEquatable<TaskId>, IParsable<
     public bool IsParentOf(TaskId other) => _key is not null && _key.IsParentOf(other._key);
     public bool IsChildOf(TaskId other) => _key is not null && _key.IsChildOf(other._key);
     public TaskId Parent() => _key?.GetParent() is { } parent ? new(parent) : None;
-    public TaskId Child(string value) => _key is { } key ? new(key.CreateEscapedChildKey(value)) : new(value);
+    /// <summary>Creates a direct child using the supplied unescaped value.</summary>
+    /// <param name="value">The non-empty child value. Separators and escape characters are escaped.</param>
+    /// <returns>The child identifier.</returns>
+    /// <exception cref="ArgumentException"><paramref name="value"/> is null or empty.</exception>
+    public TaskId Child(string value)
+    {
+        ArgumentException.ThrowIfNullOrEmpty(value);
+        return _key is { } key ? new(key.CreateEscapedChildKey(value)) : Create(value);
+    }
+    /// <summary>Creates an identifier from a non-empty unescaped value.</summary>
+    /// <param name="value">The value. Separators and escape characters are escaped.</param>
+    /// <returns>The identifier.</returns>
+    /// <exception cref="ArgumentException"><paramref name="value"/> is null or empty.</exception>
     public static TaskId Create(string value) => new(HierarchicalKey.CreateEscaped(value));
     public static TaskId CreateRandom() => new(HierarchicalKey.CreateEscaped(Guid.NewGuid().ToString()));
 }

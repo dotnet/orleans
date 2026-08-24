@@ -24,8 +24,8 @@ public interface IDurableJobHandlerRegistry
     /// </summary>
     /// <param name="handler">The activation-scoped feature handler.</param>
     /// <param name="requiresTurnIsolation">
-    /// <see langword="true"/> to execute the handler as a complete grain turn. Turn-isolated handlers return a
-    /// terminal or reschedule result and cannot return <see cref="DurableJobRunStatus.InProgress"/>.
+    /// <see langword="true"/> to execute every handler poll under an activation-level exclusive turn lease.
+    /// If the handler returns <see cref="DurableJobRunStatus.InProgress"/>, the lease is released between polls.
     /// </param>
     /// <exception cref="InvalidOperationException">The handler is already registered.</exception>
     void Register(IDurableJobFeatureHandler handler, bool requiresTurnIsolation = false);
@@ -65,6 +65,8 @@ public interface IDurableJobFeatureHandler
 
 internal interface IDurableJobHandlerLookup
 {
+    CancellationToken ExecutionToken { get; }
+
     bool TryGetHandler(string jobName, [NotNullWhen(true)] out IDurableJobFeatureHandler? handler);
 
     bool TryGetIsolatedHandler(string jobName, [NotNullWhen(true)] out IDurableJobFeatureHandler? handler);
@@ -73,6 +75,18 @@ internal interface IDurableJobHandlerLookup
 internal sealed class DurableJobHandlerRegistry : IDurableJobHandlerRegistry, IDurableJobHandlerLookup
 {
     private readonly List<Registration> _handlers = [];
+    private readonly DurableJobTurnIsolation? _turnIsolation;
+    private readonly DurableJobExecutionLifetime? _lifetime;
+
+    public DurableJobHandlerRegistry(
+        DurableJobTurnIsolation? turnIsolation = null,
+        DurableJobExecutionLifetime? lifetime = null)
+    {
+        _turnIsolation = turnIsolation;
+        _lifetime = lifetime;
+    }
+
+    public CancellationToken ExecutionToken => _lifetime?.Token ?? CancellationToken.None;
 
     public void Register(IDurableJobFeatureHandler handler, bool requiresTurnIsolation = false)
     {
@@ -87,6 +101,10 @@ internal sealed class DurableJobHandlerRegistry : IDurableJobHandlerRegistry, ID
         }
 
         _handlers.Add(new(handler, requiresTurnIsolation));
+        if (requiresTurnIsolation)
+        {
+            _turnIsolation?.Enable();
+        }
     }
 
     public bool TryGetHandler(string jobName, [NotNullWhen(true)] out IDurableJobFeatureHandler? handler) =>
@@ -143,35 +161,69 @@ internal interface IDurableJobFeatureReceiverExtension : IGrainExtension
         CancellationToken attemptCancellationToken);
 }
 
-internal sealed partial class DurableJobFeatureReceiverExtension(
-    IDurableJobHandlerLookup handlers,
-    DurableJobReceiverExtensionShared shared) : IDurableJobFeatureReceiverExtension
+internal sealed partial class DurableJobFeatureReceiverExtension : IDurableJobFeatureReceiverExtension
 {
+    private const int MaxCompletedAttempts = 65_536;
+
+    private readonly IDurableJobHandlerLookup _handlers;
+    private readonly DurableJobReceiverExtensionShared _shared;
+    private readonly DurableJobTurnIsolation _turnIsolation;
+    private readonly object _attemptLock = new();
+    private readonly Dictionary<(string JobId, long ExecutionGeneration, int DequeueCount), DurableJobRunResult> _attempts = [];
+    private readonly Queue<(string JobId, long ExecutionGeneration, int DequeueCount)> _completedAttempts = [];
+
+    public DurableJobFeatureReceiverExtension(
+        IDurableJobHandlerLookup handlers,
+        DurableJobReceiverExtensionShared shared,
+        DurableJobTurnIsolation? turnIsolation = null)
+    {
+        _handlers = handlers;
+        _shared = shared;
+        _turnIsolation = turnIsolation ?? new DurableJobTurnIsolation();
+    }
+
     public async ValueTask<DurableJobRunResult?> TryHandleFeatureJobAsync(
         IJobRunContext context,
         CancellationToken attemptCancellationToken)
     {
-        if (!handlers.TryGetIsolatedHandler(context.Job.Name, out var handler))
+        if (!_handlers.TryGetIsolatedHandler(context.Job.Name, out var handler))
         {
             return null;
         }
 
-        using var tracker = shared.BeginHandlerExecution(context);
+        var key = (context.Job.Id, context.Job.ExecutionGeneration, context.DequeueCount);
+        lock (_attemptLock)
+        {
+            if (_attempts.TryGetValue(key, out var cached) && !cached.IsInProgress)
+            {
+                return cached;
+            }
+        }
+
+        using var gateCancellation = CancellationTokenSource.CreateLinkedTokenSource(
+            attemptCancellationToken,
+            _handlers.ExecutionToken);
+        using var lease = await _turnIsolation.EnterIsolatedAsync(gateCancellation.Token);
+        lease.Activate();
+        lock (_attemptLock)
+        {
+            if (_attempts.TryGetValue(key, out var cached) && !cached.IsInProgress)
+            {
+                return cached;
+            }
+        }
+
+        using var tracker = _shared.BeginHandlerExecution(context);
         try
         {
-            var result = await handler.ExecuteJobAsync(context, attemptCancellationToken)
+            var result = await handler.ExecuteJobAsync(context, _handlers.ExecutionToken)
                 ?? throw new InvalidOperationException(
                     $"Durable job feature handler for '{context.Job.Name}' returned a null result.");
-            if (result.IsInProgress)
-            {
-                throw new InvalidOperationException(
-                    $"Turn-isolated durable job feature handler for '{context.Job.Name}' returned InProgress.");
-            }
-
+            CacheResult(key, result);
             tracker.RecordResult(result);
             return result;
         }
-        catch (OperationCanceledException) when (attemptCancellationToken.IsCancellationRequested)
+        catch (OperationCanceledException) when (_handlers.ExecutionToken.IsCancellationRequested)
         {
             tracker.AttemptCanceled();
             throw;
@@ -179,8 +231,32 @@ internal sealed partial class DurableJobFeatureReceiverExtension(
         catch (Exception exception)
         {
             tracker.Failed(exception);
-            LogErrorExecutingFeatureJob(shared.Logger, exception, context.Job.Id, context.Job.TargetGrainId);
-            return DurableJobRunResult.Failed(exception);
+            LogErrorExecutingFeatureJob(_shared.Logger, exception, context.Job.Id, context.Job.TargetGrainId);
+            var result = DurableJobRunResult.Failed(exception);
+            CacheResult(key, result);
+            return result;
+        }
+    }
+
+    private void CacheResult(
+        (string JobId, long ExecutionGeneration, int DequeueCount) key,
+        DurableJobRunResult result)
+    {
+        lock (_attemptLock)
+        {
+            _attempts[key] = result;
+            if (result.IsInProgress)
+            {
+                _attempts.Remove(key);
+                return;
+            }
+
+            _completedAttempts.Enqueue(key);
+            while (_completedAttempts.Count > MaxCompletedAttempts
+                && _completedAttempts.TryDequeue(out var expired))
+            {
+                _attempts.Remove(expired);
+            }
         }
     }
 

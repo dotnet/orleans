@@ -379,6 +379,30 @@ public class InboxHandlerRegistrationTests
         Assert.Same(newHandler, foundNewHandler);
     }
 
+    [Fact]
+    public async Task LegacyRegisterHandler_ReplacesWrapperInPlaceAndPreservesFirstMatchOrder()
+    {
+        var inbox = CreateInbox();
+        var first = new RecordingHandler("first");
+        var replacement = new RecordingHandler("replacement");
+        var laterCatchAll = new RecordingHandler("later");
+
+        inbox.RegisterHandler("route", first);
+        inbox.RegisterHandler(laterCatchAll);
+        inbox.RegisterHandler("route", replacement);
+        inbox.RegisterHandler("route", replacement);
+
+        var context = CreateContext(CreateTestEnvelope("route"));
+        Assert.True(inbox.TryFindHandler(context, out var dispatched));
+        await dispatched.HandleAsync(context, CancellationToken.None);
+
+        Assert.Equal(0, first.Count);
+        Assert.Equal(1, replacement.Count);
+        Assert.Equal(0, laterCatchAll.Count);
+        Assert.True(inbox.TryGetHandler("route", out var registered));
+        Assert.Same(replacement, registered);
+    }
+
     // Test helper classes
 
     private sealed class TestHandler : IInboxHandler
@@ -400,6 +424,21 @@ public class InboxHandlerRegistrationTests
         }
 
         public override string ToString() => _name;
+    }
+
+    private sealed class RecordingHandler(string name) : IInboxHandler
+    {
+        public int Count { get; private set; }
+
+        public bool CanHandle(IInboxHandlerContext context) => true;
+
+        public ValueTask HandleAsync(IInboxHandlerContext context, CancellationToken cancellationToken)
+        {
+            Count++;
+            return ValueTask.CompletedTask;
+        }
+
+        public override string ToString() => name;
     }
 
     private sealed class MockInboxHandlerContext : IInboxHandlerContext

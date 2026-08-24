@@ -1,15 +1,16 @@
 ﻿#nullable enable
 using System;
+using System.Diagnostics;
+using System.Diagnostics.CodeAnalysis;
+using System.Distributed.DurableTasks;
 using System.Reflection;
+using System.Threading;
+using System.Threading.Tasks;
 using Orleans.CodeGeneration;
 using Orleans.Invocation;
-using Orleans.Serialization.Invocation;
-using System.Diagnostics;
-using System.Distributed.DurableTasks;
 using Orleans.Runtime;
-using System.Threading.Tasks;
-using System.Threading;
-using System.Diagnostics.CodeAnalysis;
+using Orleans.Serialization;
+using Orleans.Serialization.Invocation;
 
 namespace Orleans.DurableTasks;
 
@@ -18,6 +19,10 @@ namespace Orleans.DurableTasks;
 /// </summary>
 public interface IDurableTaskRequest : IRequest
 {
+    private const int MaxEquivalentArgumentLength = 256 * 1024;
+    private const int MaxEquivalentArgumentsTotalLength = 1024 * 1024;
+    private const int MaxEquivalentArgumentCount = 128;
+
     /// <summary>
     /// Gets the task request context.
     /// </summary>
@@ -36,7 +41,10 @@ public interface IDurableTaskRequest : IRequest
     /// <returns>A string representation of the request.</returns>
     public string ToMethodCallString() => ToMethodCallString(this);
 
-    internal static bool AreRequestsEquivalent(IDurableTaskRequest left, IDurableTaskRequest right)
+    internal static bool AreRequestsEquivalent(
+        IDurableTaskRequest left,
+        IDurableTaskRequest right,
+        Serializer serializer)
     {
         if (!string.Equals(left.GetInterfaceName(), right.GetInterfaceName(), StringComparison.Ordinal))
         {
@@ -48,29 +56,104 @@ public interface IDurableTaskRequest : IRequest
             return false;
         }
 
+        if (!HaveEquivalentSignatures(left, right))
+        {
+            return false;
+        }
+
         if (left.GetArgumentCount() != right.GetArgumentCount())
         {
             return false;
         }
 
+        if (left.GetArgumentCount() > MaxEquivalentArgumentCount)
+        {
+            throw new InvalidOperationException(
+                $"Durable task requests exceed the {MaxEquivalentArgumentCount}-argument equivalence limit.");
+        }
+
+        var totalLength = 0;
         for (var arg = 0; arg < left.GetArgumentCount(); arg++)
         {
-            var leftValue = left.GetArgument(arg);
-            var rightValue = right.GetArgument(arg);
-            if (!Equals(leftValue, rightValue))
+            var leftBytes = SerializeArgument(left.GetArgument(arg), serializer, arg);
+            var rightBytes = SerializeArgument(right.GetArgument(arg), serializer, arg);
+            totalLength = checked(totalLength + leftBytes.Length + rightBytes.Length);
+            if (totalLength > MaxEquivalentArgumentsTotalLength)
+            {
+                throw new InvalidOperationException(
+                    $"Durable task request arguments exceed the {MaxEquivalentArgumentsTotalLength}-byte equivalence limit.");
+            }
+
+            if (!leftBytes.Span.SequenceEqual(rightBytes.Span))
             {
                 return false;
             }
         }
 
-        return true;
+        return (left.Context, right.Context) switch
+        {
+            (null, null) => true,
+            ({ } leftContext, { } rightContext) => leftContext.HasEquivalentApplicationValues(rightContext),
+            _ => false,
+        };
+
+        static bool HaveEquivalentSignatures(IDurableTaskRequest left, IDurableTaskRequest right)
+        {
+            var leftMethod = left.GetMethod();
+            var rightMethod = right.GetMethod();
+            if (leftMethod is null || rightMethod is null)
+            {
+                return leftMethod is null
+                    && rightMethod is null
+                    && left.GetType() == right.GetType();
+            }
+
+            if (leftMethod.ReturnType != rightMethod.ReturnType
+                || leftMethod.IsGenericMethod != rightMethod.IsGenericMethod)
+            {
+                return false;
+            }
+
+            if (leftMethod.IsGenericMethod
+                && !leftMethod.GetGenericArguments().SequenceEqual(rightMethod.GetGenericArguments()))
+            {
+                return false;
+            }
+
+            return leftMethod.GetParameters().Select(static parameter => parameter.ParameterType)
+                .SequenceEqual(rightMethod.GetParameters().Select(static parameter => parameter.ParameterType));
+        }
+
+        static ReadOnlyMemory<byte> SerializeArgument(object? value, Serializer serializer, int argumentIndex)
+        {
+            Memory<byte> destination = new byte[MaxEquivalentArgumentLength];
+            try
+            {
+                serializer.Serialize(value, ref destination);
+                return destination;
+            }
+            catch (Exception exception)
+            {
+                throw new InvalidOperationException(
+                    $"Durable task request argument {argumentIndex} could not be serialized within the {MaxEquivalentArgumentLength}-byte equivalence limit.",
+                    exception);
+            }
+        }
     }
 }
 
-public sealed class DurableTaskRequestShared(IGrainContextAccessor grainContextAccessor, IGrainFactory grainFactory)
+/// <summary>Provides services shared by generated durable task requests.</summary>
+/// <param name="grainContextAccessor">The current grain context accessor.</param>
+/// <param name="grainFactory">The grain factory.</param>
+/// <param name="serializer">The serializer used to preserve scheduling-time request context.</param>
+public sealed class DurableTaskRequestShared(
+    IGrainContextAccessor grainContextAccessor,
+    IGrainFactory grainFactory,
+    Serializer serializer)
 {
     public IGrainContextAccessor GrainContextAccessor { get; } = grainContextAccessor;
     public IGrainFactory GrainFactory { get; } = grainFactory;
+    internal Serializer Serializer { get; } = serializer;
 }
 
 [GenerateSerializer]
@@ -159,6 +242,7 @@ public abstract class DurableTaskRequest(DurableTaskRequestShared shared) : Dura
     {
         ArgumentOutOfRangeException.ThrowIfEqual(taskId, default);
         Debug.Assert(Context is not null);
+        Context.Values = DurableTaskRequestContext.CaptureRequestContext(_shared.Serializer);
 
         if (TryGetRuntime(out var runtime))
         {
@@ -181,9 +265,13 @@ public abstract class DurableTaskRequest(DurableTaskRequestShared shared) : Dura
         // For the first point (identical implementation and arguments), we could store the task locally and verify it against its already-stored copy.
         // This check can also be performed remotely instead, since the remote host must have stored a copy of the request in order to be able to execute it.
         Debug.Assert(Context is not null);
+        Context.Values = DurableTaskRequestContext.CaptureRequestContext(_shared.Serializer);
         if (TryGetRuntime(out var runtime))
         {
             using var durableCts = new CancellationTokenSource();
+            using var durableDeactivationRegistration = executionContext.RegisterDeactivationCallback(
+                static (cts, _) => cts.CancelAsync(),
+                durableCts);
             using var durableRegistration = executionContext.RegisterCancellationCallback(
                 static async (state, cancellationToken) =>
                 {
@@ -205,6 +293,9 @@ public abstract class DurableTaskRequest(DurableTaskRequestShared shared) : Dura
 
         var remote = _shared.GrainFactory.GetGrain<IDurableTaskGrainExtension>(Context.TargetId);
         using var cts = new CancellationTokenSource();
+        using var remoteDeactivationRegistration = executionContext.RegisterDeactivationCallback(
+            static (source, _) => source.CancelAsync(),
+            cts);
         using var registration = executionContext.RegisterCancellationCallback(
             static async (state, cancellationToken) =>
             {
@@ -345,6 +436,7 @@ public abstract class DurableTaskRequest<TResult>(DurableTaskRequestShared share
     public async ValueTask<DurableTaskResponse> ScheduleAsync(TaskId taskId, CancellationToken cancellationToken = default)
     {
         Debug.Assert(Context is not null);
+        Context.Values = DurableTaskRequestContext.CaptureRequestContext(_shared.Serializer);
 
         if (DurableTaskRequest.TryGetRuntime(out var runtime))
         {
@@ -367,9 +459,13 @@ public abstract class DurableTaskRequest<TResult>(DurableTaskRequestShared share
         // For the first point (identical implementation and arguments), we could store the task locally and verify it against its already-stored copy.
         // This check can also be performed remotely instead, since the remote host must have stored a copy of the request in order to be able to execute it.
         Debug.Assert(Context is not null);
+        Context.Values = DurableTaskRequestContext.CaptureRequestContext(_shared.Serializer);
         if (DurableTaskRequest.TryGetRuntime(out var runtime))
         {
             using var durableCts = new CancellationTokenSource();
+            using var durableDeactivationRegistration = executionContext.RegisterDeactivationCallback(
+                static (cts, _) => cts.CancelAsync(),
+                durableCts);
             using var durableRegistration = executionContext.RegisterCancellationCallback(
                 static async (state, cancellationToken) =>
                 {
@@ -391,6 +487,9 @@ public abstract class DurableTaskRequest<TResult>(DurableTaskRequestShared share
 
         var remote = _shared.GrainFactory.GetGrain<IDurableTaskGrainExtension>(Context.TargetId);
         using var cts = new CancellationTokenSource();
+        using var remoteDeactivationRegistration = executionContext.RegisterDeactivationCallback(
+            static (source, _) => source.CancelAsync(),
+            cts);
         using var registration = executionContext.RegisterCancellationCallback(
             static async (state, cancellationToken) =>
             {

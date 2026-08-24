@@ -29,7 +29,7 @@ internal sealed class OutboxMessageState
 }
 
 [GenerateSerializer]
-internal sealed class InboxDeadLetter
+internal sealed class InboxDeadLetter : IDisposable
 {
     [Id(0)]
     public required DurableEnvelope Envelope { get; init; }
@@ -42,10 +42,12 @@ internal sealed class InboxDeadLetter
 
     [Id(3)]
     public int AttemptCount { get; init; }
+
+    public void Dispose() => Envelope.Dispose();
 }
 
 [GenerateSerializer]
-internal sealed class OutboxDeadLetter
+internal sealed class OutboxDeadLetter : IDisposable
 {
     [Id(0)]
     public required DurableEnvelope Envelope { get; init; }
@@ -58,4 +60,6 @@ internal sealed class OutboxDeadLetter
 
     [Id(3)]
     public int AttemptCount { get; init; }
+
+    public void Dispose() => Envelope.Dispose();
 }

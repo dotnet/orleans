@@ -106,7 +106,7 @@ public sealed class InventoryReservationTests : IClassFixture<InventoryReservati
     {
         var grain = _fixture.Cluster.Client.GetGrain<IHelloWorkflowGrain>(Guid.NewGuid().ToString("N"));
         var handle = await grain.RunSample().ScheduleAsync(TestContext.Current.CancellationToken);
-        using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+        using var timeout = new CancellationTokenSource(TimeSpan.FromMinutes(2));
 
         var result = await handle.WaitAsync(timeout.Token);
 

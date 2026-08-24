@@ -6,6 +6,8 @@ using System.Text;
 using System.Threading.Tasks;
 using Xunit;
 using HierarchicalKey = System.Distributed.DurableTasks.HierarchicalKey;
+using OrleansHierarchicalKey = Orleans.HierarchicalKey;
+using TaskId = System.Distributed.DurableTasks.TaskId;
 
 namespace Orleans.DurableTasks.Tests;
 
@@ -274,5 +276,78 @@ public class HierarchicalKeyTests
         var result = GetLastSegment("aaa\\/".AsSpan());
 
         Assert.Equal("aaa\\/", result.ToString());
+    }
+
+    [Fact]
+    public void EveryChildFactoryRejectsNullEmptyAndMalformedChildren()
+    {
+        var parent = HierarchicalKey.Create("parent");
+
+        Assert.Throws<ArgumentNullException>(() => HierarchicalKey.Create(parent, null!));
+        Assert.Throws<ArgumentException>(() => HierarchicalKey.Create(parent, ""));
+        Assert.Throws<ArgumentException>(() => HierarchicalKey.Create(parent, "child\\"));
+        Assert.Throws<ArgumentNullException>(() => parent.CreateChildKey(null!));
+        Assert.Throws<ArgumentException>(() => parent.CreateChildKey(""));
+        Assert.Throws<ArgumentException>(() => parent.CreateChildKey("child\\q"));
+        Assert.Throws<ArgumentNullException>(() => parent.CreateEscapedChildKey(null!));
+        Assert.Throws<ArgumentException>(() => parent.CreateEscapedChildKey(""));
+        Assert.Throws<ArgumentNullException>(() => HierarchicalKey.CreateEscaped(null!));
+        Assert.Throws<ArgumentException>(() => HierarchicalKey.CreateEscaped(""));
+    }
+
+    [Fact]
+    public void EscapedChildPreservesEqualityFormattingAndHashAcrossRepresentations()
+    {
+        var parent = HierarchicalKey.Create("root");
+        var composed = parent.CreateEscapedChildKey("slash/and\\escape");
+        var parsed = HierarchicalKey.Parse(composed.ToString(), provider: null);
+
+        Assert.Equal(composed, parsed);
+        Assert.Equal(composed.ToString(), parsed.ToString());
+        Assert.Equal(composed.GetHashCode(), parsed.GetHashCode());
+        Assert.True(composed.IsChildOf(parent));
+    }
+
+    [Fact]
+    public void PublicHierarchicalKeyChildFactoriesRejectInvalidValuesAndPreserveValueSemantics()
+    {
+        var parent = OrleansHierarchicalKey.Create("root");
+        Assert.Throws<ArgumentNullException>(() => OrleansHierarchicalKey.Create(parent, null!));
+        Assert.Throws<ArgumentException>(() => OrleansHierarchicalKey.Create(parent, ""));
+        Assert.Throws<ArgumentException>(() => parent.CreateChildKey("child\\q"));
+        Assert.Throws<ArgumentNullException>(() => parent.CreateEscapedChildKey(null!));
+        Assert.Throws<ArgumentException>(() => parent.CreateEscapedChildKey(""));
+
+        var composed = parent.CreateEscapedChildKey("slash/and\\escape");
+        var parsed = OrleansHierarchicalKey.Parse(composed.ToString(), provider: null);
+        Assert.Equal(composed, parsed);
+        Assert.Equal(composed.ToString(), parsed.ToString());
+        Assert.Equal(composed.GetHashCode(), parsed.GetHashCode());
+    }
+
+    [Theory]
+    [InlineData("")]
+    [InlineData("a\\")]
+    [InlineData("a\\q")]
+    [InlineData("a//b")]
+    public void TaskIdRejectsEmptyAndMalformedEscapedValues(string value)
+    {
+        Assert.ThrowsAny<Exception>(() => TaskId.Parse(value));
+        Assert.False(TaskId.TryParse(value, provider: null, out _));
+    }
+
+    [Theory]
+    [InlineData("plain")]
+    [InlineData("separator/value")]
+    [InlineData("backslash\\value")]
+    public void TaskIdCreateStringAndChildRoundTrips(string value)
+    {
+        var created = TaskId.Create(value);
+        Assert.Equal(created, TaskId.Parse(created.ToString()));
+        Assert.Equal(created, (TaskId)(string)created);
+
+        var child = TaskId.Create("parent").Child(value);
+        Assert.Equal(child, TaskId.Parse(child.ToString()));
+        Assert.True(child.IsChildOf(TaskId.Create("parent")));
     }
 }

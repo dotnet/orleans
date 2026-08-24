@@ -7,6 +7,9 @@ public abstract partial class DurableExecutionContext(TaskId id)
     protected object SyncRoot => _lockObj;
 
     private List<CancellationCallbackRegistrationBase>? _cancellationCallbacks;
+    private List<CancellationCallbackRegistrationBase>? _deactivationCallbacks;
+    private bool _cancellationSignaled;
+    private bool _deactivationSignaled;
 
     public static DurableExecutionContext? CurrentContext => Current.Value;
 
@@ -45,12 +48,28 @@ public abstract partial class DurableExecutionContext(TaskId id)
     // Note that blocking on cancellation of a task from within that task would result in a deadlock
     // Cancels the task if it is scheduled or running. If the task is not scheduled or running, this method does nothing.
     internal async Task CancelAsync(CancellationToken cancellationToken)
+        => await InvokeCallbacksAsync(isDeactivation: false, cancellationToken);
+
+    protected internal async Task DeactivateAsync(CancellationToken cancellationToken)
+        => await InvokeCallbacksAsync(isDeactivation: true, cancellationToken);
+
+    private async Task InvokeCallbacksAsync(bool isDeactivation, CancellationToken cancellationToken)
     {
         List<CancellationCallbackRegistrationBase>? callbacks;
         lock (_lockObj)
         {
-            callbacks = _cancellationCallbacks;
-            _cancellationCallbacks = null;
+            if (isDeactivation)
+            {
+                _deactivationSignaled = true;
+                callbacks = _deactivationCallbacks;
+                _deactivationCallbacks = null;
+            }
+            else
+            {
+                _cancellationSignaled = true;
+                callbacks = _cancellationCallbacks;
+                _cancellationCallbacks = null;
+            }
         }
 
         if (callbacks is not null)
@@ -62,21 +81,57 @@ public abstract partial class DurableExecutionContext(TaskId id)
         }
     }
 
-    public IDisposable RegisterCancellationCallback<TState>(Func<TState, CancellationToken, Task> callback, TState state) => RegisterCancellationCallbackCore(new CancellationCallbackRegistration<TState>(callback, state, this));
+    public IDisposable RegisterCancellationCallback<TState>(Func<TState, CancellationToken, Task> callback, TState state) =>
+        RegisterCallbackCore(new CancellationCallbackRegistration<TState>(callback, state, this, isDeactivation: false));
 
-    public IDisposable RegisterCancellationCallback(Func<CancellationToken, Task> callback) => RegisterCancellationCallbackCore(new CancellationCallbackRegistration(callback, this));
+    public IDisposable RegisterCancellationCallback(Func<CancellationToken, Task> callback) =>
+        RegisterCallbackCore(new CancellationCallbackRegistration(callback, this, isDeactivation: false));
 
-    private CancellationCallbackRegistrationBase RegisterCancellationCallbackCore(CancellationCallbackRegistrationBase callback)
+    /// <summary>
+    /// Registers cleanup which aborts activation-owned execution during deactivation without propagating durable cancellation.
+    /// </summary>
+    /// <typeparam name="TState">The callback state type.</typeparam>
+    /// <param name="callback">The asynchronous cleanup callback.</param>
+    /// <param name="state">The callback state.</param>
+    /// <returns>A registration which removes the callback when disposed.</returns>
+    public IDisposable RegisterDeactivationCallback<TState>(Func<TState, CancellationToken, Task> callback, TState state) =>
+        RegisterCallbackCore(new CancellationCallbackRegistration<TState>(callback, state, this, isDeactivation: true));
+
+    internal IDisposable RegisterCancellationTokenSource(CancellationTokenSource cancellationTokenSource) =>
+        new CompositeRegistration(
+            RegisterCancellationCallback(static (source, _) => source.CancelAsync(), cancellationTokenSource),
+            RegisterDeactivationCallback(static (source, _) => source.CancelAsync(), cancellationTokenSource));
+
+    private CancellationCallbackRegistrationBase RegisterCallbackCore(CancellationCallbackRegistrationBase callback)
     {
         lock (_lockObj)
         {
-            (_cancellationCallbacks ??= []).Add(callback);
+            if (callback.IsDeactivation)
+            {
+                if (_deactivationSignaled)
+                {
+                    throw new OperationCanceledException("The durable execution context is deactivating.");
+                }
+
+                (_deactivationCallbacks ??= []).Add(callback);
+            }
+            else
+            {
+                if (_cancellationSignaled)
+                {
+                    throw new OperationCanceledException("The durable execution context has been canceled.");
+                }
+
+                (_cancellationCallbacks ??= []).Add(callback);
+            }
+
             return callback;
         }
     }
 
-    private abstract class CancellationCallbackRegistrationBase(DurableExecutionContext context) : IDisposable
+    private abstract class CancellationCallbackRegistrationBase(DurableExecutionContext context, bool isDeactivation) : IDisposable
     {
+        public bool IsDeactivation { get; } = isDeactivation;
         public abstract Task InvokeAsync(CancellationToken cancellationToken);
 
         public void Dispose()
@@ -85,12 +140,19 @@ public abstract partial class DurableExecutionContext(TaskId id)
         }
     }
 
-    private sealed class CancellationCallbackRegistration<TState>(Func<TState, CancellationToken, Task> callback, TState state, DurableExecutionContext context) : CancellationCallbackRegistrationBase(context)
+    private sealed class CancellationCallbackRegistration<TState>(
+        Func<TState, CancellationToken, Task> callback,
+        TState state,
+        DurableExecutionContext context,
+        bool isDeactivation) : CancellationCallbackRegistrationBase(context, isDeactivation)
     {
         public override Task InvokeAsync(CancellationToken cancellationToken) => callback(state, cancellationToken);
     }
 
-    private sealed class CancellationCallbackRegistration(Func<CancellationToken, Task> callback, DurableExecutionContext context) : CancellationCallbackRegistrationBase(context)
+    private sealed class CancellationCallbackRegistration(
+        Func<CancellationToken, Task> callback,
+        DurableExecutionContext context,
+        bool isDeactivation) : CancellationCallbackRegistrationBase(context, isDeactivation)
     {
         public override Task InvokeAsync(CancellationToken cancellationToken) => callback(cancellationToken);
     }
@@ -99,7 +161,24 @@ public abstract partial class DurableExecutionContext(TaskId id)
     {
         lock (_lockObj)
         {
-            _cancellationCallbacks?.Remove(registration);
+            if (registration.IsDeactivation)
+            {
+                _deactivationCallbacks?.Remove(registration);
+            }
+            else
+            {
+                _cancellationCallbacks?.Remove(registration);
+            }
         }
     }
+
+    private sealed class CompositeRegistration(IDisposable cancellation, IDisposable deactivation) : IDisposable
+    {
+        public void Dispose()
+        {
+            cancellation.Dispose();
+            deactivation.Dispose();
+        }
+    }
+
 }

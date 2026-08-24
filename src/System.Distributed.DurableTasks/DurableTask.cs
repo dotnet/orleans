@@ -131,7 +131,7 @@ public abstract class DurableTask<TResult> : DurableTask
 {
 }
 
-internal struct ConfiguredDurableTaskCore<TDurableTask> where TDurableTask : DurableTask
+internal sealed class ConfiguredDurableTaskCore<TDurableTask> where TDurableTask : DurableTask
 {
     internal readonly TDurableTask Task;
     internal readonly DurableExecutionContext? ParentContext = DurableExecutionContext.CurrentContext;
@@ -143,7 +143,7 @@ internal struct ConfiguredDurableTaskCore<TDurableTask> where TDurableTask : Dur
         Task = task;
     }
 
-    public readonly TaskId TaskId => _taskId;
+    public TaskId TaskId => _taskId;
 
     public void SetTaskId(string? taskId)
     {
@@ -183,26 +183,29 @@ internal struct ConfiguredDurableTaskCore<TDurableTask> where TDurableTask : Dur
 
     internal bool TrySetTaskId(string? name)
     {
-        if (!_taskId.IsDefault)
+        lock (this)
         {
-            return false;
-        }
+            if (!_taskId.IsDefault)
+            {
+                return false;
+            }
 
-        if (ParentContext is { } parentContext)
-        {
-            // Create an identifier relative to the parent context's identifier.
-            _taskId = parentContext.CreateChildTaskId(name);
-        }
-        else if (string.IsNullOrWhiteSpace(name))
-        {
-            _taskId = TaskId.CreateRandom();
-        }
-        else
-        {
-            _taskId = TaskId.Create(name);
-        }
+            if (ParentContext is { } parentContext)
+            {
+                // Create an identifier relative to the parent context's identifier.
+                _taskId = parentContext.CreateChildTaskId(name);
+            }
+            else if (string.IsNullOrWhiteSpace(name))
+            {
+                _taskId = TaskId.CreateRandom();
+            }
+            else
+            {
+                _taskId = TaskId.Create(name);
+            }
 
-        return true;
+            return true;
+        }
     }
 
     // Schedules a durable task without waiting for the task to complete
@@ -256,7 +259,7 @@ internal struct ConfiguredDurableTaskCore<TDurableTask> where TDurableTask : Dur
         return response.Status;
     }
 
-    private readonly IScheduledTaskHandle GetHandleOrThrow()
+    private IScheduledTaskHandle GetHandleOrThrow()
     {
         IScheduledTaskHandle handle;
         if (ParentContext is { } parentContext)
@@ -403,7 +406,7 @@ internal sealed class AsyncTaskDelegateDurableTask<TResult>(Func<CancellationTok
         {
             DurableExecutionContext.SetCurrentContext(context);
             using var cts = new CancellationTokenSource();
-            using var registration = context.RegisterCancellationCallback(static (cts, ct) => cts!.CancelAsync(), cts);
+            using var registration = context.RegisterCancellationTokenSource(cts);
             return DurableTaskResponse.FromResult(await func(cts.Token));
         }
         catch (Exception exception)
@@ -425,7 +428,7 @@ internal sealed class AsyncTaskDelegateDurableTask(Func<CancellationToken, Task>
         {
             DurableExecutionContext.SetCurrentContext(context);
             using var cts = new CancellationTokenSource();
-            using var registration = context.RegisterCancellationCallback(static (cts, ct) => cts!.CancelAsync(), cts);
+            using var registration = context.RegisterCancellationTokenSource(cts);
             await func(cts.Token);
             return DurableTaskResponse.Completed;
         }
@@ -448,7 +451,7 @@ internal sealed class DelegateDurableTask<TResult>(Func<CancellationToken, TResu
         try
         {
             using var cts = new CancellationTokenSource();
-            using var registration = context.RegisterCancellationCallback(static (cts, ct) => cts!.CancelAsync(), cts);
+            using var registration = context.RegisterCancellationTokenSource(cts);
             return new(DurableTaskResponse.FromResult(func(cts.Token)));
         }
         catch (Exception exception)
@@ -474,7 +477,7 @@ internal sealed class DelegateDurableTask(Action<CancellationToken> func) : Dura
         try
         {
             using var cts = new CancellationTokenSource();
-            using var registration = context.RegisterCancellationCallback(static (cts, ct) => cts!.CancelAsync(), cts);
+            using var registration = context.RegisterCancellationTokenSource(cts);
             func(cts.Token);
             return new(DurableTaskResponse.Completed);
         }
@@ -501,7 +504,7 @@ internal sealed class AsyncTaskDelegateDurableTaskWithState<TState, TResult>(Fun
         {
             DurableExecutionContext.SetCurrentContext(context);
             using var cts = new CancellationTokenSource();
-            using var registration = context.RegisterCancellationCallback(static (cts, ct) => cts!.CancelAsync(), cts);
+            using var registration = context.RegisterCancellationTokenSource(cts);
             return DurableTaskResponse.FromResult(await func(state, cts.Token));
         }
         catch (Exception exception)
@@ -523,7 +526,7 @@ internal sealed class AsyncTaskDelegateDurableTaskWithState<TState>(Func<TState,
         {
             DurableExecutionContext.SetCurrentContext(context);
             using var cts = new CancellationTokenSource();
-            using var registration = context.RegisterCancellationCallback(static (cts, ct) => cts!.CancelAsync(), cts);
+            using var registration = context.RegisterCancellationTokenSource(cts);
             await func(state, cts.Token);
             return DurableTaskResponse.Completed;
         }
@@ -546,7 +549,7 @@ internal sealed class AsyncDelegateDurableTaskWithState<TState, TResult>(Func<TS
         {
             DurableExecutionContext.SetCurrentContext(context);
             using var cts = new CancellationTokenSource();
-            using var registration = context.RegisterCancellationCallback(static (cts, ct) => cts!.CancelAsync(), cts);
+            using var registration = context.RegisterCancellationTokenSource(cts);
             return DurableTaskResponse.FromResult(await func(state, cts.Token));
         }
         catch (Exception exception)
@@ -569,7 +572,7 @@ internal sealed class DelegateDurableTaskWithState<TState, TResult>(Func<TState,
         {
             DurableExecutionContext.SetCurrentContext(context);
             using var cts = new CancellationTokenSource();
-            using var registration = context.RegisterCancellationCallback(static (cts, ct) => cts!.CancelAsync(), cts);
+            using var registration = context.RegisterCancellationTokenSource(cts);
             return new(DurableTaskResponse.FromResult(func(state, cts.Token)));
         }
         catch (Exception exception)
@@ -596,7 +599,7 @@ internal sealed class DelegateDurableTaskWithState<TState>(Action<TState, Cancel
         {
             DurableExecutionContext.SetCurrentContext(context);
             using var cts = new CancellationTokenSource();
-            using var registration = context.RegisterCancellationCallback(static (cts, ct) => cts!.CancelAsync(), cts);
+            using var registration = context.RegisterCancellationTokenSource(cts);
             func(state, cts.Token);
             return new(DurableTaskResponse.Completed);
         }

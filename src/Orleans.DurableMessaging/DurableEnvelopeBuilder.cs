@@ -39,6 +39,9 @@ namespace Orleans.DurableMessaging;
 public sealed class DurableEnvelopeBuilder : IBufferWriter<byte>
 {
     internal const string RequestContextKey = "$orleans.request-context";
+    private const string CallChainReentrancyRequestContextKey = "#CCR";
+    private const string PingRequestContextKey = "Ping";
+    private const string TurnIsolationRequestContextKey = "Orleans.DurableJobs.TurnIsolation";
 
     // Reflection cache for setting private DurableEnvelopeData fields
     private static readonly FieldInfo BufferField = typeof(DurableEnvelopeData).GetField("_buffer", BindingFlags.NonPublic | BindingFlags.Instance)!;
@@ -249,7 +252,9 @@ public sealed class DurableEnvelopeBuilder : IBufferWriter<byte>
     /// <returns>This builder for chaining.</returns>
     public DurableEnvelopeBuilder WithCurrentRequestContext()
     {
-        var values = RequestContext.Entries.ToDictionary(static entry => entry.Key, static entry => entry.Value, StringComparer.Ordinal);
+        var values = RequestContext.Entries
+            .Where(static entry => !IsFrameworkContextKey(entry.Key))
+            .ToDictionary(static entry => entry.Key, static entry => entry.Value, StringComparer.Ordinal);
         if (values.Count > 0)
         {
             WithContextValue(RequestContextKey, values);
@@ -257,6 +262,11 @@ public sealed class DurableEnvelopeBuilder : IBufferWriter<byte>
 
         return this;
     }
+
+    internal static bool IsFrameworkContextKey(string key) =>
+        string.Equals(key, CallChainReentrancyRequestContextKey, StringComparison.Ordinal)
+        || string.Equals(key, PingRequestContextKey, StringComparison.Ordinal)
+        || string.Equals(key, TurnIsolationRequestContextKey, StringComparison.Ordinal);
 
     /// <summary>
     /// Builds the durable envelope from the configured values.

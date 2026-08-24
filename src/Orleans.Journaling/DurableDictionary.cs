@@ -10,13 +10,28 @@ namespace Orleans.Journaling;
 /// </summary>
 /// <typeparam name="K">The type of keys in the dictionary.</typeparam>
 /// <typeparam name="V">The type of values in the dictionary.</typeparam>
+/// <remarks>
+/// When a value implements <see cref="IDisposable"/>, the dictionary assumes ownership after a successful mutation.
+/// It disposes the value when the last reference to it is replaced or removed, when the dictionary is cleared, or
+/// when recovery resets the dictionary. A value is not owned when encoding its mutation fails.
+/// </remarks>
 public interface IDurableDictionary<K, V> : IDictionary<K, V> where K : notnull
 {
 }
 
+internal interface IDurableDictionaryOwnership<K> where K : notnull
+{
+    bool Remove(K key, bool disposeValue);
+}
+
 [DebuggerTypeProxy(typeof(IDurableDictionaryDebugView<,>))]
 [DebuggerDisplay("Count = {Count}")]
-internal class DurableDictionary<K, V> : IDurableDictionary<K, V>, IJournaledState, IDurableDictionaryCommandHandler<K, V> where K : notnull
+internal class DurableDictionary<K, V> :
+    IDurableDictionary<K, V>,
+    IDurableDictionaryOwnership<K>,
+    IJournaledState,
+    IDurableDictionaryCommandHandler<K, V>
+    where K : notnull
 {
     private readonly IDurableDictionaryCommandCodec<K, V> _codec;
     private readonly Dictionary<K, V> _items = [];
@@ -69,15 +84,7 @@ internal class DurableDictionary<K, V> : IDurableDictionary<K, V>, IJournaledSta
 
     void IJournaledState.Reset(JournalStreamWriter writer)
     {
-        foreach (var value in _items.Values)
-        {
-            if (value is IDisposable disposable)
-            {
-                disposable.Dispose();
-            }
-        }
-
-        _items.Clear();
+        ApplyClear();
         _writer = writer;
     }
 
@@ -100,6 +107,9 @@ internal class DurableDictionary<K, V> : IDurableDictionary<K, V>, IJournaledSta
     public bool Contains(K key) => _items.ContainsKey(key);
 
     public bool Remove(K key)
+        => Remove(key, disposeValue: true);
+
+    protected bool Remove(K key, bool disposeValue)
     {
         if (!_items.ContainsKey(key))
         {
@@ -107,9 +117,11 @@ internal class DurableDictionary<K, V> : IDurableDictionary<K, V>, IJournaledSta
         }
 
         WriteRemove(key);
-        ApplyRemove(key);
+        ApplyRemove(key, disposeValue);
         return true;
     }
+
+    bool IDurableDictionaryOwnership<K>.Remove(K key, bool disposeValue) => Remove(key, disposeValue);
 
     private void WriteRemove(K key)
     {
@@ -135,12 +147,75 @@ internal class DurableDictionary<K, V> : IDurableDictionary<K, V>, IJournaledSta
 
     private void ApplySet(K key, V value)
     {
-        _items[key] = value;
+        if (_items.TryGetValue(key, out var previous) && !ReferenceEquals(previous, value))
+        {
+            _items[key] = value;
+            DisposeIfUnreferenced(previous);
+        }
+        else
+        {
+            _items[key] = value;
+        }
+
         OnSet(key, value);
     }
 
-    internal bool ApplyRemove(K key) => _items.Remove(key);
-    private void ApplyClear() => _items.Clear();
+    internal bool ApplyRemove(K key, bool disposeValue = true)
+    {
+        if (!_items.Remove(key, out var value))
+        {
+            return false;
+        }
+
+        if (disposeValue)
+        {
+            DisposeIfUnreferenced(value);
+        }
+
+        return true;
+    }
+
+    private void ApplyClear()
+    {
+        HashSet<IDisposable>? disposables = null;
+        foreach (var value in _items.Values)
+        {
+            if (value is IDisposable disposable)
+            {
+                (disposables ??= new(ReferenceEqualityComparer.Instance)).Add(disposable);
+            }
+        }
+
+        _items.Clear();
+        if (disposables is not null)
+        {
+            foreach (var disposable in disposables)
+            {
+                disposable.Dispose();
+            }
+        }
+    }
+
+    private void DisposeIfUnreferenced(V value)
+    {
+        if (value is not IDisposable disposable)
+        {
+            return;
+        }
+
+        if (!typeof(V).IsValueType)
+        {
+            foreach (var candidate in _items.Values)
+            {
+                if (ReferenceEquals(candidate, value))
+                {
+                    return;
+                }
+            }
+        }
+
+        disposable.Dispose();
+    }
     void IDurableDictionaryCommandHandler<K, V>.ApplySet(K key, V value) => ApplySet(key, value);
     void IDurableDictionaryCommandHandler<K, V>.ApplyRemove(K key) => ApplyRemove(key);
     void IDurableDictionaryCommandHandler<K, V>.ApplyClear() => ApplyClear();
@@ -182,7 +257,7 @@ internal class DurableDictionary<K, V> : IDurableDictionary<K, V>, IJournaledSta
         }
 
         WriteRemove(item.Key);
-        _ = ((ICollection<KeyValuePair<K, V>>)_items).Remove(item);
+        _ = ApplyRemove(item.Key);
         return true;
     }
 

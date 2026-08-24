@@ -8,6 +8,48 @@ namespace Orleans;
 /// </summary>
 public class TaskIdExtensionsTests
 {
+    [Theory, TestCategory("BVT")]
+    [InlineData("")]
+    [InlineData("a\\")]
+    [InlineData("a\\q")]
+    [InlineData("a//b")]
+    [InlineData("/a")]
+    [InlineData("a/")]
+    public void Parse_WithEmptyOrMalformedEscapedValue_IsRejected(string value)
+    {
+        Assert.ThrowsAny<Exception>(() => TaskId.Parse(value));
+        Assert.False(TaskId.TryParse(value, provider: null, out _));
+    }
+
+    [Theory, TestCategory("BVT")]
+    [InlineData("plain")]
+    [InlineData("separator/value")]
+    [InlineData("backslash\\value")]
+    [InlineData("already\\/escaped")]
+    public void CreateStringAndParse_RoundTripSeparatorsAndBackslashes(string value)
+    {
+        var created = TaskId.Create(value);
+        var formatted = created.ToString();
+
+        Assert.Equal(created, TaskId.Parse(formatted));
+        Assert.Equal(created, (TaskId)(string)created);
+        Assert.Equal(formatted, created.ToString());
+    }
+
+    [Fact, TestCategory("BVT")]
+    public void CreateAndChild_RejectEmptyValuesAndPreserveEscapedChildRelationship()
+    {
+        Assert.Throws<ArgumentNullException>(() => TaskId.Create(null!));
+        Assert.Throws<ArgumentException>(() => TaskId.Create(""));
+        var parent = TaskId.Create("parent");
+        Assert.Throws<ArgumentNullException>(() => parent.Child(null!));
+        Assert.Throws<ArgumentException>(() => parent.Child(""));
+
+        var child = parent.Child("separator/and\\backslash");
+        Assert.True(child.IsChildOf(parent));
+        Assert.Equal(child, TaskId.Parse(child.ToString()));
+    }
+
     [Fact, TestCategory("BVT")]
     public void ToHierarchicalKey_WithValidTaskId_ReturnsEquivalentKey()
     {

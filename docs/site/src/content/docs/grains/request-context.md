@@ -21,6 +21,10 @@ Request context uses async-local storage. When code sends a grain call, Orleans 
 
 Changes made by a callee don't flow back in the response. Treat request context as downstream metadata, not as a return channel.
 
+Recoverable runtimes can persist a bounded request-context snapshot with durable work and restore it when that work resumes after activation or process restart. Orleans durable tasks retain up to 32 application entries, with 256-character keys, 64 KiB per serialized value, and 256 KiB in total. Scheduling fails when an application entry can't be serialized or exceeds these limits.
+
+The restored values remain caller-provided metadata and follow the same serialization and security rules as an ordinary grain call. Polling a durable result doesn't replace the context captured when the work was scheduled. Orleans runtime markers, including call-chain reentrancy, ping, and activation turn-isolation state, remain scoped to the live call or activation and aren't persisted with durable work.
+
 Use the static API to manage entries:
 
 :::code language="csharp" source="../snippets/compiled/Grains/RequestsAndVersioningSnippets.cs" id="manage_request_context":::

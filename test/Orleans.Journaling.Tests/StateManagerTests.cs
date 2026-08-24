@@ -59,6 +59,35 @@ public class StateManagerTests : JournalingTestBase
     }
 
     [Fact]
+    public async Task RevertBeforeFirstCommit_RebindsRegisteredStateForLaterRecovery()
+    {
+        var storage = new VolatileJournalStorage();
+        var sut = CreateTestSystem(storage: storage);
+        var codec = new OrleansBinaryDurableDictionaryCommandCodec<string, int>(
+            CodecProvider.GetCodec<string>(),
+            CodecProvider.GetCodec<int>(),
+            SessionPool);
+        var dictionary = new DurableDictionary<string, int>("dict", sut.Manager, codec);
+        await sut.Lifecycle.OnStart();
+
+        await sut.Manager.RevertPendingChangesAsync(CancellationToken.None);
+        dictionary["key"] = 42;
+        await sut.Manager.WriteStateAsync(CancellationToken.None);
+
+        var recovered = CreateTestSystem(storage: storage);
+        var recoveredDictionary = new DurableDictionary<string, int>(
+            "dict",
+            recovered.Manager,
+            new OrleansBinaryDurableDictionaryCommandCodec<string, int>(
+                CodecProvider.GetCodec<string>(),
+                CodecProvider.GetCodec<int>(),
+                SessionPool));
+        await recovered.Lifecycle.OnStart();
+
+        Assert.Equal(42, recoveredDictionary["key"]);
+    }
+
+    [Fact]
     public async Task StateManager_Initialize_UsesStreamingStorageRead()
     {
         var storage = new StreamingOnlyStorage();
@@ -664,7 +693,207 @@ public class StateManagerTests : JournalingTestBase
     }
 
     [Fact]
-    public async Task StateManager_RevertPendingChanges_RestoresLastDurableState()
+    public async Task StateManager_RevertFailureAfterReset_BlocksQueuedWriteUntilRecoverySucceeds()
+    {
+        var storage = new CapturingStorage();
+        var sut = CreateTestSystem(storage: storage);
+        var dictionary = new DurableDictionary<string, int>("dict", sut.Manager, CreateDictionaryCodec<string, int>());
+
+        await sut.Lifecycle.OnStart();
+        dictionary.Add("persisted", 1);
+        await sut.Manager.WriteStateAsync(CancellationToken.None);
+        dictionary.Add("pending", 2);
+
+        var recoveryFailure = new IOException("Expected recovery failure after reset.");
+        storage.NextReadException = recoveryFailure;
+        var exception = await Assert.ThrowsAsync<IOException>(
+            () => sut.Manager.RevertPendingChangesAsync(CancellationToken.None).AsTask().WaitAsync(TimeSpan.FromSeconds(10)));
+
+        Assert.Same(recoveryFailure, exception);
+        Assert.Empty(dictionary);
+
+        storage.BlockNextRead = true;
+        var queuedWrite = sut.Manager.WriteStateAsync(CancellationToken.None).AsTask();
+        await storage.BlockedReadStarted.Task.WaitAsync(TimeSpan.FromSeconds(10));
+
+        Assert.False(queuedWrite.IsCompleted);
+        Assert.Empty(dictionary);
+
+        storage.AllowBlockedRead.SetResult();
+        await queuedWrite.WaitAsync(TimeSpan.FromSeconds(10));
+
+        Assert.Single(dictionary);
+        Assert.Equal(1, dictionary["persisted"]);
+        Assert.False(dictionary.ContainsKey("pending"));
+    }
+
+    [Fact]
+    public async Task StateManager_CoalescedWriteSignalsRetryAfterRecoveryFailure()
+    {
+        var storage = new CapturingStorage();
+        var sut = CreateTestSystem(storage: storage);
+        var dictionary = new DurableDictionary<string, int>("dict", sut.Manager, CreateDictionaryCodec<string, int>());
+        await sut.Lifecycle.OnStart();
+        dictionary.Add("persisted", 1);
+        await sut.Manager.WriteStateAsync(CancellationToken.None);
+
+        storage.NextReadException = new IOException("Initial recovery failure.");
+        await Assert.ThrowsAsync<IOException>(
+            () => sut.Manager.RevertPendingChangesAsync(CancellationToken.None).AsTask().WaitAsync(TimeSpan.FromSeconds(10)));
+
+        storage.NextReadException = new IOException("Queued recovery failure.");
+        var queuedWrite = sut.Manager.WriteStateAsync(CancellationToken.None).AsTask();
+        await TestHelpers.WaitUntilAsync(
+            () => storage.NextReadException is null,
+            message: "The queued write did not trigger its first recovery attempt");
+        Assert.False(queuedWrite.IsCompleted);
+
+        var coalescedRetry = sut.Manager.WriteStateAsync(CancellationToken.None).AsTask();
+        await Task.WhenAll(queuedWrite, coalescedRetry).WaitAsync(TimeSpan.FromSeconds(10));
+
+        Assert.Equal(1, dictionary["persisted"]);
+    }
+
+    [Fact]
+    public async Task StateManager_WriteAlreadyQueuedWhenRevertFails_RetriesRecoveryWithoutThirdSignal()
+    {
+        var storage = new CapturingStorage();
+        var sut = CreateTestSystem(storage: storage);
+        var dictionary = new DurableDictionary<string, int>("dict", sut.Manager, CreateDictionaryCodec<string, int>());
+        await sut.Lifecycle.OnStart();
+        dictionary.Add("persisted", 1);
+        await sut.Manager.WriteStateAsync(CancellationToken.None);
+
+        storage.NextReadException = new IOException("Expected recovery failure.");
+        var revert = sut.Manager.RevertPendingChangesAsync(CancellationToken.None).AsTask();
+        var queuedWrite = sut.Manager.WriteStateAsync(CancellationToken.None).AsTask();
+
+        await Assert.ThrowsAsync<IOException>(() => revert.WaitAsync(TimeSpan.FromSeconds(10)));
+        await queuedWrite.WaitAsync(TimeSpan.FromSeconds(10));
+
+        Assert.Equal(1, dictionary["persisted"]);
+    }
+
+    [Fact]
+    public async Task StateManager_CoalescedRevertSignalsRetryWhileRecoveryPending()
+    {
+        var storage = new CapturingStorage();
+        var sut = CreateTestSystem(storage: storage);
+        _ = new DurableDictionary<string, int>("dict", sut.Manager, CreateDictionaryCodec<string, int>());
+        await sut.Lifecycle.OnStart();
+
+        storage.NextReadException = new IOException("Initial recovery failure.");
+        await Assert.ThrowsAsync<IOException>(
+            () => sut.Manager.RevertPendingChangesAsync(CancellationToken.None).AsTask().WaitAsync(TimeSpan.FromSeconds(10)));
+
+        storage.NextReadException = new IOException("Queued recovery failure.");
+        var firstRevert = sut.Manager.RevertPendingChangesAsync(CancellationToken.None).AsTask();
+        await TestHelpers.WaitUntilAsync(
+            () => storage.NextReadException is null,
+            message: "The first queued revert did not trigger recovery");
+        Assert.False(firstRevert.IsCompleted);
+
+        var coalescedRevert = sut.Manager.RevertPendingChangesAsync(CancellationToken.None).AsTask();
+        await Task.WhenAll(firstRevert, coalescedRevert).WaitAsync(TimeSpan.FromSeconds(10));
+    }
+
+    [Fact]
+    public async Task StateManager_CoalescingDoesNotCrossDeleteOrderingBarrier()
+    {
+        var storage = new CapturingStorage();
+        var sut = CreateTestSystem(storage: storage);
+        var dictionary = new DurableDictionary<string, int>("dict", sut.Manager, CreateDictionaryCodec<string, int>());
+        await sut.Lifecycle.OnStart();
+        dictionary["initial"] = 1;
+        await sut.Manager.WriteStateAsync(CancellationToken.None);
+
+        storage.BlockNextAppendUntilAllowed = true;
+        dictionary["blocking"] = 2;
+        var blockingWrite = sut.Manager.WriteStateAsync(CancellationToken.None).AsTask();
+        await storage.BlockedAppendStarted.Task.WaitAsync(TimeSpan.FromSeconds(10));
+
+        dictionary["queued"] = 3;
+        var firstQueuedWrite = sut.Manager.WriteStateAsync(CancellationToken.None).AsTask();
+        storage.BlockNextDelete = true;
+        var delete = sut.Manager.DeleteStateAsync(CancellationToken.None).AsTask();
+        var writeAfterDelete = sut.Manager.WriteStateAsync(CancellationToken.None).AsTask();
+
+        storage.AllowBlockedAppend.SetResult();
+        await storage.BlockedDeleteStarted.Task.WaitAsync(TimeSpan.FromSeconds(10));
+
+        Assert.True(firstQueuedWrite.IsCompletedSuccessfully);
+        Assert.False(delete.IsCompleted);
+        Assert.False(writeAfterDelete.IsCompleted);
+
+        storage.AllowBlockedDelete.SetResult();
+        await Task.WhenAll(blockingWrite, firstQueuedWrite, delete, writeAfterDelete).WaitAsync(TimeSpan.FromSeconds(10));
+    }
+
+    [Fact]
+    public async Task StateManager_RevertReplayFailures_DisposePartialValuesAndPreserveQueuedOrderUntilSuccess()
+    {
+        var events = new List<string>();
+        var initial = new CountingDisposable();
+        var firstPartial = new CountingDisposable();
+        var secondPartial = new CountingDisposable();
+        var recovered = new CountingDisposable();
+        var final = new CountingDisposable();
+        var firstFailure = new InvalidOperationException("Expected first replay failure.");
+        var secondFailure = new InvalidOperationException("Expected second replay failure.");
+        var secondFailureObserved = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var format = new ScriptedDisposableRecoveryFormat(
+            events,
+            ("initial", handler => handler.ApplySet("value", initial)),
+            ("first-failure", handler =>
+            {
+                handler.ApplySet("partial", firstPartial);
+                throw firstFailure;
+            }),
+            ("second-failure", handler =>
+            {
+                handler.ApplySet("partial", secondPartial);
+                secondFailureObserved.SetResult();
+                throw secondFailure;
+            }),
+            ("recovered", handler => handler.ApplySet("value", recovered)),
+            ("final", handler => handler.ApplySet("value", final)));
+        var storage = new CapturingStorage { ConcatenateReads = true };
+        using (var seed = CreateBuffer([1]))
+        {
+            await storage.AppendAsync(seed.AsReadOnlySequence(), CancellationToken.None);
+        }
+
+        var sut = CreateTestSystem(storage: storage, journalFormat: format);
+        var dictionary = new DurableDictionary<string, CountingDisposable>(
+            "dict",
+            sut.Manager,
+            new ReplayOnlyDisposableDictionaryCodec());
+        sut.Manager.RegisterState("ordering", new OrderingState(events));
+        await sut.Lifecycle.OnStart();
+
+        var exception = await Assert.ThrowsAsync<InvalidOperationException>(
+            () => sut.Manager.RevertPendingChangesAsync(CancellationToken.None).AsTask().WaitAsync(TimeSpan.FromSeconds(10)));
+        Assert.Same(firstFailure, exception.InnerException);
+        Assert.Equal(1, initial.DisposeCount);
+        Assert.Equal(1, firstPartial.DisposeCount);
+        Assert.Empty(dictionary);
+
+        var queuedWrite = sut.Manager.WriteStateAsync(CancellationToken.None).AsTask();
+        await secondFailureObserved.Task.WaitAsync(TimeSpan.FromSeconds(10));
+        Assert.False(queuedWrite.IsCompleted);
+
+        var successfulRevert = sut.Manager.RevertPendingChangesAsync(CancellationToken.None).AsTask();
+        await Task.WhenAll(queuedWrite, successfulRevert).WaitAsync(TimeSpan.FromSeconds(10));
+
+        Assert.Equal(1, secondPartial.DisposeCount);
+        Assert.Equal(1, recovered.DisposeCount);
+        Assert.Equal(0, final.DisposeCount);
+        Assert.Same(final, dictionary["value"]);
+        Assert.Equal(["recovered", "write", "final"], events.TakeLast(3));
+    }
+
+    [Fact]
+    public async Task StateManager_WriteStateAsync_CoalescesQueuedWrites()
     {
         var storage = new CapturingStorage();
         var sut = CreateTestSystem(storage: storage);
@@ -1821,6 +2050,40 @@ public class StateManagerTests : JournalingTestBase
         }
     }
 
+    private sealed class ScriptedDisposableRecoveryFormat : IJournalFormat
+    {
+        private readonly List<string> _events;
+        private readonly Queue<(string Label, Action<IDurableDictionaryCommandHandler<string, CountingDisposable>> Apply)> _steps;
+
+        public ScriptedDisposableRecoveryFormat(
+            List<string> events,
+            params (string Label, Action<IDurableDictionaryCommandHandler<string, CountingDisposable>> Apply)[] steps)
+        {
+            _events = events;
+            _steps = new(steps);
+        }
+
+        public string FormatKey => OrleansBinaryJournalFormat.JournalFormatKey;
+
+        public string? MimeType => null;
+
+        public JournalBufferWriter CreateWriter() => new OrleansBinaryJournalBufferWriter();
+
+        public void Replay(JournalBufferReader input, JournalReplayContext context)
+        {
+            var directory = Assert.IsAssignableFrom<IDurableDictionaryCommandHandler<string, uint>>(
+                context.ResolveState(new JournalStreamId(0)));
+            directory.ApplySet("dict", 8);
+            directory.ApplySet("ordering", 9);
+            var dictionary = Assert.IsAssignableFrom<IDurableDictionaryCommandHandler<string, CountingDisposable>>(
+                context.ResolveState(new JournalStreamId(8)));
+            var step = _steps.Dequeue();
+            _events.Add(step.Label);
+            step.Apply(dictionary);
+            input.Skip(input.Length);
+        }
+    }
+
     private sealed class TrackingJournalFormat(SerializerSessionPool sessionPool) : IJournalFormat
     {
         private readonly OrleansBinaryJournalFormat _inner = new(sessionPool);
@@ -2051,6 +2314,18 @@ public class StateManagerTests : JournalingTestBase
 
         public int ReplaceAttemptCount { get; private set; }
 
+        public bool BlockNextAppendUntilAllowed { get; set; }
+
+        public TaskCompletionSource BlockedAppendStarted { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        public TaskCompletionSource AllowBlockedAppend { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        public bool BlockNextDelete { get; set; }
+
+        public TaskCompletionSource BlockedDeleteStarted { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        public TaskCompletionSource AllowBlockedDelete { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
         public int ReadConsumeCount { get; private set; }
 
         public void ResetReadConsumeCount()
@@ -2215,6 +2490,13 @@ public class StateManagerTests : JournalingTestBase
                     ExceptionDispatchInfo.Throw(exceptionToThrow);
                 }
 
+                if (BlockNextAppendUntilAllowed)
+                {
+                    BlockNextAppendUntilAllowed = false;
+                    BlockedAppendStarted.SetResult();
+                    await AllowBlockedAppend.Task.WaitAsync(cancellationToken);
+                }
+
                 AppendEntered.TrySetResult();
                 if (BlockNextAppend)
                 {
@@ -2235,9 +2517,16 @@ public class StateManagerTests : JournalingTestBase
             }
         }
 
-        public ValueTask DeleteAsync(CancellationToken cancellationToken)
+        public async ValueTask DeleteAsync(CancellationToken cancellationToken)
         {
             cancellationToken.ThrowIfCancellationRequested();
+            if (BlockNextDelete)
+            {
+                BlockNextDelete = false;
+                BlockedDeleteStarted.SetResult();
+                await AllowBlockedDelete.Task.WaitAsync(cancellationToken);
+            }
+
             lock (_lock)
             {
                 DeleteEnteredWhileAppendInProgress = Volatile.Read(ref _activeAppends) > 0;
@@ -2247,7 +2536,6 @@ public class StateManagerTests : JournalingTestBase
             }
 
             DeleteEntered.TrySetResult();
-            return default;
         }
     }
 
@@ -2546,6 +2834,50 @@ public class StateManagerTests : JournalingTestBase
                 inner.ApplySet(value);
             }
         }
+    }
+
+    private sealed class OrderingState(List<string> events) : IJournaledState
+    {
+        void IJournaledState.ReplayEntry(JournalEntry entry, JournalReplayContext context) { }
+
+        public void Reset(JournalStreamWriter writer) { }
+
+        public void AppendEntries(JournalStreamWriter writer)
+        {
+            events.Add("write");
+            using var entry = writer.BeginEntry();
+            entry.Writer.GetSpan(1)[0] = 1;
+            entry.Writer.Advance(1);
+            entry.Commit();
+        }
+
+        public void AppendSnapshot(JournalStreamWriter writer) => AppendEntries(writer);
+
+        public IJournaledState DeepCopy() => throw new NotSupportedException();
+    }
+
+    private sealed class ReplayOnlyDisposableDictionaryCodec : IDurableDictionaryCommandCodec<string, CountingDisposable>
+    {
+        public void WriteSet(string key, CountingDisposable value, JournalStreamWriter writer) => throw new NotSupportedException();
+
+        public void WriteRemove(string key, JournalStreamWriter writer) => throw new NotSupportedException();
+
+        public void WriteClear(JournalStreamWriter writer) => throw new NotSupportedException();
+
+        public void WriteSnapshot(
+            IReadOnlyCollection<KeyValuePair<string, CountingDisposable>> items,
+            JournalStreamWriter writer) => throw new NotSupportedException();
+
+        public void Apply(
+            JournalBufferReader input,
+            IDurableDictionaryCommandHandler<string, CountingDisposable> consumer) => throw new NotSupportedException();
+    }
+
+    private sealed class CountingDisposable : IDisposable
+    {
+        public int DisposeCount { get; private set; }
+
+        public void Dispose() => DisposeCount++;
     }
 
     private sealed class ThrowingDictionarySetCodec<K, V> : IDurableDictionaryCommandCodec<K, V> where K : notnull

@@ -19,19 +19,21 @@ internal sealed partial class DurableTaskGrainRuntime
 
         public TaskId TaskId { get; } = taskId;
 
+        public GrainId RemoteTarget { get; } = remoteTarget;
+
         // If this is false, the task was rehydrated from storage but has not started running yet.
         // This will happen if the task is non-serializable, like a local method invocation.
         public bool IsRunning { get; set; }
 
         public async ValueTask CancelAsync(CancellationToken cancellationToken)
         {
-            if (remoteTarget.IsDefault)
+            if (RemoteTarget.IsDefault)
             {
                 await runtime.CancelScheduledTaskAsync(TaskId, cancellationToken);
             }
             else
             {
-                await runtime.CancelRemoteAsync(TaskId, remoteTarget, cancellationToken);
+                await runtime.CancelRemoteAsync(TaskId, RemoteTarget, cancellationToken);
             }
         }
 

@@ -39,6 +39,8 @@ public sealed class DurableJobsOptions
     /// <summary>
     /// Gets or sets the delay before polling an asynchronous durable job handler again.
     /// The job continues holding its concurrency slot while it is polled.
+    /// Feature handlers which return <see cref="DurableJobRunStatus.InProgress"/> are re-entered after this
+    /// delay (or their returned delay) until they return a terminal or reschedule result.
     /// Default: 1 second.
     /// </summary>
     public TimeSpan JobStatusPollInterval { get; set; } = TimeSpan.FromSeconds(1);

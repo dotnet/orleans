@@ -4,6 +4,7 @@ using System.Diagnostics.CodeAnalysis;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using Orleans.DurableJobs;
 using Orleans.DurableMessaging;
@@ -20,6 +21,7 @@ namespace Orleans.Journaling.Tests;
 [TestCategory("BVT"), TestCategory("Journaling")]
 public class DurableInboxExtensionTests : IClassFixture<DefaultClusterFixture>
 {
+    private const string TurnIsolationRequestContextKey = "Orleans.DurableJobs.TurnIsolation";
     private readonly DefaultClusterFixture _fixture;
 
     public DurableInboxExtensionTests(DefaultClusterFixture fixture)
@@ -50,7 +52,11 @@ public class DurableInboxExtensionTests : IClassFixture<DefaultClusterFixture>
         int maxCapacity = 1000,
         bool enableLongPolling = true,
         TimeSpan? defaultPollTimeout = null,
-        TestStateManager? stateManager = null)
+        IJournaledStateManager? stateManager = null,
+        DurableMessagingCommitCoordinator? commitCoordinator = null,
+        IDurableInboxFaultInjector? faultInjector = null,
+        int maxProcessingAttempts = 1,
+        Dictionary<(GrainId, Guid), InboxDeadLetter>? deadLetters = null)
     {
         var grainContext = new MockGrainContext();
         stateManager ??= new TestStateManager();
@@ -59,6 +65,7 @@ public class DurableInboxExtensionTests : IClassFixture<DefaultClusterFixture>
 
         inbox ??= new Dictionary<(GrainId, Guid), DurableEnvelope>();
         processed ??= new Dictionary<(GrainId, Guid), DateTimeOffset>();
+        deadLetters ??= new Dictionary<(GrainId, Guid), InboxDeadLetter>();
 
         // Create a test DurableInbox for handler registration
         var durableInbox = new TestDurableInbox();
@@ -73,10 +80,10 @@ public class DurableInboxExtensionTests : IClassFixture<DefaultClusterFixture>
             logger,
             DurableMessagingInstruments.CreateForDirectConstruction(),
             durableInbox,
-            inbox,
+            new TestDurableDictionary<(GrainId, Guid), DurableEnvelope>(inbox),
             processed,
             new Dictionary<(GrainId, Guid), InboxMessageState>(),
-            new Dictionary<(GrainId, Guid), InboxDeadLetter>(),
+            deadLetters,
             new TestDurableValue<string>(),
             outbox,
             jobManager,
@@ -86,10 +93,12 @@ public class DurableInboxExtensionTests : IClassFixture<DefaultClusterFixture>
             {
                 MaxCapacity = maxCapacity,
                 BackpressureRetryDelay = TimeSpan.FromMilliseconds(1),
-                MaxProcessingAttempts = 1,
+                MaxProcessingAttempts = maxProcessingAttempts,
                 EnableLongPolling = enableLongPolling,
                 DefaultPollTimeout = defaultPollTimeout ?? TimeSpan.FromSeconds(30)
-            });
+            },
+            commitCoordinator,
+            faultInjector);
     }
 
     [Fact]
@@ -172,6 +181,7 @@ public class DurableInboxExtensionTests : IClassFixture<DefaultClusterFixture>
         var sessionPool = _fixture.Client.ServiceProvider.GetRequiredService<SerializerSessionPool>();
 
         RequestContext.Set("tenant", "contoso");
+        RequestContext.Set(TurnIsolationRequestContextKey, "sender-owner");
         try
         {
             var envelope = new DurableEnvelopeBuilder(sessionPool, senderId)
@@ -180,6 +190,7 @@ public class DurableInboxExtensionTests : IClassFixture<DefaultClusterFixture>
                 .WithBody(new TestMessage { Value = "test", Count = 1 })
                 .Build();
             RequestContext.Set("tenant", "outer");
+            RequestContext.Set(TurnIsolationRequestContextKey, "receiver-owner");
 
             var result = await extension.DeliverAsync(
                 envelope,
@@ -188,7 +199,12 @@ public class DurableInboxExtensionTests : IClassFixture<DefaultClusterFixture>
 
             Assert.Equal(DeliveryStatus.Processed, result.Status);
             Assert.Equal("contoso", await handler.ObservedTenant.Task.WaitAsync(TimeSpan.FromSeconds(10)));
+            var observedOwner = Assert.IsType<string>(
+                await handler.ObservedTurnIsolation.Task.WaitAsync(TimeSpan.FromSeconds(10)));
+            Assert.NotEmpty(observedOwner);
+            Assert.NotEqual("sender-owner", observedOwner);
             Assert.Equal("outer", RequestContext.Get("tenant"));
+            Assert.Equal("receiver-owner", RequestContext.Get(TurnIsolationRequestContextKey));
         }
         finally
         {
@@ -399,11 +415,11 @@ public class DurableInboxExtensionTests : IClassFixture<DefaultClusterFixture>
     }
 
     [Fact]
-    public async Task DeliverAsync_WithLongPolling_PropagatesCallerCancellation()
+    public async Task DeliverAsync_WithLongPolling_CallerCancellationDoesNotCancelDurableProcessing()
     {
         var stateManager = new TestStateManager();
         var extension = CreateInboxExtension(stateManager: stateManager);
-        extension.RegisterHandler("test.route", new SlowMessageHandler(delayMs: 10000));
+        extension.RegisterHandler("test.route", new SlowMessageHandler(delayMs: 250));
         var envelope = CreateTestEnvelope(
             GrainId.Create("test", "sender"),
             GrainId.Create("test", "receiver"),
@@ -418,7 +434,82 @@ public class DurableInboxExtensionTests : IClassFixture<DefaultClusterFixture>
                 cancellation.Token).AsTask());
 
         Assert.Equal(cancellation.Token, exception.CancellationToken);
-        Assert.Equal(1, stateManager.RevertCount);
+        await TestHelpers.WaitUntilAsync(
+            () => extension.Count == 0,
+            timeout: TimeSpan.FromSeconds(5),
+            message: "Durable processing did not complete after the caller canceled its poll");
+        Assert.Equal(0, stateManager.RevertCount);
+    }
+
+    [Fact]
+    public async Task DeliverAsync_ConcurrentPollsShareOneDurableExecution()
+    {
+        var extension = CreateInboxExtension();
+        var handler = new BlockingHandler();
+        extension.RegisterHandler("test.route", handler);
+        var envelope = CreateTestEnvelope(
+            GrainId.Create("test", "poll-sender"),
+            GrainId.Create("test", "poll-receiver"),
+            "test.route",
+            "payload");
+        var options = new DeliveryOptions { PollTimeout = TimeSpan.FromSeconds(10) };
+
+        var first = extension.DeliverAsync(envelope, options, CancellationToken.None).AsTask();
+        await handler.Started.Task.WaitAsync(TimeSpan.FromSeconds(10));
+        var second = extension.DeliverAsync(envelope, options, CancellationToken.None).AsTask();
+        handler.Release.TrySetResult();
+
+        var results = await Task.WhenAll(first, second).WaitAsync(TimeSpan.FromSeconds(10));
+        Assert.All(results, result => Assert.Equal(DeliveryStatus.Processed, result.Status));
+        Assert.Equal(1, handler.Count);
+    }
+
+    [Fact]
+    public async Task StopProcessing_CancelsExecutionWithShutdownToken()
+    {
+        var extension = CreateInboxExtension();
+        var handler = new ShutdownHandler();
+        extension.RegisterHandler("test.route", handler);
+        var envelope = CreateTestEnvelope(
+            GrainId.Create("test", "shutdown-sender"),
+            GrainId.Create("test", "shutdown-receiver"),
+            "test.route",
+            "payload");
+
+        _ = await extension.DeliverAsync(
+            envelope,
+            new DeliveryOptions { PollTimeout = TimeSpan.Zero },
+            CancellationToken.None);
+        await handler.Started.Task.WaitAsync(TimeSpan.FromSeconds(10));
+
+        extension.StopProcessing();
+
+        await handler.Canceled.Task.WaitAsync(TimeSpan.FromSeconds(10));
+    }
+
+    [Fact]
+    public async Task OnStop_NonCooperativeHandlerBlocksTeardownUntilTerminal()
+    {
+        var extension = CreateInboxExtension();
+        var handler = new NonCooperativeHandler();
+        extension.RegisterHandler("test.route", handler);
+        var envelope = CreateTestEnvelope(
+            GrainId.Create("test", "non-cooperative-sender"),
+            GrainId.Create("test", "non-cooperative-receiver"),
+            "test.route",
+            "payload");
+        _ = await extension.DeliverAsync(
+            envelope,
+            new DeliveryOptions { PollTimeout = TimeSpan.Zero },
+            CancellationToken.None);
+        await handler.Started.Task.WaitAsync(TimeSpan.FromSeconds(10));
+
+        var stop = extension.OnStop();
+        await Task.Yield();
+        Assert.False(stop.IsCompleted);
+
+        handler.Release.SetResult();
+        await stop.WaitAsync(TimeSpan.FromSeconds(10));
     }
 
     [Fact]
@@ -495,6 +586,117 @@ public class DurableInboxExtensionTests : IClassFixture<DefaultClusterFixture>
         Assert.Equal(0, extension.Count);
     }
 
+    [Fact]
+    public async Task ProcessMessage_WhenDeadLettered_TransfersEnvelopeOwnership()
+    {
+        var deadLetters = new Dictionary<(GrainId, Guid), InboxDeadLetter>();
+        var extension = CreateInboxExtension(deadLetters: deadLetters);
+        extension.RegisterHandler("test.route", new ThrowingMessageHandler());
+        var envelope = CreateTestEnvelope(
+            GrainId.Create("test", "dead-letter-sender"),
+            GrainId.Create("test", "dead-letter-receiver"),
+            "test.route",
+            "retained");
+
+        await extension.DeliverAsync(envelope, new DeliveryOptions(), CancellationToken.None);
+        await TestHelpers.WaitUntilAsync(
+            () => extension.Count == 0,
+            message: "Message was not dead-lettered");
+
+        var deadLetter = Assert.Single(deadLetters.Values);
+        Assert.True(deadLetter.Envelope.Data.TryGetBody<string>(out var body));
+        Assert.Equal("retained", body);
+        deadLetter.Dispose();
+        Assert.False(deadLetter.Envelope.Data.TryGetBody<string>(out _));
+    }
+
+    [Fact]
+    public async Task HandlerOwnedWrite_IsDeferredUntilInboxCompletionCommit()
+    {
+        var inner = new TestStateManager();
+        var coordinator = new DurableMessagingCommitCoordinator();
+        var manager = new CoordinatedJournaledStateManager(inner, coordinator);
+
+        using (coordinator.BeginHandler())
+        {
+            await manager.WriteStateAsync(CancellationToken.None);
+            Assert.Equal(0, inner.WriteCount);
+        }
+
+        await manager.WriteStateAsync(CancellationToken.None);
+        Assert.Equal(1, inner.WriteCount);
+    }
+
+    [Fact]
+    public async Task UnrelatedBackgroundWrite_IsNotDeferredByActiveHandler()
+    {
+        var inner = new TestStateManager();
+        var coordinator = new DurableMessagingCommitCoordinator();
+        var manager = new CoordinatedJournaledStateManager(inner, coordinator);
+        var release = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var unrelatedWrite = Task.Run(async () =>
+        {
+            await release.Task;
+            await manager.WriteStateAsync(CancellationToken.None);
+        });
+
+        using (coordinator.BeginHandler())
+        {
+            await manager.WriteStateAsync(CancellationToken.None);
+            release.SetResult();
+            await unrelatedWrite;
+        }
+
+        Assert.Equal(1, inner.WriteCount);
+    }
+
+    [Fact]
+    public void HandlerOwnedDestructiveOperations_AreRejected()
+    {
+        var coordinator = new DurableMessagingCommitCoordinator();
+        var manager = new CoordinatedJournaledStateManager(new TestStateManager(), coordinator);
+
+        using var scope = coordinator.BeginHandler();
+
+        Assert.Throws<InvalidOperationException>(
+            () => manager.RevertPendingChangesAsync(CancellationToken.None));
+        Assert.Throws<InvalidOperationException>(
+            () => manager.DeleteStateAsync(CancellationToken.None));
+    }
+
+    [Theory]
+    [InlineData((int)DurableInboxPersistencePhase.HandlerCompleted, 2)]
+    [InlineData((int)DurableInboxPersistencePhase.CompletionStaged, 2)]
+    [InlineData((int)DurableInboxPersistencePhase.CompletionCommitted, 1)]
+    public async Task PersistencePhaseCrash_RetriesOnlyWhenAtomicCommitDidNotComplete(
+        int phaseValue,
+        int expectedHandlerCalls)
+    {
+        var phase = (DurableInboxPersistencePhase)phaseValue;
+        var faultInjector = new ThrowOnceFaultInjector(phase);
+        var extension = CreateInboxExtension(
+            faultInjector: faultInjector,
+            maxProcessingAttempts: 2);
+        var handler = new CountingHandler();
+        extension.RegisterHandler("test.route", handler);
+        var envelope = CreateTestEnvelope(
+            GrainId.Create("test", "crash-sender"),
+            GrainId.Create("test", "crash-receiver"),
+            "test.route",
+            "payload");
+
+        _ = await extension.DeliverAsync(
+            envelope,
+            new DeliveryOptions { PollTimeout = TimeSpan.FromSeconds(5) },
+            CancellationToken.None);
+
+        await TestHelpers.WaitUntilAsync(
+            () => extension.Count == 0,
+            timeout: TimeSpan.FromSeconds(10),
+            message: $"Inbox did not recover after injected {phase} crash");
+        Assert.Equal(expectedHandlerCalls, handler.Count);
+    }
+
     // Test message type
     [GenerateSerializer]
     public record TestMessage
@@ -521,15 +723,100 @@ public class DurableInboxExtensionTests : IClassFixture<DefaultClusterFixture>
     {
         public TaskCompletionSource<object?> ObservedTenant { get; } =
             new(TaskCreationOptions.RunContinuationsAsynchronously);
+        public TaskCompletionSource<object?> ObservedTurnIsolation { get; } =
+            new(TaskCreationOptions.RunContinuationsAsynchronously);
 
         public bool CanHandle(IInboxHandlerContext context) => true;
 
         public ValueTask HandleAsync(IInboxHandlerContext context, CancellationToken cancellationToken)
         {
             ObservedTenant.TrySetResult(RequestContext.Get("tenant"));
+            ObservedTurnIsolation.TrySetResult(RequestContext.Get(TurnIsolationRequestContextKey));
+            return ValueTask.CompletedTask;
+        }
+
+    }
+
+    private sealed class CountingHandler : IInboxHandler
+    {
+        public int Count { get; private set; }
+
+        public bool CanHandle(IInboxHandlerContext context) => true;
+
+        public ValueTask HandleAsync(IInboxHandlerContext context, CancellationToken cancellationToken)
+        {
+            Count++;
             return ValueTask.CompletedTask;
         }
     }
+
+    private sealed class BlockingHandler : IInboxHandler
+    {
+        public TaskCompletionSource Started { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        public TaskCompletionSource Release { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        public int Count { get; private set; }
+
+        public bool CanHandle(IInboxHandlerContext context) => true;
+
+        public async ValueTask HandleAsync(IInboxHandlerContext context, CancellationToken cancellationToken)
+        {
+            Count++;
+            Started.TrySetResult();
+            await Release.Task.WaitAsync(cancellationToken);
+        }
+    }
+
+    private sealed class ShutdownHandler : IInboxHandler
+    {
+        public TaskCompletionSource Started { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        public TaskCompletionSource Canceled { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        public bool CanHandle(IInboxHandlerContext context) => true;
+
+        public async ValueTask HandleAsync(IInboxHandlerContext context, CancellationToken cancellationToken)
+        {
+            Started.TrySetResult();
+            try
+            {
+                await Task.Delay(Timeout.InfiniteTimeSpan, cancellationToken);
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                Canceled.TrySetResult();
+                throw;
+            }
+        }
+    }
+
+    private sealed class NonCooperativeHandler : IInboxHandler
+    {
+        public TaskCompletionSource Started { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        public TaskCompletionSource Release { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        public bool CanHandle(IInboxHandlerContext context) => true;
+
+        public async ValueTask HandleAsync(IInboxHandlerContext context, CancellationToken cancellationToken)
+        {
+            Started.SetResult();
+            await Release.Task;
+        }
+    }
+
+    private sealed class ThrowOnceFaultInjector(DurableInboxPersistencePhase phase) : IDurableInboxFaultInjector
+    {
+        private int _thrown;
+
+        public void OnPhase(DurableInboxPersistencePhase current)
+        {
+            if (current == phase && Interlocked.Exchange(ref _thrown, 1) == 0)
+            {
+                throw new InjectedCrashException(current);
+            }
+        }
+    }
+
+    private sealed class InjectedCrashException(DurableInboxPersistencePhase phase)
+        : Exception($"Injected crash at {phase}");
 
     // Slow handler for timeout tests
     private class SlowMessageHandler : IInboxHandler
@@ -563,13 +850,15 @@ public class DurableInboxExtensionTests : IClassFixture<DefaultClusterFixture>
     // Mock grain context
     private class MockGrainContext : IGrainContext
     {
+        private readonly TestInboxGrainLifecycle _lifecycle = new(NullLogger<TestInboxGrainLifecycle>.Instance);
+
         public GrainId GrainId { get; } = GrainId.Create("test", Guid.NewGuid().ToString());
         public GrainReference GrainReference => throw new NotImplementedException();
         public object? GrainInstance => throw new NotImplementedException();
         public ActivationId ActivationId => throw new NotImplementedException();
         public GrainAddress Address => throw new NotImplementedException();
         public IServiceProvider ActivationServices => throw new NotImplementedException();
-        public IGrainLifecycle ObservableLifecycle => throw new NotImplementedException();
+        public IGrainLifecycle ObservableLifecycle => _lifecycle;
         public IWorkItemScheduler Scheduler => throw new NotImplementedException();
         public PlacementStrategy PlacementStrategy => throw new NotImplementedException();
         public Task Deactivated => Task.CompletedTask;
@@ -584,6 +873,12 @@ public class DurableInboxExtensionTests : IClassFixture<DefaultClusterFixture>
         public void Rehydrate(IRehydrationContext context) { }
         public void Migrate(Dictionary<string, object>? requestContext, CancellationToken cancellationToken) { }
         public bool Equals(IGrainContext? other) => ReferenceEquals(this, other);
+    }
+
+    private sealed class TestInboxGrainLifecycle(ILogger logger) : LifecycleSubject(logger), IGrainLifecycle
+    {
+        public void AddMigrationParticipant(IGrainMigrationParticipant participant) { }
+        public void RemoveMigrationParticipant(IGrainMigrationParticipant participant) { }
     }
 
     // Test state machine manager
@@ -734,9 +1029,17 @@ public class DurableInboxExtensionTests : IClassFixture<DefaultClusterFixture>
     }
 
     // Test IDurableDictionary implementation for simple in-memory storage
-    private class TestDurableDictionary<TKey, TValue> : IDurableDictionary<TKey, TValue> where TKey : notnull
+    private class TestDurableDictionary<TKey, TValue> :
+        IDurableDictionary<TKey, TValue>,
+        IDurableDictionaryOwnership<TKey>
+        where TKey : notnull
     {
-        private readonly Dictionary<TKey, TValue> _dict = new();
+        private readonly Dictionary<TKey, TValue> _dict;
+
+        public TestDurableDictionary(Dictionary<TKey, TValue>? dictionary = null)
+        {
+            _dict = dictionary ?? [];
+        }
 
         public TValue this[TKey key]
         {
@@ -757,6 +1060,21 @@ public class DurableInboxExtensionTests : IClassFixture<DefaultClusterFixture>
         public void CopyTo(KeyValuePair<TKey, TValue>[] array, int arrayIndex) => ((IDictionary<TKey, TValue>)_dict).CopyTo(array, arrayIndex);
         public IEnumerator<KeyValuePair<TKey, TValue>> GetEnumerator() => _dict.GetEnumerator();
         public bool Remove(TKey key) => _dict.Remove(key);
+        bool IDurableDictionaryOwnership<TKey>.Remove(TKey key, bool disposeValue)
+        {
+            if (!_dict.Remove(key, out var value))
+            {
+                return false;
+            }
+
+            if (disposeValue && value is IDisposable disposable)
+            {
+                disposable.Dispose();
+            }
+
+            return true;
+        }
+
         public bool Remove(KeyValuePair<TKey, TValue> item) => ((IDictionary<TKey, TValue>)_dict).Remove(item);
         public bool TryGetValue(TKey key, [MaybeNullWhen(false)] out TValue value) => _dict.TryGetValue(key, out value);
         System.Collections.IEnumerator System.Collections.IEnumerable.GetEnumerator() => _dict.GetEnumerator();

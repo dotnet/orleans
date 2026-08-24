@@ -52,6 +52,24 @@ internal sealed class DurableTaskMessageHandler(
                 }
 
                 await runtime.SignalCancellationAsync(cancellation.TaskId, cancellationToken);
+                transport.SendCancellationAcknowledgement(
+                    context.GrainId,
+                    context.Envelope.SenderId,
+                    cancellation.TaskId,
+                    runtime.GetCancellationAcknowledgementResponse(cancellation.TaskId));
+                await transport.CommitAsync(cancellationToken);
+                break;
+            case DurableTaskMessageTransport.CancellationAcknowledgementRoute:
+                if (!context.Envelope.Data.TryGetBody<DurableTaskCancellationAcknowledgementMessage>(out var acknowledgement))
+                {
+                    throw new InvalidOperationException("The durable task cancellation acknowledgement payload could not be deserialized.");
+                }
+
+                await runtime.AcceptCancellationAcknowledgementAsync(
+                    acknowledgement.TaskId,
+                    context.Envelope.SenderId,
+                    acknowledgement.Response,
+                    cancellationToken);
                 break;
             case DurableTaskMessageTransport.ResumeRoute:
                 if (!context.Envelope.Data.TryGetBody<DurableTaskResumeMessage>(out var resume))

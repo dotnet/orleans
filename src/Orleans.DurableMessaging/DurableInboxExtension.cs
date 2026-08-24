@@ -19,9 +19,13 @@ namespace Orleans.DurableMessaging;
 /// Implementation of durable inbox extension for grain message delivery.
 /// Handles message persistence, deduplication, long-polling, and processing.
 /// </summary>
-internal sealed partial class DurableInboxExtension : IDurableInboxExtension, IDurableJobFeatureHandler, IDisposable
+internal sealed partial class DurableInboxExtension :
+    IDurableInboxExtension,
+    IDurableJobFeatureHandler,
+    IDisposable
 {
     internal const string JobName = "orleans.messaging.inbox-drain";
+    private const string TurnIsolationRequestContextKey = "Orleans.DurableJobs.TurnIsolation";
 
     private readonly IGrainContext _grainContext;
     private readonly IJournaledStateManager _stateManager;
@@ -30,6 +34,7 @@ internal sealed partial class DurableInboxExtension : IDurableInboxExtension, ID
     private readonly DurableMessagingInstruments _instruments;
     private readonly IDurableInbox _durableInbox;
     private readonly IDictionary<(GrainId SenderId, Guid MessageId), DurableEnvelope> _inboxDict;
+    private readonly IDurableDictionaryOwnership<(GrainId SenderId, Guid MessageId)> _inboxOwnership;
     private readonly IDictionary<(GrainId SenderId, Guid MessageId), DateTimeOffset> _processed;
     private readonly IDictionary<(GrainId SenderId, Guid MessageId), InboxMessageState> _messageStates;
     private readonly IDictionary<(GrainId SenderId, Guid MessageId), InboxDeadLetter> _deadLetters;
@@ -44,9 +49,16 @@ internal sealed partial class DurableInboxExtension : IDurableInboxExtension, ID
     private readonly TimeSpan _retryDelay;
     private readonly bool _enableLongPolling;
     private readonly TimeSpan _defaultPollTimeout;
+    private readonly DurableMessagingCommitCoordinator _commitCoordinator;
+    private readonly IDurableInboxFaultInjector? _faultInjector;
+    private readonly DurableJobTurnIsolation _turnIsolation;
     private readonly SemaphoreSlim _gate = new(1, 1);
     private readonly CancellationTokenSource _shutdownCts = new();
+    private readonly object _processingLock = new();
+    private readonly Dictionary<(GrainId SenderId, Guid MessageId), Task<DeliveryResult>> _processing = [];
     private int _metricsActive;
+    private int _admissionStopped;
+    private int _shutdownDisposed;
 
     /// <summary>
     /// Creates a new inbox extension instance.
@@ -77,7 +89,10 @@ internal sealed partial class DurableInboxExtension : IDurableInboxExtension, ID
         ILocalDurableJobManager jobManager,
         IDurableJobHandlerRegistry jobHandlers,
         TimeProvider timeProvider,
-        DurableInboxOptions options)
+        DurableInboxOptions options,
+        DurableMessagingCommitCoordinator? commitCoordinator = null,
+        IDurableInboxFaultInjector? faultInjector = null,
+        DurableJobTurnIsolation? turnIsolation = null)
     {
         ArgumentNullException.ThrowIfNull(grainContext);
         ArgumentNullException.ThrowIfNull(stateManager);
@@ -103,6 +118,8 @@ internal sealed partial class DurableInboxExtension : IDurableInboxExtension, ID
         _instruments = instruments;
         _durableInbox = durableInbox;
         _inboxDict = inboxDict;
+        _inboxOwnership = inboxDict as IDurableDictionaryOwnership<(GrainId SenderId, Guid MessageId)>
+            ?? throw new InvalidOperationException("The durable inbox dictionary must support ownership transfer.");
         _processed = processed;
         _messageStates = messageStates;
         _deadLetters = deadLetters;
@@ -117,6 +134,9 @@ internal sealed partial class DurableInboxExtension : IDurableInboxExtension, ID
         _retryDelay = options.BackpressureRetryDelay;
         _enableLongPolling = options.EnableLongPolling;
         _defaultPollTimeout = options.DefaultPollTimeout;
+        _commitCoordinator = commitCoordinator ?? new DurableMessagingCommitCoordinator();
+        _faultInjector = faultInjector;
+        _turnIsolation = turnIsolation ?? new DurableJobTurnIsolation();
         jobHandlers.Register(this, requiresTurnIsolation: true);
     }
 
@@ -173,6 +193,12 @@ internal sealed partial class DurableInboxExtension : IDurableInboxExtension, ID
         DeliveryOptions options,
         CancellationToken cancellationToken = default)
     {
+        if (Volatile.Read(ref _admissionStopped) != 0)
+        {
+            envelope.Data.Dispose();
+            return DeliveryResult.Backpressured();
+        }
+
         EnsureMetricsActive();
         var key = (envelope.SenderId, envelope.MessageId);
         var pollTimeout = options.PollTimeout == Timeout.InfiniteTimeSpan ? _defaultPollTimeout : options.PollTimeout;
@@ -216,10 +242,7 @@ internal sealed partial class DurableInboxExtension : IDurableInboxExtension, ID
                 await EnsureJobScheduledUnderGateAsync(CancellationToken.None).ConfigureAwait(true);
                 result = DeliveryResult.Duplicate();
                 shouldWait = _enableLongPolling && pollTimeout > TimeSpan.Zero;
-                if (shouldWait)
-                {
-                    envelopeToProcess = storedEnvelope;
-                }
+                envelopeToProcess = storedEnvelope;
             }
             else
             {
@@ -269,10 +292,7 @@ internal sealed partial class DurableInboxExtension : IDurableInboxExtension, ID
                     envelope.CorrelationKey?.ToString());
                 _instruments.OnInboxMessageReceived(_grainContext.GrainId.Type.ToString(), envelope.RouteKey, "accepted");
                 shouldWait = _enableLongPolling && pollTimeout > TimeSpan.Zero;
-                if (shouldWait)
-                {
-                    envelopeToProcess = envelope;
-                }
+                envelopeToProcess = envelope;
             }
         }
         finally
@@ -280,7 +300,10 @@ internal sealed partial class DurableInboxExtension : IDurableInboxExtension, ID
             _gate.Release();
         }
 
-        if (!shouldWait || envelopeToProcess is not { } pendingEnvelope)
+        var processing = envelopeToProcess is { } pendingEnvelope
+            ? GetOrStartProcessing(pendingEnvelope)
+            : null;
+        if (!shouldWait || processing is null)
         {
             return result;
         }
@@ -289,7 +312,7 @@ internal sealed partial class DurableInboxExtension : IDurableInboxExtension, ID
         timeout.CancelAfter(pollTimeout);
         try
         {
-            return await ProcessMessageAsync(pendingEnvelope, timeout.Token).ConfigureAwait(true);
+            return await processing.WaitAsync(timeout.Token).ConfigureAwait(true);
         }
         catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested && timeout.IsCancellationRequested)
         {
@@ -336,7 +359,6 @@ internal sealed partial class DurableInboxExtension : IDurableInboxExtension, ID
 
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
-            await _stateManager.RevertPendingChangesAsync(CancellationToken.None).ConfigureAwait(true);
             throw;
         }
         catch (Exception exception)
@@ -410,14 +432,7 @@ internal sealed partial class DurableInboxExtension : IDurableInboxExtension, ID
         foreach (var envelope in pending)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            try
-            {
-                _ = await ProcessMessageAsync(envelope, cancellationToken).ConfigureAwait(true);
-            }
-            catch (Exception exception) when (exception is not OperationCanceledException)
-            {
-                LogProcessingError(_logger, exception, envelope.MessageId, envelope.SenderId, envelope.RouteKey, envelope.CorrelationKey?.ToString());
-            }
+            _ = await GetOrStartProcessing(envelope).WaitAsync(cancellationToken).ConfigureAwait(true);
         }
     }
 
@@ -445,9 +460,12 @@ internal sealed partial class DurableInboxExtension : IDurableInboxExtension, ID
     /// </summary>
     private async Task<DeliveryResult> ProcessMessageAsync(DurableEnvelope envelope, CancellationToken cancellationToken)
     {
+        using var turnLease = await _turnIsolation.EnterIsolatedAsync(cancellationToken).ConfigureAwait(true);
+        turnLease.Activate();
         var key = (envelope.SenderId, envelope.MessageId);
         var grainTypeName = _grainContext.GrainId.Type.ToString();
         var stopwatch = Stopwatch.StartNew();
+        var completionCommitted = false;
         if (!_inboxDict.ContainsKey(key))
         {
             return DeliveryResult.Duplicate();
@@ -459,8 +477,12 @@ internal sealed partial class DurableInboxExtension : IDurableInboxExtension, ID
             DeliveryResult completionResult;
             if (_durableInbox.TryFindHandler(context, out var handler))
             {
-                await InvokeHandlerAsync(handler, context, cancellationToken).ConfigureAwait(true);
+                using (_commitCoordinator.BeginHandler())
+                {
+                    await InvokeHandlerAsync(handler, context, cancellationToken).ConfigureAwait(true);
+                }
                 cancellationToken.ThrowIfCancellationRequested();
+                _faultInjector?.OnPhase(DurableInboxPersistencePhase.HandlerCompleted);
                 completionResult = DeliveryResult.Processed();
             }
             else
@@ -477,10 +499,13 @@ internal sealed partial class DurableInboxExtension : IDurableInboxExtension, ID
             {
                 if (_inboxDict.ContainsKey(key))
                 {
+                    _faultInjector?.OnPhase(DurableInboxPersistencePhase.CompletionStaged);
                     RemoveMessage(key);
                     _messageStates.Remove(key);
                     _processed[key] = _timeProvider.GetUtcNow();
                     await _stateManager.WriteStateAsync(cancellationToken).ConfigureAwait(true);
+                    completionCommitted = true;
+                    _faultInjector?.OnPhase(DurableInboxPersistencePhase.CompletionCommitted);
                 }
             }
             finally
@@ -488,7 +513,6 @@ internal sealed partial class DurableInboxExtension : IDurableInboxExtension, ID
                 _gate.Release();
             }
 
-            envelope.Data.Dispose();
             stopwatch.Stop();
             _instruments.OnInboxMessageProcessed(grainTypeName, envelope.RouteKey, "success");
             _instruments.OnInboxProcessingDuration(stopwatch.Elapsed, grainTypeName, envelope.RouteKey);
@@ -502,6 +526,11 @@ internal sealed partial class DurableInboxExtension : IDurableInboxExtension, ID
         }
         catch (Exception ex)
         {
+            if (completionCommitted)
+            {
+                return DeliveryResult.Processed();
+            }
+
             LogHandlerException(_logger, ex, envelope.MessageId, envelope.SenderId, envelope.RouteKey, envelope.CorrelationKey?.ToString());
             var deadLettered = await RecordProcessingFailureAsync(key, ex, cancellationToken).ConfigureAwait(true);
             stopwatch.Stop();
@@ -513,6 +542,39 @@ internal sealed partial class DurableInboxExtension : IDurableInboxExtension, ID
             }
 
             return DeliveryResult.Pending();
+        }
+    }
+
+    private Task<DeliveryResult> GetOrStartProcessing(DurableEnvelope envelope)
+    {
+        var key = (envelope.SenderId, envelope.MessageId);
+        lock (_processingLock)
+        {
+            if (_processing.TryGetValue(key, out var existing))
+            {
+                return existing;
+            }
+
+            var task = ProcessMessageAsync(envelope, _shutdownCts.Token);
+            _processing[key] = task;
+            _ = task.ContinueWith(
+                static (completed, state) =>
+                {
+                    var (owner, messageKey) = ((DurableInboxExtension, (GrainId, Guid)))state!;
+                    lock (owner._processingLock)
+                    {
+                        if (owner._processing.TryGetValue(messageKey, out var current)
+                            && ReferenceEquals(current, completed))
+                        {
+                            owner._processing.Remove(messageKey);
+                        }
+                    }
+                },
+                (this, key),
+                CancellationToken.None,
+                TaskContinuationOptions.ExecuteSynchronously,
+                TaskScheduler.Default);
+            return task;
         }
     }
 
@@ -587,7 +649,7 @@ internal sealed partial class DurableInboxExtension : IDurableInboxExtension, ID
             Reason = reason,
             AttemptCount = attemptCount
         };
-        RemoveMessage(key);
+        RemoveMessage(key, disposeEnvelope: false);
         _messageStates.Remove(key);
         _processed[key] = _timeProvider.GetUtcNow();
         await _stateManager.WriteStateAsync(cancellationToken).ConfigureAwait(true);
@@ -599,9 +661,15 @@ internal sealed partial class DurableInboxExtension : IDurableInboxExtension, ID
         CancellationToken cancellationToken)
     {
         var previous = RequestContext.Entries.ToArray();
+        var turnIsolationOwner = RequestContext.Get(TurnIsolationRequestContextKey);
         RequestContext.Clear();
         try
         {
+            if (turnIsolationOwner is not null)
+            {
+                RequestContext.Set(TurnIsolationRequestContextKey, turnIsolationOwner);
+            }
+
             if (context.Envelope.Data.HasContextKey(DurableEnvelopeBuilder.RequestContextKey))
             {
                 if (!context.Envelope.Data.TryGetContextValue<Dictionary<string, object>>(
@@ -613,7 +681,10 @@ internal sealed partial class DurableInboxExtension : IDurableInboxExtension, ID
 
                 foreach (var (key, value) in values)
                 {
-                    RequestContext.Set(key, value);
+                    if (!DurableEnvelopeBuilder.IsFrameworkContextKey(key))
+                    {
+                        RequestContext.Set(key, value);
+                    }
                 }
             }
 
@@ -651,17 +722,52 @@ internal sealed partial class DurableInboxExtension : IDurableInboxExtension, ID
 
     internal void StopProcessing()
     {
-        _shutdownCts.Cancel();
+        _ = Interlocked.Exchange(ref _admissionStopped, 1);
+        if (Volatile.Read(ref _shutdownDisposed) == 0)
+        {
+            _shutdownCts.Cancel();
+        }
+
         if (Interlocked.Exchange(ref _metricsActive, 0) != 0)
         {
             _instruments.OnInboxDepthChanged(-_inboxDict.Count);
         }
     }
 
+    public async Task OnStop(CancellationToken cancellationToken = default)
+    {
+        StopProcessing();
+        await _gate.WaitAsync(CancellationToken.None).ConfigureAwait(true);
+        _gate.Release();
+
+        Task[] processing;
+        lock (_processingLock)
+        {
+            processing = _processing.Values.ToArray();
+        }
+
+        await Task.WhenAll(processing).ConfigureAwait(ConfigureAwaitOptions.SuppressThrowing);
+        DisposeShutdownToken();
+    }
+
     public void Dispose()
     {
         StopProcessing();
-        _shutdownCts.Dispose();
+        lock (_processingLock)
+        {
+            if (_processing.Count == 0)
+            {
+                DisposeShutdownToken();
+            }
+        }
+    }
+
+    private void DisposeShutdownToken()
+    {
+        if (Interlocked.Exchange(ref _shutdownDisposed, 1) == 0)
+        {
+            _shutdownCts.Dispose();
+        }
     }
 
     private void EnsureMetricsActive()
@@ -672,9 +778,11 @@ internal sealed partial class DurableInboxExtension : IDurableInboxExtension, ID
         }
     }
 
-    private bool RemoveMessage((GrainId SenderId, Guid MessageId) key)
+    private bool RemoveMessage(
+        (GrainId SenderId, Guid MessageId) key,
+        bool disposeEnvelope = true)
     {
-        if (!_inboxDict.Remove(key))
+        if (!_inboxOwnership.Remove(key, disposeEnvelope))
         {
             return false;
         }
