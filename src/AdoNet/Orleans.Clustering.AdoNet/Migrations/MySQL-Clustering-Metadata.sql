@@ -1,19 +1,26 @@
-SET @metadata_column_exists = (
-    SELECT COUNT(*)
-    FROM INFORMATION_SCHEMA.COLUMNS
-    WHERE TABLE_SCHEMA = DATABASE()
-      AND TABLE_NAME = 'OrleansMembershipTable'
-      AND COLUMN_NAME = 'MetadataJson'
-);
-SET @metadata_column_statement = IF(
-    @metadata_column_exists = 0,
-    'ALTER TABLE OrleansMembershipTable ADD COLUMN MetadataJson LONGTEXT NULL',
-    'SELECT 1'
-);
-PREPARE metadata_column_command FROM @metadata_column_statement;
-EXECUTE metadata_column_command;
-DEALLOCATE PREPARE metadata_column_command;
-ALTER TABLE OrleansMembershipTable MODIFY COLUMN MetadataJson LONGTEXT NULL;
+DROP PROCEDURE IF EXISTS EnsureMembershipMetadataColumn;
+
+DELIMITER $$
+
+CREATE PROCEDURE EnsureMembershipMetadataColumn()
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1
+        FROM INFORMATION_SCHEMA.COLUMNS
+        WHERE TABLE_SCHEMA = DATABASE()
+          AND TABLE_NAME = 'OrleansMembershipTable'
+          AND COLUMN_NAME = 'MetadataJson'
+    ) THEN
+        ALTER TABLE OrleansMembershipTable ADD COLUMN MetadataJson LONGTEXT NULL;
+    END IF;
+
+    ALTER TABLE OrleansMembershipTable MODIFY COLUMN MetadataJson LONGTEXT NULL;
+END$$
+
+DELIMITER ;
+
+CALL EnsureMembershipMetadataColumn();
+DROP PROCEDURE EnsureMembershipMetadataColumn;
 
 DROP PROCEDURE IF EXISTS InsertMembershipV2Key;
 
