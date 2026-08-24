@@ -49,6 +49,7 @@ internal partial class EventHubAdapterReceiver : IQueueAdapterReceiver, IQueueCa
     private readonly IQueueAdapterReceiverMonitor monitor;
     private readonly LoadSheddingOptions loadSheddingOptions;
     private readonly IEnvironmentStatisticsProvider environmentStatisticsProvider;
+    private readonly object cacheLock = new();
     private IEventHubQueueCache? cache;
 
     private IEventHubReceiver? receiver;
@@ -67,7 +68,10 @@ internal partial class EventHubAdapterReceiver : IQueueAdapterReceiver, IQueueCa
 
     public int GetMaxAddCount()
     {
-        return this.flowController.GetMaxAddCount();
+        lock (this.cacheLock)
+        {
+            return this.flowController.GetMaxAddCount();
+        }
     }
 
     public EventHubAdapterReceiver(EventHubPartitionSettings settings,
@@ -134,23 +138,32 @@ internal partial class EventHubAdapterReceiver : IQueueAdapterReceiver, IQueueCa
         var watch = Stopwatch.StartNew();
         try
         {
-            this.checkpointer = await this.checkpointerFactory(
+            var checkpointer = await this.checkpointerFactory(
                 this.settings.Partition,
                 cancellationToken);
-            if(this.cache != null)
-            {
-                this.cache.Dispose();
-                this.cache = null;
-            }
-            this.cache = this.cacheFactory(this.settings.Partition, this.checkpointer, this.loggerFactory);
-            this.flowController = new AggregatedQueueFlowController(MaxMessagesPerRead) { this.cache, LoadShedQueueFlowController.CreateAsPercentOfLoadSheddingLimit(this.loadSheddingOptions, environmentStatisticsProvider) };
-            string offset = await this.checkpointer.Load(cancellationToken);
-            this.receiverUsesCheckpoint = this.checkpointer.CheckpointExists;
-            if (!this.receiverUsesCheckpoint)
+            string offset = await checkpointer.Load(cancellationToken);
+            var receiverUsesCheckpoint = checkpointer.CheckpointExists;
+            if (!receiverUsesCheckpoint)
             {
                 offset = EventHubConstants.StartOfStream;
             }
 
+            var cache = this.cacheFactory(this.settings.Partition, checkpointer, this.loggerFactory);
+            var flowController = new AggregatedQueueFlowController(MaxMessagesPerRead)
+            {
+                cache,
+                LoadShedQueueFlowController.CreateAsPercentOfLoadSheddingLimit(this.loadSheddingOptions, environmentStatisticsProvider)
+            };
+
+            lock (this.cacheLock)
+            {
+                this.cache?.Dispose();
+                this.checkpointer = checkpointer;
+                this.cache = cache;
+                this.flowController = flowController;
+            }
+
+            this.receiverUsesCheckpoint = receiverUsesCheckpoint;
             this.receiver = this.eventHubReceiverFactory(this.settings, offset, this.logger);
             watch.Stop();
             this.monitor?.TrackInitialization(true, watch.Elapsed, null);
