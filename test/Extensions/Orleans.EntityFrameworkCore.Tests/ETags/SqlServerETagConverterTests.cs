@@ -59,6 +59,8 @@ public sealed class SqlServerETagConverterTests
     }
 
     [Theory]
+    [InlineData(ConverterKind.Clustering)]
+    [InlineData(ConverterKind.GrainDirectory)]
     [InlineData(ConverterKind.Persistence)]
     [InlineData(ConverterKind.Reminders)]
     public void Converter_UsesInvariantCulture(ConverterKind kind)
@@ -81,6 +83,8 @@ public sealed class SqlServerETagConverterTests
     }
 
     [Theory]
+    [InlineData(ConverterKind.Clustering)]
+    [InlineData(ConverterKind.GrainDirectory)]
     [InlineData(ConverterKind.Persistence)]
     [InlineData(ConverterKind.Reminders)]
     public void FromDbETag_InvalidRowVersionLength_HasDeterministicMessage(ConverterKind kind)
