@@ -257,7 +257,17 @@ internal partial class EventHubAdapterReceiver : IQueueAdapterReceiver, IQueueCa
 
         this.monitor?.TrackMessagesReceived(messages.Count, oldestMessageEnqueueTime, newestMessageEnqueueTime);
 
-        List<StreamPosition> messageStreamPositions = this.cache!.Add(messages, dequeueTimeUtc);
+        List<StreamPosition> messageStreamPositions;
+        lock (this.cacheLock)
+        {
+            if (this.cache is null)
+            {
+                return batches;
+            }
+
+            messageStreamPositions = this.cache.Add(messages, dequeueTimeUtc);
+        }
+
         foreach (var streamPosition in messageStreamPositions)
         {
             batches.Add(new StreamActivityNotificationBatch(streamPosition));
@@ -502,16 +512,19 @@ internal partial class EventHubAdapterReceiver : IQueueAdapterReceiver, IQueueCa
     {
         private readonly EventHubAdapterReceiver owner;
         private readonly StreamId streamId;
-        private IEventHubQueueCache cache;
-        private object cursor;
+        private IEventHubQueueCache? cache;
+        private object? cursor;
         private IBatchContainer? current;
 
         public Cursor(EventHubAdapterReceiver owner, StreamId streamId, StreamSequenceToken? token)
         {
             this.owner = owner;
             this.streamId = streamId;
-            this.cache = owner.cache!;
-            this.cursor = this.cache.GetCursor(streamId, token);
+            lock (owner.cacheLock)
+            {
+                this.cache = owner.cache;
+                this.cursor = this.cache?.GetCursor(streamId, token);
+            }
         }
 
         public void Dispose()
@@ -526,26 +539,45 @@ internal partial class EventHubAdapterReceiver : IQueueAdapterReceiver, IQueueCa
 
         public bool MoveNext()
         {
-            IBatchContainer? next;
-            if (!this.cache.TryGetNextMessage(this.cursor, out next))
+            lock (this.owner.cacheLock)
             {
-                return false;
-            }
+                if (this.cache is null || this.cursor is null || !ReferenceEquals(this.cache, this.owner.cache))
+                {
+                    return false;
+                }
 
-            this.current = next;
-            return true;
+                if (!this.cache.TryGetNextMessage(this.cursor, out var next))
+                {
+                    return false;
+                }
+
+                this.current = next;
+                return true;
+            }
         }
 
         public void Refresh(StreamSequenceToken? token)
         {
-            if (!ReferenceEquals(this.cache, this.owner.cache))
+            lock (this.owner.cacheLock)
             {
-                this.cache = this.owner.cache!;
-                this.cursor = this.cache.GetCursor(this.streamId, token);
-                return;
-            }
+                var cache = this.owner.cache;
+                if (cache is null)
+                {
+                    this.cache = null;
+                    this.cursor = null;
+                    this.current = null;
+                    return;
+                }
 
-            this.cache.Refresh(this.cursor, token);
+                if (!ReferenceEquals(this.cache, cache))
+                {
+                    this.cache = cache;
+                    this.cursor = cache.GetCursor(this.streamId, token);
+                    return;
+                }
+
+                cache.Refresh(this.cursor!, token);
+            }
         }
 
         public void RecordDeliveryFailure()
