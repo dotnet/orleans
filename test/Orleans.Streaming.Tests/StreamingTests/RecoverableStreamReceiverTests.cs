@@ -70,6 +70,12 @@ public sealed class RecoverableStreamReceiverTests
         public TaskCompletionSource FirstLoadStarted { get; } =
             new(TaskCreationOptions.RunContinuationsAsynchronously);
 
+        public TaskCompletionSource FirstLoadCancellationObserved { get; } =
+            new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        public TaskCompletionSource AllowFirstLoadToComplete { get; } =
+            new(TaskCreationOptions.RunContinuationsAsynchronously);
+
         public CancellationToken FirstLoadCancellation { get; private set; }
 
         public int LoadCount { get; private set; }
@@ -85,10 +91,43 @@ public sealed class RecoverableStreamReceiverTests
             {
                 FirstLoadCancellation = cancellationToken;
                 FirstLoadStarted.TrySetResult();
-                await Task.Delay(Timeout.InfiniteTimeSpan, cancellationToken);
+                using var registration = cancellationToken.Register(
+                    static state => ((TaskCompletionSource)state!).TrySetResult(),
+                    FirstLoadCancellationObserved);
+                await FirstLoadCancellationObserved.Task;
+                await AllowFirstLoadToComplete.Task;
+                cancellationToken.ThrowIfCancellationRequested();
             }
 
             return string.Empty;
+        }
+
+        public void Update(string offset, DateTime utcNow) { }
+
+        public void Update(string offset, DateTime utcNow, CancellationToken cancellationToken)
+            => cancellationToken.ThrowIfCancellationRequested();
+
+        public Task FlushAsync(CancellationToken cancellationToken)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            return Task.CompletedTask;
+        }
+    }
+
+    private sealed class IndependentlyCanceledCheckpointer : IStreamQueueCheckpointer<string>
+    {
+        public int LoadCount { get; private set; }
+
+        public bool CheckpointExists => false;
+
+        public Task<string> Load() => Load(CancellationToken.None);
+
+        public async Task<string> Load(CancellationToken cancellationToken)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            LoadCount++;
+            await Task.Yield();
+            throw new OperationCanceledException(new CancellationToken(canceled: true));
         }
 
         public void Update(string offset, DateTime utcNow) { }
@@ -547,9 +586,29 @@ public sealed class RecoverableStreamReceiverTests
         await Assert.ThrowsAnyAsync<OperationCanceledException>(() => initialization);
         Assert.True(checkpointer.FirstLoadCancellation.IsCancellationRequested);
 
-        Assert.Empty(await receiver.GetQueueMessagesAsync(10, CancellationToken.None));
+        var retry = receiver.GetQueueMessagesAsync(10, CancellationToken.None);
+        Assert.Equal(1, checkpointer.LoadCount);
+        checkpointer.AllowFirstLoadToComplete.TrySetResult();
+
+        Assert.Empty(await retry);
         Assert.Equal(2, checkpointer.LoadCount);
         Assert.Equal(1, source.InitializeCount);
+        await receiver.Shutdown(TimeSpan.FromSeconds(5));
+    }
+
+    [Fact]
+    public async Task Receiver_IndependentInitializationCancellationIsNotRetried()
+    {
+        var source = new TestSource([]);
+        var checkpointer = new IndependentlyCanceledCheckpointer();
+        var receiver = CreateReceiver(source, checkpointer);
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(
+            () => receiver.GetQueueMessagesAsync(10, CancellationToken.None)
+                .WaitAsync(TimeSpan.FromSeconds(5)));
+
+        Assert.Equal(1, checkpointer.LoadCount);
+        Assert.Equal(0, source.InitializeCount);
         await receiver.Shutdown(TimeSpan.FromSeconds(5));
     }
 
