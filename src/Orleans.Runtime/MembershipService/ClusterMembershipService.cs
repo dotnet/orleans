@@ -42,16 +42,17 @@ namespace Orleans.Runtime
                 var tableSnapshot = this.membershipManager.CurrentSnapshot;
                 if (ReferenceEquals(Volatile.Read(ref this.tableSnapshot), tableSnapshot))
                 {
-                    return this.snapshot;
+                    return Volatile.Read(ref this.snapshot);
                 }
 
-                if (this.snapshot.Version > tableSnapshot.Version)
+                var currentSnapshot = Volatile.Read(ref this.snapshot);
+                if (currentSnapshot.Version > tableSnapshot.Version)
                 {
-                    return this.snapshot;
+                    return currentSnapshot;
                 }
 
                 this.TryPublish(tableSnapshot);
-                return this.snapshot;
+                return Volatile.Read(ref this.snapshot);
             }
         }
 
