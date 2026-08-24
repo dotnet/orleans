@@ -11,11 +11,15 @@ internal sealed class KinesisCacheRecord(
     Record record,
     long sequenceNumber)
 {
+    private byte[]? _rawPayload;
+
     public Record Record { get; } = record;
 
     public long SequenceNumber { get; } = sequenceNumber;
 
     public KinesisBatchContainer.Body? Body { get; set; }
+
+    public byte[] RawPayload => _rawPayload ??= Record.Data.ToArray();
 }
 
 internal sealed class KinesisRecoverableStreamSource(
@@ -166,7 +170,7 @@ internal sealed class KinesisRecoverableStreamDataAdapter(
 {
     public StreamPosition GetStreamPosition(KinesisCacheRecord queueMessage)
     {
-        queueMessage.Body ??= serializer.Deserialize(queueMessage.Record.Data.ToArray())!;
+        queueMessage.Body ??= serializer.Deserialize(queueMessage.RawPayload)!;
         return new(
             queueMessage.Body.StreamId,
             new KinesisSequenceToken(
@@ -181,7 +185,7 @@ internal sealed class KinesisRecoverableStreamDataAdapter(
         DateTime dequeueTimeUtc,
         Func<int, ArraySegment<byte>> getSegment)
     {
-        var payload = queueMessage.Record.Data.ToArray();
+        var payload = queueMessage.RawPayload;
         var size = SegmentBuilder.CalculateAppendSize(queueMessage.Record.SequenceNumber)
             + SegmentBuilder.CalculateAppendSize(payload);
         var segment = getSegment(size);
