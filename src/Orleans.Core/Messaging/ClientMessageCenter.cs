@@ -424,7 +424,7 @@ namespace Orleans.Messaging
             Level = LogLevel.Trace,
             Message = "Sending message {Message} via gateway '{Gateway}'."
         )]
-        private partial void LogSendingMessage(Message message, EndPoint gateway);
+        private partial void LogSendingMessage(Message message, EndPoint? gateway);
 
         [LoggerMessage(
             Level = LogLevel.Trace,

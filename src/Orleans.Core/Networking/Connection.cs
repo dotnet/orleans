@@ -55,14 +55,14 @@ namespace Orleans.Runtime.Messaging
             // Set the connection on the connection context so that it can be retrieved by the middleware.
             this.Context.Features.Set<Connection>(this);
 
-            this.RemoteEndPoint = NormalizeEndpoint(this.Context.RemoteEndPoint)!;
-            this.LocalEndPoint = NormalizeEndpoint(this.Context.LocalEndPoint)!;
+            this.RemoteEndPoint = NormalizeEndpoint(this.Context.RemoteEndPoint);
+            this.LocalEndPoint = NormalizeEndpoint(this.Context.LocalEndPoint);
         }
 
         public ConnectionCommon Shared => shared;
         public string ConnectionId => (this.Context?.ConnectionId)!;
-        public virtual EndPoint RemoteEndPoint { get; }
-        public virtual EndPoint LocalEndPoint { get; }
+        public virtual EndPoint? RemoteEndPoint { get; }
+        public virtual EndPoint? LocalEndPoint { get; }
         protected ConnectionContext Context { get; }
         protected ILogger Log => this.shared.Logger;
         protected MessagingTrace MessagingTrace => this.shared.MessagingTrace;
@@ -665,13 +665,13 @@ namespace Orleans.Runtime.Messaging
             Level = LogLevel.Warning,
             Message = "Exception while processing messages from remote endpoint {EndPoint}"
         )]
-        private static partial void LogWarningExceptionProcessingMessagesFromRemote(ILogger logger, Exception exception, EndPoint endPoint);
+        private static partial void LogWarningExceptionProcessingMessagesFromRemote(ILogger logger, Exception exception, EndPoint? endPoint);
 
         [LoggerMessage(
             Level = LogLevel.Warning,
             Message = "Exception while processing messages to remote endpoint {EndPoint}"
         )]
-        private static partial void LogWarningExceptionProcessingMessagesToRemote(ILogger logger, Exception exception, EndPoint endPoint);
+        private static partial void LogWarningExceptionProcessingMessagesToRemote(ILogger logger, Exception exception, EndPoint? endPoint);
 
         [LoggerMessage(
             Level = LogLevel.Information,
@@ -683,13 +683,13 @@ namespace Orleans.Runtime.Messaging
             Level = LogLevel.Error,
             Message = "Exception reading message {Message} from remote endpoint {Remote} to local endpoint {Local}"
         )]
-        private static partial void LogErrorExceptionReadingMessage(ILogger logger, Exception exception, Message? message, EndPoint remote, EndPoint local);
+        private static partial void LogErrorExceptionReadingMessage(ILogger logger, Exception exception, Message? message, EndPoint? remote, EndPoint? local);
 
         [LoggerMessage(
             Level = LogLevel.Error,
             Message = "Exception sending message {Message} to remote endpoint {Remote} from local endpoint {Local}"
         )]
-        private static partial void LogErrorExceptionSendingMessage(ILogger logger, Exception exception, Message? message, EndPoint remote, EndPoint local);
+        private static partial void LogErrorExceptionSendingMessage(ILogger logger, Exception exception, Message? message, EndPoint? remote, EndPoint? local);
 
         [LoggerMessage(
             EventId = (int)ErrorCode.Messaging_OutgoingMS_DroppingMessage,

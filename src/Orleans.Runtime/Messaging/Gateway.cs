@@ -519,7 +519,7 @@ namespace Orleans.Runtime.Messaging
             Level = LogLevel.Information,
             Message = "Recorded opened connection from endpoint {EndPoint}, client ID {ClientId}."
         )]
-        private static partial void LogInformationGatewayClientOpenedSocket(ILogger logger, EndPoint endPoint, ClientGrainId clientId);
+        private static partial void LogInformationGatewayClientOpenedSocket(ILogger logger, EndPoint? endPoint, ClientGrainId clientId);
 
         [LoggerMessage(
             EventId = (int)ErrorCode.GatewayClientClosedSocket,
