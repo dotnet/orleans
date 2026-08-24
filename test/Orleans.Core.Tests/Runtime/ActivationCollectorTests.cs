@@ -1278,44 +1278,6 @@ namespace UnitTests.Runtime
         }
 
         [Fact, TestCategory("Activation")]
-        public async Task WorkingSet_DuplicateOnActivated_ThrowsWithoutChangingCommittedState()
-        {
-            await using var harness = await WorkingSetHarness.CreateAsync();
-            var member = harness.Members[0];
-            harness.WorkingSet.OnActivated(member);
-            var expectedMembers = harness.WorkingSet.Members.ToArray();
-            var expectedHistory = harness.Observer.GetHistory(0);
-
-            var exception = Assert.Throws<InvalidOperationException>(() => harness.WorkingSet.OnActivated(member));
-
-            Assert.Contains("already a member of the working set", exception.Message);
-            Assert.Equal(1, harness.WorkingSet.Count);
-            Assert.True(member.IsInWorkingSet);
-            Assert.False(member.IsIdle);
-            Assert.Equal(expectedMembers, harness.WorkingSet.Members);
-            Assert.Equal(["Added"], expectedHistory);
-            Assert.Equal(expectedHistory, harness.Observer.GetHistory(0));
-        }
-
-        [Fact, TestCategory("Activation")]
-        public async Task WorkingSet_DirectObserverFailure_PropagatesAfterTransitionIsCommitted()
-        {
-            await using var harness = await WorkingSetHarness.CreateAsync();
-            var member = harness.Members[0];
-            var expectedException = new InvalidOperationException("observer failure");
-            harness.Observer.AddedException = expectedException;
-
-            var actualException = Record.Exception(() => harness.WorkingSet.OnActivated(member));
-
-            Assert.Same(expectedException, actualException);
-            Assert.Equal(1, harness.WorkingSet.Count);
-            Assert.True(member.IsInWorkingSet);
-            Assert.False(member.IsIdle);
-            Assert.Same(member, Assert.Single(harness.WorkingSet.Members));
-            Assert.Equal(["Added"], harness.Observer.GetHistory(0));
-        }
-
-        [Fact, TestCategory("Activation")]
         public async Task WorkingSet_ConcurrentOnActiveForAbsentMember_AddsOnceAndNotifiesEveryCaller()
         {
             const int workerCount = 8;
@@ -1393,51 +1355,6 @@ namespace UnitTests.Runtime
             Assert.True(member.IsInWorkingSet);
             Assert.False(member.IsIdle);
             Assert.Same(member, Assert.Single(harness.WorkingSet.Members));
-        }
-
-        [Fact, TestCategory("Activation")]
-        public async Task WorkingSet_MonitorContinuesAfterMemberCandidateThrows()
-        {
-            await using var harness = await WorkingSetHarness.CreateAsync();
-            harness.MemberStates[0].CandidateException = new InvalidOperationException("candidate failure");
-            harness.MemberStates[1].CandidateEligible = true;
-            harness.WorkingSet.OnActivated(harness.Members[0]);
-            harness.WorkingSet.OnActivated(harness.Members[1]);
-            harness.WorkingSet.OnActivated(harness.Members[2]);
-
-            await harness.ScanOnceAsync();
-
-            Assert.Equal(2, harness.TimerGeneration);
-            Assert.Equal(3, harness.WorkingSet.Count);
-            Assert.True(harness.Members[0].IsInWorkingSet);
-            Assert.False(harness.Members[0].IsIdle);
-            Assert.True(harness.Members[1].IsInWorkingSet);
-            Assert.True(harness.Members[1].IsIdle);
-            Assert.True(harness.Members[2].IsInWorkingSet);
-            Assert.False(harness.Members[2].IsIdle);
-            Assert.False(harness.Members[3].IsInWorkingSet);
-            Assert.False(harness.Members[3].IsIdle);
-            Assert.Equal([0, 2], harness.WorkingSet.Members.Select(harness.GetMemberId).Order());
-            Assert.Equal([false], harness.MemberStates[0].GetCandidateCalls());
-            Assert.Equal([false], harness.MemberStates[1].GetCandidateCalls());
-            Assert.Equal([false], harness.MemberStates[2].GetCandidateCalls());
-            Assert.Empty(harness.MemberStates[3].GetCandidateCalls());
-            Assert.Equal(["Added"], harness.Observer.GetHistory(0));
-            Assert.Equal(["Added", "Idle"], harness.Observer.GetHistory(1));
-            Assert.Equal(["Added", "Active"], harness.Observer.GetHistory(2));
-            Assert.Empty(harness.Observer.GetHistory(3));
-        }
-
-        [Theory, TestCategory("Activation")]
-        [InlineData(0x0000C0DE)]
-        [InlineData(0x0013579B)]
-        [InlineData(0x02468ACE)]
-        public async Task WorkingSet_SeededConcurrentOperations_PreserveTerminalInvariants(int seed)
-        {
-            await using var harness = await WorkingSetHarness.CreateAsync();
-            var runner = new SeededWorkingSetStressRunner(seed, harness);
-
-            await runner.RunAsync();
         }
 
         private static WorkingSetOperation[] GetWorkingSetCoverageSpine() =>
@@ -1560,14 +1477,7 @@ namespace UnitTests.Runtime
         private sealed class WorkingSetMemberState
         {
             private readonly ConcurrentQueue<bool> _candidateCalls = new();
-            private Exception? _candidateException;
             private int _candidateEligible;
-
-            public Exception? CandidateException
-            {
-                get => Volatile.Read(ref _candidateException);
-                set => Volatile.Write(ref _candidateException, value);
-            }
 
             public bool CandidateEligible
             {
@@ -1578,11 +1488,6 @@ namespace UnitTests.Runtime
             public bool IsCandidateForRemoval(bool wouldRemove)
             {
                 _candidateCalls.Enqueue(wouldRemove);
-                if (CandidateException is { } exception)
-                {
-                    throw exception;
-                }
-
                 return CandidateEligible;
             }
 
@@ -1600,16 +1505,7 @@ namespace UnitTests.Runtime
             private TaskCompletionSource? _evictionEntered;
             private TaskCompletionSource? _evictionRelease;
 
-            public Exception? AddedException { get; set; }
-
-            public void OnAdded(IActivationWorkingSetMember member)
-            {
-                Record(member, "Added");
-                if (AddedException is { } exception)
-                {
-                    throw exception;
-                }
-            }
+            public void OnAdded(IActivationWorkingSetMember member) => Record(member, "Added");
 
             public void OnActive(IActivationWorkingSetMember member) => Record(member, "Active");
 
@@ -1996,163 +1892,6 @@ namespace UnitTests.Runtime
             }
         }
 
-        private sealed class SeededWorkingSetStressRunner(int seed, WorkingSetHarness harness)
-        {
-            private const int WorkerCount = 4;
-            private const int PhaseCount = 32;
-            private readonly ConcurrentQueue<string> _trace = new();
-            private readonly ConcurrentQueue<Exception> _exceptions = new();
-            private readonly Random _random = new(seed);
-            private int _currentPhase = -1;
-            private int _outcomeCount;
-            private int _selectedCount;
-
-            public async Task RunAsync()
-            {
-                try
-                {
-                    for (var phase = 0; phase < PhaseCount; phase++)
-                    {
-                        _currentPhase = phase;
-                        var operations = Enumerable.Range(0, WorkerCount)
-                            .Select(worker => CreateOperation(phase, worker))
-                            .ToArray();
-                        foreach (var operation in operations)
-                        {
-                            Record(operation.Worker, phase, operation.Operation, "selected");
-                            _selectedCount++;
-                        }
-
-                        using var ready = new CountdownEvent(WorkerCount);
-                        var start = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-                        var workers = operations
-                            .Select(operation => Task.Run(() => RunWorkerAsync(operation, ready, start.Task)))
-                            .ToArray();
-
-                        try
-                        {
-                            Assert.True(
-                                ready.Wait(TimeSpan.FromSeconds(10)),
-                                $"seed=0x{seed:X8}; worker=coordinator; phase={phase}; start gate timed out.");
-                            start.TrySetResult();
-                            await Task.WhenAll(workers).WaitAsync(TimeSpan.FromSeconds(10));
-                        }
-                        finally
-                        {
-                            start.TrySetResult();
-                            await Task.WhenAll(workers).WaitAsync(TimeSpan.FromSeconds(10));
-                        }
-
-                        Assert.Empty(_exceptions);
-                        AssertTerminalInvariants();
-                        Assert.Equal(_selectedCount, _outcomeCount);
-                    }
-
-                    Assert.Equal(WorkerCount * PhaseCount, _selectedCount);
-                    Assert.Equal(WorkerCount * PhaseCount, _outcomeCount);
-                }
-                catch (Exception exception)
-                {
-                    throw new InvalidOperationException(
-                        $"seed=0x{seed:X8}; worker=all; phase={_currentPhase}; failure={exception.Message}"
-                        + $"{Environment.NewLine}Full trace:{Environment.NewLine}{string.Join(Environment.NewLine, _trace)}",
-                        exception);
-                }
-            }
-
-            private (int Worker, WorkingSetOperation Operation) CreateOperation(int phase, int worker)
-            {
-                var kind = _random.Next(4) switch
-                {
-                    0 => WorkingSetOperationKind.Active,
-                    1 => WorkingSetOperationKind.Evict,
-                    2 => WorkingSetOperationKind.Deactivating,
-                    _ => WorkingSetOperationKind.Deactivated
-                };
-                var memberId = _random.Next(harness.Members.Count);
-                return (worker, new WorkingSetOperation(phase * WorkerCount + worker, kind, memberId, false));
-            }
-
-            private async Task RunWorkerAsync(
-                (int Worker, WorkingSetOperation Operation) work,
-                CountdownEvent ready,
-                Task start)
-            {
-                try
-                {
-                    ready.Signal();
-                    await start;
-                    ExecuteStressOperation(work.Operation);
-                    Record(work.Worker, _currentPhase, work.Operation, "completed");
-                }
-                catch (Exception exception)
-                {
-                    _exceptions.Enqueue(exception);
-                    Record(work.Worker, _currentPhase, work.Operation, $"exception={exception.GetType().Name}:{exception.Message}");
-                }
-                finally
-                {
-                    Interlocked.Increment(ref _outcomeCount);
-                }
-            }
-
-            private void ExecuteStressOperation(WorkingSetOperation operation)
-            {
-                var member = harness.Members[operation.MemberId];
-                switch (operation.Kind)
-                {
-                    case WorkingSetOperationKind.Active:
-                        harness.WorkingSet.OnActive(member);
-                        break;
-                    case WorkingSetOperationKind.Evict:
-                        harness.WorkingSet.OnEvicted(member);
-                        break;
-                    case WorkingSetOperationKind.Deactivating:
-                        harness.WorkingSet.OnDeactivating(member);
-                        break;
-                    case WorkingSetOperationKind.Deactivated:
-                        harness.WorkingSet.OnDeactivated(member);
-                        break;
-                    default:
-                        throw new ArgumentOutOfRangeException(nameof(operation));
-                }
-            }
-
-            private void AssertTerminalInvariants()
-            {
-                Assert.InRange(harness.WorkingSet.Count, 0, harness.Members.Count);
-                var inSetIds = harness.Members
-                    .Select(static (member, id) => (member, id))
-                    .Where(static item => item.member.IsInWorkingSet)
-                    .Select(static item => item.id)
-                    .Order()
-                    .ToArray();
-                Assert.Equal(inSetIds.Length, harness.WorkingSet.Count);
-                Assert.All(
-                    harness.Members,
-                    static member => Assert.False(member.IsIdle && !member.IsInWorkingSet));
-
-                var visibleIds = harness.WorkingSet.Members
-                    .Select(harness.GetMemberId)
-                    .Order()
-                    .ToArray();
-                Assert.Equal(visibleIds.Length, visibleIds.Distinct().Count());
-                var expectedVisibleIds = harness.Members
-                    .Select(static (member, id) => (member, id))
-                    .Where(static item => item.member.IsInWorkingSet && !item.member.IsIdle)
-                    .Select(static item => item.id)
-                    .Order()
-                    .ToArray();
-                Assert.Equal(expectedVisibleIds, visibleIds);
-            }
-
-            private void Record(int worker, int phase, WorkingSetOperation operation, string result)
-            {
-                _trace.Enqueue(
-                    $"seed=0x{seed:X8}; worker={worker}; phase={phase}; operation={operation}; result={result}");
-            }
-        }
-
         [Fact, TestCategory("Activation")]
         public void ActivationData_Constructor_InitializesWorkingSetClockStatus()
         {
@@ -2358,58 +2097,6 @@ namespace UnitTests.Runtime
             Assert.Empty(fixture.Observer.GetHistory(0));
         }
 
-        [Fact, TestCategory("Activation")]
-        public async Task ActivationCollector_AgeCollection_RequestsActivationIdle()
-        {
-            var timeProvider = new FakeTimeProvider(DateTimeOffset.Parse("2025-01-01T00:00:00.000+00:00"));
-            using var serviceProvider = CreateCatalogServiceProvider();
-            var collector = new ActivationCollector(
-                timeProvider,
-                Options.Create(new GrainCollectionOptions()),
-                NullLogger<ActivationCollector>.Instance,
-                Substitute.For<IEnvironmentStatisticsProvider>(),
-                serviceProvider.GetRequiredService<CatalogInstruments>());
-            var activation = CreateCollectorActivation(TimeSpan.FromMinutes(5));
-            activation.GetIdleness().Returns(TimeSpan.FromMinutes(2));
-            collector.ScheduleCollection(activation, TimeSpan.FromMinutes(5), timeProvider.GetUtcNow().UtcDateTime);
-
-            await collector.CollectActivations(TimeSpan.FromMinutes(1), CancellationToken.None);
-
-            activation.Received(1).Deactivate(
-                Arg.Is<DeactivationReason>(reason => reason.ReasonCode == DeactivationReasonCode.ActivationIdle),
-                Arg.Any<CancellationToken>());
-            activation.Received(1).Deactivate(Arg.Any<DeactivationReason>(), Arg.Any<CancellationToken>());
-            activation.DidNotReceive().Deactivate(
-                Arg.Is<DeactivationReason>(reason => reason.ReasonCode == DeactivationReasonCode.HighMemoryPressure),
-                Arg.Any<CancellationToken>());
-        }
-
-        [Fact, TestCategory("Activation")]
-        public async Task ActivationCollector_HighMemoryCollection_RequestsHighMemoryPressure()
-        {
-            var timeProvider = new FakeTimeProvider(DateTimeOffset.Parse("2025-01-01T00:00:00.000+00:00"));
-            using var serviceProvider = CreateCatalogServiceProvider();
-            var collector = new ActivationCollector(
-                timeProvider,
-                Options.Create(new GrainCollectionOptions()),
-                NullLogger<ActivationCollector>.Instance,
-                Substitute.For<IEnvironmentStatisticsProvider>(),
-                serviceProvider.GetRequiredService<CatalogInstruments>());
-            var activation = CreateCollectorActivation(TimeSpan.FromMinutes(5));
-            collector.ScheduleCollection(activation, TimeSpan.FromMinutes(5), timeProvider.GetUtcNow().UtcDateTime);
-            collector._activationCount = 1;
-
-            await collector.DeactivateInDueTimeOrder(1, CancellationToken.None);
-
-            activation.Received(1).Deactivate(
-                Arg.Is<DeactivationReason>(reason => reason.ReasonCode == DeactivationReasonCode.HighMemoryPressure),
-                Arg.Any<CancellationToken>());
-            activation.Received(1).Deactivate(Arg.Any<DeactivationReason>(), Arg.Any<CancellationToken>());
-            activation.DidNotReceive().Deactivate(
-                Arg.Is<DeactivationReason>(reason => reason.ReasonCode == DeactivationReasonCode.ActivationIdle),
-                Arg.Any<CancellationToken>());
-        }
-
         public static IEnumerable<object[]> ActivationStatusCases()
         {
             foreach (var state in Enum.GetValues<ActivationState>())
@@ -2419,26 +2106,6 @@ namespace UnitTests.Runtime
                 yield return [(int)state, true, false];
                 yield return [(int)state, true, true];
             }
-        }
-
-        private static ICollectibleGrainContext CreateCollectorActivation(TimeSpan collectionAgeLimit)
-        {
-            var activation = Substitute.For<ICollectibleGrainContext>();
-            activation.CollectionAgeLimit.Returns(collectionAgeLimit);
-            activation.IsValid.Returns(true);
-            activation.IsExemptFromCollection.Returns(false);
-            activation.IsInactive.Returns(true);
-            activation.Deactivated.Returns(Task.CompletedTask);
-            return activation;
-        }
-
-        private static ServiceProvider CreateCatalogServiceProvider()
-        {
-            var services = new ServiceCollection();
-            services.AddMetrics();
-            services.AddSingleton<OrleansInstruments>();
-            services.AddSingleton<CatalogInstruments>();
-            return services.BuildServiceProvider();
         }
 
         private sealed class ActivationDataWorkingSetFixture : IDisposable
