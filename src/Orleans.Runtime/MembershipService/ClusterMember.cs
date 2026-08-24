@@ -110,10 +110,11 @@ namespace Orleans.Runtime
             && this.SiloAddress.Equals(other.SiloAddress)
             && this.Status == other.Status
             && string.Equals(this.Name, other.Name, StringComparison.Ordinal)
+            && this.WasDeclaredDead == other.WasDeclaredDead
             && MetadataEquals(this.Metadata, other.Metadata);
 
         /// <inheritdoc/>
-        public override int GetHashCode() => this.SiloAddress.GetConsistentHashCode();
+        public override int GetHashCode() => HashCode.Combine(this.SiloAddress.GetConsistentHashCode(), this.WasDeclaredDead);
 
         /// <inheritdoc/>
         public override string ToString() => $"{this.SiloAddress}/{this.Name}/{this.Status}/MetadataAvailable={this.IsMetadataAvailable}/MetadataCount={this.Metadata?.Metadata.Count ?? 0}";

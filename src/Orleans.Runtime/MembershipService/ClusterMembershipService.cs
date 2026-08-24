@@ -40,7 +40,7 @@ namespace Orleans.Runtime
             get
             {
                 var tableSnapshot = this.membershipManager.CurrentSnapshot;
-                if (ReferenceEquals(this.tableSnapshot, tableSnapshot))
+                if (ReferenceEquals(Volatile.Read(ref this.tableSnapshot), tableSnapshot))
                 {
                     return this.snapshot;
                 }

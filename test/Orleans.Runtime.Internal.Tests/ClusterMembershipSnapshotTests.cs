@@ -152,6 +152,20 @@ public class ClusterMembershipSnapshotTests
     }
 
     [Fact]
+    public void CreateUpdate_IncludesDeathClassificationOnlyChanges()
+    {
+        var silo = CreateSiloAddress(1);
+        var previousMember = new ClusterMember(silo, SiloStatus.Dead, "silo", wasDeclaredDead: false);
+        var currentMember = new ClusterMember(silo, SiloStatus.Dead, "silo", wasDeclaredDead: true);
+        var previous = CreateSnapshot(previousMember, version: 1);
+        var current = CreateSnapshot(currentMember, version: 2);
+
+        Assert.NotEqual(previousMember, currentMember);
+        var change = Assert.Single(current.CreateUpdate(previous).Changes);
+        Assert.True(change.WasDeclaredDead);
+    }
+
+    [Fact]
     public void CreateUpdate_IncludesSameVersionMetadataEnrichment()
     {
         var silo = CreateSiloAddress(1);
