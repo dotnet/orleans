@@ -135,6 +135,7 @@ namespace Orleans.Runtime
             Dictionary<string, object>? requestContextData,
             MigrationContext? rehydrationContext)
         {
+            PreparedGrainContext preparedContext = default;
             if (TryGetGrainContext(grainId, out var result))
             {
                 rehydrationContext?.Dispose();
@@ -164,7 +165,8 @@ namespace Orleans.Runtime
                         MembershipVersion = MembershipVersion.MinValue,
                     };
 
-                    result = this.grainActivator.CreateContext(address);
+                    preparedContext = this.grainActivator.CreatePreparedContext(address);
+                    result = preparedContext.Context;
                     activations.RecordNewTarget(result);
                 }
             } // End lock
@@ -175,7 +177,7 @@ namespace Orleans.Runtime
                 return UnableToCreateActivation(this, grainId);
             }
 
-            IDisposable? activationStartup;
+            IDisposable activationStartup;
             var startAttempted = false;
             try
             {
@@ -199,7 +201,7 @@ namespace Orleans.Runtime
                 }
 
                 startAttempted = true;
-                activationStartup = result.Start();
+                activationStartup = preparedContext.Start();
             }
             catch (Exception exception)
             {
@@ -222,7 +224,7 @@ namespace Orleans.Runtime
 
                     try
                     {
-                        using var startup = result.Start();
+                        using var startup = preparedContext.Start();
                     }
                     catch (Exception cleanupException)
                     {
