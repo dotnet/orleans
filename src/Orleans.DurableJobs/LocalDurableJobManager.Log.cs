@@ -50,7 +50,7 @@ internal partial class LocalDurableJobManager
 
     [LoggerMessage(
         Level = LogLevel.Warning,
-        Message = "Cancellation request for job {JobId} (Name: '{JobName}') was not recorded because shard {ShardId} was not found"
+        Message = "Cancellation request for job {JobId} (Name: '{JobName}') was not recorded for shard {ShardId}"
     )]
     private static partial void LogJobCancellationRequestNotRecorded(ILogger logger, string jobId, string jobName, string shardId);
 
