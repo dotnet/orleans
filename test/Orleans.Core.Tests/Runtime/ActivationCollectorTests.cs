@@ -1,4 +1,5 @@
 using System.Collections.Concurrent;
+using System.Diagnostics.CodeAnalysis;
 using System.Reflection;
 using System.Runtime.CompilerServices;
 using Microsoft.Extensions.DependencyInjection;
@@ -1174,30 +1175,6 @@ namespace UnitTests.Runtime
             observer.DidNotReceive().OnActive(member);
         }
 
-        [Fact, TestCategory("Activation")]
-        public void ActivationStatus_PreservesLifecycleStateAcrossWorkingSetTransitions()
-        {
-            var activation = (ActivationData)RuntimeHelpers.GetUninitializedObject(typeof(ActivationData));
-            var workingSetState = (IActivationWorkingSetMember)activation;
-
-            lock (activation)
-            {
-                activation.SetState(ActivationState.Valid);
-                workingSetState.IsInWorkingSet = true;
-                workingSetState.IsIdle = true;
-                Assert.Equal(ActivationState.Valid, activation.State);
-                Assert.True(workingSetState.IsInWorkingSet);
-                Assert.True(workingSetState.IsIdle);
-
-                activation.SetState(ActivationState.Deactivating);
-                workingSetState.IsInWorkingSet = false;
-                workingSetState.IsIdle = false;
-                Assert.Equal(ActivationState.Deactivating, activation.State);
-                Assert.False(workingSetState.IsInWorkingSet);
-                Assert.False(workingSetState.IsIdle);
-            }
-        }
-
         private IActivationWorkingSetMember PrepareActivation(int collectionAgeLimitMinutes, ActivationCollector collector)
             => PrepareActivation(TimeSpan.FromMinutes(collectionAgeLimitMinutes), collector);
 
@@ -1271,6 +1248,1292 @@ namespace UnitTests.Runtime
                 return isCandidateForRemoval?.Invoke(wouldRemove) ?? false;
             }
 
+        }
+
+        [Fact, TestCategory("Activation")]
+        public void WorkingSet_SequentialGeneratedTrace_MatchesReferenceModel()
+        {
+            var generatedOperation = CsCheck.Gen.Select(
+                CsCheck.Gen.Int[0, 7],
+                CsCheck.Gen.Int[0, 3],
+                CsCheck.Gen.Bool,
+                static (kind, memberId, candidateEligible) =>
+                    new WorkingSetOperation(0, (WorkingSetOperationKind)kind, memberId, candidateEligible));
+            var traceGenerator = CsCheck.Gen.SelectMany(
+                CsCheck.Gen.Int[0, 64],
+                length => CsCheck.Gen.Select(
+                    generatedOperation.Array[length],
+                    static generated => GetWorkingSetCoverageSpine()
+                        .Concat(generated)
+                        .Select(static (operation, index) => operation with { Index = index })
+                        .ToArray()));
+
+            CsCheck.Check.Sample(
+                traceGenerator,
+                RunSequentialWorkingSetTrace,
+                seed: "0N0XIzNsQ0O2",
+                iter: 100,
+                threads: 1,
+                print: FormatWorkingSetTrace);
+        }
+
+        [Fact, TestCategory("Activation")]
+        public async Task WorkingSet_DuplicateOnActivated_ThrowsWithoutChangingCommittedState()
+        {
+            await using var harness = await WorkingSetHarness.CreateAsync();
+            var member = harness.Members[0];
+            harness.WorkingSet.OnActivated(member);
+            var expectedMembers = harness.WorkingSet.Members.ToArray();
+            var expectedHistory = harness.Observer.GetHistory(0);
+
+            var exception = Assert.Throws<InvalidOperationException>(() => harness.WorkingSet.OnActivated(member));
+
+            Assert.Contains("already a member of the working set", exception.Message);
+            Assert.Equal(1, harness.WorkingSet.Count);
+            Assert.True(member.IsInWorkingSet);
+            Assert.False(member.IsIdle);
+            Assert.Equal(expectedMembers, harness.WorkingSet.Members);
+            Assert.Equal(["Added"], expectedHistory);
+            Assert.Equal(expectedHistory, harness.Observer.GetHistory(0));
+        }
+
+        [Fact, TestCategory("Activation")]
+        public async Task WorkingSet_DirectObserverFailure_PropagatesAfterTransitionIsCommitted()
+        {
+            await using var harness = await WorkingSetHarness.CreateAsync();
+            var member = harness.Members[0];
+            var expectedException = new InvalidOperationException("observer failure");
+            harness.Observer.AddedException = expectedException;
+
+            var actualException = Record.Exception(() => harness.WorkingSet.OnActivated(member));
+
+            Assert.Same(expectedException, actualException);
+            Assert.Equal(1, harness.WorkingSet.Count);
+            Assert.True(member.IsInWorkingSet);
+            Assert.False(member.IsIdle);
+            Assert.Same(member, Assert.Single(harness.WorkingSet.Members));
+            Assert.Equal(["Added"], harness.Observer.GetHistory(0));
+        }
+
+        [Fact, TestCategory("Activation")]
+        public async Task WorkingSet_ConcurrentOnActiveForAbsentMember_AddsOnceAndNotifiesEveryCaller()
+        {
+            const int workerCount = 8;
+            await using var harness = await WorkingSetHarness.CreateAsync();
+            var member = harness.Members[0];
+            using var ready = new CountdownEvent(workerCount);
+            var start = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            var workers = Enumerable.Range(0, workerCount).Select(worker => Task.Run(async () =>
+            {
+                ready.Signal();
+                await start.Task;
+                harness.WorkingSet.OnActive(member);
+            })).ToArray();
+
+            try
+            {
+                Assert.True(ready.Wait(TimeSpan.FromSeconds(10)), "Workers did not reach the OnActive start gate.");
+                start.TrySetResult();
+                await Task.WhenAll(workers).WaitAsync(TimeSpan.FromSeconds(10));
+            }
+            finally
+            {
+                start.TrySetResult();
+                await Task.WhenAll(workers).WaitAsync(TimeSpan.FromSeconds(10));
+            }
+
+            Assert.Equal(1, harness.WorkingSet.Count);
+            Assert.True(member.IsInWorkingSet);
+            Assert.False(member.IsIdle);
+            Assert.Same(member, Assert.Single(harness.WorkingSet.Members));
+            Assert.Equal(Enumerable.Repeat("Active", workerCount), harness.Observer.GetHistory(0));
+            Assert.Equal(0, harness.Observer.Count("Added"));
+            Assert.Equal(workerCount, harness.Observer.Count("Active"));
+            Assert.Equal(0, harness.Observer.Count("Idle"));
+            Assert.Equal(0, harness.Observer.Count("Evicted"));
+            Assert.Equal(0, harness.Observer.Count("Deactivating"));
+            Assert.Equal(0, harness.Observer.Count("Deactivated"));
+        }
+
+        [Fact, TestCategory("Activation")]
+        public async Task WorkingSet_EvictionCallbackCanOverlapReAddWithoutHoldingMemberLock()
+        {
+            await using var harness = await WorkingSetHarness.CreateAsync();
+            var member = harness.Members[0];
+            harness.WorkingSet.OnActivated(member);
+            harness.Observer.Clear();
+            var gate = harness.Observer.ArmEvictionGate(0);
+            var eviction = Task.Run(() => harness.WorkingSet.OnEvicted(member));
+            Task? reAdd = null;
+            try
+            {
+                await gate.Entered.Task.WaitAsync(TimeSpan.FromSeconds(10));
+                reAdd = Task.Run(() => harness.WorkingSet.OnActive(member));
+                await reAdd.WaitAsync(TimeSpan.FromSeconds(10));
+                Assert.Equal(1, harness.WorkingSet.Count);
+                Assert.True(member.IsInWorkingSet);
+                Assert.False(member.IsIdle);
+                Assert.Same(member, Assert.Single(harness.WorkingSet.Members));
+                Assert.Equal(["EvictedStarted", "Active"], harness.Observer.GetHistory(0));
+            }
+            finally
+            {
+                gate.Release.TrySetResult();
+                if (reAdd is not null)
+                {
+                    await reAdd.WaitAsync(TimeSpan.FromSeconds(10));
+                }
+
+                await eviction.WaitAsync(TimeSpan.FromSeconds(10));
+            }
+
+            Assert.Equal(["EvictedStarted", "Active", "EvictedCompleted"], harness.Observer.GetHistory(0));
+            Assert.Equal(0, harness.Observer.Count("Added"));
+            Assert.Equal(1, harness.WorkingSet.Count);
+            Assert.True(member.IsInWorkingSet);
+            Assert.False(member.IsIdle);
+            Assert.Same(member, Assert.Single(harness.WorkingSet.Members));
+        }
+
+        [Fact, TestCategory("Activation")]
+        public async Task WorkingSet_MonitorContinuesAfterMemberCandidateThrows()
+        {
+            await using var harness = await WorkingSetHarness.CreateAsync();
+            harness.MemberStates[0].CandidateException = new InvalidOperationException("candidate failure");
+            harness.MemberStates[1].CandidateEligible = true;
+            harness.WorkingSet.OnActivated(harness.Members[0]);
+            harness.WorkingSet.OnActivated(harness.Members[1]);
+            harness.WorkingSet.OnActivated(harness.Members[2]);
+
+            await harness.ScanOnceAsync();
+
+            Assert.Equal(2, harness.TimerGeneration);
+            Assert.Equal(3, harness.WorkingSet.Count);
+            Assert.True(harness.Members[0].IsInWorkingSet);
+            Assert.False(harness.Members[0].IsIdle);
+            Assert.True(harness.Members[1].IsInWorkingSet);
+            Assert.True(harness.Members[1].IsIdle);
+            Assert.True(harness.Members[2].IsInWorkingSet);
+            Assert.False(harness.Members[2].IsIdle);
+            Assert.False(harness.Members[3].IsInWorkingSet);
+            Assert.False(harness.Members[3].IsIdle);
+            Assert.Equal([0, 2], harness.WorkingSet.Members.Select(harness.GetMemberId).Order());
+            Assert.Equal([false], harness.MemberStates[0].GetCandidateCalls());
+            Assert.Equal([false], harness.MemberStates[1].GetCandidateCalls());
+            Assert.Equal([false], harness.MemberStates[2].GetCandidateCalls());
+            Assert.Empty(harness.MemberStates[3].GetCandidateCalls());
+            Assert.Equal(["Added"], harness.Observer.GetHistory(0));
+            Assert.Equal(["Added", "Idle"], harness.Observer.GetHistory(1));
+            Assert.Equal(["Added", "Active"], harness.Observer.GetHistory(2));
+            Assert.Empty(harness.Observer.GetHistory(3));
+        }
+
+        [Theory, TestCategory("Activation")]
+        [InlineData(0x0000C0DE)]
+        [InlineData(0x0013579B)]
+        [InlineData(0x02468ACE)]
+        public async Task WorkingSet_SeededConcurrentOperations_PreserveTerminalInvariants(int seed)
+        {
+            await using var harness = await WorkingSetHarness.CreateAsync();
+            var runner = new SeededWorkingSetStressRunner(seed, harness);
+
+            await runner.RunAsync();
+        }
+
+        private static WorkingSetOperation[] GetWorkingSetCoverageSpine() =>
+        [
+            new(0, WorkingSetOperationKind.Activate, 0, false),
+            new(0, WorkingSetOperationKind.Active, 0, false),
+            new(0, WorkingSetOperationKind.SetCandidate, 0, false),
+            new(0, WorkingSetOperationKind.Scan, 0, false),
+            new(0, WorkingSetOperationKind.SetCandidate, 0, true),
+            new(0, WorkingSetOperationKind.Scan, 0, false),
+            new(0, WorkingSetOperationKind.Scan, 0, false),
+            new(0, WorkingSetOperationKind.Activate, 1, false),
+            new(0, WorkingSetOperationKind.Evict, 1, false),
+            new(0, WorkingSetOperationKind.Activate, 1, false),
+            new(0, WorkingSetOperationKind.Deactivating, 1, false),
+            new(0, WorkingSetOperationKind.Deactivated, 1, false),
+            new(0, WorkingSetOperationKind.Active, 2, false),
+            new(0, WorkingSetOperationKind.DeactivatePair, 2, false),
+            new(0, WorkingSetOperationKind.Activate, 3, false),
+            new(0, WorkingSetOperationKind.Evict, 3, false)
+        ];
+
+        private static string FormatWorkingSetTrace(WorkingSetOperation[] trace)
+            => string.Join(Environment.NewLine, trace.Select(static operation => operation.ToString()));
+
+        private static void RunSequentialWorkingSetTrace(WorkingSetOperation[] trace)
+        {
+            var harness = WorkingSetHarness.CreateAsync().GetAwaiter().GetResult();
+            try
+            {
+                var model = new WorkingSetReferenceModel(harness.Members.Count);
+                model.AssertMatches(harness);
+                foreach (var operation in trace)
+                {
+                    var expectedDuplicate = model.Apply(operation);
+                    var actualDuplicate = ExecuteWorkingSetOperation(harness, operation, expectedDuplicate);
+                    Assert.Equal(expectedDuplicate, actualDuplicate);
+                    model.AssertMatches(harness);
+                }
+            }
+            finally
+            {
+                harness.DisposeAsync().AsTask().GetAwaiter().GetResult();
+            }
+        }
+
+        private static bool ExecuteWorkingSetOperation(
+            WorkingSetHarness harness,
+            WorkingSetOperation operation,
+            bool expectedDuplicate)
+        {
+            var member = harness.Members[operation.MemberId];
+            switch (operation.Kind)
+            {
+                case WorkingSetOperationKind.Activate:
+                {
+                    var exception = Record.Exception(() => harness.WorkingSet.OnActivated(member));
+                    if (expectedDuplicate)
+                    {
+                        Assert.IsType<InvalidOperationException>(exception);
+                    }
+                    else if (exception is not null)
+                    {
+                        System.Runtime.ExceptionServices.ExceptionDispatchInfo.Capture(exception).Throw();
+                    }
+
+                    return exception is not null;
+                }
+                case WorkingSetOperationKind.Active:
+                    harness.WorkingSet.OnActive(member);
+                    break;
+                case WorkingSetOperationKind.SetCandidate:
+                    harness.MemberStates[operation.MemberId].CandidateEligible = operation.CandidateEligible;
+                    break;
+                case WorkingSetOperationKind.Scan:
+                    harness.ScanOnceAsync().GetAwaiter().GetResult();
+                    break;
+                case WorkingSetOperationKind.Evict:
+                    harness.WorkingSet.OnEvicted(member);
+                    break;
+                case WorkingSetOperationKind.Deactivating:
+                    harness.WorkingSet.OnDeactivating(member);
+                    break;
+                case WorkingSetOperationKind.Deactivated:
+                    harness.WorkingSet.OnDeactivated(member);
+                    break;
+                case WorkingSetOperationKind.DeactivatePair:
+                    harness.WorkingSet.OnDeactivating(member);
+                    harness.WorkingSet.OnDeactivated(member);
+                    break;
+                default:
+                    throw new ArgumentOutOfRangeException(nameof(operation));
+            }
+
+            return false;
+        }
+
+        private enum WorkingSetOperationKind
+        {
+            Activate,
+            Active,
+            SetCandidate,
+            Scan,
+            Evict,
+            Deactivating,
+            Deactivated,
+            DeactivatePair
+        }
+
+        private readonly record struct WorkingSetOperation(
+            int Index,
+            WorkingSetOperationKind Kind,
+            int MemberId,
+            bool CandidateEligible)
+        {
+            public override string ToString()
+                => $"#{Index}: {Kind}(member={MemberId}, candidateEligible={CandidateEligible})";
+        }
+
+        private sealed class WorkingSetMemberState
+        {
+            private readonly ConcurrentQueue<bool> _candidateCalls = new();
+            private Exception? _candidateException;
+            private int _candidateEligible;
+
+            public Exception? CandidateException
+            {
+                get => Volatile.Read(ref _candidateException);
+                set => Volatile.Write(ref _candidateException, value);
+            }
+
+            public bool CandidateEligible
+            {
+                get => Volatile.Read(ref _candidateEligible) != 0;
+                set => Volatile.Write(ref _candidateEligible, value ? 1 : 0);
+            }
+
+            public bool IsCandidateForRemoval(bool wouldRemove)
+            {
+                _candidateCalls.Enqueue(wouldRemove);
+                if (CandidateException is { } exception)
+                {
+                    throw exception;
+                }
+
+                return CandidateEligible;
+            }
+
+            public bool[] GetCandidateCalls() => _candidateCalls.ToArray();
+        }
+
+        private sealed class RecordingWorkingSetObserver(
+            Func<IActivationWorkingSetMember, int> getMemberId,
+            int memberCount) : IActivationWorkingSetObserver
+        {
+            private readonly ConcurrentQueue<string>[] _history =
+                Enumerable.Range(0, memberCount).Select(static _ => new ConcurrentQueue<string>()).ToArray();
+            private readonly object _gateLock = new();
+            private int _gatedMemberId = -1;
+            private TaskCompletionSource? _evictionEntered;
+            private TaskCompletionSource? _evictionRelease;
+
+            public Exception? AddedException { get; set; }
+
+            public void OnAdded(IActivationWorkingSetMember member)
+            {
+                Record(member, "Added");
+                if (AddedException is { } exception)
+                {
+                    throw exception;
+                }
+            }
+
+            public void OnActive(IActivationWorkingSetMember member) => Record(member, "Active");
+
+            public void OnIdle(IActivationWorkingSetMember member) => Record(member, "Idle");
+
+            public void OnEvicted(IActivationWorkingSetMember member)
+            {
+                var memberId = getMemberId(member);
+                TaskCompletionSource? entered;
+                TaskCompletionSource? release;
+                lock (_gateLock)
+                {
+                    entered = memberId == _gatedMemberId ? _evictionEntered : null;
+                    release = memberId == _gatedMemberId ? _evictionRelease : null;
+                }
+
+                if (entered is null || release is null)
+                {
+                    Record(memberId, "Evicted");
+                    return;
+                }
+
+                Record(memberId, "EvictedStarted");
+                entered.TrySetResult();
+                release.Task.GetAwaiter().GetResult();
+                Record(memberId, "EvictedCompleted");
+            }
+
+            public void OnDeactivating(IActivationWorkingSetMember member) => Record(member, "Deactivating");
+
+            public void OnDeactivated(IActivationWorkingSetMember member) => Record(member, "Deactivated");
+
+            public (TaskCompletionSource Entered, TaskCompletionSource Release) ArmEvictionGate(int memberId)
+            {
+                var entered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+                var release = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+                lock (_gateLock)
+                {
+                    _gatedMemberId = memberId;
+                    _evictionEntered = entered;
+                    _evictionRelease = release;
+                }
+
+                return (entered, release);
+            }
+
+            public string[] GetHistory(int memberId) => _history[memberId].ToArray();
+
+            public int Count(string eventName)
+                => _history.Sum(history => history.Count(item => string.Equals(item, eventName, StringComparison.Ordinal)));
+
+            public void Clear()
+            {
+                foreach (var history in _history)
+                {
+                    while (history.TryDequeue(out _))
+                    {
+                    }
+                }
+            }
+
+            private void Record(IActivationWorkingSetMember member, string eventName)
+                => Record(getMemberId(member), eventName);
+
+            private void Record(int memberId, string eventName) => _history[memberId].Enqueue(eventName);
+        }
+
+        private sealed class WorkingSetReferenceModel
+        {
+            private readonly ModelMember[] _members;
+
+            public WorkingSetReferenceModel(int memberCount)
+            {
+                _members = Enumerable.Range(0, memberCount).Select(static _ => new ModelMember()).ToArray();
+            }
+
+            public bool Apply(WorkingSetOperation operation)
+            {
+                var member = _members[operation.MemberId];
+                switch (operation.Kind)
+                {
+                    case WorkingSetOperationKind.Activate:
+                        if (member.Present)
+                        {
+                            return true;
+                        }
+
+                        member.Present = true;
+                        member.IsInWorkingSet = true;
+                        member.IsIdle = false;
+                        member.History.Add("Added");
+                        break;
+                    case WorkingSetOperationKind.Active:
+                        member.Present = true;
+                        member.IsInWorkingSet = true;
+                        member.IsIdle = false;
+                        member.History.Add("Active");
+                        break;
+                    case WorkingSetOperationKind.SetCandidate:
+                        member.CandidateEligible = operation.CandidateEligible;
+                        break;
+                    case WorkingSetOperationKind.Scan:
+                        foreach (var scanMember in _members)
+                        {
+                            Scan(scanMember);
+                        }
+
+                        break;
+                    case WorkingSetOperationKind.Evict:
+                        Evict(member);
+                        break;
+                    case WorkingSetOperationKind.Deactivating:
+                        Evict(member);
+                        member.History.Add("Deactivating");
+                        break;
+                    case WorkingSetOperationKind.Deactivated:
+                        Evict(member);
+                        member.History.Add("Deactivated");
+                        break;
+                    case WorkingSetOperationKind.DeactivatePair:
+                        Evict(member);
+                        member.History.Add("Deactivating");
+                        Evict(member);
+                        member.History.Add("Deactivated");
+                        break;
+                    default:
+                        throw new ArgumentOutOfRangeException(nameof(operation));
+                }
+
+                return false;
+            }
+
+            public void AssertMatches(WorkingSetHarness harness)
+            {
+                Assert.Equal(_members.Count(static member => member.Present), harness.WorkingSet.Count);
+                var expectedVisibleMembers = _members
+                    .Select(static (member, id) => (member, id))
+                    .Where(static item => item.member.Present && !item.member.IsIdle)
+                    .Select(static item => item.id)
+                    .ToArray();
+                var actualVisibleMembers = harness.WorkingSet.Members
+                    .Select(harness.GetMemberId)
+                    .Order()
+                    .ToArray();
+                Assert.Equal(expectedVisibleMembers, actualVisibleMembers);
+
+                for (var memberId = 0; memberId < _members.Length; memberId++)
+                {
+                    var expected = _members[memberId];
+                    var actual = harness.Members[memberId];
+                    Assert.Equal(expected.IsInWorkingSet, actual.IsInWorkingSet);
+                    Assert.Equal(expected.IsIdle, actual.IsIdle);
+                    Assert.Equal(expected.CandidateCalls, harness.MemberStates[memberId].GetCandidateCalls());
+                    Assert.Equal(expected.History, harness.Observer.GetHistory(memberId));
+                }
+            }
+
+            private static void Scan(ModelMember member)
+            {
+                if (!member.IsInWorkingSet)
+                {
+                    return;
+                }
+
+                var wouldRemove = member.IsIdle;
+                member.CandidateCalls.Add(wouldRemove);
+                if (!member.CandidateEligible)
+                {
+                    member.IsIdle = false;
+                    member.History.Add("Active");
+                }
+                else if (!wouldRemove)
+                {
+                    member.IsIdle = true;
+                    member.History.Add("Idle");
+                }
+                else if (member.Present)
+                {
+                    member.Present = false;
+                    member.IsInWorkingSet = false;
+                    member.IsIdle = false;
+                    member.History.Add("Evicted");
+                }
+            }
+
+            private static void Evict(ModelMember member)
+            {
+                if (!member.Present)
+                {
+                    return;
+                }
+
+                member.Present = false;
+                member.IsInWorkingSet = false;
+                member.IsIdle = false;
+                member.History.Add("Evicted");
+            }
+
+            private sealed class ModelMember
+            {
+                public bool Present { get; set; }
+                public bool IsInWorkingSet { get; set; }
+                public bool IsIdle { get; set; }
+                public bool CandidateEligible { get; set; }
+                public List<bool> CandidateCalls { get; } = [];
+                public List<string> History { get; } = [];
+            }
+        }
+
+        private sealed class WorkingSetHarness : IAsyncDisposable
+        {
+            private readonly ServiceProvider _serviceProvider;
+            private readonly ControlledAsyncTimer _timer;
+            private readonly SiloLifecycleSubject _lifecycle;
+
+            private WorkingSetHarness()
+            {
+                var services = new ServiceCollection();
+                services.AddMetrics();
+                services.AddSingleton<OrleansInstruments>();
+                services.AddSingleton<CatalogInstruments>();
+                _serviceProvider = services.BuildServiceProvider();
+                MemberStates = Enumerable.Range(0, 4).Select(static _ => new WorkingSetMemberState()).ToArray();
+                Members = MemberStates
+                    .Select(state => new TestWorkingSetMember(state.IsCandidateForRemoval))
+                    .ToArray();
+                var memberIds = Members
+                    .Select(static (member, id) => (member, id))
+                    .ToDictionary(static item => (IActivationWorkingSetMember)item.member, static item => item.id);
+                GetMemberId = member => memberIds[member];
+                Observer = new RecordingWorkingSetObserver(GetMemberId, Members.Count);
+                _timer = new ControlledAsyncTimer();
+                var timerFactory = Substitute.For<IAsyncTimerFactory>();
+                timerFactory.Create(Arg.Any<TimeSpan>(), Arg.Any<string>(), Arg.Any<TimeProvider>()).Returns(_timer);
+                WorkingSet = new ActivationWorkingSet(
+                    timerFactory,
+                    NullLogger<ActivationWorkingSet>.Instance,
+                    [Observer],
+                    _serviceProvider.GetRequiredService<CatalogInstruments>(),
+                    TimeProvider.System);
+                _lifecycle = new SiloLifecycleSubject(NullLogger<SiloLifecycleSubject>.Instance);
+                ((ILifecycleParticipant<ISiloLifecycle>)WorkingSet).Participate(_lifecycle);
+            }
+
+            public ActivationWorkingSet WorkingSet { get; }
+            public IReadOnlyList<TestWorkingSetMember> Members { get; }
+            public IReadOnlyList<WorkingSetMemberState> MemberStates { get; }
+            public RecordingWorkingSetObserver Observer { get; }
+            public Func<IActivationWorkingSetMember, int> GetMemberId { get; }
+            public int TimerGeneration => _timer.Generation;
+
+            public static async Task<WorkingSetHarness> CreateAsync()
+            {
+                var result = new WorkingSetHarness();
+                try
+                {
+                    await result._lifecycle.OnStart();
+                    await result._timer.WaitForGenerationAsync(1);
+                    return result;
+                }
+                catch
+                {
+                    await result.DisposeAsync();
+                    throw;
+                }
+            }
+
+            public async Task ScanOnceAsync()
+            {
+                var nextGeneration = _timer.Generation + 1;
+                _timer.CompleteCurrent(result: true);
+                await _timer.WaitForGenerationAsync(nextGeneration);
+            }
+
+            public async ValueTask DisposeAsync()
+            {
+                try
+                {
+                    await _lifecycle.OnStop().WaitAsync(TimeSpan.FromSeconds(10));
+                }
+                finally
+                {
+                    await _serviceProvider.DisposeAsync();
+                }
+            }
+        }
+
+        private sealed class ControlledAsyncTimer : IAsyncTimer
+        {
+            private readonly object _lock = new();
+            private TaskCompletionSource _generationChanged =
+                new(TaskCreationOptions.RunContinuationsAsynchronously);
+            private TaskCompletionSource<bool>? _current;
+            private bool _disposed;
+            private int _generation;
+
+            public int Generation
+            {
+                get
+                {
+                    lock (_lock)
+                    {
+                        return _generation;
+                    }
+                }
+            }
+
+            public Task<bool> NextTick(TimeSpan? overrideDelay = default)
+            {
+                TaskCompletionSource generationChanged;
+                TaskCompletionSource<bool> current;
+                lock (_lock)
+                {
+                    if (_disposed)
+                    {
+                        return Task.FromResult(false);
+                    }
+
+                    Assert.Null(_current);
+                    current = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+                    _current = current;
+                    _generation++;
+                    generationChanged = _generationChanged;
+                    _generationChanged = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+                }
+
+                generationChanged.TrySetResult();
+                return current.Task;
+            }
+
+            public void CompleteCurrent(bool result)
+            {
+                TaskCompletionSource<bool> current;
+                lock (_lock)
+                {
+                    current = _current ?? throw new InvalidOperationException("The working-set timer is not awaiting a tick.");
+                    _current = null;
+                }
+
+                current.TrySetResult(result);
+            }
+
+            public async Task WaitForGenerationAsync(int expectedGeneration)
+            {
+                while (true)
+                {
+                    Task generationChanged;
+                    lock (_lock)
+                    {
+                        if (_generation >= expectedGeneration)
+                        {
+                            return;
+                        }
+
+                        generationChanged = _generationChanged.Task;
+                    }
+
+                    await generationChanged.WaitAsync(TimeSpan.FromSeconds(10));
+                }
+            }
+
+            public bool CheckHealth(DateTime lastCheckTime, [NotNullWhen(false)] out string? reason)
+            {
+                reason = null;
+                return true;
+            }
+
+            public void Dispose()
+            {
+                TaskCompletionSource<bool>? current;
+                lock (_lock)
+                {
+                    if (_disposed)
+                    {
+                        return;
+                    }
+
+                    _disposed = true;
+                    current = _current;
+                    _current = null;
+                }
+
+                current?.TrySetResult(false);
+            }
+        }
+
+        private sealed class SeededWorkingSetStressRunner(int seed, WorkingSetHarness harness)
+        {
+            private const int WorkerCount = 4;
+            private const int PhaseCount = 32;
+            private readonly ConcurrentQueue<string> _trace = new();
+            private readonly ConcurrentQueue<Exception> _exceptions = new();
+            private readonly Random _random = new(seed);
+            private int _currentPhase = -1;
+            private int _outcomeCount;
+            private int _selectedCount;
+
+            public async Task RunAsync()
+            {
+                try
+                {
+                    for (var phase = 0; phase < PhaseCount; phase++)
+                    {
+                        _currentPhase = phase;
+                        var operations = Enumerable.Range(0, WorkerCount)
+                            .Select(worker => CreateOperation(phase, worker))
+                            .ToArray();
+                        foreach (var operation in operations)
+                        {
+                            Record(operation.Worker, phase, operation.Operation, "selected");
+                            _selectedCount++;
+                        }
+
+                        using var ready = new CountdownEvent(WorkerCount);
+                        var start = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+                        var workers = operations
+                            .Select(operation => Task.Run(() => RunWorkerAsync(operation, ready, start.Task)))
+                            .ToArray();
+
+                        try
+                        {
+                            Assert.True(
+                                ready.Wait(TimeSpan.FromSeconds(10)),
+                                $"seed=0x{seed:X8}; worker=coordinator; phase={phase}; start gate timed out.");
+                            start.TrySetResult();
+                            await Task.WhenAll(workers).WaitAsync(TimeSpan.FromSeconds(10));
+                        }
+                        finally
+                        {
+                            start.TrySetResult();
+                            await Task.WhenAll(workers).WaitAsync(TimeSpan.FromSeconds(10));
+                        }
+
+                        Assert.Empty(_exceptions);
+                        AssertTerminalInvariants();
+                        Assert.Equal(_selectedCount, _outcomeCount);
+                    }
+
+                    Assert.Equal(WorkerCount * PhaseCount, _selectedCount);
+                    Assert.Equal(WorkerCount * PhaseCount, _outcomeCount);
+                }
+                catch (Exception exception)
+                {
+                    throw new InvalidOperationException(
+                        $"seed=0x{seed:X8}; worker=all; phase={_currentPhase}; failure={exception.Message}"
+                        + $"{Environment.NewLine}Full trace:{Environment.NewLine}{string.Join(Environment.NewLine, _trace)}",
+                        exception);
+                }
+            }
+
+            private (int Worker, WorkingSetOperation Operation) CreateOperation(int phase, int worker)
+            {
+                var kind = _random.Next(4) switch
+                {
+                    0 => WorkingSetOperationKind.Active,
+                    1 => WorkingSetOperationKind.Evict,
+                    2 => WorkingSetOperationKind.Deactivating,
+                    _ => WorkingSetOperationKind.Deactivated
+                };
+                var memberId = _random.Next(harness.Members.Count);
+                return (worker, new WorkingSetOperation(phase * WorkerCount + worker, kind, memberId, false));
+            }
+
+            private async Task RunWorkerAsync(
+                (int Worker, WorkingSetOperation Operation) work,
+                CountdownEvent ready,
+                Task start)
+            {
+                try
+                {
+                    ready.Signal();
+                    await start;
+                    ExecuteStressOperation(work.Operation);
+                    Record(work.Worker, _currentPhase, work.Operation, "completed");
+                }
+                catch (Exception exception)
+                {
+                    _exceptions.Enqueue(exception);
+                    Record(work.Worker, _currentPhase, work.Operation, $"exception={exception.GetType().Name}:{exception.Message}");
+                }
+                finally
+                {
+                    Interlocked.Increment(ref _outcomeCount);
+                }
+            }
+
+            private void ExecuteStressOperation(WorkingSetOperation operation)
+            {
+                var member = harness.Members[operation.MemberId];
+                switch (operation.Kind)
+                {
+                    case WorkingSetOperationKind.Active:
+                        harness.WorkingSet.OnActive(member);
+                        break;
+                    case WorkingSetOperationKind.Evict:
+                        harness.WorkingSet.OnEvicted(member);
+                        break;
+                    case WorkingSetOperationKind.Deactivating:
+                        harness.WorkingSet.OnDeactivating(member);
+                        break;
+                    case WorkingSetOperationKind.Deactivated:
+                        harness.WorkingSet.OnDeactivated(member);
+                        break;
+                    default:
+                        throw new ArgumentOutOfRangeException(nameof(operation));
+                }
+            }
+
+            private void AssertTerminalInvariants()
+            {
+                Assert.InRange(harness.WorkingSet.Count, 0, harness.Members.Count);
+                var inSetIds = harness.Members
+                    .Select(static (member, id) => (member, id))
+                    .Where(static item => item.member.IsInWorkingSet)
+                    .Select(static item => item.id)
+                    .Order()
+                    .ToArray();
+                Assert.Equal(inSetIds.Length, harness.WorkingSet.Count);
+                Assert.All(
+                    harness.Members,
+                    static member => Assert.False(member.IsIdle && !member.IsInWorkingSet));
+
+                var visibleIds = harness.WorkingSet.Members
+                    .Select(harness.GetMemberId)
+                    .Order()
+                    .ToArray();
+                Assert.Equal(visibleIds.Length, visibleIds.Distinct().Count());
+                var expectedVisibleIds = harness.Members
+                    .Select(static (member, id) => (member, id))
+                    .Where(static item => item.member.IsInWorkingSet && !item.member.IsIdle)
+                    .Select(static item => item.id)
+                    .Order()
+                    .ToArray();
+                Assert.Equal(expectedVisibleIds, visibleIds);
+            }
+
+            private void Record(int worker, int phase, WorkingSetOperation operation, string result)
+            {
+                _trace.Enqueue(
+                    $"seed=0x{seed:X8}; worker={worker}; phase={phase}; operation={operation}; result={result}");
+            }
+        }
+
+        [Fact, TestCategory("Activation")]
+        public void ActivationData_Constructor_InitializesWorkingSetClockStatus()
+        {
+            using var fixture = new ActivationDataWorkingSetFixture();
+
+            Assert.Equal(ActivationState.Creating, fixture.Activation.State);
+            Assert.True(fixture.Member.IsInWorkingSet);
+            Assert.False(fixture.Member.IsIdle);
+            Assert.False(fixture.WasRemovedByCollection);
+        }
+
+        [Theory, TestCategory("Activation")]
+        [MemberData(nameof(ActivationStatusCases))]
+        public void ActivationStatus_PackedFieldsPreserveIndependentBits(
+            int stateValue,
+            bool expectedInWorkingSet,
+            bool expectedIdle)
+        {
+            using var fixture = new ActivationDataWorkingSetFixture();
+            var expectedState = (ActivationState)stateValue;
+            var otherState = expectedState == ActivationState.Invalid
+                ? ActivationState.Creating
+                : ActivationState.Invalid;
+
+            lock (fixture.Activation)
+            {
+                fixture.Member.IsInWorkingSet = expectedInWorkingSet;
+                fixture.Member.IsIdle = expectedIdle;
+                fixture.Activation.SetState(otherState);
+            }
+
+            Assert.Equal(otherState, fixture.Activation.State);
+            Assert.Equal(expectedInWorkingSet, fixture.Member.IsInWorkingSet);
+            Assert.Equal(expectedIdle, fixture.Member.IsIdle);
+            Assert.False(fixture.WasRemovedByCollection);
+
+            lock (fixture.Activation)
+            {
+                fixture.Activation.SetState(expectedState);
+            }
+
+            Assert.Equal(expectedState, fixture.Activation.State);
+            Assert.Equal(expectedInWorkingSet, fixture.Member.IsInWorkingSet);
+            Assert.Equal(expectedIdle, fixture.Member.IsIdle);
+            Assert.False(fixture.WasRemovedByCollection);
+
+            lock (fixture.Activation)
+            {
+                fixture.Member.IsInWorkingSet = !expectedInWorkingSet;
+            }
+
+            Assert.Equal(expectedState, fixture.Activation.State);
+            Assert.Equal(!expectedInWorkingSet, fixture.Member.IsInWorkingSet);
+            Assert.Equal(expectedIdle, fixture.Member.IsIdle);
+            Assert.False(fixture.WasRemovedByCollection);
+
+            lock (fixture.Activation)
+            {
+                fixture.Member.IsInWorkingSet = expectedInWorkingSet;
+                fixture.Member.IsIdle = !expectedIdle;
+            }
+
+            Assert.Equal(expectedState, fixture.Activation.State);
+            Assert.Equal(expectedInWorkingSet, fixture.Member.IsInWorkingSet);
+            Assert.Equal(!expectedIdle, fixture.Member.IsIdle);
+            Assert.False(fixture.WasRemovedByCollection);
+
+            lock (fixture.Activation)
+            {
+                fixture.Member.IsIdle = expectedIdle;
+            }
+
+            Assert.Equal(expectedState, fixture.Activation.State);
+            Assert.Equal(expectedInWorkingSet, fixture.Member.IsInWorkingSet);
+            Assert.Equal(expectedIdle, fixture.Member.IsIdle);
+            Assert.False(fixture.WasRemovedByCollection);
+        }
+
+        [Fact, TestCategory("Activation")]
+        public void ActivationData_CollectionCandidateMarker_RequiresEligibleRemovalPass()
+        {
+            using var fixture = new ActivationDataWorkingSetFixture();
+
+            fixture.AdvanceIdleDurationTo(10_000);
+            bool isCandidateAtBoundary;
+            lock (fixture.Activation)
+            {
+                isCandidateAtBoundary = fixture.Member.IsCandidateForRemoval(wouldRemove: true);
+            }
+
+            Assert.False(isCandidateAtBoundary);
+            Assert.False(fixture.WasRemovedByCollection);
+
+            fixture.AdvanceIdleDurationTo(10_001);
+            bool isCandidateOnFirstPass;
+            lock (fixture.Activation)
+            {
+                isCandidateOnFirstPass = fixture.Member.IsCandidateForRemoval(wouldRemove: false);
+            }
+
+            Assert.True(isCandidateOnFirstPass);
+            Assert.False(fixture.WasRemovedByCollection);
+
+            bool isCandidateOnRemovalPass;
+            lock (fixture.Activation)
+            {
+                isCandidateOnRemovalPass = fixture.Member.IsCandidateForRemoval(wouldRemove: true);
+            }
+
+            Assert.True(isCandidateOnRemovalPass);
+            Assert.True(fixture.WasRemovedByCollection);
+
+            lock (fixture.Activation)
+            {
+                fixture.Activation.SetState(ActivationState.Valid);
+                fixture.Member.IsIdle = true;
+            }
+
+            Assert.Equal(ActivationState.Valid, fixture.Activation.State);
+            Assert.True(fixture.Member.IsInWorkingSet);
+            Assert.True(fixture.Member.IsIdle);
+            Assert.True(fixture.WasRemovedByCollection);
+        }
+
+        [Fact, TestCategory("Activation")]
+        public void ActivationData_ClockCollectionThenOnActive_ClearsCollectionMarker()
+        {
+            using var fixture = new ActivationDataWorkingSetFixture();
+            lock (fixture.Activation)
+            {
+                fixture.Activation.SetState(ActivationState.Valid);
+            }
+
+            fixture.WorkingSet.OnActivated(fixture.Member);
+            fixture.AdvanceIdleDurationTo(10_001);
+
+            fixture.ScanOnce();
+
+            Assert.Equal(1, fixture.WorkingSet.Count);
+            Assert.True(fixture.Member.IsInWorkingSet);
+            Assert.True(fixture.Member.IsIdle);
+            Assert.False(fixture.WasRemovedByCollection);
+            Assert.Empty(fixture.WorkingSet.Members);
+            Assert.Equal(["Added", "Idle"], fixture.Observer.GetHistory(0));
+
+            fixture.ScanOnce();
+
+            Assert.Equal(0, fixture.WorkingSet.Count);
+            Assert.False(fixture.Member.IsInWorkingSet);
+            Assert.False(fixture.Member.IsIdle);
+            Assert.True(fixture.WasRemovedByCollection);
+            Assert.Empty(fixture.WorkingSet.Members);
+            Assert.Equal(["Added", "Idle", "Evicted"], fixture.Observer.GetHistory(0));
+
+            fixture.WorkingSet.OnActive(fixture.Member);
+
+            Assert.Equal(1, fixture.WorkingSet.Count);
+            Assert.True(fixture.Member.IsInWorkingSet);
+            Assert.False(fixture.Member.IsIdle);
+            Assert.False(fixture.WasRemovedByCollection);
+            Assert.Equal([fixture.Member], fixture.WorkingSet.Members);
+            Assert.Equal(["Added", "Idle", "Evicted", "Active"], fixture.Observer.GetHistory(0));
+        }
+
+        [Fact, TestCategory("Activation")]
+        public void ActivationData_ExplicitWorkingSetDeactivation_DoesNotSetCollectionMarker()
+        {
+            using var fixture = new ActivationDataWorkingSetFixture();
+            lock (fixture.Activation)
+            {
+                fixture.Activation.SetState(ActivationState.Valid);
+            }
+
+            fixture.WorkingSet.OnActivated(fixture.Member);
+
+            fixture.WorkingSet.OnDeactivating(fixture.Member);
+
+            Assert.Equal(0, fixture.WorkingSet.Count);
+            Assert.False(fixture.Member.IsInWorkingSet);
+            Assert.False(fixture.Member.IsIdle);
+            Assert.False(fixture.WasRemovedByCollection);
+            Assert.Empty(fixture.WorkingSet.Members);
+            Assert.Equal(["Added", "Evicted", "Deactivating"], fixture.Observer.GetHistory(0));
+        }
+
+        [Fact, TestCategory("Activation")]
+        public async Task ActivationCollector_AgeCollection_RequestsActivationIdle()
+        {
+            var timeProvider = new FakeTimeProvider(DateTimeOffset.Parse("2025-01-01T00:00:00.000+00:00"));
+            using var serviceProvider = CreateCatalogServiceProvider();
+            var collector = new ActivationCollector(
+                timeProvider,
+                Options.Create(new GrainCollectionOptions()),
+                NullLogger<ActivationCollector>.Instance,
+                Substitute.For<IEnvironmentStatisticsProvider>(),
+                serviceProvider.GetRequiredService<CatalogInstruments>());
+            var activation = CreateCollectorActivation(TimeSpan.FromMinutes(5));
+            activation.GetIdleness().Returns(TimeSpan.FromMinutes(2));
+            collector.ScheduleCollection(activation, TimeSpan.FromMinutes(5), timeProvider.GetUtcNow().UtcDateTime);
+
+            await collector.CollectActivations(TimeSpan.FromMinutes(1), CancellationToken.None);
+
+            activation.Received(1).Deactivate(
+                Arg.Is<DeactivationReason>(reason => reason.ReasonCode == DeactivationReasonCode.ActivationIdle),
+                Arg.Any<CancellationToken>());
+            activation.Received(1).Deactivate(Arg.Any<DeactivationReason>(), Arg.Any<CancellationToken>());
+            activation.DidNotReceive().Deactivate(
+                Arg.Is<DeactivationReason>(reason => reason.ReasonCode == DeactivationReasonCode.HighMemoryPressure),
+                Arg.Any<CancellationToken>());
+        }
+
+        [Fact, TestCategory("Activation")]
+        public async Task ActivationCollector_HighMemoryCollection_RequestsHighMemoryPressure()
+        {
+            var timeProvider = new FakeTimeProvider(DateTimeOffset.Parse("2025-01-01T00:00:00.000+00:00"));
+            using var serviceProvider = CreateCatalogServiceProvider();
+            var collector = new ActivationCollector(
+                timeProvider,
+                Options.Create(new GrainCollectionOptions()),
+                NullLogger<ActivationCollector>.Instance,
+                Substitute.For<IEnvironmentStatisticsProvider>(),
+                serviceProvider.GetRequiredService<CatalogInstruments>());
+            var activation = CreateCollectorActivation(TimeSpan.FromMinutes(5));
+            collector.ScheduleCollection(activation, TimeSpan.FromMinutes(5), timeProvider.GetUtcNow().UtcDateTime);
+            collector._activationCount = 1;
+
+            await collector.DeactivateInDueTimeOrder(1, CancellationToken.None);
+
+            activation.Received(1).Deactivate(
+                Arg.Is<DeactivationReason>(reason => reason.ReasonCode == DeactivationReasonCode.HighMemoryPressure),
+                Arg.Any<CancellationToken>());
+            activation.Received(1).Deactivate(Arg.Any<DeactivationReason>(), Arg.Any<CancellationToken>());
+            activation.DidNotReceive().Deactivate(
+                Arg.Is<DeactivationReason>(reason => reason.ReasonCode == DeactivationReasonCode.ActivationIdle),
+                Arg.Any<CancellationToken>());
+        }
+
+        public static IEnumerable<object[]> ActivationStatusCases()
+        {
+            foreach (var state in Enum.GetValues<ActivationState>())
+            {
+                yield return [(int)state, false, false];
+                yield return [(int)state, false, true];
+                yield return [(int)state, true, false];
+                yield return [(int)state, true, true];
+            }
+        }
+
+        private static ICollectibleGrainContext CreateCollectorActivation(TimeSpan collectionAgeLimit)
+        {
+            var activation = Substitute.For<ICollectibleGrainContext>();
+            activation.CollectionAgeLimit.Returns(collectionAgeLimit);
+            activation.IsValid.Returns(true);
+            activation.IsExemptFromCollection.Returns(false);
+            activation.IsInactive.Returns(true);
+            activation.Deactivated.Returns(Task.CompletedTask);
+            return activation;
+        }
+
+        private static ServiceProvider CreateCatalogServiceProvider()
+        {
+            var services = new ServiceCollection();
+            services.AddMetrics();
+            services.AddSingleton<OrleansInstruments>();
+            services.AddSingleton<CatalogInstruments>();
+            return services.BuildServiceProvider();
+        }
+
+        private sealed class ActivationDataWorkingSetFixture : IDisposable
+        {
+            private static readonly PropertyInfo WasRemovedByCollectionProperty = typeof(ActivationData).GetProperty(
+                "WasRemovedByCollection",
+                BindingFlags.Instance | BindingFlags.NonPublic)
+                ?? throw new InvalidOperationException("Could not find the collection-removal marker.");
+            private static readonly FieldInfo IdleDurationField = typeof(ActivationData).GetField(
+                "_idleDuration",
+                BindingFlags.Instance | BindingFlags.NonPublic)
+                ?? throw new InvalidOperationException("Could not find the activation idle-duration field.");
+            private static readonly FieldInfo ServiceScopeField = typeof(ActivationData).GetField(
+                "_serviceScope",
+                BindingFlags.Instance | BindingFlags.NonPublic)
+                ?? throw new InvalidOperationException("Could not find the activation service scope.");
+            private static readonly FieldInfo SharedSchedulerLoggerField = typeof(GrainTypeSharedContext).GetField(
+                "<SchedulerLogger>k__BackingField",
+                BindingFlags.Instance | BindingFlags.NonPublic)
+                ?? throw new InvalidOperationException("Could not find the shared scheduler logger.");
+            private static readonly MethodInfo VisitMemberMethod = typeof(ActivationWorkingSet).GetMethod(
+                "VisitMember",
+                BindingFlags.Instance | BindingFlags.NonPublic,
+                [typeof(IActivationWorkingSetMember)])
+                ?? throw new InvalidOperationException("Could not find the working-set scan method.");
+
+            private readonly ServiceProvider _serviceProvider;
+            private readonly IServiceScope _activationScope;
+            private readonly ControlledAsyncTimer _timer;
+            private long _elapsedMilliseconds;
+
+            public ActivationDataWorkingSetFixture()
+            {
+                TimeProvider = new FakeTimeProvider(DateTimeOffset.Parse("2025-01-01T00:00:00.000+00:00"));
+                var services = new ServiceCollection();
+                services.AddOptions();
+                services.AddLogging();
+                services.AddMetrics();
+                services.AddSingleton(TimeProvider);
+                services.AddSingleton<System.TimeProvider>(TimeProvider);
+                services.AddSingleton<OrleansInstruments>();
+                services.AddSingleton<CatalogInstruments>();
+                services.AddSingleton<SchedulerInstruments>();
+                services.Configure<SchedulingOptions>(options =>
+                {
+                    options.DelayWarningThreshold = TimeSpan.FromMilliseconds(100);
+                    options.ActivationSchedulingQuantum = TimeSpan.FromMilliseconds(100);
+                    options.TurnWarningLengthThreshold = TimeSpan.FromMilliseconds(100);
+                    options.StoppedActivationWarningInterval = TimeSpan.FromMilliseconds(200);
+                });
+                _serviceProvider = services.BuildServiceProvider();
+
+                var address = GrainAddress.NewActivationAddress(
+                    SiloAddress.New(System.Net.IPAddress.Loopback, 11_111, 1),
+                    GrainId.Create("activation-working-set", "clock-fixture"));
+                var shared = (GrainTypeSharedContext)RuntimeHelpers.GetUninitializedObject(typeof(GrainTypeSharedContext));
+                SharedSchedulerLoggerField.SetValue(
+                    shared,
+                    _serviceProvider.GetRequiredService<Microsoft.Extensions.Logging.ILoggerFactory>()
+                        .CreateLogger(typeof(Orleans.Runtime.Scheduler.WorkItemGroup).FullName!));
+                Activation = new ActivationData(
+                    address,
+                    context => new Orleans.Runtime.Scheduler.WorkItemGroup(
+                        context,
+                        _serviceProvider.GetRequiredService<IOptions<SchedulingOptions>>(),
+                        _serviceProvider.GetRequiredService<SchedulerInstruments>()),
+                    _serviceProvider,
+                    shared);
+                Member = Activation;
+                _activationScope = (IServiceScope)ServiceScopeField.GetValue(Activation)!;
+
+                Observer = new RecordingWorkingSetObserver(_ => 0, 1);
+                _timer = new ControlledAsyncTimer();
+                var timerFactory = Substitute.For<IAsyncTimerFactory>();
+                timerFactory.Create(Arg.Any<TimeSpan>(), Arg.Any<string>(), Arg.Any<System.TimeProvider>()).Returns(_timer);
+                WorkingSet = new ActivationWorkingSet(
+                    timerFactory,
+                    NullLogger<ActivationWorkingSet>.Instance,
+                    [Observer],
+                    _serviceProvider.GetRequiredService<CatalogInstruments>(),
+                    TimeProvider);
+            }
+
+            public ActivationData Activation { get; }
+            public IActivationWorkingSetMember Member { get; }
+            public FakeTimeProvider TimeProvider { get; }
+            public ActivationWorkingSet WorkingSet { get; }
+            public RecordingWorkingSetObserver Observer { get; }
+            public bool WasRemovedByCollection
+                => (bool)WasRemovedByCollectionProperty.GetValue(Activation)!;
+
+            public void AdvanceIdleDurationTo(long elapsedMilliseconds)
+            {
+                var advance = elapsedMilliseconds - _elapsedMilliseconds;
+                Assert.True(advance >= 0);
+                TimeProvider.Advance(TimeSpan.FromMilliseconds(advance));
+                lock (Activation)
+                {
+                    IdleDurationField.SetValue(
+                        Activation,
+                        CoarseStopwatch.FromTimestamp(0, elapsedMilliseconds));
+                }
+
+                _elapsedMilliseconds = elapsedMilliseconds;
+                Assert.Equal(TimeSpan.FromMilliseconds(elapsedMilliseconds), Activation.GetIdleness());
+            }
+
+            public void ScanOnce() => VisitMemberMethod.Invoke(WorkingSet, [Member]);
+
+            public void Dispose()
+            {
+                _timer.Dispose();
+                _activationScope.Dispose();
+                _serviceProvider.Dispose();
+            }
         }
     }
 }
