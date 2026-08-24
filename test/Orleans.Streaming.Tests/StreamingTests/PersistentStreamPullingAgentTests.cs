@@ -145,6 +145,7 @@ namespace UnitTests.StreamingTests
                 now: DateTime.UtcNow);
             consumerData.IsRegistered = true;
             consumerData.Cursor = queueCache.GetCacheCursor(streamId, token);
+            consumerData.LastProcessedToken = token;
             var deliveryTask = testAccessor.RunConsumerCursor(consumerData);
             await consumer.Delivered.Task.WaitAsync(TimeSpan.FromSeconds(5));
             Assert.Equal(token, Assert.Single(consumer.DeliveredTokens));
