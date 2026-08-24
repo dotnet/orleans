@@ -55,6 +55,7 @@ namespace Orleans.Streams
             Task<bool> ReadFromQueueWithCancellation(QueueId myQueueId, IQueueAdapterReceiver? receiver, int maxCacheAddCount, CancellationToken cancellationToken);
             Task RegisterStream(QualifiedStreamId streamId, StreamSequenceToken firstToken, DateTime now);
             Task<bool> DoHandshakeWithConsumer(StreamConsumerData consumerData, StreamSequenceToken? cacheToken);
+            Task RunConsumerCursor(StreamConsumerData consumerData);
             Task<IReadOnlyDictionary<QualifiedStreamId, StreamConsumerCollection>> GetPubSubCache();
             Task<bool> DoHandshakeWithConsumer(StreamConsumerData consumerData, StreamSequenceToken? cacheToken);
             Task RunConsumerCursor(StreamConsumerData consumerData);
@@ -135,6 +136,9 @@ namespace Orleans.Streams
 
         Task<bool> ITestAccessor.DoHandshakeWithConsumer(StreamConsumerData consumerData, StreamSequenceToken? cacheToken)
             => this.RunOrQueueTaskResult(() => DoHandshakeWithConsumer(consumerData, cacheToken)).Unwrap();
+
+        Task ITestAccessor.RunConsumerCursor(StreamConsumerData consumerData)
+            => this.RunOrQueueTask(() => RunConsumerCursor(consumerData));
 
         Task<IReadOnlyDictionary<QualifiedStreamId, StreamConsumerCollection>> ITestAccessor.GetPubSubCache()
             => this.RunOrQueueTaskResult(() => (IReadOnlyDictionary<QualifiedStreamId, StreamConsumerCollection>)new Dictionary<QualifiedStreamId, StreamConsumerCollection>(pubSubCache));
@@ -440,22 +444,32 @@ namespace Orleans.Streams
                     else if (effectiveHandshakeToken is StartToken or DeliveryToken
                         && effectiveHandshakeToken.Token is { } requestedToken)
                     {
-                        cursorStartToken = requestedToken;
+                        cursorStartToken = requestedHandshakeToken is DeliveryToken
+                            ? cacheToken ?? consumerData.PendingStartToken ?? requestedToken
+                            : requestedToken;
                         consumerData.SafeDisposeCursor(logger);
                         try
                         {
-                            consumerData.Cursor = queueCache.GetCacheCursor(consumerData.StreamId, requestedToken);
+                            consumerData.Cursor = queueCache.GetCacheCursor(consumerData.StreamId, cursorStartToken);
                             if (effectiveHandshakeToken is DeliveryToken
                                 || effectiveHandshakeToken is StartToken
                                     && SubscriptionMarker.IsImplicitSubscription(consumerData.SubscriptionId.Guid))
                             {
                                 // Delivery tokens and implicit recovery tokens identify already processed events.
-                                if (consumerData.Cursor is IQueueCacheCursorProgress progressCursor)
+                                if (effectiveHandshakeToken is DeliveryToken
+                                    && consumerData.Cursor is IQueueCacheCursorProgress progressCursor)
                                 {
-                                    progressCursor.AdvancePast(requestedToken);
+                                    progressCursor.SetDeliveredThrough(requestedToken);
                                 }
                                 else
                                 {
+                                    if (!Equals(cursorStartToken, requestedToken))
+                                    {
+                                        consumerData.Cursor.Dispose();
+                                        cursorStartToken = requestedToken;
+                                        consumerData.Cursor = queueCache.GetCacheCursor(consumerData.StreamId, requestedToken);
+                                    }
+
                                     consumerData.Cursor.MoveNext();
                                 }
                             }
@@ -541,8 +555,7 @@ namespace Orleans.Streams
                 if (requestedHandshakeToken is DeliveryToken deliveryToken)
                 {
                     consumerData.LastProcessedToken = deliveryToken.Token;
-                    consumerData.LastSafePartitionToken = deliveryToken.Token;
-                    (consumerData.Cursor as IQueueCacheCursorProgress)?.AdvancePast(deliveryToken.Token);
+                    consumerData.LastSafePartitionToken = null;
                 }
                 else
                 {
@@ -905,9 +918,11 @@ namespace Orleans.Streams
                         return false;
                     }
 
-                    var current = consumer.LastProcessedToken;
-                    var safePartition = consumer.LastSafePartitionToken;
-                    if (safePartition is not null
+                    var current = consumer.Cursor is IQueueCacheCursorProgress
+                        ? consumer.LastSafePartitionToken
+                        : consumer.LastProcessedToken;
+                    if (consumer.Cursor is not IQueueCacheCursorProgress
+                        && consumer.LastSafePartitionToken is { } safePartition
                         && (current is null || IsBefore(current, safePartition)))
                     {
                         current = safePartition;
@@ -1200,6 +1215,7 @@ namespace Orleans.Streams
                                 cancellationToken: cancellationToken);
                             if (newToken is not null)
                             {
+                                var previousSafePartitionToken = consumerData.LastSafePartitionToken;
                                 consumerData.LastToken = newToken;
                                 IQueueCacheCursor newCursor;
                                 var resumedFromFallback = false;
@@ -1260,14 +1276,20 @@ namespace Orleans.Streams
                                     consumerData.LastProcessedToken = sequenceToken;
                                     try
                                     {
-                                        newCursor = queueCache!.GetCacheCursor(consumerData.StreamId, sequenceToken); // queueCache must be non-null here: consumerData.Cursor was only ever populated via queueCache.GetCacheCursor.
-                                        // The handshake token points to an already processed event, so advance past it.
+                                        var restartToken = previousSafePartitionToken ?? sequenceToken;
+                                        newCursor = queueCache!.GetCacheCursor(consumerData.StreamId, restartToken); // queueCache must be non-null here: consumerData.Cursor was only ever populated via queueCache.GetCacheCursor.
                                         if (newCursor is IQueueCacheCursorProgress progress)
                                         {
-                                            progress.AdvancePast(sequenceToken);
+                                            progress.SetDeliveredThrough(sequenceToken);
                                         }
                                         else
                                         {
+                                            if (!Equals(restartToken, sequenceToken))
+                                            {
+                                                newCursor.Dispose();
+                                                newCursor = queueCache.GetCacheCursor(consumerData.StreamId, sequenceToken);
+                                            }
+
                                             newCursor.MoveNext();
                                         }
                                     }
@@ -1291,7 +1313,7 @@ namespace Orleans.Streams
                                 if (newToken is DeliveryToken deliveryToken)
                                 {
                                     consumerData.LastProcessedToken = deliveryToken.Token;
-                                    consumerData.LastSafePartitionToken = deliveryToken.Token;
+                                    consumerData.LastSafePartitionToken = previousSafePartitionToken;
                                     UpdateCursorProgress(consumerData, newCursor as IQueueCacheCursorProgress);
                                 }
                                 else
