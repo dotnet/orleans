@@ -25,6 +25,7 @@ public sealed class AdoNetStreamSchemaTests
         Assert.Contains("StreamNamespaceLength INT NOT NULL", script, StringComparison.Ordinal);
         Assert.Contains("CheckpointedOn", script, StringComparison.Ordinal);
         Assert.Contains("CheckpointedOn = COALESCE", script, StringComparison.Ordinal);
+        Assert.Contains("CheckpointedOn IS NULL", script, StringComparison.Ordinal);
         Assert.Contains("CheckpointedOn <", script, StringComparison.Ordinal);
         Assert.Contains("CreatedOn <", script, StringComparison.Ordinal);
         Assert.Contains("Payload", script, StringComparison.Ordinal);
