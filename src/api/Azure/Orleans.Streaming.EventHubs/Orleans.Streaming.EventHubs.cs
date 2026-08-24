@@ -101,18 +101,18 @@ namespace Orleans.Hosting
         public ClusterClientEventHubStreamConfigurator(string name, IClientBuilder builder) : base(default!, default!, default!) { }
     }
 
-    public static partial class EventHubStreamConfiguratorExtensions
-    {
-        public static void ConfigureEventHub(this IEventHubStreamConfigurator configurator, System.Action<Microsoft.Extensions.Options.OptionsBuilder<Configuration.EventHubOptions>> configureOptions) { }
-
-        public static void UseDataAdapter(this IEventHubStreamConfigurator configurator, System.Func<System.IServiceProvider, string, Streaming.EventHubs.IEventHubDataAdapter> factory) { }
-    }
-
     public sealed partial class EventHubsStreamProviderBuilder : Providers.IProviderBuilder<ISiloBuilder>, Providers.IProviderBuilder<IClientBuilder>
     {
         public void Configure(IClientBuilder builder, string? name, Microsoft.Extensions.Configuration.IConfigurationSection configurationSection) { }
 
         public void Configure(ISiloBuilder builder, string? name, Microsoft.Extensions.Configuration.IConfigurationSection configurationSection) { }
+    }
+
+    public static partial class EventHubStreamConfiguratorExtensions
+    {
+        public static void ConfigureEventHub(this IEventHubStreamConfigurator configurator, System.Action<Microsoft.Extensions.Options.OptionsBuilder<Configuration.EventHubOptions>> configureOptions) { }
+
+        public static void UseDataAdapter(this IEventHubStreamConfigurator configurator, System.Func<System.IServiceProvider, string, Streaming.EventHubs.IEventHubDataAdapter> factory) { }
     }
 
     public partial interface IClusterClientEventHubStreamConfigurator : IEventHubStreamConfigurator, INamedServiceConfigurator, IClusterClientPersistentStreamConfigurator, IPersistentStreamConfigurator
