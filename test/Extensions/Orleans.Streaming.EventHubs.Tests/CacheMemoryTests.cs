@@ -109,6 +109,7 @@ public sealed class CacheMemoryTests : IDisposable
         Assert.True(cache.TryGetNextMessage(nextCursor, out var next));
         Assert.Equal(positions[0].SequenceToken, next.SequenceToken);
 
+        cache.AddCachePressureMonitor(new AlwaysPressureMonitor());
         cache.UpdatePurgeProtection(hasActiveSubscriptions: false);
 
         var attempts = 0;
@@ -272,6 +273,17 @@ public sealed class CacheMemoryTests : IDisposable
         public void Update(string offset, DateTime utcNow)
         {
             LastOffset = offset;
+        }
+    }
+
+    private sealed class AlwaysPressureMonitor : ICachePressureMonitor
+    {
+        public ICacheMonitor? CacheMonitor { private get; set; }
+
+        public bool IsUnderPressure(DateTime utcNow) => true;
+
+        public void RecordCachePressureContribution(double cachePressureContribution)
+        {
         }
     }
 
