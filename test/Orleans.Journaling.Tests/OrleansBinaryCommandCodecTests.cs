@@ -120,39 +120,6 @@ public sealed class OrleansBinaryCommandCodecTests : JournalingTestBase
     }
 
     [Fact]
-    public void DictionaryCodec_Set_ReplaysLegacySharedReferenceScope()
-    {
-        var keyCodec = ValueCodec<SnapshotReferenceRecord>();
-        var valueCodec = ValueCodec<SnapshotReferenceRecord>();
-        var codec = new OrleansBinaryDurableDictionaryCommandCodec<SnapshotReferenceRecord, SnapshotReferenceRecord>(
-            keyCodec,
-            valueCodec,
-            SessionPool);
-        var shared = new byte[] { 1, 2, 3 };
-        var key = new SnapshotReferenceRecord { Payload = shared, Alias = shared };
-        var value = new SnapshotReferenceRecord { Payload = shared, Alias = shared };
-        var payload = CodecTestHelpers.WriteEntry(writer =>
-        {
-            using var entry = writer.BeginEntry();
-            using var session = SessionPool.GetSession();
-            var payloadWriter = Writer.Create(entry.Writer, session);
-            payloadWriter.WriteVarUInt32(0);
-            keyCodec.WriteField(ref payloadWriter, 0, typeof(SnapshotReferenceRecord), key);
-            valueCodec.WriteField(ref payloadWriter, 1, typeof(SnapshotReferenceRecord), value);
-            payloadWriter.Commit();
-            entry.Commit();
-        });
-
-        var consumer = new RecordingDictionaryCommandHandler<SnapshotReferenceRecord, SnapshotReferenceRecord>();
-        codec.Apply(CodecTestHelpers.ReadBuffer(payload), consumer);
-
-        var item = Assert.Single(consumer.SnapshotItems);
-        Assert.Same(item.Key.Payload, item.Key.Alias);
-        Assert.Same(item.Key.Payload, item.Value.Payload);
-        Assert.Same(item.Value.Payload, item.Value.Alias);
-    }
-
-    [Fact]
     public void ListCodec_AllCommands_RoundTrip()
     {
         var codec = new OrleansBinaryDurableListCommandCodec<string>(ValueCodec<string>(), SessionPool);

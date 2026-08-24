@@ -13,11 +13,10 @@ internal sealed class OrleansBinaryDurableDictionaryCommandCodec<TKey, TValue>(
     IFieldCodec<TValue> valueCodec,
     SerializerSessionPool sessionPool) : IDurableDictionaryCommandCodec<TKey, TValue> where TKey : notnull
 {
-    private const uint LegacySetCommand = 0;
+    private const uint SetCommand = 0;
     private const uint RemoveCommand = 1;
     private const uint ClearCommand = 2;
     private const uint SnapshotCommand = 3;
-    private const uint SetCommand = 4;
 
     /// <inheritdoc/>
     public void WriteSet(TKey key, TValue value, JournalStreamWriter writer)
@@ -94,13 +93,6 @@ internal sealed class OrleansBinaryDurableDictionaryCommandCodec<TKey, TValue>(
         var command = reader.ReadVarUInt32();
         switch (command)
         {
-            case LegacySetCommand:
-            {
-                var key = ReadSharedValue(keyCodec, ref reader);
-                var value = ReadSharedValue(valueCodec, ref reader);
-                consumer.ApplySet(key, value);
-                break;
-            }
             case SetCommand:
             {
                 var (key, value) = ReadKeyValue(ref reader);
@@ -119,12 +111,6 @@ internal sealed class OrleansBinaryDurableDictionaryCommandCodec<TKey, TValue>(
             default:
                 throw new NotSupportedException($"Command type {command} is not supported");
         }
-    }
-
-    private static TField ReadSharedValue<TField, TInput>(IFieldCodec<TField> codec, ref Reader<TInput> reader)
-    {
-        var field = reader.ReadFieldHeader();
-        return codec.ReadValue(ref reader, field)!;
     }
 
     private void ApplySnapshot<TInput>(ref Reader<TInput> reader, IDurableDictionaryCommandHandler<TKey, TValue> consumer)
