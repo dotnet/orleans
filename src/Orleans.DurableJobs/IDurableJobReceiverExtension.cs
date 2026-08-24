@@ -100,7 +100,7 @@ internal sealed partial class DurableJobReceiverExtension : IDurableJobReceiverE
             var result = await handler.ExecuteJobAsync(context, cancellationToken)
                 ?? throw new InvalidOperationException(
                     $"Durable job feature handler for '{context.Job.Name}' returned a null result.");
-            tracker.Completed();
+            tracker.RecordResult(result);
             return result;
         }
         catch (OperationCanceledException)

@@ -1,3 +1,5 @@
+using System.Collections.Concurrent;
+using System.Diagnostics;
 using System.Diagnostics.Metrics;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Diagnostics.Metrics.Testing;
@@ -6,6 +8,7 @@ using Microsoft.Extensions.Options;
 using Microsoft.Extensions.Time.Testing;
 using NSubstitute;
 using Orleans.Configuration;
+using Orleans.Diagnostics;
 using Orleans.DurableJobs;
 using Orleans.Hosting;
 using Orleans.Runtime;
@@ -214,17 +217,55 @@ public class DurableJobReceiverExtensionTests
     }
 
     [Fact]
-    public async Task HandleDurableJobAsync_WhenFeatureHandlerReturnsNull_RecordsOnlyFailure()
+    public async Task HandleDurableJobAsync_WhenFeatureHandlerReturnsFailed_RecordsFailureTelemetryOnce()
     {
-        var services = new ServiceCollection();
-        services.AddMetrics();
-        using var serviceProvider = services.BuildServiceProvider();
-        var meterFactory = serviceProvider.GetRequiredService<IMeterFactory>();
-        var instruments = new DurableJobsInstruments(new OrleansInstruments(meterFactory));
-        using var executionCollector = new MetricCollector<long>(
-            meterFactory,
-            "Microsoft.Orleans",
-            "orleans-durablejobs-handler-executions");
+        using var telemetry = new HandlerTelemetryCapture();
+        var exception = new InvalidOperationException("Explicit feature failure");
+        var expected = DurableJobRunResult.Failed(exception);
+        var featureHandler = Substitute.For<IDurableJobFeatureHandler>();
+        featureHandler.ExecuteJobAsync(Arg.Any<IJobRunContext>(), Arg.Any<CancellationToken>())
+            .Returns(ValueTask.FromResult(expected));
+        var registry = new DurableJobHandlerRegistry();
+        registry.Register("feature", featureHandler);
+        var extension = CreateExtension(
+            Substitute.For<IDurableJobHandler>(),
+            registry: registry,
+            durableJobsInstruments: telemetry.Instruments);
+        var context = CreateJobContext("run-explicit-failure", jobName: "feature");
+
+        var result = await extension.HandleDurableJobAsync(context, CancellationToken.None);
+
+        Assert.Same(expected, result);
+        telemetry.AssertOutcome(context.RunId, "failed", ActivityStatusCode.Error, exception);
+    }
+
+    [Fact]
+    public async Task HandleDurableJobAsync_WhenFeatureHandlerThrows_RecordsFailureTelemetryOnce()
+    {
+        using var telemetry = new HandlerTelemetryCapture();
+        var exception = new InvalidOperationException("Thrown feature failure");
+        var featureHandler = Substitute.For<IDurableJobFeatureHandler>();
+        featureHandler.ExecuteJobAsync(Arg.Any<IJobRunContext>(), Arg.Any<CancellationToken>())
+            .Returns(ValueTask.FromException<DurableJobRunResult>(exception));
+        var registry = new DurableJobHandlerRegistry();
+        registry.Register("feature", featureHandler);
+        var extension = CreateExtension(
+            Substitute.For<IDurableJobHandler>(),
+            registry: registry,
+            durableJobsInstruments: telemetry.Instruments);
+        var context = CreateJobContext("run-thrown-failure", jobName: "feature");
+
+        var result = await extension.HandleDurableJobAsync(context, CancellationToken.None);
+
+        Assert.True(result.IsFailed);
+        Assert.Same(exception, result.Exception);
+        telemetry.AssertOutcome(context.RunId, "failed", ActivityStatusCode.Error, exception);
+    }
+
+    [Fact]
+    public async Task HandleDurableJobAsync_WhenFeatureHandlerReturnsNull_RecordsFailureTelemetryOnce()
+    {
+        using var telemetry = new HandlerTelemetryCapture();
         var featureHandler = Substitute.For<IDurableJobFeatureHandler>();
         featureHandler.ExecuteJobAsync(Arg.Any<IJobRunContext>(), Arg.Any<CancellationToken>())
             .Returns(ValueTask.FromResult<DurableJobRunResult>(null!));
@@ -233,15 +274,76 @@ public class DurableJobReceiverExtensionTests
         var extension = CreateExtension(
             Substitute.For<IDurableJobHandler>(),
             registry: registry,
-            durableJobsInstruments: instruments);
-        var context = CreateJobContext("run-1", jobName: "feature");
+            durableJobsInstruments: telemetry.Instruments);
+        var context = CreateJobContext("run-null-result", jobName: "feature");
 
         var result = await extension.HandleDurableJobAsync(context, CancellationToken.None);
 
-        Assert.Equal(DurableJobRunStatus.Failed, result.Status);
-        var measurement = Assert.Single(executionCollector.GetMeasurementSnapshot());
-        Assert.Equal(1, measurement.Value);
-        Assert.Equal("failed", measurement.Tags["status"]);
+        Assert.True(result.IsFailed);
+        var exception = Assert.IsType<InvalidOperationException>(result.Exception);
+        telemetry.AssertOutcome(context.RunId, "failed", ActivityStatusCode.Error, exception);
+    }
+
+    [Fact]
+    public async Task HandleDurableJobAsync_WhenFeatureHandlerCancels_RecordsCancellationTelemetryOnce()
+    {
+        using var telemetry = new HandlerTelemetryCapture();
+        using var cancellation = new CancellationTokenSource();
+        cancellation.Cancel();
+        var featureHandler = Substitute.For<IDurableJobFeatureHandler>();
+        featureHandler.ExecuteJobAsync(Arg.Any<IJobRunContext>(), Arg.Any<CancellationToken>())
+            .Returns(ValueTask.FromCanceled<DurableJobRunResult>(cancellation.Token));
+        var registry = new DurableJobHandlerRegistry();
+        registry.Register("feature", featureHandler);
+        var extension = CreateExtension(
+            Substitute.For<IDurableJobHandler>(),
+            registry: registry,
+            durableJobsInstruments: telemetry.Instruments);
+        var context = CreateJobContext("run-canceled", jobName: "feature");
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(
+            () => extension.HandleDurableJobAsync(context, CancellationToken.None).AsTask());
+
+        telemetry.AssertOutcome(context.RunId, "canceled", ActivityStatusCode.Unset);
+    }
+
+    [Fact]
+    public async Task HandleDurableJobAsync_WhenFeatureHandlerReturnsSuccessfulDisposition_RecordsCompletedTelemetryOnce()
+    {
+        using var telemetry = new HandlerTelemetryCapture();
+        var outcomes = new[]
+        {
+            (RunId: "run-completed", Result: DurableJobRunResult.Completed),
+            (RunId: "run-in-progress", Result: DurableJobRunResult.InProgress(TimeSpan.FromSeconds(1))),
+            (RunId: "run-rescheduled", Result: DurableJobRunResult.RescheduleAt(DateTimeOffset.UtcNow.AddHours(1)))
+        };
+
+        foreach (var outcome in outcomes)
+        {
+            var featureHandler = Substitute.For<IDurableJobFeatureHandler>();
+            featureHandler.ExecuteJobAsync(Arg.Any<IJobRunContext>(), Arg.Any<CancellationToken>())
+                .Returns(ValueTask.FromResult(outcome.Result));
+            var registry = new DurableJobHandlerRegistry();
+            registry.Register("feature", featureHandler);
+            var extension = CreateExtension(
+                Substitute.For<IDurableJobHandler>(),
+                registry: registry,
+                durableJobsInstruments: telemetry.Instruments);
+            var context = CreateJobContext(outcome.RunId, jobName: "feature");
+
+            var result = await extension.HandleDurableJobAsync(context, CancellationToken.None);
+
+            Assert.Same(outcome.Result, result);
+        }
+
+        foreach (var outcome in outcomes)
+        {
+            telemetry.AssertOutcome(
+                outcome.RunId,
+                "completed",
+                ActivityStatusCode.Ok,
+                expectedInvocationCount: outcomes.Length);
+        }
     }
 
     [Fact]
@@ -398,6 +500,88 @@ public class DurableJobReceiverExtensionTests
                     Interlocked.Decrement(ref _owner._activeTimerCount);
                 }
             }
+        }
+    }
+
+    private sealed class HandlerTelemetryCapture : IDisposable
+    {
+        private readonly ConcurrentQueue<Activity> _activities = new();
+        private readonly ServiceProvider _serviceProvider;
+        private readonly ActivityListener _activityListener;
+        private readonly MetricCollector<long> _startedCollector;
+        private readonly MetricCollector<long> _executionCollector;
+
+        public HandlerTelemetryCapture()
+        {
+            var services = new ServiceCollection();
+            services.AddMetrics();
+            _serviceProvider = services.BuildServiceProvider();
+            var meterFactory = _serviceProvider.GetRequiredService<IMeterFactory>();
+            Instruments = new DurableJobsInstruments(new OrleansInstruments(meterFactory));
+            _startedCollector = new MetricCollector<long>(
+                meterFactory,
+                "Microsoft.Orleans",
+                "orleans-durablejobs-handler-executions-started");
+            _executionCollector = new MetricCollector<long>(
+                meterFactory,
+                "Microsoft.Orleans",
+                "orleans-durablejobs-handler-executions");
+            _activityListener = new ActivityListener
+            {
+                ShouldListenTo = static source => ReferenceEquals(source, DurableJobsDiagnostics.Source),
+                Sample = static (ref ActivityCreationOptions<ActivityContext> _) => ActivitySamplingResult.AllDataAndRecorded,
+                SampleUsingParentId = static (ref ActivityCreationOptions<string> _) => ActivitySamplingResult.AllDataAndRecorded,
+                ActivityStopped = activity => _activities.Enqueue(activity)
+            };
+            ActivitySource.AddActivityListener(_activityListener);
+        }
+
+        public DurableJobsInstruments Instruments { get; }
+
+        public void AssertOutcome(
+            string runId,
+            string expectedMetricStatus,
+            ActivityStatusCode expectedActivityStatus,
+            Exception? exception = null,
+            int expectedInvocationCount = 1)
+        {
+            var started = _startedCollector.GetMeasurementSnapshot();
+            Assert.Equal(expectedInvocationCount, started.Count);
+            Assert.All(started, static measurement => Assert.Equal(1, measurement.Value));
+            var executions = _executionCollector.GetMeasurementSnapshot();
+            Assert.Equal(expectedInvocationCount, executions.Count);
+            Assert.All(executions, measurement =>
+            {
+                Assert.Equal(1, measurement.Value);
+                Assert.Equal(expectedMetricStatus, measurement.Tags["status"]);
+            });
+
+            var activity = Assert.Single(
+                _activities,
+                activity => activity.OperationName == DurableJobsDiagnostics.ActivityExecuteJobHandler
+                    && activity.GetTagItem(ActivityTagKeys.DurableJobRunId) is string activityRunId
+                    && activityRunId == runId);
+            Assert.Equal(expectedActivityStatus, activity.Status);
+            if (exception is null)
+            {
+                Assert.Null(activity.GetTagItem(ActivityTagKeys.ExceptionType));
+                Assert.Null(activity.GetTagItem(ActivityTagKeys.ExceptionMessage));
+                Assert.Null(activity.StatusDescription);
+            }
+            else
+            {
+                Assert.Equal(exception.GetType().FullName, activity.GetTagItem(ActivityTagKeys.ExceptionType));
+                Assert.Equal(exception.Message, activity.GetTagItem(ActivityTagKeys.ExceptionMessage));
+                Assert.Equal(exception.Message, activity.StatusDescription);
+            }
+        }
+
+        public void Dispose()
+        {
+            _activityListener.Dispose();
+            _executionCollector.Dispose();
+            _startedCollector.Dispose();
+            _serviceProvider.Dispose();
         }
     }
 }

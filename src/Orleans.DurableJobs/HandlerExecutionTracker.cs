@@ -6,8 +6,9 @@ namespace Orleans.DurableJobs;
 /// <summary>
 /// Tracks a single invocation of <see cref="IDurableJobHandler.ExecuteJobAsync"/>, recording the
 /// associated metrics via <see cref="DurableJobsInstruments"/> and the distributed-tracing activity
-/// via <see cref="DurableJobsDiagnostics"/>. Callers must call exactly one of <see cref="Completed"/>,
-/// <see cref="Canceled"/>, or <see cref="Failed"/> before disposal.
+/// via <see cref="DurableJobsDiagnostics"/>. Callers must record exactly one terminal telemetry outcome
+/// using <see cref="RecordResult"/>, <see cref="Completed"/>, <see cref="Canceled"/>, or <see cref="Failed"/>
+/// before disposal.
 /// </summary>
 internal readonly struct HandlerExecutionTracker : IDisposable
 {
@@ -27,6 +28,23 @@ internal readonly struct HandlerExecutionTracker : IDisposable
         _startTimestamp = timeProvider.GetTimestamp();
         _durableJobsInstruments.OnHandlerExecutionStarted();
         _activity = DurableJobsDiagnostics.StartHandlerActivity(context.Job, context.DequeueCount, context.RunId);
+    }
+
+    /// <summary>
+    /// Records failed telemetry for a failed result and completed telemetry for every non-failed disposition.
+    /// </summary>
+    public void RecordResult(DurableJobRunResult result)
+    {
+        ArgumentNullException.ThrowIfNull(result);
+
+        if (result.IsFailed)
+        {
+            Failed(result.Exception);
+        }
+        else
+        {
+            Completed();
+        }
     }
 
     /// <summary>
