@@ -208,18 +208,9 @@ namespace Orleans.Runtime
                 List<Exception>? cleanupExceptions = null;
                 if (!startAttempted)
                 {
-                    try
+                    if (activations.RemoveTarget(result))
                     {
-                        result.Deactivate(
-                            new DeactivationReason(
-                                DeactivationReasonCode.ActivationFailed,
-                                exception,
-                                "Error preparing grain activation."),
-                            CancellationToken.None);
-                    }
-                    catch (Exception cleanupException)
-                    {
-                        (cleanupExceptions ??= []).Add(cleanupException);
+                        LogTraceUnregisteredActivation(result);
                     }
 
                     try

@@ -1,5 +1,7 @@
+using System.Diagnostics;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.CodeGeneration;
+using Orleans.Diagnostics;
 using Orleans.Runtime;
 using Orleans.Runtime.Diagnostics;
 using Orleans.TestingHost.Diagnostics;
@@ -16,6 +18,43 @@ public sealed class ActivationStartupTests(ActivationStartupTestFixture fixture)
     : IClassFixture<ActivationStartupTestFixture>
 {
     private static readonly TimeSpan Timeout = TimeSpan.FromSeconds(30);
+
+    [Fact]
+    public void FailureBeforeStartAbortsAndUnregistersPreparedContext()
+    {
+        var (grainId, scenario) = fixture.CreateScenario(
+            ActivationStartupCompletion.ImmediateSuccess,
+            ActivationStartupDisposal.Synchronous);
+        var failActivityCreation = new AsyncLocal<bool>();
+        var expected = new InvalidOperationException("activity-start-fault");
+        using var listener = new ActivityListener
+        {
+            ShouldListenTo = static source =>
+                source.Name == ActivitySources.LifecycleActivitySourceName,
+            Sample = (ref ActivityCreationOptions<ActivityContext> _) =>
+                failActivityCreation.Value ? throw expected : ActivitySamplingResult.None,
+            SampleUsingParentId = (ref ActivityCreationOptions<string> _) =>
+                failActivityCreation.Value ? throw expected : ActivitySamplingResult.None,
+        };
+        ActivitySource.AddActivityListener(listener);
+
+        try
+        {
+            failActivityCreation.Value = true;
+            var actual = Assert.Throws<InvalidOperationException>(() => fixture.StartActivation(grainId));
+
+            Assert.Same(expected, actual);
+            Assert.Null(fixture.ActivationDirectory.FindTarget(grainId));
+            Assert.Equal(0, scenario.CreateCount);
+            Assert.Equal(0, scenario.ConstructorCount);
+            Assert.Equal(0, scenario.OnActivateCount);
+        }
+        finally
+        {
+            failActivityCreation.Value = false;
+            fixture.RemoveScenario(grainId);
+        }
+    }
 
     [Fact]
     public async Task AsyncActivation_OrdersLifecycleCallbacksAndCleanup()
