@@ -444,20 +444,17 @@ namespace Orleans.Streams
                     else if (effectiveHandshakeToken is StartToken or DeliveryToken
                         && effectiveHandshakeToken.Token is { } requestedToken)
                     {
-                        cursorStartToken = requestedHandshakeToken is DeliveryToken
+                        var isDeliveryToken = requestedHandshakeToken is DeliveryToken;
+                        cursorStartToken = isDeliveryToken
                             ? cacheToken ?? consumerData.PendingStartToken ?? requestedToken
                             : requestedToken;
                         consumerData.SafeDisposeCursor(logger);
                         try
                         {
-                            consumerData.Cursor = queueCache.GetCacheCursor(consumerData.StreamId, cursorStartToken);
-                            if (effectiveHandshakeToken is DeliveryToken
-                                || effectiveHandshakeToken is StartToken
-                                    && SubscriptionMarker.IsImplicitSubscription(consumerData.SubscriptionId.Guid))
+                            var newCursor = queueCache.GetCacheCursor(consumerData.StreamId, cursorStartToken);
+                            if (isDeliveryToken)
                             {
-                                // Delivery tokens and implicit recovery tokens identify already processed events.
-                                if (effectiveHandshakeToken is DeliveryToken
-                                    && consumerData.Cursor is IQueueCacheCursorProgress progressCursor)
+                                if (newCursor is IQueueCacheCursorProgress progressCursor)
                                 {
                                     progressCursor.SetDeliveredThrough(requestedToken);
                                 }
@@ -465,16 +462,31 @@ namespace Orleans.Streams
                                 {
                                     if (!Equals(cursorStartToken, requestedToken))
                                     {
-                                        consumerData.Cursor.Dispose();
+                                        newCursor.Dispose();
                                         cursorStartToken = requestedToken;
-                                        consumerData.Cursor = queueCache.GetCacheCursor(consumerData.StreamId, requestedToken);
+                                        newCursor = queueCache.GetCacheCursor(consumerData.StreamId, requestedToken);
                                     }
-
                                     consumerData.PendingBatch = AdvanceCursorPastToken(
-                                        consumerData.Cursor,
+                                        newCursor,
                                         requestedToken);
                                 }
                             }
+                            else if (effectiveHandshakeToken is StartToken
+                                && SubscriptionMarker.IsImplicitSubscription(consumerData.SubscriptionId.Guid))
+                            {
+                                if (newCursor is IQueueCacheCursorProgress progressCursor)
+                                {
+                                    progressCursor.AdvancePast(requestedToken);
+                                }
+                                else
+                                {
+                                    consumerData.PendingBatch = AdvanceCursorPastToken(
+                                        newCursor,
+                                        requestedToken);
+                                }
+                            }
+
+                            consumerData.Cursor = newCursor;
                             cursorRepositioned = true;
                         }
                         catch (QueueCacheMissException) when (cacheToken is not null)
@@ -484,6 +496,12 @@ namespace Orleans.Streams
                             consumerData.SafeDisposeCursor(logger);
                             cursorStartToken = cacheToken;
                             consumerData.Cursor = queueCache.GetCacheCursor(consumerData.StreamId, cacheToken);
+                            if (requestedHandshakeToken is DeliveryToken
+                                && consumerData.Cursor is IQueueCacheCursorProgress progressCursor)
+                            {
+                                progressCursor.SetDeliveredThrough(requestedToken);
+                            }
+
                             cursorRepositioned = true;
                         }
                     }
