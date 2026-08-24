@@ -56,10 +56,11 @@ Every multi-silo production cluster needs a shared membership provider.
 | [Microsoft.Orleans.Persistence.AzureStorage](https://www.nuget.org/packages/Microsoft.Orleans.Persistence.AzureStorage) | Azure Table and Blob Storage |
 | [Microsoft.Orleans.Persistence.Cosmos](https://www.nuget.org/packages/Microsoft.Orleans.Persistence.Cosmos) | Azure Cosmos DB |
 | [Microsoft.Orleans.Persistence.DynamoDB](https://www.nuget.org/packages/Microsoft.Orleans.Persistence.DynamoDB) | Amazon DynamoDB |
-| [Microsoft.Orleans.Persistence.FileStorage](https://www.nuget.org/packages/Microsoft.Orleans.Persistence.FileStorage) | Local files for single-silo development and testing |
 | [Microsoft.Orleans.Persistence.Firestore](https://www.nuget.org/packages/Microsoft.Orleans.Persistence.Firestore) | Google Cloud Firestore |
 | [Microsoft.Orleans.Persistence.Redis](https://www.nuget.org/packages/Microsoft.Orleans.Persistence.Redis) | Redis |
 | [Microsoft.Orleans.Persistence.Memory](https://www.nuget.org/packages/Microsoft.Orleans.Persistence.Memory) | Process memory for development and testing |
+
+File storage for local, single-silo development and testing is included in [Microsoft.Orleans.Runtime](https://www.nuget.org/packages/Microsoft.Orleans.Runtime).
 
 Memory persistence distributes records across cluster storage grains but isn't durable or replicated. Use it only when losing records with a hosting process is acceptable.
 

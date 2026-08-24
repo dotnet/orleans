@@ -525,6 +525,40 @@ namespace Orleans.Metadata
     }
 }
 
+namespace Orleans.Persistence.FileStorage
+{
+    public sealed partial class FileGrainStorage : Storage.IGrainStorage, ILifecycleParticipant<Runtime.ISiloLifecycle>
+    {
+        public FileGrainStorage(string storageName, FileGrainStorageOptions options, Microsoft.Extensions.Options.IOptions<Configuration.ClusterOptions> clusterOptions, Serialization.Serializers.IActivatorProvider activatorProvider) { }
+
+        public System.Threading.Tasks.Task ClearStateAsync<T>(string stateName, Runtime.GrainId grainId, IGrainState<T> grainState) { throw null; }
+
+        public void Participate(Runtime.ISiloLifecycle lifecycle) { }
+
+        public System.Threading.Tasks.Task ReadStateAsync<T>(string stateName, Runtime.GrainId grainId, IGrainState<T> grainState) { throw null; }
+
+        public System.Threading.Tasks.Task WriteStateAsync<T>(string stateName, Runtime.GrainId grainId, IGrainState<T> grainState) { throw null; }
+    }
+
+    public sealed partial class FileGrainStorageOptions : Storage.IStorageProviderSerializerOptions
+    {
+        public required Storage.IGrainStorageSerializer GrainStorageSerializer { get { throw null; } set { } }
+
+        public required string RootDirectory { get { throw null; } set { } }
+    }
+
+    public static partial class FileSiloBuilderExtensions
+    {
+        public static Microsoft.Extensions.DependencyInjection.IServiceCollection AddFileGrainStorage(this Microsoft.Extensions.DependencyInjection.IServiceCollection services, System.Action<FileGrainStorageOptions> options) { throw null; }
+
+        public static Microsoft.Extensions.DependencyInjection.IServiceCollection AddFileGrainStorage(this Microsoft.Extensions.DependencyInjection.IServiceCollection services, string providerName, System.Action<FileGrainStorageOptions> options) { throw null; }
+
+        public static Hosting.ISiloBuilder AddFileGrainStorage(this Hosting.ISiloBuilder builder, System.Action<FileGrainStorageOptions> options) { throw null; }
+
+        public static Hosting.ISiloBuilder AddFileGrainStorage(this Hosting.ISiloBuilder builder, string providerName, System.Action<FileGrainStorageOptions> options) { throw null; }
+    }
+}
+
 namespace Orleans.Runtime
 {
     [GenerateSerializer]
