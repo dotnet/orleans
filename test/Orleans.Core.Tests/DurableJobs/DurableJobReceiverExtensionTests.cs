@@ -110,7 +110,7 @@ public class DurableJobReceiverExtensionTests
     }
 
     [Fact]
-    public async Task HandleDurableJobAsync_DeduplicatesDifferentRunIdsForSameJobAttempt()
+    public async Task HandleDurableJobAsync_CoalescesActiveDeliveriesAndReexecutesAfterCompletion()
     {
         var executionTask = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
         var handler = Substitute.For<IDurableJobHandler>();
@@ -134,14 +134,14 @@ public class DurableJobReceiverExtensionTests
         Assert.Equal(DurableJobRunStatus.Completed, completed.Status);
         await handler.Received(1).ExecuteJobAsync(Arg.Any<IJobRunContext>(), Arg.Any<CancellationToken>());
 
-        var duplicateAfterCompletion = await extension.HandleDurableJobAsync(secondNotification, CancellationToken.None);
-        Assert.Equal(DurableJobRunStatus.Completed, duplicateAfterCompletion.Status);
-        await handler.Received(1).ExecuteJobAsync(Arg.Any<IJobRunContext>(), Arg.Any<CancellationToken>());
+        var redeliveryAfterCompletion = await extension.HandleDurableJobAsync(secondNotification, CancellationToken.None);
+        Assert.Equal(DurableJobRunStatus.Completed, redeliveryAfterCompletion.Status);
+        await handler.Received(2).ExecuteJobAsync(Arg.Any<IJobRunContext>(), Arg.Any<CancellationToken>());
 
         var nextAttempt = CreateJobContext("run-3", jobId: "job-1", dequeueCount: 2);
         var retryResult = await extension.HandleDurableJobAsync(nextAttempt, CancellationToken.None);
         Assert.Equal(DurableJobRunStatus.Completed, retryResult.Status);
-        await handler.Received(2).ExecuteJobAsync(Arg.Any<IJobRunContext>(), Arg.Any<CancellationToken>());
+        await handler.Received(3).ExecuteJobAsync(Arg.Any<IJobRunContext>(), Arg.Any<CancellationToken>());
     }
 
     [Fact]
@@ -158,25 +158,6 @@ public class DurableJobReceiverExtensionTests
         Assert.Equal(DurableJobRunStatus.Completed, (await extension.HandleDurableJobAsync(firstRun, CancellationToken.None)).Status);
         Assert.Equal(DurableJobRunStatus.Completed, (await extension.HandleDurableJobAsync(rescheduledRun, CancellationToken.None)).Status);
         await handler.Received(2).ExecuteJobAsync(Arg.Any<IJobRunContext>(), Arg.Any<CancellationToken>());
-    }
-
-    [Fact]
-    public async Task HandleDurableJobAsync_DeduplicatesDelayedDuplicateWithinConfiguredRetentionHorizon()
-    {
-        var timeProvider = new FakeTimeProvider(new DateTimeOffset(2026, 1, 1, 0, 0, 0, TimeSpan.Zero));
-        var handler = Substitute.For<IDurableJobHandler>();
-        handler.ExecuteJobAsync(Arg.Any<IJobRunContext>(), Arg.Any<CancellationToken>()).Returns(Task.CompletedTask);
-        var extension = CreateExtension(
-            handler,
-            timeProvider: timeProvider,
-            completedAttemptRetentionPeriod: TimeSpan.FromHours(1));
-        var context = CreateJobContext("run-1");
-
-        Assert.Equal(DurableJobRunStatus.Completed, (await extension.HandleDurableJobAsync(context, CancellationToken.None)).Status);
-        timeProvider.Advance(TimeSpan.FromMinutes(59));
-        Assert.Equal(DurableJobRunStatus.Completed, (await extension.HandleDurableJobAsync(context, CancellationToken.None)).Status);
-
-        await handler.Received(1).ExecuteJobAsync(context, Arg.Any<CancellationToken>());
     }
 
     [Fact]
@@ -231,12 +212,17 @@ public class DurableJobReceiverExtensionTests
             Substitute.For<IDurableJobHandler>(),
             registry: registry,
             durableJobsInstruments: telemetry.Instruments);
-        var context = CreateJobContext("run-explicit-failure", jobName: "feature");
+        var firstContext = CreateJobContext("run-explicit-failure-1", jobName: "feature");
+        var secondContext = CreateJobContext("run-explicit-failure-2", jobName: "feature");
 
-        var result = await extension.HandleDurableJobAsync(context, CancellationToken.None);
+        var firstResult = await extension.HandleDurableJobAsync(firstContext, CancellationToken.None);
+        var secondResult = await extension.HandleDurableJobAsync(secondContext, CancellationToken.None);
 
-        Assert.Same(expected, result);
-        telemetry.AssertOutcome(context.RunId, "failed", ActivityStatusCode.Error, exception);
+        Assert.Same(expected, firstResult);
+        Assert.Same(expected, secondResult);
+        await featureHandler.Received(2).ExecuteJobAsync(Arg.Any<IJobRunContext>(), Arg.Any<CancellationToken>());
+        telemetry.AssertOutcome(firstContext.RunId, "failed", ActivityStatusCode.Error, exception, expectedInvocationCount: 2);
+        telemetry.AssertOutcome(secondContext.RunId, "failed", ActivityStatusCode.Error, exception, expectedInvocationCount: 2);
     }
 
     [Fact]
@@ -253,13 +239,19 @@ public class DurableJobReceiverExtensionTests
             Substitute.For<IDurableJobHandler>(),
             registry: registry,
             durableJobsInstruments: telemetry.Instruments);
-        var context = CreateJobContext("run-thrown-failure", jobName: "feature");
+        var firstContext = CreateJobContext("run-thrown-failure-1", jobName: "feature");
+        var secondContext = CreateJobContext("run-thrown-failure-2", jobName: "feature");
 
-        var result = await extension.HandleDurableJobAsync(context, CancellationToken.None);
+        var firstResult = await extension.HandleDurableJobAsync(firstContext, CancellationToken.None);
+        var secondResult = await extension.HandleDurableJobAsync(secondContext, CancellationToken.None);
 
-        Assert.True(result.IsFailed);
-        Assert.Same(exception, result.Exception);
-        telemetry.AssertOutcome(context.RunId, "failed", ActivityStatusCode.Error, exception);
+        Assert.True(firstResult.IsFailed);
+        Assert.True(secondResult.IsFailed);
+        Assert.Same(exception, firstResult.Exception);
+        Assert.Same(exception, secondResult.Exception);
+        await featureHandler.Received(2).ExecuteJobAsync(Arg.Any<IJobRunContext>(), Arg.Any<CancellationToken>());
+        telemetry.AssertOutcome(firstContext.RunId, "failed", ActivityStatusCode.Error, exception, expectedInvocationCount: 2);
+        telemetry.AssertOutcome(secondContext.RunId, "failed", ActivityStatusCode.Error, exception, expectedInvocationCount: 2);
     }
 
     [Fact]
@@ -275,13 +267,20 @@ public class DurableJobReceiverExtensionTests
             Substitute.For<IDurableJobHandler>(),
             registry: registry,
             durableJobsInstruments: telemetry.Instruments);
-        var context = CreateJobContext("run-null-result", jobName: "feature");
+        var firstContext = CreateJobContext("run-null-result-1", jobName: "feature");
+        var secondContext = CreateJobContext("run-null-result-2", jobName: "feature");
 
-        var result = await extension.HandleDurableJobAsync(context, CancellationToken.None);
+        var firstResult = await extension.HandleDurableJobAsync(firstContext, CancellationToken.None);
+        var secondResult = await extension.HandleDurableJobAsync(secondContext, CancellationToken.None);
 
-        Assert.True(result.IsFailed);
-        var exception = Assert.IsType<InvalidOperationException>(result.Exception);
-        telemetry.AssertOutcome(context.RunId, "failed", ActivityStatusCode.Error, exception);
+        Assert.True(firstResult.IsFailed);
+        Assert.True(secondResult.IsFailed);
+        var firstException = Assert.IsType<InvalidOperationException>(firstResult.Exception);
+        var secondException = Assert.IsType<InvalidOperationException>(secondResult.Exception);
+        Assert.Equal(firstException.Message, secondException.Message);
+        await featureHandler.Received(2).ExecuteJobAsync(Arg.Any<IJobRunContext>(), Arg.Any<CancellationToken>());
+        telemetry.AssertOutcome(firstContext.RunId, "failed", ActivityStatusCode.Error, firstException, expectedInvocationCount: 2);
+        telemetry.AssertOutcome(secondContext.RunId, "failed", ActivityStatusCode.Error, secondException, expectedInvocationCount: 2);
     }
 
     [Fact]
@@ -299,12 +298,17 @@ public class DurableJobReceiverExtensionTests
             Substitute.For<IDurableJobHandler>(),
             registry: registry,
             durableJobsInstruments: telemetry.Instruments);
-        var context = CreateJobContext("run-canceled", jobName: "feature");
+        var firstContext = CreateJobContext("run-canceled-1", jobName: "feature");
+        var secondContext = CreateJobContext("run-canceled-2", jobName: "feature");
 
         await Assert.ThrowsAnyAsync<OperationCanceledException>(
-            () => extension.HandleDurableJobAsync(context, CancellationToken.None).AsTask());
+            () => extension.HandleDurableJobAsync(firstContext, CancellationToken.None).AsTask());
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(
+            () => extension.HandleDurableJobAsync(secondContext, CancellationToken.None).AsTask());
 
-        telemetry.AssertOutcome(context.RunId, "canceled", ActivityStatusCode.Unset);
+        await featureHandler.Received(2).ExecuteJobAsync(Arg.Any<IJobRunContext>(), Arg.Any<CancellationToken>());
+        telemetry.AssertOutcome(firstContext.RunId, "canceled", ActivityStatusCode.Unset, expectedInvocationCount: 2);
+        telemetry.AssertOutcome(secondContext.RunId, "canceled", ActivityStatusCode.Unset, expectedInvocationCount: 2);
     }
 
     [Fact]
@@ -313,10 +317,11 @@ public class DurableJobReceiverExtensionTests
         using var telemetry = new HandlerTelemetryCapture();
         var outcomes = new[]
         {
-            (RunId: "run-completed", Result: DurableJobRunResult.Completed),
-            (RunId: "run-in-progress", Result: DurableJobRunResult.InProgress(TimeSpan.FromSeconds(1))),
-            (RunId: "run-rescheduled", Result: DurableJobRunResult.RescheduleAt(DateTimeOffset.UtcNow.AddHours(1)))
+            (RunIds: new[] { "run-completed-1", "run-completed-2" }, Result: DurableJobRunResult.Completed),
+            (RunIds: new[] { "run-in-progress" }, Result: DurableJobRunResult.InProgress(TimeSpan.FromSeconds(1))),
+            (RunIds: new[] { "run-rescheduled-1", "run-rescheduled-2" }, Result: DurableJobRunResult.RescheduleAt(DateTimeOffset.UtcNow.AddHours(1)))
         };
+        var expectedInvocationCount = outcomes.Sum(static outcome => outcome.RunIds.Length);
 
         foreach (var outcome in outcomes)
         {
@@ -329,20 +334,30 @@ public class DurableJobReceiverExtensionTests
                 Substitute.For<IDurableJobHandler>(),
                 registry: registry,
                 durableJobsInstruments: telemetry.Instruments);
-            var context = CreateJobContext(outcome.RunId, jobName: "feature");
 
-            var result = await extension.HandleDurableJobAsync(context, CancellationToken.None);
+            foreach (var runId in outcome.RunIds)
+            {
+                var context = CreateJobContext(runId, jobName: "feature");
+                var result = await extension.HandleDurableJobAsync(context, CancellationToken.None);
 
-            Assert.Same(outcome.Result, result);
+                Assert.Same(outcome.Result, result);
+            }
+
+            await featureHandler.Received(outcome.RunIds.Length).ExecuteJobAsync(
+                Arg.Any<IJobRunContext>(),
+                Arg.Any<CancellationToken>());
         }
 
         foreach (var outcome in outcomes)
         {
-            telemetry.AssertOutcome(
-                outcome.RunId,
-                "completed",
-                ActivityStatusCode.Ok,
-                expectedInvocationCount: outcomes.Length);
+            foreach (var runId in outcome.RunIds)
+            {
+                telemetry.AssertOutcome(
+                    runId,
+                    "completed",
+                    ActivityStatusCode.Ok,
+                    expectedInvocationCount: expectedInvocationCount);
+            }
         }
     }
 
@@ -401,7 +416,6 @@ public class DurableJobReceiverExtensionTests
         object handler,
         TimeSpan? jobStatusPollInterval = null,
         TimeProvider? timeProvider = null,
-        TimeSpan? completedAttemptRetentionPeriod = null,
         DurableJobHandlerRegistry? registry = null,
         DurableJobsInstruments? durableJobsInstruments = null)
     {
@@ -412,8 +426,7 @@ public class DurableJobReceiverExtensionTests
             NullLogger<DurableJobReceiverExtension>.Instance,
             Options.Create(new DurableJobsOptions
             {
-                JobStatusPollInterval = jobStatusPollInterval ?? TimeSpan.FromSeconds(1),
-                CompletedJobAttemptRetentionPeriod = completedAttemptRetentionPeriod ?? TimeSpan.FromMinutes(10)
+                JobStatusPollInterval = jobStatusPollInterval ?? TimeSpan.FromSeconds(1)
             }),
             Options.Create(new SiloMessagingOptions()),
             timeProvider ?? TimeProvider.System,
