@@ -1058,6 +1058,11 @@ namespace Orleans.Streams
                         return false;
                     }
 
+                    if (consumer.State == StreamConsumerDataState.Active)
+                    {
+                        return false;
+                    }
+
                     var current = consumer.LastProcessedToken;
                     if (current is null)
                     {
