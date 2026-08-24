@@ -30,14 +30,15 @@ public class GrainContextActivatorTests
     }
 
     [Fact]
-    public void CreatePreparedContext_CustomActivatorRemainsEager()
+    public void PreparedContextCreate_CustomActivatorRemainsEager()
     {
         var events = new List<string>();
         var context = Substitute.For<IGrainContext>();
-        var activator = CreateActivator(new TestGrainContextActivator(context, events), events);
+        var activator = new TestGrainContextActivator(context, events);
         var address = new GrainAddress { GrainId = GrainId.Create("test", "grain") };
+        IConfigureGrainContext[] configureActions = [new TestConfigureGrainContext(events)];
 
-        var preparedContext = activator.CreatePreparedContext(address);
+        var preparedContext = PreparedGrainContext.Create(activator, address, configureActions);
         using var startup = preparedContext.Start();
         preparedContext.Abort();
 
@@ -55,6 +56,34 @@ public class GrainContextActivatorTests
 
         Assert.Same(context, activator.CreateInstance(address));
         Assert.Equal(["configure", "create", "start", "release"], events);
+    }
+
+    [Fact]
+    public void PreparedContext_AbortDoesNotStart()
+    {
+        var events = new List<string>();
+        var context = Substitute.For<IGrainContext>();
+        var preparedContext = new PreparedGrainContext(context, new TestGrainContextStartup(events));
+
+        preparedContext.Abort();
+
+        Assert.Equal(["abort"], events);
+    }
+
+    [Fact]
+    public void PreparedContext_StartFailureAbortsExactlyOnce()
+    {
+        var events = new List<string>();
+        var context = Substitute.For<IGrainContext>();
+        var expected = new InvalidOperationException("start-fault");
+        var preparedContext = new PreparedGrainContext(
+            context,
+            new ThrowingGrainContextStartup(events, expected));
+
+        var actual = Assert.Throws<InvalidOperationException>(preparedContext.Start);
+
+        Assert.Same(expected, actual);
+        Assert.Equal(["start", "abort"], events);
     }
 
     private static GrainContextActivator CreateActivator(
@@ -152,5 +181,18 @@ public class GrainContextActivatorTests
                 events.Add("release");
             }
         }
+    }
+
+    private sealed class ThrowingGrainContextStartup(
+        List<string> events,
+        Exception exception) : IGrainContextStartup
+    {
+        public IDisposable Start()
+        {
+            events.Add("start");
+            throw exception;
+        }
+
+        public void Abort() => events.Add("abort");
     }
 }
