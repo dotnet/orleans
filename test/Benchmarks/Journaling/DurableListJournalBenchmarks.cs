@@ -130,8 +130,6 @@ public class DurableListJournalBenchmarks
 
         public void RegisterState(string name, IJournaledState state) => state.Reset(buffer.CreateJournalStreamWriter(streamId));
 
-        public void RegisterObserver(IJournaledStateObserver observer) { }
-
         public bool TryGetState(string name, [NotNullWhen(true)] out IJournaledState state)
         {
             state = null!;

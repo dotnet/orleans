@@ -2,22 +2,18 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace Orleans.Journaling;
 
-public abstract class DurableGrain : Grain, IGrainBase, ILifecycleParticipant<IGrainLifecycle>
+public abstract class DurableGrain : Grain, IGrainBase
 {
     protected DurableGrain()
     {
         StateManager = ServiceProvider.GetRequiredService<IJournaledStateManager>();
+        if (StateManager is ILifecycleParticipant<IGrainLifecycle> participant)
+        {
+            participant.Participate(((IGrainBase)this).GrainContext.ObservableLifecycle);
+        }
     }
 
     protected IJournaledStateManager StateManager { get; }
-
-    void ILifecycleParticipant<IGrainLifecycle>.Participate(IGrainLifecycle lifecycle)
-    {
-        if (StateManager is ILifecycleParticipant<IGrainLifecycle> participant)
-        {
-            participant.Participate(lifecycle);
-        }
-    }
 
     protected TState GetOrCreateState<TState>(string name) where TState : class, IJournaledState
         => GetOrCreateState(name, static sp => sp.GetRequiredService<TState>(), ServiceProvider);
@@ -35,11 +31,5 @@ public abstract class DurableGrain : Grain, IGrainBase, ILifecycleParticipant<IG
         return result;
     }
 
-    /// <summary>
-    /// Writes pending journaled state.
-    /// </summary>
-    /// <param name="cancellationToken">Cancellation token.</param>
-    /// <returns>A task which completes when the state is written.</returns>
-    protected ValueTask WriteStateAsync(CancellationToken cancellationToken = default) =>
-        StateManager.WriteStateAsync(cancellationToken);
+    protected ValueTask WriteStateAsync(CancellationToken cancellationToken = default) => StateManager.WriteStateAsync(cancellationToken);
 }

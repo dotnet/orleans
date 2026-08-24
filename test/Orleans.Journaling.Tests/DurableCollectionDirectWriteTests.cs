@@ -197,8 +197,6 @@ public sealed class DurableCollectionDirectWriteTests
 
         public void RegisterState(string name, IJournaledState state) => state.Reset(writer.CreateWriter());
 
-        public void RegisterObserver(IJournaledStateObserver observer) { }
-
         public bool TryGetState(string name, [NotNullWhen(true)] out IJournaledState? state)
         {
             state = null;

@@ -113,7 +113,7 @@ internal sealed class OrleansBinaryDurableQueueCommandCodec<T>(
         consumer.Reset(count);
         for (var i = 0; i < count; i++)
         {
-            consumer.ApplyEnqueue(OrleansBinaryCommandCodecHelpers.ReadIndependentValue(codec, ref reader));
+            consumer.ApplyEnqueue(OrleansBinaryCommandCodecHelpers.ReadValue(codec, ref reader));
         }
     }
 
