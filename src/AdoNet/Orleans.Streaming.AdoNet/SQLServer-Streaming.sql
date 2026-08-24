@@ -366,7 +366,8 @@ BEGIN
         WHERE ServiceId = @ServiceId
             AND ProviderId = @ProviderId
             AND QueueId = @QueueId
-            AND MessageId <= @Checkpoint;
+            AND MessageId <= @Checkpoint
+            AND CheckpointedOn IS NULL;
 
         SELECT @OwnerEpoch = OwnerEpoch
         FROM OrleansStreamPartition
@@ -455,7 +456,8 @@ BEGIN
             WHERE ServiceId = @ServiceId
                 AND ProviderId = @ProviderId
                 AND QueueId = @QueueId
-                AND MessageId <= @Checkpoint;
+                AND MessageId <= @Checkpoint
+                AND CheckpointedOn IS NULL;
         END;
 
         IF @StartedTransaction = 1
