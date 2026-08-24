@@ -141,6 +141,9 @@ namespace Orleans.Streams
         Task<bool> ITestAccessor.DoHandshakeWithConsumer(StreamConsumerData consumerData, StreamSequenceToken? cacheToken)
             => this.RunOrQueueTaskResult(() => DoHandshakeWithConsumer(consumerData, cacheToken)).Unwrap();
 
+        Task ITestAccessor.RunConsumerCursor(StreamConsumerData consumerData)
+            => this.RunOrQueueTask(() => RunConsumerCursor(consumerData));
+
         Task<IReadOnlyDictionary<QualifiedStreamId, StreamConsumerCollection>> ITestAccessor.GetPubSubCache()
             => this.RunOrQueueTaskResult(() => (IReadOnlyDictionary<QualifiedStreamId, StreamConsumerCollection>)new Dictionary<QualifiedStreamId, StreamConsumerCollection>(pubSubCache));
 
@@ -494,18 +497,30 @@ namespace Orleans.Streams
                     else if (effectiveHandshakeToken is StartToken or DeliveryToken
                         && effectiveHandshakeToken.Token is { } requestedToken)
                     {
-                        cursorStartToken = requestedToken;
+                        cursorStartToken = requestedHandshakeToken is DeliveryToken
+                            ? cacheToken ?? consumerData.PendingStartToken ?? requestedToken
+                            : requestedToken;
                         consumerData.SafeDisposeCursor(logger);
                         if (effectiveHandshakeToken is DeliveryToken
                             || effectiveHandshakeToken is StartToken
                                 && SubscriptionMarker.IsImplicitSubscription(consumerData.SubscriptionId.Guid))
                         {
-                            // Delivery tokens and implicit recovery tokens identify already processed events.
-                            consumerData.Cursor = GetAdvancedCursorOrFallback(
-                                consumerData.StreamId,
-                                requestedToken,
-                                cacheToken,
-                                out consumerData.PendingBatch);
+                            consumerData.Cursor = GetCacheCursorOrThrow(consumerData.StreamId, cursorStartToken);
+                            if (effectiveHandshakeToken is DeliveryToken
+                                && consumerData.Cursor is IQueueCacheCursorProgress progressCursor)
+                            {
+                                progressCursor.SetDeliveredThrough(requestedToken);
+                            }
+                            else
+                            {
+                                consumerData.SafeDisposeCursor(logger);
+                                cursorStartToken = requestedToken;
+                                consumerData.Cursor = GetAdvancedCursorOrFallback(
+                                    consumerData.StreamId,
+                                    requestedToken,
+                                    cacheToken,
+                                    out consumerData.PendingBatch);
+                            }
                             cursorRepositioned = true;
                         }
                         else
@@ -606,8 +621,7 @@ namespace Orleans.Streams
                 if (requestedHandshakeToken is DeliveryToken deliveryToken)
                 {
                     consumerData.LastProcessedToken = deliveryToken.Token;
-                    consumerData.LastSafePartitionToken = deliveryToken.Token;
-                    (consumerData.Cursor as IQueueCacheCursorProgress)?.AdvancePast(deliveryToken.Token);
+                    consumerData.LastSafePartitionToken = null;
                 }
                 else
                 {
@@ -636,7 +650,7 @@ namespace Orleans.Streams
             pendingBatch = null;
             if (cursor is IQueueCacheCursorProgress progressCursor)
             {
-                progressCursor.AdvancePast(token);
+                progressCursor.SetDeliveredThrough(token);
                 return QueueCacheCursorMoveResult.NoData;
             }
 
@@ -1224,9 +1238,11 @@ namespace Orleans.Streams
                         return false;
                     }
 
-                    var current = consumer.LastProcessedToken;
-                    var safePartition = consumer.LastSafePartitionToken;
-                    if (safePartition is not null
+                    var current = consumer.Cursor is IQueueCacheCursorProgress
+                        ? consumer.LastSafePartitionToken
+                        : consumer.LastProcessedToken;
+                    if (consumer.Cursor is not IQueueCacheCursorProgress
+                        && consumer.LastSafePartitionToken is { } safePartition
                         && (current is null || IsBefore(current, safePartition)))
                     {
                         current = safePartition;
@@ -1663,6 +1679,7 @@ namespace Orleans.Streams
                             if (newToken is not null)
                             {
                                 _useLegacyDeliveryProgress = true;
+                                var previousSafePartitionToken = consumerData.LastSafePartitionToken;
                                 consumerData.LastToken = newToken;
                                 IQueueCacheCursor newCursor;
                                 IBatchContainer? pendingBatch = null;
@@ -1709,13 +1726,31 @@ namespace Orleans.Streams
                                     var sequenceToken = newToken.Token
                                         ?? throw new InvalidOperationException("A delivery handshake token must contain a stream sequence token.");
                                     consumerData.LastProcessedToken = sequenceToken;
-                                    // The handshake token points to an already processed event, so advance past it.
-                                    // The current batch is the receiver's first available message if that token was evicted.
-                                    newCursor = GetAdvancedCursorOrFallback(
-                                        consumerData.StreamId,
-                                        sequenceToken,
-                                        batch.SequenceToken,
-                                        out pendingBatch);
+                                    try
+                                    {
+                                        var restartToken = previousSafePartitionToken ?? sequenceToken;
+                                        newCursor = GetCacheCursorOrThrow(consumerData.StreamId, restartToken);
+                                        if (newCursor is IQueueCacheCursorProgress progress)
+                                        {
+                                            progress.SetDeliveredThrough(sequenceToken);
+                                        }
+                                        else
+                                        {
+                                            newCursor.Dispose();
+                                            newCursor = GetAdvancedCursorOrFallback(
+                                                consumerData.StreamId,
+                                                sequenceToken,
+                                                batch.SequenceToken,
+                                                out pendingBatch);
+                                        }
+                                    }
+                                    catch (QueueCacheMissException)
+                                    {
+                                        // The current batch is the receiver's first available message.
+                                        // Keep it pending when the consumer resumes from an evicted token.
+                                        newCursor = GetCacheCursorOrThrow(consumerData.StreamId, batch.SequenceToken);
+                                        resumedFromFallback = true;
+                                    }
                                 }
                                 else
                                 {
@@ -1730,7 +1765,7 @@ namespace Orleans.Streams
                                 if (newToken is DeliveryToken deliveryToken)
                                 {
                                     consumerData.LastProcessedToken = deliveryToken.Token;
-                                    consumerData.LastSafePartitionToken = deliveryToken.Token;
+                                    consumerData.LastSafePartitionToken = previousSafePartitionToken;
                                     UpdateCursorProgress(consumerData, newCursor as IQueueCacheCursorProgress);
                                 }
                                 else
