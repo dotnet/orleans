@@ -127,26 +127,21 @@ namespace Orleans.Streaming.EventHubs
         public void SignalPurge()
         {
             var previousMetadataSize = cache.AllocatedSizeInBytes;
-            if (!hasActiveSubscriptions)
+            var nowUtc = DateTime.UtcNow;
+            if (!hasActiveSubscriptions
+                && memoryController?.IsUnderPressure == true
+                && evictionStrategy is IMemoryPressureEvictionStrategy memoryPressureEvictionStrategy)
             {
-                if (memoryController?.IsUnderPressure == true
-                    && evictionStrategy is IMemoryPressureEvictionStrategy memoryPressureEvictionStrategy)
-                {
-                    memoryPressureEvictionStrategy.PerformMemoryPressurePurge(DateTime.UtcNow);
-                }
-                else
-                {
-                    this.evictionStrategy.PerformPurge(DateTime.UtcNow);
-                }
+                memoryPressureEvictionStrategy.PerformMemoryPressurePurge(nowUtc);
             }
             else
             {
-                if (this.cachePressureMonitor.IsUnderPressure(DateTime.UtcNow))
+                if (this.cachePressureMonitor.IsUnderPressure(nowUtc))
                 {
                     return;
                 }
 
-                this.evictionStrategy.PerformPurge(DateTime.UtcNow);
+                this.evictionStrategy.PerformPurge(nowUtc);
             }
 
             UpdateMetadataMemory(previousMetadataSize);

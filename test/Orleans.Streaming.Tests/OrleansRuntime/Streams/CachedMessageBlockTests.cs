@@ -1,3 +1,4 @@
+using System.Runtime.CompilerServices;
 using Orleans.Providers.Streams.Common;
 using Orleans.Runtime;
 using Orleans.Streams;
@@ -121,6 +122,44 @@ namespace UnitTests.OrleansRuntime.Streams
             block.OnResetState();
             Assert.Equal(initialSize, block.AllocatedSizeInBytes);
             Assert.Equal(0, block.ItemCount);
+        }
+
+        [Fact, TestCategory("BVT"), TestCategory("Streaming")]
+        public void DisposeClearsCachedMessageReferencesBeforePoolReuse()
+        {
+            var pool = new ObjectPool<CachedMessageBlock>(
+                () => new CachedMessageBlock(2, 2),
+                maxRetainedObjects: 1);
+            var (payloadReference, block) = AddMessageAndDisposeBlock(pool);
+
+            GC.Collect(GC.MaxGeneration, GCCollectionMode.Forced, blocking: true, compacting: true);
+            GC.WaitForPendingFinalizers();
+            GC.Collect(GC.MaxGeneration, GCCollectionMode.Forced, blocking: true, compacting: true);
+
+            Assert.False(payloadReference.IsAlive);
+            var reusedBlock = pool.Allocate();
+            Assert.Same(block, reusedBlock);
+            Assert.Equal(0, reusedBlock.ItemCount);
+        }
+
+        [Fact, TestCategory("BVT"), TestCategory("Streaming")]
+        public void CachedMessagePoolRequiresCacheDataAdapter()
+        {
+            var exception = Assert.Throws<ArgumentNullException>(() => new CachedMessagePool(null!));
+
+            Assert.Equal("cacheDataAdapter", exception.ParamName);
+        }
+
+        [MethodImpl(MethodImplOptions.NoInlining)]
+        private static (WeakReference PayloadReference, CachedMessageBlock Block) AddMessageAndDisposeBlock(
+            ObjectPool<CachedMessageBlock> pool)
+        {
+            var payload = new byte[1024];
+            var payloadReference = new WeakReference(payload);
+            var block = pool.Allocate();
+            block.Add(new CachedMessage { Segment = new ArraySegment<byte>(payload) });
+            block.Dispose();
+            return (payloadReference, block);
         }
 
         [Fact, TestCategory("BVT"), TestCategory("Streaming")]
