@@ -152,7 +152,7 @@ namespace UnitTests.General
         }
 
         [Fact]
-        public async Task BuiltInActivatorCreateContextReturnsUnstartedContext()
+        public async Task BuiltInActivatorCreateContextStartsContext()
         {
             var primary = Assert.IsType<InProcessSiloHandle>(fixture.HostedCluster.Primary);
             var services = primary.ServiceProvider;
@@ -173,11 +173,7 @@ namespace UnitTests.General
             var context = Assert.IsType<ActivationData>(activator.CreateContext(address, []));
             try
             {
-                Assert.Null(context.GrainInstance);
-                using (context.Start())
-                {
-                    Assert.NotNull(context.GrainInstance);
-                }
+                Assert.NotNull(context.GrainInstance);
             }
             finally
             {
