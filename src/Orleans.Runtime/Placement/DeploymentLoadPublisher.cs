@@ -115,9 +115,10 @@ namespace Orleans.Runtime
 
                 // Inform other cluster members about our refreshed statistics.
                 var members = _siloStatusOracle.GetApproximateSiloStatuses(true).Keys.ToArray();
-                var directPublication = PublishStatisticsDirectly(myStats, members, cancellationToken);
-                TryPublishStatisticsViaDissemination(myStats).Ignore();
-                await directPublication;
+                if (!await TryPublishStatisticsViaDissemination(myStats))
+                {
+                    await PublishStatisticsDirectly(myStats, members, cancellationToken);
+                }
 
                 DeploymentLoadPublisherEvents.EmitClusterRefreshed(_siloDetails.SiloAddress, _periodicStats);
             }
@@ -157,7 +158,7 @@ namespace Orleans.Runtime
         internal IReadOnlyCollection<SiloAddress> GetActiveSilosForStatisticsDigest() =>
             _siloStatusOracle.GetApproximateSiloStatuses(onlyActive: true).Keys;
 
-        private async Task TryPublishStatisticsViaDissemination(SiloRuntimeStatistics myStats)
+        private async Task<bool> TryPublishStatisticsViaDissemination(SiloRuntimeStatistics myStats)
         {
             using var cancellation = new CancellationTokenSource(_statisticsRefreshTime);
             try
@@ -166,22 +167,26 @@ namespace Orleans.Runtime
                 var disseminationNamespace = _serviceProvider.GetService<DeploymentLoadStatisticsDisseminationNamespace>();
                 if (dissemination is null || disseminationNamespace is null || !disseminationNamespace.Options.Enabled)
                 {
-                    return;
+                    return false;
                 }
 
-                await dissemination.Publish(
-                    disseminationNamespace,
-                    _siloDetails.SiloAddress,
-                    myStats.DateTime.Ticks,
-                    cancellation.Token);
+                return await dissemination.Publish(
+                        disseminationNamespace,
+                        _siloDetails.SiloAddress,
+                        myStats.DateTime.Ticks,
+                        cancellation.Token)
+                    .AsTask()
+                    .WaitAsync(cancellation.Token);
             }
             catch (OperationCanceledException) when (cancellation.IsCancellationRequested)
             {
                 LogDebugRuntimeStatisticsDisseminationTimedOut(_logger, _statisticsRefreshTime);
+                return false;
             }
             catch (Exception exception)
             {
                 LogWarningRuntimeStatisticsUpdateFailure1(_logger, exception);
+                return false;
             }
         }
 
