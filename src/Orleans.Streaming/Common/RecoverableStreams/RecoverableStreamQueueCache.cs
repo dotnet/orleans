@@ -271,7 +271,8 @@ namespace Orleans.Providers.Streams.Common
 
             public StreamSequenceToken? SafeSequenceToken => _cache.GetSafeSequenceToken(_cursor);
 
-            public void AdvancePast(StreamSequenceToken token) => _cache.AdvanceCursorPast(_cursor, token);
+            public void SetDeliveredThrough(StreamSequenceToken token)
+                => _cache.SetCursorDeliveredThrough(_cursor, token);
 
             public IBatchContainer? GetCurrent(out Exception? exception)
             {
