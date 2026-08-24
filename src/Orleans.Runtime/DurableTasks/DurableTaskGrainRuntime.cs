@@ -82,7 +82,7 @@ internal sealed partial class DurableTaskGrainRuntime(
         var context = request.Context ?? throw new InvalidOperationException("The durable task request has no context.");
         context.CallerId = GrainId;
         transport.SendInvocation(GrainId, context.TargetId, taskId, request);
-        await transport.CommitAsync(cancellationToken);
+        await _storage.WriteAsync(cancellationToken);
         return DurableTaskResponse.Pending;
     }
 
@@ -90,16 +90,16 @@ internal sealed partial class DurableTaskGrainRuntime(
     {
         var transport = _messageTransport ?? throw new InvalidOperationException(
             "Durable messaging is not configured. Call AddDurableTasks on the silo builder.");
-        if (_storage.TryGetTask(taskId, out var state)
-            && state.Result is not { IsCompleted: true }
-            && state is DurableTaskState durableState)
+        var state = _storage.GetOrCreateTask(taskId, request: null);
+        if (state.Result is not { IsCompleted: true })
         {
-            durableState.PendingCancellationDestination = target;
+            _storage.SetRemoteTarget(taskId, state, target);
+            _storage.SetPendingCancellationDestination(taskId, state, target);
             _storage.RequestCancellation(taskId, state);
         }
 
         transport.SendCancellation(GrainId, target, taskId);
-        await transport.CommitAsync(cancellationToken);
+        await _storage.WriteAsync(cancellationToken);
     }
 
     internal async ValueTask CancelScheduledTaskAsync(TaskId taskId, CancellationToken cancellationToken)
@@ -128,21 +128,31 @@ internal sealed partial class DurableTaskGrainRuntime(
         return DurableTaskResponse.Pending;
     }
 
-    internal void AcceptResponse(TaskId taskId, DurableTaskResponse response)
+    internal async ValueTask AcceptResponseAsync(
+        TaskId taskId,
+        DurableTaskResponse response,
+        CancellationToken cancellationToken)
     {
         if (!_storage.TryGetTask(taskId, out var state))
         {
             state = _storage.GetOrCreateTask(taskId, request: null);
         }
 
+        var changed = false;
         if (state.Result is not { IsCompleted: true })
         {
             _storage.SetResponse(taskId, state, response);
+            changed = true;
+        }
+
+        if (changed)
+        {
+            await _storage.WriteAsync(cancellationToken);
         }
 
         if (_taskHandles.TryGetValue(taskId, out var handle) && handle is TaskHandle localHandle)
         {
-            localHandle.TrySetResponse(response);
+            PublishAfterCommit(() => localHandle.TrySetResponse(state.Result ?? response));
         }
     }
 
@@ -150,8 +160,8 @@ internal sealed partial class DurableTaskGrainRuntime(
     {
         EnsureAcceptingRequests();
         var pendingCancellations = _storage.Tasks
-            .Where(static task => task.State is DurableTaskState { PendingCancellationDestination.IsDefault: false })
-            .Select(static task => (task.Id, ((DurableTaskState)task.State).PendingCancellationDestination))
+            .Where(static task => !task.State.PendingCancellationDestination.IsDefault)
+            .Select(static task => (task.Id, task.State.PendingCancellationDestination))
             .ToList();
         if (pendingCancellations.Count > 0)
         {
@@ -162,7 +172,7 @@ internal sealed partial class DurableTaskGrainRuntime(
                 transport.SendCancellation(GrainId, destination, taskId);
             }
 
-            await transport.CommitAsync(cancellationToken);
+            await _storage.WriteAsync(cancellationToken);
         }
 
         foreach (var (taskId, state) in _storage.Tasks.ToList())
@@ -176,7 +186,7 @@ internal sealed partial class DurableTaskGrainRuntime(
 
             if (state.CancellationRequestedAt.HasValue)
             {
-                if (state is DurableTaskState { PendingCancellationDestination.IsDefault: false })
+                if (!state.PendingCancellationDestination.IsDefault)
                 {
                     continue;
                 }
@@ -211,6 +221,14 @@ internal sealed partial class DurableTaskGrainRuntime(
             throw new InvalidOperationException($"No context for durable task request {request}");
         }
         requestContext.Validate();
+
+        if (_storage.TryGetTask(taskId, out var requestlessState)
+            && requestlessState.Request is null
+            && !requestlessState.IsCancellationTombstone)
+        {
+            throw new InvalidOperationException(
+                $"Task id '{taskId}' is already associated with a local, delay, or outbound durable task.");
+        }
 
         if (_storage.TryGetTask(taskId, out var persistedState)
             && persistedState.Request is { } persistedRequest
@@ -278,6 +296,25 @@ internal sealed partial class DurableTaskGrainRuntime(
             var executionContext = CreateExecutionContext(taskId);
             handle = new TaskHandle(taskId, this) { IsRunning = true };
             _taskHandles[taskId] = handle;
+            var requestToInvoke = state.Request ?? request;
+            void StartInvocation()
+            {
+                requestToInvoke.SetTarget(_shared.GrainContextAccessor.GrainContext);
+                _runningRequests[taskId] = Invoke(
+                    static request => request.CreateTask(),
+                    requestToInvoke,
+                    executionContext,
+                    restorePersistedRequestContext: true);
+            }
+
+            void RollbackInvocationRuntimeState()
+            {
+                _executionContexts.Remove(taskId);
+                _taskHandles.Remove(taskId);
+                _runningRequests.Remove(taskId);
+            }
+
+            var invocationEnlisted = TryEnlistAfterCommit(StartInvocation, RollbackInvocationRuntimeState);
 
             // Persist the task state before invoking the task.
             // Note that if we intercept all outgoing calls to other durable tasks, then we do not need to do this here.
@@ -290,21 +327,18 @@ internal sealed partial class DurableTaskGrainRuntime(
             }
             catch
             {
-                _storage.RemoveTask(taskId);
-                _executionContexts.Remove(taskId);
-                _taskHandles.Remove(taskId);
+                if (!invocationEnlisted)
+                {
+                    _storage.RemoveTask(taskId);
+                    RollbackInvocationRuntimeState();
+                }
                 throw;
             }
 
-            // Schedule the task with the runtime.
-            var requestToInvoke = state.Request ?? request;
-            requestToInvoke.SetTarget(_shared.GrainContextAccessor.GrainContext);
-            var invocationTask = Invoke(
-                static request => request.CreateTask(),
-                requestToInvoke,
-                executionContext,
-                restorePersistedRequestContext: true);
-            _runningRequests.Add(taskId, invocationTask);
+            if (!invocationEnlisted)
+            {
+                StartInvocation();
+            }
 
             return subscribed ? DurableTaskResponse.Subscribed : DurableTaskResponse.Pending;
         }
@@ -334,23 +368,86 @@ internal sealed partial class DurableTaskGrainRuntime(
                 handle = durableTask is IDurableTaskRequest messageRequest
                     ? new TaskHandle(taskId, this, messageRequest.Context!.TargetId) { IsRunning = true }
                     : new TaskHandle(taskId, this) { IsRunning = true };
+                if (handle is TaskHandle remoteHandle && !remoteHandle.RemoteTarget.IsDefault)
+                {
+                    _storage.SetRemoteTarget(taskId, state, remoteHandle.RemoteTarget);
+                }
                 _taskHandles[taskId] = handle;
             }
 
-            var schedulingResponse = await schedulableTask.ScheduleAsync(taskId, cancellationToken);
+            using var schedulerEnlistment = schedulableTask.CommitsDurableState
+                && !_storage.IsCommitIntegratedWithActivationJournal
+                    ? _storage.EnlistWithNextMessageCommit()
+                    : null;
+            var schedulerCommitIncludesStorage = schedulableTask.CommitsDurableState
+                && (_storage.IsCommitIntegratedWithActivationJournal || schedulerEnlistment is not null);
+            var provisionalHandle = handle as TaskHandle;
+            void RemoveProvisionalHandle()
+            {
+                if (provisionalHandle is not null
+                    && _taskHandles.TryGetValue(taskId, out var current)
+                    && ReferenceEquals(current, provisionalHandle))
+                {
+                    _taskHandles.Remove(taskId);
+                }
+            }
+
+            _ = provisionalHandle is not null
+                && TryEnlistAfterCommit(commit: static () => { }, rollback: RemoveProvisionalHandle);
+            DurableTaskResponse schedulingResponse;
+            try
+            {
+                schedulingResponse = await schedulableTask.ScheduleAsync(taskId, cancellationToken);
+            }
+            catch
+            {
+                RemoveProvisionalHandle();
+                throw;
+            }
+
             if (schedulingResponse.IsCompleted)
             {
                 _storage.SetResponse(taskId, state, schedulingResponse);
-                await _storage.WriteAsync(cancellationToken);
+                Action? publishCompletion = null;
+                Action? rollbackCompletion = null;
+                var completionEnlisted = false;
                 if (handle is TaskHandle completedHandle)
                 {
-                    completedHandle.TrySetResponse(schedulingResponse);
+                    publishCompletion = () => completedHandle.TrySetResponse(schedulingResponse);
+                    rollbackCompletion = () =>
+                    {
+                        if (_taskHandles.TryGetValue(taskId, out var current)
+                            && ReferenceEquals(current, completedHandle))
+                        {
+                            _taskHandles.Remove(taskId);
+                        }
+                    };
+                    completionEnlisted = TryEnlistAfterCommit(publishCompletion, rollbackCompletion);
+                }
+
+                try
+                {
+                    await _storage.WriteAsync(cancellationToken);
+                }
+                catch
+                {
+                    if (!completionEnlisted)
+                    {
+                        rollbackCompletion?.Invoke();
+                    }
+                    throw;
+                }
+
+                if (!completionEnlisted)
+                {
+                    publishCompletion?.Invoke();
                 }
                 return new CompletedTaskHandle(taskId, schedulingResponse);
             }
 
             if (state.Result is { IsCompleted: true } completedResponse)
             {
+                RemoveProvisionalHandle();
                 return new CompletedTaskHandle(taskId, completedResponse);
             }
 
@@ -358,11 +455,20 @@ internal sealed partial class DurableTaskGrainRuntime(
             {
                 handle = schedulableTask.GetHandle(taskId);
                 _taskHandles[taskId] = handle;
+                provisionalHandle = handle as TaskHandle;
             }
 
-            if (!schedulableTask.CommitsDurableState)
+            if (!schedulerCommitIncludesStorage)
             {
-                await _storage.WriteAsync(cancellationToken);
+                try
+                {
+                    await _storage.WriteAsync(cancellationToken);
+                }
+                catch
+                {
+                    RemoveProvisionalHandle();
+                    throw;
+                }
             }
             return handle!;
         }
@@ -497,10 +603,9 @@ internal sealed partial class DurableTaskGrainRuntime(
             if (state is DurableTaskState durableState)
             {
                 durableState.MigrateLegacyObservers();
-                durableState.PendingCancellationDestination = default;
             }
+            _storage.SetPendingCancellationDestination(taskId, state, default);
 
-            var sentCompletion = false;
             if (state.CompletionDestinations.Count > 0)
             {
                 var transport = _messageTransport ?? throw new InvalidOperationException(
@@ -508,28 +613,20 @@ internal sealed partial class DurableTaskGrainRuntime(
                 foreach (var destination in state.CompletionDestinations)
                 {
                     transport.SendCompletion(GrainId, destination, taskId, response);
-                    sentCompletion = true;
                 }
 
                 _storage.ClearCompletionDestinations(taskId, state);
             }
 
             _storage.SetResponse(taskId, state, response);
-            if (sentCompletion)
-            {
-                await _messageTransport!.CommitAsync(cancellationToken);
-            }
-            else
-            {
-                await _storage.WriteAsync(cancellationToken);
-            }
+            await _storage.WriteAsync(cancellationToken);
         }
 
         if (_taskHandles.TryGetValue(taskId, out var handle))
         {
             if (handle is TaskHandle localHandle)
             {
-                localHandle.TrySetResponse(response);
+                PublishAfterCommit(() => localHandle.TrySetResponse(response));
             }
         }
 
@@ -699,6 +796,7 @@ internal sealed partial class DurableTaskGrainRuntime(
         if (!_storage.TryGetTask(taskId, out var taskState))
         {
             taskState = _storage.GetOrCreateTask(taskId, request: null);
+            _storage.SetCancellationTombstone(taskId, taskState, value: true);
             _storage.RequestCancellation(taskId, taskState);
             await _storage.WriteAsync(cancellationToken);
             return;
@@ -719,7 +817,7 @@ internal sealed partial class DurableTaskGrainRuntime(
                 }
 
                 // The task-state mutations and outgoing cancellation envelopes share the journal transaction.
-                await transport.CommitAsync(cancellationToken);
+                await _storage.WriteAsync(cancellationToken);
             }
             else
             {
@@ -774,10 +872,12 @@ internal sealed partial class DurableTaskGrainRuntime(
             if (context is null && cancelHandle)
             {
                 _ = TryGetScheduledTaskHandle(taskId, out handle);
-                if (handle is TaskHandle { RemoteTarget.IsDefault: false } remoteHandle
-                    && taskState is DurableTaskState durableState)
+                if (handle is TaskHandle { RemoteTarget.IsDefault: false } remoteHandle)
                 {
-                    durableState.PendingCancellationDestination = remoteHandle.RemoteTarget;
+                    _storage.SetPendingCancellationDestination(
+                        taskId,
+                        taskState,
+                        remoteHandle.RemoteTarget);
                     cancellationMessages.Add((taskId, remoteHandle.RemoteTarget));
                 }
             }
@@ -811,13 +911,12 @@ internal sealed partial class DurableTaskGrainRuntime(
         CancellationToken cancellationToken)
     {
         if (!_storage.TryGetTask(taskId, out var state)
-            || state is not DurableTaskState durableState
-            || durableState.PendingCancellationDestination != sender)
+            || state.PendingCancellationDestination != sender)
         {
             return;
         }
 
-        durableState.PendingCancellationDestination = default;
+        _storage.SetPendingCancellationDestination(taskId, state, default);
         response = state.Result is { IsCompleted: true } completed
             ? completed
             : response;
@@ -825,8 +924,25 @@ internal sealed partial class DurableTaskGrainRuntime(
         await _storage.WriteAsync(cancellationToken);
         if (_taskHandles.TryGetValue(taskId, out var handle) && handle is TaskHandle localHandle)
         {
-            localHandle.TrySetResponse(response);
+            PublishAfterCommit(() => localHandle.TrySetResponse(response));
         }
+    }
+
+    private void PublishAfterCommit(Action publish)
+        => EnlistAfterCommit(publish, rollback: static () => { });
+
+    private bool TryEnlistAfterCommit(Action commit, Action rollback) =>
+        _messageTransport is IDurableTaskMessageTransaction transaction
+        && transaction.TryEnlist(commit, rollback);
+
+    private void EnlistAfterCommit(Action commit, Action rollback)
+    {
+        if (TryEnlistAfterCommit(commit, rollback))
+        {
+            return;
+        }
+
+        commit();
     }
 
     internal DurableTaskResponse GetCancellationAcknowledgementResponse(TaskId taskId)
@@ -859,7 +975,7 @@ internal sealed partial class DurableTaskGrainRuntime(
             else
             {
                 // Create a new handle for the task.
-                handle = new TaskHandle(taskId, this);
+                handle = new TaskHandle(taskId, this, taskState.RemoteTarget);
                 _taskHandles.Add(taskId, handle);
                 return true;
             }

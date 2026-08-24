@@ -12,18 +12,72 @@ using Orleans.Serialization;
 
 namespace Orleans.Runtime.DurableTasks;
 
-public class VolatileDurableTaskGrainStorage(
-    DeepCopier<Dictionary<TaskId, DurableTaskState>> storageCopier,
-    DeepCopier<DurableTaskState> stateCopier,
-    TimeProvider timeProvider) : IDurableTaskGrainStorage
+public class VolatileDurableTaskGrainStorage : IDurableTaskGrainStorage
 {
-    private readonly DeepCopier<Dictionary<TaskId, DurableTaskState>> _storageCopier = storageCopier;
-    private readonly DeepCopier<DurableTaskState> _stateCopier = stateCopier;
-    private readonly TimeProvider _timeProvider = timeProvider;
+    private readonly DeepCopier<Dictionary<TaskId, DurableTaskState>> _storageCopier;
+    private readonly DeepCopier<DurableTaskState> _stateCopier;
+    private readonly TimeProvider _timeProvider;
+    private readonly IDurableTaskMessageTransport? _messageTransport;
+    private readonly AsyncLocal<NextCommitEnlistment?> _nextCommitEnlistment = new();
     private Dictionary<TaskId, DurableTaskState> _workingCopy = [];
     private Dictionary<TaskId, DurableTaskState> _persistedCopy = [];
 
+    public VolatileDurableTaskGrainStorage(
+        DeepCopier<Dictionary<TaskId, DurableTaskState>> storageCopier,
+        DeepCopier<DurableTaskState> stateCopier,
+        TimeProvider timeProvider)
+        : this(storageCopier, stateCopier, timeProvider, messageTransport: null)
+    {
+    }
+
+    internal VolatileDurableTaskGrainStorage(
+        DeepCopier<Dictionary<TaskId, DurableTaskState>> storageCopier,
+        DeepCopier<DurableTaskState> stateCopier,
+        TimeProvider timeProvider,
+        IDurableTaskMessageTransport? messageTransport)
+    {
+        _storageCopier = storageCopier;
+        _stateCopier = stateCopier;
+        _timeProvider = timeProvider;
+        _messageTransport = messageTransport;
+    }
+
     public IEnumerable<(TaskId Id, IDurableTaskState State)> Tasks => _workingCopy.Select(static pair => (pair.Key, (IDurableTaskState)pair.Value));
+
+    public IDisposable? EnlistWithNextMessageCommit()
+    {
+        if (_messageTransport is not IDurableTaskMessageTransaction transaction)
+        {
+            return null;
+        }
+
+        if (_nextCommitEnlistment.Value is { IsActive: true })
+        {
+            return _nextCommitEnlistment.Value;
+        }
+
+        var persistedCopy = CopyStorage(_workingCopy);
+        var rollbackCopy = CopyStorage(_persistedCopy);
+        var enlistment = new NextCommitEnlistment();
+        _nextCommitEnlistment.Value = enlistment;
+        transaction.EnlistNextCommit(
+            commit: () =>
+            {
+                if (enlistment.TryComplete())
+                {
+                    _persistedCopy = persistedCopy;
+                }
+            },
+            rollback: () =>
+            {
+                if (enlistment.TryComplete())
+                {
+                    _workingCopy = rollbackCopy;
+                }
+            });
+        enlistment.SetRollback(() => _workingCopy = rollbackCopy);
+        return enlistment;
+    }
 
     public void AddOrUpdateTask(TaskId taskId, DurableTaskState state) => _workingCopy[taskId] = CopyState(state);
     public bool RemoveTask(TaskId taskId) => _workingCopy.Remove(taskId);
@@ -45,10 +99,70 @@ public class VolatileDurableTaskGrainStorage(
         return default;
     }
 
-    public ValueTask WriteAsync(CancellationToken cancellationToken)
+    public async ValueTask WriteAsync(CancellationToken cancellationToken)
     {
-        _persistedCopy = CopyStorage(_workingCopy);
-        return default;
+        if (_messageTransport is IDurableTaskMessageTransaction transaction)
+        {
+            if (_nextCommitEnlistment.Value is { IsActive: true })
+            {
+                _nextCommitEnlistment.Value.Arm();
+                await _messageTransport.CommitAsync(cancellationToken);
+                return;
+            }
+
+            var persistedCopy = CopyStorage(_workingCopy);
+            var rollbackCopy = CopyStorage(_persistedCopy);
+            if (transaction.TryEnlist(
+                commit: () => _persistedCopy = persistedCopy,
+                rollback: () => _workingCopy = rollbackCopy))
+            {
+                await _messageTransport.CommitAsync(cancellationToken);
+                return;
+            }
+
+            Dictionary<TaskId, DurableTaskState>? preparedSnapshot = null;
+            await transaction.CommitAsync(
+                prepare: () =>
+                {
+                    preparedSnapshot = CopyStorage(_workingCopy);
+                    return ValueTask.CompletedTask;
+                },
+                commit: () => _persistedCopy = preparedSnapshot!,
+                rollback: static () => { },
+                cancellationToken: cancellationToken);
+            return;
+        }
+
+        var snapshot = CopyStorage(_workingCopy);
+        if (_messageTransport is not null)
+        {
+            await _messageTransport.CommitAsync(cancellationToken);
+        }
+
+        _persistedCopy = snapshot;
+    }
+
+    private sealed class NextCommitEnlistment : IDisposable
+    {
+        private int _active = 1;
+        private int _armed;
+        private Action? _rollback;
+
+        public bool IsActive => Volatile.Read(ref _active) != 0;
+
+        public bool TryComplete() => Interlocked.Exchange(ref _active, 0) != 0;
+
+        public void SetRollback(Action rollback) => _rollback = rollback;
+
+        public void Arm() => Volatile.Write(ref _armed, 1);
+
+        public void Dispose()
+        {
+            if (Volatile.Read(ref _armed) == 0 && TryComplete())
+            {
+                _rollback?.Invoke();
+            }
+        }
     }
 
     public IDurableTaskState GetOrCreateTask(TaskId taskId, IDurableTaskRequest? request)
@@ -104,6 +218,27 @@ public class VolatileDurableTaskGrainStorage(
     {
         var typedState = GetState(state);
         typedState.CompletionDestinations.Clear();
+        AddOrUpdateTask(taskId, typedState);
+    }
+
+    public void SetRemoteTarget(TaskId taskId, IDurableTaskState state, GrainId target)
+    {
+        var typedState = GetState(state);
+        typedState.RemoteTarget = target;
+        AddOrUpdateTask(taskId, typedState);
+    }
+
+    public void SetPendingCancellationDestination(TaskId taskId, IDurableTaskState state, GrainId target)
+    {
+        var typedState = GetState(state);
+        typedState.PendingCancellationDestination = target;
+        AddOrUpdateTask(taskId, typedState);
+    }
+
+    public void SetCancellationTombstone(TaskId taskId, IDurableTaskState state, bool value)
+    {
+        var typedState = GetState(state);
+        typedState.IsCancellationTombstone = value;
         AddOrUpdateTask(taskId, typedState);
     }
 

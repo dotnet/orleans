@@ -316,6 +316,7 @@ public class DurableTaskGrainRuntimeTests
         var taskId = TaskId.Create("cancellation-tombstone");
         var caller = GrainId.Create("caller", "canceled");
         var tombstone = fixture.Storage.GetOrCreateTask(taskId, request: null);
+        fixture.Storage.SetCancellationTombstone(taskId, tombstone, value: true);
         fixture.Storage.RequestCancellation(taskId, tombstone);
 
         var request = new RuntimeTestDurableTaskRequest(() => throw new InvalidOperationException("Should not be invoked: the task was already canceled."))
@@ -339,7 +340,7 @@ public class DurableTaskGrainRuntimeTests
         Assert.Equal(caller, completion.Target);
         Assert.Equal(taskId, completion.TaskId);
         Assert.IsType<OperationCanceledException>(completion.Response.Exception);
-        Assert.Equal(1, fixture.Transport.CommitCount);
+        Assert.Equal(0, fixture.Transport.CommitCount);
     }
 
     [Fact]
@@ -350,13 +351,40 @@ public class DurableTaskGrainRuntimeTests
         fixture.Storage.GetOrCreateTask(taskId, request: null);
         var handle = fixture.Runtime.GetScheduledTaskHandle(taskId);
 
-        fixture.Runtime.AcceptResponse(taskId, DurableTaskResponse.FromResult(1));
-        fixture.Runtime.AcceptResponse(taskId, DurableTaskResponse.FromResult(2));
+        await fixture.Runtime.AcceptResponseAsync(
+            taskId,
+            DurableTaskResponse.FromResult(1),
+            CancellationToken.None);
+        await fixture.Runtime.AcceptResponseAsync(
+            taskId,
+            DurableTaskResponse.FromResult(2),
+            CancellationToken.None);
 
         var response = await handle.WaitAsync(CancellationToken.None);
         Assert.Equal(1, response.GetResult<int>());
         Assert.True(fixture.Storage.TryGetTask(taskId, out var state));
         Assert.Equal(1, state.Result!.GetResult<int>());
+    }
+
+    [Fact]
+    public async Task AcceptResponse_HandlerTransactionPublishesHandleOnlyAfterCommit()
+    {
+        var fixture = CreateFixture(withTransport: true);
+        fixture.Transport!.EnlistWrites = true;
+        var taskId = TaskId.Create("transactional-response");
+        fixture.Storage.GetOrCreateTask(taskId, request: null);
+        var handle = fixture.Runtime.GetScheduledTaskHandle(taskId);
+
+        await fixture.Runtime.AcceptResponseAsync(
+            taskId,
+            DurableTaskResponse.FromResult(7),
+            CancellationToken.None);
+
+        Assert.False((await handle.PollAsync(
+            new PollingOptions { PollTimeout = TimeSpan.Zero },
+            CancellationToken.None)).IsCompleted);
+        fixture.Transport.CompleteTransaction(committed: true);
+        Assert.Equal(7, (await handle.WaitAsync(BoundedWait())).GetResult<int>());
     }
 
     [Fact]
@@ -482,7 +510,7 @@ public class DurableTaskGrainRuntimeTests
         Assert.Equal(2, fixture.Transport!.Completions.Count);
         Assert.Contains(fixture.Transport.Completions, c => c.Sender == fixture.GrainId && c.Target == callerA && c.TaskId.Equals(taskId) && c.Response.GetResult<int>() == 7);
         Assert.Contains(fixture.Transport.Completions, c => c.Sender == fixture.GrainId && c.Target == callerB && c.TaskId.Equals(taskId) && c.Response.GetResult<int>() == 7);
-        Assert.Equal(1, fixture.Transport.CommitCount);
+        Assert.Equal(0, fixture.Transport.CommitCount);
 
         Assert.True(fixture.Storage.TryGetTask(taskId, out var stateAfterCompletion));
         Assert.Empty(stateAfterCompletion.CompletionDestinations);
@@ -812,7 +840,7 @@ public class DurableTaskGrainRuntimeTests
     }
 
     [Fact]
-    public async Task ScheduleChildAsync_WhenSchedulerCommitsDurableState_DoesNotWriteAgain()
+    public async Task ScheduleChildAsync_WhenStorageIsNotJournalIntegrated_WritesAfterSchedulerCommit()
     {
         var storage = new RpcTestDurableTaskGrainStorage();
         var grainContext = new TestGrainContext(GrainId.Create("test-grain", "atomic-scheduler"));
@@ -826,7 +854,84 @@ public class DurableTaskGrainRuntimeTests
         var result = await runtime.ScheduleChildAsync(handle.TaskId, task, CancellationToken.None);
 
         Assert.Same(handle, result);
-        Assert.Equal(0, storage.WriteAsyncCallCount);
+        Assert.Equal(1, storage.WriteAsyncCallCount);
+    }
+
+    [Fact]
+    public async Task ScheduleChildAsync_ImmediateCompletionPublishesCachedHandleAfterCommit()
+    {
+        var storage = new RpcTestDurableTaskGrainStorage();
+        var transport = new RecordingDurableTaskMessageTransport { EnlistWrites = true };
+        var grainContext = new TestGrainContext(GrainId.Create("test-grain", "transactional-child"));
+        var runtime = RpcTestRuntimeFactory.Create(storage, grainContext, transport);
+        var taskId = TaskId.Create("transactional-child");
+        var task = new TestSchedulableTask(
+            (_, _) => ValueTask.FromResult<DurableTaskResponse>(DurableTaskResponse.FromResult(9)),
+            _ => new StubScheduledTaskHandle(taskId),
+            commitsDurableState: false);
+
+        _ = await runtime.ScheduleChildAsync(taskId, task, CancellationToken.None);
+        var cached = runtime.GetScheduledTaskHandle(taskId);
+        Assert.False((await cached.PollAsync(
+            new PollingOptions { PollTimeout = TimeSpan.Zero },
+            CancellationToken.None)).IsCompleted);
+
+        transport.CompleteTransaction(committed: true);
+        Assert.Equal(9, (await cached.WaitAsync(BoundedWait())).GetResult<int>());
+    }
+
+    [Fact]
+    public async Task ScheduleChildAsync_DelayPersistsVolatileChildState()
+    {
+        var fixture = CreateFixture(withTransport: true);
+        var parentId = TaskId.Create("volatile-delay");
+        var taskId = parentId.Child("delay");
+        DurableExecutionContext.SetCurrentContext(new GrainDurableExecutionContext(parentId, fixture.Runtime));
+        try
+        {
+            _ = await fixture.Runtime.ScheduleChildAsync(
+                taskId,
+                DurableTask.Delay(TimeSpan.FromSeconds(1)),
+                CancellationToken.None);
+        }
+        finally
+        {
+            DurableExecutionContext.SetCurrentContext(null);
+        }
+        await fixture.Storage.ReadAsync(CancellationToken.None);
+
+        Assert.True(fixture.Storage.TryGetTask(taskId, out var state));
+        Assert.Null(state.Result);
+    }
+
+    [Fact]
+    public async Task ScheduleChildAsync_FailedSchedulingRemovesProvisionalHandle()
+    {
+        var fixture = CreateFixture(withTransport: true);
+        var taskId = TaskId.Create("failed-scheduling");
+        var failure = new InvalidOperationException("Expected scheduling failure.");
+        var failed = new TestSchedulableTask(
+            (_, _) => ValueTask.FromException<DurableTaskResponse>(failure),
+            _ => new StubScheduledTaskHandle(taskId),
+            commitsDurableState: false);
+
+        var exception = await Assert.ThrowsAsync<InvalidOperationException>(
+            async () => await fixture.Runtime.ScheduleChildAsync(taskId, failed, CancellationToken.None));
+        Assert.Same(failure, exception);
+
+        var retried = false;
+        var retry = new TestSchedulableTask(
+            (_, _) =>
+            {
+                retried = true;
+                return ValueTask.FromResult<DurableTaskResponse>(DurableTaskResponse.Pending);
+            },
+            _ => new StubScheduledTaskHandle(taskId),
+            commitsDurableState: false);
+        var result = await fixture.Runtime.ScheduleChildAsync(taskId, retry, CancellationToken.None);
+
+        Assert.True(retried);
+        Assert.Equal(taskId, result.TaskId);
     }
 
     [Fact]
@@ -850,11 +955,11 @@ public class DurableTaskGrainRuntimeTests
         Assert.Equal(target, invocation.Target);
         Assert.Equal(taskId, invocation.TaskId);
         Assert.Same(request, invocation.Request);
-        Assert.Equal(1, fixture.Transport.CommitCount);
+        Assert.Equal(0, fixture.Transport.CommitCount);
     }
 
     [Fact]
-    public async Task ScheduleRemoteAsync_CommitsThroughTransportWithoutSeparateStorageWrite()
+    public async Task ScheduleRemoteAsync_CommitsThroughStorageTransaction()
     {
         var storage = new RpcTestDurableTaskGrainStorage();
         var transport = new RecordingDurableTaskMessageTransport();
@@ -868,8 +973,8 @@ public class DurableTaskGrainRuntimeTests
 
         await runtime.ScheduleRemoteAsync(TaskId.Create("atomic-remote"), request, CancellationToken.None);
 
-        Assert.Equal(0, storage.WriteAsyncCallCount);
-        Assert.Equal(1, transport.CommitCount);
+        Assert.Equal(1, storage.WriteAsyncCallCount);
+        Assert.Equal(0, transport.CommitCount);
     }
 
     [Fact]
@@ -890,8 +995,8 @@ public class DurableTaskGrainRuntimeTests
         var response = await runtime.GetScheduledTaskHandle(taskId).WaitAsync(BoundedWait());
 
         Assert.Equal(42, response.GetResult<int>());
-        Assert.Equal(1, storage.WriteAsyncCallCount);
-        Assert.Equal(1, transport.CommitCount);
+        Assert.Equal(2, storage.WriteAsyncCallCount);
+        Assert.Equal(0, transport.CommitCount);
         Assert.Single(transport.Completions);
     }
 
@@ -946,7 +1051,7 @@ public class DurableTaskGrainRuntimeTests
         Assert.Equal(fixture.GrainId, cancellation.Sender);
         Assert.Equal(target, cancellation.Target);
         Assert.Equal(taskId, cancellation.TaskId);
-        Assert.Equal(1, fixture.Transport.CommitCount);
+        Assert.Equal(0, fixture.Transport.CommitCount);
     }
 
     [Fact]
@@ -1207,11 +1312,50 @@ public class DurableTaskGrainRuntimeTests
             target,
             authoritative,
             CancellationToken.None);
-        fixture.Runtime.AcceptResponse(taskId, authoritative);
+        await fixture.Runtime.AcceptResponseAsync(taskId, authoritative, CancellationToken.None);
 
         Assert.True(fixture.Storage.TryGetTask(taskId, out var state));
         Assert.Equal(73, state.Result!.GetResult<int>());
         Assert.True(Assert.IsType<DurableTaskState>(state).PendingCancellationDestination.IsDefault);
+    }
+
+    [Fact]
+    public async Task RecoveredRemoteChild_RetainsCancellationTarget()
+    {
+        var fixture = CreateFixture(withTransport: true);
+        var taskId = TaskId.Create("remote-child-recovery");
+        var target = GrainId.Create("remote-target", "recovered");
+        var state = fixture.Storage.GetOrCreateTask(taskId, request: null);
+        fixture.Storage.SetRemoteTarget(taskId, state, target);
+        await fixture.Storage.WriteAsync(CancellationToken.None);
+        await fixture.Storage.ReadAsync(CancellationToken.None);
+        var restarted = CreateSecondRuntime(fixture);
+
+        await restarted.GetScheduledTaskHandle(taskId).CancelAsync(CancellationToken.None);
+
+        var cancellation = Assert.Single(fixture.Transport!.Cancellations);
+        Assert.Equal((fixture.GrainId, target, taskId), cancellation);
+    }
+
+    [Fact]
+    public async Task CustomStorage_RetainsPendingCancellationDestinationForRecovery()
+    {
+        var storage = new RpcTestDurableTaskGrainStorage();
+        var grainContext = new TestGrainContext(GrainId.Create("custom-storage", "grain"));
+        var transport = new RpcTestMessageTransport();
+        var runtime = RpcTestRuntimeFactory.Create(storage, grainContext, transport);
+        var taskId = TaskId.Create("custom-storage-cancellation");
+        var target = GrainId.Create("remote-target", "custom");
+        storage.GetOrCreateTask(taskId, request: null);
+
+        await runtime.CancelRemoteAsync(taskId, target, CancellationToken.None);
+        Assert.Equal(1, storage.WriteAsyncCallCount);
+        transport.Cancellations.Clear();
+        var restarted = RpcTestRuntimeFactory.Create(storage, grainContext, transport);
+        await restarted.ResumePendingTasksAsync(CancellationToken.None);
+
+        Assert.Equal((grainContext.GrainId, target, taskId), Assert.Single(transport.Cancellations));
+        Assert.Equal(2, storage.WriteAsyncCallCount);
     }
 
     [Fact]
@@ -1279,6 +1423,46 @@ public class DurableTaskGrainRuntimeTests
             async () => await ((IDurableTaskServer)fixture.Runtime).ScheduleAsync(taskId, conflict, CancellationToken.None));
         Assert.Equal(0, equivalent.CreateTaskCallCount);
         Assert.Equal(0, conflict.CreateTaskCallCount);
+    }
+
+    [Fact]
+    public async Task ScheduleAsync_RequestlessTaskIdReuse_IsRejected()
+    {
+        var fixture = CreateFixture();
+        var taskId = TaskId.Create("requestless-collision");
+        fixture.Storage.GetOrCreateTask(taskId, request: null);
+        var request = new RuntimeTestDurableTaskRequest
+        {
+            Context = new DurableTaskRequestContext { TargetId = fixture.GrainId },
+        };
+
+        var exception = await Assert.ThrowsAsync<InvalidOperationException>(
+            async () => await ((IDurableTaskServer)fixture.Runtime).ScheduleAsync(
+                taskId,
+                request,
+                CancellationToken.None));
+
+        Assert.Contains("local, delay, or outbound", exception.Message);
+        Assert.Equal(0, request.CreateTaskCallCount);
+    }
+
+    [Fact]
+    public async Task ScheduleAsync_CanceledRequestlessNonTombstone_IsRejected()
+    {
+        var fixture = CreateFixture();
+        var taskId = TaskId.Create("canceled-requestless-collision");
+        var state = fixture.Storage.GetOrCreateTask(taskId, request: null);
+        fixture.Storage.RequestCancellation(taskId, state);
+        var request = new RuntimeTestDurableTaskRequest
+        {
+            Context = new DurableTaskRequestContext { TargetId = fixture.GrainId },
+        };
+
+        await Assert.ThrowsAsync<InvalidOperationException>(
+            async () => await ((IDurableTaskServer)fixture.Runtime).ScheduleAsync(
+                taskId,
+                request,
+                CancellationToken.None));
     }
 
     [Fact]

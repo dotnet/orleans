@@ -12,7 +12,10 @@ internal sealed class DurableTaskMessageTransport(
     IDurableOutbox outbox,
     IDurableMessageScheduler scheduler,
     IJournaledStateManager stateManager,
-    SerializerSessionPool sessionPool) : IDurableTaskMessageTransport
+    SerializerSessionPool sessionPool,
+    DurableMessagingCommitCoordinator commitCoordinator) :
+    IDurableTaskMessageTransport,
+    IDurableTaskMessageTransaction
 {
     internal const string InvocationRoute = "durable-rpc/invoke";
     internal const string CompletionRoute = "durable-rpc/complete";
@@ -60,6 +63,42 @@ internal sealed class DurableTaskMessageTransport(
 
     public ValueTask CommitAsync(CancellationToken cancellationToken) =>
         stateManager.WriteStateAsync(cancellationToken);
+
+    public bool TryEnlist(Action commit, Action rollback) =>
+        commitCoordinator.TryEnlist(commit, rollback);
+
+    public void EnlistNextCommit(Action commit, Action rollback) =>
+        commitCoordinator.EnlistNextCommit(commit, rollback);
+
+    public ValueTask CommitAsync(
+        Func<ValueTask> prepare,
+        Action commit,
+        Action rollback,
+        CancellationToken cancellationToken) =>
+        commitCoordinator.ExecuteExclusiveAsync(
+            async () =>
+            {
+                await prepare();
+                try
+                {
+                    if (stateManager is CoordinatedJournaledStateManager coordinated)
+                    {
+                        await coordinated.CommitHandlerAsync(cancellationToken);
+                    }
+                    else
+                    {
+                        await stateManager.WriteStateAsync(cancellationToken);
+                    }
+
+                    commit();
+                }
+                catch
+                {
+                    rollback();
+                    throw;
+                }
+            },
+            cancellationToken);
 
     private void Send<T>(
         GrainId sender,

@@ -50,18 +50,14 @@ internal sealed class GrainDurableExecutionContext(TaskId taskId, IDurableTaskGr
             if (string.IsNullOrWhiteSpace(name))
             {
                 var sequenceNumber = _nextSequenceNumber++;
-                return TaskId.Child(sequenceNumber.ToString(CultureInfo.InvariantCulture));
+                return TaskId.Child($"unnamed:{sequenceNumber.ToString(CultureInfo.InvariantCulture)}");
             }
             else
             {
                 ref var nextSequenceNumber = ref CollectionsMarshal.GetValueRefOrAddDefault(_nextChildIds ??= [], name, out _);
                 var sequenceNumber = nextSequenceNumber++;
-                if (sequenceNumber > 0)
-                {
-                    return TaskId.Child($"{name}.{sequenceNumber.ToString(CultureInfo.InvariantCulture)}");
-                }
-
-                return TaskId.Child(name);
+                return TaskId.Child(
+                    $"named:{name.Length.ToString(CultureInfo.InvariantCulture)}:{name}:{sequenceNumber.ToString(CultureInfo.InvariantCulture)}");
             }
         }
     }

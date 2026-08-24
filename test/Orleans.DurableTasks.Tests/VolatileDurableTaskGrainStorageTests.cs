@@ -26,6 +26,113 @@ public class VolatileDurableTaskGrainStorageTests
     }
 
     [Fact]
+    public async Task WriteAsync_CommitsConfiguredDurableMessageTransport()
+    {
+        var services = new ServiceCollection().AddSerializer().BuildServiceProvider();
+        var transport = new RecordingDurableTaskMessageTransport();
+        var storage = new VolatileDurableTaskGrainStorage(
+            services.GetRequiredService<DeepCopier<Dictionary<TaskId, DurableTaskState>>>(),
+            services.GetRequiredService<DeepCopier<DurableTaskState>>(),
+            TimeProvider.System,
+            transport);
+
+        await storage.WriteAsync(CancellationToken.None);
+
+        Assert.Equal(1, transport.CommitCount);
+    }
+
+    [Fact]
+    public async Task WriteAsync_EnlistedSnapshotCommitsOrRollsBackWithHandlerTransaction()
+    {
+        var services = new ServiceCollection().AddSerializer().BuildServiceProvider();
+        var transport = new RecordingDurableTaskMessageTransport();
+        var storage = new VolatileDurableTaskGrainStorage(
+            services.GetRequiredService<DeepCopier<Dictionary<TaskId, DurableTaskState>>>(),
+            services.GetRequiredService<DeepCopier<DurableTaskState>>(),
+            TimeProvider.System,
+            transport);
+        var taskId = TaskId.Create("enlisted");
+        var state = storage.GetOrCreateTask(taskId, request: null);
+        storage.SetResponse(taskId, state, DurableTaskResponse.FromResult(1));
+        await storage.WriteAsync(CancellationToken.None);
+
+        transport.EnlistWrites = true;
+        Assert.True(storage.TryGetTask(taskId, out state));
+        storage.SetResponse(taskId, state, DurableTaskResponse.FromResult(2));
+        await storage.WriteAsync(CancellationToken.None);
+        transport.CompleteTransaction(committed: false);
+        Assert.True(storage.TryGetTask(taskId, out var rolledBack));
+        Assert.Equal(1, rolledBack.Result!.GetResult<int>());
+
+        storage.SetResponse(taskId, rolledBack, DurableTaskResponse.FromResult(3));
+        await storage.WriteAsync(CancellationToken.None);
+        transport.CompleteTransaction(committed: true);
+        await storage.ReadAsync(CancellationToken.None);
+        Assert.True(storage.TryGetTask(taskId, out var committed));
+        Assert.Equal(3, committed.Result!.GetResult<int>());
+    }
+
+    [Fact]
+    public async Task WriteAsync_FailedMessageCommitDoesNotPublishPreparedSnapshot()
+    {
+        var services = new ServiceCollection().AddSerializer().BuildServiceProvider();
+        var transport = new RecordingDurableTaskMessageTransport();
+        var storage = new VolatileDurableTaskGrainStorage(
+            services.GetRequiredService<DeepCopier<Dictionary<TaskId, DurableTaskState>>>(),
+            services.GetRequiredService<DeepCopier<DurableTaskState>>(),
+            TimeProvider.System,
+            transport);
+        var taskId = TaskId.Create("failed-commit");
+        var state = storage.GetOrCreateTask(taskId, request: null);
+        storage.SetResponse(taskId, state, DurableTaskResponse.FromResult(1));
+        await storage.WriteAsync(CancellationToken.None);
+        Assert.True(storage.TryGetTask(taskId, out state));
+        storage.SetResponse(taskId, state, DurableTaskResponse.FromResult(2));
+        transport.NextCommitException = new IOException("Expected commit failure.");
+
+        await Assert.ThrowsAsync<IOException>(
+            () => storage.WriteAsync(CancellationToken.None).AsTask());
+        await storage.ReadAsync(CancellationToken.None);
+
+        Assert.True(storage.TryGetTask(taskId, out var recovered));
+        Assert.Equal(1, recovered.Result!.GetResult<int>());
+    }
+
+    [Fact]
+    public async Task ArmedNextCommitEnlistment_IsNotRolledBackByScopeDisposal()
+    {
+        var services = new ServiceCollection().AddSerializer().BuildServiceProvider();
+        var transport = new RecordingDurableTaskMessageTransport();
+        var storage = new VolatileDurableTaskGrainStorage(
+            services.GetRequiredService<DeepCopier<Dictionary<TaskId, DurableTaskState>>>(),
+            services.GetRequiredService<DeepCopier<DurableTaskState>>(),
+            TimeProvider.System,
+            transport);
+        var taskId = TaskId.Create("armed-enlistment");
+        var state = storage.GetOrCreateTask(taskId, request: null);
+        storage.SetResponse(taskId, state, DurableTaskResponse.FromResult(1));
+        await storage.WriteAsync(CancellationToken.None);
+        Assert.True(storage.TryGetTask(taskId, out state));
+        storage.SetResponse(taskId, state, DurableTaskResponse.FromResult(2));
+
+        using (storage.EnlistWithNextMessageCommit())
+        {
+            await storage.WriteAsync(CancellationToken.None);
+        }
+
+        Assert.True(storage.TryGetTask(taskId, out var stillWorking));
+        Assert.Equal(2, stillWorking.Result!.GetResult<int>());
+        await transport.ScheduleResumeAsync(
+            GrainId.Create("test", "target"),
+            taskId,
+            DateTimeOffset.UtcNow,
+            CancellationToken.None);
+        await storage.ReadAsync(CancellationToken.None);
+        Assert.True(storage.TryGetTask(taskId, out var committed));
+        Assert.Equal(2, committed.Result!.GetResult<int>());
+    }
+
+    [Fact]
     public void AddOrUpdateTask_TryGetTask_RoundTrip_DeepCopyIsolation()
     {
         var (storage, time) = CreateStorage();
@@ -318,6 +425,9 @@ public class VolatileDurableTaskGrainStorageTests
         public DateTimeOffset? CompletedAt => null;
         public DateTimeOffset? CancellationRequestedAt => null;
         public DateTimeOffset CreatedAt => default;
+        public GrainId RemoteTarget => default;
+        public bool IsCancellationTombstone { get; set; }
+        public GrainId PendingCancellationDestination { get; set; }
     }
 
     [Fact]

@@ -3,12 +3,18 @@ using Orleans.Runtime;
 
 namespace Orleans.DurableJobs;
 
+internal interface IDurableJobTurnIsolationReentrantScope
+{
+    IDisposable JoinReentrantScope();
+}
+
 internal sealed class DurableJobTurnIsolation
 {
     internal const string RequestContextKey = "Orleans.DurableJobs.TurnIsolation";
 
     private readonly object _sync = new();
     private readonly SemaphoreSlim _gate = new(1, 1);
+    private readonly string _activationKey = Guid.NewGuid().ToString("N");
     private string? _ownerId;
     private int _enabled;
     private int _leaseCount;
@@ -35,7 +41,7 @@ internal sealed class DurableJobTurnIsolation
             if (IsCurrentOwnerUnderLock())
             {
                 _leaseCount++;
-                return new Lease(this, _ownerId!, RequestContext.Get(RequestContextKey));
+                return new Lease(this, _ownerId!, RequestContext.Get(RequestContextKey), isReentrant: true);
             }
         }
 
@@ -47,7 +53,7 @@ internal sealed class DurableJobTurnIsolation
             _leaseCount = 1;
         }
 
-        return new Lease(this, ownerId, RequestContext.Get(RequestContextKey));
+        return new Lease(this, ownerId, RequestContext.Get(RequestContextKey), isReentrant: false);
     }
 
     public async ValueTask<Lease> EnterOrdinaryAsync()
@@ -62,7 +68,7 @@ internal sealed class DurableJobTurnIsolation
             if (IsCurrentOwnerUnderLock())
             {
                 _leaseCount++;
-                return new Lease(this, _ownerId!, RequestContext.Get(RequestContextKey));
+                return new Lease(this, _ownerId!, RequestContext.Get(RequestContextKey), isReentrant: true);
             }
         }
 
@@ -74,13 +80,15 @@ internal sealed class DurableJobTurnIsolation
             _leaseCount = 1;
         }
 
-        return new Lease(this, ownerId, RequestContext.Get(RequestContextKey));
+        return new Lease(this, ownerId, RequestContext.Get(RequestContextKey), isReentrant: false);
     }
 
     private bool IsCurrentOwnerUnderLock() =>
         _leaseCount > 0
         && _ownerId is { } ownerId
-        && string.Equals(RequestContext.Get(RequestContextKey) as string, ownerId, StringComparison.Ordinal);
+        && RequestContext.Get(RequestContextKey) is IReadOnlyDictionary<string, string> owners
+        && owners.TryGetValue(_activationKey, out var currentOwner)
+        && string.Equals(currentOwner, ownerId, StringComparison.Ordinal);
 
     private void Release()
     {
@@ -102,7 +110,7 @@ internal sealed class DurableJobTurnIsolation
 
     public sealed class Lease : IDisposable
     {
-        public static Lease None { get; } = new(null, null, null);
+        public static Lease None { get; } = new(null, null, null, isReentrant: false);
 
         private readonly DurableJobTurnIsolation? _owner;
         private readonly string? _ownerId;
@@ -110,18 +118,29 @@ internal sealed class DurableJobTurnIsolation
         private bool _activated;
         private int _disposed;
 
-        internal Lease(DurableJobTurnIsolation? owner, string? ownerId, object? previousOwner)
+        internal Lease(
+            DurableJobTurnIsolation? owner,
+            string? ownerId,
+            object? previousOwner,
+            bool isReentrant)
         {
             _owner = owner;
             _ownerId = ownerId;
             _previousOwner = previousOwner;
+            IsReentrant = isReentrant;
         }
+
+        public bool IsReentrant { get; }
 
         public void Activate()
         {
             if (_owner is not null && !_activated)
             {
-                RequestContext.Set(RequestContextKey, _ownerId!);
+                var owners = _previousOwner is IReadOnlyDictionary<string, string> previous
+                    ? new Dictionary<string, string>(previous, StringComparer.Ordinal)
+                    : new Dictionary<string, string>(StringComparer.Ordinal);
+                owners[_owner._activationKey] = _ownerId!;
+                RequestContext.Set(RequestContextKey, owners);
                 _activated = true;
             }
         }
@@ -167,15 +186,41 @@ internal sealed class DurableJobTurnIsolationFilter : IIncomingGrainCallFilter
 
         using var lease = await isolation.EnterOrdinaryAsync();
         lease.Activate();
-        await context.Invoke();
+        List<IDisposable>? reentrantScopes = null;
+        if (lease.IsReentrant)
+        {
+            foreach (var participant in context.TargetContext.ActivationServices.GetServices<IDurableJobTurnIsolationReentrantScope>())
+            {
+                (reentrantScopes ??= []).Add(participant.JoinReentrantScope());
+            }
+        }
+
+        try
+        {
+            await context.Invoke();
+        }
+        finally
+        {
+            if (reentrantScopes is not null)
+            {
+                for (var i = reentrantScopes.Count - 1; i >= 0; i--)
+                {
+                    reentrantScopes[i].Dispose();
+                }
+            }
+        }
     }
 }
 
 internal sealed class DurableJobExecutionLifetime : ILifecycleObserver
 {
+    private readonly object _sync = new();
     private readonly CancellationTokenSource _shutdown = new();
+    private readonly HashSet<Task> _executions = [];
+    private bool _admissionStopped;
 
     public DurableJobExecutionLifetime(IGrainContext grainContext)
+        : this()
     {
         grainContext.ObservableLifecycle.Subscribe(
             nameof(DurableJobExecutionLifetime),
@@ -183,13 +228,59 @@ internal sealed class DurableJobExecutionLifetime : ILifecycleObserver
             this);
     }
 
+    internal DurableJobExecutionLifetime()
+    {
+    }
+
     public CancellationToken Token => _shutdown.Token;
+
+    public Task<TResult> Start<TResult>(Func<CancellationToken, Task<TResult>> factory)
+    {
+        ArgumentNullException.ThrowIfNull(factory);
+        Task<TResult> task;
+        lock (_sync)
+        {
+            if (_admissionStopped)
+            {
+                throw new OperationCanceledException("The durable job activation is stopping.");
+            }
+
+            task = factory(_shutdown.Token);
+            _executions.Add(task);
+        }
+
+        _ = task.ContinueWith(
+            static (completed, state) =>
+            {
+                var owner = (DurableJobExecutionLifetime)state!;
+                lock (owner._sync)
+                {
+                    owner._executions.Remove(completed);
+                }
+            },
+            this,
+            CancellationToken.None,
+            TaskContinuationOptions.ExecuteSynchronously,
+            TaskScheduler.Default);
+        return task;
+    }
 
     public Task OnStart(CancellationToken cancellationToken = default) => Task.CompletedTask;
 
-    public Task OnStop(CancellationToken cancellationToken = default)
+    public async Task OnStop(CancellationToken cancellationToken = default)
     {
+        lock (_sync)
+        {
+            _admissionStopped = true;
+        }
+
         _shutdown.Cancel();
-        return Task.CompletedTask;
+        Task[] executions;
+        lock (_sync)
+        {
+            executions = _executions.ToArray();
+        }
+
+        await Task.WhenAll(executions).ConfigureAwait(ConfigureAwaitOptions.SuppressThrowing);
     }
 }

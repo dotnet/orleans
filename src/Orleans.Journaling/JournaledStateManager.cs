@@ -22,6 +22,7 @@ internal sealed partial class JournaledStateManager : IJournaledStateManager, IJ
     private readonly JournaledStateManagerShared _shared;
     private readonly IJournalStorage _storage;
     private readonly JournalBufferWriter _journalWriter;
+    private IJournaledStateMutationGuard? _mutationGuard;
     private readonly SingleWaiterAutoResetEvent _workSignal = new() { RunContinuationsAsynchronously = true };
     private readonly Queue<WorkItem> _workQueue = new();
     private readonly CancellationTokenSource _shutdownCancellation = new();
@@ -32,8 +33,15 @@ internal sealed partial class JournaledStateManager : IJournaledStateManager, IJ
     private bool _migrationSnapshotRequired;
     private int _disposed;
 
-    public JournaledStateManager(JournaledStateManagerShared shared, IJournalStorageProvider storageProvider, IGrainContext grainContext)
-        : this(shared, CreateStorage(storageProvider, CreateJournalId(grainContext)))
+    public JournaledStateManager(
+        JournaledStateManagerShared shared,
+        IJournalStorageProvider storageProvider,
+        IGrainContext grainContext,
+        IJournaledStateMutationGuard? mutationGuard = null)
+        : this(
+            shared,
+            CreateStorage(storageProvider, CreateJournalId(grainContext)),
+            mutationGuard)
     {
     }
 
@@ -42,12 +50,16 @@ internal sealed partial class JournaledStateManager : IJournaledStateManager, IJ
     {
     }
 
-    internal JournaledStateManager(JournaledStateManagerShared shared, IJournalStorage storage)
+    internal JournaledStateManager(
+        JournaledStateManagerShared shared,
+        IJournalStorage storage,
+        IJournaledStateMutationGuard? mutationGuard = null)
     {
         ArgumentNullException.ThrowIfNull(shared);
         ArgumentNullException.ThrowIfNull(storage);
         _shared = shared;
         _storage = storage;
+        _mutationGuard = mutationGuard;
         _journalWriter = _shared.JournalFormat.CreateWriter();
         var serviceProvider = _shared.ServiceProvider;
         var journalStreamIdsCodec = JournalFormatServices.GetRequiredCommandCodec<IDurableDictionaryCommandCodec<string, uint>>(serviceProvider, WriteJournalFormatKey);
@@ -678,7 +690,14 @@ internal sealed partial class JournaledStateManager : IJournaledStateManager, IJ
         }
     }
 
-    private JournalStreamWriter CreateJournalStreamWriter(JournalStreamId streamId) => _journalWriter.CreateJournalStreamWriter(streamId);
+    private JournalStreamWriter CreateJournalStreamWriter(JournalStreamId streamId) =>
+        _journalWriter.CreateJournalStreamWriter(streamId, _mutationGuard);
+
+    internal void SetMutationGuard(IJournaledStateMutationGuard mutationGuard)
+    {
+        ArgumentNullException.ThrowIfNull(mutationGuard);
+        _mutationGuard = mutationGuard;
+    }
 
     private static void AppendUpdatesOrSnapshotState(JournalBufferWriter journalWriter, bool isSnapshot, uint id, IJournaledState state)
     {

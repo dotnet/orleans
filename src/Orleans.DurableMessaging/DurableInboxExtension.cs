@@ -204,11 +204,18 @@ internal sealed partial class DurableInboxExtension :
         var pollTimeout = options.PollTimeout == Timeout.InfiniteTimeSpan ? _defaultPollTimeout : options.PollTimeout;
         var shouldWait = false;
         DurableEnvelope? envelopeToProcess = null;
+        Task<DeliveryResult>? processing = null;
         var result = DeliveryResult.Accepted();
 
         await _gate.WaitAsync(CancellationToken.None).ConfigureAwait(true);
         try
         {
+            if (Volatile.Read(ref _admissionStopped) != 0)
+            {
+                envelope.Data.Dispose();
+                return DeliveryResult.Backpressured();
+            }
+
             if (_processed.ContainsKey(key))
             {
                 LogDuplicateMessageDetected(
@@ -294,15 +301,17 @@ internal sealed partial class DurableInboxExtension :
                 shouldWait = _enableLongPolling && pollTimeout > TimeSpan.Zero;
                 envelopeToProcess = envelope;
             }
+
+            if (envelopeToProcess is { } admittedEnvelope)
+            {
+                processing = GetOrStartProcessing(admittedEnvelope);
+            }
         }
         finally
         {
             _gate.Release();
         }
 
-        var processing = envelopeToProcess is { } pendingEnvelope
-            ? GetOrStartProcessing(pendingEnvelope)
-            : null;
         if (!shouldWait || processing is null)
         {
             return result;
@@ -482,15 +491,15 @@ internal sealed partial class DurableInboxExtension :
         }
 
         var context = new InboxHandlerContext(envelope, _grainContext.GrainId, _outbox, _sessionPool);
+        DurableMessagingCommitCoordinator.HandlerScope? commitScope = null;
         try
         {
             DeliveryResult completionResult;
             if (_durableInbox.TryFindHandler(context, out var handler))
             {
-                using (_commitCoordinator.BeginHandler())
-                {
-                    await InvokeHandlerAsync(handler, context, cancellationToken).ConfigureAwait(true);
-                }
+                commitScope = await _commitCoordinator.BeginHandlerAsync(cancellationToken).ConfigureAwait(true);
+                commitScope.Activate();
+                await InvokeHandlerAsync(handler, context, _sessionPool, cancellationToken).ConfigureAwait(true);
                 cancellationToken.ThrowIfCancellationRequested();
                 _faultInjector?.OnPhase(DurableInboxPersistencePhase.HandlerCompleted);
                 completionResult = DeliveryResult.Processed();
@@ -513,8 +522,9 @@ internal sealed partial class DurableInboxExtension :
                     RemoveMessage(key);
                     _messageStates.Remove(key);
                     _processed[key] = _timeProvider.GetUtcNow();
-                    await _stateManager.WriteStateAsync(cancellationToken).ConfigureAwait(true);
+                    await CommitHandlerStateAsync(cancellationToken).ConfigureAwait(true);
                     completionCommitted = true;
+                    commitScope?.Complete();
                     _faultInjector?.OnPhase(DurableInboxPersistencePhase.CompletionCommitted);
                 }
             }
@@ -531,7 +541,11 @@ internal sealed partial class DurableInboxExtension :
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
-            await _stateManager.RevertPendingChangesAsync(CancellationToken.None).ConfigureAwait(true);
+            await RollbackHandlerStateAsync(
+                ownsHandlerScope: commitScope is not null,
+                cancellationToken: CancellationToken.None).ConfigureAwait(true);
+            commitScope?.Dispose();
+            commitScope = null;
             return DeliveryResult.Pending();
         }
         catch (Exception ex)
@@ -542,6 +556,11 @@ internal sealed partial class DurableInboxExtension :
             }
 
             LogHandlerException(_logger, ex, envelope.MessageId, envelope.SenderId, envelope.RouteKey, envelope.CorrelationKey?.ToString());
+            await RollbackHandlerStateAsync(
+                ownsHandlerScope: commitScope is not null,
+                cancellationToken: cancellationToken).ConfigureAwait(true);
+            commitScope?.Dispose();
+            commitScope = null;
             var deadLettered = await RecordProcessingFailureAsync(key, ex, cancellationToken).ConfigureAwait(true);
             stopwatch.Stop();
             _instruments.OnInboxMessageProcessed(grainTypeName, envelope.RouteKey, deadLettered ? "dead_lettered" : "retry");
@@ -552,6 +571,10 @@ internal sealed partial class DurableInboxExtension :
             }
 
             return DeliveryResult.Pending();
+        }
+        finally
+        {
+            commitScope?.Dispose();
         }
     }
 
@@ -593,7 +616,6 @@ internal sealed partial class DurableInboxExtension :
         Exception exception,
         CancellationToken cancellationToken)
     {
-        await _stateManager.RevertPendingChangesAsync(cancellationToken).ConfigureAwait(true);
         await _gate.WaitAsync(cancellationToken).ConfigureAwait(true);
         try
         {
@@ -626,6 +648,18 @@ internal sealed partial class DurableInboxExtension :
             _gate.Release();
         }
     }
+
+    private ValueTask CommitHandlerStateAsync(CancellationToken cancellationToken) =>
+        _stateManager is CoordinatedJournaledStateManager coordinated
+            ? coordinated.CommitHandlerAsync(cancellationToken)
+            : _stateManager.WriteStateAsync(cancellationToken);
+
+    private ValueTask RollbackHandlerStateAsync(
+        bool ownsHandlerScope,
+        CancellationToken cancellationToken) =>
+        ownsHandlerScope && _stateManager is CoordinatedJournaledStateManager coordinated
+            ? coordinated.RollbackHandlerAsync(cancellationToken)
+            : _stateManager.RevertPendingChangesAsync(cancellationToken);
 
     private async ValueTask DeadLetterAsync(
         (GrainId SenderId, Guid MessageId) key,
@@ -668,6 +702,7 @@ internal sealed partial class DurableInboxExtension :
     private static async ValueTask InvokeHandlerAsync(
         IInboxHandler handler,
         IInboxHandlerContext context,
+        SerializerSessionPool sessionPool,
         CancellationToken cancellationToken)
     {
         var previous = RequestContext.Entries.ToArray();
@@ -689,6 +724,7 @@ internal sealed partial class DurableInboxExtension :
                     throw new InvalidOperationException("The durable request context could not be deserialized.");
                 }
 
+                DurableEnvelopeBuilder.ValidateRequestContextValues(values, sessionPool);
                 foreach (var (key, value) in values)
                 {
                     if (!DurableEnvelopeBuilder.IsFrameworkContextKey(key))

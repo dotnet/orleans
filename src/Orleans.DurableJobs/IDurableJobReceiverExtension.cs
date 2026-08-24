@@ -94,10 +94,10 @@ internal sealed partial class DurableJobReceiverExtension : IDurableJobReceiverE
 
     private Task<DurableJobRunResult> StartJob(IJobRunContext context)
     {
-        var executionToken = _featureHandlers.ExecutionToken;
         if (_featureHandlers.TryGetHandler(context.Job.Name, out var featureHandler))
         {
-            return ExecuteFeatureHandlerAsync(featureHandler, context, executionToken);
+            return _featureHandlers.StartExecution(
+                token => ExecuteFeatureHandlerAsync(featureHandler, context, token));
         }
 
         if (_grain.GrainInstance is not IDurableJobHandler handler)
@@ -106,7 +106,8 @@ internal sealed partial class DurableJobReceiverExtension : IDurableJobReceiverE
             throw new InvalidOperationException($"Grain {_grain.GrainId} does not implement IDurableJobHandler");
         }
 
-        return ExecuteHandlerAsync(handler, context, executionToken);
+        return _featureHandlers.StartExecution(
+            token => ExecuteHandlerAsync(handler, context, token));
     }
 
     private Task<DurableJobRunResult> ExecuteFeatureHandlerAsync(

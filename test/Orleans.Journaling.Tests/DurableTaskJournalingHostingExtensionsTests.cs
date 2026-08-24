@@ -28,8 +28,8 @@ public class DurableTaskJournalingHostingExtensionsTests
         var descriptor = Assert.Single(builder.Services, d => d.ServiceType == typeof(VolatileDurableTaskGrainStorage));
         Assert.Equal(ServiceLifetime.Transient, descriptor.Lifetime);
         Assert.Null(descriptor.ImplementationInstance);
-        Assert.Null(descriptor.ImplementationFactory);
-        Assert.Equal(typeof(VolatileDurableTaskGrainStorage), descriptor.ImplementationType);
+        Assert.NotNull(descriptor.ImplementationFactory);
+        Assert.Null(descriptor.ImplementationType);
     }
 
     [Fact]

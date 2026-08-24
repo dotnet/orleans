@@ -24,7 +24,12 @@ public class DurableTaskMessageTransportTests
         var outbox = new RpcTestDurableOutbox();
         var scheduler = new RpcTestDurableMessageScheduler();
         var stateManager = new RpcTestJournaledStateManager();
-        var transport = new DurableTaskMessageTransport(outbox, scheduler, stateManager, sessionPool);
+        var transport = new DurableTaskMessageTransport(
+            outbox,
+            scheduler,
+            stateManager,
+            sessionPool,
+            new DurableMessagingCommitCoordinator());
         return (transport, outbox, scheduler, stateManager);
     }
 

@@ -53,6 +53,10 @@ public static class DurableMessagingExtensions
             options => options.JournalFormatKey = OrleansBinaryJournalFormat.JournalFormatKey);
         services.TryAddSingleton<DurableMessagingInstruments>();
         services.TryAddScoped<DurableMessagingCommitCoordinator>();
+        services.TryAddScoped<IDurableJobTurnIsolationReentrantScope>(
+            static serviceProvider => serviceProvider.GetRequiredService<DurableMessagingCommitCoordinator>());
+        services.TryAddScoped<IJournaledStateMutationGuard>(
+            static serviceProvider => serviceProvider.GetRequiredService<DurableMessagingCommitCoordinator>());
         DecorateJournaledStateManager(services);
 
         services.TryAddScoped<DurableInboxExtension>(sp =>

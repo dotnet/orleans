@@ -34,9 +34,9 @@ public class GrainDurableExecutionContextTests
         var second = context.CreateChildTaskId("");
         var third = context.CreateChildTaskId("   ");
 
-        Assert.Equal("0", first.ToString());
-        Assert.Equal("1", second.ToString());
-        Assert.Equal("2", third.ToString());
+        Assert.Equal("unnamed:0", first.ToString());
+        Assert.Equal("unnamed:1", second.ToString());
+        Assert.Equal("unnamed:2", third.ToString());
     }
 
     [Fact]
@@ -48,9 +48,9 @@ public class GrainDurableExecutionContextTests
         var second = context.CreateChildTaskId("foo");
         var third = context.CreateChildTaskId("foo");
 
-        Assert.Equal("foo", first.ToString());
-        Assert.Equal("foo.1", second.ToString());
-        Assert.Equal("foo.2", third.ToString());
+        Assert.Equal("named:3:foo:0", first.ToString());
+        Assert.Equal("named:3:foo:1", second.ToString());
+        Assert.Equal("named:3:foo:2", third.ToString());
     }
 
     [Fact]
@@ -58,10 +58,31 @@ public class GrainDurableExecutionContextTests
     {
         var (context, _) = CreateContext();
 
-        Assert.Equal("foo", context.CreateChildTaskId("foo").ToString());
-        Assert.Equal("bar", context.CreateChildTaskId("bar").ToString());
-        Assert.Equal("foo.1", context.CreateChildTaskId("foo").ToString());
-        Assert.Equal("bar.1", context.CreateChildTaskId("bar").ToString());
+        Assert.Equal("named:3:foo:0", context.CreateChildTaskId("foo").ToString());
+        Assert.Equal("named:3:bar:0", context.CreateChildTaskId("bar").ToString());
+        Assert.Equal("named:3:foo:1", context.CreateChildTaskId("foo").ToString());
+        Assert.Equal("named:3:bar:1", context.CreateChildTaskId("bar").ToString());
+    }
+
+    [Fact]
+    public void CreateChildTaskId_NamedUnnamedAndSuffixLikeNamesAreInjective()
+    {
+        var (context, _) = CreateContext();
+
+        var unnamed = context.CreateChildTaskId(null);
+        var namedZero = context.CreateChildTaskId("0");
+        var firstFoo = context.CreateChildTaskId("foo");
+        var namedFooSuffix = context.CreateChildTaskId("foo.1");
+        var secondFoo = context.CreateChildTaskId("foo");
+
+        Assert.Equal(5, new HashSet<TaskId>
+        {
+            unnamed,
+            namedZero,
+            firstFoo,
+            namedFooSuffix,
+            secondFoo,
+        }.Count);
     }
 
     [Fact]

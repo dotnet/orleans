@@ -48,4 +48,19 @@ public interface IDurableTaskState
     /// The time at which the task was created.
     /// </summary>
     public DateTimeOffset CreatedAt { get; }
+
+    /// <summary>
+    /// Gets the remote grain which owns this task, or the default grain id for local tasks.
+    /// </summary>
+    public GrainId RemoteTarget { get; }
+
+    /// <summary>
+    /// Gets a value indicating whether this state records cancellation received before its invocation request.
+    /// </summary>
+    public bool IsCancellationTombstone { get; set; }
+
+    /// <summary>
+    /// Gets or sets the remote destination which must acknowledge a persisted cancellation request.
+    /// </summary>
+    public GrainId PendingCancellationDestination { get; set; }
 }

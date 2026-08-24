@@ -22,14 +22,20 @@ namespace Orleans.DurableTasks.Tests;
 /// A recording fake for the internal <see cref="IDurableTaskMessageTransport"/> interface. Records every call so that
 /// tests can assert on the exact arguments passed by <see cref="Orleans.Runtime.DurableTasks.DurableTaskGrainRuntime"/>.
 /// </summary>
-internal sealed class RecordingDurableTaskMessageTransport : IDurableTaskMessageTransport
+internal sealed class RecordingDurableTaskMessageTransport :
+    IDurableTaskMessageTransport,
+    IDurableTaskMessageTransaction
 {
+    private readonly List<(Action Commit, Action Rollback)> _participants = [];
+    private readonly List<(Action Commit, Action Rollback)> _nextCommitParticipants = [];
     public List<(GrainId Sender, GrainId Target, TaskId TaskId, IDurableTaskRequest Request)> Invocations { get; } = [];
     public List<(GrainId Sender, GrainId Target, TaskId TaskId, DurableTaskResponse Response)> Completions { get; } = [];
     public List<(GrainId Sender, GrainId Target, TaskId TaskId)> Cancellations { get; } = [];
     public List<(GrainId Sender, GrainId Target, TaskId TaskId, DurableTaskResponse Response)> CancellationAcknowledgements { get; } = [];
     public List<(GrainId Target, TaskId TaskId, DateTimeOffset DueTime)> ScheduledResumes { get; } = [];
     public int CommitCount { get; private set; }
+    public bool EnlistWrites { get; set; }
+    public Exception? NextCommitException { get; set; }
 
     public void SendInvocation(GrainId sender, GrainId target, TaskId taskId, IDurableTaskRequest request) => Invocations.Add((sender, target, taskId, request));
 
@@ -47,13 +53,75 @@ internal sealed class RecordingDurableTaskMessageTransport : IDurableTaskMessage
     public ValueTask ScheduleResumeAsync(GrainId target, TaskId taskId, DateTimeOffset dueTime, CancellationToken cancellationToken)
     {
         ScheduledResumes.Add((target, taskId, dueTime));
+        CompleteNextCommit(committed: true);
         return default;
     }
 
     public ValueTask CommitAsync(CancellationToken cancellationToken)
     {
         CommitCount++;
+        if (NextCommitException is { } exception)
+        {
+            NextCommitException = null;
+            return ValueTask.FromException(exception);
+        }
+
         return default;
+    }
+
+    public bool TryEnlist(Action commit, Action rollback)
+    {
+        if (!EnlistWrites)
+        {
+            return false;
+        }
+
+        _participants.Add((commit, rollback));
+        return true;
+    }
+
+    public void EnlistNextCommit(Action commit, Action rollback) =>
+        _nextCommitParticipants.Add((commit, rollback));
+
+    public async ValueTask CommitAsync(
+        Func<ValueTask> prepare,
+        Action commit,
+        Action rollback,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            await prepare();
+            await CommitAsync(cancellationToken);
+            commit();
+            CompleteNextCommit(committed: true);
+        }
+        catch
+        {
+            rollback();
+            CompleteNextCommit(committed: false);
+            throw;
+        }
+    }
+
+    public void CompleteTransaction(bool committed)
+    {
+        foreach (var participant in _participants)
+        {
+            (committed ? participant.Commit : participant.Rollback)();
+        }
+
+        _participants.Clear();
+    }
+
+    private void CompleteNextCommit(bool committed)
+    {
+        foreach (var participant in _nextCommitParticipants)
+        {
+            (committed ? participant.Commit : participant.Rollback)();
+        }
+
+        _nextCommitParticipants.Clear();
     }
 }
 

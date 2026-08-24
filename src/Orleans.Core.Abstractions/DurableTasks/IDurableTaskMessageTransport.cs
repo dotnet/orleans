@@ -21,3 +21,14 @@ internal interface IDurableTaskMessageTransport
 
     ValueTask CommitAsync(CancellationToken cancellationToken);
 }
+
+internal interface IDurableTaskMessageTransaction
+{
+    bool TryEnlist(Action commit, Action rollback);
+    void EnlistNextCommit(Action commit, Action rollback);
+    ValueTask CommitAsync(
+        Func<ValueTask> prepare,
+        Action commit,
+        Action rollback,
+        CancellationToken cancellationToken);
+}
