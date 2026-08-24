@@ -276,7 +276,8 @@ BEGIN
     WHERE ServiceId = _ServiceId
         AND ProviderId = _ProviderId
         AND QueueId = _QueueId
-        AND MessageId <= _Checkpoint;
+        AND MessageId <= _Checkpoint
+        AND CheckpointedOn IS NULL;
 
     SELECT OwnerEpoch
     INTO _OwnerEpoch
@@ -344,7 +345,8 @@ BEGIN
         WHERE ServiceId = _ServiceId
             AND ProviderId = _ProviderId
             AND QueueId = _QueueId
-            AND MessageId <= _Checkpoint;
+            AND MessageId <= _Checkpoint
+            AND CheckpointedOn IS NULL;
     END IF;
 
     SELECT OwnerEpoch, Checkpoint
