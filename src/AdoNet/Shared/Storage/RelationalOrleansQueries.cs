@@ -56,7 +56,7 @@ namespace Orleans.Tests.SqlUtils
         /// </summary>
         /// <param name="storage">the underlying relational storage</param>
         /// <param name="dbStoredQueries">Orleans functional queries</param>
-        private RelationalOrleansQueries(IRelationalStorage storage, DbStoredQueries dbStoredQueries)
+        internal RelationalOrleansQueries(IRelationalStorage storage, DbStoredQueries dbStoredQueries)
         {
             this.storage = storage;
             this.dbStoredQueries = dbStoredQueries;
@@ -505,7 +505,8 @@ namespace Orleans.Tests.SqlUtils
             string serviceId,
             string providerId,
             string queueId,
-            bool startFromNow)
+            bool startFromNow,
+            CancellationToken cancellationToken = default)
         {
             ArgumentNullException.ThrowIfNull(serviceId);
             ArgumentNullException.ThrowIfNull(providerId);
@@ -528,7 +529,8 @@ namespace Orleans.Tests.SqlUtils
                     QueueId = queueId,
                     StartFromNow = startFromNow
                 },
-                result => result.Single());
+                result => result.Single(),
+                cancellationToken);
         }
 
         /// <summary>
@@ -539,7 +541,8 @@ namespace Orleans.Tests.SqlUtils
             string providerId,
             string queueId,
             long afterMessageId,
-            int maxCount)
+            int maxCount,
+            CancellationToken cancellationToken = default)
         {
             ArgumentNullException.ThrowIfNull(serviceId);
             ArgumentNullException.ThrowIfNull(providerId);
@@ -566,7 +569,8 @@ namespace Orleans.Tests.SqlUtils
                     AfterMessageId = afterMessageId,
                     MaxCount = maxCount
                 },
-                result => result.ToList());
+                result => result.ToList(),
+                cancellationToken);
         }
 
         /// <summary>
@@ -577,7 +581,8 @@ namespace Orleans.Tests.SqlUtils
             string providerId,
             string queueId,
             long ownerEpoch,
-            long checkpoint)
+            long checkpoint,
+            CancellationToken cancellationToken = default)
         {
             ArgumentNullException.ThrowIfNull(serviceId);
             ArgumentNullException.ThrowIfNull(providerId);
@@ -602,7 +607,8 @@ namespace Orleans.Tests.SqlUtils
                     OwnerEpoch = ownerEpoch,
                     Checkpoint = checkpoint
                 },
-                result => result.SingleOrDefault());
+                result => result.SingleOrDefault(),
+                cancellationToken);
         }
 
         /// <summary>
@@ -646,7 +652,8 @@ namespace Orleans.Tests.SqlUtils
             int retentionPeriodSeconds,
             int? maximumRetentionPeriodSeconds,
             int cleanupIntervalSeconds,
-            int cleanupBatchSize)
+            int cleanupBatchSize,
+            CancellationToken cancellationToken = default)
         {
             ArgumentNullException.ThrowIfNull(serviceId);
             ArgumentNullException.ThrowIfNull(providerId);
@@ -681,7 +688,8 @@ namespace Orleans.Tests.SqlUtils
                     CleanupIntervalSeconds = cleanupIntervalSeconds,
                     CleanupBatchSize = cleanupBatchSize
                 },
-                result => result.Single());
+                result => result.Single(),
+                cancellationToken);
         }
 
         private static long? GetNullableInt64(IDataRecord record, string fieldName)
