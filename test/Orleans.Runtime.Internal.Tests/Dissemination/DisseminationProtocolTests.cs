@@ -2757,6 +2757,23 @@ public class DisseminationProtocolTests
     }
 
     [Fact]
+    public void DisseminationNamespaceDefaultValueSupportsKeyOperations()
+    {
+        var namespaceName = default(DisseminationNamespace);
+        var namespaces = new Dictionary<DisseminationNamespace, int> { [namespaceName] = 1 };
+
+        Assert.True(namespaces.TryGetValue(default, out var value));
+        Assert.Equal(1, value);
+        Assert.Equal(0, namespaceName.GetHashCode());
+        Assert.Equal(0, namespaceName.CompareTo(default));
+        Assert.True(namespaceName.CompareTo(new DisseminationNamespace("membership")) < 0);
+        Assert.Equal(string.Empty, namespaceName.ToString());
+        Assert.True(namespaceName.TryFormat([], out var charsWritten, default, null));
+        Assert.Equal(0, charsWritten);
+        Assert.Throws<InvalidOperationException>(() => namespaceName.Value);
+    }
+
+    [Fact]
     public void ManifestHashIsIndependentOfDictionaryOrdering()
     {
         var manifest1 = CreateManifest(

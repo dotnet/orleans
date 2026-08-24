@@ -30,13 +30,13 @@ internal readonly struct DisseminationNamespace : IEquatable<DisseminationNamesp
 
     public static bool operator !=(DisseminationNamespace left, DisseminationNamespace right) => !left.Equals(right);
 
-    public bool Equals(DisseminationNamespace other) => string.Equals(Value, other.Value, StringComparison.Ordinal);
+    public bool Equals(DisseminationNamespace other) => string.Equals(_value, other._value, StringComparison.Ordinal);
 
     public override bool Equals(object? obj) => obj is DisseminationNamespace other && Equals(other);
 
-    public override int GetHashCode() => StringComparer.Ordinal.GetHashCode(Value);
+    public override int GetHashCode() => _value is null ? 0 : StringComparer.Ordinal.GetHashCode(_value);
 
-    public int CompareTo(DisseminationNamespace other) => string.Compare(Value, other.Value, StringComparison.Ordinal);
+    public int CompareTo(DisseminationNamespace other) => string.Compare(_value, other._value, StringComparison.Ordinal);
 
     public int CompareTo(object? obj)
     {
@@ -50,15 +50,16 @@ internal readonly struct DisseminationNamespace : IEquatable<DisseminationNamesp
             : throw new ArgumentException($"Object must be of type {nameof(DisseminationNamespace)}.", nameof(obj));
     }
 
-    public override string ToString() => Value;
+    public override string ToString() => _value ?? string.Empty;
 
-    public string ToString(string? format, IFormatProvider? formatProvider) => Value;
+    public string ToString(string? format, IFormatProvider? formatProvider) => _value ?? string.Empty;
 
     public bool TryFormat(Span<char> destination, out int charsWritten, ReadOnlySpan<char> format, IFormatProvider? formatProvider)
     {
-        if (Value.AsSpan().TryCopyTo(destination))
+        var value = _value.AsSpan();
+        if (value.TryCopyTo(destination))
         {
-            charsWritten = Value.Length;
+            charsWritten = value.Length;
             return true;
         }
 
