@@ -50,6 +50,8 @@ internal sealed partial class ActivationData :
     private GrainLifecycle? _lifecycle;
     private Queue<object>? _pendingOperations;
     private Message? _blockingRequest;
+    private int _runningNonAlwaysInterleaveCount;
+    private int _runningNonAlwaysInterleaveWritableCount;
     private bool _isInWorkingSet = true;
     private CoarseStopwatch _busyDuration;
     private CoarseStopwatch _idleDuration;
@@ -1117,7 +1119,15 @@ internal sealed partial class ActivationData :
             var stopwatch = CoarseStopwatch.StartNew();
             _runningRequests.Add(message, stopwatch);
 
-            if (_blockingRequest != null || isInterleavable) return;
+            if (isInterleavable) return;
+
+            ++_runningNonAlwaysInterleaveCount;
+            if (!message.IsReadOnly)
+            {
+                ++_runningNonAlwaysInterleaveWritableCount;
+            }
+
+            if (_blockingRequest != null) return;
 
             // This logic only works for non-reentrant activations
             // Consider: Handle long request detection for reentrant activations.
@@ -1197,12 +1207,8 @@ internal sealed partial class ActivationData :
                 return true;
             }
 
-            if (_blockingRequest is null)
-            {
-                return true;
-            }
-
-            if (_blockingRequest.IsReadOnly && incoming.IsReadOnly)
+            if (_runningNonAlwaysInterleaveCount == 0
+                || (incoming.IsReadOnly && _runningNonAlwaysInterleaveWritableCount == 0))
             {
                 return true;
             }
@@ -1214,21 +1220,45 @@ internal sealed partial class ActivationData :
                 return true;
             }
 
-            if (GetComponent<GrainCanInterleave>() is GrainCanInterleave canInterleave)
+            var canInterleave = GetComponent<GrainCanInterleave>();
+            bool? incomingMayInterleave = null;
+            foreach (var runningRequest in _runningRequests)
             {
-                try
+                var runningMessage = runningRequest.Key;
+                if (runningMessage.IsAlwaysInterleave
+                    || (runningMessage.IsReadOnly && incoming.IsReadOnly))
                 {
-                    return canInterleave.MayInterleave(GrainInstance, incoming)
-                        || canInterleave.MayInterleave(GrainInstance, _blockingRequest);
+                    continue;
                 }
-                catch (Exception exception)
+
+                if (canInterleave is not null)
                 {
-                    LogErrorInvokingMayInterleavePredicate(_shared.Logger, exception, this, incoming);
-                    throw;
+                    try
+                    {
+                        incomingMayInterleave ??= canInterleave.MayInterleave(GrainInstance, incoming);
+                        if (incomingMayInterleave.Value)
+                        {
+                            return true;
+                        }
+
+                        if (canInterleave.MayInterleave(GrainInstance, runningMessage))
+                        {
+                            continue;
+                        }
+                    }
+                    catch (Exception exception)
+                    {
+                        LogErrorInvokingMayInterleavePredicate(_shared.Logger, exception, this, incoming);
+                        throw;
+                    }
                 }
+
+                _blockingRequest = runningMessage;
+                _busyDuration = runningRequest.Value;
+                return false;
             }
 
-            return false;
+            return true;
         }
 
         async Task ProcessOperationsAsync()
@@ -1478,7 +1508,17 @@ internal sealed partial class ActivationData :
     {
         lock (this)
         {
-            _runningRequests.Remove(message);
+            if (_runningRequests.Remove(message) && !message.IsAlwaysInterleave)
+            {
+                --_runningNonAlwaysInterleaveCount;
+                if (!message.IsReadOnly)
+                {
+                    --_runningNonAlwaysInterleaveWritableCount;
+                }
+
+                Debug.Assert(_runningNonAlwaysInterleaveCount >= 0);
+                Debug.Assert(_runningNonAlwaysInterleaveWritableCount >= 0);
+            }
 
             // If the message is meant to keep the activation active, reset the idle timer and ensure the activation
             // is in the activation working set.
