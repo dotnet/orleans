@@ -61,6 +61,7 @@ namespace Orleans.Streams
             Task<bool> DoHandshakeWithConsumer(StreamConsumerData consumerData, StreamSequenceToken? cacheToken);
             Task RunConsumerCursor(StreamConsumerData consumerData);
             Task RunQueuePump(QueueId myQueueId, CancellationToken cancellationToken);
+            Task RunConsumerCursor(StreamConsumerData consumerData);
             Task Shutdown();
         }
 
@@ -836,6 +837,12 @@ namespace Orleans.Streams
                 // loop through the queue until it is empty.
                 while (!IsShutdown && !cancellationToken.IsCancellationRequested) // shutdown sets IsShutdown and cancels the timer token.
                 {
+                    // Flow controllers can purge while calculating capacity, so preserve registration pins first.
+                    if (HasPendingStreamRegistration())
+                    {
+                        return;
+                    }
+
                     int maxCacheAddCount = queueCache?.GetMaxAddCount() ?? QueueAdapterConstants.UNLIMITED_GET_QUEUE_MSG;
                     if (maxCacheAddCount != QueueAdapterConstants.UNLIMITED_GET_QUEUE_MSG && maxCacheAddCount <= 0)
                         return;
@@ -889,7 +896,7 @@ namespace Orleans.Streams
             }
 
             // Pause all queue reads so a cold stream's first batch stays pinned until registration completes.
-            if (pubSubCache.Values.Any(static stream => stream.RegistrationTask is { IsCompleted: false }))
+            if (HasPendingStreamRegistration())
             {
                 return false;
             }
@@ -978,6 +985,9 @@ namespace Orleans.Streams
 
             return !IsShutdown && !cancellationToken.IsCancellationRequested;
         }
+
+        private bool HasPendingStreamRegistration()
+            => pubSubCache.Values.Any(static stream => stream.RegistrationTask is { IsCompleted: false });
 
         private void CleanupPubSubCache(DateTime now)
         {
