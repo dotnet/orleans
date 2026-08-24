@@ -233,7 +233,7 @@ namespace Orleans.Providers.Streams.Common
             return segment;
         }
 
-        private sealed class Cursor : IQueueCacheCursor
+        private sealed class Cursor : IQueueCacheCursor, IQueueCacheCursorProgress
         {
             private readonly PooledQueueCache _cache;
             private readonly object _cursor;
@@ -248,6 +248,10 @@ namespace Orleans.Providers.Streams.Common
             public void Dispose()
             {
             }
+
+            public StreamSequenceToken? SafeSequenceToken => _cache.GetSafeSequenceToken(_cursor);
+
+            public void AdvancePast(StreamSequenceToken token) => _cache.AdvanceCursorPast(_cursor, token);
 
             public IBatchContainer? GetCurrent(out Exception? exception)
             {
@@ -271,6 +275,8 @@ namespace Orleans.Providers.Streams.Common
             public void RecordDeliveryFailure()
             {
             }
+
+            public void RecordDeliverySuccess() => _cache.RecordDeliverySuccess(_cursor);
         }
     }
 }

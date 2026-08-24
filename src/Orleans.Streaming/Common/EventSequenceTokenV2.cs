@@ -8,6 +8,11 @@ namespace Orleans.Providers.Streams.Common
     /// <summary>
     /// Stream sequence token that tracks sequence number and event index
     /// </summary>
+    /// <remarks>
+    /// The exact <see cref="EventSequenceTokenV2"/> and <see cref="EventSequenceToken"/>
+    /// types compare across versions. Derived provider tokens define their own equality,
+    /// ordering, and hashing contract and are not comparable with these base tokens.
+    /// </remarks>
     [Serializable]
     [GenerateSerializer]
     public class EventSequenceTokenV2 : StreamSequenceToken
@@ -76,7 +81,8 @@ namespace Orleans.Providers.Streams.Common
         /// <inheritdoc/>
         public override bool Equals(StreamSequenceToken? other)
         {
-            return other is EventSequenceTokenV2 or EventSequenceToken
+            return other is not null
+                && IsCompatibleLegacyToken(other)
                 && other.SequenceNumber == SequenceNumber
                 && other.EventIndex == EventIndex;
         }
@@ -87,7 +93,7 @@ namespace Orleans.Providers.Streams.Common
             if (other == null)
                 return 1;
 
-            if (other is not EventSequenceTokenV2 and not EventSequenceToken)
+            if (!IsCompatibleLegacyToken(other))
                 throw new ArgumentOutOfRangeException(nameof(other));
 
             int difference = SequenceNumber.CompareTo(other.SequenceNumber);
@@ -101,6 +107,17 @@ namespace Orleans.Providers.Streams.Common
         public override string ToString()
         {
             return string.Format(CultureInfo.InvariantCulture, "[EventSequenceTokenV2: SeqNum={0}, EventIndex={1}]", SequenceNumber, EventIndex);
+        }
+
+        private bool IsCompatibleLegacyToken(StreamSequenceToken? other)
+        {
+            if (other is null || GetType() != typeof(EventSequenceTokenV2))
+            {
+                return false;
+            }
+
+            var otherType = other.GetType();
+            return otherType == typeof(EventSequenceTokenV2) || otherType == typeof(EventSequenceToken);
         }
     }
 }

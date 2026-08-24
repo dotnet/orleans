@@ -1,4 +1,5 @@
 using static System.String;
+using Orleans.Streaming.AdoNet;
 
 namespace Orleans.Configuration;
 
@@ -58,5 +59,5 @@ public class AdoNetStreamOptionsValidator(AdoNetStreamOptions options, string na
     }
 
     private static bool IsInvalidSqlInterval(TimeSpan value)
-        => value < TimeSpan.FromSeconds(1) || value.TotalSeconds > int.MaxValue;
+        => !AdoNetStreamTime.IsValidSqlInterval(value);
 }

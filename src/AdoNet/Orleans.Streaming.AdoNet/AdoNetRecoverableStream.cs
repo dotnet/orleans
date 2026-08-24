@@ -13,14 +13,21 @@ internal sealed partial class AdoNetRecoverableStream(
 {
     private AdoNetStreamPartitionState? _partition;
     private long _readOffset;
+    private Task<AdoNetStreamPartitionState>? _acquisitionTask;
+
+    internal Task AcquisitionCompletion => Volatile.Read(ref _acquisitionTask) ?? Task.CompletedTask;
 
     public async ValueTask<StreamCheckpointStoreState> Load(CancellationToken cancellationToken)
     {
-        var partition = await queries.AcquireStreamPartitionAsync(
+        var acquisitionTask = queries.AcquireStreamPartitionAsync(
             serviceId,
             providerId,
             queueId,
-            options.StartFromNow).WaitAsync(cancellationToken);
+            options.StartFromNow,
+            cancellationToken);
+        Volatile.Write(ref _acquisitionTask, acquisitionTask);
+        var partition = await acquisitionTask;
+        cancellationToken.ThrowIfCancellationRequested();
         _partition = partition;
         _readOffset = partition.Checkpoint ?? 0;
         ThrowIfRetentionGap(partition);
@@ -45,7 +52,8 @@ internal sealed partial class AdoNetRecoverableStream(
             providerId,
             queueId,
             ownerEpoch,
-            checkpointValue).WaitAsync(cancellationToken);
+            checkpointValue,
+            cancellationToken);
         return ResolveCheckpointUpdate(
             $"{serviceId}/{providerId}/{queueId}",
             partition.OwnerEpoch,
@@ -93,18 +101,20 @@ internal sealed partial class AdoNetRecoverableStream(
             providerId,
             queueId,
             _readOffset,
-            Math.Min(maxCount, options.MaxMessagesPerRead)).WaitAsync(cancellationToken);
+            Math.Min(maxCount, options.MaxMessagesPerRead),
+            cancellationToken);
 
         var cleanup = await queries.CleanupStreamMessagesAsync(
             serviceId,
             providerId,
             queueId,
-            checked((int)options.RetentionPeriod.TotalSeconds),
+            AdoNetStreamTime.ToSqlSeconds(options.RetentionPeriod),
             options.MaximumRetentionPeriod is { } maximum
-                ? checked((int)maximum.TotalSeconds)
+                ? AdoNetStreamTime.ToSqlSeconds(maximum)
                 : null,
-            checked((int)options.CleanupInterval.TotalSeconds),
-            options.CleanupBatchSize).WaitAsync(cancellationToken);
+            AdoNetStreamTime.ToSqlSeconds(options.CleanupInterval),
+            options.CleanupBatchSize,
+            cancellationToken);
         if (cleanup.HardDeletedCount > 0)
         {
             LogHardRetentionCrossed(

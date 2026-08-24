@@ -9,7 +9,7 @@ namespace Orleans.Streaming.Kinesis
 {
     [Serializable]
     [GenerateSerializer]
-    internal class KinesisSequenceToken : EventSequenceTokenV2
+    internal sealed class KinesisSequenceToken : EventSequenceTokenV2
     {
         [NonSerialized]
         private BigInteger? _numericShardSequence;

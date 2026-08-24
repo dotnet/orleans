@@ -3,6 +3,7 @@ using System;
 using System.Globalization;
 using Newtonsoft.Json;
 using Orleans.Providers.Streams.Common;
+using Orleans.Streams;
 
 namespace Orleans.Streaming.EventHubs
 {
@@ -31,6 +32,10 @@ namespace Orleans.Streaming.EventHubs
     ///   indicates which application layer event this token is for, within an EventHub message.  It is required for uniqueness
     ///   and ordering of application layer events within an EventHub message.
     /// </summary>
+    /// <remarks>
+    /// Event Hub token versions compare with each other using the Event Hubs sequence number
+    /// and event index. They do not compare with generic event sequence tokens.
+    /// </remarks>
     [Serializable]
     [GenerateSerializer]
     public class EventHubSequenceToken : EventSequenceToken, IEventHubPartitionLocation
@@ -64,12 +69,54 @@ namespace Orleans.Streaming.EventHubs
         {
         }
 
+        /// <inheritdoc />
+        public override bool Equals(StreamSequenceToken? other)
+        {
+            return other is not null
+                && IsCompatibleEventHubToken(other)
+                && other.SequenceNumber == SequenceNumber
+                && other.EventIndex == EventIndex;
+        }
+
+        /// <inheritdoc />
+        public override int CompareTo(StreamSequenceToken? other)
+        {
+            if (other is null)
+            {
+                return 1;
+            }
+
+            if (!IsCompatibleEventHubToken(other))
+            {
+                throw new ArgumentOutOfRangeException(nameof(other));
+            }
+
+            var difference = SequenceNumber.CompareTo(other.SequenceNumber);
+            return difference != 0 ? difference : EventIndex.CompareTo(other.EventIndex);
+        }
+
+        /// <inheritdoc />
+        public override int GetHashCode() => HashCode.Combine(SequenceNumber, EventIndex);
+
         /// <summary>Returns a string that represents the current object.</summary>
         /// <returns>A string that represents the current object.</returns>
         /// <filterpriority>2</filterpriority>
         public override string ToString()
         {
             return string.Format(CultureInfo.InvariantCulture, "EventHubSequenceToken(EventHubOffset: {0}, SequenceNumber: {1}, EventIndex: {2})", EventHubOffset, SequenceNumber, EventIndex);
+        }
+
+        private bool IsCompatibleEventHubToken(StreamSequenceToken? other)
+        {
+            if (other is null)
+            {
+                return false;
+            }
+
+            var currentType = GetType();
+            var otherType = other.GetType();
+            return (currentType == typeof(EventHubSequenceToken) || currentType == typeof(EventHubSequenceTokenV2))
+                && (otherType == typeof(EventHubSequenceToken) || otherType == typeof(EventHubSequenceTokenV2));
         }
     }
 }
