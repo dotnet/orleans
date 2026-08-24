@@ -2339,6 +2339,26 @@ namespace UnitTests.Runtime
         }
 
         [Fact, TestCategory("Activation")]
+        public void ActivationData_CompletedRequest_DoesNotReaddDeactivatingActivation()
+        {
+            using var fixture = new ActivationDataWorkingSetFixture();
+            lock (fixture.Activation)
+            {
+                fixture.Activation.SetState(ActivationState.Deactivating);
+                fixture.Member.IsInWorkingSet = false;
+                fixture.Member.IsIdle = false;
+            }
+
+            fixture.CompleteRequest(new Message());
+
+            Assert.Equal(ActivationState.Deactivating, fixture.Activation.State);
+            Assert.False(fixture.Member.IsInWorkingSet);
+            Assert.False(fixture.Member.IsIdle);
+            Assert.Equal(0, fixture.WorkingSet.Count);
+            Assert.Empty(fixture.Observer.GetHistory(0));
+        }
+
+        [Fact, TestCategory("Activation")]
         public async Task ActivationCollector_AgeCollection_RequestsActivationIdle()
         {
             var timeProvider = new FakeTimeProvider(DateTimeOffset.Parse("2025-01-01T00:00:00.000+00:00"));
@@ -2444,6 +2464,11 @@ namespace UnitTests.Runtime
                 BindingFlags.Instance | BindingFlags.NonPublic,
                 [typeof(IActivationWorkingSetMember)])
                 ?? throw new InvalidOperationException("Could not find the working-set scan method.");
+            private static readonly MethodInfo CompleteRequestMethod = typeof(ActivationData).GetMethod(
+                "OnCompletedRequest",
+                BindingFlags.Instance | BindingFlags.NonPublic,
+                [typeof(Message)])
+                ?? throw new InvalidOperationException("Could not find the completed-request method.");
 
             private readonly ServiceProvider _serviceProvider;
             private readonly IServiceScope _activationScope;
@@ -2527,6 +2552,8 @@ namespace UnitTests.Runtime
             }
 
             public void ScanOnce() => VisitMemberMethod.Invoke(WorkingSet, [Member]);
+
+            public void CompleteRequest(Message message) => CompleteRequestMethod.Invoke(Activation, [message]);
 
             public void Dispose()
             {
