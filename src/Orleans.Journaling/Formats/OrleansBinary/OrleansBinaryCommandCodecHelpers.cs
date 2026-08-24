@@ -10,7 +10,7 @@ namespace Orleans.Journaling;
 /// </summary>
 internal static class OrleansBinaryCommandCodecHelpers
 {
-    public static void WriteValue<T>(
+    public static void WriteIndependentValue<T>(
         IFieldCodec<T> codec,
         T value,
         IBufferWriter<byte> output,
@@ -22,17 +22,17 @@ internal static class OrleansBinaryCommandCodecHelpers
         writer.Commit();
     }
 
-    public static T ReadValue<T, TInput>(IFieldCodec<T> codec, ref Reader<TInput> reader)
-    {
-        var field = reader.ReadFieldHeader();
-        return codec.ReadValue(ref reader, field)!;
-    }
-
     public static T ReadIndependentValue<T, TInput>(IFieldCodec<T> codec, ref Reader<TInput> reader)
     {
-        var result = ReadValue(codec, ref reader);
-        // Snapshot values are each encoded with a fresh serializer session.
         reader.Session.Reset();
-        return result;
+        try
+        {
+            var field = reader.ReadFieldHeader();
+            return codec.ReadValue(ref reader, field)!;
+        }
+        finally
+        {
+            reader.Session.Reset();
+        }
     }
 }

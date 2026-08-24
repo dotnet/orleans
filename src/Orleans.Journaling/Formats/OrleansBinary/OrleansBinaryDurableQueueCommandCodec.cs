@@ -24,7 +24,7 @@ internal sealed class OrleansBinaryDurableQueueCommandCodec<T>(
         var payloadWriter = Writer.Create(output, session: null!);
         payloadWriter.WriteVarUInt32(EnqueueCommand);
         payloadWriter.Commit();
-        OrleansBinaryCommandCodecHelpers.WriteValue(codec, item, output, sessionPool);
+        OrleansBinaryCommandCodecHelpers.WriteIndependentValue(codec, item, output, sessionPool);
         entry.Commit();
     }
 
@@ -62,7 +62,7 @@ internal sealed class OrleansBinaryDurableQueueCommandCodec<T>(
         foreach (var item in items)
         {
             CollectionCodecHelpers.ThrowIfSnapshotItemCountExceeded(count, written);
-            OrleansBinaryCommandCodecHelpers.WriteValue(codec, item, output, sessionPool);
+            OrleansBinaryCommandCodecHelpers.WriteIndependentValue(codec, item, output, sessionPool);
             written++;
         }
 
@@ -90,7 +90,7 @@ internal sealed class OrleansBinaryDurableQueueCommandCodec<T>(
         switch (command)
         {
             case EnqueueCommand:
-                consumer.ApplyEnqueue(OrleansBinaryCommandCodecHelpers.ReadValue(codec, ref reader));
+                consumer.ApplyEnqueue(OrleansBinaryCommandCodecHelpers.ReadIndependentValue(codec, ref reader));
                 break;
             case DequeueCommand:
                 consumer.ApplyDequeue();

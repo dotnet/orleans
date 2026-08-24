@@ -26,7 +26,7 @@ internal sealed class OrleansBinaryDurableListCommandCodec<T>(
         var payloadWriter = Writer.Create(output, session: null!);
         payloadWriter.WriteVarUInt32(AddCommand);
         payloadWriter.Commit();
-        OrleansBinaryCommandCodecHelpers.WriteValue(codec, item, output, sessionPool);
+        OrleansBinaryCommandCodecHelpers.WriteIndependentValue(codec, item, output, sessionPool);
         entry.Commit();
     }
 
@@ -39,7 +39,7 @@ internal sealed class OrleansBinaryDurableListCommandCodec<T>(
         payloadWriter.WriteVarUInt32(SetCommand);
         payloadWriter.WriteVarUInt32((uint)index);
         payloadWriter.Commit();
-        OrleansBinaryCommandCodecHelpers.WriteValue(codec, item, output, sessionPool);
+        OrleansBinaryCommandCodecHelpers.WriteIndependentValue(codec, item, output, sessionPool);
         entry.Commit();
     }
 
@@ -52,7 +52,7 @@ internal sealed class OrleansBinaryDurableListCommandCodec<T>(
         payloadWriter.WriteVarUInt32(InsertCommand);
         payloadWriter.WriteVarUInt32((uint)index);
         payloadWriter.Commit();
-        OrleansBinaryCommandCodecHelpers.WriteValue(codec, item, output, sessionPool);
+        OrleansBinaryCommandCodecHelpers.WriteIndependentValue(codec, item, output, sessionPool);
         entry.Commit();
     }
 
@@ -91,7 +91,7 @@ internal sealed class OrleansBinaryDurableListCommandCodec<T>(
         foreach (var item in items)
         {
             CollectionCodecHelpers.ThrowIfSnapshotItemCountExceeded(count, written);
-            OrleansBinaryCommandCodecHelpers.WriteValue(codec, item, output, sessionPool);
+            OrleansBinaryCommandCodecHelpers.WriteIndependentValue(codec, item, output, sessionPool);
             written++;
         }
 
@@ -119,19 +119,19 @@ internal sealed class OrleansBinaryDurableListCommandCodec<T>(
         switch (command)
         {
             case AddCommand:
-                consumer.ApplyAdd(OrleansBinaryCommandCodecHelpers.ReadValue(codec, ref reader));
+                consumer.ApplyAdd(OrleansBinaryCommandCodecHelpers.ReadIndependentValue(codec, ref reader));
                 break;
             case SetCommand:
             {
                 var index = OrleansBinaryCollectionWireHelpers.ReadListIndex(ref reader);
-                var item = OrleansBinaryCommandCodecHelpers.ReadValue(codec, ref reader);
+                var item = OrleansBinaryCommandCodecHelpers.ReadIndependentValue(codec, ref reader);
                 consumer.ApplySet(index, item);
                 break;
             }
             case InsertCommand:
             {
                 var index = OrleansBinaryCollectionWireHelpers.ReadListIndex(ref reader);
-                var item = OrleansBinaryCommandCodecHelpers.ReadValue(codec, ref reader);
+                var item = OrleansBinaryCommandCodecHelpers.ReadIndependentValue(codec, ref reader);
                 consumer.ApplyInsert(index, item);
                 break;
             }

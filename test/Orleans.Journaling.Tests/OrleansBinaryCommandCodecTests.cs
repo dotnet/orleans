@@ -39,7 +39,7 @@ public sealed class OrleansBinaryCommandCodecTests : JournalingTestBase
     }
 
     [Fact]
-    public void DictionaryCodec_PreChangeSnapshotPayload_ReplaysIndependentReferenceScopes()
+    public void DictionaryCodec_SnapshotPayload_ReplaysIndependentReferenceScopes()
     {
         var codec = new OrleansBinaryDurableDictionaryCommandCodec<string, SnapshotReferenceRecord>(
             ValueCodec<string>(),
@@ -56,6 +56,27 @@ public sealed class OrleansBinaryCommandCodecTests : JournalingTestBase
         var consumer = new RecordingDictionaryCommandHandler<string, SnapshotReferenceRecord>();
         codec.Apply(CodecTestHelpers.ReadBuffer(payload), consumer);
         AssertAliases(consumer.SnapshotItems.Select(static item => item.Value));
+    }
+
+    [Fact]
+    public void DictionaryCodec_Set_ReplaysKeyAndValueAsIndependentReferenceScopes()
+    {
+        var codec = new OrleansBinaryDurableDictionaryCommandCodec<SnapshotReferenceRecord, SnapshotReferenceRecord>(
+            ValueCodec<SnapshotReferenceRecord>(),
+            ValueCodec<SnapshotReferenceRecord>(),
+            SessionPool);
+        var shared = new byte[] { 1, 2, 3 };
+        var key = new SnapshotReferenceRecord { Payload = shared, Alias = shared };
+        var value = new SnapshotReferenceRecord { Payload = shared, Alias = shared };
+        var payload = CodecTestHelpers.WriteEntry(writer => codec.WriteSet(key, value, writer));
+
+        var consumer = new RecordingDictionaryCommandHandler<SnapshotReferenceRecord, SnapshotReferenceRecord>();
+        codec.Apply(CodecTestHelpers.ReadBuffer(payload), consumer);
+
+        var item = Assert.Single(consumer.SnapshotItems);
+        Assert.Same(item.Key.Payload, item.Key.Alias);
+        Assert.Same(item.Value.Payload, item.Value.Alias);
+        Assert.NotSame(item.Key.Payload, item.Value.Payload);
     }
 
     [Fact]
@@ -88,7 +109,7 @@ public sealed class OrleansBinaryCommandCodecTests : JournalingTestBase
     }
 
     [Fact]
-    public void ListCodec_PreChangeSnapshotPayload_ReplaysIndependentReferenceScopes()
+    public void ListCodec_SnapshotPayload_ReplaysIndependentReferenceScopes()
     {
         var codec = new OrleansBinaryDurableListCommandCodec<SnapshotReferenceRecord>(
             ValueCodec<SnapshotReferenceRecord>(),
@@ -128,7 +149,7 @@ public sealed class OrleansBinaryCommandCodecTests : JournalingTestBase
     }
 
     [Fact]
-    public void QueueCodec_PreChangeSnapshotPayload_ReplaysIndependentReferenceScopes()
+    public void QueueCodec_SnapshotPayload_ReplaysIndependentReferenceScopes()
     {
         var codec = new OrleansBinaryDurableQueueCommandCodec<SnapshotReferenceRecord>(
             ValueCodec<SnapshotReferenceRecord>(),
@@ -168,7 +189,7 @@ public sealed class OrleansBinaryCommandCodecTests : JournalingTestBase
     }
 
     [Fact]
-    public void SetCodec_PreChangeSnapshotPayload_ReplaysIndependentReferenceScopes()
+    public void SetCodec_SnapshotPayload_ReplaysIndependentReferenceScopes()
     {
         var codec = new OrleansBinaryDurableSetCommandCodec<SnapshotReferenceRecord>(
             ValueCodec<SnapshotReferenceRecord>(),

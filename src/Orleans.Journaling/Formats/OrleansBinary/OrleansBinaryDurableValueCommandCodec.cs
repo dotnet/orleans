@@ -21,7 +21,7 @@ internal sealed class OrleansBinaryDurableValueCommandCodec<T>(
         var payloadWriter = Writer.Create(output, session: null!);
         payloadWriter.WriteVarUInt32(SetValueCommand);
         payloadWriter.Commit();
-        OrleansBinaryCommandCodecHelpers.WriteValue(codec, value, output, sessionPool);
+        OrleansBinaryCommandCodecHelpers.WriteIndependentValue(codec, value, output, sessionPool);
         entry.Commit();
     }
 
@@ -45,7 +45,7 @@ internal sealed class OrleansBinaryDurableValueCommandCodec<T>(
         switch (command)
         {
             case SetValueCommand:
-                consumer.ApplySet(OrleansBinaryCommandCodecHelpers.ReadValue(codec, ref reader));
+                consumer.ApplySet(OrleansBinaryCommandCodecHelpers.ReadIndependentValue(codec, ref reader));
                 break;
             default:
                 throw new NotSupportedException($"Command type {command} is not supported");
