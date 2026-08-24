@@ -178,7 +178,8 @@ namespace Orleans.Reminders.DynamoDB
                 return result;
             }
 
-            if (Uri.TryCreate(connectionString, UriKind.Absolute, out var serviceUri))
+            if (!connectionString.Contains(';', StringComparison.Ordinal)
+                && Uri.TryCreate(connectionString, UriKind.Absolute, out var serviceUri))
             {
                 result[nameof(DynamoDBClientOptions.Service)] = serviceUri.AbsoluteUri;
                 return result;
