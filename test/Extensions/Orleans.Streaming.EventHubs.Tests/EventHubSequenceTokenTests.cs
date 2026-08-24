@@ -41,4 +41,27 @@ public sealed class EventHubSequenceTokenTests
         Assert.True(earlierEvent.CompareTo(laterEvent) < 0);
         Assert.True(laterEvent.CompareTo(earlierEvent) > 0);
     }
+
+    [Fact]
+    public void SameCustomEventHubTokenSubtypeRemainsComparable()
+    {
+        StreamSequenceToken first = new CustomEventHubSequenceToken("10", 10, 2);
+        StreamSequenceToken second = new CustomEventHubSequenceToken("other-offset", 10, 2);
+        StreamSequenceToken builtIn = new EventHubSequenceToken("10", 10, 2);
+
+        Assert.True(first.Equals(second));
+        Assert.True(second.Equals(first));
+        Assert.Equal(0, first.CompareTo(second));
+        Assert.Equal(first.GetHashCode(), second.GetHashCode());
+        Assert.False(first.Equals(builtIn));
+        Assert.False(builtIn.Equals(first));
+        Assert.Throws<ArgumentOutOfRangeException>(() => first.CompareTo(builtIn));
+        Assert.Throws<ArgumentOutOfRangeException>(() => builtIn.CompareTo(first));
+    }
+
+    private sealed class CustomEventHubSequenceToken(
+        string eventHubOffset,
+        long sequenceNumber,
+        int eventIndex)
+        : EventHubSequenceToken(eventHubOffset, sequenceNumber, eventIndex);
 }
