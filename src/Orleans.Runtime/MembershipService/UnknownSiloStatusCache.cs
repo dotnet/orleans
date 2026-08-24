@@ -33,6 +33,12 @@ internal sealed partial class UnknownSiloStatusCache
         ClusterMembershipSnapshot snapshot,
         IReadOnlySet<SiloAddress> siloAddresses,
         CancellationToken cancellationToken)
+        => (await ValidateSiloStatuses(snapshot, siloAddresses, cancellationToken)).Statuses;
+
+    public async ValueTask<SiloStatusValidationResult> ValidateSiloStatuses(
+        ClusterMembershipSnapshot snapshot,
+        IReadOnlySet<SiloAddress> siloAddresses,
+        CancellationToken cancellationToken)
     {
         var result = new Dictionary<SiloAddress, SiloStatus>();
         List<SiloAddress>? unknownSilos = null;
@@ -57,23 +63,23 @@ internal sealed partial class UnknownSiloStatusCache
 
         if (unknownSilos is null)
         {
-            return result;
+            return new(result, snapshot);
         }
 
         try
         {
             var refresh = GetRefreshOperation(unknownSilos, cancellationToken);
-            var refreshedSnapshot = await refresh.Completion.Task.WaitAsync(cancellationToken);
+            var refreshedTableSnapshot = await refresh.Completion.Task.WaitAsync(cancellationToken);
             foreach (var siloAddress in unknownSilos)
             {
                 if (_siloStatuses.TryGet(siloAddress, out var cachedStatus)
-                    && cachedStatus.Version >= refreshedSnapshot.Version)
+                    && cachedStatus.Version >= refreshedTableSnapshot.Version)
                 {
                     result.Add(siloAddress, cachedStatus.Status);
                     continue;
                 }
 
-                var status = refreshedSnapshot.GetSiloStatus(siloAddress);
+                var status = refreshedTableSnapshot.GetSiloStatus(siloAddress);
                 if (status == SiloStatus.None)
                 {
                     status = SiloStatus.Dead;
@@ -81,8 +87,10 @@ internal sealed partial class UnknownSiloStatusCache
 
                 result.Add(
                     siloAddress,
-                    UpdateCachedStatus(siloAddress, status, refreshedSnapshot.Version).Status);
+                    UpdateCachedStatus(siloAddress, status, refreshedTableSnapshot.Version).Status);
             }
+
+            snapshot = refreshedTableSnapshot.CreateClusterMembershipSnapshot();
         }
         catch (Exception) when (!cancellationToken.IsCancellationRequested)
         {
@@ -92,7 +100,7 @@ internal sealed partial class UnknownSiloStatusCache
             }
         }
 
-        return result;
+        return new(result, snapshot);
     }
 
     private RefreshOperation GetRefreshOperation(
@@ -224,6 +232,10 @@ internal sealed partial class UnknownSiloStatusCache
     private readonly record struct SiloStatusCacheEntry(
         SiloStatus Status,
         MembershipVersion Version);
+
+    internal readonly record struct SiloStatusValidationResult(
+        Dictionary<SiloAddress, SiloStatus> Statuses,
+        ClusterMembershipSnapshot Snapshot);
 
     private sealed class RefreshOperation
     {
