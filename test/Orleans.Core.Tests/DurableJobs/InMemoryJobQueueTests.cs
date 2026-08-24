@@ -165,20 +165,20 @@ public class InMemoryJobQueueTests
     }
 
     [Fact]
-    public void CancelJob_RemovesJobFromQueue()
+    public void RemoveJob_RemovesJobFromQueue()
     {
         var queue = new InMemoryJobQueue();
         var job = CreateJob("job1", DateTimeOffset.UtcNow.AddSeconds(5));
 
         queue.Enqueue(job, 0);
-        var removed = queue.CancelJob("job1");
+        var removed = queue.RemoveJob("job1");
 
         Assert.True(removed);
         Assert.Equal(0, queue.Count);
     }
 
     [Fact]
-    public async Task CancelJob_PreventsJobFromBeingDequeued()
+    public async Task RemoveJob_PreventsJobFromBeingDequeued()
     {
         var queue = new InMemoryJobQueue();
         var job1 = CreateJob("job1", DateTimeOffset.UtcNow.AddMilliseconds(-100));
@@ -186,7 +186,7 @@ public class InMemoryJobQueueTests
 
         queue.Enqueue(job1, 0);
         queue.Enqueue(job2, 0);
-        queue.CancelJob("job1");
+        queue.RemoveJob("job1");
         queue.MarkAsComplete();
 
         var results = new List<string>();
@@ -201,14 +201,32 @@ public class InMemoryJobQueueTests
     }
 
     [Fact]
-    public void CancelJob_NonExistentJob_DoesNotThrow()
+    public void RemoveJob_NonExistentJob_DoesNotThrow()
     {
         var queue = new InMemoryJobQueue();
 
-        var removed = queue.CancelJob("non-existent-job");
+        var removed = queue.RemoveJob("non-existent-job");
 
         Assert.False(removed);
         Assert.Equal(0, queue.Count);
+    }
+
+    [Fact]
+    public async Task RetryJobLater_AfterCancel_DoesNotResurrectJob()
+    {
+        var queue = new InMemoryJobQueue();
+        var job = CreateJob("job1", DateTimeOffset.UtcNow.AddMilliseconds(-100));
+        queue.Enqueue(job, 0);
+        await using var enumerator = queue.GetAsyncEnumerator(CancellationToken.None);
+        Assert.True(await enumerator.MoveNextAsync());
+        var attempt = enumerator.Current;
+
+        Assert.True(queue.RemoveJob(job.Id));
+        queue.RetryJobLater(attempt, DateTimeOffset.UtcNow.AddMilliseconds(-50));
+        queue.MarkAsComplete();
+
+        Assert.Equal(0, queue.Count);
+        Assert.False(await enumerator.MoveNextAsync());
     }
 
     [Fact]
@@ -288,8 +306,8 @@ public class InMemoryJobQueueTests
 
         queue.Enqueue(job1, 0);
         queue.Enqueue(job2, 0);
-        queue.CancelJob("job1");
-        queue.CancelJob("job2");
+        queue.RemoveJob("job1");
+        queue.RemoveJob("job2");
         queue.MarkAsComplete();
 
         var results = new List<IJobRunContext>();
@@ -384,7 +402,7 @@ public class InMemoryJobQueueTests
         // the bucket already dequeued from _queue.
         Assert.True(await enumerator.MoveNextAsync().AsTask().WaitAsync(TimeSpan.FromSeconds(5)));
         Assert.Equal("job1", enumerator.Current.Job.Name);
-        queue.CancelJob(enumerator.Current.Job.Id);
+        queue.RemoveJob(enumerator.Current.Job.Id);
 
         // Enqueue a second job at the same DueTime. With the bug, this would target the
         // already-dequeued bucket and never become visible to the enumerator.
@@ -393,7 +411,7 @@ public class InMemoryJobQueueTests
 
         Assert.True(await enumerator.MoveNextAsync().AsTask().WaitAsync(TimeSpan.FromSeconds(5)));
         Assert.Equal("job2", enumerator.Current.Job.Name);
-        queue.CancelJob(enumerator.Current.Job.Id);
+        queue.RemoveJob(enumerator.Current.Job.Id);
 
         Assert.False(await enumerator.MoveNextAsync().AsTask().WaitAsync(TimeSpan.FromSeconds(5)));
     }
@@ -414,7 +432,7 @@ public class InMemoryJobQueueTests
 
         Assert.True(await enumerator.MoveNextAsync().AsTask().WaitAsync(TimeSpan.FromSeconds(5)));
         Assert.Equal("job1", enumerator.Current.Job.Name);
-        queue.CancelJob(enumerator.Current.Job.Id);
+        queue.RemoveJob(enumerator.Current.Job.Id);
 
         // job1 has been yielded and removed; a new job at the same DueTime must be visible
         // to the next MoveNextAsync.
@@ -424,7 +442,7 @@ public class InMemoryJobQueueTests
 
         Assert.True(await enumerator.MoveNextAsync().AsTask().WaitAsync(TimeSpan.FromSeconds(5)));
         Assert.Equal("job2", enumerator.Current.Job.Name);
-        queue.CancelJob(enumerator.Current.Job.Id);
+        queue.RemoveJob(enumerator.Current.Job.Id);
 
         Assert.False(await enumerator.MoveNextAsync().AsTask().WaitAsync(TimeSpan.FromSeconds(5)));
     }

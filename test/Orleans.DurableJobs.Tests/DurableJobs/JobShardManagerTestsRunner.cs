@@ -152,6 +152,27 @@ public abstract class JobShardManagerTestsRunner(IJobShardManagerTestFixture fix
     }
 
     [Fact]
+    public async Task AttemptCancellationPreservesJobForReassignment()
+    {
+        await using var scope = await fixture.CreateScopeAsync();
+        var first = scope.CreateManager(scope.ActiveSilo);
+        var second = scope.CreateManager(scope.SecondActiveSilo);
+        var now = scope.Now;
+        var shard = await first.CreateShardAsync(now, now.AddMinutes(5), Metadata("purpose", "attempt-cancellation"), CancellationToken.None);
+        var job = await ScheduleJobAsync(shard, now.AddMinutes(-1), "attempt-canceled-job");
+        var firstAttempt = await TakeOneAsync(shard);
+
+        await first.UnregisterShardAsync(shard, CancellationToken.None);
+
+        var reassigned = Assert.Single(await second.AssignJobShardsAsync(now.AddMinutes(5), int.MaxValue, CancellationToken.None));
+        var secondAttempt = await TakeOneAsync(reassigned);
+
+        Assert.Equal(job!.Id, secondAttempt.Job.Id);
+        Assert.NotEqual(firstAttempt.RunId, secondAttempt.RunId);
+        Assert.Equal(1, secondAttempt.DequeueCount);
+    }
+
+    [Fact]
     public async Task RetryLaterPersistsThroughShardReassignment()
     {
         await using var scope = await fixture.CreateScopeAsync();
@@ -207,10 +228,15 @@ public abstract class JobShardManagerTestsRunner(IJobShardManagerTestFixture fix
         var cancelDuringRun = await ScheduleJobAsync(shard, now.AddMinutes(-2), "cancel-during");
         var remaining = await ScheduleJobAsync(shard, now.AddMinutes(-1), "remaining");
 
-        Assert.True(await shard.RemoveJobAsync(cancelBeforeRun!.Id, CancellationToken.None));
+        Assert.Equal(
+            DurableJobMutationResult.Applied,
+            await shard.RemoveJobAsync(cancelBeforeRun!.Id, CancellationToken.None));
         var running = await TakeOneAsync(shard);
         Assert.Equal(cancelDuringRun!.Id, running.Job.Id);
-        Assert.True(await shard.RemoveJobAsync(running.Job.Id, CancellationToken.None));
+        Assert.Equal(
+            DurableJobMutationResult.Applied,
+            await shard.RemoveJobAsync(running.Job.Id, CancellationToken.None));
+        await shard.RetryJobLaterAsync(running, now.AddMinutes(-1), CancellationToken.None);
         await first.UnregisterShardAsync(shard, CancellationToken.None);
 
         var reassigned = Assert.Single(await second.AssignJobShardsAsync(now.AddMinutes(5), int.MaxValue, CancellationToken.None));

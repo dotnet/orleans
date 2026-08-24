@@ -44,21 +44,21 @@ internal partial class LocalDurableJobManager
 
     [LoggerMessage(
         Level = LogLevel.Debug,
-        Message = "Attempting to cancel job {JobId} (Name: '{JobName}') in shard {ShardId}"
+        Message = "Requesting cancellation of job {JobId} (Name: '{JobName}') in shard {ShardId}"
     )]
-    private static partial void LogCancellingJob(ILogger logger, string jobId, string jobName, string shardId);
+    private static partial void LogRequestingJobCancellation(ILogger logger, string jobId, string jobName, string shardId);
 
     [LoggerMessage(
         Level = LogLevel.Warning,
-        Message = "Failed to cancel job {JobId} (Name: '{JobName}') - shard {ShardId} not found in cache"
+        Message = "Cancellation request for job {JobId} (Name: '{JobName}') was not recorded because shard {ShardId} was not found"
     )]
-    private static partial void LogJobCancellationFailed(ILogger logger, string jobId, string jobName, string shardId);
+    private static partial void LogJobCancellationRequestNotRecorded(ILogger logger, string jobId, string jobName, string shardId);
 
     [LoggerMessage(
         Level = LogLevel.Information,
-        Message = "Job {JobId} (Name: '{JobName}') cancelled from shard {ShardId}"
+        Message = "Cancellation requested for job {JobId} (Name: '{JobName}') in shard {ShardId}; future attempts are disabled"
     )]
-    private static partial void LogJobCancelled(ILogger logger, string jobId, string jobName, string shardId);
+    private static partial void LogJobCancellationRequested(ILogger logger, string jobId, string jobName, string shardId);
 
     [LoggerMessage(
         Level = LogLevel.Error,

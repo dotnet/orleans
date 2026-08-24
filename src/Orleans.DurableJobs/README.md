@@ -9,7 +9,7 @@ Microsoft Orleans Durable Jobs provides a distributed, scalable system for sched
 - **Distributed**: Jobs are automatically distributed and rebalanced across silos
 - **Reliable**: Failed jobs can be automatically retried with configurable policies
 - **Rich Metadata**: Associate custom metadata with each job
-- **Cancellable**: Jobs can be canceled before execution
+- **Durably cancellable**: Cancellation requests prevent future attempts; an already-running attempt may still complete
 
 ## Getting Started
 
@@ -113,14 +113,14 @@ using Orleans.DurableJobs;
 public interface INotificationGrain : IGrainWithStringKey
 {
     Task ScheduleNotification(string message, DateTimeOffset sendTime);
-    Task CancelScheduledNotification();
+    Task CancelScheduledNotification(CancellationToken requestCancellationToken);
 }
 
 public class NotificationGrain : Grain, INotificationGrain, IDurableJobHandler
 {
     private readonly ILocalDurableJobManager _jobManager;
     private readonly ILogger<NotificationGrain> _logger;
-    private IDurableJob? _durableJob;
+    private DurableJob? _durableJob;
 
     public NotificationGrain(
         ILocalDurableJobManager jobManager,
@@ -153,7 +153,7 @@ public class NotificationGrain : Grain, INotificationGrain, IDurableJobHandler
             userId, sendTime, _durableJob.Id);
     }
 
-    public async Task CancelScheduledNotification()
+    public async Task CancelScheduledNotification(CancellationToken requestCancellationToken)
     {
         if (_durableJob is null)
         {
@@ -161,17 +161,21 @@ public class NotificationGrain : Grain, INotificationGrain, IDurableJobHandler
             return;
         }
 
-        var canceled = await _jobManager.TryCancelDurableJobAsync(_durableJob);
-        _logger.LogInformation("Notification {JobId} canceled: {Canceled}", _durableJob.Id, canceled);
-        
-        if (canceled)
+        var cancellationRequested = await _jobManager.CancelAsync(_durableJob, requestCancellationToken);
+        _logger.LogInformation(
+            "Notification {JobId} cancellation request recorded: {CancellationRequested}",
+            _durableJob.Id,
+            cancellationRequested);
+
+        if (cancellationRequested)
         {
+            // No future attempt will start. An already-running attempt may still complete.
             _durableJob = null;
         }
     }
 
     // This method is called when the durable job executes
-    public Task ExecuteJobAsync(IJobRunContext context, CancellationToken cancellationToken)
+    public Task ExecuteJobAsync(IJobRunContext context, CancellationToken attemptCancellationToken)
     {
         var userId = this.GetPrimaryKeyString();
         var message = context.Job.Metadata?["Message"];
@@ -262,7 +266,7 @@ public class OrderGrain : Grain, IOrderGrain, IDurableJobHandler
         await _orderService.CancelOrderAsync(orderId);
     }
 
-    public async Task ExecuteJobAsync(IJobRunContext context, CancellationToken cancellationToken)
+    public async Task ExecuteJobAsync(IJobRunContext context, CancellationToken attemptCancellationToken)
     {
         var step = context.Job.Metadata!["Step"];
         var orderId = this.GetPrimaryKey();
@@ -270,16 +274,16 @@ public class OrderGrain : Grain, IOrderGrain, IDurableJobHandler
         switch (step)
         {
             case "DeliveryReminder":
-                await HandleDeliveryReminder(context, cancellationToken);
+                await HandleDeliveryReminder(context, attemptCancellationToken);
                 break;
 
             case "OrderExpiration":
-                await HandleOrderExpiration(cancellationToken);
+                await HandleOrderExpiration(attemptCancellationToken);
                 break;
         }
     }
 
-    private async Task HandleDeliveryReminder(IJobRunContext context, CancellationToken ct)
+    private async Task HandleDeliveryReminder(IJobRunContext context, CancellationToken attemptCancellationToken)
     {
         var customerId = context.Job.Metadata!["CustomerId"];
         var orderNumber = context.Job.Metadata["OrderNumber"];
@@ -290,14 +294,14 @@ public class OrderGrain : Grain, IOrderGrain, IDurableJobHandler
             DateTimeOffset.UtcNow);
     }
 
-    private async Task HandleOrderExpiration(CancellationToken ct)
+    private async Task HandleOrderExpiration(CancellationToken attemptCancellationToken)
     {
         var orderId = this.GetPrimaryKey();
-        var order = await _orderService.GetOrderAsync(orderId, ct);
+        var order = await _orderService.GetOrderAsync(orderId, attemptCancellationToken);
         
         if (order?.Status == OrderStatus.Pending)
         {
-            await _orderService.CancelOrderAsync(orderId, ct);
+            await _orderService.CancelOrderAsync(orderId, attemptCancellationToken);
             _logger.LogInformation("Order {OrderId} expired and canceled", orderId);
         }
     }
@@ -313,7 +317,7 @@ public class PaymentProcessorGrain : Grain, IDurableJobHandler
     private readonly IPaymentService _paymentService;
     private readonly ILogger<PaymentProcessorGrain> _logger;
 
-    public Task ExecuteJobAsync(IJobRunContext context, CancellationToken cancellationToken)
+    public Task ExecuteJobAsync(IJobRunContext context, CancellationToken attemptCancellationToken)
     {
         var paymentId = context.Job.Metadata?["PaymentId"];
         
@@ -323,7 +327,7 @@ public class PaymentProcessorGrain : Grain, IDurableJobHandler
 
         try
         {
-            await _paymentService.ProcessPaymentAsync(paymentId, cancellationToken);
+            await _paymentService.ProcessPaymentAsync(paymentId, attemptCancellationToken);
             return Task.CompletedTask;
         }
         catch (TransientException ex)
@@ -346,7 +350,7 @@ public class WorkflowGrain : Grain, IDurableJobHandler
 {
     private readonly Dictionary<string, TaskCompletionSource> _pendingJobs = new();
 
-    public async Task<IDurableJob> ScheduleWorkflowStep(string stepName, DateTimeOffset executeAt)
+    public async Task<DurableJob> ScheduleWorkflowStep(string stepName, DateTimeOffset executeAt)
     {
         var job = await _jobManager.ScheduleJobAsync(
             new ScheduleJobRequest
@@ -371,7 +375,7 @@ public class WorkflowGrain : Grain, IDurableJobHandler
         }
     }
 
-    public Task ExecuteJobAsync(IDurableJobContext context, CancellationToken cancellationToken)
+    public Task ExecuteJobAsync(IJobRunContext context, CancellationToken attemptCancellationToken)
     {
         // Execute the workflow step...
         
@@ -426,7 +430,7 @@ public class WorkflowGrain : Grain, IDurableJobHandler
 |----------|------|---------|-------------|
 | `ShardDuration` | `TimeSpan` | 1 minute | Duration of each job shard. Smaller values reduce latency but increase overhead. |
 | `MaxConcurrentJobsPerSilo` | `int` | 100 | Maximum number of jobs that can execute simultaneously on a silo. |
-| `ShouldRetry` | `Func<IDurableJobContext, Exception, DateTimeOffset?>` | 3 retries with exp. backoff | Determines if a failed job should be retried. Return the new due time or `null` to not retry. |
+| `ShouldRetry` | `Func<IJobRunContext, Exception, DateTimeOffset?>` | 3 retries with exp. backoff | Determines if a failed job should be retried. Return the new due time or `null` to not retry. |
 
 ## Best Practices
 
@@ -437,7 +441,7 @@ public class WorkflowGrain : Grain, IDurableJobHandler
 
 2. **Implement Idempotent Job Handlers**: Jobs may be retried, ensure handlers are idempotent
    ```csharp
-   public async Task ExecuteJobAsync(IDurableJobContext context, CancellationToken ct)
+   public async Task ExecuteJobAsync(IJobRunContext context, CancellationToken attemptCancellationToken)
    {
        var jobId = context.Job.Id;
        // Check if already processed
@@ -460,9 +464,9 @@ public class WorkflowGrain : Grain, IDurableJobHandler
 
 4. **Handle Cancellation**: Respect the cancellation token
    ```csharp
-   public async Task ExecuteJobAsync(IDurableJobContext context, CancellationToken ct)
+   public async Task ExecuteJobAsync(IJobRunContext context, CancellationToken attemptCancellationToken)
    {
-       await SomeLongRunningOperation(ct);
+       await SomeLongRunningOperation(attemptCancellationToken);
    }
    ```
 

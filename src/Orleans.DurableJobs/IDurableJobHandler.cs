@@ -78,14 +78,18 @@ internal class JobRunContext : IJobRunContext
 /// <code>
 /// public class MyGrain : Grain, IDurableJobHandler
 /// {
-///     public Task ExecuteJobAsync(IJobRunContext context, CancellationToken cancellationToken)
+///     public Task ExecuteJobAsync(IJobRunContext context, CancellationToken attemptCancellationToken)
 ///     {
 ///         // Process the durable job
 ///         var jobName = context.Job.Name;
 ///         var dueTime = context.Job.DueTime;
-///         
+///
+///         // This token requests cancellation of this execution attempt, for example during silo shutdown.
+///         // The durable job remains eligible for another attempt on another host.
+///         attemptCancellationToken.ThrowIfCancellationRequested();
+///
 ///         // Perform job logic here
-///         
+///
 ///         return Task.CompletedTask;
 ///     }
 /// }
@@ -98,7 +102,10 @@ public interface IDurableJobHandler
     /// Executes the durable job with the provided context.
     /// </summary>
     /// <param name="context">The context containing information about the durable job execution.</param>
-    /// <param name="cancellationToken">A token to monitor for cancellation requests.</param>
+    /// <param name="attemptCancellationToken">
+    /// A token which cooperatively requests cancellation of the current execution attempt.
+    /// Attempt cancellation does not cancel the durable job itself; the job remains eligible for another attempt.
+    /// </param>
     /// <returns>A task that represents the asynchronous job execution operation.</returns>
     /// <remarks>
     /// <para>
@@ -110,6 +117,10 @@ public interface IDurableJobHandler
     /// If the method throws an exception and a retry policy is configured, the job may be retried.
     /// The <see cref="IJobRunContext.DequeueCount"/> property can be used to determine if this is a retry attempt.
     /// </para>
+    /// <para>
+    /// Durable job cancellation is requested through <see cref="ILocalDurableJobManager.CancelAsync"/>.
+    /// That request prevents future attempts but does not forcibly stop an already-running attempt.
+    /// </para>
     /// </remarks>
-    Task ExecuteJobAsync(IJobRunContext context, CancellationToken cancellationToken);
+    Task ExecuteJobAsync(IJobRunContext context, CancellationToken attemptCancellationToken);
 }

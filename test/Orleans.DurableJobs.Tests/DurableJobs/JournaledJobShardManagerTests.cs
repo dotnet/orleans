@@ -158,7 +158,9 @@ public class JournaledJobShardManagerTests
         await foreach (var jobContext in shard.ConsumeDurableJobsAsync().WithCancellation(CancellationToken.None))
         {
             Assert.Equal(scheduled.Id, jobContext.Job.Id);
-            Assert.True(await shard.RemoveJobAsync(jobContext.Job.Id, CancellationToken.None));
+            Assert.Equal(
+                DurableJobMutationResult.Applied,
+                await shard.RemoveJobAsync(jobContext.Job.Id, CancellationToken.None));
         }
 
         Assert.Equal(0, await shard.GetJobCountAsync());
@@ -650,7 +652,9 @@ public class JournaledJobShardManagerTests
         await foreach (var jobContext in shard.ConsumeDurableJobsAsync().WithCancellation(cts.Token))
         {
             consumed++;
-            Assert.True(await shard.RemoveJobAsync(jobContext.Job.Id, cts.Token));
+            Assert.Equal(
+                DurableJobMutationResult.Applied,
+                await shard.RemoveJobAsync(jobContext.Job.Id, cts.Token));
             if (consumed == expectedJobs)
             {
                 break;

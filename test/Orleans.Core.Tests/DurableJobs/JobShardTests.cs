@@ -97,6 +97,71 @@ public class JobShardTests
         Assert.Equal(1, retryShard.PersistedRetryContext!.DequeueCount);
     }
 
+    [Fact]
+    public async Task RetryJobLaterAsync_AfterCancellationRequest_DoesNotResurrectJob()
+    {
+        var now = DateTimeOffset.UtcNow;
+        var shard = await CreateShardWithDueJobAsync("canceled", now);
+        var attempt = await ConsumeNextAsync(shard);
+
+        Assert.Equal(
+            DurableJobMutationResult.Applied,
+            await shard.RemoveJobAsync(attempt.Job.Id, CancellationToken.None));
+        await shard.RetryJobLaterAsync(attempt, now.AddSeconds(-1), CancellationToken.None);
+        await shard.MarkAsCompleteAsync(CancellationToken.None);
+
+        Assert.Equal(0, await shard.GetJobCountAsync());
+        Assert.Null(shard.PersistedRetryContext);
+        await using var enumerator = shard.ConsumeDurableJobsAsync().GetAsyncEnumerator(CancellationToken.None);
+        Assert.False(await enumerator.MoveNextAsync());
+    }
+
+    [Fact]
+    public async Task AttemptCancellation_WithoutRemoval_PreservesJob()
+    {
+        var now = DateTimeOffset.UtcNow;
+        var shard = await CreateShardWithDueJobAsync("attempt-canceled", now);
+
+        var firstAttempt = await ConsumeNextAsync(shard);
+
+        Assert.Equal("attempt-canceled", firstAttempt.Job.Name);
+        Assert.Equal(1, await shard.GetJobCountAsync());
+    }
+
+    [Fact]
+    public async Task MarkAsCompleteAsync_WaitsForInFlightSchedulePersistence()
+    {
+        var now = DateTimeOffset.UtcNow;
+        var shard = new GateableJobShard(now.AddMinutes(-1), now.AddMinutes(1));
+        var scheduleTask = shard.TryScheduleJobAsync(
+            new ScheduleJobRequest
+            {
+                Target = GrainId.Create("test", "job"),
+                JobName = "job",
+                DueTime = now
+            },
+            CancellationToken.None);
+
+        await shard.PersistAddStarted.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        var completionTask = shard.MarkAsCompleteAsync(CancellationToken.None);
+
+        Assert.False(completionTask.IsCompleted);
+        shard.AllowPersistAdd.SetResult();
+
+        Assert.NotNull(await scheduleTask.WaitAsync(TimeSpan.FromSeconds(5)));
+        await completionTask.WaitAsync(TimeSpan.FromSeconds(5));
+        Assert.True(shard.IsAddingCompleted);
+        Assert.Equal(1, await shard.GetJobCountAsync());
+        Assert.Null(await shard.TryScheduleJobAsync(
+            new ScheduleJobRequest
+            {
+                Target = GrainId.Create("test", "later"),
+                JobName = "later",
+                DueTime = now
+            },
+            CancellationToken.None));
+    }
+
     private static async Task<TestJobShard> CreateShardWithDueJobAsync(string id, DateTimeOffset now)
     {
         var shard = new TestJobShard(now.AddHours(-1), now.AddHours(1));
@@ -141,5 +206,30 @@ public class JobShardTests
             PersistedRetryTime = newDueTime;
             return Task.CompletedTask;
         }
+    }
+
+    private sealed class GateableJobShard(DateTimeOffset startTime, DateTimeOffset endTime)
+        : JobShard("gateable-shard", startTime, endTime)
+    {
+        public TaskCompletionSource PersistAddStarted { get; } =
+            new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        public TaskCompletionSource AllowPersistAdd { get; } =
+            new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        protected override async Task PersistAddJobAsync(DurableJob job, CancellationToken cancellationToken)
+        {
+            PersistAddStarted.TrySetResult();
+            await AllowPersistAdd.Task.WaitAsync(cancellationToken);
+        }
+
+        protected override Task PersistRemoveJobAsync(string jobId, CancellationToken cancellationToken) =>
+            Task.CompletedTask;
+
+        protected override Task PersistRetryJobAsync(
+            IJobRunContext jobContext,
+            DateTimeOffset newDueTime,
+            CancellationToken cancellationToken) =>
+            Task.CompletedTask;
     }
 }

@@ -54,6 +54,20 @@ public interface IJobShard : IAsyncDisposable
     IAsyncEnumerable<IJobRunContext> ConsumeDurableJobsAsync();
 
     /// <summary>
+    /// Attempts to reserve a dequeued durable job for execution.
+    /// </summary>
+    /// <param name="jobContext">The dequeued job context.</param>
+    /// <param name="cancellationToken">A token to cancel the operation.</param>
+    /// <returns>
+    /// A task containing <see cref="DurableJobMutationResult.Applied"/> when the attempt may start,
+    /// <see cref="DurableJobMutationResult.JobNotFound"/> when cancellation or completion removed the job first,
+    /// or <see cref="DurableJobMutationResult.OwnershipLost"/> when this shard is no longer locally owned.
+    /// </returns>
+    Task<DurableJobMutationResult> TryStartAttemptAsync(
+        IJobRunContext jobContext,
+        CancellationToken cancellationToken);
+
+    /// <summary>
     /// Gets the number of jobs currently scheduled in this shard.
     /// </summary>
     /// <returns>A task that represents the asynchronous operation. The task result contains the job count.</returns>
@@ -71,8 +85,8 @@ public interface IJobShard : IAsyncDisposable
     /// </summary>
     /// <param name="jobId">The unique identifier of the job to remove.</param>
     /// <param name="cancellationToken">A token to cancel the operation.</param>
-    /// <returns>A task that represents the asynchronous operation. The task result contains true if the job was successfully removed, or false if the job was not found.</returns>
-    Task<bool> RemoveJobAsync(string jobId, CancellationToken cancellationToken);
+    /// <returns>A task containing the durable mutation outcome.</returns>
+    Task<DurableJobMutationResult> RemoveJobAsync(string jobId, CancellationToken cancellationToken);
 
     /// <summary>
     /// Reschedules a job to be retried at a later time.
@@ -83,8 +97,11 @@ public interface IJobShard : IAsyncDisposable
     /// <see cref="IJobRunContext.Job"/>.
     /// </param>
     /// <param name="cancellationToken">A token to cancel the operation.</param>
-    /// <returns>A task that represents the asynchronous operation.</returns>
-    Task RetryJobLaterAsync(IJobRunContext jobContext, DateTimeOffset newDueTime, CancellationToken cancellationToken);
+    /// <returns>A task containing the durable mutation outcome.</returns>
+    Task<DurableJobMutationResult> RetryJobLaterAsync(
+        IJobRunContext jobContext,
+        DateTimeOffset newDueTime,
+        CancellationToken cancellationToken);
 
     /// <summary>
     /// Reschedules a successfully completed execution with its dequeue count reset.
@@ -95,8 +112,11 @@ public interface IJobShard : IAsyncDisposable
     /// <see cref="IJobRunContext.Job"/>.
     /// </param>
     /// <param name="cancellationToken">A token to cancel the operation.</param>
-    /// <returns>A task that represents the asynchronous operation.</returns>
-    Task RescheduleJobAsync(IJobRunContext jobContext, DateTimeOffset newDueTime, CancellationToken cancellationToken);
+    /// <returns>A task containing the durable mutation outcome.</returns>
+    Task<DurableJobMutationResult> RescheduleJobAsync(
+        IJobRunContext jobContext,
+        DateTimeOffset newDueTime,
+        CancellationToken cancellationToken);
 
     /// <summary>
     /// Attempts to schedule a new job on this shard.
@@ -109,11 +129,33 @@ public interface IJobShard : IAsyncDisposable
 }
 
 /// <summary>
+/// Describes the outcome of an attempt to mutate a durable job after execution.
+/// </summary>
+public enum DurableJobMutationResult
+{
+    /// <summary>
+    /// The mutation was durably applied.
+    /// </summary>
+    Applied,
+
+    /// <summary>
+    /// The job was no longer present, typically because cancellation or completion removed it first.
+    /// </summary>
+    JobNotFound,
+
+    /// <summary>
+    /// The local silo no longer owned the shard, so the mutation was not applied.
+    /// </summary>
+    OwnershipLost
+}
+
+/// <summary>
 /// Base implementation of <see cref="IJobShard"/> that provides common functionality for job shard implementations.
 /// </summary>
 public abstract class JobShard : IJobShard
 {
     private readonly InMemoryJobQueue _jobQueue;
+    private readonly SemaphoreSlim _mutationLock = new(1, 1);
 
     /// <inheritdoc/>
     public string Id { get; protected set; }
@@ -154,72 +196,154 @@ public abstract class JobShard : IJobShard
     }
 
     /// <inheritdoc/>
+    public async Task<DurableJobMutationResult> TryStartAttemptAsync(
+        IJobRunContext jobContext,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(jobContext);
+        await _mutationLock.WaitAsync(cancellationToken);
+        try
+        {
+            return _jobQueue.ContainsJob(jobContext.Job.Id)
+                ? DurableJobMutationResult.Applied
+                : DurableJobMutationResult.JobNotFound;
+        }
+        finally
+        {
+            _mutationLock.Release();
+        }
+    }
+
+    /// <inheritdoc/>
     public async Task<DurableJob?> TryScheduleJobAsync(ScheduleJobRequest request, CancellationToken cancellationToken)
     {
-        if (IsAddingCompleted)
+        await _mutationLock.WaitAsync(cancellationToken);
+        try
         {
-            return null;
+            if (IsAddingCompleted)
+            {
+                return null;
+            }
+
+            if (request.DueTime < StartTime || request.DueTime > EndTime)
+            {
+                throw new ArgumentOutOfRangeException(nameof(request), "Scheduled time is out of shard bounds.");
+            }
+
+            var jobId = Guid.NewGuid().ToString();
+            var job = new DurableJob
+            {
+                Id = jobId,
+                TargetGrainId = request.Target,
+                Name = request.JobName,
+                DueTime = request.DueTime,
+                ShardId = Id,
+                Metadata = request.Metadata,
+                TraceParent = request.TraceParent,
+                TraceState = request.TraceState,
+            };
+
+            await PersistAddJobAsync(job, cancellationToken);
+            _jobQueue.Enqueue(job, 0);
+            return job;
         }
-
-        if (request.DueTime < StartTime || request.DueTime > EndTime)
+        finally
         {
-            throw new ArgumentOutOfRangeException(nameof(request), "Scheduled time is out of shard bounds.");
+            _mutationLock.Release();
         }
+    }
 
-        var jobId = Guid.NewGuid().ToString();
-        var job = new DurableJob
+    /// <inheritdoc/>
+    public async Task<DurableJobMutationResult> RemoveJobAsync(string jobId, CancellationToken cancellationToken)
+    {
+        await _mutationLock.WaitAsync(cancellationToken);
+        try
         {
-            Id = jobId,
-            TargetGrainId = request.Target,
-            Name = request.JobName,
-            DueTime = request.DueTime,
-            ShardId = Id,
-            Metadata = request.Metadata,
-            TraceParent = request.TraceParent,
-            TraceState = request.TraceState,
-        };
+            if (!_jobQueue.ContainsJob(jobId))
+            {
+                return DurableJobMutationResult.JobNotFound;
+            }
 
-        await PersistAddJobAsync(job, cancellationToken);
-        _jobQueue.Enqueue(job, 0);
-        return job;
+            await PersistRemoveJobAsync(jobId, cancellationToken);
+            return _jobQueue.RemoveJob(jobId)
+                ? DurableJobMutationResult.Applied
+                : DurableJobMutationResult.JobNotFound;
+        }
+        finally
+        {
+            _mutationLock.Release();
+        }
     }
 
     /// <inheritdoc/>
-    public async Task<bool> RemoveJobAsync(string jobId, CancellationToken cancellationToken)
+    public async Task MarkAsCompleteAsync(CancellationToken cancellationToken)
     {
-        await PersistRemoveJobAsync(jobId, cancellationToken);
-        return _jobQueue.CancelJob(jobId);
+        await _mutationLock.WaitAsync(cancellationToken);
+        try
+        {
+            IsAddingCompleted = true;
+            _jobQueue.MarkAsComplete();
+        }
+        finally
+        {
+            _mutationLock.Release();
+        }
     }
 
     /// <inheritdoc/>
-    public Task MarkAsCompleteAsync(CancellationToken cancellationToken)
+    public async Task<DurableJobMutationResult> RetryJobLaterAsync(
+        IJobRunContext jobContext,
+        DateTimeOffset newDueTime,
+        CancellationToken cancellationToken)
     {
-        IsAddingCompleted = true;
-        _jobQueue.MarkAsComplete();
-        return Task.CompletedTask;
+        await _mutationLock.WaitAsync(cancellationToken);
+        try
+        {
+            if (!_jobQueue.ContainsJob(jobContext.Job.Id))
+            {
+                return DurableJobMutationResult.JobNotFound;
+            }
+
+            await PersistRetryJobAsync(jobContext, newDueTime, cancellationToken);
+            return _jobQueue.RetryJobLater(jobContext.Job.Id, newDueTime, jobContext.DequeueCount)
+                ? DurableJobMutationResult.Applied
+                : DurableJobMutationResult.JobNotFound;
+        }
+        finally
+        {
+            _mutationLock.Release();
+        }
     }
 
     /// <inheritdoc/>
-    public async Task RetryJobLaterAsync(IJobRunContext jobContext, DateTimeOffset newDueTime, CancellationToken cancellationToken)
-    {
-        await PersistRetryJobAsync(jobContext, newDueTime, cancellationToken);
-        _jobQueue.RetryJobLater(jobContext, newDueTime);
-    }
-
-    /// <inheritdoc/>
-    public async Task RescheduleJobAsync(
+    public async Task<DurableJobMutationResult> RescheduleJobAsync(
         IJobRunContext jobContext,
         DateTimeOffset newDueTime,
         CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(jobContext);
-        var executionGeneration = checked(jobContext.Job.ExecutionGeneration + 1);
-        var resetContext = new JobRunContext(
-            jobContext.Job.WithExecutionGeneration(executionGeneration),
-            jobContext.RunId,
-            retryCount: 0);
-        await PersistRetryJobAsync(resetContext, newDueTime, cancellationToken);
-        _jobQueue.RetryJobLater(jobContext.Job.Id, newDueTime, dequeueCount: 0, executionGeneration);
+        await _mutationLock.WaitAsync(cancellationToken);
+        try
+        {
+            if (!_jobQueue.ContainsJob(jobContext.Job.Id))
+            {
+                return DurableJobMutationResult.JobNotFound;
+            }
+
+            var executionGeneration = checked(jobContext.Job.ExecutionGeneration + 1);
+            var resetContext = new JobRunContext(
+                jobContext.Job.WithExecutionGeneration(executionGeneration),
+                jobContext.RunId,
+                retryCount: 0);
+            await PersistRetryJobAsync(resetContext, newDueTime, cancellationToken);
+            return _jobQueue.RetryJobLater(jobContext.Job.Id, newDueTime, dequeueCount: 0, executionGeneration)
+                ? DurableJobMutationResult.Applied
+                : DurableJobMutationResult.JobNotFound;
+        }
+        finally
+        {
+            _mutationLock.Release();
+        }
     }
 
     /// <summary>

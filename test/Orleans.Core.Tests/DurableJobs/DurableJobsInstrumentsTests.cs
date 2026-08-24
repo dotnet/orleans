@@ -42,4 +42,53 @@ public class DurableJobsInstrumentsTests
         Assert.Equal(18, Assert.Single(attemptDurations, static measurement => measurement.Tags["status"] is "rescheduled").Value);
         Assert.Equal(1, Assert.Single(stripeCollector.GetMeasurementSnapshot()).Value);
     }
+
+    [Fact]
+    public void DurableJobsInstruments_DistinguishesTaskRequestOperationAndAttemptCancellation()
+    {
+        var services = new ServiceCollection();
+        services.AddMetrics();
+
+        using var serviceProvider = services.BuildServiceProvider();
+        var meterFactory = serviceProvider.GetRequiredService<IMeterFactory>();
+        var instruments = new DurableJobsInstruments(new OrleansInstruments(meterFactory));
+        using var taskCancellationRequests = new MetricCollector<long>(
+            meterFactory,
+            "Microsoft.Orleans",
+            "orleans-durablejobs-job-cancellation-requests");
+        using var cancellationRequestCalls = new MetricCollector<long>(
+            meterFactory,
+            "Microsoft.Orleans",
+            "orleans-durablejobs-cancel-job-calls");
+        using var handlerExecutions = new MetricCollector<long>(
+            meterFactory,
+            "Microsoft.Orleans",
+            "orleans-durablejobs-handler-executions");
+        using var shardsProcessed = new MetricCollector<long>(
+            meterFactory,
+            "Microsoft.Orleans",
+            "orleans-durablejobs-shards-processed");
+
+        instruments.OnJobCancellationRequested();
+        instruments.OnCancelJobCall(TimeSpan.FromMilliseconds(1), cancellationRequested: true);
+        instruments.OnCancelJobCallCanceled(TimeSpan.FromMilliseconds(1));
+        instruments.OnHandlerExecutionAttemptCanceled(TimeSpan.FromMilliseconds(1));
+        instruments.OnShardProcessed(TimeSpan.FromMilliseconds(1), attemptCanceled: true, error: false);
+
+        Assert.Equal(1, Assert.Single(taskCancellationRequests.GetMeasurementSnapshot()).Value);
+        var requestCalls = cancellationRequestCalls.GetMeasurementSnapshot();
+        Assert.Equal(2, requestCalls.Count);
+        Assert.Equal(
+            1,
+            Assert.Single(requestCalls, static measurement => measurement.Tags["status"] is "cancellation_requested").Value);
+        Assert.Equal(
+            1,
+            Assert.Single(requestCalls, static measurement => measurement.Tags["status"] is "operation_canceled").Value);
+        Assert.Equal(
+            "attempt_canceled",
+            Assert.Single(handlerExecutions.GetMeasurementSnapshot()).Tags["status"]);
+        Assert.Equal(
+            "attempt_canceled",
+            Assert.Single(shardsProcessed.GetMeasurementSnapshot()).Tags["status"]);
+    }
 }

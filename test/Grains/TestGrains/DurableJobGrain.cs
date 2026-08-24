@@ -69,9 +69,9 @@ public class DurableJobGrain : Grain, IDurableJobGrain, IDurableJobHandler
         await taskResult.Task;
     }
 
-    public async Task<bool> TryCancelJobAsync(DurableJob job)
+    public async Task<bool> CancelAsync(DurableJob job)
     {
-        return await _localDurableJobManager.TryCancelDurableJobAsync(job, CancellationToken.None);
+        return await _localDurableJobManager.CancelAsync(job, CancellationToken.None);
     }
 
     public Task<DateTimeOffset> GetJobExecutionTime(string jobId)

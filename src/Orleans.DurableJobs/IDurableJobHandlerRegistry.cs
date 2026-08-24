@@ -39,9 +39,12 @@ public interface IDurableJobFeatureHandler
     /// Executes a durable job and returns its explicit disposition.
     /// </summary>
     /// <param name="context">The durable job execution context.</param>
-    /// <param name="cancellationToken">A token to monitor for cancellation requests.</param>
+    /// <param name="attemptCancellationToken">
+    /// A token which cooperatively requests cancellation of the current execution attempt.
+    /// The durable job remains eligible for another attempt.
+    /// </param>
     /// <returns>The completed, polling, or failed disposition.</returns>
-    ValueTask<DurableJobRunResult> ExecuteJobAsync(IJobRunContext context, CancellationToken cancellationToken);
+    ValueTask<DurableJobRunResult> ExecuteJobAsync(IJobRunContext context, CancellationToken attemptCancellationToken);
 }
 
 internal interface IDurableJobHandlerLookup
