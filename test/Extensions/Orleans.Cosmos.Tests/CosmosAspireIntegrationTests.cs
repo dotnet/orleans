@@ -90,6 +90,22 @@ public sealed class CosmosAspireIntegrationTests
         Assert.Contains("missing-cosmos", exception.Message, StringComparison.Ordinal);
     }
 
+    [Fact]
+    public async Task AspireResourceConfiguration_HandlesExplicitNullEnvironmentValue()
+    {
+        await using var builder = DistributedApplicationTestingBuilder.Create();
+        var resource = builder.AddContainer("app", "unused")
+            .WithEnvironment("OPTIONAL_VALUE", (string?)null);
+        await using var app = await builder.BuildAsync();
+
+        var configuration = await AspireResourceConfiguration.CreateAsync(
+            resource.Resource,
+            app.Services,
+            include: static key => key == "OPTIONAL_VALUE");
+
+        Assert.Equal(string.Empty, configuration["OPTIONAL_VALUE"]);
+    }
+
     private static IHost CreateHost(IConfiguration configuration)
     {
         var hostBuilder = Host.CreateApplicationBuilder();
