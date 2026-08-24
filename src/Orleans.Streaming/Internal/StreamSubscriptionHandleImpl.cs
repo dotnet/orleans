@@ -29,10 +29,19 @@ namespace Orleans.Streams
         [NonSerialized]
         private IAsyncBatchObserver<T>? batchObserver;
         [NonSerialized]
-        private StreamHandshakeToken? expectedToken;
+        private SharedHandshakeState? handshakeState;
+        private StreamHandshakeToken? expectedToken
+        {
+            get => SharedHandshake.Token;
+            set => SharedHandshake.Token = value;
+        }
+
         internal bool IsValid { get { return streamImpl != null; } }
         internal GuidId SubscriptionId { get { return subscriptionId; } }
         internal bool IsRewindable { get { return isRewindable; } }
+        internal string? FilterData { get { return filterData; } }
+        internal bool HasObserver { get { return observer is not null || batchObserver is not null; } }
+        internal SharedHandshakeState SharedHandshake => handshakeState ??= new();
 
         public override string ProviderName { get { return this.streamImpl!.ProviderName; } }
         public override StreamId StreamId { get { return streamImpl!.StreamId; } }
@@ -57,17 +66,19 @@ namespace Orleans.Streams
             StreamImpl<T> streamImpl,
             StreamSequenceToken? token,
             string? filterData,
-            bool disableHandshake = false)
+            bool disableHandshake = false,
+            SharedHandshakeState? handshakeState = null)
         {
             this.subscriptionId = subscriptionId ?? throw new ArgumentNullException(nameof(subscriptionId));
             this.observer = observer;
             this.batchObserver = batchObserver;
             this.streamImpl = streamImpl ?? throw new ArgumentNullException(nameof(streamImpl));
             this.filterData = filterData;
+            this.handshakeState = handshakeState;
             this.isRewindable = streamImpl.IsRewindable && !disableHandshake;
             if (IsRewindable)
             {
-                expectedToken = StreamHandshakeToken.CreateStartToken(token);
+                expectedToken ??= StreamHandshakeToken.CreateStartToken(token);
             }
         }
 
@@ -81,6 +92,34 @@ namespace Orleans.Streams
         public StreamHandshakeToken? GetSequenceToken()
         {
             return expectedToken;
+        }
+
+        internal void ValidateResumeToken(StreamSequenceToken? token)
+            => ValidateResumeToken(subscriptionId, HasObserver, expectedToken, token);
+
+        internal static void ValidateResumeToken(
+            GuidId subscriptionId,
+            bool hasObserver,
+            StreamHandshakeToken? expectedToken,
+            StreamSequenceToken? token)
+        {
+            // A DeliveryToken is recorded only after the complete delivery call succeeds.
+            if (token is null
+                || !hasObserver
+                || !SubscriptionMarker.IsImplicitSubscription(subscriptionId.Guid)
+                || expectedToken is not DeliveryToken deliveryToken)
+            {
+                return;
+            }
+
+            throw new InvalidOperationException(
+                $"An active implicit stream subscription cannot resume from token {token} because it has already completed delivery through token {deliveryToken.Token}. "
+                + "Implicit subscriptions advance monotonically within an activation.");
+        }
+
+        internal sealed class SharedHandshakeState
+        {
+            public StreamHandshakeToken? Token { get; set; }
         }
 
         public override Task UnsubscribeAsync()

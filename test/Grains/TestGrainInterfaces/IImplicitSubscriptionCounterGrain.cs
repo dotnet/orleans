@@ -9,6 +9,10 @@ namespace UnitTests.GrainInterfaces
         Task Deactivate();
 
         Task DeactivateOnEvent(bool deactivate);
+
+        Task ReplaceObserverOnNextEvent();
+
+        Task RewindToFirstToken();
     }
 
     public interface IFastImplicitSubscriptionCounterGrain : IImplicitSubscriptionCounterGrain

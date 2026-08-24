@@ -1,7 +1,7 @@
 ---
 title: Orleans streaming APIs
 description: Work with stream identities, producers, consumers, and explicit or implicit subscriptions in Orleans.
-ms.date: 08/19/2026
+ms.date: 08/24/2026
 ms.topic: concept-article
 ---
 
@@ -91,6 +91,8 @@ Use an implicit subscription when a stream item should activate a grain determin
 :::code language="csharp" source="snippets/streaming/ImplicitSubscriptions.cs" id="implicit_subscription_grain":::
 
 <xref:Orleans.ImplicitStreamSubscriptionAttribute> selects stream namespaces. For each matching grain type, Orleans maps the stream key to the grain key. Implementing <xref:Orleans.Streams.Core.IStreamSubscriptionObserver> lets Orleans supply the implicit handle; call `ResumeAsync` once to attach processing logic.
+
+An implicit subscription advances monotonically while its observer remains attached. After a delivery call completes successfully, `ResumeAsync` accepts `null` to replace the observer and rejects sequence tokens which would reposition that active subscription. A newly activated grain can attach its newly supplied handle using a persisted recovery token. Use an explicit subscription when application logic intentionally repositions delivery or replays previously acknowledged events.
 
 Implicit subscriptions are declared in grain metadata. They aren't created through <xref:Orleans.Streams.IAsyncObservable`1.SubscribeAsync*>, can't be individually removed at runtime, and don't support multiple subscriptions for the same grain binding.
 

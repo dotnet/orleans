@@ -46,6 +46,9 @@ namespace Orleans.Streams
         /// <returns>
         /// The new stream subscription handle.
         /// </returns>
+        /// <exception cref="InvalidOperationException">
+        /// The active implicit subscription has already completed a delivery and <paramref name="token"/> is non-null.
+        /// </exception>
         public abstract Task<StreamSubscriptionHandle<T>> ResumeAsync(IAsyncObserver<T> observer, StreamSequenceToken? token = null);
 
         /// <summary>
@@ -56,6 +59,9 @@ namespace Orleans.Streams
         /// <returns>
         /// The new stream subscription handle.
         /// </returns>
+        /// <exception cref="InvalidOperationException">
+        /// The active implicit subscription has already completed a delivery and <paramref name="token"/> is non-null.
+        /// </exception>
         public abstract Task<StreamSubscriptionHandle<T>> ResumeAsync(IAsyncBatchObserver<T> observer, StreamSequenceToken? token = null);
 
         /// <inheritdoc/>
