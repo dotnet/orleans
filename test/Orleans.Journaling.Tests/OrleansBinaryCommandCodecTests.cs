@@ -39,7 +39,7 @@ public sealed class OrleansBinaryCommandCodecTests : JournalingTestBase
     }
 
     [Fact]
-    public void DictionaryCodec_SnapshotPayload_ReplaysIndependentReferenceScopes()
+    public void DictionaryCodec_SnapshotPayload_ReplaysEntryReferenceScopes()
     {
         var codec = new OrleansBinaryDurableDictionaryCommandCodec<string, SnapshotReferenceRecord>(
             ValueCodec<string>(),
@@ -50,7 +50,7 @@ public sealed class OrleansBinaryCommandCodecTests : JournalingTestBase
             writer => codec.WriteSnapshot([new("first", items[0]), new("second", items[1])], writer));
 
         Assert.Equal(
-            "0705400B6669727374204007010203C105E0400D7365636F6E64204007040506C105E0",
+            "0705400B6669727374214007010203C107E0400D7365636F6E64214007040506C107E0",
             Convert.ToHexString(payload));
 
         var consumer = new RecordingDictionaryCommandHandler<string, SnapshotReferenceRecord>();
@@ -59,7 +59,7 @@ public sealed class OrleansBinaryCommandCodecTests : JournalingTestBase
     }
 
     [Fact]
-    public void DictionaryCodec_Set_ReplaysKeyAndValueAsIndependentReferenceScopes()
+    public void DictionaryCodec_Set_PreservesReferencesBetweenKeyAndValue()
     {
         var codec = new OrleansBinaryDurableDictionaryCommandCodec<SnapshotReferenceRecord, SnapshotReferenceRecord>(
             ValueCodec<SnapshotReferenceRecord>(),
@@ -76,7 +76,47 @@ public sealed class OrleansBinaryCommandCodecTests : JournalingTestBase
         var item = Assert.Single(consumer.SnapshotItems);
         Assert.Same(item.Key.Payload, item.Key.Alias);
         Assert.Same(item.Value.Payload, item.Value.Alias);
-        Assert.NotSame(item.Key.Payload, item.Value.Payload);
+        Assert.Same(item.Key.Payload, item.Value.Payload);
+    }
+
+    [Fact]
+    public void DictionaryCodec_Snapshot_PreservesEntryReferencesAndIsolatesEntries()
+    {
+        var codec = new OrleansBinaryDurableDictionaryCommandCodec<SnapshotReferenceRecord, SnapshotReferenceRecord>(
+            ValueCodec<SnapshotReferenceRecord>(),
+            ValueCodec<SnapshotReferenceRecord>(),
+            SessionPool);
+        var shared = new byte[] { 1, 2, 3 };
+        var payload = CodecTestHelpers.WriteEntry(
+            writer => codec.WriteSnapshot(
+            [
+                new(
+                    new() { Payload = shared, Alias = shared },
+                    new() { Payload = shared, Alias = shared }),
+                new(
+                    new() { Payload = shared, Alias = shared },
+                    new() { Payload = shared, Alias = shared })
+            ],
+            writer));
+
+        var consumer = new RecordingDictionaryCommandHandler<SnapshotReferenceRecord, SnapshotReferenceRecord>();
+        codec.Apply(CodecTestHelpers.ReadBuffer(payload), consumer);
+
+        Assert.Collection(
+            consumer.SnapshotItems,
+            first =>
+            {
+                Assert.Same(first.Key.Payload, first.Key.Alias);
+                Assert.Same(first.Value.Payload, first.Value.Alias);
+                Assert.Same(first.Key.Payload, first.Value.Payload);
+            },
+            second =>
+            {
+                Assert.Same(second.Key.Payload, second.Key.Alias);
+                Assert.Same(second.Value.Payload, second.Value.Alias);
+                Assert.Same(second.Key.Payload, second.Value.Payload);
+                Assert.NotSame(consumer.SnapshotItems[0].Key.Payload, second.Key.Payload);
+            });
     }
 
     [Fact]
