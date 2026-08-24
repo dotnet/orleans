@@ -179,6 +179,22 @@ public sealed class DynamoDBProviderConfigurationTests
     }
 
     [Fact]
+    public void Create_SemicolonDelimitedConnectionString_ParsesEndpointAndCredentials()
+    {
+        var (_, provider, options) = Bind(new()
+        {
+            ["Provider:ConnectionString"] =
+                "Service=https://localhost:8123;AccessKey=connection-access;" +
+                "SecretKey=connection-secret;TableName=connection-table",
+        });
+
+        Assert.Equal("https://localhost:8123", options.Service);
+        Assert.Equal("connection-access", options.AccessKey);
+        Assert.Equal("connection-secret", options.SecretKey);
+        Assert.Equal("connection-table", provider.GetValue("TableName"));
+    }
+
+    [Fact]
     public void Create_MalformedConnectionString_FailsAsMissingOrIncompatibleConfiguration()
     {
         var (_, _, options) = Bind(new()
