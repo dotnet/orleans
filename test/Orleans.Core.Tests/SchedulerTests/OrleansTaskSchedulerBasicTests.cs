@@ -239,33 +239,52 @@ namespace UnitTests.SchedulerTests
         [Fact]
         public async Task Sched_ActivationStartup_DisposeIsIdempotent()
         {
-            var queuedTaskRan = false;
-            var queuedTask = new Task(() => queuedTaskRan = true);
+            var queuedWorkCount = 0;
+            var subsequentWorkCount = 0;
+            var queuedTask = new Task(() => Interlocked.Increment(ref queuedWorkCount));
             var startup = _rootContext.WorkItemGroup.BeginActivationStartup();
             queuedTask.Start(_rootContext.WorkItemGroup.TaskScheduler);
 
             startup.Dispose();
-            startup.Dispose();
-
             await queuedTask.WaitAsync(TimeSpan.FromSeconds(5));
-            Assert.True(queuedTaskRan);
+            Assert.Equal(1, Volatile.Read(ref queuedWorkCount));
+            Assert.Equal(0, _rootContext.WorkItemGroup.ExternalWorkItemCount);
+
+            startup.Dispose();
+            Assert.Equal(1, Volatile.Read(ref queuedWorkCount));
+            Assert.Equal(0, _rootContext.WorkItemGroup.ExternalWorkItemCount);
+
+            var subsequentTask = new Task(() => Interlocked.Increment(ref subsequentWorkCount));
+            subsequentTask.Start(_rootContext.WorkItemGroup.TaskScheduler);
+            await subsequentTask.WaitAsync(TimeSpan.FromSeconds(5));
+
+            Assert.Equal(1, Volatile.Read(ref queuedWorkCount));
+            Assert.Equal(1, Volatile.Read(ref subsequentWorkCount));
+            Assert.Equal(0, _rootContext.WorkItemGroup.ExternalWorkItemCount);
         }
 
         [Fact]
         public async Task Sched_ActivationStartup_AbortDiscardsQueuedWorkAndAllowsReuse()
         {
-            var discardedTask = new Task(static () => throw new InvalidOperationException("This task must not execute."));
+            var discardedWorkCount = 0;
+            var subsequentWorkCount = 0;
+            var discardedTask = new Task(() => Interlocked.Increment(ref discardedWorkCount));
             var startup = _rootContext.WorkItemGroup.BeginActivationStartup();
             discardedTask.Start(_rootContext.WorkItemGroup.TaskScheduler);
+            Assert.Equal(1, _rootContext.WorkItemGroup.ExternalWorkItemCount);
+
             startup.Abort();
 
-            Assert.False(discardedTask.IsCompleted);
+            Assert.Equal(0, Volatile.Read(ref discardedWorkCount));
+            Assert.Equal(0, _rootContext.WorkItemGroup.ExternalWorkItemCount);
 
-            var subsequentTaskRan = false;
-            var subsequentTask = new Task(() => subsequentTaskRan = true);
+            var subsequentTask = new Task(() => Interlocked.Increment(ref subsequentWorkCount));
             subsequentTask.Start(_rootContext.WorkItemGroup.TaskScheduler);
             await subsequentTask.WaitAsync(TimeSpan.FromSeconds(5));
-            Assert.True(subsequentTaskRan);
+
+            Assert.Equal(0, Volatile.Read(ref discardedWorkCount));
+            Assert.Equal(1, Volatile.Read(ref subsequentWorkCount));
+            Assert.Equal(0, _rootContext.WorkItemGroup.ExternalWorkItemCount);
         }
 
         [Fact]
@@ -594,6 +613,54 @@ namespace UnitTests.SchedulerTests
             filters.AddFilter("Scheduler.WorkerPoolThread", LogLevel.Trace);
             var loggerFactory = TestingUtils.CreateDefaultLoggerFactory(TestingUtils.CreateTraceFileName("Silo", DateTime.UtcNow.ToString("yyyyMMdd_hhmmss")), filters);
             return loggerFactory;
+        }
+
+        [Fact]
+        public async Task Sched_ActivationStartup_ConcurrentReleaseExecutesQueuedWorkExactlyOnce()
+        {
+            const int ParticipantCount = 8;
+            var queuedWorkCount = 0;
+            var subsequentWorkCount = 0;
+            var queuedWork = new Task(() => Interlocked.Increment(ref queuedWorkCount));
+            var startup = _rootContext.WorkItemGroup.BeginActivationStartup();
+            queuedWork.Start(_rootContext.WorkItemGroup.TaskScheduler);
+
+            var releaseParticipants = new Task[ParticipantCount];
+            var participantReady = new TaskCompletionSource[ParticipantCount];
+            var releaseParticipantsBarrier = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            for (var i = 0; i < ParticipantCount; i++)
+            {
+                var participant = participantReady[i] = new(TaskCreationOptions.RunContinuationsAsynchronously);
+                releaseParticipants[i] = Task.Run(async () =>
+                {
+                    participant.SetResult();
+                    await releaseParticipantsBarrier.Task;
+                    startup.Dispose();
+                });
+            }
+
+            try
+            {
+                await Task.WhenAll(Array.ConvertAll(participantReady, static participant => participant.Task))
+                    .WaitAsync(TimeSpan.FromSeconds(5));
+                Assert.False(queuedWork.IsCompleted);
+
+                releaseParticipantsBarrier.SetResult();
+                await Task.WhenAll(releaseParticipants).WaitAsync(TimeSpan.FromSeconds(5));
+                await queuedWork.WaitAsync(TimeSpan.FromSeconds(5));
+                Assert.Equal(1, Volatile.Read(ref queuedWorkCount));
+
+                var subsequentWork = new Task(() => Interlocked.Increment(ref subsequentWorkCount));
+                subsequentWork.Start(_rootContext.WorkItemGroup.TaskScheduler);
+                await subsequentWork.WaitAsync(TimeSpan.FromSeconds(5));
+                Assert.Equal(1, Volatile.Read(ref subsequentWorkCount));
+            }
+            finally
+            {
+                releaseParticipantsBarrier.TrySetResult();
+                startup.Dispose();
+                await Task.WhenAll(releaseParticipants).WaitAsync(TimeSpan.FromSeconds(5));
+            }
         }
     }
 }
