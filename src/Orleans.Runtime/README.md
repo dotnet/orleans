@@ -20,7 +20,7 @@ The runtime includes a file-based grain storage provider for local, single-silo 
 using Orleans.Persistence.FileStorage;
 
 siloBuilder.AddFileGrainStorage(
-    options => options.RootDirectory = Path.Combine(
+    options: options => options.RootDirectory = Path.Combine(
         AppContext.BaseDirectory,
         "Orleans",
         "GrainState"));
