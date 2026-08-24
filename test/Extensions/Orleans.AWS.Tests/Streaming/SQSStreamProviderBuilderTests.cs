@@ -1,4 +1,5 @@
 using System.Reflection;
+using Amazon.SQS;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration;
@@ -43,6 +44,10 @@ public sealed class SQSStreamProviderBuilderTests
         Assert.Contains(("AmazonSQS", "Streaming", "Silo"), registrations);
         Assert.Contains(("AmazonSQS", "Streaming", "Client"), registrations);
     }
+
+    [Fact]
+    public void SqsProvider_UsesAwsSdkV4()
+        => Assert.Equal(4, typeof(AmazonSQSClient).Assembly.GetName().Version?.Major);
 
     [Fact]
     public async Task AspireAwsSdkResource_ConfiguresRegionWithoutCredentialMaterial()
