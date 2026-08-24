@@ -64,6 +64,12 @@ namespace Orleans.Streams
         bool IsUnderPressure();
 
         /// <summary>
+        /// Gets a value indicating whether purge and flow-control operations use complete delivery progress
+        /// to protect messages which are still needed by active subscriptions.
+        /// </summary>
+        bool UsesDeliveryProgressForPurgeProtection => false;
+
+        /// <summary>
         /// Updates the cache with the current delivery progress of all active subscriptions.
         /// </summary>
         /// <param name="earliestSubscriptionToken">

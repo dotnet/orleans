@@ -627,8 +627,8 @@ namespace Orleans.Streams
                 // loop through the queue until it is empty.
                 while (!IsShutdown && !cancellationToken.IsCancellationRequested) // shutdown sets IsShutdown and cancels the timer token.
                 {
-                    // Flow controllers can purge while calculating capacity, so preserve registration pins first.
-                    if (HasPendingStreamRegistration())
+                    // Flow controllers can purge while calculating capacity, so publish the safe delivery boundary first.
+                    if (HasPendingStreamRegistration() || !TryUpdateDeliveryProgress())
                     {
                         return;
                     }
@@ -686,7 +686,7 @@ namespace Orleans.Streams
             }
 
             // Pause all queue reads so a cold stream's first batch stays pinned until registration completes.
-            if (HasPendingStreamRegistration())
+            if (HasPendingStreamRegistration() || !TryUpdateDeliveryProgress())
             {
                 return false;
             }
@@ -811,13 +811,23 @@ namespace Orleans.Streams
         /// </summary>
         private void NotifyDeliveryProgress()
         {
-            if (queueCache is null) return;
+            TryUpdateDeliveryProgress();
+        }
 
-            var utcNow = _timeProvider.GetUtcNow().UtcDateTime;
-            if (TryGetDeliveryProgress(out var earliest))
+        private bool TryUpdateDeliveryProgress()
+        {
+            if (queueCache is null)
             {
-                queueCache.UpdateDeliveryProgress(earliest, utcNow);
+                return true;
             }
+
+            if (!TryGetDeliveryProgress(out var earliest))
+            {
+                return !queueCache.UsesDeliveryProgressForPurgeProtection;
+            }
+
+            queueCache.UpdateDeliveryProgress(earliest, _timeProvider.GetUtcNow().UtcDateTime);
+            return true;
         }
 
         private bool TryGetDeliveryProgress(out StreamSequenceToken? earliest)

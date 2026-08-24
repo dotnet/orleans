@@ -266,6 +266,8 @@ namespace Orleans.Streaming.EventHubs
             return this.GetMaxAddCount() <= 0;
         }
 
+        public bool UsesDeliveryProgressForPurgeProtection => this.cache is EventHubQueueCache;
+
         public Task MessagesDeliveredAsync(IList<IBatchContainer> messages)
         {
             return Task.CompletedTask;
@@ -273,6 +275,11 @@ namespace Orleans.Streaming.EventHubs
 
         public void UpdateDeliveryProgress(StreamSequenceToken? earliestSubscriptionToken, DateTime utcNow)
         {
+            if (this.cache is EventHubQueueCache eventHubQueueCache)
+            {
+                eventHubQueueCache.UpdateDeliveryProgress(earliestSubscriptionToken);
+            }
+
             if (earliestSubscriptionToken is IEventHubPartitionLocation location
                 && long.TryParse(location.EventHubOffset, NumberStyles.Integer, CultureInfo.InvariantCulture, out _))
             {

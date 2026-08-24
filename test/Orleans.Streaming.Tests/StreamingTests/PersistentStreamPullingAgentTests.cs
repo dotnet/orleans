@@ -148,6 +148,8 @@ namespace UnitTests.StreamingTests
             var deliveryTask = testAccessor.RunConsumerCursor(consumerData);
             await consumer.Delivered.Task.WaitAsync(TimeSpan.FromSeconds(5));
             Assert.Equal(token, Assert.Single(consumer.DeliveredTokens));
+            await testAccessor.RunQueuePump(queueId, CancellationToken.None);
+            Assert.Equal(1, queueCache.GetMaxAddCountCallCount);
             Assert.Equal(0, queueCache.PurgeCount);
             Assert.Null(queueCache.CheckpointedToken);
             consumer.ReleaseDelivery();
@@ -156,6 +158,7 @@ namespace UnitTests.StreamingTests
             await testAccessor.RunQueuePump(queueId, CancellationToken.None);
 
             Assert.Equal(2, queueCache.GetMaxAddCountCallCount);
+            Assert.Equal(token, queueCache.DeliveryProgress);
             Assert.Equal(1, queueCache.PurgeCount);
             Assert.Equal(token, queueCache.CheckpointedToken);
             Assert.Equal(0, queueCache.ItemCount);
@@ -844,7 +847,9 @@ namespace UnitTests.StreamingTests
             public int GetMaxAddCountCallCount { get; private set; }
             public int PurgeCount { get; private set; }
             public StreamSequenceToken? CheckpointedToken { get; private set; }
+            public StreamSequenceToken? DeliveryProgress { get; private set; }
             public int ItemCount => cache.ItemCount;
+            public bool UsesDeliveryProgressForPurgeProtection => purgeFromGetMaxAddCount;
 
             public int GetMaxAddCount()
             {
@@ -888,6 +893,7 @@ namespace UnitTests.StreamingTests
 
             public void UpdateDeliveryProgress(StreamSequenceToken? earliestSubscriptionToken, DateTime utcNow)
             {
+                DeliveryProgress = earliestSubscriptionToken;
             }
 
             public void Purge()
