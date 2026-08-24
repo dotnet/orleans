@@ -1,4 +1,10 @@
 using System.Reflection;
+#if NET10_0
+using Amazon.CDK.AWS.SQS;
+using Amazon.CloudFormation;
+using Aspire.Hosting.AWS.CDK;
+#endif
+using Amazon.SQS;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration;
@@ -34,6 +40,7 @@ public sealed class SQSAspireIntegrationTests
             new Dictionary<string, string?>
             {
                 ["ProviderType"] = "SQS",
+                ["Region"] = "us-east-1",
                 ["PartitionCount"] = "4",
                 ["FifoQueue"] = "False",
                 ["ReceiveWaitTimeSeconds"] = "12",
@@ -48,18 +55,31 @@ public sealed class SQSAspireIntegrationTests
             provider);
         Assert.Equal("integration-profile", environment["AWS_PROFILE"]);
         Assert.Equal("us-east-1", environment["AWS_REGION"]);
-        Assert.Equal("integration-profile", environment["AWS__Profile"]);
-        Assert.Equal("us-east-1", environment["AWS__Region"]);
         Assert.DoesNotContain(configuration.Keys, key => key.StartsWith("ConnectionStrings:", StringComparison.Ordinal));
         AssertSecretFree(environment);
         var clientEnvironment = await app.GetClientEnvironmentAsync();
         Assert.Equal(environment["AWS_PROFILE"], clientEnvironment["AWS_PROFILE"]);
         Assert.Equal(environment["AWS_REGION"], clientEnvironment["AWS_REGION"]);
-        Assert.Equal(environment["AWS__Profile"], clientEnvironment["AWS__Profile"]);
-        Assert.Equal(environment["AWS__Region"], clientEnvironment["AWS__Region"]);
+#if NET10_0
+        var stack = Assert.Single(app.Model.Resources.OfType<IStackResource>());
+        Assert.Equal("orders-stream-sqs", stack.Name);
+        var queues = GetCdkQueues(app);
+        Assert.Equal(
+            Enumerable.Range(0, 4)
+                .Select(index => $"{ServiceId}-orders-stream-{index}")
+                .ToArray(),
+            queues.Select(queue => queue.QueueName));
+        Assert.All(queues, queue =>
+        {
+            Assert.NotEqual(true, queue.FifoQueue);
+            Assert.Equal(12, queue.ReceiveMessageWaitTimeSeconds);
+            Assert.Equal(45, queue.VisibilityTimeout);
+        });
+#else
         Assert.DoesNotContain(
             app.Model.Resources,
             resource => resource.GetType().Name.Contains("AWS", StringComparison.OrdinalIgnoreCase));
+#endif
     }
 
     [Fact]
@@ -149,7 +169,15 @@ public sealed class SQSAspireIntegrationTests
         Assert.NotNull(Environment.GetEnvironmentVariable("Orleans__ClusterId"));
         Assert.Equal("integration-profile", Environment.GetEnvironmentVariable("AWS_PROFILE"));
         Assert.Equal("us-east-1", Environment.GetEnvironmentVariable("AWS_REGION"));
-        Assert.Equal("us-east-1", Environment.GetEnvironmentVariable("AWS__Region"));
+    }
+
+    [Fact]
+    public void AspireAwsIntegration_UsesAwsSdkV4()
+    {
+        Assert.Equal(4, typeof(AmazonSQSClient).Assembly.GetName().Version?.Major);
+#if NET10_0
+        Assert.Equal(4, typeof(AmazonCloudFormationClient).Assembly.GetName().Version?.Major);
+#endif
     }
 
     [Theory]
@@ -188,6 +216,17 @@ public sealed class SQSAspireIntegrationTests
         Assert.All(
             siloPhysicalNames,
             name => Assert.Equal(fifoQueue, name.EndsWith(".fifo", StringComparison.Ordinal)));
+#if NET10_0
+        var cdkQueues = GetCdkQueues(app);
+        Assert.Equal(expectedPhysicalNames, cdkQueues.Select(queue => queue.QueueName).Order());
+        Assert.All(cdkQueues, queue =>
+        {
+            Assert.Equal(fifoQueue, queue.FifoQueue is true);
+            Assert.Equal(fifoQueue, queue.ContentBasedDeduplication is true);
+            Assert.Equal(fifoQueue ? "messageGroup" : null, queue.DeduplicationScope);
+            Assert.Equal(fifoQueue ? "perMessageGroupId" : null, queue.FifoThroughputLimit);
+        });
+#endif
     }
 
     private static Task<SqsAspireTestApp> CreateRegionAppAsync()
@@ -283,6 +322,15 @@ public sealed class SQSAspireIntegrationTests
             .Order()
             .ToArray();
     }
+
+#if NET10_0
+    private static CfnQueue[] GetCdkQueues(SqsAspireTestApp app)
+        => app.Model.Resources
+            .OfType<IConstructResource<Queue>>()
+            .Select(resource => Assert.IsType<CfnQueue>(resource.Construct.Node.DefaultChild))
+            .OrderBy(queue => queue.QueueName)
+            .ToArray();
+#endif
 
     private sealed class FakeSqsDataAdapter(string id) : ISQSDataAdapter
     {
