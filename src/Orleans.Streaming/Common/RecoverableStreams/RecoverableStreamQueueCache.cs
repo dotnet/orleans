@@ -295,6 +295,7 @@ namespace Orleans.Providers.Streams.Common
 
             public void RecordDeliveryFailure()
             {
+                _cache.RecordDeliveryFailure(_cursor);
             }
 
             public void RecordDeliverySuccess() => _cache.RecordDeliverySuccess(_cursor);

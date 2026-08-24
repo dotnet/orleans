@@ -498,6 +498,41 @@ public sealed class RecoverableStreamReceiverTests
     }
 
     [Fact]
+    public void Cache_DeliveryFailureRewindsToFirstPendingRecord()
+    {
+        var streamA = StreamId.Create("namespace", Guid.NewGuid());
+        var streamB = StreamId.Create("namespace", Guid.NewGuid());
+        var cache = new RecoverableStreamQueueCache<TestQueueMessage>(
+            100,
+            new ObjectPool<FixedSizeBuffer>(() => new FixedSizeBuffer(4 * 1024)),
+            new TestDataAdapter(),
+            new NoOpEvictionStrategy(),
+            NullLogger.Instance);
+        var positions = cache.Add(
+        [
+            new TestQueueMessage(streamA, 1, "a-1"),
+            new TestQueueMessage(streamB, 2, "b-2"),
+            new TestQueueMessage(streamA, 3, "a-3"),
+        ],
+            DateTime.UnixEpoch);
+        using var cursor = cache.GetCacheCursor(streamA, positions[0].SequenceToken);
+        var progress = Assert.IsAssignableFrom<IQueueCacheCursorProgress>(cursor);
+        Assert.True(cursor.MoveNext());
+        Assert.Equal(1, cursor.GetCurrent(out _)!.SequenceToken.SequenceNumber);
+        Assert.True(cursor.MoveNext());
+        Assert.Equal(3, cursor.GetCurrent(out _)!.SequenceToken.SequenceNumber);
+
+        cursor.RecordDeliveryFailure();
+
+        Assert.Null(progress.SafeSequenceToken);
+        Assert.True(cursor.MoveNext());
+        Assert.Equal(1, cursor.GetCurrent(out _)!.SequenceToken.SequenceNumber);
+        progress.RecordDeliverySuccess();
+        Assert.True(cursor.MoveNext());
+        Assert.Equal(3, cursor.GetCurrent(out _)!.SequenceToken.SequenceNumber);
+    }
+
+    [Fact]
     public async Task Receiver_MidInitializationCancellationReachesLoadAndAllowsRetry()
     {
         var source = new TestSource([]);

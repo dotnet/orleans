@@ -618,6 +618,20 @@ namespace Orleans.Providers.Streams.Common
         internal void RecordDeliverySuccess(object cursorObj)
             => GetCursor(cursorObj).RecordDeliverySuccess();
 
+        internal void RecordDeliveryFailure(object cursorObj)
+        {
+            var cursor = GetCursor(cursorObj);
+            if (cursor.TakePendingStartToken() is not { } retryToken)
+            {
+                return;
+            }
+
+            cursor.State = CursorStates.Unset;
+            cursor.CurrentBlock = null;
+            cursor.SequenceToken = retryToken;
+            SetCursor(cursor, retryToken);
+        }
+
         private Cursor GetCursor(object cursorObj)
             => cursorObj as Cursor
                 ?? throw new ArgumentOutOfRangeException(nameof(cursorObj), "Cursor is bad");
@@ -730,6 +744,7 @@ namespace Orleans.Providers.Streams.Common
             public StreamSequenceToken? SafeSequenceToken;
             public StreamSequenceToken? DeliveredThroughToken;
             private StreamSequenceToken? pendingSequenceToken;
+            private StreamSequenceToken? pendingStartToken;
             private bool hasPendingDelivery;
 
             // reference into cache; non-null while State is Set
@@ -755,6 +770,11 @@ namespace Orleans.Providers.Streams.Common
 
             public void RecordPending(StreamSequenceToken token)
             {
+                if (!hasPendingDelivery)
+                {
+                    pendingStartToken = token;
+                }
+
                 hasPendingDelivery = true;
                 pendingSequenceToken = token;
             }
@@ -768,7 +788,22 @@ namespace Orleans.Providers.Streams.Common
 
                 SafeSequenceToken = pendingSequenceToken;
                 pendingSequenceToken = null;
+                pendingStartToken = null;
                 hasPendingDelivery = false;
+            }
+
+            public StreamSequenceToken? TakePendingStartToken()
+            {
+                if (!hasPendingDelivery)
+                {
+                    return null;
+                }
+
+                var result = pendingStartToken;
+                pendingSequenceToken = null;
+                pendingStartToken = null;
+                hasPendingDelivery = false;
+                return result;
             }
 
         }
