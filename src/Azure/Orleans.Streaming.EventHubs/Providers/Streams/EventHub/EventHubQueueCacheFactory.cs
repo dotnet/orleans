@@ -216,21 +216,11 @@ namespace Orleans.Streaming.EventHubs
             private bool purgingForMemoryPressure;
             private bool oldestBufferInitialized;
             private object? oldestBuffer;
-            private bool hasMaxPurgeToken;
-            private long maxPurgeSequenceNumber;
-            private int maxPurgeEventIndex;
 
-            public void PerformMemoryPressurePurge(
-                DateTime nowUtc,
-                bool hasMaxPurgeToken,
-                long maxPurgeSequenceNumber,
-                int maxPurgeEventIndex)
+            public void PerformMemoryPressurePurge(DateTime nowUtc)
             {
                 purgingForMemoryPressure = true;
                 oldestBufferInitialized = false;
-                this.hasMaxPurgeToken = hasMaxPurgeToken;
-                this.maxPurgeSequenceNumber = maxPurgeSequenceNumber;
-                this.maxPurgeEventIndex = maxPurgeEventIndex;
                 try
                 {
                     PerformPurge(nowUtc);
@@ -240,7 +230,6 @@ namespace Orleans.Streaming.EventHubs
                     purgingForMemoryPressure = false;
                     oldestBufferInitialized = false;
                     oldestBuffer = null;
-                    this.hasMaxPurgeToken = false;
                 }
             }
 
@@ -251,14 +240,6 @@ namespace Orleans.Streaming.EventHubs
             {
                 if (purgingForMemoryPressure)
                 {
-                    if (hasMaxPurgeToken
-                        && (cachedMessage.SequenceNumber > maxPurgeSequenceNumber
-                            || cachedMessage.SequenceNumber == maxPurgeSequenceNumber
-                            && cachedMessage.EventIndex > maxPurgeEventIndex))
-                    {
-                        return false;
-                    }
-
                     if (!oldestBufferInitialized)
                     {
                         oldestBuffer = cachedMessage.Segment.Array;

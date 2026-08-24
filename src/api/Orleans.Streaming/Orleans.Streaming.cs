@@ -1690,9 +1690,9 @@ namespace Orleans.Streams
         IQueueCacheCursor GetCacheCursor(Runtime.StreamId streamId, StreamSequenceToken? token);
         IQueueCacheCursor GetCacheCursorAtPosition(Runtime.StreamId streamId, StreamSubscriptionStartPosition startPosition);
         bool IsUnderPressure();
-        bool UsesDeliveryProgressForPurgeProtection { get; }
         bool TryPurgeFromCache(out System.Collections.Generic.IList<IBatchContainer> purgedItems);
         void UpdateDeliveryProgress(StreamSequenceToken? earliestSubscriptionToken, System.DateTime utcNow);
+        void UpdatePurgeProtection(bool hasActiveSubscriptions);
     }
 
     public partial interface IQueueCacheCursor : System.IDisposable

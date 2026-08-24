@@ -42,9 +42,7 @@ namespace Orleans.Streaming.EventHubs
         private FixedSizeBuffer? currentBuffer;
         private readonly EventHubCacheMemoryController? memoryController;
         private int preferredBufferSize = EventHubCacheBufferPool.MinBufferSize;
-        private bool hasDeliveryProgress;
-        private long deliveryProgressSequenceNumber;
-        private int deliveryProgressEventIndex;
+        private bool hasActiveSubscriptions;
 
         internal bool IsUnderMemoryPressure => memoryController?.IsUnderPressure == true;
 
@@ -135,13 +133,10 @@ namespace Orleans.Streaming.EventHubs
 
             var previousMetadataSize = cache.AllocatedSizeInBytes;
             if (memoryController?.IsUnderPressure == true
+                && !hasActiveSubscriptions
                 && evictionStrategy is IMemoryPressureEvictionStrategy memoryPressureEvictionStrategy)
             {
-                memoryPressureEvictionStrategy.PerformMemoryPressurePurge(
-                    DateTime.UtcNow,
-                    hasDeliveryProgress,
-                    deliveryProgressSequenceNumber,
-                    deliveryProgressEventIndex);
+                memoryPressureEvictionStrategy.PerformMemoryPressurePurge(DateTime.UtcNow);
             }
             else
             {
@@ -253,14 +248,9 @@ namespace Orleans.Streaming.EventHubs
             cache.Refresh(cursor, sequenceToken);
         }
 
-        internal void UpdateDeliveryProgress(StreamSequenceToken? token)
+        internal void UpdatePurgeProtection(bool hasActiveSubscriptions)
         {
-            hasDeliveryProgress = token is not null;
-            if (token is not null)
-            {
-                deliveryProgressSequenceNumber = token.SequenceNumber;
-                deliveryProgressEventIndex = token.EventIndex;
-            }
+            this.hasActiveSubscriptions = hasActiveSubscriptions;
         }
 
         /// <summary>
@@ -396,10 +386,6 @@ namespace Orleans.Streaming.EventHubs
 
     internal interface IMemoryPressureEvictionStrategy
     {
-        void PerformMemoryPressurePurge(
-            DateTime nowUtc,
-            bool hasMaxPurgeToken,
-            long maxPurgeSequenceNumber,
-            int maxPurgeEventIndex);
+        void PerformMemoryPressurePurge(DateTime nowUtc);
     }
 }

@@ -137,8 +137,9 @@ namespace UnitTests.StreamingTests
 
             var qualifiedStreamId = new QualifiedStreamId("provider", streamId);
             var consumer = new RecordingConsumer();
+            var subscriptionId = GuidId.GetGuidId(Guid.NewGuid());
             var consumerData = streamData.AddConsumer(
-                GuidId.GetGuidId(Guid.NewGuid()),
+                subscriptionId,
                 qualifiedStreamId,
                 consumer,
                 filterData: null,
@@ -150,16 +151,16 @@ namespace UnitTests.StreamingTests
             await consumer.Delivered.Task.WaitAsync(TimeSpan.FromSeconds(5));
             Assert.Equal(token, Assert.Single(consumer.DeliveredTokens));
             await testAccessor.RunQueuePump(queueId, CancellationToken.None);
-            Assert.Equal(1, queueCache.GetMaxAddCountCallCount);
+            Assert.Equal(2, queueCache.GetMaxAddCountCallCount);
             Assert.Equal(0, queueCache.PurgeCount);
             Assert.Null(queueCache.CheckpointedToken);
             consumer.ReleaseDelivery();
             await deliveryTask.WaitAsync(TimeSpan.FromSeconds(5));
+            Assert.True(streamData.RemoveConsumer(subscriptionId, NullLogger.Instance));
 
             await testAccessor.RunQueuePump(queueId, CancellationToken.None);
 
-            Assert.Equal(2, queueCache.GetMaxAddCountCallCount);
-            Assert.Equal(token, queueCache.DeliveryProgress);
+            Assert.Equal(3, queueCache.GetMaxAddCountCallCount);
             Assert.Equal(1, queueCache.PurgeCount);
             Assert.Equal(token, queueCache.CheckpointedToken);
             Assert.Equal(0, queueCache.ItemCount);
@@ -249,7 +250,7 @@ namespace UnitTests.StreamingTests
         [TestProvider("None")]
         [TestArea("Streaming")]
         [Fact, TestCategory("BVT"), TestCategory("Streaming")]
-        public async Task RunQueuePump_ReadsFutureEventForTokenlessWarmStreamWithoutPurging()
+        public async Task RunQueuePump_ReadsFutureEventForTokenlessWarmStreamWithPurgeProtection()
         {
             var pubSub = Substitute.For<IStreamPubSub>();
             pubSub.RegisterProducer(default, default)
@@ -276,8 +277,9 @@ namespace UnitTests.StreamingTests
 
             var streamData = Assert.Single(await testAccessor.GetPubSubCache()).Value;
             var consumer = new RecordingConsumer();
+            var subscriptionId = GuidId.GetGuidId(Guid.NewGuid());
             var consumerData = streamData.AddConsumer(
-                GuidId.GetGuidId(Guid.NewGuid()),
+                subscriptionId,
                 qualifiedStreamId,
                 consumer,
                 filterData: null,
@@ -289,9 +291,8 @@ namespace UnitTests.StreamingTests
             await consumer.Delivered.Task.WaitAsync(TimeSpan.FromSeconds(5));
 
             Assert.Equal(futureToken, Assert.Single(consumer.DeliveredTokens));
-            Assert.Equal(0, queueCache.GetMaxAddCountCallCount);
+            Assert.True(queueCache.GetMaxAddCountCallCount > 0);
             Assert.Equal(0, queueCache.PurgeCount);
-            await receiver.Received(1).GetQueueMessagesAsync(1, Arg.Any<CancellationToken>());
 
             consumer.ReleaseDelivery();
             var timeout = DateTime.UtcNow + TimeSpan.FromSeconds(5);
@@ -301,6 +302,7 @@ namespace UnitTests.StreamingTests
             }
 
             Assert.Equal(StreamConsumerDataState.Inactive, consumerData.State);
+            Assert.True(streamData.RemoveConsumer(subscriptionId, NullLogger.Instance));
             await testAccessor.RunQueuePump(queueId, CancellationToken.None);
             Assert.True(queueCache.GetMaxAddCountCallCount > 0);
             Assert.True(queueCache.PurgeCount > 0);
@@ -376,6 +378,20 @@ namespace UnitTests.StreamingTests
             }
 
             Assert.True(streamData.StreamRegistered);
+        }
+
+        [TestSuite("BVT")]
+        [TestProvider("None")]
+        [TestArea("Streaming")]
+        [Fact, TestCategory("BVT"), TestCategory("Streaming")]
+        public void GetConfirmedDeliveryProgress_UsesOnlyDeliveryTokens()
+        {
+            var token = new EventSequenceTokenV2(1);
+
+            Assert.Null(PersistentStreamPullingAgent.GetConfirmedDeliveryProgress(StreamHandshakeToken.CreateStartToken(token)));
+            Assert.Equal(
+                token,
+                PersistentStreamPullingAgent.GetConfirmedDeliveryProgress(StreamHandshakeToken.CreateDeliveyToken(token)));
         }
 
         [TestSuite("BVT")]
@@ -909,14 +925,13 @@ namespace UnitTests.StreamingTests
             public int GetMaxAddCountCallCount { get; private set; }
             public int PurgeCount { get; private set; }
             public StreamSequenceToken? CheckpointedToken { get; private set; }
-            public StreamSequenceToken? DeliveryProgress { get; private set; }
             public int ItemCount => cache.ItemCount;
-            public bool UsesDeliveryProgressForPurgeProtection => purgeFromGetMaxAddCount;
+            public bool HasActiveSubscriptions { get; private set; }
 
             public int GetMaxAddCount()
             {
                 GetMaxAddCountCallCount++;
-                if (purgeFromGetMaxAddCount && !cache.IsEmpty)
+                if (purgeFromGetMaxAddCount && !HasActiveSubscriptions && !cache.IsEmpty)
                 {
                     Purge();
                 }
@@ -953,9 +968,9 @@ namespace UnitTests.StreamingTests
 
             public bool IsUnderPressure() => false;
 
-            public void UpdateDeliveryProgress(StreamSequenceToken? earliestSubscriptionToken, DateTime utcNow)
+            public void UpdatePurgeProtection(bool hasActiveSubscriptions)
             {
-                DeliveryProgress = earliestSubscriptionToken;
+                HasActiveSubscriptions = hasActiveSubscriptions;
             }
 
             public void Purge()

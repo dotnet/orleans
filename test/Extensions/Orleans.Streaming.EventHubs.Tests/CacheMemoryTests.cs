@@ -89,7 +89,7 @@ public sealed class CacheMemoryTests : IDisposable
     }
 
     [Fact, TestCategory("BVT")]
-    public void MemoryPressurePurgeStopsAtDeliveryProgress()
+    public void ActiveSubscriptionsUseTimeBasedPurgeUnderMemoryPressure()
     {
         const int maxActiveMemory = 100 * 1024;
         var controller = new EventHubCacheMemoryController(maxActiveMemory);
@@ -101,15 +101,15 @@ public sealed class CacheMemoryTests : IDisposable
             DateTime.UtcNow);
         Assert.True(controller.ActiveCacheMemory > maxActiveMemory);
 
-        cache.UpdateDeliveryProgress(positions[0].SequenceToken);
+        cache.UpdatePurgeProtection(hasActiveSubscriptions: true);
 
         Assert.Equal(0, cache.GetMaxAddCount());
-        Assert.Equal(((IEventHubPartitionLocation)positions[0].SequenceToken).EventHubOffset, checkpointer.LastOffset);
-        var nextCursor = cache.GetCursor(positions[1].StreamId, positions[1].SequenceToken);
+        Assert.Null(checkpointer.LastOffset);
+        var nextCursor = cache.GetCursor(positions[0].StreamId, positions[0].SequenceToken);
         Assert.True(cache.TryGetNextMessage(nextCursor, out var next));
-        Assert.Equal(positions[1].SequenceToken, next.SequenceToken);
+        Assert.Equal(positions[0].SequenceToken, next.SequenceToken);
 
-        cache.UpdateDeliveryProgress(positions[^1].SequenceToken);
+        cache.UpdatePurgeProtection(hasActiveSubscriptions: false);
 
         var attempts = 0;
         while (cache.GetMaxAddCount() == 0 && attempts++ < 10)
@@ -117,7 +117,7 @@ public sealed class CacheMemoryTests : IDisposable
         }
 
         Assert.True(attempts < 10);
-        Assert.NotEqual(((IEventHubPartitionLocation)positions[0].SequenceToken).EventHubOffset, checkpointer.LastOffset);
+        Assert.NotNull(checkpointer.LastOffset);
     }
 
     [Fact]

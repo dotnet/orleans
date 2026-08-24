@@ -64,10 +64,13 @@ namespace Orleans.Streams
         bool IsUnderPressure();
 
         /// <summary>
-        /// Gets a value indicating whether purge and flow-control operations use complete delivery progress
-        /// to protect messages which are still needed by active subscriptions.
+        /// Updates whether the cache has active subscriptions which require purge protection.
         /// </summary>
-        bool UsesDeliveryProgressForPurgeProtection => false;
+        /// <param name="hasActiveSubscriptions">
+        /// <see langword="true"/> when at least one active subscription can consume cached messages;
+        /// otherwise, <see langword="false"/>.
+        /// </param>
+        void UpdatePurgeProtection(bool hasActiveSubscriptions) { }
 
         /// <summary>
         /// Updates the cache with the current delivery progress of all active subscriptions.
