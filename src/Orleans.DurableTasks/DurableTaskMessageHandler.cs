@@ -43,7 +43,10 @@ internal sealed class DurableTaskMessageHandler(
                     throw new InvalidOperationException("The durable task completion payload could not be deserialized.");
                 }
 
-                runtime.AcceptResponse(completion.TaskId, completion.Response);
+                await runtime.AcceptResponseAsync(
+                    completion.TaskId,
+                    completion.Response,
+                    cancellationToken);
                 break;
             case DurableTaskMessageTransport.CancellationRoute:
                 if (!context.Envelope.Data.TryGetBody<DurableTaskCancellationMessage>(out var cancellation))
@@ -77,7 +80,10 @@ internal sealed class DurableTaskMessageHandler(
                     throw new InvalidOperationException("The durable task resume payload could not be deserialized.");
                 }
 
-                runtime.AcceptResponse(resume.TaskId, DurableTaskResponse.Completed);
+                await runtime.AcceptResponseAsync(
+                    resume.TaskId,
+                    DurableTaskResponse.Completed,
+                    cancellationToken);
                 break;
             default:
                 throw new InvalidOperationException($"Unsupported durable task route '{context.Envelope.RouteKey}'.");

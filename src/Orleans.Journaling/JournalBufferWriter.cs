@@ -32,7 +32,13 @@ public abstract class JournalBufferWriter : IDisposable, IBufferWriter<byte>
     /// </summary>
     /// <param name="streamId">The durable state id.</param>
     /// <returns>A journal stream writer for the specified state.</returns>
-    public JournalStreamWriter CreateJournalStreamWriter(JournalStreamId streamId) => new(streamId, this);
+    public JournalStreamWriter CreateJournalStreamWriter(JournalStreamId streamId) =>
+        new(streamId, this);
+
+    internal JournalStreamWriter CreateJournalStreamWriter(
+        JournalStreamId streamId,
+        IJournaledStateMutationGuard? mutationGuard) =>
+        new(streamId, this, mutationGuard);
 
     /// <summary>
     /// Gets a pinned snapshot of the accumulated journal bytes which are safe to persist.

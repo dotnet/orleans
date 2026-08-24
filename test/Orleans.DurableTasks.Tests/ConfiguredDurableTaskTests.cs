@@ -110,7 +110,7 @@ public class ConfiguredDurableTaskTests
 
         var scheduled = await configured.ScheduleAsync();
 
-        var expectedChildTaskId = ownTaskId.Child("0");
+        var expectedChildTaskId = ownTaskId.Child("unnamed:0");
         Assert.Equal(expectedChildTaskId, capturedTaskId);
         _ = Assert.IsType<ScheduledDurableTask>(scheduled);
         await runtime.Received(1).ScheduleChildAsync(expectedChildTaskId, configured.Task, Arg.Any<CancellationToken>());
@@ -134,7 +134,7 @@ public class ConfiguredDurableTaskTests
         var result = await configured;
 
         Assert.Equal(42, result);
-        var expectedChildTaskId = ownTaskId.Child("0");
+        var expectedChildTaskId = ownTaskId.Child("unnamed:0");
         Assert.Equal(expectedChildTaskId, capturedTaskId);
         await runtime.Received(1).ScheduleChildAsync(expectedChildTaskId, configured.Task, Arg.Any<CancellationToken>());
         await handle.Received(1).WaitAsync(Arg.Any<CancellationToken>());
@@ -155,7 +155,7 @@ public class ConfiguredDurableTaskTests
         var result = await configured.CancelAsync(CancellationToken.None);
 
         Assert.True(result);
-        var expectedChildTaskId = ownTaskId.Child("0");
+        var expectedChildTaskId = ownTaskId.Child("unnamed:0");
         Assert.Equal(expectedChildTaskId, capturedTaskId);
         await handle.Received(1).CancelAsync(Arg.Any<CancellationToken>());
     }
@@ -178,7 +178,7 @@ public class ConfiguredDurableTaskTests
         var status = await configured.PollAsync(pollingOptions, CancellationToken.None);
 
         Assert.Equal(DurableTaskStatus.CompletedSuccessfully, status);
-        var expectedChildTaskId = ownTaskId.Child("0");
+        var expectedChildTaskId = ownTaskId.Child("unnamed:0");
         Assert.Equal(expectedChildTaskId, capturedTaskId);
         await handle.Received(1).PollAsync(pollingOptions, Arg.Any<CancellationToken>());
     }
@@ -198,7 +198,7 @@ public class ConfiguredDurableTaskTests
 
         var scheduled = await configured.ScheduleAsync();
 
-        var expectedChildTaskId = ownTaskId.Child("0");
+        var expectedChildTaskId = ownTaskId.Child("unnamed:0");
         Assert.Equal(expectedChildTaskId, capturedTaskId);
         _ = Assert.IsType<ScheduledDurableTask<int>>(scheduled);
         await runtime.Received(1).ScheduleChildAsync(expectedChildTaskId, configured.Task, Arg.Any<CancellationToken>());

@@ -67,6 +67,8 @@ internal interface IDurableJobHandlerLookup
 {
     CancellationToken ExecutionToken { get; }
 
+    Task<TResult> StartExecution<TResult>(Func<CancellationToken, Task<TResult>> factory);
+
     bool TryGetHandler(string jobName, [NotNullWhen(true)] out IDurableJobFeatureHandler? handler);
 
     bool TryGetIsolatedHandler(string jobName, [NotNullWhen(true)] out IDurableJobFeatureHandler? handler);
@@ -87,6 +89,9 @@ internal sealed class DurableJobHandlerRegistry : IDurableJobHandlerRegistry, ID
     }
 
     public CancellationToken ExecutionToken => _lifetime?.Token ?? CancellationToken.None;
+
+    public Task<TResult> StartExecution<TResult>(Func<CancellationToken, Task<TResult>> factory) =>
+        _lifetime?.Start(factory) ?? factory(CancellationToken.None);
 
     public void Register(IDurableJobFeatureHandler handler, bool requiresTurnIsolation = false)
     {
@@ -216,7 +221,8 @@ internal sealed partial class DurableJobFeatureReceiverExtension : IDurableJobFe
         using var tracker = _shared.BeginHandlerExecution(context);
         try
         {
-            var result = await handler.ExecuteJobAsync(context, _handlers.ExecutionToken)
+            var result = await _handlers.StartExecution(
+                token => handler.ExecuteJobAsync(context, token).AsTask())
                 ?? throw new InvalidOperationException(
                     $"Durable job feature handler for '{context.Job.Name}' returned a null result.");
             CacheResult(key, result);

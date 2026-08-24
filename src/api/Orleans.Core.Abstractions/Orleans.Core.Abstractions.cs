@@ -1771,16 +1771,22 @@ namespace Orleans.DurableTasks
 
     public partial interface IDurableTaskGrainStorage
     {
+        bool IsCommitIntegratedWithActivationJournal { get; }
+
         System.Collections.Generic.IEnumerable<(System.Distributed.DurableTasks.TaskId Id, IDurableTaskState State)> Tasks { get; }
 
         void AddCompletionDestination(System.Distributed.DurableTasks.TaskId taskId, IDurableTaskState state, Runtime.GrainId destination);
         void Clear();
         void ClearCompletionDestinations(System.Distributed.DurableTasks.TaskId taskId, IDurableTaskState state);
+        System.IDisposable? EnlistWithNextMessageCommit();
         System.Collections.Generic.IEnumerable<(System.Distributed.DurableTasks.TaskId Id, IDurableTaskState State)> GetChildren(System.Distributed.DurableTasks.TaskId task);
         IDurableTaskState GetOrCreateTask(System.Distributed.DurableTasks.TaskId taskId, IDurableTaskRequest? request);
         System.Threading.Tasks.ValueTask ReadAsync(System.Threading.CancellationToken cancellationToken);
         bool RemoveTask(System.Distributed.DurableTasks.TaskId taskId);
         void RequestCancellation(System.Distributed.DurableTasks.TaskId taskId, IDurableTaskState state);
+        void SetCancellationTombstone(System.Distributed.DurableTasks.TaskId taskId, IDurableTaskState state, bool value);
+        void SetPendingCancellationDestination(System.Distributed.DurableTasks.TaskId taskId, IDurableTaskState state, Runtime.GrainId target);
+        void SetRemoteTarget(System.Distributed.DurableTasks.TaskId taskId, IDurableTaskState state, Runtime.GrainId target);
         void SetRequest(System.Distributed.DurableTasks.TaskId taskId, IDurableTaskState state, IDurableTaskRequest request);
         void SetResponse(System.Distributed.DurableTasks.TaskId taskId, IDurableTaskState state, System.Distributed.DurableTasks.DurableTaskResponse response);
         bool TryGetTask(System.Distributed.DurableTasks.TaskId taskId, out IDurableTaskState? state);
@@ -1826,6 +1832,12 @@ namespace Orleans.DurableTasks
         System.Collections.Generic.IReadOnlySet<Runtime.GrainId> CompletionDestinations { get; }
 
         System.DateTimeOffset CreatedAt { get; }
+
+        bool IsCancellationTombstone { get; set; }
+
+        Runtime.GrainId PendingCancellationDestination { get; set; }
+
+        Runtime.GrainId RemoteTarget { get; }
 
         IDurableTaskRequest? Request { get; }
 

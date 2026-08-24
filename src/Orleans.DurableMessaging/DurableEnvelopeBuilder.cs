@@ -42,6 +42,10 @@ public sealed class DurableEnvelopeBuilder : IBufferWriter<byte>
     private const string CallChainReentrancyRequestContextKey = "#CCR";
     private const string PingRequestContextKey = "Ping";
     private const string TurnIsolationRequestContextKey = "Orleans.DurableJobs.TurnIsolation";
+    private const int MaxRequestContextEntryCount = 32;
+    private const int MaxRequestContextKeyLength = 256;
+    private const int MaxSerializedRequestContextValueLength = 64 * 1024;
+    private const int MaxSerializedRequestContextTotalLength = 256 * 1024;
 
     // Reflection cache for setting private DurableEnvelopeData fields
     private static readonly FieldInfo BufferField = typeof(DurableEnvelopeData).GetField("_buffer", BindingFlags.NonPublic | BindingFlags.Instance)!;
@@ -228,7 +232,18 @@ public sealed class DurableEnvelopeBuilder : IBufferWriter<byte>
     {
         ArgumentNullException.ThrowIfNull(key);
         ArgumentException.ThrowIfNullOrWhiteSpace(key);
+        if (string.Equals(key, RequestContextKey, StringComparison.Ordinal))
+        {
+            throw new ArgumentException(
+                $"The context key '{RequestContextKey}' is reserved for Orleans request context propagation.",
+                nameof(key));
+        }
 
+        return WithContextValueCore(key, value);
+    }
+
+    private DurableEnvelopeBuilder WithContextValueCore<T>(string key, T value)
+    {
         _contextIndices ??= new(StringComparer.Ordinal);
 
         if (_contextIndices.ContainsKey(key))
@@ -255,12 +270,61 @@ public sealed class DurableEnvelopeBuilder : IBufferWriter<byte>
         var values = RequestContext.Entries
             .Where(static entry => !IsFrameworkContextKey(entry.Key))
             .ToDictionary(static entry => entry.Key, static entry => entry.Value, StringComparer.Ordinal);
+        ValidateRequestContextValues(values, SessionPool);
         if (values.Count > 0)
         {
-            WithContextValue(RequestContextKey, values);
+            WithContextValueCore(RequestContextKey, values);
         }
 
         return this;
+    }
+
+    internal static void ValidateRequestContextValues(
+        IReadOnlyDictionary<string, object> values,
+        SerializerSessionPool sessionPool)
+    {
+        if (values.Count > MaxRequestContextEntryCount)
+        {
+            throw new InvalidOperationException(
+                $"Durable envelope request context exceeds the limit of {MaxRequestContextEntryCount} entries.");
+        }
+
+        var totalLength = 0;
+        foreach (var (key, value) in values)
+        {
+            if (string.IsNullOrEmpty(key) || key.Length > MaxRequestContextKeyLength)
+            {
+                throw new InvalidOperationException(
+                    $"Durable envelope request context keys must contain between 1 and {MaxRequestContextKeyLength} characters.");
+            }
+
+            var serializedLength = GetSerializedLength(value, sessionPool);
+            if (serializedLength > MaxSerializedRequestContextValueLength)
+            {
+                throw new InvalidOperationException(
+                    $"Serialized durable envelope request context value '{key}' exceeds the "
+                    + $"{MaxSerializedRequestContextValueLength}-byte limit.");
+            }
+
+            totalLength = checked(totalLength + serializedLength);
+            if (totalLength > MaxSerializedRequestContextTotalLength)
+            {
+                throw new InvalidOperationException(
+                    $"Serialized durable envelope request context exceeds the "
+                    + $"{MaxSerializedRequestContextTotalLength}-byte total limit.");
+            }
+        }
+
+    }
+
+    private static int GetSerializedLength(object value, SerializerSessionPool sessionPool)
+    {
+        var buffer = new ArrayBufferWriter<byte>();
+        using var session = sessionPool.GetSession();
+        var writer = Writer.Create(buffer, session);
+        sessionPool.CodecProvider.GetCodec<object>().WriteField(ref writer, 0, typeof(object), value);
+        writer.Commit();
+        return buffer.WrittenCount;
     }
 
     internal static bool IsFrameworkContextKey(string key) =>

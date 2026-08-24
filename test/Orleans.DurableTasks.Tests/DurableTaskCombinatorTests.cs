@@ -55,8 +55,8 @@ public class DurableTaskCombinatorTests
         var firstCompletion = new TaskCompletionSource<DurableTaskResponse>(TaskCreationOptions.RunContinuationsAsynchronously);
         var handles = new Dictionary<string, IScheduledTaskHandle>
         {
-            ["0"] = CreateHandle("root/0", _ => new ValueTask<DurableTaskResponse>(firstCompletion.Task)),
-            ["1"] = CreateHandle("root/1", _ => new ValueTask<DurableTaskResponse>(DurableTaskResponse.Completed)),
+            ["named:1:0:0"] = CreateHandle("root/named:1:0:0", _ => new ValueTask<DurableTaskResponse>(firstCompletion.Task)),
+            ["named:1:1:0"] = CreateHandle("root/named:1:1:0", _ => new ValueTask<DurableTaskResponse>(DurableTaskResponse.Completed)),
         };
         ConfigureRuntime(runtime, handles);
         var context = new GrainDurableExecutionContext(TaskId.Create("root"), runtime);
@@ -75,8 +75,8 @@ public class DurableTaskCombinatorTests
         var firstCompletion = new TaskCompletionSource<DurableTaskResponse>(TaskCreationOptions.RunContinuationsAsynchronously);
         var handles = new Dictionary<string, IScheduledTaskHandle>
         {
-            ["0"] = CreateHandle("root/0", _ => new ValueTask<DurableTaskResponse>(firstCompletion.Task)),
-            ["1"] = CreateHandle("root/1", _ => new ValueTask<DurableTaskResponse>(DurableTaskResponse.FromResult(2))),
+            ["named:1:0:0"] = CreateHandle("root/named:1:0:0", _ => new ValueTask<DurableTaskResponse>(firstCompletion.Task)),
+            ["named:1:1:0"] = CreateHandle("root/named:1:1:0", _ => new ValueTask<DurableTaskResponse>(DurableTaskResponse.FromResult(2))),
         };
         ConfigureRuntime(runtime, handles);
         var context = new GrainDurableExecutionContext(TaskId.Create("root"), runtime);
@@ -129,8 +129,10 @@ public class DurableTaskCombinatorTests
     private static Dictionary<string, IScheduledTaskHandle> CreateHandles(
         params (string Name, DurableTaskResponse Response)[] responses)
         => responses.ToDictionary(
-            entry => entry.Name,
-            entry => CreateHandle($"root/{entry.Name}", _ => new ValueTask<DurableTaskResponse>(entry.Response)));
+            entry => $"named:{entry.Name.Length}:{entry.Name}:0",
+            entry => CreateHandle(
+                $"root/named:{entry.Name.Length}:{entry.Name}:0",
+                _ => new ValueTask<DurableTaskResponse>(entry.Response)));
 
     private static async ValueTask<DurableTaskResponse> RunAsync(
         DurableTask task,

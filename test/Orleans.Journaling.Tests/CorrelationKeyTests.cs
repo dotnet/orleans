@@ -134,7 +134,10 @@ public class CorrelationKeyTests
         var a = parent.CreateEscapedChildKey("baz/boz");
         var b = parent.CreateEscapedChildKey("baz\\/boz");
 
-        Assert.Equal(a, b);
+        Assert.NotEqual(a, b);
+        Assert.NotEqual(a.ToString(), b.ToString());
+        Assert.Equal(a, CorrelationKey.Parse(a.ToString(), provider: null));
+        Assert.Equal(b, CorrelationKey.Parse(b.ToString(), provider: null));
     }
 
     /// <summary>

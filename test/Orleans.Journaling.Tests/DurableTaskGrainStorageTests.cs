@@ -35,11 +35,31 @@ public class DurableTaskGrainStorageTests : JournalingTestBase
             new OrleansBinaryDurableDictionaryCommandCodec<TaskId, DurableTaskState>(keyCodec, valueCodec, SessionPool));
         await sut.Lifecycle.OnStart();
 
-        var storage = new DurableTaskGrainStorage(dictionary, sut.Manager, timeProvider ?? TimeProvider.System);
+        var storage = new DurableTaskGrainStorage(
+            dictionary,
+            sut.Manager,
+            timeProvider ?? TimeProvider.System,
+            ServiceProvider.GetRequiredService<DeepCopier<DurableTaskState>>());
         return (storage, sut.Manager, dictionary);
     }
 
     private static TaskId CreateTaskId(string value = "root-task") => TaskId.Parse(value, provider: null);
+
+    [Fact]
+    public async Task SetRemoteTarget_PersistsAcrossRecovery()
+    {
+        var (storage, manager, _) = await CreateSubject();
+        var taskId = CreateTaskId("remote-child");
+        var target = GrainId.Create("remote", "target");
+        var state = storage.GetOrCreateTask(taskId, request: null);
+
+        storage.SetRemoteTarget(taskId, state, target);
+        await manager.WriteStateAsync(CancellationToken.None);
+        await manager.RevertPendingChangesAsync(CancellationToken.None);
+
+        Assert.True(storage.TryGetTask(taskId, out var recovered));
+        Assert.Equal(target, recovered.RemoteTarget);
+    }
 
     // ---------------------------------------------------------------------
     // default(TaskId) validation - genuine delta vs. VolatileDurableTaskGrainStorage
@@ -235,7 +255,8 @@ public class DurableTaskGrainStorageTests : JournalingTestBase
 
         storage.RequestCancellation(taskId, state);
 
-        Assert.Equal(timeProvider.GetUtcNow(), state.CancellationRequestedAt);
+        Assert.True(storage.TryGetTask(taskId, out var updated));
+        Assert.Equal(timeProvider.GetUtcNow(), updated.CancellationRequestedAt);
     }
 
     [Fact]
@@ -247,16 +268,18 @@ public class DurableTaskGrainStorageTests : JournalingTestBase
         var state = storage.GetOrCreateTask(taskId, request: null);
 
         storage.RequestCancellation(taskId, state);
-        var firstCancellationTimestamp = state.CancellationRequestedAt;
+        Assert.True(storage.TryGetTask(taskId, out var canceled));
+        var firstCancellationTimestamp = canceled.CancellationRequestedAt;
         Assert.NotNull(firstCancellationTimestamp);
 
         timeProvider.Advance(TimeSpan.FromHours(1));
-        storage.RequestCancellation(taskId, state);
+        storage.RequestCancellation(taskId, canceled);
 
         // The second call must be a no-op: the original cancellation timestamp is preserved,
         // not overwritten with the advanced clock value.
-        Assert.Equal(firstCancellationTimestamp, state.CancellationRequestedAt);
-        Assert.NotEqual(timeProvider.GetUtcNow(), state.CancellationRequestedAt);
+        Assert.True(storage.TryGetTask(taskId, out var afterRetry));
+        Assert.Equal(firstCancellationTimestamp, afterRetry.CancellationRequestedAt);
+        Assert.NotEqual(timeProvider.GetUtcNow(), afterRetry.CancellationRequestedAt);
     }
 
     [Fact]
@@ -267,12 +290,14 @@ public class DurableTaskGrainStorageTests : JournalingTestBase
         var taskId = CreateTaskId();
         var state = storage.GetOrCreateTask(taskId, request: null);
         storage.SetResponse(taskId, state, DurableTaskResponse.FromResult(42));
-        Assert.True(state.CompletedAt.HasValue);
+        Assert.True(storage.TryGetTask(taskId, out var completed));
+        Assert.True(completed.CompletedAt.HasValue);
 
         timeProvider.Advance(TimeSpan.FromHours(1));
-        storage.RequestCancellation(taskId, state);
+        storage.RequestCancellation(taskId, completed);
 
-        Assert.Null(state.CancellationRequestedAt);
+        Assert.True(storage.TryGetTask(taskId, out var afterCancellation));
+        Assert.Null(afterCancellation.CancellationRequestedAt);
     }
 
     [Fact]
@@ -323,7 +348,7 @@ public class DurableTaskGrainStorageTests : JournalingTestBase
 
         var state = storage.GetOrCreateTask(taskId, request: null);
 
-        Assert.Same(seeded, state);
+        Assert.NotSame(seeded, state);
         Assert.Single(state.CompletionDestinations);
         Assert.Contains(observerGrainId, ((IDurableTaskState)state).CompletionDestinations);
         Assert.Empty(((DurableTaskState)state).LegacyObservers);
@@ -419,7 +444,11 @@ public class DurableTaskGrainStorageTests : JournalingTestBase
             sut.Manager,
             new OrleansBinaryDurableDictionaryCommandCodec<TaskId, DurableTaskState>(keyCodec, valueCodec, SessionPool));
         var spy = new SpyJournaledStateManager(sut.Manager);
-        var storage = new DurableTaskGrainStorage(dictionary, spy, TimeProvider.System);
+        var storage = new DurableTaskGrainStorage(
+            dictionary,
+            spy,
+            TimeProvider.System,
+            ServiceProvider.GetRequiredService<DeepCopier<DurableTaskState>>());
 
         // The manager's internal work loop is only started (lazily) by InitializeAsync/lifecycle OnStart - it
         // must run before WriteStateAsync's enqueued work item can ever be dequeued and completed, otherwise
@@ -443,7 +472,11 @@ public class DurableTaskGrainStorageTests : JournalingTestBase
             sut.Manager,
             new OrleansBinaryDurableDictionaryCommandCodec<TaskId, DurableTaskState>(keyCodec, valueCodec, SessionPool));
         var spy = new SpyJournaledStateManager(sut.Manager);
-        var storage = new DurableTaskGrainStorage(dictionary, spy, TimeProvider.System);
+        var storage = new DurableTaskGrainStorage(
+            dictionary,
+            spy,
+            TimeProvider.System,
+            ServiceProvider.GetRequiredService<DeepCopier<DurableTaskState>>());
 
         await storage.ReadAsync(CancellationToken.None);
 

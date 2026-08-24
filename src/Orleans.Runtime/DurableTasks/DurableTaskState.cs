@@ -47,10 +47,27 @@ public class DurableTaskState : IDurableTaskState
     [Id(7)]
     internal GrainId PendingCancellationDestination { get; set; }
 
+    [Id(8)]
+    internal GrainId RemoteTarget { get; set; }
+
+    [Id(9)]
+    internal bool IsCancellationTombstone { get; set; }
+
     IReadOnlySet<GrainId> IDurableTaskState.CompletionDestinations => CompletionDestinations;
     IDurableTaskRequest? IDurableTaskState.Request => Request;
     DateTimeOffset? IDurableTaskState.CompletedAt => CompletedAt;
     DateTimeOffset IDurableTaskState.CreatedAt => CreatedAt;
+    GrainId IDurableTaskState.RemoteTarget => RemoteTarget;
+    bool IDurableTaskState.IsCancellationTombstone
+    {
+        get => IsCancellationTombstone;
+        set => IsCancellationTombstone = value;
+    }
+    GrainId IDurableTaskState.PendingCancellationDestination
+    {
+        get => PendingCancellationDestination;
+        set => PendingCancellationDestination = value;
+    }
 
     internal bool MigrateLegacyObservers()
     {

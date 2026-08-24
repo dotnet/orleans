@@ -20,6 +20,9 @@ public interface IDurableTaskGrainStorage
 
     void AddCompletionDestination(TaskId taskId, IDurableTaskState state, GrainId destination);
     void ClearCompletionDestinations(TaskId taskId, IDurableTaskState state);
+    void SetRemoteTarget(TaskId taskId, IDurableTaskState state, GrainId target);
+    void SetPendingCancellationDestination(TaskId taskId, IDurableTaskState state, GrainId target);
+    void SetCancellationTombstone(TaskId taskId, IDurableTaskState state, bool value);
 
     bool TryGetTask(TaskId taskId, [NotNullWhen(true)] out IDurableTaskState? state);
 
@@ -27,6 +30,24 @@ public interface IDurableTaskGrainStorage
     bool RemoveTask(TaskId taskId);
     void Clear();
 
+    /// <summary>
+    /// Enlists the current working state in the next durable messaging commit on this async flow.
+    /// </summary>
+    /// <returns><see langword="true"/> when the storage snapshot was enlisted.</returns>
+    IDisposable? EnlistWithNextMessageCommit() => null;
+
+    /// <summary>
+    /// Gets a value indicating whether writes by activation journal participants include this storage.
+    /// </summary>
+    bool IsCommitIntegratedWithActivationJournal => false;
+
+    /// <summary>
+    /// Atomically commits task state together with durable messaging effects staged by the current activation.
+    /// </summary>
+    /// <remarks>
+    /// Implementations used with durable messaging must share its transaction boundary. Returning success guarantees
+    /// that both the task-state mutation and its staged invocation, completion, or cancellation envelopes are durable.
+    /// </remarks>
     ValueTask WriteAsync(CancellationToken cancellationToken);
     ValueTask ReadAsync(CancellationToken cancellationToken);
 }

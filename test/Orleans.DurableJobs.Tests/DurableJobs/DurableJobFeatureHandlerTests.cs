@@ -197,26 +197,117 @@ public class DurableJobFeatureHandlerTests
     {
         var isolation = new DurableJobTurnIsolation();
         isolation.Enable();
-        string priorOwner;
+        object priorOwners;
         using (var prior = await isolation.EnterOrdinaryAsync())
         {
             prior.Activate();
-            priorOwner = Assert.IsType<string>(RequestContext.Get(DurableJobTurnIsolation.RequestContextKey));
+            priorOwners = Assert.IsAssignableFrom<IReadOnlyDictionary<string, string>>(
+                RequestContext.Get(DurableJobTurnIsolation.RequestContextKey));
         }
 
         using var current = await isolation.EnterOrdinaryAsync();
         current.Activate();
-        var currentOwner = Assert.IsType<string>(RequestContext.Get(DurableJobTurnIsolation.RequestContextKey));
-        Assert.NotEqual(priorOwner, currentOwner);
-        RequestContext.Set(DurableJobTurnIsolation.RequestContextKey, priorOwner);
+        var currentOwners = Assert.IsAssignableFrom<IReadOnlyDictionary<string, string>>(
+            RequestContext.Get(DurableJobTurnIsolation.RequestContextKey));
+        Assert.NotEqual(
+            Assert.Single((IReadOnlyDictionary<string, string>)priorOwners).Value,
+            Assert.Single(currentOwners).Value);
+        RequestContext.Set(DurableJobTurnIsolation.RequestContextKey, priorOwners);
 
         var staleEntry = isolation.EnterOrdinaryAsync();
         Assert.False(staleEntry.IsCompleted);
 
-        RequestContext.Set(DurableJobTurnIsolation.RequestContextKey, currentOwner);
+        RequestContext.Set(DurableJobTurnIsolation.RequestContextKey, currentOwners);
         current.Dispose();
         using var admitted = await staleEntry.AsTask().WaitAsync(TimeSpan.FromSeconds(10));
         admitted.Activate();
+    }
+
+    [Fact]
+    public async Task TurnIsolation_NestedActivationCallChainRetainsEveryOwner()
+    {
+        var first = new DurableJobTurnIsolation();
+        var second = new DurableJobTurnIsolation();
+        first.Enable();
+        second.Enable();
+
+        using var firstLease = await first.EnterOrdinaryAsync();
+        firstLease.Activate();
+        using var secondLease = await second.EnterOrdinaryAsync();
+        secondLease.Activate();
+
+        var reentrantFirst = first.EnterOrdinaryAsync();
+        Assert.True(reentrantFirst.IsCompleted);
+        using var nested = await reentrantFirst;
+        Assert.True(nested.IsReentrant);
+    }
+
+    [Fact]
+    public async Task ExecutionLifetime_OnStopDrainsNonCooperativeHandlerAndStopsAdmission()
+    {
+        var lifetime = new DurableJobExecutionLifetime();
+        var release = new TaskCompletionSource<DurableJobRunResult>(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+        var execution = lifetime.Start(_ => release.Task);
+
+        var stop = lifetime.OnStop();
+        await Task.Yield();
+        Assert.False(stop.IsCompleted);
+        Assert.Throws<OperationCanceledException>(
+            () => { _ = lifetime.Start(_ => Task.FromResult(DurableJobRunResult.Completed)); });
+
+        release.SetResult(DurableJobRunResult.Completed);
+        Assert.Same(DurableJobRunResult.Completed, await execution);
+        await stop.WaitAsync(TimeSpan.FromSeconds(10));
+    }
+
+    [Theory]
+    [InlineData(DurableJobRunStatus.Completed)]
+    [InlineData(DurableJobRunStatus.InProgress)]
+    [InlineData(DurableJobRunStatus.Failed)]
+    [InlineData(DurableJobRunStatus.RescheduleRequested)]
+    public void StatusFlags_AreMutuallyExclusive_AcrossAllStatuses(DurableJobRunStatus status)
+    {
+        var result = status switch
+        {
+            DurableJobRunStatus.Completed => DurableJobRunResult.Completed,
+            DurableJobRunStatus.InProgress => DurableJobRunResult.InProgress(TimeSpan.FromSeconds(30)),
+            DurableJobRunStatus.Failed => DurableJobRunResult.Failed(new InvalidOperationException("boom")),
+            DurableJobRunStatus.RescheduleRequested => DurableJobRunResult.RescheduleAt(DateTimeOffset.UtcNow.AddMinutes(5)),
+            _ => throw new ArgumentOutOfRangeException(nameof(status), status, "Unexpected status."),
+        };
+
+        Assert.Equal(status, result.Status);
+
+        var trueFlagCount = (result.IsFailed ? 1 : 0) + (result.IsInProgress ? 1 : 0) + (result.IsRescheduleRequested ? 1 : 0);
+
+        switch (status)
+        {
+            case DurableJobRunStatus.Completed:
+                Assert.Equal(0, trueFlagCount);
+                Assert.False(result.IsFailed);
+                Assert.False(result.IsInProgress);
+                Assert.False(result.IsRescheduleRequested);
+                break;
+            case DurableJobRunStatus.InProgress:
+                Assert.Equal(1, trueFlagCount);
+                Assert.True(result.IsInProgress);
+                Assert.False(result.IsFailed);
+                Assert.False(result.IsRescheduleRequested);
+                break;
+            case DurableJobRunStatus.Failed:
+                Assert.Equal(1, trueFlagCount);
+                Assert.True(result.IsFailed);
+                Assert.False(result.IsInProgress);
+                Assert.False(result.IsRescheduleRequested);
+                break;
+            case DurableJobRunStatus.RescheduleRequested:
+                Assert.Equal(1, trueFlagCount);
+                Assert.True(result.IsRescheduleRequested);
+                Assert.False(result.IsFailed);
+                Assert.False(result.IsInProgress);
+                break;
+        }
     }
 
     private static DurableJobReceiverExtensionShared CreateShared() =>

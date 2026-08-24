@@ -199,10 +199,10 @@ public class DurableInboxExtensionTests : IClassFixture<DefaultClusterFixture>
 
             Assert.Equal(DeliveryStatus.Processed, result.Status);
             Assert.Equal("contoso", await handler.ObservedTenant.Task.WaitAsync(TimeSpan.FromSeconds(10)));
-            var observedOwner = Assert.IsType<string>(
+            var observedOwners = Assert.IsAssignableFrom<IReadOnlyDictionary<string, string>>(
                 await handler.ObservedTurnIsolation.Task.WaitAsync(TimeSpan.FromSeconds(10)));
-            Assert.NotEmpty(observedOwner);
-            Assert.NotEqual("sender-owner", observedOwner);
+            Assert.NotEmpty(observedOwners);
+            Assert.DoesNotContain("sender-owner", observedOwners.Values);
             Assert.Equal("outer", RequestContext.Get("tenant"));
             Assert.Equal("receiver-owner", RequestContext.Get(TurnIsolationRequestContextKey));
         }
@@ -513,6 +513,74 @@ public class DurableInboxExtensionTests : IClassFixture<DefaultClusterFixture>
     }
 
     [Fact]
+    public async Task OnStop_DrainsDeliveryAcceptedDuringAdmissionGateHandoff()
+    {
+        var stateManager = new TestStateManager { BlockNextWrite = true };
+        var extension = CreateInboxExtension(stateManager: stateManager);
+        var handler = new NonCooperativeHandler();
+        extension.RegisterHandler("test.route", handler);
+        var envelope = CreateTestEnvelope(
+            GrainId.Create("test", "handoff-sender"),
+            GrainId.Create("test", "handoff-receiver"),
+            "test.route",
+            "payload");
+
+        var delivery = extension.DeliverAsync(
+            envelope,
+            new DeliveryOptions { PollTimeout = TimeSpan.Zero },
+            CancellationToken.None).AsTask();
+        await stateManager.WriteStarted.Task.WaitAsync(TimeSpan.FromSeconds(10));
+        var stop = extension.OnStop();
+        stateManager.AllowWrite.SetResult();
+        await delivery.WaitAsync(TimeSpan.FromSeconds(10));
+        await stop.WaitAsync(TimeSpan.FromSeconds(10));
+        Assert.False(handler.Started.Task.IsCompleted);
+        Assert.Equal(1, extension.Count);
+    }
+
+    [Fact]
+    public void EnvelopeRequestContext_RejectsOversizedEntryCountAndValue()
+    {
+        var sessionPool = _fixture.Client.ServiceProvider.GetRequiredService<SerializerSessionPool>();
+        RequestContext.Clear();
+        try
+        {
+            for (var i = 0; i <= 32; i++)
+            {
+                RequestContext.Set($"key-{i}", i);
+            }
+
+            Assert.Throws<InvalidOperationException>(
+                () => new DurableEnvelopeBuilder(sessionPool, GrainId.Create("test", "sender"))
+                    .WithCurrentRequestContext());
+
+            RequestContext.Clear();
+            RequestContext.Set("large", new byte[(64 * 1024) + 1]);
+            Assert.Throws<InvalidOperationException>(
+                () => new DurableEnvelopeBuilder(sessionPool, GrainId.Create("test", "sender"))
+                    .WithCurrentRequestContext());
+        }
+        finally
+        {
+            RequestContext.Clear();
+        }
+    }
+
+    [Fact]
+    public void EnvelopeBuilder_RejectsReservedRequestContextKey()
+    {
+        var sessionPool = _fixture.Client.ServiceProvider.GetRequiredService<SerializerSessionPool>();
+
+        var exception = Assert.Throws<ArgumentException>(
+            () => new DurableEnvelopeBuilder(sessionPool, GrainId.Create("test", "sender"))
+                .WithContextValue(
+                    DurableEnvelopeBuilder.RequestContextKey,
+                    new Dictionary<string, object>()));
+
+        Assert.Equal("key", exception.ParamName);
+    }
+
+    [Fact]
     public async Task ProcessMessage_InvokesHandler()
     {
         // Arrange
@@ -617,8 +685,9 @@ public class DurableInboxExtensionTests : IClassFixture<DefaultClusterFixture>
         var coordinator = new DurableMessagingCommitCoordinator();
         var manager = new CoordinatedJournaledStateManager(inner, coordinator);
 
-        using (coordinator.BeginHandler())
+        using (var scope = await coordinator.BeginHandlerAsync(CancellationToken.None))
         {
+            scope.Activate();
             await manager.WriteStateAsync(CancellationToken.None);
             Assert.Equal(0, inner.WriteCount);
         }
@@ -628,40 +697,178 @@ public class DurableInboxExtensionTests : IClassFixture<DefaultClusterFixture>
     }
 
     [Fact]
-    public async Task UnrelatedBackgroundWrite_IsNotDeferredByActiveHandler()
+    public async Task UnrelatedMutation_IsRejectedWhileHandlerTransactionIsActive()
+    {
+        var coordinator = new DurableMessagingCommitCoordinator();
+        using var scope = await coordinator.BeginHandlerAsync(CancellationToken.None);
+        scope.Activate();
+
+        Task unrelated;
+        using (ExecutionContext.SuppressFlow())
+        {
+            unrelated = Task.Run(coordinator.ThrowIfMutationBlocked);
+        }
+        await Assert.ThrowsAsync<InvalidOperationException>(() => unrelated);
+
+        using var reentrant = coordinator.JoinReentrantScope();
+        coordinator.ThrowIfMutationBlocked();
+    }
+
+    [Fact]
+    public async Task UnrelatedBackgroundWrite_WaitsForActiveHandlerCommit()
     {
         var inner = new TestStateManager();
         var coordinator = new DurableMessagingCommitCoordinator();
         var manager = new CoordinatedJournaledStateManager(inner, coordinator);
         var release = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var waiting = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         var unrelatedWrite = Task.Run(async () =>
         {
             await release.Task;
-            await manager.WriteStateAsync(CancellationToken.None);
+            var write = manager.WriteStateAsync(CancellationToken.None);
+            waiting.SetResult();
+            await write;
         });
 
-        using (coordinator.BeginHandler())
-        {
-            await manager.WriteStateAsync(CancellationToken.None);
-            release.SetResult();
-            await unrelatedWrite;
-        }
+        using var scope = await coordinator.BeginHandlerAsync(CancellationToken.None);
+        scope.Activate();
+        await manager.WriteStateAsync(CancellationToken.None);
+        release.SetResult();
+        await waiting.Task.WaitAsync(TimeSpan.FromSeconds(10));
+        Assert.False(unrelatedWrite.IsCompleted);
 
+        scope.Complete();
+        await unrelatedWrite;
         Assert.Equal(1, inner.WriteCount);
     }
 
     [Fact]
-    public void HandlerOwnedDestructiveOperations_AreRejected()
+    public async Task UnrelatedBackgroundWrite_FailsWhenActiveHandlerRollsBack()
+    {
+        var coordinator = new DurableMessagingCommitCoordinator();
+        var manager = new CoordinatedJournaledStateManager(new TestStateManager(), coordinator);
+        var release = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var waiting = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var unrelatedWrite = Task.Run(async () =>
+        {
+            await release.Task;
+            var write = manager.WriteStateAsync(CancellationToken.None);
+            waiting.SetResult();
+            await write;
+        });
+
+        using (var scope = await coordinator.BeginHandlerAsync(CancellationToken.None))
+        {
+            scope.Activate();
+            release.SetResult();
+            await waiting.Task.WaitAsync(TimeSpan.FromSeconds(10));
+            Assert.False(unrelatedWrite.IsCompleted);
+        }
+
+        await Assert.ThrowsAsync<InvalidOperationException>(() => unrelatedWrite);
+    }
+
+    [Fact]
+    public async Task ReentrantCallChainWrite_JoinsActiveHandlerCommitScope()
+    {
+        var inner = new TestStateManager();
+        var coordinator = new DurableMessagingCommitCoordinator();
+        var manager = new CoordinatedJournaledStateManager(inner, coordinator);
+        var release = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var reentrantWrite = Task.Run(async () =>
+        {
+            await release.Task;
+            using var joined = coordinator.JoinReentrantScope();
+            await manager.WriteStateAsync(CancellationToken.None);
+        });
+
+        using (var scope = await coordinator.BeginHandlerAsync(CancellationToken.None))
+        {
+            scope.Activate();
+            release.SetResult();
+            await reentrantWrite;
+        }
+
+        Assert.Equal(0, inner.WriteCount);
+        await manager.WriteStateAsync(CancellationToken.None);
+        Assert.Equal(1, inner.WriteCount);
+    }
+
+    [Fact]
+    public async Task HandlerOwnedDestructiveOperations_AreRejected()
     {
         var coordinator = new DurableMessagingCommitCoordinator();
         var manager = new CoordinatedJournaledStateManager(new TestStateManager(), coordinator);
 
-        using var scope = coordinator.BeginHandler();
+        using var scope = await coordinator.BeginHandlerAsync(CancellationToken.None);
+        scope.Activate();
 
         Assert.Throws<InvalidOperationException>(
             () => manager.RevertPendingChangesAsync(CancellationToken.None));
         Assert.Throws<InvalidOperationException>(
             () => manager.DeleteStateAsync(CancellationToken.None));
+    }
+
+    [Fact]
+    public async Task CoordinatorOwnedCommitAndRollback_BypassHandlerDeferral()
+    {
+        var inner = new TestStateManager();
+        var coordinator = new DurableMessagingCommitCoordinator();
+        var manager = new CoordinatedJournaledStateManager(inner, coordinator);
+
+        using (var rollback = await coordinator.BeginHandlerAsync(CancellationToken.None))
+        {
+            rollback.Activate();
+            await manager.RollbackHandlerAsync(CancellationToken.None);
+        }
+        Assert.Equal(1, inner.RevertCount);
+
+        using (var commit = await coordinator.BeginHandlerAsync(CancellationToken.None))
+        {
+            commit.Activate();
+            await manager.CommitHandlerAsync(CancellationToken.None);
+            commit.Complete();
+        }
+        Assert.Equal(1, inner.WriteCount);
+    }
+
+    [Fact]
+    public async Task NextCommitParticipants_AreConsumedExactlyOnce()
+    {
+        var coordinator = new DurableMessagingCommitCoordinator();
+        var commits = 0;
+        coordinator.EnlistNextCommit(
+            commit: () => commits++,
+            rollback: static () => { });
+
+        await coordinator.ExecuteExclusiveAsync(
+            static () => ValueTask.CompletedTask,
+            CancellationToken.None);
+        await coordinator.ExecuteExclusiveAsync(
+            static () => ValueTask.CompletedTask,
+            CancellationToken.None);
+
+        Assert.Equal(1, commits);
+    }
+
+    [Fact]
+    public async Task HandlerCompletionParticipants_RunAfterMutationGuardIsReleased()
+    {
+        var coordinator = new DurableMessagingCommitCoordinator();
+        using var scope = await coordinator.BeginHandlerAsync(CancellationToken.None);
+        scope.Activate();
+        var callbackRan = false;
+        Assert.True(coordinator.TryEnlist(
+            commit: () =>
+            {
+                coordinator.ThrowIfMutationBlocked();
+                callbackRan = true;
+            },
+            rollback: static () => { }));
+
+        scope.Complete();
+
+        Assert.True(callbackRan);
     }
 
     [Theory]
@@ -886,6 +1093,11 @@ public class DurableInboxExtensionTests : IClassFixture<DefaultClusterFixture>
     {
         public int WriteCount { get; private set; }
         public int RevertCount { get; private set; }
+        public bool BlockNextWrite { get; set; }
+        public TaskCompletionSource WriteStarted { get; } =
+            new(TaskCreationOptions.RunContinuationsAsynchronously);
+        public TaskCompletionSource AllowWrite { get; } =
+            new(TaskCreationOptions.RunContinuationsAsynchronously);
 
         public ValueTask InitializeAsync(CancellationToken cancellationToken = default) => ValueTask.CompletedTask;
 
@@ -897,10 +1109,15 @@ public class DurableInboxExtensionTests : IClassFixture<DefaultClusterFixture>
             return false;
         }
 
-        public ValueTask WriteStateAsync(CancellationToken cancellationToken = default)
+        public async ValueTask WriteStateAsync(CancellationToken cancellationToken = default)
         {
             WriteCount++;
-            return ValueTask.CompletedTask;
+            if (BlockNextWrite)
+            {
+                BlockNextWrite = false;
+                WriteStarted.SetResult();
+                await AllowWrite.Task.WaitAsync(cancellationToken);
+            }
         }
 
         public ValueTask RevertPendingChangesAsync(CancellationToken cancellationToken = default)

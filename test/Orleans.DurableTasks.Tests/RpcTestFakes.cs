@@ -83,6 +83,9 @@ internal sealed class RpcTestDurableTaskState : IDurableTaskState
     public DateTimeOffset? CompletedAt { get; set; }
     public DateTimeOffset? CancellationRequestedAt { get; set; }
     public DateTimeOffset CreatedAt { get; set; }
+    public GrainId RemoteTarget { get; set; }
+    public bool IsCancellationTombstone { get; set; }
+    public GrainId PendingCancellationDestination { get; set; }
 
     internal void AddDestination(GrainId destination) => _completionDestinations.Add(destination);
     internal void ClearDestinations() => _completionDestinations.Clear();
@@ -138,6 +141,15 @@ internal sealed class RpcTestDurableTaskGrainStorage : IDurableTaskGrainStorage
 
     public void ClearCompletionDestinations(TaskId taskId, IDurableTaskState state) =>
         ((RpcTestDurableTaskState)state).ClearDestinations();
+
+    public void SetRemoteTarget(TaskId taskId, IDurableTaskState state, GrainId target) =>
+        ((RpcTestDurableTaskState)state).RemoteTarget = target;
+
+    public void SetPendingCancellationDestination(TaskId taskId, IDurableTaskState state, GrainId target) =>
+        ((RpcTestDurableTaskState)state).PendingCancellationDestination = target;
+
+    public void SetCancellationTombstone(TaskId taskId, IDurableTaskState state, bool value) =>
+        ((RpcTestDurableTaskState)state).IsCancellationTombstone = value;
 
     public bool TryGetTask(TaskId taskId, [NotNullWhen(true)] out IDurableTaskState? state)
     {
