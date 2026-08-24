@@ -226,7 +226,7 @@ public sealed class StreamingDiagnosticObserver : IDisposable
     }
 
     /// <summary>
-    /// Waits for a specific number of individual items to be delivered on a stream and then
+    /// Waits for messages containing a specific number of items to be delivered on a stream and then
     /// for that stream to report a cursor-drained transition afterward.
     /// </summary>
     public async Task WaitForItemDeliveryAndCursorDrainAsync(StreamId streamId, int expectedCount, string? streamProvider, CancellationToken cancellationToken)
@@ -234,13 +234,13 @@ public sealed class StreamingDiagnosticObserver : IDisposable
         await _events
             .Where(e => e switch
             {
-                StreamingEvents.ItemDelivered item => MatchesStream(item.StreamId, item.StreamProvider, streamId, streamProvider),
+                StreamingEvents.MessageDelivered message => MatchesStream(message.StreamId, message.StreamProvider, streamId, streamProvider),
                 StreamingEvents.ConsumerCursorDrained drained => MatchesStream(drained.StreamId, drained.StreamProvider, streamId, streamProvider),
                 _ => false,
             })
             .Scan((DeliveredCount: 0, Drained: false), (state, evt) => evt switch
             {
-                StreamingEvents.ItemDelivered => (state.DeliveredCount + 1, state.Drained),
+                StreamingEvents.MessageDelivered message => (state.DeliveredCount + message.Batch.GetEvents<object>().Count(), state.Drained),
                 StreamingEvents.ConsumerCursorDrained when state.DeliveredCount >= expectedCount => (state.DeliveredCount, true),
                 _ => state,
             })
@@ -250,7 +250,7 @@ public sealed class StreamingDiagnosticObserver : IDisposable
     }
 
     /// <summary>
-    /// Waits for a specific number of individual items to be delivered to a particular subscription and then
+    /// Waits for messages containing a specific number of items to be delivered to a particular subscription and then
     /// for that subscription's cursor-drained transition to be reported.
     /// </summary>
     public async Task WaitForItemDeliveryAndCursorDrainAsync(StreamId streamId, Guid subscriptionId, int expectedCount, string? streamProvider, CancellationToken cancellationToken)
@@ -258,13 +258,13 @@ public sealed class StreamingDiagnosticObserver : IDisposable
         await _events
             .Where(e => e switch
             {
-                StreamingEvents.ItemDelivered item => MatchesSubscription(item.StreamId, item.SubscriptionId, item.StreamProvider, streamId, subscriptionId, streamProvider),
+                StreamingEvents.MessageDelivered message => MatchesSubscription(message.StreamId, message.SubscriptionId, message.StreamProvider, streamId, subscriptionId, streamProvider),
                 StreamingEvents.ConsumerCursorDrained drained => MatchesSubscription(drained.StreamId, drained.SubscriptionId, drained.StreamProvider, streamId, subscriptionId, streamProvider),
                 _ => false,
             })
             .Scan((DeliveredCount: 0, Drained: false), (state, evt) => evt switch
             {
-                StreamingEvents.ItemDelivered => (state.DeliveredCount + 1, state.Drained),
+                StreamingEvents.MessageDelivered message => (state.DeliveredCount + message.Batch.GetEvents<object>().Count(), state.Drained),
                 StreamingEvents.ConsumerCursorDrained when state.DeliveredCount >= expectedCount => (state.DeliveredCount, true),
                 _ => state,
             })

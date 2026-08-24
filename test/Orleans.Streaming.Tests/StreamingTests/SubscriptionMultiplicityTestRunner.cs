@@ -184,12 +184,14 @@ public class SubscriptionMultiplicityTestRunner
         await WarmUpColdStreamAsync(
             producer,
             this.testCluster.Client!,
+            streamId,
             cts.Token,
             (consumer, firstSubscriptionHandle.HandleId),
             (consumer, secondSubscriptionHandle.HandleId));
         var produced = await ProduceUntilConsumedAsync(
             producer,
             this.testCluster.Client!,
+            streamId,
             cts.Token,
             EventCountPerPhase,
             (consumer, firstSubscriptionHandle.HandleId),
@@ -215,8 +217,8 @@ public class SubscriptionMultiplicityTestRunner
         // setup one subscription and send messsages
         StreamSubscriptionHandle<int> firstSubscriptionHandle = null!;
         await WaitForSubscriptionRegisteredAsync(streamId, async () => firstSubscriptionHandle = await consumer.BecomeConsumer(streamGuid, streamNamespace, streamProviderName), cts.Token);
-        await WarmUpColdStreamAsync(producer, this.testCluster.Client!, cts.Token, (consumer, firstSubscriptionHandle.HandleId));
-        var produced = await ProduceUntilConsumedAsync(producer, this.testCluster.Client!, cts.Token, EventCountPerPhase, (consumer, firstSubscriptionHandle.HandleId));
+        await WarmUpColdStreamAsync(producer, this.testCluster.Client!, streamId, cts.Token, (consumer, firstSubscriptionHandle.HandleId));
+        var produced = await ProduceUntilConsumedAsync(producer, this.testCluster.Client!, streamId, cts.Token, EventCountPerPhase, (consumer, firstSubscriptionHandle.HandleId));
         await AssertCountersAsync(producer, consumer, produced, 1);
 
         // clear counts
@@ -228,8 +230,8 @@ public class SubscriptionMultiplicityTestRunner
         // setup second subscription and send messages
         StreamSubscriptionHandle<int> secondSubscriptionHandle = null!;
         await WaitForSubscriptionRegisteredAsync(streamId, async () => secondSubscriptionHandle = await consumer.BecomeConsumer(streamGuid, streamNamespace, streamProviderName), cts.Token);
-        await WarmUpColdStreamAsync(producer, this.testCluster.Client!, cts.Token, (consumer, secondSubscriptionHandle.HandleId));
-        produced = await ProduceUntilConsumedAsync(producer, this.testCluster.Client!, cts.Token, EventCountPerPhase, (consumer, secondSubscriptionHandle.HandleId));
+        await WarmUpColdStreamAsync(producer, this.testCluster.Client!, streamId, cts.Token, (consumer, secondSubscriptionHandle.HandleId));
+        produced = await ProduceUntilConsumedAsync(producer, this.testCluster.Client!, streamId, cts.Token, EventCountPerPhase, (consumer, secondSubscriptionHandle.HandleId));
         await AssertCountersAsync(producer, consumer, produced, 1);
 
         // remove second subscription
@@ -250,8 +252,8 @@ public class SubscriptionMultiplicityTestRunner
         // setup one subscription and send messsages
         StreamSubscriptionHandle<int> firstSubscriptionHandle = null!;
         await WaitForSubscriptionRegisteredAsync(streamId, async () => firstSubscriptionHandle = await consumer.BecomeConsumer(streamGuid, streamNamespace, streamProviderName), cts.Token);
-        await WarmUpColdStreamAsync(producer, this.testCluster.Client!, cts.Token, (consumer, firstSubscriptionHandle.HandleId));
-        var produced = await ProduceUntilConsumedAsync(producer, this.testCluster.Client!, cts.Token, EventCountPerPhase, (consumer, firstSubscriptionHandle.HandleId));
+        await WarmUpColdStreamAsync(producer, this.testCluster.Client!, streamId, cts.Token, (consumer, firstSubscriptionHandle.HandleId));
+        var produced = await ProduceUntilConsumedAsync(producer, this.testCluster.Client!, streamId, cts.Token, EventCountPerPhase, (consumer, firstSubscriptionHandle.HandleId));
         await AssertCountersAsync(producer, consumer, produced, 1);
 
         // clear counts
@@ -264,12 +266,14 @@ public class SubscriptionMultiplicityTestRunner
         await WarmUpColdStreamAsync(
             producer,
             this.testCluster.Client!,
+            streamId,
             cts.Token,
             (consumer, firstSubscriptionHandle.HandleId),
             (consumer, secondSubscriptionHandle.HandleId));
         produced = await ProduceUntilConsumedAsync(
             producer,
             this.testCluster.Client!,
+            streamId,
             cts.Token,
             EventCountPerPhase,
             (consumer, firstSubscriptionHandle.HandleId),
@@ -283,7 +287,7 @@ public class SubscriptionMultiplicityTestRunner
         // remove first subscription and send messages
         await WaitForSubscriptionDetachedAsync(streamId, async () => await consumer.StopConsuming(firstSubscriptionHandle), cts.Token);
 
-        produced = await ProduceUntilConsumedAsync(producer, this.testCluster.Client!, cts.Token, EventCountPerPhase, (consumer, secondSubscriptionHandle.HandleId));
+        produced = await ProduceUntilConsumedAsync(producer, this.testCluster.Client!, streamId, cts.Token, EventCountPerPhase, (consumer, secondSubscriptionHandle.HandleId));
         await AssertCountersAsync(producer, consumer, produced, 1);
 
         // remove second subscription
@@ -304,8 +308,8 @@ public class SubscriptionMultiplicityTestRunner
         // setup one subscription and send messsages
         StreamSubscriptionHandle<int> firstSubscriptionHandle = null!;
         await WaitForSubscriptionRegisteredAsync(streamId, async () => firstSubscriptionHandle = await consumer.BecomeConsumer(streamGuid, streamNamespace, streamProviderName), cts.Token);
-        await WarmUpColdStreamAsync(producer, this.testCluster.Client!, cts.Token, (consumer, firstSubscriptionHandle.HandleId));
-        var produced = await ProduceUntilConsumedAsync(producer, this.testCluster.Client!, cts.Token, EventCountPerPhase, (consumer, firstSubscriptionHandle.HandleId));
+        await WarmUpColdStreamAsync(producer, this.testCluster.Client!, streamId, cts.Token, (consumer, firstSubscriptionHandle.HandleId));
+        var produced = await ProduceUntilConsumedAsync(producer, this.testCluster.Client!, streamId, cts.Token, EventCountPerPhase, (consumer, firstSubscriptionHandle.HandleId));
         await AssertCountersAsync(producer, consumer, produced, 1);
 
         // Resume
@@ -314,7 +318,7 @@ public class SubscriptionMultiplicityTestRunner
 
         Assert.Equal(firstSubscriptionHandle, resumeHandle);
 
-        produced = await ProduceUntilConsumedAsync(producer, this.testCluster.Client!, cts.Token, EventCountPerPhase, false, (consumer, resumeHandle.HandleId));
+        produced = await ProduceUntilConsumedAsync(producer, this.testCluster.Client!, streamId, cts.Token, EventCountPerPhase, false, (consumer, resumeHandle.HandleId));
         await AssertCountersAsync(producer, consumer, produced, 1);
 
         // remove subscription
@@ -336,8 +340,8 @@ public class SubscriptionMultiplicityTestRunner
         // setup one subscription and send messsages
         StreamSubscriptionHandle<int> firstSubscriptionHandle = null!;
         await WaitForSubscriptionRegisteredAsync(streamId, async () => firstSubscriptionHandle = await consumer.BecomeConsumer(streamGuid, streamNamespace, streamProviderName), cts.Token);
-        await WarmUpColdStreamAsync(producer, this.testCluster.Client!, cts.Token, (consumer, firstSubscriptionHandle.HandleId));
-        var produced = await ProduceUntilConsumedAsync(producer, this.testCluster.Client!, cts.Token, EventCountPerPhase, (consumer, firstSubscriptionHandle.HandleId));
+        await WarmUpColdStreamAsync(producer, this.testCluster.Client!, streamId, cts.Token, (consumer, firstSubscriptionHandle.HandleId));
+        var produced = await ProduceUntilConsumedAsync(producer, this.testCluster.Client!, streamId, cts.Token, EventCountPerPhase, (consumer, firstSubscriptionHandle.HandleId));
         await AssertCountersAsync(producer, consumer, produced, 1);
 
         // Deactivate grain
@@ -353,7 +357,7 @@ public class SubscriptionMultiplicityTestRunner
 
         Assert.Equal(firstSubscriptionHandle, resumeHandle);
 
-        produced = await ProduceUntilConsumedAsync(producer, this.testCluster.Client!, cts.Token, EventCountPerPhase, (consumer, resumeHandle.HandleId));
+        produced = await ProduceUntilConsumedAsync(producer, this.testCluster.Client!, streamId, cts.Token, EventCountPerPhase, (consumer, resumeHandle.HandleId));
         await AssertCountersAsync(producer, consumer, produced, 1);
 
         // remove subscription
@@ -425,8 +429,8 @@ public class SubscriptionMultiplicityTestRunner
 
         StreamSubscriptionHandle<int> handle = null!;
         await WaitForSubscriptionRegisteredAsync(streamId1, async () => handle = await consumer.BecomeConsumer(streamGuid, streamNamespace1, streamProviderName), cts.Token);
-        await WarmUpColdStreamAsync(producer, this.testCluster.Client!, cts.Token, (consumer, handle.HandleId));
-        var produced = await ProduceUntilConsumedAsync(producer, this.testCluster.Client!, cts.Token, EventCountPerPhase, (consumer, handle.HandleId));
+        await WarmUpColdStreamAsync(producer, this.testCluster.Client!, streamId1, cts.Token, (consumer, handle.HandleId));
+        var produced = await ProduceUntilConsumedAsync(producer, this.testCluster.Client!, streamId1, cts.Token, EventCountPerPhase, (consumer, handle.HandleId));
         await AssertCountersAsync(producer, consumer, produced, 1);
 
         // send some events on second stream /////////////////////////////
@@ -438,12 +442,12 @@ public class SubscriptionMultiplicityTestRunner
 
         StreamSubscriptionHandle<int> handle2 = null!;
         await WaitForSubscriptionRegisteredAsync(streamId2, async () => handle2 = await consumer2.BecomeConsumer(streamGuid, streamNamespace2, streamProviderName), cts.Token);
-        await WarmUpColdStreamAsync(producer2, this.testCluster.Client!, cts.Token, (consumer2, handle2.HandleId));
-        var produced2 = await ProduceUntilConsumedAsync(producer2, this.testCluster.Client!, cts.Token, EventCountPerPhase, (consumer2, handle2.HandleId));
+        await WarmUpColdStreamAsync(producer2, this.testCluster.Client!, streamId2, cts.Token, (consumer2, handle2.HandleId));
+        var produced2 = await ProduceUntilConsumedAsync(producer2, this.testCluster.Client!, streamId2, cts.Token, EventCountPerPhase, (consumer2, handle2.HandleId));
         await AssertCountersAsync(producer2, consumer2, produced2, 1);
 
         // send some events on first stream again /////////////////////////////
-        produced = await ProduceUntilConsumedAsync(producer, this.testCluster.Client!, cts.Token, EventCountPerPhase, false, (consumer, handle.HandleId));
+        produced = await ProduceUntilConsumedAsync(producer, this.testCluster.Client!, streamId1, cts.Token, EventCountPerPhase, false, (consumer, handle.HandleId));
         await AssertCountersAsync(producer, consumer, produced, 1);
 
         await consumer.StopConsuming(handle);
@@ -493,13 +497,14 @@ public class SubscriptionMultiplicityTestRunner
         }
     }
 
-    private static Task<int> ProduceUntilConsumedAsync(
+    private Task<int> ProduceUntilConsumedAsync(
         ISampleStreaming_ProducerGrain producer,
         IGrainFactory grainFactory,
+        StreamId streamId,
         CancellationToken cancellationToken,
         int target,
         params (IMultipleSubscriptionConsumerGrain Consumer, Guid HandleId)[] waits)
-        => ProduceUntilConsumedAsync(producer, grainFactory, cancellationToken, target, true, waits);
+        => ProduceUntilConsumedAsync(producer, grainFactory, streamId, cancellationToken, target, true, waits);
 
     private static async Task WaitForConsumerCountsAsync(
         IGrainFactory grainFactory,
@@ -549,9 +554,10 @@ public class SubscriptionMultiplicityTestRunner
         }
     }
 
-    private static async Task<int> ProduceUntilConsumedAsync(
+    private async Task<int> ProduceUntilConsumedAsync(
         ISampleStreaming_ProducerGrain producer,
         IGrainFactory grainFactory,
+        StreamId streamId,
         CancellationToken cancellationToken,
         int target,
         bool resetCounts = true,
@@ -567,6 +573,7 @@ public class SubscriptionMultiplicityTestRunner
             await producer.ClearNumberProduced();
         }
 
+        using var deliveryObserver = StreamingDiagnosticObserver.Create();
         await ProduceExactCountAsync(producer, target);
         var produced = await producer.GetNumberProduced();
 
@@ -581,6 +588,8 @@ public class SubscriptionMultiplicityTestRunner
                 $"Timed out waiting for consumers to reach produced count {produced}. Current produced={currentProduced}. {exception.Message}",
                 exception);
         }
+
+        await WaitForConsumerCursorsDrainedAsync(deliveryObserver, streamId, target, cancellationToken, waits);
 
         return produced;
     }
@@ -619,7 +628,7 @@ public class SubscriptionMultiplicityTestRunner
         return produced;
     }
 
-    private static async Task WaitForConsumersToCatchUpAsync(
+    private static async Task<int> WaitForConsumersToCatchUpAsync(
         ISampleStreaming_ProducerGrain producer,
         IGrainFactory grainFactory,
         CancellationToken cancellationToken,
@@ -633,7 +642,7 @@ public class SubscriptionMultiplicityTestRunner
             var confirmedProduced = await producer.GetNumberProduced();
             if (confirmedProduced == produced)
             {
-                return;
+                return produced;
             }
         }
     }
@@ -656,9 +665,10 @@ public class SubscriptionMultiplicityTestRunner
         }
     }
 
-    private static async Task WarmUpColdStreamAsync(
+    private async Task WarmUpColdStreamAsync(
         ISampleStreaming_ProducerGrain producer,
         IGrainFactory grainFactory,
+        StreamId streamId,
         CancellationToken cancellationToken,
         params (IMultipleSubscriptionConsumerGrain Consumer, Guid HandleId)[] waits)
     {
@@ -668,6 +678,7 @@ public class SubscriptionMultiplicityTestRunner
         }
 
         await producer.ClearNumberProduced();
+        using var deliveryObserver = StreamingDiagnosticObserver.Create();
         await producer.StartPeriodicProducing();
         try
         {
@@ -678,7 +689,8 @@ public class SubscriptionMultiplicityTestRunner
             await producer.StopPeriodicProducing().ConfigureAwait(ConfigureAwaitOptions.SuppressThrowing | ConfigureAwaitOptions.ContinueOnCapturedContext);
         }
 
-        await WaitForConsumersToCatchUpAsync(producer, grainFactory, cancellationToken, waits);
+        var produced = await WaitForConsumersToCatchUpAsync(producer, grainFactory, cancellationToken, waits);
+        await WaitForConsumerCursorsDrainedAsync(deliveryObserver, streamId, produced, cancellationToken, waits);
 
         foreach (var consumer in waits.Select(wait => wait.Consumer).Distinct())
         {
@@ -687,6 +699,19 @@ public class SubscriptionMultiplicityTestRunner
 
         await producer.ClearNumberProduced();
     }
+
+    private Task WaitForConsumerCursorsDrainedAsync(
+        StreamingDiagnosticObserver observer,
+        StreamId streamId,
+        int expectedCount,
+        CancellationToken cancellationToken,
+        params (IMultipleSubscriptionConsumerGrain Consumer, Guid HandleId)[] waits)
+        => Task.WhenAll(waits.Select(wait => observer.WaitForItemDeliveryAndCursorDrainAsync(
+            streamId,
+            wait.HandleId,
+            expectedCount,
+            streamProviderName,
+            cancellationToken)));
 
     private static async Task WarmUpColdClientStreamAsync(
         ISampleStreaming_ProducerGrain producer,
