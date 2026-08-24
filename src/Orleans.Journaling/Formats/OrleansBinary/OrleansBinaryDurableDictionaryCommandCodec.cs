@@ -123,8 +123,8 @@ internal sealed class OrleansBinaryDurableDictionaryCommandCodec<TKey, TValue>(
         consumer.Reset(count);
         for (var i = 0; i < count; i++)
         {
-            var key = OrleansBinaryCommandCodecHelpers.ReadValue(keyCodec, ref reader);
-            var value = OrleansBinaryCommandCodecHelpers.ReadValue(valueCodec, ref reader);
+            var key = OrleansBinaryCommandCodecHelpers.ReadIndependentValue(keyCodec, ref reader);
+            var value = OrleansBinaryCommandCodecHelpers.ReadIndependentValue(valueCodec, ref reader);
             consumer.ApplySet(key, value);
         }
     }
