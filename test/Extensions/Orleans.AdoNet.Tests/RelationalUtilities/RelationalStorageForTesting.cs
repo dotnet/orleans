@@ -193,7 +193,7 @@ namespace UnitTests.General
         /// <param name="setupScript">the script. usually CreateOrleansTables_xxxx.sql</param>
         /// <param name="dataBaseName">the target database to be populated</param>
         /// <returns></returns>
-        private async Task ExecuteSetupScript(string setupScript, string dataBaseName)
+        protected virtual async Task ExecuteSetupScript(string setupScript, string dataBaseName)
         {
             var splitScripts = ConvertToExecutableBatches(setupScript, dataBaseName);
             foreach (var script in splitScripts)

@@ -31,63 +31,64 @@ namespace UnitTests.General
 
         protected override async Task WaitForDatabaseReadyAsync()
         {
-            const int maxAttempts = 3;
             var databaseConnectionStringBuilder = new SqlConnectionStringBuilder(CurrentConnectionString)
             {
                 Pooling = false,
                 ConnectTimeout = 5
             };
 
-            for (var attempt = 1; ; attempt++)
-            {
-                try
-                {
-                    await using var connection = new SqlConnection(databaseConnectionStringBuilder.ConnectionString);
-                    await connection.OpenAsync();
-                    await using var command = connection.CreateCommand();
-                    command.CommandText = "SELECT 1";
-                    command.CommandTimeout = 5;
-                    _ = await command.ExecuteScalarAsync();
-                }
-                catch (SqlException exception) when (exception.Number == 18456 && exception.State == 1 && attempt < maxAttempts)
-                {
-                    await Task.Delay(TimeSpan.FromMilliseconds(250));
-                    continue;
-                }
+            await using var connection = new SqlConnection(databaseConnectionStringBuilder.ConnectionString);
+            await OpenConnectionAsync(connection);
+            await using var command = connection.CreateCommand();
+            command.CommandText = "SELECT 1";
+            command.CommandTimeout = 5;
+            _ = await command.ExecuteScalarAsync();
+        }
 
-                break;
-            }
+        protected override Task ExecuteSetupScript(string setupScript, string dataBaseName) =>
+            ExecuteSetupScriptBatchesAsync(ConvertToExecutableBatches(setupScript, dataBaseName), dataBaseName);
 
-            // The first schema batch enables snapshot isolation and requires exclusive database access.
-            var administrativeConnectionStringBuilder = new SqlConnectionStringBuilder(CurrentConnectionString)
+        internal async Task ExecuteSetupScriptBatchesAsync(IEnumerable<string> scripts, string databaseName)
+        {
+            var connectionStringBuilder = new SqlConnectionStringBuilder(CurrentConnectionString)
             {
-                InitialCatalog = "master",
                 Pooling = false,
                 ConnectTimeout = 5
             };
 
-            await using var administrativeConnection = new SqlConnection(administrativeConnectionStringBuilder.ConnectionString);
-            await administrativeConnection.OpenAsync();
-            await using var readinessCommand = administrativeConnection.CreateCommand();
-            readinessCommand.CommandText = """
-                DECLARE @DatabaseId INT = DB_ID(@DatabaseName);
-                WHILE EXISTS
-                (
-                    SELECT 1
-                    FROM sys.dm_exec_sessions
-                    WHERE database_id = @DatabaseId
-                      AND session_id <> @@SPID
-                )
-                BEGIN
-                    WAITFOR DELAY '00:00:00.050';
-                END;
-                """;
-            readinessCommand.CommandTimeout = 30;
-            readinessCommand.Parameters.AddWithValue("DatabaseName", databaseConnectionStringBuilder.InitialCatalog);
-            await readinessCommand.ExecuteNonQueryAsync();
+            await using var connection = new SqlConnection(connectionStringBuilder.ConnectionString);
+            await OpenConnectionAsync(connection);
+
+            using var commandBuilder = new SqlCommandBuilder();
+            var quotedDatabaseName = commandBuilder.QuoteIdentifier(databaseName);
+            var hasExclusiveAccess = false;
+            try
+            {
+                await ExecuteCommandAsync(
+                    connection,
+                    $"ALTER DATABASE {quotedDatabaseName} SET SINGLE_USER WITH ROLLBACK IMMEDIATE;");
+                hasExclusiveAccess = true;
+
+                foreach (var script in scripts)
+                {
+                    await ExecuteCommandAsync(connection, script);
+                }
+            }
+            finally
+            {
+                if (hasExclusiveAccess)
+                {
+                    await ExecuteCommandAsync(
+                        connection,
+                        $"ALTER DATABASE {quotedDatabaseName} SET MULTI_USER;");
+
+                    using var pooledConnection = new SqlConnection(CurrentConnectionString);
+                    SqlConnection.ClearPool(pooledConnection);
+                }
+            }
         }
 
-        protected override async Task ExecuteSetupScriptBatchAsync(string script)
+        private static async Task OpenConnectionAsync(SqlConnection connection)
         {
             const int maxAttempts = 10;
 
@@ -95,16 +96,22 @@ namespace UnitTests.General
             {
                 try
                 {
-                    await base.ExecuteSetupScriptBatchAsync(script);
+                    await connection.OpenAsync();
                     return;
                 }
                 catch (SqlException exception) when (exception.Number == 18456 && exception.State == 1 && attempt < maxAttempts)
                 {
-                    using var connection = new SqlConnection(CurrentConnectionString);
                     SqlConnection.ClearPool(connection);
                     await Task.Delay(TimeSpan.FromMilliseconds(500));
                 }
             }
+        }
+
+        private static async Task ExecuteCommandAsync(SqlConnection connection, string script)
+        {
+            await using var command = connection.CreateCommand();
+            command.CommandText = script;
+            await command.ExecuteNonQueryAsync();
         }
 
         public override string CancellationTestQuery { get { return "WAITFOR DELAY '00:00:010'; SELECT 1; "; } }
