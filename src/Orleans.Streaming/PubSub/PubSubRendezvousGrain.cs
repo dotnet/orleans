@@ -243,32 +243,11 @@ namespace Orleans.Streams
                 membershipSnapshot = _clusterMembershipService.CurrentSnapshot;
             }
 
-            var statuses = new Dictionary<SiloAddress, SiloStatus>();
-            HashSet<SiloAddress>? unversionedSilos = null;
-            foreach (var (siloAddress, version) in siloMembershipVersions)
-            {
-                if (HasMembershipVersion(version))
-                {
-                    statuses.Add(siloAddress, membershipSnapshot.GetSiloStatus(siloAddress, version));
-                }
-                else
-                {
-                    unversionedSilos ??= [];
-                    unversionedSilos.Add(siloAddress);
-                }
-            }
-
-            if (unversionedSilos is not null)
-            {
-                var unversionedStatuses = await _unknownSiloStatusCache.GetSiloStatuses(
-                    membershipSnapshot,
-                    unversionedSilos,
-                    CancellationToken.None);
-                foreach (var (siloAddress, status) in unversionedStatuses)
-                {
-                    statuses.Add(siloAddress, status);
-                }
-            }
+            var statuses = await GetSiloStatuses(
+                membershipSnapshot,
+                siloMembershipVersions,
+                _unknownSiloStatusCache.ValidateSiloStatuses,
+                cancellationToken);
 
             List<PubSubPublisherState>? removedProducers = null;
             if (systemTargetProducers is not null)
@@ -311,6 +290,51 @@ namespace Orleans.Streams
 
         internal static bool HasMembershipVersion(MembershipVersion membershipVersion) =>
             membershipVersion != PubSubPublisherState.UnknownMembershipVersion;
+
+        internal static async ValueTask<Dictionary<SiloAddress, SiloStatus>> GetSiloStatuses(
+            ClusterMembershipSnapshot membershipSnapshot,
+            IReadOnlyDictionary<SiloAddress, MembershipVersion> siloMembershipVersions,
+            Func<
+                ClusterMembershipSnapshot,
+                IReadOnlySet<SiloAddress>,
+                CancellationToken,
+                ValueTask<UnknownSiloStatusCache.SiloStatusValidationResult>> validateUnknownSilos,
+            CancellationToken cancellationToken)
+        {
+            var statuses = new Dictionary<SiloAddress, SiloStatus>();
+            HashSet<SiloAddress>? unversionedSilos = null;
+            foreach (var (siloAddress, version) in siloMembershipVersions)
+            {
+                if (!HasMembershipVersion(version))
+                {
+                    unversionedSilos ??= [];
+                    unversionedSilos.Add(siloAddress);
+                }
+            }
+
+            if (unversionedSilos is not null)
+            {
+                var validation = await validateUnknownSilos(
+                    membershipSnapshot,
+                    unversionedSilos,
+                    cancellationToken);
+                membershipSnapshot = validation.Snapshot;
+                foreach (var (siloAddress, status) in validation.Statuses)
+                {
+                    statuses.Add(siloAddress, status);
+                }
+            }
+
+            foreach (var (siloAddress, version) in siloMembershipVersions)
+            {
+                if (HasMembershipVersion(version))
+                {
+                    statuses[siloAddress] = membershipSnapshot.GetSiloStatus(siloAddress, version);
+                }
+            }
+
+            return statuses;
+        }
 
         internal static bool IsValidSystemTargetRegistrationStatus(SiloStatus status) =>
             status != SiloStatus.None && !status.IsTerminating();

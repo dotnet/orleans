@@ -179,6 +179,30 @@ public class UnknownSiloStatusCacheTests
     }
 
     [Fact]
+    public async Task ValidationReturnsSnapshotFromQualifyingFreshRead()
+    {
+        var silo = CreateSiloAddress();
+        var membershipManager = new TestMembershipManager(CreateMembershipTableSnapshot(1))
+        {
+            AutoCompleteRefreshes = false,
+        };
+        var cache = new UnknownSiloStatusCache(membershipManager, NullLogger<UnknownSiloStatusCache>.Instance);
+        var validationTask = cache.ValidateSiloStatuses(
+            CreateSnapshot(1),
+            SiloAddresses(silo),
+            CancellationToken.None).AsTask();
+        var refresh = await membershipManager.WaitForRefreshAttempt();
+        membershipManager.SetCurrentSnapshot(CreateMembershipTableSnapshot(2));
+
+        refresh.Completion.TrySetResult();
+
+        var validation = await validationTask;
+        Assert.Equal(new MembershipVersion(2), validation.Snapshot.Version);
+        Assert.Equal(SiloStatus.Dead, validation.Statuses[silo]);
+        Assert.Equal(1, membershipManager.CurrentSnapshotReadCount);
+    }
+
+    [Fact]
     public async Task FailedSharedRefreshAllowsNextValidationToRetry()
     {
         var membershipManager = new TestMembershipManager(CreateMembershipTableSnapshot(1))
