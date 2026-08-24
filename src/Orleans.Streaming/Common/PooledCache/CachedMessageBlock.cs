@@ -276,13 +276,18 @@ namespace Orleans.Providers.Streams.Common
 
         private void ResetCore()
         {
-            writeIndex = 0;
-            readIndex = 0;
-            generation++;
             if (cachedMessages.Length != initialBlockSize)
             {
                 cachedMessages = new CachedMessage[initialBlockSize];
             }
+            else
+            {
+                Array.Clear(cachedMessages, readIndex, writeIndex - readIndex);
+            }
+
+            writeIndex = 0;
+            readIndex = 0;
+            generation++;
         }
     }
 }

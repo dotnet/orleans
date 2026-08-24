@@ -1,6 +1,5 @@
 using Microsoft.Extensions.Logging.Abstractions;
 using Orleans.Providers.Streams.Common;
-using Orleans.Streams;
 using Xunit;
 
 namespace UnitTests.OrleansRuntime.Streams
