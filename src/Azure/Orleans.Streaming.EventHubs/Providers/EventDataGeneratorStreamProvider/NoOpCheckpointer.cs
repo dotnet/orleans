@@ -9,9 +9,14 @@ public class NoOpCheckpointerFactory : IStreamQueueCheckpointerFactory
 {
     public static NoOpCheckpointerFactory Instance = new NoOpCheckpointerFactory();
     public Task<IStreamQueueCheckpointer<string>> Create(string partition)
-    {
-        return Task.FromResult<IStreamQueueCheckpointer<string>>(NoOpCheckpointer.Instance);
-    }
+        => Create(partition, CancellationToken.None);
+
+    public Task<IStreamQueueCheckpointer<string>> Create(
+        string partition,
+        CancellationToken cancellationToken)
+        => cancellationToken.IsCancellationRequested
+            ? Task.FromCanceled<IStreamQueueCheckpointer<string>>(cancellationToken)
+            : Task.FromResult<IStreamQueueCheckpointer<string>>(NoOpCheckpointer.Instance);
 }
 /// <summary>
 /// NoOpCheckpointer is used in EventDataGeneratorStreamProvider ecosystem to replace the default Checkpointer which requires a back end storage. In EventHubDataGeneratorStreamProvider,
