@@ -89,7 +89,8 @@ the placeholders with identifiers, not secrets:
 
 Assign the app role only to authorized workload service principals and also
 configure the corresponding caller application-ID or service-principal
-allowlist. Role assignment and allowlisting are independent checks.
+allowlist. When both allowlists are configured, matching either identity
+authorizes the caller. Role assignment and allowlisting are independent checks.
 
 As an alternative to `ClusterRole`, configure `ClusterClaimType` and have the
 trusted issuer emit that signed custom claim with a value exactly equal to the
