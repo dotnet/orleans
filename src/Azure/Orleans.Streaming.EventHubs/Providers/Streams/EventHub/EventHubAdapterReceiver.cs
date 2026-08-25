@@ -556,7 +556,7 @@ internal partial class EventHubAdapterReceiver : IQueueAdapterReceiver, IQueueCa
             }
         }
 
-        public void Refresh(StreamSequenceToken? token)
+        public void Refresh(StreamSequenceToken token)
         {
             lock (this.owner.cacheLock)
             {
