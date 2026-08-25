@@ -573,6 +573,7 @@ internal partial class EventHubAdapterReceiver : IQueueAdapterReceiver, IQueueCa
                 {
                     this.cache = cache;
                     this.cursor = cache.GetCursor(this.streamId, token);
+                    this.current = null;
                     return;
                 }
 

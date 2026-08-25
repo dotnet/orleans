@@ -89,6 +89,7 @@ public class EventHubCheckpointerTests
         public object? RefreshedCursor { get; private set; }
         public StreamSequenceToken? RefreshToken { get; private set; }
         public int GetCursorCount { get; private set; }
+        public IBatchContainer? NextMessage { get; set; }
 
         public int GetMaxAddCount() => 1_000;
 
@@ -112,6 +113,13 @@ public class EventHubCheckpointerTests
 
         public bool TryGetNextMessage(object cursorObj, out IBatchContainer message)
         {
+            if (NextMessage is { } next)
+            {
+                NextMessage = null;
+                message = next;
+                return true;
+            }
+
             message = null!;
             return false;
         }
@@ -148,6 +156,16 @@ public class EventHubCheckpointerTests
             CloseCount++;
             return Task.CompletedTask;
         }
+    }
+
+    private sealed class TestBatchContainer : IBatchContainer
+    {
+        public StreamId StreamId { get; } = StreamId.Create("namespace", Guid.NewGuid());
+        public StreamSequenceToken SequenceToken { get; } = MakeToken(1);
+
+        public IEnumerable<Tuple<T, StreamSequenceToken>> GetEvents<T>() => [];
+
+        public bool ImportRequestContext() => false;
     }
 
     private sealed class NullReturningEventHubReceiver : IEventHubReceiver
@@ -318,7 +336,11 @@ public class EventHubCheckpointerTests
         {
             LoadedOffset = "123",
         };
-        var initialCache = new TestEventHubQueueCache();
+        var initialBatch = new TestBatchContainer();
+        var initialCache = new TestEventHubQueueCache
+        {
+            NextMessage = initialBatch,
+        };
         var replacementCache = new TestEventHubQueueCache();
         var caches = new Queue<IEventHubQueueCache>([initialCache, replacementCache]);
         var invalidReceiver = new InvalidOffsetEventHubReceiver();
@@ -329,6 +351,8 @@ public class EventHubCheckpointerTests
             receiverFactory: offset => offset == "123" ? invalidReceiver : new TestEventHubReceiver(),
             cacheFactory: caches.Dequeue);
         var cursor = receiver.GetCacheCursor(StreamId.Create("namespace", Guid.NewGuid()), MakeToken(1));
+        Assert.True(cursor.MoveNext());
+        Assert.Same(initialBatch, cursor.GetCurrent(out _));
 
         await Assert.ThrowsAsync<ArgumentException>(
             () => receiver.GetQueueMessagesAsync(10, CancellationToken.None));
@@ -342,6 +366,20 @@ public class EventHubCheckpointerTests
         var refreshToken = MakeToken(2);
         cursor.Refresh(refreshToken);
         Assert.Equal(1, replacementCache.GetCursorCount);
+        Assert.Null(cursor.GetCurrent(out _));
+    }
+
+    [TestSuite("BVT")]
+    [Fact, TestCategory("BVT")]
+    public async Task NoOpCheckpointerFactory_CreateHonorsCancellation()
+    {
+        using var cancellation = new CancellationTokenSource();
+        cancellation.Cancel();
+
+        var exception = await Assert.ThrowsAnyAsync<OperationCanceledException>(
+            () => NoOpCheckpointerFactory.Instance.Create("partition", cancellation.Token));
+
+        Assert.Equal(cancellation.Token, exception.CancellationToken);
     }
 
     [TestSuite("BVT")]
