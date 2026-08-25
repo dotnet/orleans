@@ -183,13 +183,12 @@ internal sealed class EntraJwtValidator
 
         if (!_options.AllowAnyApplicationInTenant)
         {
-            if (_options.AllowedClientIds.Count > 0 && !_options.AllowedClientIds.Contains(callerId))
-            {
-                throw new EntraAuthenticationException(EntraAuthenticationError.UnauthorizedCaller);
-            }
-
-            if (_options.AllowedServicePrincipalObjectIds.Count > 0
-                && (document.ObjectId is null || !_options.AllowedServicePrincipalObjectIds.Contains(document.ObjectId)))
+            var hasCallerAllowlist = _options.AllowedClientIds.Count > 0
+                || _options.AllowedServicePrincipalObjectIds.Count > 0;
+            var callerIdAllowed = _options.AllowedClientIds.Contains(callerId);
+            var objectIdAllowed = document.ObjectId is not null
+                && _options.AllowedServicePrincipalObjectIds.Contains(document.ObjectId);
+            if (hasCallerAllowlist && !callerIdAllowed && !objectIdAllowed)
             {
                 throw new EntraAuthenticationException(EntraAuthenticationError.UnauthorizedCaller);
             }

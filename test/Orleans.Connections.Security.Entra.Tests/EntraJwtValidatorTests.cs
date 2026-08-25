@@ -191,6 +191,7 @@ public sealed class EntraJwtValidatorTests
     public async Task AuthorizesConfiguredServicePrincipalObjectId()
     {
         using var fixture = new EntraTestFixture();
+        fixture.Options.AllowedClientIds.Clear();
         fixture.Options.AllowedServicePrincipalObjectIds.Add(EntraTestFixture.ObjectId);
         var token = fixture.CreateToken();
 
@@ -206,10 +207,47 @@ public sealed class EntraJwtValidatorTests
     public async Task RejectsWrongServicePrincipalObjectId()
     {
         using var fixture = new EntraTestFixture();
+        fixture.Options.AllowedClientIds.Clear();
         fixture.Options.AllowedServicePrincipalObjectIds.Add("33333333-3333-3333-3333-333333333333");
         var token = fixture.CreateToken();
 
         await AssertErrorAsync(fixture, token, EntraAuthenticationError.UnauthorizedCaller);
+    }
+
+    [Theory]
+    [InlineData(true, false, true)]
+    [InlineData(false, true, true)]
+    [InlineData(true, true, true)]
+    [InlineData(false, false, false)]
+    public async Task CombinedCallerAllowlists_AuthorizeWhenEitherIdentityMatches(
+        bool clientIdMatches,
+        bool objectIdMatches,
+        bool succeeds)
+    {
+        const string otherClientId = "33333333-3333-3333-3333-333333333333";
+        const string otherObjectId = "44444444-4444-4444-4444-444444444444";
+        using var fixture = new EntraTestFixture();
+        fixture.Options.AllowedClientIds.Clear();
+        fixture.Options.AllowedClientIds.Add(clientIdMatches ? EntraTestFixture.ClientId : otherClientId);
+        fixture.Options.AllowedServicePrincipalObjectIds.Add(
+            objectIdMatches ? EntraTestFixture.ObjectId : otherObjectId);
+        var token = fixture.CreateToken();
+
+        if (succeeds)
+        {
+            var result = await fixture.CreateValidator().ValidateAsync(
+                token,
+                EntraTestFixture.ClusterId,
+                CancellationToken.None);
+
+            Assert.True(result.Principal.Identity?.IsAuthenticated);
+            Assert.Equal(EntraTestFixture.ClientId, result.Principal.FindFirst("azp")?.Value);
+            Assert.Equal(EntraTestFixture.ObjectId, result.Principal.FindFirst("oid")?.Value);
+        }
+        else
+        {
+            await AssertErrorAsync(fixture, token, EntraAuthenticationError.UnauthorizedCaller);
+        }
     }
 
     [Theory]

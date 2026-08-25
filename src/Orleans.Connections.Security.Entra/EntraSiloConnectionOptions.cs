@@ -50,11 +50,19 @@ public sealed class EntraSiloConnectionOptions
     /// <summary>
     /// Gets the client application identifiers which are authorized to connect.
     /// </summary>
+    /// <remarks>
+    /// When this allowlist and <see cref="AllowedServicePrincipalObjectIds"/> are both configured,
+    /// a caller is authorized when either identity matches.
+    /// </remarks>
     public ISet<string> AllowedClientIds { get; } = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
     /// <summary>
     /// Gets the service-principal object identifiers which are authorized to connect.
     /// </summary>
+    /// <remarks>
+    /// When this allowlist and <see cref="AllowedClientIds"/> are both configured,
+    /// a caller is authorized when either identity matches.
+    /// </remarks>
     public ISet<string> AllowedServicePrincipalObjectIds { get; } = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
     /// <summary>
