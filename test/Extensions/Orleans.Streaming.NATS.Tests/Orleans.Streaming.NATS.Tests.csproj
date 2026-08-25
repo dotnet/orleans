@@ -28,7 +28,6 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="$(SourceRoot)src\File\Orleans.Persistence.FileStorage\Orleans.Persistence.FileStorage.csproj" />
     <ProjectReference Include="$(SourceRoot)src\Orleans.Streaming.NATS\Orleans.Streaming.NATS.csproj" />
     <ProjectReference Include="$(SourceRoot)test\Orleans.Runtime.Tests\Orleans.Runtime.Tests.csproj" />
     <ProjectReference Include="$(SourceRoot)test\Orleans.Streaming.Tests\Orleans.Streaming.Tests.csproj" />
