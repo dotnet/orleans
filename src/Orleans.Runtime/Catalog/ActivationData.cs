@@ -1114,12 +1114,12 @@ internal sealed partial class ActivationData :
             while (true);
         }
 
-        void RecordRunning(Message message, bool isInterleavable)
+        void RecordRunning(Message message, bool isAlwaysInterleave)
         {
             var stopwatch = CoarseStopwatch.StartNew();
             _runningRequests.Add(message, stopwatch);
 
-            if (isInterleavable) return;
+            if (isAlwaysInterleave) return;
 
             ++_runningNonAlwaysInterleaveCount;
             if (!message.IsReadOnly)
