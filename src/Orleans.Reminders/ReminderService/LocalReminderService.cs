@@ -405,9 +405,9 @@ namespace Orleans.Runtime.ReminderService
             }
 
             rangeChangeGeneration++;
-            rangeChangeTask = rangeChangeTask.IsCompletedSuccessfully
-                ? task
-                : Task.WhenAll(rangeChangeTask, task);
+            // A newer refresh advances localTableSequence before yielding, so older results cannot
+            // change local schedules after the latest reconciliation completes.
+            rangeChangeTask = task;
             return task;
         }
 

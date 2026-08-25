@@ -253,7 +253,7 @@ public class LocalReminderServiceCompatibilityTests : IClassFixture<LocalReminde
     [TestSuite("BVT")]
     [TestProvider("None")]
     [Fact, TestCategory("BVT")]
-    public async Task RangeChangeBarrier_WaitsForReconciliation()
+    public async Task RangeChangeBarrier_DoesNotWaitForSupersededReconciliation()
     {
         var silo = Assert.Single(fixture.HostedCluster.Silos);
         using var cancellation = new CancellationTokenSource(TestConstants.InitTimeout);
@@ -279,11 +279,11 @@ public class LocalReminderServiceCompatibilityTests : IClassFixture<LocalReminde
             Assert.False(reconciliationTask.IsCompleted);
 
             secondReadGate.Release();
-            await secondRangeChangeTask.WaitAsync(cancellation.Token);
-            Assert.False(reconciliationTask.IsCompleted);
+            await Task.WhenAll(secondRangeChangeTask, reconciliationTask).WaitAsync(cancellation.Token);
+            Assert.False(firstRangeChangeTask.IsCompleted);
 
             firstReadGate.Release();
-            await Task.WhenAll(firstRangeChangeTask, reconciliationTask).WaitAsync(cancellation.Token);
+            await firstRangeChangeTask.WaitAsync(cancellation.Token);
         }
         finally
         {
