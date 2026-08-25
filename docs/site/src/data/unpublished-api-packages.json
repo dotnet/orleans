@@ -1,11 +1,4 @@
 {
   "description": "Generated API assemblies which are not currently published as standalone NuGet packages.",
-  "packages": {
-    "Microsoft.Orleans.Clustering.Firestore": "The new provider is awaiting its first NuGet publication.",
-    "Microsoft.Orleans.GrainDirectory.Firestore": "The new provider is awaiting its first NuGet publication.",
-    "Microsoft.Orleans.Journaling.Redis": "The new provider is awaiting its first NuGet publication.",
-    "Microsoft.Orleans.Persistence.Firestore": "The new provider is awaiting its first NuGet publication.",
-    "Microsoft.Orleans.Reminders.Firestore": "The new provider is awaiting its first NuGet publication.",
-    "Microsoft.Orleans.Streaming.Kinesis": "The new provider is awaiting its first NuGet publication."
-  }
+  "packages": {}
 }

@@ -14,9 +14,9 @@ import {
   buildTypeSignature,
   memberDisplayName,
   memberSlug,
+  nugetHref,
 } from '../src/lib/api/packages';
 import type { PackageApiDocument } from '../src/lib/api/types';
-import unpublishedApiPackages from '../src/data/unpublished-api-packages.json';
 
 const pkg = fixture as PackageApiDocument;
 const grain = pkg.types[0];
@@ -51,15 +51,14 @@ describe('native API Markdown companions', () => {
   });
 
   test('omits NuGet links only for explicitly unpublished API assemblies', () => {
-    const unpublished = structuredClone(pkg);
-    const unpublishedPackage = Object.keys(unpublishedApiPackages.packages).at(0);
-    if (!unpublishedPackage) throw new Error('Expected an unpublished API package fixture.');
-    unpublished.package.name = unpublishedPackage;
+    const unpublishedPackage = 'Microsoft.Orleans.UnpublishedFixture';
 
-    expect(renderPackageMarkdown(unpublished)).not.toContain(
-      `https://www.nuget.org/packages/${unpublishedPackage}`,
-    );
-    expect(renderTypeMarkdown(unpublished, unpublished.types[0])).not.toContain(
+    expect(
+      nugetHref(unpublishedPackage, {
+        [unpublishedPackage]: 'Test fixture.',
+      }),
+    ).toBeUndefined();
+    expect(nugetHref(unpublishedPackage, {})).toBe(
       `https://www.nuget.org/packages/${unpublishedPackage}`,
     );
   });
