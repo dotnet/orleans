@@ -207,6 +207,15 @@ public sealed class SQSStreamProviderBuilderTests
             "multiple values among Service, Region, and ServiceEndpoint"
         },
         {
+            "ConflictingServiceEndpointAliases",
+            [
+                "ServiceEndpoint", "http://localhost:9324",
+                "Endpoint", "http://localhost:9325",
+            ],
+            [],
+            "ServiceEndpoint and Endpoint"
+        },
+        {
             "ConflictingServiceAndRegion",
             ["Service", "us-east-1", "Region", "us-west-2"],
             [],

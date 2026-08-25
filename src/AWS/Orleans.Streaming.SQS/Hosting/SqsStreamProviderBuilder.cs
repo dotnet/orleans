@@ -129,9 +129,22 @@ public sealed class SqsStreamProviderBuilder : IProviderBuilder<ISiloBuilder>, I
 
         var service = configurationSection["Service"];
         var region = configurationSection["Region"];
+        var configuredServiceEndpoint = configurationSection["ServiceEndpoint"];
+        var configuredEndpoint = configurationSection["Endpoint"];
+        if (!string.IsNullOrWhiteSpace(configuredServiceEndpoint)
+            && !string.IsNullOrWhiteSpace(configuredEndpoint)
+            && !string.Equals(
+                configuredServiceEndpoint.Trim(),
+                configuredEndpoint.Trim(),
+                StringComparison.Ordinal))
+        {
+            throw new OrleansConfigurationException(
+                "SQS streaming configuration specifies different ServiceEndpoint and Endpoint values. Configure one SQS service endpoint.");
+        }
+
         var serviceEndpoint = GetFirstNonWhiteSpace(
-            configurationSection["ServiceEndpoint"],
-            configurationSection["Endpoint"]);
+            configuredServiceEndpoint,
+            configuredEndpoint);
         var configuredLocations = new[] { service, region, serviceEndpoint }
             .Count(value => !string.IsNullOrWhiteSpace(value));
         if (configuredLocations > 1)
