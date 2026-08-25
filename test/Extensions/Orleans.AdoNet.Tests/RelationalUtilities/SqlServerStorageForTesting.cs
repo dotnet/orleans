@@ -61,30 +61,31 @@ namespace UnitTests.General
 
             using var commandBuilder = new SqlCommandBuilder();
             var quotedDatabaseName = commandBuilder.QuoteIdentifier(databaseName);
-            var hasExclusiveAccess = false;
+            using var scriptEnumerator = scripts.GetEnumerator();
+            if (!scriptEnumerator.MoveNext())
+            {
+                return;
+            }
+
             try
             {
                 await ExecuteCommandAsync(
                     connection,
-                    $"ALTER DATABASE {quotedDatabaseName} SET SINGLE_USER WITH ROLLBACK IMMEDIATE;");
-                hasExclusiveAccess = true;
+                    $"ALTER DATABASE {quotedDatabaseName} SET SINGLE_USER WITH ROLLBACK IMMEDIATE;\n{scriptEnumerator.Current}");
 
-                foreach (var script in scripts)
+                while (scriptEnumerator.MoveNext())
                 {
-                    await ExecuteCommandAsync(connection, script);
+                    await ExecuteCommandAsync(connection, scriptEnumerator.Current);
                 }
             }
             finally
             {
-                if (hasExclusiveAccess)
-                {
-                    await ExecuteCommandAsync(
-                        connection,
-                        $"ALTER DATABASE {quotedDatabaseName} SET MULTI_USER;");
+                await ExecuteCommandAsync(
+                    connection,
+                    $"ALTER DATABASE {quotedDatabaseName} SET MULTI_USER;");
 
-                    using var pooledConnection = new SqlConnection(CurrentConnectionString);
-                    SqlConnection.ClearPool(pooledConnection);
-                }
+                using var pooledConnection = new SqlConnection(CurrentConnectionString);
+                SqlConnection.ClearPool(pooledConnection);
             }
         }
 
