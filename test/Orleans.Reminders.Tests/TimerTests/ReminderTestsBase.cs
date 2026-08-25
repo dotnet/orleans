@@ -165,8 +165,9 @@ public class ReminderTestsBase : OrleansTestingBase, IDisposable
         IReminderTestGrain2 g3 = this.GrainFactory.GetGrain<IReminderTestGrain2>(Guid.NewGuid());
         IReminderTestGrain2 g4 = this.GrainFactory.GetGrain<IReminderTestGrain2>(Guid.NewGuid());
         IReminderTestGrain2 g5 = this.GrainFactory.GetGrain<IReminderTestGrain2>(Guid.NewGuid());
+        var initialSilos = HostedCluster.GetActiveSilos().ToHashSet();
         using var cts = new CancellationTokenSource(CHURN_ENDWAIT);
-        InProcessSiloHandle? additionalSilo = null;
+        Task<List<InProcessSiloHandle>>? startSilosTask = null;
         try
         {
             await Test_Reminders_MultiGrainMultiReminders(
@@ -175,10 +176,9 @@ public class ReminderTestsBase : OrleansTestingBase, IDisposable
                     await using (await PauseReminderTimeAsync(cancellationToken))
                     {
                         log.LogInformation("Starting another silo");
-                        additionalSilo = Assert.Single(await this.StartAdditionalSilosAndWaitForReminderServicesAsync(
-                            1,
-                            cancellationToken,
-                            startAdditionalSiloOnNewPort: true));
+                        startSilosTask = StartAdditionalSilosAsync(1, startAdditionalSiloOnNewPort: true);
+                        var additionalSilos = await WaitForAdditionalSilosAndReminderServicesAsync(startSilosTask, cancellationToken);
+                        _ = Assert.Single(additionalSilos);
                     }
                 },
                 cts.Token,
@@ -190,12 +190,7 @@ public class ReminderTestsBase : OrleansTestingBase, IDisposable
         }
         finally
         {
-            if (additionalSilo is not null)
-            {
-                using var cleanupCts = new CancellationTokenSource(CHURN_ENDWAIT);
-                await StopSiloAsync(additionalSilo).WaitAsync(cleanupCts.Token);
-                await WaitForLivenessToStabilizeAsync().WaitAsync(cleanupCts.Token);
-            }
+            await CleanupAdditionalSilosAsync(initialSilos, startSilosTask);
         }
     }
 
@@ -230,28 +225,7 @@ public class ReminderTestsBase : OrleansTestingBase, IDisposable
         }
         finally
         {
-            if (startSilosTask is not null)
-            {
-                try
-                {
-                    using var startupCompletionCts = new CancellationTokenSource(CHURN_ENDWAIT);
-                    await startSilosTask.WaitAsync(startupCompletionCts.Token);
-                }
-                catch (Exception exception)
-                {
-                    log.LogInformation(exception, "Additional silo startup did not complete successfully before cleanup.");
-                }
-
-                var additionalSilos = HostedCluster.GetActiveSilos()
-                    .Where(silo => !initialSilos.Contains(silo))
-                    .ToArray();
-                if (additionalSilos.Length > 0)
-                {
-                    using var cleanupCts = new CancellationTokenSource(CHURN_ENDWAIT);
-                    await Task.WhenAll(additionalSilos.Select(StopSiloAsync)).WaitAsync(cleanupCts.Token);
-                    await WaitForLivenessToStabilizeAsync().WaitAsync(cleanupCts.Token);
-                }
-            }
+            await CleanupAdditionalSilosAsync(initialSilos, startSilosTask);
         }
     }
 
@@ -328,6 +302,38 @@ public class ReminderTestsBase : OrleansTestingBase, IDisposable
             silo.ServiceProvider.GetRequiredService<LocalReminderService>().TestOnlyWaitForRangeChangeReconciliation(cancellationToken));
         await Task.WhenAll(rangeChangeReconciliations);
         return result;
+    }
+
+    private async Task CleanupAdditionalSilosAsync(
+        HashSet<InProcessSiloHandle> initialSilos,
+        Task<List<InProcessSiloHandle>>? startSilosTask)
+    {
+        if (startSilosTask is null)
+        {
+            return;
+        }
+
+        try
+        {
+            using var startupCompletionCts = new CancellationTokenSource(CHURN_ENDWAIT);
+            await startSilosTask.WaitAsync(startupCompletionCts.Token);
+        }
+        catch (Exception exception)
+        {
+            log.LogInformation(exception, "Additional silo startup did not complete successfully before cleanup.");
+        }
+
+        var additionalSilos = HostedCluster.GetActiveSilos()
+            .Where(silo => !initialSilos.Contains(silo))
+            .ToArray();
+        if (additionalSilos.Length == 0)
+        {
+            return;
+        }
+
+        using var cleanupCts = new CancellationTokenSource(CHURN_ENDWAIT);
+        await Task.WhenAll(additionalSilos.Select(StopSiloAsync)).WaitAsync(cleanupCts.Token);
+        await WaitForLivenessToStabilizeAsync().WaitAsync(cleanupCts.Token);
     }
 
     protected async Task<InProcessSiloHandle> StopSiloAndStartAdditionalSiloAsync(
