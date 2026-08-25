@@ -3,7 +3,6 @@ using System;
 using System.Distributed.DurableTasks;
 using NSubstitute;
 using Orleans.DurableTasks;
-using Orleans.Runtime;
 using Xunit;
 
 namespace Orleans.DurableTasks.Tests;
