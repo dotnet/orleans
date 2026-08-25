@@ -123,10 +123,15 @@ public class ReminderTableRetryPolicyTests
     public async Task UniformPolicy_HardBoundsTheFirstAttempt()
     {
         var never = new TaskCompletionSource<string>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var invocations = 0;
 
         var exception = await Assert.ThrowsAsync<ReminderConformanceException>(() =>
             ReminderTableRetryPolicy.ExecuteUntilAsync(
-                () => never.Task,
+                () =>
+                {
+                    invocations++;
+                    return never.Task;
+                },
                 _ => true,
                 "Blocked",
                 "ReadGuarantee",
@@ -134,9 +139,10 @@ public class ReminderTableRetryPolicyTests
                 "a completed read",
                 value => value,
                 "read convergence",
-                TimeSpan.FromMilliseconds(40),
+                TimeSpan.FromTicks(1),
                 TimeSpan.FromMilliseconds(5)));
 
+        Assert.Equal(1, invocations);
         Assert.Contains("attempts=1", exception.Message, StringComparison.Ordinal);
         Assert.Contains("Last exception: System.TimeoutException", exception.Message, StringComparison.Ordinal);
     }

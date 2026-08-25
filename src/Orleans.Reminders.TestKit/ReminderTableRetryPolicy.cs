@@ -96,15 +96,16 @@ internal static class ReminderTableRetryPolicy
         while (true)
         {
             var remaining = timeout - stopwatch.Elapsed;
-            if (remaining <= TimeSpan.Zero)
+            if (attempts > 0 && remaining <= TimeSpan.Zero)
             {
                 ThrowTimeout();
             }
 
+            attempts++;
             try
             {
-                var value = await operation().WaitAsync(remaining);
-                attempts++;
+                var attempt = operation();
+                var value = await attempt.WaitAsync(remaining > TimeSpan.Zero ? remaining : TimeSpan.Zero);
                 lastException = null;
                 lastObservation = describe(value);
                 if (succeeded(value))
@@ -115,7 +116,6 @@ internal static class ReminderTableRetryPolicy
             }
             catch (Exception exception) when (exception is not ReminderConformanceException)
             {
-                attempts++;
                 lastException = exception;
             }
 
