@@ -108,9 +108,6 @@ public sealed class KinesisAspireLiveStreamTests(ITestOutputHelper output)
             Assert.Equal(streamId, firstDelivery.StreamId);
             Assert.Equal([firstPayload], firstDelivery.Payloads);
 
-            await StopAndDisposeClusterAsync(cluster);
-            cluster = null;
-
             var firstCheckpoint = Assert.Single(await WaitForCheckpointsAsync(
                 dynamoDb,
                 checkpointTableName,
@@ -120,6 +117,9 @@ public sealed class KinesisAspireLiveStreamTests(ITestOutputHelper output)
             Assert.False(string.IsNullOrWhiteSpace(firstCheckpoint.Partition));
             Assert.False(string.IsNullOrWhiteSpace(firstCheckpoint.Sequence));
             Assert.True(firstCheckpoint.Version > 0);
+
+            await StopAndDisposeClusterAsync(cluster);
+            cluster = null;
 
             var secondPayload = $"second-{Guid.NewGuid():N}";
             cluster = BuildCluster(siloConfiguration, clientConfiguration);
@@ -132,9 +132,6 @@ public sealed class KinesisAspireLiveStreamTests(ITestOutputHelper output)
 
             Assert.Equal(streamId, secondDelivery.StreamId);
             Assert.Equal([secondPayload], secondDelivery.Payloads);
-
-            await StopAndDisposeClusterAsync(cluster);
-            cluster = null;
 
             var finalCheckpoints = await WaitForCheckpointsAsync(
                 dynamoDb,
@@ -150,6 +147,9 @@ public sealed class KinesisAspireLiveStreamTests(ITestOutputHelper output)
                     > BigInteger.Parse(firstCheckpoint.Sequence, CultureInfo.InvariantCulture),
                 $"Expected checkpoint '{finalCheckpoint.Sequence}' to advance beyond '{firstCheckpoint.Sequence}'.");
             Assert.True(finalCheckpoint.Version > firstCheckpoint.Version);
+
+            await StopAndDisposeClusterAsync(cluster);
+            cluster = null;
         }
         catch (Exception exception)
         {
@@ -277,9 +277,17 @@ public sealed class KinesisAspireLiveStreamTests(ITestOutputHelper output)
         configuration.Remove("AWS_PROFILE");
         configuration.Remove("AWS:Profile");
 
+        var liveKinesisOptions = new KinesisStreamOptions
+        {
+            ConnectionString = KinesisTestConstants.ConnectionString,
+        };
+        var liveRegion = liveKinesisOptions.Region
+            ?? throw new InvalidOperationException("The live Kinesis connection string requires a region.");
         var streamingPrefix = $"Orleans:Streaming:{topology.ProviderName}";
         configuration[$"{streamingPrefix}:ConnectionString"] = KinesisTestConstants.ConnectionString;
         configuration[$"{streamingPrefix}:StreamName"] = streamName;
+        configuration[$"{streamingPrefix}:Region"] = liveRegion;
+        configuration[$"{streamingPrefix}:Checkpoint:Region"] = liveRegion;
         configuration[$"{streamingPrefix}:Checkpoint:Service"] = KinesisTestConstants.DynamoDbService;
         configuration[$"{streamingPrefix}:Checkpoint:AccessKey"] = KinesisTestConstants.DynamoDbAccessKey;
         configuration[$"{streamingPrefix}:Checkpoint:SecretKey"] = KinesisTestConstants.DynamoDbSecretKey;
@@ -287,6 +295,8 @@ public sealed class KinesisAspireLiveStreamTests(ITestOutputHelper output)
         configuration[$"AWS:Resources:{topology.Stream.ResourceName}:StreamArn"] = streamArn;
         configuration[$"AWS:Resources:{topology.PubSubTable.ResourceName}:TableName"] = pubSubTableName;
         configuration[$"AWS:Resources:{topology.CheckpointTable.ResourceName}:TableName"] = checkpointTableName;
+        configuration["AWS_REGION"] = liveRegion;
+        configuration["AWS:Region"] = liveRegion;
 
         if (includeDynamoDbStorage)
         {
