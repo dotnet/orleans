@@ -386,6 +386,84 @@ public class LocalDurableJobManagerTests
     }
 
     [Fact]
+    public async Task CancelAsync_WhenCachedShardOwnershipMoved_RoutesToCurrentOwner()
+    {
+        var timeProvider = new FakeTimeProvider(new DateTimeOffset(2026, 1, 1, 0, 0, 0, TimeSpan.Zero));
+        var options = CreateOptions();
+        var owner = SiloAddress.New(new IPEndPoint(IPAddress.Loopback, 5001), 0);
+        var shardManager = new TestJobShardManager
+        {
+            IsLocallyOwned = false,
+            ShardOwner = owner
+        };
+        var grainFactory = Substitute.For<IInternalGrainFactory>();
+        var remoteManager = Substitute.For<ILocalDurableJobManagerSystemTarget>();
+        remoteManager.CancelAsync(Arg.Any<DurableJob>(), Arg.Any<CancellationToken>()).Returns(true);
+        grainFactory.GetSystemTarget<ILocalDurableJobManagerSystemTarget>(
+                LocalDurableJobManager.JobManagerGrainType,
+                owner)
+            .Returns(remoteManager);
+        var manager = CreateManager(shardManager, timeProvider, options, grainFactory);
+        var accessor = new LocalDurableJobManager.TestAccessor(manager);
+        var shardKey = timeProvider.GetUtcNow();
+        var shard = CreateSubstituteShard("cancellation-shard", shardKey, shardKey.Add(options.ShardDuration));
+        accessor.AddWritableShard(shardKey, shard);
+        var job = new DurableJob
+        {
+            Id = "job-1",
+            Name = "job",
+            DueTime = shardKey,
+            TargetGrainId = GrainId.Create("test", "job"),
+            ShardId = shard.Id
+        };
+
+        var cancellationRequested = await manager.CancelAsync(job, CancellationToken.None);
+
+        Assert.True(cancellationRequested);
+        Assert.False(accessor.HasCachedShard(shard.Id));
+        await shard.DidNotReceive().RemoveJobAsync(Arg.Any<string>(), Arg.Any<CancellationToken>());
+        await remoteManager.Received(1).CancelAsync(job, Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task CancelAsync_WhenOwnershipReturnsLocally_UsesReplacementCachedShard()
+    {
+        var timeProvider = new FakeTimeProvider(new DateTimeOffset(2026, 1, 1, 0, 0, 0, TimeSpan.Zero));
+        var options = CreateOptions();
+        var localOwner = SiloAddress.New(new IPEndPoint(IPAddress.Loopback, 5000), 0);
+        var shardManager = new TestJobShardManager { IsLocallyOwned = false };
+        var manager = CreateManager(shardManager, timeProvider, options);
+        var accessor = new LocalDurableJobManager.TestAccessor(manager);
+        var shardKey = timeProvider.GetUtcNow();
+        var staleShard = CreateSubstituteShard("cancellation-shard", shardKey, shardKey.Add(options.ShardDuration));
+        var replacementShard = CreateSubstituteShard("cancellation-shard", shardKey, shardKey.Add(options.ShardDuration));
+        replacementShard.RemoveJobAsync("job-1", Arg.Any<CancellationToken>())
+            .Returns(DurableJobMutationResult.Applied);
+        accessor.AddWritableShard(shardKey, staleShard);
+        shardManager.GetShardOwner = (_, _) =>
+        {
+            accessor.AddWritableShard(shardKey, replacementShard);
+            shardManager.IsLocallyOwned = true;
+            return ValueTask.FromResult<SiloAddress?>(localOwner);
+        };
+        var job = new DurableJob
+        {
+            Id = "job-1",
+            Name = "job",
+            DueTime = shardKey,
+            TargetGrainId = GrainId.Create("test", "job"),
+            ShardId = staleShard.Id
+        };
+
+        var cancellationRequested = await manager.CancelAsync(job, CancellationToken.None);
+
+        Assert.True(cancellationRequested);
+        Assert.True(accessor.HasCachedShard(replacementShard.Id));
+        await staleShard.DidNotReceive().RemoveJobAsync(Arg.Any<string>(), Arg.Any<CancellationToken>());
+        await replacementShard.Received(1).RemoveJobAsync(job.Id, Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
     public async Task ScheduleJobAsync_WhenShardStripingEnabled_DistributesJobsAcrossWritableShards()
     {
         var timeProvider = new FakeTimeProvider(new DateTimeOffset(2026, 1, 1, 0, 0, 0, TimeSpan.Zero));
@@ -1250,6 +1328,12 @@ public class LocalDurableJobManagerTests
 
         public Func<DateTimeOffset, DateTimeOffset, IDictionary<string, string>, CancellationToken, Task<IJobShard>>? CreateShard { get; set; }
 
+        public Func<string, CancellationToken, ValueTask<SiloAddress?>>? GetShardOwner { get; set; }
+
+        public bool IsLocallyOwned { get; set; } = true;
+
+        public SiloAddress? ShardOwner { get; set; }
+
         public int CreateShardCallCount { get; private set; }
 
         public DateTimeOffset LastMaxDueTime { get; private set; }
@@ -1273,6 +1357,14 @@ public class LocalDurableJobManagerTests
             UnregisteredShards.Add(shard);
             return Task.CompletedTask;
         }
+
+        internal override ValueTask<SiloAddress?> GetShardOwnerAsync(string shardId, CancellationToken cancellationToken) =>
+            GetShardOwner is { } getShardOwner
+                ? getShardOwner(shardId, cancellationToken)
+                : ValueTask.FromResult(ShardOwner);
+
+        internal override ValueTask<bool> IsShardOwnedByLocalSiloAsync(string shardId, CancellationToken cancellationToken) =>
+            ValueTask.FromResult(IsLocallyOwned);
     }
 
     private sealed class TestLocalSiloDetails(SiloAddress siloAddress) : ILocalSiloDetails
