@@ -532,15 +532,20 @@ namespace Orleans.Transactions.DynamoDB.Tests
             if (service.StartsWith("http://", StringComparison.OrdinalIgnoreCase)
                 || service.StartsWith("https://", StringComparison.OrdinalIgnoreCase))
             {
-                var credentials = string.IsNullOrEmpty(AWSTestConstants.DynamoDbAccessKey)
-                    || string.IsNullOrEmpty(AWSTestConstants.DynamoDbSecretKey)
-                        ? new BasicAWSCredentials("dummy", "dummyKey")
-                        : new BasicAWSCredentials(
+                var serviceConfig = new AmazonDynamoDBConfig { ServiceURL = service };
+                if (!string.IsNullOrEmpty(AWSTestConstants.DynamoDbAccessKey)
+                    && !string.IsNullOrEmpty(AWSTestConstants.DynamoDbSecretKey))
+                {
+                    return new AmazonDynamoDBClient(
+                        new BasicAWSCredentials(
                             AWSTestConstants.DynamoDbAccessKey,
-                            AWSTestConstants.DynamoDbSecretKey);
-                return new AmazonDynamoDBClient(
-                    credentials,
-                    new AmazonDynamoDBConfig { ServiceURL = service });
+                            AWSTestConstants.DynamoDbSecretKey),
+                        serviceConfig);
+                }
+
+                return service.StartsWith("http://", StringComparison.OrdinalIgnoreCase)
+                    ? new AmazonDynamoDBClient(new BasicAWSCredentials("dummy", "dummyKey"), serviceConfig)
+                    : new AmazonDynamoDBClient(serviceConfig);
             }
 
             var config = new AmazonDynamoDBConfig { RegionEndpoint = RegionEndpoint.GetBySystemName(service) };
