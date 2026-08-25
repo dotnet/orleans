@@ -1,7 +1,7 @@
 ---
 title: Model collections of grains
 description: Model bounded catalogs, partitioned indexes, query stores, paging, and bulk operations over Orleans grains.
-ms.date: 08/21/2026
+ms.date: 08/25/2026
 ms.topic: how-to
 ---
 
@@ -9,7 +9,7 @@ ms.topic: how-to
 
 Orleans virtualizes individually addressed grains. Applications define collection membership explicitly and choose the storage and consistency model which matches each collection's access patterns.
 
-A grain key identifies a logical grain, and <xref:Orleans.IGrainFactory.GetGrain*> can create a reference for any valid key. Therefore, a domain catalog or query store determines which keys currently represent application members. The runtime grain directory tracks active grain locations for request routing; application catalogs retain membership across deactivation and cluster restarts.
+A grain key identifies a logical grain, and <xref:Orleans.IGrainFactory.GetGrain*> can create a reference for any valid key. Therefore, a domain catalog or query store determines which keys currently represent application members. Callers select a logical member or shard key; Orleans places activations and routes calls to their current locations. Persisted application catalogs retain membership across deactivation and cluster restarts.
 
 ## Choose a collection shape
 
@@ -32,7 +32,7 @@ Store ordinary serializable objects in an owning grain's state when they form a 
 
 ## Keep bounded catalogs in one grain
 
-An owning grain or registry grain is a direct model for a collection with a known operational bound. A non-reentrant owner processes one request at a time, and one awaited persistent state write provides an optimistic-concurrency boundary.
+An owning grain or registry grain is a direct model for a collection with a known operational bound. A non-reentrant owner processes one request at a time. An awaited state write persists the updated catalog as one record, and the configured provider applies its record-level concurrency checks.
 
 Return pages or streamed results instead of returning the complete collection. Size the bound using:
 
@@ -55,13 +55,15 @@ Each membership entry has one owning shard. Keep the shard count and hash algori
 
 For a query spanning known shards, use a coordinator service or grain to issue calls with bounded concurrency and merge the results. Apply limits for shard fan-out, returned items, elapsed time, and per-call concurrency. This keeps one query from producing an unbounded number of grain calls.
 
+Treat a bulk operation as a set of shard operations. Include an operation identifier, collect per-shard outcomes, and retry incomplete shards. Use Orleans transactions when the participant count and contention fit the transaction limits and the operation requires one atomic outcome.
+
 ## Define the consistency boundary
 
 Collection membership and member state often occupy different records. Choose the authority and completion contract before implementing updates:
 
 | Update model | Completion contract |
 |---|---|
-| Member data and membership share one grain state record | The awaited state write durably records both changes |
+| Member data and membership share one grain state record | The completed state write stores both changes in one record |
 | Member and index use Orleans transactional state | An [Orleans transaction](../grains/transactions.md) commits both changes atomically |
 | One external database owns member data and indexes | A database transaction commits the data and queryable index together |
 | Grain state is authoritative and a separate read model is updated asynchronously | A durable event or outbox drives an idempotent projector; queries expose the documented projection lag |
@@ -76,7 +78,9 @@ Use a database or search service as the query authority when the workload needs 
 
 Use continuation tokens for resumable paging. A token can carry the routing version, shard or partition, last ordering value, and last grain key. Treat tokens as opaque application contracts and version their encoded form.
 
-[Response streaming](../grains/response-streaming.md) progressively delivers one live query result with pull-based flow control. A page with a continuation token provides a durable resume boundary when a caller must continue after cancellation, timeout, grain deactivation, or process failure.
+Define whether paging observes a query snapshot or a changing data set. When the query store supports snapshots, include its snapshot identifier or read timestamp in the token. Otherwise, document how concurrent updates can produce repeated or omitted items and make page processing idempotent. Validate or authenticate client-supplied tokens before using their routing or ordering fields.
+
+[Response streaming](../grains/response-streaming.md) progressively delivers one live query result with pull-based flow control. A page with a continuation token provides an explicit resume boundary which a caller can persist before cancellation, timeout, grain deactivation, or process failure.
 
 ## Examples
 
