@@ -64,10 +64,27 @@ internal sealed class DurableMessagingPumpResults
             }
             else
             {
-                execution = new(key, ++_generation);
-                var entry = new Entry(execution.Generation, now);
-                _entries.Add(key, entry);
-                removed = Merge(removed, Prune(now, force: _entries.Count > _maxRetainedEntries));
+                if (_entries.Count >= _maxRetainedEntries)
+                {
+                    var candidate = _entries
+                        .Where(static pair => pair.Value.State != EntryState.Running)
+                        .OrderBy(static pair => pair.Value.State == EntryState.Completed ? pair.Value.CompletedAt : pair.Value.CreatedAt)
+                        .FirstOrDefault();
+                    if (candidate.Value is not null && _entries.Remove(candidate.Key))
+                    {
+                        (removed ??= []).Add(candidate.Value);
+                    }
+                }
+
+                if (_entries.Count >= _maxRetainedEntries)
+                {
+                    execution = default;
+                }
+                else
+                {
+                    execution = new(key, ++_generation);
+                    _entries.Add(key, new Entry(execution.Generation, now));
+                }
             }
         }
 
@@ -265,21 +282,6 @@ internal sealed class DurableMessagingPumpResults
         }
 
         return removed;
-    }
-
-    private static List<Entry>? Merge(List<Entry>? left, List<Entry>? right)
-    {
-        if (left is null)
-        {
-            return right;
-        }
-
-        if (right is not null)
-        {
-            left.AddRange(right);
-        }
-
-        return left;
     }
 
     private static void DisposeRegistrations(List<Entry>? entries)
