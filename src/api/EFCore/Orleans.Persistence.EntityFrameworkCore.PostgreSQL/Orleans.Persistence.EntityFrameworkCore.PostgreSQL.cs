@@ -42,7 +42,7 @@ namespace Orleans.Persistence.EntityFrameworkCore.PostgreSQL.Data
 namespace Orleans.Persistence.EntityFrameworkCore.PostgreSQL.Data.Migrations
 {
     [Microsoft.EntityFrameworkCore.Infrastructure.DbContext(typeof(PostgreSqlGrainStateDbContext))]
-    [Microsoft.EntityFrameworkCore.Migrations.Migration("20260811155003_InitialPersistenceSchema")]
+    [Microsoft.EntityFrameworkCore.Migrations.Migration("20260823101503_InitialPersistenceSchema")]
     public partial class InitialPersistenceSchema : Microsoft.EntityFrameworkCore.Migrations.Migration
     {
         protected override void BuildTargetModel(Microsoft.EntityFrameworkCore.ModelBuilder modelBuilder) { }
