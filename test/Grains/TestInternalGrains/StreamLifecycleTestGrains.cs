@@ -198,7 +198,7 @@ namespace UnitTests.Grains
 
             if (_deactivationStream is not null)
             {
-                await _deactivationStream.OnNextAsync(1);
+                await _deactivationStream.OnNextAsync(1).WaitAsync(cancellationToken);
             }
 
             await RecordDeactivate();
