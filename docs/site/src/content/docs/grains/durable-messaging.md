@@ -79,6 +79,12 @@ sender retains and retries the envelope. Handler failures restore the preceding 
 state before retry accounting is committed. Messages move to the appropriate inbox or
 outbox dead-letter collection after their configured attempt or age limit. Use
 <xref:Orleans.DurableMessaging.IDurableMessagingDiagnostics> to inspect those records.
+After an operator or application has handled a record, remove it with
+<xref:Orleans.DurableMessaging.IDurableMessagingDiagnostics.RemoveInboxDeadLetter*>
+or <xref:Orleans.DurableMessaging.IDurableMessagingDiagnostics.RemoveOutboxDeadLetter*>
+so dead-letter storage remains bounded by the application's retention policy.
+Removal is staged in the grain transaction and becomes durable with the grain's next
+journal write.
 
 Malformed typed bodies are isolated during handler deserialization and follow the same
 retry and dead-letter path; they don't prevent later envelopes from being recovered.
