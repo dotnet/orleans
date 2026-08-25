@@ -105,7 +105,14 @@ internal static class ReminderTableRetryPolicy
             try
             {
                 var attempt = operation();
-                var value = await attempt.WaitAsync(remaining > TimeSpan.Zero ? remaining : TimeSpan.Zero);
+                remaining = timeout - stopwatch.Elapsed;
+                if (remaining <= TimeSpan.Zero)
+                {
+                    lastException = new TimeoutException("The retry timeout elapsed while starting the operation.");
+                    ThrowTimeout();
+                }
+
+                var value = await attempt.WaitAsync(remaining);
                 lastException = null;
                 lastObservation = describe(value);
                 if (succeeded(value))
