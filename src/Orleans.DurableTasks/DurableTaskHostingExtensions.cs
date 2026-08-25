@@ -33,8 +33,8 @@ public static class DurableTaskHostingExtensions
         siloBuilder.Services.AddScoped<DurableTaskMessageHandler>();
         siloBuilder.Services.AddScoped<IInboxHandler>(sp => sp.GetRequiredService<DurableTaskMessageHandler>());
         siloBuilder.Services.AddScoped<DurableTaskGrainParticipant>();
-        siloBuilder.Services.TryAddEnumerable(
-            ServiceDescriptor.Scoped<IJournaledGrainParticipant, DurableTaskGrainParticipant>());
+        siloBuilder.Services.AddScoped<IJournaledGrainParticipant>(
+            static serviceProvider => serviceProvider.GetRequiredService<DurableTaskGrainParticipant>());
         siloBuilder.Services.AddKeyedTransient<IGrainExtension>(typeof(IDurableTaskGrainExtension), (sp, _) => sp.GetRequiredService<DurableTaskGrainRuntime>());
         siloBuilder.Services.AddKeyedTransient<IGrainExtension>(typeof(IDurableTaskServer), (sp, _) => sp.GetRequiredService<DurableTaskGrainRuntime>());
 
