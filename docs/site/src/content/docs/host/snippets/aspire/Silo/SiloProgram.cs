@@ -9,6 +9,18 @@ namespace Orleans.Docs.Snippets.Aspire.Silo;
 // This class contains example code for Orleans silo configuration with Aspire
 public static class SiloProgram
 {
+    // <kinesis_streaming_silo>
+    public static void KinesisStreaming(string[] args)
+    {
+        var builder = Host.CreateApplicationBuilder(args);
+
+        builder.AddServiceDefaults();
+        builder.UseOrleans();
+
+        builder.Build().Run();
+    }
+    // </kinesis_streaming_silo>
+
     // <silo_basic_config>
     public static void BasicSiloConfiguration(string[] args)
     {
