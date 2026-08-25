@@ -1394,6 +1394,8 @@ public sealed class KinesisAspireIntegrationTests
 
     private static void AssertRegionFallback(string providerName, string key, string region)
     {
+        using var environment = new EnvironmentVariableScope(
+            new Dictionary<string, string?>(StringComparer.Ordinal));
         var config = BuildConfig(new Dictionary<string, string?>
         {
             [$"Orleans:Streaming:{providerName}:ProviderType"] = "Kinesis",
