@@ -2,6 +2,7 @@ using Aspire.Hosting;
 using Aspire.Hosting.ApplicationModel;
 using Aspire.Hosting.Orleans;
 using Aspire.Hosting.Testing;
+using Amazon.DynamoDBv2;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
@@ -107,6 +108,176 @@ public sealed class DynamoDBAspireIntegrationTests
         ValidateDynamoDBOptions(clientHost.Services, ["DynamoDBGatewayOptionsValidator"]);
     }
 
+    [Fact]
+    public async Task CdkAppModel_EmitsExactTopologyAndSecretFreeConfiguration()
+    {
+        await using var app = await DynamoDBAspireTestModel.CreateCdkAsync();
+        var silo = await app.GetSiloConfigurationAsync();
+        var client = await app.GetClientConfigurationAsync();
+        var tables = app.Model.Resources
+            .OfType<DynamoDBAspireTestModel.DynamoDBTableResource>()
+            .Select(resource => resource.Contract)
+            .OrderBy(table => table.ResourceName, StringComparer.Ordinal)
+            .ToArray();
+
+        AssertTable(
+            tables,
+            "orleans-membership",
+            "orders-orleans-membership",
+            ("DeploymentId", DynamoDBAttributeType.String),
+            ("SiloIdentity", DynamoDBAttributeType.String));
+        AssertTable(
+            tables,
+            "orleans-grain-state",
+            "orders-orleans-grain-state",
+            ("GrainReference", DynamoDBAttributeType.String),
+            ("GrainType", DynamoDBAttributeType.String));
+        AssertTable(
+            tables,
+            "orleans-reminders",
+            "orders-orleans-reminders",
+            ("ReminderId", DynamoDBAttributeType.String),
+            ("GrainHash", DynamoDBAttributeType.Number),
+            ("ServiceIdIndex", "ServiceId", DynamoDBAttributeType.String, "GrainHash", DynamoDBAttributeType.Number),
+            ("ServiceIdGrainReferenceIndex", "ServiceId", DynamoDBAttributeType.String, "GrainReference", DynamoDBAttributeType.String));
+        AssertTable(
+            tables,
+            "orleans-transactions",
+            "orders-orleans-transactions",
+            ("PartitionKey", DynamoDBAttributeType.String),
+            ("RowKey", DynamoDBAttributeType.String));
+        AssertTable(
+            tables,
+            "orleans-checkpoints",
+            "orders-orleans-checkpoints",
+            ("CheckpointNamespace", DynamoDBAttributeType.String),
+            ("Partition", DynamoDBAttributeType.String));
+        Assert.Equal("integration-profile", silo["AWS_PROFILE"]);
+        Assert.Equal(DynamoDBAspireTopology.Region, silo["AWS_REGION"]);
+        Assert.Equal("integration-profile", silo["AWS:Profile"]);
+        Assert.Equal(DynamoDBAspireTopology.Region, silo["AWS:Region"]);
+        Assert.Equal(silo["AWS_PROFILE"], client["AWS_PROFILE"]);
+        Assert.Equal(silo["AWS_REGION"], client["AWS_REGION"]);
+        AssertProviderConfiguration(silo, "Orleans:Clustering", DynamoDBAspireTopology.Membership);
+        AssertProviderConfiguration(silo, "Orleans:GrainStorage:Default", DynamoDBAspireTopology.GrainState);
+        AssertProviderConfiguration(silo, "Orleans:Reminders", DynamoDBAspireTopology.Reminders);
+        AssertProviderConfiguration(client, "Orleans:Clustering", DynamoDBAspireTopology.Membership);
+        AssertSecretFree(silo);
+        AssertSecretFree(client);
+        Assert.Single(
+            app.Model.Resources,
+            resource => resource is DynamoDBAspireTestModel.DynamoDBStackResource);
+    }
+
+    [Fact]
+    public async Task CdkGeneratedConfiguration_ActivatesInfrastructureOwnedProviders()
+    {
+        await using var app = await DynamoDBAspireTestModel.CreateCdkAsync(profile: null);
+        var siloConfiguration = await app.GetSiloConfigurationAsync();
+        var clientConfiguration = await app.GetClientConfigurationAsync();
+
+        var siloBuilder = Host.CreateApplicationBuilder();
+        siloBuilder.Configuration.AddConfiguration(siloConfiguration);
+        siloBuilder.UseOrleans();
+        using var siloHost = siloBuilder.Build();
+        var clustering = siloHost.Services.GetRequiredService<IOptions<DynamoDBClusteringOptions>>().Value;
+        var storage = siloHost.Services
+            .GetRequiredService<IOptionsMonitor<DynamoDBStorageOptions>>()
+            .Get("Default");
+        var reminders = siloHost.Services
+            .GetRequiredService<IOptions<DynamoDBReminderStorageOptions>>()
+            .Value;
+
+        AssertInfrastructureOwnedOptions(
+            clustering.Service,
+            clustering.TableName,
+            clustering.UseProvisionedThroughput,
+            clustering.CreateIfNotExists,
+            clustering.UpdateIfExists,
+            clustering.AccessKey,
+            clustering.SecretKey,
+            clustering.Token,
+            clustering.ProfileName,
+            DynamoDBAspireTopology.Membership.TableName);
+        AssertInfrastructureOwnedOptions(
+            storage.Service,
+            storage.TableName,
+            storage.UseProvisionedThroughput,
+            storage.CreateIfNotExists,
+            storage.UpdateIfExists,
+            storage.AccessKey,
+            storage.SecretKey,
+            storage.Token,
+            storage.ProfileName,
+            DynamoDBAspireTopology.GrainState.TableName);
+        AssertInfrastructureOwnedOptions(
+            reminders.Service,
+            reminders.TableName,
+            reminders.UseProvisionedThroughput,
+            reminders.CreateIfNotExists,
+            reminders.UpdateIfExists,
+            reminders.AccessKey,
+            reminders.SecretKey,
+            reminders.Token,
+            reminders.ProfileName,
+            DynamoDBAspireTopology.Reminders.TableName);
+        Assert.Equal(DynamoDBAspireTopology.ServiceId, storage.ServiceId);
+
+        var clientBuilder = Host.CreateApplicationBuilder();
+        clientBuilder.Configuration.AddConfiguration(clientConfiguration);
+        clientBuilder.UseOrleansClient();
+        using var clientHost = clientBuilder.Build();
+        var gateway = clientHost.Services.GetRequiredService<IOptions<DynamoDBGatewayOptions>>().Value;
+        AssertInfrastructureOwnedOptions(
+            gateway.Service,
+            gateway.TableName,
+            gateway.UseProvisionedThroughput,
+            gateway.CreateIfNotExists,
+            gateway.UpdateIfExists,
+            gateway.AccessKey,
+            gateway.SecretKey,
+            gateway.Token,
+            gateway.ProfileName,
+            DynamoDBAspireTopology.Membership.TableName);
+    }
+
+    [Fact]
+    public async Task CdkPublishConfiguration_RetainsProviderRegionAndServiceIdentity()
+    {
+        await using var app = await DynamoDBAspireTestModel.CreateCdkAsync();
+        var configuration = await app.GetSiloConfigurationAsync(DistributedApplicationOperation.Publish);
+
+        Assert.Null(configuration["AWS:Region"]);
+        Assert.Null(configuration["AWS:Profile"]);
+        Assert.Equal(
+            DynamoDBAspireTopology.Region,
+            configuration["Orleans:Clustering:Region"]);
+        Assert.Equal(
+            DynamoDBAspireTopology.Region,
+            configuration["Orleans:GrainStorage:Default:Region"]);
+        Assert.Equal(
+            DynamoDBAspireTopology.Region,
+            configuration["Orleans:Reminders:Region"]);
+        Assert.Equal(
+            DynamoDBAspireTopology.ServiceId,
+            configuration["Orleans:GrainStorage:Default:ServiceId"]);
+
+        var hostBuilder = Host.CreateApplicationBuilder();
+        hostBuilder.Configuration.AddConfiguration(configuration);
+        hostBuilder.UseOrleans();
+        using var host = hostBuilder.Build();
+        var storage = host.Services
+            .GetRequiredService<IOptionsMonitor<DynamoDBStorageOptions>>()
+            .Get("Default");
+
+        Assert.Equal(DynamoDBAspireTopology.Region, storage.Service);
+        Assert.Equal(DynamoDBAspireTopology.ServiceId, storage.ServiceId);
+    }
+
+    [Fact]
+    public void DynamoDBProvider_UsesAwsSdkV4()
+        => Assert.Equal(4, typeof(AmazonDynamoDBClient).Assembly.GetName().Version?.Major);
+
     private static async Task<(
         IConfigurationRoot Silo,
         IConfigurationRoot Client)> CreateDynamoDBOrleansEnvironmentAsync()
@@ -170,6 +341,20 @@ public sealed class DynamoDBAspireIntegrationTests
         Assert.Equal("dynamodb", configuration[$"{section}:ServiceKey"]);
     }
 
+    private static void AssertProviderConfiguration(
+        IConfiguration configuration,
+        string section,
+        DynamoDBTableContract table)
+    {
+        Assert.Equal("DynamoDB", configuration[$"{section}:ProviderType"]);
+        Assert.Equal(table.ResourceName, configuration[$"{section}:ServiceKey"]);
+        Assert.Equal(DynamoDBAspireTopology.Region, configuration[$"{section}:Region"]);
+        Assert.False(bool.Parse(configuration[$"{section}:UseProvisionedThroughput"]!));
+        Assert.False(bool.Parse(configuration[$"{section}:CreateIfNotExists"]!));
+        Assert.False(bool.Parse(configuration[$"{section}:UpdateIfExists"]!));
+        Assert.Equal(table.TableName, configuration[$"AWS:Resources:{table.ResourceName}:TableName"]);
+    }
+
     private static void AssertDynamoDBOptions(
         string? service,
         string? tableName,
@@ -192,6 +377,64 @@ public sealed class DynamoDBAspireIntegrationTests
             expectedValidatorNames.Order(StringComparer.Ordinal),
             validators.Select(validator => validator.GetType().Name).Order(StringComparer.Ordinal));
         Assert.All(validators, validator => validator.ValidateConfiguration());
+    }
+
+    private static void AssertInfrastructureOwnedOptions(
+        string? service,
+        string? tableName,
+        bool useProvisionedThroughput,
+        bool createIfNotExists,
+        bool updateIfExists,
+        string? accessKey,
+        string? secretKey,
+        string? token,
+        string? profileName,
+        string expectedTableName)
+    {
+        Assert.Equal(DynamoDBAspireTopology.Region, service);
+        Assert.Equal(expectedTableName, tableName);
+        Assert.False(useProvisionedThroughput);
+        Assert.False(createIfNotExists);
+        Assert.False(updateIfExists);
+        Assert.Null(accessKey);
+        Assert.Null(secretKey);
+        Assert.Null(token);
+        Assert.Null(profileName);
+    }
+
+    private static void AssertSecretFree(IConfiguration configuration)
+    {
+        string[] forbidden = ["AccessKey", "SecretKey", "SessionToken", "Token"];
+        Assert.DoesNotContain(
+            configuration.AsEnumerable(),
+            pair => forbidden.Any(fragment =>
+                pair.Key.Contains(fragment, StringComparison.OrdinalIgnoreCase)
+                || pair.Value?.Contains(fragment, StringComparison.OrdinalIgnoreCase) == true));
+    }
+
+    private static void AssertTable(
+        IReadOnlyList<DynamoDBTableContract> tables,
+        string resourceName,
+        string tableName,
+        (string Name, DynamoDBAttributeType Type) partitionKey,
+        (string Name, DynamoDBAttributeType Type) sortKey,
+        params (string Name, string PartitionName, DynamoDBAttributeType PartitionType, string SortName, DynamoDBAttributeType SortType)[] indexes)
+    {
+        var table = Assert.Single(tables, value => value.ResourceName == resourceName);
+        Assert.Equal(tableName, table.TableName);
+        Assert.Equal(new DynamoDBAttributeContract(partitionKey.Name, partitionKey.Type), table.PartitionKey);
+        Assert.Equal(new DynamoDBAttributeContract(sortKey.Name, sortKey.Type), table.SortKey);
+        Assert.Equal(indexes.Length, table.GlobalSecondaryIndexes.Count);
+        foreach (var index in indexes)
+        {
+            var actual = Assert.Single(table.GlobalSecondaryIndexes, value => value.Name == index.Name);
+            Assert.Equal(
+                new DynamoDBAttributeContract(index.PartitionName, index.PartitionType),
+                actual.PartitionKey);
+            Assert.Equal(
+                new DynamoDBAttributeContract(index.SortName, index.SortType),
+                actual.SortKey);
+        }
     }
 
     private sealed class DynamoDBProviderConfiguration(string serviceKey) : IProviderConfiguration
