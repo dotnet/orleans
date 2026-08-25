@@ -16,9 +16,9 @@ internal sealed class MessageHandlerShared(
     MessagingInstruments messagingInstruments)
 {
     private readonly IServiceProvider _serviceProvider = serviceProvider;
-    private readonly ConcurrentStack<MessageSerializer> _serializerPool = new();
-    private readonly ConcurrentStack<MessageReadRequest> _receivePool = new();
-    private readonly ConcurrentStack<MessageWriteRequest> _sendPool = new();
+    private readonly ConcurrentBag<MessageSerializer> _serializerPool = new();
+    private readonly ConcurrentBag<MessageReadRequest> _receivePool = new();
+    private readonly ConcurrentBag<MessageWriteRequest> _sendPool = new();
 
     public MessagingTrace MessagingTrace { get; } = messagingTrace;
     public ConnectionTrace ConnectionTrace { get; } = connectionTrace;
@@ -29,7 +29,7 @@ internal sealed class MessageHandlerShared(
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     internal MessageSerializer GetMessageSerializer()
     {
-        if (_serializerPool.TryPop(out var result))
+        if (_serializerPool.TryTake(out var result))
         {
             return result;
         }
@@ -38,15 +38,12 @@ internal sealed class MessageHandlerShared(
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    internal void Return(MessageSerializer serializer)
-    {
-        _serializerPool.Push(serializer);
-    }
+    internal void Return(MessageSerializer serializer) => _serializerPool.Add(serializer);
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     internal MessageReadRequest GetReceiveMessageHandler()
     {
-        if (_receivePool.TryPop(out var result))
+        if (_receivePool.TryTake(out var result))
         {
             return result;
         }
@@ -55,15 +52,12 @@ internal sealed class MessageHandlerShared(
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    internal void Return(MessageReadRequest handler)
-    {
-        _receivePool.Push(handler);
-    }
+    internal void Return(MessageReadRequest handler) => _receivePool.Add(handler);
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     internal MessageWriteRequest GetSendMessageHandler()
     {
-        if (_sendPool.TryPop(out var result))
+        if (_sendPool.TryTake(out var result))
         {
             return result;
         }
@@ -80,8 +74,5 @@ internal sealed class MessageHandlerShared(
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    internal void Return(MessageWriteRequest handler)
-    {
-        _sendPool.Push(handler);
-    }
+    internal void Return(MessageWriteRequest handler) => _sendPool.Add(handler);
 }

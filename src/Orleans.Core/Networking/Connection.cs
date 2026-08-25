@@ -258,6 +258,7 @@ namespace Orleans.Runtime.Messaging
                     }
                 }
 
+                writeRequest.CompleteWriting();
                 if (writeRequest.Messages.Count == 0)
                 {
                     writeRequest.Reset();
