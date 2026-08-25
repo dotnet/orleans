@@ -10,15 +10,16 @@
 
   <!-- <apphost_packages> -->
   <ItemGroup>
+    <!-- Amazon.CDK.Lib is not strong-name signed; the .NET SDK suppresses CS8002 for .NETCoreApp targets. -->
+    <PackageReference Include="Amazon.CDK.Lib" Version="2.262.0" />
     <PackageReference Include="Aspire.Hosting.AppHost" Version="13.4.6" />
-    <PackageReference Include="Aspire.Hosting.AWS" Version="13.4.0" />
+    <PackageReference Include="Aspire.Hosting.AWS" Version="13.6.0" />
     <PackageReference Include="Aspire.Hosting.Orleans" Version="13.4.6" />
     <PackageReference Include="Aspire.Hosting.Redis" Version="13.4.6" />
   </ItemGroup>
   <!-- </apphost_packages> -->
 
   <ItemGroup>
-    <PackageReference Include="Amazon.CDK.Lib" Version="2.253.0" />
     <PackageReference Include="Aspire.Hosting.Azure.CosmosDB" Version="13.4.6" />
     <PackageReference Include="Aspire.Hosting.Azure.EventHubs" Version="13.4.6" />
     <PackageReference Include="Aspire.Hosting.Azure.Redis" Version="13.4.6" />

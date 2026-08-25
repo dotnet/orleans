@@ -2,8 +2,10 @@ using Amazon;
 using Amazon.CDK.AWS.DynamoDB;
 using Aspire.Hosting;
 using Aspire.Hosting.ApplicationModel;
+using Aspire.Hosting.AWS;
 using Aspire.Hosting.Azure;
 using Aspire.Hosting.Orleans;
+using DynamoDBAttribute = Amazon.CDK.AWS.DynamoDB.Attribute;
 
 namespace Orleans.Docs.Snippets.Aspire;
 
@@ -256,8 +258,8 @@ public static class AppHostExamples
     {
         var builder = DistributedApplication.CreateBuilder(args);
 
-        var dynamodb = builder.AddAWSDynamoDBLocal("dynamodb");
-        var provider = new DynamoDBProviderConfiguration(dynamodb.Resource.Name);
+        var dynamodb = builder.AddConnectionString("dynamodb");
+        var provider = new DynamoDBProviderConfiguration(null, dynamodb.Resource.Name);
         var orleans = builder.AddOrleans("cluster")
             .WithClusterId("orders")
             .WithServiceId("orders")
@@ -267,15 +269,86 @@ public static class AppHostExamples
 
         builder.AddProject<Projects.Silo>("silo")
             .WithReference(orleans)
-            .WithReference(dynamodb)
-            .WaitFor(dynamodb);
+            .WithReference(dynamodb);
 
         builder.Build().Run();
     }
+    // </dynamodb_local_aspire>
 
+    // <dynamodb_cdk_aspire>
+    public static void DynamoDBWithAwsCdk(string[] args)
+    {
+        var builder = DistributedApplication.CreateBuilder(args);
+
+        var aws = builder.AddAWSSDKConfig()
+            .WithRegion(RegionEndpoint.USEast1);
+        var stack = builder.AddAWSCDKStack("orleans-dynamodb")
+            .WithReference(aws);
+        var membership = stack.AddDynamoDBTable(
+            DynamoDBTopology.MembershipResourceName,
+            DynamoDBTopology.CreateMembershipTable());
+        var grainState = stack.AddDynamoDBTable(
+            DynamoDBTopology.GrainStateResourceName,
+            DynamoDBTopology.CreateGrainStateTable());
+        var reminders = stack.AddDynamoDBTable(
+            DynamoDBTopology.RemindersResourceName,
+            DynamoDBTopology.CreateRemindersTable())
+            .AddGlobalSecondaryIndex(DynamoDBTopology.CreateServiceIdIndex())
+            .AddGlobalSecondaryIndex(DynamoDBTopology.CreateServiceIdGrainReferenceIndex());
+        var transactions = stack.AddDynamoDBTable(
+            DynamoDBTopology.TransactionsResourceName,
+            DynamoDBTopology.CreateTransactionsTable());
+        var checkpoints = stack.AddDynamoDBTable(
+            DynamoDBTopology.CheckpointsResourceName,
+            DynamoDBTopology.CreateCheckpointsTable());
+
+        var orleans = builder.AddOrleans("cluster")
+            .WithClusterId(DynamoDBTopology.ClusterId)
+            .WithServiceId(DynamoDBTopology.ServiceId)
+            .WithClustering(
+                new DynamoDBProviderConfiguration(
+                    aws,
+                    DynamoDBTopology.MembershipResourceName,
+                    infrastructureOwnsTable: true))
+            .WithGrainStorage(
+                "Default",
+                new DynamoDBProviderConfiguration(
+                    aws,
+                    DynamoDBTopology.GrainStateResourceName,
+                    infrastructureOwnsTable: true,
+                    serviceId: DynamoDBTopology.ServiceId))
+            .WithReminders(
+                new DynamoDBProviderConfiguration(
+                    aws,
+                    DynamoDBTopology.RemindersResourceName,
+                    infrastructureOwnsTable: true));
+
+        var silo = builder.AddProject<Projects.Silo>("silo")
+            .WithReference(orleans)
+            .WithReference(membership)
+            .WithReference(grainState)
+            .WithReference(reminders)
+            .WithReference(transactions)
+            .WithReference(checkpoints)
+            .WaitFor(stack)
+            .WithReplicas(3);
+
+        builder.AddProject<Projects.Client>("client")
+            .WithReference(orleans.AsClient())
+            .WithReference(membership)
+            .WaitFor(stack)
+            .WaitFor(silo);
+
+        builder.Build().Run();
+    }
+    // </dynamodb_cdk_aspire>
+
+    // <dynamodb_provider_configuration>
     private sealed class DynamoDBProviderConfiguration(
+        IAWSSDKConfig? aws,
         string serviceKey,
-        bool infrastructureOwnsTable = false) : IProviderConfiguration
+        bool infrastructureOwnsTable = false,
+        string? serviceId = null) : IProviderConfiguration
     {
         public void ConfigureResource<T>(
             IResourceBuilder<T> resourceBuilder,
@@ -283,6 +356,15 @@ public static class AppHostExamples
             where T : IResourceWithEnvironment
         {
             var prefix = $"Orleans__{configSectionPath.Replace(":", "__", StringComparison.Ordinal)}";
+            if (aws is not null)
+            {
+                var region = aws.Region?.SystemName
+                    ?? throw new InvalidOperationException("DynamoDB providers require an AWS region.");
+                resourceBuilder
+                    .WithReference(aws)
+                    .WithEnvironment($"{prefix}__Region", region);
+            }
+
             resourceBuilder
                 .WithEnvironment($"{prefix}__ProviderType", "DynamoDB")
                 .WithEnvironment($"{prefix}__ServiceKey", serviceKey);
@@ -293,9 +375,106 @@ public static class AppHostExamples
                     .WithEnvironment($"{prefix}__CreateIfNotExists", "false")
                     .WithEnvironment($"{prefix}__UpdateIfExists", "false");
             }
+
+            if (serviceId is not null)
+            {
+                resourceBuilder.WithEnvironment($"{prefix}__ServiceId", serviceId);
+            }
         }
     }
-    // </dynamodb_local_aspire>
+    // </dynamodb_provider_configuration>
+
+    // <dynamodb_cdk_topology>
+    private static class DynamoDBTopology
+    {
+        public const string ClusterId = "orders-production";
+        public const string ServiceId = "orders-service";
+        public const string MembershipResourceName = "orleans-membership";
+        public const string GrainStateResourceName = "orleans-grain-state";
+        public const string RemindersResourceName = "orleans-reminders";
+        public const string TransactionsResourceName = "orleans-transactions";
+        public const string CheckpointsResourceName = "orleans-checkpoints";
+
+        private const string MembershipTableName = "orders-orleans-membership";
+        private const string GrainStateTableName = "orders-orleans-grain-state";
+        private const string RemindersTableName = "orders-orleans-reminders";
+        private const string TransactionsTableName = "orders-orleans-transactions";
+        private const string CheckpointsTableName = "orders-orleans-checkpoints";
+
+        public static TableProps CreateMembershipTable()
+            => CreateTable(
+                MembershipTableName,
+                partitionKey: ("DeploymentId", AttributeType.STRING),
+                sortKey: ("SiloIdentity", AttributeType.STRING));
+
+        public static TableProps CreateGrainStateTable()
+            => CreateTable(
+                GrainStateTableName,
+                partitionKey: ("GrainReference", AttributeType.STRING),
+                sortKey: ("GrainType", AttributeType.STRING));
+
+        public static TableProps CreateRemindersTable()
+            => CreateTable(
+                RemindersTableName,
+                partitionKey: ("ReminderId", AttributeType.STRING),
+                sortKey: ("GrainHash", AttributeType.NUMBER));
+
+        public static GlobalSecondaryIndexProps CreateServiceIdIndex()
+            => CreateIndex(
+                "ServiceIdIndex",
+                partitionKey: ("ServiceId", AttributeType.STRING),
+                sortKey: ("GrainHash", AttributeType.NUMBER));
+
+        public static GlobalSecondaryIndexProps CreateServiceIdGrainReferenceIndex()
+            => CreateIndex(
+                "ServiceIdGrainReferenceIndex",
+                partitionKey: ("ServiceId", AttributeType.STRING),
+                sortKey: ("GrainReference", AttributeType.STRING));
+
+        public static TableProps CreateTransactionsTable()
+            => CreateTable(
+                TransactionsTableName,
+                partitionKey: ("PartitionKey", AttributeType.STRING),
+                sortKey: ("RowKey", AttributeType.STRING));
+
+        public static TableProps CreateCheckpointsTable()
+            => CreateTable(
+                CheckpointsTableName,
+                partitionKey: ("CheckpointNamespace", AttributeType.STRING),
+                sortKey: ("Partition", AttributeType.STRING));
+
+        private static TableProps CreateTable(
+            string tableName,
+            (string Name, AttributeType Type) partitionKey,
+            (string Name, AttributeType Type) sortKey)
+            => new()
+            {
+                TableName = tableName,
+                BillingMode = BillingMode.PAY_PER_REQUEST,
+                PartitionKey = CreateAttribute(partitionKey),
+                SortKey = CreateAttribute(sortKey),
+            };
+
+        private static GlobalSecondaryIndexProps CreateIndex(
+            string indexName,
+            (string Name, AttributeType Type) partitionKey,
+            (string Name, AttributeType Type) sortKey)
+            => new()
+            {
+                IndexName = indexName,
+                PartitionKey = CreateAttribute(partitionKey),
+                SortKey = CreateAttribute(sortKey),
+                ProjectionType = ProjectionType.ALL,
+            };
+
+        private static DynamoDBAttribute CreateAttribute((string Name, AttributeType Type) attribute)
+            => new()
+            {
+                Name = attribute.Name,
+                Type = attribute.Type,
+            };
+    }
+    // </dynamodb_cdk_topology>
 
     // <local_development>
     public static void LocalDevelopment(string[] args)
@@ -418,6 +597,7 @@ public static class AppHostExamples
             .WithGrainStorage(
                 "PubSubStore",
                 new DynamoDBProviderConfiguration(
+                    aws,
                     pubSubStore.Resource.Name,
                     infrastructureOwnsTable: true))
             .WithStreaming(
@@ -484,6 +664,7 @@ public static class AppHostExamples
             .WithGrainStorage(
                 "PubSubStore",
                 new DynamoDBProviderConfiguration(
+                    aws,
                     pubSubStore.Resource.Name,
                     infrastructureOwnsTable: true))
             .WithStreaming(
