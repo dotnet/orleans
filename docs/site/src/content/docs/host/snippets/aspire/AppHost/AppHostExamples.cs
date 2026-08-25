@@ -1,10 +1,13 @@
 using Amazon;
 using Amazon.CDK.AWS.DynamoDB;
+using Amazon.CDK.AWS.Kinesis;
 using Aspire.Hosting;
 using Aspire.Hosting.ApplicationModel;
 using Aspire.Hosting.AWS;
 using Aspire.Hosting.Azure;
 using Aspire.Hosting.Orleans;
+using CdkDuration = Amazon.CDK.Duration;
+using CdkRemovalPolicy = Amazon.CDK.RemovalPolicy;
 using DynamoDBAttribute = Amazon.CDK.AWS.DynamoDB.Attribute;
 
 namespace Orleans.Docs.Snippets.Aspire;
@@ -566,72 +569,33 @@ public static class AppHostExamples
     }
     // </reminders_inmemory_apphost>
 
-    // <kinesis_apphost_grain_checkpoints>
-    public static void KinesisWithGrainCheckpoints(string[] args)
+    // <kinesis_streaming_apphost>
+    public static void KinesisStreaming(string[] args)
     {
+        var topology = KinesisTopology.Orders;
         var builder = DistributedApplication.CreateBuilder(args);
 
         var aws = builder.AddAWSSDKConfig()
-            .WithRegion(RegionEndpoint.USWest2);
-        var stack = builder.AddAWSCDKStack("streaming")
+            .WithRegion(topology.Region);
+        var stack = builder.AddAWSCDKStack(topology.StackName)
             .WithReference(aws);
-        var stream = stack.AddKinesisStream("orders-stream");
-        var pubSubStore = stack.AddDynamoDBTable(
-            "pubsub-store",
-            new TableProps
+        var stream = stack.AddKinesisStream(
+            topology.StreamResourceName,
+            new StreamProps
             {
-                BillingMode = BillingMode.PAY_PER_REQUEST,
-                PartitionKey = new Amazon.CDK.AWS.DynamoDB.Attribute
-                {
-                    Name = "GrainReference",
-                    Type = AttributeType.STRING,
-                },
-                SortKey = new Amazon.CDK.AWS.DynamoDB.Attribute
-                {
-                    Name = "GrainType",
-                    Type = AttributeType.STRING,
-                },
+                StreamName = topology.StreamName,
+                ShardCount = topology.ShardCount,
+                StreamMode = StreamMode.PROVISIONED,
+                RetentionPeriod = CdkDuration.Hours(topology.RetentionHours),
+                RemovalPolicy = CdkRemovalPolicy.RETAIN,
             });
-        var orleans = builder.AddOrleans("cluster")
-            .WithDevelopmentClustering()
-            .WithGrainStorage(
-                "PubSubStore",
-                new DynamoDBProviderConfiguration(
-                    aws,
-                    pubSubStore.Resource.Name,
-                    infrastructureOwnsTable: true))
-            .WithStreaming(
-                "Orders",
-                new KinesisProviderConfiguration(stream.Resource.Name, checkpointType: "Grain"));
-
-        builder.AddProject<Projects.Silo>("silo")
-            .WithReference(orleans)
-            .WithReference(stream)
-            .WithReference(pubSubStore);
-
-        builder.AddProject<Projects.Client>("client")
-            .WithReference(orleans.AsClient())
-            .WithReference(stream);
-
-        builder.Build().Run();
-    }
-    // </kinesis_apphost_grain_checkpoints>
-
-    // <kinesis_apphost_dynamodb_checkpoints>
-    public static void KinesisWithDynamoDBCheckpoints(string[] args)
-    {
-        var builder = DistributedApplication.CreateBuilder(args);
-
-        var aws = builder.AddAWSSDKConfig()
-            .WithRegion(RegionEndpoint.USWest2);
-        var stack = builder.AddAWSCDKStack("streaming")
-            .WithReference(aws);
-        var stream = stack.AddKinesisStream("orders-stream");
         var pubSubStore = stack.AddDynamoDBTable(
-            "pubsub-store",
+            topology.PubSubResourceName,
             new TableProps
             {
+                TableName = topology.PubSubTableName,
                 BillingMode = BillingMode.PAY_PER_REQUEST,
+                RemovalPolicy = CdkRemovalPolicy.RETAIN,
                 PartitionKey = new Amazon.CDK.AWS.DynamoDB.Attribute
                 {
                     Name = "GrainReference",
@@ -644,10 +608,12 @@ public static class AppHostExamples
                 },
             });
         var checkpoints = stack.AddDynamoDBTable(
-            "orders-checkpoints",
+            topology.CheckpointResourceName,
             new TableProps
             {
+                TableName = topology.CheckpointTableName,
                 BillingMode = BillingMode.PAY_PER_REQUEST,
+                RemovalPolicy = CdkRemovalPolicy.RETAIN,
                 PartitionKey = new Amazon.CDK.AWS.DynamoDB.Attribute
                 {
                     Name = "CheckpointNamespace",
@@ -660,6 +626,8 @@ public static class AppHostExamples
                 },
             });
         var orleans = builder.AddOrleans("cluster")
+            .WithClusterId(topology.ClusterId)
+            .WithServiceId(topology.ServiceId)
             .WithDevelopmentClustering()
             .WithGrainStorage(
                 "PubSubStore",
@@ -668,26 +636,30 @@ public static class AppHostExamples
                     pubSubStore.Resource.Name,
                     infrastructureOwnsTable: true))
             .WithStreaming(
-                "Orders",
+                topology.ProviderName,
                 new KinesisProviderConfiguration(
+                    aws,
+                    topology,
                     stream.Resource.Name,
-                    checkpointType: "DynamoDB",
-                    checkpointServiceKey: checkpoints.Resource.Name));
+                    checkpoints.Resource.Name));
 
-        builder.AddProject<Projects.Silo>("silo")
+        var silo = builder.AddProject<Projects.Silo>("silo")
             .WithReference(orleans)
             .WithReference(stream)
             .WithReference(pubSubStore)
             .WithReference(checkpoints)
-            .WithEnvironment("Orleans__Streaming__Orders__Checkpoint__CreateIfNotExists", "false");
+            .WaitFor(stack)
+            .WithReplicas(3);
 
         builder.AddProject<Projects.Client>("client")
             .WithReference(orleans.AsClient())
-            .WithReference(stream);
+            .WithReference(stream)
+            .WaitFor(stack)
+            .WaitFor(silo);
 
         builder.Build().Run();
     }
-    // </kinesis_apphost_dynamodb_checkpoints>
+    // </kinesis_streaming_apphost>
 
     // <adonet_apphost>
     public static void AdoNetAppHost(string[] args)
@@ -865,10 +837,12 @@ public static class AppHostExamples
         }
     }
 
+    // <kinesis_provider_configuration>
     private sealed class KinesisProviderConfiguration(
-        string serviceKey,
-        string checkpointType,
-        string? checkpointServiceKey = null) : IProviderConfiguration
+        IAWSSDKConfig aws,
+        KinesisTopology topology,
+        string streamServiceKey,
+        string checkpointServiceKey) : IProviderConfiguration
     {
         public void ConfigureResource<T>(
             IResourceBuilder<T> resourceBuilder,
@@ -876,17 +850,52 @@ public static class AppHostExamples
             where T : IResourceWithEnvironment
         {
             var prefix = $"Orleans__{configurationSectionPath.Replace(":", "__", StringComparison.Ordinal)}";
+            var region = aws.Region?.SystemName
+                ?? throw new InvalidOperationException("Kinesis streaming requires an AWS region.");
             resourceBuilder
+                .WithReference(aws)
                 .WithEnvironment($"{prefix}__ProviderType", "Kinesis")
-                .WithEnvironment($"{prefix}__ServiceKey", serviceKey)
-                .WithEnvironment($"{prefix}__Checkpoint__Type", checkpointType);
-            if (checkpointServiceKey is not null)
-            {
-                resourceBuilder.WithEnvironment(
-                    $"{prefix}__Checkpoint__ServiceKey",
-                    checkpointServiceKey);
-            }
+                .WithEnvironment($"{prefix}__ServiceKey", streamServiceKey)
+                .WithEnvironment($"{prefix}__StreamName", topology.StreamName)
+                .WithEnvironment($"{prefix}__Region", region)
+                .WithEnvironment($"{prefix}__Checkpoint__Type", "DynamoDB")
+                .WithEnvironment($"{prefix}__Checkpoint__ServiceKey", checkpointServiceKey)
+                .WithEnvironment($"{prefix}__Checkpoint__CreateIfNotExists", "false")
+                .WithEnvironment($"{prefix}__Checkpoint__UseProvisionedThroughput", "false");
         }
     }
+    // </kinesis_provider_configuration>
 
+    // <kinesis_topology>
+    private sealed record KinesisTopology(
+        string StackName,
+        string ClusterId,
+        string ServiceId,
+        string ProviderName,
+        RegionEndpoint Region,
+        string StreamResourceName,
+        string StreamName,
+        int ShardCount,
+        int RetentionHours,
+        string PubSubResourceName,
+        string PubSubTableName,
+        string CheckpointResourceName,
+        string CheckpointTableName)
+    {
+        public static KinesisTopology Orders { get; } = new(
+            StackName: "orders-kinesis",
+            ClusterId: "orders-v1",
+            ServiceId: "orders-service",
+            ProviderName: "Orders",
+            Region: RegionEndpoint.USWest2,
+            StreamResourceName: "orders-stream",
+            StreamName: "orleans-orders",
+            ShardCount: 4,
+            RetentionHours: 24,
+            PubSubResourceName: "orders-pubsub",
+            PubSubTableName: "orleans-orders-pubsub",
+            CheckpointResourceName: "orders-checkpoints",
+            CheckpointTableName: "orleans-orders-checkpoints");
+    }
+    // </kinesis_topology>
 }
