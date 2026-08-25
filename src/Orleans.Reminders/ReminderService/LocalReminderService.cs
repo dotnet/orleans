@@ -32,6 +32,7 @@ namespace Orleans.Runtime.ReminderService
         private readonly ReminderInstruments _reminderInstruments;
         private long localTableSequence;
         private long rangeChangeGeneration;
+        private TaskCompletionSource rangeChangeGenerationChanged = new(TaskCreationOptions.RunContinuationsAsynchronously);
         private Task rangeChangeTask = Task.CompletedTask;
         private uint initialReadCallCount = 0;
         private Task? runTask;
@@ -404,10 +405,11 @@ namespace Orleans.Runtime.ReminderService
                 LogIgnoringRangeChange(Status);
             }
 
+            var previousGenerationChanged = rangeChangeGenerationChanged;
+            rangeChangeGenerationChanged = new(TaskCreationOptions.RunContinuationsAsynchronously);
             rangeChangeGeneration++;
-            rangeChangeTask = rangeChangeTask.IsCompletedSuccessfully
-                ? task
-                : Task.WhenAll(rangeChangeTask, task);
+            rangeChangeTask = task;
+            previousGenerationChanged.TrySetResult();
             return task;
         }
 
@@ -415,18 +417,20 @@ namespace Orleans.Runtime.ReminderService
         {
             while (true)
             {
-                // Range-change turns can overlap after yielding to storage. Await every observed turn,
-                // then verify that no newer generation started while those reads were completing.
+                // A newer refresh supersedes older results through localTableSequence. Follow generation
+                // changes so a stalled obsolete read does not block the current reconciliation.
                 long observedGeneration = 0;
                 Task observedTask = Task.CompletedTask;
+                Task observedGenerationChanged = Task.CompletedTask;
                 await this.QueueTask(() =>
                 {
                     observedGeneration = rangeChangeGeneration;
                     observedTask = rangeChangeTask;
+                    observedGenerationChanged = rangeChangeGenerationChanged.Task;
                     return Task.CompletedTask;
                 }).WaitAsync(cancellationToken);
 
-                await observedTask.WaitAsync(cancellationToken);
+                await Task.WhenAny(observedTask, observedGenerationChanged).WaitAsync(cancellationToken);
 
                 var isCurrentGeneration = false;
                 await this.QueueTask(() =>
@@ -437,6 +441,7 @@ namespace Orleans.Runtime.ReminderService
 
                 if (isCurrentGeneration)
                 {
+                    await observedTask.WaitAsync(cancellationToken);
                     return;
                 }
             }

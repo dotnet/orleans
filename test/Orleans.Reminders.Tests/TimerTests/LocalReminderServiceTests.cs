@@ -253,7 +253,7 @@ public class LocalReminderServiceCompatibilityTests : IClassFixture<LocalReminde
     [TestSuite("BVT")]
     [TestProvider("None")]
     [Fact, TestCategory("BVT")]
-    public async Task RangeChangeBarrier_WaitsForReconciliation()
+    public async Task RangeChangeBarrier_FollowsLatestReconciliation()
     {
         var silo = Assert.Single(fixture.HostedCluster.Silos);
         using var cancellation = new CancellationTokenSource(TestConstants.InitTimeout);
@@ -271,19 +271,20 @@ public class LocalReminderServiceCompatibilityTests : IClassFixture<LocalReminde
             var firstRangeChangeTask = reminderService.TestOnlyChangeRange(oldRange, intermediateRange, increased: false);
             await firstReadGate.WaitUntilBlockedAsync(cancellation.Token);
 
-            secondReadGate = reminderTable.BlockNextRangeRead();
-            var secondRangeChangeTask = reminderService.TestOnlyChangeRange(intermediateRange, newRange, increased: false);
-            await secondReadGate.WaitUntilBlockedAsync(cancellation.Token);
-
             var reconciliationTask = reminderService.TestOnlyWaitForRangeChangeReconciliation(cancellation.Token);
             Assert.False(reconciliationTask.IsCompleted);
 
-            secondReadGate.Release();
-            await secondRangeChangeTask.WaitAsync(cancellation.Token);
+            secondReadGate = reminderTable.BlockNextRangeRead();
+            var secondRangeChangeTask = reminderService.TestOnlyChangeRange(intermediateRange, newRange, increased: false);
+            await secondReadGate.WaitUntilBlockedAsync(cancellation.Token);
             Assert.False(reconciliationTask.IsCompleted);
 
+            secondReadGate.Release();
+            await Task.WhenAll(secondRangeChangeTask, reconciliationTask).WaitAsync(cancellation.Token);
+            Assert.False(firstRangeChangeTask.IsCompleted);
+
             firstReadGate.Release();
-            await Task.WhenAll(firstRangeChangeTask, reconciliationTask).WaitAsync(cancellation.Token);
+            await firstRangeChangeTask.WaitAsync(cancellation.Token);
         }
         finally
         {
