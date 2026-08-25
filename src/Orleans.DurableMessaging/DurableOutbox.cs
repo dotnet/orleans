@@ -863,49 +863,58 @@ internal sealed partial class DurableOutbox : IDurableOutbox, IDurableJobFeature
 
         await DeliverPendingMessagesAsync(cancellationToken).ConfigureAwait(true);
 
-        await _gate.WaitAsync(cancellationToken).ConfigureAwait(true);
-        try
+        while (true)
         {
-            if (!string.Equals(_jobId.Value, jobId, StringComparison.Ordinal))
+            var retryOwnershipClear = false;
+            await _gate.WaitAsync(cancellationToken).ConfigureAwait(true);
+            try
             {
-                return DurableJobRunResult.Completed;
-            }
-
-            if (Count == 0)
-            {
-                _completedJobId.Value = jobId;
-                _jobId.Value = null;
-                try
+                if (!string.Equals(_jobId.Value, jobId, StringComparison.Ordinal))
                 {
-                    await _stateManager.WriteStateAsync(cancellationToken).ConfigureAwait(true);
-                    _jobScheduleConfirmed = false;
                     return DurableJobRunResult.Completed;
                 }
-                catch
+
+                if (Count == 0)
                 {
-                    await _stateManager.RevertPendingChangesAsync(CancellationToken.None).ConfigureAwait(true);
-                    return DurableJobRunResult.InProgress(_backpressureRetryDelay);
+                    _completedJobId.Value = jobId;
+                    _jobId.Value = null;
+                    try
+                    {
+                        await _stateManager.WriteStateAsync(cancellationToken).ConfigureAwait(true);
+                        _jobScheduleConfirmed = false;
+                        return DurableJobRunResult.Completed;
+                    }
+                    catch
+                    {
+                        await _stateManager.RevertPendingChangesAsync(CancellationToken.None).ConfigureAwait(true);
+                        retryOwnershipClear = true;
+                    }
+                }
+
+                if (!retryOwnershipClear)
+                {
+                    if (_pendingMessageIds.Count > 0)
+                    {
+                        return DurableJobRunResult.InProgress(TimeSpan.FromMilliseconds(10));
+                    }
+
+                    var now = _jobTimeProvider.GetUtcNow();
+                    var attempts = _messages.Values
+                        .Select(envelope => GetNextAttemptAt(envelope, now))
+                        .ToList();
+                    var nextAttempt = attempts.Any(value => value is null || value <= now)
+                        ? now
+                        : attempts.Min()!.Value;
+                    return DurableJobRunResult.RescheduleAt(nextAttempt <= now ? now : nextAttempt);
                 }
             }
 
-            if (_pendingMessageIds.Count > 0)
+            finally
             {
-                return DurableJobRunResult.InProgress(TimeSpan.FromMilliseconds(10));
+                _gate.Release();
             }
 
-            var now = _jobTimeProvider.GetUtcNow();
-            var attempts = _messages.Values
-                .Select(envelope => GetNextAttemptAt(envelope, now))
-                .ToList();
-            var nextAttempt = attempts.Any(value => value is null || value <= now)
-                ? now
-                : attempts.Min()!.Value;
-            return DurableJobRunResult.RescheduleAt(nextAttempt <= now ? now : nextAttempt);
-        }
-
-        finally
-        {
-            _gate.Release();
+            await Task.Delay(_backpressureRetryDelay, _jobTimeProvider, cancellationToken).ConfigureAwait(true);
         }
     }
 
