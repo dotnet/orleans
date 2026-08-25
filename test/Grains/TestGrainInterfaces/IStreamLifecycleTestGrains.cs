@@ -12,6 +12,7 @@ namespace UnitTests.GrainInterfaces
         Task BecomeConsumer(StreamId streamId, string providerName);
         Task TestBecomeConsumerSlim(StreamId streamId, string providerName);
         Task RemoveConsumer(StreamId streamId, string providerName, StreamSubscriptionHandle<int> consumerHandle);
+        Task ProduceOnDeactivate(StreamId streamId, string providerName);
         Task ClearGrain();
     }
 
