@@ -44,7 +44,7 @@ namespace Orleans.Persistence.EntityFrameworkCore.MySql.Data
 namespace Orleans.Persistence.EntityFrameworkCore.MySql.Data.Migrations
 {
     [Microsoft.EntityFrameworkCore.Infrastructure.DbContext(typeof(MySqlGrainStateDbContext))]
-    [Microsoft.EntityFrameworkCore.Migrations.Migration("20260811210104_InitialPersistenceSchema")]
+    [Microsoft.EntityFrameworkCore.Migrations.Migration("20260823101339_InitialPersistenceSchema")]
     public partial class InitialPersistenceSchema : Microsoft.EntityFrameworkCore.Migrations.Migration
     {
         protected override void BuildTargetModel(Microsoft.EntityFrameworkCore.ModelBuilder modelBuilder) { }
