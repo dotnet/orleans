@@ -95,8 +95,11 @@ export function markdownCompanionPath(route: string): string {
   return `${route.replace(/\/$/, '')}.md`;
 }
 
-export function nugetHref(packageName: string): string | undefined {
-  if (Object.hasOwn(unpublishedApiPackages.packages, packageName)) {
+export function nugetHref(
+  packageName: string,
+  unpublishedPackages: Readonly<Record<string, string>> = unpublishedApiPackages.packages,
+): string | undefined {
+  if (Object.hasOwn(unpublishedPackages, packageName)) {
     return undefined;
   }
   return `https://www.nuget.org/packages/${encodeURIComponent(packageName)}`;
