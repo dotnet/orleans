@@ -634,7 +634,8 @@ public static class AppHostExamples
                 new DynamoDBProviderConfiguration(
                     aws,
                     pubSubStore.Resource.Name,
-                    infrastructureOwnsTable: true))
+                    infrastructureOwnsTable: true,
+                    serviceId: topology.ServiceId))
             .WithStreaming(
                 topology.ProviderName,
                 new KinesisProviderConfiguration(
@@ -860,6 +861,7 @@ public static class AppHostExamples
                 .WithEnvironment($"{prefix}__Region", region)
                 .WithEnvironment($"{prefix}__Checkpoint__Type", "DynamoDB")
                 .WithEnvironment($"{prefix}__Checkpoint__ServiceKey", checkpointServiceKey)
+                .WithEnvironment($"{prefix}__Checkpoint__Region", region)
                 .WithEnvironment($"{prefix}__Checkpoint__CreateIfNotExists", "false")
                 .WithEnvironment($"{prefix}__Checkpoint__UseProvisionedThroughput", "false");
         }
