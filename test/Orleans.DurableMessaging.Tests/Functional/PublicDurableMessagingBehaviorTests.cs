@@ -328,6 +328,26 @@ public sealed class PublicDurableMessagingBehaviorTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task InboxDeadLetterRemoval_IsDurable()
+    {
+        var receiver = NewGrain();
+        using var malformed = CreateEnvelope(receiver, "wrong-body", "typed");
+        Assert.Equal(DeliveryStatus.Accepted, (await DeliverAsync(receiver, malformed.Value)).Status);
+        _ = await fixture.WaitForDeadLetterCountAsync(receiver, 1);
+
+        Assert.True(await receiver.RemoveInboxDeadLetterAsync(
+            malformed.Value.SenderId,
+            malformed.Value.MessageId));
+        Assert.Empty((await receiver.GetSnapshotAsync()).InboxDeadLetters);
+        Assert.False(await receiver.RemoveInboxDeadLetterAsync(
+            malformed.Value.SenderId,
+            malformed.Value.MessageId));
+
+        await receiver.RequestDeactivationAsync();
+        Assert.Empty((await receiver.GetSnapshotAsync()).InboxDeadLetters);
+    }
+
+    [Fact]
     public async Task StagedOutboxWithoutCommit_IsRemovedOnReactivationAndNeverDispatched()
     {
         var sender = NewGrain();
@@ -871,6 +891,25 @@ public sealed class PublicDurableMessagingBehaviorTests : IAsyncLifetime
         Assert.Equal(0, receiverState.InboxCount);
         Assert.Empty(receiverState.Effects);
         Assert.Empty(receiverState.InboxDeadLetters);
+    }
+
+    [Fact]
+    public async Task OutboxDeadLetterRemoval_IsDurable()
+    {
+        var sender = NewGrain();
+        var receiver = NewGrain();
+        var messageId = await sender.SendAsync(
+            receiver.GetGrainId(),
+            "unknown/removable-outbox-route",
+            NewMessage(73, "removable-undeliverable"));
+        _ = await fixture.WaitForDeadLetterCountAsync(sender, 1);
+
+        Assert.True(await sender.RemoveOutboxDeadLetterAsync(messageId));
+        Assert.Empty((await sender.GetSnapshotAsync()).OutboxDeadLetters);
+        Assert.False(await sender.RemoveOutboxDeadLetterAsync(messageId));
+
+        await sender.RequestDeactivationAsync();
+        Assert.Empty((await sender.GetSnapshotAsync()).OutboxDeadLetters);
     }
 
     private IDurableMessagingTestGrain NewGrain() =>
