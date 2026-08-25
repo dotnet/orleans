@@ -130,6 +130,10 @@ internal sealed class KinesisAspireTestApp : IAsyncDisposable
         DistributedApplicationOperation operation = DistributedApplicationOperation.Run)
         => GetEnvironmentVariablesAsync(_silo, includeClustering: false, operation);
 
+    internal Task<IReadOnlyDictionary<string, string?>> GetSiloEnvironmentIncludingClusteringAsync(
+        DistributedApplicationOperation operation = DistributedApplicationOperation.Run)
+        => GetEnvironmentVariablesAsync(_silo, includeClustering: true, operation);
+
     public Task<IReadOnlyDictionary<string, string?>> GetClientEnvironmentAsync(
         DistributedApplicationOperation operation = DistributedApplicationOperation.Run)
         => GetEnvironmentVariablesAsync(_client, includeClustering: false, operation);

@@ -602,6 +602,72 @@ public sealed class KinesisAspireIntegrationTests
             });
             Assert.Equal("intentional scope failure", exception.Message);
             AssertEnvironment(sentinelValues);
+
+            var completeGenerated = await app.GetSiloEnvironmentIncludingClusteringAsync();
+            string[] ambientAwsVariables =
+            [
+                "AWS_REGION",
+                "AWS_DEFAULT_REGION",
+                "AWS_PROFILE",
+                "AWS__Region",
+                "AWS__Profile",
+                "AWS_ENDPOINT_URL_KINESIS",
+                "AWS_ENDPOINT_URL_DYNAMODB",
+                "AWS_ACCESS_KEY_ID",
+                "AWS_SECRET_ACCESS_KEY",
+                "AWS_SESSION_TOKEN",
+            ];
+            var touchedKeys = completeGenerated.Keys
+                .Concat(ambientAwsVariables)
+                .Distinct(StringComparer.Ordinal)
+                .Order(StringComparer.Ordinal)
+                .ToArray();
+            var completeOriginalValues = touchedKeys.ToDictionary(
+                key => key,
+                Environment.GetEnvironmentVariable,
+                StringComparer.Ordinal);
+            var completeSeedValues = touchedKeys.ToDictionary(
+                key => key,
+                key => key is "AWS_ENDPOINT_URL_DYNAMODB" or "AWS_SECRET_ACCESS_KEY"
+                    ? null
+                    : $"sentinel-{key}-\u2603",
+                StringComparer.Ordinal);
+            var completeActiveValues = touchedKeys.ToDictionary(
+                key => key,
+                key => completeGenerated.TryGetValue(key, out var value) ? value : null,
+                StringComparer.Ordinal);
+
+            try
+            {
+                SetEnvironment(completeSeedValues);
+                using (await app.CreateEnvironmentScopeAsync(KinesisAspireResourceRole.Silo))
+                {
+                    AssertEnvironment(completeActiveValues);
+                }
+
+                AssertEnvironment(completeSeedValues);
+
+                SetEnvironment(completeSeedValues);
+                var completeBodyException = await Assert.ThrowsAsync<InvalidOperationException>(async () =>
+                {
+                    using var scope = await app.CreateEnvironmentScopeAsync(KinesisAspireResourceRole.Silo);
+                    AssertEnvironment(completeActiveValues);
+                    throw new InvalidOperationException("intentional complete-scope failure");
+                });
+                Assert.Equal("intentional complete-scope failure", completeBodyException.Message);
+                AssertEnvironment(completeSeedValues);
+
+                SetEnvironment(completeSeedValues);
+                var constructionException = await Assert.ThrowsAsync<InvalidOperationException>(() =>
+                    app.CreateSiloHost(_ =>
+                        throw new InvalidOperationException("intentional host-construction failure")));
+                Assert.Equal("intentional host-construction failure", constructionException.Message);
+                AssertEnvironment(completeSeedValues);
+            }
+            finally
+            {
+                SetEnvironment(completeOriginalValues);
+            }
         }
         finally
         {
@@ -781,19 +847,37 @@ public sealed class KinesisAspireIntegrationTests
             case "UnresolvedConnectionOrTableReference":
             {
                 const string unresolved = "missing-connection-or-table";
-                var config = BuildConfig(new Dictionary<string, string?>
+                var connectionConfig = BuildConfig(new Dictionary<string, string?>
                 {
                     [$"Orleans:Streaming:{provider}:ProviderType"] = "Kinesis",
                     [$"Orleans:Streaming:{provider}:StreamName"] = "orleans-orders",
                     [$"Orleans:Streaming:{provider}:ConnectionName"] = unresolved,
+                }, providerName: provider);
+                using (var host = BuildSiloHost(connectionConfig))
+                {
+                    var exception = Assert.Throws<OrleansConfigurationException>(() => Resolve(host, provider));
+                    Assert.Contains(provider, exception.Message);
+                    Assert.Contains(unresolved, exception.Message);
+                    Assert.Contains("connection string", exception.Message, StringComparison.OrdinalIgnoreCase);
+                }
+
+                var tableConfig = BuildConfig(new Dictionary<string, string?>
+                {
+                    [$"Orleans:Streaming:{provider}:ProviderType"] = "Kinesis",
+                    [$"Orleans:Streaming:{provider}:StreamName"] = "orleans-orders",
+                    [$"Orleans:Streaming:{provider}:Region"] = "us-west-2",
                     [$"Orleans:Streaming:{provider}:Checkpoint:Type"] = "DynamoDB",
                     [$"Orleans:Streaming:{provider}:Checkpoint:ServiceKey"] = unresolved,
                 }, providerName: provider);
-                using var host = BuildSiloHost(config);
-                var exception = Assert.Throws<OrleansConfigurationException>(() => Resolve(host, provider));
-                Assert.Contains(provider, exception.Message);
-                Assert.Contains(unresolved, exception.Message);
-                Assert.Contains("connection string", exception.Message, StringComparison.OrdinalIgnoreCase);
+                using var tableHost = BuildSiloHost(tableConfig);
+                var tableException = Assert.Throws<OrleansConfigurationException>(() =>
+                    tableHost.Services
+                        .GetRequiredService<IOptionsMonitor<DynamoDBStreamQueueCheckpointerOptions>>()
+                        .Get(provider));
+                Assert.Equal(
+                    $"Kinesis stream provider '{provider}' references DynamoDB checkpoint resource '{unresolved}', " +
+                    "but its AWS Aspire TableName output is missing.",
+                    tableException.Message);
                 break;
             }
             case "UnsupportedCheckpointType":
@@ -905,6 +989,77 @@ public sealed class KinesisAspireIntegrationTests
                     Assert.Equal("http://dynamodb-endpoint:4566", checkpoint.Service);
                 }
 
+                var directArnConflictConfig = BuildConfig(new Dictionary<string, string?>
+                {
+                    [$"Orleans:Streaming:{provider}:ProviderType"] = "Kinesis",
+                    [$"Orleans:Streaming:{provider}:ServiceKey"] = "referenced-stream",
+                    [$"Orleans:Streaming:{provider}:StreamArn"] =
+                        "arn:aws:kinesis:eu-north-1:123456789012:stream/direct-stream",
+                    ["AWS:Resources:referenced-stream:StreamArn"] =
+                        "arn:aws:kinesis:us-west-1:123456789012:stream/referenced-stream",
+                }, providerName: provider);
+                using (var host = BuildSiloHost(directArnConflictConfig))
+                {
+                    var options = Resolve(host, provider);
+                    Assert.Equal("direct-stream", options.StreamName);
+                    Assert.Equal("eu-north-1", options.Region);
+                }
+
+                var simultaneousRegionConfig = BuildConfig(new Dictionary<string, string?>
+                {
+                    [$"Orleans:Streaming:{provider}:ProviderType"] = "Kinesis",
+                    [$"Orleans:Streaming:{provider}:StreamName"] = "region-precedence-stream",
+                    [$"Orleans:Streaming:{provider}:Checkpoint:Type"] = "DynamoDB",
+                    [$"Orleans:Streaming:{provider}:Checkpoint:TableName"] = "region-precedence-checkpoints",
+                    ["AWS:Region"] = "eu-west-1",
+                    ["AWS_REGION"] = "ap-northeast-1",
+                    ["AWS_DEFAULT_REGION"] = "sa-east-1",
+                }, providerName: provider);
+                using (var host = BuildSiloHost(simultaneousRegionConfig))
+                {
+                    var options = Resolve(host, provider);
+                    var checkpoint = host.Services
+                        .GetRequiredService<IOptionsMonitor<DynamoDBStreamQueueCheckpointerOptions>>()
+                        .Get(provider);
+                    Assert.Equal("region-precedence-stream", options.StreamName);
+                    Assert.Equal("eu-west-1", options.Region);
+                    Assert.Equal("region-precedence-checkpoints", checkpoint.TableName);
+                    Assert.Equal("eu-west-1", checkpoint.Service);
+                }
+
+                string[] malformedArns =
+                [
+                    "arn:aws:sqs:us-west-2:123456789012:stream/wrong-service",
+                    "arn:aws:kinesis::123456789012:stream/missing-region",
+                    "arn:aws:kinesis:us-west-2:123456789012:streams/wrong-prefix",
+                    "arn:aws:kinesis:us-west-2:123456789012:stream/",
+                    "arn:aws:kinesis:us-west-2:123456789012:stream",
+                ];
+                foreach (var malformedArn in malformedArns)
+                {
+                    var malformedConfig = BuildConfig(new Dictionary<string, string?>
+                    {
+                        [$"Orleans:Streaming:{provider}:ProviderType"] = "Kinesis",
+                        [$"Orleans:Streaming:{provider}:StreamArn"] = malformedArn,
+                    }, providerName: provider);
+                    using var malformedHost = BuildSiloHost(malformedConfig);
+                    var malformedException = Assert.Throws<OrleansConfigurationException>(
+                        () => Resolve(malformedHost, provider));
+                    Assert.Equal(
+                        $"Kinesis stream provider '{provider}' has invalid StreamArn '{malformedArn}'.",
+                        malformedException.Message);
+                }
+
+                var duplicateKeyException = Assert.Throws<InvalidOperationException>(() =>
+                    KinesisAspireTestApp.NormalizeConfiguration(new Dictionary<string, string?>
+                    {
+                        ["AWS__Region"] = "us-west-2",
+                        ["AWS:Region"] = "eu-west-1",
+                    }));
+                Assert.Equal(
+                    "Environment keys normalize to duplicate configuration key 'AWS:Region'.",
+                    duplicateKeyException.Message);
+
                 break;
             }
             default:
@@ -978,6 +1133,37 @@ public sealed class KinesisAspireIntegrationTests
             using var host = BuildSiloHost(missingConfig);
             var exception = Assert.Throws<OrleansConfigurationException>(() => Resolve(host, "Orders"));
             Assert.DoesNotContain(sentinels, sentinel => exception.ToString().Contains(sentinel, StringComparison.Ordinal));
+
+            const string invalidBoolean = "credential-path-invalid-boolean";
+            var credentialFailureConfig = BuildConfig(new Dictionary<string, string?>
+            {
+                ["Orleans:Streaming:Orders:ProviderType"] = "Kinesis",
+                ["Orleans:Streaming:Orders:StreamName"] = "credential-failure-stream",
+                ["Orleans:Streaming:Orders:Region"] = "us-west-2",
+                ["Orleans:Streaming:Orders:AccessKey"] = accessSentinel,
+                ["Orleans:Streaming:Orders:SecretKey"] = secretSentinel,
+                ["Orleans:Streaming:Orders:Checkpoint:Type"] = "DynamoDB",
+                ["Orleans:Streaming:Orders:Checkpoint:TableName"] = "credential-failure-checkpoints",
+                ["Orleans:Streaming:Orders:Checkpoint:Service"] = "us-west-2",
+                ["Orleans:Streaming:Orders:Checkpoint:AccessKey"] = accessSentinel,
+                ["Orleans:Streaming:Orders:Checkpoint:SecretKey"] = secretSentinel,
+                ["Orleans:Streaming:Orders:Checkpoint:Token"] = tokenSentinel,
+                ["Orleans:Streaming:Orders:Checkpoint:CreateIfNotExists"] = invalidBoolean,
+            }, providerName: "Orders");
+            using var credentialFailureHost = BuildSiloHost(credentialFailureConfig);
+            var credentialOptions = Resolve(credentialFailureHost, "Orders");
+            Assert.Equal(accessSentinel, credentialOptions.AccessKey);
+            Assert.Equal(secretSentinel, credentialOptions.SecretKey);
+            var credentialException = Assert.Throws<OrleansConfigurationException>(() =>
+                credentialFailureHost.Services
+                    .GetRequiredService<IOptionsMonitor<DynamoDBStreamQueueCheckpointerOptions>>()
+                    .Get("Orders"));
+            Assert.Equal(
+                $"Kinesis stream provider 'Orders' has invalid DynamoDB checkpoint CreateIfNotExists value '{invalidBoolean}'.",
+                credentialException.Message);
+            var diagnosticOutput = $"{credentialException}{Environment.NewLine}{credentialOptions}";
+            Assert.DoesNotContain(sentinels, sentinel =>
+                diagnosticOutput.Contains(sentinel, StringComparison.Ordinal));
         }
         finally
         {
