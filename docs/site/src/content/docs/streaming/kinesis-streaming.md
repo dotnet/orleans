@@ -42,7 +42,7 @@ The provider configuration references the AWS SDK metadata and emits the Kinesis
 
 :::code language="csharp" source="../host/snippets/aspire/AppHost/AppHostExamples.cs" id="kinesis_provider_configuration":::
 
-`WithReference(stream)` maps the CDK `StreamArn` output to `AWS:Resources:orders-stream:StreamArn`. The provider validates the ARN, while the shared topology supplies the effective stream name and region. The DynamoDB references map each `TableName` output through its service key. The generated environment contains provider, region, and resource metadata, plus profile metadata when the AWS SDK configuration selects a profile. The AWS SDK credential chain supplies workload credentials.
+`WithReference(stream)` maps the CDK `StreamArn` output to `AWS:Resources:orders-stream:StreamArn`. The provider validates the ARN, while the shared topology supplies the effective stream name and region. The DynamoDB references map each `TableName` output through its service key. Provider-local configuration carries the checkpoint region and `PubSubStore` service ID in every deployment mode. Run-mode environment contains AWS profile and region metadata when the AWS SDK configuration selects them, and the AWS SDK credential chain supplies workload credentials.
 
 The `PubSubStore` table uses the `GrainReference` partition key and `GrainType` sort key required by DynamoDB grain storage. The checkpoint table uses `CheckpointNamespace` and `Partition`. CDK configures both tables for on-demand billing, and Orleans receives `CreateIfNotExists=false`, `UpdateIfExists=false`, and `UseProvisionedThroughput=false` for the infrastructure-owned grain storage. The direct checkpoint provider receives `CreateIfNotExists=false` and `UseProvisionedThroughput=false`.
 
