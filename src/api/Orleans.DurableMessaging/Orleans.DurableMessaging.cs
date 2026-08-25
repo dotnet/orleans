@@ -230,6 +230,9 @@ namespace Orleans.DurableMessaging
         System.Collections.Generic.IReadOnlyList<DurableDeadLetter> InboxDeadLetters { get; }
 
         System.Collections.Generic.IReadOnlyList<DurableDeadLetter> OutboxDeadLetters { get; }
+
+        bool RemoveInboxDeadLetter(Runtime.GrainId senderId, System.Guid messageId);
+        bool RemoveOutboxDeadLetter(System.Guid messageId);
     }
 
     public partial interface IDurableOutbox
