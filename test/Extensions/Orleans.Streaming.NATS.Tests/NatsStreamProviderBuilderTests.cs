@@ -159,6 +159,22 @@ public sealed class NatsStreamProviderBuilderTests
     }
 
     [Fact]
+    public void Configure_InvalidIntegerSetting_IdentifiesConfigurationSection()
+    {
+        const string providerName = "orders";
+        var configurationSectionPath = $"Orleans:Streaming:{providerName}";
+        var builder = new TestSiloBuilder(CreateConfiguration(
+            ($"{configurationSectionPath}:ConnectionString", "nats://localhost:4222"),
+            ($"{configurationSectionPath}:PartitionCount", "many")));
+
+        var exception = Assert.Throws<OrleansConfigurationException>(
+            () => Configure(builder, providerName));
+
+        Assert.Contains(configurationSectionPath, exception.Message, StringComparison.Ordinal);
+        Assert.Contains(nameof(NatsOptions.PartitionCount), exception.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void Assembly_RegistersStableManualAndAspireProviderTypes()
     {
         var registrations = typeof(NatsStreamProviderBuilder)

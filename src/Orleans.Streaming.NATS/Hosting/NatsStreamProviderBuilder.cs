@@ -191,7 +191,8 @@ public sealed class NatsStreamProviderBuilder : IProviderBuilder<ISiloBuilder>, 
             || result < minimumValue)
         {
             throw new OrleansConfigurationException(
-                $"NATS stream provider setting '{key}' must be an integer greater than or equal to {minimumValue}.");
+                $"NATS stream provider configuration section '{configurationSection.Path}' setting '{key}' " +
+                $"must be an integer greater than or equal to {minimumValue}.");
         }
 
         return result;
