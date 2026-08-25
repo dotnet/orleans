@@ -48,11 +48,12 @@ public sealed class ReminderTestKitClusterIntegrationTests
     {
         var builder = new InProcessTestClusterBuilder(1);
         var oracle = builder.UseIdealizedReminderTable();
+        using var observer = ReminderDiagnosticObserver.Create();
         var cluster = builder.Build();
 
         try
         {
-            await cluster.DeployAsync();
+            await DeployAndWaitForReminderServicesAsync(cluster, observer);
             var grain = cluster.Client.GetGrain<IReminderTestKitGrain>(Guid.NewGuid());
             var grainId = grain.GetGrainId();
             var period = TimeSpan.FromMinutes(5);
@@ -93,11 +94,12 @@ public sealed class ReminderTestKitClusterIntegrationTests
     {
         var builder = new InProcessTestClusterBuilder(1);
         var oracle = builder.UseIdealizedReminderTable();
+        using var observer = ReminderDiagnosticObserver.Create();
         var cluster = builder.Build();
 
         try
         {
-            await cluster.DeployAsync();
+            await DeployAndWaitForReminderServicesAsync(cluster, observer);
             var grain = cluster.Client.GetGrain<IReminderTestKitGrain>(Guid.NewGuid());
 
             await grain.RegisterReminderAsync("updated-reminder", TimeSpan.FromMinutes(5), TimeSpan.FromMinutes(5));
@@ -125,11 +127,12 @@ public sealed class ReminderTestKitClusterIntegrationTests
     {
         var builder = new InProcessTestClusterBuilder(1);
         var oracle = builder.UseIdealizedReminderTable();
+        using var observer = ReminderDiagnosticObserver.Create();
         var cluster = builder.Build();
 
         try
         {
-            await cluster.DeployAsync();
+            await DeployAndWaitForReminderServicesAsync(cluster, observer);
             var grain = cluster.Client.GetGrain<IReminderTestKitGrain>(Guid.NewGuid());
 
             oracle.SetAvailable(false);
@@ -174,7 +177,7 @@ public sealed class ReminderTestKitClusterIntegrationTests
 
         try
         {
-            await cluster.DeployAsync();
+            await DeployAndWaitForReminderServicesAsync(cluster, observer);
             var grain = cluster.Client.GetGrain<IReminderTestKitGrain>(Guid.NewGuid());
             var grainId = grain.GetGrainId();
             using var cancellation = new CancellationTokenSource(TimeSpan.FromSeconds(30));
@@ -217,7 +220,7 @@ public sealed class ReminderTestKitClusterIntegrationTests
 
         try
         {
-            await cluster.DeployAsync();
+            await DeployAndWaitForReminderServicesAsync(cluster, observer);
             var grain = cluster.Client.GetGrain<IReminderTestKitGrain>(Guid.NewGuid());
             var grainId = grain.GetGrainId();
             var timerLimit = TimeSpan.FromMilliseconds(0xfffffffe) + TimeSpan.FromMilliseconds(1);
@@ -267,7 +270,7 @@ public sealed class ReminderTestKitClusterIntegrationTests
 
         try
         {
-            await cluster.DeployAsync();
+            await DeployAndWaitForReminderServicesAsync(cluster, observer);
             var grain = cluster.Client.GetGrain<IReminderTestKitGrain>(Guid.NewGuid());
             var grainId = grain.GetGrainId();
             var dueTime = loadingWindow + TimeSpan.FromMinutes(1);
@@ -320,7 +323,7 @@ public sealed class ReminderTestKitClusterIntegrationTests
 
         try
         {
-            await cluster.DeployAsync();
+            await DeployAndWaitForReminderServicesAsync(cluster, observer);
             var grain = cluster.Client.GetGrain<IReminderTestKitGrain>(Guid.NewGuid());
             var grainId = grain.GetGrainId();
             using var cancellation = new CancellationTokenSource(TimeSpan.FromSeconds(30));
@@ -374,7 +377,7 @@ public sealed class ReminderTestKitClusterIntegrationTests
 
         try
         {
-            await cluster.DeployAsync();
+            await DeployAndWaitForReminderServicesAsync(cluster, observer);
             var grain = cluster.Client.GetGrain<IReminderTestKitGrain>(Guid.NewGuid());
             var grainId = grain.GetGrainId();
             var dueTime = TimeSpan.FromMinutes(10);
@@ -425,6 +428,18 @@ public sealed class ReminderTestKitClusterIntegrationTests
             await cluster.StopAllSilosAsync();
             await cluster.DisposeAsync();
         }
+    }
+
+    private static async Task DeployAndWaitForReminderServicesAsync(
+        InProcessTestCluster cluster,
+        ReminderDiagnosticObserver observer)
+    {
+        await cluster.DeployAsync();
+
+        using var cancellation = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+        var started = cluster.Silos.Select(silo =>
+            observer.WaitForReminderServiceStartedAsync(cancellation.Token, silo.SiloAddress));
+        await Task.WhenAll(started);
     }
 
     private static async Task AdvanceUntilAsync(
