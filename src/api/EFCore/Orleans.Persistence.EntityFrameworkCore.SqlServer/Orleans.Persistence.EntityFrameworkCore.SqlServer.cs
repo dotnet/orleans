@@ -44,7 +44,7 @@ namespace Orleans.Persistence.EntityFrameworkCore.SqlServer.Data
 namespace Orleans.Persistence.EntityFrameworkCore.SqlServer.Data.Migrations
 {
     [Microsoft.EntityFrameworkCore.Infrastructure.DbContext(typeof(SqlServerGrainStateDbContext))]
-    [Microsoft.EntityFrameworkCore.Migrations.Migration("20260811210111_InitialPersistenceSchema")]
+    [Microsoft.EntityFrameworkCore.Migrations.Migration("20260823101553_InitialPersistenceSchema")]
     public partial class InitialPersistenceSchema : Microsoft.EntityFrameworkCore.Migrations.Migration
     {
         protected override void BuildTargetModel(Microsoft.EntityFrameworkCore.ModelBuilder modelBuilder) { }
