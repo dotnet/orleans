@@ -87,6 +87,23 @@ public sealed class DurableMessagingPumpResultsTests
     }
 
     [Fact]
+    public void CapacityExhaustedByRunningExecution_RejectsNewStartWithoutLosingRunningExecution()
+    {
+        var results = new PumpResults(new FakeTimeProvider(), TimeSpan.FromMinutes(1), TimeSpan.FromMinutes(1), 1);
+        var runningKey = results.CreateKey("job", "running", "run");
+        var rejectedKey = results.CreateKey("job", "rejected", "run");
+        Assert.True(results.TryStart(runningKey, out var execution));
+        Assert.True(results.TryBegin(execution));
+
+        Assert.False(results.TryStart(rejectedKey, out _));
+        results.Complete(execution);
+
+        Assert.True(results.TryTake(runningKey, out var result, out var exception));
+        Assert.Same(DurableJobRunResult.Completed, result);
+        Assert.Null(exception);
+    }
+
+    [Fact]
     public void DifferentRunId_DoesNotObserveOlderResult()
     {
         var results = new PumpResults();
