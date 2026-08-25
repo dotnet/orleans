@@ -1161,6 +1161,40 @@ IZulu [Version(1)]";
     }
 
     [Fact]
+    public async Task CodeFix_AddGrainClass_IncludesConventionBasedGrainType()
+    {
+        const string source = @"
+public class ShoppingCartGrain : Grain, IGrainWithStringKey
+{
+}
+";
+
+        var content = await ApplyCodeFixAndGetContractsAsync(
+            source,
+            string.Empty,
+            GrainInterfaceVersionAnalyzer.RuleId0022);
+
+        Assert.Equal("class [GrainType(\"shoppingcart\")] ShoppingCartGrain\n", content);
+    }
+
+    [Fact]
+    public async Task CodeFix_AddGenericGrainClass_IncludesConventionBasedGrainType()
+    {
+        const string source = @"
+public class ShoppingCartGrain<T> : Grain, IGrainWithStringKey
+{
+}
+";
+
+        var content = await ApplyCodeFixAndGetContractsAsync(
+            source,
+            string.Empty,
+            GrainInterfaceVersionAnalyzer.RuleId0022);
+
+        Assert.Equal("class [GrainType(\"shoppingcart`1\")] ShoppingCartGrain<T>\n", content);
+    }
+
+    [Fact]
     public async Task CodeFix_AddRecordGrainClass()
     {
         const string source = @"
@@ -1313,6 +1347,50 @@ public interface IMyGrain : IGrain
     }
 
     [Fact]
+    public async Task CodeFix_AddInterface_IncludesConventionBasedGrainInterfaceType()
+    {
+        const string source = @"
+namespace Contoso.Grains
+{
+    public interface IShoppingCartGrain : IGrain
+    {
+    }
+}
+";
+
+        var content = await ApplyCodeFixAndGetContractsAsync(
+            source,
+            string.Empty,
+            GrainInterfaceVersionAnalyzer.RuleId0016);
+
+        Assert.Equal(
+            "interface [GrainInterfaceType(\"Contoso.Grains.IShoppingCartGrain\")] Contoso.Grains.IShoppingCartGrain [Version(0)]\n",
+            content);
+    }
+
+    [Fact]
+    public async Task CodeFix_AddGenericInterface_IncludesConventionBasedGrainInterfaceType()
+    {
+        const string source = @"
+namespace Contoso.Grains
+{
+    public interface IShoppingCartGrain<T> : IGrain
+    {
+    }
+}
+";
+
+        var content = await ApplyCodeFixAndGetContractsAsync(
+            source,
+            string.Empty,
+            GrainInterfaceVersionAnalyzer.RuleId0016);
+
+        Assert.Equal(
+            "interface [GrainInterfaceType(\"Contoso.Grains.IShoppingCartGrain`1\")] Contoso.Grains.IShoppingCartGrain<T> [Version(0)]\n",
+            content);
+    }
+
+    [Fact]
     public async Task CodeFix_AddInterface_SortsContractsAndMembers()
     {
         const string source = @"
@@ -1350,11 +1428,39 @@ public interface IMiddle : IGrain
         Assert.Equal(
             "interface IAlpha [Version(1)]\n" +
             "  Method() -> Task\n\n" +
-            "interface IMiddle [Version(1)]\n" +
+            "interface [GrainInterfaceType(\"IMiddle\")] IMiddle [Version(1)]\n" +
             "  Alpha() -> Task\n" +
             "  Zeta() -> Task\n\n" +
             "interface IZulu [Version(1)]\n" +
             "  Method() -> Task\n",
+            content);
+    }
+
+    [Fact]
+    public async Task CodeFix_RemovesGeneratedHeader()
+    {
+        const string source = @"
+public interface IMyGrain : IGrain
+{
+}
+";
+        const string contractsFile = @"# This file tracks grain interface versions for compatibility during rolling upgrades.
+# Format:
+#   # Namespace.GrainClass
+#   class [GrainType(""identity"")] Namespace.GrainClass
+#   # Namespace.IInterface
+#   interface [GrainInterfaceType(""identity"")] Namespace.IInterface [Version(N)]
+#   # Namespace.IInterface.Method(params) -> ReturnType
+#   contract-signature
+";
+
+        var content = await ApplyCodeFixAndGetContractsAsync(
+            source,
+            contractsFile,
+            GrainInterfaceVersionAnalyzer.RuleId0016);
+
+        Assert.Equal(
+            "interface [GrainInterfaceType(\"IMyGrain\")] IMyGrain [Version(0)]" + Environment.NewLine,
             content);
     }
 

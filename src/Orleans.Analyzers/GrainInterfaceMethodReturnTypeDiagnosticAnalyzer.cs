@@ -27,7 +27,8 @@ namespace Orleans.Analyzers
             description: new LocalizableResourceString(
                 nameof(Resources.GrainInterfaceMethodReturnTypeDescription),
                 Resources.ResourceManager,
-                typeof(Resources)));
+                typeof(Resources)),
+            helpLinkUri: Constants.GetDiagnosticHelpLink(DiagnosticId));
         private static readonly DiagnosticDescriptor InvalidMappingRule = new(
             InvalidMappingDiagnosticId,
             new LocalizableResourceString(nameof(Resources.InvalidInvokableBaseTypeMappingTitle), Resources.ResourceManager, typeof(Resources)),
@@ -38,7 +39,8 @@ namespace Orleans.Analyzers
             description: new LocalizableResourceString(
                 nameof(Resources.InvalidInvokableBaseTypeMappingDescription),
                 Resources.ResourceManager,
-                typeof(Resources)));
+                typeof(Resources)),
+            helpLinkUri: Constants.GetDiagnosticHelpLink(InvalidMappingDiagnosticId));
 
         public override ImmutableArray<DiagnosticDescriptor> SupportedDiagnostics { get; } = [Rule, InvalidMappingRule];
 

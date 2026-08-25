@@ -1,9 +1,9 @@
-interface Orleans.Transactions.Abstractions.ITransactionManagerExtension [Version(0)]
+interface [GrainInterfaceType("Orleans.Transactions.Abstractions.ITransactionManagerExtension")] Orleans.Transactions.Abstractions.ITransactionManagerExtension [Version(0)]
   Ping(string, System.Guid, System.DateTime, Orleans.Transactions.ParticipantId) -> Task
   PrepareAndCommit(string, System.Guid, Orleans.Transactions.Abstractions.AccessCounter, System.DateTime, System.Collections.Generic.List<Orleans.Transactions.ParticipantId>, int) -> Task<Orleans.Transactions.TransactionalStatus>
   Prepared(string, System.Guid, System.DateTime, Orleans.Transactions.ParticipantId, Orleans.Transactions.TransactionalStatus) -> Task
 
-interface Orleans.Transactions.Abstractions.ITransactionalResourceExtension [Version(0)]
+interface [GrainInterfaceType("Orleans.Transactions.Abstractions.ITransactionalResourceExtension")] Orleans.Transactions.Abstractions.ITransactionalResourceExtension [Version(0)]
   Abort(string, System.Guid) -> Task
   Cancel(string, System.Guid, System.DateTime, Orleans.Transactions.TransactionalStatus) -> Task
   CommitReadOnly(string, System.Guid, Orleans.Transactions.Abstractions.AccessCounter, System.DateTime) -> Task<Orleans.Transactions.TransactionalStatus>

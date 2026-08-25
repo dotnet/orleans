@@ -39,7 +39,8 @@ public class ConfigureAwaitAnalyzer : DiagnosticAnalyzer
         category: "Usage",
         defaultSeverity: DiagnosticSeverity.Warning,
         isEnabledByDefault: true,
-        description: Description);
+        description: Description,
+        helpLinkUri: Constants.GetDiagnosticHelpLink(RuleId));
 
     public override ImmutableArray<DiagnosticDescriptor> SupportedDiagnostics => ImmutableArray.Create(Rule);
 

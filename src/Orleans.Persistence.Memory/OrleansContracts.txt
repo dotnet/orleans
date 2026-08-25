@@ -1,1 +1,1 @@
-class Orleans.Storage.MemoryStorageGrain
+class [GrainType("memorystorage")] Orleans.Storage.MemoryStorageGrain

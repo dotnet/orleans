@@ -56,7 +56,8 @@ public sealed partial class GrainInterfaceVersionAnalyzer : DiagnosticAnalyzer
         category: "Orleans.Versioning",
         defaultSeverity: DiagnosticSeverity.Warning,
         isEnabledByDefault: true,
-        description: new LocalizableResourceString(nameof(Resources.GrainInterfaceNotDeclaredDescription), Resources.ResourceManager, typeof(Resources)));
+        description: new LocalizableResourceString(nameof(Resources.GrainInterfaceNotDeclaredDescription), Resources.ResourceManager, typeof(Resources)),
+        helpLinkUri: Constants.GetDiagnosticHelpLink(RuleId0016));
 
     private static readonly DiagnosticDescriptor InterfaceVersionMismatchRule = new(
         id: RuleId0017,
@@ -65,7 +66,8 @@ public sealed partial class GrainInterfaceVersionAnalyzer : DiagnosticAnalyzer
         category: "Orleans.Versioning",
         defaultSeverity: DiagnosticSeverity.Warning,
         isEnabledByDefault: true,
-        description: new LocalizableResourceString(nameof(Resources.GrainInterfaceVersionMismatchDescription), Resources.ResourceManager, typeof(Resources)));
+        description: new LocalizableResourceString(nameof(Resources.GrainInterfaceVersionMismatchDescription), Resources.ResourceManager, typeof(Resources)),
+        helpLinkUri: Constants.GetDiagnosticHelpLink(RuleId0017));
 
     private static readonly DiagnosticDescriptor MemberNotDeclaredRule = new(
         id: RuleId0018,
@@ -74,7 +76,8 @@ public sealed partial class GrainInterfaceVersionAnalyzer : DiagnosticAnalyzer
         category: "Orleans.Versioning",
         defaultSeverity: DiagnosticSeverity.Warning,
         isEnabledByDefault: true,
-        description: new LocalizableResourceString(nameof(Resources.GrainInterfaceMemberNotDeclaredDescription), Resources.ResourceManager, typeof(Resources)));
+        description: new LocalizableResourceString(nameof(Resources.GrainInterfaceMemberNotDeclaredDescription), Resources.ResourceManager, typeof(Resources)),
+        helpLinkUri: Constants.GetDiagnosticHelpLink(RuleId0018));
 
     private static readonly DiagnosticDescriptor RemovedInterfaceNotRetiredRule = new(
         id: RuleId0019,
@@ -84,6 +87,7 @@ public sealed partial class GrainInterfaceVersionAnalyzer : DiagnosticAnalyzer
         defaultSeverity: DiagnosticSeverity.Warning,
         isEnabledByDefault: true,
         description: new LocalizableResourceString(nameof(Resources.GrainInterfaceRemovedNotRetiredDescription), Resources.ResourceManager, typeof(Resources)),
+        helpLinkUri: Constants.GetDiagnosticHelpLink(RuleId0019),
         customTags: WellKnownDiagnosticTags.CompilationEnd);
 
     private static readonly DiagnosticDescriptor OrleansContractsFileMissingRule = new(
@@ -94,6 +98,7 @@ public sealed partial class GrainInterfaceVersionAnalyzer : DiagnosticAnalyzer
         defaultSeverity: DiagnosticSeverity.Info,
         isEnabledByDefault: true,
         description: new LocalizableResourceString(nameof(Resources.OrleansContractsFileMissingDescription), Resources.ResourceManager, typeof(Resources)),
+        helpLinkUri: Constants.GetDiagnosticHelpLink(RuleId0020),
         customTags: WellKnownDiagnosticTags.CompilationEnd);
 
     internal static readonly DiagnosticDescriptor DuplicateInterfaceDeclarationRule = new(
@@ -103,7 +108,8 @@ public sealed partial class GrainInterfaceVersionAnalyzer : DiagnosticAnalyzer
         category: "Orleans.Versioning",
         defaultSeverity: DiagnosticSeverity.Warning,
         isEnabledByDefault: true,
-        description: new LocalizableResourceString(nameof(Resources.GrainInterfaceDuplicateDeclarationDescription), Resources.ResourceManager, typeof(Resources)));
+        description: new LocalizableResourceString(nameof(Resources.GrainInterfaceDuplicateDeclarationDescription), Resources.ResourceManager, typeof(Resources)),
+        helpLinkUri: Constants.GetDiagnosticHelpLink(RuleId0021));
 
     private static readonly DiagnosticDescriptor GrainClassNotDeclaredRule = new(
         id: RuleId0022,
@@ -112,7 +118,8 @@ public sealed partial class GrainInterfaceVersionAnalyzer : DiagnosticAnalyzer
         category: "Orleans.Versioning",
         defaultSeverity: DiagnosticSeverity.Warning,
         isEnabledByDefault: true,
-        description: new LocalizableResourceString(nameof(Resources.GrainClassNotDeclaredDescription), Resources.ResourceManager, typeof(Resources)));
+        description: new LocalizableResourceString(nameof(Resources.GrainClassNotDeclaredDescription), Resources.ResourceManager, typeof(Resources)),
+        helpLinkUri: Constants.GetDiagnosticHelpLink(RuleId0022));
 
     private static readonly DiagnosticDescriptor GrainClassAliasMismatchRule = new(
         id: RuleId0023,
@@ -121,7 +128,8 @@ public sealed partial class GrainInterfaceVersionAnalyzer : DiagnosticAnalyzer
         category: "Orleans.Versioning",
         defaultSeverity: DiagnosticSeverity.Warning,
         isEnabledByDefault: true,
-        description: new LocalizableResourceString(nameof(Resources.GrainClassAliasMismatchDescription), Resources.ResourceManager, typeof(Resources)));
+        description: new LocalizableResourceString(nameof(Resources.GrainClassAliasMismatchDescription), Resources.ResourceManager, typeof(Resources)),
+        helpLinkUri: Constants.GetDiagnosticHelpLink(RuleId0023));
 
     private static readonly DiagnosticDescriptor RemovedGrainClassNotRetiredRule = new(
         id: RuleId0024,
@@ -131,6 +139,7 @@ public sealed partial class GrainInterfaceVersionAnalyzer : DiagnosticAnalyzer
         defaultSeverity: DiagnosticSeverity.Warning,
         isEnabledByDefault: true,
         description: new LocalizableResourceString(nameof(Resources.GrainClassRemovedNotRetiredDescription), Resources.ResourceManager, typeof(Resources)),
+        helpLinkUri: Constants.GetDiagnosticHelpLink(RuleId0024),
         customTags: WellKnownDiagnosticTags.CompilationEnd);
 
     internal static readonly DiagnosticDescriptor DuplicateGrainClassDeclarationRule = new(
@@ -140,7 +149,8 @@ public sealed partial class GrainInterfaceVersionAnalyzer : DiagnosticAnalyzer
         category: "Orleans.Versioning",
         defaultSeverity: DiagnosticSeverity.Warning,
         isEnabledByDefault: true,
-        description: new LocalizableResourceString(nameof(Resources.GrainClassDuplicateDeclarationDescription), Resources.ResourceManager, typeof(Resources)));
+        description: new LocalizableResourceString(nameof(Resources.GrainClassDuplicateDeclarationDescription), Resources.ResourceManager, typeof(Resources)),
+        helpLinkUri: Constants.GetDiagnosticHelpLink(RuleId0025));
 
     public override ImmutableArray<DiagnosticDescriptor> SupportedDiagnostics =>
         ImmutableArray.Create(
@@ -200,7 +210,6 @@ public sealed partial class GrainInterfaceVersionAnalyzer : DiagnosticAnalyzer
 
     private sealed class Impl
     {
-        private readonly Compilation _compilation;
         private readonly GrainInterfaceData? _data;
         private readonly AdditionalText? _grainInterfacesFile;
         private readonly List<Diagnostic>? _fileParseErrors;
@@ -208,8 +217,6 @@ public sealed partial class GrainInterfaceVersionAnalyzer : DiagnosticAnalyzer
         private readonly ConcurrentDictionary<string, bool> _visitedClasses = new(StringComparer.Ordinal);
         private readonly INamedTypeSymbol? _iAddressableType;
         private readonly INamedTypeSymbol? _aliasAttributeType;
-        private readonly INamedTypeSymbol? _grainInterfaceTypeAttributeType;
-        private readonly INamedTypeSymbol? _grainTypeAttributeType;
         private readonly INamedTypeSymbol? _versionAttributeType;
 
         public Impl(
@@ -218,15 +225,12 @@ public sealed partial class GrainInterfaceVersionAnalyzer : DiagnosticAnalyzer
             AdditionalText? grainInterfacesFile,
             List<Diagnostic>? fileParseErrors)
         {
-            _compilation = compilation;
             _data = data;
             _grainInterfacesFile = grainInterfacesFile;
             _fileParseErrors = fileParseErrors;
 
             _iAddressableType = compilation.GetTypeByMetadataName(Constants.IAddressibleFullyQualifiedName);
             _aliasAttributeType = compilation.GetTypeByMetadataName(Constants.AliasAttributeFullyQualifiedName);
-            _grainInterfaceTypeAttributeType = compilation.GetTypeByMetadataName(Constants.GrainInterfaceTypeAttributeFullyQualifiedName);
-            _grainTypeAttributeType = compilation.GetTypeByMetadataName(Constants.GrainTypeAttributeFullyQualifiedName);
             _versionAttributeType = compilation.GetTypeByMetadataName(Constants.VersionAttributeFullyQualifiedName);
         }
 
@@ -263,7 +267,7 @@ public sealed partial class GrainInterfaceVersionAnalyzer : DiagnosticAnalyzer
             }
 
             // Check if interface is declared in the file
-            var grainInterfaceType = GetGrainInterfaceTypeFromAttribute(namedType);
+            var grainInterfaceType = GetGrainInterfaceType(namedType);
             var declaredInterface = FindDeclaredInterface(interfaceName, grainInterfaceType);
             if (declaredInterface is null)
             {
@@ -469,7 +473,7 @@ public sealed partial class GrainInterfaceVersionAnalyzer : DiagnosticAnalyzer
                 return;
             }
 
-            var codeAlias = GetGrainTypeAliasFromAttribute(namedType);
+            var codeAlias = GetGrainType(namedType);
             var declaredClass = FindDeclaredClass(className, codeAlias);
             if (declaredClass is null || declaredClass.IsRetired)
             {
@@ -484,7 +488,8 @@ public sealed partial class GrainInterfaceVersionAnalyzer : DiagnosticAnalyzer
             }
 
             _visitedClasses.TryAdd(declaredClass.Name, true);
-            if (string.Equals(codeAlias, declaredClass.Alias, StringComparison.Ordinal))
+            if (declaredClass.Alias is null
+                || string.Equals(codeAlias, declaredClass.Alias, StringComparison.Ordinal))
             {
                 return;
             }
@@ -596,45 +601,52 @@ public sealed partial class GrainInterfaceVersionAnalyzer : DiagnosticAnalyzer
             return null;
         }
 
-        private string? GetGrainTypeAliasFromAttribute(ISymbol symbol)
+    }
+
+    internal static string GetGrainType(INamedTypeSymbol type)
+    {
+        if (GetStringAttributeValue(type, Constants.GrainTypeAttributeFullyQualifiedName) is { } grainType)
         {
-            if (_grainTypeAttributeType is null)
-            {
-                return null;
-            }
-
-            foreach (var attribute in symbol.GetAttributes())
-            {
-                if (SymbolEqualityComparer.Default.Equals(attribute.AttributeClass, _grainTypeAttributeType)
-                    && attribute.ConstructorArguments.Length > 0
-                    && attribute.ConstructorArguments[0].Value is string alias)
-                {
-                    return alias;
-                }
-            }
-
-            return null;
+            return grainType;
         }
 
-        private string? GetGrainInterfaceTypeFromAttribute(ISymbol symbol)
+        var name = type.MetadataName.ToLowerInvariant();
+        var arityIndex = name.IndexOf('`');
+        var arity = arityIndex >= 0 ? name.Substring(arityIndex) : string.Empty;
+        if (arityIndex >= 0)
         {
-            if (_grainInterfaceTypeAttributeType is null)
-            {
-                return null;
-            }
-
-            foreach (var attribute in symbol.GetAttributes())
-            {
-                if (SymbolEqualityComparer.Default.Equals(attribute.AttributeClass, _grainInterfaceTypeAttributeType)
-                    && attribute.ConstructorArguments.Length > 0
-                    && attribute.ConstructorArguments[0].Value is string value)
-                {
-                    return value;
-                }
-            }
-
-            return null;
+            name = name.Substring(0, arityIndex);
         }
+
+        const string GrainSuffix = "grain";
+        if (name.EndsWith(GrainSuffix, StringComparison.Ordinal) && name.Length > GrainSuffix.Length)
+        {
+            name = name.Substring(0, name.Length - GrainSuffix.Length);
+        }
+
+        return name + arity;
+    }
+
+    internal static string GetGrainInterfaceType(INamedTypeSymbol type)
+    {
+        if (GetStringAttributeValue(type, Constants.GrainInterfaceTypeAttributeFullyQualifiedName) is { } grainInterfaceType)
+        {
+            return grainInterfaceType;
+        }
+
+        return GetRuntimeTypeName(type);
+    }
+
+    private static string GetRuntimeTypeName(INamedTypeSymbol type)
+    {
+        if (type.ContainingType is { } containingType)
+        {
+            return $"{GetRuntimeTypeName(containingType)}+{type.MetadataName}";
+        }
+
+        return type.ContainingNamespace.IsGlobalNamespace
+            ? type.MetadataName
+            : $"{type.ContainingNamespace.ToDisplayString()}.{type.MetadataName}";
     }
 
     internal static string GetMethodSignature(IMethodSymbol method)

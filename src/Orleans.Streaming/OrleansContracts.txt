@@ -1,26 +1,26 @@
-interface Orleans.Providers.IMemoryStreamQueueGrain [Version(0)]
+interface [GrainInterfaceType("Orleans.Providers.IMemoryStreamQueueGrain")] Orleans.Providers.IMemoryStreamQueueGrain [Version(0)]
   Dequeue(int) -> Task<System.Collections.Generic.List<Orleans.Providers.MemoryMessageData>>
   Enqueue(Orleans.Providers.MemoryMessageData) -> Task
 
-class Orleans.Providers.MemoryStreamQueueGrain
+class [GrainType("memorystreamqueue")] Orleans.Providers.MemoryStreamQueueGrain
 
 # Orleans.Streams.ConfiguredStreamCheckpointGrain
 class [GrainType("stream.checkpoint.configured")] Orleans.Streams.ConfiguredStreamCheckpointGrain
 
-interface Orleans.Streams.IConfiguredStreamCheckpointerGrain [Version(0)]
+interface [GrainInterfaceType("Orleans.Streams.IConfiguredStreamCheckpointerGrain")] Orleans.Streams.IConfiguredStreamCheckpointerGrain [Version(0)]
 
-interface Orleans.Streams.IPersistentStreamPullingAgent [Version(0)]
+interface [GrainInterfaceType("Orleans.Streams.IPersistentStreamPullingAgent")] Orleans.Streams.IPersistentStreamPullingAgent [Version(0)]
   Initialize() -> Task
   Shutdown() -> Task
 
-interface Orleans.Streams.IPersistentStreamPullingManager [Version(0)]
+interface [GrainInterfaceType("Orleans.Streams.IPersistentStreamPullingManager")] Orleans.Streams.IPersistentStreamPullingManager [Version(0)]
   ExecuteCommand(Orleans.Providers.Streams.Common.PersistentStreamProviderCommand, object?) -> Task<object?>
   Initialize() -> Task
   StartAgents() -> Task
   Stop() -> Task
   StopAgents() -> Task
 
-interface Orleans.Streams.IPubSubRendezvousGrain [Version(0)]
+interface [GrainInterfaceType("Orleans.Streams.IPubSubRendezvousGrain")] Orleans.Streams.IPubSubRendezvousGrain [Version(0)]
   ConsumerCount(Orleans.Runtime.QualifiedStreamId) -> Task<int>
   DiagGetConsumers(Orleans.Runtime.QualifiedStreamId) -> Task<Orleans.Streams.PubSubSubscriptionState[]>
   FaultSubscription(Orleans.Runtime.GuidId) -> Task
@@ -32,11 +32,11 @@ interface Orleans.Streams.IPubSubRendezvousGrain [Version(0)]
   UnregisterProducer(Orleans.Runtime.QualifiedStreamId, Orleans.Runtime.GrainId) -> Task
   Validate() -> Task
 
-interface Orleans.Streams.IStreamCheckpointerGrain [Version(0)]
+interface [GrainInterfaceType("Orleans.Streams.IStreamCheckpointerGrain")] Orleans.Streams.IStreamCheckpointerGrain [Version(0)]
   Load(System.Threading.CancellationToken) -> ValueTask<string>
   Update(string, string, System.Threading.CancellationToken) -> ValueTask<string>
 
-interface Orleans.Streams.IStreamConsumerExtension [Version(0)]
+interface [GrainInterfaceType("Orleans.Streams.IStreamConsumerExtension")] Orleans.Streams.IStreamConsumerExtension [Version(0)]
   CompleteStream(Orleans.Runtime.GuidId) -> Task
   DeliverBatch(Orleans.Runtime.GuidId, Orleans.Runtime.QualifiedStreamId, Orleans.Streams.IBatchContainer, Orleans.Streams.StreamHandshakeToken?) -> Task<Orleans.Streams.StreamHandshakeToken?>
   DeliverImmutable(Orleans.Runtime.GuidId, Orleans.Runtime.QualifiedStreamId, object, Orleans.Streams.StreamSequenceToken, Orleans.Streams.StreamHandshakeToken?) -> Task<Orleans.Streams.StreamHandshakeToken?>
@@ -44,13 +44,13 @@ interface Orleans.Streams.IStreamConsumerExtension [Version(0)]
   ErrorInStream(Orleans.Runtime.GuidId, System.Exception) -> Task
   GetSequenceToken(Orleans.Runtime.GuidId) -> Task<Orleans.Streams.StreamHandshakeToken?>
 
-interface Orleans.Streams.IStreamProducerExtension [Version(0)]
+interface [GrainInterfaceType("Orleans.Streams.IStreamProducerExtension")] Orleans.Streams.IStreamProducerExtension [Version(0)]
   AddSubscriber(Orleans.Runtime.GuidId, Orleans.Runtime.QualifiedStreamId, Orleans.Runtime.GrainId, string?) -> Task
   RemoveSubscriber(Orleans.Runtime.GuidId, Orleans.Runtime.QualifiedStreamId) -> Task
 
-class Orleans.Streams.PersistentStreamPullingAgent
+class [GrainType("persistentstreampullingagent")] Orleans.Streams.PersistentStreamPullingAgent
 
-class Orleans.Streams.PersistentStreamPullingManager
+class [GrainType("persistentstreampullingmanager")] Orleans.Streams.PersistentStreamPullingManager
 
 # Orleans.Streams.PubSubRendezvousGrain
 class [GrainType("pubsubrendezvous")] Orleans.Streams.PubSubRendezvousGrain

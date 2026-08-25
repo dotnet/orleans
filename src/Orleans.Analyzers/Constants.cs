@@ -26,5 +26,8 @@ namespace Orleans.Analyzers
         public const string NonSerializedAttributeSourceName = "global::System.NonSerializedAttribute";
 
         public const string OrleansContractsFileName = "OrleansContracts.txt";
+
+        public static string GetDiagnosticHelpLink(string diagnosticId)
+            => $"https://aka.ms/orleans/diagnostics#{diagnosticId.ToLowerInvariant()}";
     }
 }

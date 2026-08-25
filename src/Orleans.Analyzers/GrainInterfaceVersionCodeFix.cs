@@ -227,11 +227,10 @@ public class GrainInterfaceVersionCodeFix : CodeFixProvider
             return solution;
         }
 
-        var alias = GetGrainTypeAliasFromAttributes(classSymbol);
-        var classClrComment = GrainInterfaceVersionAnalyzer.IdentityDiffersFromClrName(alias, classSymbol) ? className : null;
-        var classLine = string.IsNullOrEmpty(alias)
-            ? $"class {className}"
-            : $"class [GrainType(\"{alias}\")] {className}";
+        var explicitGrainType = GetGrainTypeFromAttributes(classSymbol);
+        var grainType = GrainInterfaceVersionAnalyzer.GetGrainType(classSymbol);
+        var classClrComment = GrainInterfaceVersionAnalyzer.IdentityDiffersFromClrName(explicitGrainType, classSymbol) ? className : null;
+        var classLine = $"class [GrainType(\"{grainType}\")] {className}";
         var contractsFile = project.AdditionalDocuments
             .FirstOrDefault(d => Path.GetFileName(d.FilePath ?? d.Name).Equals(Constants.OrleansContractsFileName, StringComparison.OrdinalIgnoreCase));
         if (contractsFile is null)
@@ -400,8 +399,9 @@ public class GrainInterfaceVersionCodeFix : CodeFixProvider
         }
 
         var version = GetVersionFromAttributes(symbol);
-        grainInterfaceType ??= GetGrainInterfaceTypeFromAttributes(symbol);
-        var interfaceClrComment = GrainInterfaceVersionAnalyzer.IdentityDiffersFromClrName(grainInterfaceType, symbol)
+        var explicitGrainInterfaceType = GetGrainInterfaceTypeFromAttributes(symbol);
+        grainInterfaceType ??= GrainInterfaceVersionAnalyzer.GetGrainInterfaceType(symbol);
+        var interfaceClrComment = GrainInterfaceVersionAnalyzer.IdentityDiffersFromClrName(explicitGrainInterfaceType, symbol)
             ? interfaceName
             : null;
 
@@ -482,17 +482,7 @@ public class GrainInterfaceVersionCodeFix : CodeFixProvider
         }
         else
         {
-            // Create new file with header
             var content = new StringBuilder();
-            AppendLine(content, "# This file tracks grain interface versions for compatibility during rolling upgrades.", DefaultNewLine);
-            AppendLine(content, "# Format:", DefaultNewLine);
-            AppendLine(content, "#   # Namespace.GrainClass", DefaultNewLine);
-            AppendLine(content, "#   class [GrainType(\"identity\")] Namespace.GrainClass", DefaultNewLine);
-            AppendLine(content, "#   # Namespace.IInterface", DefaultNewLine);
-            AppendLine(content, "#   interface [GrainInterfaceType(\"identity\")] Namespace.IInterface [Version(N)]", DefaultNewLine);
-            AppendLine(content, "#   # Namespace.IInterface.Method(params) -> ReturnType", DefaultNewLine);
-            AppendLine(content, "#   contract-signature", DefaultNewLine);
-            AppendLine(content, "", DefaultNewLine);
             if (interfaceClrComment is not null)
             {
                 AppendLine(content, $"# {interfaceClrComment}", DefaultNewLine);
@@ -791,7 +781,7 @@ public class GrainInterfaceVersionCodeFix : CodeFixProvider
         {
             var line = lines[lineIndex];
             var trimmedLine = line.TrimStart();
-            if (string.Equals(trimmedLine, "# OrleansContracts.txt", StringComparison.Ordinal))
+            if (IsGeneratedHeaderLine(trimmedLine))
             {
                 continue;
             }
@@ -889,6 +879,17 @@ public class GrainInterfaceVersionCodeFix : CodeFixProvider
         return string.Join(newLine, result) + newLine;
     }
 
+    private static bool IsGeneratedHeaderLine(string line)
+        => line is "# OrleansContracts.txt"
+            or "# This file tracks grain interface versions for compatibility during rolling upgrades."
+            or "# Format:"
+            or "#   # Namespace.GrainClass"
+            or "#   class [GrainType(\"identity\")] Namespace.GrainClass"
+            or "#   # Namespace.IInterface"
+            or "#   interface [GrainInterfaceType(\"identity\")] Namespace.IInterface [Version(N)]"
+            or "#   # Namespace.IInterface.Method(params) -> ReturnType"
+            or "#   contract-signature";
+
     private static string NormalizeComment(string comment)
     {
         var result = comment.Trim();
@@ -973,7 +974,7 @@ public class GrainInterfaceVersionCodeFix : CodeFixProvider
         return null;
     }
 
-    private static string? GetGrainTypeAliasFromAttributes(ISymbol symbol)
+    private static string? GetGrainTypeFromAttributes(ISymbol symbol)
     {
         foreach (var attribute in symbol.GetAttributes())
         {

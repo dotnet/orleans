@@ -13,7 +13,14 @@ namespace Orleans.Analyzers
         private static readonly LocalizableString Title = new LocalizableResourceString(nameof(Resources.AbstractOrStaticMembersCannotBeSerializedTitle), Resources.ResourceManager, typeof(Resources));
         private static readonly LocalizableString MessageFormat = new LocalizableResourceString(nameof(Resources.AbstractOrStaticMembersCannotBeSerializedMessageFormat), Resources.ResourceManager, typeof(Resources));
 
-        internal static readonly DiagnosticDescriptor Rule = new DiagnosticDescriptor(RuleId, Title, MessageFormat, Category, DiagnosticSeverity.Error, isEnabledByDefault: true);
+        internal static readonly DiagnosticDescriptor Rule = new DiagnosticDescriptor(
+            RuleId,
+            Title,
+            MessageFormat,
+            Category,
+            DiagnosticSeverity.Error,
+            isEnabledByDefault: true,
+            helpLinkUri: Constants.GetDiagnosticHelpLink(RuleId));
 
         public override ImmutableArray<DiagnosticDescriptor> SupportedDiagnostics { get; } = [Rule];
 
