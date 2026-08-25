@@ -114,13 +114,14 @@ public static class DurableMessagingExtensions
         services.TryAddScoped(sp =>
         {
             var options = sp.GetRequiredService<IOptions<DurableJobsOptions>>().Value;
+            var completedRetentionPeriod = TimeSpan.FromMinutes(10);
             var abandonedRetentionPeriod = options.JobStatusPollInterval <= TimeSpan.MaxValue / 4
                 ? options.JobStatusPollInterval * 4
                 : TimeSpan.MaxValue;
             return new DurableMessagingPumpResults(
                 sp.GetRequiredKeyedService<TimeProvider>(DurableJobTimeProviderNames.DurableJobs),
-                options.CompletedJobAttemptRetentionPeriod,
-                TimeSpan.FromTicks(Math.Max(options.CompletedJobAttemptRetentionPeriod.Ticks, abandonedRetentionPeriod.Ticks)),
+                completedRetentionPeriod,
+                TimeSpan.FromTicks(Math.Max(completedRetentionPeriod.Ticks, abandonedRetentionPeriod.Ticks)),
                 maxRetainedEntries: 65_536);
         });
         services.TryAddScoped<DurableMessagingGrainParticipant>();

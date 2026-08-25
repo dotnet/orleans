@@ -884,7 +884,7 @@ internal sealed partial class DurableOutbox : IDurableOutbox, IDurableJobFeature
                 catch
                 {
                     await _stateManager.RevertPendingChangesAsync(CancellationToken.None).ConfigureAwait(true);
-                    return DurableJobRunResult.RescheduleAt(_jobTimeProvider.GetUtcNow() + _backpressureRetryDelay);
+                    return DurableJobRunResult.InProgress(_backpressureRetryDelay);
                 }
             }
 
