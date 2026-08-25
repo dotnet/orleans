@@ -729,6 +729,32 @@ public sealed class DynamoDBStorageCredentialTests
     }
 
     [Fact]
+    public void DynamoDBStorage_HttpEmulatorEndpointWithoutCredentials_UsesDummyCredentials()
+    {
+        var storage = new LinkedDynamoDBStorage(
+            NullLogger<LinkedDynamoDBStorage>.Instance,
+            service: "http://dynamodb:8000");
+
+        var credentials = Assert.IsType<BasicAWSCredentials>(storage.GetClientCredentialsForTest());
+        var immutable = credentials.GetCredentials();
+
+        Assert.Equal("dummy", immutable.AccessKey);
+        Assert.Equal("dummyKey", immutable.SecretKey);
+        Assert.Equal(new Uri("http://dynamodb:8000").AbsoluteUri, storage.ClientForTest.Config.ServiceURL);
+    }
+
+    [Fact]
+    public void DynamoDBStorage_HttpsEndpointWithoutCredentials_PreservesDefaultChain()
+    {
+        var storage = new LinkedDynamoDBStorage(
+            NullLogger<LinkedDynamoDBStorage>.Instance,
+            service: "https://dynamodb.example");
+
+        Assert.Null(storage.GetClientCredentialsForTest());
+        Assert.Equal(new Uri("https://dynamodb.example").AbsoluteUri, storage.ClientForTest.Config.ServiceURL);
+    }
+
+    [Fact]
     public void DynamoDBStorage_ExplicitAccessAndSecret_UsesBasicCredentials()
     {
         var storage = new LinkedDynamoDBStorage(

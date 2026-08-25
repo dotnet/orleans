@@ -152,16 +152,22 @@ namespace Orleans.Transactions.DynamoDB
             var config = isServiceUrl
                 ? new AmazonDynamoDBConfig { ServiceURL = this._service }
                 : new AmazonDynamoDBConfig { RegionEndpoint = AWSUtils.GetRegionEndpoint(this._service) };
-            var credentials = GetExplicitCredentials();
-
-            if (credentials is null && isServiceUrl && serviceUri!.IsLoopback)
-            {
-                credentials = new BasicAWSCredentials("dummy", "dummyKey");
-            }
+            var credentials = GetClientCredentials(serviceUri);
 
             this._ddbClient = credentials is null
                 ? new AmazonDynamoDBClient(config)
                 : new AmazonDynamoDBClient(credentials, config);
+        }
+
+        private AWSCredentials? GetClientCredentials(Uri? serviceUri)
+        {
+            var credentials = GetExplicitCredentials();
+            if (credentials is null && serviceUri?.Scheme == Uri.UriSchemeHttp)
+            {
+                credentials = new BasicAWSCredentials("dummy", "dummyKey");
+            }
+
+            return credentials;
         }
 
         private AWSCredentials? GetExplicitCredentials()
