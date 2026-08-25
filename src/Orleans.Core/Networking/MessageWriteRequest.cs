@@ -14,6 +14,7 @@ internal sealed class MessageWriteRequest : WriteRequest
     private readonly ArcBufferWriter _buffer = new();
     private readonly List<(int TotalLength, int HeaderLength)> _messageSizes = [];
     private Connection? _connection;
+    private MessageSerializer? _messageSerializer;
 
     public MessageWriteRequest(MessageHandlerShared shared)
     {
@@ -29,7 +30,7 @@ internal sealed class MessageWriteRequest : WriteRequest
     public void WriteMessage(Message message)
     {
         var startLength = _buffer.Length;
-        var messageSerializer = _shared.GetMessageSerializer();
+        var messageSerializer = _messageSerializer ??= _shared.GetMessageSerializer();
         try
         {
             // Reserve space for framing
@@ -51,9 +52,14 @@ internal sealed class MessageWriteRequest : WriteRequest
             _buffer.Truncate(startLength);
             throw;
         }
-        finally
+    }
+
+    public void CompleteWriting()
+    {
+        if (_messageSerializer is { } serializer)
         {
-            _shared.Return(messageSerializer);
+            _messageSerializer = null;
+            _shared.Return(serializer);
         }
     }
 
@@ -93,6 +99,7 @@ internal sealed class MessageWriteRequest : WriteRequest
 
     public void Reset()
     {
+        CompleteWriting();
         Messages.Clear();
         _messageSizes.Clear();
         _buffer.Reset();
