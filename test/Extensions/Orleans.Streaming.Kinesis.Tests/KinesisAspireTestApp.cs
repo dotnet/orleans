@@ -126,18 +126,21 @@ internal sealed class KinesisAspireTestApp : IAsyncDisposable
             client.Resource);
     }
 
-    public Task<IReadOnlyDictionary<string, string?>> GetSiloEnvironmentAsync()
-        => GetEnvironmentVariablesAsync(_silo, includeClustering: false);
+    public Task<IReadOnlyDictionary<string, string?>> GetSiloEnvironmentAsync(
+        DistributedApplicationOperation operation = DistributedApplicationOperation.Run)
+        => GetEnvironmentVariablesAsync(_silo, includeClustering: false, operation);
 
-    public Task<IReadOnlyDictionary<string, string?>> GetClientEnvironmentAsync()
-        => GetEnvironmentVariablesAsync(_client, includeClustering: false);
+    public Task<IReadOnlyDictionary<string, string?>> GetClientEnvironmentAsync(
+        DistributedApplicationOperation operation = DistributedApplicationOperation.Run)
+        => GetEnvironmentVariablesAsync(_client, includeClustering: false, operation);
 
     public async Task<IReadOnlyDictionary<string, string?>> ResolveEnvironmentAsync(
-        KinesisAspireResourceRole role)
+        KinesisAspireResourceRole role,
+        DistributedApplicationOperation operation = DistributedApplicationOperation.Run)
     {
         var environment = role == KinesisAspireResourceRole.Silo
-            ? await GetSiloEnvironmentAsync()
-            : await GetClientEnvironmentAsync();
+            ? await GetSiloEnvironmentAsync(operation)
+            : await GetClientEnvironmentAsync(operation);
         return NormalizeConfiguration(environment);
     }
 
@@ -222,10 +225,11 @@ internal sealed class KinesisAspireTestApp : IAsyncDisposable
 
     private async Task<IReadOnlyDictionary<string, string?>> GetEnvironmentVariablesAsync(
         IResource resource,
-        bool includeClustering)
+        bool includeClustering,
+        DistributedApplicationOperation operation = DistributedApplicationOperation.Run)
     {
         var executionContext = new DistributedApplicationExecutionContext(
-            new DistributedApplicationExecutionContextOptions(DistributedApplicationOperation.Run)
+            new DistributedApplicationExecutionContextOptions(operation)
             {
                 ServiceProvider = _application.Services,
             });
@@ -339,10 +343,18 @@ internal sealed class KinesisAspireTestApp : IAsyncDisposable
                 .WithEnvironment(
                     $"AWS__Resources__{topology.Stream.ResourceName}__{streamArn.Name}",
                     streamArn.Value)
-                .WithEnvironment("AWS_PROFILE", topology.Profile)
-                .WithEnvironment("AWS_REGION", topology.Region)
-                .WithEnvironment("AWS__Profile", topology.Profile)
-                .WithEnvironment("AWS__Region", topology.Region);
+                .WithEnvironment(context =>
+                {
+                    if (context.ExecutionContext.IsPublishMode)
+                    {
+                        return;
+                    }
+
+                    context.EnvironmentVariables["AWS_PROFILE"] = topology.Profile;
+                    context.EnvironmentVariables["AWS_REGION"] = topology.Region;
+                    context.EnvironmentVariables["AWS__Profile"] = topology.Profile;
+                    context.EnvironmentVariables["AWS__Region"] = topology.Region;
+                });
 
             if (resourceBuilder.Resource.Name == SiloResourceName)
             {
@@ -351,6 +363,7 @@ internal sealed class KinesisAspireTestApp : IAsyncDisposable
                     .WithEnvironment(
                         $"{prefix}__Checkpoint__ServiceKey",
                         topology.CheckpointTable.ResourceName)
+                    .WithEnvironment($"{prefix}__Checkpoint__Region", topology.Region)
                     .WithEnvironment($"{prefix}__Checkpoint__CreateIfNotExists", "false")
                     .WithEnvironment(
                         $"{prefix}__Checkpoint__UseProvisionedThroughput",
@@ -375,6 +388,7 @@ internal sealed class KinesisAspireTestApp : IAsyncDisposable
             resourceBuilder
                 .WithEnvironment($"{prefix}__ProviderType", "DynamoDB")
                 .WithEnvironment($"{prefix}__ServiceKey", topology.PubSubTable.ResourceName)
+                .WithEnvironment($"{prefix}__ServiceId", topology.ServiceId)
                 .WithEnvironment($"{prefix}__UseProvisionedThroughput", "false")
                 .WithEnvironment($"{prefix}__CreateIfNotExists", "false")
                 .WithEnvironment($"{prefix}__UpdateIfExists", "false")

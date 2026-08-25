@@ -530,6 +530,7 @@ public sealed class KinesisAspireIntegrationTests
             .GetRequiredService<IOptionsMonitor<DynamoDBStreamQueueCheckpointerOptions>>()
             .Get(app.ProviderName);
         Assert.Equal("orleans-orders-checkpoints", checkpoint.TableName);
+        Assert.Equal("us-west-2", checkpoint.Service);
         Assert.False(checkpoint.CreateIfNotExists);
         Assert.False(checkpoint.UseProvisionedThroughput);
 
@@ -537,6 +538,7 @@ public sealed class KinesisAspireIntegrationTests
             .GetRequiredService<IOptionsMonitor<DynamoDBStorageOptions>>()
             .Get("PubSubStore");
         Assert.Equal("orleans-orders-pubsub", pubSub.TableName);
+        Assert.Equal("orders-service", pubSub.ServiceId);
         Assert.False(pubSub.CreateIfNotExists);
         Assert.False(pubSub.UpdateIfExists);
         Assert.False(pubSub.UseProvisionedThroughput);
@@ -682,12 +684,31 @@ public sealed class KinesisAspireIntegrationTests
             .GetRequiredService<IOptionsMonitor<DynamoDBStreamQueueCheckpointerOptions>>()
             .Get(topology.ProviderName);
         Assert.Equal(topology.PubSubTable.TableName, pubSub.TableName);
+        Assert.Equal(topology.ServiceId, pubSub.ServiceId);
         Assert.False(pubSub.CreateIfNotExists);
         Assert.False(pubSub.UpdateIfExists);
         Assert.False(pubSub.UseProvisionedThroughput);
         Assert.Equal(topology.CheckpointTable.TableName, checkpoint.TableName);
+        Assert.Equal(topology.Region, checkpoint.Service);
         Assert.False(checkpoint.CreateIfNotExists);
         Assert.False(checkpoint.UseProvisionedThroughput);
+    }
+
+    [Fact]
+    public async Task AspirePublishConfiguration_PreservesProviderLocalAwsIdentity()
+    {
+        await using var app = await KinesisAspireTestApp.CreateAsync();
+        var configuration = await app.ResolveEnvironmentAsync(
+            KinesisAspireResourceRole.Silo,
+            DistributedApplicationOperation.Publish);
+
+        Assert.DoesNotContain("AWS_PROFILE", configuration.Keys);
+        Assert.DoesNotContain("AWS_REGION", configuration.Keys);
+        Assert.DoesNotContain("AWS:Profile", configuration.Keys);
+        Assert.DoesNotContain("AWS:Region", configuration.Keys);
+        Assert.Equal("us-west-2", configuration["Orleans:Streaming:Orders:Region"]);
+        Assert.Equal("us-west-2", configuration["Orleans:Streaming:Orders:Checkpoint:Region"]);
+        Assert.Equal("orders-service", configuration["Orleans:GrainStorage:PubSubStore:ServiceId"]);
     }
 
     [Fact]
@@ -1099,10 +1120,12 @@ public sealed class KinesisAspireIntegrationTests
             ["Orleans:Streaming:Orders:Region"] = "us-west-2",
             ["Orleans:Streaming:Orders:Checkpoint:Type"] = "DynamoDB",
             ["Orleans:Streaming:Orders:Checkpoint:ServiceKey"] = "orders-checkpoints",
+            ["Orleans:Streaming:Orders:Checkpoint:Region"] = "us-west-2",
             ["Orleans:Streaming:Orders:Checkpoint:CreateIfNotExists"] = "false",
             ["Orleans:Streaming:Orders:Checkpoint:UseProvisionedThroughput"] = "false",
             ["Orleans:GrainStorage:PubSubStore:ProviderType"] = "DynamoDB",
             ["Orleans:GrainStorage:PubSubStore:ServiceKey"] = "orders-pubsub",
+            ["Orleans:GrainStorage:PubSubStore:ServiceId"] = "orders-service",
             ["Orleans:GrainStorage:PubSubStore:UseProvisionedThroughput"] = "false",
             ["Orleans:GrainStorage:PubSubStore:CreateIfNotExists"] = "false",
             ["Orleans:GrainStorage:PubSubStore:UpdateIfExists"] = "false",
