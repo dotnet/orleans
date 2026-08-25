@@ -4,7 +4,7 @@
     <PackageId>Microsoft.Orleans.Clustering.EntityFrameworkCore.MySql</PackageId>
     <Title>Microsoft Orleans Entity Framework Core (MySql) Clustering Provider</Title>
     <Description>Microsoft Orleans clustering provider backed by Entity Framework Core for MySQL</Description>
-    <PackageTags>$(PackageTags) Entity Framework Core SQL MySQL PostgreSQL Oracle</PackageTags>
+    <PackageTags>$(PackageTags) Entity Framework Core SQL MySQL MariaDB</PackageTags>
     <Nullable>enable</Nullable>
     <TargetFrameworks>$(DefaultTargetFrameworks)</TargetFrameworks>
   </PropertyGroup>
