@@ -12,6 +12,8 @@ public sealed class ControlledJournalStorageProvider : IJournalStorageProvider, 
     private readonly ConcurrentDictionary<JournalId, WritePlan> _writePlans = new();
     private readonly ConcurrentDictionary<JournalId, WritePlan> _postWritePlans = new();
     private readonly ConcurrentDictionary<JournalId, int> _successfulWrites = new();
+    private readonly object _writeSucceededLock = new();
+    private TaskCompletionSource _writeSucceeded = CreateSignal();
 
     public string? JournalFormatKey { get; private set; }
 
@@ -78,6 +80,30 @@ public sealed class ControlledJournalStorageProvider : IJournalStorageProvider, 
     public int GetSuccessfulWriteCount(JournalId journalId) =>
         _successfulWrites.TryGetValue(journalId, out var count) ? count : 0;
 
+    public async Task WaitForSuccessfulWriteCountAsync(
+        JournalId journalId,
+        int expected,
+        CancellationToken cancellationToken = default)
+    {
+        using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        timeout.CancelAfter(TimeSpan.FromSeconds(30));
+        while (GetSuccessfulWriteCount(journalId) < expected)
+        {
+            Task changed;
+            lock (_writeSucceededLock)
+            {
+                if (GetSuccessfulWriteCount(journalId) >= expected)
+                {
+                    return;
+                }
+
+                changed = _writeSucceeded.Task;
+            }
+
+            await changed.WaitAsync(timeout.Token);
+        }
+    }
+
     private async ValueTask BeforeWriteAsync(JournalId journalId, CancellationToken cancellationToken)
     {
         if (!_writePlans.TryGetValue(journalId, out var plan)
@@ -109,8 +135,18 @@ public sealed class ControlledJournalStorageProvider : IJournalStorageProvider, 
         await plan.Release.Task.WaitAsync(cancellationToken).ConfigureAwait(false);
     }
 
-    private void OnWriteSucceeded(JournalId journalId) =>
+    private void OnWriteSucceeded(JournalId journalId)
+    {
         _successfulWrites.AddOrUpdate(journalId, 1, static (_, count) => count + 1);
+        lock (_writeSucceededLock)
+        {
+            _writeSucceeded.TrySetResult();
+            _writeSucceeded = CreateSignal();
+        }
+    }
+
+    private static TaskCompletionSource CreateSignal() =>
+        new(TaskCreationOptions.RunContinuationsAsynchronously);
 
     private void AfterWrite(JournalId journalId)
     {

@@ -728,6 +728,7 @@ public sealed class PublicDurableMessagingBehaviorTests : IAsyncLifetime
         var sender = NewGrain();
         var receiver = NewGrain();
         var journalId = JournalId.FromGrainId(sender.GetGrainId());
+        var writeBaseline = fixture.Storage.GetSuccessfulWriteCount(journalId);
         fixture.Storage.FailWrite(journalId, matchingWrite: 3);
 
         await sender.SendAsync(
@@ -735,9 +736,8 @@ public sealed class PublicDurableMessagingBehaviorTests : IAsyncLifetime
             "messages/outbox-clear-retry",
             NewMessage(56, "outbox-clear-retry"));
         _ = await fixture.WaitForEffectCountAsync(receiver, 1);
-        var cleaned = await fixture.SnapshotProbe.WaitAsync(
-            sender.GetGrainId(),
-            static snapshot => snapshot.OutboxCount == 0 && snapshot.OutboxJobId is null);
+        await fixture.Storage.WaitForSuccessfulWriteCountAsync(journalId, writeBaseline + 3);
+        var cleaned = await sender.GetSnapshotAsync();
 
         Assert.Equal(0, cleaned.OutboxCount);
         Assert.Null(cleaned.OutboxJobId);
