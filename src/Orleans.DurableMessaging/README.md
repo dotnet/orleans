@@ -11,6 +11,9 @@ siloBuilder
 ```
 
 Inject `IDurableInbox` to register handlers and `IDurableOutbox` to enqueue envelopes.
+Inject `IDurableMessagingDiagnostics` to inspect dead letters and remove records after
+they have been handled operationally. Removal is staged and becomes durable with the
+grain's next journal write.
 An outbox enqueue allocates stable job ownership and durably schedules that job before
 the grain journal captures the envelope and ownership in one commit. The job safely
 polls while the envelope is provisional, and dispatch starts only after the commit. If

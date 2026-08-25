@@ -2,11 +2,12 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using Orleans.Journaling;
+using Orleans.Runtime;
 
 namespace Orleans.DurableMessaging;
 
 /// <summary>
-/// Provides a read-only view of a grain's durable messaging state.
+/// Provides operational access to a grain's durable messaging state.
 /// </summary>
 public interface IDurableMessagingDiagnostics
 {
@@ -19,6 +20,27 @@ public interface IDurableMessagingDiagnostics
     /// Gets messages which could not be delivered from the outbox.
     /// </summary>
     IReadOnlyList<DurableDeadLetter> OutboxDeadLetters { get; }
+
+    /// <summary>
+    /// Stages removal of an inbox dead letter.
+    /// </summary>
+    /// <param name="senderId">The original sender grain identifier.</param>
+    /// <param name="messageId">The message identifier.</param>
+    /// <returns><see langword="true"/> when the dead letter existed and was removed.</returns>
+    /// <remarks>
+    /// The removal becomes durable with the grain's next journal write.
+    /// </remarks>
+    bool RemoveInboxDeadLetter(GrainId senderId, Guid messageId);
+
+    /// <summary>
+    /// Stages removal of an outbox dead letter.
+    /// </summary>
+    /// <param name="messageId">The message identifier.</param>
+    /// <returns><see langword="true"/> when the dead letter existed and was removed.</returns>
+    /// <remarks>
+    /// The removal becomes durable with the grain's next journal write.
+    /// </remarks>
+    bool RemoveOutboxDeadLetter(Guid messageId);
 }
 
 /// <summary>
@@ -70,4 +92,9 @@ internal sealed class DurableMessagingDiagnostics(
             Reason = entry.Reason,
             AttemptCount = entry.AttemptCount
         }).ToList();
+
+    public bool RemoveInboxDeadLetter(GrainId senderId, Guid messageId) =>
+        inbox.Remove((senderId, messageId));
+
+    public bool RemoveOutboxDeadLetter(Guid messageId) => outbox.Remove(messageId);
 }
