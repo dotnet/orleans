@@ -58,7 +58,6 @@ public class DurableJobReceiverExtensionTests
     [Fact]
     public async Task HandleDurableJobAsync_WhenCanceledAttemptIsRedeliveredWithActiveToken_StartsNewAttempt()
     {
-        using var telemetry = new HandlerTelemetryCapture("run-1");
         using var firstAttemptCancellation = new CancellationTokenSource();
         var invocationCount = 0;
         var handler = Substitute.For<IDurableJobHandler>();
@@ -67,16 +66,17 @@ public class DurableJobReceiverExtensionTests
                 Interlocked.Increment(ref invocationCount) == 1
                     ? WaitForAttemptCancellationAsync(call.ArgAt<CancellationToken>(1))
                     : Task.CompletedTask);
-        var extension = CreateExtension(
-            handler,
-            jobStatusPollInterval: TimeSpan.FromMilliseconds(1),
-            durableJobsInstruments: telemetry.Instruments);
+        var extension = CreateExtension(handler, jobStatusPollInterval: TimeSpan.FromMilliseconds(1));
         var context = CreateJobContext("run-1");
 
         var initial = await extension.HandleDurableJobAsync(context, firstAttemptCancellation.Token);
         Assert.True(initial.IsInProgress);
+        var attemptTask = new DurableJobReceiverExtension.TestAccessor(extension).GetAttemptTask(context);
+        Assert.NotNull(attemptTask);
+
         firstAttemptCancellation.Cancel();
-        await telemetry.TrackedHandlerStopped.WaitAsync(TimeSpan.FromSeconds(5));
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(
+            () => attemptTask!.WaitAsync(TimeSpan.FromSeconds(5)));
 
         var redelivery = await extension.HandleDurableJobAsync(context, CancellationToken.None);
 

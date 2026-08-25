@@ -252,6 +252,12 @@ internal sealed partial class DurableJobReceiverExtension : IDurableJobReceiverE
     private static (string JobId, long ExecutionGeneration, int DequeueCount) GetExecutionKey(IJobRunContext context)
         => (context.Job.Id, context.Job.ExecutionGeneration, context.DequeueCount);
 
+    internal sealed class TestAccessor(DurableJobReceiverExtension extension)
+    {
+        public Task<DurableJobRunResult>? GetAttemptTask(IJobRunContext context) =>
+            extension._jobAttempts.TryGetValue(GetExecutionKey(context), out var state) ? state.Task : null;
+    }
+
     private sealed class JobAttemptState(Task<DurableJobRunResult> task)
     {
         public Task<DurableJobRunResult> Task { get; } = task;
