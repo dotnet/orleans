@@ -202,7 +202,7 @@ public sealed class S3JournalStorageTests : IAsyncLifetime
         }
 
         [Fact]
-        public async Task ListAsync_WhenPhysicalKeysMapToSameJournalId_ReturnsIdentityOnce()
+        public async Task ListAsync_WhenAliasMapsToCanonicalJournalId_ReturnsCanonicalIdentityOnce()
         {
             var client = CreateTrackingClient();
             client.ListObjectsV2Async(Arg.Any<ListObjectsV2Request>(), Arg.Any<CancellationToken>())
@@ -217,6 +217,7 @@ public sealed class S3JournalStorageTests : IAsyncLifetime
                 }));
             var options = CreateOptions();
             options.S3Client = client;
+            options.GetObjectKey = static id => $"current/{id.Value}";
             options.TryParseJournalId = static key =>
                 key.EndsWith("journals/alpha", StringComparison.Ordinal)
                     ? new JournalId("journals/alpha")
@@ -231,6 +232,39 @@ public sealed class S3JournalStorageTests : IAsyncLifetime
             }
 
             Assert.Equal(["journals/alpha"], listed.Select(static id => id.Value));
+            await provider.CloseAsync(CancellationToken.None);
+        }
+
+        [Fact]
+        public async Task ListAsync_WhenOnlyAliasMapsToJournalId_DoesNotReturnDanglingIdentity()
+        {
+            var client = CreateTrackingClient();
+            client.ListObjectsV2Async(Arg.Any<ListObjectsV2Request>(), Arg.Any<CancellationToken>())
+                .Returns(Task.FromResult(new ListObjectsV2Response
+                {
+                    IsTruncated = false,
+                    S3Objects =
+                    [
+                        new S3Object { Key = "legacy/journals/alpha/wal" },
+                    ],
+                }));
+            var options = CreateOptions();
+            options.S3Client = client;
+            options.GetObjectKey = static id => $"current/{id.Value}";
+            options.TryParseJournalId = static key =>
+                key.EndsWith("journals/alpha", StringComparison.Ordinal)
+                    ? new JournalId("journals/alpha")
+                    : null;
+            var provider = CreateProvider(options);
+            await provider.InitializeAsync(CancellationToken.None);
+
+            var listed = new List<JournalId>();
+            await foreach (var journalId in provider.ListAsync(new JournalId("journals"), CancellationToken.None))
+            {
+                listed.Add(journalId);
+            }
+
+            Assert.Empty(listed);
             await provider.CloseAsync(CancellationToken.None);
         }
 
@@ -460,6 +494,51 @@ public sealed class S3JournalStorageTests : IAsyncLifetime
             await storage.ReadAsync(new CapturingJournalStorageConsumer(), CancellationToken.None);
 
             Assert.True(storage.IsCompactionRequested);
+        }
+
+        [Fact]
+        public async Task ReadAsync_WithCheckpoint_DisposesCheckpointResponseBeforeOpeningWal()
+        {
+            const string checkpointName = "journals/test/checkpoints/checkpoint-1";
+            var client = Substitute.For<IAmazonS3>();
+            var properties = new GetObjectMetadataResponse
+            {
+                ETag = "etag-1",
+                ContentLength = 1,
+                PartsCount = 1,
+            };
+            properties.Metadata.Add(S3JournalStorage.CheckpointMetadataKey, checkpointName);
+            client.GetObjectMetadataAsync(Arg.Any<GetObjectMetadataRequest>(), Arg.Any<CancellationToken>())
+                .Returns(Task.FromResult(properties));
+            var checkpointStream = new TrackingMemoryStream([1, 2]);
+            client.GetObjectAsync(Arg.Any<GetObjectRequest>(), Arg.Any<CancellationToken>())
+                .Returns(call =>
+                {
+                    var request = call.Arg<GetObjectRequest>();
+                    if (request.Key == checkpointName)
+                    {
+                        return Task.FromResult(new GetObjectResponse
+                        {
+                            ContentLength = checkpointStream.Length,
+                            ResponseStream = checkpointStream,
+                        });
+                    }
+
+                    Assert.True(checkpointStream.IsDisposed);
+                    return Task.FromResult(new GetObjectResponse
+                    {
+                        ETag = "etag-1",
+                        ContentLength = 1,
+                        PartsCount = 1,
+                        ResponseStream = new MemoryStream([3], writable: false),
+                    });
+                });
+            var storage = CreateStorage(client, new S3JournalStorageOptions { BucketName = BucketName });
+            var consumer = new CapturingJournalStorageConsumer();
+
+            await storage.ReadAsync(consumer, CancellationToken.None);
+
+            Assert.Equal([1, 2, 3], consumer.Bytes.ToArray());
         }
 
         [Fact]
@@ -1512,6 +1591,17 @@ public sealed class S3JournalStorageTests : IAsyncLifetime
                 buffer.Read(chunk);
                 Bytes.Write(chunk);
             }
+        }
+    }
+
+    private sealed class TrackingMemoryStream(byte[] buffer) : MemoryStream(buffer, writable: false)
+    {
+        public bool IsDisposed { get; private set; }
+
+        protected override void Dispose(bool disposing)
+        {
+            IsDisposed = true;
+            base.Dispose(disposing);
         }
     }
 }

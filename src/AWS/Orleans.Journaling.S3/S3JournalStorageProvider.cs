@@ -74,7 +74,14 @@ internal sealed class S3JournalStorageProvider : ILifecycleParticipant<ISiloLife
 
                 var storageIdValue = item.Key[..^"/wal".Length];
                 var journalId = _options.TryParseJournalId(storageIdValue);
-                if (journalId is { } id && prefix.IsPrefixOf(id))
+                if (journalId is not { } id || !prefix.IsPrefixOf(id))
+                {
+                    continue;
+                }
+
+                var journalObjectKey = _options.GetObjectKeyForJournal(id);
+                var canonicalWalObjectKey = S3JournalStorageOptions.GetWalObjectKeyForJournal(id, journalObjectKey);
+                if (string.Equals(item.Key, canonicalWalObjectKey, StringComparison.Ordinal))
                 {
                     journalIds.Add(id);
                 }

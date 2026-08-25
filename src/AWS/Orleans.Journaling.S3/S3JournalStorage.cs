@@ -198,7 +198,7 @@ internal sealed partial class S3JournalStorage : IJournalStorage
                         },
                         cancellationToken).ConfigureAwait(false);
                     var marker = RandomNumberGenerator.GetBytes(CompactedWalMarkerBytes);
-                    await using var payload = CreateTemporaryWalRewriteStream();
+                    await using var payload = CreateTemporaryPayloadStream();
                     await payload.WriteAsync(marker, cancellationToken).ConfigureAwait(false);
                     if (walState.Manifest.WalOffset > 0)
                     {
@@ -438,6 +438,33 @@ internal sealed partial class S3JournalStorage : IJournalStorage
                 walProperties.PartsCount,
                 cancellationToken).ConfigureAwait(false);
 
+            var walMetadata = CopyMetadata(walProperties.Metadata);
+            var manifest = CreateWalManifest(walMetadata);
+            SetWal(walProperties.ETag, CreateWalProviderState(manifest, walProperties.ContentLength, partsCount), walProperties.LastModified);
+
+            var expectedFormat = manifest.Metadata.Format;
+            IJournalMetadata? checkpointMetadata = null;
+            string? checkpointObjectKey = null;
+            await using var checkpointPayload = manifest.Checkpoint is not null ? CreateTemporaryPayloadStream() : null;
+            if (manifest.Checkpoint is { } checkpoint)
+            {
+                checkpointObjectKey = checkpoint.Name;
+                using (var checkpointResult = await _client.GetObjectAsync(
+                    new GetObjectRequest
+                    {
+                        BucketName = _shared.BucketName,
+                        Key = checkpoint.Name,
+                    },
+                    cancellationToken).ConfigureAwait(false))
+                {
+                    checkpointMetadata = ValidateCheckpointMetadata(checkpoint, CopyMetadata(checkpointResult.Metadata), expectedFormat);
+                    await checkpointResult.ResponseStream.CopyToAsync(checkpointPayload!, cancellationToken).ConfigureAwait(false);
+                }
+
+                checkpointPayload!.Position = 0;
+                expectedFormat = checkpointMetadata.Format;
+            }
+
             GetObjectResponse walResult;
             try
             {
@@ -460,30 +487,15 @@ internal sealed partial class S3JournalStorage : IJournalStorage
 
             using (walResult)
             {
-                var walMetadata = CopyMetadata(walResult.Metadata);
-                var manifest = CreateWalManifest(walMetadata);
-                SetWal(walResult.ETag, CreateWalProviderState(manifest, walResult.ContentLength, partsCount), walResult.LastModified);
-
-                var expectedFormat = manifest.Metadata.Format;
-                if (manifest.Checkpoint is { } checkpoint)
+                if (checkpointPayload is not null)
                 {
-                    using var checkpointResult = await _client.GetObjectAsync(
-                        new GetObjectRequest
-                        {
-                            BucketName = _shared.BucketName,
-                            Key = checkpoint.Name,
-                        },
-                        cancellationToken).ConfigureAwait(false);
-
-                    var checkpointMetadata = ValidateCheckpointMetadata(checkpoint, CopyMetadata(checkpointResult.Metadata), expectedFormat);
                     var totalCheckpointBytes = await consumer.ReadAsync(
-                        checkpointResult.ResponseStream,
-                        checkpointMetadata,
+                        checkpointPayload,
+                        checkpointMetadata!,
                         complete: false,
                         cancellationToken).ConfigureAwait(false);
-                    LogRead(_shared.Logger, totalCheckpointBytes, _shared.BucketName, checkpoint.Name);
+                    LogRead(_shared.Logger, totalCheckpointBytes, _shared.BucketName, checkpointObjectKey!);
                     bytes += totalCheckpointBytes;
-                    expectedFormat = checkpointMetadata.Format;
                 }
 
                 if (manifest.WalOffset > 0)
@@ -712,7 +724,7 @@ internal sealed partial class S3JournalStorage : IJournalStorage
         }
 
         var metadata = CreateWalMetadata(manifest);
-        await using var payload = CreateTemporaryWalRewriteStream();
+        await using var payload = CreateTemporaryPayloadStream();
         await walResult.ResponseStream.CopyToAsync(payload, cancellationToken).ConfigureAwait(false);
         foreach (var segment in value)
         {
@@ -955,7 +967,7 @@ internal sealed partial class S3JournalStorage : IJournalStorage
         return request;
     }
 
-    private static FileStream CreateTemporaryWalRewriteStream()
+    private static FileStream CreateTemporaryPayloadStream()
     {
         var path = Path.Combine(Path.GetTempPath(), $"orleans-s3-journal-{Guid.NewGuid():N}.tmp");
         return new FileStream(
