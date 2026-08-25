@@ -73,8 +73,11 @@ internal sealed partial class DurableOutbox : IDurableOutbox, IDurableJobFeature
     private readonly HashSet<Guid> _pendingMessageIds = [];
     private readonly HashSet<Guid> _committingMessageIds = [];
     private DateTimeOffset? _pendingJobDueTime;
+    private DateTimeOffset? _scheduledOwnershipDueTime;
+    private string? _scheduledOwnershipId;
     private bool _jobScheduleConfirmed;
     private bool _recoveryCompleted;
+    private int _ensureJobScheduledQueued;
 
     private int _metricsActive;
     private int _reportedDepth;
@@ -300,6 +303,8 @@ internal sealed partial class DurableOutbox : IDurableOutbox, IDurableJobFeature
             },
             cancellationToken).ConfigureAwait(true);
         _jobScheduleConfirmed = true;
+        _scheduledOwnershipId = jobId;
+        _scheduledOwnershipDueTime = dueTime;
     }
 
     public void OnWriteCompleted()
@@ -311,6 +316,11 @@ internal sealed partial class DurableOutbox : IDurableOutbox, IDurableJobFeature
         }
 
         _committingMessageIds.Clear();
+        if (string.Equals(_scheduledOwnershipId, _jobId.Value, StringComparison.Ordinal))
+        {
+            _scheduledOwnershipId = null;
+            _scheduledOwnershipDueTime = null;
+        }
     }
 
     public void OnRecoveryCompleted()
@@ -318,8 +328,20 @@ internal sealed partial class DurableOutbox : IDurableOutbox, IDurableJobFeature
         _recoveryCompleted = true;
         _pendingMessageIds.Clear();
         _committingMessageIds.Clear();
-        _pendingJobDueTime = null;
-        _jobScheduleConfirmed = false;
+        if (Count > 0 && _scheduledOwnershipId is { } scheduledOwnershipId)
+        {
+            _jobId.Value = scheduledOwnershipId;
+            _pendingJobDueTime = _scheduledOwnershipDueTime ?? _jobTimeProvider.GetUtcNow();
+            _jobScheduleConfirmed = true;
+        }
+        else
+        {
+            _pendingJobDueTime = null;
+            _scheduledOwnershipDueTime = null;
+            _scheduledOwnershipId = null;
+            _jobScheduleConfirmed = false;
+        }
+
         ReconcileOutboxDepth();
         if (Count > 0)
         {
@@ -555,19 +577,17 @@ internal sealed partial class DurableOutbox : IDurableOutbox, IDurableJobFeature
     /// <summary>
     /// Called when the grain activates. Starts the background pump if there are pending durable messages.
     /// </summary>
-    public async Task OnStart(CancellationToken cancellationToken = default)
+    public Task OnStart(CancellationToken cancellationToken = default)
     {
-        if (cancellationToken.IsCancellationRequested)
-        {
-            return;
-        }
-
+        cancellationToken.ThrowIfCancellationRequested();
         EnsureMetricsActive();
         if (Count > 0)
         {
             LogPumpStartingOnActivation(_logger, Count);
-            await EnsureJobScheduledAsync(replaceExisting: true, cancellationToken).ConfigureAwait(true);
+            QueueEnsureJobScheduled(replaceExisting: true);
         }
+
+        return Task.CompletedTask;
     }
 
     /// <summary>
@@ -619,16 +639,29 @@ internal sealed partial class DurableOutbox : IDurableOutbox, IDurableJobFeature
 
     private void QueueEnsureJobScheduled(bool replaceExisting)
     {
+        if (Interlocked.Exchange(ref _ensureJobScheduledQueued, 1) != 0)
+        {
+            return;
+        }
+
         var state = new EnsureJobTimerState(this, replaceExisting);
-        state.Handle.Attach(_timerRegistry.RegisterGrainTimer(
-            _grainContext,
-            static (state, cancellationToken) => state.RunAsync(cancellationToken),
-            state,
-            new GrainTimerCreationOptions(TimeSpan.Zero, Timeout.InfiniteTimeSpan)
-            {
-                Interleave = false,
-                KeepAlive = true
-            }));
+        try
+        {
+            state.Handle.Attach(_timerRegistry.RegisterGrainTimer(
+                _grainContext,
+                static (state, cancellationToken) => state.RunAsync(cancellationToken),
+                state,
+                new GrainTimerCreationOptions(TimeSpan.Zero, Timeout.InfiniteTimeSpan)
+                {
+                    Interleave = false,
+                    KeepAlive = true
+                }));
+        }
+        catch
+        {
+            Volatile.Write(ref _ensureJobScheduledQueued, 0);
+            throw;
+        }
     }
 
     internal async Task EnsureJobScheduledAsync(bool replaceExisting, CancellationToken cancellationToken)
@@ -648,24 +681,45 @@ internal sealed partial class DurableOutbox : IDurableOutbox, IDurableJobFeature
                         return;
                     }
 
-                    var persistOwnership = replaceExisting || string.IsNullOrEmpty(_jobId.Value);
-                    var ownershipId = GetOrCreateOwnershipId(replaceExisting);
-                    await _jobManager.ScheduleJobAsync(
-                        new ScheduleJobRequest
-                        {
-                            Target = _grainContext.GrainId,
-                            JobName = JobName,
-                            DueTime = _pendingJobDueTime ?? _jobTimeProvider.GetUtcNow(),
-                            Metadata = DurableMessagingJobOwnership.CreateMetadata(ownershipId)
-                        },
-                        token).ConfigureAwait(true);
+                    string ownershipId;
+                    bool persistOwnership;
+                    if (_jobScheduleConfirmed && _scheduledOwnershipId is { } scheduledOwnershipId)
+                    {
+                        ownershipId = scheduledOwnershipId;
+                        _jobId.Value = scheduledOwnershipId;
+                        _pendingJobDueTime = _scheduledOwnershipDueTime ?? _jobTimeProvider.GetUtcNow();
+                        persistOwnership = true;
+                    }
+                    else
+                    {
+                        persistOwnership = replaceExisting || string.IsNullOrEmpty(_jobId.Value);
+                        ownershipId = GetOrCreateOwnershipId(replaceExisting);
+                    }
+
+                    if (!_jobScheduleConfirmed)
+                    {
+                        var dueTime = _pendingJobDueTime ?? _jobTimeProvider.GetUtcNow();
+                        await _jobManager.ScheduleJobAsync(
+                            new ScheduleJobRequest
+                            {
+                                Target = _grainContext.GrainId,
+                                JobName = JobName,
+                                DueTime = dueTime,
+                                Metadata = DurableMessagingJobOwnership.CreateMetadata(ownershipId)
+                            },
+                            token).ConfigureAwait(true);
+                        _jobScheduleConfirmed = true;
+                        _scheduledOwnershipId = ownershipId;
+                        _scheduledOwnershipDueTime = dueTime;
+                    }
 
                     if (persistOwnership)
                     {
                         await _stateManager.WriteStateAsync(token).ConfigureAwait(true);
                     }
 
-                    _jobScheduleConfirmed = true;
+                    _scheduledOwnershipId = null;
+                    _scheduledOwnershipDueTime = null;
                     _pendingJobDueTime = null;
                     return;
                 }
@@ -682,7 +736,8 @@ internal sealed partial class DurableOutbox : IDurableOutbox, IDurableJobFeature
             catch (Exception exception)
             {
                 LogPumpLoopError(_logger, exception);
-                await Task.Delay(_backpressureRetryDelay, token).ConfigureAwait(ConfigureAwaitOptions.SuppressThrowing);
+                await Task.Delay(_backpressureRetryDelay, _jobTimeProvider, token)
+                    .ConfigureAwait(ConfigureAwaitOptions.SuppressThrowing);
             }
         }
     }
@@ -1045,6 +1100,7 @@ internal sealed partial class DurableOutbox : IDurableOutbox, IDurableJobFeature
             }
             finally
             {
+                Volatile.Write(ref owner._ensureJobScheduledQueued, 0);
                 Handle.Complete();
             }
         }

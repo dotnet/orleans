@@ -1,4 +1,7 @@
+using System.Reflection;
+using System.Runtime.CompilerServices;
 using Orleans.DurableMessaging.Configuration;
+using Orleans.Runtime;
 using Xunit;
 
 namespace Orleans.DurableMessaging.Tests.Contracts;
@@ -93,5 +96,39 @@ public sealed class DeliveryAndOptionsContractTests
             Assert.Equal(nameof(DurableInboxOptions.MaxOutboxRetryAge), exception.ParamName);
             Assert.Contains("less than DeduplicationWindow", exception.Message, StringComparison.Ordinal);
         }
+    }
+
+    [Fact]
+    public async Task InboxLifecycleStart_ObservesPreCanceledLifecycleToken()
+    {
+        var extensionType = typeof(IDurableInbox).Assembly.GetType(
+            "Orleans.DurableMessaging.DurableInboxExtension",
+            throwOnError: true)!;
+        var extension = (ILifecycleObserver)RuntimeHelpers.GetUninitializedObject(extensionType);
+        using var cancellation = new CancellationTokenSource();
+        cancellation.Cancel();
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(
+            () => extension.OnStart(cancellation.Token));
+    }
+
+    [Fact]
+    public async Task InboxLifecycleStart_CancellationInterruptsBlockedResume()
+    {
+        var extensionType = typeof(IDurableInbox).Assembly.GetType(
+            "Orleans.DurableMessaging.DurableInboxExtension",
+            throwOnError: true)!;
+        var extension = (ILifecycleObserver)RuntimeHelpers.GetUninitializedObject(extensionType);
+        extensionType.GetField("_gate", BindingFlags.Instance | BindingFlags.NonPublic)!
+            .SetValue(extension, new SemaphoreSlim(0, 1));
+        extensionType.GetField("_metricsActive", BindingFlags.Instance | BindingFlags.NonPublic)!
+            .SetValue(extension, 1);
+        using var cancellation = new CancellationTokenSource();
+
+        var start = extension.OnStart(cancellation.Token);
+        Assert.False(start.IsCompleted);
+        cancellation.Cancel();
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => start);
     }
 }

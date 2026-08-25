@@ -5,6 +5,7 @@ using System.Reflection;
 using System.Runtime.CompilerServices;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
+using Microsoft.Extensions.Time.Testing;
 using NSubstitute;
 using Orleans.DurableJobs;
 using Orleans.DurableMessaging.Configuration;
@@ -20,6 +21,79 @@ namespace Orleans.DurableMessaging.Tests.Contracts;
 [TestArea("DurableMessaging")]
 public sealed class DurableOutboxDeliveryBatchTests
 {
+    [Fact]
+    public async Task RecoveryAndLifecycleStart_CoalesceReplacementScheduling()
+    {
+        var timerRegistry = Substitute.For<ITimerRegistry>();
+        var fixture = new OutboxFixture(hasDurableMessage: true, timerRegistry: timerRegistry);
+
+        fixture.Manager.NotifyRecoveryCompleted();
+        await fixture.StartAsync();
+
+        Assert.Single(
+            timerRegistry.ReceivedCalls(),
+            static call => call.GetMethodInfo().Name == "RegisterGrainTimer");
+    }
+
+    [Fact]
+    public async Task EnsureJobTimerCompletion_ReleasesCoalescingSlot()
+    {
+        var timerRegistry = Substitute.For<ITimerRegistry>();
+        var fixture = new OutboxFixture(
+            hasDurableMessage: true,
+            timerRegistry: timerRegistry,
+            jobManager: new RecordingJobManager());
+
+        fixture.Manager.NotifyRecoveryCompleted();
+        await fixture.RunRegisteredTimerAsync();
+        fixture.Manager.NotifyRecoveryCompleted();
+
+        Assert.Equal(
+            2,
+            timerRegistry.ReceivedCalls().Count(static call => call.GetMethodInfo().Name == "RegisterGrainTimer"));
+    }
+
+    [Fact]
+    public async Task OwnershipPersistenceRetry_DoesNotScheduleDuplicateJob()
+    {
+        var jobManager = new RecordingJobManager();
+        var fixture = new OutboxFixture(
+            hasDurableMessage: true,
+            jobManager: jobManager,
+            backpressureRetryDelay: TimeSpan.FromMilliseconds(1));
+        fixture.Manager.FailNextWrite(new IOException("Injected ownership write failure."));
+
+        await fixture.EnsureJobScheduledAsync(replaceExisting: true, CancellationToken.None)
+            .WaitAsync(TimeSpan.FromSeconds(10));
+
+        Assert.Equal(1, jobManager.AttemptCount);
+        Assert.Equal(2, fixture.Manager.WriteCount);
+    }
+
+    [Fact]
+    public async Task SchedulingRetry_UsesConfiguredTimeProvider()
+    {
+        var clock = new FakeTimeProvider();
+        var jobManager = new RecordingJobManager(alwaysFail: true);
+        var fixture = new OutboxFixture(
+            hasDurableMessage: true,
+            jobManager: jobManager,
+            jobTimeProvider: clock,
+            backpressureRetryDelay: TimeSpan.FromMinutes(1));
+        using var cancellation = new CancellationTokenSource();
+
+        var scheduling = fixture.EnsureJobScheduledAsync(replaceExisting: true, cancellation.Token);
+        await jobManager.WaitForAttemptCountAsync(1);
+        Assert.False(scheduling.IsCompleted);
+
+        clock.Advance(TimeSpan.FromMinutes(1));
+        await jobManager.WaitForAttemptCountAsync(2);
+        cancellation.Cancel();
+        await scheduling;
+
+        Assert.Equal(2, jobManager.AttemptCount);
+    }
+
     [Fact]
     public async Task DuplicateAfterCommitRemainsDeliverableAndUnfenced()
     {
@@ -297,7 +371,11 @@ public sealed class DurableOutboxDeliveryBatchTests
             Exception? writeException = null,
             Exception? revertException = null,
             bool hasDurableMessage = true,
-            bool supportsObservers = true)
+            bool supportsObservers = true,
+            ILocalDurableJobManager? jobManager = null,
+            ITimerRegistry? timerRegistry = null,
+            TimeProvider? jobTimeProvider = null,
+            TimeSpan? backpressureRetryDelay = null)
         {
             MessageId = Guid.NewGuid();
             SenderId = GrainId.Create("sender", "1");
@@ -334,6 +412,8 @@ public sealed class DurableOutboxDeliveryBatchTests
             grainContext.GrainId.Returns(SenderId);
             grainContext.ObservableLifecycle.Returns(Substitute.For<IGrainLifecycle>());
 
+            TimerRegistry = timerRegistry ?? Substitute.For<ITimerRegistry>();
+            JobManager = jobManager ?? Substitute.For<ILocalDurableJobManager>();
             var outboxType = GetInternalType("Orleans.DurableMessaging.DurableOutbox");
             var instrumentsType = GetInternalType("Orleans.DurableMessaging.DurableMessagingInstruments");
             var instruments = instrumentsType
@@ -359,7 +439,7 @@ public sealed class DurableOutboxDeliveryBatchTests
                     Messages,
                     grainFactory,
                     grainContext,
-                    Substitute.For<ITimerRegistry>(),
+                    TimerRegistry,
                     logger,
                     instruments,
                     MessageStates.Instance,
@@ -367,14 +447,14 @@ public sealed class DurableOutboxDeliveryBatchTests
                     new TestDurableValue<string>(),
                     new TestDurableValue<string>(),
                     new TestDurableValue<long>(),
-                    Substitute.For<ILocalDurableJobManager>(),
+                    JobManager,
                     Substitute.For<IDurableJobHandlerRegistry>(),
                     pumpResults,
-                    TimeProvider.System,
+                    jobTimeProvider ?? TimeProvider.System,
                     Options.Create(
                         new DurableInboxOptions
                         {
-                            BackpressureRetryDelay = TimeSpan.FromMilliseconds(1),
+                            BackpressureRetryDelay = backpressureRetryDelay ?? TimeSpan.FromMilliseconds(1),
                             MaxOutboxRetryAge = TimeSpan.FromMinutes(5),
                             MaxDeliveryAttempts = maxDeliveryAttempts,
                             OutboxBatchSize = 8
@@ -394,10 +474,30 @@ public sealed class DurableOutboxDeliveryBatchTests
         public UntypedDurableDictionary MessageStates { get; }
         public UntypedDurableDictionary DeadLetters { get; }
         public TestStateManager Manager { get; }
+        public ILocalDurableJobManager JobManager { get; }
+        public ITimerRegistry TimerRegistry { get; }
         public int PendingMessageCount => GetPendingMessageIds().Count;
 
         public Task DeliverAsync(CancellationToken cancellationToken = default) =>
             (Task)_deliverMethod.Invoke(_outbox, [cancellationToken])!;
+
+        public Task EnsureJobScheduledAsync(bool replaceExisting, CancellationToken cancellationToken) =>
+            (Task)_outbox.GetType()
+                .GetMethod("EnsureJobScheduledAsync", BindingFlags.Instance | BindingFlags.NonPublic)!
+                .Invoke(_outbox, [replaceExisting, cancellationToken])!;
+
+        public Task StartAsync(CancellationToken cancellationToken = default) =>
+            ((ILifecycleObserver)_outbox).OnStart(cancellationToken);
+
+        public async Task RunRegisteredTimerAsync()
+        {
+            var call = Assert.Single(
+                TimerRegistry.ReceivedCalls(),
+                static call => call.GetMethodInfo().Name == "RegisterGrainTimer");
+            var arguments = call.GetArguments();
+            var callback = (Delegate)arguments[1]!;
+            await (Task)callback.DynamicInvoke(arguments[2], CancellationToken.None)!;
+        }
 
         public void ActivateMetrics() =>
             _outbox.GetType()
@@ -526,6 +626,7 @@ public sealed class DurableOutboxDeliveryBatchTests
         public int WriteCount { get; private set; }
         public int WriteCompletedCount { get; private set; }
         public int RevertCount { get; private set; }
+        private Exception? _nextWriteException = writeException;
 
         public ValueTask InitializeAsync(CancellationToken cancellationToken) => default;
         public void RegisterState(string name, IJournaledState state) { }
@@ -549,9 +650,10 @@ public sealed class DurableOutboxDeliveryBatchTests
         {
             cancellationToken.ThrowIfCancellationRequested();
             WriteCount++;
-            if (writeException is not null)
+            if (_nextWriteException is { } exception)
             {
-                return ValueTask.FromException(writeException);
+                _nextWriteException = null;
+                return ValueTask.FromException(exception);
             }
 
             _observer?.OnWriteStarted();
@@ -567,6 +669,10 @@ public sealed class DurableOutboxDeliveryBatchTests
             WriteCompletedCount++;
             return default;
         }
+
+        public void FailNextWrite(Exception exception) => _nextWriteException = exception;
+
+        public void NotifyRecoveryCompleted() => _observer?.OnRecoveryCompleted();
 
         public void CommitWithInterleavedMutation(Action mutation)
         {
@@ -601,6 +707,45 @@ public sealed class DurableOutboxDeliveryBatchTests
         }
 
         public ValueTask DeleteStateAsync(CancellationToken cancellationToken) => default;
+    }
+
+    private sealed class RecordingJobManager(bool alwaysFail = false) : ILocalDurableJobManager
+    {
+        private readonly SemaphoreSlim _attempted = new(0);
+        private int _attemptCount;
+
+        public int AttemptCount => Volatile.Read(ref _attemptCount);
+
+        public Task<DurableJob> ScheduleJobAsync(ScheduleJobRequest request, CancellationToken cancellationToken)
+        {
+            var count = Interlocked.Increment(ref _attemptCount);
+            _attempted.Release();
+            if (alwaysFail)
+            {
+                return Task.FromException<DurableJob>(new IOException($"Injected scheduling failure {count}."));
+            }
+
+            return Task.FromResult(new DurableJob
+            {
+                Id = $"job-{count}",
+                Name = request.JobName,
+                DueTime = request.DueTime,
+                TargetGrainId = request.Target,
+                ShardId = "test",
+                Metadata = request.Metadata
+            });
+        }
+
+        public Task<bool> TryCancelDurableJobAsync(DurableJob job, CancellationToken cancellationToken) =>
+            Task.FromResult(true);
+
+        public async Task WaitForAttemptCountAsync(int expected)
+        {
+            while (AttemptCount < expected)
+            {
+                await _attempted.WaitAsync(TimeSpan.FromSeconds(10));
+            }
+        }
     }
 
     private sealed class TestDurableValue<T> : IDurableValue<T>

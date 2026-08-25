@@ -20,6 +20,8 @@ public interface IDurableMessagingTestGrain : IGrainWithGuidKey
     [AlwaysInterleave] Task DeactivateOnNextRecoveryAsync();
     Task<DuplicateRouteRegistrationResult> RegisterDuplicateExactRouteHandlersAsync(string route);
     Task<RouteLookupValidationResult> ValidateRouteLookupAsync(string? route);
+    Task<bool> RemoveInboxDeadLetterAsync(GrainId senderId, Guid messageId);
+    Task<bool> RemoveOutboxDeadLetterAsync(Guid messageId);
     [AlwaysInterleave] Task<DurableEndpointSnapshot> GetSnapshotAsync();
     Task RequestDeactivationAsync();
 }
@@ -197,6 +199,28 @@ public sealed class DurableMessagingTestGrain : DurableGrain, IDurableMessagingT
         return Task.FromResult(new RouteLookupValidationResult(
             hasHandlerParameterName,
             tryGetHandlerParameterName));
+    }
+
+    public async Task<bool> RemoveInboxDeadLetterAsync(GrainId senderId, Guid messageId)
+    {
+        if (!_diagnostics.RemoveInboxDeadLetter(senderId, messageId))
+        {
+            return false;
+        }
+
+        await WriteStateAsync();
+        return true;
+    }
+
+    public async Task<bool> RemoveOutboxDeadLetterAsync(Guid messageId)
+    {
+        if (!_diagnostics.RemoveOutboxDeadLetter(messageId))
+        {
+            return false;
+        }
+
+        await WriteStateAsync();
+        return true;
     }
 
     public Task<DurableEndpointSnapshot> GetSnapshotAsync() => Task.FromResult(CreateSnapshot());
