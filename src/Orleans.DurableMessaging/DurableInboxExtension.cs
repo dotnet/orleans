@@ -794,13 +794,14 @@ internal sealed partial class DurableInboxExtension :
         await _stateManager.WriteStateAsync(CancellationToken.None).ConfigureAwait(true);
     }
 
-    internal async Task ResumeProcessingAsync(bool replaceExisting)
+    internal async Task ResumeProcessingAsync(bool replaceExisting, CancellationToken cancellationToken)
     {
+        cancellationToken.ThrowIfCancellationRequested();
         EnsureMetricsActive();
-        await _gate.WaitAsync(CancellationToken.None).ConfigureAwait(true);
+        await _gate.WaitAsync(cancellationToken).ConfigureAwait(true);
         try
         {
-            await EnsureJobScheduledUnderGateAsync(CancellationToken.None, replaceExisting: replaceExisting).ConfigureAwait(true);
+            await EnsureJobScheduledUnderGateAsync(cancellationToken, replaceExisting: replaceExisting).ConfigureAwait(true);
             ScheduleLocalDrain();
         }
 
@@ -810,7 +811,8 @@ internal sealed partial class DurableInboxExtension :
         }
     }
 
-    public Task OnStart(CancellationToken cancellationToken) => ResumeProcessingAsync(replaceExisting: true);
+    public Task OnStart(CancellationToken cancellationToken) =>
+        ResumeProcessingAsync(replaceExisting: true, cancellationToken);
 
     public Task OnStop(CancellationToken cancellationToken)
     {
