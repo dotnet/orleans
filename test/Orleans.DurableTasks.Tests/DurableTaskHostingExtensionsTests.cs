@@ -183,10 +183,16 @@ public class DurableTaskHostingExtensionsTests
 
         builder.AddDurableTasks();
 
-        var descriptor = Assert.Single(
-            builder.Services,
-            d => d.ServiceType == typeof(IJournaledGrainParticipant) && d.ImplementationType == typeof(DurableTaskGrainParticipant));
-        Assert.Equal(ServiceLifetime.Scoped, descriptor.Lifetime);
+        var descriptors = builder.Services
+            .Where(d => d.ServiceType == typeof(IJournaledGrainParticipant))
+            .ToList();
+        Assert.Equal(2, descriptors.Count);
+        Assert.All(descriptors, descriptor =>
+        {
+            Assert.Equal(ServiceLifetime.Scoped, descriptor.Lifetime);
+            Assert.NotNull(descriptor.ImplementationFactory);
+            Assert.Null(descriptor.ImplementationType);
+        });
     }
 
     [Fact]
@@ -300,24 +306,16 @@ public class DurableTaskHostingExtensionsTests
 
         var participants = scope.ServiceProvider.GetServices<IJournaledGrainParticipant>().ToList();
         var durableTaskParticipant = Assert.Single(participants, p => p is DurableTaskGrainParticipant);
-
-        // Unlike IDurableTaskGrainRuntime/IDurableTaskMessageTransport (registered via AddFromExisting, which
-        // forwards to the pre-existing concrete-type scoped registration to guarantee identity),
-        // DurableTaskGrainParticipant's IJournaledGrainParticipant registration is a second, independent
-        // constructor-based ServiceDescriptor.Scoped<IJournaledGrainParticipant, DurableTaskGrainParticipant>(), so it
-        // produces a DIFFERENT instance than GetRequiredService<DurableTaskGrainParticipant>() within the same scope.
-        // Nothing in production resolves the concrete type directly (only the IJournaledGrainParticipant enumerable
-        // is consumed), so this divergence is harmless, but it is a genuine, concrete behavioral difference from the
-        // other three forwarded services worth pinning down explicitly rather than assuming shared identity.
         var concreteParticipant = scope.ServiceProvider.GetRequiredService<DurableTaskGrainParticipant>();
-        Assert.NotSame(concreteParticipant, durableTaskParticipant);
+        Assert.Same(concreteParticipant, durableTaskParticipant);
 
-        // Resolving the enumerable a second time within the same scope returns the identical cached instance
-        // (standard scoped-service caching), confirming DurableTaskGrainParticipant's own identity is stable across
-        // repeated resolutions within one scope even though it differs from the concrete-type registration's instance.
         var participantsAgain = scope.ServiceProvider.GetServices<IJournaledGrainParticipant>().ToList();
         var durableTaskParticipantAgain = Assert.Single(participantsAgain, p => p is DurableTaskGrainParticipant);
         Assert.Same(durableTaskParticipant, durableTaskParticipantAgain);
+
+        var durableMessagingParticipant = Assert.Single(participants, p => p is DurableMessagingGrainParticipant);
+        var concreteMessagingParticipant = scope.ServiceProvider.GetRequiredService<DurableMessagingGrainParticipant>();
+        Assert.Same(concreteMessagingParticipant, durableMessagingParticipant);
     }
 
     [Fact]

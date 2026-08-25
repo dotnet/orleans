@@ -113,8 +113,8 @@ public static class DurableMessagingExtensions
         services.TryAddScoped<IDurableMessageScheduler>(sp => sp.GetRequiredService<DurableMessageScheduler>());
         services.TryAddScoped<IDurableMessagingDiagnostics, DurableMessagingDiagnostics>();
         services.TryAddScoped<DurableMessagingGrainParticipant>();
-        services.TryAddEnumerable(
-            ServiceDescriptor.Scoped<IJournaledGrainParticipant, DurableMessagingGrainParticipant>());
+        services.AddScoped<IJournaledGrainParticipant>(
+            static serviceProvider => serviceProvider.GetRequiredService<DurableMessagingGrainParticipant>());
         return services;
     }
 
