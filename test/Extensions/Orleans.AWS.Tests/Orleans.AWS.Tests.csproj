@@ -25,6 +25,7 @@
   <ItemGroup Condition="'$(TargetFramework)' != 'net10.0'">
     <Compile Remove="DynamoDBAspireIntegrationTests.cs" />
     <Compile Remove="DynamoDBAspireLiveTests.cs" />
+    <Compile Remove="DynamoDBAspireTestModel.cs" />
   </ItemGroup>
 
   <ItemGroup>
