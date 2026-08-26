@@ -15,6 +15,7 @@ public class DynamicRebalancingTests(RebalancerFixture fixture, ITestOutputHelpe
     [Fact]
     public async Task Should_Move_Activations_From_Silo1_And_Silo3_To_Silo2_And_Silo4_While_New_Activations_Are_Created()
     {
+        var cancellationToken = TestContext.Current.CancellationToken;
         var tasks = new List<Task>();
 
         AddTestActivations(tasks, Silo1, 300);
@@ -53,7 +54,7 @@ public class DynamicRebalancingTests(RebalancerFixture fixture, ITestOutputHelpe
 
         while (index < 5)
         {
-            await Task.Delay(RebalancerFixture.SessionCyclePeriod);
+            await Task.Delay(RebalancerFixture.SessionCyclePeriod, cancellationToken);
 
             if (index % 2 == 0)
             {

@@ -41,15 +41,17 @@ public sealed class GrainDirectoryResilienceTests
     [Fact]
     public async Task ElasticChaos()
     {
+        var cancellationToken = TestContext.Current.CancellationToken;
         var testClusterBuilder = new TestClusterBuilder(1);
         testClusterBuilder.AddSiloBuilderConfigurator<SiloBuilderConfigurator>();
         var testCluster = testClusterBuilder.Build();
-        await testCluster.DeployAsync();
+        await testCluster.DeployAsync().WaitAsync(cancellationToken);
         var log = testCluster.ServiceProvider.GetRequiredService<ILogger<GrainDirectoryResilienceTests>>();
         log.LogInformation("ServiceId: '{ServiceId}'", testCluster.Options.ServiceId);
         log.LogInformation("ClusterId: '{ClusterId}'.", testCluster.Options.ClusterId);
 
-        var cts = new CancellationTokenSource(TimeSpan.FromMinutes(5));
+        using var cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        cts.CancelAfter(TimeSpan.FromMinutes(5));
         var reconfigurationTimer = CoarseStopwatch.StartNew();
         var upperLimit = 10;
         var lowerLimit = 1; // Membership is kept on the primary, so we can't go below 1
@@ -67,7 +69,11 @@ public sealed class GrainDirectoryResilienceTests
 
                 try
                 {
-                    await workTask;
+                    await workTask.WaitAsync(cts.Token);
+                }
+                catch (OperationCanceledException) when (cts.IsCancellationRequested)
+                {
+                    break;
                 }
                 catch (SiloUnavailableException sue)
                 {
@@ -85,7 +91,7 @@ public sealed class GrainDirectoryResilienceTests
 
                 idBase += CallsPerIteration;
             }
-        });
+        }, cts.Token);
 
         var chaosTask = Task.Run(async () =>
         {
@@ -98,9 +104,9 @@ public sealed class GrainDirectoryResilienceTests
                     if (remaining <= TimeSpan.Zero)
                     {
                         reconfigurationTimer.Restart();
-                        await clusterOperation;
+                        await clusterOperation.WaitAsync(cts.Token);
 
-                        await CheckIntegrityAsync(testCluster, client);
+                        await CheckIntegrityAsync(testCluster, client, cts.Token);
 
                         clusterOperation = Task.Run(async () =>
                         {
@@ -113,20 +119,20 @@ public sealed class GrainDirectoryResilienceTests
                                 if (currentCount % 2 == 0)
                                 {
                                     log.LogInformation("Stopping '{Silo}'.", victim.SiloAddress);
-                                    await testCluster.StopSiloAsync(victim);
+                                    await testCluster.StopSiloAsync(victim).WaitAsync(cts.Token);
                                     log.LogInformation("Stopped '{Silo}'.", victim.SiloAddress);
                                 }
                                 else
                                 {
                                     log.LogInformation("Killing '{Silo}'.", victim.SiloAddress);
-                                    await testCluster.KillSiloAsync(victim);
+                                    await testCluster.KillSiloAsync(victim).WaitAsync(cts.Token);
                                     log.LogInformation("Killed '{Silo}'.", victim.SiloAddress);
                                 }
                             }
                             else if (currentCount < target)
                             {
                                 log.LogInformation("Starting new silo.");
-                                var result = await testCluster.StartAdditionalSiloAsync();
+                                var result = await testCluster.StartAdditionalSiloAsync().WaitAsync(cts.Token);
                                 log.LogInformation("Started '{Silo}'.", result.SiloAddress);
                             }
 
@@ -138,11 +144,11 @@ public sealed class GrainDirectoryResilienceTests
                             {
                                 target = lowerLimit;
                             }
-                        });
+                        }, cts.Token);
                     }
                     else
                     {
-                        await Task.Delay(remaining);
+                        await Task.Delay(remaining, cts.Token);
                     }
                 }
                 catch (Exception exception)
@@ -150,29 +156,55 @@ public sealed class GrainDirectoryResilienceTests
                     log.LogInformation(exception, "Ignoring chaos exception.");
                 }
             }
-        });
+        }, cts.Token);
 
-        await await Task.WhenAny(loadTask, chaosTask);
-        cts.Cancel();
-        await Task.WhenAll(loadTask, chaosTask);
-        await testCluster.StopAllSilosAsync();
-        await testCluster.DisposeAsync();
+        try
+        {
+            await await Task.WhenAny(loadTask, chaosTask).WaitAsync(cancellationToken);
+        }
+        finally
+        {
+            cts.Cancel();
+            using var joinCancellation = new CancellationTokenSource(TimeSpan.FromMinutes(1));
+            try
+            {
+                await Task.WhenAll(loadTask, chaosTask).WaitAsync(joinCancellation.Token);
+            }
+            catch (OperationCanceledException) when (
+                cts.IsCancellationRequested
+                && !joinCancellation.IsCancellationRequested)
+            {
+            }
+
+            try
+            {
+                using var stopCancellation = new CancellationTokenSource(TimeSpan.FromMinutes(1));
+                await testCluster.StopAllSilosAsync().WaitAsync(stopCancellation.Token);
+            }
+            finally
+            {
+                using var disposeCancellation = new CancellationTokenSource(TimeSpan.FromMinutes(1));
+                await testCluster.DisposeAsync().AsTask().WaitAsync(disposeCancellation.Token);
+            }
+        }
     }
 
     [Fact]
     public async Task JoiningSilo_DoesNotLeaveStaleEntriesOnPreviousOwner()
     {
+        var cancellationToken = TestContext.Current.CancellationToken;
         using var directoryEvents = new DiagnosticEventCollector(GrainDirectoryEvents.ListenerName);
         var testClusterBuilder = new TestClusterBuilder(1);
         testClusterBuilder.AddSiloBuilderConfigurator<SiloBuilderConfigurator>();
         var testCluster = testClusterBuilder.Build();
-        await testCluster.DeployAsync();
+        await testCluster.DeployAsync().WaitAsync(cancellationToken);
         var log = testCluster.ServiceProvider.GetRequiredService<ILogger<GrainDirectoryResilienceTests>>();
         var client = ((InProcessSiloHandle)testCluster.Primary!).SiloHost.Services.GetRequiredService<IGrainFactory>();
         var previousDirectoryView = await WaitForDirectoryViewAsync(
             ((InProcessSiloHandle)testCluster.Primary).ServiceProvider.GetRequiredService<DirectoryMembershipService>(),
             view => view.Members.Contains(testCluster.Primary.SiloAddress),
-            "initial directory membership view");
+            "initial directory membership view",
+            cancellationToken);
         const int CallsPerIteration = 100;
         var nextGrainId = 0L;
 
@@ -180,48 +212,80 @@ public sealed class GrainDirectoryResilienceTests
         {
             for (var i = 0; i < 10; i++)
             {
-                await RunPingBatchAsync(client, log, nextGrainId, CallsPerIteration);
+                await RunPingBatchAsync(client, log, nextGrainId, CallsPerIteration, cancellationToken);
                 nextGrainId += CallsPerIteration;
             }
 
-            using var cts = new CancellationTokenSource(TimeSpan.FromMinutes(1));
+            using var cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+            cts.CancelAfter(TimeSpan.FromMinutes(1));
             var loadGrainId = nextGrainId;
             var loadTask = Task.Run(async () =>
             {
-                while (!cts.IsCancellationRequested)
+                try
                 {
-                    await RunPingBatchAsync(client, log, loadGrainId, CallsPerIteration);
-                    loadGrainId += CallsPerIteration;
+                    while (!cts.IsCancellationRequested)
+                    {
+                        await RunPingBatchAsync(client, log, loadGrainId, CallsPerIteration, cts.Token);
+                        loadGrainId += CallsPerIteration;
+                    }
                 }
-            });
+                catch (OperationCanceledException) when (cts.IsCancellationRequested)
+                {
+                }
+            }, cts.Token);
 
             try
             {
                 log.LogInformation("Starting new silo.");
-                var newSilo = await testCluster.StartAdditionalSiloAsync();
+                var newSilo = await testCluster.StartAdditionalSiloAsync().WaitAsync(cancellationToken);
                 log.LogInformation("Started '{Silo}'.", newSilo.SiloAddress);
 
                 var currentDirectoryView = await WaitForDirectoryViewAsync(
                     ((InProcessSiloHandle)newSilo).ServiceProvider.GetRequiredService<DirectoryMembershipService>(),
                     view => view.Members.Contains(newSilo.SiloAddress),
-                    $"directory membership view containing '{newSilo.SiloAddress}'");
-                await WaitForDirectoryMigrationAsync(directoryEvents, previousDirectoryView, currentDirectoryView);
-                await CheckIntegrityAsync(testCluster, client);
+                    $"directory membership view containing '{newSilo.SiloAddress}'",
+                    cancellationToken);
+                await WaitForDirectoryMigrationAsync(
+                    directoryEvents,
+                    previousDirectoryView,
+                    currentDirectoryView,
+                    cancellationToken);
+                await CheckIntegrityAsync(testCluster, client, cancellationToken);
             }
             finally
             {
                 cts.Cancel();
-                await loadTask;
+                using var joinCancellation = new CancellationTokenSource(TimeSpan.FromMinutes(1));
+                try
+                {
+                    await loadTask.WaitAsync(joinCancellation.Token);
+                }
+                catch (OperationCanceledException) when (
+                    cts.IsCancellationRequested
+                    && !joinCancellation.IsCancellationRequested)
+                {
+                }
             }
         }
         finally
         {
-            await testCluster.StopAllSilosAsync();
-            await testCluster.DisposeAsync();
+            try
+            {
+                using var stopCancellation = new CancellationTokenSource(TimeSpan.FromMinutes(1));
+                await testCluster.StopAllSilosAsync().WaitAsync(stopCancellation.Token);
+            }
+            finally
+            {
+                using var disposeCancellation = new CancellationTokenSource(TimeSpan.FromMinutes(1));
+                await testCluster.DisposeAsync().AsTask().WaitAsync(disposeCancellation.Token);
+            }
         }
     }
 
-    private static async Task CheckIntegrityAsync(TestCluster testCluster, IGrainFactory client)
+    private static async Task CheckIntegrityAsync(
+        TestCluster testCluster,
+        IGrainFactory client,
+        CancellationToken cancellationToken)
     {
         var integrityChecks = new List<Task>();
         var internalGrainFactory = (IInternalGrainFactory)client;
@@ -232,19 +296,21 @@ public sealed class GrainDirectoryResilienceTests
             for (var partitionIndex = 0; partitionIndex < partitionsPerSilo; partitionIndex++)
             {
                 var replica = internalGrainFactory.GetSystemTarget<IGrainDirectoryTestHooks>(GrainDirectoryPartition.CreateGrainId(address, partitionIndex).GrainId);
-                integrityChecks.Add(replica.CheckIntegrityAsync().AsTask());
+                integrityChecks.Add(replica.CheckIntegrityAsync().AsTask().WaitAsync(cancellationToken));
             }
         }
 
-        await Task.WhenAll(integrityChecks);
+        await Task.WhenAll(integrityChecks).WaitAsync(cancellationToken);
     }
 
     private static async Task<DirectoryMembershipSnapshot> WaitForDirectoryViewAsync(
         DirectoryMembershipService directoryMembershipService,
         Func<DirectoryMembershipSnapshot, bool> predicate,
-        string description)
+        string description,
+        CancellationToken cancellationToken)
     {
-        using var cts = new CancellationTokenSource(DirectoryMigrationTimeout);
+        using var cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        cts.CancelAfter(DirectoryMigrationTimeout);
         try
         {
             await foreach (var view in directoryMembershipService.ViewUpdates.WithCancellation(cts.Token))
@@ -255,7 +321,7 @@ public sealed class GrainDirectoryResilienceTests
                 }
             }
         }
-        catch (OperationCanceledException) when (cts.IsCancellationRequested)
+        catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested && cts.IsCancellationRequested)
         {
             throw new TimeoutException($"Timed out waiting for {description} after {DirectoryMigrationTimeout}.");
         }
@@ -266,12 +332,15 @@ public sealed class GrainDirectoryResilienceTests
     private static async Task WaitForDirectoryMigrationAsync(
         DiagnosticEventCollector directoryEvents,
         DirectoryMembershipSnapshot previousView,
-        DirectoryMembershipSnapshot currentView)
+        DirectoryMembershipSnapshot currentView,
+        CancellationToken cancellationToken)
     {
         var expectedOperations = GetExpectedRangeOperations(previousView, currentView).ToArray();
         Assert.NotEmpty(expectedOperations);
 
-        await Task.WhenAll(expectedOperations.Select(operation => WaitForRangeOperationCompletedAsync(directoryEvents, operation)));
+        await Task.WhenAll(expectedOperations.Select(
+            operation => WaitForRangeOperationCompletedAsync(directoryEvents, operation, cancellationToken)))
+            .WaitAsync(cancellationToken);
     }
 
     private static IEnumerable<ExpectedRangeOperation> GetExpectedRangeOperations(
@@ -316,7 +385,8 @@ public sealed class GrainDirectoryResilienceTests
 
     private static async Task WaitForRangeOperationCompletedAsync(
         DiagnosticEventCollector directoryEvents,
-        ExpectedRangeOperation expectedOperation)
+        ExpectedRangeOperation expectedOperation,
+        CancellationToken cancellationToken)
     {
         await directoryEvents.WaitForEventAsync(
             nameof(GrainDirectoryEvents.RangeOperationCompleted),
@@ -327,17 +397,23 @@ public sealed class GrainDirectoryResilienceTests
                 && completed.Version == expectedOperation.Version
                 && completed.Range.Equals(expectedOperation.Range)
                 && string.Equals(completed.OperationName, expectedOperation.OperationName, StringComparison.Ordinal),
-            DirectoryMigrationTimeout);
+            DirectoryMigrationTimeout,
+            cancellationToken);
     }
 
-    private static async Task RunPingBatchAsync(IGrainFactory client, ILogger log, long idBase, int callsPerIteration)
+    private static async Task RunPingBatchAsync(
+        IGrainFactory client,
+        ILogger log,
+        long idBase,
+        int callsPerIteration,
+        CancellationToken cancellationToken)
     {
         var tasks = Enumerable.Range(0, callsPerIteration).Select(i => client.GetGrain<IMyDirectoryTestGrain>(idBase + i).Ping().AsTask()).ToList();
         var workTask = Task.WhenAll(tasks);
 
         try
         {
-            await workTask;
+            await workTask.WaitAsync(cancellationToken);
         }
         catch (SiloUnavailableException sue)
         {

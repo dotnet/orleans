@@ -15,6 +15,7 @@ public class StaticRebalancingTests(RebalancerFixture fixture, ITestOutputHelper
     [Fact]
     public async Task Should_Move_Activations_From_Silo1_And_Silo3_To_Silo2_And_Silo4()
     {
+        var cancellationToken = TestContext.Current.CancellationToken;
         var tasks = new List<Task>();
 
         AddTestActivations(tasks, Silo1, 300);
@@ -46,7 +47,7 @@ public class StaticRebalancingTests(RebalancerFixture fixture, ITestOutputHelper
         var index = 0;
         while (index < 3)
         {
-            await Task.Delay(RebalancerFixture.SessionCyclePeriod);
+            await Task.Delay(RebalancerFixture.SessionCyclePeriod, cancellationToken);
             stats = await MgmtGrain.GetDetailedGrainStatistics();
 
             silo1Activations = GetActivationCount(stats, Silo1);

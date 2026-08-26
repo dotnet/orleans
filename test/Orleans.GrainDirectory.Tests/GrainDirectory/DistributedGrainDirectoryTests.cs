@@ -38,6 +38,7 @@ public sealed class DistributedGrainDirectoryMembershipTests
     [Fact]
     public async Task OwnerResolutionWaitsForActiveDirectoryMembership()
     {
+        var cancellationToken = TestContext.Current.CancellationToken;
         var builder = new InProcessTestClusterBuilder(1);
 #pragma warning disable ORLEANSEXP003
         builder.Options.UseDistributedGrainDirectory = true;
@@ -56,13 +57,14 @@ public sealed class DistributedGrainDirectoryMembershipTests
 
         try
         {
-            await cluster.DeployAsync();
+            await cluster.DeployAsync().WaitAsync(cancellationToken);
             var silo = cluster.Silos[0];
             var membership = silo.ServiceProvider.GetRequiredService<DirectoryMembershipService>();
             var directory = silo.ServiceProvider.GetRequiredService<DistributedGrainDirectory>();
             var testHooks = (DistributedGrainDirectory.ITestHooks)directory;
             var controlledMembership = silo.ServiceProvider.GetRequiredService<ControlledMembershipService>();
-            using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+            using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+            timeout.CancelAfter(TimeSpan.FromSeconds(30));
 
             await controlledMembership.ActiveUpdateBlocked.WaitAsync(timeout.Token);
             var siloAddress = silo.SiloAddress;
@@ -78,7 +80,8 @@ public sealed class DistributedGrainDirectoryMembershipTests
         }
         finally
         {
-            await cluster.DisposeAsync();
+            using var cleanupCancellation = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+            await cluster.DisposeAsync().AsTask().WaitAsync(cleanupCancellation.Token);
         }
     }
 

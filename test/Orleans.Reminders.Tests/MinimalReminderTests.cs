@@ -27,7 +27,8 @@ namespace UnitTests.CatalogTests
             {
                 try
                 {
-                    await base.DisposeAsync();
+                    using var cleanupCancellation = new CancellationTokenSource(TestConstants.InitTimeout);
+                    await base.DisposeAsync().AsTask().WaitAsync(cleanupCancellation.Token);
                 }
                 finally
                 {
@@ -64,7 +65,8 @@ namespace UnitTests.CatalogTests
             var grainId = reminderGrain.GetGrainId();
             var observer = this.fixture.ReminderObserver;
 
-            using var cts = new CancellationTokenSource(TestConstants.InitTimeout);
+            using var cts = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
+            cts.CancelAfter(TestConstants.InitTimeout);
             foreach (var silo in this.fixture.HostedCluster.Silos)
             {
                 await observer.WaitForReminderServiceStartedAsync(cts.Token, silo.SiloAddress);

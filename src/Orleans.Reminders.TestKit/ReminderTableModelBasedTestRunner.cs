@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
 using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Accordant;
 using Orleans.Runtime;
@@ -92,9 +93,21 @@ public sealed class ReminderTableModelBasedTestRunner
     /// </summary>
     /// <returns>A task which represents the asynchronous test run.</returns>
     /// <exception cref="ReminderConformanceException">One or more generated test cases failed.</exception>
-    public async Task RunGeneratedConformanceTests()
+    public Task RunGeneratedConformanceTests() => RunGeneratedConformanceTests(CancellationToken.None);
+
+    /// <summary>
+    /// Generates and executes reminder table operation sequences.
+    /// </summary>
+    /// <param name="cancellationToken">A cancellation token.</param>
+    /// <returns>A task which represents the asynchronous test run.</returns>
+    /// <exception cref="ReminderConformanceException">One or more generated test cases failed.</exception>
+    public async Task RunGeneratedConformanceTests(CancellationToken cancellationToken)
     {
-        var results = await ReminderTableModelBasedConformance.RunGeneratedTests(_reminderTable, _options, _output);
+        var results = await ReminderTableModelBasedConformance.RunGeneratedTests(
+            _reminderTable,
+            _options,
+            cancellationToken,
+            _output);
         var failures = results
             .Where(result => !result.Success)
             .Select(result => ReminderTableModelBasedConformance.BuildFailureMessage(_options.ProviderName, _options.Seed, result))
@@ -113,6 +126,7 @@ internal static class ReminderTableModelBasedConformance
     public static async Task<IList<TestCaseExecutionResult>> RunGeneratedTests(
         IReminderTable reminderTable,
         ReminderTableModelBasedConformanceOptions options,
+        CancellationToken cancellationToken,
         Action<string>? output = null)
     {
         ArgumentNullException.ThrowIfNull(reminderTable);
@@ -137,67 +151,85 @@ internal static class ReminderTableModelBasedConformance
         context.ResponsePrinter = response => response?.ToString() ?? "<null>";
 
         var testIndex = 0;
-        var results = await spec.RunTests(
-            context,
-            initialState,
-            testCases,
-            new TestExecutionOptions
-            {
-                StopOnFirstFailure = true,
-                BeforeEach = info =>
-                {
-                    reminderTable.TestOnlyClearTable().GetAwaiter().GetResult();
-                    var prefix = $"{runId}-{testIndex++:D4}";
-                    info.Context.Register(new ReminderExecutionContext(
-                        reminderTable,
-                        options.ProviderName,
-                        options.GrainType,
-                        prefix,
-                        options.Seed));
-                },
-                AfterEach = info =>
-                {
-                    try
-                    {
-                        reminderTable.TestOnlyClearTable().GetAwaiter().GetResult();
-                    }
-                    catch when (!info.Success)
-                    {
-                        // Preserve the generated failure, which identifies the operation sequence and state mismatch.
-                    }
-
-                    if (!info.Success)
-                    {
-                        output?.Invoke(info.FailureMessage);
-                    }
-                }
-            });
-
+        IList<TestCaseExecutionResult>? results = null;
         try
         {
-            await reminderTable.TestOnlyClearTable();
-            var finalRows = await ReminderTableRetryPolicy.ReadUntilAsync(
-                () => reminderTable.ReadRows(0, 0),
-                rows => rows is not null && rows.Reminders.Count == 0,
-                options.ProviderName,
-                nameof(ReminderTableModelBasedTestRunner),
-                "FinalCleanup/ReadRows(0, 0)",
-                "an empty reminder table after final cleanup",
-                rows => rows is null
-                    ? "null"
-                    : $"{rows.Reminders.Count.ToString(CultureInfo.InvariantCulture)} rows");
-            if (finalRows is null || finalRows.Reminders.Count != 0)
+            var executionResults = await spec.RunTests(
+                context,
+                initialState,
+                testCases,
+                new TestExecutionOptions
+                {
+                    StopOnFirstFailure = true,
+                    BeforeEach = info =>
+                    {
+                        cancellationToken.ThrowIfCancellationRequested();
+                        reminderTable.TestOnlyClearTable().WaitAsync(cancellationToken).GetAwaiter().GetResult();
+                        var prefix = $"{runId}-{testIndex++:D4}";
+                        info.Context.Register(new ReminderExecutionContext(
+                            reminderTable,
+                            options.ProviderName,
+                            options.GrainType,
+                            prefix,
+                            options.Seed,
+                            cancellationToken));
+                    },
+                    AfterEach = info =>
+                    {
+                        try
+                        {
+                            using var cleanupCancellation = new CancellationTokenSource(TimeSpan.FromMinutes(1));
+                            reminderTable.TestOnlyClearTable()
+                                .WaitAsync(cleanupCancellation.Token)
+                                .GetAwaiter()
+                                .GetResult();
+                        }
+                        catch when (!info.Success || cancellationToken.IsCancellationRequested)
+                        {
+                            // Preserve the generated failure or test cancellation.
+                        }
+
+                        if (!info.Success)
+                        {
+                            output?.Invoke(info.FailureMessage);
+                        }
+                    }
+                }).WaitAsync(cancellationToken);
+            results = executionResults;
+
+            return executionResults;
+        }
+        finally
+        {
+            try
             {
-                throw new ReminderConformanceException(
-                    $"Final reminder table cleanup left {finalRows?.Reminders.Count.ToString(CultureInfo.InvariantCulture) ?? "null"} rows; expected an empty table.");
+                using var cleanupCancellation = new CancellationTokenSource(TimeSpan.FromMinutes(1));
+                await reminderTable.TestOnlyClearTable().WaitAsync(cleanupCancellation.Token);
+                var finalRows = await ReminderTableRetryPolicy.ReadUntilAsync(
+                    () => reminderTable.ReadRows(0, 0),
+                    rows => rows is not null && rows.Reminders.Count == 0,
+                    options.ProviderName,
+                    nameof(ReminderTableModelBasedTestRunner),
+                    "FinalCleanup/ReadRows(0, 0)",
+                    "an empty reminder table after final cleanup",
+                    rows => rows is null
+                        ? "null"
+                        : $"{rows.Reminders.Count.ToString(CultureInfo.InvariantCulture)} rows",
+                    cleanupCancellation.Token);
+                if (finalRows is null || finalRows.Reminders.Count != 0)
+                {
+                    throw new ReminderConformanceException(
+                        $"Final reminder table cleanup left {finalRows?.Reminders.Count.ToString(CultureInfo.InvariantCulture) ?? "null"} rows; expected an empty table.");
+                }
+            }
+            catch when (
+                results is null
+                || cancellationToken.IsCancellationRequested
+                || results.Any(result => !result.Success))
+            {
+                // Preserve the generated failure, test cancellation, or execution exception.
             }
         }
-        catch when (results.Any(result => !result.Success))
-        {
-            // Preserve the generated failure, which contains the operation sequence and observed state.
-        }
-
-        return results;
     }
 
     public static string BuildFailureMessage(string providerName, int seed, TestCaseExecutionResult result)
@@ -662,6 +694,7 @@ internal static class ReminderTableModelBasedConformance
 
         private readonly IReminderTable _reminderTable;
         private readonly string _providerName;
+        private readonly CancellationToken _cancellationToken;
         private readonly Dictionary<string, (GrainId GrainId, string ReminderName)> _identities;
         private readonly Dictionary<string, string?> _currentETags = new(StringComparer.Ordinal);
         private readonly Dictionary<string, string?> _previousETags = new(StringComparer.Ordinal);
@@ -673,10 +706,12 @@ internal static class ReminderTableModelBasedConformance
             string providerName,
             string grainType,
             string prefix,
-            int seed)
+            int seed,
+            CancellationToken cancellationToken)
         {
             _reminderTable = reminderTable;
             _providerName = providerName;
+            _cancellationToken = cancellationToken;
             var grainType1 = GrainType.Create(grainType);
             var primaryKey = $"{prefix}/{ReminderKey.PrimaryGrainName}";
             var primary = GrainId.Create(grainType1, GrainIdKeyExtensions.CreateGuidKey(ReminderTestData.CreateGuid(seed, primaryKey), primaryKey));
@@ -713,7 +748,8 @@ internal static class ReminderTableModelBasedConformance
                     nameof(ReminderTableModelBasedTestRunner),
                     "UpsertRow",
                     $"a non-empty ETag for '{request.Key}'",
-                    value => value ?? "<null>");
+                    value => value ?? "<null>",
+                    _cancellationToken);
                 _previousETags[request.Key] = previous;
                 _currentETags[request.Key] = etag;
                 if (!string.IsNullOrEmpty(etag))
@@ -735,7 +771,7 @@ internal static class ReminderTableModelBasedConformance
                     removed: false,
                     entries: ToObservedEntries(readBack is null ? [] : [readBack]));
             }
-            catch (Exception exception)
+            catch (Exception exception) when (!_cancellationToken.IsCancellationRequested)
             {
                 return ReminderOperationResult.Failure(exception);
             }
@@ -759,7 +795,7 @@ internal static class ReminderTableModelBasedConformance
                     removed: false,
                     entries: ToObservedEntries(entry is null ? [] : [entry]));
             }
-            catch (Exception exception)
+            catch (Exception exception) when (!_cancellationToken.IsCancellationRequested)
             {
                 return ReminderOperationResult.Failure(exception);
             }
@@ -781,7 +817,7 @@ internal static class ReminderTableModelBasedConformance
                     $"{expected.Count} current rows for grain '{request.Key}'");
                 return ReminderOperationResult.Success(null, false, ToObservedEntries(rows?.Reminders ?? []));
             }
-            catch (Exception exception)
+            catch (Exception exception) when (!_cancellationToken.IsCancellationRequested)
             {
                 return ReminderOperationResult.Failure(exception);
             }
@@ -809,7 +845,7 @@ internal static class ReminderTableModelBasedConformance
                     $"{expected.Count} current rows in ({begin}, {end}]");
                 return ReminderOperationResult.Success(null, false, ToObservedEntries(rows?.Reminders ?? []));
             }
-            catch (Exception exception)
+            catch (Exception exception) when (!_cancellationToken.IsCancellationRequested)
             {
                 return ReminderOperationResult.Failure(exception);
             }
@@ -827,7 +863,7 @@ internal static class ReminderTableModelBasedConformance
 
             try
             {
-                var removed = await _reminderTable.RemoveRow(grainId, reminderName, etag);
+                var removed = await _reminderTable.RemoveRow(grainId, reminderName, etag).WaitAsync(_cancellationToken);
                 if (removed)
                 {
                     _previousETags[request.Key] = null;
@@ -856,7 +892,7 @@ internal static class ReminderTableModelBasedConformance
                     false,
                     ToObservedEntries(readBack is null ? [] : [readBack]));
             }
-            catch (Exception exception)
+            catch (Exception exception) when (!_cancellationToken.IsCancellationRequested)
             {
                 return ReminderOperationResult.Failure(exception);
             }
@@ -867,7 +903,7 @@ internal static class ReminderTableModelBasedConformance
             _ = request;
             try
             {
-                await _reminderTable.TestOnlyClearTable();
+                await _reminderTable.TestOnlyClearTable().WaitAsync(_cancellationToken);
                 _currentETags.Clear();
                 _previousETags.Clear();
                 _currentEntries.Clear();
@@ -879,7 +915,7 @@ internal static class ReminderTableModelBasedConformance
                     "an empty reminder table");
                 return ReminderOperationResult.Success(null, false, ToObservedEntries(rows?.Reminders ?? []));
             }
-            catch (Exception exception)
+            catch (Exception exception) when (!_cancellationToken.IsCancellationRequested)
             {
                 return ReminderOperationResult.Failure(exception);
             }
@@ -914,7 +950,8 @@ internal static class ReminderTableModelBasedConformance
                     ReminderEntry entry => ReminderTableEntrySnapshot.Observe(entry, supportsSubSecondPrecision: true).ToString(),
                     ReminderTableData rows => $"{rows.Reminders.Count} rows: [{string.Join(", ", rows.Reminders.Select(entry => ReminderTableEntrySnapshot.Observe(entry, supportsSubSecondPrecision: true)))}]",
                     _ => value.ToString() ?? "<null>"
-                });
+                },
+                _cancellationToken);
 
         private bool Matches(ReminderTableEntrySnapshot expected, ReminderEntry actual)
             => ReminderTableEntrySnapshotComparer.CompareExact(

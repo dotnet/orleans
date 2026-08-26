@@ -200,7 +200,7 @@ public sealed class ReminderTableOperationGate : IAsyncDisposable
     /// </summary>
     /// <param name="cancellationToken">A cancellation token.</param>
     /// <returns>A task which completes when the operation is blocked.</returns>
-    public Task WaitUntilBlockedAsync(CancellationToken cancellationToken = default) => _blocked.Task.WaitAsync(cancellationToken);
+    public Task WaitUntilBlockedAsync(CancellationToken cancellationToken) => _blocked.Task.WaitAsync(cancellationToken);
 
     /// <summary>
     /// Releases the blocked operation.

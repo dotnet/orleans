@@ -14,10 +14,11 @@ namespace Orleans.Reminders.TestKit;
 /// <remarks>
 /// The fixture deploys an <see cref="InProcessTestCluster"/>, configures the provider under test through
 /// <see cref="ConfigureSilo"/>, and resolves the reminder table from the first silo. Connect
-/// <see cref="InitializeAsync"/> and <see cref="DisposeAsync"/> to the lifecycle hooks of your test framework.
+/// <see cref="InitializeAsync()"/> and <see cref="DisposeAsync()"/> to the lifecycle hooks of your test framework.
 /// </remarks>
 public abstract class ReminderTableTestFixture
 {
+    private static readonly TimeSpan CleanupTimeout = TimeSpan.FromMinutes(1);
     private ExceptionDispatchInfo? _preconditionException;
     private InProcessTestCluster? _cluster;
     private IReminderTable? _reminderTable;
@@ -81,7 +82,14 @@ public abstract class ReminderTableTestFixture
     /// Deploys the cluster and resolves the reminder table.
     /// </summary>
     /// <returns>A task which represents the asynchronous initialization.</returns>
-    public virtual async ValueTask InitializeAsync()
+    public virtual ValueTask InitializeAsync() => InitializeAsync(CancellationToken.None);
+
+    /// <summary>
+    /// Deploys the cluster and resolves the reminder table.
+    /// </summary>
+    /// <param name="cancellationToken">A cancellation token.</param>
+    /// <returns>A task which represents the asynchronous initialization.</returns>
+    public virtual async ValueTask InitializeAsync(CancellationToken cancellationToken)
     {
         try
         {
@@ -100,16 +108,18 @@ public abstract class ReminderTableTestFixture
         var cluster = builder.Build();
         try
         {
-            await cluster.DeployAsync().ConfigureAwait(false);
+            await cluster.DeployAsync().WaitAsync(cancellationToken).ConfigureAwait(false);
             var reminderTable = ResolveReminderTable(cluster.Silos[0].ServiceProvider);
-            using var cancellation = new CancellationTokenSource(TimeSpan.FromMinutes(1));
+            using var cancellation = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+            cancellation.CancelAfter(TimeSpan.FromMinutes(1));
             await reminderTable.StartAsync(cancellation.Token).ConfigureAwait(false);
             _cluster = cluster;
             _reminderTable = reminderTable;
         }
         catch
         {
-            await cluster.DisposeAsync().ConfigureAwait(false);
+            using var cleanupCancellation = new CancellationTokenSource(CleanupTimeout);
+            await cluster.DisposeAsync().AsTask().WaitAsync(cleanupCancellation.Token).ConfigureAwait(false);
             throw;
         }
     }
@@ -118,7 +128,14 @@ public abstract class ReminderTableTestFixture
     /// Stops and disposes the cluster.
     /// </summary>
     /// <returns>A task which represents the asynchronous disposal.</returns>
-    public virtual async ValueTask DisposeAsync()
+    public virtual ValueTask DisposeAsync() => DisposeAsync(CancellationToken.None);
+
+    /// <summary>
+    /// Stops and disposes the cluster.
+    /// </summary>
+    /// <param name="cancellationToken">A cancellation token.</param>
+    /// <returns>A task which represents the asynchronous disposal.</returns>
+    public virtual async ValueTask DisposeAsync(CancellationToken cancellationToken)
     {
         if (_cluster is not { } cluster)
         {
@@ -127,11 +144,12 @@ public abstract class ReminderTableTestFixture
 
         try
         {
-            await cluster.StopAllSilosAsync().ConfigureAwait(false);
+            await cluster.StopAllSilosAsync().WaitAsync(cancellationToken).ConfigureAwait(false);
         }
         finally
         {
-            await cluster.DisposeAsync().ConfigureAwait(false);
+            using var cleanupCancellation = new CancellationTokenSource(CleanupTimeout);
+            await cluster.DisposeAsync().AsTask().WaitAsync(cleanupCancellation.Token).ConfigureAwait(false);
         }
     }
 }

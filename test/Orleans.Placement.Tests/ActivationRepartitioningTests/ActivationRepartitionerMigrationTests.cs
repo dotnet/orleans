@@ -22,6 +22,7 @@ public class ActivationRepartitionerMigrationTests(ActivationRepartitionerMigrat
     [Fact]
     public async Task FinalizeProtocol_DoesNotAwaitDeactivated_ForNonActivationDataContext()
     {
+        var cancellationToken = TestContext.Current.CancellationToken;
         var services = PrimarySilo.SiloHost.Services;
         var directory = services.GetRequiredService<ActivationDirectory>();
         var repartitioner = services.GetRequiredService<ActivationRepartitioner>();
@@ -30,7 +31,8 @@ public class ActivationRepartitionerMigrationTests(ActivationRepartitionerMigrat
         directory.RecordNewTarget(context);
         try
         {
-            await repartitioner.FinalizeProtocol([context.GrainId], [], SiloAddress.Zero, []).WaitAsync(TimeSpan.FromSeconds(3));
+            await repartitioner.FinalizeProtocol([context.GrainId], [], SiloAddress.Zero, [])
+                .WaitAsync(TimeSpan.FromSeconds(3), cancellationToken);
 
             Assert.Equal(1, context.MigrateCallCount);
             Assert.False(context.Deactivated.IsCompleted);

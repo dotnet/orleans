@@ -63,7 +63,8 @@ public sealed class FaultyReminderTableTests : IDisposable
     {
         var runner = CreateRunner(new ConstantETagReminderTable(), "ConstantETag");
 
-        var exception = await Assert.ThrowsAsync<ReminderConformanceException>(runner.ReminderTable_UpsertRow_ReplacesETagOnEachWrite);
+        var exception = await Assert.ThrowsAsync<ReminderConformanceException>(
+            () => runner.RunReminderTable_UpsertRow_ReplacesETagOnEachWrite(TestContext.Current.CancellationToken));
 
         AssertDiagnostics(exception.Message, "ConstantETag", nameof(ReminderTableTestRunner.ReminderTable_UpsertRow_ReplacesETagOnEachWrite), "UpsertRow");
         Assert.Contains("ETag different from 'constant-etag'", exception.Message, StringComparison.Ordinal);
@@ -76,7 +77,7 @@ public sealed class FaultyReminderTableTests : IDisposable
         var runner = CreateRunner(new TornConcurrentWriteReminderTable(), "TornConcurrentWrite");
 
         var exception = await Assert.ThrowsAsync<ReminderConformanceException>(
-            runner.ReminderTable_ConcurrentUpserts_ProduceDistinctETags);
+            () => runner.RunReminderTable_ConcurrentUpserts_ProduceDistinctETags(TestContext.Current.CancellationToken));
 
         AssertDiagnostics(
             exception.Message,
@@ -93,7 +94,7 @@ public sealed class FaultyReminderTableTests : IDisposable
         var runner = CreateRunner(table, "OneTimeReusedETag");
 
         var exception = await Assert.ThrowsAsync<ReminderConformanceException>(
-            runner.ReminderTable_UpsertRow_ReplacesETagOnEachWrite);
+            () => runner.RunReminderTable_UpsertRow_ReplacesETagOnEachWrite(TestContext.Current.CancellationToken));
 
         Assert.Equal(2, table.UpsertAttempts);
         Assert.Contains("successful replacement returned the reused ETag", exception.Message, StringComparison.Ordinal);
@@ -104,7 +105,8 @@ public sealed class FaultyReminderTableTests : IDisposable
     {
         var runner = CreateRunner(new ETagIgnoringRemoveReminderTable(), "ETagIgnoringRemove");
 
-        var exception = await Assert.ThrowsAsync<ReminderConformanceException>(runner.ReminderTable_RemoveRow_WithStaleETag_FailsAndRetainsRow);
+        var exception = await Assert.ThrowsAsync<ReminderConformanceException>(
+            () => runner.RunReminderTable_RemoveRow_WithStaleETag_FailsAndRetainsRow(TestContext.Current.CancellationToken));
 
         AssertDiagnostics(exception.Message, "ETagIgnoringRemove", nameof(ReminderTableTestRunner.ReminderTable_RemoveRow_WithStaleETag_FailsAndRetainsRow), "RemoveRow");
         Assert.Contains("false when removing with a stale ETag", exception.Message, StringComparison.Ordinal);
@@ -117,7 +119,8 @@ public sealed class FaultyReminderTableTests : IDisposable
     {
         var runner = CreateRunner(new InclusiveBeginRangeReminderTable(), "InclusiveBeginRange");
 
-        var exception = await Assert.ThrowsAsync<ReminderConformanceException>(runner.ReminderTable_ReadRows_Range_ExcludesBeginAndIncludesEnd);
+        var exception = await Assert.ThrowsAsync<ReminderConformanceException>(
+            () => runner.RunReminderTable_ReadRows_Range_ExcludesBeginAndIncludesEnd(TestContext.Current.CancellationToken));
 
         AssertDiagnostics(exception.Message, "InclusiveBeginRange", nameof(ReminderTableTestRunner.ReminderTable_ReadRows_Range_ExcludesBeginAndIncludesEnd), "ReadRows(low, middle)");
         Assert.Contains("Expected exact identities", exception.Message, StringComparison.Ordinal);
@@ -129,7 +132,8 @@ public sealed class FaultyReminderTableTests : IDisposable
     {
         var runner = CreateRunner(new NoWrapAroundRangeReminderTable(), "NoWrapAround");
 
-        var exception = await Assert.ThrowsAsync<ReminderConformanceException>(runner.ReminderTable_ReadRows_WrapAroundRange_ReturnsWrappedSegment);
+        var exception = await Assert.ThrowsAsync<ReminderConformanceException>(
+            () => runner.RunReminderTable_ReadRows_WrapAroundRange_ReturnsWrappedSegment(TestContext.Current.CancellationToken));
 
         AssertDiagnostics(exception.Message, "NoWrapAround", nameof(ReminderTableTestRunner.ReminderTable_ReadRows_WrapAroundRange_ReturnsWrappedSegment), "ReadRows(high, low)");
         Assert.Contains("Expected exact identities", exception.Message, StringComparison.Ordinal);
@@ -141,7 +145,8 @@ public sealed class FaultyReminderTableTests : IDisposable
     {
         var runner = CreateRunner(new PeriodLosingReminderTable(), "PeriodLosing");
 
-        var exception = await Assert.ThrowsAsync<ReminderConformanceException>(runner.ReminderTable_UpsertRow_PersistsScheduleForPointRead);
+        var exception = await Assert.ThrowsAsync<ReminderConformanceException>(
+            () => runner.RunReminderTable_UpsertRow_PersistsScheduleForPointRead(TestContext.Current.CancellationToken));
 
         AssertDiagnostics(exception.Message, "PeriodLosing", nameof(ReminderTableTestRunner.ReminderTable_UpsertRow_PersistsScheduleForPointRead), "ReadRow");
         Assert.Contains("Period=00:03:00", exception.Message, StringComparison.Ordinal);
@@ -153,7 +158,8 @@ public sealed class FaultyReminderTableTests : IDisposable
     {
         var runner = CreateRunner(new ResurrectingReminderTable(), "Resurrecting");
 
-        var exception = await Assert.ThrowsAsync<ReminderConformanceException>(runner.ReminderTable_RemoveRow_WithCurrentETag_RemovesRow);
+        var exception = await Assert.ThrowsAsync<ReminderConformanceException>(
+            () => runner.RunReminderTable_RemoveRow_WithCurrentETag_RemovesRow(TestContext.Current.CancellationToken));
 
         AssertDiagnostics(exception.Message, "Resurrecting", nameof(ReminderTableTestRunner.ReminderTable_RemoveRow_WithCurrentETag_RemovesRow), "ReadRow");
         Assert.Contains("Expected null after successful removal", exception.Message, StringComparison.Ordinal);
@@ -164,7 +170,8 @@ public sealed class FaultyReminderTableTests : IDisposable
     {
         var runner = CreateRunner(new ResurrectingReminderTable(), "Resurrecting");
 
-        var exception = await Assert.ThrowsAsync<ReminderConformanceException>(runner.ReminderTable_ReadRow_AfterRemoval_ReturnsNull);
+        var exception = await Assert.ThrowsAsync<ReminderConformanceException>(
+            () => runner.RunReminderTable_ReadRow_AfterRemoval_ReturnsNull(TestContext.Current.CancellationToken));
 
         AssertDiagnostics(exception.Message, "Resurrecting", nameof(ReminderTableTestRunner.ReminderTable_ReadRow_AfterRemoval_ReturnsNull), "ReadRow");
         Assert.Contains("Expected null after successful removal", exception.Message, StringComparison.Ordinal);
@@ -176,7 +183,8 @@ public sealed class FaultyReminderTableTests : IDisposable
         string? failureOutput = null;
         var runner = new ReminderTableModelBasedTestRunner(new ResurrectingReminderTable(), "Resurrecting", message => failureOutput = message);
 
-        var exception = await Assert.ThrowsAsync<ReminderConformanceException>(runner.RunGeneratedConformanceTests);
+        var exception = await Assert.ThrowsAsync<ReminderConformanceException>(
+            () => runner.RunGeneratedConformanceTests(TestContext.Current.CancellationToken));
 
         Assert.Contains("Model-based reminder table conformance test failed [provider=Resurrecting, seed=0]", exception.Message, StringComparison.Ordinal);
         Assert.NotNull(failureOutput);
@@ -190,7 +198,8 @@ public sealed class FaultyReminderTableTests : IDisposable
         string? failureOutput = null;
         var runner = new ReminderTableModelBasedTestRunner(new ConstantETagReminderTable(), "ConstantETag", message => failureOutput = message);
 
-        var exception = await Assert.ThrowsAsync<ReminderConformanceException>(runner.RunGeneratedConformanceTests);
+        var exception = await Assert.ThrowsAsync<ReminderConformanceException>(
+            () => runner.RunGeneratedConformanceTests(TestContext.Current.CancellationToken));
 
         Assert.Contains("Model-based reminder table conformance test failed [provider=ConstantETag, seed=0]", exception.Message, StringComparison.Ordinal);
         Assert.NotNull(failureOutput);
@@ -211,7 +220,8 @@ public sealed class FaultyReminderTableTests : IDisposable
             },
             message => failureOutput = message);
 
-        var exception = await Assert.ThrowsAsync<ReminderConformanceException>(runner.RunGeneratedConformanceTests);
+        var exception = await Assert.ThrowsAsync<ReminderConformanceException>(
+            () => runner.RunGeneratedConformanceTests(TestContext.Current.CancellationToken));
 
         Assert.Contains(
             "Model-based reminder table conformance test failed [provider=CollateralDeleting, seed=0]",
@@ -231,9 +241,9 @@ public sealed class FaultyReminderTableTests : IDisposable
             table,
             "Control");
 
-        await runner.RunGeneratedConformanceTests();
+        await runner.RunGeneratedConformanceTests(TestContext.Current.CancellationToken);
 
-        Assert.Empty((await table.ReadRows(0, 0)).Reminders);
+        Assert.Empty((await table.ReadRows(0, 0).WaitAsync(TestContext.Current.CancellationToken)).Reminders);
     }
 
     [Fact, TestCategory("ModelBased")]
@@ -245,7 +255,8 @@ public sealed class FaultyReminderTableTests : IDisposable
             "NoWrapAroundModel",
             message => failureOutput = message);
 
-        var exception = await Assert.ThrowsAsync<ReminderConformanceException>(runner.RunGeneratedConformanceTests);
+        var exception = await Assert.ThrowsAsync<ReminderConformanceException>(
+            () => runner.RunGeneratedConformanceTests(TestContext.Current.CancellationToken));
 
         Assert.Contains(
             "Model-based reminder table conformance test failed [provider=NoWrapAroundModel, seed=0]",
@@ -509,7 +520,7 @@ public sealed class FaultyReminderTableTests : IDisposable
         var runner = CreateRunner(new DuplicateGrainEnumerationReminderTable(), "DuplicateGrainEnumeration");
 
         var exception = await Assert.ThrowsAsync<ReminderConformanceException>(
-            runner.ReminderTable_ReadRows_ForGrain_ReturnsOnlyThatGrainsReminders);
+            () => runner.RunReminderTable_ReadRows_ForGrain_ReturnsOnlyThatGrainsReminders(TestContext.Current.CancellationToken));
 
         AssertExactEnumerationFailure(
             exception,
@@ -526,7 +537,7 @@ public sealed class FaultyReminderTableTests : IDisposable
         var runner = CreateRunner(new DuplicateRangeEnumerationReminderTable(), "DuplicateRangeEnumeration");
 
         var exception = await Assert.ThrowsAsync<ReminderConformanceException>(
-            runner.ReminderTable_ReadRows_FullRange_ReturnsAllReminders);
+            () => runner.RunReminderTable_ReadRows_FullRange_ReturnsAllReminders(TestContext.Current.CancellationToken));
 
         AssertExactEnumerationFailure(
             exception,
@@ -615,7 +626,7 @@ public sealed class FaultyReminderTableTests : IDisposable
         var runner = CreateRunner(new StaleLoadingWindowEnumerationReminderTable(), "StaleLoadingWindowEnumeration");
 
         var exception = await Assert.ThrowsAsync<ReminderConformanceException>(
-            runner.ReminderTable_UpsertRow_MovesReminderBetweenLoadingWindows);
+            () => runner.RunReminderTable_UpsertRow_MovesReminderBetweenLoadingWindows(TestContext.Current.CancellationToken));
 
         AssertExactEnumerationFailure(
             exception,
@@ -633,7 +644,7 @@ public sealed class FaultyReminderTableTests : IDisposable
         var runner = CreateRunner(new DuplicateFullRangeCardinalityReminderTable(), "DuplicateFullRangeCardinality");
 
         var exception = await Assert.ThrowsAsync<ReminderConformanceException>(
-            () => runner.ReminderTable_ReadRows_FullRange_ReturnsExactRequestedCardinality(7));
+            () => runner.RunReminderTable_ReadRows_FullRange_ReturnsExactRequestedCardinality(7, TestContext.Current.CancellationToken));
 
         AssertExactEnumerationFailure(
             exception,
@@ -663,7 +674,8 @@ public sealed class FaultyReminderTableTests : IDisposable
             options,
             message => failureOutput = message);
 
-        var exception = await Assert.ThrowsAsync<ReminderConformanceException>(runner.RunGeneratedConformanceTests);
+        var exception = await Assert.ThrowsAsync<ReminderConformanceException>(
+            () => runner.RunGeneratedConformanceTests(TestContext.Current.CancellationToken));
 
         Assert.Contains(
             "Model-based reminder table conformance test failed [provider=EnumerationOnlyPayloadMutation, seed=17]",
@@ -686,7 +698,7 @@ public sealed class FaultyReminderTableTests : IDisposable
         var runner = CreateRunner(new CorruptGrainEnumerationReminderTable(mutation), provider);
 
         var exception = await Assert.ThrowsAsync<ReminderConformanceException>(
-            runner.ReminderTable_ReadRows_ForGrain_ReturnsOnlyThatGrainsReminders);
+            () => runner.RunReminderTable_ReadRows_ForGrain_ReturnsOnlyThatGrainsReminders(TestContext.Current.CancellationToken));
 
         AssertExactEnumerationFailure(
             exception,
@@ -706,7 +718,7 @@ public sealed class FaultyReminderTableTests : IDisposable
         var runner = CreateRunner(new CorruptRangeEnumerationReminderTable(mutation), provider);
 
         var exception = await Assert.ThrowsAsync<ReminderConformanceException>(
-            runner.ReminderTable_ReadRows_FullRange_ReturnsAllReminders);
+            () => runner.RunReminderTable_ReadRows_FullRange_ReturnsAllReminders(TestContext.Current.CancellationToken));
 
         AssertExactEnumerationFailure(
             exception,

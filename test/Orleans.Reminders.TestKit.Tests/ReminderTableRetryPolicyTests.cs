@@ -12,7 +12,7 @@ public class ReminderTableRetryPolicyTests
         var table = new TransientReminderTable();
         var runner = new TestRunner(table, "TransientTable");
 
-        await runner.ReminderTable_UpsertRow_PersistsScheduleForPointRead();
+        await runner.RunReminderTable_UpsertRow_PersistsScheduleForPointRead(TestContext.Current.CancellationToken);
 
         Assert.Equal(3, table.UpsertAttempts);
         Assert.Equal(2, table.HiddenPointReads);
@@ -33,7 +33,8 @@ public class ReminderTableRetryPolicyTests
             value => value.ToString(),
             "read convergence",
             TimeSpan.FromSeconds(1),
-            TimeSpan.FromMilliseconds(1));
+            TimeSpan.FromMilliseconds(1),
+            TestContext.Current.CancellationToken);
 
         Assert.Equal(3, result);
         Assert.Equal(3, attempts);
@@ -63,7 +64,8 @@ public class ReminderTableRetryPolicyTests
             value => value ?? "<null>",
             "mutation retry",
             TimeSpan.FromSeconds(1),
-            TimeSpan.FromMilliseconds(1));
+            TimeSpan.FromMilliseconds(1),
+            TestContext.Current.CancellationToken);
 
         Assert.Equal("etag-3", result);
         Assert.Equal(3, attempts);
@@ -83,7 +85,8 @@ public class ReminderTableRetryPolicyTests
                 value => value,
                 "read convergence",
                 TimeSpan.FromMilliseconds(40),
-                TimeSpan.FromMilliseconds(5)));
+                TimeSpan.FromMilliseconds(5),
+                TestContext.Current.CancellationToken));
 
         Assert.Contains("provider=EventuallyConsistent", exception.Message, StringComparison.Ordinal);
         Assert.Contains("operation=ReadRow", exception.Message, StringComparison.Ordinal);
@@ -110,7 +113,8 @@ public class ReminderTableRetryPolicyTests
                 value => value ?? "<null>",
                 "mutation retry",
                 TimeSpan.FromMilliseconds(40),
-                TimeSpan.FromMilliseconds(5)));
+                TimeSpan.FromMilliseconds(5),
+                TestContext.Current.CancellationToken));
 
         Assert.True(attempts > 1);
         Assert.Contains("provider=PersistentlyContended", exception.Message, StringComparison.Ordinal);
@@ -140,7 +144,8 @@ public class ReminderTableRetryPolicyTests
                 value => value,
                 "read convergence",
                 TimeSpan.FromTicks(1),
-                TimeSpan.FromMilliseconds(5)));
+                TimeSpan.FromMilliseconds(5),
+                TestContext.Current.CancellationToken));
 
         Assert.Equal(1, invocations);
         Assert.Contains("attempts=1", exception.Message, StringComparison.Ordinal);
@@ -168,7 +173,8 @@ public class ReminderTableRetryPolicyTests
                 value => value,
                 "read convergence",
                 TimeSpan.FromMilliseconds(1),
-                TimeSpan.FromMilliseconds(5)));
+                TimeSpan.FromMilliseconds(5),
+                TestContext.Current.CancellationToken));
 
         Assert.Equal(1, invocations);
         Assert.Contains("attempts=1", exception.Message, StringComparison.Ordinal);

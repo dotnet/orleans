@@ -56,11 +56,12 @@ public class GrainPlacementFilterTests(GrainPlacementFilterTests.Fixture fixture
     [Fact, TestCategory("Functional")]
     public async Task PlacementFilter_FilterIsTriggered()
     {
+        var cancellationToken = TestContext.Current.CancellationToken;
         var triggered = false;
         var task = Task.Run(async () =>
         {
-            triggered = await TestPlacementFilterDirector.Triggered.WaitAsync(TimeSpan.FromSeconds(1));
-        });
+            triggered = await TestPlacementFilterDirector.Triggered.WaitAsync(TimeSpan.FromSeconds(1), cancellationToken);
+        }, cancellationToken);
         var localOnlyGrain = fixture.Cluster.Client!.GetGrain<ITestFilteredGrain>(0);
         await localOnlyGrain.Ping();
         await task;

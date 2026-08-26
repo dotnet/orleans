@@ -49,6 +49,7 @@ public sealed class GrainDirectoryRollingUpgradeTests(ITestOutputHelper output)
     [Fact]
     public async Task RollingUpgrade_LocalToDistributed_NoErrors()
     {
+        var cancellationToken = TestContext.Current.CancellationToken;
         var builder = new InProcessTestClusterBuilder(3);
         // Initial silos use LocalGrainDirectory only; later silos opt into DistributedGrainDirectory.
         builder.Options.UseTestClusterGrainDirectory = false;
@@ -80,7 +81,7 @@ public sealed class GrainDirectoryRollingUpgradeTests(ITestOutputHelper output)
 
         try
         {
-            await cluster.DeployAsync();
+            await cluster.DeployAsync().WaitAsync(cancellationToken);
             output.WriteLine($"Cluster deployed with {cluster.Silos.Count} silos (LocalGrainDirectory only).");
 
             IGrainFactory client = cluster.Client!;
@@ -91,7 +92,7 @@ public sealed class GrainDirectoryRollingUpgradeTests(ITestOutputHelper output)
             {
                 // Phase 1: Drive load on the LocalGrainDirectory cluster.
                 output.WriteLine("Phase 1: Driving load on LocalGrainDirectory cluster...");
-                await DriveLoad(client, nextGrainId, count: 100, id => failingGrainKey = id);
+                await DriveLoad(client, nextGrainId, count: 100, cancellationToken, id => failingGrainKey = id);
 
                 // Phase 2: Add DistributedGrainDirectory silos one at a time.
                 output.WriteLine("Phase 2: Rolling upgrade — adding DistributedGrainDirectory silos...");
@@ -100,18 +101,32 @@ public sealed class GrainDirectoryRollingUpgradeTests(ITestOutputHelper output)
 
                 for (var i = 0; i < oldSilos.Count; i++)
                 {
-                    await ValidateDirectoryPhaseInvariantsAsync(cluster, $"before adding distributed silo {i + 1}/{oldSilos.Count}");
+                    await ValidateDirectoryPhaseInvariantsAsync(
+                        cluster,
+                        $"before adding distributed silo {i + 1}/{oldSilos.Count}",
+                        cancellationToken);
                     var preSplitPartitions = CaptureLocalDirectoryPartitions(cluster);
-                    var newSilo = await cluster.StartAdditionalSiloAsync();
+                    var newSilo = await cluster.StartAdditionalSiloAsync().WaitAsync(cancellationToken);
                     output.WriteLine($"  Started new silo: {newSilo.SiloAddress}");
-                    await cluster.WaitForLivenessToStabilizeAsync();
-                    await WaitForDirectoryConvergenceAsync(cluster, $"after adding distributed silo {i + 1}/{oldSilos.Count}");
-                    await AssertSplitPartitionHandoffAsync(cluster, preSplitPartitions, newSilo, handoffLogs);
-                    await ValidateDirectoryPhaseInvariantsAsync(cluster, $"after adding distributed silo {i + 1}/{oldSilos.Count}");
-                    await DriveLoad(client, nextGrainId, count: 100, id => failingGrainKey = id);
+                    await cluster.WaitForLivenessToStabilizeAsync().WaitAsync(cancellationToken);
+                    await WaitForDirectoryConvergenceAsync(
+                        cluster,
+                        $"after adding distributed silo {i + 1}/{oldSilos.Count}",
+                        cancellationToken);
+                    await AssertSplitPartitionHandoffAsync(
+                        cluster,
+                        preSplitPartitions,
+                        newSilo,
+                        handoffLogs,
+                        cancellationToken);
+                    await ValidateDirectoryPhaseInvariantsAsync(
+                        cluster,
+                        $"after adding distributed silo {i + 1}/{oldSilos.Count}",
+                        cancellationToken);
+                    await DriveLoad(client, nextGrainId, count: 100, cancellationToken, id => failingGrainKey = id);
                 }
 
-                await cluster.InitializeClientAsync();
+                await cluster.InitializeClientAsync().WaitAsync(cancellationToken);
                 client = cluster.Client!;
 
                 // Phase 3: Stop old silos one at a time, non-primary first.
@@ -120,23 +135,42 @@ public sealed class GrainDirectoryRollingUpgradeTests(ITestOutputHelper output)
                 foreach (var oldSilo in oldSilos.OrderBy(static s => s.InstanceNumber == 0 ? 1 : 0))
                 {
                     transitionIndex++;
-                    await ValidateDirectoryPhaseInvariantsAsync(cluster, $"before removing local silo {transitionIndex}/{oldSilos.Count}");
-                    await cluster.StopSiloAsync(oldSilo);
+                    await ValidateDirectoryPhaseInvariantsAsync(
+                        cluster,
+                        $"before removing local silo {transitionIndex}/{oldSilos.Count}",
+                        cancellationToken);
+                    await cluster.StopSiloAsync(oldSilo).WaitAsync(cancellationToken);
                     output.WriteLine($"  Stopped old silo: {oldSilo.SiloAddress}");
-                    await cluster.WaitForLivenessToStabilizeAsync();
-                    await WaitForDirectoryConvergenceAsync(cluster, $"after removing local silo {transitionIndex}/{oldSilos.Count}");
-                    await ValidateDirectoryPhaseInvariantsAsync(cluster, $"after removing local silo {transitionIndex}/{oldSilos.Count}");
-                    await DriveLoad(client, nextGrainId, count: 100, id => failingGrainKey = id);
+                    await cluster.WaitForLivenessToStabilizeAsync().WaitAsync(cancellationToken);
+                    await WaitForDirectoryConvergenceAsync(
+                        cluster,
+                        $"after removing local silo {transitionIndex}/{oldSilos.Count}",
+                        cancellationToken);
+                    await ValidateDirectoryPhaseInvariantsAsync(
+                        cluster,
+                        $"after removing local silo {transitionIndex}/{oldSilos.Count}",
+                        cancellationToken);
+                    await DriveLoad(client, nextGrainId, count: 100, cancellationToken, id => failingGrainKey = id);
                 }
 
                 // Phase 4: Final verification on the fully-upgraded cluster — must succeed without retries.
                 output.WriteLine("Phase 4: Verifying fully-upgraded DistributedGrainDirectory cluster...");
-                await DriveLoad(client, nextGrainId, count: 200, id => failingGrainKey = id);
-                await ValidateDirectoryPhaseInvariantsAsync(cluster, "after final verification");
+                await DriveLoad(client, nextGrainId, count: 200, cancellationToken, id => failingGrainKey = id);
+                await ValidateDirectoryPhaseInvariantsAsync(cluster, "after final verification", cancellationToken);
             }
             catch
             {
-                await DumpFailureDiagnosticsAsync(cluster, errorLogs, diagnosticLogs, failingGrainKey);
+                if (!cancellationToken.IsCancellationRequested)
+                {
+                    using var diagnosticsCancellation = new CancellationTokenSource(DirectoryConvergenceTimeout);
+                    await DumpFailureDiagnosticsAsync(
+                        cluster,
+                        errorLogs,
+                        diagnosticLogs,
+                        failingGrainKey,
+                        diagnosticsCancellation.Token);
+                }
+
                 throw;
             }
         }
@@ -144,8 +178,16 @@ public sealed class GrainDirectoryRollingUpgradeTests(ITestOutputHelper output)
         {
             try
             {
-                await cluster.StopAllSilosAsync();
-                await cluster.DisposeAsync();
+                try
+                {
+                    using var stopCancellation = new CancellationTokenSource(DirectoryConvergenceTimeout);
+                    await cluster.StopAllSilosAsync().WaitAsync(stopCancellation.Token);
+                }
+                finally
+                {
+                    using var disposeCancellation = new CancellationTokenSource(DirectoryConvergenceTimeout);
+                    await cluster.DisposeAsync().AsTask().WaitAsync(disposeCancellation.Token);
+                }
             }
             finally
             {
@@ -190,7 +232,8 @@ public sealed class GrainDirectoryRollingUpgradeTests(ITestOutputHelper output)
         InProcessTestCluster cluster,
         LocalDirectoryPartitionSnapshot[] preSplitPartitions,
         InProcessSiloHandle recipient,
-        PhaseAwareLogCapture logs)
+        PhaseAwareLogCapture logs,
+        CancellationToken cancellationToken)
     {
         var recipientAddress = recipient.SiloAddress;
         var ownerDirectory = recipient.ServiceProvider.GetRequiredService<LocalGrainDirectory>();
@@ -203,7 +246,7 @@ public sealed class GrainDirectoryRollingUpgradeTests(ITestOutputHelper output)
             .Where(static group => group.Count() > 1)
             .ToArray();
         Assert.Empty(duplicateTransfers);
-        await AssertSplitPartitionHandoffIsDurableAsync(logs, recipient, expectedTransfers);
+        await AssertSplitPartitionHandoffIsDurableAsync(logs, recipient, expectedTransfers, cancellationToken);
 
         foreach (var snapshot in preSplitPartitions)
         {
@@ -242,7 +285,7 @@ public sealed class GrainDirectoryRollingUpgradeTests(ITestOutputHelper output)
         var liveActivations = GetDirectoryActivations(cluster);
         foreach (var transfer in expectedTransfers)
         {
-            var winner = await distributedDirectory.Lookup(transfer.Address.GrainId);
+            var winner = await distributedDirectory.Lookup(transfer.Address.GrainId, cancellationToken);
             Assert.NotNull(winner);
             Assert.Equal(transfer.Address.GrainId, winner.GrainId);
             Assert.Contains(
@@ -255,7 +298,10 @@ public sealed class GrainDirectoryRollingUpgradeTests(ITestOutputHelper output)
             + $"{expectedTransfers.Length} registrations transferred.");
     }
 
-    private async Task WaitForDirectoryConvergenceAsync(InProcessTestCluster cluster, string stage)
+    private async Task WaitForDirectoryConvergenceAsync(
+        InProcessTestCluster cluster,
+        string stage,
+        CancellationToken cancellationToken)
     {
         var distributedSilos = new List<(InProcessSiloHandle Silo, DirectoryMembershipService MembershipService)>();
         foreach (var silo in cluster.Silos)
@@ -276,7 +322,8 @@ public sealed class GrainDirectoryRollingUpgradeTests(ITestOutputHelper output)
         var targetVersion = new MembershipVersion(cluster.Silos.Max(static silo =>
             silo.ServiceProvider.GetRequiredService<ClusterMembershipService>().CurrentSnapshot.Version.Value));
 
-        using var timeout = new CancellationTokenSource(DirectoryConvergenceTimeout);
+        using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        timeout.CancelAfter(DirectoryConvergenceTimeout);
         try
         {
             var views = await Task.WhenAll(distributedSilos.Select(silo =>
@@ -291,13 +338,14 @@ public sealed class GrainDirectoryRollingUpgradeTests(ITestOutputHelper output)
                 {
                     var replica = cluster.InternalClient!.GetSystemTarget<IGrainDirectoryTestHooks>(
                         GrainDirectoryPartition.CreateGrainId(silo.SiloAddress, partitionIndex).GrainId);
-                    partitionWaits.Add(replica.WaitForMembershipVersionAsync(view.Version).AsTask());
+                    partitionWaits.Add(
+                        replica.WaitForMembershipVersionAsync(view.Version).AsTask().WaitAsync(timeout.Token));
                 }
             }
 
             await Task.WhenAll(partitionWaits).WaitAsync(timeout.Token);
         }
-        catch (OperationCanceledException) when (timeout.IsCancellationRequested)
+        catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested && timeout.IsCancellationRequested)
         {
             throw new TimeoutException($"Timed out waiting for grain directory convergence {stage} after {DirectoryConvergenceTimeout}.");
         }
@@ -350,7 +398,10 @@ public sealed class GrainDirectoryRollingUpgradeTests(ITestOutputHelper output)
         return true;
     }
 
-    private async Task ValidateDirectoryPhaseInvariantsAsync(InProcessTestCluster cluster, string stage)
+    private async Task ValidateDirectoryPhaseInvariantsAsync(
+        InProcessTestCluster cluster,
+        string stage,
+        CancellationToken cancellationToken)
     {
         output.WriteLine($"  Validating grain directory invariants {stage}...");
 
@@ -396,13 +447,15 @@ public sealed class GrainDirectoryRollingUpgradeTests(ITestOutputHelper output)
 
         if (distributedPartitions.Count == 0)
         {
-            await CheckActivationRegistrationsWithLocalDirectoryAsync(activations, stage);
+            await CheckActivationRegistrationsWithLocalDirectoryAsync(activations, stage, cancellationToken);
         }
         else
         {
             var activationAddresses = activations.Select(static activation => activation.Address).ToList().AsImmutable();
-            var activationChecks = distributedPartitions.Select(partition => partition.CheckActivationsAsync(activationAddresses).AsTask()).ToArray();
-            await Task.WhenAll(activationChecks);
+            var activationChecks = distributedPartitions
+                .Select(partition => partition.CheckActivationsAsync(activationAddresses).AsTask().WaitAsync(cancellationToken))
+                .ToArray();
+            await Task.WhenAll(activationChecks).WaitAsync(cancellationToken);
             var distributedCheckedGrains = new HashSet<GrainId>();
             foreach (var task in activationChecks)
             {
@@ -421,17 +474,25 @@ public sealed class GrainDirectoryRollingUpgradeTests(ITestOutputHelper output)
                 }
 
                 var grainLocator = activation.Silo.ServiceProvider.GetRequiredService<GrainLocator>();
-                localActivationChecks.Add(CheckActivationRegistrationAsync(grainLocator, activation.Address, activation.Silo.SiloAddress, stage));
+                localActivationChecks.Add(
+                    CheckActivationRegistrationAsync(
+                        grainLocator,
+                        activation.Address,
+                        activation.Silo.SiloAddress,
+                        stage,
+                        cancellationToken));
             }
 
-            await Task.WhenAll(localActivationChecks);
+            await Task.WhenAll(localActivationChecks).WaitAsync(cancellationToken);
             foreach (var task in localActivationChecks)
             {
                 await task;
             }
 
-            var integrityChecks = distributedPartitions.Select(static partition => partition.CheckIntegrityAsync().AsTask()).ToArray();
-            await Task.WhenAll(integrityChecks);
+            var integrityChecks = distributedPartitions
+                .Select(partition => partition.CheckIntegrityAsync().AsTask().WaitAsync(cancellationToken))
+                .ToArray();
+            await Task.WhenAll(integrityChecks).WaitAsync(cancellationToken);
         }
 
         output.WriteLine($"  Validated {activations.Count} activations and {distributedPartitions.Count} DistributedGrainDirectory partitions {stage}.");
@@ -467,25 +528,38 @@ public sealed class GrainDirectoryRollingUpgradeTests(ITestOutputHelper output)
         return activation is not SystemTarget && activation.GetComponent<PlacementStrategy>() is { IsUsingGrainDirectory: true };
     }
 
-    private static async Task CheckActivationRegistrationsWithLocalDirectoryAsync(List<(InProcessSiloHandle Silo, GrainAddress Address)> activations, string stage)
+    private static async Task CheckActivationRegistrationsWithLocalDirectoryAsync(
+        List<(InProcessSiloHandle Silo, GrainAddress Address)> activations,
+        string stage,
+        CancellationToken cancellationToken)
     {
         var activationChecks = activations.Select(activation =>
         {
             var grainLocator = activation.Silo.ServiceProvider.GetRequiredService<GrainLocator>();
-            return CheckActivationRegistrationAsync(grainLocator, activation.Address, activation.Silo.SiloAddress, stage);
+            return CheckActivationRegistrationAsync(
+                grainLocator,
+                activation.Address,
+                activation.Silo.SiloAddress,
+                stage,
+                cancellationToken);
         }).ToArray();
 
-        await Task.WhenAll(activationChecks);
+        await Task.WhenAll(activationChecks).WaitAsync(cancellationToken);
         foreach (var task in activationChecks)
         {
             await task;
         }
     }
 
-    private static async Task CheckActivationRegistrationAsync(GrainLocator grainLocator, GrainAddress activationAddress, SiloAddress siloAddress, string stage)
+    private static async Task CheckActivationRegistrationAsync(
+        GrainLocator grainLocator,
+        GrainAddress activationAddress,
+        SiloAddress siloAddress,
+        string stage,
+        CancellationToken cancellationToken)
     {
         grainLocator.InvalidateCache(activationAddress.GrainId);
-        var registeredAddress = await grainLocator.Lookup(activationAddress.GrainId);
+        var registeredAddress = await grainLocator.Lookup(activationAddress.GrainId).AsTask().WaitAsync(cancellationToken);
         Assert.True(
             activationAddress.Matches(registeredAddress),
             $"Activation '{activationAddress.ToFullString()}' on silo '{siloAddress}' did not have a matching directory registration during '{stage}'. Registered address: '{registeredAddress?.ToFullString() ?? "<null>"}'.");
@@ -504,7 +578,12 @@ public sealed class GrainDirectoryRollingUpgradeTests(ITestOutputHelper output)
     /// Activates grains by calling each one. Retries individual calls that fail with transient
     /// exceptions expected during directory ownership transitions in a rolling upgrade.
     /// </summary>
-    private async Task DriveLoad(IGrainFactory client, Func<long> nextGrainId, int count, Action<long>? onPersistentFailure = null)
+    private async Task DriveLoad(
+        IGrainFactory client,
+        Func<long> nextGrainId,
+        int count,
+        CancellationToken cancellationToken,
+        Action<long>? onPersistentFailure = null)
     {
         var ids = new long[count];
         for (var i = 0; i < count; i++)
@@ -519,7 +598,7 @@ public sealed class GrainDirectoryRollingUpgradeTests(ITestOutputHelper output)
             var tasks = remainingIds.Select(id => client.GetGrain<IRollingUpgradeTestGrain>(id).GetHost().AsTask()).ToArray();
             try
             {
-                await Task.WhenAll(tasks);
+                await Task.WhenAll(tasks).WaitAsync(cancellationToken);
                 return;
             }
             catch
@@ -559,12 +638,17 @@ public sealed class GrainDirectoryRollingUpgradeTests(ITestOutputHelper output)
             }
 
             output.WriteLine($"    {failedIds.Count}/{remainingIds.Length} calls failed on attempt {attempt}, retrying...");
-            await Task.Delay(TimeSpan.FromMilliseconds(100));
+            await Task.Delay(TimeSpan.FromMilliseconds(100), cancellationToken);
             remainingIds = [.. failedIds];
         }
     }
 
-    private async Task DumpFailureDiagnosticsAsync(InProcessTestCluster cluster, ErrorLogCapture errorLogs, DiagnosticLogCapture diagnosticLogs, long? failingGrainKey)
+    private async Task DumpFailureDiagnosticsAsync(
+        InProcessTestCluster cluster,
+        ErrorLogCapture errorLogs,
+        DiagnosticLogCapture diagnosticLogs,
+        long? failingGrainKey,
+        CancellationToken cancellationToken)
     {
         DumpCapturedMessages("ERROR LOGS", errorLogs.ToArray());
         DumpCapturedMessages("ROLLING UPGRADE DIAGNOSTICS", diagnosticLogs.ToArray(), limit: 200);
@@ -582,10 +666,10 @@ public sealed class GrainDirectoryRollingUpgradeTests(ITestOutputHelper output)
             try
             {
                 var siloControl = cluster.InternalClient!.GetSystemTarget<ISiloControl>(Constants.SiloControlType, silo.SiloAddress);
-                var report = await siloControl.GetDetailedGrainReport(grainId);
+                var report = await siloControl.GetDetailedGrainReport(grainId).WaitAsync(cancellationToken);
                 output.WriteLine(report.ToString());
             }
-            catch (Exception exception)
+            catch (Exception exception) when (!cancellationToken.IsCancellationRequested)
             {
                 output.WriteLine($"Failed to get detailed grain report from silo {silo.SiloAddress}: {exception}");
             }
@@ -760,6 +844,7 @@ public sealed class GrainDirectoryRollingUpgradeTests(ITestOutputHelper output)
     [Fact]
     public async Task RollingUpgrade_RestartInPlace_PreservesTrafficAndDirectoryIntegrity()
     {
+        var cancellationToken = TestContext.Current.CancellationToken;
         const int SiloCount = 3;
         var operationTimeout = TimeSpan.FromSeconds(45);
         var cleanupTimeout = TimeSpan.FromSeconds(30);
@@ -805,7 +890,7 @@ public sealed class GrainDirectoryRollingUpgradeTests(ITestOutputHelper output)
         var deployed = false;
         try
         {
-            await cluster.DeployAsync().WaitAsync(operationTimeout);
+            await cluster.DeployAsync().WaitAsync(operationTimeout, cancellationToken);
             deployed = true;
 
             var originalClient = cluster.Client;
@@ -818,8 +903,16 @@ public sealed class GrainDirectoryRollingUpgradeTests(ITestOutputHelper output)
                 $"Phase '{phase.Current}': {SiloCount} LocalGrainDirectory silos: "
                 + string.Join(", ", cluster.Silos.Select(static silo => $"{silo.Name}={silo.SiloAddress}")));
 
-            var initialObservations = await CallIdentityGrainsAsync(originalClient, trackedGrainKeys, operationTimeout);
-            var repeatedInitialObservations = await CallIdentityGrainsAsync(originalClient, trackedGrainKeys, operationTimeout);
+            var initialObservations = await CallIdentityGrainsAsync(
+                originalClient,
+                trackedGrainKeys,
+                operationTimeout,
+                cancellationToken);
+            var repeatedInitialObservations = await CallIdentityGrainsAsync(
+                originalClient,
+                trackedGrainKeys,
+                operationTimeout,
+                cancellationToken);
             AssertStableActivationProgress(initialObservations, repeatedInitialObservations, "initial LocalGrainDirectory phase");
             await ValidateTrackedDirectoryCheckpointAsync(
                 cluster,
@@ -827,7 +920,8 @@ public sealed class GrainDirectoryRollingUpgradeTests(ITestOutputHelper output)
                 cluster.Silos.Select(static silo => silo.SiloAddress).ToHashSet(),
                 retiredAddresses,
                 "initial LocalGrainDirectory phase",
-                staleCacheEvidence);
+                staleCacheEvidence,
+                cancellationToken);
 
             traffic = new SustainedRollingUpgradeTraffic(
                 originalClient,
@@ -835,14 +929,20 @@ public sealed class GrainDirectoryRollingUpgradeTests(ITestOutputHelper output)
                 phase,
                 trackedGrainKeys.ToArray(),
                 expectedMaximumSilos: SiloCount,
-                callTimeout: TimeSpan.FromSeconds(10));
+                callTimeout: TimeSpan.FromSeconds(10),
+                cancellationToken);
             traffic.Start(workerCount: 3);
             var initialWorkerProgress = traffic.GetWorkerProgress();
-            await traffic.WaitForPhaseSuccessesAsync(phase.Current, minimumSuccesses: 12, operationTimeout);
+            await traffic.WaitForPhaseSuccessesAsync(
+                phase.Current,
+                minimumSuccesses: 12,
+                operationTimeout,
+                cancellationToken);
             await traffic.WaitForAllWorkersProgressAsync(
                 initialWorkerProgress,
                 "initial LocalGrainDirectory traffic",
-                operationTimeout);
+                operationTimeout,
+                cancellationToken);
             AssertNoTrafficFailures(traffic, phase.Current);
             AssertTransientTrafficFailuresWithinLimit(traffic, 0, phase.Current);
 
@@ -866,7 +966,11 @@ public sealed class GrainDirectoryRollingUpgradeTests(ITestOutputHelper output)
                 Assert.Equal(SiloCount, cluster.Silos.Count);
                 Assert.Same(originalClient, cluster.Client);
 
-                await traffic.WaitForPhaseSuccessesAsync(restartPhase, minimumSuccesses: 4, operationTimeout);
+                await traffic.WaitForPhaseSuccessesAsync(
+                    restartPhase,
+                    minimumSuccesses: 4,
+                    operationTimeout,
+                    cancellationToken);
                 var oldAddress = oldSilo.SiloAddress;
                 output.WriteLine(
                     $"Phase '{restartPhase}': restarting {oldSilo.Name} ({oldAddress}) in place; "
@@ -882,7 +986,7 @@ public sealed class GrainDirectoryRollingUpgradeTests(ITestOutputHelper output)
                 var restartStartedAt = DateTimeOffset.UtcNow;
                 var workerProgressBeforeRestart = traffic.GetWorkerProgress();
                 var successCountBeforeRestart = traffic.SuccessfulCalls;
-                using var progressRaceCancellation = new CancellationTokenSource();
+                using var progressRaceCancellation = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
                 var progressDuringRestartTask = traffic.WaitForTotalProgressAsync(
                     successCountBeforeRestart + 1,
                     progressRaceCancellation.Token);
@@ -915,7 +1019,7 @@ public sealed class GrainDirectoryRollingUpgradeTests(ITestOutputHelper output)
                 {
                 }
 
-                var replacement = await restartTask.WaitAsync(operationTimeout);
+                var replacement = await restartTask.WaitAsync(operationTimeout, cancellationToken);
                 Assert.NotNull(replacement);
                 Assert.Equal(oldSilo.Name, replacement.Name);
                 Assert.Equal(oldSilo.InstanceNumber, replacement.InstanceNumber);
@@ -941,14 +1045,23 @@ public sealed class GrainDirectoryRollingUpgradeTests(ITestOutputHelper output)
                     Assert.Equal(2, distributedSilos);
                 }
 
-                await cluster.WaitForLivenessToStabilizeAsync().WaitAsync(operationTimeout);
-                await WaitForClusterMembershipConvergenceAsync(cluster, retiredAddresses, restartPhase, operationTimeout);
-                await WaitForDirectoryConvergenceAsync(cluster, $"during {restartPhase}");
+                await cluster.WaitForLivenessToStabilizeAsync().WaitAsync(operationTimeout, cancellationToken);
+                await WaitForClusterMembershipConvergenceAsync(
+                    cluster,
+                    retiredAddresses,
+                    restartPhase,
+                    operationTimeout,
+                    cancellationToken);
+                await WaitForDirectoryConvergenceAsync(
+                    cluster,
+                    $"during {restartPhase}",
+                    cancellationToken);
                 AssertCachesWereNotCleared(cacheClearBaselines, restartPhase);
                 await traffic.WaitForAllWorkersProgressAsync(
                     workerProgressAfterRetirement,
                     $"post-retirement portion of restart phase '{restartPhase}'",
-                    operationTimeout);
+                    operationTimeout,
+                    cancellationToken);
                 AssertNoTrafficFailures(traffic, restartPhase);
                 AssertTransientTrafficFailuresWithinLimit(traffic, SiloCount, restartPhase);
                 var liveAddresses = cluster.Silos.Select(static silo => silo.SiloAddress).ToHashSet();
@@ -962,15 +1075,27 @@ public sealed class GrainDirectoryRollingUpgradeTests(ITestOutputHelper output)
                 var verificationPhase = $"{restartPhase}-post-convergence";
                 verificationPhases.Add(verificationPhase);
                 phase.Set(verificationPhase);
-                await traffic.WaitForPhaseSuccessesAsync(verificationPhase, minimumSuccesses: 12, operationTimeout);
+                await traffic.WaitForPhaseSuccessesAsync(
+                    verificationPhase,
+                    minimumSuccesses: 12,
+                    operationTimeout,
+                    cancellationToken);
                 AssertTrafficUsesOnlyLiveAddresses(traffic, verificationPhase, liveAddresses, retiredAddresses);
 
                 var freshKeys = Enumerable.Range(0, 4)
                     .Select(_ => Interlocked.Increment(ref nextVerificationGrainKey))
                     .ToArray();
                 trackedGrainKeys.AddRange(freshKeys);
-                var observations = await CallIdentityGrainsAsync(originalClient, freshKeys, operationTimeout);
-                var repeatedObservations = await CallIdentityGrainsAsync(originalClient, freshKeys, operationTimeout);
+                var observations = await CallIdentityGrainsAsync(
+                    originalClient,
+                    freshKeys,
+                    operationTimeout,
+                    cancellationToken);
+                var repeatedObservations = await CallIdentityGrainsAsync(
+                    originalClient,
+                    freshKeys,
+                    operationTimeout,
+                    cancellationToken);
                 AssertStableActivationProgress(observations, repeatedObservations, verificationPhase);
                 await ValidateTrackedDirectoryCheckpointAsync(
                     cluster,
@@ -978,7 +1103,8 @@ public sealed class GrainDirectoryRollingUpgradeTests(ITestOutputHelper output)
                     liveAddresses,
                     retiredAddresses,
                     verificationPhase,
-                    staleCacheEvidence);
+                    staleCacheEvidence,
+                    cancellationToken);
                 AssertNoTrafficFailures(traffic, restartPhase, verificationPhase);
                 AssertTransientTrafficFailuresWithinLimit(traffic, SiloCount, restartPhase);
                 AssertTransientTrafficFailuresWithinLimit(traffic, 0, verificationPhase);
@@ -1003,14 +1129,19 @@ public sealed class GrainDirectoryRollingUpgradeTests(ITestOutputHelper output)
                 static silo => Assert.NotNull(silo.ServiceProvider.GetService<DirectoryMembershipService>()));
             Assert.Same(originalClient, cluster.Client);
 
-            await traffic.WaitForPhaseSuccessesAsync(phase.Current, minimumSuccesses: 20, operationTimeout);
+            await traffic.WaitForPhaseSuccessesAsync(
+                phase.Current,
+                minimumSuccesses: 20,
+                operationTimeout,
+                cancellationToken);
             await traffic.WaitForAllWorkersProgressAsync(
                 finalWorkerProgress,
                 "final all-DistributedGrainDirectory phase",
-                operationTimeout);
+                operationTimeout,
+                cancellationToken);
             var finalLiveAddresses = cluster.Silos.Select(static silo => silo.SiloAddress).ToHashSet();
             AssertTrafficUsesOnlyLiveAddresses(traffic, phase.Current, finalLiveAddresses, retiredAddresses);
-            await traffic.StopSchedulingAndDrainAsync(operationTimeout);
+            await traffic.StopSchedulingAndDrainAsync(operationTimeout, cancellationToken);
             foreach (var restartPhase in restartPhases)
             {
                 AssertTransientTrafficFailuresWithinLimit(traffic, SiloCount, restartPhase);
@@ -1021,8 +1152,16 @@ public sealed class GrainDirectoryRollingUpgradeTests(ITestOutputHelper output)
                 AssertTransientTrafficFailuresWithinLimit(traffic, 0, verificationPhase);
             }
 
-            var finalObservations = await CallIdentityGrainsAsync(originalClient, trackedGrainKeys, operationTimeout);
-            var repeatedFinalObservations = await CallIdentityGrainsAsync(originalClient, trackedGrainKeys, operationTimeout);
+            var finalObservations = await CallIdentityGrainsAsync(
+                originalClient,
+                trackedGrainKeys,
+                operationTimeout,
+                cancellationToken);
+            var repeatedFinalObservations = await CallIdentityGrainsAsync(
+                originalClient,
+                trackedGrainKeys,
+                operationTimeout,
+                cancellationToken);
             AssertStableActivationProgress(finalObservations, repeatedFinalObservations, phase.Current);
             await ValidateTrackedDirectoryCheckpointAsync(
                 cluster,
@@ -1030,10 +1169,19 @@ public sealed class GrainDirectoryRollingUpgradeTests(ITestOutputHelper output)
                 finalLiveAddresses,
                 retiredAddresses,
                 phase.Current,
-                staleCacheEvidence);
-            await WaitForClusterMembershipConvergenceAsync(cluster, retiredAddresses, phase.Current, operationTimeout);
-            await WaitForDirectoryConvergenceAsync(cluster, "in the final all-DistributedGrainDirectory phase");
-            await ValidateDirectoryPhaseInvariantsAsync(cluster, phase.Current);
+                staleCacheEvidence,
+                cancellationToken);
+            await WaitForClusterMembershipConvergenceAsync(
+                cluster,
+                retiredAddresses,
+                phase.Current,
+                operationTimeout,
+                cancellationToken);
+            await WaitForDirectoryConvergenceAsync(
+                cluster,
+                "in the final all-DistributedGrainDirectory phase",
+                cancellationToken);
+            await ValidateDirectoryPhaseInvariantsAsync(cluster, phase.Current, cancellationToken);
 
             Assert.Equal(SiloCount, traffic.MaximumObservedSiloCount);
             Assert.True(traffic.MaximumObservedSiloCount <= SiloCount);
@@ -1051,8 +1199,9 @@ public sealed class GrainDirectoryRollingUpgradeTests(ITestOutputHelper output)
         }
         catch
         {
-            if (deployed)
+            if (deployed && !cancellationToken.IsCancellationRequested)
             {
+                using var diagnosticsCancellation = new CancellationTokenSource(cleanupTimeout);
                 await DumpInPlaceFailureDiagnosticsAsync(
                     cluster,
                     phase,
@@ -1061,7 +1210,8 @@ public sealed class GrainDirectoryRollingUpgradeTests(ITestOutputHelper output)
                     trackedGrainKeys,
                     traffic,
                     logs,
-                    staleCacheEvidence);
+                    staleCacheEvidence,
+                    diagnosticsCancellation.Token);
             }
 
             throw;
@@ -1073,7 +1223,8 @@ public sealed class GrainDirectoryRollingUpgradeTests(ITestOutputHelper output)
             {
                 if (traffic is not null)
                 {
-                    await traffic.CancelAsync(cleanupTimeout);
+                    using var trafficCancellation = new CancellationTokenSource(cleanupTimeout);
+                    await traffic.CancelAsync(cleanupTimeout, trafficCancellation.Token);
                 }
             }
             finally
@@ -1082,12 +1233,14 @@ public sealed class GrainDirectoryRollingUpgradeTests(ITestOutputHelper output)
                 {
                     if (deployed)
                     {
-                        await cluster.StopAllSilosAsync().WaitAsync(cleanupTimeout);
+                        using var stopCancellation = new CancellationTokenSource(cleanupTimeout);
+                        await cluster.StopAllSilosAsync().WaitAsync(cleanupTimeout, stopCancellation.Token);
                     }
                 }
                 finally
                 {
-                    await cluster.DisposeAsync().AsTask().WaitAsync(cleanupTimeout);
+                    using var disposeCancellation = new CancellationTokenSource(cleanupTimeout);
+                    await cluster.DisposeAsync().AsTask().WaitAsync(cleanupTimeout, disposeCancellation.Token);
                 }
             }
         }
@@ -1096,12 +1249,13 @@ public sealed class GrainDirectoryRollingUpgradeTests(ITestOutputHelper output)
     private static async Task<Dictionary<long, RollingUpgradeGrainObservation>> CallIdentityGrainsAsync(
         IGrainFactory client,
         IEnumerable<long> grainKeys,
-        TimeSpan timeout)
+        TimeSpan timeout,
+        CancellationToken cancellationToken)
     {
         var calls = grainKeys.Distinct().Select(async grainKey =>
         {
             var grain = client.GetGrain<IRollingUpgradeIdentityGrain>(grainKey);
-            var observation = await grain.Observe().AsTask().WaitAsync(timeout);
+            var observation = await grain.Observe().AsTask().WaitAsync(timeout, cancellationToken);
             Assert.Equal(grain.GetGrainId(), observation.Address.GrainId);
             Assert.NotNull(observation.Address.SiloAddress);
             Assert.False(observation.Address.ActivationId.IsDefault);
@@ -1109,7 +1263,8 @@ public sealed class GrainDirectoryRollingUpgradeTests(ITestOutputHelper output)
             return (GrainKey: grainKey, Observation: observation);
         }).ToArray();
 
-        return (await Task.WhenAll(calls)).ToDictionary(static result => result.GrainKey, static result => result.Observation);
+        return (await Task.WhenAll(calls).WaitAsync(cancellationToken))
+            .ToDictionary(static result => result.GrainKey, static result => result.Observation);
     }
 
     private static void AssertCachesWereNotCleared(
@@ -1151,7 +1306,8 @@ public sealed class GrainDirectoryRollingUpgradeTests(ITestOutputHelper output)
         HashSet<SiloAddress> liveAddresses,
         HashSet<SiloAddress> retiredAddresses,
         string stage,
-        StaleCacheEvidenceCapture staleCacheEvidence)
+        StaleCacheEvidenceCapture staleCacheEvidence,
+        CancellationToken cancellationToken)
     {
         // Validate bounded grains using fresh directory lookups before checking phase-wide activation invariants.
         await ValidateObservedAddressesAsync(
@@ -1160,9 +1316,10 @@ public sealed class GrainDirectoryRollingUpgradeTests(ITestOutputHelper output)
             liveAddresses,
             retiredAddresses,
             stage,
-            staleCacheEvidence);
+            staleCacheEvidence,
+            cancellationToken);
 
-        await ValidateDirectoryPhaseInvariantsAsync(cluster, stage);
+        await ValidateDirectoryPhaseInvariantsAsync(cluster, stage, cancellationToken);
         output.WriteLine($"  Validated {observations.Count} bounded tracked grains during '{stage}'.");
     }
 
@@ -1172,7 +1329,8 @@ public sealed class GrainDirectoryRollingUpgradeTests(ITestOutputHelper output)
         HashSet<SiloAddress> liveAddresses,
         HashSet<SiloAddress> retiredAddresses,
         string stage,
-        StaleCacheEvidenceCapture staleCacheEvidence)
+        StaleCacheEvidenceCapture staleCacheEvidence,
+        CancellationToken cancellationToken)
     {
         var activations = GetDirectoryActivations(cluster);
         var distributedSiloCount = cluster.Silos.Count(
@@ -1216,7 +1374,9 @@ public sealed class GrainDirectoryRollingUpgradeTests(ITestOutputHelper output)
                 }
 
                 grainLocator.InvalidateCache(observedAddress.GrainId);
-                var resolvedAddress = await grainLocator.Lookup(observedAddress.GrainId);
+                var resolvedAddress = await grainLocator.Lookup(observedAddress.GrainId)
+                    .AsTask()
+                    .WaitAsync(cancellationToken);
                 Assert.NotNull(resolvedAddress);
                 AssertAddressMatchesObservation(
                     resolvedAddress,
@@ -1285,10 +1445,12 @@ public sealed class GrainDirectoryRollingUpgradeTests(ITestOutputHelper output)
         InProcessTestCluster cluster,
         HashSet<SiloAddress> retiredAddresses,
         string stage,
-        TimeSpan timeout)
+        TimeSpan timeout,
+        CancellationToken cancellationToken)
     {
         output.WriteLine($"  Waiting for cluster membership convergence during '{stage}'...");
-        using var cancellation = new CancellationTokenSource(timeout);
+        using var cancellation = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        cancellation.CancelAfter(timeout);
         try
         {
             while (true)
@@ -1316,7 +1478,8 @@ public sealed class GrainDirectoryRollingUpgradeTests(ITestOutputHelper output)
                 await Task.Delay(TimeSpan.FromMilliseconds(50), cancellation.Token);
             }
         }
-        catch (OperationCanceledException exception) when (cancellation.IsCancellationRequested)
+        catch (OperationCanceledException exception)
+            when (!cancellationToken.IsCancellationRequested && cancellation.IsCancellationRequested)
         {
             var statusReport = string.Join(
                 Environment.NewLine,
@@ -1413,7 +1576,8 @@ public sealed class GrainDirectoryRollingUpgradeTests(ITestOutputHelper output)
     private static async Task AssertSplitPartitionHandoffIsDurableAsync(
         PhaseAwareLogCapture logs,
         InProcessSiloHandle recipient,
-        SplitPartitionTransfer[] expectedTransfers)
+        SplitPartitionTransfer[] expectedTransfers,
+        CancellationToken cancellationToken)
     {
         var target = recipient.SiloAddress.ToString();
         if (expectedTransfers.Length == 0)
@@ -1425,7 +1589,8 @@ public sealed class GrainDirectoryRollingUpgradeTests(ITestOutputHelper output)
                         "LogInformationAcceptSplitPartitionStarted",
                         StringComparison.Ordinal),
                 DirectoryConvergenceTimeout,
-                $"zero-count split-partition handoff to {recipient.Name} ({target})");
+                $"zero-count split-partition handoff to {recipient.Name} ({target})",
+                cancellationToken);
             Assert.Equal(recipient.Name, acceptedHandoff.SiloName);
             Assert.Equal(0, acceptedHandoff.HandoffCount);
             return;
@@ -1438,7 +1603,8 @@ public sealed class GrainDirectoryRollingUpgradeTests(ITestOutputHelper output)
                     "LogInformationAcceptSplitPartitionCompleted",
                     StringComparison.Ordinal),
             DirectoryConvergenceTimeout,
-            $"recipient completion for split-partition handoff to {recipient.Name} ({target})");
+            $"recipient completion for split-partition handoff to {recipient.Name} ({target})",
+            cancellationToken);
         await logs.WaitForAsync(
             entry => string.Equals(entry.HandoffSilo, target, StringComparison.Ordinal)
                 && string.Equals(
@@ -1446,7 +1612,8 @@ public sealed class GrainDirectoryRollingUpgradeTests(ITestOutputHelper output)
                     "LogInformationRemovedTransferredEntries",
                     StringComparison.Ordinal),
             DirectoryConvergenceTimeout,
-            $"sender removal for split-partition handoff to {recipient.Name} ({target})");
+            $"sender removal for split-partition handoff to {recipient.Name} ({target})",
+            cancellationToken);
 
         var relevantEntries = logs.ToArray()
             .Where(entry => string.Equals(entry.HandoffSilo, target, StringComparison.Ordinal))
@@ -1602,7 +1769,8 @@ public sealed class GrainDirectoryRollingUpgradeTests(ITestOutputHelper output)
         List<long> trackedGrainKeys,
         SustainedRollingUpgradeTraffic? traffic,
         PhaseAwareLogCapture logs,
-        StaleCacheEvidenceCapture staleCacheEvidence)
+        StaleCacheEvidenceCapture staleCacheEvidence,
+        CancellationToken cancellationToken)
     {
         output.WriteLine($"ROLLING UPGRADE FAILURE in phase '{phase.Current}'.");
         output.WriteLine($"Upgraded stable silo names: [{string.Join(", ", upgradedSiloNames.Keys.Order())}]");
@@ -1642,7 +1810,8 @@ public sealed class GrainDirectoryRollingUpgradeTests(ITestOutputHelper output)
             output.WriteLine($"  STALE CACHE HINT {entry}");
         }
 
-        using var cancellation = new CancellationTokenSource(TimeSpan.FromSeconds(20));
+        using var cancellation = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        cancellation.CancelAfter(TimeSpan.FromSeconds(20));
         foreach (var grainKey in trackedGrainKeys.Take(6))
         {
             var grainId = cluster.Client.GetGrain<IRollingUpgradeIdentityGrain>(grainKey).GetGrainId();
@@ -1657,7 +1826,7 @@ public sealed class GrainDirectoryRollingUpgradeTests(ITestOutputHelper output)
                     var report = await siloControl.GetDetailedGrainReport(grainId).WaitAsync(cancellation.Token);
                     output.WriteLine(report.ToString());
                 }
-                catch (Exception exception)
+                catch (Exception exception) when (!cancellationToken.IsCancellationRequested)
                 {
                     output.WriteLine(
                         $"  Failed to get report from {silo.Name} ({silo.SiloAddress}): "
@@ -1686,9 +1855,11 @@ public sealed class GrainDirectoryRollingUpgradeTests(ITestOutputHelper output)
         RollingUpgradePhase phase,
         long[] hotGrainKeys,
         int expectedMaximumSilos,
-        TimeSpan callTimeout)
+        TimeSpan callTimeout,
+        CancellationToken cancellationToken)
     {
-        private readonly CancellationTokenSource _shutdown = new();
+        private readonly CancellationTokenSource _shutdown =
+            CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         private readonly ConcurrentDictionary<string, long> _phaseSuccesses = new(StringComparer.Ordinal);
         private readonly ConcurrentQueue<RollingUpgradeTrafficFailure> _failures = new();
         private readonly ConcurrentQueue<RollingUpgradeTrafficFailure> _transientFailures = new();
@@ -1745,9 +1916,14 @@ public sealed class GrainDirectoryRollingUpgradeTests(ITestOutputHelper output)
                 .Where(observation => string.Equals(observation.Phase, targetPhase, StringComparison.Ordinal))
                 .ToArray();
 
-        public async Task WaitForPhaseSuccessesAsync(string targetPhase, long minimumSuccesses, TimeSpan timeout)
+        public async Task WaitForPhaseSuccessesAsync(
+            string targetPhase,
+            long minimumSuccesses,
+            TimeSpan timeout,
+            CancellationToken cancellationToken)
         {
-            using var cancellation = new CancellationTokenSource(timeout);
+            using var cancellation = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+            cancellation.CancelAfter(timeout);
             try
             {
                 while (GetPhaseSuccesses(targetPhase) < minimumSuccesses)
@@ -1755,7 +1931,8 @@ public sealed class GrainDirectoryRollingUpgradeTests(ITestOutputHelper output)
                     await Task.Delay(TimeSpan.FromMilliseconds(20), cancellation.Token);
                 }
             }
-            catch (OperationCanceledException exception) when (cancellation.IsCancellationRequested)
+            catch (OperationCanceledException exception)
+                when (!cancellationToken.IsCancellationRequested && cancellation.IsCancellationRequested)
             {
                 throw new TimeoutException(
                     $"Traffic made {GetPhaseSuccesses(targetPhase)}/{minimumSuccesses} successful calls "
@@ -1764,10 +1941,15 @@ public sealed class GrainDirectoryRollingUpgradeTests(ITestOutputHelper output)
             }
         }
 
-        public async Task WaitForAllWorkersProgressAsync(long[] baseline, string stage, TimeSpan timeout)
+        public async Task WaitForAllWorkersProgressAsync(
+            long[] baseline,
+            string stage,
+            TimeSpan timeout,
+            CancellationToken cancellationToken)
         {
             Assert.Equal(_workerSuccesses.Length, baseline.Length);
-            using var cancellation = new CancellationTokenSource(timeout);
+            using var cancellation = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+            cancellation.CancelAfter(timeout);
             try
             {
                 while (true)
@@ -1782,7 +1964,8 @@ public sealed class GrainDirectoryRollingUpgradeTests(ITestOutputHelper output)
                     await progressSignal.Task.WaitAsync(cancellation.Token);
                 }
             }
-            catch (OperationCanceledException exception) when (cancellation.IsCancellationRequested)
+            catch (OperationCanceledException exception)
+                when (!cancellationToken.IsCancellationRequested && cancellation.IsCancellationRequested)
             {
                 throw new TimeoutException(
                     $"Not every traffic worker made progress during {stage} after {timeout}: "
@@ -1806,12 +1989,14 @@ public sealed class GrainDirectoryRollingUpgradeTests(ITestOutputHelper output)
             }
         }
 
-        public async Task StopSchedulingAndDrainAsync(TimeSpan timeout)
+        public async Task StopSchedulingAndDrainAsync(
+            TimeSpan timeout,
+            CancellationToken cancellationToken)
         {
             Volatile.Write(ref _stopScheduling, 1);
             try
             {
-                await _runTask.WaitAsync(timeout);
+                await _runTask.WaitAsync(timeout, cancellationToken);
             }
             catch (TimeoutException exception)
             {
@@ -1823,12 +2008,18 @@ public sealed class GrainDirectoryRollingUpgradeTests(ITestOutputHelper output)
             }
         }
 
-        public async Task CancelAsync(TimeSpan timeout)
+        public async Task CancelAsync(TimeSpan timeout, CancellationToken cancellationToken)
         {
             Volatile.Write(ref _stopScheduling, 1);
             _shutdown.Cancel();
-            await _runTask.WaitAsync(timeout);
-            _shutdown.Dispose();
+            try
+            {
+                await _runTask.WaitAsync(timeout, cancellationToken);
+            }
+            finally
+            {
+                _shutdown.Dispose();
+            }
         }
 
         private long GetPhaseSuccesses(string targetPhase) =>
@@ -2137,9 +2328,11 @@ public sealed class GrainDirectoryRollingUpgradeTests(ITestOutputHelper output)
         public async Task<PhaseAwareLogEntry> WaitForAsync(
             Func<PhaseAwareLogEntry, bool> predicate,
             TimeSpan timeout,
-            string description)
+            string description,
+            CancellationToken cancellationToken)
         {
-            using var cancellation = new CancellationTokenSource(timeout);
+            using var cancellation = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+            cancellation.CancelAfter(timeout);
             while (true)
             {
                 var signal = Volatile.Read(ref _entryAdded);
@@ -2152,7 +2345,8 @@ public sealed class GrainDirectoryRollingUpgradeTests(ITestOutputHelper output)
                 {
                     await signal.Task.WaitAsync(cancellation.Token);
                 }
-                catch (OperationCanceledException exception) when (cancellation.IsCancellationRequested)
+                catch (OperationCanceledException exception)
+                    when (!cancellationToken.IsCancellationRequested && cancellation.IsCancellationRequested)
                 {
                     throw new TimeoutException($"Timed out waiting for {description} after {timeout}.", exception);
                 }
