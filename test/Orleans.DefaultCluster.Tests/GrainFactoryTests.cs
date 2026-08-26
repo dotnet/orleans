@@ -86,14 +86,12 @@ namespace DefaultCluster.Tests
         }
 
         /// <summary>
-        /// Tests that non-existent grain prefixes produce references which can resolve after the cluster manifest changes.
+        /// Tests that non-existent grain prefixes throw an exception.
         /// </summary>
         [Fact, TestCategory("BVT"), TestCategory("Factory"), TestCategory("GetGrain")]
-        public void GetGrain_WrongPrefix_ReturnsUnresolvedReference()
+        public void GetGrain_WrongPrefix()
         {
-            var grain = this.GrainFactory.GetGrain<IBase>(GetRandomGrainId(), "Foo");
-
-            Assert.True(grain.GetGrainId().Type.IsStubGrain());
+            Assert.Throws<ArgumentException>(() => this.GrainFactory.GetGrain<IBase>(GetRandomGrainId(), "Foo"));
         }
 
         /// <summary>
@@ -150,14 +148,12 @@ namespace DefaultCluster.Tests
         }
 
         /// <summary>
-        /// Tests that invalid prefixes for derived grain interfaces produce unresolved references.
+        /// Tests that invalid prefixes for derived grain interfaces throw an exception.
         /// </summary>
         [Fact, TestCategory("BVT"), TestCategory("Factory"), TestCategory("GetGrain")]
-        public void GetGrain_Derived_WithWrongPrefix_ReturnsUnresolvedReference()
+        public void GetGrain_Derived_WithWrongPrefix()
         {
-            var grain = this.GrainFactory.GetGrain<IDerivedFromBase>(GetRandomGrainId(), "Foo");
-
-            Assert.True(grain.GetGrainId().Type.IsStubGrain());
+            Assert.Throws<ArgumentException>(() => this.GrainFactory.GetGrain<IDerivedFromBase>(GetRandomGrainId(), "Foo"));
         }
 
         /// <summary>
