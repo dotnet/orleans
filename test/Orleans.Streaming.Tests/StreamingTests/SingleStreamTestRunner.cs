@@ -45,117 +45,117 @@ public class SingleStreamTestRunner
     }
 
     //------------------------ One to One ----------------------//
-    public async Task StreamTest_01_OneProducerGrainOneConsumerGrain()
+    public async Task StreamTest_01_OneProducerGrainOneConsumerGrain(CancellationToken cancellationToken = default)
     {
         Heading("StreamTest_01_ConsumerJoinsFirstProducerLater");
         Guid streamId = Guid.NewGuid();
         // consumer joins first, producer later
-        this.consumer = await ConsumerProxy.NewConsumerGrainsAsync(streamId, this.streamProviderName, this.logger, this.client);
-        this.producer = await ProducerProxy.NewProducerGrainsAsync(streamId, this.streamProviderName, null, this.logger, this.client);
-        await BasicTestAsync();
+        this.consumer = await ConsumerProxy.NewConsumerGrainsAsync(streamId, this.streamProviderName, this.logger, this.client, cancellationToken: cancellationToken);
+        this.producer = await ProducerProxy.NewProducerGrainsAsync(streamId, this.streamProviderName, null, this.logger, this.client, cancellationToken: cancellationToken);
+        await BasicTestAsync(cancellationToken: cancellationToken);
         await StopProxies();
 
         streamId = Guid.NewGuid();
         // produce joins first, consumer later
-        this.producer = await ProducerProxy.NewProducerGrainsAsync(streamId, this.streamProviderName, null, this.logger, this.client);
-        this.consumer = await ConsumerProxy.NewConsumerGrainsAsync(streamId, this.streamProviderName, this.logger, this.client);
-        await BasicTestAsync();
+        this.producer = await ProducerProxy.NewProducerGrainsAsync(streamId, this.streamProviderName, null, this.logger, this.client, cancellationToken: cancellationToken);
+        this.consumer = await ConsumerProxy.NewConsumerGrainsAsync(streamId, this.streamProviderName, this.logger, this.client, cancellationToken: cancellationToken);
+        await BasicTestAsync(cancellationToken: cancellationToken);
         await StopProxies();
     }
 
-    public async Task StreamTest_02_OneProducerGrainOneConsumerClient()
+    public async Task StreamTest_02_OneProducerGrainOneConsumerClient(CancellationToken cancellationToken = default)
     {
         Heading("StreamTest_02_OneProducerGrainOneConsumerClient");
         Guid streamId = Guid.NewGuid();
-        consumer = await ConsumerProxy.NewConsumerClientObjectsAsync(streamId, streamProviderName, logger, this.client);
-        this.producer = await ProducerProxy.NewProducerGrainsAsync(streamId, this.streamProviderName, null, this.logger, this.client);
-        await BasicTestAsync();
+        consumer = await ConsumerProxy.NewConsumerClientObjectsAsync(streamId, streamProviderName, logger, this.client, cancellationToken: cancellationToken);
+        this.producer = await ProducerProxy.NewProducerGrainsAsync(streamId, this.streamProviderName, null, this.logger, this.client, cancellationToken: cancellationToken);
+        await BasicTestAsync(cancellationToken: cancellationToken);
         await StopProxies();
 
         streamId = Guid.NewGuid();
-        this.producer = await ProducerProxy.NewProducerGrainsAsync(streamId, this.streamProviderName, null, this.logger, this.client);
-        consumer = await ConsumerProxy.NewConsumerClientObjectsAsync(streamId, streamProviderName, logger, this.client);
-        await BasicTestAsync();
+        this.producer = await ProducerProxy.NewProducerGrainsAsync(streamId, this.streamProviderName, null, this.logger, this.client, cancellationToken: cancellationToken);
+        consumer = await ConsumerProxy.NewConsumerClientObjectsAsync(streamId, streamProviderName, logger, this.client, cancellationToken: cancellationToken);
+        await BasicTestAsync(cancellationToken: cancellationToken);
         await StopProxies();
     }
 
-    public async Task StreamTest_03_OneProducerClientOneConsumerGrain()
+    public async Task StreamTest_03_OneProducerClientOneConsumerGrain(CancellationToken cancellationToken = default)
     {
         Heading("StreamTest_03_OneProducerClientOneConsumerGrain");
         Guid streamId = Guid.NewGuid();
-        this.consumer = await ConsumerProxy.NewConsumerGrainsAsync(streamId, this.streamProviderName, this.logger, this.client);
-        producer = await ProducerProxy.NewProducerClientObjectsAsync(streamId, streamProviderName, null, logger, this.client);
-        await BasicTestAsync();
+        this.consumer = await ConsumerProxy.NewConsumerGrainsAsync(streamId, this.streamProviderName, this.logger, this.client, cancellationToken: cancellationToken);
+        producer = await ProducerProxy.NewProducerClientObjectsAsync(streamId, streamProviderName, null, logger, this.client, cancellationToken: cancellationToken);
+        await BasicTestAsync(cancellationToken: cancellationToken);
         await StopProxies();
 
         streamId = Guid.NewGuid();
-        producer = await ProducerProxy.NewProducerClientObjectsAsync(streamId, streamProviderName, null, logger, this.client);
-        this.consumer = await ConsumerProxy.NewConsumerGrainsAsync(streamId, this.streamProviderName, this.logger, this.client);
-        await BasicTestAsync();
+        producer = await ProducerProxy.NewProducerClientObjectsAsync(streamId, streamProviderName, null, logger, this.client, cancellationToken: cancellationToken);
+        this.consumer = await ConsumerProxy.NewConsumerGrainsAsync(streamId, this.streamProviderName, this.logger, this.client, cancellationToken: cancellationToken);
+        await BasicTestAsync(cancellationToken: cancellationToken);
         await StopProxies();
     }
 
-    public async Task StreamTest_04_OneProducerClientOneConsumerClient()
+    public async Task StreamTest_04_OneProducerClientOneConsumerClient(CancellationToken cancellationToken = default)
     {
         Heading("StreamTest_04_OneProducerClientOneConsumerClient");
         Guid streamId = Guid.NewGuid();
-        consumer = await ConsumerProxy.NewConsumerClientObjectsAsync(streamId, streamProviderName, logger, this.client);
-        producer = await ProducerProxy.NewProducerClientObjectsAsync(streamId, streamProviderName, null, logger, this.client);
-        await BasicTestAsync();
+        consumer = await ConsumerProxy.NewConsumerClientObjectsAsync(streamId, streamProviderName, logger, this.client, cancellationToken: cancellationToken);
+        producer = await ProducerProxy.NewProducerClientObjectsAsync(streamId, streamProviderName, null, logger, this.client, cancellationToken: cancellationToken);
+        await BasicTestAsync(cancellationToken: cancellationToken);
         await StopProxies();
 
         streamId = Guid.NewGuid();
-        producer = await ProducerProxy.NewProducerClientObjectsAsync(streamId, streamProviderName, null, logger, this.client);
-        consumer = await ConsumerProxy.NewConsumerClientObjectsAsync(streamId, streamProviderName, logger, this.client);
-        await BasicTestAsync();
+        producer = await ProducerProxy.NewProducerClientObjectsAsync(streamId, streamProviderName, null, logger, this.client, cancellationToken: cancellationToken);
+        consumer = await ConsumerProxy.NewConsumerClientObjectsAsync(streamId, streamProviderName, logger, this.client, cancellationToken: cancellationToken);
+        await BasicTestAsync(cancellationToken: cancellationToken);
         await StopProxies();
     }
 
     //------------------------ MANY to Many different grains ----------------------//
 
-    public async Task StreamTest_05_ManyDifferent_ManyProducerGrainsManyConsumerGrains()
+    public async Task StreamTest_05_ManyDifferent_ManyProducerGrainsManyConsumerGrains(CancellationToken cancellationToken = default)
     {
         Heading("StreamTest_05_ManyDifferent_ManyProducerGrainsManyConsumerGrains");
         Guid streamId = Guid.NewGuid();
-        this.consumer = await ConsumerProxy.NewConsumerGrainsAsync(streamId, this.streamProviderName, this.logger, this.client, null, Many);
-        this.producer = await ProducerProxy.NewProducerGrainsAsync(streamId, this.streamProviderName, null, this.logger, this.client, null, Many);
-        await BasicTestAsync();
+        this.consumer = await ConsumerProxy.NewConsumerGrainsAsync(streamId, this.streamProviderName, this.logger, this.client, null, Many, cancellationToken);
+        this.producer = await ProducerProxy.NewProducerGrainsAsync(streamId, this.streamProviderName, null, this.logger, this.client, null, Many, cancellationToken);
+        await BasicTestAsync(cancellationToken: cancellationToken);
         await StopProxies();
     }
 
-    public async Task StreamTest_06_ManyDifferent_ManyProducerGrainManyConsumerClients()
+    public async Task StreamTest_06_ManyDifferent_ManyProducerGrainManyConsumerClients(CancellationToken cancellationToken = default)
     {
         Heading("StreamTest_06_ManyDifferent_ManyProducerGrainManyConsumerClients");
         Guid streamId = Guid.NewGuid();
-        consumer = await ConsumerProxy.NewConsumerClientObjectsAsync(streamId, streamProviderName, logger, this.client, Many);
-        this.producer = await ProducerProxy.NewProducerGrainsAsync(streamId, this.streamProviderName, null, this.logger, this.client, null, Many);
-        await BasicTestAsync();
+        consumer = await ConsumerProxy.NewConsumerClientObjectsAsync(streamId, streamProviderName, logger, this.client, Many, cancellationToken);
+        this.producer = await ProducerProxy.NewProducerGrainsAsync(streamId, this.streamProviderName, null, this.logger, this.client, null, Many, cancellationToken);
+        await BasicTestAsync(cancellationToken: cancellationToken);
         await StopProxies();
     }
 
-    public async Task StreamTest_07_ManyDifferent_ManyProducerClientsManyConsumerGrains()
+    public async Task StreamTest_07_ManyDifferent_ManyProducerClientsManyConsumerGrains(CancellationToken cancellationToken = default)
     {
         Heading("StreamTest_07_ManyDifferent_ManyProducerClientsManyConsumerGrains");
         Guid streamId = Guid.NewGuid();
-        this.consumer = await ConsumerProxy.NewConsumerGrainsAsync(streamId, this.streamProviderName, this.logger, this.client, null, Many);
-        producer = await ProducerProxy.NewProducerClientObjectsAsync(streamId, streamProviderName, null, logger, this.client, Many);
-        await BasicTestAsync();
+        this.consumer = await ConsumerProxy.NewConsumerGrainsAsync(streamId, this.streamProviderName, this.logger, this.client, null, Many, cancellationToken);
+        producer = await ProducerProxy.NewProducerClientObjectsAsync(streamId, streamProviderName, null, logger, this.client, Many, cancellationToken);
+        await BasicTestAsync(cancellationToken: cancellationToken);
         await StopProxies();
     }
 
-    public async Task StreamTest_08_ManyDifferent_ManyProducerClientsManyConsumerClients()
+    public async Task StreamTest_08_ManyDifferent_ManyProducerClientsManyConsumerClients(CancellationToken cancellationToken = default)
     {
         Heading("StreamTest_08_ManyDifferent_ManyProducerClientsManyConsumerClients");
         Guid streamId = Guid.NewGuid();
-        consumer = await ConsumerProxy.NewConsumerClientObjectsAsync(streamId, streamProviderName, logger, this.client, Many);
-        producer = await ProducerProxy.NewProducerClientObjectsAsync(streamId, streamProviderName, null, logger, this.client, Many);
-        await BasicTestAsync();
+        consumer = await ConsumerProxy.NewConsumerClientObjectsAsync(streamId, streamProviderName, logger, this.client, Many, cancellationToken);
+        producer = await ProducerProxy.NewProducerClientObjectsAsync(streamId, streamProviderName, null, logger, this.client, Many, cancellationToken);
+        await BasicTestAsync(cancellationToken: cancellationToken);
         await StopProxies();
     }
 
     //------------------------ MANY to Many Same grains ----------------------//
 
-    public async Task StreamTest_09_ManySame_ManyProducerGrainsManyConsumerGrains()
+    public async Task StreamTest_09_ManySame_ManyProducerGrainsManyConsumerGrains(CancellationToken cancellationToken = default)
     {
         Heading("StreamTest_09_ManySame_ManyProducerGrainsManyConsumerGrains");
         Guid streamId = Guid.NewGuid();
@@ -164,13 +164,13 @@ public class SingleStreamTestRunner
         Guid[] consumerGrainIds = new Guid[] { grain1, grain1, grain1 };
         Guid[] producerGrainIds = new Guid[] { grain2, grain2, grain2 };
         // producer joins first, consumer later
-        this.producer = await ProducerProxy.NewProducerGrainsAsync(streamId, this.streamProviderName, null, this.logger, this.client, producerGrainIds);
-        this.consumer = await ConsumerProxy.NewConsumerGrainsAsync(streamId, this.streamProviderName, this.logger, this.client, consumerGrainIds);
-        await BasicTestAsync();
+        this.producer = await ProducerProxy.NewProducerGrainsAsync(streamId, this.streamProviderName, null, this.logger, this.client, producerGrainIds, cancellationToken: cancellationToken);
+        this.consumer = await ConsumerProxy.NewConsumerGrainsAsync(streamId, this.streamProviderName, this.logger, this.client, consumerGrainIds, cancellationToken: cancellationToken);
+        await BasicTestAsync(cancellationToken: cancellationToken);
         await StopProxies();
     }
 
-    public async Task StreamTest_10_ManySame_ManyConsumerGrainsManyProducerGrains()
+    public async Task StreamTest_10_ManySame_ManyConsumerGrainsManyProducerGrains(CancellationToken cancellationToken = default)
     {
         Heading("StreamTest_10_ManySame_ManyConsumerGrainsManyProducerGrains");
         Guid streamId = Guid.NewGuid();
@@ -179,96 +179,104 @@ public class SingleStreamTestRunner
         Guid[] consumerGrainIds = new Guid[] { grain1, grain1, grain1 };
         Guid[] producerGrainIds = new Guid[] { grain2, grain2, grain2 };
         // consumer joins first, producer later
-        this.consumer = await ConsumerProxy.NewConsumerGrainsAsync(streamId, this.streamProviderName, this.logger, this.client, consumerGrainIds);
-        this.producer = await ProducerProxy.NewProducerGrainsAsync(streamId, this.streamProviderName, null, this.logger, this.client, producerGrainIds);
-        await BasicTestAsync();
+        this.consumer = await ConsumerProxy.NewConsumerGrainsAsync(streamId, this.streamProviderName, this.logger, this.client, consumerGrainIds, cancellationToken: cancellationToken);
+        this.producer = await ProducerProxy.NewProducerGrainsAsync(streamId, this.streamProviderName, null, this.logger, this.client, producerGrainIds, cancellationToken: cancellationToken);
+        await BasicTestAsync(cancellationToken: cancellationToken);
         await StopProxies();
     }
 
-    public async Task StreamTest_11_ManySame_ManyProducerGrainsManyConsumerClients()
+    public async Task StreamTest_11_ManySame_ManyProducerGrainsManyConsumerClients(CancellationToken cancellationToken = default)
     {
         Heading("StreamTest_11_ManySame_ManyProducerGrainsManyConsumerClients");
         Guid streamId = Guid.NewGuid();
         Guid grain1 = Guid.NewGuid();
         Guid[] producerGrainIds = new Guid[] { grain1, grain1, grain1, grain1 };
-        this.producer = await ProducerProxy.NewProducerGrainsAsync(streamId, this.streamProviderName, null, this.logger, this.client, producerGrainIds);
-        consumer = await ConsumerProxy.NewConsumerClientObjectsAsync(streamId, streamProviderName, logger, this.client, Many);
-        await BasicTestAsync();
+        this.producer = await ProducerProxy.NewProducerGrainsAsync(streamId, this.streamProviderName, null, this.logger, this.client, producerGrainIds, cancellationToken: cancellationToken);
+        consumer = await ConsumerProxy.NewConsumerClientObjectsAsync(streamId, streamProviderName, logger, this.client, Many, cancellationToken);
+        await BasicTestAsync(cancellationToken: cancellationToken);
         await StopProxies();
     }
 
-    public async Task StreamTest_12_ManySame_ManyProducerClientsManyConsumerGrains()
+    public async Task StreamTest_12_ManySame_ManyProducerClientsManyConsumerGrains(CancellationToken cancellationToken = default)
     {
         Heading("StreamTest_12_ManySame_ManyProducerClientsManyConsumerGrains");
         Guid streamId = Guid.NewGuid();
         Guid grain1 = Guid.NewGuid();
         Guid[] consumerGrainIds = new Guid[] { grain1, grain1, grain1 };
-        this.consumer = await ConsumerProxy.NewConsumerGrainsAsync(streamId, this.streamProviderName, this.logger, this.client, consumerGrainIds);
-        producer = await ProducerProxy.NewProducerClientObjectsAsync(streamId, streamProviderName, null, logger, this.client, Many);
-        await BasicTestAsync();
+        this.consumer = await ConsumerProxy.NewConsumerGrainsAsync(streamId, this.streamProviderName, this.logger, this.client, consumerGrainIds, cancellationToken: cancellationToken);
+        producer = await ProducerProxy.NewProducerClientObjectsAsync(streamId, streamProviderName, null, logger, this.client, Many, cancellationToken);
+        await BasicTestAsync(cancellationToken: cancellationToken);
         await StopProxies();
     }
 
     //------------------------ MANY to Many producer consumer same grain ----------------------//
 
-    public async Task StreamTest_13_SameGrain_ConsumerFirstProducerLater(bool useReentrantGrain)
+    public async Task StreamTest_13_SameGrain_ConsumerFirstProducerLater(
+        bool useReentrantGrain,
+        CancellationToken cancellationToken = default)
     {
         Heading("StreamTest_13_SameGrain_ConsumerFirstProducerLater");
         Guid streamId = Guid.NewGuid();
         int grain1 = Random.Shared.Next();
         int[] grainIds = new int[] { grain1 };
         // consumer joins first, producer later
-        this.consumer = await ConsumerProxy.NewProducerConsumerGrainsAsync(streamId, this.streamProviderName, this.logger, grainIds, useReentrantGrain, this.client);
-        this.producer = await ProducerProxy.NewProducerConsumerGrainsAsync(streamId, this.streamProviderName, this.logger, grainIds, useReentrantGrain, this.client);
-        await BasicTestAsync();
+        this.consumer = await ConsumerProxy.NewProducerConsumerGrainsAsync(streamId, this.streamProviderName, this.logger, grainIds, useReentrantGrain, this.client, cancellationToken);
+        this.producer = await ProducerProxy.NewProducerConsumerGrainsAsync(streamId, this.streamProviderName, this.logger, grainIds, useReentrantGrain, this.client, cancellationToken);
+        await BasicTestAsync(cancellationToken: cancellationToken);
         await StopProxies();
     }
 
-    public async Task StreamTest_14_SameGrain_ProducerFirstConsumerLater(bool useReentrantGrain)
+    public async Task StreamTest_14_SameGrain_ProducerFirstConsumerLater(
+        bool useReentrantGrain,
+        CancellationToken cancellationToken = default)
     {
         Heading("StreamTest_14_SameGrain_ProducerFirstConsumerLater");
         Guid streamId = Guid.NewGuid();
         int grain1 = Random.Shared.Next();
         int[] grainIds = new int[] { grain1 };
         // produce joins first, consumer later
-        this.producer = await ProducerProxy.NewProducerConsumerGrainsAsync(streamId, this.streamProviderName, this.logger, grainIds, useReentrantGrain, this.client);
-        this.consumer = await ConsumerProxy.NewProducerConsumerGrainsAsync(streamId, this.streamProviderName, this.logger, grainIds, useReentrantGrain, this.client);
-        await BasicTestAsync();
+        this.producer = await ProducerProxy.NewProducerConsumerGrainsAsync(streamId, this.streamProviderName, this.logger, grainIds, useReentrantGrain, this.client, cancellationToken);
+        this.consumer = await ConsumerProxy.NewProducerConsumerGrainsAsync(streamId, this.streamProviderName, this.logger, grainIds, useReentrantGrain, this.client, cancellationToken);
+        await BasicTestAsync(cancellationToken: cancellationToken);
         await StopProxies();
     }
 
     //----------------------------------------------//
 
-    public async Task StreamTest_15_ConsumeAtProducersRequest()
+    public async Task StreamTest_15_ConsumeAtProducersRequest(CancellationToken cancellationToken = default)
     {
         Heading("StreamTest_15_ConsumeAtProducersRequest");
         Guid streamId = Guid.NewGuid();
         // this reproduces a scenario was discovered to not work (deadlock) by the Halo team. the scenario is that
         // where a producer calls a consumer, which subscribes to the calling producer.
 
-        this.producer = await ProducerProxy.NewProducerGrainsAsync(streamId, this.streamProviderName, null, this.logger, this.client);
+        this.producer = await ProducerProxy.NewProducerGrainsAsync(streamId, this.streamProviderName, null, this.logger, this.client, cancellationToken: cancellationToken);
         Guid consumerGrainId = await producer.AddNewConsumerGrain();
 
         this.consumer = ConsumerProxy.NewConsumerGrainAsync_WithoutBecomeConsumer(consumerGrainId, this.logger, this.client);
-        await BasicTestAsync();
+        await BasicTestAsync(cancellationToken: cancellationToken);
         await StopProxies();
     }
 
-    internal async Task StreamTest_Create_OneProducerGrainOneConsumerGrain()
+    internal async Task StreamTest_Create_OneProducerGrainOneConsumerGrain(
+        CancellationToken cancellationToken = default)
     {
         Guid streamId = Guid.NewGuid();
-        this.consumer = await ConsumerProxy.NewConsumerGrainsAsync(streamId, this.streamProviderName, this.logger, this.client);
-        this.producer = await ProducerProxy.NewProducerGrainsAsync(streamId, this.streamProviderName, null, this.logger, this.client);
+        this.consumer = await ConsumerProxy.NewConsumerGrainsAsync(streamId, this.streamProviderName, this.logger, this.client, cancellationToken: cancellationToken);
+        this.producer = await ProducerProxy.NewProducerGrainsAsync(streamId, this.streamProviderName, null, this.logger, this.client, cancellationToken: cancellationToken);
     }
 
-    private async Task ProducePhaseAndWaitForDeliveriesAsync(Func<Task> produce)
+    private async Task ProducePhaseAndWaitForDeliveriesAsync(
+        Func<Task> produce,
+        CancellationToken cancellationToken)
     {
         var consumerCount = await consumer.ConsumerCount;
         Assert.NotEqual(0, consumerCount);
 
         var producedBefore = await producer.ExpectedItemsProduced;
         using var observer = StreamingDiagnosticObserver.Create();
-        using var cts = new CancellationTokenSource(_timeout);
+        using var cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        cts.CancelAfter(_timeout);
 
         await produce();
 
@@ -279,16 +287,20 @@ public class SingleStreamTestRunner
         await observer.WaitForItemDeliveryCountAsync(producer.StreamId, producedThisPhase * consumerCount, producer.ProviderName, cts.Token);
     }
 
-    private async Task ProduceAndWaitForImplicitDeliveriesAsync(int count)
+    private async Task ProduceAndWaitForImplicitDeliveriesAsync(
+        int count,
+        CancellationToken cancellationToken)
     {
         using var observer = StreamingDiagnosticObserver.Create();
-        using var cts = new CancellationTokenSource(_timeout);
+        using var cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        cts.CancelAfter(_timeout);
 
         await producer.ProduceSequentialSeries(count);
         await observer.WaitForItemDeliveryCountAsync(producer.StreamId, count, producer.ProviderName, cts.Token);
     }
 
-    public async Task StreamTest_16_Deactivation_OneProducerGrainOneConsumerGrain()
+    public async Task StreamTest_16_Deactivation_OneProducerGrainOneConsumerGrain(
+        CancellationToken cancellationToken = default)
     {
         Heading("StreamTest_16_Deactivation_OneProducerGrainOneConsumerGrain");
         Guid streamId = Guid.NewGuid();
@@ -296,24 +308,32 @@ public class SingleStreamTestRunner
         Guid[] producerGrainIds = { Guid.NewGuid() };
 
         // consumer joins first, producer later
-        this.consumer = await ConsumerProxy.NewConsumerGrainsAsync(streamId, this.streamProviderName, this.logger, this.client, consumerGrainIds);
-        this.producer = await ProducerProxy.NewProducerGrainsAsync(streamId, this.streamProviderName, null, this.logger, this.client, producerGrainIds);
-        await BasicTestAsync(false);
+        this.consumer = await ConsumerProxy.NewConsumerGrainsAsync(streamId, this.streamProviderName, this.logger, this.client, consumerGrainIds, cancellationToken: cancellationToken);
+        this.producer = await ProducerProxy.NewProducerGrainsAsync(streamId, this.streamProviderName, null, this.logger, this.client, producerGrainIds, cancellationToken: cancellationToken);
+        await BasicTestAsync(false, cancellationToken);
         //await consumer.StopBeingConsumer();
         await StopProxies();
 
         await consumer.DeactivateOnIdle();
         await producer.DeactivateOnIdle();
 
-        await TestingUtils.WaitUntilAsync((lastTry, cancellationToken) => CheckGrainsDeactivated(null, consumer, lastTry, cancellationToken), _timeout, delayOnFail: TimeSpan.FromMilliseconds(100));
-        await TestingUtils.WaitUntilAsync((lastTry, cancellationToken) => CheckGrainsDeactivated(producer, null, lastTry, cancellationToken), _timeout, delayOnFail: TimeSpan.FromMilliseconds(100));
+        await TestingUtils.WaitUntilAsync(
+            (lastTry, token) => CheckGrainsDeactivated(null, consumer, lastTry, token),
+            _timeout,
+            delayOnFail: TimeSpan.FromMilliseconds(100),
+            cancellationToken: cancellationToken);
+        await TestingUtils.WaitUntilAsync(
+            (lastTry, token) => CheckGrainsDeactivated(producer, null, lastTry, token),
+            _timeout,
+            delayOnFail: TimeSpan.FromMilliseconds(100),
+            cancellationToken: cancellationToken);
 
         logger.LogInformation("\n\n\n*******************************************************************\n\n\n");
 
-        this.consumer = await ConsumerProxy.NewConsumerGrainsAsync(streamId, this.streamProviderName, this.logger, this.client, consumerGrainIds);
-        this.producer = await ProducerProxy.NewProducerGrainsAsync(streamId, this.streamProviderName, null, this.logger, this.client, producerGrainIds);
+        this.consumer = await ConsumerProxy.NewConsumerGrainsAsync(streamId, this.streamProviderName, this.logger, this.client, consumerGrainIds, cancellationToken: cancellationToken);
+        this.producer = await ProducerProxy.NewProducerGrainsAsync(streamId, this.streamProviderName, null, this.logger, this.client, producerGrainIds, cancellationToken: cancellationToken);
 
-        await BasicTestAsync(false);
+        await BasicTestAsync(false, cancellationToken);
         await StopProxies();
     }
 
@@ -337,12 +357,13 @@ public class SingleStreamTestRunner
     //    //await StopProxies();
     //}
 
-    public async Task StreamTest_19_ConsumerImplicitlySubscribedToProducerClient()
+    public async Task StreamTest_19_ConsumerImplicitlySubscribedToProducerClient(
+        CancellationToken cancellationToken = default)
     {
         Heading("StreamTest_19_ConsumerImplicitlySubscribedToProducerClient");
         string consumerTypeName = typeof(Streaming_ImplicitlySubscribedConsumerGrain).FullName!;
         Guid streamGuid = Guid.NewGuid();
-        producer = await ProducerProxy.NewProducerClientObjectsAsync(streamGuid, streamProviderName, "TestNamespace1", logger, this.client);
+        producer = await ProducerProxy.NewProducerClientObjectsAsync(streamGuid, streamProviderName, "TestNamespace1", logger, this.client, cancellationToken: cancellationToken);
         this.consumer = ConsumerProxy.NewConsumerGrainAsync_WithoutBecomeConsumer(streamGuid, this.logger, this.client, consumerTypeName);
 
         logger.LogInformation("\n** Starting Test {TestNumber}.\n", testNumber);
@@ -350,17 +371,18 @@ public class SingleStreamTestRunner
         logger.LogInformation("\n** Test {TestNumber} BasicTestAsync: producerCount={ProducerCount}.\n", testNumber, producerCount);
 
         _ = consumerTypeName;
-        await ProduceAndWaitForImplicitDeliveriesAsync(ItemCount);
+        await ProduceAndWaitForImplicitDeliveriesAsync(ItemCount, cancellationToken);
         await CheckCounters(producer, consumer);
         await StopProxies();
     }
 
-    public async Task StreamTest_20_ConsumerImplicitlySubscribedToProducerGrain()
+    public async Task StreamTest_20_ConsumerImplicitlySubscribedToProducerGrain(
+        CancellationToken cancellationToken = default)
     {
         Heading("StreamTest_20_ConsumerImplicitlySubscribedToProducerGrain");
         string consumerTypeName = typeof(Streaming_ImplicitlySubscribedConsumerGrain).FullName!;
         Guid streamGuid = Guid.NewGuid();
-        this.producer = await ProducerProxy.NewProducerGrainsAsync(streamGuid, this.streamProviderName, "TestNamespace1", this.logger, this.client);
+        this.producer = await ProducerProxy.NewProducerGrainsAsync(streamGuid, this.streamProviderName, "TestNamespace1", this.logger, this.client, cancellationToken: cancellationToken);
         this.consumer = ConsumerProxy.NewConsumerGrainAsync_WithoutBecomeConsumer(streamGuid, this.logger, this.client, consumerTypeName);
 
         logger.LogInformation("\n** Starting Test {TestNumber}.\n", testNumber);
@@ -368,18 +390,19 @@ public class SingleStreamTestRunner
         logger.LogInformation("\n** Test {TestNumber} BasicTestAsync: producerCount={ProducerCount}.\n", testNumber, producerCount);
 
         _ = consumerTypeName;
-        await ProduceAndWaitForImplicitDeliveriesAsync(ItemCount);
+        await ProduceAndWaitForImplicitDeliveriesAsync(ItemCount, cancellationToken);
         await CheckCounters(producer, consumer);
         await StopProxies();
     }
 
-    public async Task StreamTest_21_GenericConsumerImplicitlySubscribedToProducerGrain()
+    public async Task StreamTest_21_GenericConsumerImplicitlySubscribedToProducerGrain(
+        CancellationToken cancellationToken = default)
     {
         Heading("StreamTest_21_GenericConsumerImplicitlySubscribedToProducerGrain");
         //ToDo in migrate: the following consumer grain is not implemented in VSO and all tests depend on it fail.
         string consumerTypeName = "UnitTests.Grains.Streaming_ImplicitlySubscribedGenericConsumerGrain";//typeof(Streaming_ImplicitlySubscribedGenericConsumerGrain).FullName;
         Guid streamGuid = Guid.NewGuid();
-        this.producer = await ProducerProxy.NewProducerGrainsAsync(streamGuid, this.streamProviderName, "TestNamespace1", this.logger, this.client);
+        this.producer = await ProducerProxy.NewProducerGrainsAsync(streamGuid, this.streamProviderName, "TestNamespace1", this.logger, this.client, cancellationToken: cancellationToken);
         this.consumer = ConsumerProxy.NewConsumerGrainAsync_WithoutBecomeConsumer(streamGuid, this.logger, this.client, consumerTypeName);
 
         logger.LogInformation("\n** Starting Test {TestNumber}.\n", testNumber);
@@ -387,7 +410,7 @@ public class SingleStreamTestRunner
         logger.LogInformation("\n** Test {TestNumber} BasicTestAsync: producerCount={ProducerCount}.\n", testNumber, producerCount);
 
         _ = consumerTypeName;
-        await ProduceAndWaitForImplicitDeliveriesAsync(ItemCount);
+        await ProduceAndWaitForImplicitDeliveriesAsync(ItemCount, cancellationToken);
         await CheckCounters(producer, consumer);
         await StopProxies();
     }
@@ -444,7 +467,9 @@ public class SingleStreamTestRunner
 
     //-----------------------------------------------------------------------------//
 
-    public async Task BasicTestAsync(bool fullTest = true)
+    public async Task BasicTestAsync(
+        bool fullTest = true,
+        CancellationToken cancellationToken = default)
     {
         logger.LogInformation("\n** Starting Test {TestNumber} BasicTestAsync.\n", testNumber);
         var producerCount = await producer.ProducerCount;
@@ -455,14 +480,14 @@ public class SingleStreamTestRunner
             producerCount,
             consumerCount);
 
-        await ProducePhaseAndWaitForDeliveriesAsync(() => producer.ProduceSequentialSeries(ItemCount));
+        await ProducePhaseAndWaitForDeliveriesAsync(() => producer.ProduceSequentialSeries(ItemCount), cancellationToken);
         await CheckCounters(producer, consumer);
         if (runFullTest)
         {
-            await ProducePhaseAndWaitForDeliveriesAsync(() => producer.ProduceParallelSeries(ItemCount));
+            await ProducePhaseAndWaitForDeliveriesAsync(() => producer.ProduceParallelSeries(ItemCount), cancellationToken);
             await CheckCounters(producer, consumer);
 
-            await ProducePhaseAndWaitForDeliveriesAsync(() => producer.ProducePeriodicSeries(ItemCount));
+            await ProducePhaseAndWaitForDeliveriesAsync(() => producer.ProducePeriodicSeries(ItemCount), cancellationToken);
             await CheckCounters(producer, consumer);
         }
         await ValidatePubSub(producer.StreamId, producer.ProviderName);

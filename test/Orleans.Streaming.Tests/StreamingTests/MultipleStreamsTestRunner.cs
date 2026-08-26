@@ -31,7 +31,10 @@ namespace UnitTests.Streaming
             logger.LogInformation("\n\n************************ {StreamProviderName}_{TestNumber}_{TestName} ********************************* \n\n", streamProviderName, testNumber, testName);
         }
 
-        public async Task StreamTest_MultipleStreams_ManyDifferent_ManyProducerGrainsManyConsumerGrains(Func<SiloHandle>? startSiloFunc = null, Action<SiloHandle>? stopSiloFunc = null)
+        public async Task StreamTest_MultipleStreams_ManyDifferent_ManyProducerGrainsManyConsumerGrains(
+            Func<SiloHandle>? startSiloFunc = null,
+            Action<SiloHandle>? stopSiloFunc = null,
+            CancellationToken cancellationToken = default)
         {
             Heading("MultipleStreams_ManyDifferent_ManyProducerGrainsManyConsumerGrains");
             List<SingleStreamTestRunner> runners = new List<SingleStreamTestRunner>();
@@ -42,7 +45,7 @@ namespace UnitTests.Streaming
             }
             foreach (var runner in runners)
             {
-                tasks.Add(runner.StreamTest_Create_OneProducerGrainOneConsumerGrain());
+                tasks.Add(runner.StreamTest_Create_OneProducerGrainOneConsumerGrain(cancellationToken));
             }
             await Task.WhenAll(tasks);
             tasks.Clear();
@@ -55,7 +58,7 @@ namespace UnitTests.Streaming
 
             foreach (var runner in runners)
             {
-                tasks.Add(runner.BasicTestAsync(runFullTest));
+                tasks.Add(runner.BasicTestAsync(runFullTest, cancellationToken));
             }
             await Task.WhenAll(tasks);
             tasks.Clear();
@@ -68,7 +71,7 @@ namespace UnitTests.Streaming
 
                 foreach (var runner in runners)
                 {
-                    tasks.Add(runner.BasicTestAsync(runFullTest));
+                    tasks.Add(runner.BasicTestAsync(runFullTest, cancellationToken));
                 }
                 await Task.WhenAll(tasks);
                 tasks.Clear();

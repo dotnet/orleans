@@ -25,7 +25,9 @@ public sealed class AzureTableJournalStorageConcurrencyTests
     {
         var store = new CoordinatedTableStore();
         var storage = CreateStorage(store, maxRetries: 2);
-        Assert.True(await storage.CreateIfNotExistsAsync(new Dictionary<string, string> { ["owner"] = "original" }));
+        Assert.True(await storage.CreateIfNotExistsAsync(
+            new Dictionary<string, string> { ["owner"] = "original" },
+            TestContext.Current.CancellationToken));
         var originalGeneration = store.HeaderGeneration;
         var metadataWriter = CreateStorage(store);
         store.BeforeTransactionAsync = async (attempt, _, cancellationToken) =>
@@ -38,7 +40,7 @@ public sealed class AzureTableJournalStorageConcurrencyTests
             }
         };
 
-        await storage.AppendAsync(new ReadOnlySequence<byte>([4, 5]), CancellationToken.None);
+        await storage.AppendAsync(new ReadOnlySequence<byte>([4, 5]), TestContext.Current.CancellationToken);
 
         Assert.Equal(3, store.TransactionAttempts);
         Assert.Equal(1, store.SuccessfulTransactions);
@@ -53,7 +55,8 @@ public sealed class AzureTableJournalStorageConcurrencyTests
             store.TransactionCalls,
             transaction => Assert.Equal(store.TransactionCalls[0][1].RowKey, transaction[1].RowKey));
 
-        var metadata = Assert.IsAssignableFrom<IJournalMetadata>(await storage.GetMetadataAsync());
+        var metadata = Assert.IsAssignableFrom<IJournalMetadata>(
+            await storage.GetMetadataAsync(TestContext.Current.CancellationToken));
         Assert.Equal(
             new Dictionary<string, string>
             {
@@ -62,7 +65,7 @@ public sealed class AzureTableJournalStorageConcurrencyTests
                 ["conflict-2"] = "2",
             },
             metadata.Properties);
-        Assert.Equal([4, 5], await ReadBytesAsync(store));
+        Assert.Equal([4, 5], await ReadBytesAsync(store, TestContext.Current.CancellationToken));
     }
 
     [Fact]
@@ -70,7 +73,9 @@ public sealed class AzureTableJournalStorageConcurrencyTests
     {
         var store = new CoordinatedTableStore();
         var storage = CreateStorage(store, maxRetries: 2);
-        Assert.True(await storage.CreateIfNotExistsAsync(new Dictionary<string, string> { ["owner"] = "original" }));
+        Assert.True(await storage.CreateIfNotExistsAsync(
+            new Dictionary<string, string> { ["owner"] = "original" },
+            TestContext.Current.CancellationToken));
         var originalGeneration = store.HeaderGeneration;
         var metadataWriter = CreateStorage(store);
         store.BeforeTransactionAsync = async (attempt, _, cancellationToken) =>
@@ -81,7 +86,7 @@ public sealed class AzureTableJournalStorageConcurrencyTests
         };
 
         var exception = await Assert.ThrowsAsync<InconsistentStateException>(
-            () => storage.AppendAsync(new ReadOnlySequence<byte>([7, 8, 9]), CancellationToken.None).AsTask());
+            () => storage.AppendAsync(new ReadOnlySequence<byte>([7, 8, 9]), TestContext.Current.CancellationToken).AsTask());
 
         Assert.Equal(412, Assert.IsType<RequestFailedException>(exception.InnerException).Status);
         Assert.Equal(3, store.TransactionAttempts);
@@ -99,10 +104,11 @@ public sealed class AzureTableJournalStorageConcurrencyTests
                 Assert.Equal(store.TransactionCalls[0][1].RowKey, transaction[1].RowKey);
             });
 
-        var metadata = Assert.IsAssignableFrom<IJournalMetadata>(await storage.GetMetadataAsync());
+        var metadata = Assert.IsAssignableFrom<IJournalMetadata>(
+            await storage.GetMetadataAsync(TestContext.Current.CancellationToken));
         Assert.Equal(4, metadata.Properties.Count);
         Assert.Equal("3", metadata.Properties["conflict-3"]);
-        Assert.Empty(await ReadBytesAsync(store));
+        Assert.Empty(await ReadBytesAsync(store, TestContext.Current.CancellationToken));
     }
 
     [Fact]
@@ -110,7 +116,7 @@ public sealed class AzureTableJournalStorageConcurrencyTests
     {
         var store = new CoordinatedTableStore();
         var storage = CreateStorage(store, maxRetries: 0);
-        Assert.True(await storage.CreateIfNotExistsAsync());
+        Assert.True(await storage.CreateIfNotExistsAsync(cancellationToken: TestContext.Current.CancellationToken));
         var originalGeneration = store.HeaderGeneration;
         store.BeforeTransactionAsync = (attempt, _, _) =>
         {
@@ -120,7 +126,7 @@ public sealed class AzureTableJournalStorageConcurrencyTests
         };
 
         await Assert.ThrowsAsync<InconsistentStateException>(
-            () => storage.AppendAsync(new ReadOnlySequence<byte>([1]), CancellationToken.None).AsTask());
+            () => storage.AppendAsync(new ReadOnlySequence<byte>([1]), TestContext.Current.CancellationToken).AsTask());
 
         Assert.Equal(1, store.TransactionAttempts);
         Assert.Equal(0, store.SuccessfulTransactions);
@@ -129,7 +135,7 @@ public sealed class AzureTableJournalStorageConcurrencyTests
         Assert.Equal(originalGeneration, store.HeaderGeneration);
         Assert.Equal(0L, store.HeaderRowCount);
         Assert.Equal(0L, store.HeaderLength);
-        Assert.Equal("injected", (await storage.GetMetadataAsync())!.Properties["conflict"]);
+        Assert.Equal("injected", (await storage.GetMetadataAsync(TestContext.Current.CancellationToken))!.Properties["conflict"]);
     }
 
     [Fact]
@@ -141,7 +147,7 @@ public sealed class AzureTableJournalStorageConcurrencyTests
             maxRetries: 3,
             initialBackoff: TimeSpan.FromDays(1),
             maxBackoff: TimeSpan.FromDays(1));
-        Assert.True(await storage.CreateIfNotExistsAsync());
+        Assert.True(await storage.CreateIfNotExistsAsync(cancellationToken: TestContext.Current.CancellationToken));
         var originalGeneration = store.HeaderGeneration;
         var conflictObserved = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         store.BeforeTransactionAsync = (_, _, _) =>
@@ -169,7 +175,7 @@ public sealed class AzureTableJournalStorageConcurrencyTests
         Assert.Equal(originalGeneration, store.HeaderGeneration);
         Assert.Equal(0L, store.HeaderRowCount);
         Assert.Equal(0L, store.HeaderLength);
-        Assert.Equal("before-backoff", (await storage.GetMetadataAsync())!.Properties["conflict"]);
+        Assert.Equal("before-backoff", (await storage.GetMetadataAsync(TestContext.Current.CancellationToken))!.Properties["conflict"]);
     }
 
     [Fact]
@@ -190,10 +196,12 @@ public sealed class AzureTableJournalStorageConcurrencyTests
         var second = CreateStorage(store);
 
         var firstTask = first.CreateIfNotExistsAsync(
-            new Dictionary<string, string> { ["owner"] = "first" }).AsTask();
-        await firstAddEntered.Task;
+            new Dictionary<string, string> { ["owner"] = "first" },
+            TestContext.Current.CancellationToken).AsTask();
+        await firstAddEntered.Task.WaitAsync(TestContext.Current.CancellationToken);
         var secondResult = await second.CreateIfNotExistsAsync(
-            new Dictionary<string, string> { ["owner"] = "second" });
+            new Dictionary<string, string> { ["owner"] = "second" },
+            TestContext.Current.CancellationToken);
         releaseFirstAdd.TrySetResult();
         var firstResult = await firstTask;
 
@@ -206,7 +214,8 @@ public sealed class AzureTableJournalStorageConcurrencyTests
         Assert.False(string.IsNullOrWhiteSpace(store.HeaderGeneration));
         Assert.Equal(0L, store.HeaderRowCount);
         Assert.Equal(0L, store.HeaderLength);
-        var metadata = Assert.IsAssignableFrom<IJournalMetadata>(await CreateStorage(store).GetMetadataAsync());
+        var metadata = Assert.IsAssignableFrom<IJournalMetadata>(
+            await CreateStorage(store).GetMetadataAsync(TestContext.Current.CancellationToken));
         Assert.Equal(new Dictionary<string, string> { ["owner"] = "second" }, metadata.Properties);
     }
 
@@ -215,12 +224,12 @@ public sealed class AzureTableJournalStorageConcurrencyTests
     {
         var store = new CoordinatedTableStore();
         var seed = CreateStorage(store);
-        await seed.AppendAsync(new ReadOnlySequence<byte>([1]), CancellationToken.None);
+        await seed.AppendAsync(new ReadOnlySequence<byte>([1]), TestContext.Current.CancellationToken);
         var originalGeneration = store.HeaderGeneration;
         var blockedWriter = CreateStorage(store, maxRetries: 3);
         var winningWriter = CreateStorage(store, maxRetries: 3);
-        await RecoverAsync(blockedWriter);
-        await RecoverAsync(winningWriter);
+        await RecoverAsync(blockedWriter, TestContext.Current.CancellationToken);
+        await RecoverAsync(winningWriter, TestContext.Current.CancellationToken);
         var baselineAttempts = store.TransactionAttempts;
         var blockedAttemptEntered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         var releaseBlockedAttempt = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -233,9 +242,9 @@ public sealed class AzureTableJournalStorageConcurrencyTests
             }
         };
 
-        var blockedTask = blockedWriter.AppendAsync(new ReadOnlySequence<byte>([2]), CancellationToken.None).AsTask();
-        await blockedAttemptEntered.Task;
-        await winningWriter.AppendAsync(new ReadOnlySequence<byte>([3]), CancellationToken.None);
+        var blockedTask = blockedWriter.AppendAsync(new ReadOnlySequence<byte>([2]), TestContext.Current.CancellationToken).AsTask();
+        await blockedAttemptEntered.Task.WaitAsync(TestContext.Current.CancellationToken);
+        await winningWriter.AppendAsync(new ReadOnlySequence<byte>([3]), TestContext.Current.CancellationToken);
         releaseBlockedAttempt.TrySetResult();
         var exception = await Assert.ThrowsAsync<InconsistentStateException>(() => blockedTask);
 
@@ -247,7 +256,7 @@ public sealed class AzureTableJournalStorageConcurrencyTests
         Assert.Equal(2L, store.HeaderLength);
         Assert.Equal(2, store.DataRowCount);
         Assert.Equal(2, store.DataRowKeys.Distinct(StringComparer.Ordinal).Count());
-        Assert.Equal([1, 3], await ReadBytesAsync(store));
+        Assert.Equal([1, 3], await ReadBytesAsync(store, TestContext.Current.CancellationToken));
     }
 
     [Fact]
@@ -255,7 +264,8 @@ public sealed class AzureTableJournalStorageConcurrencyTests
     {
         var store = new CoordinatedTableStore();
         Assert.True(await CreateStorage(store).CreateIfNotExistsAsync(
-            new Dictionary<string, string> { ["owner"] = "seed" }));
+            new Dictionary<string, string> { ["owner"] = "seed" },
+            TestContext.Current.CancellationToken));
         var originalGeneration = store.HeaderGeneration;
         var firstUpdateEntered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         var releaseFirstUpdate = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -272,11 +282,11 @@ public sealed class AzureTableJournalStorageConcurrencyTests
 
         var firstTask = first.UpdateMetadataAsync(
             set: new Dictionary<string, string> { ["alpha"] = "A" },
-            cancellationToken: CancellationToken.None).AsTask();
-        await firstUpdateEntered.Task;
+            cancellationToken: TestContext.Current.CancellationToken).AsTask();
+        await firstUpdateEntered.Task.WaitAsync(TestContext.Current.CancellationToken);
         var secondResult = await second.UpdateMetadataAsync(
             set: new Dictionary<string, string> { ["beta"] = "B" },
-            cancellationToken: CancellationToken.None);
+            cancellationToken: TestContext.Current.CancellationToken);
         releaseFirstUpdate.TrySetResult();
         var firstResult = await firstTask;
 
@@ -293,7 +303,8 @@ public sealed class AzureTableJournalStorageConcurrencyTests
         Assert.Equal(
             new Dictionary<string, string> { ["owner"] = "seed", ["beta"] = "B" },
             secondResult.Properties);
-        var final = Assert.IsAssignableFrom<IJournalMetadata>(await CreateStorage(store).GetMetadataAsync());
+        var final = Assert.IsAssignableFrom<IJournalMetadata>(
+            await CreateStorage(store).GetMetadataAsync(TestContext.Current.CancellationToken));
         Assert.Equal(firstResult.Properties, final.Properties);
         Assert.Equal(firstResult.ETag, final.ETag);
         Assert.Equal(1, store.EntityCount);
@@ -305,7 +316,8 @@ public sealed class AzureTableJournalStorageConcurrencyTests
         var store = new CoordinatedTableStore();
         var storage = CreateStorage(store);
         Assert.True(await storage.CreateIfNotExistsAsync(
-            new Dictionary<string, string> { ["owner"] = "seed" }));
+            new Dictionary<string, string> { ["owner"] = "seed" },
+            TestContext.Current.CancellationToken));
         store.BeforeUpdateAsync = (attempt, entity, _, _, _) =>
         {
             Assert.Equal(AzureTableJournalStorage.HeaderRowKey, entity.RowKey);
@@ -315,12 +327,13 @@ public sealed class AzureTableJournalStorageConcurrencyTests
 
         var result = await storage.UpdateMetadataAsync(
             set: new Dictionary<string, string> { ["owner"] = "overwritten" },
-            cancellationToken: CancellationToken.None);
+            cancellationToken: TestContext.Current.CancellationToken);
 
         Assert.Null(result);
         Assert.Equal(3, store.UpdateAttempts);
         Assert.Equal(0, store.SuccessfulUpdates);
-        var metadata = Assert.IsAssignableFrom<IJournalMetadata>(await storage.GetMetadataAsync());
+        var metadata = Assert.IsAssignableFrom<IJournalMetadata>(
+            await storage.GetMetadataAsync(TestContext.Current.CancellationToken));
         Assert.Equal("seed", metadata.Properties["owner"]);
         Assert.Equal(["1", "2", "3"], Enumerable.Range(1, 3).Select(index => metadata.Properties[$"conflict-{index}"]));
     }
@@ -330,7 +343,7 @@ public sealed class AzureTableJournalStorageConcurrencyTests
     {
         var store = new CoordinatedTableStore();
         var storage = CreateStorage(store, maxRetries: 2);
-        await storage.AppendAsync(new ReadOnlySequence<byte>([1]), CancellationToken.None);
+        await storage.AppendAsync(new ReadOnlySequence<byte>([1]), TestContext.Current.CancellationToken);
         var oldGeneration = store.HeaderGeneration;
         store.BeforeUpdateAsync = (attempt, entity, _, _, _) =>
         {
@@ -343,15 +356,16 @@ public sealed class AzureTableJournalStorageConcurrencyTests
             return Task.CompletedTask;
         };
 
-        await storage.ReplaceAsync(new ReadOnlySequence<byte>([8, 9]), CancellationToken.None);
+        await storage.ReplaceAsync(new ReadOnlySequence<byte>([8, 9]), TestContext.Current.CancellationToken);
 
         Assert.Equal(3, store.UpdateAttempts);
         Assert.Equal(1, store.SuccessfulUpdates);
         Assert.NotEqual(oldGeneration, store.HeaderGeneration);
         Assert.Equal(1L, store.HeaderRowCount);
         Assert.Equal(2L, store.HeaderLength);
-        Assert.Equal([8, 9], await ReadBytesAsync(store));
-        var metadata = Assert.IsAssignableFrom<IJournalMetadata>(await storage.GetMetadataAsync());
+        Assert.Equal([8, 9], await ReadBytesAsync(store, TestContext.Current.CancellationToken));
+        var metadata = Assert.IsAssignableFrom<IJournalMetadata>(
+            await storage.GetMetadataAsync(TestContext.Current.CancellationToken));
         Assert.Equal("1", metadata.Properties["conflict-1"]);
         Assert.Equal("2", metadata.Properties["conflict-2"]);
     }
@@ -361,7 +375,7 @@ public sealed class AzureTableJournalStorageConcurrencyTests
     {
         var store = new CoordinatedTableStore();
         var storage = CreateStorage(store, maxRetries: 2);
-        await storage.AppendAsync(new ReadOnlySequence<byte>([1]), CancellationToken.None);
+        await storage.AppendAsync(new ReadOnlySequence<byte>([1]), TestContext.Current.CancellationToken);
         store.BeforeDeleteAsync = (attempt, _, _, _) =>
         {
             if (attempt <= 2)
@@ -372,7 +386,7 @@ public sealed class AzureTableJournalStorageConcurrencyTests
             return Task.CompletedTask;
         };
 
-        await storage.DeleteAsync(CancellationToken.None);
+        await storage.DeleteAsync(TestContext.Current.CancellationToken);
 
         Assert.Equal(3, store.DeleteAttempts);
         Assert.Equal(1, store.SuccessfulDeletes);
@@ -385,7 +399,7 @@ public sealed class AzureTableJournalStorageConcurrencyTests
     {
         var store = new CoordinatedTableStore();
         var storage = CreateStorage(store, maxRetries: 2);
-        Assert.True(await storage.CreateIfNotExistsAsync());
+        Assert.True(await storage.CreateIfNotExistsAsync(cancellationToken: TestContext.Current.CancellationToken));
         store.BeforeTransactionAsync = (_, _, _) =>
         {
             store.RemoveHeader();
@@ -393,7 +407,7 @@ public sealed class AzureTableJournalStorageConcurrencyTests
         };
 
         var exception = await Assert.ThrowsAsync<InconsistentStateException>(
-            () => storage.AppendAsync(new ReadOnlySequence<byte>([1]), CancellationToken.None).AsTask());
+            () => storage.AppendAsync(new ReadOnlySequence<byte>([1]), TestContext.Current.CancellationToken).AsTask());
 
         Assert.Equal(404, Assert.IsType<RequestFailedException>(exception.InnerException).Status);
         Assert.Contains("recovery", exception.Message, StringComparison.OrdinalIgnoreCase);
@@ -408,10 +422,10 @@ public sealed class AzureTableJournalStorageConcurrencyTests
     {
         var store = new CoordinatedTableStore();
         var replacement = CreateStorage(store, maxRetries: 3);
-        await replacement.AppendAsync(new ReadOnlySequence<byte>([1]), CancellationToken.None);
+        await replacement.AppendAsync(new ReadOnlySequence<byte>([1]), TestContext.Current.CancellationToken);
         var originalGeneration = store.HeaderGeneration;
         var appender = CreateStorage(store, maxRetries: 3);
-        await RecoverAsync(appender);
+        await RecoverAsync(appender, TestContext.Current.CancellationToken);
         var baselineTransactions = store.TransactionAttempts;
         var flipEntered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         var releaseFlip = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -424,9 +438,9 @@ public sealed class AzureTableJournalStorageConcurrencyTests
             }
         };
 
-        var replaceTask = replacement.ReplaceAsync(new ReadOnlySequence<byte>([9]), CancellationToken.None).AsTask();
-        await flipEntered.Task;
-        await appender.AppendAsync(new ReadOnlySequence<byte>([3]), CancellationToken.None);
+        var replaceTask = replacement.ReplaceAsync(new ReadOnlySequence<byte>([9]), TestContext.Current.CancellationToken).AsTask();
+        await flipEntered.Task.WaitAsync(TestContext.Current.CancellationToken);
+        await appender.AppendAsync(new ReadOnlySequence<byte>([3]), TestContext.Current.CancellationToken);
         releaseFlip.TrySetResult();
         var exception = await Assert.ThrowsAsync<InconsistentStateException>(() => replaceTask);
 
@@ -441,7 +455,7 @@ public sealed class AzureTableJournalStorageConcurrencyTests
         Assert.Equal(2, store.DataRowCount);
         Assert.Equal(2, store.DataRowKeys.Count(key => key.StartsWith(originalGeneration + "-", StringComparison.Ordinal)));
         Assert.DoesNotContain(store.DataRowKeys, key => !key.StartsWith(originalGeneration + "-", StringComparison.Ordinal));
-        Assert.Equal([1, 3], await ReadBytesAsync(store));
+        Assert.Equal([1, 3], await ReadBytesAsync(store, TestContext.Current.CancellationToken));
     }
 
     private static AzureTableJournalStorage CreateStorage(
@@ -472,13 +486,17 @@ public sealed class AzureTableJournalStorageConcurrencyTests
         return services.BuildServiceProvider().GetRequiredService<AzureTableJournalStorageInstruments>();
     }
 
-    private static async Task RecoverAsync(AzureTableJournalStorage storage)
-        => await storage.ReadAsync(DiscardingConsumer.Instance, CancellationToken.None);
+    private static async Task RecoverAsync(
+        AzureTableJournalStorage storage,
+        CancellationToken cancellationToken)
+        => await storage.ReadAsync(DiscardingConsumer.Instance, cancellationToken);
 
-    private static async Task<byte[]> ReadBytesAsync(CoordinatedTableStore store)
+    private static async Task<byte[]> ReadBytesAsync(
+        CoordinatedTableStore store,
+        CancellationToken cancellationToken)
     {
         var consumer = new CapturingConsumer();
-        await CreateStorage(store).ReadAsync(consumer, CancellationToken.None);
+        await CreateStorage(store).ReadAsync(consumer, cancellationToken);
         return consumer.Bytes.ToArray();
     }
 

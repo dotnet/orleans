@@ -23,7 +23,10 @@ public sealed class MemorySubscriptionMultiplicityTests : IClassFixture<MemorySu
 
     [Fact]
     public Task MemoryMultipleSubscriptionTest_AddRemove()
-        => _runner.MultipleSubscriptionTest_AddRemove(Guid.NewGuid(), StreamNamespace);
+        => _runner.MultipleSubscriptionTest_AddRemove(
+            Guid.NewGuid(),
+            StreamNamespace,
+            TestContext.Current.CancellationToken);
 
     public sealed class Fixture : BaseTestClusterFixture
     {

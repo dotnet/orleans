@@ -28,7 +28,7 @@ public class DurableSetTests : JournalingTestBase
         var manager = sut.Manager;
         var codec = CodecProvider.GetCodec<string>();
         var set = new DurableSet<string>("testSet", manager, new OrleansBinaryDurableSetCommandCodec<string>(codec, SessionPool));
-        await sut.Lifecycle.OnStart();
+        await sut.Lifecycle.OnStart(TestContext.Current.CancellationToken);
         
         // Act - Add items
         bool added1 = set.Add("one");
@@ -69,7 +69,7 @@ public class DurableSetTests : JournalingTestBase
         var sut = CreateTestSystem();
         var codec = CodecProvider.GetCodec<string>();
         var set1 = new DurableSet<string>("testSet", sut.Manager, new OrleansBinaryDurableSetCommandCodec<string>(codec, SessionPool));
-        await sut.Lifecycle.OnStart();
+        await sut.Lifecycle.OnStart(TestContext.Current.CancellationToken);
         
         // Act - Add items and persist
         set1.Add("one");
@@ -80,7 +80,7 @@ public class DurableSetTests : JournalingTestBase
         // Create a new manager with the same storage
         var sut2 = CreateTestSystem(storage: sut.Storage);
         var set2 = new DurableSet<string>("testSet", sut2.Manager, new OrleansBinaryDurableSetCommandCodec<string>(codec, SessionPool));
-        await sut2.Lifecycle.OnStart();
+        await sut2.Lifecycle.OnStart(TestContext.Current.CancellationToken);
 
         // Assert - Set should be recovered
         Assert.Equal(3, set2.Count);
@@ -100,7 +100,7 @@ public class DurableSetTests : JournalingTestBase
         var manager = sut.Manager;
         var codec = CodecProvider.GetCodec<TestPerson>();
         var set = new DurableSet<TestPerson>("personSet", manager, new OrleansBinaryDurableSetCommandCodec<TestPerson>(codec, SessionPool));
-        await sut.Lifecycle.OnStart();
+        await sut.Lifecycle.OnStart(TestContext.Current.CancellationToken);
         
         // Act
         var person1 = new TestPerson { Id = 1, Name = "John", Age = 30 };
@@ -130,7 +130,7 @@ public class DurableSetTests : JournalingTestBase
         var manager = sut.Manager;
         var codec = CodecProvider.GetCodec<string>();
         var set = new DurableSet<string>("clearSet", manager, new OrleansBinaryDurableSetCommandCodec<string>(codec, SessionPool));
-        await sut.Lifecycle.OnStart();
+        await sut.Lifecycle.OnStart(TestContext.Current.CancellationToken);
         
         // Add items
         set.Add("one");
@@ -159,7 +159,7 @@ public class DurableSetTests : JournalingTestBase
         var manager = sut.Manager;
         var codec = CodecProvider.GetCodec<string>();
         var set = new DurableSet<string>("enumSet", manager, new OrleansBinaryDurableSetCommandCodec<string>(codec, SessionPool));
-        await sut.Lifecycle.OnStart();
+        await sut.Lifecycle.OnStart(TestContext.Current.CancellationToken);
         
         // Add items
         var expectedItems = new HashSet<string> { "one", "two", "three" };
@@ -191,7 +191,7 @@ public class DurableSetTests : JournalingTestBase
         var manager = sut.Manager;
         var codec = CodecProvider.GetCodec<int>();
         var set = new DurableSet<int>("largeSet", manager, new OrleansBinaryDurableSetCommandCodec<int>(codec, SessionPool));
-        await sut.Lifecycle.OnStart();
+        await sut.Lifecycle.OnStart(TestContext.Current.CancellationToken);
         
         // Act - Add many items
         const int itemCount = 1000;
@@ -214,7 +214,7 @@ public class DurableSetTests : JournalingTestBase
         // Create a new manager with the same storage to test recovery
         var sut2 = CreateTestSystem(storage: sut.Storage);
         var set2 = new DurableSet<int>("largeSet", sut2.Manager, new OrleansBinaryDurableSetCommandCodec<int>(codec, SessionPool));
-        await sut2.Lifecycle.OnStart();
+        await sut2.Lifecycle.OnStart(TestContext.Current.CancellationToken);
         
         // Assert - Large set is correctly recovered
         Assert.Equal(itemCount, set2.Count);
@@ -238,7 +238,7 @@ public class DurableSetTests : JournalingTestBase
         var codec = CodecProvider.GetCodec<int>();
         var set1 = new DurableSet<int>("set1", manager, new OrleansBinaryDurableSetCommandCodec<int>(codec, SessionPool));
         var set2 = new DurableSet<int>("set2", manager, new OrleansBinaryDurableSetCommandCodec<int>(codec, SessionPool));
-        await sut.Lifecycle.OnStart();
+        await sut.Lifecycle.OnStart(TestContext.Current.CancellationToken);
         
         // Populate set1 with even numbers from 0 to 10
         for (int i = 0; i <= 10; i += 2)
@@ -287,7 +287,7 @@ public class DurableSetTests : JournalingTestBase
         var manager = sut.Manager;
         var codec = CodecProvider.GetCodec<int>();
         var set = new DurableSet<int>("exceptSet", manager, new OrleansBinaryDurableSetCommandCodec<int>(codec, SessionPool));
-        await sut.Lifecycle.OnStart();
+        await sut.Lifecycle.OnStart(TestContext.Current.CancellationToken);
         
         // Add numbers from 0 to 9
         for (int i = 0; i < 10; i++)

@@ -126,7 +126,8 @@ namespace UnitTests.StreamingTests
             finally
             {
                 await run.ReleaseDeliveriesAsync(Timeout);
-                await Task.WhenAll(streamIds.Select(streamId => consumer.StopConsuming(streamId, StreamProvider)));
+                await Task.WhenAll(streamIds.Select(streamId =>
+                    consumer.StopConsuming(streamId, StreamProvider)));
             }
 
             Assert.Equal(PartitionCount, run.DeliveryCount);

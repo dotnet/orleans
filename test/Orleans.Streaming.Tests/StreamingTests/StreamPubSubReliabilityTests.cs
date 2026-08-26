@@ -81,7 +81,7 @@ namespace UnitTests.StreamingTests
         [Fact, TestCategory("Functional"), TestCategory("Streaming"), TestCategory("PubSub")]
         public async Task PubSub_Store_Baseline()
         {
-            await Test_PubSub_Stream(StreamProviderName, StreamId);
+            await Test_PubSub_Stream(StreamProviderName, StreamId, TestContext.Current.CancellationToken);
         }
 
         [Fact, TestCategory("Functional"), TestCategory("Streaming"), TestCategory("PubSub")]
@@ -97,7 +97,7 @@ namespace UnitTests.StreamingTests
 
             // TODO: expect StorageProviderInjectedError directly instead of OrleansException
             await Assert.ThrowsAsync<StorageProviderInjectedError>(() =>
-                Test_PubSub_Stream(StreamProviderName, StreamId));
+                Test_PubSub_Stream(StreamProviderName, StreamId, TestContext.Current.CancellationToken));
         }
 
         [Fact, TestCategory("Functional"), TestCategory("Streaming"), TestCategory("PubSub")]
@@ -106,7 +106,7 @@ namespace UnitTests.StreamingTests
             await SetErrorInjection(PubSubStoreProviderName, ErrorInjectionPoint.BeforeWrite);
 
             var exception = await Assert.ThrowsAsync<StorageProviderInjectedError>(() =>
-                Test_PubSub_Stream(StreamProviderName, StreamId));
+                Test_PubSub_Stream(StreamProviderName, StreamId, TestContext.Current.CancellationToken));
         }
 
         [Fact, TestCategory("Functional"), TestCategory("Streaming"), TestCategory("PubSub")]
@@ -123,7 +123,8 @@ namespace UnitTests.StreamingTests
             var timeout = TimeSpan.FromSeconds(30);
             using var streamObserver = StreamingDiagnosticObserver.Create();
             using var grainObserver = GrainDiagnosticObserver.Create();
-            using var cts = new CancellationTokenSource(timeout);
+            using var cts = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
+            cts.CancelAfter(timeout);
             var deliveryTask = streamObserver.WaitForItemDeliveryCountAsync(producedStreamId, 1, StreamProviderName, cts.Token);
             var deactivationTask = grainObserver.WaitForDeactivatedAsync(deactivatingConsumer, timeout);
 
@@ -134,22 +135,28 @@ namespace UnitTests.StreamingTests
             Assert.Equal(1, await receivingConsumer.GetReceivedCount());
         }
 
-        private async Task Test_PubSub_Stream(string streamProviderName, Guid streamId)
+        private async Task Test_PubSub_Stream(
+            string streamProviderName,
+            Guid streamId,
+            CancellationToken cancellationToken)
         {
             using var observer = StreamingDiagnosticObserver.Create();
 
             // Consumer
             IStreamLifecycleConsumerGrain consumer = this.GrainFactory.GetGrain<IStreamLifecycleConsumerGrain>(Guid.NewGuid());
+            cancellationToken.ThrowIfCancellationRequested();
             await consumer.BecomeConsumer(streamId, this.StreamNamespace, streamProviderName);
 
             // Producer
             IStreamLifecycleProducerGrain producer = this.GrainFactory.GetGrain<IStreamLifecycleProducerGrain>(Guid.NewGuid());
+            cancellationToken.ThrowIfCancellationRequested();
             await producer.BecomeProducer(StreamId, this.StreamNamespace, streamProviderName);
 
             await producer.SendItem(1);
 
             int received1 = 0;
-            using var cts = new CancellationTokenSource(1000);
+            using var cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+            cts.CancelAfter(1000);
             do
             {
                 received1 = await consumer.GetReceivedCount();
@@ -162,7 +169,8 @@ namespace UnitTests.StreamingTests
 
             // Wait for subscription removal to propagate
             var rxStreamId = Orleans.Runtime.StreamId.Create(this.StreamNamespace, streamId);
-            using var subCts = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+            using var subCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+            subCts.CancelAfter(TimeSpan.FromSeconds(5));
             await observer.WaitForSubscriptionRemovedAsync(rxStreamId, streamProviderName, subCts.Token);
 
             // Send one more message

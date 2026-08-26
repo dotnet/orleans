@@ -24,7 +24,7 @@ public sealed class DurableStateAndTcsRecoveryTests : JournalingTestBase
             new OrleansBinaryDurableTaskCompletionSourceCommandCodec<int>(ValueCodec<int>(), ValueCodec<Exception>(), SessionPool),
             Copier<int>(),
             Copier<Exception>());
-        await sut.Lifecycle.OnStart();
+        await sut.Lifecycle.OnStart(TestContext.Current.CancellationToken);
 
         ((IStorage<string>)state).State = "state-value";
         Assert.True(tcs.TrySetResult(17));
@@ -38,7 +38,7 @@ public sealed class DurableStateAndTcsRecoveryTests : JournalingTestBase
             new OrleansBinaryDurableTaskCompletionSourceCommandCodec<int>(ValueCodec<int>(), ValueCodec<Exception>(), SessionPool),
             Copier<int>(),
             Copier<Exception>());
-        await sut2.Lifecycle.OnStart();
+        await sut2.Lifecycle.OnStart(TestContext.Current.CancellationToken);
 
         var recoveredState = (IStorage<string>)state2;
         Assert.True(recoveredState.RecordExists);
@@ -57,7 +57,7 @@ public sealed class DurableStateAndTcsRecoveryTests : JournalingTestBase
         var sut = CreateTestSystem(storage: storage);
         var state = new DurableState<string>("state", sut.Manager, codec);
         var grainState = (IStorage<string>)state;
-        await sut.Lifecycle.OnStart();
+        await sut.Lifecycle.OnStart(TestContext.Current.CancellationToken);
 
         grainState.State = "state-value";
         await grainState.WriteStateAsync(CancellationToken.None);
@@ -69,7 +69,7 @@ public sealed class DurableStateAndTcsRecoveryTests : JournalingTestBase
 
         var recovered = CreateTestSystem(storage: storage);
         var recoveredState = new DurableState<string>("state", recovered.Manager, new OrleansBinaryPersistentStateCommandCodec<string>(ValueCodec<string>(), SessionPool));
-        await recovered.Lifecycle.OnStart();
+        await recovered.Lifecycle.OnStart(TestContext.Current.CancellationToken);
 
         var recoveredStorage = (IStorage<string>)recoveredState;
         Assert.False(recoveredStorage.RecordExists);
@@ -86,7 +86,7 @@ public sealed class DurableStateAndTcsRecoveryTests : JournalingTestBase
             new OrleansBinaryDurableTaskCompletionSourceCommandCodec<int>(ValueCodec<int>(), ValueCodec<Exception>(), SessionPool),
             Copier<int>(),
             Copier<Exception>());
-        await sut.Lifecycle.OnStart();
+        await sut.Lifecycle.OnStart(TestContext.Current.CancellationToken);
         Assert.True(tcs.TrySetResult(17));
         await sut.Manager.WriteStateAsync(CancellationToken.None);
         Assert.Equal(17, await tcs.Task);

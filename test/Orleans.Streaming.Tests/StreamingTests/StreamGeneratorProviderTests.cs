@@ -74,7 +74,10 @@ namespace UnitTests.StreamingTests
         public async Task ValidateGeneratedStreamsTest()
         {
             this.fixture.Logger.LogInformation("************************ ValidateGeneratedStreamsTest *********************************");
-            await TestingUtils.WaitUntilAsync((lastTry, cancellationToken) => CheckCounters(lastTry, cancellationToken), Timeout);
+            await TestingUtils.WaitUntilAsync(
+                (lastTry, cancellationToken) => CheckCounters(lastTry, cancellationToken),
+                Timeout,
+                cancellationToken: TestContext.Current.CancellationToken);
         }
 
         private async Task<bool> CheckCounters(bool assertIsTrue, CancellationToken cancellationToken)

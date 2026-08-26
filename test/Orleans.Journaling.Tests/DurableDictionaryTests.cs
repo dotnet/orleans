@@ -31,7 +31,7 @@ public class DurableDictionaryTests : JournalingTestBase
         var keyCodec = CodecProvider.GetCodec<string>();
         var valueCodec = CodecProvider.GetCodec<int>();
         var dictionary = new DurableDictionary<string, int>("testDict", sut.Manager, new OrleansBinaryDurableDictionaryCommandCodec<string, int>(keyCodec, valueCodec, SessionPool));
-        await sut.Lifecycle.OnStart();
+        await sut.Lifecycle.OnStart(TestContext.Current.CancellationToken);
 
         // Act - Add items to the dictionary
         // Each operation is journaled but not persisted until WriteStateAsync is called
@@ -76,7 +76,7 @@ public class DurableDictionaryTests : JournalingTestBase
         var keyCodec = CodecProvider.GetCodec<string>();
         var valueCodec = CodecProvider.GetCodec<int>();
         var dictionary1 = new DurableDictionary<string, int>("testDict", sut.Manager, new OrleansBinaryDurableDictionaryCommandCodec<string, int>(keyCodec, valueCodec, SessionPool));
-        await sut.Lifecycle.OnStart();
+        await sut.Lifecycle.OnStart(TestContext.Current.CancellationToken);
         
         // Act - Add items and persist
         dictionary1.Add("one", 1);
@@ -88,7 +88,7 @@ public class DurableDictionaryTests : JournalingTestBase
         // This tests the journaling system's ability to replay operations and restore state
         var sut2 = CreateTestSystem(storage: sut.Storage);
         var dictionary2 = new DurableDictionary<string, int>("testDict", sut2.Manager, new OrleansBinaryDurableDictionaryCommandCodec<string, int>(keyCodec, valueCodec, SessionPool));
-        await sut2.Lifecycle.OnStart();
+        await sut2.Lifecycle.OnStart(TestContext.Current.CancellationToken);
         
         // Assert - Dictionary should be recovered
         Assert.Equal(3, dictionary2.Count);
@@ -111,7 +111,7 @@ public class DurableDictionaryTests : JournalingTestBase
         var keyCodec = CodecProvider.GetCodec<TestKey>();
         var valueCodec = CodecProvider.GetCodec<string>();
         var dictionary = new DurableDictionary<TestKey, string>("complexDict", manager, new OrleansBinaryDurableDictionaryCommandCodec<TestKey, string>(keyCodec, valueCodec, SessionPool));
-        await sut.Lifecycle.OnStart();
+        await sut.Lifecycle.OnStart(TestContext.Current.CancellationToken);
         
         // Act
         var key1 = new TestKey { Id = 1, Name = "Key1" };
@@ -141,7 +141,7 @@ public class DurableDictionaryTests : JournalingTestBase
         var keyCodec = CodecProvider.GetCodec<string>();
         var valueCodec = CodecProvider.GetCodec<TestPerson>();
         var dictionary = new DurableDictionary<string, TestPerson>("peopleDict", manager, new OrleansBinaryDurableDictionaryCommandCodec<string, TestPerson>(keyCodec, valueCodec, SessionPool));
-        await sut.Lifecycle.OnStart();
+        await sut.Lifecycle.OnStart(TestContext.Current.CancellationToken);
         
         // Act
         var person1 = new TestPerson { Id = 1, Name = "John", Age = 30 };
@@ -177,7 +177,7 @@ public class DurableDictionaryTests : JournalingTestBase
         var keyCodec = CodecProvider.GetCodec<string>();
         var valueCodec = CodecProvider.GetCodec<int>();
         var dictionary = new DurableDictionary<string, int>("clearDict", manager, new OrleansBinaryDurableDictionaryCommandCodec<string, int>(keyCodec, valueCodec, SessionPool));
-        await sut.Lifecycle.OnStart();
+        await sut.Lifecycle.OnStart(TestContext.Current.CancellationToken);
         
         // Add items
         dictionary.Add("one", 1);
@@ -207,7 +207,7 @@ public class DurableDictionaryTests : JournalingTestBase
         var keyCodec = CodecProvider.GetCodec<string>();
         var valueCodec = CodecProvider.GetCodec<int>();
         var dictionary = new DurableDictionary<string, int>("enumDict", manager, new OrleansBinaryDurableDictionaryCommandCodec<string, int>(keyCodec, valueCodec, SessionPool));
-        await sut.Lifecycle.OnStart();
+        await sut.Lifecycle.OnStart(TestContext.Current.CancellationToken);
         
         // Add items
         var expectedPairs = new Dictionary<string, int>

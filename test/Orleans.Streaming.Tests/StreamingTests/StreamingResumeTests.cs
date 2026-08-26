@@ -206,10 +206,18 @@ public abstract class StreamingResumeTests : TestClusterPerTest
         var slowGrain = this.Client.GetGrain<ISlowImplicitSubscriptionCounterGrain>(key);
 
         await stream.OnNextAsync([1]);
-        await TestingUtils.WaitUntilAsync((lastTry, cancellationToken) => CheckFastCounter(1, lastTry, cancellationToken), TimeSpan.FromSeconds(30), delayOnFail: PollInterval);
+        await TestingUtils.WaitUntilAsync(
+            (lastTry, cancellationToken) => CheckFastCounter(1, lastTry, cancellationToken),
+            TimeSpan.FromSeconds(30),
+            delayOnFail: PollInterval,
+            cancellationToken: TestContext.Current.CancellationToken);
 
         await stream.OnNextAsync([2]);
-        await TestingUtils.WaitUntilAsync((lastTry, cancellationToken) => CheckFastCounter(2, lastTry, cancellationToken), TimeSpan.FromSeconds(30), delayOnFail: PollInterval);
+        await TestingUtils.WaitUntilAsync(
+            (lastTry, cancellationToken) => CheckFastCounter(2, lastTry, cancellationToken),
+            TimeSpan.FromSeconds(30),
+            delayOnFail: PollInterval,
+            cancellationToken: TestContext.Current.CancellationToken);
 
         async Task<bool> CheckFastCounter(int expected, bool lastTry, CancellationToken cancellationToken)
         {

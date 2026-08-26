@@ -161,8 +161,8 @@ public abstract class StreamQueueCheckpointerTests
 
         await store.WaitForWriteAttempts(1);
         firstWrite.SetResult();
-        await context.RunNext();
-        await context.RunNext();
+        await context.RunNext(TestContext.Current.CancellationToken);
+        await context.RunNext(TestContext.Current.CancellationToken);
         Assert.Equal(["20"], store.CompletedWrites);
 
         var secondWrite = store.BlockNextWrite();
@@ -172,15 +172,15 @@ public abstract class StreamQueueCheckpointerTests
         }
 
         await store.WaitForWriteAttempts(2);
-        await context.RunNext();
+        await context.RunNext(TestContext.Current.CancellationToken);
 
         Assert.False(flush.IsCompleted);
         Assert.Equal(["20", "30"], store.WriteAttempts);
         Assert.Single(store.CompletedWrites);
 
         secondWrite.SetResult();
-        await context.RunNext();
-        await context.RunNext();
+        await context.RunNext(TestContext.Current.CancellationToken);
+        await context.RunNext(TestContext.Current.CancellationToken);
         await flush;
 
         Assert.Equal(["20", "30"], store.WriteAttempts);
@@ -443,9 +443,10 @@ public abstract class StreamQueueCheckpointerTests
             return new DelegateDisposable(() => SetSynchronizationContext(previous));
         }
 
-        public async Task RunNext()
+        public async Task RunNext(CancellationToken cancellationToken)
         {
-            await _callbackPosted.WaitAsync().WaitAsync(TimeSpan.FromSeconds(10));
+            await _callbackPosted.WaitAsync(cancellationToken)
+                .WaitAsync(TimeSpan.FromSeconds(10), cancellationToken);
             (SendOrPostCallback Callback, object? State) workItem;
             lock (_callbacks)
             {

@@ -35,7 +35,7 @@ public class CodecRecoveryTests : JournalingTestBase
         var keyCodec = CodecProvider.GetCodec<string>();
         var valueCodec = CodecProvider.GetCodec<int>();
         var dict = new DurableDictionary<string, int>("dict", sut.Manager, new OrleansBinaryDurableDictionaryCommandCodec<string, int>(keyCodec, valueCodec, SessionPool));
-        await sut.Lifecycle.OnStart();
+        await sut.Lifecycle.OnStart(TestContext.Current.CancellationToken);
 
         dict.Add("alpha", 1);
         dict.Add("beta", 2);
@@ -47,7 +47,7 @@ public class CodecRecoveryTests : JournalingTestBase
         var keyCodec2 = CodecProvider.GetCodec<string>();
         var valueCodec2 = CodecProvider.GetCodec<int>();
         var dict2 = new DurableDictionary<string, int>("dict", sut2.Manager, new OrleansBinaryDurableDictionaryCommandCodec<string, int>(keyCodec2, valueCodec2, SessionPool));
-        await sut2.Lifecycle.OnStart();
+        await sut2.Lifecycle.OnStart(TestContext.Current.CancellationToken);
 
         Assert.Equal(3, dict2.Count);
         Assert.Equal(1, dict2["alpha"]);
@@ -68,7 +68,7 @@ public class CodecRecoveryTests : JournalingTestBase
         // Write phase
         var sut = CreateTestSystemWithJsonCodec(storage, jsonOptions);
         var dict = new DurableDictionary<string, int>("dict", sut.Manager, new JsonDurableDictionaryCommandCodec<string, int>(jsonOptions));
-        await sut.Lifecycle.OnStart();
+        await sut.Lifecycle.OnStart(TestContext.Current.CancellationToken);
 
         dict.Add("alpha", 1);
         dict.Add("beta", 2);
@@ -83,7 +83,7 @@ public class CodecRecoveryTests : JournalingTestBase
         // Recovery phase
         var sut2 = CreateTestSystemWithJsonCodec(storage, jsonOptions);
         var dict2 = new DurableDictionary<string, int>("dict", sut2.Manager, new JsonDurableDictionaryCommandCodec<string, int>(jsonOptions));
-        await sut2.Lifecycle.OnStart();
+        await sut2.Lifecycle.OnStart(TestContext.Current.CancellationToken);
 
         Assert.Equal(2, dict2.Count);
         Assert.Equal(1, dict2["alpha"]);
@@ -102,7 +102,7 @@ public class CodecRecoveryTests : JournalingTestBase
         // Write phase
         var sut = CreateTestSystemWithJsonCodec(storage, jsonOptions);
         var list = new DurableList<string>("list", sut.Manager, new JsonDurableListCommandCodec<string>(jsonOptions));
-        await sut.Lifecycle.OnStart();
+        await sut.Lifecycle.OnStart(TestContext.Current.CancellationToken);
 
         list.Add("one");
         list.Add("two");
@@ -112,7 +112,7 @@ public class CodecRecoveryTests : JournalingTestBase
         // Recovery phase
         var sut2 = CreateTestSystemWithJsonCodec(storage, jsonOptions);
         var list2 = new DurableList<string>("list", sut2.Manager, new JsonDurableListCommandCodec<string>(jsonOptions));
-        await sut2.Lifecycle.OnStart();
+        await sut2.Lifecycle.OnStart(TestContext.Current.CancellationToken);
 
         Assert.Equal(3, list2.Count);
         Assert.Equal("one", list2[0]);
@@ -132,7 +132,7 @@ public class CodecRecoveryTests : JournalingTestBase
         // Write phase
         var sut = CreateTestSystemWithJsonCodec(storage, jsonOptions);
         var value = new DurableValue<int>("val", sut.Manager, new JsonDurableValueCommandCodec<int>(jsonOptions));
-        await sut.Lifecycle.OnStart();
+        await sut.Lifecycle.OnStart(TestContext.Current.CancellationToken);
 
         value.Value = 42;
         await sut.Manager.WriteStateAsync(CancellationToken.None);
@@ -140,7 +140,7 @@ public class CodecRecoveryTests : JournalingTestBase
         // Recovery phase
         var sut2 = CreateTestSystemWithJsonCodec(storage, jsonOptions);
         var value2 = new DurableValue<int>("val", sut2.Manager, new JsonDurableValueCommandCodec<int>(jsonOptions));
-        await sut2.Lifecycle.OnStart();
+        await sut2.Lifecycle.OnStart(TestContext.Current.CancellationToken);
 
         Assert.Equal(42, value2.Value);
     }
@@ -161,7 +161,7 @@ public class CodecRecoveryTests : JournalingTestBase
             new JsonDurableTaskCompletionSourceCommandCodec<int>(jsonOptions),
             Copier<int>(),
             Copier<Exception>());
-        await sut.Lifecycle.OnStart();
+        await sut.Lifecycle.OnStart(TestContext.Current.CancellationToken);
 
         queue.Enqueue("first");
         queue.Enqueue("second");
@@ -181,7 +181,7 @@ public class CodecRecoveryTests : JournalingTestBase
             new JsonDurableTaskCompletionSourceCommandCodec<int>(jsonOptions),
             Copier<int>(),
             Copier<Exception>());
-        await sut2.Lifecycle.OnStart();
+        await sut2.Lifecycle.OnStart(TestContext.Current.CancellationToken);
 
         Assert.Equal(2, queue2.Count);
         Assert.Equal("first", queue2.Dequeue());
@@ -199,7 +199,7 @@ public class CodecRecoveryTests : JournalingTestBase
         var storage = new VolatileJournalStorage(OrleansBinaryJournalFormat.JournalFormatKey);
         using var first = CreateFormatAwareTestSystem(storage, OrleansBinaryJournalFormat.JournalFormatKey);
         var dict = CreateFormatAwareDictionary(first, OrleansBinaryJournalFormat.JournalFormatKey);
-        await first.Lifecycle.OnStart();
+        await first.Lifecycle.OnStart(TestContext.Current.CancellationToken);
         dict.Add("alpha", 1);
         await first.Manager.WriteStateAsync(CancellationToken.None);
         Assert.Equal(OrleansBinaryJournalFormat.JournalFormatKey, storage.StoredJournalFormatKey);
@@ -207,7 +207,7 @@ public class CodecRecoveryTests : JournalingTestBase
         storage.SetConfiguredJournalFormatKey(JsonJournalExtensions.JournalFormatKey);
         using var recovered = CreateFormatAwareTestSystem(storage, JsonJournalExtensions.JournalFormatKey);
         var recoveredDict = CreateFormatAwareDictionary(recovered, JsonJournalExtensions.JournalFormatKey);
-        await recovered.Lifecycle.OnStart();
+        await recovered.Lifecycle.OnStart(TestContext.Current.CancellationToken);
 
         Assert.Equal(1, recoveredDict["alpha"]);
 
@@ -227,7 +227,7 @@ public class CodecRecoveryTests : JournalingTestBase
         var storage = new VolatileJournalStorage(JsonJournalExtensions.JournalFormatKey);
         using var first = CreateFormatAwareTestSystem(storage, JsonJournalExtensions.JournalFormatKey);
         var dict = CreateFormatAwareDictionary(first, JsonJournalExtensions.JournalFormatKey);
-        await first.Lifecycle.OnStart();
+        await first.Lifecycle.OnStart(TestContext.Current.CancellationToken);
         dict.Add("alpha", 1);
         await first.Manager.WriteStateAsync(CancellationToken.None);
         Assert.Equal(JsonJournalExtensions.JournalFormatKey, storage.StoredJournalFormatKey);
@@ -235,7 +235,7 @@ public class CodecRecoveryTests : JournalingTestBase
         storage.SetConfiguredJournalFormatKey(OrleansBinaryJournalFormat.JournalFormatKey);
         using var recovered = CreateFormatAwareTestSystem(storage, OrleansBinaryJournalFormat.JournalFormatKey);
         var recoveredDict = CreateFormatAwareDictionary(recovered, OrleansBinaryJournalFormat.JournalFormatKey);
-        await recovered.Lifecycle.OnStart();
+        await recovered.Lifecycle.OnStart(TestContext.Current.CancellationToken);
 
         Assert.Equal(1, recoveredDict["alpha"]);
 
@@ -247,7 +247,7 @@ public class CodecRecoveryTests : JournalingTestBase
 
         using var final = CreateFormatAwareTestSystem(storage, OrleansBinaryJournalFormat.JournalFormatKey);
         var finalDict = CreateFormatAwareDictionary(final, OrleansBinaryJournalFormat.JournalFormatKey);
-        await final.Lifecycle.OnStart();
+        await final.Lifecycle.OnStart(TestContext.Current.CancellationToken);
         Assert.Equal(1, finalDict["alpha"]);
         Assert.Equal(2, finalDict["beta"]);
     }
@@ -258,14 +258,14 @@ public class CodecRecoveryTests : JournalingTestBase
         var storage = new VolatileJournalStorage(JsonJournalExtensions.JournalFormatKey);
         using var first = CreateFormatAwareTestSystem(storage, JsonJournalExtensions.JournalFormatKey);
         var dict = CreateFormatAwareDictionary(first, JsonJournalExtensions.JournalFormatKey);
-        await first.Lifecycle.OnStart();
+        await first.Lifecycle.OnStart(TestContext.Current.CancellationToken);
         dict.Add("alpha", 1);
         await first.Manager.WriteStateAsync(CancellationToken.None);
         var metadataLessStorage = new MetadataOverridingStorage(storage, storedJournalFormatKey: null);
 
         using var recovered = CreateFormatAwareTestSystem(metadataLessStorage, JsonJournalExtensions.JournalFormatKey);
         var recoveredDict = CreateFormatAwareDictionary(recovered, JsonJournalExtensions.JournalFormatKey);
-        await recovered.Lifecycle.OnStart();
+        await recovered.Lifecycle.OnStart(TestContext.Current.CancellationToken);
 
         Assert.Equal(1, recoveredDict["alpha"]);
 
@@ -284,7 +284,7 @@ public class CodecRecoveryTests : JournalingTestBase
         var staleMetadataStorage = new MetadataOverridingStorage(storage, OrleansBinaryJournalFormat.JournalFormatKey);
         using var system = CreateFormatAwareTestSystem(staleMetadataStorage, JsonJournalExtensions.JournalFormatKey);
         var dict = CreateFormatAwareDictionary(system, JsonJournalExtensions.JournalFormatKey);
-        await system.Lifecycle.OnStart();
+        await system.Lifecycle.OnStart(TestContext.Current.CancellationToken);
 
         dict.Add("alpha", 1);
         await system.Manager.WriteStateAsync(CancellationToken.None);
@@ -299,14 +299,14 @@ public class CodecRecoveryTests : JournalingTestBase
         var storage = new VolatileJournalStorage(OrleansBinaryJournalFormat.JournalFormatKey);
         using var first = CreateFormatAwareTestSystem(storage, OrleansBinaryJournalFormat.JournalFormatKey);
         var dict = CreateFormatAwareDictionary(first, OrleansBinaryJournalFormat.JournalFormatKey, "dict");
-        await first.Lifecycle.OnStart();
+        await first.Lifecycle.OnStart(TestContext.Current.CancellationToken);
         dict.Add("alpha", 1);
         await first.Manager.WriteStateAsync(CancellationToken.None);
 
         storage.SetConfiguredJournalFormatKey(JsonJournalExtensions.JournalFormatKey);
         using var recovered = CreateFormatAwareTestSystem(storage, JsonJournalExtensions.JournalFormatKey);
         var other = CreateFormatAwareDictionary(recovered, JsonJournalExtensions.JournalFormatKey, "other");
-        await recovered.Lifecycle.OnStart();
+        await recovered.Lifecycle.OnStart(TestContext.Current.CancellationToken);
 
         other.Add("beta", 2);
         var exception = await Assert.ThrowsAsync<InvalidOperationException>(
@@ -321,10 +321,13 @@ public class CodecRecoveryTests : JournalingTestBase
     [InlineData("[8,[\"set\",42]]\n[9,[\"set\",43]]{}\n", "invalid JSON journal entry")]
     public async Task JsonRecovery_MalformedJournal_ThrowsFormatKeyError(string jsonLines, string expectedInnerMessage)
     {
-        var storage = await CreateJsonStorageWithSegment(jsonLines);
+        var storage = await CreateJsonStorageWithSegment(jsonLines, TestContext.Current.CancellationToken);
         var sut = CreateTestSystemWithJsonCodec(storage);
 
-        var exception = await AssertRecoveryFailsAsync(sut.Lifecycle, JsonJournalExtensions.JournalFormatKey);
+        var exception = await AssertRecoveryFailsAsync(
+            sut.Lifecycle,
+            JsonJournalExtensions.JournalFormatKey,
+            TestContext.Current.CancellationToken);
 
         Assert.Contains(expectedInnerMessage, exception.InnerException!.Message, StringComparison.Ordinal);
     }
@@ -432,24 +435,29 @@ public class CodecRecoveryTests : JournalingTestBase
 
     private IFieldCodec<T> ValueCodec<T>() => CodecProvider.GetCodec<T>();
 
-    private static async Task<VolatileJournalStorage> CreateJsonStorageWithSegment(string jsonLines)
+    private static async Task<VolatileJournalStorage> CreateJsonStorageWithSegment(
+        string jsonLines,
+        CancellationToken cancellationToken)
     {
         var storage = CreateJsonStorage();
-        await storage.AppendAsync(new ReadOnlySequence<byte>(Encoding.UTF8.GetBytes(jsonLines)), CancellationToken.None);
+        await storage.AppendAsync(new ReadOnlySequence<byte>(Encoding.UTF8.GetBytes(jsonLines)), cancellationToken);
         return storage;
     }
 
-    private static async Task<InvalidOperationException> AssertRecoveryFailsAsync(ILifecycleSubject lifecycle, string journalFormatKey)
+    private static async Task<InvalidOperationException> AssertRecoveryFailsAsync(
+        ILifecycleSubject lifecycle,
+        string journalFormatKey,
+        CancellationToken cancellationToken)
     {
         InvalidOperationException exception;
         try
         {
             exception = await Assert.ThrowsAsync<InvalidOperationException>(
-                () => lifecycle.OnStart().WaitAsync(TimeSpan.FromSeconds(10)));
+                () => lifecycle.OnStart(cancellationToken).WaitAsync(TimeSpan.FromSeconds(10), cancellationToken));
         }
         finally
         {
-            await lifecycle.OnStop(CancellationToken.None);
+            await lifecycle.OnStop(cancellationToken);
         }
 
         Assert.Contains($"journal format key '{journalFormatKey}'", exception.Message, StringComparison.Ordinal);

@@ -64,18 +64,18 @@ namespace UnitTests.StreamingTests
         public async Task ValidateControllableGeneratedStreamsTest()
         {
             this.fixture.Logger.LogInformation("************************ ValidateControllableGeneratedStreamsTest *********************************");
-            await ValidateControllableGeneratedStreams();
+            await ValidateControllableGeneratedStreams(TestContext.Current.CancellationToken);
         }
 
         [Fact, TestCategory("BVT"), TestCategory("Streaming")]
         public async Task Validate2ControllableGeneratedStreamsTest()
         {
             this.fixture.Logger.LogInformation("************************ Validate2ControllableGeneratedStreamsTest *********************************");
-            await ValidateControllableGeneratedStreams();
-            await ValidateControllableGeneratedStreams();
+            await ValidateControllableGeneratedStreams(TestContext.Current.CancellationToken);
+            await ValidateControllableGeneratedStreams(TestContext.Current.CancellationToken);
         }
 
-        private async Task ValidateControllableGeneratedStreams()
+        private async Task ValidateControllableGeneratedStreams(CancellationToken cancellationToken)
         {
             var generatorConfig = new SimpleGeneratorOptions
             {
@@ -95,7 +95,10 @@ namespace UnitTests.StreamingTests
                     Assert.True(controlCommandResult);
                 }
 
-                await TestingUtils.WaitUntilAsync((lastTry, cancellationToken) => CheckCounters(generatorConfig, lastTry, cancellationToken), Timeout);
+                await TestingUtils.WaitUntilAsync(
+                    (lastTry, token) => CheckCounters(generatorConfig, lastTry, token),
+                    Timeout,
+                    cancellationToken: cancellationToken);
             }
             finally
             {
@@ -127,9 +130,13 @@ namespace UnitTests.StreamingTests
 
         private async Task ResetReporter(string streamNamespace)
         {
+            using var cleanup = new CancellationTokenSource(Timeout);
             var reporter = this.fixture.GrainFactory.GetGrain<IGeneratedEventReporterGrain>(GeneratedStreamTestConstants.ReporterId);
-            await reporter.Reset();
-            await TestingUtils.WaitUntilAsync((lastTry, cancellationToken) => CheckReporterIsEmpty(reporter, streamNamespace, lastTry, cancellationToken), Timeout);
+            await reporter.Reset(cleanup.Token);
+            await TestingUtils.WaitUntilAsync(
+                (lastTry, token) => CheckReporterIsEmpty(reporter, streamNamespace, lastTry, token),
+                Timeout,
+                cancellationToken: cleanup.Token);
         }
 
         private static async Task<bool> CheckReporterIsEmpty(IGeneratedEventReporterGrain reporter, string streamNamespace, bool assertIsTrue, CancellationToken cancellationToken)

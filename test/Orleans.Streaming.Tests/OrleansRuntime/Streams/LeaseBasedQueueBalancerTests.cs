@@ -24,7 +24,7 @@ public class LeaseBasedQueueBalancerTests
         var siloAddress = SiloAddress.New(new IPEndPoint(IPAddress.Loopback, 13000), 1);
         var membershipUpdates = Channel.CreateUnbounded<ClusterMembershipSnapshot>();
         var membership = Substitute.For<IClusterMembershipService>();
-        membership.MembershipUpdates.Returns(membershipUpdates.Reader.ReadAllAsync());
+        membership.MembershipUpdates.Returns(membershipUpdates.Reader.ReadAllAsync(TestContext.Current.CancellationToken));
         var localSiloDetails = Substitute.For<ILocalSiloDetails>();
         localSiloDetails.SiloAddress.Returns(siloAddress);
         using var services = new ServiceCollection()
@@ -61,14 +61,14 @@ public class LeaseBasedQueueBalancerTests
 
         await balancer.Initialize(queueMapper);
         balancer.NotifyClusterMembershipChange([siloAddress]);
-        var requests = await acquireStarted.Task.WaitAsync(TimeSpan.FromSeconds(10));
+        var requests = await acquireStarted.Task.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
         var shutdownTask = balancer.Shutdown();
         var acquiredLease = new AcquiredLease(requests[0].ResourceKey, options.LeaseLength, "token", DateTime.UtcNow);
 
         try
         {
             await Assert.ThrowsAsync<TimeoutException>(
-                () => shutdownTask.WaitAsync(TimeSpan.FromMilliseconds(100)));
+                () => shutdownTask.WaitAsync(TimeSpan.FromMilliseconds(100), TestContext.Current.CancellationToken));
         }
         finally
         {

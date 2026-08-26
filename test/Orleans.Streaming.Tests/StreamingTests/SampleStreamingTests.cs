@@ -41,24 +41,43 @@ namespace UnitTests.StreamingTests
         /// - Messages are delivered once the producer starts
         /// - No messages are lost in the handoff
         /// </summary>
-        public async Task StreamingTests_Consumer_Producer(Guid streamId)
+        public async Task StreamingTests_Consumer_Producer(
+            Guid streamId,
+            CancellationToken cancellationToken = default)
         {
             // consumer joins first, producer later
             var consumer = this.cluster.GrainFactory!.GetGrain<ISampleStreaming_ConsumerGrain>(Guid.NewGuid());
-            await consumer.BecomeConsumer(streamId, StreamNamespace, streamProvider);
+            await consumer.BecomeConsumer(streamId, StreamNamespace, streamProvider, cancellationToken);
 
             var producer = this.cluster.GrainFactory!.GetGrain<ISampleStreaming_ProducerGrain>(Guid.NewGuid());
-            await producer.BecomeProducer(streamId, StreamNamespace, streamProvider);
+            await producer.BecomeProducer(streamId, StreamNamespace, streamProvider, cancellationToken);
 
-            await producer.StartPeriodicProducing();
+            var producerStarted = false;
+            try
+            {
+                producerStarted = true;
+                await producer.StartPeriodicProducing(cancellationToken);
+                await Task.Delay(TimeSpan.FromMilliseconds(1000), cancellationToken);
+                await producer.StopPeriodicProducing(cancellationToken);
+                producerStarted = false;
 
-            await Task.Delay(TimeSpan.FromMilliseconds(1000));
+                await TestingUtils.WaitUntilAsync(
+                    (lastTry, token) => CheckCounters(producer, consumer, lastTry, token),
+                    _timeout,
+                    cancellationToken: cancellationToken);
+            }
+            finally
+            {
+                using var cleanup = new CancellationTokenSource(_timeout);
+                if (producerStarted)
+                {
+                    await producer.StopPeriodicProducing(cleanup.Token)
+                        .ConfigureAwait(ConfigureAwaitOptions.SuppressThrowing | ConfigureAwaitOptions.ContinueOnCapturedContext);
+                }
 
-            await producer.StopPeriodicProducing();
-
-            await TestingUtils.WaitUntilAsync((lastTry, cancellationToken) => CheckCounters(producer, consumer, lastTry, cancellationToken), _timeout);
-
-            await consumer.StopConsuming();
+                await consumer.StopConsuming(cleanup.Token)
+                    .ConfigureAwait(ConfigureAwaitOptions.SuppressThrowing | ConfigureAwaitOptions.ContinueOnCapturedContext);
+            }
         }
 
         /// <summary>
@@ -68,25 +87,43 @@ namespace UnitTests.StreamingTests
         /// - Late-joining consumers receive messages (depending on provider)
         /// - The system handles dynamic subscription scenarios
         /// </summary>
-        public async Task StreamingTests_Producer_Consumer(Guid streamId)
+        public async Task StreamingTests_Producer_Consumer(
+            Guid streamId,
+            CancellationToken cancellationToken = default)
         {
             // producer joins first, consumer later
             var producer = this.cluster.GrainFactory!.GetGrain<ISampleStreaming_ProducerGrain>(Guid.NewGuid());
-            await producer.BecomeProducer(streamId, StreamNamespace, streamProvider);
+            await producer.BecomeProducer(streamId, StreamNamespace, streamProvider, cancellationToken);
 
             var consumer = this.cluster.GrainFactory!.GetGrain<ISampleStreaming_ConsumerGrain>(Guid.NewGuid());
-            await consumer.BecomeConsumer(streamId, StreamNamespace, streamProvider);
+            await consumer.BecomeConsumer(streamId, StreamNamespace, streamProvider, cancellationToken);
 
-            await producer.StartPeriodicProducing();
+            var producerStarted = false;
+            try
+            {
+                producerStarted = true;
+                await producer.StartPeriodicProducing(cancellationToken);
+                await Task.Delay(TimeSpan.FromMilliseconds(1000), cancellationToken);
+                await producer.StopPeriodicProducing(cancellationToken);
+                producerStarted = false;
 
-            await Task.Delay(TimeSpan.FromMilliseconds(1000));
+                await TestingUtils.WaitUntilAsync(
+                    (lastTry, token) => CheckCounters(producer, consumer, lastTry, token),
+                    _timeout,
+                    cancellationToken: cancellationToken);
+            }
+            finally
+            {
+                using var cleanup = new CancellationTokenSource(_timeout);
+                if (producerStarted)
+                {
+                    await producer.StopPeriodicProducing(cleanup.Token)
+                        .ConfigureAwait(ConfigureAwaitOptions.SuppressThrowing | ConfigureAwaitOptions.ContinueOnCapturedContext);
+                }
 
-            await producer.StopPeriodicProducing();
-            //int numProduced = await producer.NumberProduced;
-
-            await TestingUtils.WaitUntilAsync((lastTry, cancellationToken) => CheckCounters(producer, consumer, lastTry, cancellationToken), _timeout);
-
-            await consumer.StopConsuming();
+                await consumer.StopConsuming(cleanup.Token)
+                    .ConfigureAwait(ConfigureAwaitOptions.SuppressThrowing | ConfigureAwaitOptions.ContinueOnCapturedContext);
+            }
         }
 
         /// <summary>
@@ -96,25 +133,43 @@ namespace UnitTests.StreamingTests
         /// - Can provide lower latency but may impact throughput
         /// - Are useful for simple, fast message processing
         /// </summary>
-        public async Task StreamingTests_Producer_InlineConsumer(Guid streamId)
+        public async Task StreamingTests_Producer_InlineConsumer(
+            Guid streamId,
+            CancellationToken cancellationToken = default)
         {
             // producer joins first, consumer later
             var producer = this.cluster.GrainFactory!.GetGrain<ISampleStreaming_ProducerGrain>(Guid.NewGuid());
-            await producer.BecomeProducer(streamId, StreamNamespace, streamProvider);
+            await producer.BecomeProducer(streamId, StreamNamespace, streamProvider, cancellationToken);
 
             var consumer = this.cluster.GrainFactory!.GetGrain<ISampleStreaming_InlineConsumerGrain>(Guid.NewGuid());
-            await consumer.BecomeConsumer(streamId, StreamNamespace, streamProvider);
+            await consumer.BecomeConsumer(streamId, StreamNamespace, streamProvider, cancellationToken);
 
-            await producer.StartPeriodicProducing();
+            var producerStarted = false;
+            try
+            {
+                producerStarted = true;
+                await producer.StartPeriodicProducing(cancellationToken);
+                await Task.Delay(TimeSpan.FromMilliseconds(1000), cancellationToken);
+                await producer.StopPeriodicProducing(cancellationToken);
+                producerStarted = false;
 
-            await Task.Delay(TimeSpan.FromMilliseconds(1000));
+                await TestingUtils.WaitUntilAsync(
+                    (lastTry, token) => CheckCounters(producer, consumer, lastTry, token),
+                    _timeout,
+                    cancellationToken: cancellationToken);
+            }
+            finally
+            {
+                using var cleanup = new CancellationTokenSource(_timeout);
+                if (producerStarted)
+                {
+                    await producer.StopPeriodicProducing(cleanup.Token)
+                        .ConfigureAwait(ConfigureAwaitOptions.SuppressThrowing | ConfigureAwaitOptions.ContinueOnCapturedContext);
+                }
 
-            await producer.StopPeriodicProducing();
-            //int numProduced = await producer.NumberProduced;
-
-            await TestingUtils.WaitUntilAsync((lastTry, cancellationToken) => CheckCounters(producer, consumer, lastTry, cancellationToken), _timeout);
-
-            await consumer.StopConsuming();
+                await consumer.StopConsuming(cleanup.Token)
+                    .ConfigureAwait(ConfigureAwaitOptions.SuppressThrowing | ConfigureAwaitOptions.ContinueOnCapturedContext);
+            }
         }
 
         /// <summary>
