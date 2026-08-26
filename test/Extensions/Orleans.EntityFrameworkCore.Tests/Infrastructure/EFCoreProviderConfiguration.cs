@@ -71,7 +71,7 @@ public sealed class SqlServerEFCoreProviderConfiguration : EFCoreProviderConfigu
 
     public override ConfigureReminderService UseReminderService =>
         static (builder, configure) =>
-            Orleans.Reminders.SqlHostingExtensions.UseEntityFrameworkCoreSqlServerReminderService(builder, configure);
+            Orleans.Reminders.SqlServerHostingExtensions.UseEntityFrameworkCoreSqlServerReminderService(builder, configure);
 }
 
 public sealed class MySqlEFCoreProviderConfiguration : EFCoreProviderConfiguration<Guid>
