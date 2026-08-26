@@ -232,6 +232,7 @@ namespace Orleans.Runtime.Messaging
                 var attempts = 0;
                 while (attempts++ < MaxMessagesPerBatch
                     && writeRequest.Length < SoftMaxBatchBytes
+                    && !writeRequest.HasLargeMessages
                     && _workItems.TryDequeue(out var message))
                 {
                     if (!_connection.PrepareMessageForSend(message))
