@@ -123,10 +123,15 @@ public class ReminderTableRetryPolicyTests
     public async Task UniformPolicy_HardBoundsTheFirstAttempt()
     {
         var never = new TaskCompletionSource<string>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var invocations = 0;
 
         var exception = await Assert.ThrowsAsync<ReminderConformanceException>(() =>
             ReminderTableRetryPolicy.ExecuteUntilAsync(
-                () => never.Task,
+                () =>
+                {
+                    invocations++;
+                    return never.Task;
+                },
                 _ => true,
                 "Blocked",
                 "ReadGuarantee",
@@ -134,10 +139,40 @@ public class ReminderTableRetryPolicyTests
                 "a completed read",
                 value => value,
                 "read convergence",
-                TimeSpan.FromMilliseconds(40),
+                TimeSpan.FromTicks(1),
                 TimeSpan.FromMilliseconds(5)));
 
+        Assert.Equal(1, invocations);
         Assert.Contains("attempts=1", exception.Message, StringComparison.Ordinal);
+        Assert.Contains("Last exception: System.TimeoutException", exception.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task UniformPolicy_EnforcesDeadlineAfterStartingFirstAttempt()
+    {
+        var invocations = 0;
+
+        var exception = await Assert.ThrowsAsync<ReminderConformanceException>(() =>
+            ReminderTableRetryPolicy.ExecuteUntilAsync(
+                () =>
+                {
+                    invocations++;
+                    Thread.Sleep(TimeSpan.FromMilliseconds(20));
+                    return Task.FromResult("late-success");
+                },
+                _ => true,
+                "DelayedStart",
+                "ReadGuarantee",
+                "ReadRow",
+                "a result within the deadline",
+                value => value,
+                "read convergence",
+                TimeSpan.FromMilliseconds(1),
+                TimeSpan.FromMilliseconds(5)));
+
+        Assert.Equal(1, invocations);
+        Assert.Contains("attempts=1", exception.Message, StringComparison.Ordinal);
+        Assert.Contains("Last observation: <no completed attempt>", exception.Message, StringComparison.Ordinal);
         Assert.Contains("Last exception: System.TimeoutException", exception.Message, StringComparison.Ordinal);
     }
 
