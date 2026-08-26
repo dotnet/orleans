@@ -5,6 +5,7 @@ using Microsoft.AspNetCore.Connections;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Hosting;
 using Orleans.Configuration;
+using Orleans.Hosting;
 using Orleans.Runtime.Messaging;
 using Orleans.TestingHost;
 using TestExtensions;
