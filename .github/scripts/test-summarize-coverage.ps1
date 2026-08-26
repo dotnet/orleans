@@ -293,6 +293,8 @@ try {
             ([regex]::Matches($dotnetTestAction, 'ContinuousIntegrationBuild=false')).Count `
             'GitHub coverage must preserve continuous integration build semantics.'
         foreach ($coverageConfig in $coverageConfigs) {
+            [xml] $coverageConfigXml = $coverageConfig
+            $modulePaths = @($coverageConfigXml.Configuration.CodeCoverage.ModulePaths.Include.ModulePath)
             Assert-Matches `
                 $coverageConfig `
                 '<DeterministicReport>True</DeterministicReport>' `
@@ -301,6 +303,14 @@ try {
                 $coverageConfig `
                 '<ExcludeAssembliesWithoutSources>None</ExcludeAssembliesWithoutSources>' `
                 'Coverage collection must retain symbol-bearing assemblies with deterministic sources.'
+            Assert-Matches `
+                $coverageConfig `
+                '<ModulePath>\.\*\[\\\\/\]Orleans\\\.\.\*\\\.dll\$</ModulePath>' `
+                'Coverage collection must include only Orleans product assemblies.'
+            Assert-Equal 1 $modulePaths.Count 'Coverage collection must define one product assembly filter.'
+            Assert-Equal $true ('C:\repo\src\Orleans.Runtime.dll' -match $modulePaths[0]) 'Coverage collection must include Orleans assemblies.'
+            Assert-Equal $false ('C:\packages\FSharp.Core.dll' -match $modulePaths[0]) 'Coverage collection must exclude FSharp.Core.'
+            Assert-Equal $false ('C:\packages\StackExchange.Redis.dll' -match $modulePaths[0]) 'Coverage collection must exclude StackExchange.Redis.'
         }
         Assert-Matches `
             $dotnetTestAction `

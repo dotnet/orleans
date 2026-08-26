@@ -4,6 +4,11 @@
   <IncludeTestAssembly>False</IncludeTestAssembly>
   <ExcludeAssembliesWithoutSources>None</ExcludeAssembliesWithoutSources>
   <CodeCoverage>
+    <ModulePaths>
+      <Include>
+        <ModulePath>.*[\\/]Orleans\..*\.dll$</ModulePath>
+      </Include>
+    </ModulePaths>
     <Sources>
       <Include>
         <Source>.*[\\/]src[\\/].*</Source>
