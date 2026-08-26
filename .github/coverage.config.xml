@@ -6,7 +6,7 @@
   <CodeCoverage>
     <ModulePaths>
       <Include>
-        <ModulePath>.*[\\/]Orleans\..*\.dll$</ModulePath>
+        <ModulePath>.*[\\/]Orleans\.[^\\/]*\.dll$</ModulePath>
       </Include>
     </ModulePaths>
     <Sources>
