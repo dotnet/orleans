@@ -133,11 +133,18 @@ public sealed class ArcBufferWriter : IBufferWriter<byte>, IDisposable
     /// <summary>
     /// Resets this instance, returning all memory.
     /// </summary>
-    public void Reset()
+    public void Reset() => Reset(0);
+
+    internal void Reset(int minimumPageSize)
     {
+        if (minimumPageSize < 0)
+        {
+            throw new ArgumentOutOfRangeException(nameof(minimumPageSize));
+        }
+
         UnpinAll();
         _totalLength = _readIndex = 0;
-        _readPage = _writePage = _tail = ArcBufferPagePool.Shared.Rent();
+        _readPage = _writePage = _tail = ArcBufferPagePool.Shared.Rent(minimumPageSize);
         _hasPinnedPages = false;
         Debug.Assert(_readPage.ReferenceCount == 0);
         _readPage.Pin(_readPage.Version);

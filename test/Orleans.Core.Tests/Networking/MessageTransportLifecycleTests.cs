@@ -301,6 +301,39 @@ public class MessageTransportLifecycleTests
     }
 
     [Fact]
+    public void MessageWriteRequest_LargeMessageState_TracksFramesAndAdaptsPageSize()
+    {
+        using var serviceProvider = CreateServiceProvider();
+        var shared = CreateMessageHandlerShared(serviceProvider);
+        var request = shared.GetSendMessageHandler();
+
+        request.WriteMessage(new Message());
+        Assert.False(request.HasLargeMessages);
+        request.Reset();
+
+        request = shared.GetSendMessageHandler();
+        request.WriteMessage(new Message { BodyObject = new byte[8 * 1024] });
+        Assert.True(request.HasLargeMessages);
+
+        request.Reset();
+        var reused = shared.GetSendMessageHandler();
+        Assert.Same(request, reused);
+        Assert.False(reused.HasLargeMessages);
+
+        reused.WriteMessage(new Message { BodyObject = new byte[16 * 1024] });
+        var segmentCount = 0;
+        using var slice = reused.Buffers.ConsumeSlice(reused.Buffers.Length);
+        var segments = slice.ArraySegments;
+        while (segments.MoveNext())
+        {
+            segmentCount++;
+        }
+
+        Assert.Equal(1, segmentCount);
+        reused.Reset();
+    }
+
+    [Fact]
     public async Task MessageTransportStream_ReadCancellation_ClosesInnerTransport()
     {
         var transport = new CancelableTransport();

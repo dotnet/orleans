@@ -98,7 +98,7 @@ internal sealed class MessageReadRequest(MessageHandlerShared shared) : ReadRequ
         Debug.Assert(_body.Length == _bodyLength);
 
         _connection.EnqueueRead();
-        ThreadPool.UnsafeQueueUserWorkItem(this, preferLocal: true);
+        ThreadPool.UnsafeQueueUserWorkItem(this, preferLocal: false);
         return true;
     }
 

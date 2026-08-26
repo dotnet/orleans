@@ -159,6 +159,7 @@ internal static class ProcessPingBenchmark
             Console.WriteLine(
                 $"PING_SAMPLE index={sample} throughput={throughput:F2} completed={completed} " +
                 $"seconds={elapsedSeconds:F3} failures={failed} concurrency={concurrency} " +
+                $"payloadMBps={throughput * payloadSize / 1_000_000:F2} " +
                 $"allocatedBytes={allocatedBytes} bytesPerOperation={(double)allocatedBytes / completed:F2} " +
                 $"gen0={GC.CollectionCount(0) - initialGen0Collections} " +
                 $"gen1={GC.CollectionCount(1) - initialGen1Collections} " +
@@ -176,6 +177,7 @@ internal static class ProcessPingBenchmark
         Console.WriteLine(
             $"PING_RESULT throughput={medianThroughput:F2} completed={totalCompleted} " +
             $"seconds={totalElapsedSeconds:F3} failures={totalFailures} concurrency={concurrency} " +
+            $"payloadMBps={medianThroughput * payloadSize / 1_000_000:F2} " +
             $"allocatedBytes={totalAllocatedBytes} bytesPerOperation={(double)totalAllocatedBytes / totalCompleted:F2} " +
             $"samples={sampleCount}");
 
@@ -244,7 +246,8 @@ internal static class ProcessPingBenchmark
                 $"PING_LATENCY index={sample} count={count} throughput={count / elapsedSeconds:F2} " +
                 $"p50us={Percentile(durations, count, 0.50) * tickToMicroseconds:F2} " +
                 $"p95us={Percentile(durations, count, 0.95) * tickToMicroseconds:F2} " +
-                $"p99us={Percentile(durations, count, 0.99) * tickToMicroseconds:F2}");
+                $"p99us={Percentile(durations, count, 0.99) * tickToMicroseconds:F2} " +
+                $"p100us={durations[count - 1] * tickToMicroseconds:F2}");
         }
 
         await host.StopAsync();
