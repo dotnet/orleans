@@ -1,6 +1,7 @@
 import { mkdtemp, mkdir, symlink, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
+import { performance } from 'node:perf_hooks';
 import { afterEach, describe, expect, test } from 'vitest';
 import {
   collectIncludeTargets,
@@ -1022,9 +1023,37 @@ describe('DocFX conversion', () => {
   });
 
   test('scans unmatched link destinations in linear time', () => {
-    const unmatchedDestinations = '[]('.repeat(100_000);
+    const shortInput = '[]('.repeat(12_500);
+    const longInput = '[]('.repeat(100_000);
+    const measure = (input, iterations) => {
+      const start = performance.now();
+      for (let iteration = 0; iteration < iterations; iteration += 1) {
+        collectMarkdownLinks(input);
+      }
+      return performance.now() - start;
+    };
 
-    expect(collectMarkdownLinks(unmatchedDestinations)).toEqual([]);
+    for (let iteration = 0; iteration < 10; iteration += 1) {
+      collectMarkdownLinks(shortInput);
+      collectMarkdownLinks(longInput);
+    }
+
+    const ratios = Array.from({ length: 9 }, (_value, index) => {
+      let shortDuration;
+      let longDuration;
+      if (index % 2 === 0) {
+        shortDuration = measure(shortInput, 160);
+        longDuration = measure(longInput, 20);
+      } else {
+        longDuration = measure(longInput, 20);
+        shortDuration = measure(shortInput, 160);
+      }
+      return longDuration / shortDuration;
+    }).sort((left, right) => left - right);
+
+    expect(collectMarkdownLinks(longInput)).toEqual([]);
+    // Equal total input should take comparable time; quadratic growth would approach an 8x ratio.
+    expect(ratios[4]).toBeLessThan(2.5);
   });
 
   test('converts links after code spans containing backslashes', async () => {
