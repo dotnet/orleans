@@ -31,6 +31,8 @@ namespace Orleans.Runtime.ReminderService
         private readonly TimeProvider _timeProvider;
         private readonly ReminderInstruments _reminderInstruments;
         private long localTableSequence;
+        // The test barrier reads this state off-scheduler so it remains observable while the service is busy.
+        private readonly object _rangeChangeLock = new();
         private long rangeChangeGeneration;
         private TaskCompletionSource rangeChangeGenerationChanged = new(TaskCreationOptions.RunContinuationsAsynchronously);
         private Task rangeChangeTask = Task.CompletedTask;
@@ -397,20 +399,36 @@ namespace Orleans.Runtime.ReminderService
             CheckRuntimeContext();
 
             _ = base.OnRangeChange(oldRange, newRange, increased);
-            var task = Status == GrainServiceStatus.Started
-                ? ReadAndUpdateReminders()
-                : Task.CompletedTask;
-            if (Status != GrainServiceStatus.Started)
+            var reconciliationTaskSource = new TaskCompletionSource<Task>(TaskCreationOptions.RunContinuationsAsynchronously);
+            TaskCompletionSource previousGenerationChanged;
+            lock (_rangeChangeLock)
             {
-                LogIgnoringRangeChange(Status);
+                previousGenerationChanged = rangeChangeGenerationChanged;
+                rangeChangeGenerationChanged = new(TaskCreationOptions.RunContinuationsAsynchronously);
+                rangeChangeGeneration++;
+                rangeChangeTask = reconciliationTaskSource.Task.Unwrap();
             }
 
-            var previousGenerationChanged = rangeChangeGenerationChanged;
-            rangeChangeGenerationChanged = new(TaskCreationOptions.RunContinuationsAsynchronously);
-            rangeChangeGeneration++;
-            rangeChangeTask = task;
             previousGenerationChanged.TrySetResult();
-            return task;
+            try
+            {
+                var status = Status;
+                var task = status == GrainServiceStatus.Started
+                    ? ReadAndUpdateReminders()
+                    : Task.CompletedTask;
+                if (status != GrainServiceStatus.Started)
+                {
+                    LogIgnoringRangeChange(status);
+                }
+
+                reconciliationTaskSource.SetResult(task);
+                return task;
+            }
+            catch (Exception exception)
+            {
+                reconciliationTaskSource.SetException(exception);
+                throw;
+            }
         }
 
         internal async Task TestOnlyWaitForRangeChangeReconciliation(CancellationToken cancellationToken)
@@ -419,29 +437,28 @@ namespace Orleans.Runtime.ReminderService
             {
                 // A newer refresh supersedes older results through localTableSequence. Follow generation
                 // changes so a stalled obsolete read does not block the current reconciliation.
-                long observedGeneration = 0;
-                Task observedTask = Task.CompletedTask;
-                Task observedGenerationChanged = Task.CompletedTask;
-                await this.QueueTask(() =>
+                long observedGeneration;
+                Task observedTask;
+                Task observedGenerationChanged;
+                lock (_rangeChangeLock)
                 {
                     observedGeneration = rangeChangeGeneration;
                     observedTask = rangeChangeTask;
                     observedGenerationChanged = rangeChangeGenerationChanged.Task;
-                    return Task.CompletedTask;
-                }).WaitAsync(cancellationToken);
+                }
 
                 await Task.WhenAny(observedTask, observedGenerationChanged).WaitAsync(cancellationToken);
 
-                var isCurrentGeneration = false;
-                await this.QueueTask(() =>
+                lock (_rangeChangeLock)
                 {
-                    isCurrentGeneration = observedGeneration == rangeChangeGeneration;
-                    return Task.CompletedTask;
-                }).WaitAsync(cancellationToken);
+                    if (observedGeneration != rangeChangeGeneration)
+                    {
+                        continue;
+                    }
 
-                if (isCurrentGeneration)
-                {
-                    await observedTask.WaitAsync(cancellationToken);
+                    // The generation-change task can only complete after the generation advances, so the
+                    // observed reconciliation is complete and its outcome can be read without blocking.
+                    observedTask.GetAwaiter().GetResult();
                     return;
                 }
             }
