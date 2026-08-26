@@ -1,7 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <Configuration>
+  <DeterministicReport>True</DeterministicReport>
   <IncludeTestAssembly>False</IncludeTestAssembly>
-  <ExcludeAssembliesWithoutSources>MissingAll</ExcludeAssembliesWithoutSources>
+  <ExcludeAssembliesWithoutSources>None</ExcludeAssembliesWithoutSources>
   <CodeCoverage>
     <Sources>
       <Include>

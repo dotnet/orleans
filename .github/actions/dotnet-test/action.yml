@@ -29,7 +29,7 @@ runs:
   - name: Build and discover tests for static coverage
     if: github.event_name == 'pull_request' && (runner.os == 'macOS' || inputs.static-instrumentation == 'true')
     shell: pwsh
-    run: dotnet test --solution Orleans.slnx --framework "${{ inputs.framework }}" --filter-query "${{ inputs.filter-query }}" --list-tests --minimum-expected-tests 1 --max-parallel-test-modules 1 -p:ContinuousIntegrationBuild=false
+    run: dotnet test --solution Orleans.slnx --framework "${{ inputs.framework }}" --filter-query "${{ inputs.filter-query }}" --list-tests --minimum-expected-tests 1 --max-parallel-test-modules 1
   - name: Test
     if: github.event_name != 'pull_request'
     shell: pwsh
@@ -62,7 +62,6 @@ runs:
         'test_results_${{ inputs.result-id }}_{asm}_{tfm}_{arch}.trx'
         '--max-parallel-test-modules'
         '1'
-        '-p:ContinuousIntegrationBuild=false'
       )
       ./.github/scripts/invoke-coverage.ps1 -Settings ./.github/coverage.config.xml -Output "TestResults/${{ inputs.coverage-id }}.cobertura.xml" -RetryLogFile "logs/${{ inputs.coverage-id }}.retry.log" -Command $command
   - name: Test with static coverage
