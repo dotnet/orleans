@@ -32,6 +32,7 @@ public class StatePreservationRebalancingTests(SPFixture fixture, ITestOutputHel
     [Fact]
     public async Task Should_Migrate_And_Preserve_State_When_Hosting_Silo_Dies()
     {
+        var cancellationToken = TestContext.Current.CancellationToken;
         var tasks = new List<Task>();
         using var rebalancerEvents = RebalancerDiagnosticObserver.Create();
         var rebalancer = Cluster.Client!.GetGrain<IActivationRebalancerWorker>(0);
@@ -73,7 +74,9 @@ public class StatePreservationRebalancingTests(SPFixture fixture, ITestOutputHel
         Assert.Equal(targetHost, rebalancerHost);
         Assert.NotEqual(rebalancerHost, Cluster.Silos[0].SiloAddress);
 
-        await Cluster.StopSiloAsync(Cluster.Silos.First(x => x.SiloAddress.Equals(rebalancerHost)));
+        await Cluster.StopSiloAsync(
+            Cluster.Silos.First(x => x.SiloAddress.Equals(rebalancerHost)),
+            cancellationToken);
 
         var reportAfterStop = await rebalancer.GetReport();
         var newHost = reportAfterStop.Host;

@@ -81,7 +81,7 @@ public sealed class GrainDirectoryRollingUpgradeTests(ITestOutputHelper output)
 
         try
         {
-            await cluster.DeployAsync().WaitAsync(cancellationToken);
+            await cluster.DeployAsync(cancellationToken);
             output.WriteLine($"Cluster deployed with {cluster.Silos.Count} silos (LocalGrainDirectory only).");
 
             IGrainFactory client = cluster.Client!;
@@ -126,7 +126,7 @@ public sealed class GrainDirectoryRollingUpgradeTests(ITestOutputHelper output)
                     await DriveLoad(client, nextGrainId, count: 100, cancellationToken, id => failingGrainKey = id);
                 }
 
-                await cluster.InitializeClientAsync().WaitAsync(cancellationToken);
+                await cluster.InitializeClientAsync(cancellationToken);
                 client = cluster.Client!;
 
                 // Phase 3: Stop old silos one at a time, non-primary first.
@@ -139,7 +139,7 @@ public sealed class GrainDirectoryRollingUpgradeTests(ITestOutputHelper output)
                         cluster,
                         $"before removing local silo {transitionIndex}/{oldSilos.Count}",
                         cancellationToken);
-                    await cluster.StopSiloAsync(oldSilo).WaitAsync(cancellationToken);
+                    await cluster.StopSiloAsync(oldSilo, cancellationToken);
                     output.WriteLine($"  Stopped old silo: {oldSilo.SiloAddress}");
                     await cluster.WaitForLivenessToStabilizeAsync().WaitAsync(cancellationToken);
                     await WaitForDirectoryConvergenceAsync(
@@ -181,7 +181,7 @@ public sealed class GrainDirectoryRollingUpgradeTests(ITestOutputHelper output)
                 try
                 {
                     using var stopCancellation = new CancellationTokenSource(DirectoryConvergenceTimeout);
-                    await cluster.StopAllSilosAsync().WaitAsync(stopCancellation.Token);
+                    await cluster.StopAllSilosAsync(stopCancellation.Token);
                 }
                 finally
                 {
@@ -890,7 +890,9 @@ public sealed class GrainDirectoryRollingUpgradeTests(ITestOutputHelper output)
         var deployed = false;
         try
         {
-            await cluster.DeployAsync().WaitAsync(operationTimeout, cancellationToken);
+            using var deployCancellation = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+            deployCancellation.CancelAfter(operationTimeout);
+            await cluster.DeployAsync(deployCancellation.Token);
             deployed = true;
 
             var originalClient = cluster.Client;
@@ -1234,7 +1236,7 @@ public sealed class GrainDirectoryRollingUpgradeTests(ITestOutputHelper output)
                     if (deployed)
                     {
                         using var stopCancellation = new CancellationTokenSource(cleanupTimeout);
-                        await cluster.StopAllSilosAsync().WaitAsync(cleanupTimeout, stopCancellation.Token);
+                        await cluster.StopAllSilosAsync(stopCancellation.Token);
                     }
                 }
                 finally

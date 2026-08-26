@@ -97,7 +97,11 @@ namespace UnitTests.General
         [Fact(Skip = "https://github.com/dotnet/orleans/issues/4008"), TestCategory("Functional")]
         public async Task ElasticityTest_StoppingSilos()
         {
-            List<SiloHandle> runtimes = await this.HostedCluster.StartAdditionalSilosAsync(2);
+            var cancellationToken = TestContext.Current.CancellationToken;
+            List<SiloHandle> runtimes = await this.HostedCluster.StartAdditionalSilosAsync(
+                2,
+                startAdditionalSiloOnNewPort: false,
+                cancellationToken);
             await this.HostedCluster.WaitForLivenessToStabilizeAsync();
             int stopLeavy = leavy;
 
@@ -115,7 +119,7 @@ namespace UnitTests.General
             AssertIsInRange(activationCounts[runtimes[0]], perSilo, stopLeavy);
             AssertIsInRange(activationCounts[runtimes[1]], perSilo, stopLeavy);
 
-            await this.HostedCluster.StopSiloAsync(runtimes[0]);
+            await this.HostedCluster.StopSiloAsync(runtimes[0], cancellationToken);
             await this.HostedCluster.WaitForLivenessToStabilizeAsync();
             await InvokeAllGrains();
 

@@ -57,7 +57,7 @@ public sealed class DistributedGrainDirectoryMembershipTests
 
         try
         {
-            await cluster.DeployAsync().WaitAsync(cancellationToken);
+            await cluster.DeployAsync(cancellationToken);
             var silo = cluster.Silos[0];
             var membership = silo.ServiceProvider.GetRequiredService<DirectoryMembershipService>();
             var directory = silo.ServiceProvider.GetRequiredService<DistributedGrainDirectory>();

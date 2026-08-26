@@ -45,7 +45,7 @@ public sealed class GrainDirectoryResilienceTests
         var testClusterBuilder = new TestClusterBuilder(1);
         testClusterBuilder.AddSiloBuilderConfigurator<SiloBuilderConfigurator>();
         var testCluster = testClusterBuilder.Build();
-        await testCluster.DeployAsync().WaitAsync(cancellationToken);
+        await testCluster.DeployAsync(cancellationToken);
         var log = testCluster.ServiceProvider.GetRequiredService<ILogger<GrainDirectoryResilienceTests>>();
         log.LogInformation("ServiceId: '{ServiceId}'", testCluster.Options.ServiceId);
         log.LogInformation("ClusterId: '{ClusterId}'.", testCluster.Options.ClusterId);
@@ -119,7 +119,7 @@ public sealed class GrainDirectoryResilienceTests
                                 if (currentCount % 2 == 0)
                                 {
                                     log.LogInformation("Stopping '{Silo}'.", victim.SiloAddress);
-                                    await testCluster.StopSiloAsync(victim).WaitAsync(cts.Token);
+                                    await testCluster.StopSiloAsync(victim, cts.Token);
                                     log.LogInformation("Stopped '{Silo}'.", victim.SiloAddress);
                                 }
                                 else
@@ -179,7 +179,7 @@ public sealed class GrainDirectoryResilienceTests
             try
             {
                 using var stopCancellation = new CancellationTokenSource(TimeSpan.FromMinutes(1));
-                await testCluster.StopAllSilosAsync().WaitAsync(stopCancellation.Token);
+                await testCluster.StopAllSilosAsync(stopCancellation.Token);
             }
             finally
             {
@@ -197,7 +197,7 @@ public sealed class GrainDirectoryResilienceTests
         var testClusterBuilder = new TestClusterBuilder(1);
         testClusterBuilder.AddSiloBuilderConfigurator<SiloBuilderConfigurator>();
         var testCluster = testClusterBuilder.Build();
-        await testCluster.DeployAsync().WaitAsync(cancellationToken);
+        await testCluster.DeployAsync(cancellationToken);
         var log = testCluster.ServiceProvider.GetRequiredService<ILogger<GrainDirectoryResilienceTests>>();
         var client = ((InProcessSiloHandle)testCluster.Primary!).SiloHost.Services.GetRequiredService<IGrainFactory>();
         var previousDirectoryView = await WaitForDirectoryViewAsync(
@@ -272,7 +272,7 @@ public sealed class GrainDirectoryResilienceTests
             try
             {
                 using var stopCancellation = new CancellationTokenSource(TimeSpan.FromMinutes(1));
-                await testCluster.StopAllSilosAsync().WaitAsync(stopCancellation.Token);
+                await testCluster.StopAllSilosAsync(stopCancellation.Token);
             }
             finally
             {

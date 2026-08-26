@@ -147,7 +147,7 @@ public class GrainDirectoryLeaseTests
         var cancellationToken = TestContext.Current.CancellationToken;
         var (cluster, _) = CreateCluster();
         using var events = new DiagnosticEventCollector(GrainDirectoryEvents.ListenerName);
-        await cluster.DeployAsync().WaitAsync(cancellationToken);
+        await cluster.DeployAsync(cancellationToken);
 
         try
         {
@@ -179,7 +179,7 @@ public class GrainDirectoryLeaseTests
 
             // Graceful shutdown transitions through ShuttingDown → Dead,
             // which does not create a silo lease hold.
-            await cluster.StopSiloAsync(secondary).WaitAsync(cancellationToken);
+            await cluster.StopSiloAsync(secondary, cancellationToken);
 
             var directory = primary.ServiceProvider.GetRequiredService<GrainDirectoryResolver>().DefaultGrainDirectory!;
             var fakeAddress = GrainAddress.NewActivationAddress(primary.SiloAddress, leaseGrain.GetGrainId());
@@ -451,7 +451,7 @@ public class GrainDirectoryLeaseTests
         InProcessTestCluster cluster,
         CancellationToken cancellationToken)
     {
-        await cluster.DeployAsync().WaitAsync(cancellationToken);
+        await cluster.DeployAsync(cancellationToken);
         await cluster.WaitForClusterManifestToStabilizeAsync().WaitAsync(cancellationToken);
     }
 
@@ -460,7 +460,7 @@ public class GrainDirectoryLeaseTests
         try
         {
             using var stopCancellation = new CancellationTokenSource(EventTimeout);
-            await cluster.StopAllSilosAsync().WaitAsync(stopCancellation.Token);
+            await cluster.StopAllSilosAsync(stopCancellation.Token);
         }
         finally
         {

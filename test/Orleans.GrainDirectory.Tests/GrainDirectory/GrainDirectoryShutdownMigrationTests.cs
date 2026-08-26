@@ -32,7 +32,7 @@ public sealed class GrainDirectoryShutdownMigrationTests
         });
 
         await using var cluster = builder.Build();
-        await cluster.DeployAsync().WaitAsync(cancellationToken);
+        await cluster.DeployAsync(cancellationToken);
         await cluster.WaitForLivenessToStabilizeAsync().WaitAsync(cancellationToken);
         await cluster.WaitForClusterManifestToStabilizeAsync().WaitAsync(cancellationToken);
         await WaitForDirectoryMembershipAsync(cluster, cancellationToken);
@@ -61,7 +61,7 @@ public sealed class GrainDirectoryShutdownMigrationTests
         }
 
         ShutdownMigrationTestCoordinator.Reset();
-        var stopTask = cluster.StopSiloAsync(shuttingDownSilo);
+        var stopTask = cluster.StopSiloAsync(shuttingDownSilo, cancellationToken);
         try
         {
             using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
