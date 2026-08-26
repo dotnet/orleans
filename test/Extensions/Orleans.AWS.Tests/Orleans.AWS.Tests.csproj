@@ -7,6 +7,7 @@
     <OrleansBuildTimeCodeGen>true</OrleansBuildTimeCodeGen>
     <IsAspireHost>false</IsAspireHost>
     <Nullable>enable</Nullable>
+    <CentralPackageTransitivePinningEnabled>false</CentralPackageTransitivePinningEnabled>
   </PropertyGroup>
 
   <ItemGroup>
@@ -14,12 +15,20 @@
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="Aspire.Hosting.AppHost" />
-    <PackageReference Include="Aspire.Hosting.Orleans" />
+    <PackageReference Include="Aspire.Hosting.AppHost" PrivateAssets="all" />
+    <PackageReference Include="Aspire.Hosting.Orleans" PrivateAssets="all" />
+    <PackageReference Include="Microsoft.Testing.Platform.MSBuild" VersionOverride="2.3.3" PrivateAssets="all" />
   </ItemGroup>
 
   <ItemGroup Condition="'$(TargetFramework)' == 'net10.0'">
-    <PackageReference Include="Aspire.Hosting.Testing" />
+    <ProjectReference Include="$(SourceRoot)src\AWS\Orleans.Streaming.SQS.Aspire\Orleans.Streaming.SQS.Aspire.csproj" PrivateAssets="all" />
+    <PackageReference Update="Aspire.Hosting.AppHost" VersionOverride="13.4.6" />
+    <PackageReference Update="Aspire.Hosting.Orleans" VersionOverride="13.4.6" />
+    <PackageReference Include="Microsoft.CodeAnalysis.Common" VersionOverride="5.0.0" PrivateAssets="all" />
+    <PackageReference Include="Microsoft.CodeAnalysis.CSharp" VersionOverride="5.0.0" PrivateAssets="all" />
+    <PackageReference Include="Microsoft.CodeAnalysis.Workspaces.Common" VersionOverride="5.0.0" PrivateAssets="all" />
+    <PackageReference Include="System.IO.Pipelines" VersionOverride="10.0.8" PrivateAssets="all" />
+    <PackageReference Include="System.Text.Json" VersionOverride="10.0.8" PrivateAssets="all" />
   </ItemGroup>
 
   <ItemGroup>

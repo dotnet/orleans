@@ -176,7 +176,6 @@
   </Folder>
   <Folder Name="/test/Extensions/">
     <Project Path="test/Extensions/Orleans.AWS.Tests/Orleans.AWS.Tests.csproj" />
-    <Project Path="test/Extensions/Orleans.Streaming.SQS.Aspire.Tests/Orleans.Streaming.SQS.Aspire.Tests.csproj" />
     <Project Path="test/Extensions/Orleans.Clustering.Consul.Tests/Orleans.Clustering.Consul.Tests.csproj" />
     <Project Path="test/Extensions/Orleans.Streaming.Kinesis.Tests/Orleans.Streaming.Kinesis.Tests.csproj" />
     <Project Path="test/Extensions/Orleans.Streaming.EventHubs.Tests/Orleans.Streaming.EventHubs.Tests.csproj" />

@@ -27,6 +27,5 @@
 
   <ItemGroup>
     <InternalsVisibleTo Include="Orleans.AWS.Tests" />
-    <InternalsVisibleTo Include="Orleans.Streaming.SQS.Aspire.Tests" />
   </ItemGroup>
 </Project>
