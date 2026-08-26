@@ -278,13 +278,33 @@ namespace Orleans.Runtime
         [NonSerialized]
         private readonly IdSpan _key;
 
+        [NonSerialized]
+        private readonly int _hashCode;
+
         /// <summary>
         /// Gets the grain reference functionality which is shared by all grain references of a given type.
         /// </summary>
         internal GrainReferenceShared Shared
         {
             get => Volatile.Read(ref _shared) ?? throw new GrainReferenceNotBoundException(this);
-            set => Volatile.Write(ref _shared, value ?? throw new ArgumentNullException(nameof(value)));
+        }
+
+        internal void Resolve(IGrainReferenceRuntime unresolvedRuntime, GrainReferenceShared resolved)
+        {
+            ArgumentNullException.ThrowIfNull(resolved);
+            while (true)
+            {
+                var current = Shared;
+                if (!ReferenceEquals(current.Runtime, unresolvedRuntime))
+                {
+                    return;
+                }
+
+                if (ReferenceEquals(Interlocked.CompareExchange(ref _shared, resolved, current), current))
+                {
+                    return;
+                }
+            }
         }
 
         /// <summary>
@@ -323,6 +343,7 @@ namespace Orleans.Runtime
         {
             _shared = shared;
             _key = key;
+            _hashCode = key.GetHashCode();
         }
 
         /// <summary>
@@ -356,7 +377,7 @@ namespace Orleans.Runtime
         public bool Equals(GrainReference? other) => other is not null && this.GrainId.Equals(other.GrainId);
 
         /// <inheritdoc />
-        public override int GetHashCode() => _key.GetHashCode();
+        public override int GetHashCode() => _hashCode;
 
         /// <summary>
         /// Get a uniform hash code for this grain reference.

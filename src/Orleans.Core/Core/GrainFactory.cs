@@ -3,6 +3,8 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.Threading;
 using System.Threading.Tasks;
+using Microsoft.Extensions.Options;
+using Orleans.Configuration;
 using Orleans.GrainReferences;
 using Orleans.Metadata;
 using Orleans.Runtime;
@@ -25,17 +27,20 @@ namespace Orleans
         private readonly GrainInterfaceTypeResolver interfaceTypeResolver;
         private readonly GrainInterfaceTypeToGrainTypeResolver interfaceTypeToGrainTypeResolver;
         private readonly IRuntimeClient runtimeClient;
+        private readonly TypeManagementOptions typeManagementOptions;
 
         public GrainFactory(
             IRuntimeClient runtimeClient,
             GrainReferenceActivator referenceActivator,
             GrainInterfaceTypeResolver interfaceTypeResolver,
-            GrainInterfaceTypeToGrainTypeResolver interfaceToTypeResolver)
+            GrainInterfaceTypeToGrainTypeResolver interfaceToTypeResolver,
+            IOptions<TypeManagementOptions> typeManagementOptions)
         {
             this.runtimeClient = runtimeClient;
             this.referenceActivator = referenceActivator;
             this.interfaceTypeResolver = interfaceTypeResolver;
             this.interfaceTypeToGrainTypeResolver = interfaceToTypeResolver;
+            this.typeManagementOptions = typeManagementOptions.Value;
         }
 
         private GrainReferenceRuntime GrainReferenceRuntime => this.grainReferenceRuntime ??= (GrainReferenceRuntime)this.runtimeClient.GrainReferenceRuntime;
@@ -215,8 +220,17 @@ namespace Orleans
 
             if (!interfaceTypeToGrainTypeResolver.TryGetGrainType(grainInterfaceType, grainClassNamePrefix, out var grainType))
             {
-                // A compatible implementation can become available as the cluster manifest changes.
-                grainType = GrainTypePrefix.CreateStubGrainType(grainInterfaceType, grainClassNamePrefix);
+                if (!string.IsNullOrWhiteSpace(grainClassNamePrefix) || !typeManagementOptions.EnableDeferredGrainTypeResolution)
+                {
+                    grainType = string.IsNullOrWhiteSpace(grainClassNamePrefix)
+                        ? interfaceTypeToGrainTypeResolver.GetGrainType(grainInterfaceType)
+                        : interfaceTypeToGrainTypeResolver.GetGrainType(grainInterfaceType, grainClassNamePrefix);
+                }
+                else
+                {
+                    // A compatible implementation can become available as the cluster manifest changes.
+                    grainType = GrainTypePrefix.CreateStubGrainType(grainInterfaceType, grainClassNamePrefix);
+                }
             }
 
             Debug.Assert(!grainType.IsDefault);

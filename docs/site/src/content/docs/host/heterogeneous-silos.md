@@ -1,7 +1,7 @@
 ---
 title: Heterogeneous Orleans silos
 description: Host different Orleans grain types on different silos.
-ms.date: 08/02/2026
+ms.date: 08/26/2026
 ms.topic: how-to
 ---
 
@@ -46,16 +46,18 @@ Use heterogeneous grain type registration when a silo cannot host the implementa
 ## Deployment rules
 
 - Keep <xref:Orleans.Configuration.ClusterOptions.ServiceId>, <xref:Orleans.Configuration.ClusterOptions.ClusterId>, clustering, and protocol configuration consistent across all roles.
-- Deploy at least one healthy silo for every supported grain type before clients invoke it.
+- Deploy at least one healthy silo for every supported grain type before the response deadline for calls targeting that type.
 - Maintain capacity and redundancy independently for each specialized grain set.
 - Roll out contract changes before implementations that require them.
 - Avoid removing the last silo for a grain type while requests or durable work still target it.
 
-Clients obtain cluster type information after connecting. Handle deployments so clients don't depend on a grain type before supporting silos are available.
+Clients obtain cluster type information after connecting. <xref:Orleans.Configuration.TypeManagementOptions.EnableDeferredGrainTypeResolution> defaults to `true`, so a client can create a grain reference before the cluster manifest contains a compatible implementation. Calls through that reference wait for a manifest update and retain their original response deadline. An explicit grain class prefix continues to require an immediate match.
+
+Set <xref:Orleans.Configuration.TypeManagementOptions.EnableDeferredGrainTypeResolution> to `false` when every grain reference must resolve against the current cluster manifest during creation.
 
 ## Limitations
 
-- A request fails when no active silo supports its target grain type.
+- A request reaches its response deadline when no active silo advertises a compatible target grain type.
 - Every silo that supports one grain type must use a compatible implementation and contract.
 - Stateless worker grains should be consistently available across the cluster rather than split into incompatible heterogeneous sets.
 - Implicit stream subscriptions require compatible grain availability; use [explicit subscriptions](../streaming/streams-programming-apis.md) when heterogeneous deployment makes ownership ambiguous.

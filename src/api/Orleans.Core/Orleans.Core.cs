@@ -597,6 +597,8 @@ namespace Orleans.Configuration
     public partial class TypeManagementOptions
     {
         public static readonly System.TimeSpan DEFAULT_REFRESH_CLUSTER_INTERFACEMAP_TIME;
+        public bool EnableDeferredGrainTypeResolution { get { throw null; } set { } }
+
         public System.TimeSpan TypeMapRefreshInterval { get { throw null; } set { } }
     }
 }

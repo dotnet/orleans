@@ -3,6 +3,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration;
+using Orleans.Metadata;
 using Orleans.Runtime;
 using Orleans.Serialization.TypeSystem;
 using Orleans.TestingHost;
@@ -27,11 +28,15 @@ namespace Tester.HeterogeneousSilosTests
         private TestCluster? cluster;
 
         private void SetupAndDeployCluster(Type defaultPlacementStrategy, params Type[] blackListedTypes)
+            => SetupAndDeployCluster(defaultPlacementStrategy, enableDeferredGrainTypeResolution: true, blackListedTypes);
+
+        private void SetupAndDeployCluster(Type defaultPlacementStrategy, bool enableDeferredGrainTypeResolution, params Type[] blackListedTypes)
         {
             cluster?.StopAllSilos();
             var builder = new TestClusterBuilder(1);
             builder.Properties["DefaultPlacementStrategy"] = RuntimeTypeNameFormatter.Format(defaultPlacementStrategy);
             builder.Properties["BlockedGrainTypes"] = string.Join("|", blackListedTypes.Select(t => RuntimeTypeNameFormatter.Format(t)));
+            builder.Properties["EnableDeferredGrainTypeResolution"] = enableDeferredGrainTypeResolution.ToString();
             builder.AddSiloBuilderConfigurator<SiloConfigurator>();
             builder.AddClientBuilderConfigurator<ClientConfigurator>();
             cluster = builder.Build();
@@ -45,7 +50,11 @@ namespace Tester.HeterogeneousSilosTests
                 hostBuilder.ConfigureServices(services =>
                 {
                     services.Configure<SiloMessagingOptions>(options => options.AssumeHomogenousSilosForTesting = false);
-                    services.Configure<TypeManagementOptions>(options => options.TypeMapRefreshInterval = RefreshInterval);
+                    services.Configure<TypeManagementOptions>(options =>
+                    {
+                        options.TypeMapRefreshInterval = RefreshInterval;
+                        options.EnableDeferredGrainTypeResolution = hostBuilder.GetConfiguration().GetValue("EnableDeferredGrainTypeResolution", true);
+                    });
                     services.AddOptions<GrainTypeOptions>().Configure((GrainTypeOptions options, IOptions<SiloOptions> siloOptions) =>
                     {
                         var cfg = hostBuilder.GetConfiguration();
@@ -72,7 +81,11 @@ namespace Tester.HeterogeneousSilosTests
         {
             public void Configure(IConfiguration configuration, IClientBuilder clientBuilder)
             {
-                clientBuilder.Configure<TypeManagementOptions>(options => options.TypeMapRefreshInterval = ClientRefreshDelay);
+                clientBuilder.Configure<TypeManagementOptions>(options =>
+                {
+                    options.TypeMapRefreshInterval = ClientRefreshDelay;
+                    options.EnableDeferredGrainTypeResolution = configuration.GetValue("EnableDeferredGrainTypeResolution", true);
+                });
             }
         }
 
@@ -94,6 +107,23 @@ namespace Tester.HeterogeneousSilosTests
         }
 
         [Fact]
+        public void DeferredResolutionCanBeDisabled()
+        {
+            SetupAndDeployCluster(typeof(RandomPlacement), enableDeferredGrainTypeResolution: false, typeof(TestGrain));
+
+            Assert.Throws<ArgumentException>(() => this.cluster!.GrainFactory!.GetGrain<ITestGrain>(0));
+
+            var clientServices = this.cluster!.ServiceProvider;
+            var interfaceType = clientServices.GetRequiredService<GrainInterfaceTypeResolver>().GetGrainInterfaceType(typeof(ITestGrain));
+            var grainId = GrainId.Create(GrainTypePrefix.CreateStubGrainType(interfaceType, grainClassPrefix: null), IdSpan.Create("0"));
+            var clientFactory = clientServices.GetRequiredService<IInternalGrainFactory>();
+            var siloFactory = this.cluster.GetSiloServiceProvider().GetRequiredService<IInternalGrainFactory>();
+
+            Assert.Throws<InvalidOperationException>(() => { _ = clientFactory.GetGrain(grainId, interfaceType); });
+            Assert.Throws<InvalidOperationException>(() => { _ = siloFactory.GetGrain(grainId, interfaceType); });
+        }
+
+        [Fact]
         public async Task DeferredResolutionPreservesResponseDeadline()
         {
             SetupAndDeployCluster(typeof(RandomPlacement), typeof(TestGrain));
@@ -110,6 +140,40 @@ namespace Tester.HeterogeneousSilosTests
             Assert.Same(invocationStarted, firstCompleted);
             await invocationStarted;
             await Assert.ThrowsAsync<TimeoutException>(() => call);
+        }
+
+        [Fact]
+        public async Task TimedOutCallDoesNotPreventLaterResolution()
+        {
+            SetupAndDeployCluster(typeof(RandomPlacement), typeof(TestGrain));
+            var grainKey = Random.Shared.NextInt64();
+            var grain = this.cluster!.GrainFactory!.GetGrain<ITestGrain>(grainKey);
+            var longInvocationStarted = TestGrain.WaitForDeferredLongActionAsync(grainKey);
+            var shortCall = grain.DoLongActionWithShortDeferredResolutionTimeout(TimeSpan.Zero, nameof(TimedOutCallDoesNotPreventLaterResolution));
+            var longCall = grain.DoLongActionWithDeferredResolutionTimeout(TimeSpan.Zero, nameof(TimedOutCallDoesNotPreventLaterResolution));
+
+            await Assert.ThrowsAsync<TimeoutException>(() => shortCall);
+            await cluster!.StartAdditionalSiloAsync();
+            await WaitForClusterStateToStabilizeAsync(restartClient: false);
+
+            await longInvocationStarted.WaitAsync(TestConstants.InitTimeout);
+            await longCall.WaitAsync(TestConstants.InitTimeout);
+        }
+
+        [Fact]
+        public async Task CanceledCallDoesNotPreventLaterResolution()
+        {
+            SetupAndDeployCluster(typeof(RandomPlacement), typeof(TestGrain));
+            var grain = this.cluster!.GrainFactory!.GetGrain<ITestGrain>(Random.Shared.NextInt64());
+            using var cancellation = new CancellationTokenSource();
+            var canceledCall = grain.SetLabelWithCancellation(nameof(CanceledCallDoesNotPreventLaterResolution), cancellation.Token);
+
+            cancellation.Cancel();
+            await Assert.ThrowsAnyAsync<OperationCanceledException>(() => canceledCall);
+            await cluster!.StartAdditionalSiloAsync();
+            await WaitForClusterStateToStabilizeAsync(restartClient: false);
+
+            await grain.SetLabel(nameof(CanceledCallDoesNotPreventLaterResolution)).WaitAsync(TestConstants.InitTimeout);
         }
 
 
@@ -219,6 +283,8 @@ namespace Tester.HeterogeneousSilosTests
                 Assert.Equal(unresolvedGrainHashCode, grain.GetHashCode());
                 Assert.Equal(resolvedGrain, grain);
                 Assert.Equal(resolvedGrain.GetHashCode(), grain.GetHashCode());
+                var references = new HashSet<IGrain> { grain };
+                Assert.Contains(resolvedGrain, references);
             }
             else
             {
