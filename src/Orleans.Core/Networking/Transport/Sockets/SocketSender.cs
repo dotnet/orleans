@@ -94,11 +94,17 @@ internal sealed class SocketSender : SocketAwaitableEventArgs
         Debug.Assert(!buffer.IsEmpty);
         Debug.Assert(!buffer.IsSingleSegment);
 
-        if (_bufferList == null)
+        if (BufferList is not null)
         {
-            _bufferList = new List<ArraySegment<byte>>();
+            BufferList = null;
+        }
+        else if (!MemoryBuffer.IsEmpty)
+        {
+            SetBuffer(null, 0, 0);
         }
 
+        _bufferList ??= new List<ArraySegment<byte>>();
+        _bufferList.Clear();
         foreach (var b in buffer)
         {
             _bufferList.Add(b.GetArray());
