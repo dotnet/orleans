@@ -2,10 +2,14 @@ using System.Diagnostics;
 using System.Net;
 using System.Runtime.InteropServices;
 using System.Runtime;
+using System.Security.Authentication;
+using System.Security.Cryptography;
+using System.Security.Cryptography.X509Certificates;
 using BenchmarkGrainInterfaces.Ping;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
+using Orleans.Hosting;
 
 namespace Benchmarks.Ping;
 
@@ -16,12 +20,24 @@ internal static class ProcessPingBenchmark
         var duration = GetInt32(args, 0, 240);
         var siloPort = GetInt32(args, 1, 11111);
         var gatewayPort = GetInt32(args, 2, 30000);
+        var useTls = GetBoolean(args, 3);
+        using var certificate = useTls ? CreateCertificate(includeServerAuthentication: true) : null;
         using var host = new HostBuilder()
             .ConfigureLogging(logging => logging.SetMinimumLevel(LogLevel.Warning))
-            .UseOrleans((_, siloBuilder) => siloBuilder.UseLocalhostClustering(
-                siloPort,
-                gatewayPort,
-                primarySiloEndpoint: null))
+            .UseOrleans((_, siloBuilder) =>
+            {
+                siloBuilder.UseLocalhostClustering(siloPort, gatewayPort, primarySiloEndpoint: null);
+                if (certificate is not null)
+                {
+                    siloBuilder.UseTls(certificate, options =>
+                    {
+                        options.SslProtocols = SslProtocols.Tls12;
+                        SetTlsMode(options, "ClientCertificateMode", "RequireCertificate");
+                        SetTlsMode(options, "RemoteCertificateMode", "AllowCertificate");
+                        options.AllowAnyRemoteCertificate();
+                    });
+                }
+            })
             .Build();
 
         await host.StartAsync();
@@ -37,10 +53,26 @@ internal static class ProcessPingBenchmark
         var concurrency = GetInt32(args, 2, 250);
         var gatewayPort = GetInt32(args, 3, 30000);
         var sampleCount = GetInt32(args, 4, 1);
+        var useTls = GetBoolean(args, 5);
+        using var certificate = useTls ? CreateCertificate(includeServerAuthentication: false) : null;
 
         using var host = new HostBuilder()
             .ConfigureLogging(logging => logging.SetMinimumLevel(LogLevel.Warning))
-            .UseOrleansClient((_, clientBuilder) => clientBuilder.UseLocalhostClustering(gatewayPort))
+            .UseOrleansClient((_, clientBuilder) =>
+            {
+                clientBuilder.UseLocalhostClustering(gatewayPort);
+                if (useTls)
+                {
+                    clientBuilder.UseTls(certificate!, options =>
+                    {
+                        options.SslProtocols = SslProtocols.Tls12;
+                        SetTlsMode(options, "ClientCertificateMode", "RequireCertificate");
+                        SetTlsMode(options, "RemoteCertificateMode", "RequireCertificate");
+                        options.AllowAnyRemoteCertificate();
+                        options.OnAuthenticateAsClient = (_, sslOptions) => sslOptions.TargetHost = "localhost";
+                    });
+                }
+            })
             .Build();
 
         await host.StartAsync();
@@ -126,10 +158,26 @@ internal static class ProcessPingBenchmark
         var measurementSeconds = GetInt32(args, 1, 20);
         var sampleCount = GetInt32(args, 2, 3);
         var gatewayPort = GetInt32(args, 3, 30000);
+        var useTls = GetBoolean(args, 4);
+        using var certificate = useTls ? CreateCertificate(includeServerAuthentication: false) : null;
 
         using var host = new HostBuilder()
             .ConfigureLogging(logging => logging.SetMinimumLevel(LogLevel.Warning))
-            .UseOrleansClient((_, clientBuilder) => clientBuilder.UseLocalhostClustering(gatewayPort))
+            .UseOrleansClient((_, clientBuilder) =>
+            {
+                clientBuilder.UseLocalhostClustering(gatewayPort);
+                if (useTls)
+                {
+                    clientBuilder.UseTls(certificate!, options =>
+                    {
+                        options.SslProtocols = SslProtocols.Tls12;
+                        SetTlsMode(options, "ClientCertificateMode", "RequireCertificate");
+                        SetTlsMode(options, "RemoteCertificateMode", "RequireCertificate");
+                        options.AllowAnyRemoteCertificate();
+                        options.OnAuthenticateAsClient = (_, sslOptions) => sslOptions.TargetHost = "localhost";
+                    });
+                }
+            })
             .Build();
 
         await host.StartAsync();
@@ -208,6 +256,39 @@ internal static class ProcessPingBenchmark
 
     private static int GetInt32(string[] args, int index, int defaultValue)
         => args.Length > index && int.TryParse(args[index], out var value) && value > 0 ? value : defaultValue;
+
+    private static bool GetBoolean(string[] args, int index)
+        => args.Length > index && bool.TryParse(args[index], out var value) && value;
+
+    private static void SetTlsMode(object options, string propertyName, string value)
+    {
+        var property = options.GetType().GetProperty(propertyName)!;
+        property.SetValue(options, Enum.Parse(property.PropertyType, value));
+    }
+
+    private static X509Certificate2 CreateCertificate(bool includeServerAuthentication)
+    {
+        using var rsa = RSA.Create(2048);
+        var request = new CertificateRequest("CN=localhost", rsa, HashAlgorithmName.SHA256, RSASignaturePadding.Pkcs1);
+        request.CertificateExtensions.Add(new X509BasicConstraintsExtension(false, false, 0, false));
+        request.CertificateExtensions.Add(new X509KeyUsageExtension(X509KeyUsageFlags.DigitalSignature, false));
+        var enhancedKeyUsages = new OidCollection { new("1.3.6.1.5.5.7.3.2") };
+        if (includeServerAuthentication)
+        {
+            enhancedKeyUsages.Add(new("1.3.6.1.5.5.7.3.1"));
+        }
+
+        request.CertificateExtensions.Add(new X509EnhancedKeyUsageExtension(enhancedKeyUsages, false));
+        var subjectAlternativeName = new SubjectAlternativeNameBuilder();
+        subjectAlternativeName.AddDnsName("localhost");
+        subjectAlternativeName.AddIpAddress(IPAddress.Loopback);
+        request.CertificateExtensions.Add(subjectAlternativeName.Build());
+        using var certificate = request.CreateSelfSigned(DateTimeOffset.UtcNow.AddDays(-1), DateTimeOffset.UtcNow.AddDays(1));
+        return X509CertificateLoader.LoadPkcs12(
+            certificate.Export(X509ContentType.Pkcs12, "benchmark-only"),
+            "benchmark-only",
+            X509KeyStorageFlags.Exportable | X509KeyStorageFlags.PersistKeySet | X509KeyStorageFlags.UserKeySet);
+    }
 
     private static long Percentile(long[] values, int count, double percentile)
         => values[Math.Min(count - 1, (int)Math.Ceiling(count * percentile) - 1)];
