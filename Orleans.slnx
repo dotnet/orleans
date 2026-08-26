@@ -82,6 +82,7 @@
   <Folder Name="/src/Extensions/AWS/">
     <Project Path="src/AWS/Orleans.Clustering.DynamoDB/Orleans.Clustering.DynamoDB.csproj" />
     <Project Path="src/AWS/Orleans.Journaling.S3/Orleans.Journaling.S3.csproj" />
+    <Project Path="src/AWS/Orleans.Streaming.SQS.Aspire/Orleans.Streaming.SQS.Aspire.csproj" />
     <Project Path="src/AWS/Orleans.Persistence.DynamoDB/Orleans.Persistence.DynamoDB.csproj" />
     <Project Path="src/AWS/Orleans.Reminders.DynamoDB/Orleans.Reminders.DynamoDB.csproj" />
     <Project Path="src/AWS/Orleans.Streaming.Kinesis/Orleans.Streaming.Kinesis.csproj" />
@@ -175,6 +176,7 @@
   </Folder>
   <Folder Name="/test/Extensions/">
     <Project Path="test/Extensions/Orleans.AWS.Tests/Orleans.AWS.Tests.csproj" />
+    <Project Path="test/Extensions/Orleans.Streaming.SQS.Aspire.Tests/Orleans.Streaming.SQS.Aspire.Tests.csproj" />
     <Project Path="test/Extensions/Orleans.Clustering.Consul.Tests/Orleans.Clustering.Consul.Tests.csproj" />
     <Project Path="test/Extensions/Orleans.Streaming.Kinesis.Tests/Orleans.Streaming.Kinesis.Tests.csproj" />
     <Project Path="test/Extensions/Orleans.Streaming.EventHubs.Tests/Orleans.Streaming.EventHubs.Tests.csproj" />
