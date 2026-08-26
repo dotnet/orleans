@@ -1,6 +1,7 @@
 #nullable enable
 
 using System;
+using System.Buffers;
 using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
 using System.Net.Sockets;
@@ -16,6 +17,7 @@ using Orleans.Runtime;
 using System.Runtime.CompilerServices;
 using Orleans.Serialization.Buffers;
 using Orleans.Connections.Transport;
+using Orleans.Runtime.Utilities;
 
 namespace Orleans.Connections.Transport.Sockets;
 
@@ -34,13 +36,16 @@ public sealed class SocketMessageTransport : MessageTransportBase
     private readonly CancellationTokenSource _connectionClosingCts = new();
     private readonly CancellationTokenSource _connectionClosedCts = new();
     private readonly object _shutdownLock = new();
-    private readonly object _writesLock = new();
     private readonly object _readsLock = new();
     private readonly string _remoteEndpointString; // For diagnostics only
     private readonly string _localEndpointString; // For diagnostics only
-    private Queue<WriteRequest> _writeRequests = new();
+    private readonly StripedMpscBuffer<WriteRequest> _writeRequests = new(
+        stripeCount: 16,
+        bufferSize: 256);
     private bool _readsCompleted;
-    private bool _writesCompleted;
+    private int _pendingWriteCount;
+    private int _writeEnqueuers;
+    private int _writesCompleted;
     private Task? _processingTask;
     private volatile bool _socketDisposed;
     private volatile bool _socketShutdown;
@@ -220,21 +225,34 @@ public sealed class SocketMessageTransport : MessageTransportBase
 
     public override bool EnqueueWrite(WriteRequest request)
     {
-        if (_connectionClosingCts.IsCancellationRequested)
+        if (_connectionClosingCts.IsCancellationRequested || Volatile.Read(ref _writesCompleted) != 0)
         {
             return false;
         }
 
-        lock (_writesLock)
+        Interlocked.Increment(ref _writeEnqueuers);
+        if (_connectionClosingCts.IsCancellationRequested || Volatile.Read(ref _writesCompleted) != 0)
         {
-            if (_writesCompleted)
+            Interlocked.Decrement(ref _writeEnqueuers);
+            return false;
+        }
+
+        Interlocked.Increment(ref _pendingWriteCount);
+        var spinner = new SpinWait();
+        while (_writeRequests.TryAdd(request) is not BufferStatus.Success)
+        {
+            if (_connectionClosingCts.IsCancellationRequested || Volatile.Read(ref _writesCompleted) != 0)
             {
+                Interlocked.Decrement(ref _pendingWriteCount);
+                Interlocked.Decrement(ref _writeEnqueuers);
                 return false;
             }
 
-            _writeRequests.Enqueue(request);
+            _writeSignal.Signal();
+            spinner.SpinOnce();
         }
 
+        Interlocked.Decrement(ref _writeEnqueuers);
         _writeSignal.Signal();
         return true;
     }
@@ -498,10 +516,13 @@ exit:
         await Task.CompletedTask.ConfigureAwait(ConfigureAwaitOptions.ForceYielding);
 
         const int MaxBuffersPerSend = 32;
+        const int CoalescingBufferSize = 64 * 1024;
         Exception? error = null;
         Queue<WriteRequest> requests = new();
+        WriteRequest[] requestBuffer = new WriteRequest[256];
         List<ArraySegment<byte>> buffers = new(capacity: MaxBuffersPerSend);
         List<(WriteRequest, ArcBuffer)> processingRequests = new(capacity: MaxBuffersPerSend);
+        var coalescingBuffer = ArrayPool<byte>.Shared.Rent(CoalescingBufferSize);
         ArcBuffer.ArraySegmentEnumerator enumerator = default;
 
         try
@@ -543,7 +564,7 @@ RefreshRequestQueue:
                             }
 
                             // Check for pending messages before waiting.
-                            RefreshRequestQueue(ref requests);
+                            RefreshRequestQueue(requests, requestBuffer);
 
                             // Wait for more requests.
                             if (requests.Count == 0)
@@ -569,23 +590,97 @@ RefreshRequestQueue:
                     continue;
                 }
 
-                while (buffers.Count > 0)
+                var totalBytes = 0;
+                foreach (var buffer in buffers)
                 {
-                    await _socketSender.SendAsync(_socket, buffers).ConfigureAwait(false);
-                    if (_socketSender.HasError)
+                    totalBytes += buffer.Count;
+                }
+
+                if (buffers.Count == 1
+                    && processingRequests.Count == 1
+                    && requests.Count == 0
+                    && Volatile.Read(ref _pendingWriteCount) == 0)
+                {
+                    var buffer = buffers[0];
+                    var remaining = new ReadOnlyMemory<byte>(buffer.Array!, buffer.Offset, buffer.Count);
+                    while (!remaining.IsEmpty)
                     {
-                        error = GetSendAsyncError();
-                        break;
+                        await _socketSender.SendAsync(_socket, remaining).ConfigureAwait(false);
+                        if (_socketSender.HasError)
+                        {
+                            error = GetSendAsyncError();
+                            break;
+                        }
+
+                        var transferred = _socketSender.BytesTransferred;
+                        if (transferred == 0)
+                        {
+                            error = new ConnectionClosedException("The socket closed before all queued data was sent.");
+                            break;
+                        }
+
+                        remaining = remaining[transferred..];
                     }
 
-                    var transferred = _socketSender.BytesTransferred;
-                    if (transferred == 0)
+                    if (error is null)
                     {
-                        error = new ConnectionClosedException("The socket closed before all queued data was sent.");
-                        break;
+                        buffers.Clear();
+                    }
+                }
+                else if (buffers.Count > 1 && totalBytes <= coalescingBuffer.Length)
+                {
+                    var offset = 0;
+                    foreach (var buffer in buffers)
+                    {
+                        buffer.AsSpan().CopyTo(coalescingBuffer.AsSpan(offset));
+                        offset += buffer.Count;
                     }
 
-                    AdvanceBufferList(buffers, transferred);
+                    var remaining = new ReadOnlyMemory<byte>(coalescingBuffer, 0, totalBytes);
+                    while (!remaining.IsEmpty)
+                    {
+                        await _socketSender.SendAsync(_socket, remaining).ConfigureAwait(false);
+                        if (_socketSender.HasError)
+                        {
+                            error = GetSendAsyncError();
+                            break;
+                        }
+
+                        var transferred = _socketSender.BytesTransferred;
+                        if (transferred == 0)
+                        {
+                            error = new ConnectionClosedException("The socket closed before all queued data was sent.");
+                            break;
+                        }
+
+                        remaining = remaining[transferred..];
+                    }
+
+                    if (error is null)
+                    {
+                        buffers.Clear();
+                    }
+                }
+                else
+                {
+                    while (buffers.Count > 0)
+                    {
+                        await _socketSender.SendAsync(_socket, buffers).ConfigureAwait(false);
+                        if (_socketSender.HasError)
+                        {
+                            error = GetSendAsyncError();
+                            break;
+                        }
+
+                        var transferred = _socketSender.BytesTransferred;
+                        if (transferred == 0)
+                        {
+                            error = new ConnectionClosedException("The socket closed before all queued data was sent.");
+                            break;
+                        }
+
+                        AdvanceBufferList(buffers, transferred);
+                    }
                 }
 
                 if (error is not null)
@@ -638,24 +733,39 @@ RefreshRequestQueue:
                 slice.Dispose();
             }
 
-            lock (_writesLock)
+            Volatile.Write(ref _writesCompleted, 1);
+            var spinner = new SpinWait();
+            while (Volatile.Read(ref _writeEnqueuers) != 0)
             {
-                _writesCompleted = true;
+                spinner.SpinOnce();
             }
 
             // Drain requests.
-            while (requests.TryDequeue(out var request) || _writeRequests.TryDequeue(out request))
+            int drained;
+            do
             {
-                request.SetException(requestError);
+                drained = RefreshRequestQueue(requests, requestBuffer);
+                while (requests.TryDequeue(out var request))
+                {
+                    request.SetException(requestError);
+                }
             }
+            while (drained > 0);
+
+            ArrayPool<byte>.Shared.Return(coalescingBuffer);
         }
 
-        void RefreshRequestQueue(ref Queue<WriteRequest> queue)
+        int RefreshRequestQueue(Queue<WriteRequest> queue, WriteRequest[] buffer)
         {
-            lock (_writesLock)
+            var count = _writeRequests.DrainTo(buffer);
+            Interlocked.Add(ref _pendingWriteCount, -count);
+            for (var i = 0; i < count; i++)
             {
-                queue = Interlocked.Exchange(ref _writeRequests, queue);
+                queue.Enqueue(buffer[i]);
+                buffer[i] = null!;
             }
+
+            return count;
         }
 
         static void AdvanceBufferList(List<ArraySegment<byte>> buffers, int bytesTransferred)

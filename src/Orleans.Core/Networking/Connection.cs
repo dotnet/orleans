@@ -4,7 +4,6 @@ using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
 using System.Net;
-using System.Numerics;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
@@ -38,17 +37,10 @@ namespace Orleans.Runtime.Messaging
             _transport = transport ?? throw new ArgumentNullException(nameof(transport));
             _shared = shared;
 
-            uint workerCount = CeilingPowerOfTwo((uint)Environment.ProcessorCount);
-            _sendWorkers = new SendWorker[workerCount];
-            _sendWorkerMask = (int)(workerCount - 1);
-            for (var i = 0; i < _sendWorkers.Length; i++)
-            {
-                _sendWorkers[i] = new(this);
-            }
+            _sendWorkers = [new(this)];
+            _sendWorkerMask = 0;
 
             _transport.Closed.Register(static state => ((Connection)state!).OnTransportConnectionClosed(), this);
-
-            static uint CeilingPowerOfTwo(uint x) => 1u << -BitOperations.LeadingZeroCount(x - 1);
         }
 
         public string ConnectionId => _id;
@@ -199,6 +191,7 @@ namespace Orleans.Runtime.Messaging
             {
                 LogWarningExceptionTerminatingConnection(Log, abortException, this);
             }
+
         }
 
         public virtual void Send(Message message)
@@ -216,7 +209,7 @@ namespace Orleans.Runtime.Messaging
 
         private sealed class SendWorker(Connection connection) : IThreadPoolWorkItem
         {
-            private const int MaxMessagesPerBatch = 4;
+            private const int MaxMessagesPerBatch = 64;
             private const int SoftMaxBatchBytes = 64 * 1024;
             private readonly ConcurrentQueue<Message> _workItems = new();
             private readonly Action<Message>? _messageObserver = connection._shared.MessageObserver;
@@ -281,6 +274,7 @@ namespace Orleans.Runtime.Messaging
                     ThreadPool.UnsafeQueueUserWorkItem(this, preferLocal: true);
                 }
             }
+
         }
 
         public override string ToString() => $"{nameof(Connection)}(Id: {_id}, Transport: {_transport})";
