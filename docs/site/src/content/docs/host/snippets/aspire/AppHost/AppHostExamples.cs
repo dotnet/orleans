@@ -1,12 +1,7 @@
-using System.Globalization;
 using Amazon;
-using Amazon.CDK.AWS.SQS;
 using Aspire.Hosting;
-using Aspire.Hosting.ApplicationModel;
-using Aspire.Hosting.AWS;
 using Aspire.Hosting.Azure;
 using Aspire.Hosting.Orleans;
-using CdkDuration = Amazon.CDK.Duration;
 
 namespace Orleans.Docs.Snippets.Aspire;
 
@@ -18,67 +13,37 @@ public static class AppHostExamples
     // <sqs_streaming_apphost>
     public static void SqsStreaming(string[] args)
     {
-        const string providerName = "Orders";
-        const string serviceId = "orders-service";
-        const int partitionCount = 16;
-        const bool fifoQueue = true;
-        const int receiveWaitTimeSeconds = 20;
-        const int visibilityTimeoutSeconds = 60;
         var builder = DistributedApplication.CreateBuilder(args);
 
         var aws = builder.AddAWSSDKConfig()
             .WithRegion(RegionEndpoint.USEast1);
-        var stack = builder.AddAWSCDKStack("orders-sqs")
-            .WithReference(aws);
-        for (var partition = 0; partition < partitionCount; partition++)
-        {
-            stack.AddSQSQueue(
-                $"orders-{partition}",
-                new QueueProps
-                {
-                    QueueName = GetSqsQueueName(serviceId, providerName, partition, fifoQueue),
-                    Fifo = fifoQueue,
-                    ContentBasedDeduplication = fifoQueue,
-                    DeduplicationScope = fifoQueue ? DeduplicationScope.MESSAGE_GROUP : null,
-                    FifoThroughputLimit = fifoQueue ? FifoThroughputLimit.PER_MESSAGE_GROUP_ID : null,
-                    ReceiveMessageWaitTime = CdkDuration.Seconds(receiveWaitTimeSeconds),
-                    VisibilityTimeout = CdkDuration.Seconds(visibilityTimeoutSeconds),
-                });
-        }
 
         var orleans = builder.AddOrleans("cluster")
-            .WithServiceId(serviceId)
             .WithDevelopmentClustering()
             .WithMemoryGrainStorage("PubSubStore")
-            .WithStreaming(
-                providerName,
-                new SqsProviderConfiguration(
-                    aws,
-                    partitionCount,
-                    fifoQueue,
-                    receiveWaitTimeSeconds,
-                    visibilityTimeoutSeconds));
+            .WithSqsStreaming(
+                "Orders",
+                aws,
+                new SqsStreamingOptions
+                {
+                    ServiceId = "orders-service",
+                    PartitionCount = 16,
+                    FifoQueue = true,
+                    ReceiveWaitTimeSeconds = 20,
+                    VisibilityTimeoutSeconds = 60,
+                });
 
         var silo = builder.AddProject<Projects.Silo>("silo")
             .WithReference(orleans)
-            .WaitFor(stack)
             .WithReplicas(3);
 
         builder.AddProject<Projects.Client>("client")
             .WithReference(orleans.AsClient())
-            .WaitFor(stack)
             .WaitFor(silo);
 
         builder.Build().Run();
     }
     // </sqs_streaming_apphost>
-
-    private static string GetSqsQueueName(
-        string serviceId,
-        string providerName,
-        int partition,
-        bool fifoQueue)
-        => $"{serviceId}-{providerName.ToLowerInvariant()}-{partition}{(fifoQueue ? ".fifo" : string.Empty)}";
 
     // <basic_orleans_cluster>
     public static void BasicOrleansCluster(string[] args)
@@ -336,31 +301,4 @@ public static class AppHostExamples
     }
     // </explicit_cluster_ids>
 
-    // <sqs_provider_configuration>
-    private sealed class SqsProviderConfiguration(
-        IAWSSDKConfig aws,
-        int partitionCount,
-        bool fifoQueue,
-        int receiveWaitTimeSeconds,
-        int visibilityTimeoutSeconds) : IProviderConfiguration
-    {
-        public void ConfigureResource<T>(
-            IResourceBuilder<T> resourceBuilder,
-            string configSectionPath)
-            where T : IResourceWithEnvironment
-        {
-            var environmentPrefix = $"Orleans__{configSectionPath.Replace(":", "__", StringComparison.Ordinal)}";
-            var region = aws.Region?.SystemName
-                ?? throw new InvalidOperationException("SQS streaming requires an AWS region.");
-            resourceBuilder
-                .WithReference(aws)
-                .WithEnvironment($"{environmentPrefix}__ProviderType", "SQS")
-                .WithEnvironment($"{environmentPrefix}__Region", region)
-                .WithEnvironment($"{environmentPrefix}__PartitionCount", partitionCount.ToString(CultureInfo.InvariantCulture))
-                .WithEnvironment($"{environmentPrefix}__FifoQueue", fifoQueue.ToString())
-                .WithEnvironment($"{environmentPrefix}__ReceiveWaitTimeSeconds", receiveWaitTimeSeconds.ToString(CultureInfo.InvariantCulture))
-                .WithEnvironment($"{environmentPrefix}__VisibilityTimeoutSeconds", visibilityTimeoutSeconds.ToString(CultureInfo.InvariantCulture));
-        }
-    }
-    // </sqs_provider_configuration>
 }
