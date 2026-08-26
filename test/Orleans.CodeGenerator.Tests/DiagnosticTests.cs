@@ -72,7 +72,7 @@ public class DiagnosticTests
         var assemblyAttr = SyntaxFactory.AttributeList(
             SyntaxFactory.SingletonSeparatedList(referenceAssemblyAttribute))
             .WithTarget(SyntaxFactory.AttributeTargetSpecifier(SyntaxFactory.Token(SyntaxKind.AssemblyKeyword)));
-        var root = (CompilationUnitSyntax)compilation.SyntaxTrees[0].GetRoot();
+        var root = (CompilationUnitSyntax)compilation.SyntaxTrees[0].GetRoot(TestContext.Current.CancellationToken);
         var newRoot = root.AddAttributeLists(assemblyAttr);
         var newTree = compilation.SyntaxTrees[0].WithRootAndOptions(newRoot, compilation.SyntaxTrees[0].Options);
         compilation = compilation.RemoveSyntaxTrees(compilation.SyntaxTrees[0]).AddSyntaxTrees(newTree);
@@ -339,7 +339,9 @@ public class DiagnosticTests
             """;
 
         var compilation = await CreateCompilation(code);
-        Assert.Contains(compilation.GetDiagnostics(), diagnostic => diagnostic.Severity == DiagnosticSeverity.Error);
+        Assert.Contains(
+            compilation.GetDiagnostics(TestContext.Current.CancellationToken),
+            diagnostic => diagnostic.Severity == DiagnosticSeverity.Error);
 
         var result = RunGeneratorOnCompilation(compilation);
 

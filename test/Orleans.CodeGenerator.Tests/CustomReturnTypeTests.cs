@@ -891,7 +891,7 @@ public class CustomReturnTypeTests
         var diagnostic = Assert.Single(result.Diagnostics);
         Assert.Equal(DiagnosticRuleId.InvalidInvokableBaseTypeMapping, diagnostic.Id);
         Assert.Contains("accessible parameterless constructor", diagnostic.GetMessage());
-        Assert.Equal("InvokableBaseType", diagnostic.Location.SourceTree!.GetText()
+        Assert.Equal("InvokableBaseType", diagnostic.Location.SourceTree!.GetText(TestContext.Current.CancellationToken)
             .ToString(diagnostic.Location.SourceSpan)
             .Split('(')[0]
             .TrimStart('['));
@@ -1098,7 +1098,8 @@ public class CustomReturnTypeTests
             }
             """;
         var validCompilation = await TestCompilationHelper.CreateCompilation(source, "CustomReturnTypes");
-        var invalidCompilation = validCompilation.AddSyntaxTrees(CSharpSyntaxTree.ParseText(registration));
+        var invalidCompilation = validCompilation.AddSyntaxTrees(
+            CSharpSyntaxTree.ParseText(registration, cancellationToken: TestContext.Current.CancellationToken));
         var invalidInterface = invalidCompilation.GetTypeByMetadataName("ICustomGrain")!;
         var taskType = invalidCompilation.GetTypeByMetadataName("System.Threading.Tasks.Task")!;
         var customRequest = invalidCompilation.GetTypeByMetadataName("CustomRequest")!;
@@ -1119,11 +1120,11 @@ public class CustomReturnTypeTests
         var validModel = ProxyInterfaceModelExtractor.ExtractProxyInterfaceModel(
             validCompilation.GetTypeByMetadataName("ICustomGrain")!,
             validCompilation,
-            CancellationToken.None);
+            TestContext.Current.CancellationToken);
         var invalidModel = ProxyInterfaceModelExtractor.ExtractProxyInterfaceModel(
             invalidInterface,
             invalidCompilation,
-            CancellationToken.None);
+            TestContext.Current.CancellationToken);
         Assert.Equal(validModel, invalidModel);
 
         var result = RunGenerator(invalidCompilation);

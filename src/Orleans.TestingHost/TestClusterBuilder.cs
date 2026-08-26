@@ -18,6 +18,7 @@ namespace Orleans.TestingHost
         private readonly List<Action<IConfigurationBuilder>> configureHostConfigActions = new List<Action<IConfigurationBuilder>>();
         private readonly List<Action> configureBuilderActions = new List<Action>();
         private Func<string, IConfiguration, Task<SiloHandle>>? _createSiloAsync;
+        private Func<string, IConfiguration, CancellationToken, Task<SiloHandle>>? _createSiloAsyncWithCancellation;
 
         /// <summary>
         /// Initializes a new instance of <see cref="TestClusterBuilder"/> using the default options.
@@ -74,6 +75,21 @@ namespace Orleans.TestingHost
             set
             {
                 _createSiloAsync = value;
+
+                // The custom builder does not have access to the in-memory transport.
+                Options.ConnectionTransport = ConnectionTransportType.TcpSocket;
+            }
+        }
+
+        /// <summary>
+        /// Gets or sets the cancellation-aware delegate used to create and start an individual silo.
+        /// </summary>
+        public Func<string, IConfiguration, CancellationToken, Task<SiloHandle>> CreateSiloAsyncWithCancellation
+        {
+            private get => _createSiloAsyncWithCancellation!;
+            set
+            {
+                _createSiloAsyncWithCancellation = value;
 
                 // The custom builder does not have access to the in-memory transport.
                 Options.ConnectionTransport = ConnectionTransportType.TcpSocket;
@@ -166,7 +182,15 @@ namespace Orleans.TestingHost
 
             var configSources = new ReadOnlyCollection<IConfigurationSource>(configBuilder.Sources);
             var testCluster = new TestCluster(finalOptions, configSources, portAllocator);
-            if (CreateSiloAsync != null) testCluster.CreateSiloAsync = CreateSiloAsync;
+            if (_createSiloAsyncWithCancellation is not null)
+            {
+                testCluster.CreateSiloAsyncWithCancellation = CreateSiloAsyncWithCancellation;
+            }
+            else if (_createSiloAsync is not null)
+            {
+                testCluster.CreateSiloAsync = CreateSiloAsync;
+            }
+
             return testCluster;
         }
 

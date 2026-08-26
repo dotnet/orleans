@@ -41,6 +41,8 @@ namespace Orleans.TestingHost
         private readonly StringBuilder log = new StringBuilder();
         private readonly InMemoryTransportConnectionHub _transportHub = new();
         private readonly GrainDirectoryObserver _grainDirectoryObserver = new();
+        private Func<string, IConfiguration, Task<SiloHandle>> _createSiloAsync;
+        private Func<string, IConfiguration, CancellationToken, Task<SiloHandle>> _createSiloAsyncWithCancellation;
         private bool _disposed;
         private int startedInstances;
 
@@ -130,7 +132,28 @@ namespace Orleans.TestingHost
         /// <summary>
         /// Delegate used to create and start an individual silo.
         /// </summary>
-        public Func<string, IConfiguration, Task<SiloHandle>> CreateSiloAsync { private get; set; }
+        public Func<string, IConfiguration, Task<SiloHandle>> CreateSiloAsync
+        {
+            private get => _createSiloAsync;
+            set
+            {
+                _createSiloAsync = value;
+                _createSiloAsyncWithCancellation = (name, configuration, _) => value(name, configuration);
+            }
+        }
+
+        /// <summary>
+        /// Delegate used to create and start an individual silo with cancellation.
+        /// </summary>
+        public Func<string, IConfiguration, CancellationToken, Task<SiloHandle>> CreateSiloAsyncWithCancellation
+        {
+            private get => _createSiloAsyncWithCancellation;
+            set
+            {
+                _createSiloAsyncWithCancellation = value;
+                _createSiloAsync = (name, configuration) => value(name, configuration, CancellationToken.None);
+            }
+        }
 
         /// <summary>
         /// The port allocator.
@@ -148,7 +171,8 @@ namespace Orleans.TestingHost
             this.options = options;
             this.ConfigurationSources = configurationSources.ToArray();
             this.PortAllocator = portAllocator;
-            this.CreateSiloAsync = DefaultCreateSiloAsync;
+            _createSiloAsync = DefaultCreateSiloAsync;
+            _createSiloAsyncWithCancellation = DefaultCreateSiloAsync;
         }
 
         /// <summary>
@@ -288,8 +312,15 @@ namespace Orleans.TestingHost
         /// <summary>
         /// Deploys the cluster using the specified configuration and starts the client in-process.
         /// </summary>
-        public async Task DeployAsync()
+        public Task DeployAsync() => DeployAsync(CancellationToken.None);
+
+        /// <summary>
+        /// Deploys the cluster using the specified configuration and starts the client in-process.
+        /// </summary>
+        /// <param name="cancellationToken">The token used to cancel deployment.</param>
+        public async Task DeployAsync(CancellationToken cancellationToken)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             if (this.Primary != null || this.additionalSilos.Count > 0) throw new InvalidOperationException("Cluster host already deployed.");
 
             AppDomain.CurrentDomain.UnhandledException += ReportUnobservedException;
@@ -298,11 +329,11 @@ namespace Orleans.TestingHost
             {
                 string startMsg = "----------------------------- STARTING NEW UNIT TEST SILO HOST: " + GetType().FullName + " -------------------------------------";
                 WriteLog(startMsg);
-                await InitializeAsync();
+                await InitializeAsync(cancellationToken);
 
                 if (this.options.InitializeClientOnDeploy)
                 {
-                    await WaitForInitialStabilization();
+                    await WaitForInitialStabilization(cancellationToken);
                 }
             }
             catch (TimeoutException te)
@@ -312,7 +343,7 @@ namespace Orleans.TestingHost
             }
             catch (Exception ex)
             {
-                await StopAllSilosAsync();
+                await StopAllSilosAsync(CancellationToken.None);
 
                 Exception baseExc = ex.GetBaseException();
                 FlushLogToConsole();
@@ -337,7 +368,7 @@ namespace Orleans.TestingHost
             }
         }
 
-        private async Task WaitForInitialStabilization()
+        private async Task WaitForInitialStabilization(CancellationToken cancellationToken)
         {
             // Poll each silo to check that it knows the expected number of active silos.
             // If any silo does not have the expected number of active silos in its cluster membership oracle, try again.
@@ -352,7 +383,7 @@ namespace Orleans.TestingHost
                 foreach (var silo in silos)
                 {
                     var hooks = this.InternalClient!.GetTestHooks(silo); // Membership stabilization requires an initialized client.
-                    var statuses = await hooks.GetApproximateSiloStatuses();
+                    var statuses = await hooks.GetApproximateSiloStatuses().WaitAsync(cancellationToken);
                     var activeCount = statuses.Count(s => s.Value == SiloStatus.Active);
                     if (activeCount != expectedCount) break;
                     remainingSilos--;
@@ -365,7 +396,7 @@ namespace Orleans.TestingHost
                 }
 
                 WriteLog($"{remainingSilos} silos do not have a consistent cluster view, waiting until stabilization.");
-                await Task.Delay(TimeSpan.FromMilliseconds(100));
+                await Task.Delay(TimeSpan.FromMilliseconds(100), cancellationToken);
 
                 if (totalWait.Elapsed < TimeSpan.FromSeconds(60))
                 {
@@ -523,12 +554,40 @@ namespace Orleans.TestingHost
         /// <param name="startAdditionalSiloOnNewPort"></param>
         /// <returns>List of SiloHandles for the newly started silos.</returns>
         public async Task<List<SiloHandle>> StartAdditionalSilosAsync(int silosToStart, bool startAdditionalSiloOnNewPort = false)
+            => await StartAdditionalSilosAsync(
+                silosToStart,
+                startAdditionalSiloOnNewPort,
+                CancellationToken.None);
+
+        /// <summary>
+        /// Start a number of additional silos, so that they join the existing cluster.
+        /// </summary>
+        /// <param name="silosToStart">Number of silos to start.</param>
+        /// <param name="startAdditionalSiloOnNewPort">Whether to start each silo on a new port.</param>
+        /// <param name="cancellationToken">The token used to cancel silo startup.</param>
+        /// <returns>List of silo handles for the newly started silos.</returns>
+        public async Task<List<SiloHandle>> StartAdditionalSilosAsync(
+            int silosToStart,
+            bool startAdditionalSiloOnNewPort,
+            CancellationToken cancellationToken)
         {
             var instances = new List<SiloHandle>();
             if (silosToStart > 0)
             {
-                var siloStartTasks = Enumerable.Range(this.startedInstances, silosToStart)
-                    .Select(instanceNumber => Task.Run(() => StartSiloAsync((short)instanceNumber, this.options, startSiloOnNewPort: startAdditionalSiloOnNewPort))).ToArray();
+                var silos = Silos;
+                var firstInstanceNumber = silos.Count == 0
+                    ? 0
+                    : silos.Max(static silo => silo.InstanceNumber) + 1;
+                var siloStartTasks = Enumerable.Range(firstInstanceNumber, silosToStart)
+                    .Select(instanceNumber => Task.Run(
+                        () => StartSiloAsync(
+                            (short)instanceNumber,
+                            this.options,
+                            configurationOverrides: null,
+                            startAdditionalSiloOnNewPort,
+                            cancellationToken),
+                        cancellationToken))
+                    .ToArray();
 
                 try
                 {
@@ -538,7 +597,10 @@ namespace Orleans.TestingHost
                 {
                     lock (additionalSilos)
                     {
-                        this.additionalSilos.AddRange(siloStartTasks.Where(t => t.Exception == null).Select(t => t.Result));
+                        this.additionalSilos.AddRange(
+                            siloStartTasks
+                                .Where(static task => task.Status == TaskStatus.RanToCompletion)
+                                .Select(static task => task.Result));
                     }
 
                     throw;
@@ -557,41 +619,64 @@ namespace Orleans.TestingHost
         /// <summary>
         /// Stop any additional silos, not including the default Primary silo.
         /// </summary>
-        public async Task StopSecondarySilosAsync()
+        public Task StopSecondarySilosAsync() => StopSecondarySilosAsync(CancellationToken.None);
+
+        /// <summary>
+        /// Stop any additional silos, not including the default Primary silo.
+        /// </summary>
+        /// <param name="cancellationToken">The token used to cancel shutdown.</param>
+        public async Task StopSecondarySilosAsync(CancellationToken cancellationToken)
         {
             foreach (var instance in this.additionalSilos.ToList())
             {
-                await StopSiloAsync(instance);
+                await StopSiloAsync(instance, cancellationToken);
             }
         }
 
         /// <summary>
         /// Stops the default Primary silo.
         /// </summary>
-        public async Task StopPrimarySiloAsync()
+        public Task StopPrimarySiloAsync() => StopPrimarySiloAsync(CancellationToken.None);
+
+        /// <summary>
+        /// Stops the default Primary silo.
+        /// </summary>
+        /// <param name="cancellationToken">The token used to cancel shutdown.</param>
+        public async Task StopPrimarySiloAsync(CancellationToken cancellationToken)
         {
             if (Primary == null) throw new InvalidOperationException("There is no primary silo");
-            await StopClusterClientAsync();
-            await StopSiloAsync(Primary);
+            await StopClusterClientAsync(cancellationToken);
+            await StopSiloAsync(Primary, cancellationToken);
         }
 
         /// <summary>
         /// Stop cluster client as an asynchronous operation.
         /// </summary>
         /// <returns>A <see cref="Task"/> representing the asynchronous operation.</returns>
-        public async Task StopClusterClientAsync()
+        public Task StopClusterClientAsync() => StopClusterClientAsync(CancellationToken.None);
+
+        /// <summary>
+        /// Stop cluster client as an asynchronous operation.
+        /// </summary>
+        /// <param name="cancellationToken">The token used to cancel shutdown.</param>
+        /// <returns>A <see cref="Task"/> representing the asynchronous operation.</returns>
+        public async Task StopClusterClientAsync(CancellationToken cancellationToken)
         {
             var client = this.ClientHost;
             try
             {
                 if (client is not null)
                 {
-                    await client.StopAsync().ConfigureAwait(false);
+                    await client.StopAsync(cancellationToken).ConfigureAwait(false);
                 }                
             }
             catch (Exception exc)
             {
                 WriteLog("Exception stopping client: {0}", exc);
+                if (exc is OperationCanceledException && cancellationToken.IsCancellationRequested)
+                {
+                    throw;
+                }
             }
             finally
             {
@@ -611,35 +696,60 @@ namespace Orleans.TestingHost
         /// <summary>
         /// Stop all current silos.
         /// </summary>
-        public async Task StopAllSilosAsync()
+        public Task StopAllSilosAsync() => StopAllSilosAsync(CancellationToken.None);
+
+        /// <summary>
+        /// Stop all current silos.
+        /// </summary>
+        /// <param name="cancellationToken">The token used to cancel shutdown.</param>
+        public async Task StopAllSilosAsync(CancellationToken cancellationToken)
         {
-            await StopClusterClientAsync();
-            await StopSecondarySilosAsync();
-            if (Primary != null)
+            try
             {
-                await StopPrimarySiloAsync();
+                await StopClusterClientAsync(cancellationToken);
+                await StopSecondarySilosAsync(cancellationToken);
+                if (Primary != null)
+                {
+                    await StopPrimarySiloAsync(cancellationToken);
+                }
             }
-            AppDomain.CurrentDomain.UnhandledException -= ReportUnobservedException;
+            finally
+            {
+                AppDomain.CurrentDomain.UnhandledException -= ReportUnobservedException;
+            }
         }
 
         /// <summary>
         /// Do a semi-graceful Stop of the specified silo.
         /// </summary>
         /// <param name="instance">Silo to be stopped.</param>
-        public async Task StopSiloAsync(SiloHandle instance)
+        public Task StopSiloAsync(SiloHandle instance) => StopSiloAsync(instance, CancellationToken.None);
+
+        /// <summary>
+        /// Do a semi-graceful Stop of the specified silo.
+        /// </summary>
+        /// <param name="instance">Silo to be stopped.</param>
+        /// <param name="cancellationToken">The token used to cancel shutdown.</param>
+        public async Task StopSiloAsync(SiloHandle instance, CancellationToken cancellationToken)
         {
             if (instance != null)
             {
-                await StopSiloAsync(instance, true);
-                if (Primary == instance)
+                try
                 {
-                    Primary = null;
+                    await StopSiloAsync(instance, true, cancellationToken);
                 }
-                else
+                finally
                 {
-                    lock (additionalSilos)
+                    if (Primary == instance)
                     {
-                        additionalSilos.Remove(instance);
+                        Primary = null;
+                    }
+                    else
+                    {
+                        lock (additionalSilos)
+                        {
+                            additionalSilos.Remove(instance);
+                        }
                     }
                 }
             }
@@ -649,21 +759,35 @@ namespace Orleans.TestingHost
         /// Do an immediate Kill of the specified silo.
         /// </summary>
         /// <param name="instance">Silo to be killed.</param>
-        public async Task KillSiloAsync(SiloHandle instance)
+        public Task KillSiloAsync(SiloHandle instance) => KillSiloAsync(instance, CancellationToken.None);
+
+        /// <summary>
+        /// Do an immediate Kill of the specified silo.
+        /// </summary>
+        /// <param name="instance">Silo to be killed.</param>
+        /// <param name="cancellationToken">The token used to cancel the operation.</param>
+        public async Task KillSiloAsync(SiloHandle instance, CancellationToken cancellationToken)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             if (instance != null)
             {
-                // do NOT stop, just kill directly, to simulate crash.
-                await StopSiloAsync(instance, false);
-                if (Primary == instance)
+                try
                 {
-                    Primary = null;
+                    // do NOT stop, just kill directly, to simulate crash.
+                    await StopSiloAsync(instance, false, cancellationToken);
                 }
-                else
+                finally
                 {
-                    lock (additionalSilos)
+                    if (Primary == instance)
                     {
-                        additionalSilos.Remove(instance);
+                        Primary = null;
+                    }
+                    else
+                    {
+                        lock (additionalSilos)
+                        {
+                            additionalSilos.Remove(instance);
+                        }
                     }
                 }
             }
@@ -739,15 +863,21 @@ namespace Orleans.TestingHost
         }
 
         /// <summary>
-        /// Initialize the grain client. This should be already done by <see cref="Deploy()"/> or <see cref="DeployAsync"/>
+        /// Initialize the grain client. This should be already done by <see cref="Deploy()"/> or <see cref="DeployAsync()"/>
         /// </summary>
-        public async Task InitializeClientAsync()
+        public Task InitializeClientAsync() => InitializeClientAsync(CancellationToken.None);
+
+        /// <summary>
+        /// Initialize the grain client.
+        /// </summary>
+        /// <param name="cancellationToken">The token used to cancel initialization.</param>
+        public async Task InitializeClientAsync(CancellationToken cancellationToken)
         {
             WriteLog("Initializing Cluster Client");
 
             if (ClientHost is not null)
             {
-                await StopClusterClientAsync();
+                await StopClusterClientAsync(cancellationToken);
             }
 
             var configurationBuilder = new ConfigurationBuilder();
@@ -813,7 +943,7 @@ namespace Orleans.TestingHost
                 });
             try
             {
-                await clientHost.StartAsync();
+                await clientHost.StartAsync(cancellationToken);
                 this.ClientHost = clientHost;
             }
             catch
@@ -829,26 +959,34 @@ namespace Orleans.TestingHost
         /// <value>The configuration sources.</value>
         public IReadOnlyList<IConfigurationSource> ConfigurationSources { get; }
 
-        private async Task InitializeAsync()
+        private async Task InitializeAsync(CancellationToken cancellationToken)
         {
             short silosToStart = this.options.InitialSilosCount;
 
             if (this.options.UseTestClusterMembership)
             {
-                this.Primary = await StartSiloAsync(this.startedInstances, this.options);
+                this.Primary = await StartSiloAsync(
+                    this.startedInstances,
+                    this.options,
+                    configurationOverrides: null,
+                    startSiloOnNewPort: false,
+                    cancellationToken);
                 silosToStart--;
             }
 
             if (silosToStart > 0)
             {
-                await this.StartAdditionalSilosAsync(silosToStart);
+                await this.StartAdditionalSilosAsync(
+                    silosToStart,
+                    startAdditionalSiloOnNewPort: false,
+                    cancellationToken);
             }
 
             WriteLog("Done initializing cluster");
 
             if (this.options.InitializeClientOnDeploy)
             {
-                await InitializeClientAsync();
+                await InitializeClientAsync(cancellationToken);
             }
         }
 
@@ -859,6 +997,19 @@ namespace Orleans.TestingHost
         /// <param name="configuration">The configuration.</param>
         /// <returns>The silo handle.</returns>
         public async Task<SiloHandle> DefaultCreateSiloAsync(string siloName, IConfiguration configuration)
+            => await DefaultCreateSiloAsync(siloName, configuration, CancellationToken.None);
+
+        /// <summary>
+        /// Creates a new silo handle.
+        /// </summary>
+        /// <param name="siloName">Name of the silo.</param>
+        /// <param name="configuration">The configuration.</param>
+        /// <param name="cancellationToken">The token used to cancel silo startup.</param>
+        /// <returns>The silo handle.</returns>
+        public async Task<SiloHandle> DefaultCreateSiloAsync(
+            string siloName,
+            IConfiguration configuration,
+            CancellationToken cancellationToken)
         {
             return await InProcessSiloHandle.CreateAsync(siloName, configuration, hostBuilder =>
             {
@@ -889,7 +1040,7 @@ namespace Orleans.TestingHost
                         }
                     }
                 });
-            });
+            }, cancellationToken);
         }
 
         /// <summary>
@@ -922,6 +1073,28 @@ namespace Orleans.TestingHost
         /// <param name="startSiloOnNewPort">Whether we start this silo on a new port, instead of the default one</param>
         /// <returns>A handle to the deployed silo.</returns>
         public async Task<SiloHandle> StartSiloAsync(int instanceNumber, TestClusterOptions clusterOptions, IReadOnlyList<IConfigurationSource>? configurationOverrides = null, bool startSiloOnNewPort = false)
+            => await StartSiloAsync(
+                instanceNumber,
+                clusterOptions,
+                configurationOverrides,
+                startSiloOnNewPort,
+                CancellationToken.None);
+
+        /// <summary>
+        /// Starts a new silo.
+        /// </summary>
+        /// <param name="instanceNumber">The instance number to deploy.</param>
+        /// <param name="clusterOptions">The options to use.</param>
+        /// <param name="configurationOverrides">Configuration overrides.</param>
+        /// <param name="startSiloOnNewPort">Whether to start this silo on a new port.</param>
+        /// <param name="cancellationToken">The token used to cancel silo startup.</param>
+        /// <returns>A handle to the deployed silo.</returns>
+        public async Task<SiloHandle> StartSiloAsync(
+            int instanceNumber,
+            TestClusterOptions clusterOptions,
+            IReadOnlyList<IConfigurationSource>? configurationOverrides,
+            bool startSiloOnNewPort,
+            CancellationToken cancellationToken)
         {
             var configurationSources = this.ConfigurationSources.ToList();
 
@@ -939,17 +1112,20 @@ namespace Orleans.TestingHost
                 configurationBuilder.Add(source);
             }
             var configuration = configurationBuilder.Build();
-            var handle = await this.CreateSiloAsync(siloSpecificOptions.SiloName, configuration);
+            var handle = await _createSiloAsyncWithCancellation(
+                siloSpecificOptions.SiloName,
+                configuration,
+                cancellationToken);
             handle.InstanceNumber = (short)instanceNumber;
             Interlocked.Increment(ref this.startedInstances);
             return handle;
         }
 
-        private async Task StopSiloAsync(SiloHandle instance, bool stopGracefully)
+        private async Task StopSiloAsync(SiloHandle instance, bool stopGracefully, CancellationToken cancellationToken)
         {
             try
             {
-                await instance.StopSiloAsync(stopGracefully).ConfigureAwait(false);
+                await instance.StopSiloAsync(stopGracefully, cancellationToken).ConfigureAwait(false);
             }
             finally
             {
@@ -994,6 +1170,7 @@ namespace Orleans.TestingHost
 
             await Task.Run(async () =>
             {
+                AppDomain.CurrentDomain.UnhandledException -= ReportUnobservedException;
                 await DisposeAsync(ClientHost).ConfigureAwait(ConfigureAwaitOptions.SuppressThrowing);
 
                 foreach (var handle in SecondarySilos)

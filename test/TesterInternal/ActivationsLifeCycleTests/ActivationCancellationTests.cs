@@ -148,12 +148,12 @@ public class ActivationCancellationLoggingTests : OrleansTestingBase, IClassFixt
 
         await Assert.ThrowsAnyAsync<OperationCanceledException>(async () =>
         {
-            await grain.IsActivated().WaitAsync(TimeSpan.FromSeconds(5));
+            await grain.IsActivated().WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
         });
 
         RequestContext.Clear();
 
-        await Task.Delay(100);
+        await Task.Delay(100, TestContext.Current.CancellationToken);
 
         var (errorLogs, warningLogs, infoLogs) = GetActivationLogs();
 
@@ -190,7 +190,7 @@ public class ActivationCancellationLoggingTests : OrleansTestingBase, IClassFixt
 
         RequestContext.Clear();
 
-        await Task.Delay(100);
+        await Task.Delay(100, TestContext.Current.CancellationToken);
 
         var (errorLogs, warningLogs, infoLogs) = GetActivationLogs();
 
@@ -221,12 +221,12 @@ public class ActivationCancellationLoggingTests : OrleansTestingBase, IClassFixt
 
         await Assert.ThrowsAnyAsync<OperationCanceledException>(async () =>
         {
-            await grain.IsActivated().WaitAsync(TimeSpan.FromSeconds(5));
+            await grain.IsActivated().WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
         });
 
         RequestContext.Clear();
 
-        await Task.Delay(100);
+        await Task.Delay(100, TestContext.Current.CancellationToken);
 
         var (errorLogs, warningLogs, infoLogs) = GetActivationLogs();
 
@@ -263,7 +263,7 @@ public class ActivationCancellationLoggingTests : OrleansTestingBase, IClassFixt
 
         RequestContext.Clear();
 
-        await Task.Delay(100);
+        await Task.Delay(100, TestContext.Current.CancellationToken);
 
         var (errorLogs, _, infoLogs) = GetActivationLogs();
 
@@ -291,7 +291,7 @@ public class ActivationCancellationLoggingTests : OrleansTestingBase, IClassFixt
 
         RequestContext.Clear();
 
-        await Task.Delay(100);
+        await Task.Delay(100, TestContext.Current.CancellationToken);
 
         var (errorLogs, _, infoLogs) = GetActivationLogs();
 
@@ -319,7 +319,7 @@ public class ActivationCancellationLoggingTests : OrleansTestingBase, IClassFixt
 
         RequestContext.Clear();
 
-        await Task.Delay(100);
+        await Task.Delay(100, TestContext.Current.CancellationToken);
 
         var (errorLogs, _, infoLogs) = GetActivationLogs();
 
@@ -346,7 +346,7 @@ public class ActivationCancellationLoggingTests : OrleansTestingBase, IClassFixt
 
         var isActivated = await grain.IsActivated();
 
-        await Task.Delay(100);
+        await Task.Delay(100, TestContext.Current.CancellationToken);
 
         var (errorLogs, warningLogs, infoLogs) = GetActivationLogs();
 

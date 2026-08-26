@@ -368,7 +368,10 @@ public record DemoRecord([Id(42)] string Value);
     public async Task ExtractReferenceAssemblyData_CollectsCrossAssemblyMetadataAndDeterministicOrdering()
     {
         var consumerCompilation = await CreateReferenceExtractionCompilation();
-        var model = ModelExtractor.ExtractReferenceAssemblyData(consumerCompilation, new CodeGeneratorOptions(), default);
+        var model = ModelExtractor.ExtractReferenceAssemblyData(
+            consumerCompilation,
+            new CodeGeneratorOptions(),
+            TestContext.Current.CancellationToken);
 
         Assert.Equal("ConsumerProject", model.ApplicationParts[0]);
         Assert.Equal(model.ApplicationParts.Length, model.ApplicationParts.Distinct(StringComparer.Ordinal).Count());
@@ -412,8 +415,14 @@ public record DemoRecord([Id(42)] string Value);
         var compilationA = await CreateReferenceExtractionCompilation();
         var compilationB = await CreateReferenceExtractionCompilation(reverseReferenceOrder: true);
 
-        var modelA = ModelExtractor.ExtractReferenceAssemblyData(compilationA, new CodeGeneratorOptions(), default);
-        var modelB = ModelExtractor.ExtractReferenceAssemblyData(compilationB, new CodeGeneratorOptions(), default);
+        var modelA = ModelExtractor.ExtractReferenceAssemblyData(
+            compilationA,
+            new CodeGeneratorOptions(),
+            TestContext.Current.CancellationToken);
+        var modelB = ModelExtractor.ExtractReferenceAssemblyData(
+            compilationB,
+            new CodeGeneratorOptions(),
+            TestContext.Current.CancellationToken);
 
         Assert.Equal(modelA, modelB);
         Assert.Equal(modelA.GetHashCode(), modelB.GetHashCode());
@@ -468,7 +477,10 @@ public record DemoRecord([Id(42)] string Value);
             "ConsumerProject",
             aliasedReference);
 
-        var model = ModelExtractor.ExtractReferenceAssemblyData(consumerCompilation, new CodeGeneratorOptions(), default);
+        var model = ModelExtractor.ExtractReferenceAssemblyData(
+            consumerCompilation,
+            new CodeGeneratorOptions(),
+            TestContext.Current.CancellationToken);
 
         Assert.Empty(model.RegisteredProviders);
     }
@@ -495,7 +507,10 @@ public record DemoRecord([Id(42)] string Value);
             """;
 
         var compilation = await CreateCompilation(code);
-        var model = ModelExtractor.ExtractReferenceAssemblyData(compilation, new CodeGeneratorOptions(), default);
+        var model = ModelExtractor.ExtractReferenceAssemblyData(
+            compilation,
+            new CodeGeneratorOptions(),
+            TestContext.Current.CancellationToken);
 
         Assert.Empty(model.RegisteredProviders);
     }

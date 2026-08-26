@@ -359,7 +359,8 @@ public class IncrementalCachingTests
             """;
 
         var compilation = await CreateCompilation(code);
-        var newCompilation = compilation.AddSyntaxTrees(CSharpSyntaxTree.ParseText(additionalFile));
+        var newCompilation = compilation.AddSyntaxTrees(
+            CSharpSyntaxTree.ParseText(additionalFile, cancellationToken: TestContext.Current.CancellationToken));
         var (result1, result2) = await RunTwice(compilation, newCompilation);
 
         AssertTrackedStepsCachedOrUnchanged(
@@ -401,8 +402,10 @@ public class IncrementalCachingTests
             }
             """;
 
-        var compilation = (await CreateCompilation(code)).AddSyntaxTrees(CSharpSyntaxTree.ParseText(registration));
-        var updatedCompilation = compilation.AddSyntaxTrees(CSharpSyntaxTree.ParseText(unrelated));
+        var compilation = (await CreateCompilation(code)).AddSyntaxTrees(
+            CSharpSyntaxTree.ParseText(registration, cancellationToken: TestContext.Current.CancellationToken));
+        var updatedCompilation = compilation.AddSyntaxTrees(
+            CSharpSyntaxTree.ParseText(unrelated, cancellationToken: TestContext.Current.CancellationToken));
         var (result1, result2) = await RunTwice(compilation, updatedCompilation);
 
         AssertTrackedStepsCachedOrUnchanged(
@@ -445,9 +448,13 @@ public class IncrementalCachingTests
             """;
 
         var compilation = await CreateCompilation(code);
-        var registrationTree = CSharpSyntaxTree.ParseText(registrationA);
+        var registrationTree = CSharpSyntaxTree.ParseText(
+            registrationA,
+            cancellationToken: TestContext.Current.CancellationToken);
         compilation = compilation.AddSyntaxTrees(registrationTree);
-        var updatedCompilation = compilation.ReplaceSyntaxTree(registrationTree, CSharpSyntaxTree.ParseText(registrationB));
+        var updatedCompilation = compilation.ReplaceSyntaxTree(
+            registrationTree,
+            CSharpSyntaxTree.ParseText(registrationB, cancellationToken: TestContext.Current.CancellationToken));
         var (result1, result2) = await RunTwice(compilation, updatedCompilation);
 
         AssertTrackedStepsCachedOrUnchanged(
@@ -483,7 +490,8 @@ public class IncrementalCachingTests
             """;
 
         var compilation = await CreateCompilation(code);
-        var updatedCompilation = compilation.AddSyntaxTrees(CSharpSyntaxTree.ParseText(invalidRegistration));
+        var updatedCompilation = compilation.AddSyntaxTrees(
+            CSharpSyntaxTree.ParseText(invalidRegistration, cancellationToken: TestContext.Current.CancellationToken));
         var (result1, result2) = await RunTwice(compilation, updatedCompilation);
 
         Assert.Empty(result1.Diagnostics);
@@ -522,7 +530,8 @@ public class IncrementalCachingTests
             """;
 
         var compilation = await CreateCompilation(code);
-        var newCompilation = compilation.AddSyntaxTrees(CSharpSyntaxTree.ParseText(additionalFile));
+        var newCompilation = compilation.AddSyntaxTrees(
+            CSharpSyntaxTree.ParseText(additionalFile, cancellationToken: TestContext.Current.CancellationToken));
         var (result1, result2) = await RunTwice(compilation, newCompilation);
 
         AssertTrackedStepsCachedOrUnchanged(

@@ -68,7 +68,7 @@ namespace TestExtensions
             var testCluster = builder.Build();
             if (testCluster.Primary == null)
             {
-                await testCluster.DeployAsync().ConfigureAwait(false);
+                await testCluster.DeployAsync(Xunit.TestContext.Current.CancellationToken).ConfigureAwait(false);
             }
 
             this.HostedCluster = testCluster;
@@ -82,7 +82,7 @@ namespace TestExtensions
 
             try
             {
-                await cluster.StopAllSilosAsync().ConfigureAwait(false);
+                await cluster.StopAllSilosAsync(Xunit.TestContext.Current.CancellationToken).ConfigureAwait(false);
             }
             finally
             {

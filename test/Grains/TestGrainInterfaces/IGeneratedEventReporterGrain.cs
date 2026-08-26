@@ -8,7 +8,7 @@ namespace TestGrainInterfaces
 
         Task<IDictionary<Guid,int>> GetReport(string streamProvider, string streamNamespace, CancellationToken cancellationToken = default);
 
-        Task Reset();
+        Task Reset(CancellationToken cancellationToken);
 
         Task<bool> IsLocatedOnSilo(SiloAddress siloAddress);
     }

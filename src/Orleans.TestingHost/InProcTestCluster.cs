@@ -230,8 +230,15 @@ public sealed class InProcessTestCluster : IDisposable, IAsyncDisposable
     /// <summary>
     /// Deploys the cluster using the specified configuration and starts the client in-process.
     /// </summary>
-    public async Task DeployAsync()
+    public Task DeployAsync() => DeployAsync(CancellationToken.None);
+
+    /// <summary>
+    /// Deploys the cluster using the specified configuration and starts the client in-process.
+    /// </summary>
+    /// <param name="cancellationToken">The token used to cancel deployment.</param>
+    public async Task DeployAsync(CancellationToken cancellationToken)
     {
+        cancellationToken.ThrowIfCancellationRequested();
         if (_silos.Count > 0) throw new InvalidOperationException("Cluster host already deployed.");
 
         AppDomain.CurrentDomain.UnhandledException += ReportUnobservedException;
@@ -240,11 +247,11 @@ public sealed class InProcessTestCluster : IDisposable, IAsyncDisposable
         {
             string startMsg = "----------------------------- STARTING NEW UNIT TEST SILO HOST: " + GetType().FullName + " -------------------------------------";
             WriteLog(startMsg);
-            await InitializeAsync();
+            await InitializeAsync(cancellationToken);
 
             if (Options.InitializeClientOnDeploy)
             {
-                await WaitForInitialStabilization();
+                await WaitForInitialStabilization(cancellationToken);
             }
         }
         catch (TimeoutException te)
@@ -254,7 +261,7 @@ public sealed class InProcessTestCluster : IDisposable, IAsyncDisposable
         }
         catch (Exception ex)
         {
-            await StopAllSilosAsync();
+            await StopAllSilosAsync(CancellationToken.None);
 
             Exception baseExc = ex.GetBaseException();
             FlushLogToConsole();
@@ -279,7 +286,7 @@ public sealed class InProcessTestCluster : IDisposable, IAsyncDisposable
         }
     }
 
-    private async Task WaitForInitialStabilization()
+    private async Task WaitForInitialStabilization(CancellationToken cancellationToken)
     {
         // Poll each silo to check that it knows the expected number of active silos.
         // If any silo does not have the expected number of active silos in its cluster membership oracle, try again.
@@ -294,7 +301,7 @@ public sealed class InProcessTestCluster : IDisposable, IAsyncDisposable
             foreach (var silo in silos)
             {
                 var hooks = InternalClient!.GetTestHooks(silo); // Membership stabilization requires a deployed client.
-                var statuses = await hooks.GetApproximateSiloStatuses();
+                var statuses = await hooks.GetApproximateSiloStatuses().WaitAsync(cancellationToken);
                 var activeCount = statuses.Count(s => s.Value == SiloStatus.Active);
                 if (activeCount != expectedCount) break;
                 remainingSilos--;
@@ -307,7 +314,7 @@ public sealed class InProcessTestCluster : IDisposable, IAsyncDisposable
             }
 
             WriteLog($"{remainingSilos} silos do not have a consistent cluster view, waiting until stabilization.");
-            await Task.Delay(TimeSpan.FromMilliseconds(100));
+            await Task.Delay(TimeSpan.FromMilliseconds(100), cancellationToken);
 
             if (totalWait.Elapsed < TimeSpan.FromSeconds(60))
             {
@@ -481,13 +488,31 @@ public sealed class InProcessTestCluster : IDisposable, IAsyncDisposable
     /// </summary>
     /// <param name="silosToStart">Number of silos to start.</param>
     /// <returns>List of SiloHandles for the newly started silos.</returns>
-    public async Task<List<InProcessSiloHandle>> StartSilosAsync(int silosToStart)
+    public Task<List<InProcessSiloHandle>> StartSilosAsync(int silosToStart)
+        => StartSilosAsync(silosToStart, CancellationToken.None);
+
+    /// <summary>
+    /// Start a number of additional silos, so that they join the existing cluster.
+    /// </summary>
+    /// <param name="silosToStart">Number of silos to start.</param>
+    /// <param name="cancellationToken">The token used to cancel silo startup.</param>
+    /// <returns>List of silo handles for the newly started silos.</returns>
+    public async Task<List<InProcessSiloHandle>> StartSilosAsync(
+        int silosToStart,
+        CancellationToken cancellationToken)
     {
         var instances = new List<InProcessSiloHandle>();
         if (silosToStart > 0)
         {
-            var siloStartTasks = Enumerable.Range(_startedInstances, silosToStart)
-                .Select(instanceNumber => Task.Run(() => StartSiloAsync((short)instanceNumber, Options))).ToArray();
+            var silos = Silos;
+            var firstInstanceNumber = silos.Count == 0
+                ? 0
+                : silos.Max(static silo => silo.InstanceNumber) + 1;
+            var siloStartTasks = Enumerable.Range(firstInstanceNumber, silosToStart)
+                .Select(instanceNumber => Task.Run(
+                    () => StartSiloAsync((short)instanceNumber, Options, cancellationToken),
+                    cancellationToken))
+                .ToArray();
 
             try
             {
@@ -497,7 +522,10 @@ public sealed class InProcessTestCluster : IDisposable, IAsyncDisposable
             {
                 lock (_silos)
                 {
-                    _silos.AddRange(siloStartTasks.Where(t => t.Exception == null).Select(t => t.Result));
+                    _silos.AddRange(
+                        siloStartTasks
+                            .Where(static task => task.Status == TaskStatus.RanToCompletion)
+                            .Select(static task => task.Result));
                 }
 
                 throw;
@@ -516,11 +544,17 @@ public sealed class InProcessTestCluster : IDisposable, IAsyncDisposable
     /// <summary>
     /// Stop all silos.
     /// </summary>
-    public async Task StopSilosAsync()
+    public Task StopSilosAsync() => StopSilosAsync(CancellationToken.None);
+
+    /// <summary>
+    /// Stop all silos.
+    /// </summary>
+    /// <param name="cancellationToken">The token used to cancel shutdown.</param>
+    public async Task StopSilosAsync(CancellationToken cancellationToken)
     {
         foreach (var instance in _silos.ToList())
         {
-            await StopSiloAsync(instance);
+            await StopSiloAsync(instance, cancellationToken);
         }
     }
 
@@ -528,19 +562,30 @@ public sealed class InProcessTestCluster : IDisposable, IAsyncDisposable
     /// Stop cluster client as an asynchronous operation.
     /// </summary>
     /// <returns>A <see cref="Task"/> representing the asynchronous operation.</returns>
-    public async Task StopClusterClientAsync()
+    public Task StopClusterClientAsync() => StopClusterClientAsync(CancellationToken.None);
+
+    /// <summary>
+    /// Stop cluster client as an asynchronous operation.
+    /// </summary>
+    /// <param name="cancellationToken">The token used to cancel shutdown.</param>
+    /// <returns>A <see cref="Task"/> representing the asynchronous operation.</returns>
+    public async Task StopClusterClientAsync(CancellationToken cancellationToken)
     {
         var client = ClientHost;
         try
         {
             if (client is not null)
             {
-                await client.StopAsync().ConfigureAwait(false);
+                await client.StopAsync(cancellationToken).ConfigureAwait(false);
             }
         }
         catch (Exception exc)
         {
             WriteLog("Exception stopping client: {0}", exc);
+            if (exc is OperationCanceledException && cancellationToken.IsCancellationRequested)
+            {
+                throw;
+            }
         }
         finally
         {
@@ -560,25 +605,50 @@ public sealed class InProcessTestCluster : IDisposable, IAsyncDisposable
     /// <summary>
     /// Stop all current silos.
     /// </summary>
-    public async Task StopAllSilosAsync()
+    public Task StopAllSilosAsync() => StopAllSilosAsync(CancellationToken.None);
+
+    /// <summary>
+    /// Stop all current silos.
+    /// </summary>
+    /// <param name="cancellationToken">The token used to cancel shutdown.</param>
+    public async Task StopAllSilosAsync(CancellationToken cancellationToken)
     {
-        await StopClusterClientAsync();
-        await StopSilosAsync();
-        AppDomain.CurrentDomain.UnhandledException -= ReportUnobservedException;
+        try
+        {
+            await StopClusterClientAsync(cancellationToken);
+            await StopSilosAsync(cancellationToken);
+        }
+        finally
+        {
+            AppDomain.CurrentDomain.UnhandledException -= ReportUnobservedException;
+        }
     }
 
     /// <summary>
     /// Do a semi-graceful Stop of the specified silo.
     /// </summary>
     /// <param name="instance">Silo to be stopped.</param>
-    public async Task StopSiloAsync(InProcessSiloHandle instance)
+    public Task StopSiloAsync(InProcessSiloHandle instance) => StopSiloAsync(instance, CancellationToken.None);
+
+    /// <summary>
+    /// Do a semi-graceful Stop of the specified silo.
+    /// </summary>
+    /// <param name="instance">Silo to be stopped.</param>
+    /// <param name="cancellationToken">The token used to cancel shutdown.</param>
+    public async Task StopSiloAsync(InProcessSiloHandle instance, CancellationToken cancellationToken)
     {
         if (instance != null)
         {
-            await StopSiloAsync(instance, true);
-            lock (_silos)
+            try
             {
-                _silos.Remove(instance);
+                await StopSiloAsync(instance, true, cancellationToken);
+            }
+            finally
+            {
+                lock (_silos)
+                {
+                    _silos.Remove(instance);
+                }
             }
         }
     }
@@ -587,15 +657,29 @@ public sealed class InProcessTestCluster : IDisposable, IAsyncDisposable
     /// Do an immediate Kill of the specified silo.
     /// </summary>
     /// <param name="instance">Silo to be killed.</param>
-    public async Task KillSiloAsync(InProcessSiloHandle instance)
+    public Task KillSiloAsync(InProcessSiloHandle instance) => KillSiloAsync(instance, CancellationToken.None);
+
+    /// <summary>
+    /// Do an immediate Kill of the specified silo.
+    /// </summary>
+    /// <param name="instance">Silo to be killed.</param>
+    /// <param name="cancellationToken">The token used to cancel the operation.</param>
+    public async Task KillSiloAsync(InProcessSiloHandle instance, CancellationToken cancellationToken)
     {
+        cancellationToken.ThrowIfCancellationRequested();
         if (instance != null)
         {
-            // do NOT stop, just kill directly, to simulate crash.
-            await StopSiloAsync(instance, false);
-            lock (_silos)
+            try
             {
-                _silos.Remove(instance);
+                // do NOT stop, just kill directly, to simulate crash.
+                await StopSiloAsync(instance, false, cancellationToken);
+            }
+            finally
+            {
+                lock (_silos)
+                {
+                    _silos.Remove(instance);
+                }
             }
         }
     }
@@ -661,15 +745,21 @@ public sealed class InProcessTestCluster : IDisposable, IAsyncDisposable
     }
 
     /// <summary>
-    /// Initialize the grain client. This should be already done by <see cref="DeployAsync"/>
+    /// Initialize the grain client. This should be already done by <see cref="DeployAsync()"/>
     /// </summary>
-    public async Task InitializeClientAsync()
+    public Task InitializeClientAsync() => InitializeClientAsync(CancellationToken.None);
+
+    /// <summary>
+    /// Initialize the grain client.
+    /// </summary>
+    /// <param name="cancellationToken">The token used to cancel initialization.</param>
+    public async Task InitializeClientAsync(CancellationToken cancellationToken)
     {
         WriteLog("Initializing Cluster Client");
 
         if (ClientHost is not null)
         {
-            await StopClusterClientAsync();
+            await StopClusterClientAsync(cancellationToken);
         }
 
         var hostBuilder = Host.CreateApplicationBuilder(new HostApplicationBuilderSettings
@@ -705,7 +795,7 @@ public sealed class InProcessTestCluster : IDisposable, IAsyncDisposable
         var clientHost = hostBuilder.Build();
         try
         {
-            await clientHost.StartAsync();
+            await clientHost.StartAsync(cancellationToken);
             ClientHost = clientHost;
         }
         catch
@@ -715,24 +805,35 @@ public sealed class InProcessTestCluster : IDisposable, IAsyncDisposable
         }
     }
 
-    private async Task InitializeAsync()
+    private async Task InitializeAsync(CancellationToken cancellationToken)
     {
         var silosToStart = Options.InitialSilosCount;
 
         if (silosToStart > 0)
         {
-            await StartSilosAsync(silosToStart);
+            await StartSilosAsync(silosToStart, cancellationToken);
         }
 
         WriteLog("Done initializing cluster");
 
         if (Options.InitializeClientOnDeploy)
         {
-            await InitializeClientAsync();
+            await InitializeClientAsync(cancellationToken);
         }
     }
 
-    public async Task<InProcessSiloHandle> CreateSiloAsync(InProcessTestSiloSpecificOptions siloOptions)
+    public Task<InProcessSiloHandle> CreateSiloAsync(InProcessTestSiloSpecificOptions siloOptions)
+        => CreateSiloAsync(siloOptions, CancellationToken.None);
+
+    /// <summary>
+    /// Creates and starts an in-process silo.
+    /// </summary>
+    /// <param name="siloOptions">The silo options.</param>
+    /// <param name="cancellationToken">The token used to cancel silo startup.</param>
+    /// <returns>A handle to the started silo.</returns>
+    public async Task<InProcessSiloHandle> CreateSiloAsync(
+        InProcessTestSiloSpecificOptions siloOptions,
+        CancellationToken cancellationToken)
     {
         var host = await Task.Run(async () =>
         {
@@ -814,9 +915,17 @@ public sealed class InProcessTestCluster : IDisposable, IAsyncDisposable
             var host = appBuilder.Build();
             TestClusterFatalErrorHandler.Attach(host);
             InitializeTestHooksSystemTarget(host);
-            await host.StartAsync();
-            return host;
-        });
+            try
+            {
+                await host.StartAsync(cancellationToken);
+                return host;
+            }
+            catch
+            {
+                await DisposeAsync(host);
+                throw;
+            }
+        }, cancellationToken);
 
         return new InProcessSiloHandle
         {
@@ -862,10 +971,23 @@ public sealed class InProcessTestCluster : IDisposable, IAsyncDisposable
     /// <param name="instanceNumber">The instance number to deploy</param>
     /// <param name="clusterOptions">The options to use.</param>
     /// <returns>A handle to the deployed silo.</returns>
-    public async Task<InProcessSiloHandle> StartSiloAsync(int instanceNumber, InProcessTestClusterOptions clusterOptions)
+    public Task<InProcessSiloHandle> StartSiloAsync(int instanceNumber, InProcessTestClusterOptions clusterOptions)
+        => StartSiloAsync(instanceNumber, clusterOptions, CancellationToken.None);
+
+    /// <summary>
+    /// Starts a new silo.
+    /// </summary>
+    /// <param name="instanceNumber">The instance number to deploy.</param>
+    /// <param name="clusterOptions">The options to use.</param>
+    /// <param name="cancellationToken">The token used to cancel silo startup.</param>
+    /// <returns>A handle to the deployed silo.</returns>
+    public async Task<InProcessSiloHandle> StartSiloAsync(
+        int instanceNumber,
+        InProcessTestClusterOptions clusterOptions,
+        CancellationToken cancellationToken)
     {
         var siloOptions = InProcessTestSiloSpecificOptions.Create(this, clusterOptions, instanceNumber, assignNewPort: true);
-        var handle = await CreateSiloAsync(siloOptions);
+        var handle = await CreateSiloAsync(siloOptions, cancellationToken);
         handle.InstanceNumber = (short)instanceNumber;
         Interlocked.Increment(ref _startedInstances);
         return handle;
@@ -885,11 +1007,14 @@ public sealed class InProcessTestCluster : IDisposable, IAsyncDisposable
         return await StartSiloAsync(instanceNumber, clusterOptions);
     }
 
-    private async Task StopSiloAsync(InProcessSiloHandle instance, bool stopGracefully)
+    private async Task StopSiloAsync(
+        InProcessSiloHandle instance,
+        bool stopGracefully,
+        CancellationToken cancellationToken)
     {
         try
         {
-            await instance.StopSiloAsync(stopGracefully).ConfigureAwait(false);
+            await instance.StopSiloAsync(stopGracefully, cancellationToken).ConfigureAwait(false);
         }
         finally
         {
@@ -934,6 +1059,7 @@ public sealed class InProcessTestCluster : IDisposable, IAsyncDisposable
 
         await Task.Run(async () =>
         {
+            AppDomain.CurrentDomain.UnhandledException -= ReportUnobservedException;
             foreach (var handle in Silos)
             {
                 await DisposeAsync(handle).ConfigureAwait(false);

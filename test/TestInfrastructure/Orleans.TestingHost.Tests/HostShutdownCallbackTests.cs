@@ -26,7 +26,7 @@ namespace Orleans.TestingHost.Tests
             var builder = new InProcessTestClusterBuilder(1);
             builder.ConfigureHost(hostBuilder => TestDefaultConfiguration.ConfigureHostConfiguration(hostBuilder.Configuration));
             await using var cluster = builder.Build();
-            await cluster.DeployAsync();
+            await cluster.DeployAsync(TestContext.Current.CancellationToken);
 
             var key = Guid.NewGuid();
             var blocker = cluster.Client.GetGrain<IRemoteBlockerGrain>(key);
@@ -34,10 +34,15 @@ namespace Orleans.TestingHost.Tests
             // Start (but do not await) a call to a grain that blocks and never responds.
             var pending = blocker.BlockUntilReleased();
             var followUp = RetryAfterFailure(pending, blocker);
-            Assert.True(await RemoteBlockerGrain.WaitForEntered(key, TimeSpan.FromSeconds(30)), "The blocking call was never entered.");
+            Assert.True(
+                await RemoteBlockerGrain.WaitForEntered(
+                    key,
+                    TimeSpan.FromSeconds(30),
+                    TestContext.Current.CancellationToken),
+                "The blocking call was never entered.");
 
             // Stop the client while the call is in-flight.
-            await cluster.StopClusterClientAsync();
+            await cluster.StopClusterClientAsync(TestContext.Current.CancellationToken);
 
             // The pending call must fault promptly instead of hanging.
             var faulted = await Task.WhenAny(pending, Task.Delay(TimeSpan.FromSeconds(30), TestContext.Current.CancellationToken));
