@@ -180,9 +180,9 @@ public sealed class SqlServerHostingExtensionsTests
             {
                 builder.Services.AddPooledDbContextFactory<SqlServerReminderDbContext>(ConfigureDatabase());
 
-                var servicesResult = Orleans.Reminders.SqlHostingExtensions
+                var servicesResult = Orleans.Reminders.SqlServerHostingExtensions
                     .UseEntityFrameworkCoreSqlServerReminderService(builder.Services);
-                var builderResult = Orleans.Reminders.SqlHostingExtensions
+                var builderResult = Orleans.Reminders.SqlServerHostingExtensions
                     .UseEntityFrameworkCoreSqlServerReminderService(builder, ConfigureDatabase());
 
                 Assert.Same(builder.Services, servicesResult);

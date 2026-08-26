@@ -119,6 +119,25 @@ public sealed class GuidDbContextModelTests
     }
 
     [Fact]
+    public void BaseClusteringModel_MapsSuspectLists()
+    {
+        var options = new DbContextOptionsBuilder<BaseClusterDbContext>()
+            .UseSqlite("Data Source=:memory:")
+            .Options;
+        using var context = new BaseClusterDbContext(options);
+        var silo = context.Model.FindEntityType(typeof(SiloRecord<Guid>));
+
+        Assert.NotNull(silo);
+        foreach (var propertyName in new[] { nameof(SiloRecord<Guid>.SuspectingTimes), nameof(SiloRecord<Guid>.SuspectingSilos) })
+        {
+            var property = silo.FindProperty(propertyName);
+            Assert.NotNull(property);
+            Assert.Equal(typeof(string), property.GetValueConverter()?.ProviderClrType);
+            Assert.NotNull(property.GetValueComparer());
+        }
+    }
+
+    [Fact]
     public void ClusteringModel_SuspectListConverterAndComparer_HandleNullValues()
     {
         using var context = CreateContext(DatabaseProvider.PostgreSql, Feature.Clustering);
@@ -299,6 +318,9 @@ public sealed class GuidDbContextModelTests
             typeof(TContext).Assembly.GetName().Name!);
         return factory(builder.Options);
     }
+
+    private sealed class BaseClusterDbContext(DbContextOptions<BaseClusterDbContext> options)
+        : ClusterDbContext<BaseClusterDbContext, Guid>(options);
 
     public enum DatabaseProvider
     {
