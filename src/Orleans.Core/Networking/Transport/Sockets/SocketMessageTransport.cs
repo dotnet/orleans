@@ -515,22 +515,24 @@ exit:
     {
         await Task.CompletedTask.ConfigureAwait(ConfigureAwaitOptions.ForceYielding);
 
-        const int MaxBuffersPerSend = 32;
+        const int SmallRequestBufferLimit = 32;
+        const int LargeRequestBufferLimit = 64;
         const int CoalescingBufferSize = 64 * 1024;
         Exception? error = null;
         Queue<WriteRequest> requests = new();
         WriteRequest[] requestBuffer = new WriteRequest[256];
-        List<ArraySegment<byte>> buffers = new(capacity: MaxBuffersPerSend);
-        List<(WriteRequest, ArcBuffer)> processingRequests = new(capacity: MaxBuffersPerSend);
+        List<ArraySegment<byte>> buffers = new(capacity: LargeRequestBufferLimit);
+        List<(WriteRequest, ArcBuffer)> processingRequests = new(capacity: LargeRequestBufferLimit);
         var coalescingBuffer = ArrayPool<byte>.Shared.Rent(CoalescingBufferSize);
         ArcBuffer.ArraySegmentEnumerator enumerator = default;
+        var bufferLimit = SmallRequestBufferLimit;
 
         try
         {
             // Loop until termination.
             while (!_connectionClosingCts.IsCancellationRequested)
             {
-                while (buffers.Count < MaxBuffersPerSend)
+                while (buffers.Count < bufferLimit)
                 {
                     // Try to consume a buffer from the current enumerator.
                     if (enumerator.MoveNext())
@@ -548,6 +550,11 @@ DequeueRequest:
                             {
                                 request.SetResult();
                                 goto DequeueRequest;
+                            }
+
+                            if (request.HasLargeMessages)
+                            {
+                                bufferLimit = LargeRequestBufferLimit;
                             }
 
                             // Start enumerating the next request.
@@ -687,6 +694,8 @@ RefreshRequestQueue:
                 {
                     break;
                 }
+
+                bufferLimit = SmallRequestBufferLimit;
 
                 // Signal that the requests are completed
                 for (var i = 0; i < processingRequests.Count - 1; i++)

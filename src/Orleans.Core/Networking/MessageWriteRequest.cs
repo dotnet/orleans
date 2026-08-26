@@ -24,6 +24,8 @@ internal sealed class MessageWriteRequest : WriteRequest
 
     public List<Message> Messages { get; } = [];
     public int Length => _buffer.Length;
+    internal override bool HasLargeMessages
+        => _messageSizes.Exists(static size => size.TotalLength >= 8 * 1024);
 
     public void Initialize(Connection connection) => _connection = connection;
 
