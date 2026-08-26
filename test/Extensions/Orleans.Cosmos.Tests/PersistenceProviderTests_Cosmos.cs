@@ -71,7 +71,7 @@ public class PersistenceProviderTests_Cosmos
         var storage = await InitializeStorage(deleteStateOnClear: false);
         var runner = new GrainStorageModelBasedTestRunner(storage, "Cosmos", output.WriteLine);
 
-        await runner.RunGeneratedConformanceTests();
+        await runner.RunGeneratedConformanceTests(TestContext.Current.CancellationToken);
     }
 
     [Fact, TestCategory("Functional"), TestCategory("ModelBased")]
@@ -80,7 +80,7 @@ public class PersistenceProviderTests_Cosmos
         var storage = await InitializeStorage(deleteStateOnClear: true);
         var runner = new GrainStorageModelBasedTestRunner(storage, "CosmosDeleteStateOnClear", output.WriteLine);
 
-        await runner.RunGeneratedConformanceTests();
+        await runner.RunGeneratedConformanceTests(TestContext.Current.CancellationToken);
     }
 
     [Fact, TestCategory("Functional")]

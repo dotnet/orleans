@@ -132,7 +132,10 @@ namespace Tester.AzureUtils.Streaming
                 includeHistory: true);
 
             var existingSilos = this.HostedCluster.GetActiveSilos().Select(silo => silo.SiloAddress).ToArray();
-            var addedSilos = await this.HostedCluster.StartAdditionalSilosAsync(2, true);
+            var addedSilos = await this.HostedCluster.StartAdditionalSilosAsync(
+                2,
+                true,
+                TestContext.Current.CancellationToken);
             var addedSiloAddresses = addedSilos.Select(silo => silo.SiloAddress).ToArray();
             var activeSiloAddresses = this.HostedCluster.GetActiveSilos().Select(silo => silo.SiloAddress).ToArray();
 

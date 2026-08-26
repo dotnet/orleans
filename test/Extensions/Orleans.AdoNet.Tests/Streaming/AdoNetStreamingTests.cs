@@ -149,64 +149,65 @@ public abstract class AdoNetStreamingTests : TestClusterPerTest
     //------------------------ One to One -----------------------------------------------------//
 
     [Fact, TestCategory("Functional")]
-    public Task AdoNet_01_OneProducerGrainOneConsumerGrain() => _runner.StreamTest_01_OneProducerGrainOneConsumerGrain();
+    public Task AdoNet_01_OneProducerGrainOneConsumerGrain() => _runner.StreamTest_01_OneProducerGrainOneConsumerGrain(TestContext.Current.CancellationToken);
 
     [Fact, TestCategory("Functional")]
-    public Task AdoNet_02_OneProducerGrainOneConsumerClient() => _runner.StreamTest_02_OneProducerGrainOneConsumerClient();
+    public Task AdoNet_02_OneProducerGrainOneConsumerClient() => _runner.StreamTest_02_OneProducerGrainOneConsumerClient(TestContext.Current.CancellationToken);
 
     [Fact, TestCategory("Functional")]
-    public Task AdoNet_03_OneProducerClientOneConsumerGrain() => _runner.StreamTest_03_OneProducerClientOneConsumerGrain();
+    public Task AdoNet_03_OneProducerClientOneConsumerGrain() => _runner.StreamTest_03_OneProducerClientOneConsumerGrain(TestContext.Current.CancellationToken);
 
     [Fact, TestCategory("Functional")]
-    public Task AdoNet_04_OneProducerClientOneConsumerClient() => _runner.StreamTest_04_OneProducerClientOneConsumerClient();
+    public Task AdoNet_04_OneProducerClientOneConsumerClient() => _runner.StreamTest_04_OneProducerClientOneConsumerClient(TestContext.Current.CancellationToken);
 
     //------------------------ MANY to Many different grains ----------------------------------//
 
     [Fact, TestCategory("Functional")]
-    public Task AdoNet_05_ManyDifferent_ManyProducerGrainsManyConsumerGrains() => _runner.StreamTest_05_ManyDifferent_ManyProducerGrainsManyConsumerGrains();
+    public Task AdoNet_05_ManyDifferent_ManyProducerGrainsManyConsumerGrains() => _runner.StreamTest_05_ManyDifferent_ManyProducerGrainsManyConsumerGrains(TestContext.Current.CancellationToken);
 
     [Fact, TestCategory("Functional")]
-    public Task AdoNet_06_ManyDifferent_ManyProducerGrainManyConsumerClients() => _runner.StreamTest_06_ManyDifferent_ManyProducerGrainManyConsumerClients();
+    public Task AdoNet_06_ManyDifferent_ManyProducerGrainManyConsumerClients() => _runner.StreamTest_06_ManyDifferent_ManyProducerGrainManyConsumerClients(TestContext.Current.CancellationToken);
 
     [Fact, TestCategory("Functional")]
-    public Task AdoNet_07_ManyDifferent_ManyProducerClientsManyConsumerGrains() => _runner.StreamTest_07_ManyDifferent_ManyProducerClientsManyConsumerGrains();
+    public Task AdoNet_07_ManyDifferent_ManyProducerClientsManyConsumerGrains() => _runner.StreamTest_07_ManyDifferent_ManyProducerClientsManyConsumerGrains(TestContext.Current.CancellationToken);
 
     [Fact, TestCategory("Functional")]
-    public Task AdoNet_08_ManyDifferent_ManyProducerClientsManyConsumerClients() => _runner.StreamTest_08_ManyDifferent_ManyProducerClientsManyConsumerClients();
+    public Task AdoNet_08_ManyDifferent_ManyProducerClientsManyConsumerClients() => _runner.StreamTest_08_ManyDifferent_ManyProducerClientsManyConsumerClients(TestContext.Current.CancellationToken);
 
     //------------------------ MANY to Many Same grains ---------------------------------------//
 
     [Fact, TestCategory("Functional")]
-    public Task AdoNet_09_ManySame_ManyProducerGrainsManyConsumerGrains() => _runner.StreamTest_09_ManySame_ManyProducerGrainsManyConsumerGrains();
+    public Task AdoNet_09_ManySame_ManyProducerGrainsManyConsumerGrains() => _runner.StreamTest_09_ManySame_ManyProducerGrainsManyConsumerGrains(TestContext.Current.CancellationToken);
 
     [Fact, TestCategory("Functional")]
-    public Task AdoNet_10_ManySame_ManyConsumerGrainsManyProducerGrains() => _runner.StreamTest_10_ManySame_ManyConsumerGrainsManyProducerGrains();
+    public Task AdoNet_10_ManySame_ManyConsumerGrainsManyProducerGrains() => _runner.StreamTest_10_ManySame_ManyConsumerGrainsManyProducerGrains(TestContext.Current.CancellationToken);
 
     [Fact, TestCategory("Functional")]
-    public Task AdoNet_11_ManySame_ManyProducerGrainsManyConsumerClients() => _runner.StreamTest_11_ManySame_ManyProducerGrainsManyConsumerClients();
+    public Task AdoNet_11_ManySame_ManyProducerGrainsManyConsumerClients() => _runner.StreamTest_11_ManySame_ManyProducerGrainsManyConsumerClients(TestContext.Current.CancellationToken);
 
     [Fact, TestCategory("Functional")]
-    public Task AdoNet_12_ManySame_ManyProducerClientsManyConsumerGrains() => _runner.StreamTest_12_ManySame_ManyProducerClientsManyConsumerGrains();
+    public Task AdoNet_12_ManySame_ManyProducerClientsManyConsumerGrains() => _runner.StreamTest_12_ManySame_ManyProducerClientsManyConsumerGrains(TestContext.Current.CancellationToken);
 
     //------------------------ MANY to Many producer consumer same grain ----------------------//
 
     [Fact, TestCategory("Functional")]
-    public Task AdoNet_13_SameGrain_ConsumerFirstProducerLater() => _runner.StreamTest_13_SameGrain_ConsumerFirstProducerLater(false);
+    public Task AdoNet_13_SameGrain_ConsumerFirstProducerLater() => _runner.StreamTest_13_SameGrain_ConsumerFirstProducerLater(false, TestContext.Current.CancellationToken);
 
     [Fact, TestCategory("Functional")]
-    public Task AdoNet_14_SameGrain_ProducerFirstConsumerLater() => _runner.StreamTest_14_SameGrain_ProducerFirstConsumerLater(false);
+    public Task AdoNet_14_SameGrain_ProducerFirstConsumerLater() => _runner.StreamTest_14_SameGrain_ProducerFirstConsumerLater(false, TestContext.Current.CancellationToken);
 
     //-----------------------------------------------------------------------------------------//
 
     [Fact, TestCategory("Functional")]
-    public Task AdoNet_15_ConsumeAtProducersRequest() => _runner.StreamTest_15_ConsumeAtProducersRequest();
+    public Task AdoNet_15_ConsumeAtProducersRequest() => _runner.StreamTest_15_ConsumeAtProducersRequest(TestContext.Current.CancellationToken);
 
     [Fact, TestCategory("Functional")]
     public async Task AdoNet_16_MultipleStreams_ManyDifferent_ManyProducerGrainsManyConsumerGrains()
     {
         var multiRunner = new MultipleStreamsTestRunner(InternalClient, AdoNetStreamProviderName, 16, false);
 
-        await multiRunner.StreamTest_MultipleStreams_ManyDifferent_ManyProducerGrainsManyConsumerGrains();
+        await multiRunner.StreamTest_MultipleStreams_ManyDifferent_ManyProducerGrainsManyConsumerGrains(
+            cancellationToken: TestContext.Current.CancellationToken);
     }
 
     [Fact, TestCategory("Functional")]
@@ -214,6 +215,8 @@ public abstract class AdoNetStreamingTests : TestClusterPerTest
     {
         var multiRunner = new MultipleStreamsTestRunner(InternalClient, AdoNetStreamProviderName, 17, false);
 
-        await multiRunner.StreamTest_MultipleStreams_ManyDifferent_ManyProducerGrainsManyConsumerGrains(() => HostedCluster.StartAdditionalSilo());
+        await multiRunner.StreamTest_MultipleStreams_ManyDifferent_ManyProducerGrainsManyConsumerGrains(
+            () => HostedCluster.StartAdditionalSilo(),
+            cancellationToken: TestContext.Current.CancellationToken);
     }
 }

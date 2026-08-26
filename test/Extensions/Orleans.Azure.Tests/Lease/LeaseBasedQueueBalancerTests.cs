@@ -71,14 +71,18 @@ namespace Tester.AzureUtils.Lease
                 mgmtGrain,
                 TestContext.Current.CancellationToken);
             //stop one silo, 6 queues, 3 silo, then each agent manager should own 2 queues 
-            await this.HostedCluster.StopSiloAsync(this.HostedCluster.SecondarySilos[0]);
+            await this.HostedCluster.StopSiloAsync(
+                this.HostedCluster.SecondarySilos[0],
+                TestContext.Current.CancellationToken);
             await WaitUntilAgentManagersOwnCorrectAmountOfAgents(
                 2,
                 2,
                 mgmtGrain,
                 TestContext.Current.CancellationToken);
             //stop another silo, 6 queues, 2 silo, then each agent manager should own 3 queues
-            await this.HostedCluster.StopSiloAsync(this.HostedCluster.SecondarySilos[0]);
+            await this.HostedCluster.StopSiloAsync(
+                this.HostedCluster.SecondarySilos[0],
+                TestContext.Current.CancellationToken);
             await WaitUntilAgentManagersOwnCorrectAmountOfAgents(
                 3,
                 3,
@@ -104,14 +108,18 @@ namespace Tester.AzureUtils.Lease
                 mgmtGrain,
                 TestContext.Current.CancellationToken);
             //stop one silo, 6 queues, 3 silo, then each agent manager should own 2 queues 
-            await this.HostedCluster.KillSiloAsync(this.HostedCluster.SecondarySilos[0]);
+            await this.HostedCluster.KillSiloAsync(
+                this.HostedCluster.SecondarySilos[0],
+                TestContext.Current.CancellationToken);
             await WaitUntilAgentManagersOwnCorrectAmountOfAgents(
                 2,
                 2,
                 mgmtGrain,
                 TestContext.Current.CancellationToken);
             //stop another silo, 6 queues, 2 silo, then each agent manager should own 3 queues
-            await this.HostedCluster.KillSiloAsync(this.HostedCluster.SecondarySilos[0]);
+            await this.HostedCluster.KillSiloAsync(
+                this.HostedCluster.SecondarySilos[0],
+                TestContext.Current.CancellationToken);
             await WaitUntilAgentManagersOwnCorrectAmountOfAgents(
                 3,
                 3,

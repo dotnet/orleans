@@ -98,7 +98,11 @@ namespace ServiceBus.Tests.StreamingTests
 
             // subscribe to each partition
             List<Task> becomeConsumersTasks = consumers
-                .Select( (consumer, i) => consumer.BecomeConsumer(StreamPerPartitionDataAdapter.GetPartitionGuid(i.ToString()), null!, StreamProviderName)) // This test intentionally uses the null stream namespace.
+                .Select((consumer, i) => consumer.BecomeConsumer(
+                    StreamPerPartitionDataAdapter.GetPartitionGuid(i.ToString()),
+                    null!,
+                    StreamProviderName,
+                    TestContext.Current.CancellationToken)) // This test intentionally uses the null stream namespace.
                 .ToList();
             await Task.WhenAll(becomeConsumersTasks);
 

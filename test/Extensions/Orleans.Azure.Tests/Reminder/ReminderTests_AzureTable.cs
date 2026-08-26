@@ -123,7 +123,7 @@ namespace Tester.AzureUtils.TimerTests
         [Fact, TestCategory("Functional")]
         public async Task Rem_Azure_Basic_StopByRef()
         {
-            await Test_Reminders_Basic_StopByRef();
+            await Test_Reminders_Basic_StopByRef(TestContext.Current.CancellationToken);
         }
 
         [Fact, TestCategory("Functional")]
@@ -136,7 +136,7 @@ namespace Tester.AzureUtils.TimerTests
         [Fact, TestCategory("Functional")]
         public async Task Rem_Azure_Basic_ListOps()
         {
-            await Test_Reminders_Basic_ListOps();
+            await Test_Reminders_Basic_ListOps(TestContext.Current.CancellationToken);
         }
 
         // Single join tests ... multi grain, multi reminders
@@ -144,13 +144,13 @@ namespace Tester.AzureUtils.TimerTests
         [Fact, TestCategory("Functional")]
         public async Task Rem_Azure_1J_MultiGrainMultiReminders()
         {
-            await Test_Reminders_1J_MultiGrainMultiReminders();
+            await Test_Reminders_1J_MultiGrainMultiReminders(TestContext.Current.CancellationToken);
         }
 
         [Fact, TestCategory("Functional")]
         public async Task Rem_Azure_ReminderNotFound()
         {
-            await Test_Reminders_ReminderNotFound();
+            await Test_Reminders_ReminderNotFound(TestContext.Current.CancellationToken);
         }
 
         [Fact, TestCategory("Functional")]
@@ -207,7 +207,7 @@ namespace Tester.AzureUtils.TimerTests
         [Fact, TestCategory("Functional")]
         public async Task Rem_Azure_2J_MultiGrainMultiReminders()
         {
-            await Test_Reminders_2J_MultiGrainMultiReminders();
+            await Test_Reminders_2J_MultiGrainMultiReminders(TestContext.Current.CancellationToken);
         }
 
         [Fact, TestCategory("Functional")]

@@ -95,7 +95,7 @@ namespace Tester.Redis.Persistence
         {
             var runner = new GrainStorageModelBasedTestRunner(storageProvider, "RedisDeleteStateOnClear", output.WriteLine);
 
-            await runner.RunGeneratedConformanceTests();
+            await runner.RunGeneratedConformanceTests(TestContext.Current.CancellationToken);
         }
     }
 

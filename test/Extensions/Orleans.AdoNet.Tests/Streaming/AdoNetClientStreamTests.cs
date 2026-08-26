@@ -125,7 +125,10 @@ public abstract class AdoNetClientStreamTests : TestClusterPerTest
     }
 
     [Fact, TestCategory("Functional")]
-    public Task AdoNetStreamProducerOnDroppedClientTest() => _runner.StreamProducerOnDroppedClientTest(AdoNetStreamProviderName, StreamNamespace);
+    public Task AdoNetStreamProducerOnDroppedClientTest() => _runner.StreamProducerOnDroppedClientTest(
+        AdoNetStreamProviderName,
+        StreamNamespace,
+        TestContext.Current.CancellationToken);
 
     [Fact, TestCategory("Functional")]
     public virtual Task AdoNetStreamConsumerOnDroppedClientTest()
@@ -140,6 +143,7 @@ public abstract class AdoNetClientStreamTests : TestClusterPerTest
                 _ => { },
                 (record, i, ct) => Task.FromResult(record.GetInt32(0)),
                 cancellationToken: cancellationToken))
-                .Single());
+                .Single(),
+            cancellationToken: cancellationToken);
     }
 }

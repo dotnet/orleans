@@ -126,6 +126,9 @@ public class NatsClientStreamTests : TestClusterPerTest
     {
         logger.LogInformation(
             "************************ NatStreamProducerOnDroppedClientTest *********************************");
-        await runner.StreamProducerOnDroppedClientTest(NatsStreamProviderName, StreamNamespace);
+        await runner.StreamProducerOnDroppedClientTest(
+            NatsStreamProviderName,
+            StreamNamespace,
+            TestContext.Current.CancellationToken);
     }
 }

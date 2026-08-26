@@ -94,56 +94,56 @@ namespace Orleans.Streaming.Kinesis.Tests
         public async Task KinesisMultipleParallelSubscriptionTest()
         {
             logger.LogInformation("************************ KinesisMultipleParallelSubscriptionTest *********************************");
-            await runner.MultipleParallelSubscriptionTest(Guid.NewGuid(), StreamNamespace);
+            await runner.MultipleParallelSubscriptionTest(Guid.NewGuid(), StreamNamespace, TestContext.Current.CancellationToken);
         }
 
         [Fact]
         public async Task KinesisMultipleLinearSubscriptionTest()
         {
             logger.LogInformation("************************ KinesisMultipleLinearSubscriptionTest *********************************");
-            await runner.MultipleLinearSubscriptionTest(Guid.NewGuid(), StreamNamespace);
+            await runner.MultipleLinearSubscriptionTest(Guid.NewGuid(), StreamNamespace, TestContext.Current.CancellationToken);
         }
 
         [Fact]
         public async Task KinesisMultipleSubscriptionTest_AddRemoveSubscriptions()
         {
             logger.LogInformation("************************ KinesisMultipleSubscriptionTest_AddRemoveSubscriptions *********************************");
-            await runner.MultipleSubscriptionTest_AddRemove(Guid.NewGuid(), StreamNamespace);
+            await runner.MultipleSubscriptionTest_AddRemove(Guid.NewGuid(), StreamNamespace, TestContext.Current.CancellationToken);
         }
 
         [Fact]
         public async Task KinesisResubscriptionTest()
         {
             logger.LogInformation("************************ KinesisResubscriptionTest *********************************");
-            await runner.ResubscriptionTest(Guid.NewGuid(), StreamNamespace);
+            await runner.ResubscriptionTest(Guid.NewGuid(), StreamNamespace, TestContext.Current.CancellationToken);
         }
 
         [Fact]
         public async Task KinesisResubscriptionAfterDeactivationTest()
         {
             logger.LogInformation("************************ KinesisResubscriptionAfterDeactivationTest *********************************");
-            await runner.ResubscriptionAfterDeactivationTest(Guid.NewGuid(), StreamNamespace);
+            await runner.ResubscriptionAfterDeactivationTest(Guid.NewGuid(), StreamNamespace, TestContext.Current.CancellationToken);
         }
 
         [Fact]
         public async Task KinesisActiveSubscriptionTest()
         {
             logger.LogInformation("************************ KinesisActiveSubscriptionTest *********************************");
-            await runner.ActiveSubscriptionTest(Guid.NewGuid(), StreamNamespace);
+            await runner.ActiveSubscriptionTest(Guid.NewGuid(), StreamNamespace, TestContext.Current.CancellationToken);
         }
 
         [Fact]
         public async Task KinesisTwoIntermitentStreamTest()
         {
             logger.LogInformation("************************ KinesisTwoIntermitentStreamTest *********************************");
-            await runner.TwoIntermittentStreamTest(Guid.NewGuid());
+            await runner.TwoIntermittentStreamTest(Guid.NewGuid(), TestContext.Current.CancellationToken);
         }
 
         [Fact]
         public async Task KinesisSubscribeFromClientTest()
         {
             logger.LogInformation("************************ KinesisSubscribeFromClientTest *********************************");
-            await runner.SubscribeFromClientTest(Guid.NewGuid(), StreamNamespace);
+            await runner.SubscribeFromClientTest(Guid.NewGuid(), StreamNamespace, TestContext.Current.CancellationToken);
         }
     }
 }

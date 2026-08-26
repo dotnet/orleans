@@ -59,7 +59,7 @@ namespace Tester.AdoNet.Persistence
         {
             var runner = new GrainStorageModelBasedTestRunner(this.fixture.Storage, "Sqlite");
 
-            await runner.RunGeneratedConformanceTests();
+            await runner.RunGeneratedConformanceTests(TestContext.Current.CancellationToken);
         }
 
         [Fact]

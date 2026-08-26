@@ -92,7 +92,8 @@ namespace ServiceBus.Tests.SlowConsumingTests
                     streamGuid,
                     StreamNamespace,
                     StreamProviderName,
-                    healthyConsumerCount);
+                    healthyConsumerCount,
+                    testCancellationToken);
 
                 //configure data generator for stream and start producing
                 var randomStreamPlacementArg = new EventDataGeneratorAdapterFactory.StreamRandomPlacementArg(streamId, this.seed.Next(100));
@@ -123,7 +124,9 @@ namespace ServiceBus.Tests.SlowConsumingTests
                 {
                     await CleanupAsync(() => slowConsumer.StopConsuming(), testCancellationToken);
                 }
-                await CleanupAsync(() => StopHealthyConsumerGrainComing(healthyConsumers), testCancellationToken);
+                await CleanupAsync(
+                    cancellationToken => StopHealthyConsumerGrainComing(healthyConsumers, cancellationToken),
+                    testCancellationToken);
                 if (productionStarted)
                 {
                     await CleanupAsync(
@@ -133,6 +136,19 @@ namespace ServiceBus.Tests.SlowConsumingTests
                             streamId),
                         testCancellationToken);
                 }
+            }
+        }
+
+        private static async Task CleanupAsync(Func<CancellationToken, Task> cleanup, CancellationToken testCancellationToken)
+        {
+            using var cancellation = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+            try
+            {
+                await cleanup(cancellation.Token);
+            }
+            catch (OperationCanceledException) when (testCancellationToken.IsCancellationRequested)
+            {
+                // Preserve the original test cancellation after bounded cleanup.
             }
         }
 
@@ -149,7 +165,13 @@ namespace ServiceBus.Tests.SlowConsumingTests
             }
         }
 
-        public static async Task<List<ISampleStreaming_ConsumerGrain>> SetUpHealthyConsumerGrain(IGrainFactory GrainFactory, Guid streamId, string streamNameSpace, string streamProvider, int grainCount)
+        public static async Task<List<ISampleStreaming_ConsumerGrain>> SetUpHealthyConsumerGrain(
+            IGrainFactory GrainFactory,
+            Guid streamId,
+            string streamNameSpace,
+            string streamProvider,
+            int grainCount,
+            CancellationToken cancellationToken)
         {
             List<ISampleStreaming_ConsumerGrain> grains = new List<ISampleStreaming_ConsumerGrain>();
             List<Task> tasks = new List<Task>();
@@ -157,19 +179,21 @@ namespace ServiceBus.Tests.SlowConsumingTests
             {
                 var consumer = GrainFactory.GetGrain<ISampleStreaming_ConsumerGrain>(Guid.NewGuid());
                 grains.Add(consumer);
-                tasks.Add(consumer.BecomeConsumer(streamId, streamNameSpace, streamProvider));
+                tasks.Add(consumer.BecomeConsumer(streamId, streamNameSpace, streamProvider, cancellationToken));
                 grainCount--;
             }
             await Task.WhenAll(tasks);
             return grains;
         }
 
-        private static async Task StopHealthyConsumerGrainComing(List<ISampleStreaming_ConsumerGrain> grains)
+        private static async Task StopHealthyConsumerGrainComing(
+            List<ISampleStreaming_ConsumerGrain> grains,
+            CancellationToken cancellationToken)
         {
             List<Task> tasks = new List<Task>();
             foreach (var grain in grains)
             {
-                tasks.Add(grain.StopConsuming());
+                tasks.Add(grain.StopConsuming(cancellationToken));
             }
             await Task.WhenAll(tasks);
         }

@@ -121,7 +121,7 @@ public class NatsSubscriptionMultiplicityTests : TestClusterPerTest
     {
         logger.LogInformation(
             "************************ NatsMultipleLinearSubscriptionTest *********************************");
-        await runner.MultipleLinearSubscriptionTest(Guid.NewGuid(), StreamNamespace);
+        await runner.MultipleLinearSubscriptionTest(Guid.NewGuid(), StreamNamespace, TestContext.Current.CancellationToken);
     }
 
     [Fact, TestCategory("NATS")]
@@ -129,14 +129,14 @@ public class NatsSubscriptionMultiplicityTests : TestClusterPerTest
     {
         logger.LogInformation(
             "************************ NatsMultipleSubscriptionTest_AddRemove *********************************");
-        await runner.MultipleSubscriptionTest_AddRemove(Guid.NewGuid(), StreamNamespace);
+        await runner.MultipleSubscriptionTest_AddRemove(Guid.NewGuid(), StreamNamespace, TestContext.Current.CancellationToken);
     }
 
     [Fact, TestCategory("NATS")]
     public async Task NatsResubscriptionTest()
     {
         logger.LogInformation("************************ NatsResubscriptionTest *********************************");
-        await runner.ResubscriptionTest(Guid.NewGuid(), StreamNamespace);
+        await runner.ResubscriptionTest(Guid.NewGuid(), StreamNamespace, TestContext.Current.CancellationToken);
     }
 
     [Fact, TestCategory("NATS")]
@@ -144,27 +144,27 @@ public class NatsSubscriptionMultiplicityTests : TestClusterPerTest
     {
         logger.LogInformation(
             "************************ ResubscriptionAfterDeactivationTest *********************************");
-        await runner.ResubscriptionAfterDeactivationTest(Guid.NewGuid(), StreamNamespace);
+        await runner.ResubscriptionAfterDeactivationTest(Guid.NewGuid(), StreamNamespace, TestContext.Current.CancellationToken);
     }
 
     [Fact, TestCategory("NATS")]
     public async Task NatsActiveSubscriptionTest()
     {
         logger.LogInformation("************************ NatsActiveSubscriptionTest *********************************");
-        await runner.ActiveSubscriptionTest(Guid.NewGuid(), StreamNamespace);
+        await runner.ActiveSubscriptionTest(Guid.NewGuid(), StreamNamespace, TestContext.Current.CancellationToken);
     }
 
     [Fact, TestCategory("NATS")]
     public async Task NatsTwoIntermittentStreamTest()
     {
         logger.LogInformation("************************ NatsTwoIntermittentStreamTest *********************************");
-        await runner.TwoIntermittentStreamTest(Guid.NewGuid());
+        await runner.TwoIntermittentStreamTest(Guid.NewGuid(), TestContext.Current.CancellationToken);
     }
 
     [Fact, TestCategory("NATS")]
     public async Task NatsSubscribeFromClientTest()
     {
         logger.LogInformation("************************ NatsSubscribeFromClientTest *********************************");
-        await runner.SubscribeFromClientTest(Guid.NewGuid(), StreamNamespace);
+        await runner.SubscribeFromClientTest(Guid.NewGuid(), StreamNamespace, TestContext.Current.CancellationToken);
     }
 }

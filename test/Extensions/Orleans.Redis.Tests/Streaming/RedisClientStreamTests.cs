@@ -25,10 +25,17 @@ public sealed class RedisClientStreamTests : TestClusterPerTest
     }
 
     [Fact]
-    public async Task Redis_StreamProducerOnDroppedClientTest() => await _runner.StreamProducerOnDroppedClientTest(StreamProviderName, StreamNamespace);
+    public async Task Redis_StreamProducerOnDroppedClientTest() => await _runner.StreamProducerOnDroppedClientTest(
+        StreamProviderName,
+        StreamNamespace,
+        TestContext.Current.CancellationToken);
 
     [Fact]
-    public async Task Redis_StreamConsumerOnDroppedClientTest() => await _runner.StreamConsumerOnDroppedClientTest(StreamProviderName, StreamNamespace, _output);
+    public async Task Redis_StreamConsumerOnDroppedClientTest() => await _runner.StreamConsumerOnDroppedClientTest(
+        StreamProviderName,
+        StreamNamespace,
+        _output,
+        cancellationToken: TestContext.Current.CancellationToken);
 
     public override async ValueTask InitializeAsync()
     {

@@ -111,7 +111,7 @@ namespace Tester.AdoNet.Reminders
         [Fact]
         public async Task Rem_Sql_Basic_StopByRef()
         {
-            await Test_Reminders_Basic_StopByRef();
+            await Test_Reminders_Basic_StopByRef(TestContext.Current.CancellationToken);
         }
 
         [Fact]
@@ -123,7 +123,7 @@ namespace Tester.AdoNet.Reminders
         [Fact]
         public async Task Rem_Sql_Basic_ListOps()
         {
-            await Test_Reminders_Basic_ListOps();
+            await Test_Reminders_Basic_ListOps(TestContext.Current.CancellationToken);
         }
 
         // Single join tests ... multi grain, multi reminders
@@ -131,13 +131,13 @@ namespace Tester.AdoNet.Reminders
         [Fact]
         public async Task Rem_Sql_1J_MultiGrainMultiReminders()
         {
-            await Test_Reminders_1J_MultiGrainMultiReminders();
+            await Test_Reminders_1J_MultiGrainMultiReminders(TestContext.Current.CancellationToken);
         }
 
         [Fact]
         public async Task Rem_Sql_ReminderNotFound()
         {
-            await Test_Reminders_ReminderNotFound();
+            await Test_Reminders_ReminderNotFound(TestContext.Current.CancellationToken);
         }
     }
 }

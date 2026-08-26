@@ -85,7 +85,7 @@ public sealed class AzureBlobGrainStorageTests : AzureStorageBasicTests, IAsyncD
         var storage = await CreateStorageAsync(CreateSetupSerializer());
         var runner = new GrainStorageModelBasedTestRunner(storage, "AzureBlob", _output.WriteLine);
 
-        await runner.RunGeneratedConformanceTests();
+        await runner.RunGeneratedConformanceTests(TestContext.Current.CancellationToken);
     }
 
     [Fact, TestCategory("Functional"), TestCategory("ModelBased")]
@@ -94,7 +94,7 @@ public sealed class AzureBlobGrainStorageTests : AzureStorageBasicTests, IAsyncD
         var storage = await CreateStorageAsync(CreateSetupSerializer(), deleteStateOnClear: false);
         var runner = new GrainStorageModelBasedTestRunner(storage, "AzureBlobClearWritesTombstone", _output.WriteLine);
 
-        await runner.RunGeneratedConformanceTests();
+        await runner.RunGeneratedConformanceTests(TestContext.Current.CancellationToken);
     }
 
     private async Task AssertFailedReadDoesNotMutateStateAsync(

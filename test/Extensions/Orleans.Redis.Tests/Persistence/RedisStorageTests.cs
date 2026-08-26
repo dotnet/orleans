@@ -145,7 +145,7 @@ namespace Tester.Redis.Persistence
         public async Task GrainStorage_ModelBasedGeneratedConformance()
         {
             var runner = new GrainStorageModelBasedTestRunner(storageProvider, "Redis", output.WriteLine);
-            await runner.RunGeneratedConformanceTests();
+            await runner.RunGeneratedConformanceTests(TestContext.Current.CancellationToken);
         }
     }
 }

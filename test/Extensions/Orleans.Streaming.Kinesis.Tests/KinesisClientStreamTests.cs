@@ -101,7 +101,10 @@ namespace Orleans.Streaming.Kinesis.Tests
         [Fact]
         public async Task KinesisStreamProducerOnDroppedClientTest()
         {
-            await runner.StreamProducerOnDroppedClientTest(KinesisStreamProviderName, StreamNamespace);
+            await runner.StreamProducerOnDroppedClientTest(
+                KinesisStreamProviderName,
+                StreamNamespace,
+                TestContext.Current.CancellationToken);
         }
     }
 }
