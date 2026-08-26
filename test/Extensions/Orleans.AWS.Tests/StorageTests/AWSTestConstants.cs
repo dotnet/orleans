@@ -10,43 +10,51 @@ namespace AWSUtils.Tests.StorageTests
 {
     public class AWSTestConstants
     {
-        private static readonly Lazy<bool> _isDynamoDbAvailable = new Lazy<bool>(() =>
-        {
-            if (string.IsNullOrEmpty(DynamoDbService))
+        private static readonly Lazy<bool> _isDynamoDbAvailable = new(
+            () =>
             {
-                return false;
-            }
+                if (string.IsNullOrEmpty(DynamoDbService))
+                {
+                    return false;
+                }
 
-            try
-            {
-                DynamoDBStorage storage;
                 try
                 {
-                    storage = new DynamoDBStorage(NullLoggerFactory.Instance.CreateLogger("DynamoDBStorage"), DynamoDbService);
+                    DynamoDBStorage storage;
+                    try
+                    {
+                        storage = new DynamoDBStorage(NullLoggerFactory.Instance.CreateLogger("DynamoDBStorage"), DynamoDbService);
+                    }
+                    catch (AmazonServiceException)
+                    {
+                        return false;
+                    }
+                    storage.InitializeTable(
+                        "TestTable",
+                        new List<KeySchemaElement> {
+                            new KeySchemaElement { AttributeName = "PartitionKey", KeyType = KeyType.HASH }
+                        },
+                        new List<AttributeDefinition> {
+                            new AttributeDefinition { AttributeName = "PartitionKey", AttributeType = ScalarAttributeType.S }
+                        })
+                    .WaitAsync(TimeSpan.FromSeconds(2), Xunit.TestContext.Current.CancellationToken)
+                    .GetAwaiter()
+                    .GetResult();
+                    return true;
                 }
-                catch (AmazonServiceException)
+                catch (TimeoutException)
                 {
                     return false;
                 }
-                storage.InitializeTable(
-                    "TestTable",
-                    new List<KeySchemaElement> {
-                        new KeySchemaElement { AttributeName = "PartitionKey", KeyType = KeyType.HASH }
-                    },
-                    new List<AttributeDefinition> {
-                        new AttributeDefinition { AttributeName = "PartitionKey", AttributeType = ScalarAttributeType.S }
-                    })
-                .WaitAsync(TimeSpan.FromSeconds(2)).Wait();
-                return true;
-            }
-            catch (Exception exc)
-            {
-                if (exc.InnerException is TimeoutException)
-                    return false;
+                catch (Exception exc)
+                {
+                    if (exc.InnerException is TimeoutException)
+                        return false;
 
-                throw;
-            }
-        });
+                    throw;
+                }
+            },
+            LazyThreadSafetyMode.PublicationOnly);
 
         public static string DynamoDbAccessKey { get; set; } = TestDefaultConfiguration.DynamoDbAccessKey!;
         public static string DynamoDbSecretKey { get; set; } = TestDefaultConfiguration.DynamoDbSecretKey!;

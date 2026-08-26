@@ -51,9 +51,11 @@ public class NatsAdapterTests : IAsyncLifetime, IClassFixture<TestEnvironmentFix
 
         try
         {
-            var stream = await natsContext.GetStreamAsync(this.testStreamName);
+            var stream = await natsContext.GetStreamAsync(
+                this.testStreamName,
+                cancellationToken: TestContext.Current.CancellationToken);
 
-            await stream.DeleteAsync();
+            await stream.DeleteAsync(TestContext.Current.CancellationToken);
         }
         catch (NatsJSApiException)
         {
@@ -65,11 +67,23 @@ public class NatsAdapterTests : IAsyncLifetime, IClassFixture<TestEnvironmentFix
     {
         if (NatsTestConstants.IsNatsAvailable)
         {
-            var stream = await natsContext.GetStreamAsync(this.testStreamName);
+            using var cleanup = new CancellationTokenSource(TimeSpan.FromSeconds(2));
+            try
+            {
+                var stream = await natsContext.GetStreamAsync(
+                    this.testStreamName,
+                    cancellationToken: cleanup.Token);
 
-            await stream.DeleteAsync();
-
-            await natsConnection.DisposeAsync();
+                await stream.DeleteAsync(cleanup.Token);
+            }
+            catch (OperationCanceledException) when (TestContext.Current.CancellationToken.IsCancellationRequested)
+            {
+                // Preserve the original test cancellation after bounded cleanup.
+            }
+            finally
+            {
+                await natsConnection.DisposeAsync();
+            }
         }
     }
 
@@ -86,12 +100,14 @@ public class NatsAdapterTests : IAsyncLifetime, IClassFixture<TestEnvironmentFix
             fixture.Serializer,
             NullLoggerFactory.Instance);
         adapterFactory.Init();
-        await SendAndReceiveFromQueueAdapter(adapterFactory);
+        await SendAndReceiveFromQueueAdapter(adapterFactory, TestContext.Current.CancellationToken);
     }
 
-    private async Task SendAndReceiveFromQueueAdapter(IQueueAdapterFactory adapterFactory)
+    private async Task SendAndReceiveFromQueueAdapter(
+        IQueueAdapterFactory adapterFactory,
+        CancellationToken cancellationToken)
     {
-        IQueueAdapter adapter = await adapterFactory.CreateAdapter(CancellationToken.None);
+        IQueueAdapter adapter = await adapterFactory.CreateAdapter(cancellationToken);
         IQueueAdapterCache cache = adapterFactory.GetQueueAdapterCache();
 
         // Create receiver per queue
@@ -118,11 +134,11 @@ public class NatsAdapterTests : IAsyncLifetime, IClassFixture<TestEnvironmentFix
             QueueId queueId = receiverKvp.Key;
             var receiver = receiverKvp.Value;
             var qCache = caches[queueId];
-            Task task = Task.Factory.StartNew(() =>
+            Task task = Task.Run(async () =>
             {
                 while (receivedBatches < NumBatches)
                 {
-                    var receivedMessages = receiver.GetQueueMessagesAsync(50, CancellationToken.None).Result;
+                    var receivedMessages = await receiver.GetQueueMessagesAsync(50, cancellationToken);
                     Assert.NotNull(receivedMessages);
                     var messages = receivedMessages.ToArray();
                     if (!messages.Any())
@@ -154,19 +170,23 @@ public class NatsAdapterTests : IAsyncLifetime, IClassFixture<TestEnvironmentFix
                     Interlocked.Add(ref receivedBatches, messages.Length);
                     qCache.AddToCache(messages);
                 }
-            });
+            }, cancellationToken);
             work.Add(task);
         }
 
         // send events
         List<object> events = CreateEvents(NumMessagesPerBatch);
-        work.Add(Task.Factory.StartNew(() => Enumerable.Range(0, NumBatches)
-            .Select(i => i % 2 == 0 ? streamId1 : streamId2)
-            .ToList()
-            .ForEach(streamId =>
-                adapter.QueueMessageBatchAsync(StreamId.Create(streamId.ToString(), streamId),
-                    events.Take(NumMessagesPerBatch).ToArray(), null!,
-                    RequestContextExtensions.Export(this.fixture.DeepCopier)!).Wait())));
+        work.Add(Task.Run(async () =>
+        {
+            foreach (var streamId in Enumerable.Range(0, NumBatches).Select(i => i % 2 == 0 ? streamId1 : streamId2))
+            {
+                await adapter.QueueMessageBatchAsync(
+                    StreamId.Create(streamId.ToString(), streamId),
+                    events.Take(NumMessagesPerBatch).ToArray(),
+                    null!,
+                    RequestContextExtensions.Export(this.fixture.DeepCopier)!);
+            }
+        }, cancellationToken));
         await Task.WhenAll(work);
 
         // Make sure we got back everything we sent

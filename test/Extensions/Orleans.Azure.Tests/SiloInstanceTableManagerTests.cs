@@ -54,7 +54,11 @@ namespace Tester.AzureUtils
                 this.clusterId,
                 fixture.LoggerFactory,
                 new AzureStorageClusteringOptions { TableName = new AzureStorageClusteringOptions().TableName }.ConfigureTestDefaults())
-                .WaitAsync(SiloInstanceTableTestConstants.Timeout).Result;
+                .WaitAsync(
+                    SiloInstanceTableTestConstants.Timeout,
+                    TestContext.Current.CancellationToken)
+                .GetAwaiter()
+                .GetResult();
         }
 
         // Use TestCleanup to run code after each test has run
@@ -66,10 +70,24 @@ namespace Tester.AzureUtils
 
                 output.WriteLine("TestCleanup Timeout={0}", timeout);
 
-                manager.DeleteTableEntries(this.clusterId).WaitAsync(timeout).Wait();
+                using var cleanupCancellation = new CancellationTokenSource(timeout);
+                try
+                {
+                    manager.DeleteTableEntries(this.clusterId)
+                        .WaitAsync(cleanupCancellation.Token)
+                        .GetAwaiter()
+                        .GetResult();
 
-                output.WriteLine("TestCleanup -  Finished");
-                manager = null!;
+                    output.WriteLine("TestCleanup -  Finished");
+                }
+                catch (OperationCanceledException) when (cleanupCancellation.IsCancellationRequested)
+                {
+                    throw new TimeoutException($"Test cleanup timed out after {timeout}.");
+                }
+                finally
+                {
+                    manager = null!;
+                }
             }
         }
 
@@ -114,11 +132,11 @@ namespace Tester.AzureUtils
                 await manager.ActivateSiloInstance(instance);
             }
 
-            await Task.Delay(TimeSpan.FromSeconds(3));
+            await Task.Delay(TimeSpan.FromSeconds(3), TestContext.Current.CancellationToken);
 
             await manager.CleanupDefunctSiloEntries(DateTime.Now - TimeSpan.FromSeconds(1));
 
-            var entries = await manager.FindAllSiloEntries();
+            var entries = await manager.FindAllSiloEntries(TestContext.Current.CancellationToken);
             Assert.Equal(5, entries.Count);
             Assert.All(entries, e => Assert.NotEqual(SiloInstanceTableTestConstants.INSTANCE_STATUS_DEAD, e.Item1.Status));
             var before = await manager.ReadSingleTableEntryAsync(
@@ -136,7 +154,9 @@ namespace Tester.AzureUtils
         public async Task SiloInstanceTable_Op_CreateSiloEntryConditionally()
         {
             bool didInsert = await manager.TryCreateTableVersionEntryAsync()
-                .WaitAsync(new AzureStoragePolicyOptions().OperationTimeout);
+                .WaitAsync(
+                    new AzureStoragePolicyOptions().OperationTimeout,
+                    TestContext.Current.CancellationToken);
 
             Assert.True(didInsert, "Did insert");
             var before = await manager.ReadSingleTableEntryAsync(

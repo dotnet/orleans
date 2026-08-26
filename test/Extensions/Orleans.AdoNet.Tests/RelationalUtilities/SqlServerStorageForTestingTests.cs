@@ -14,29 +14,40 @@ public class SqlServerStorageForTestingTests
     [Fact]
     public async Task RecreatesDatabaseWithActivePooledConnection()
     {
-        var storage = await RelationalStorageForTesting.SetupInstance(AdoNetInvariants.InvariantNameSqlServer, TestDatabaseName);
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var storage = await RelationalStorageForTesting.SetupInstance(
+            AdoNetInvariants.InvariantNameSqlServer,
+            TestDatabaseName,
+            cancellationToken: cancellationToken);
 
         for (var iteration = 0; iteration < 3; iteration++)
         {
             await using var connection = new SqlConnection(storage.CurrentConnectionString);
-            await connection.OpenAsync();
+            await connection.OpenAsync(cancellationToken);
             await using var command = connection.CreateCommand();
             command.CommandText = "SELECT 1";
 
-            Assert.Equal(1, await command.ExecuteScalarAsync());
+            Assert.Equal(1, await command.ExecuteScalarAsync(cancellationToken));
 
-            storage = await RelationalStorageForTesting.SetupInstance(AdoNetInvariants.InvariantNameSqlServer, TestDatabaseName);
+            storage = await RelationalStorageForTesting.SetupInstance(
+                AdoNetInvariants.InvariantNameSqlServer,
+                TestDatabaseName,
+                cancellationToken: cancellationToken);
         }
     }
 
     [Fact]
     public async Task SetupOwnsSingleUserSlotWhileApplyingSchema()
     {
+        var cancellationToken = TestContext.Current.CancellationToken;
         var storage = Assert.IsType<SqlServerStorageForTesting>(
-            await RelationalStorageForTesting.SetupInstance(AdoNetInvariants.InvariantNameSqlServer, TestDatabaseName));
+            await RelationalStorageForTesting.SetupInstance(
+                AdoNetInvariants.InvariantNameSqlServer,
+                TestDatabaseName,
+                cancellationToken: cancellationToken));
         await using var competingConnection = new SqlConnection(storage.CurrentConnectionString);
-        await competingConnection.OpenAsync();
-        using var cancellation = new CancellationTokenSource();
+        await competingConnection.OpenAsync(cancellationToken);
+        using var cancellation = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         var reconnectingClients = Enumerable.Range(0, 4)
             .Select(_ => ReconnectUntilCanceledAsync(storage.CurrentConnectionString, cancellation.Token))
             .ToArray();
@@ -50,7 +61,8 @@ public class SqlServerStorageForTestingTests
                     ALTER DATABASE [{TestDatabaseName}] SET READ_COMMITTED_SNAPSHOT ON;
                     """
                 ],
-                TestDatabaseName);
+                TestDatabaseName,
+                cancellationToken);
         }
         finally
         {
@@ -65,7 +77,8 @@ public class SqlServerStorageForTestingTests
             WHERE name = @DatabaseName
             """,
             command => command.AddParameter("DatabaseName", TestDatabaseName),
-            (record, _, _) => Task.FromResult((record.GetString(0), record.GetBoolean(1))));
+            (record, _, _) => Task.FromResult((record.GetString(0), record.GetBoolean(1))),
+            cancellationToken: cancellationToken);
 
         Assert.Equal(("MULTI_USER", true), Assert.Single(databaseState));
     }

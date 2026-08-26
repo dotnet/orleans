@@ -71,7 +71,7 @@ namespace UnitTests.MembershipTests
 
         protected override async Task<string> GetConnectionString()
         {
-            bool isReachable = await ZookeeperTestUtils.EnsureZooKeeperAsync();
+            bool isReachable = await ZookeeperTestUtils.EnsureZooKeeperAsync(TestContext.Current.CancellationToken);
             return isReachable ? TestDefaultConfiguration.ZooKeeperConnectionString! : null!;
         }
 

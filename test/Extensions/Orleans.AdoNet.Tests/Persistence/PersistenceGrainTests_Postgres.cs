@@ -41,7 +41,10 @@ namespace Tester.AdoNet.Persistence
                     return;
                 }
 
-                var relationalStorage = await RelationalStorageForTesting.SetupInstance(AdoInvariant, TestDatabaseName);
+                var relationalStorage = await RelationalStorageForTesting.SetupInstance(
+                    AdoInvariant,
+                    TestDatabaseName,
+                    cancellationToken: TestContext.Current.CancellationToken);
                 _connectionString = relationalStorage.CurrentConnectionString;
                 await base.InitializeAsync();
                 if (!PreconditionsMet)

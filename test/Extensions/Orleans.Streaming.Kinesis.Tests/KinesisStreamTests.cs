@@ -96,9 +96,9 @@ namespace Orleans.Streaming.Kinesis.Tests
         public override async ValueTask InitializeAsync()
         {
             EnsurePreconditionsMet();
-            await KinesisStreamTestResource.Create(KinesisStreamName);
+            await KinesisStreamTestResource.Create(KinesisStreamName, TestContext.Current.CancellationToken);
             streamCreated = true;
-            await KinesisStreamTestResource.Create(KinesisStreamName2);
+            await KinesisStreamTestResource.Create(KinesisStreamName2, TestContext.Current.CancellationToken);
             stream2Created = true;
             await base.InitializeAsync();
             if (!PreconditionsMet)
@@ -120,14 +120,18 @@ namespace Orleans.Streaming.Kinesis.Tests
                 {
                     if (streamCreated)
                     {
-                        await KinesisStreamTestResource.Delete(KinesisStreamName);
+                        await KinesisStreamTestResource.DeleteForCleanup(
+                            KinesisStreamName,
+                            TestContext.Current.CancellationToken);
                     }
                 }
                 finally
                 {
                     if (stream2Created)
                     {
-                        await KinesisStreamTestResource.Delete(KinesisStreamName2);
+                        await KinesisStreamTestResource.DeleteForCleanup(
+                            KinesisStreamName2,
+                            TestContext.Current.CancellationToken);
                     }
                 }
             }

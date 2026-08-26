@@ -41,35 +41,39 @@ public class ReminderTests_Cosmos_Standalone
     [Fact, TestCategory("Reminders"), TestCategory("Performance")]
     public async Task Reminders_AzureTable_InsertRate()
     {
+        var testCancellationToken = TestContext.Current.CancellationToken;
         var clusterOptions = Options.Create(new ClusterOptions { ClusterId = "TMSLocalTesting", ServiceId = _serviceId });
         var storageOptions = Options.Create(new CosmosReminderTableOptions());
         storageOptions.Value.ConfigureTestDefaults();
 
         IReminderTable table = new CosmosReminderTable(_loggerFactory, _fixture.Services, storageOptions, clusterOptions);
-        using var cancellation = new CancellationTokenSource(new ReminderOptions().InitializationTimeout);
+        using var cancellation = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
+        cancellation.CancelAfter(new ReminderOptions().InitializationTimeout);
         await table.StartAsync(cancellation.Token);
 
-        await TestTableInsertRate(table, 10);
-        await TestTableInsertRate(table, 500);
+        await TestTableInsertRate(table, 10, testCancellationToken);
+        await TestTableInsertRate(table, 500, testCancellationToken);
     }
 
     [Fact, TestCategory("Reminders"), TestCategory("Functional")]
     public async Task Reminders_AzureTable_InsertNewRowAndReadBack()
     {
+        var testCancellationToken = TestContext.Current.CancellationToken;
         string clusterId = NewClusterId();
         var clusterOptions = Options.Create(new ClusterOptions { ClusterId = clusterId, ServiceId = _serviceId });
         var storageOptions = Options.Create(new CosmosReminderTableOptions());
         storageOptions.Value.ConfigureTestDefaults();
         IReminderTable table = new CosmosReminderTable(_loggerFactory, _fixture.Services, storageOptions, clusterOptions);
-        using var cancellation = new CancellationTokenSource(new ReminderOptions().InitializationTimeout);
+        using var cancellation = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
+        cancellation.CancelAfter(new ReminderOptions().InitializationTimeout);
         await table.StartAsync(cancellation.Token);
 
-        ReminderEntry[] rows = (await GetAllRows(table)).ToArray();
+        ReminderEntry[] rows = (await GetAllRows(table, testCancellationToken)).ToArray();
         Assert.Empty(rows); // "The reminder table (sid={0}, did={1}) was not empty.", ServiceId, clusterId);
 
         ReminderEntry expected = NewReminderEntry();
-        await table.UpsertRow(expected);
-        rows = (await GetAllRows(table)).ToArray();
+        await table.UpsertRow(expected).WaitAsync(testCancellationToken);
+        rows = (await GetAllRows(table, testCancellationToken)).ToArray();
 
         Assert.Single(rows); // "The reminder table (sid={0}, did={1}) did not contain the correct number of rows (1).", ServiceId, clusterId);
         ReminderEntry actual = rows[0];
@@ -81,7 +85,10 @@ public class ReminderTests_Cosmos_Standalone
         Assert.False(string.IsNullOrWhiteSpace(actual.ETag), $"The newly inserted reminder table (sid={_serviceId}, did={clusterId}) row contains an invalid etag.");
     }
 
-    private async Task TestTableInsertRate(IReminderTable reminderTable, double numOfInserts)
+    private async Task TestTableInsertRate(
+        IReminderTable reminderTable,
+        double numOfInserts,
+        CancellationToken cancellationToken)
     {
         DateTime startedAt = DateTime.UtcNow;
 
@@ -103,15 +110,15 @@ public class ReminderTests_Cosmos_Standalone
             int capture = i;
             Task<bool> promise = Task.Run(async () =>
             {
-                await reminderTable.UpsertRow(e);
+                await reminderTable.UpsertRow(e).WaitAsync(cancellationToken);
                 _output.WriteLine("Done " + capture);
                 return true;
-            });
+            }, cancellationToken);
             promises.Add(promise);
             _log.LogInformation("Started {Capture}", capture);
         }
         _log.LogInformation("Started all, now waiting...");
-        await Task.WhenAll(promises).WaitAsync(TimeSpan.FromSeconds(500));
+        await Task.WhenAll(promises).WaitAsync(TimeSpan.FromSeconds(500), cancellationToken);
 
         TimeSpan dur = DateTime.UtcNow - startedAt;
         _log.LogInformation(
@@ -138,9 +145,11 @@ public class ReminderTests_Cosmos_Standalone
         return string.Format("ReminderTest.{0}", Guid.NewGuid());
     }
 
-    private static async Task<IEnumerable<ReminderEntry>> GetAllRows(IReminderTable table)
+    private static async Task<IEnumerable<ReminderEntry>> GetAllRows(
+        IReminderTable table,
+        CancellationToken cancellationToken)
     {
-        ReminderTableData data = await table.ReadRows(0, 0xffffffff);
+        ReminderTableData data = await table.ReadRows(0, 0xffffffff).WaitAsync(cancellationToken);
         Assert.NotNull(data);
         return data.Reminders;
     }

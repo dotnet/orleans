@@ -26,6 +26,7 @@ namespace Tester.AzureUtils.Persistence;
 [TestArea("Persistence")]
 public sealed class AzureBlobGrainStorageTests : AzureStorageBasicTests, IAsyncDisposable
 {
+    private static readonly TimeSpan CleanupTimeout = TimeSpan.FromSeconds(30);
     private const string GrainType = "test-grain";
     private readonly BlobContainerClient _container;
     private readonly string _containerName = $"test-grainstate-{Guid.NewGuid():N}";
@@ -50,20 +51,32 @@ public sealed class AzureBlobGrainStorageTests : AzureStorageBasicTests, IAsyncD
 
     public async ValueTask DisposeAsync()
     {
-        await _container.DeleteIfExistsAsync();
-        _services.Dispose();
+        using var cleanupCancellation = new CancellationTokenSource(CleanupTimeout);
+        try
+        {
+            await _container.DeleteIfExistsAsync(
+                cancellationToken: cleanupCancellation.Token);
+        }
+        finally
+        {
+            _services.Dispose();
+        }
     }
 
     [Fact, TestCategory("Functional")]
     public async Task AzureBlobStorage_ReadState_StreamDeserializationFailure_DoesNotMutateGrainState()
     {
-        await AssertFailedReadDoesNotMutateStateAsync(new ThrowingStreamDeserializeSerializer(CreateSetupSerializer()));
+        await AssertFailedReadDoesNotMutateStateAsync(
+            new ThrowingStreamDeserializeSerializer(CreateSetupSerializer()),
+            TestContext.Current.CancellationToken);
     }
 
     [Fact, TestCategory("Functional")]
     public async Task AzureBlobStorage_ReadState_PooledBinaryDeserializationFailure_DoesNotMutateGrainState()
     {
-        await AssertFailedReadDoesNotMutateStateAsync(new ThrowingBinaryDeserializeSerializer(CreateSetupSerializer()));
+        await AssertFailedReadDoesNotMutateStateAsync(
+            new ThrowingBinaryDeserializeSerializer(CreateSetupSerializer()),
+            TestContext.Current.CancellationToken);
     }
 
     [Fact, TestCategory("Functional"), TestCategory("ModelBased")]
@@ -84,13 +97,19 @@ public sealed class AzureBlobGrainStorageTests : AzureStorageBasicTests, IAsyncD
         await runner.RunGeneratedConformanceTests();
     }
 
-    private async Task AssertFailedReadDoesNotMutateStateAsync(IGrainStorageSerializer serializer)
+    private async Task AssertFailedReadDoesNotMutateStateAsync(
+        IGrainStorageSerializer serializer,
+        CancellationToken cancellationToken)
     {
         var storage = await CreateStorageAsync(serializer);
         var blob = _container.GetBlobClient(GetBlobName());
-        await blob.UploadAsync(CreateSetupSerializer().Serialize(new TestState { Value = 7 }), overwrite: true);
+        await blob.UploadAsync(
+            CreateSetupSerializer().Serialize(new TestState { Value = 7 }),
+            overwrite: true,
+            cancellationToken: cancellationToken);
 
-        var actualEtag = (await blob.GetPropertiesAsync()).Value.ETag.ToString();
+        var actualEtag = (await blob.GetPropertiesAsync(
+            cancellationToken: cancellationToken)).Value.ETag.ToString();
         const string initialEtag = "\"initial-etag\"";
         Assert.NotEqual(initialEtag, actualEtag);
 

@@ -67,7 +67,10 @@ public abstract class AdoNetGrainDirectoryTests(string invariant, int concurrenc
 
     public async ValueTask InitializeAsync()
     {
-        _testing = await RelationalStorageForTesting.SetupInstance(invariant, TestDatabaseName);
+        _testing = await RelationalStorageForTesting.SetupInstance(
+            invariant,
+            TestDatabaseName,
+            cancellationToken: TestContext.Current.CancellationToken);
 
         Assert.SkipWhen(IsNullOrEmpty(_testing.CurrentConnectionString), $"Database '{TestDatabaseName}' not initialized");
 
@@ -96,7 +99,7 @@ public abstract class AdoNetGrainDirectoryTests(string invariant, int concurrenc
         var lifetime = new FakeHostApplicationLifetime();
         var directory = new AdoNetGrainDirectory("MyProviderId", options, logger, clusterOptions, lifetime);
 
-        await _storage.ExecuteAsync("DELETE FROM OrleansGrainDirectory");
+        await _storage.ExecuteAsync("DELETE FROM OrleansGrainDirectory", TestContext.Current.CancellationToken);
 
         // act
         var address = new GrainAddress
@@ -113,7 +116,7 @@ public abstract class AdoNetGrainDirectoryTests(string invariant, int concurrenc
         Assert.Equal(address.SiloAddress, result.SiloAddress);
         Assert.Equal(address.ActivationId, result.ActivationId);
 
-        var saved = await _storage.ReadAsync<AdoNetGrainDirectoryEntry>("SELECT * FROM OrleansGrainDirectory");
+        var saved = await _storage.ReadAsync<AdoNetGrainDirectoryEntry>("SELECT * FROM OrleansGrainDirectory", TestContext.Current.CancellationToken);
         var entry = Assert.Single(saved);
         Assert.Equal("MyClusterId", entry.ClusterId);
         Assert.Equal("MyProviderId", entry.ProviderId);
@@ -142,7 +145,7 @@ public abstract class AdoNetGrainDirectoryTests(string invariant, int concurrenc
         var lifetime = new FakeHostApplicationLifetime();
         var directory = new AdoNetGrainDirectory("MyProviderId", options, logger, clusterOptions, lifetime);
 
-        await _storage.ExecuteAsync("DELETE FROM OrleansGrainDirectory");
+        await _storage.ExecuteAsync("DELETE FROM OrleansGrainDirectory", TestContext.Current.CancellationToken);
 
         var address = new GrainAddress
         {
@@ -156,7 +159,7 @@ public abstract class AdoNetGrainDirectoryTests(string invariant, int concurrenc
         await directory.Unregister(address);
 
         // assert
-        var saved = await _storage.ReadAsync<AdoNetGrainDirectoryEntry>("SELECT * FROM OrleansGrainDirectory");
+        var saved = await _storage.ReadAsync<AdoNetGrainDirectoryEntry>("SELECT * FROM OrleansGrainDirectory", TestContext.Current.CancellationToken);
         Assert.Empty(saved);
     }
 
@@ -180,7 +183,7 @@ public abstract class AdoNetGrainDirectoryTests(string invariant, int concurrenc
         var lifetime = new FakeHostApplicationLifetime();
         var directory = new AdoNetGrainDirectory("MyProviderId", options, logger, clusterOptions, lifetime);
 
-        await _storage.ExecuteAsync("DELETE FROM OrleansGrainDirectory");
+        await _storage.ExecuteAsync("DELETE FROM OrleansGrainDirectory", TestContext.Current.CancellationToken);
 
         var grainId = GrainId.Create("MyGrainType", "MyGrainKey");
         var siloAddress = SiloAddress.New(IPEndPoint.Parse("127.0.0.1:11111"), 123456);
@@ -223,7 +226,7 @@ public abstract class AdoNetGrainDirectoryTests(string invariant, int concurrenc
         var lifetime = new FakeHostApplicationLifetime();
         var directory = new AdoNetGrainDirectory("MyProviderId", options, logger, clusterOptions, lifetime);
 
-        await _storage.ExecuteAsync("DELETE FROM OrleansGrainDirectory");
+        await _storage.ExecuteAsync("DELETE FROM OrleansGrainDirectory", TestContext.Current.CancellationToken);
 
         var grainIds = Enumerable.Range(0, 5).Select(i => GrainId.Create("MyGrainType", $"MyGrainKey{i}")).ToArray();
         var siloAddresses = Enumerable.Range(0, 5).Select(i => SiloAddress.New(IPEndPoint.Parse($"127.0.0.{i}:11111"), 123456)).ToArray();
@@ -244,7 +247,7 @@ public abstract class AdoNetGrainDirectoryTests(string invariant, int concurrenc
         await directory.UnregisterSilos([siloAddresses[0], siloAddresses[2], siloAddresses[4]]);
 
         // assert
-        var results = await _storage.ReadAsync<AdoNetGrainDirectoryEntry>("SELECT * FROM OrleansGrainDirectory ORDER BY GrainId");
+        var results = await _storage.ReadAsync<AdoNetGrainDirectoryEntry>("SELECT * FROM OrleansGrainDirectory ORDER BY GrainId", TestContext.Current.CancellationToken);
         var resultAddresses = results.Select(entry => entry.ToGrainAddress()).ToArray();
         Assert.Equal([addresses[1], addresses[3]], resultAddresses);
     }
@@ -271,10 +274,14 @@ public abstract class AdoNetGrainDirectoryTests(string invariant, int concurrenc
         var lifetime = new FakeHostApplicationLifetime();
         var directory = new AdoNetGrainDirectory("MyProviderId", options, logger, clusterOptions, lifetime);
 
-        await _storage.ExecuteAsync("DELETE FROM OrleansGrainDirectory");
+        await _storage.ExecuteAsync("DELETE FROM OrleansGrainDirectory", TestContext.Current.CancellationToken);
 
         // act
-        await Parallel.ForAsync(0, 10000, new ParallelOptions { MaxDegreeOfParallelism = concurrency }, async (i, ct) =>
+        await Parallel.ForAsync(0, 10000, new ParallelOptions
+        {
+            MaxDegreeOfParallelism = concurrency,
+            CancellationToken = TestContext.Current.CancellationToken
+        }, async (i, ct) =>
         {
             var grainId = GrainId.Create("MyGrainType", $"MyGrainKey{Random.Shared.Next(10)}");
             var siloAddress = SiloAddress.New(IPEndPoint.Parse($"127.0.0.{Random.Shared.Next(10)}:11111"), 123456);
@@ -302,7 +309,7 @@ public abstract class AdoNetGrainDirectoryTests(string invariant, int concurrenc
         });
 
         // assert
-        var remaining = await _storage.ReadAsync<AdoNetGrainDirectoryEntry>("SELECT * FROM OrleansGrainDirectory");
+        var remaining = await _storage.ReadAsync<AdoNetGrainDirectoryEntry>("SELECT * FROM OrleansGrainDirectory", TestContext.Current.CancellationToken);
         Assert.Empty(remaining);
     }
 }

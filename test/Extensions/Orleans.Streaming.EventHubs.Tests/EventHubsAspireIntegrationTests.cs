@@ -59,7 +59,7 @@ public sealed class EventHubsAspireIntegrationTests
             .Single(endpoint => endpoint.Name == "emulator");
         emulatorEndpoint.AllocatedEndpoint = new AllocatedEndpoint(emulatorEndpoint, "localhost", 5672);
 
-        await using var app = await builder.BuildAsync();
+        await using var app = await builder.BuildAsync(TestContext.Current.CancellationToken);
         var environment = await GetEnvironmentVariablesAsync(silo.Resource, app.Services);
 
         Assert.Equal(expectedProviderType, environment[$"Orleans:Streaming:{providerName}:ProviderType"]);

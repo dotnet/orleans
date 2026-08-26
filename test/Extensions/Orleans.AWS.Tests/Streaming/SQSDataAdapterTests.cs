@@ -72,12 +72,14 @@ public class SQSDataAdapterTests : IAsyncLifetime
         var dataAdapter = new StringOrIntSqsDataAdapter(fixture.Serializer);
         var adapterFactory = new SQSAdapterFactory(SQS_STREAM_PROVIDER_NAME, options, new HashRingStreamQueueMapperOptions(), new SimpleQueueCacheOptions(), Options.Create(clusterOptions), dataAdapter, NullLoggerFactory.Instance);
         adapterFactory.Init();
-        await SendAndReceiveFromQueueAdapter(adapterFactory);
+        await SendAndReceiveFromQueueAdapter(adapterFactory, TestContext.Current.CancellationToken);
     }
 
-    private async Task SendAndReceiveFromQueueAdapter(IQueueAdapterFactory adapterFactory)
+    private async Task SendAndReceiveFromQueueAdapter(
+        IQueueAdapterFactory adapterFactory,
+        CancellationToken cancellationToken)
     {
-        IQueueAdapter adapter = await adapterFactory.CreateAdapter(CancellationToken.None);
+        IQueueAdapter adapter = await adapterFactory.CreateAdapter(cancellationToken);
         IQueueAdapterCache cache = adapterFactory.GetQueueAdapterCache();
 
         // Create receiver per queue
@@ -107,10 +109,10 @@ public class SQSDataAdapterTests : IAsyncLifetime
                 {
                     var messages = (await receiver.GetQueueMessagesAsync(
                         SQSStorage.MAX_NUMBER_OF_MESSAGE_TO_PEEK,
-                        CancellationToken.None)).ToArray();
+                        cancellationToken)).ToArray();
                     if (!messages.Any())
                     {
-                        await Task.Delay(QueuePollRate);
+                        await Task.Delay(QueuePollRate, cancellationToken);
                         continue;
                     }
                     foreach (var message in messages.Cast<SQSBatchContainer>())
@@ -129,7 +131,7 @@ public class SQSDataAdapterTests : IAsyncLifetime
                     Interlocked.Add(ref receivedBatches, messages.Length);
                     qCache.AddToCache(messages);
                 }
-            });
+            }, cancellationToken);
             work.Add(task);
         }
 
@@ -139,17 +141,19 @@ public class SQSDataAdapterTests : IAsyncLifetime
         {
             foreach (var streamId in Enumerable.Range(0, NumBatches).Select(i => i % 2 == 0 ? streamId1 : streamId2))
             {
-                await adapter.QueueMessageBatchAsync(
-                    StreamId.Create(streamId.ToString(), streamId),
-                    events.Take(NumMessagesPerBatch).ToArray(),
-                    null,
-                    RequestContextExtensions.Export(this.fixture.DeepCopier));
+                await AwaitWithCancellation(
+                    adapter.QueueMessageBatchAsync(
+                        StreamId.Create(streamId.ToString(), streamId),
+                        events.Take(NumMessagesPerBatch).ToArray(),
+                        null,
+                        RequestContextExtensions.Export(this.fixture.DeepCopier)),
+                    cancellationToken);
             }
-        }));
+        }, cancellationToken));
         await Task.WhenAll(work);
 
         // Wait for everything to be consumed.
-        await Task.Delay(QueuePollRate * 2);
+        await Task.Delay(QueuePollRate * 2, cancellationToken);
 
         // Make sure we got back everything we sent
         Assert.Equal(NumBatches, receivedBatches);
@@ -197,6 +201,27 @@ public class SQSDataAdapterTests : IAsyncLifetime
                 const int expected = NumBatches / 2 - 10 + 1; // all except the first 10, including the 10th (10 + 1)
                 Assert.Equal(expected, messageCount);
             }
+        }
+    }
+
+    private static async Task AwaitWithCancellation(Task task, CancellationToken cancellationToken)
+    {
+        try
+        {
+            await task.WaitAsync(cancellationToken);
+        }
+        catch
+        {
+            if (!task.IsCompleted)
+            {
+                _ = task.ContinueWith(
+                    static completed => _ = completed.Exception,
+                    CancellationToken.None,
+                    TaskContinuationOptions.OnlyOnFaulted | TaskContinuationOptions.ExecuteSynchronously,
+                    TaskScheduler.Default);
+            }
+
+            throw;
         }
     }
 

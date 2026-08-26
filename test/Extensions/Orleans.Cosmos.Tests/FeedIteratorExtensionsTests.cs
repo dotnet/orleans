@@ -37,7 +37,7 @@ public class FeedIteratorExtensionsTests
             Array.Empty<int>(),
             new[] { 4, 5 });
 
-        var drained = await iterator.ToListAsync();
+        var drained = await iterator.ToListAsync(TestContext.Current.CancellationToken);
 
         Assert.Equal(new[] { 1, 2, 3, 4, 5 }, drained);
     }
@@ -51,7 +51,7 @@ public class FeedIteratorExtensionsTests
             Array.Empty<int>(),
             new[] { 1, 2, 3 });
 
-        var drained = await iterator.ToListAsync();
+        var drained = await iterator.ToListAsync(TestContext.Current.CancellationToken);
 
         Assert.Equal(new[] { 1, 2, 3 }, drained);
     }
@@ -64,7 +64,7 @@ public class FeedIteratorExtensionsTests
             Array.Empty<int>(),
             Array.Empty<int>());
 
-        var drained = await iterator.ToListAsync();
+        var drained = await iterator.ToListAsync(TestContext.Current.CancellationToken);
 
         Assert.Empty(drained);
     }
@@ -74,7 +74,7 @@ public class FeedIteratorExtensionsTests
     {
         var iterator = new FakeFeedIterator<int>(new[] { 1, 2, 3, 4, 5 });
 
-        var drained = await iterator.ToListAsync();
+        var drained = await iterator.ToListAsync(TestContext.Current.CancellationToken);
 
         Assert.Equal(new[] { 1, 2, 3, 4, 5 }, drained);
     }
@@ -86,7 +86,7 @@ public class FeedIteratorExtensionsTests
             new[] { 1, 2 },
             Array.Empty<int>());
 
-        var drained = await iterator.ToListAsync();
+        var drained = await iterator.ToListAsync(TestContext.Current.CancellationToken);
 
         Assert.Equal(new[] { 1, 2 }, drained);
     }

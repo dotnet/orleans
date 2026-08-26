@@ -25,7 +25,7 @@ namespace Tester.AzureUtils
             this.output = output;
 
             // Pre-create table, if required
-            manager = new UnitTestAzureTableDataManager();
+            manager = new UnitTestAzureTableDataManager(TestContext.Current.CancellationToken);
 
             PartitionKey = "AzureTableDataManagerStressTests-" + Guid.NewGuid();
         }
@@ -39,7 +39,12 @@ namespace Tester.AzureUtils
             const int numPartitions = 1;
 
             // Write some data
-            await WriteAlot_Async(testName, numPartitions, iterations, batchSize);
+            await WriteAlot_Async(
+                testName,
+                numPartitions,
+                iterations,
+                batchSize,
+                TestContext.Current.CancellationToken);
         }
 
         [Fact]
@@ -51,7 +56,12 @@ namespace Tester.AzureUtils
             const int numPartitions = 100;
 
             // Write some data
-            await WriteAlot_Async(testName, numPartitions, iterations, batchSize);
+            await WriteAlot_Async(
+                testName,
+                numPartitions,
+                iterations,
+                batchSize,
+                TestContext.Current.CancellationToken);
         }
 
         [Fact]
@@ -61,12 +71,21 @@ namespace Tester.AzureUtils
             const int iterations = 1000;
 
             // Write some data
-            await WriteAlot_Async(testName, 1, iterations, iterations);
+            await WriteAlot_Async(
+                testName,
+                1,
+                iterations,
+                iterations,
+                TestContext.Current.CancellationToken);
 
             Stopwatch sw = Stopwatch.StartNew();
 
-            var data = (await manager.ReadAllTableEntriesForPartitionAsync(PartitionKey)
-                .WaitAsync(new AzureStoragePolicyOptions().CreationTimeout)).Select(tuple => tuple.Entity);
+            var data = (await manager.ReadAllTableEntriesForPartitionAsync(
+                    PartitionKey,
+                    TestContext.Current.CancellationToken)
+                .WaitAsync(
+                    new AzureStoragePolicyOptions().CreationTimeout,
+                    TestContext.Current.CancellationToken)).Select(tuple => tuple.Entity);
 
             sw.Stop();
             int count = data.Count();
@@ -82,11 +101,18 @@ namespace Tester.AzureUtils
             const int iterations = 2000;
 
             // Write some data
-            await WriteAlot_Async(testName, 3, iterations, iterations);
+            await WriteAlot_Async(
+                testName,
+                3,
+                iterations,
+                iterations,
+                TestContext.Current.CancellationToken);
 
             Stopwatch sw = Stopwatch.StartNew();
 
-            var data = (await manager.ReadAllTableEntriesAsync().WaitAsync(new AzureStoragePolicyOptions().CreationTimeout))
+            var data = (await manager.ReadAllTableEntriesAsync(TestContext.Current.CancellationToken).WaitAsync(
+                    new AzureStoragePolicyOptions().CreationTimeout,
+                    TestContext.Current.CancellationToken))
                 .Select(tuple => tuple.Entity);
 
             sw.Stop();
@@ -96,12 +122,19 @@ namespace Tester.AzureUtils
             Assert.True(count >= iterations, $"ReadAllshould return some data: Found={count}");
 
             sw = Stopwatch.StartNew();
-            await manager.ClearTableAsync().WaitAsync(new AzureStoragePolicyOptions().CreationTimeout);
+            await manager.ClearTableAsync().WaitAsync(
+                new AzureStoragePolicyOptions().CreationTimeout,
+                TestContext.Current.CancellationToken);
             sw.Stop();
             output.WriteLine("AzureTable_ReadAllTableEntities clear. Cleared table of {0} entries in {1} at {2} RPS", count, sw.Elapsed, count / sw.Elapsed.TotalSeconds);
         }
 
-        private async Task WriteAlot_Async(string testName, int numPartitions, int iterations, int batchSize)
+        private async Task WriteAlot_Async(
+            string testName,
+            int numPartitions,
+            int iterations,
+            int batchSize,
+            CancellationToken cancellationToken)
         {
             output.WriteLine("Iterations={0}, Batch={1}, Partitions={2}", iterations, batchSize, numPartitions);
             List<Task> promises = new List<Task>();
@@ -120,13 +153,17 @@ namespace Tester.AzureUtils
                 promises.Add(promise);
                 if ((i % batchSize) == 0 && i > 0)
                 {
-                    await Task.WhenAll(promises).WaitAsync(new AzureStoragePolicyOptions().CreationTimeout);
+                    await Task.WhenAll(promises).WaitAsync(
+                        new AzureStoragePolicyOptions().CreationTimeout,
+                        cancellationToken);
                     promises.Clear();
                     output.WriteLine("{0} has written {1} rows in {2} at {3} RPS",
                         testName, i, sw.Elapsed, i / sw.Elapsed.TotalSeconds);
                 }
             }
-            await Task.WhenAll(promises).WaitAsync(new AzureStoragePolicyOptions().CreationTimeout);
+            await Task.WhenAll(promises).WaitAsync(
+                new AzureStoragePolicyOptions().CreationTimeout,
+                cancellationToken);
             sw.Stop();
             output.WriteLine("{0} completed. Wrote {1} entries to {2} partition(s) in {3} at {4} RPS",
                 testName, iterations, numPartitions, sw.Elapsed, iterations / sw.Elapsed.TotalSeconds);

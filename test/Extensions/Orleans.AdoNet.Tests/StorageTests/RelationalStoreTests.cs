@@ -49,7 +49,7 @@ namespace UnitTests.StorageTests.AdoNet
                     await InsertIntoDatabaseUsingStream(sut, streamId, rb, cancellationToken);
                     var dataStreamFromTheDb = await ReadFromDatabaseUsingAsyncStream(sut, streamId, cancellationToken);
                     return dataStreamFromTheDb.StreamData.SequenceEqual(rb);
-                });
+                }, cancellationToken);
             }
 
             return streamChecks;
@@ -92,15 +92,15 @@ namespace UnitTests.StorageTests.AdoNet
                 p.ParameterName = "streamId";
                 p.Value = streamId;
                 command.Parameters.Add(p);
-            }, async (selector, resultSetCount, canellationToken) =>
+            }, async (selector, resultSetCount, cancellationToken) =>
             {
                 var streamSelector = (DbDataReader)selector;
-                var id = await streamSelector.GetValueAsync<int>("Id");
+                var id = await streamSelector.GetValueAsync<int>("Id", cancellationToken);
                 using (var ms = new MemoryStream())
                 {
                     using (var downloadStream = streamSelector.GetStream(1, sut.Storage))
                     {
-                        await downloadStream.CopyToAsync(ms);
+                        await downloadStream.CopyToAsync(ms, cancellationToken);
 
                         return new StreamingTest { Id = id, StreamData = ms.ToArray() };
                     }
@@ -108,11 +108,15 @@ namespace UnitTests.StorageTests.AdoNet
             }, CommandBehavior.SequentialAccess, cancellationToken).ConfigureAwait(false)).Single();
         }
 
-        protected static Task CancellationTokenTest(RelationalStorageForTesting sut, TimeSpan timeoutLimit)
+        protected static Task CancellationTokenTest(
+            RelationalStorageForTesting sut,
+            TimeSpan timeoutLimit,
+            CancellationToken testCancellationToken)
         {
             Assert.SkipWhen(string.IsNullOrEmpty(sut.CurrentConnectionString), "Database was not initialized correctly");
-            using (var tokenSource = new CancellationTokenSource(timeoutLimit))
+            using (var tokenSource = CancellationTokenSource.CreateLinkedTokenSource(testCancellationToken))
             {
+                tokenSource.CancelAfter(timeoutLimit);
                 try
                 {
                     //Here one second is added to the task timeout limit in order to account for the delays.
@@ -125,6 +129,8 @@ namespace UnitTests.StorageTests.AdoNet
                 }
                 catch(Exception ex)
                 {
+                    testCancellationToken.ThrowIfCancellationRequested();
+
                     //There can be a DbException due to the operation being forcefully cancelled...
                     //... Unless this is a test for a provider which does not support for cancellation.
                     //The exception is wrapped into an AggregrateException due to the test arrangement of hard synchronous

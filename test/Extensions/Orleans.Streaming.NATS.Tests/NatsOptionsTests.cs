@@ -96,6 +96,8 @@ public sealed class NatsOptionsTests
     [Fact]
     public async Task NumReplicas_IsAppliedToJetStreamConfig()
     {
+        var cancellationToken = TestContext.Current.CancellationToken;
+
         if (!NatsTestConstants.IsNatsAvailable)
         {
             throw Xunit.Sdk.SkipException.ForSkip("Nats Server is not available");
@@ -112,7 +114,7 @@ public sealed class NatsOptionsTests
         };
 
         var connectionManager = new NatsConnectionManager(providerName, NullLoggerFactory.Instance, options);
-        await connectionManager.Initialize();
+        await connectionManager.Initialize(cancellationToken);
 
         await using var natsConnection = new NatsConnection();
         var natsContext = new NatsJSContext(natsConnection);
@@ -120,7 +122,7 @@ public sealed class NatsOptionsTests
 
         try
         {
-            var stream = await natsContext.GetStreamAsync(streamName);
+            var stream = await natsContext.GetStreamAsync(streamName, cancellationToken: cancellationToken);
             var info = stream.Info;
 
             Assert.Equal(1, info.Config.NumReplicas);
@@ -128,14 +130,19 @@ public sealed class NatsOptionsTests
         }
         finally
         {
+            using var cleanup = new CancellationTokenSource(TimeSpan.FromSeconds(2));
             try
             {
-                var stream = await natsContext.GetStreamAsync(streamName);
-                await stream.DeleteAsync();
+                var stream = await natsContext.GetStreamAsync(streamName, cancellationToken: cleanup.Token);
+                await stream.DeleteAsync(cleanup.Token);
             }
             catch (NatsJSApiException)
             {
                 // Ignore cleanup errors
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                // Preserve the original test cancellation after bounded cleanup.
             }
         }
     }
@@ -150,6 +157,8 @@ public sealed class NatsOptionsTests
     [InlineData(StreamConfigStorage.Memory)]
     public async Task StorageType_IsAppliedToJetStreamConfig(StreamConfigStorage storageType)
     {
+        var cancellationToken = TestContext.Current.CancellationToken;
+
         if (!NatsTestConstants.IsNatsAvailable)
         {
             throw Xunit.Sdk.SkipException.ForSkip("Nats Server is not available");
@@ -168,7 +177,7 @@ public sealed class NatsOptionsTests
         };
 
         var connectionManager = new NatsConnectionManager(providerName, NullLoggerFactory.Instance, options);
-        await connectionManager.Initialize();
+        await connectionManager.Initialize(cancellationToken);
 
         await using var natsConnection = new NatsConnection(NatsTestConstants.NatsClientOptions);
         var natsContext = new NatsJSContext(natsConnection);
@@ -176,21 +185,26 @@ public sealed class NatsOptionsTests
 
         try
         {
-            var stream = await natsContext.GetStreamAsync(streamName);
+            var stream = await natsContext.GetStreamAsync(streamName, cancellationToken: cancellationToken);
             var info = stream.Info;
 
             Assert.Equal(storageType, info.Config.Storage);
         }
         finally
         {
+            using var cleanup = new CancellationTokenSource(TimeSpan.FromSeconds(2));
             try
             {
-                var stream = await natsContext.GetStreamAsync(streamName);
-                await stream.DeleteAsync();
+                var stream = await natsContext.GetStreamAsync(streamName, cancellationToken: cleanup.Token);
+                await stream.DeleteAsync(cleanup.Token);
             }
             catch (NatsJSApiException)
             {
                 // Ignore cleanup errors
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                // Preserve the original test cancellation after bounded cleanup.
             }
         }
     }

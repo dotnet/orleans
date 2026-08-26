@@ -22,7 +22,7 @@ public class AzureMembershipPaginationTests
         var storage = new ScriptedMembershipTableReadStorage();
         storage.AddQuery(Query(false, Version(1, "v1"), Silo("silo-1", "s1")));
 
-        var result = await CreateManager(storage).FindAllSiloEntries();
+        var result = await CreateManager(storage).FindAllSiloEntries(TestContext.Current.CancellationToken);
 
         Assert.Equal(2, result.Count);
         Assert.Equal(1, storage.QueryCount);
@@ -34,7 +34,7 @@ public class AzureMembershipPaginationTests
         var storage = new ScriptedMembershipTableReadStorage();
         storage.AddQuery(FencedQuery(1, Silo("silo-1", "s1")));
 
-        var result = await CreateManager(storage).FindAllSiloEntries();
+        var result = await CreateManager(storage).FindAllSiloEntries(TestContext.Current.CancellationToken);
 
         Assert.Equal(["silo-1", SiloInstanceTableEntry.TABLE_VERSION_ROW], result.Select(entry => entry.Entity.RowKey));
         Assert.Equal(1, storage.QueryCount);
@@ -52,7 +52,7 @@ public class AzureMembershipPaginationTests
             BoundaryVersion(SiloInstanceTableEntry.TABLE_VERSION_ROW_MAX, 2, "after-2")));
         storage.AddQuery(FencedQuery(2, Silo("silo-2", "s2")));
 
-        var result = await CreateManager(storage).FindAllSiloEntries();
+        var result = await CreateManager(storage).FindAllSiloEntries(TestContext.Current.CancellationToken);
 
         Assert.Equal(["silo-2", SiloInstanceTableEntry.TABLE_VERSION_ROW], result.Select(entry => entry.Entity.RowKey));
         Assert.Equal(2, storage.QueryCount);
@@ -69,7 +69,7 @@ public class AzureMembershipPaginationTests
             Version(11, "legacy-11"),
             BoundaryVersion(SiloInstanceTableEntry.TABLE_VERSION_ROW_MAX, 10, "after-10")));
 
-        var result = await CreateManager(storage).FindAllSiloEntries();
+        var result = await CreateManager(storage).FindAllSiloEntries(TestContext.Current.CancellationToken);
 
         Assert.Equal("stale", result.Single(entry => entry.Entity.RowKey == "silo-1").ETag);
         Assert.Equal(1, storage.QueryCount);
@@ -87,7 +87,7 @@ public class AzureMembershipPaginationTests
             BoundaryVersion(SiloInstanceTableEntry.TABLE_VERSION_ROW_MAX, 3, "after-3")));
         storage.AddQuery(FencedQuery(3, Silo("silo-1", "current")));
 
-        var result = await CreateManager(storage).FindAllSiloEntries();
+        var result = await CreateManager(storage).FindAllSiloEntries(TestContext.Current.CancellationToken);
 
         Assert.Equal("current", result.Single(entry => entry.Entity.RowKey == "silo-1").ETag);
         Assert.Equal(2, storage.QueryCount);
@@ -108,7 +108,7 @@ public class AzureMembershipPaginationTests
         }
 
         var exception = await Assert.ThrowsAsync<InconsistentStateException>(
-            () => CreateManager(storage).FindAllSiloEntries());
+            () => CreateManager(storage).FindAllSiloEntries(TestContext.Current.CancellationToken));
 
         Assert.Equal((OrleansSiloInstanceManager.MaxMembershipSnapshotAttempts - 1).ToString(), exception.StoredEtag);
         Assert.Equal(OrleansSiloInstanceManager.MaxMembershipSnapshotAttempts.ToString(), exception.CurrentEtag);
@@ -121,7 +121,7 @@ public class AzureMembershipPaginationTests
         var storage = new ScriptedMembershipTableReadStorage();
         storage.AddQuery(Query(true, Version(1, "v1"), Silo("silo-1", "s1")));
 
-        var result = await CreateManager(storage).FindAllSiloEntries();
+        var result = await CreateManager(storage).FindAllSiloEntries(TestContext.Current.CancellationToken);
 
         Assert.Equal("v1", result.Single(entry => entry.Entity.RowKey == SiloInstanceTableEntry.TABLE_VERSION_ROW).ETag);
         Assert.Equal(1, storage.QueryCount);
@@ -133,7 +133,7 @@ public class AzureMembershipPaginationTests
         var storage = new ScriptedMembershipTableReadStorage();
         storage.AddQuery(FencedQuery(1, Silo("silo-1", "heartbeat-2")));
 
-        var result = await CreateManager(storage).FindAllSiloEntries();
+        var result = await CreateManager(storage).FindAllSiloEntries(TestContext.Current.CancellationToken);
 
         Assert.Equal("heartbeat-2", result.Single(entry => entry.Entity.RowKey == "silo-1").ETag);
         Assert.Equal(1, storage.QueryCount);
@@ -142,7 +142,8 @@ public class AzureMembershipPaginationTests
     [Fact]
     public async Task CancellationTokenFlowsThroughPaginatedRead()
     {
-        using var cancellation = new CancellationTokenSource();
+        using var cancellation = CancellationTokenSource.CreateLinkedTokenSource(
+            TestContext.Current.CancellationToken);
         var storage = new ScriptedMembershipTableReadStorage();
         storage.AddQuery(FencedQuery(1, Silo("silo-1", "s1")));
 

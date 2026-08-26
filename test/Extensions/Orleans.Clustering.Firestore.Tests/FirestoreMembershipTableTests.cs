@@ -121,7 +121,9 @@ public class FirestoreMembershipTableTests : MembershipTableTestsBase, IClassFix
                         proxyPort: 30_000),
                     membershipVersion: 0))
                 .ToArray();
-            await Task.WhenAll(fillers.Select(filler => storage.UpsertEntity(filler)));
+            await Task.WhenAll(fillers.Select(filler => storage.UpsertEntity(
+                filler,
+                TestContext.Current.CancellationToken)));
 
             var start = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
             var writer = WriteUpdates();
@@ -129,17 +131,21 @@ public class FirestoreMembershipTableTests : MembershipTableTestsBase, IClassFix
             var readRow = ReadSnapshots(() => table.ReadRow(address));
             start.SetResult();
 
-            await Task.WhenAll(writer, readAll, readRow).WaitAsync(TimeSpan.FromMinutes(2));
+            await Task.WhenAll(writer, readAll, readRow).WaitAsync(
+                TimeSpan.FromMinutes(2),
+                TestContext.Current.CancellationToken);
 
             async Task WriteUpdates()
             {
-                await start.Task;
+                await start.Task.WaitAsync(TestContext.Current.CancellationToken);
                 for (var i = 0; i < updateCount; i++)
                 {
                     var updated = false;
                     while (!updated)
                     {
-                        var snapshot = await ReadWithRetries(() => table.ReadRow(address));
+                        var snapshot = await ReadWithRetries(
+                            () => table.ReadRow(address),
+                            TestContext.Current.CancellationToken);
                         var row = Assert.Single(snapshot.Members);
                         var nextVersion = snapshot.Version.Next();
                         row.Item1.ProxyPort = nextVersion.Version;
@@ -151,11 +157,13 @@ public class FirestoreMembershipTableTests : MembershipTableTestsBase, IClassFix
 
             async Task ReadSnapshots(Func<Task<MembershipTableData>> read)
             {
-                await start.Task;
+                await start.Task.WaitAsync(TestContext.Current.CancellationToken);
                 var previousVersion = -1;
                 for (var i = 0; i < readsPerReader; i++)
                 {
-                    var snapshot = await ReadWithRetries(read);
+                    var snapshot = await ReadWithRetries(
+                        read,
+                        TestContext.Current.CancellationToken);
                     Assert.True(snapshot.Version.Version >= previousVersion);
                     var row = Assert.Single(
                         snapshot.Members,
@@ -165,7 +173,9 @@ public class FirestoreMembershipTableTests : MembershipTableTestsBase, IClassFix
                 }
             }
 
-            static async Task<MembershipTableData> ReadWithRetries(Func<Task<MembershipTableData>> read)
+            static async Task<MembershipTableData> ReadWithRetries(
+                Func<Task<MembershipTableData>> read,
+                CancellationToken cancellationToken)
             {
                 for (var attempt = 0; ; attempt++)
                 {
@@ -176,7 +186,7 @@ public class FirestoreMembershipTableTests : MembershipTableTestsBase, IClassFix
                     catch (RpcException exception) when (
                         exception.StatusCode == StatusCode.Aborted && attempt < 9)
                     {
-                        await Task.Delay(10);
+                        await Task.Delay(10, cancellationToken);
                     }
                 }
             }

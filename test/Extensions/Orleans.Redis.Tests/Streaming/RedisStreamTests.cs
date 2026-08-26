@@ -77,7 +77,9 @@ public sealed class RedisStreamTests : TestClusterPerTest
     }
 
     [Fact]
-    public async Task Redis_18_Deactivation_OneProducerGrainOneConsumerGrain() => await _runner.StreamTest_16_Deactivation_OneProducerGrainOneConsumerGrain();
+    public async Task Redis_18_Deactivation_OneProducerGrainOneConsumerGrain() =>
+        await _runner.StreamTest_16_Deactivation_OneProducerGrainOneConsumerGrain(
+            cancellationToken: TestContext.Current.CancellationToken);
 
     [Fact]
     public async Task Redis_19_ConsumerImplicitlySubscribedToProducerClient() => await _runner.StreamTest_19_ConsumerImplicitlySubscribedToProducerClient();

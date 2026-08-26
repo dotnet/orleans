@@ -63,7 +63,10 @@ public abstract class AdoNetQueueAdapterFactoryTests(string invariant, TestEnvir
 
     public async ValueTask InitializeAsync()
     {
-        _testing = await RelationalStorageForTesting.SetupInstance(invariant, TestDatabaseName);
+        _testing = await RelationalStorageForTesting.SetupInstance(
+            invariant,
+            TestDatabaseName,
+            cancellationToken: TestContext.Current.CancellationToken);
 
         Assert.SkipWhen(IsNullOrEmpty(_testing.CurrentConnectionString), $"Database '{TestDatabaseName}' not initialized");
 

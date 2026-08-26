@@ -61,7 +61,10 @@ public abstract class AdoNetStreamFailureHandlerTests(string invariant) : IAsync
 
     public async ValueTask InitializeAsync()
     {
-        _testing = await RelationalStorageForTesting.SetupInstance(invariant, TestDatabaseName);
+        _testing = await RelationalStorageForTesting.SetupInstance(
+            invariant,
+            TestDatabaseName,
+            cancellationToken: TestContext.Current.CancellationToken);
 
         Assert.SkipWhen(IsNullOrEmpty(_testing.CurrentConnectionString), $"Database '{TestDatabaseName}' not initialized");
 
@@ -142,13 +145,17 @@ public abstract class AdoNetStreamFailureHandlerTests(string invariant) : IAsync
             streamOptions.DeadLetterEvictionTimeout.TotalSecondsCeiling(),
             streamOptions.EvictionInterval.TotalSecondsCeiling(),
             streamOptions.EvictionBatchSize);
-        Assert.Empty(await _storage.ReadAsync<AdoNetStreamDeadLetter>("SELECT * FROM OrleansStreamDeadLetter"));
+        Assert.Empty(await _storage.ReadAsync<AdoNetStreamDeadLetter>(
+            "SELECT * FROM OrleansStreamDeadLetter",
+            TestContext.Current.CancellationToken));
 
         // act - clean up with max attempts of one so the message above is flagged
         await handler.OnDeliveryFailure(GuidId.GetNewGuidId(), providerId, streamId, new EventSequenceTokenV2(ack.MessageId));
 
         // assert
-        var dead = Assert.Single(await _storage.ReadAsync<AdoNetStreamDeadLetter>("SELECT * FROM OrleansStreamDeadLetter"));
+        var dead = Assert.Single(await _storage.ReadAsync<AdoNetStreamDeadLetter>(
+            "SELECT * FROM OrleansStreamDeadLetter",
+            TestContext.Current.CancellationToken));
         Assert.Equal(clusterOptions.ServiceId, dead.ServiceId);
         Assert.Equal(providerId, dead.ProviderId);
         Assert.Equal(queueId, dead.QueueId);
@@ -206,7 +213,9 @@ public abstract class AdoNetStreamFailureHandlerTests(string invariant) : IAsync
         await handler.OnDeliveryFailure(GuidId.GetNewGuidId(), providerId, streamId, new EventSequenceTokenV2(ack.MessageId));
 
         // assert
-        Assert.Empty(await _storage.ReadAsync<AdoNetStreamDeadLetter>("SELECT * FROM OrleansStreamDeadLetter"));
+        Assert.Empty(await _storage.ReadAsync<AdoNetStreamDeadLetter>(
+            "SELECT * FROM OrleansStreamDeadLetter",
+            TestContext.Current.CancellationToken));
     }
 
     public ValueTask DisposeAsync() => ValueTask.CompletedTask;

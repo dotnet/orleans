@@ -28,7 +28,10 @@ namespace UnitTests.MembershipTests
 
         public override async ValueTask InitializeAsync()
         {
-            var relationalStorage = await RelationalStorageForTesting.SetupInstance(AdoNetInvariantName, TestDatabaseName);
+            var relationalStorage = await RelationalStorageForTesting.SetupInstance(
+                AdoNetInvariantName,
+                TestDatabaseName,
+                cancellationToken: TestContext.Current.CancellationToken);
             _connectionString = relationalStorage.CurrentConnectionString;
             await base.InitializeAsync();
             if (!PreconditionsMet)
@@ -113,7 +116,10 @@ namespace UnitTests.MembershipTests
 
         public override async ValueTask InitializeAsync()
         {
-            var relationalStorage = await RelationalStorageForTesting.SetupInstance(AdoNetInvariantName, TestDatabaseName);
+            var relationalStorage = await RelationalStorageForTesting.SetupInstance(
+                AdoNetInvariantName,
+                TestDatabaseName,
+                cancellationToken: TestContext.Current.CancellationToken);
             _connectionString = relationalStorage.CurrentConnectionString;
             await base.InitializeAsync();
             if (!PreconditionsMet)
@@ -198,7 +204,10 @@ namespace UnitTests.MembershipTests
 
         public override async ValueTask InitializeAsync()
         {
-            var relationalStorage = await RelationalStorageForTesting.SetupInstance(AdoNetInvariantName, TestDatabaseName);
+            var relationalStorage = await RelationalStorageForTesting.SetupInstance(
+                AdoNetInvariantName,
+                TestDatabaseName,
+                cancellationToken: TestContext.Current.CancellationToken);
             _connectionString = relationalStorage.CurrentConnectionString;
             await base.InitializeAsync();
             if (!PreconditionsMet)

@@ -44,7 +44,8 @@ public sealed class AzureBlobJournaledJobShardManagerTestFixture : IJobShardMana
         var storageProvider = serviceProvider.GetRequiredService<IJournalStorageProvider>();
         Assert.IsAssignableFrom<ILifecycleParticipant<ISiloLifecycle>>(storageProvider).Participate(lifecycle);
 
-        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(60));
+        using var cts = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
+        cts.CancelAfter(TimeSpan.FromSeconds(60));
         await lifecycle.OnStart(cts.Token);
         return new AzureBlobJournaledJobShardManagerTestScope(serviceProvider, lifecycle, CreateContainerClient(containerName));
     }
@@ -64,9 +65,24 @@ public sealed class AzureBlobJournaledJobShardManagerTestFixture : IJobShardMana
         public override async ValueTask DisposeAsync()
         {
             using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(60));
-            await lifecycle.OnStop(cts.Token);
+            try
+            {
+                await lifecycle.OnStop(cts.Token);
+            }
+            catch (OperationCanceledException) when (TestContext.Current.CancellationToken.IsCancellationRequested)
+            {
+                // Preserve the original test cancellation after bounded cleanup.
+            }
+
             await base.DisposeAsync();
-            await container.DeleteIfExistsAsync(cancellationToken: cts.Token);
+            try
+            {
+                await container.DeleteIfExistsAsync(cancellationToken: cts.Token);
+            }
+            catch (OperationCanceledException) when (TestContext.Current.CancellationToken.IsCancellationRequested)
+            {
+                // Preserve the original test cancellation after bounded cleanup.
+            }
         }
     }
 }

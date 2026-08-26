@@ -27,7 +27,10 @@ namespace Tester.Redis.Persistence
             TestUtils.CheckForRedis();
             this.fixture = commonFixture;
             this.output = output;
-            this.storageProvider = commonFixture.CreateRedisGrainStorage(useOrleansSerializer: false, deleteStateOnClear: true).GetAwaiter().GetResult();
+            this.storageProvider = commonFixture.CreateRedisGrainStorage(
+                useOrleansSerializer: false,
+                deleteStateOnClear: true,
+                cancellationToken: TestContext.Current.CancellationToken).GetAwaiter().GetResult();
             this.commonStorageTests = new CommonStorageTests(storageProvider);
         }
 

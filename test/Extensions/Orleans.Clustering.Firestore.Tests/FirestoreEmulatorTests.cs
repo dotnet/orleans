@@ -22,8 +22,10 @@ public class FirestoreEmulatorTests
         }.Build();
 
         var collection = db.Collection("users");
-        var document = await collection.AddAsync(new { Name = new { First = "Ada", Last = "Lovelace" }, Born = 1815 });
-        var snapshot = await document.GetSnapshotAsync();
+        var document = await collection.AddAsync(
+            new { Name = new { First = "Ada", Last = "Lovelace" }, Born = 1815 },
+            TestContext.Current.CancellationToken);
+        var snapshot = await document.GetSnapshotAsync(TestContext.Current.CancellationToken);
 
         Assert.Equal("Ada", snapshot.GetValue<string>("Name.First"));
         Assert.Equal("Lovelace", snapshot.GetValue<string>("Name.Last"));

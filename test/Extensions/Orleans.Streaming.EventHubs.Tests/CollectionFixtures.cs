@@ -48,7 +48,8 @@ namespace ServiceBus.Tests
                 .Select(silo => HostedCluster.GetSiloServiceProvider(silo.SiloAddress).GetRequiredService<IMeterFactory>())
                 .Select(meterFactory => new MetricCollector<long>(meterFactory, "Microsoft.Orleans", "orleans-streams-queue-read-duration"))
                 .ToArray();
-            using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+            using var cts = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
+            cts.CancelAfter(TimeSpan.FromSeconds(30));
             try
             {
                 // Wait for 10 queue reads across the cluster.

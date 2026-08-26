@@ -54,7 +54,10 @@ namespace Tester.AdoNet.Reminders
                     return;
                 }
 
-                var relationalStorage = await RelationalStorageForTesting.SetupInstance(AdoInvariant, TestDatabaseName);
+                var relationalStorage = await RelationalStorageForTesting.SetupInstance(
+                    AdoInvariant,
+                    TestDatabaseName,
+                    cancellationToken: TestContext.Current.CancellationToken);
                 _connectionString = relationalStorage.CurrentConnectionString;
                 await base.InitializeAsync();
                 if (!PreconditionsMet)
@@ -98,7 +101,7 @@ namespace Tester.AdoNet.Reminders
             // ReminderTable.Clear() cannot be called from a non-Orleans thread,
             // so we must proxy the call through a grain.
             var controlProxy = GrainFactory.GetGrain<IReminderTestGrain2>(Guid.NewGuid());
-            await controlProxy.EraseReminderTable().WaitAsync(TestConstants.InitTimeout);
+            await controlProxy.EraseReminderTable().WaitAsync(TestConstants.InitTimeout, TestContext.Current.CancellationToken);
         }
 
         ValueTask IAsyncDisposable.DisposeAsync() => ValueTask.CompletedTask;
@@ -114,7 +117,7 @@ namespace Tester.AdoNet.Reminders
         [Fact]
         public async Task Rem_Sql_UpdateReminder_DoesNotRestartLocalReminder()
         {
-            await Test_Reminders_UpdateReminder_DoesNotRestartLocalReminder();
+            await Test_Reminders_UpdateReminder_DoesNotRestartLocalReminder(TestContext.Current.CancellationToken);
         }
 
         [Fact]

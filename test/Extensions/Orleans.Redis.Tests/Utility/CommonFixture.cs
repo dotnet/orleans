@@ -12,6 +12,7 @@ using Orleans.Storage;
 using StackExchange.Redis;
 using Tester;
 using TestExtensions;
+using Xunit;
 
 public class CommonFixture : TestEnvironmentFixture
 {
@@ -37,17 +38,49 @@ public class CommonFixture : TestEnvironmentFixture
     /// </summary>
     /// <remarks>If the environment invariants have failed to hold upon creation of the storage provider,
     /// a <em>null</em> value will be provided.</remarks>
-    public async Task<IGrainStorage> CreateRedisGrainStorage(bool useOrleansSerializer = false, bool deleteStateOnClear = false)
+    public async Task<IGrainStorage> CreateRedisGrainStorage(
+        bool useOrleansSerializer = false,
+        bool deleteStateOnClear = false,
+        CancellationToken cancellationToken = default)
     {
         TestUtils.CheckForRedis();
         IGrainStorageSerializer grainStorageSerializer = useOrleansSerializer ? new OrleansGrainStorageSerializer(this.DefaultProviderRuntime.ServiceProvider.GetService<Serializer>()!)
                                                                               : new JsonGrainStorageSerializer(this.DefaultProviderRuntime.ServiceProvider.GetService<OrleansJsonSerializer>()!);
-        var options = new RedisStorageOptions()
+        var options = new RedisStorageOptions
         {
             ConfigurationOptions = ConfigurationOptions.Parse(TestDefaultConfiguration.RedisConnectionString!),
             GrainStorageSerializer = grainStorageSerializer,
             DeleteStateOnClear = deleteStateOnClear,
         };
+        var connectTask = ConnectionMultiplexer.ConnectAsync(options.ConfigurationOptions);
+        ConnectionMultiplexer connection;
+        try
+        {
+            connection = await connectTask.WaitAsync(cancellationToken);
+        }
+        catch
+        {
+            _ = connectTask.ContinueWith(
+                static task =>
+                {
+                    if (task.IsCompletedSuccessfully)
+                    {
+                        task.Result.Dispose();
+                    }
+                    else
+                    {
+                        _ = task.Exception;
+                    }
+                },
+                CancellationToken.None,
+                TaskContinuationOptions.ExecuteSynchronously,
+                TaskScheduler.Default);
+            throw;
+        }
+
+        options.CreateMultiplexer = _ => Task.FromResult((
+            Multiplexer: (IConnectionMultiplexer)connection,
+            IsShared: false));
 
         var clusterOptions = new ClusterOptions()
         {
@@ -64,7 +97,15 @@ public class CommonFixture : TestEnvironmentFixture
             serviceProvider.GetRequiredService<ILogger<RedisGrainStorage>>());
         ISiloLifecycleSubject siloLifeCycle = new SiloLifecycleSubject(NullLoggerFactory.Instance.CreateLogger<SiloLifecycleSubject>());
         storageProvider.Participate(siloLifeCycle);
-        await siloLifeCycle.OnStart(CancellationToken.None);
-        return storageProvider;
+        try
+        {
+            await siloLifeCycle.OnStart(cancellationToken);
+            return storageProvider;
+        }
+        catch
+        {
+            connection.Dispose();
+            throw;
+        }
     }
 }

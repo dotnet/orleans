@@ -12,6 +12,7 @@ namespace Orleans.Clustering.Firestore.Tests;
 [TestCategory("Stress"), TestCategory("Firestore"), TestCategory("GoogleCloud")]
 public class FirestoreDataManagerStressTests : IAsyncLifetime
 {
+    private static readonly TimeSpan CleanupTimeout = TimeSpan.FromMinutes(1);
     private readonly ITestOutputHelper _output = default!;
     private readonly List<FirestoreDataManager> _managers = [];
     private FirestoreOptions _options = default!;
@@ -29,7 +30,12 @@ public class FirestoreDataManagerStressTests : IAsyncLifetime
         const int batchSize = 1000;
         const int numPartitions = 1;
 
-        return WriteMany(testName, numPartitions, iterations, batchSize);
+        return WriteMany(
+            testName,
+            numPartitions,
+            iterations,
+            batchSize,
+            TestContext.Current.CancellationToken);
     }
 
     [Fact]
@@ -40,10 +46,20 @@ public class FirestoreDataManagerStressTests : IAsyncLifetime
         const int batchSize = 1000;
         const int numPartitions = 100;
 
-        return WriteMany(testName, numPartitions, iterations, batchSize);
+        return WriteMany(
+            testName,
+            numPartitions,
+            iterations,
+            batchSize,
+            TestContext.Current.CancellationToken);
     }
 
-    private async Task WriteMany(string testName, int numPartitions, int iterations, int batchSize)
+    private async Task WriteMany(
+        string testName,
+        int numPartitions,
+        int iterations,
+        int batchSize,
+        CancellationToken cancellationToken)
     {
         _output.WriteLine("Iterations={0}, Batch={1}, Partitions={2}", iterations, batchSize, numPartitions);
         var managers = Enumerable.Range(0, numPartitions)
@@ -54,7 +70,7 @@ public class FirestoreDataManagerStressTests : IAsyncLifetime
                 NullLoggerFactory.Instance.CreateLogger<FirestoreDataManagerStressTests>()))
             .ToArray();
         _managers.AddRange(managers);
-        await Task.WhenAll(managers.Select(manager => manager.Initialize()));
+        await Task.WhenAll(managers.Select(manager => manager.Initialize(cancellationToken)));
 
         var promises = new List<Task>();
         var sw = Stopwatch.StartNew();
@@ -66,22 +82,22 @@ public class FirestoreDataManagerStressTests : IAsyncLifetime
                 StringData = "This is a test string",
                 BinaryData = new byte[128]
             };
-            var promise = managers[i % managers.Length].UpsertEntity(dataObject);
+            var promise = managers[i % managers.Length].UpsertEntity(dataObject, cancellationToken);
             promises.Add(promise);
             if (promises.Count == batchSize)
             {
-                await Task.WhenAll(promises);
+                await Task.WhenAll(promises).WaitAsync(cancellationToken);
                 promises.Clear();
                 _output.WriteLine("{0} has written {1} rows in {2} at {3} RPS",
                     testName, i + 1, sw.Elapsed, (i + 1) / sw.Elapsed.TotalSeconds);
             }
         }
 
-        await Task.WhenAll(promises);
+        await Task.WhenAll(promises).WaitAsync(cancellationToken);
         sw.Stop();
 
         var counts = await Task.WhenAll(managers.Select(async manager =>
-            (await manager.ReadAllEntities<DummyLoadEntity>()).Length));
+            (await manager.ReadAllEntities<DummyLoadEntity>(cancellationToken)).Length));
         Assert.Equal(iterations, counts.Sum());
 
         _output.WriteLine("{0} completed. Wrote {1} entries to {2} partition(s) in {3} at {4} RPS",
@@ -90,7 +106,16 @@ public class FirestoreDataManagerStressTests : IAsyncLifetime
 
     public async ValueTask DisposeAsync()
     {
-        await Task.WhenAll(_managers.Select(manager => manager.ClearCollection()));
+        using var cleanupCancellation = new CancellationTokenSource(CleanupTimeout);
+        try
+        {
+            await Task.WhenAll(_managers.Select(manager =>
+                manager.ClearCollection(cleanupCancellation.Token)));
+        }
+        finally
+        {
+            _managers.Clear();
+        }
     }
 
     public ValueTask InitializeAsync()

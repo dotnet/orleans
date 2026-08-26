@@ -74,7 +74,11 @@ public abstract class AdoNetStreamingTests : TestClusterPerTest
     public override async ValueTask InitializeAsync()
     {
         // set up the adonet environment before the base initializes
-        _testing = await RelationalStorageForTesting.SetupInstance(_invariant, TestDatabaseName);
+        var cancellationToken = TestContext.Current.CancellationToken;
+        _testing = await RelationalStorageForTesting.SetupInstance(
+            _invariant,
+            TestDatabaseName,
+            cancellationToken: cancellationToken);
 
         Assert.SkipWhen(IsNullOrEmpty(_testing.CurrentConnectionString), $"Database '{TestDatabaseName}' not initialized");
 
@@ -84,7 +88,7 @@ public abstract class AdoNetStreamingTests : TestClusterPerTest
         {
             return;
         }
-        await WaitForStreamingProviderReadyAsync();
+        await WaitForStreamingProviderReadyAsync(cancellationToken);
 
         // the runner must only be created after base initialization
         _runner = new SingleStreamTestRunner(InternalClient, AdoNetStreamProviderName);
@@ -128,7 +132,7 @@ public abstract class AdoNetStreamingTests : TestClusterPerTest
         }
     }
 
-    private async Task WaitForStreamingProviderReadyAsync()
+    private async Task WaitForStreamingProviderReadyAsync(CancellationToken cancellationToken)
     {
         var activeSilos = HostedCluster.GetActiveSilos().Select(static silo => silo.SiloAddress).ToArray();
         var grainFactory = (IInternalGrainFactory)GrainFactory;
@@ -139,7 +143,7 @@ public abstract class AdoNetStreamingTests : TestClusterPerTest
             .WaitForProviderReady(AdoNetStreamProviderName, StreamingDiagnosticTimeout))
             .ToArray();
 
-        await Task.WhenAll(waits);
+        await Task.WhenAll(waits).WaitAsync(cancellationToken);
     }
 
     //------------------------ One to One -----------------------------------------------------//
