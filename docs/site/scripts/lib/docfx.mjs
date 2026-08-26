@@ -1072,7 +1072,7 @@ function findMarkdownDestinationEnd(source, start) {
   return -1;
 }
 
-function collectMarkdownLinks(source) {
+export function collectMarkdownLinks(source) {
   const links = [];
   const labelStarts = [];
   let codeDelimiterLength = 0;
