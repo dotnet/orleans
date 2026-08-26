@@ -8,6 +8,7 @@ $scriptPath = Join-Path $PSScriptRoot 'summarize-coverage.ps1'
 $coverageReportScriptPath = Join-Path $PSScriptRoot 'coverage-report.ps1'
 $archiveTestResultsActionPath = Join-Path $PSScriptRoot '../actions/archive-test-results/action.yml'
 $dotnetTestActionPath = Join-Path $PSScriptRoot '../actions/dotnet-test/action.yml'
+$invokeCoverageScriptPath = Join-Path $PSScriptRoot 'invoke-coverage.ps1'
 $runTestsActionPath = Join-Path $PSScriptRoot '../actions/run-tests/action.yml'
 $setupCoverageScriptPath = Join-Path $PSScriptRoot 'setup-coverage.ps1'
 $workflowPath = Join-Path $PSScriptRoot '../workflows/ci.yml'
@@ -277,7 +278,7 @@ try {
         $coverageReportScript = Get-Content -Raw -LiteralPath $coverageReportScriptPath
         Assert-Matches `
             $dotnetTestAction `
-            'dotnet-coverage collect' `
+            'invoke-coverage\.ps1' `
             'Coverage must use the external collector with ContinuousIntegrationBuild.'
         Assert-Matches `
             $dotnetTestAction `
@@ -285,7 +286,7 @@ try {
             'Coverage builds must disable deterministic CI instrumentation.'
         Assert-Matches `
             $dotnetTestAction `
-            '--include-files=' `
+            '-IncludeFiles' `
             'macOS coverage must specify files for static instrumentation.'
         Assert-Matches `
             $dotnetTestAction `
@@ -311,6 +312,92 @@ try {
             $dotnetTestAction `
             'dotnet test --solution Orleans\.slnx' `
             'Test partitions must use native solution discovery.'
+    }
+
+    Invoke-Test 'retries only the uninitialized coverage handle failure' {
+        $testCase = New-TestCase
+        $attemptFile = Join-Path $testCase.Root 'attempt.txt'
+        $fakeCollector = Join-Path $testCase.Root 'fake-collector.ps1'
+        $collectorArguments = Join-Path $testCase.Root 'collector-arguments'
+        $settings = Join-Path $testCase.Root 'coverage.config.xml'
+        $coverageOutput = Join-Path $testCase.ReportDirectory 'coverage.cobertura.xml'
+        $retryLog = Join-Path $testCase.Root 'logs/coverage.retry.log'
+        [IO.File]::WriteAllText($settings, '<Configuration />', [Text.UTF8Encoding]::new($false))
+        [IO.File]::WriteAllText(
+            $fakeCollector,
+            @'
+$attempt = if (Test-Path -LiteralPath $env:ORLEANS_COVERAGE_ATTEMPT_FILE) {
+    [int] (Get-Content -Raw -LiteralPath $env:ORLEANS_COVERAGE_ATTEMPT_FILE)
+} else {
+    0
+}
+
+$attempt++
+Set-Content -LiteralPath $env:ORLEANS_COVERAGE_ATTEMPT_FILE -Value $attempt
+Set-Content -LiteralPath "$env:ORLEANS_COVERAGE_ARGUMENTS.$attempt.txt" -Value $args
+if (($env:ORLEANS_COVERAGE_FAILURE -eq 'handle' -and $attempt -eq 1) -or
+    $env:ORLEANS_COVERAGE_FAILURE -eq 'handle-always') {
+    Write-Output 'Unhandled exception: One or more errors occurred. (Handle is not initialized.)'
+    Write-Output 'No code coverage data available. Profiler was not initialized.'
+    exit 1
+}
+
+if ($env:ORLEANS_COVERAGE_FAILURE -eq 'test') {
+    Write-Output 'A test failed.'
+    exit 1
+}
+
+exit 0
+'@,
+            [Text.UTF8Encoding]::new($false)
+        )
+
+        $previousAttemptFile = $env:ORLEANS_COVERAGE_ATTEMPT_FILE
+        $previousArguments = $env:ORLEANS_COVERAGE_ARGUMENTS
+        $previousFailure = $env:ORLEANS_COVERAGE_FAILURE
+        try {
+            $env:ORLEANS_COVERAGE_ATTEMPT_FILE = $attemptFile
+            $env:ORLEANS_COVERAGE_ARGUMENTS = $collectorArguments
+            $env:ORLEANS_COVERAGE_FAILURE = 'handle'
+            & $invokeCoverageScriptPath `
+                -Settings $settings `
+                -Output $coverageOutput `
+                -RetryLogFile $retryLog `
+                -CoverageCommand $fakeCollector `
+                -Command @('dotnet', 'test', '-p:ContinuousIntegrationBuild=false')
+            Assert-Equal 0 $LASTEXITCODE 'The retry should succeed.'
+            Assert-Equal 2 ([int] (Get-Content -Raw -LiteralPath $attemptFile)) 'The collector attempt count differs.'
+            $retryArguments = Get-Content -LiteralPath "$collectorArguments.2.txt"
+            Assert-Equal $true ($retryArguments -contains '-p:ContinuousIntegrationBuild=false') 'The inner MSBuild property must be forwarded.'
+            Assert-Equal $true ($retryArguments -contains '--log-file') 'The retry must capture a collector log.'
+            Assert-Equal $true ($retryArguments -contains 'Verbose') 'The retry collector log must be verbose.'
+
+            Remove-Item -LiteralPath $attemptFile
+            $env:ORLEANS_COVERAGE_FAILURE = 'test'
+            & $invokeCoverageScriptPath `
+                -Settings $settings `
+                -Output $coverageOutput `
+                -RetryLogFile $retryLog `
+                -CoverageCommand $fakeCollector `
+                -Command @('dotnet', 'test', '-p:ContinuousIntegrationBuild=false')
+            Assert-Equal 1 $LASTEXITCODE 'An unrelated test failure should be preserved.'
+            Assert-Equal 1 ([int] (Get-Content -Raw -LiteralPath $attemptFile)) 'An unrelated failure must not be retried.'
+
+            Remove-Item -LiteralPath $attemptFile
+            $env:ORLEANS_COVERAGE_FAILURE = 'handle-always'
+            & $invokeCoverageScriptPath `
+                -Settings $settings `
+                -Output $coverageOutput `
+                -RetryLogFile $retryLog `
+                -CoverageCommand $fakeCollector `
+                -Command @('dotnet', 'test', '-p:ContinuousIntegrationBuild=false')
+            Assert-Equal 1 $LASTEXITCODE 'A persistent collector failure should be preserved.'
+            Assert-Equal 2 ([int] (Get-Content -Raw -LiteralPath $attemptFile)) 'The collector must retry only once.'
+        } finally {
+            $env:ORLEANS_COVERAGE_ATTEMPT_FILE = $previousAttemptFile
+            $env:ORLEANS_COVERAGE_ARGUMENTS = $previousArguments
+            $env:ORLEANS_COVERAGE_FAILURE = $previousFailure
+        }
     }
 
     Invoke-Test 'downloads only coverage artifacts for merging' {
@@ -362,7 +449,9 @@ try {
         Assert-Equal 16 ([regex]::Matches($workflow, '(?m)^\s{8}provider: [A-Za-z]')).Count 'Provider-discovered test partition count differs.'
         Assert-Equal 2 ([regex]::Matches($runTestsAction, 'uses: \./\.github/actions/dotnet-test')).Count 'Native test action invocation count differs.'
         Assert-Equal 2 ([regex]::Matches($runTestsAction, "format\('/\[\(Provider=\{0\}\)")).Count 'Standard provider filter count differs.'
-        Assert-Equal 4 ([regex]::Matches($dotnetTestAction, 'dotnet test --solution Orleans\.slnx')).Count 'Native test command count differs.'
+        $directTestCommands = ([regex]::Matches($dotnetTestAction, 'dotnet test --solution Orleans\.slnx')).Count
+        $coveredTestCommands = ([regex]::Matches($dotnetTestAction, "(?s)'dotnet'\s*'test'\s*'--solution'\s*'Orleans\.slnx'")).Count
+        Assert-Equal 4 ($directTestCommands + $coveredTestCommands) 'Native test command count differs.'
         Assert-Matches $dotnetTestAction '--framework "\$\{\{ inputs\.framework \}\}".*?--list-tests' 'Static coverage builds must target and discover the selected framework.'
         Assert-Equal 1 ([regex]::Matches($workflow, "retry: 'true'")).Count 'Cosmos retry configuration count differs.'
         Assert-Matches $runTestsAction 'attempt1' 'The first retryable attempt must retain distinct test results.'
