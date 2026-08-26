@@ -359,11 +359,11 @@ try {
         Assert-Equal 3 ([regex]::Matches($archiveTestResultsAction, 'continue-on-error: true')).Count 'Only the final coverage upload attempt may gate the job.'
         Assert-Matches `
             $archiveTestResultsAction `
-            "(?ms)^  - id: archive-test-results\r?\n    uses: actions/upload-artifact@.*?\r?\n    continue-on-error: true\r?\n.*?^  - name: Retry test result upload\r?\n    if: steps\.archive-test-results\.outcome == 'failure'\r?\n    continue-on-error: true\r?\n    uses: actions/upload-artifact@.*?\r?\n    with:\r?\n.*?      overwrite: true\r?$" `
+            "(?ms)^  - id: archive-test-results\r?\n    uses: actions/upload-artifact@.*?\r?\n    continue-on-error: true\r?\n.*?^  - name: Retry test result upload\r?\n    if: steps\.archive-test-results\.outcome == 'failure'\r?\n    continue-on-error: true\r?\n    uses: actions/upload-artifact@.*?\r?\n    with:\r?\n(?:(?!^  - ).)*?      overwrite: true\r?$" `
             'Test result upload attempts must remain non-gating and retry with overwrite.'
         Assert-Matches `
             $archiveTestResultsAction `
-            "(?ms)^  - name: Archive coverage\r?\n    id: archive-coverage\r?\n    if: github\.event_name == 'pull_request'\r?\n    continue-on-error: true\r?\n    uses: actions/upload-artifact@.*?\r?\n.*?^  - name: Retry coverage upload\r?\n    if: github\.event_name == 'pull_request' && steps\.archive-coverage\.outcome == 'failure'\r?\n    uses: actions/upload-artifact@.*?\r?\n    with:\r?\n.*?      overwrite: true\r?$" `
+            "(?ms)^  - name: Archive coverage\r?\n    id: archive-coverage\r?\n    if: github\.event_name == 'pull_request'\r?\n    continue-on-error: true\r?\n    uses: actions/upload-artifact@.*?\r?\n.*?^  - name: Retry coverage upload\r?\n    if: github\.event_name == 'pull_request' && steps\.archive-coverage\.outcome == 'failure'\r?\n    uses: actions/upload-artifact@.*?\r?\n    with:\r?\n(?:(?!^  - ).)*?      overwrite: true\r?$" `
             'Coverage upload must retry with overwrite and keep the final attempt gating.'
     }
 
