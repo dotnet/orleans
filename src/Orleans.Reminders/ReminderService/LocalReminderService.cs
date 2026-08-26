@@ -399,18 +399,18 @@ namespace Orleans.Runtime.ReminderService
             CheckRuntimeContext();
 
             _ = base.OnRangeChange(oldRange, newRange, increased);
-            Task task;
+            var status = Status;
+            var task = status == GrainServiceStatus.Started
+                ? ReadAndUpdateReminders()
+                : Task.CompletedTask;
+            if (status != GrainServiceStatus.Started)
+            {
+                LogIgnoringRangeChange(status);
+            }
+
             TaskCompletionSource previousGenerationChanged;
             lock (_rangeChangeLock)
             {
-                task = Status == GrainServiceStatus.Started
-                    ? ReadAndUpdateReminders()
-                    : Task.CompletedTask;
-                if (Status != GrainServiceStatus.Started)
-                {
-                    LogIgnoringRangeChange(Status);
-                }
-
                 previousGenerationChanged = rangeChangeGenerationChanged;
                 rangeChangeGenerationChanged = new(TaskCreationOptions.RunContinuationsAsynchronously);
                 rangeChangeGeneration++;
