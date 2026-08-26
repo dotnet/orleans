@@ -57,7 +57,7 @@ internal partial class EventHubAdapterReceiver : IQueueAdapterReceiver, IQueueCa
     private readonly Func<EventHubPartitionSettings, string, ILogger, IEventHubReceiver> eventHubReceiverFactory;
 
     private IStreamQueueCheckpointer<string>? checkpointer;
-    private AggregatedQueueFlowController flowController = null!;
+    private AggregatedQueueFlowController flowController = new(MaxMessagesPerRead);
     private bool receiverUsesCheckpoint;
 
     // Receiver life cycle

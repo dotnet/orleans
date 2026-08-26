@@ -256,7 +256,8 @@ public class EventHubCheckpointerTests
         IEventHubReceiver? eventHubReceiver = null,
         Action<string>? onReceiverCreated = null,
         Func<string, IEventHubReceiver>? receiverFactory = null,
-        Func<IEventHubQueueCache>? cacheFactory = null)
+        Func<IEventHubQueueCache>? cacheFactory = null,
+        bool initialize = true)
     {
         var settings = new EventHubPartitionSettings
         {
@@ -290,9 +291,21 @@ public class EventHubCheckpointerTests
                 return receiverFactory?.Invoke(offset) ?? eventHubReceiver ?? new TestEventHubReceiver();
             });
 
-        await receiver.Initialize(TimeSpan.FromSeconds(5));
+        if (initialize)
+        {
+            await receiver.Initialize(TimeSpan.FromSeconds(5));
+        }
 
         return receiver;
+    }
+
+    [TestSuite("BVT")]
+    [Fact, TestCategory("BVT")]
+    public async Task GetMaxAddCount_BeforeInitialize_UsesSafeDefault()
+    {
+        var receiver = await CreateReceiver(new TestCheckpointer(), initialize: false);
+
+        Assert.Equal(EventHubAdapterReceiver.MaxMessagesPerRead, receiver.GetMaxAddCount());
     }
 
     [TestSuite("BVT")]
