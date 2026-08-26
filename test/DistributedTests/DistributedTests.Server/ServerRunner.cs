@@ -30,15 +30,22 @@ namespace DistributedTests.Server
             _siloName = $"{Environment.MachineName}-{Guid.NewGuid().ToString("N")[..5]}";
         }
 
-        public async Task Run(CommonParameters commonParameters, T configuratorParameters)
+        public async Task Run(
+            CommonParameters commonParameters,
+            T configuratorParameters,
+            CancellationToken cancellationToken)
         {
-            var channel = await Channels.CreateReceiveChannel(_siloName, commonParameters.ClusterId, commonParameters.AzureQueueUri);
+            var channel = await Channels.CreateReceiveChannel(
+                _siloName,
+                commonParameters.ClusterId,
+                commonParameters.AzureQueueUri,
+                cancellationToken);
 
             ServerMessage? msg = null;
 
             while (true)
             {
-                var host = Host
+                using var host = Host
                     .CreateDefaultBuilder()
                     .ConfigureLogging(logging =>
                     {
@@ -47,22 +54,28 @@ namespace DistributedTests.Server
                     .UseOrleans((ctx, siloBuilder) => ConfigureOrleans(siloBuilder, commonParameters, configuratorParameters))
                     .Build();
 
-                var hostTask = host.RunAsync();
+                await host.StartAsync(cancellationToken);
 
                 if (msg != null)
                 {
                     // we did restart the silo
-                    await channel.SendAck(msg);
+                    await channel.SendAck(msg, cancellationToken);
                     msg = null;
                 }
 
-                msg = await channel.WaitForMessage(CancellationToken.None);
+                msg = await channel.WaitForMessage(cancellationToken);
 
-                await host.StopAsync(new CancellationToken(!msg.IsGraceful));
+                using var stopCancellation = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+                if (!msg.IsGraceful)
+                {
+                    stopCancellation.Cancel();
+                }
+
+                await host.StopAsync(stopCancellation.Token);
 
                 if (!msg.Restart)
                 {
-                    await channel.SendAck(msg);
+                    await channel.SendAck(msg, cancellationToken);
                     break;
                 }
             }

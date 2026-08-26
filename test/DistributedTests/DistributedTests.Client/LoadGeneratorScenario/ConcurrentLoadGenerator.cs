@@ -17,7 +17,7 @@ namespace DistributedTests.Client
 
         public int BlocksCompleted { get; set; }
 
-        public readonly long RatePerSecond => (long)(Completed / TotalDuration);
+        public readonly long RatePerSecond => TotalDuration > 0 ? (long)(Completed / TotalDuration) : 0;
 
         public override readonly string ToString()
         {
@@ -42,7 +42,7 @@ namespace DistributedTests.Client
         }
 
         private Channel<WorkBlock> _completedBlocks = null!;
-        private readonly Func<TState, ValueTask> _issueRequest;
+        private readonly Func<TState, CancellationToken, ValueTask> _issueRequest;
         private readonly Func<int, TState> _getStateForWorker;
         private readonly ILogger _logger;
         private readonly bool _logIntermediateResults;
@@ -56,7 +56,7 @@ namespace DistributedTests.Client
             int numWorkers,
             int blocksPerWorker,
             int requestsPerBlock,
-            Func<TState, ValueTask> issueRequest,
+            Func<TState, CancellationToken, ValueTask> issueRequest,
             Func<int, TState> getStateForWorker,
             ILogger logger,
             bool logIntermediateResults = false)
@@ -72,7 +72,7 @@ namespace DistributedTests.Client
             this._states = new TState[numWorkers];
         }
 
-        public async Task Warmup()
+        public async Task Warmup(CancellationToken cancellationToken)
         {
             this.ResetBetweenRuns();
             var completedBlockReader = this._completedBlocks.Reader;
@@ -80,11 +80,15 @@ namespace DistributedTests.Client
             for (var ree = 0; ree < this._numWorkers; ree++)
             {
                 this._states[ree] = _getStateForWorker(ree);
-                this._tasks[ree] = this.RunWorker(this._states[ree], this._requestsPerBlock, 3, default);
+                this._tasks[ree] = this.RunWorker(
+                    this._states[ree],
+                    this._requestsPerBlock,
+                    3,
+                    cancellationToken);
             }
 
             // Wait for warmup to complete.
-            await Task.WhenAll(this._tasks);
+            await Task.WhenAll(this._tasks).WaitAsync(cancellationToken);
 
             // Ignore warmup blocks.
             while (completedBlockReader.TryRead(out _)) ;
@@ -104,7 +108,9 @@ namespace DistributedTests.Client
                 });
         }
 
-        public async Task<LoadGeneratorReport> Run(CancellationToken ct)
+        public async Task<LoadGeneratorReport> Run(
+            CancellationToken runCancellationToken,
+            CancellationToken cancellationToken)
         {
             this.ResetBetweenRuns();
             var completedBlockReader = this._completedBlocks.Reader;
@@ -112,18 +118,22 @@ namespace DistributedTests.Client
             // Start the run.
             for (var i = 0; i < this._numWorkers; i++)
             {
-                this._tasks[i] = this.RunWorker(this._states[i], this._requestsPerBlock, this._blocksPerWorker, ct);
+                this._tasks[i] = this.RunWorker(
+                    this._states[i],
+                    this._requestsPerBlock,
+                    this._blocksPerWorker,
+                    runCancellationToken);
             }
 
             var completion = Task.WhenAll(this._tasks);
-            _ = Task.Run(async () => { try { await completion; } catch { } finally { this._completedBlocks.Writer.Complete(); } });
+            _ = CompleteWriterAsync(completion);
             // Do not allocated a list with a too high capacity
             var blocks = new List<WorkBlock>(this._numWorkers * Math.Min(100, this._blocksPerWorker));
             var blocksPerReport = this._numWorkers * Math.Min(100, this._blocksPerWorker) / 5;
             var nextReportBlockCount = blocksPerReport;
             while (!completion.IsCompleted)
             {
-                var more = await completedBlockReader.WaitToReadAsync();
+                var more = await completedBlockReader.WaitToReadAsync(cancellationToken);
                 if (!more) break;
                 while (completedBlockReader.TryRead(out var block))
                 {
@@ -189,12 +199,16 @@ namespace DistributedTests.Client
             {
                 var workBlock = new WorkBlock();
                 workBlock.StartTimestamp = Stopwatch.GetTimestamp();
-                while (workBlock.Completed < requestsPerBlock)
+                while (workBlock.Completed < requestsPerBlock && !ct.IsCancellationRequested)
                 {
                     try
                     {
-                        await this._issueRequest(state).ConfigureAwait(false);
+                        await this._issueRequest(state, ct).ConfigureAwait(false);
                         ++workBlock.Successes;
+                    }
+                    catch (OperationCanceledException) when (ct.IsCancellationRequested)
+                    {
+                        break;
                     }
                     catch
                     {
@@ -203,8 +217,25 @@ namespace DistributedTests.Client
                 }
 
                 workBlock.EndTimestamp = Stopwatch.GetTimestamp();
-                await completedBlockWriter.WriteAsync(workBlock);
+                if (workBlock.Completed > 0 && !completedBlockWriter.TryWrite(workBlock))
+                {
+                    break;
+                }
+
                 --numBlocks;
+            }
+        }
+
+        private async Task CompleteWriterAsync(Task completion)
+        {
+            try
+            {
+                await completion;
+                this._completedBlocks.Writer.TryComplete();
+            }
+            catch (Exception exception)
+            {
+                this._completedBlocks.Writer.TryComplete(exception);
             }
         }
     }

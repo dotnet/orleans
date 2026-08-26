@@ -287,6 +287,7 @@ namespace Orleans.Transactions.DynamoDB.Tests
         [Fact]
         public async Task TransactWriteItems_ExplicitClientRequestToken_ReplaysIdenticalRequest()
         {
+            var cancellationToken = TestContext.Current.CancellationToken;
             _ = await InitTableAsync(NullLogger.Instance);
             using var client = CreateDynamoDBClient();
             var partitionKey = $"{partition}-{Guid.NewGuid():N}";
@@ -313,8 +314,8 @@ namespace Orleans.Transactions.DynamoDB.Tests
                 ]
             };
 
-            await client.TransactWriteItemsAsync(request);
-            await client.TransactWriteItemsAsync(request);
+            await client.TransactWriteItemsAsync(request, cancellationToken);
+            await client.TransactWriteItemsAsync(request, cancellationToken);
 
             var response = await client.GetItemAsync(new GetItemRequest
             {
@@ -325,7 +326,7 @@ namespace Orleans.Transactions.DynamoDB.Tests
                     [DynamoDBTransactionalStateConstants.PARTITION_KEY_PROPERTY_NAME] = new AttributeValue { S = partitionKey },
                     [DynamoDBTransactionalStateConstants.ROW_KEY_PROPERTY_NAME] = new AttributeValue { S = "idempotency" }
                 }
-            });
+            }, cancellationToken);
             Assert.Equal("1", response.Item["Value"].N);
         }
 

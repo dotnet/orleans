@@ -36,7 +36,10 @@ namespace DistributedTests.Client.LoadGeneratorScenario
             _logger = loggerFactory.CreateLogger(scenario.Name);
         }
 
-        public async Task Run(ClientParameters clientParams, LoadGeneratorParameters loadParams)
+        public async Task Run(
+            ClientParameters clientParams,
+            LoadGeneratorParameters loadParams,
+            CancellationToken cancellationToken)
         {
             Console.WriteLine($"AzureTableUri: {clientParams.AzureTableUri}");
 
@@ -52,7 +55,7 @@ namespace DistributedTests.Client.LoadGeneratorScenario
             using var host = hostBuilder.Build();
 
             _logger.LogInformation("Connecting to cluster...");
-            await host.StartAsync();
+            await host.StartAsync(cancellationToken);
             // The Orleans client is always registered by UseOrleansClient above.
             var client = host.Services.GetService<IClusterClient>()!;
 
@@ -66,19 +69,24 @@ namespace DistributedTests.Client.LoadGeneratorScenario
                 logIntermediateResults: true);
 
             _logger.LogInformation("Warming-up...");
-            await generator.Warmup();
+            await generator.Warmup(cancellationToken);
 
-            var cts = loadParams.Duration != 0
-                ? new CancellationTokenSource(TimeSpan.FromSeconds(loadParams.Duration))
-                : new CancellationTokenSource();
+            using var durationCancellation = new CancellationTokenSource();
+            if (loadParams.Duration != 0)
+            {
+                durationCancellation.CancelAfter(TimeSpan.FromSeconds(loadParams.Duration));
+            }
 
+            using var runCancellation = CancellationTokenSource.CreateLinkedTokenSource(
+                cancellationToken,
+                durationCancellation.Token);
             _logger.LogInformation("Running");
-            var report = await generator.Run(cts.Token);
+            var report = await generator.Run(runCancellation.Token, cancellationToken);
 
             BenchmarksEventSource.Register("overall-rps", Operations.Last, Operations.Last, "Overall RPS", "RPS", "n0");
             BenchmarksEventSource.Measure("overall-rps", report.RatePerSecond);
 
-            await host.StopAsync();
+            await host.StopAsync(cancellationToken);
         }
     }
 }

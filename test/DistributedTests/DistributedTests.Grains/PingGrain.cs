@@ -4,5 +4,9 @@ namespace DistributedTests.Grains;
 
 public class PingGrain : Grain, IPingGrain
 {
-    public ValueTask Ping() => default;
+    public ValueTask Ping(CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        return default;
+    }
 }

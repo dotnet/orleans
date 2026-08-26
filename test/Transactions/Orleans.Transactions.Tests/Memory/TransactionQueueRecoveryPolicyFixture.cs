@@ -187,14 +187,22 @@ internal sealed class TransactionQueueRecoveryPolicyActivationTracker
         }
     }
 
-    public Task WaitForActivationCountAsync(GrainId grainId, int expectedCount, TimeSpan? timeout = null)
+    public Task WaitForActivationCountAsync(
+        GrainId grainId,
+        int expectedCount,
+        CancellationToken cancellationToken,
+        TimeSpan? timeout = null)
     {
-        return this.WaitForCountAsync(grainId, WaiterKind.Activation, expectedCount, timeout);
+        return this.WaitForCountAsync(grainId, WaiterKind.Activation, expectedCount, cancellationToken, timeout);
     }
 
-    public Task WaitForDeactivationCountAsync(GrainId grainId, int expectedCount, TimeSpan? timeout = null)
+    public Task WaitForDeactivationCountAsync(
+        GrainId grainId,
+        int expectedCount,
+        CancellationToken cancellationToken,
+        TimeSpan? timeout = null)
     {
-        return this.WaitForCountAsync(grainId, WaiterKind.Deactivation, expectedCount, timeout);
+        return this.WaitForCountAsync(grainId, WaiterKind.Deactivation, expectedCount, cancellationToken, timeout);
     }
 
     public void RecordActivated(GrainId grainId)
@@ -207,7 +215,12 @@ internal sealed class TransactionQueueRecoveryPolicyActivationTracker
         this.Record(grainId, WaiterKind.Deactivation, this.deactivations);
     }
 
-    private Task WaitForCountAsync(GrainId grainId, WaiterKind kind, int expectedCount, TimeSpan? timeout)
+    private Task WaitForCountAsync(
+        GrainId grainId,
+        WaiterKind kind,
+        int expectedCount,
+        CancellationToken cancellationToken,
+        TimeSpan? timeout)
     {
         ArgumentOutOfRangeException.ThrowIfLessThan(expectedCount, 1);
 
@@ -224,7 +237,7 @@ internal sealed class TransactionQueueRecoveryPolicyActivationTracker
             task = completion.Task;
         }
 
-        return task.WaitAsync(timeout ?? TimeSpan.FromSeconds(30));
+        return task.WaitAsync(timeout ?? TimeSpan.FromSeconds(30), cancellationToken);
     }
 
     private void Record(GrainId grainId, WaiterKind kind, Dictionary<GrainId, int> counts)
@@ -277,13 +290,13 @@ public sealed class TransactionQueueRecoveryPolicyState
 
 public interface ITransactionQueueRecoveryPolicyGrain : IGrainWithStringKey
 {
-    Task<Guid> GetActivationId();
+    Task<Guid> GetActivationId(CancellationToken cancellationToken);
 
     [Transaction(TransactionOption.CreateOrJoin)]
-    Task<int> Add(int delta);
+    Task<int> Add(int delta, CancellationToken cancellationToken);
 
     [Transaction(TransactionOption.CreateOrJoin)]
-    Task<int> GetValue();
+    Task<int> GetValue(CancellationToken cancellationToken);
 }
 
 internal sealed class TransactionQueueRecoveryPolicyGrain(
@@ -305,10 +318,15 @@ internal sealed class TransactionQueueRecoveryPolicyGrain(
         return base.OnDeactivateAsync(reason, cancellationToken);
     }
 
-    public Task<Guid> GetActivationId() => Task.FromResult(this.activationId);
-
-    public Task<int> Add(int delta)
+    public Task<Guid> GetActivationId(CancellationToken cancellationToken)
     {
+        cancellationToken.ThrowIfCancellationRequested();
+        return Task.FromResult(this.activationId);
+    }
+
+    public Task<int> Add(int delta, CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
         return state.PerformUpdate(currentState =>
         {
             currentState.Value += delta;
@@ -316,5 +334,9 @@ internal sealed class TransactionQueueRecoveryPolicyGrain(
         });
     }
 
-    public Task<int> GetValue() => state.PerformRead(currentState => currentState.Value);
+    public Task<int> GetValue(CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        return state.PerformRead(currentState => currentState.Value);
+    }
 }

@@ -62,17 +62,21 @@ internal static class TransactionRecoveryFailureObservation
         Task<TFailure> firstFailure,
         CancellationTokenSource stopProducing,
         TimeSpan observationWindow,
-        TimeSpan producerDrainTimeout)
+        TimeSpan producerDrainTimeout,
+        CancellationToken cancellationToken)
         where TFailure : class
     {
         ArgumentOutOfRangeException.ThrowIfLessThan(observationWindow, TimeSpan.Zero);
         ArgumentOutOfRangeException.ThrowIfLessThan(producerDrainTimeout, TimeSpan.Zero);
 
+        using var cancellationRegistration = cancellationToken.Register(
+            static state => ((CancellationTokenSource)state!).Cancel(),
+            stopProducing);
         var startedAt = Stopwatch.GetTimestamp();
         var responseDeadline = GetDeadline(startedAt, observationWindow);
         var drainDeadline = GetDeadline(responseDeadline, producerDrainTimeout);
 
-        await WaitUntilAsync(firstFailure, producer, responseDeadline);
+        await WaitUntilAsync(firstFailure, producer, responseDeadline, cancellationToken);
         if (firstFailure.IsCompleted)
         {
             return await CompleteFailureAsync(
@@ -80,7 +84,8 @@ internal static class TransactionRecoveryFailureObservation
                 firstFailure,
                 stopProducing,
                 startedAt,
-                drainDeadline);
+                drainDeadline,
+                cancellationToken);
         }
 
         if (producer.IsCompleted)
@@ -93,7 +98,8 @@ internal static class TransactionRecoveryFailureObservation
                     firstFailure,
                     stopProducing,
                     startedAt,
-                    drainDeadline);
+                    drainDeadline,
+                    cancellationToken);
             }
 
             return new(
@@ -107,7 +113,7 @@ internal static class TransactionRecoveryFailureObservation
 
         stopProducing.Cancel();
         var drainStartedAt = Stopwatch.GetTimestamp();
-        await WaitUntilAsync(firstFailure, producer, drainDeadline);
+        await WaitUntilAsync(firstFailure, producer, drainDeadline, cancellationToken);
 
         if (firstFailure.IsCompleted)
         {
@@ -117,6 +123,7 @@ internal static class TransactionRecoveryFailureObservation
                 stopProducing,
                 startedAt,
                 drainDeadline,
+                cancellationToken,
                 drainStartedAt);
         }
 
@@ -131,6 +138,7 @@ internal static class TransactionRecoveryFailureObservation
                     stopProducing,
                     startedAt,
                     drainDeadline,
+                    cancellationToken,
                     drainStartedAt);
             }
 
@@ -159,6 +167,7 @@ internal static class TransactionRecoveryFailureObservation
         CancellationTokenSource stopProducing,
         long startedAt,
         long drainDeadline,
+        CancellationToken cancellationToken,
         long? drainStartedAt = null)
         where TFailure : class
     {
@@ -167,7 +176,7 @@ internal static class TransactionRecoveryFailureObservation
         var drainStarted = drainStartedAt ?? Stopwatch.GetTimestamp();
         if (!producer.IsCompleted)
         {
-            await WaitUntilAsync(producer, drainDeadline);
+            await WaitUntilAsync(producer, drainDeadline, cancellationToken);
         }
 
         if (producer.IsCompleted)
@@ -191,31 +200,45 @@ internal static class TransactionRecoveryFailureObservation
             Stopwatch.GetElapsedTime(drainStarted));
     }
 
-    private static async Task WaitUntilAsync(Task first, long deadline)
+    private static async Task WaitUntilAsync(
+        Task first,
+        long deadline,
+        CancellationToken cancellationToken)
     {
         while (!first.IsCompleted)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             var now = Stopwatch.GetTimestamp();
             if (now >= deadline)
             {
                 return;
             }
 
-            await Task.WhenAny(first, Task.Delay(Stopwatch.GetElapsedTime(now, deadline))).ConfigureAwait(false);
+            await Task.WhenAny(
+                first,
+                Task.Delay(Stopwatch.GetElapsedTime(now, deadline), cancellationToken)).ConfigureAwait(false);
         }
     }
 
-    private static async Task WaitUntilAsync(Task first, Task second, long deadline)
+    private static async Task WaitUntilAsync(
+        Task first,
+        Task second,
+        long deadline,
+        CancellationToken cancellationToken)
     {
         while (!first.IsCompleted && !second.IsCompleted)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             var now = Stopwatch.GetTimestamp();
             if (now >= deadline)
             {
                 return;
             }
 
-            await Task.WhenAny(first, second, Task.Delay(Stopwatch.GetElapsedTime(now, deadline))).ConfigureAwait(false);
+            await Task.WhenAny(
+                first,
+                second,
+                Task.Delay(Stopwatch.GetElapsedTime(now, deadline), cancellationToken)).ConfigureAwait(false);
         }
     }
 

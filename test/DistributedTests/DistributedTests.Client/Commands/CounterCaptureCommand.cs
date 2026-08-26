@@ -34,11 +34,11 @@ namespace DistributedTests.Client.Commands
             AddOption(OptionHelper.CreateOption("--counterKey", defaultValue: StreamingConstants.DefaultCounterGrain));
             AddArgument(new Argument<List<string>>("Counters") { Arity = ArgumentArity.OneOrMore });
 
-            Handler = CommandHandler.Create<Parameters>(RunAsync);
+            Handler = CommandHandler.Create<Parameters, CancellationToken>(RunAsync);
             _logger = logger;
         }
 
-        private async Task RunAsync(Parameters parameters)
+        private async Task RunAsync(Parameters parameters, CancellationToken cancellationToken)
         {
             _logger.LogInformation("Connecting to cluster...");
             var hostBuilder = new HostBuilder()
@@ -48,26 +48,26 @@ namespace DistributedTests.Client.Commands
                         .UseAzureStorageClustering(options => options.TableServiceClient = parameters.AzureTableUri.CreateTableServiceClient());
                 });
             using var host = hostBuilder.Build();
-            await host.StartAsync();
+            await host.StartAsync(cancellationToken);
 
             // The Orleans client is always registered by UseOrleansClient above.
             var client = host.Services.GetService<IClusterClient>()!;
 
             var counterGrain = client.GetGrain<ICounterGrain>(parameters.CounterKey);
 
-            var duration = await counterGrain.GetRunDuration();
+            var duration = await counterGrain.GetRunDuration(cancellationToken);
             BenchmarksEventSource.Register("duration", Operations.First, Operations.Last, "duration", "duration", "n0");
             BenchmarksEventSource.Measure("duration", duration.TotalSeconds);
 
-            var initialWait = await counterGrain.WaitTimeForReport();
+            var initialWait = await counterGrain.WaitTimeForReport(cancellationToken);
 
             _logger.LogInformation("Counters should be ready in {InitialWait}", initialWait);
-            await Task.Delay(initialWait);
+            await Task.Delay(initialWait, cancellationToken);
 
             _logger.LogInformation("Counters ready");
             foreach (var counter in parameters.Counters)
             {
-                var value = await counterGrain.GetTotalCounterValue(counter);
+                var value = await counterGrain.GetTotalCounterValue(counter, cancellationToken);
                 _logger.LogInformation("{Counter}: {Value}", counter, value);
                 BenchmarksEventSource.Register(counter, Operations.First, Operations.Sum, counter, counter, "n0");
                 BenchmarksEventSource.Measure(counter, value);
@@ -79,7 +79,7 @@ namespace DistributedTests.Client.Commands
                 }
             }
 
-            await host.StopAsync();
+            await host.StopAsync(cancellationToken);
         }
     }
 }

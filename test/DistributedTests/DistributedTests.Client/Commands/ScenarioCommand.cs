@@ -27,7 +27,7 @@ namespace DistributedTests.Client.Commands
             AddOption(OptionHelper.CreateOption<int>("--requestsPerBlock", defaultValue: 500, validator: OptionHelper.OnlyStrictlyPositive));
             AddOption(OptionHelper.CreateOption<int>("--duration", defaultValue: 0, validator: OptionHelper.OnlyPositiveOrZero));
 
-            Handler = CommandHandler.Create<ClientParameters, LoadGeneratorParameters>(_runner.Run);
+            Handler = CommandHandler.Create<ClientParameters, LoadGeneratorParameters, CancellationToken>(_runner.Run);
         }
     }
 

@@ -17,7 +17,7 @@ namespace DistributedTests.GrainInterfaces
 
     public interface IGrainWithCounter : IGrainWithGuidKey
     {
-        Task<int> GetCounterValue(string counterName);
+        Task<int> GetCounterValue(string counterName, CancellationToken cancellationToken);
     }
 
     public interface IImplicitSubscriberGrain : IGrainWithCounter
@@ -28,10 +28,10 @@ namespace DistributedTests.GrainInterfaces
     {
         Task Track(IGrainWithCounter grain);
 
-        Task<TimeSpan> GetRunDuration();
+        Task<TimeSpan> GetRunDuration(CancellationToken cancellationToken);
 
-        Task<TimeSpan> WaitTimeForReport();
+        Task<TimeSpan> WaitTimeForReport(CancellationToken cancellationToken);
 
-        Task<int> GetTotalCounterValue(string counterName);
+        Task<int> GetTotalCounterValue(string counterName, CancellationToken cancellationToken);
     }
 }

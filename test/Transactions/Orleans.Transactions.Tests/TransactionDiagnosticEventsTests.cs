@@ -695,7 +695,9 @@ public class TransactionDiagnosticEventsTests
             waitCount: 2,
             deadline: timeStamp.AddSeconds(10),
             identity));
-        var transition = await gate.WaitAsync(GetDeadline(RecoveryObservationTimeout));
+        var transition = await gate.WaitAsync(
+            GetDeadline(RecoveryObservationTimeout),
+            TestContext.Current.CancellationToken);
 
         Assert.False(emission.IsCompleted);
         Assert.Equal(transactionId, transition.TransactionId);
@@ -718,7 +720,9 @@ public class TransactionDiagnosticEventsTests
         using var gate = observer.GateNextTransition(transition =>
             transition.Kind == TransactionRecoveryEventObserver.RecoveryTransitionKind.TransactionConfirmCompleted
             && transition.TransactionId == committedTransactionId);
-        var wait = gate.WaitAsync(GetDeadline(RecoveryObservationTimeout));
+        var wait = gate.WaitAsync(
+            GetDeadline(RecoveryObservationTimeout),
+            TestContext.Current.CancellationToken);
 
         TransactionDiagnosticEvents.EmitTransactionConfirmCompleted(
             resource,

@@ -363,7 +363,8 @@ namespace Orleans.Transactions.TestKit
                 firstFailure.Task,
                 stopProducing,
                 failureObservationTimeout.ObservationWindow,
-                failureObservationTimeout.ProducerDrainTimeout);
+                failureObservationTimeout.ProducerDrainTimeout,
+                CancellationToken.None);
             this.Log(
                 $"Recovery phase=failure-watchdog completed, timestamp={DateTime.UtcNow:O}. "
                 + $"Outcome={failureDetection.Kind}, elapsed={failureDetection.Elapsed}, "

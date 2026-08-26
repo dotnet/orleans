@@ -13,14 +13,20 @@ namespace DistributedTests.Grains
             _options = options.Value;
         }
 
-        public Task<TimeSpan> GetRunDuration() => Task.FromResult(TimeSpan.FromSeconds(_options.Duration));
+        public Task<TimeSpan> GetRunDuration(CancellationToken cancellationToken)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            return Task.FromResult(TimeSpan.FromSeconds(_options.Duration));
+        }
 
-        public async Task<int> GetTotalCounterValue(string counterName)
+        public async Task<int> GetTotalCounterValue(
+            string counterName,
+            CancellationToken cancellationToken)
         {
             var counter = 0;
             foreach (var grain in _trackedGrains)
             {
-                counter += await grain.GetCounterValue(counterName);
+                counter += await grain.GetCounterValue(counterName, cancellationToken);
             }
             return counter;
         }
@@ -31,8 +37,9 @@ namespace DistributedTests.Grains
             return Task.CompletedTask;
         }
 
-        public Task<TimeSpan> WaitTimeForReport()
+        public Task<TimeSpan> WaitTimeForReport(CancellationToken cancellationToken)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             var ts = _options.ReportAt - DateTime.UtcNow;
             return ts < TimeSpan.Zero
                 ? Task.FromResult(TimeSpan.Zero)

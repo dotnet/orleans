@@ -17,8 +17,9 @@ namespace DistributedTests.Grains
             _logger = logger;
         }
 
-        public Task<int> GetCounterValue(string counterName)
+        public Task<int> GetCounterValue(string counterName, CancellationToken cancellationToken)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             return counterName switch
             {
                 "requests" => Task.FromResult(_requestCounter),
