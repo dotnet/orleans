@@ -254,15 +254,16 @@ internal sealed partial class ActivationData
     {
         try
         {
-            if (activation.ForwardingAddress is null)
+            var forwardingAddress = activation.ForwardingAddress;
+            if (forwardingAddress is null)
             {
-                var selectedAddress = await PlaceMigratingGrainAsync(activation, context.RequestContext, cancellationToken);
-                if (selectedAddress is null)
+                forwardingAddress = await PlaceMigratingGrainAsync(activation, context.RequestContext, cancellationToken);
+                if (forwardingAddress is null)
                 {
                     return false;
                 }
 
-                activation.ForwardingAddress = selectedAddress;
+                activation.ForwardingAddress = forwardingAddress;
             }
 
             // Populate the dehydration context.
@@ -274,8 +275,8 @@ internal sealed partial class ActivationData
             activation.OnDehydrate(context.MigrationContext);
 
             // Send the dehydration context to the target host.
-            await migrationManager.MigrateAsync(activation.ForwardingAddress, activation.GrainId, context.MigrationContext).AsTask().WaitAsync(cancellationToken);
-            activation._shared.InternalRuntime.GrainLocator.UpdateCache(activation.GrainId, activation.ForwardingAddress);
+            await migrationManager.MigrateAsync(forwardingAddress, activation.GrainId, context.MigrationContext).AsTask().WaitAsync(cancellationToken);
+            activation._shared.InternalRuntime.GrainLocator.UpdateCache(activation.GrainId, forwardingAddress);
             return true;
         }
         catch (Exception exception)
@@ -313,7 +314,7 @@ internal sealed partial class ActivationData
 
         // Only migrate if a different silo was selected.
         activation.ForwardingAddress = selectedAddress;
-        LogDebugMigrating(activation._shared.Logger, activation.GrainId, activation.ForwardingAddress);
+        LogDebugMigrating(activation._shared.Logger, activation.GrainId, selectedAddress);
         activation.Migrate(requestContextData, cancellationToken: CancellationToken.None);
     }
 
