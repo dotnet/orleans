@@ -5,7 +5,6 @@ using Orleans.Runtime;
 using Orleans.Runtime.Hosting;
 using Orleans.Storage;
 using Orleans.TestingHost;
-using Orleans.TestingHost.Utils;
 using TestExtensions;
 using UnitTests.GrainInterfaces;
 using UnitTests.StorageTests;
@@ -121,29 +120,18 @@ namespace UnitTests.StreamingTests
             var deactivatingConsumer = GrainFactory.GetGrain<IStreamLifecycleConsumerGrain>(Guid.NewGuid());
             await deactivatingConsumer.BecomeConsumer(subscribedStreamId, StreamProviderName);
 
-            using var observer = StreamingDiagnosticObserver.Create();
-            using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
-            var deliveryTask = observer.WaitForItemDeliveryCountAsync(producedStreamId, 1, StreamProviderName, cts.Token);
+            var timeout = TimeSpan.FromSeconds(30);
+            using var streamObserver = StreamingDiagnosticObserver.Create();
+            using var grainObserver = GrainDiagnosticObserver.Create();
+            using var cts = new CancellationTokenSource(timeout);
+            var deliveryTask = streamObserver.WaitForItemDeliveryCountAsync(producedStreamId, 1, StreamProviderName, cts.Token);
+            var deactivationTask = grainObserver.WaitForDeactivatedAsync(deactivatingConsumer, timeout);
 
             await deactivatingConsumer.ProduceOnDeactivate(producedStreamId, StreamProviderName);
             await deliveryTask;
+            await deactivationTask;
 
             Assert.Equal(1, await receivingConsumer.GetReceivedCount());
-
-            var managementGrain = GrainFactory.GetGrain<IManagementGrain>(0);
-            await TestingUtils.WaitUntilAsync(
-                async (lastTry, cancellationToken) =>
-                {
-                    var activationCount = await managementGrain.GetGrainActivationCount((GrainReference)deactivatingConsumer);
-                    if (lastTry)
-                    {
-                        Assert.Equal(0, activationCount);
-                    }
-
-                    return activationCount == 0;
-                },
-                TimeSpan.FromSeconds(30),
-                delayOnFail: TimeSpan.FromMilliseconds(100));
         }
 
         private async Task Test_PubSub_Stream(string streamProviderName, Guid streamId)
