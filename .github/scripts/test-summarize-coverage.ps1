@@ -5,8 +5,12 @@ Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
 $scriptPath = Join-Path $PSScriptRoot 'summarize-coverage.ps1'
+$coverageConfigPath = Join-Path $PSScriptRoot '../coverage.config.xml'
 $coverageReportScriptPath = Join-Path $PSScriptRoot 'coverage-report.ps1'
+$coverageStaticConfigPath = Join-Path $PSScriptRoot '../coverage.static.config.xml'
 $archiveTestResultsActionPath = Join-Path $PSScriptRoot '../actions/archive-test-results/action.yml'
+$azureBuildTemplatePath = Join-Path $PSScriptRoot '../../.azure/pipelines/templates/build.yaml'
+$azureVariablesPath = Join-Path $PSScriptRoot '../../.azure/pipelines/templates/vars.yaml'
 $dotnetTestActionPath = Join-Path $PSScriptRoot '../actions/dotnet-test/action.yml'
 $invokeCoverageScriptPath = Join-Path $PSScriptRoot 'invoke-coverage.ps1'
 $runTestsActionPath = Join-Path $PSScriptRoot '../actions/run-tests/action.yml'
@@ -276,14 +280,28 @@ try {
     Invoke-Test 'uses external coverage collection for CI builds' {
         $dotnetTestAction = Get-Content -Raw -LiteralPath $dotnetTestActionPath
         $coverageReportScript = Get-Content -Raw -LiteralPath $coverageReportScriptPath
+        $coverageConfigs = @(
+            Get-Content -Raw -LiteralPath $coverageConfigPath
+            Get-Content -Raw -LiteralPath $coverageStaticConfigPath
+        )
         Assert-Matches `
             $dotnetTestAction `
             'invoke-coverage\.ps1' `
-            'Coverage must use the external collector with ContinuousIntegrationBuild.'
-        Assert-Matches `
-            $dotnetTestAction `
-            '-p:ContinuousIntegrationBuild=false' `
-            'Coverage builds must disable deterministic CI instrumentation.'
+            'Coverage must use the external collector during CI.'
+        Assert-Equal `
+            0 `
+            ([regex]::Matches($dotnetTestAction, 'ContinuousIntegrationBuild=false')).Count `
+            'GitHub coverage must preserve continuous integration build semantics.'
+        foreach ($coverageConfig in $coverageConfigs) {
+            Assert-Matches `
+                $coverageConfig `
+                '<DeterministicReport>True</DeterministicReport>' `
+                'Coverage reports must preserve deterministic source paths.'
+            Assert-Matches `
+                $coverageConfig `
+                '<ExcludeAssembliesWithoutSources>None</ExcludeAssembliesWithoutSources>' `
+                'Coverage collection must retain symbol-bearing assemblies with deterministic sources.'
+        }
         Assert-Matches `
             $dotnetTestAction `
             '-IncludeFiles' `
@@ -373,11 +391,11 @@ exit 0
                 -Output $coverageOutput `
                 -RetryLogFile $retryLog `
                 -CoverageCommand $fakeCollector `
-                -Command @('dotnet', 'test', '-p:ContinuousIntegrationBuild=false')
+                -Command @('dotnet', 'test', '--forwarded-argument')
             Assert-Equal 0 $LASTEXITCODE 'The retry should succeed.'
             Assert-Equal 2 ([int] (Get-Content -Raw -LiteralPath $attemptFile)) 'The collector attempt count differs.'
             $retryArguments = Get-Content -LiteralPath "$collectorArguments.2.txt"
-            Assert-Equal $true ($retryArguments -contains '-p:ContinuousIntegrationBuild=false') 'The inner MSBuild property must be forwarded.'
+            Assert-Equal $true ($retryArguments -contains '--forwarded-argument') 'The inner test argument must be forwarded.'
             Assert-Equal $true ($retryArguments -contains '--log-file') 'The retry must capture a collector log.'
             Assert-Equal $true ($retryArguments -contains 'Verbose') 'The retry collector log must be verbose.'
 
@@ -388,7 +406,7 @@ exit 0
                 -Output $coverageOutput `
                 -RetryLogFile $retryLog `
                 -CoverageCommand $fakeCollector `
-                -Command @('dotnet', 'test', '-p:ContinuousIntegrationBuild=false')
+                -Command @('dotnet', 'test', '--forwarded-argument')
             Assert-Equal 1 $LASTEXITCODE 'An unrelated test failure should be preserved.'
             Assert-Equal 1 ([int] (Get-Content -Raw -LiteralPath $attemptFile)) 'An unrelated failure must not be retried.'
 
@@ -399,7 +417,7 @@ exit 0
                 -Output $coverageOutput `
                 -RetryLogFile $retryLog `
                 -CoverageCommand $fakeCollector `
-                -Command @('dotnet', 'test', '-p:ContinuousIntegrationBuild=false')
+                -Command @('dotnet', 'test', '--forwarded-argument')
             Assert-Equal 1 $LASTEXITCODE 'A persistent collector failure should be preserved.'
             Assert-Equal 2 ([int] (Get-Content -Raw -LiteralPath $attemptFile)) 'The collector must retry only once.'
         } finally {
@@ -484,12 +502,45 @@ exit 0
         Assert-Equal 0 ([regex]::Matches($dotnetTestAction, '--project|--test-modules')).Count 'Native test action must discover projects from the solution.'
     }
 
+    Invoke-Test 'publishes Azure Pipelines coverage' {
+        $azureBuildTemplate = Get-Content -Raw -LiteralPath $azureBuildTemplatePath
+        $azureVariables = Get-Content -Raw -LiteralPath $azureVariablesPath
+        Assert-Matches `
+            $azureVariables `
+            'DOTNET_COVERAGE_VERSION:\s*\d+\.\d+\.\d+' `
+            'Azure Pipelines must pin the coverage collector version.'
+        Assert-Matches `
+            $azureBuildTemplate `
+            '(?s)setup-coverage\.ps1.*?invoke-coverage\.ps1.*?coverage-\$\{\{suite\}\}-\$\{\{framework\}\}\.cobertura\.xml' `
+            'Azure Pipelines must use the shared coverage scripts to collect a distinct report from every test job.'
+        Assert-Equal `
+            0 `
+            ([regex]::Matches($azureBuildTemplate, 'ContinuousIntegrationBuild=false')).Count `
+            'Azure Pipelines coverage must preserve continuous integration build semantics.'
+        Assert-Matches `
+            $azureBuildTemplate `
+            '(?s)job: PublishCodeCoverage.*?dependsOn:.*?Test_\$\{\{suite\}\}_\$\{\{ replace\(framework.*?DownloadPipelineArtifact@2.*?itemPattern: ''\*\*/\*\.cobertura\.xml''' `
+            'Azure Pipelines must aggregate coverage after every test matrix job.'
+        Assert-Matches `
+            $azureBuildTemplate `
+            '(?s)PublishCodeCoverageResults@2.*?summaryFileLocation:.*?\*\*/\*\.cobertura\.xml.*?failIfCoverageEmpty: true' `
+            'Azure Pipelines must publish the aggregated coverage and require results.'
+    }
+
     Invoke-Test 'validates the coverage tool version' {
         $setupCoverageScript = Get-Content -Raw -LiteralPath $setupCoverageScriptPath
         Assert-Matches `
             $setupCoverageScript `
             'DOTNET_COVERAGE_VERSION must specify' `
             'Coverage setup must reject a missing tool version.'
+        Assert-Matches `
+            $setupCoverageScript `
+            'InstallPath must be specified outside GitHub Actions' `
+            'Coverage setup must require an explicit installation path in other CI systems.'
+        Assert-Matches `
+            $setupCoverageScript `
+            'if \(-not \[string\]::IsNullOrWhiteSpace\(\$env:GITHUB_PATH\)\)' `
+            'Coverage setup must continue adding the tool to the GitHub Actions path.'
         Assert-Equal 2 ([regex]::Matches($setupCoverageScript, 'Assert-NotReparsePoint \$toolPath')).Count 'Coverage tool path validation count differs.'
     }
 
