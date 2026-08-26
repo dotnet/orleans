@@ -68,8 +68,7 @@ namespace Orleans.Runtime.Membership
                 this.clusterId,
                 this.kvRootFolder,
                 this.logger,
-                versionKey: null,
-                includeMetadata: false);
+                versionKey: null);
             if (membershipTableData == null) return new List<Uri>();
 
             return membershipTableData.Members.Select(e => e.Item1).

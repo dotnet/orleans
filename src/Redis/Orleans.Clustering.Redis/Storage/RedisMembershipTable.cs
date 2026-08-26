@@ -182,8 +182,7 @@ namespace Orleans.Clustering.Redis
             TableVersion tableVersion = GetTableVersionFromRow(await tableVersionRowTask).Next();
             var existingEntry = Deserialize(entryRowValue);
 
-            // Update only the IAmAliveTime property.
-            existingEntry.IAmAliveTime = entry.IAmAliveTime;
+            ApplyHeartbeat(existingEntry, entry);
 
             var result = await UpsertRowInternal(existingEntry, tableVersion, updateTableVersion: false, allowInsertOnly: false);
             if (result == UpsertResult.Conflict)
@@ -194,6 +193,12 @@ namespace Orleans.Clustering.Redis
             {
                 throw new RedisClusteringException($"Failed to update IAmAlive value for key {key} for an unknown reason");
             }
+        }
+
+        internal static void ApplyHeartbeat(MembershipEntry existingEntry, MembershipEntry heartbeat)
+        {
+            existingEntry.IAmAliveTime = heartbeat.IAmAliveTime;
+            existingEntry.Metadata ??= heartbeat.Metadata;
         }
 
         public async Task<bool> UpdateRow(MembershipEntry entry, string etag, TableVersion tableVersion)

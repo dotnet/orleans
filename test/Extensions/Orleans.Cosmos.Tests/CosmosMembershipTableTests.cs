@@ -155,7 +155,7 @@ public class CosmosMembershipTableTests : MembershipTableTestsBase
     }
 
     [Fact, TestCategory("Functional")]
-    public async Task MembershipMetadata_SurvivesLegacyReplacement_RejectsConflict_AndIsCleanedUp()
+    public async Task MembershipMetadata_HeartbeatRepairsMissingInlineMetadata()
     {
         CosmosTestUtils.SkipIfCosmosEmulator(CosmosEmulatorTransactionalBatchConditionSkipReason);
 
@@ -176,57 +176,12 @@ public class CosmosMembershipTableTests : MembershipTableTestsBase
         legacyEntity.Metadata = null;
         await container.ReplaceItemAsync(legacyEntity, id, partitionKey);
 
-        var afterLegacyWrite = await membership.ReadRow(entry.SiloAddress);
-        var storedTuple = Assert.Single(afterLegacyWrite.Members);
-        Assert.Equal(entry.Metadata, storedTuple.Item1.Metadata);
+        entry.IAmAliveTime = entry.IAmAliveTime.AddMinutes(1);
+        await membership.UpdateIAmAlive(entry);
 
-        storedTuple.Item1.Metadata = ImmutableDictionary<string, string>.Empty.Add("region", "conflict");
-        storedTuple.Item1.Status = SiloStatus.Dead;
-        Assert.True(await membership.UpdateRow(storedTuple.Item1, storedTuple.Item2, afterLegacyWrite.Version.Next()));
-
-        var afterConflict = await membership.ReadRow(entry.SiloAddress);
-        Assert.Equal(entry.Metadata, Assert.Single(afterConflict.Members).Item1.Metadata);
-
-        await membership.CleanupDefunctSiloEntries(DateTimeOffset.UtcNow.AddDays(1));
-        Assert.Empty((await membership.ReadAll()).Members);
-
-        var metadataContainer = client.GetContainer(
-            options.DatabaseName,
-            CosmosMembershipTable.GetMetadataContainerName(options));
-        var exception = await Assert.ThrowsAsync<CosmosException>(
-            () => metadataContainer.ReadItemAsync<SiloMetadataEntity>(id, partitionKey));
-        Assert.Equal(HttpStatusCode.NotFound, exception.StatusCode);
-    }
-
-    [Fact, TestCategory("Functional")]
-    public async Task MembershipMetadata_LegacyCleanupOrphanIsReconciled()
-    {
-        CosmosTestUtils.SkipIfCosmosEmulator(CosmosEmulatorTransactionalBatchConditionSkipReason);
-        var options = new CosmosClusteringOptions();
-        options.ConfigureTestDefaults();
-        var membership = new CosmosMembershipTable(loggerFactory, Services, Options.Create(options), _clusterOptions);
-        await membership.InitializeMembershipTable(false);
-        var entry = CreateMetadataEntry();
-        var initial = await membership.ReadAll();
-        Assert.True(await membership.InsertRow(entry, initial.Version.Next()));
-
-        using var client = await options.CreateClient(Services);
-        var partitionKey = new PartitionKey(clusterId);
-        var id = $"{entry.SiloAddress.Endpoint.Address}-{entry.SiloAddress.Endpoint.Port}-{entry.SiloAddress.Generation}";
-        var membershipContainer = client.GetContainer(options.DatabaseName, options.ContainerName);
-        var metadataContainer = client.GetContainer(
-            options.DatabaseName,
-            CosmosMembershipTable.GetMetadataContainerName(options));
-        await membershipContainer.DeleteItemAsync<SiloEntity>(id, partitionKey);
-        var metadataEntity = (await metadataContainer.ReadItemAsync<SiloMetadataEntity>(id, partitionKey)).Resource;
-        metadataEntity.CreatedAt = DateTimeOffset.UtcNow - CosmosMembershipTable.MetadataOrphanGracePeriod - TimeSpan.FromMinutes(1);
-        await metadataContainer.ReplaceItemAsync(metadataEntity, id, partitionKey);
-
-        await membership.CleanupDefunctSiloEntries(DateTimeOffset.UtcNow);
-
-        var exception = await Assert.ThrowsAsync<CosmosException>(
-            () => metadataContainer.ReadItemAsync<SiloMetadataEntity>(id, partitionKey));
-        Assert.Equal(HttpStatusCode.NotFound, exception.StatusCode);
+        var repaired = (await container.ReadItemAsync<SiloEntity>(id, partitionKey)).Resource;
+        Assert.Equal(entry.Metadata, repaired.Metadata);
+        Assert.Equal(entry.IAmAliveTime, repaired.IAmAliveTime.UtcDateTime);
     }
 
     private static MembershipEntry CreateMetadataEntry() => new()
@@ -241,43 +196,60 @@ public class CosmosMembershipTableTests : MembershipTableTestsBase
     };
 }
 
+[TestCategory("BVT")]
 [TestSuite("BVT")]
 [TestProvider("Cosmos")]
 [TestArea("Membership")]
 public class CosmosMembershipMetadataContractTests
 {
     [Fact]
-    public void CompanionContainerName_IsValidAndDeterministicAtMaximumLength()
+    public void ApplyHeartbeat_RepairsMissingInlineMetadata()
     {
-        var options = new CosmosClusteringOptions { ContainerName = new string('c', 255) };
-
-        var first = CosmosMembershipTable.GetMetadataContainerName(options);
-        var second = CosmosMembershipTable.GetMetadataContainerName(options);
-
-        Assert.Equal(first, second);
-        Assert.Equal(255, first.Length);
-        Assert.NotEqual(options.ContainerName, first);
-    }
-
-    [Fact]
-    public void ExplicitCompanionContainerName_IsPreserved()
-    {
-        var options = new CosmosClusteringOptions { MetadataContainerName = "ProvisionedMetadata" };
-
-        Assert.Equal("ProvisionedMetadata", CosmosMembershipTable.GetMetadataContainerName(options));
-    }
-
-    [Fact]
-    public void CompanionContainerName_MustDifferFromMembershipContainer()
-    {
-        var options = new CosmosClusteringOptions
+        var expected = ImmutableDictionary<string, string>.Empty.Add("region", "west");
+        var heartbeat = new MembershipEntry
         {
-            ContainerName = "Membership",
-            MetadataContainerName = "Membership"
+            IAmAliveTime = DateTime.UtcNow,
+            Metadata = expected
+        };
+        var entity = new SiloEntity { Metadata = null };
+
+        CosmosMembershipTable.ApplyHeartbeat(entity, heartbeat);
+
+        Assert.Equal(expected, entity.Metadata);
+        Assert.Equal(heartbeat.IAmAliveTime, entity.IAmAliveTime);
+    }
+
+    [Fact]
+    public void ApplyHeartbeat_RepairsAvailableEmptyInlineMetadata()
+    {
+        var heartbeat = new MembershipEntry
+        {
+            IAmAliveTime = DateTime.UtcNow,
+            Metadata = ImmutableDictionary<string, string>.Empty
+        };
+        var entity = new SiloEntity { Metadata = null };
+
+        CosmosMembershipTable.ApplyHeartbeat(entity, heartbeat);
+
+        Assert.NotNull(entity.Metadata);
+        Assert.Empty(entity.Metadata);
+    }
+
+    [Fact]
+    public void ApplyHeartbeat_PreservesAvailableInlineMetadata()
+    {
+        var heartbeat = new MembershipEntry
+        {
+            IAmAliveTime = DateTime.UtcNow,
+            Metadata = ImmutableDictionary<string, string>.Empty.Add("region", "replacement")
+        };
+        var entity = new SiloEntity
+        {
+            Metadata = new Dictionary<string, string> { ["region"] = "existing" }
         };
 
-        var exception = Assert.Throws<OrleansConfigurationException>(
-            () => CosmosMembershipTable.GetMetadataContainerName(options));
-        Assert.Contains(nameof(CosmosClusteringOptions.MetadataContainerName), exception.Message);
+        CosmosMembershipTable.ApplyHeartbeat(entity, heartbeat);
+
+        Assert.Equal("existing", entity.Metadata["region"]);
     }
 }

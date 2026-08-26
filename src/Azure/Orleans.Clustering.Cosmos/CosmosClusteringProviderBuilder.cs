@@ -26,11 +26,6 @@ internal sealed class CosmosClusteringProviderBuilder : IProviderBuilder<ISiloBu
                 {
                     options.ContainerName = containerName;
                 }
-                var metadataContainerName = configurationSection[nameof(options.MetadataContainerName)];
-                if (!string.IsNullOrEmpty(metadataContainerName))
-                {
-                    options.MetadataContainerName = metadataContainerName;
-                }
                 if (bool.TryParse(configurationSection[nameof(options.IsResourceCreationEnabled)], out var irce))
                 {
                     options.IsResourceCreationEnabled = irce;

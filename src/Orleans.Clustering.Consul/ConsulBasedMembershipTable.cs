@@ -17,7 +17,6 @@ namespace Orleans.Runtime.Membership
     /// </summary>
     public partial class ConsulBasedMembershipTable : IMembershipTable
     {
-        internal static readonly TimeSpan MetadataOrphanGracePeriod = TimeSpan.FromMinutes(5);
         private static readonly TableVersion NotFoundTableVersion = new TableVersion(0, "0");
         private readonly ILogger _logger;
         private readonly IConsulClient _consulClient;
@@ -84,17 +83,6 @@ namespace Orleans.Runtime.Membership
         /// <returns>The cluster membership entries and table version.</returns>
         public static async Task<MembershipTableData> ReadAll(IConsulClient consulClient, string clusterId, string? kvRootFolder, ILogger logger, string? versionKey)
         {
-            return await ReadAll(consulClient, clusterId, kvRootFolder, logger, versionKey, includeMetadata: true);
-        }
-
-        internal static async Task<MembershipTableData> ReadAll(
-            IConsulClient consulClient,
-            string clusterId,
-            string? kvRootFolder,
-            ILogger logger,
-            string? versionKey,
-            bool includeMetadata)
-        {
             var deploymentKVAddresses = await consulClient.KV.List(
                 ConsulSiloRegistrationAssembler.FormatDeploymentKVPrefix(clusterId, kvRootFolder));
             if (deploymentKVAddresses.Response == null)
@@ -103,30 +91,19 @@ namespace Orleans.Runtime.Membership
                 return new MembershipTableData(NotFoundTableVersion);
             }
 
-            var metadataResponse = includeMetadata
-                ? await consulClient.KV.List(ConsulSiloRegistrationAssembler.FormatMetadataDeploymentKVPrefix(clusterId, kvRootFolder))
-                : null;
-            var metadata = metadataResponse?.Response?
-                .ToDictionary(kv => kv.Key, ConsulSiloRegistrationAssembler.MetadataFromKVPair, StringComparer.OrdinalIgnoreCase);
             var allSiloRegistrations =
                 deploymentKVAddresses.Response
                 .Where(siloKV => !siloKV.Key.EndsWith(ConsulSiloRegistrationAssembler.SiloIAmAliveSuffix, StringComparison.OrdinalIgnoreCase)
                         && !siloKV.Key.EndsWith(ConsulSiloRegistrationAssembler.VersionSuffix, StringComparison.OrdinalIgnoreCase))
                 .Select(siloKV =>
-                {
-                    var iAmAliveKV = deploymentKVAddresses.Response.SingleOrDefault(kv => kv.Key.Equals(ConsulSiloRegistrationAssembler.FormatSiloIAmAliveKey(siloKV.Key), StringComparison.OrdinalIgnoreCase));
-                    var metadataKey = ConsulSiloRegistrationAssembler.FormatSiloMetadataKey(
+                    ConsulSiloRegistrationAssembler.FromKVPairs(
                         clusterId,
-                        kvRootFolder,
-                        SiloAddress.FromParsableString(siloKV.Key.Split('/')[^1]));
-                    var registration = ConsulSiloRegistrationAssembler.FromKVPairs(clusterId, siloKV, iAmAliveKV);
-                    if (metadata?.GetValueOrDefault(metadataKey) is { } companionMetadata)
-                    {
-                        registration.Metadata = companionMetadata;
-                    }
-
-                    return registration;
-                }).ToArray();
+                        siloKV,
+                        deploymentKVAddresses.Response.SingleOrDefault(kv =>
+                            kv.Key.Equals(
+                                ConsulSiloRegistrationAssembler.FormatSiloIAmAliveKey(siloKV.Key),
+                                StringComparison.OrdinalIgnoreCase))))
+                .ToArray();
 
             var tableVersion = GetTableVersion(versionKey, deploymentKVAddresses);
 
@@ -140,7 +117,6 @@ namespace Orleans.Runtime.Membership
             {
                 //Use "0" as the eTag then Consul KV CAS will treat the operation as an insert and return false if the KV already exiats.
                 var siloRegistration = ConsulSiloRegistrationAssembler.FromMembershipEntry(this.clusterId, entry, "0");
-                siloRegistration.Metadata = await EnsureMetadata(entry.SiloAddress, siloRegistration.Metadata);
                 var insertKV = ConsulSiloRegistrationAssembler.ToKVPair(siloRegistration, this.kvRootFolder);
                 var rowInsert = new KVTxnOp(insertKV.Key, KVTxnVerb.CAS) { Index = siloRegistration.LastIndex, Value = insertKV.Value };
                 var versionUpdate = this.GetVersionRowUpdate(tableVersion);
@@ -168,10 +144,6 @@ namespace Orleans.Runtime.Membership
             try
             {
                 var siloRegistration = ConsulSiloRegistrationAssembler.FromMembershipEntry(this.clusterId, entry, etag);
-                siloRegistration.Metadata = await EnsureMetadata(
-                    entry.SiloAddress,
-                    siloRegistration.Metadata,
-                    preserveInlineMetadata: true);
                 var updateKV = ConsulSiloRegistrationAssembler.ToKVPair(siloRegistration, this.kvRootFolder);
 
                 var rowUpdate = new KVTxnOp(updateKV.Key, KVTxnVerb.CAS) { Index = siloRegistration.LastIndex, Value = updateKV.Value };
@@ -198,13 +170,44 @@ namespace Orleans.Runtime.Membership
         {
             var iAmAliveKV = ConsulSiloRegistrationAssembler.ToIAmAliveKVPair(this.clusterId, this.kvRootFolder, entry.SiloAddress, entry.IAmAliveTime);
             await _consulClient.KV.Put(iAmAliveKV);
+
+            if (entry.Metadata is null)
+            {
+                return;
+            }
+
+            var membershipKey = ConsulSiloRegistrationAssembler.FormatDeploymentSiloKey(
+                this.clusterId,
+                this.kvRootFolder,
+                entry.SiloAddress);
+            var membership = await _consulClient.KV.Get(membershipKey);
+            if (membership.Response is not { } membershipPair)
+            {
+                return;
+            }
+
+            var registration = ConsulSiloRegistrationAssembler.FromKVPairs(this.clusterId, membershipPair, null);
+            if (registration.Metadata is not null)
+            {
+                return;
+            }
+
+            registration.Metadata = entry.Metadata.ToDictionary(kvp => kvp.Key, kvp => kvp.Value);
+            var repair = ConsulSiloRegistrationAssembler.ToKVPair(registration, this.kvRootFolder);
+            await _consulClient.KV.Txn(
+            [
+                new KVTxnOp(repair.Key, KVTxnVerb.CAS)
+                {
+                    Index = membershipPair.ModifyIndex,
+                    Value = repair.Value
+                }
+            ]);
         }
 
         /// <inheritdoc />
         public async Task DeleteMembershipTableEntries(string clusterId)
         {
             await _consulClient.KV.DeleteTree(ConsulSiloRegistrationAssembler.FormatDeploymentKVPrefix(this.clusterId, this.kvRootFolder));
-            await _consulClient.KV.DeleteTree(ConsulSiloRegistrationAssembler.FormatMetadataDeploymentKVPrefix(this.clusterId, this.kvRootFolder));
         }
 
         private static TableVersion GetTableVersion(string? versionKey, QueryResult<KVPair[]> entries)
@@ -248,85 +251,8 @@ namespace Orleans.Runtime.Membership
             var tableVersion = GetTableVersion(versionKey: versionKey, entries: entries);
 
             var siloRegistration = ConsulSiloRegistrationAssembler.FromKVPairs(this.clusterId, siloKV, iAmAliveKV);
-            var metadataKey = ConsulSiloRegistrationAssembler.FormatSiloMetadataKey(this.clusterId, this.kvRootFolder, siloAddress);
-            var metadata = await _consulClient.KV.Get(metadataKey);
-            if (ConsulSiloRegistrationAssembler.MetadataFromKVPair(metadata.Response) is { } companionMetadata)
-            {
-                siloRegistration.Metadata = companionMetadata;
-            }
 
             return (siloRegistration, tableVersion);
-        }
-
-        private async Task<Dictionary<string, string>?> EnsureMetadata(
-            SiloAddress siloAddress,
-            Dictionary<string, string>? proposedMetadata,
-            bool preserveInlineMetadata = false)
-        {
-            var key = ConsulSiloRegistrationAssembler.FormatSiloMetadataKey(this.clusterId, this.kvRootFolder, siloAddress);
-            if (preserveInlineMetadata)
-            {
-                var existingCompanion = await _consulClient.KV.Get(key);
-                if (ConsulSiloRegistrationAssembler.MetadataFromKVPair(existingCompanion.Response) is { } existingMetadata)
-                {
-                    return existingMetadata;
-                }
-
-                var membershipKey = ConsulSiloRegistrationAssembler.FormatDeploymentSiloKey(
-                    this.clusterId,
-                    this.kvRootFolder,
-                    siloAddress);
-                var membership = await _consulClient.KV.Get(membershipKey);
-                if (membership.Response is { } membershipPair)
-                {
-                    proposedMetadata = ConsulSiloRegistrationAssembler
-                        .FromKVPairs(this.clusterId, membershipPair, null)
-                        .Metadata ?? proposedMetadata;
-                }
-            }
-
-            const int maxAttempts = 3;
-            for (var attempt = 0; attempt < maxAttempts; attempt++)
-            {
-                if (proposedMetadata is not null)
-                {
-                    var create = new KVTxnOp(key, KVTxnVerb.CAS)
-                    {
-                        Index = 0,
-                        Value = ConsulSiloRegistrationAssembler.MetadataToBytes(proposedMetadata)
-                    };
-                    var response = await _consulClient.KV.Txn([create]);
-                    if (response.Response.Success)
-                    {
-                        return proposedMetadata;
-                    }
-                }
-
-                var existing = await _consulClient.KV.Get(key);
-                if (existing.Response is not { } existingPair
-                    || ConsulSiloRegistrationAssembler.MetadataFromKVPair(existingPair) is not { } claimedMetadata)
-                {
-                    if (proposedMetadata is null)
-                    {
-                        return null;
-                    }
-
-                    continue;
-                }
-
-                var claim = new KVTxnOp(key, KVTxnVerb.CAS)
-                {
-                    Index = existingPair.ModifyIndex,
-                    Value = ConsulSiloRegistrationAssembler.MetadataToBytes(claimedMetadata)
-                };
-                var claimResponse = await _consulClient.KV.Txn([claim]);
-                if (claimResponse.Response.Success)
-                {
-                    return claimedMetadata;
-                }
-            }
-
-            throw new OrleansException($"Unable to create or claim immutable membership metadata for silo {siloAddress}.");
         }
 
         private static MembershipTableData AssembleMembershipTableData(TableVersion tableVersion, params ConsulSiloRegistration?[] silos)
@@ -363,39 +289,11 @@ namespace Orleans.Runtime.Membership
                     };
                 }).ToArray();
 
-            var retainedMetadataKeys = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             foreach (var entry in allRegistrations)
             {
-                var metadataKey = ConsulSiloRegistrationAssembler.FormatSiloMetadataKey(
-                    this.clusterId,
-                    this.kvRootFolder,
-                    entry.Registration.Address);
                 if (entry.Registration.IAmAliveTime < beforeDate && entry.Registration.Status != SiloStatus.Active)
                 {
                     await _consulClient.KV.DeleteTree(entry.RegistrationKey);
-                    await _consulClient.KV.Delete(metadataKey);
-                }
-                else
-                {
-                    retainedMetadataKeys.Add(metadataKey);
-                }
-            }
-
-            var metadataEntries = await _consulClient.KV.List(
-                ConsulSiloRegistrationAssembler.FormatMetadataDeploymentKVPrefix(this.clusterId, this.kvRootFolder));
-            var cutoff = DateTimeOffset.UtcNow - MetadataOrphanGracePeriod;
-            foreach (var metadataEntry in metadataEntries.Response ?? [])
-            {
-                if (!retainedMetadataKeys.Contains(metadataEntry.Key)
-                    && ConsulSiloRegistrationAssembler.MetadataCreatedAtFromKVPair(metadataEntry) <= cutoff)
-                {
-                    await _consulClient.KV.Txn(
-                    [
-                        new KVTxnOp(metadataEntry.Key, KVTxnVerb.DeleteCAS)
-                        {
-                            Index = metadataEntry.ModifyIndex
-                        }
-                    ]);
                 }
             }
         }

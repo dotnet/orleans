@@ -93,7 +93,8 @@ namespace Orleans
 
         /// <summary>
         /// Updates the IAmAlive part (column) of the MembershipEntry for this silo.
-        /// This operation should only update the IAmAlive column and not change other columns.
+        /// The operation can also restore this silo's immutable metadata when <see cref="MembershipEntry.Metadata"/>
+        /// is available and the stored metadata is missing. It should not change other columns.
         /// This operation is a "dirty write" or "in place update" and is performed without etag validation. 
         /// With regards to eTags update:
         /// This operation may automatically update the eTag associated with the given silo row, but it does not have to. It can also leave the etag not changed ("dirty write").
@@ -394,7 +395,9 @@ namespace Orleans
         /// A <see langword="null"/> value indicates that metadata is unavailable. An empty dictionary indicates
         /// that metadata is available and the silo has not supplied any metadata values.
         /// Metadata is fixed for the lifetime of a silo instance. Membership snapshots can enrich an unavailable
-        /// value when metadata becomes available, and retain the first available value thereafter.
+        /// value when metadata becomes available, and retain the first available value thereafter. During a
+        /// mixed-version rolling upgrade, an older replace-style provider write can temporarily remove inline
+        /// metadata. An active metadata-aware silo restores its own metadata on its next heartbeat.
         /// Storage limits are determined by the configured membership provider.
         /// </remarks>
         [Id(11)]

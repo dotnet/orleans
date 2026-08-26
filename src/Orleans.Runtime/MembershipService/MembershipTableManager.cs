@@ -217,7 +217,8 @@ namespace Orleans.Runtime.MembershipService
             var entry = new MembershipEntry
             {
                 SiloAddress = myAddress,
-                IAmAliveTime = GetDateTimeUtcNow()
+                IAmAliveTime = GetDateTimeUtcNow(),
+                Metadata = localSiloMetadata
             };
 
             await this.membershipTableProvider.UpdateIAmAlive(entry);
