@@ -37,11 +37,65 @@ runs:
   - name: Test with dynamic coverage
     if: github.event_name == 'pull_request' && runner.os != 'macOS' && inputs.static-instrumentation != 'true'
     shell: pwsh
-    run: dotnet-coverage collect --settings ./.github/coverage.config.xml --output "TestResults/${{ inputs.coverage-id }}.cobertura.xml" --output-format cobertura --nologo dotnet test --solution Orleans.slnx --framework "${{ inputs.framework }}" --filter-query "${{ inputs.filter-query }}" --minimum-expected-tests 1 --hangdump --hangdump-timeout 10m --crashdump --crashdump-type Full --hangdump-type Full --report-trx --report-trx-filename "test_results_${{ inputs.result-id }}_{asm}_{tfm}_{arch}.trx" --max-parallel-test-modules 1 -p:ContinuousIntegrationBuild=false
+    run: |
+      $command = @(
+        'dotnet'
+        'test'
+        '--solution'
+        'Orleans.slnx'
+        '--framework'
+        '${{ inputs.framework }}'
+        '--filter-query'
+        '${{ inputs.filter-query }}'
+        '--minimum-expected-tests'
+        '1'
+        '--hangdump'
+        '--hangdump-timeout'
+        '10m'
+        '--crashdump'
+        '--crashdump-type'
+        'Full'
+        '--hangdump-type'
+        'Full'
+        '--report-trx'
+        '--report-trx-filename'
+        'test_results_${{ inputs.result-id }}_{asm}_{tfm}_{arch}.trx'
+        '--max-parallel-test-modules'
+        '1'
+        '-p:ContinuousIntegrationBuild=false'
+      )
+      ./.github/scripts/invoke-coverage.ps1 -Settings ./.github/coverage.config.xml -Output "TestResults/${{ inputs.coverage-id }}.cobertura.xml" -RetryLogFile "logs/${{ inputs.coverage-id }}.retry.log" -Command $command
   - name: Test with static coverage
     if: github.event_name == 'pull_request' && (runner.os == 'macOS' || inputs.static-instrumentation == 'true')
     shell: pwsh
-    run: dotnet-coverage collect --settings ./.github/coverage.static.config.xml --output "TestResults/${{ inputs.coverage-id }}.cobertura.xml" --output-format cobertura --nologo "--include-files=${{ github.workspace }}/test/**/bin/Debug/${{ inputs.framework }}/*.dll" dotnet test --solution Orleans.slnx --framework "${{ inputs.framework }}" --filter-query "${{ inputs.filter-query }}" --minimum-expected-tests 1 --hangdump --hangdump-timeout 10m --crashdump --crashdump-type Full --hangdump-type Full --report-trx --report-trx-filename "test_results_${{ inputs.result-id }}_{asm}_{tfm}_{arch}.trx" --max-parallel-test-modules 1 --no-build
+    run: |
+      $command = @(
+        'dotnet'
+        'test'
+        '--solution'
+        'Orleans.slnx'
+        '--framework'
+        '${{ inputs.framework }}'
+        '--filter-query'
+        '${{ inputs.filter-query }}'
+        '--minimum-expected-tests'
+        '1'
+        '--hangdump'
+        '--hangdump-timeout'
+        '10m'
+        '--crashdump'
+        '--crashdump-type'
+        'Full'
+        '--hangdump-type'
+        'Full'
+        '--report-trx'
+        '--report-trx-filename'
+        'test_results_${{ inputs.result-id }}_{asm}_{tfm}_{arch}.trx'
+        '--max-parallel-test-modules'
+        '1'
+        '--no-build'
+      )
+      ./.github/scripts/invoke-coverage.ps1 -Settings ./.github/coverage.static.config.xml -Output "TestResults/${{ inputs.coverage-id }}.cobertura.xml" -RetryLogFile "logs/${{ inputs.coverage-id }}.retry.log" -IncludeFiles "${{ github.workspace }}/test/**/bin/Debug/${{ inputs.framework }}/*.dll" -Command $command
   - name: Validate coverage report
     if: github.event_name == 'pull_request'
     shell: pwsh
