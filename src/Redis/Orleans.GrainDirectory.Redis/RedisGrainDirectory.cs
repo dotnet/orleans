@@ -147,7 +147,6 @@ namespace Orleans.GrainDirectory.Redis
             {
                 ObjectDisposedException.ThrowIf(_disposed, _database);
 
-                var value = JsonSerializer.Serialize(address);
                 var result = (int)await _database.ScriptEvaluateAsync(
                     DeleteScript,
                     keys: new RedisKey[] { GetKey(address.GrainId) },
