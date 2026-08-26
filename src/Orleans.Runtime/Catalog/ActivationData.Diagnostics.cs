@@ -25,9 +25,9 @@ internal sealed partial class ActivationData
 {
     /// <summary>
     /// Check whether this activation is overloaded.
-    /// Returns LimitExceededException if overloaded, otherwise <c>null</c>c>
+    /// Returns LimitExceededException if overloaded, otherwise <c>null</c>.
     /// </summary>
-    /// <returns>Returns LimitExceededException if overloaded, otherwise <c>null</c>c></returns>
+    /// <returns>Returns LimitExceededException if overloaded, otherwise <c>null</c>.</returns>
     public LimitExceededException? CheckOverloaded()
     {
         string limitName = nameof(SiloMessagingOptions.MaxEnqueuedRequestsHardLimit);

@@ -56,6 +56,10 @@ internal sealed partial class ActivationData
         {
             result = this;
         }
+        else if (componentType == typeof(GrainCanInterleave) && _extras?.InterleavingPredicate is { } interleavingPredicate)
+        {
+            result = interleavingPredicate;
+        }
         else if (_extras is { } extras && extras.TryGetComponent(componentType, out var resultObj))
         {
             result = resultObj;
@@ -97,6 +101,7 @@ internal sealed partial class ActivationData
                 if (componentType == typeof(GrainCanInterleave) && _extras is { } existingExtras)
                 {
                     existingExtras.InterleavingPredicate = null;
+                    return;
                 }
 
                 _extras?.RemoveComponent(componentType);
@@ -107,6 +112,7 @@ internal sealed partial class ActivationData
             if (componentType == typeof(GrainCanInterleave))
             {
                 _extras.InterleavingPredicate = (GrainCanInterleave)instance;
+                return;
             }
 
             _extras.SetComponent(componentType, instance);
