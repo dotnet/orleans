@@ -5,7 +5,6 @@ using System.Linq;
 using System.Text;
 using Consul;
 using Newtonsoft.Json;
-using Newtonsoft.Json.Linq;
 
 namespace Orleans.Runtime.Host
 {
@@ -116,7 +115,6 @@ namespace Orleans.Runtime.Host
     internal class ConsulSiloRegistrationAssembler
     {
         private const string DeploymentKVPrefix = "orleans";  //Ensures a root KV namespace for orleans in Consul
-        private const string MetadataKVPrefix = "orleans-metadata";
         private const char KeySeparator = '/';
         internal const string SiloIAmAliveSuffix = "iamalive";
         internal const string VersionSuffix = "version";
@@ -133,19 +131,6 @@ namespace Orleans.Runtime.Host
 
             return $"{rootKvFolder}{KeySeparator}{DeploymentKVPrefix}{KeySeparator}{deploymentId}";
         }
-
-        internal static string FormatMetadataDeploymentKVPrefix(string deploymentId, string? rootKvFolder)
-        {
-            if (string.IsNullOrEmpty(rootKvFolder))
-            {
-                return $"{MetadataKVPrefix}{KeySeparator}{deploymentId}";
-            }
-
-            return $"{rootKvFolder}{KeySeparator}{MetadataKVPrefix}{KeySeparator}{deploymentId}";
-        }
-
-        internal static string FormatSiloMetadataKey(string deploymentId, string? rootKvFolder, SiloAddress siloAddress) =>
-            $"{FormatMetadataDeploymentKVPrefix(deploymentId, rootKvFolder)}{KeySeparator}{siloAddress.ToParsableString()}";
 
         internal static string FormatDeploymentSiloKey(string deploymentId, string? rootKvFolder, SiloAddress siloAddress)
         {
@@ -177,47 +162,6 @@ namespace Orleans.Runtime.Host
                 ret.IAmAliveTime = JsonConvert.DeserializeObject<DateTime>(Encoding.UTF8.GetString(iAmAliveKV.Value));
 
             return ret;
-        }
-
-        internal static Dictionary<string, string>? MetadataFromKVPair(KVPair? metadataKV)
-        {
-            if (metadataKV?.Value is not { Length: > 0 } value)
-            {
-                return null;
-            }
-
-            var json = Encoding.UTF8.GetString(value);
-            return TryParseMetadataEnvelope(json)?.Metadata
-                ?? JsonConvert.DeserializeObject<Dictionary<string, string>>(json);
-        }
-
-        internal static DateTimeOffset MetadataCreatedAtFromKVPair(KVPair metadataKV)
-        {
-            if (metadataKV.Value is not { Length: > 0 } value)
-            {
-                return DateTimeOffset.MinValue;
-            }
-
-            return TryParseMetadataEnvelope(Encoding.UTF8.GetString(value))?.CreatedAt
-                ?? DateTimeOffset.MinValue;
-        }
-
-        internal static byte[] MetadataToBytes(IReadOnlyDictionary<string, string> metadata) =>
-            Encoding.UTF8.GetBytes(JsonConvert.SerializeObject(new ConsulSiloMetadata
-            {
-                FormatVersion = 1,
-                Metadata = metadata.ToDictionary(entry => entry.Key, entry => entry.Value),
-                CreatedAt = DateTimeOffset.UtcNow
-            }));
-
-        private static ConsulSiloMetadata? TryParseMetadataEnvelope(string json)
-        {
-            var value = JObject.Parse(json);
-            return value[nameof(ConsulSiloMetadata.FormatVersion)]?.Type == JTokenType.Integer
-                && value.Value<int>(nameof(ConsulSiloMetadata.FormatVersion)) == 1
-                && value[nameof(ConsulSiloMetadata.Metadata)] is JObject
-                    ? value.ToObject<ConsulSiloMetadata>()
-                    : null;
         }
 
         internal static ConsulSiloRegistration FromMembershipEntry(string deploymentId, MembershipEntry entry, string etag)
@@ -279,10 +223,4 @@ namespace Orleans.Runtime.Host
         }
     }
 
-    internal sealed class ConsulSiloMetadata
-    {
-        public int FormatVersion { get; set; }
-        public Dictionary<string, string>? Metadata { get; set; }
-        public DateTimeOffset CreatedAt { get; set; }
-    }
 }

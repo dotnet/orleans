@@ -14,8 +14,4 @@
     <PackageReference Include="Consul" />
   </ItemGroup>
 
-  <ItemGroup>
-    <InternalsVisibleTo Include="Orleans.Clustering.Consul.Tests" />
-  </ItemGroup>
-
 </Project>

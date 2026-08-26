@@ -1,5 +1,6 @@
 using System.Collections.Immutable;
 using System.Net;
+using System.Text.Json;
 using Azure;
 using Azure.Data.Tables;
 using Microsoft.Extensions.Logging;
@@ -154,7 +155,7 @@ namespace Tester.AzureUtils
         }
 
         [Fact, TestCategory("Functional")]
-        public async Task MembershipMetadata_SurvivesLegacyReplacement_RejectsConflict_AndIsCleanedUp()
+        public async Task MembershipMetadata_HeartbeatRepairsMissingInlineMetadata()
         {
             var options = new AzureStorageClusteringOptions();
             options.ConfigureTestDefaults();
@@ -171,55 +172,15 @@ namespace Tester.AzureUtils
             legacyEntity.Remove(nameof(SiloInstanceTableEntry.Metadata));
             await table.UpdateEntityAsync(legacyEntity, ETag.All, TableUpdateMode.Replace);
 
-            var afterLegacyWrite = await membership.ReadRow(entry.SiloAddress);
-            var stored = Assert.Single(afterLegacyWrite.Members).Item1;
-            Assert.Equal(entry.Metadata, stored.Metadata);
+            entry.IAmAliveTime = entry.IAmAliveTime.AddMinutes(1);
+            await membership.UpdateIAmAlive(entry);
 
-            stored.Metadata = ImmutableDictionary<string, string>.Empty.Add("region", "conflict");
-            stored.Status = SiloStatus.Dead;
-            Assert.True(await membership.UpdateRow(
-                stored,
-                Assert.Single(afterLegacyWrite.Members).Item2,
-                afterLegacyWrite.Version.Next()));
-
-            var afterConflict = await membership.ReadRow(entry.SiloAddress);
-            Assert.Equal(entry.Metadata, Assert.Single(afterConflict.Members).Item1.Metadata);
-
-            await membership.CleanupDefunctSiloEntries(DateTimeOffset.UtcNow.AddDays(1));
-            Assert.Empty((await membership.ReadAll()).Members);
-
-            var metadataTable = options.TableServiceClient.GetTableClient(
-                OrleansSiloInstanceManager.GetMetadataTableName(options.TableName));
-            var exception = await Assert.ThrowsAsync<RequestFailedException>(
-                () => metadataTable.GetEntityAsync<MembershipMetadataTableEntry>(clusterId, rowKey));
-            Assert.Equal(404, exception.Status);
-        }
-
-        [Fact, TestCategory("Functional")]
-        public async Task MembershipMetadata_LegacyCleanupOrphanIsReconciled()
-        {
-            var options = new AzureStorageClusteringOptions();
-            options.ConfigureTestDefaults();
-            var membership = new AzureBasedMembershipTable(loggerFactory, Options.Create(options), _clusterOptions);
-            await membership.InitializeMembershipTable(false);
-            var entry = CreateMetadataEntry();
-            var initial = await membership.ReadAll();
-            Assert.True(await membership.InsertRow(entry, initial.Version.Next()));
-
-            var rowKey = SiloInstanceTableEntry.ConstructRowKey(entry.SiloAddress);
-            var membershipTable = options.TableServiceClient!.GetTableClient(options.TableName);
-            var metadataTable = options.TableServiceClient.GetTableClient(
-                OrleansSiloInstanceManager.GetMetadataTableName(options.TableName));
-            await membershipTable.DeleteEntityAsync(clusterId, rowKey, ETag.All);
-            var metadataEntity = (await metadataTable.GetEntityAsync<MembershipMetadataTableEntry>(clusterId, rowKey)).Value;
-            metadataEntity.CreatedAt = DateTimeOffset.UtcNow - OrleansSiloInstanceManager.MetadataOrphanGracePeriod - TimeSpan.FromMinutes(1);
-            await metadataTable.UpdateEntityAsync(metadataEntity, ETag.All, TableUpdateMode.Replace);
-
-            await membership.CleanupDefunctSiloEntries(DateTimeOffset.UtcNow);
-
-            var exception = await Assert.ThrowsAsync<RequestFailedException>(
-                () => metadataTable.GetEntityAsync<MembershipMetadataTableEntry>(clusterId, rowKey));
-            Assert.Equal(404, exception.Status);
+            var repairedEntity = (await table.GetEntityAsync<TableEntity>(clusterId, rowKey)).Value;
+            var serializedMetadata = Assert.IsType<string>(repairedEntity[nameof(SiloInstanceTableEntry.Metadata)]);
+            var repairedMetadata = JsonSerializer.Deserialize<Dictionary<string, string>>(serializedMetadata);
+            Assert.Equal(entry.Metadata, repairedMetadata);
+            Assert.Equal(entry.IAmAliveTime, LogFormatter.ParseDate(
+                Assert.IsType<string>(repairedEntity[nameof(SiloInstanceTableEntry.IAmAliveTime)])));
         }
 
         private static MembershipEntry CreateMetadataEntry() => new()
@@ -234,23 +195,58 @@ namespace Tester.AzureUtils
         };
     }
 
+    [TestCategory("BVT")]
     [TestSuite("BVT")]
     [TestProvider("AzureStorage")]
     [TestArea("Membership")]
     public class AzureMembershipMetadataContractTests
     {
         [Fact]
-        public void CompanionTableName_IsValidAndDeterministicAtMaximumLength()
+        public void ConvertPartial_IncludesSerializedMetadata()
         {
-            var membershipTableName = "A" + new string('b', 62);
+            var metadata = ImmutableDictionary<string, string>.Empty.Add("region", "west");
+            var entry = new MembershipEntry
+            {
+                SiloAddress = SiloAddress.New(new IPEndPoint(IPAddress.Loopback, 12345), 123456),
+                IAmAliveTime = DateTime.UtcNow,
+                Metadata = metadata
+            };
 
-            var first = OrleansSiloInstanceManager.GetMetadataTableName(membershipTableName);
-            var second = OrleansSiloInstanceManager.GetMetadataTableName(membershipTableName);
+            var result = AzureBasedMembershipTable.ConvertPartial(entry, "cluster");
 
-            Assert.Equal(first, second);
-            Assert.Equal(63, first.Length);
-            Assert.Matches("^[A-Za-z][A-Za-z0-9]{2,62}$", first);
-            Assert.NotEqual(membershipTableName, first);
+            Assert.Equal(metadata, JsonSerializer.Deserialize<Dictionary<string, string>>(result.Metadata!));
+        }
+
+        [Fact]
+        public void ConvertPartial_IncludesAvailableEmptyMetadata()
+        {
+            var entry = new MembershipEntry
+            {
+                SiloAddress = SiloAddress.New(new IPEndPoint(IPAddress.Loopback, 12345), 123456),
+                IAmAliveTime = DateTime.UtcNow,
+                Metadata = ImmutableDictionary<string, string>.Empty
+            };
+
+            var result = AzureBasedMembershipTable.ConvertPartial(entry, "cluster");
+
+            Assert.NotNull(result.Metadata);
+            Assert.Empty(JsonSerializer.Deserialize<Dictionary<string, string>>(result.Metadata)!);
+        }
+
+        [Fact]
+        public void ConvertPartial_OmitsMetadataWhenStoredMetadataIsAvailable()
+        {
+            var entry = new MembershipEntry
+            {
+                SiloAddress = SiloAddress.New(new IPEndPoint(IPAddress.Loopback, 12345), 123456),
+                IAmAliveTime = DateTime.UtcNow,
+                Metadata = ImmutableDictionary<string, string>.Empty.Add("region", "replacement")
+            };
+
+            var result = AzureBasedMembershipTable.ConvertPartial(entry, "cluster", includeMetadata: false);
+
+            Assert.Null(result.Metadata);
         }
     }
+
 }

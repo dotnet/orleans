@@ -3,7 +3,6 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
 using System.Net;
-using System.Security.Cryptography;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
@@ -20,7 +19,6 @@ namespace Orleans.AzureUtils
     internal partial class OrleansSiloInstanceManager
     {
         internal const int MaxMembershipSnapshotAttempts = 5;
-        internal static readonly TimeSpan MetadataOrphanGracePeriod = TimeSpan.FromMinutes(5);
 
         public string TableName { get; }
 
@@ -29,12 +27,9 @@ namespace Orleans.AzureUtils
         private const string INSTANCE_STATUS_DEAD = nameof(SiloStatus.Dead);        //"Dead";
 
         private readonly AzureTableDataManager<SiloInstanceTableEntry> storage;
-        private readonly string metadataTableName;
         private readonly IMembershipTableReadStorage membershipTableReadStorage;
         private readonly ILogger logger;
         private readonly AzureStoragePolicyOptions storagePolicyOptions;
-        private TableClient metadataTable = null!;
-        private bool IsMetadataStorageInitialized => metadataTable is not null;
 
         public string DeploymentId { get; private set; }
 
@@ -58,7 +53,6 @@ namespace Orleans.AzureUtils
             storage = new AzureTableDataManager<SiloInstanceTableEntry>(
                 options,
                 loggerFactory.CreateLogger<AzureTableDataManager<SiloInstanceTableEntry>>());
-            metadataTableName = GetMetadataTableName(options.TableName);
             this.membershipTableReadStorage = membershipTableReadStorage ?? new AzureMembershipTableReadStorage(storage);
             this.storagePolicyOptions = options.StoragePolicyOptions;
         }
@@ -66,28 +60,18 @@ namespace Orleans.AzureUtils
         public static async Task<OrleansSiloInstanceManager> GetManager(
             string clusterId,
             ILoggerFactory loggerFactory,
-            AzureStorageOperationOptions options,
-            bool initializeMetadataStorage = false)
+            AzureStorageOperationOptions options)
         {
             var instance = new OrleansSiloInstanceManager(clusterId, loggerFactory, options);
             try
             {
                 await instance.storage.InitTableAsync();
-                if (initializeMetadataStorage)
-                {
-                    var serviceClient = await options.CreateClient();
-                    instance.metadataTable = serviceClient.GetTableClient(instance.metadataTableName);
-                    await instance.metadataTable.CreateIfNotExistsAsync();
-                }
             }
             catch (Exception ex)
             {
-                var resourceDescription = initializeMetadataStorage
-                    ? $"{instance.storage.TableName} or companion metadata table {instance.metadataTableName}"
-                    : instance.storage.TableName;
-                instance.LogErrorConnectingToAzureTable(ex, resourceDescription);
+                instance.LogErrorConnectingToAzureTable(ex, instance.storage.TableName);
                 throw new OrleansException(
-                    $"Unable to create or connect to Azure membership storage '{resourceDescription}'.",
+                    $"Unable to create or connect to Azure membership storage '{instance.storage.TableName}'.",
                     ex);
             }
             return instance;
@@ -230,10 +214,6 @@ namespace Orleans.AzureUtils
             var entries = await storage.ReadAllTableEntriesForPartitionAsync(clusterId);
 
             await DeleteEntriesBatch(entries);
-            if (IsMetadataStorageInitialized)
-            {
-                await DeleteMetadataEntries(clusterId);
-            }
 
             return entries.Count;
         }
@@ -248,160 +228,6 @@ namespace Orleans.AzureUtils
 
             // Defunct-row cleanup intentionally does not advance the membership snapshot fence.
             await DeleteEntriesBatch(entriesList);
-            if (IsMetadataStorageInitialized)
-            {
-                await DeleteMetadataEntries(entriesList.Select(entry => entry.Item1.RowKey));
-                await DeleteOrphanedMetadataEntries();
-            }
-        }
-
-        internal async Task<string?> EnsureMetadataEntry(
-            SiloAddress siloAddress,
-            string? metadata,
-            bool preserveInlineMetadata = false)
-        {
-            var rowKey = SiloInstanceTableEntry.ConstructRowKey(siloAddress);
-            if (preserveInlineMetadata)
-            {
-                var existingMetadata = await ReadMetadataTableEntry(rowKey);
-                if (existingMetadata is not null)
-                {
-                    return existingMetadata.Metadata;
-                }
-
-                var existingMembershipEntry = await storage.ReadSingleTableEntryAsync(DeploymentId, rowKey);
-                metadata = existingMembershipEntry.Entity?.Metadata ?? metadata;
-            }
-
-            if (metadata is not null)
-            {
-                try
-                {
-                    await metadataTable.AddEntityAsync(new MembershipMetadataTableEntry
-                    {
-                        PartitionKey = DeploymentId,
-                        RowKey = rowKey,
-                        Metadata = metadata,
-                        CreatedAt = DateTimeOffset.UtcNow
-                    });
-                    return metadata;
-                }
-                catch (Azure.RequestFailedException exception) when (exception.Status == (int)HttpStatusCode.Conflict)
-                {
-                    var existing = await ReadMetadataTableEntry(rowKey);
-                    if (existing is not null)
-                    {
-                        existing.CreatedAt = DateTimeOffset.UtcNow;
-                        try
-                        {
-                            await metadataTable.UpdateEntityAsync(existing, existing.ETag, TableUpdateMode.Replace);
-                            return existing.Metadata;
-                        }
-                        catch (Azure.RequestFailedException updateException) when (updateException.Status == (int)HttpStatusCode.PreconditionFailed)
-                        {
-                            return (await ReadMetadataTableEntry(rowKey))?.Metadata;
-                        }
-                    }
-                }
-            }
-
-            return await ReadMetadataEntry(rowKey);
-        }
-
-        internal Task<string?> ReadMetadataEntry(SiloAddress siloAddress) =>
-            ReadMetadataEntry(SiloInstanceTableEntry.ConstructRowKey(siloAddress));
-
-        internal async Task<Dictionary<string, string>> ReadMetadataEntries()
-        {
-            var result = new Dictionary<string, string>(StringComparer.Ordinal);
-            var filter = TableClient.CreateQueryFilter($"PartitionKey eq {DeploymentId}");
-            await foreach (var entity in metadataTable.QueryAsync<MembershipMetadataTableEntry>(filter))
-            {
-                result[entity.RowKey] = entity.Metadata;
-            }
-
-            return result;
-        }
-
-        internal static string GetMetadataTableName(string tableName)
-        {
-            const string suffix = "Metadata";
-            if (tableName.Length + suffix.Length <= 63)
-            {
-                return tableName + suffix;
-            }
-
-            var hash = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(tableName)));
-            return tableName[..47] + suffix + hash[..8];
-        }
-
-        private async Task<string?> ReadMetadataEntry(string rowKey)
-            => (await ReadMetadataTableEntry(rowKey))?.Metadata;
-
-        private async Task<MembershipMetadataTableEntry?> ReadMetadataTableEntry(string rowKey)
-        {
-            try
-            {
-                var response = await metadataTable.GetEntityAsync<MembershipMetadataTableEntry>(DeploymentId, rowKey);
-                return response.Value;
-            }
-            catch (Azure.RequestFailedException exception) when (exception.Status == (int)HttpStatusCode.NotFound)
-            {
-                return null;
-            }
-        }
-
-        private async Task DeleteMetadataEntries(string clusterId)
-        {
-            var rowKeys = new List<string>();
-            var filter = TableClient.CreateQueryFilter($"PartitionKey eq {clusterId}");
-            await foreach (var entity in metadataTable.QueryAsync<MembershipMetadataTableEntry>(filter))
-            {
-                rowKeys.Add(entity.RowKey);
-            }
-
-            await DeleteMetadataEntries(rowKeys, clusterId);
-        }
-
-        private Task DeleteMetadataEntries(IEnumerable<string> rowKeys) =>
-            DeleteMetadataEntries(rowKeys, DeploymentId);
-
-        private async Task DeleteMetadataEntries(IEnumerable<string> rowKeys, string partitionKey)
-        {
-            foreach (var rowKey in rowKeys)
-            {
-                try
-                {
-                    await metadataTable.DeleteEntityAsync(partitionKey, rowKey, ETag.All);
-                }
-                catch (Azure.RequestFailedException exception) when (exception.Status == (int)HttpStatusCode.NotFound)
-                {
-                }
-            }
-        }
-
-        private async Task DeleteOrphanedMetadataEntries()
-        {
-            var membershipRowKeys = (await FindAllSiloEntries())
-                .Where(entry => !SiloInstanceTableEntry.IsVersionRow(entry.Entity.RowKey))
-                .Select(entry => entry.Entity.RowKey)
-                .ToHashSet(StringComparer.Ordinal);
-            var cutoff = DateTimeOffset.UtcNow - MetadataOrphanGracePeriod;
-            var filter = TableClient.CreateQueryFilter($"PartitionKey eq {DeploymentId}");
-            await foreach (var entity in metadataTable.QueryAsync<MembershipMetadataTableEntry>(filter))
-            {
-                if (entity.CreatedAt <= cutoff && !membershipRowKeys.Contains(entity.RowKey))
-                {
-                    try
-                    {
-                        await metadataTable.DeleteEntityAsync(DeploymentId, entity.RowKey, entity.ETag);
-                    }
-                    catch (Azure.RequestFailedException exception) when (
-                        exception.Status is (int)HttpStatusCode.NotFound or (int)HttpStatusCode.PreconditionFailed)
-                    {
-                    }
-                }
-            }
         }
 
         private async Task DeleteEntriesBatch(List<(SiloInstanceTableEntry, string)> entriesList)

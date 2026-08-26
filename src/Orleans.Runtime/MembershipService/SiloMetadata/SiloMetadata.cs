@@ -9,7 +9,9 @@ namespace Orleans.Runtime.MembershipService.SiloMetadata;
 /// <remarks>
 /// Membership providers persist this data with the silo's membership entry. Metadata can become
 /// available after an initial snapshot and is then retained for that silo instance. The configured
-/// membership provider determines the supported storage size.
+/// membership provider determines the supported storage size. During a mixed-version rolling upgrade,
+/// an older replace-style provider write can temporarily remove inline metadata. An active
+/// metadata-aware silo restores its own metadata on its next heartbeat.
 /// </remarks>
 [GenerateSerializer]
 [Alias("Orleans.Runtime.MembershipService.SiloMetadata.SiloMetadata")]

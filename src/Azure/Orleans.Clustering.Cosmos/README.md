@@ -34,9 +34,7 @@ await builder.RunAsync();
 
 ## Membership metadata storage
 
-The silo provider stores immutable membership metadata in a companion container so that rolling-upgrade writes from older silos cannot remove it when they replace a membership document. Set `MetadataContainerName` to use a pre-provisioned container, or leave it unset to derive a deterministic name from `ContainerName`.
-
-Both containers use `/ClusterId` as the partition key. When `IsResourceCreationEnabled` is `false`, provision both containers before starting a silo. Resource creation uses the configured container throughput for each container.
+The silo provider stores membership metadata inline in each silo's membership document. During a mixed-version rolling upgrade, an older silo can temporarily remove that field when it replaces a document. Each active metadata-aware silo restores its own metadata on its next heartbeat.
 
 ## Documentation
 For more comprehensive documentation, please refer to:

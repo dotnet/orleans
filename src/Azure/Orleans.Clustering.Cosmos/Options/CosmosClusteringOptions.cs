@@ -15,16 +15,6 @@ public class CosmosClusteringOptions : CosmosOptions
         ContainerName = ORLEANS_CLUSTER_CONTAINER;
     }
 
-    /// <summary>
-    /// Gets or sets the name of the companion container used to store immutable silo metadata.
-    /// When unset, a deterministic name is derived from <see cref="CosmosOptions.ContainerName"/>.
-    /// </summary>
-    /// <remarks>
-    /// The companion container uses <c>/ClusterId</c> as its partition key. When resource creation
-    /// is disabled, provision this container together with the membership container. The two
-    /// container names must differ.
-    /// </remarks>
-    public string? MetadataContainerName { get; set; }
 }
 
 /// <summary>
