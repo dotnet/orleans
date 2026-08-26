@@ -27,19 +27,15 @@ The `Service` connection value accepts an AWS region such as `us-east-1` or an S
 
 ## Configure SQS streams with Aspire
 
-The Aspire application model uses the AWS-supported [`Aspire.Hosting.AWS`](https://www.nuget.org/packages/Aspire.Hosting.AWS) integration to configure AWS SDK for .NET v4 and provision the complete Orleans queue topology through AWS CDK. The CDK stack creates one queue for each Orleans partition using the stable service ID, provider name, partition count, and FIFO mode.
+Install [`Microsoft.Orleans.Streaming.SQS.Aspire`](https://www.nuget.org/packages/Microsoft.Orleans.Streaming.SQS.Aspire) in the AppHost. Its <xref:Aspire.Hosting.OrleansSqsStreamingExtensions.WithSqsStreaming*> extension uses the AWS-supported [`Aspire.Hosting.AWS`](https://www.nuget.org/packages/Aspire.Hosting.AWS) integration to configure AWS SDK for .NET v4 and provision the complete Orleans queue topology through AWS CDK.
 
-Configure the AWS SDK region, create the partition queues in a CDK stack, and identify the Orleans provider type as `SQS`:
+Configure the AWS SDK region and one <xref:Aspire.Hosting.SqsStreamingOptions> object:
 
 :::code language="csharp" source="../host/snippets/aspire/AppHost/AppHostExamples.cs" id="sqs_streaming_apphost":::
 
-The provider configuration connects the AWS SDK resource and emits identical topology settings for each silo or client resource:
+The integration uses those options for both the CDK queue resources and the `Orleans:Streaming:Orders` configuration emitted to every referenced silo and client. The provisioned queue names therefore match the runtime topology exactly. The AWS SDK reference supplies `AWS_PROFILE` and `AWS_REGION`; workload identity and shared AWS configuration remain available through the SDK credential chain.
 
-:::code language="csharp" source="../host/snippets/aspire/AppHost/AppHostExamples.cs" id="sqs_provider_configuration":::
-
-The AppHost supplies the same service ID, provider name, region, partition count, FIFO mode, long-poll duration, and visibility timeout to CDK and Orleans. This gives the provisioned queues the exact names and settings that the Orleans runtime resolves. The AWS SDK reference supplies `AWS_PROFILE` and `AWS_REGION`; workload identity and shared AWS configuration remain available through the SDK credential chain.
-
-The silo and client wait for the CDK stack before starting. The stack uses CloudFormation in the account and region selected by the AWS SDK configuration. Grant the AppHost credentials permission to create and update the stack; bootstrap the environment when added constructs use CDK assets. See [Provisioning application resources with AWS CDK](https://github.com/aws/integrations-on-dotnet-aspire-for-aws/blob/main/src/Aspire.Hosting.AWS/README.md#provisioning-application-resources-with-aws-cdk) for the integration contract.
+The extension applies the stable service ID and makes each referenced silo and client wait for the CDK stack automatically. The stack uses CloudFormation in the account and region selected by the AWS SDK configuration. Grant the AppHost credentials permission to create and update the stack; bootstrap the environment when added constructs use CDK assets. See [Provisioning application resources with AWS CDK](https://github.com/aws/integrations-on-dotnet-aspire-for-aws/blob/main/src/Aspire.Hosting.AWS/README.md#provisioning-application-resources-with-aws-cdk) for the integration contract.
 
 The silo activates generated `Orleans:Streaming:Orders` configuration through <xref:Microsoft.Extensions.Hosting.OrleansSiloGenericHostExtensions.UseOrleans*>:
 
