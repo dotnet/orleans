@@ -21,12 +21,16 @@ internal static class ProcessPingBenchmark
         var siloPort = GetInt32(args, 1, 11111);
         var gatewayPort = GetInt32(args, 2, 30000);
         var useTls = GetBoolean(args, 3);
+        var primarySiloPort = GetInt32(args, 4, 0);
+        var primarySiloEndpoint = primarySiloPort > 0
+            ? new IPEndPoint(IPAddress.Loopback, primarySiloPort)
+            : null;
         using var certificate = useTls ? CreateCertificate(includeServerAuthentication: true) : null;
         using var host = new HostBuilder()
             .ConfigureLogging(logging => logging.SetMinimumLevel(LogLevel.Warning))
             .UseOrleans((_, siloBuilder) =>
             {
-                siloBuilder.UseLocalhostClustering(siloPort, gatewayPort, primarySiloEndpoint: null);
+                siloBuilder.UseLocalhostClustering(siloPort, gatewayPort, primarySiloEndpoint);
                 if (certificate is not null)
                 {
                     siloBuilder.UseTls(certificate, options =>
@@ -54,13 +58,24 @@ internal static class ProcessPingBenchmark
         var gatewayPort = GetInt32(args, 3, 30000);
         var sampleCount = GetInt32(args, 4, 1);
         var useTls = GetBoolean(args, 5);
+        var payloadSize = GetInt32(args, 6, 0);
+        var secondaryGatewayPort = GetInt32(args, 7, 0);
         using var certificate = useTls ? CreateCertificate(includeServerAuthentication: false) : null;
 
         using var host = new HostBuilder()
             .ConfigureLogging(logging => logging.SetMinimumLevel(LogLevel.Warning))
             .UseOrleansClient((_, clientBuilder) =>
             {
-                clientBuilder.UseLocalhostClustering(gatewayPort);
+                if (secondaryGatewayPort > 0)
+                {
+                    clientBuilder.UseStaticClustering([
+                        new IPEndPoint(IPAddress.Loopback, gatewayPort),
+                        new IPEndPoint(IPAddress.Loopback, secondaryGatewayPort)]);
+                }
+                else
+                {
+                    clientBuilder.UseLocalhostClustering(gatewayPort);
+                }
                 if (useTls)
                 {
                     clientBuilder.UseTls(certificate!, options =>
@@ -80,14 +95,29 @@ internal static class ProcessPingBenchmark
         var counters = new PaddedCounter[concurrency];
         var failures = new PaddedCounter[concurrency];
         var workers = new Task[concurrency];
+        var payload = new byte[payloadSize];
         using var cancellation = new CancellationTokenSource();
         var start = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
 
         for (var i = 0; i < workers.Length; i++)
         {
             var workerId = i;
-            var grain = client.GetGrain<IPingGrain>(workerId);
-            workers[i] = RunWorker(workerId, grain, start.Task, counters, failures, cancellation.Token);
+            workers[i] = payload.Length == 0
+                ? RunWorker(
+                    workerId,
+                    client.GetGrain<IPingGrain>(workerId),
+                    start.Task,
+                    counters,
+                    failures,
+                    cancellation.Token)
+                : RunPayloadWorker(
+                    workerId,
+                    client.GetGrain<IPayloadGrain>(workerId),
+                    payload,
+                    start.Task,
+                    counters,
+                    failures,
+                    cancellation.Token);
         }
 
         start.SetResult();
@@ -243,6 +273,30 @@ internal static class ProcessPingBenchmark
         }
     }
 
+    private static async Task RunPayloadWorker(
+        int workerId,
+        IPayloadGrain grain,
+        byte[] payload,
+        Task start,
+        PaddedCounter[] counters,
+        PaddedCounter[] failures,
+        CancellationToken cancellationToken)
+    {
+        await start.ConfigureAwait(false);
+        while (!cancellationToken.IsCancellationRequested)
+        {
+            try
+            {
+                await grain.Run(payload).ConfigureAwait(false);
+                counters[workerId].Value++;
+            }
+            catch when (!cancellationToken.IsCancellationRequested)
+            {
+                failures[workerId].Value++;
+            }
+        }
+    }
+
     private static long Sum(PaddedCounter[] counters)
     {
         long result = 0;
@@ -284,10 +338,20 @@ internal static class ProcessPingBenchmark
         subjectAlternativeName.AddIpAddress(IPAddress.Loopback);
         request.CertificateExtensions.Add(subjectAlternativeName.Build());
         using var certificate = request.CreateSelfSigned(DateTimeOffset.UtcNow.AddDays(-1), DateTimeOffset.UtcNow.AddDays(1));
+        var pfx = certificate.Export(X509ContentType.Pkcs12, "benchmark-only");
+#if NET9_0_OR_GREATER
         return X509CertificateLoader.LoadPkcs12(
-            certificate.Export(X509ContentType.Pkcs12, "benchmark-only"),
+            pfx,
             "benchmark-only",
             X509KeyStorageFlags.Exportable | X509KeyStorageFlags.PersistKeySet | X509KeyStorageFlags.UserKeySet);
+#else
+#pragma warning disable SYSLIB0057
+        return new X509Certificate2(
+            pfx,
+            "benchmark-only",
+            X509KeyStorageFlags.Exportable | X509KeyStorageFlags.PersistKeySet | X509KeyStorageFlags.UserKeySet);
+#pragma warning restore SYSLIB0057
+#endif
     }
 
     private static long Percentile(long[] values, int count, double percentile)
