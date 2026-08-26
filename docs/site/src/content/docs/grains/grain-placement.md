@@ -1,7 +1,7 @@
 ---
 title: Grain placement and migration
 description: Understand placement, resource-optimized defaults, and activation movement in Orleans.
-ms.date: 08/17/2026
+ms.date: 08/26/2026
 ms.topic: concept-article
 ---
 
@@ -81,6 +81,16 @@ Activation-count-based placement applies the power-of-two-choices technique desc
 
 :::code language="csharp" source="../snippets/compiled/Grains/PlacementSnippets.cs" id="prefer_local_grain":::
 Placement happens when creating an activation. Changing cluster membership or a strategy doesn't move existing activations by itself.
+
+## Direct placement with placement hints
+
+A placement hint directs a new activation to a specific silo. Set <xref:Orleans.Runtime.Placement.IPlacementDirector.PlacementHintKey> in <xref:Orleans.Runtime.RequestContext> before making the grain call which can trigger activation. The built-in placement directors select the hinted silo when it belongs to the compatible candidate set after version compatibility and placement filters are applied.
+
+The following grain directs a worker activation to its own silo:
+
+:::code language="csharp" source="snippets/placement/PlacementHints.cs" id="direct_placement_with_hint":::
+
+The grain call, rather than `GetGrain`, triggers activation and placement. If the worker is already active, Orleans routes the call to its existing activation. If the hinted silo isn't compatible, the configured placement strategy selects another compatible silo. Restore the previous request-context value after the call because request context propagates to outgoing grain calls.
 
 ## Override the cluster default
 
