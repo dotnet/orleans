@@ -207,11 +207,6 @@ namespace Orleans.Runtime.Messaging
             }
         }
 
-        protected override void OnSendMessageFailure(Message message, string error)
-        {
-            this.FailMessage(message, error);
-        }
-
         [LoggerMessage(
             Level = LogLevel.Debug,
             Message = "Rejecting a request due to overloading: {Message}"

@@ -14,7 +14,7 @@ internal sealed class MessageWriteRequest : WriteRequest
     private const int SendPageSize = 32 * 1024;
     private readonly MessageHandlerShared _shared;
     private readonly ArcBufferWriter _buffer = new();
-    private readonly List<(int TotalLength, int HeaderLength)> _messageSizes = [];
+    private readonly List<(Message Message, int TotalLength, int HeaderLength)> _messages = [];
     private Connection? _connection;
     private MessageSerializer? _messageSerializer;
     private bool _hasLargeMessages;
@@ -25,11 +25,12 @@ internal sealed class MessageWriteRequest : WriteRequest
         Buffers = new(_buffer);
     }
 
-    public List<Message> Messages { get; } = [];
+    public int MessageCount => _messages.Count;
     public int Length => _buffer.Length;
     internal override bool HasLargeMessages => _hasLargeMessages;
 
     public void Initialize(Connection connection) => _connection = connection;
+    public Message GetMessage(int index) => _messages[index].Message;
 
     public void WriteMessage(Message message)
     {
@@ -48,9 +49,8 @@ internal sealed class MessageWriteRequest : WriteRequest
             BinaryPrimitives.WriteInt32LittleEndian(framingBytes, headerLength);
             BinaryPrimitives.WriteInt32LittleEndian(framingBytes[sizeof(int)..], bodyLength);
 
-            Messages.Add(message);
             var totalLength = headerLength + bodyLength;
-            _messageSizes.Add((totalLength, headerLength));
+            _messages.Add((message, totalLength, headerLength));
             _hasLargeMessages |= totalLength >= LargeMessageSize;
         }
         catch
@@ -74,15 +74,14 @@ internal sealed class MessageWriteRequest : WriteRequest
         try
         {
             var connection = _connection ?? throw new InvalidOperationException("The write request has no owning connection.");
-            for (var i = 0; i < Messages.Count; i++)
+            foreach (var (message, totalLength, headerLength) in _messages)
             {
-                var (totalLength, headerLength) = _messageSizes[i];
-                connection.RecordMessageSend(Messages[i], totalLength, headerLength);
+                connection.RecordMessageSend(message, totalLength, headerLength);
             }
         }
         finally
         {
-            foreach (var message in Messages)
+            foreach (var (message, _, _) in _messages)
             {
                 message.ReleaseBodyBuffer();
             }
@@ -93,9 +92,9 @@ internal sealed class MessageWriteRequest : WriteRequest
 
     public override void SetException(Exception error)
     {
-        _shared.ConnectionTrace.LogError(error, "Error sending messages {Messages}", Messages);
+        _shared.ConnectionTrace.LogError(error, "Error sending messages {Messages}", _messages);
         var connection = _connection ?? throw new InvalidOperationException("The write request has no owning connection.");
-        foreach (var message in Messages)
+        foreach (var (message, _, _) in _messages)
         {
             connection.RerouteMessage(message, error);
         }
@@ -105,13 +104,12 @@ internal sealed class MessageWriteRequest : WriteRequest
 
     public void Reset()
     {
-        var nextPageSize = _messageSizes.Count == 1
-            && _messageSizes[0].TotalLength is >= LargeMessageSize and < SendPageSize
+        var nextPageSize = _messages.Count == 1
+            && _messages[0].TotalLength is >= LargeMessageSize and < SendPageSize
                 ? SendPageSize
                 : 0;
         CompleteWriting();
-        Messages.Clear();
-        _messageSizes.Clear();
+        _messages.Clear();
         _hasLargeMessages = false;
         _buffer.Reset(nextPageSize);
         _connection = null;

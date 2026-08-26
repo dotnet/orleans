@@ -21,7 +21,7 @@ using Orleans.Runtime.Utilities;
 
 namespace Orleans.Connections.Transport.Sockets;
 
-public sealed class SocketMessageTransport : MessageTransportBase
+internal sealed class SocketMessageTransport : MessageTransportBase
 {
     private static readonly bool IsWindows = RuntimeInformation.IsOSPlatform(OSPlatform.Windows);
     private static readonly bool IsMacOS = RuntimeInformation.IsOSPlatform(OSPlatform.OSX);
@@ -276,6 +276,7 @@ public sealed class SocketMessageTransport : MessageTransportBase
         if (_processingTask is null)
         {
             Shutdown();
+            _connectionClosedCts.Cancel();
             return;
         }
 
@@ -284,24 +285,12 @@ public sealed class SocketMessageTransport : MessageTransportBase
         // allowing the processing loops to exit gracefully.
         ShutdownSocket();
 
-        // Wait for processing task to complete (which will dispose the socket in its finally block)
-        var completion = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-        using var closedRegistration = _connectionClosedCts.Token.Register(
-            static state => ((TaskCompletionSource)state!).TrySetResult(),
-            completion,
-            useSynchronizationContext: false);
-        using var cancelRegistration = cancellationToken.Register(
-            static state => ((TaskCompletionSource)state!).TrySetCanceled(),
-            completion,
-            useSynchronizationContext: false);
-
         try
         {
-            await completion.Task.ConfigureAwait(false);
+            await _processingTask.WaitAsync(cancellationToken).ConfigureAwait(false);
         }
-        catch (TaskCanceledException)
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
-            // Cancellation requested - force shutdown immediately
             Shutdown();
         }
     }
@@ -313,7 +302,19 @@ public sealed class SocketMessageTransport : MessageTransportBase
 
         // Signal that we're closing if not already done
         _connectionClosingCts.Cancel();
-        _connectionClosedCts.Cancel();
+        _readSignal.Signal();
+        _writeSignal.Signal();
+
+        if (_processingTask is { } processingTask)
+        {
+            await processingTask.ConfigureAwait(false);
+        }
+        else
+        {
+            _socketReceiver.Dispose();
+            _socketSender.Dispose();
+            _connectionClosedCts.Cancel();
+        }
 
         await base.DisposeAsync().ConfigureAwait(false);
     }
@@ -364,7 +365,7 @@ public sealed class SocketMessageTransport : MessageTransportBase
 
                         var transferred = _socketReceiver.BytesTransferred;
 
-                        MaintainBufferList(networkBuffers, transferred);
+                        AdvanceBufferList(networkBuffers, transferred);
                         bufferWriter.AdvanceWriter(transferred);
 
                         if (transferred == 0)
@@ -442,27 +443,6 @@ exit:
             }
         }
 
-        static void MaintainBufferList(List<ArraySegment<byte>> buffers, int readSize)
-        {
-            while (readSize > 0)
-            {
-                Debug.Assert(buffers.Count > 0);
-                var bufferSize = buffers[0].Count;
-                if (bufferSize <= readSize)
-                {
-                    // Consume the buffer completely.
-                    readSize -= bufferSize;
-                    buffers.RemoveAt(0);
-                }
-                else
-                {
-                    // Consume the buffer partially.
-                    buffers[0] = new(buffers[0].Array!, buffers[0].Offset + readSize, bufferSize - readSize);
-                    Debug.Assert(buffers[0].Count > 0);
-                    break;
-                }
-            }
-        }
     }
 
     private bool HandleReadError(ref Exception? error)
@@ -779,22 +759,23 @@ RefreshRequestQueue:
             return count;
         }
 
-        static void AdvanceBufferList(List<ArraySegment<byte>> buffers, int bytesTransferred)
+    }
+
+    private static void AdvanceBufferList(List<ArraySegment<byte>> buffers, int bytesTransferred)
+    {
+        while (bytesTransferred > 0)
         {
-            while (bytesTransferred > 0)
+            Debug.Assert(buffers.Count > 0);
+            var current = buffers[0];
+            if (bytesTransferred >= current.Count)
             {
-                Debug.Assert(buffers.Count > 0);
-                var current = buffers[0];
-                if (bytesTransferred >= current.Count)
-                {
-                    bytesTransferred -= current.Count;
-                    buffers.RemoveAt(0);
-                }
-                else
-                {
-                    buffers[0] = new(current.Array!, current.Offset + bytesTransferred, current.Count - bytesTransferred);
-                    bytesTransferred = 0;
-                }
+                bytesTransferred -= current.Count;
+                buffers.RemoveAt(0);
+            }
+            else
+            {
+                buffers[0] = new(current.Array!, current.Offset + bytesTransferred, current.Count - bytesTransferred);
+                bytesTransferred = 0;
             }
         }
     }

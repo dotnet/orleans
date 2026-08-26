@@ -11,7 +11,7 @@ namespace Orleans.Connections.Transport.Security;
 /// <summary>
 /// Message transport factory which configures transports for TLS.
 /// </summary>
-public class TlsMessageTransportConnector(
+internal sealed class TlsMessageTransportConnector(
     MessageTransportConnector innerTransportFactory,
     IOptionsMonitor<TlsOptions> tlsOptions,
     ILoggerFactory loggerFactory) : MessageTransportConnector

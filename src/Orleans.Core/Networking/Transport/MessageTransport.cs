@@ -15,12 +15,7 @@ public abstract class MessageTransport : IAsyncDisposable
     /// <summary>
     /// Gets the cancellation token which is canceled once the connection is closed.
     /// </summary>
-    public virtual CancellationToken Closed { get; }
-
-    /// <summary>
-    /// Gets a value indicating whether this instance is valid.
-    /// </summary>
-    public virtual bool IsValid => !Closed.IsCancellationRequested;
+    public abstract CancellationToken Closed { get; }
 
     /// <summary>
     /// Gets the collection of features available on the transport.

@@ -12,7 +12,7 @@ using Microsoft.Extensions.Options;
 
 namespace Orleans.Connections.Transport.Sockets;
 
-public class TcpMessageTransportListenerOptions
+internal sealed class TcpMessageTransportListenerOptions
 {
     public IPEndPoint? Endpoint { get; set; }
     public bool Enabled { get; set; } = true;
@@ -21,7 +21,7 @@ public class TcpMessageTransportListenerOptions
 /// <summary>
 /// <see cref="MessageTransportListener"/> which listens for TCP connections.
 /// </summary>
-public sealed class TcpMessageTransportListener : MessageTransportListener
+internal sealed class TcpMessageTransportListener : MessageTransportListener
 {
     private readonly IOptionsMonitor<TcpMessageTransportOptions> _tcpOptions;
     private readonly IOptionsMonitor<TcpMessageTransportListenerOptions> _listenerOptions;
@@ -37,7 +37,7 @@ public sealed class TcpMessageTransportListener : MessageTransportListener
         Logger = loggerFactory.CreateLogger("Orleans.Connections.Transport.Sockets");
     }
 
-    protected ILogger Logger { get; }
+    private ILogger Logger { get; }
 
     /// <inheritdoc/>
     public override FeatureCollection Features { get; } = new FeatureCollection();
@@ -48,7 +48,7 @@ public sealed class TcpMessageTransportListener : MessageTransportListener
     /// <inheritdoc/>
     public override string ListenerName { get; }
 
-    protected Socket CreateListenSocket()
+    private Socket CreateListenSocket()
     {
         var options = _tcpOptions.Get(ListenerName);
         var listenerOptions = _listenerOptions.Get(ListenerName);
@@ -74,7 +74,7 @@ public sealed class TcpMessageTransportListener : MessageTransportListener
         return listenSocket;
     }
 
-    protected void OnAcceptSocket(Socket socket)
+    private void OnAcceptSocket(Socket socket)
     {
         var options = _tcpOptions.Get(ListenerName);
         socket.NoDelay = options.NoDelay;

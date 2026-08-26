@@ -167,12 +167,6 @@ namespace Orleans.Runtime.Messaging
             msg.Dispose();
         }
 
-        protected override void OnSendMessageFailure(Message message, string error)
-        {
-            message.TargetSilo = null;
-            this.messageCenter.SendMessage(message);
-        }
-
         [LoggerMessage(
             Level = LogLevel.Information,
             SkipEnabledCheck = true,

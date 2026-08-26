@@ -23,8 +23,7 @@ namespace Orleans.Runtime.Messaging
         private readonly TaskCompletionSource _startedClosing = new(TaskCreationOptions.RunContinuationsAsynchronously);
         private readonly string _id;
         private readonly MessageTransport _transport;
-        private readonly SendWorker[] _sendWorkers;
-        private readonly int _sendWorkerMask;
+        private readonly SendWorker _sendWorker;
         private Task? _processIncomingTask;
         private Task? _closeTask;
         private long _lastMessageReceivedTimestamp;
@@ -37,8 +36,7 @@ namespace Orleans.Runtime.Messaging
             _transport = transport ?? throw new ArgumentNullException(nameof(transport));
             _shared = shared;
 
-            _sendWorkers = [new(this)];
-            _sendWorkerMask = 0;
+            _sendWorker = new(this);
 
             _transport.Closed.Register(static state => ((Connection)state!).OnTransportConnectionClosed(), this);
         }
@@ -197,7 +195,7 @@ namespace Orleans.Runtime.Messaging
         public virtual void Send(Message message)
         {
             Debug.Assert(!message.IsLocalOnly);
-            _sendWorkers[Environment.CurrentManagedThreadId & _sendWorkerMask].Schedule(message);
+            _sendWorker.Schedule(message);
         }
 
         private sealed class UnknownEndPoint : EndPoint
@@ -253,16 +251,16 @@ namespace Orleans.Runtime.Messaging
                 }
 
                 writeRequest.CompleteWriting();
-                if (writeRequest.Messages.Count == 0)
+                if (writeRequest.MessageCount == 0)
                 {
                     writeRequest.Reset();
                 }
                 else if (!_connection._transport.EnqueueWrite(writeRequest))
                 {
                     _connection.StartClosing(new ConnectionClosedException());
-                    foreach (var message in writeRequest.Messages)
+                    for (var i = 0; i < writeRequest.MessageCount; i++)
                     {
-                        _connection.RerouteMessage(message);
+                        _connection.RerouteMessage(writeRequest.GetMessage(i));
                     }
 
                     writeRequest.Reset();
@@ -283,8 +281,6 @@ namespace Orleans.Runtime.Messaging
         internal protected abstract void OnReceivedMessage(Message message);
         internal protected abstract void RecordMessageReceive(Message message, int totalBytes, int headerBytes);
         internal protected abstract void RecordMessageSend(Message message, int totalBytes, int headerBytes);
-        protected abstract void OnSendMessageFailure(Message message, string error);
-
         public void OnReadCompleted(Exception error)
         {
             StartClosing(error);
@@ -363,40 +359,6 @@ namespace Orleans.Runtime.Messaging
             }
         }
 
-        private bool HandleSendMessageFailure(Message message, Exception exception)
-        {
-            LogWarningUnexpectedErrorSerializingMessage(Log, exception, message);
-
-            if (exception is InvalidMessageFrameException)
-            {
-                return false;
-            }
-
-            MessagingMetrics.OnFailedSentMessage(message);
-
-            if (message.Direction == Message.Directions.Request)
-            {
-                var response = MessageFactory.CreateResponseMessage(message);
-                response.Result = Message.ResponseTypes.Error;
-                response.BodyObject = Response.FromException(exception);
-                MessageCenter.DispatchLocalMessage(response);
-            }
-            else if (message.Direction == Message.Directions.Response && message.RetryCount < MessagingOptions.DEFAULT_MAX_MESSAGE_SEND_RETRIES)
-            {
-                message.Result = Message.ResponseTypes.Error;
-                message.BodyObject = Response.FromException(exception);
-                ++message.RetryCount;
-                Send(message);
-            }
-            else
-            {
-                LogWarningDroppingMessage(Log, exception, message);
-                MessagingMetrics.OnDroppedSentMessage(message);
-            }
-
-            return true;
-        }
-
         public virtual void ReceiveMessage(Message message, IMessageReceiverCache cache)
         {
             if (!IsValid)
@@ -438,13 +400,6 @@ namespace Orleans.Runtime.Messaging
             Message = "Exception serializing message {Message} on connection {Connection}"
         )]
         private static partial void LogErrorExceptionSerializingMessage(ILogger logger, Exception exception, Message message, Connection connection);
-
-        [LoggerMessage(
-            EventId = (int)ErrorCode.Messaging_SerializationError,
-            Level = LogLevel.Warning,
-            Message = "Unexpected error serializing message {Message}"
-        )]
-        private static partial void LogWarningUnexpectedErrorSerializingMessage(ILogger logger, Exception exception, Message message);
 
         [LoggerMessage(
             EventId = (int)ErrorCode.Messaging_OutgoingMS_DroppingMessage,
