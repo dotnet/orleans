@@ -328,6 +328,40 @@ public class LocalReminderServiceCompatibilityTests : IClassFixture<LocalReminde
         }
     }
 
+    [TestSuite("BVT")]
+    [TestProvider("None")]
+    [Fact, TestCategory("BVT")]
+    public async Task RangeChangeBarrier_DoesNotDependOnServiceSchedulerAvailability()
+    {
+        var silo = Assert.Single(fixture.HostedCluster.Silos);
+        using var cancellation = new CancellationTokenSource(TestConstants.InitTimeout);
+        _ = await fixture.ReminderObserver.WaitForReminderServiceStartedAsync(cancellation.Token, silo.SiloAddress);
+
+        var reminderService = silo.ServiceProvider.GetRequiredService<LocalReminderService>();
+        await reminderService.TestOnlyWaitForRangeChangeReconciliation(cancellation.Token);
+
+        var schedulerBlocked = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        using var releaseScheduler = new ManualResetEventSlim();
+        var blockingTask = new Task(() =>
+        {
+            schedulerBlocked.TrySetResult();
+            releaseScheduler.Wait(cancellation.Token);
+        });
+        reminderService.Scheduler.QueueTask(blockingTask);
+        await schedulerBlocked.Task.WaitAsync(cancellation.Token);
+
+        try
+        {
+            using var barrierCancellation = new CancellationTokenSource(TimeSpan.FromSeconds(1));
+            await reminderService.TestOnlyWaitForRangeChangeReconciliation(barrierCancellation.Token);
+        }
+        finally
+        {
+            releaseScheduler.Set();
+            await blockingTask.WaitAsync(cancellation.Token);
+        }
+    }
+
     public sealed class Fixture : BaseInProcessTestClusterFixture
     {
         public ReminderDiagnosticObserver ReminderObserver { get; } = ReminderDiagnosticObserver.Create();

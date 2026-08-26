@@ -31,6 +31,8 @@ namespace Orleans.Runtime.ReminderService
         private readonly TimeProvider _timeProvider;
         private readonly ReminderInstruments _reminderInstruments;
         private long localTableSequence;
+        // The test barrier reads this state off-scheduler so it remains observable while the service is busy.
+        private readonly object _rangeChangeLock = new();
         private long rangeChangeGeneration;
         private TaskCompletionSource rangeChangeGenerationChanged = new(TaskCreationOptions.RunContinuationsAsynchronously);
         private Task rangeChangeTask = Task.CompletedTask;
@@ -397,18 +399,24 @@ namespace Orleans.Runtime.ReminderService
             CheckRuntimeContext();
 
             _ = base.OnRangeChange(oldRange, newRange, increased);
-            var task = Status == GrainServiceStatus.Started
-                ? ReadAndUpdateReminders()
-                : Task.CompletedTask;
-            if (Status != GrainServiceStatus.Started)
+            Task task;
+            TaskCompletionSource previousGenerationChanged;
+            lock (_rangeChangeLock)
             {
-                LogIgnoringRangeChange(Status);
+                task = Status == GrainServiceStatus.Started
+                    ? ReadAndUpdateReminders()
+                    : Task.CompletedTask;
+                if (Status != GrainServiceStatus.Started)
+                {
+                    LogIgnoringRangeChange(Status);
+                }
+
+                previousGenerationChanged = rangeChangeGenerationChanged;
+                rangeChangeGenerationChanged = new(TaskCreationOptions.RunContinuationsAsynchronously);
+                rangeChangeGeneration++;
+                rangeChangeTask = task;
             }
 
-            var previousGenerationChanged = rangeChangeGenerationChanged;
-            rangeChangeGenerationChanged = new(TaskCreationOptions.RunContinuationsAsynchronously);
-            rangeChangeGeneration++;
-            rangeChangeTask = task;
             previousGenerationChanged.TrySetResult();
             return task;
         }
@@ -419,30 +427,33 @@ namespace Orleans.Runtime.ReminderService
             {
                 // A newer refresh supersedes older results through localTableSequence. Follow generation
                 // changes so a stalled obsolete read does not block the current reconciliation.
-                long observedGeneration = 0;
-                Task observedTask = Task.CompletedTask;
-                Task observedGenerationChanged = Task.CompletedTask;
-                await this.QueueTask(() =>
+                long observedGeneration;
+                Task observedTask;
+                Task observedGenerationChanged;
+                lock (_rangeChangeLock)
                 {
                     observedGeneration = rangeChangeGeneration;
                     observedTask = rangeChangeTask;
                     observedGenerationChanged = rangeChangeGenerationChanged.Task;
-                    return Task.CompletedTask;
-                }).WaitAsync(cancellationToken);
+                }
 
                 await Task.WhenAny(observedTask, observedGenerationChanged).WaitAsync(cancellationToken);
 
-                var isCurrentGeneration = false;
-                await this.QueueTask(() =>
+                lock (_rangeChangeLock)
                 {
-                    isCurrentGeneration = observedGeneration == rangeChangeGeneration;
-                    return Task.CompletedTask;
-                }).WaitAsync(cancellationToken);
+                    if (observedGeneration != rangeChangeGeneration)
+                    {
+                        continue;
+                    }
+                }
 
-                if (isCurrentGeneration)
+                await observedTask.WaitAsync(cancellationToken);
+                lock (_rangeChangeLock)
                 {
-                    await observedTask.WaitAsync(cancellationToken);
-                    return;
+                    if (observedGeneration == rangeChangeGeneration)
+                    {
+                        return;
+                    }
                 }
             }
         }
