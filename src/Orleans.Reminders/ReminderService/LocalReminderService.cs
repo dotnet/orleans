@@ -455,15 +455,11 @@ namespace Orleans.Runtime.ReminderService
                     {
                         continue;
                     }
-                }
 
-                await observedTask.WaitAsync(cancellationToken);
-                lock (_rangeChangeLock)
-                {
-                    if (observedGeneration == rangeChangeGeneration)
-                    {
-                        return;
-                    }
+                    // The generation-change task can only complete after the generation advances, so the
+                    // observed reconciliation is complete and its outcome can be read without blocking.
+                    observedTask.GetAwaiter().GetResult();
+                    return;
                 }
             }
         }
