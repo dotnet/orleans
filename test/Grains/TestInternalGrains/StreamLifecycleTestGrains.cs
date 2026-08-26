@@ -196,9 +196,15 @@ namespace UnitTests.Grains
         {
             if (logger.IsEnabled(LogLevel.Debug)) logger.LogDebug("OnDeactivateAsync");
 
-            if (_deactivationStream is not null)
+            if (_deactivationStream is not null && !cancellationToken.IsCancellationRequested)
             {
-                await _deactivationStream.OnNextAsync(1).WaitAsync(cancellationToken);
+                try
+                {
+                    await _deactivationStream.OnNextAsync(1).WaitAsync(cancellationToken);
+                }
+                catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+                {
+                }
             }
 
             await RecordDeactivate();
