@@ -3,7 +3,9 @@ param(
     [string] $BenchmarksDll,
     [int] $WarmupSeconds = 60,
     [int] $MeasurementSeconds = 120,
+    [int] $SampleCount = 1,
     [int] $Concurrency = 250,
+    [switch] $Latency,
     [string] $OutputDirectory = ".",
     [string] $PvanalyzeDll,
     [ValidateSet("cpu", "gc-verbose")]
@@ -65,6 +67,33 @@ public static class ProcessorTopology
 }
 "@
 
+function Start-AffinitizedDotnet(
+    [string[]] $Arguments,
+    [UInt64] $Affinity,
+    [string] $StandardOutput,
+    [string] $StandardError)
+{
+    $quotedArguments = $Arguments | ForEach-Object { '"' + $_.Replace('"', '\"') + '"' }
+    $command = 'start "" /b /wait /high /affinity {0:X} dotnet {1}' -f $Affinity, ($quotedArguments -join " ")
+    return Start-Process $env:ComSpec -PassThru -NoNewWindow `
+        -ArgumentList @("/d", "/s", "/c", $command) `
+        -RedirectStandardOutput $StandardOutput `
+        -RedirectStandardError $StandardError
+}
+
+function Get-DotnetChild([System.Diagnostics.Process] $wrapper)
+{
+    $child = Get-CimInstance Win32_Process -Filter "ParentProcessId = $($wrapper.Id)" |
+        Where-Object Name -eq "dotnet.exe" |
+        Select-Object -First 1
+    if (-not $child)
+    {
+        throw "Could not find the dotnet child process for wrapper $($wrapper.Id)."
+    }
+
+    return Get-Process -Id $child.ProcessId
+}
+
 $coreMasks = [ProcessorTopology]::GetPhysicalCoreMasks()
 if ($coreMasks.Count -lt 16)
 {
@@ -89,17 +118,15 @@ $serverError = Join-Path $OutputDirectory "server.err.log"
 $clientOutput = Join-Path $OutputDirectory "client.log"
 $clientError = Join-Path $OutputDirectory "client.err.log"
 
-$serverDuration = $WarmupSeconds + $MeasurementSeconds + 60
-$server = Start-Process dotnet -PassThru -NoNewWindow `
-    -ArgumentList @($BenchmarksDll, "ProcessPing_Server", $serverDuration) `
-    -RedirectStandardOutput $serverOutput `
-    -RedirectStandardError $serverError
+$serverDuration = $WarmupSeconds + ($MeasurementSeconds * $SampleCount) + 60
+$server = Start-AffinitizedDotnet `
+    @($BenchmarksDll, "ProcessPing_Server", $serverDuration) `
+    $serverMask `
+    $serverOutput `
+    $serverError
 
 try
 {
-    $server.ProcessorAffinity = [IntPtr][Int64]$serverMask
-    $server.PriorityClass = [System.Diagnostics.ProcessPriorityClass]::High
-
     $deadline = [DateTime]::UtcNow.AddSeconds(60)
     while ([DateTime]::UtcNow -lt $deadline)
     {
@@ -121,26 +148,34 @@ try
         throw "Timed out waiting for the server to become ready."
     }
 
-    $client = Start-Process dotnet -PassThru -NoNewWindow `
-        -ArgumentList @($BenchmarksDll, "ProcessPing_Client", $WarmupSeconds, $MeasurementSeconds, $Concurrency) `
-        -RedirectStandardOutput $clientOutput `
-        -RedirectStandardError $clientError
-
-    $client.ProcessorAffinity = [IntPtr][Int64]$clientMask
-    $client.PriorityClass = [System.Diagnostics.ProcessPriorityClass]::High
+    $clientArguments = if ($Latency)
+    {
+        @($BenchmarksDll, "ProcessPing_LatencyClient", $WarmupSeconds, $MeasurementSeconds, $SampleCount, 30000)
+    }
+    else
+    {
+        @($BenchmarksDll, "ProcessPing_Client", $WarmupSeconds, $MeasurementSeconds, $Concurrency, 30000, $SampleCount)
+    }
+    $client = Start-AffinitizedDotnet `
+        $clientArguments `
+        $clientMask `
+        $clientOutput `
+        $clientError
 
     if ($PvanalyzeDll)
     {
         Start-Sleep -Seconds ($WarmupSeconds + 5)
+        $serverDotnet = Get-DotnetChild $server
+        $clientDotnet = Get-DotnetChild $client
         if ($ProfileRole -in @("both", "server"))
         {
-            & dotnet $PvanalyzeDll collect --process-id $server.Id --profile $PvanalyzeProfile --duration-seconds 30 `
+            & dotnet $PvanalyzeDll collect --process-id $serverDotnet.Id --profile $PvanalyzeProfile --duration-seconds 30 `
                 --output (Join-Path $OutputDirectory "server.nettrace")
         }
 
         if ($ProfileRole -in @("both", "client"))
         {
-            & dotnet $PvanalyzeDll collect --process-id $client.Id --profile $PvanalyzeProfile --duration-seconds 30 `
+            & dotnet $PvanalyzeDll collect --process-id $clientDotnet.Id --profile $PvanalyzeProfile --duration-seconds 30 `
                 --output (Join-Path $OutputDirectory "client.nettrace")
         }
     }
@@ -152,12 +187,14 @@ try
         throw "Client exited with code $($client.ExitCode). See $clientError."
     }
 
-    Get-Content $clientOutput | Select-String "PING_RESULT"
+    Get-Content $clientOutput | Select-String "PING_(ENV|SAMPLE|RESULT|LATENCY)"
 }
 finally
 {
     if (-not $server.HasExited)
     {
+        Get-CimInstance Win32_Process -Filter "ParentProcessId = $($server.Id)" |
+            ForEach-Object { Stop-Process -Id $_.ProcessId -ErrorAction SilentlyContinue }
         Stop-Process -Id $server.Id
         $server.WaitForExit()
     }

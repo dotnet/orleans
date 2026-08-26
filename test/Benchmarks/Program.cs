@@ -149,6 +149,7 @@ internal class Program
         },
         ["ProcessPing_Server"] = args => ProcessPingBenchmark.RunServerAsync(args).GetAwaiter().GetResult(),
         ["ProcessPing_Client"] = args => ProcessPingBenchmark.RunClientAsync(args).GetAwaiter().GetResult(),
+        ["ProcessPing_LatencyClient"] = args => ProcessPingBenchmark.RunLatencyClientAsync(args).GetAwaiter().GetResult(),
         ["ConcurrentPing_TwoSilos"] = _ =>
         {
             new PingBenchmark(numSilos: 2, startClient: true).PingConcurrent().GetAwaiter().GetResult();

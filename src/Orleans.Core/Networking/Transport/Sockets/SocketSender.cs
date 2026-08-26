@@ -40,6 +40,11 @@ internal sealed class SocketSender : SocketAwaitableEventArgs
 
     public ValueTask SendAsync(Socket socket, List<ArraySegment<byte>> buffers)
     {
+        if (!MemoryBuffer.IsEmpty)
+        {
+            SetBuffer(null, 0, 0);
+        }
+
         BufferList = buffers;
 
         if (socket.SendAsync(this))
@@ -69,6 +74,11 @@ internal sealed class SocketSender : SocketAwaitableEventArgs
 
     public ValueTask SendAsync(Socket socket, ReadOnlyMemory<byte> memory)
     {
+        if (BufferList is not null)
+        {
+            BufferList = null;
+        }
+
         SetBuffer(MemoryMarshal.AsMemory(memory));
 
         if (socket.SendAsync(this))

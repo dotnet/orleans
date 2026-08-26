@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using System.Net;
 using System.Runtime.InteropServices;
+using System.Runtime;
 using BenchmarkGrainInterfaces.Ping;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
@@ -13,12 +14,14 @@ internal static class ProcessPingBenchmark
     public static async Task RunServerAsync(string[] args)
     {
         var duration = GetInt32(args, 0, 240);
+        var siloPort = GetInt32(args, 1, 11111);
+        var gatewayPort = GetInt32(args, 2, 30000);
         using var host = new HostBuilder()
             .ConfigureLogging(logging => logging.SetMinimumLevel(LogLevel.Warning))
             .UseOrleans((_, siloBuilder) => siloBuilder.UseLocalhostClustering(
-                siloPort: 11111,
-                gatewayPort: 30000,
-                primarySiloEndpoint: new IPEndPoint(IPAddress.Loopback, 11111)))
+                siloPort,
+                gatewayPort,
+                primarySiloEndpoint: null))
             .Build();
 
         await host.StartAsync();
@@ -32,10 +35,12 @@ internal static class ProcessPingBenchmark
         var warmupSeconds = GetInt32(args, 0, 60);
         var measurementSeconds = GetInt32(args, 1, 120);
         var concurrency = GetInt32(args, 2, 250);
+        var gatewayPort = GetInt32(args, 3, 30000);
+        var sampleCount = GetInt32(args, 4, 1);
 
         using var host = new HostBuilder()
             .ConfigureLogging(logging => logging.SetMinimumLevel(LogLevel.Warning))
-            .UseOrleansClient((_, clientBuilder) => clientBuilder.UseLocalhostClustering())
+            .UseOrleansClient((_, clientBuilder) => clientBuilder.UseLocalhostClustering(gatewayPort))
             .Build();
 
         await host.StartAsync();
@@ -55,33 +60,114 @@ internal static class ProcessPingBenchmark
 
         start.SetResult();
         await Task.Delay(TimeSpan.FromSeconds(warmupSeconds));
+        Console.WriteLine(
+            $"PING_ENV processors={Environment.ProcessorCount} serverGC={GCSettings.IsServerGC} " +
+            $"latencyMode={GCSettings.LatencyMode}");
 
-        var initialCount = Sum(counters);
-        var initialFailures = Sum(failures);
-        var initialAllocatedBytes = GC.GetTotalAllocatedBytes(precise: false);
-        var initialGen0Collections = GC.CollectionCount(0);
-        var initialGen1Collections = GC.CollectionCount(1);
-        var initialGen2Collections = GC.CollectionCount(2);
-        var startTimestamp = Stopwatch.GetTimestamp();
+        var throughputs = new double[sampleCount];
+        long totalCompleted = 0;
+        long totalFailures = 0;
+        long totalAllocatedBytes = 0;
+        double totalElapsedSeconds = 0;
 
-        await Task.Delay(TimeSpan.FromSeconds(measurementSeconds));
+        for (var sample = 0; sample < sampleCount; sample++)
+        {
+            var initialCount = Sum(counters);
+            var initialFailures = Sum(failures);
+            var initialAllocatedBytes = GC.GetTotalAllocatedBytes(precise: false);
+            var initialGen0Collections = GC.CollectionCount(0);
+            var initialGen1Collections = GC.CollectionCount(1);
+            var initialGen2Collections = GC.CollectionCount(2);
+            var startTimestamp = Stopwatch.GetTimestamp();
 
-        var endTimestamp = Stopwatch.GetTimestamp();
-        var completed = Sum(counters) - initialCount;
-        var failed = Sum(failures) - initialFailures;
-        var allocatedBytes = GC.GetTotalAllocatedBytes(precise: false) - initialAllocatedBytes;
-        var elapsedSeconds = Stopwatch.GetElapsedTime(startTimestamp, endTimestamp).TotalSeconds;
+            await Task.Delay(TimeSpan.FromSeconds(measurementSeconds));
+
+            var endTimestamp = Stopwatch.GetTimestamp();
+            var completed = Sum(counters) - initialCount;
+            var failed = Sum(failures) - initialFailures;
+            var allocatedBytes = GC.GetTotalAllocatedBytes(precise: false) - initialAllocatedBytes;
+            var elapsedSeconds = Stopwatch.GetElapsedTime(startTimestamp, endTimestamp).TotalSeconds;
+            var throughput = completed / elapsedSeconds;
+            throughputs[sample] = throughput;
+            totalCompleted += completed;
+            totalFailures += failed;
+            totalAllocatedBytes += allocatedBytes;
+            totalElapsedSeconds += elapsedSeconds;
+
+            Console.WriteLine(
+                $"PING_SAMPLE index={sample} throughput={throughput:F2} completed={completed} " +
+                $"seconds={elapsedSeconds:F3} failures={failed} concurrency={concurrency} " +
+                $"allocatedBytes={allocatedBytes} bytesPerOperation={(double)allocatedBytes / completed:F2} " +
+                $"gen0={GC.CollectionCount(0) - initialGen0Collections} " +
+                $"gen1={GC.CollectionCount(1) - initialGen1Collections} " +
+                $"gen2={GC.CollectionCount(2) - initialGen2Collections}");
+        }
 
         await cancellation.CancelAsync();
         await Task.WhenAll(workers);
 
+        Array.Sort(throughputs);
+        var medianThroughput = throughputs.Length % 2 == 0
+            ? (throughputs[(throughputs.Length / 2) - 1] + throughputs[throughputs.Length / 2]) / 2
+            : throughputs[throughputs.Length / 2];
+
         Console.WriteLine(
-            $"PING_RESULT throughput={completed / elapsedSeconds:F2} completed={completed} " +
-            $"seconds={elapsedSeconds:F3} failures={failed} concurrency={concurrency} " +
-            $"allocatedBytes={allocatedBytes} bytesPerOperation={(double)allocatedBytes / completed:F2} " +
-            $"gen0={GC.CollectionCount(0) - initialGen0Collections} " +
-            $"gen1={GC.CollectionCount(1) - initialGen1Collections} " +
-            $"gen2={GC.CollectionCount(2) - initialGen2Collections}");
+            $"PING_RESULT throughput={medianThroughput:F2} completed={totalCompleted} " +
+            $"seconds={totalElapsedSeconds:F3} failures={totalFailures} concurrency={concurrency} " +
+            $"allocatedBytes={totalAllocatedBytes} bytesPerOperation={(double)totalAllocatedBytes / totalCompleted:F2} " +
+            $"samples={sampleCount}");
+
+        await host.StopAsync();
+    }
+
+    public static async Task RunLatencyClientAsync(string[] args)
+    {
+        var warmupSeconds = GetInt32(args, 0, 60);
+        var measurementSeconds = GetInt32(args, 1, 20);
+        var sampleCount = GetInt32(args, 2, 3);
+        var gatewayPort = GetInt32(args, 3, 30000);
+
+        using var host = new HostBuilder()
+            .ConfigureLogging(logging => logging.SetMinimumLevel(LogLevel.Warning))
+            .UseOrleansClient((_, clientBuilder) => clientBuilder.UseLocalhostClustering(gatewayPort))
+            .Build();
+
+        await host.StartAsync();
+        var client = host.Services.GetRequiredService<IClusterClient>();
+        var grain = client.GetGrain<IPingGrain>(0);
+
+        var warmupStart = Stopwatch.GetTimestamp();
+        while (Stopwatch.GetElapsedTime(warmupStart).TotalSeconds < warmupSeconds)
+        {
+            await grain.Run();
+        }
+
+        Console.WriteLine(
+            $"PING_ENV processors={Environment.ProcessorCount} serverGC={GCSettings.IsServerGC} " +
+            $"latencyMode={GCSettings.LatencyMode}");
+
+        var durations = new long[2_000_000];
+        for (var sample = 0; sample < sampleCount; sample++)
+        {
+            var count = 0;
+            var sampleStart = Stopwatch.GetTimestamp();
+            while (count < durations.Length
+                && Stopwatch.GetElapsedTime(sampleStart).TotalSeconds < measurementSeconds)
+            {
+                var start = Stopwatch.GetTimestamp();
+                await grain.Run();
+                durations[count++] = Stopwatch.GetTimestamp() - start;
+            }
+
+            var elapsedSeconds = Stopwatch.GetElapsedTime(sampleStart).TotalSeconds;
+            Array.Sort(durations, 0, count);
+            var tickToMicroseconds = 1_000_000d / Stopwatch.Frequency;
+            Console.WriteLine(
+                $"PING_LATENCY index={sample} count={count} throughput={count / elapsedSeconds:F2} " +
+                $"p50us={Percentile(durations, count, 0.50) * tickToMicroseconds:F2} " +
+                $"p95us={Percentile(durations, count, 0.95) * tickToMicroseconds:F2} " +
+                $"p99us={Percentile(durations, count, 0.99) * tickToMicroseconds:F2}");
+        }
 
         await host.StopAsync();
     }
@@ -122,6 +208,9 @@ internal static class ProcessPingBenchmark
 
     private static int GetInt32(string[] args, int index, int defaultValue)
         => args.Length > index && int.TryParse(args[index], out var value) && value > 0 ? value : defaultValue;
+
+    private static long Percentile(long[] values, int count, double percentile)
+        => values[Math.Min(count - 1, (int)Math.Ceiling(count * percentile) - 1)];
 
     [StructLayout(LayoutKind.Explicit, Size = 128)]
     private struct PaddedCounter
