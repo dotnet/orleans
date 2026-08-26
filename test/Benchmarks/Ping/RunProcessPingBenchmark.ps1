@@ -1,14 +1,19 @@
 param(
     [Parameter(Mandatory = $true)]
     [string] $BenchmarksDll,
+    [string] $DotnetExecutable = "dotnet",
     [int] $WarmupSeconds = 60,
     [int] $MeasurementSeconds = 120,
     [int] $SampleCount = 1,
     [int] $Concurrency = 250,
+    [int] $PayloadSize = 0,
     [switch] $Latency,
     [switch] $Tls,
+    [switch] $SecondarySilo,
     [string] $OutputDirectory = ".",
     [string] $PvanalyzeDll,
+    [string] $DotnetCounters,
+    [string] $CounterProviders = "System.Runtime",
     [ValidateSet("cpu", "gc-verbose")]
     [string] $PvanalyzeProfile = "cpu",
     [ValidateSet("both", "client", "server")]
@@ -75,7 +80,8 @@ function Start-AffinitizedDotnet(
     [string] $StandardError)
 {
     $quotedArguments = $Arguments | ForEach-Object { '"' + $_.Replace('"', '\"') + '"' }
-    $command = 'start "" /b /wait /high /affinity {0:X} dotnet {1}' -f $Affinity, ($quotedArguments -join " ")
+    $command = 'start "" /b /wait /high /affinity {0:X} "{1}" {2}' -f `
+        $Affinity, $DotnetExecutable, ($quotedArguments -join " ")
     return Start-Process $env:ComSpec -PassThru -NoNewWindow `
         -ArgumentList @("/d", "/s", "/c", $command) `
         -RedirectStandardOutput $StandardOutput `
@@ -102,10 +108,19 @@ if ($coreMasks.Count -lt 16)
 }
 
 [UInt64] $serverMask = 0
+[UInt64] $secondaryServerMask = 0
 [UInt64] $clientMask = 0
-for ($i = 0; $i -lt 8; $i++)
+for ($i = 0; $i -lt $(if ($SecondarySilo) { 4 } else { 8 }); $i++)
 {
     $serverMask = $serverMask -bor $coreMasks[$i]
+}
+
+if ($SecondarySilo)
+{
+    for ($i = 4; $i -lt 8; $i++)
+    {
+        $secondaryServerMask = $secondaryServerMask -bor $coreMasks[$i]
+    }
 }
 
 for ($i = 8; $i -lt 16; $i++)
@@ -116,15 +131,26 @@ for ($i = 8; $i -lt 16; $i++)
 New-Item -ItemType Directory -Force -Path $OutputDirectory | Out-Null
 $serverOutput = Join-Path $OutputDirectory "server.log"
 $serverError = Join-Path $OutputDirectory "server.err.log"
+$secondaryServerOutput = Join-Path $OutputDirectory "secondary-server.log"
+$secondaryServerError = Join-Path $OutputDirectory "secondary-server.err.log"
 $clientOutput = Join-Path $OutputDirectory "client.log"
 $clientError = Join-Path $OutputDirectory "client.err.log"
 
 $serverDuration = $WarmupSeconds + ($MeasurementSeconds * $SampleCount) + 60
 $server = Start-AffinitizedDotnet `
-    @($BenchmarksDll, "ProcessPing_Server", $serverDuration, 11111, 30000, [bool]$Tls) `
+    @($BenchmarksDll, "ProcessPing_Server", $serverDuration, 11111, 30000, [bool]$Tls, 0) `
     $serverMask `
     $serverOutput `
     $serverError
+$secondaryServer = $null
+if ($SecondarySilo)
+{
+    $secondaryServer = Start-AffinitizedDotnet `
+        @($BenchmarksDll, "ProcessPing_Server", $serverDuration, 11112, 30001, [bool]$Tls, 11111) `
+        $secondaryServerMask `
+        $secondaryServerOutput `
+        $secondaryServerError
+}
 
 try
 {
@@ -149,13 +175,37 @@ try
         throw "Timed out waiting for the server to become ready."
     }
 
+    if ($secondaryServer)
+    {
+        $deadline = [DateTime]::UtcNow.AddSeconds(60)
+        while ([DateTime]::UtcNow -lt $deadline)
+        {
+            if ($secondaryServer.HasExited)
+            {
+                throw "Secondary server exited before becoming ready. See $secondaryServerError."
+            }
+
+            if ((Test-Path $secondaryServerOutput) -and (Select-String -Path $secondaryServerOutput -Pattern "PING_SERVER_READY" -Quiet))
+            {
+                break
+            }
+
+            Start-Sleep -Milliseconds 200
+        }
+
+        if (-not (Select-String -Path $secondaryServerOutput -Pattern "PING_SERVER_READY" -Quiet))
+        {
+            throw "Timed out waiting for the secondary server to become ready."
+        }
+    }
+
     $clientArguments = if ($Latency)
     {
         @($BenchmarksDll, "ProcessPing_LatencyClient", $WarmupSeconds, $MeasurementSeconds, $SampleCount, 30000, [bool]$Tls)
     }
     else
     {
-        @($BenchmarksDll, "ProcessPing_Client", $WarmupSeconds, $MeasurementSeconds, $Concurrency, 30000, $SampleCount, [bool]$Tls)
+        @($BenchmarksDll, "ProcessPing_Client", $WarmupSeconds, $MeasurementSeconds, $Concurrency, 30000, $SampleCount, [bool]$Tls, $PayloadSize, $(if ($SecondarySilo) { 30001 } else { 0 }))
     }
     $client = Start-AffinitizedDotnet `
         $clientArguments `
@@ -163,11 +213,15 @@ try
         $clientOutput `
         $clientError
 
-    if ($PvanalyzeDll)
+    if ($PvanalyzeDll -or $DotnetCounters)
     {
-        Start-Sleep -Seconds ($WarmupSeconds + 5)
+        Start-Sleep -Seconds $WarmupSeconds
         $serverDotnet = Get-DotnetChild $server
         $clientDotnet = Get-DotnetChild $client
+    }
+
+    if ($PvanalyzeDll)
+    {
         if ($ProfileRole -in @("both", "server"))
         {
             & dotnet $PvanalyzeDll collect --process-id $serverDotnet.Id --profile $PvanalyzeProfile --duration-seconds 30 `
@@ -179,6 +233,15 @@ try
             & dotnet $PvanalyzeDll collect --process-id $clientDotnet.Id --profile $PvanalyzeProfile --duration-seconds 30 `
                 --output (Join-Path $OutputDirectory "client.nettrace")
         }
+    }
+
+    if ($DotnetCounters)
+    {
+        $counterDuration = [TimeSpan]::FromSeconds($MeasurementSeconds * $SampleCount)
+        & $DotnetCounters collect --process-id $clientDotnet.Id --counters $CounterProviders `
+            --refresh-interval 1 --format csv `
+            --duration $counterDuration.ToString("dd\:hh\:mm\:ss") `
+            --output (Join-Path $OutputDirectory "client-counters")
     }
 
     $client.WaitForExit()
@@ -198,5 +261,13 @@ finally
             ForEach-Object { Stop-Process -Id $_.ProcessId -ErrorAction SilentlyContinue }
         Stop-Process -Id $server.Id
         $server.WaitForExit()
+    }
+
+    if ($secondaryServer -and -not $secondaryServer.HasExited)
+    {
+        Get-CimInstance Win32_Process -Filter "ParentProcessId = $($secondaryServer.Id)" |
+            ForEach-Object { Stop-Process -Id $_.ProcessId -ErrorAction SilentlyContinue }
+        Stop-Process -Id $secondaryServer.Id
+        $secondaryServer.WaitForExit()
     }
 }
