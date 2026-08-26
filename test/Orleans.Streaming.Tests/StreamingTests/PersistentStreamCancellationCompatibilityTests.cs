@@ -176,6 +176,5 @@ public class PersistentStreamCancellationCompatibilityTests
 
         public void Update(string offset, DateTime utcNow) => Checkpoint = offset;
 
-        public Task FlushAsync(CancellationToken cancellationToken) => Task.CompletedTask;
     }
 }

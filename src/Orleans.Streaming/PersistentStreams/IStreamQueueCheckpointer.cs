@@ -56,7 +56,8 @@ public interface IStreamQueueCheckpointer<TCheckpoint>
     /// <param name="cancellationToken">The cancellation token.</param>
     /// <returns>The checkpoint.</returns>
 #pragma warning disable CS0618 // Required for compatibility with providers which only implement the legacy overload.
-    Task<TCheckpoint> Load(CancellationToken cancellationToken) => Load();
+    Task<TCheckpoint> Load(CancellationToken cancellationToken)
+        => cancellationToken.IsCancellationRequested ? Task.FromCanceled<TCheckpoint>(cancellationToken) : Load();
 #pragma warning restore CS0618
 
     /// <summary>
@@ -92,7 +93,10 @@ public interface IStreamQueueCheckpointer<TCheckpoint>
     /// <param name="cancellationToken">The cancellation token.</param>
 #pragma warning disable CS0618 // Required for compatibility with providers which only implement the legacy overload.
     void Update(TCheckpoint offset, DateTime utcNow, CancellationToken cancellationToken)
-        => Update(offset, utcNow);
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        Update(offset, utcNow);
+    }
 #pragma warning restore CS0618
 
     /// <summary>
@@ -101,5 +105,6 @@ public interface IStreamQueueCheckpointer<TCheckpoint>
     /// </summary>
     /// <param name="cancellationToken">The cancellation token.</param>
     /// <returns>A <see cref="Task"/> representing the flush operation.</returns>
-    Task FlushAsync(CancellationToken cancellationToken) => Task.CompletedTask;
+    Task FlushAsync(CancellationToken cancellationToken)
+        => cancellationToken.IsCancellationRequested ? Task.FromCanceled(cancellationToken) : Task.CompletedTask;
 }
