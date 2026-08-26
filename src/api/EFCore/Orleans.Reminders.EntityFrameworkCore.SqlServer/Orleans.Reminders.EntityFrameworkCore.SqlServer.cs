@@ -8,7 +8,7 @@
 //------------------------------------------------------------------------------
 namespace Orleans.Reminders
 {
-    public static partial class SqlHostingExtensions
+    public static partial class SqlServerHostingExtensions
     {
         public static Microsoft.Extensions.DependencyInjection.IServiceCollection UseEntityFrameworkCoreSqlServerReminderService(this Microsoft.Extensions.DependencyInjection.IServiceCollection services, System.Action<Microsoft.EntityFrameworkCore.DbContextOptionsBuilder> configureDatabase) { throw null; }
 
