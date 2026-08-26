@@ -1496,6 +1496,58 @@ public class DisseminationProtocolTests
     }
 
     [Fact]
+    public async Task MembershipTopicApplyValueRejectsDiffWithMismatchedDigestVersion()
+    {
+        var local = CreateSilo(11132);
+        using var serviceProvider = new ServiceCollection().AddSerializer().BuildServiceProvider();
+        var serializer = serviceProvider.GetRequiredService<Serializer>();
+        var currentSnapshot = CreateMembershipSnapshot(1, CreateMembershipEntry(local, SiloStatus.Active, DateTime.UnixEpoch));
+        var manager = new FakeMembershipManager(currentSnapshot);
+        var topic = CreateMembershipTopic(local, manager, serializer);
+        var diff = new MembershipTableSnapshotDiff(
+            currentSnapshot.Version,
+            new MembershipVersion(2),
+            ImmutableArray<MembershipEntry>.Empty,
+            ImmutableArray<SiloAddress>.Empty);
+        var value = new DisseminationValue
+        {
+            Digest = new DisseminationTopicDigest("cluster", 3),
+            Root = local,
+            ExpiresAt = DateTimeOffset.UtcNow.AddMinutes(1),
+            Payload = serializer.SerializeToArray(new MembershipTableSnapshotUpdate { Diff = diff }),
+        };
+
+        var result = await topic.ApplyValue(value, CancellationToken.None);
+
+        Assert.Equal(DisseminationApplyResult.Rejected, result);
+        Assert.Equal(currentSnapshot.Version, manager.CurrentSnapshot.Version);
+    }
+
+    [Fact]
+    public async Task MembershipTopicApplyValueRejectsSnapshotWithMismatchedDigestVersion()
+    {
+        var local = CreateSilo(11133);
+        using var serviceProvider = new ServiceCollection().AddSerializer().BuildServiceProvider();
+        var serializer = serviceProvider.GetRequiredService<Serializer>();
+        var currentSnapshot = CreateMembershipSnapshot(1, CreateMembershipEntry(local, SiloStatus.Active, DateTime.UnixEpoch));
+        var manager = new FakeMembershipManager(currentSnapshot);
+        var topic = CreateMembershipTopic(local, manager, serializer);
+        var proposedSnapshot = CreateMembershipSnapshot(2, CreateMembershipEntry(local, SiloStatus.Active, DateTime.UnixEpoch));
+        var value = new DisseminationValue
+        {
+            Digest = new DisseminationTopicDigest("cluster", 3),
+            Root = local,
+            ExpiresAt = DateTimeOffset.UtcNow.AddMinutes(1),
+            Payload = serializer.SerializeToArray(new MembershipTableSnapshotUpdate { Snapshot = proposedSnapshot }),
+        };
+
+        var result = await topic.ApplyValue(value, CancellationToken.None);
+
+        Assert.Equal(DisseminationApplyResult.Rejected, result);
+        Assert.Equal(currentSnapshot.Version, manager.CurrentSnapshot.Version);
+    }
+
+    [Fact]
     public async Task MembershipTopicApplyValueReturnsObsoleteThenDuplicateForStaleVersions()
     {
         var local = CreateSilo(11123);
@@ -2780,6 +2832,41 @@ public class DisseminationProtocolTests
         var result = await topic.ApplyValue(value, CancellationToken.None);
 
         Assert.Equal(DisseminationApplyResult.Rejected, result);
+    }
+
+    [Fact]
+    public async Task DeploymentLoadTopic_ApplyValueRejectsDigestPayloadMismatch()
+    {
+        using var serviceProvider = new ServiceCollection().AddSerializer().BuildServiceProvider();
+        var serializer = serviceProvider.GetRequiredService<Serializer>();
+        var local = CreateSilo(21115);
+        var peer = CreateSilo(21116);
+        var statusOracle = new FakeSiloStatusOracle();
+        statusOracle.SetStatus(peer, SiloStatus.Active);
+        var publisher = CreateDeploymentLoadPublisher(local, statusOracle);
+        var topic = CreateDeploymentLoadTopic(publisher, serializer);
+        var statistics = CreateStatistics(new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc));
+
+        var mismatchedRoot = new DisseminationValue
+        {
+            Digest = new DisseminationTopicDigest(peer.ToParsableString(), statistics.DateTime.Ticks),
+            Root = local,
+            ExpiresAt = DateTimeOffset.UtcNow.AddMinutes(1),
+            Payload = serializer.SerializeToArray(statistics),
+        };
+        var mismatchedVersion = new DisseminationValue
+        {
+            Digest = new DisseminationTopicDigest(peer.ToParsableString(), statistics.DateTime.Ticks + 1),
+            Root = peer,
+            ExpiresAt = DateTimeOffset.UtcNow.AddMinutes(1),
+            Payload = serializer.SerializeToArray(statistics),
+        };
+
+        var rootResult = await topic.ApplyValue(mismatchedRoot, CancellationToken.None);
+        var versionResult = await topic.ApplyValue(mismatchedVersion, CancellationToken.None);
+
+        Assert.Equal(DisseminationApplyResult.Rejected, rootResult);
+        Assert.Equal(DisseminationApplyResult.Rejected, versionResult);
     }
 
     [Fact]

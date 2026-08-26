@@ -101,12 +101,20 @@ internal sealed class MembershipDisseminationTopic(
 
         if (update.Diff is { } diff)
         {
-            return update.Snapshot is null
-                ? await ApplyDiff(diff, cancellationToken)
-                : DisseminationApplyResult.Rejected;
+            if (update.Snapshot is not null || diff.Version.Value != value.Digest.Version)
+            {
+                return DisseminationApplyResult.Rejected;
+            }
+
+            return await ApplyDiff(diff, cancellationToken);
         }
 
         if (update.Snapshot is not { } snapshot)
+        {
+            return DisseminationApplyResult.Rejected;
+        }
+
+        if (snapshot.Version.Value != value.Digest.Version)
         {
             return DisseminationApplyResult.Rejected;
         }
