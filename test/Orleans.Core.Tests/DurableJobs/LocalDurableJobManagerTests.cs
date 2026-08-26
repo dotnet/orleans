@@ -386,6 +386,18 @@ public class LocalDurableJobManagerTests
     }
 
     [Fact]
+    public async Task CancelAsync_NullJob_Throws()
+    {
+        var timeProvider = new FakeTimeProvider(new DateTimeOffset(2026, 1, 1, 0, 0, 0, TimeSpan.Zero));
+        var manager = CreateManager(new TestJobShardManager(), timeProvider, CreateOptions());
+
+        var exception = await Assert.ThrowsAsync<ArgumentNullException>(
+            () => manager.CancelAsync(null!, CancellationToken.None));
+
+        Assert.Equal("job", exception.ParamName);
+    }
+
+    [Fact]
     public async Task CancelAsync_WhenCachedShardOwnershipMoved_RoutesToCurrentOwner()
     {
         var timeProvider = new FakeTimeProvider(new DateTimeOffset(2026, 1, 1, 0, 0, 0, TimeSpan.Zero));

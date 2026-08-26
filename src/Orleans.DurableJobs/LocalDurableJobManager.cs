@@ -247,6 +247,7 @@ internal partial class LocalDurableJobManager : SystemTarget, ILocalDurableJobMa
     /// <inheritdoc/>
     public async Task<bool> CancelAsync(DurableJob job, CancellationToken requestCancellationToken)
     {
+        ArgumentNullException.ThrowIfNull(job);
         var startTimestamp = _timeProvider.GetTimestamp();
         try
         {

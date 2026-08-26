@@ -48,6 +48,7 @@ internal sealed partial class DurableJobReceiverExtension : IDurableJobReceiverE
     /// <inheritdoc />
     public ValueTask<DurableJobRunResult> HandleDurableJobAsync(IJobRunContext context, CancellationToken attemptCancellationToken)
     {
+        ArgumentNullException.ThrowIfNull(context);
         var key = GetExecutionKey(context);
         var newJob = false;
         if (!_jobAttempts.TryGetValue(key, out var state))

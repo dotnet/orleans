@@ -32,6 +32,7 @@ public interface ILocalDurableJobManager
     /// the cancellation request was durably recorded, preventing future attempts; otherwise, <see langword="false"/>.
     /// An already-running attempt is cooperatively independent of this request and may still complete.
     /// </returns>
+    /// <exception cref="ArgumentNullException"><paramref name="job"/> is <see langword="null"/>.</exception>
     Task<bool> CancelAsync(DurableJob job, CancellationToken requestCancellationToken);
 }
 

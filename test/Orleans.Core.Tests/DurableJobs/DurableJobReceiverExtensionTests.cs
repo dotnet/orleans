@@ -23,6 +23,17 @@ namespace NonSilo.Tests.ScheduledJobs;
 public class DurableJobReceiverExtensionTests
 {
     [Fact]
+    public void HandleDurableJobAsync_NullContext_Throws()
+    {
+        var extension = CreateExtension(Substitute.For<IDurableJobHandler>());
+
+        var exception = Assert.Throws<ArgumentNullException>(
+            () => extension.HandleDurableJobAsync(null!, CancellationToken.None));
+
+        Assert.Equal("context", exception.ParamName);
+    }
+
+    [Fact]
     public async Task HandleDurableJobAsync_WhenHandlerCancelsWithoutAttemptCancellation_ReturnsFailure()
     {
         var exception = new OperationCanceledException("Handler-specific cancellation");
