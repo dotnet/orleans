@@ -18,18 +18,29 @@ public sealed class OrderWorkerGrain : Grain, IOrderWorkerGrain
     public Task ProcessOrder() => Task.CompletedTask;
 }
 
-public sealed class OrderCoordinatorGrain : Grain, IOrderCoordinatorGrain
+// <direct_placement_with_hint>
+public sealed class OrderCoordinatorGrain(
+    IClusterMembershipService clusterMembership,
+    ILocalSiloDetails localSiloDetails)
+    : Grain, IOrderCoordinatorGrain
 {
-    // <direct_placement_with_hint>
     public async Task ProcessOrder(string orderId)
     {
+        var targetSilo = clusterMembership.CurrentSnapshot.Members
+            .Where(member => member.Value.Status == SiloStatus.Active)
+            .Select(member => member.Key)
+            .FirstOrDefault(address =>
+                !address.Equals(localSiloDetails.SiloAddress))
+            ?? throw new InvalidOperationException(
+                "No active remote silo is available.");
+
         var worker = GrainFactory.GetGrain<IOrderWorkerGrain>(orderId);
         var previousHint = RequestContext.Get(
             IPlacementDirector.PlacementHintKey);
 
         RequestContext.Set(
             IPlacementDirector.PlacementHintKey,
-            GrainContext.Address.SiloAddress!);
+            targetSilo);
 
         try
         {
@@ -50,5 +61,5 @@ public sealed class OrderCoordinatorGrain : Grain, IOrderCoordinatorGrain
             }
         }
     }
-    // </direct_placement_with_hint>
 }
+// </direct_placement_with_hint>
