@@ -7,7 +7,7 @@ using Orleans.Reminders.EntityFrameworkCore.SqlServer.Data;
 
 namespace Orleans.Reminders;
 
-public static  class SqlHostingExtensions
+public static class SqlServerHostingExtensions
 {
     /// <summary>
     /// Adds reminder storage backed by Entity Framework Core with Sql Server.
