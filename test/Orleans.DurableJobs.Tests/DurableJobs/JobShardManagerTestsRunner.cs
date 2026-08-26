@@ -9,6 +9,29 @@ namespace Orleans.DurableJobs.Tests;
 [TestCategory("BVT")]
 public abstract class JobShardManagerTestsRunner(IJobShardManagerTestFixture fixture)
 {
+    [Theory]
+    [InlineData(null)]
+    [InlineData("")]
+    [InlineData(" ")]
+    public async Task TryScheduleJobAsync_InvalidJobName_Throws(string? jobName)
+    {
+        await using var scope = await fixture.CreateScopeAsync();
+        var manager = scope.CreateManager(scope.ActiveSilo);
+        var now = scope.Now;
+        var shard = await manager.CreateShardAsync(now, now.AddMinutes(5), new Dictionary<string, string>(), CancellationToken.None);
+        var request = new ScheduleJobRequest
+        {
+            Target = GrainId.Create("durable-job-test", "target"),
+            JobName = jobName!,
+            DueTime = now.AddMinutes(1)
+        };
+
+        var exception = await Assert.ThrowsAnyAsync<ArgumentException>(
+            () => shard.TryScheduleJobAsync(request, CancellationToken.None));
+
+        Assert.Equal("JobName", exception.ParamName);
+    }
+
     [Fact]
     public async Task ShardCreationAndAssignmentUsesDistinctShardIdsForSameWindow()
     {

@@ -40,4 +40,7 @@ public readonly struct ScheduleJobRequest
     /// If <see langword="null"/>, the value of <see cref="System.Diagnostics.Activity.Current"/> at the time <see cref="ILocalDurableJobManager.ScheduleJobAsync"/> is invoked will be used.
     /// </summary>
     public string? TraceState { get; init; }
+
+    internal void Validate() =>
+        ArgumentException.ThrowIfNullOrWhiteSpace(JobName, nameof(JobName));
 }

@@ -212,6 +212,7 @@ internal sealed class JournaledJobShard : IJobShard
     /// <inheritdoc/>
     public async Task<DurableJob?> TryScheduleJobAsync(ScheduleJobRequest request, CancellationToken cancellationToken)
     {
+        request.Validate();
         ThrowIfDisposed();
 
         var operation = new ScheduleJobOperation(request, cancellationToken);

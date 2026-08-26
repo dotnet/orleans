@@ -217,6 +217,7 @@ public abstract class JobShard : IJobShard
     /// <inheritdoc/>
     public async Task<DurableJob?> TryScheduleJobAsync(ScheduleJobRequest request, CancellationToken cancellationToken)
     {
+        request.Validate();
         await _mutationLock.WaitAsync(cancellationToken);
         try
         {

@@ -13,6 +13,27 @@ namespace NonSilo.Tests.DurableJobs;
 [TestCategory("DurableJobs")]
 public class JobShardTests
 {
+    [Theory]
+    [InlineData(null)]
+    [InlineData("")]
+    [InlineData(" ")]
+    public async Task TryScheduleJobAsync_InvalidJobName_Throws(string? jobName)
+    {
+        var dueTime = DateTimeOffset.UtcNow.AddMinutes(1);
+        var shard = new TestJobShard(dueTime.AddMinutes(-1), dueTime.AddMinutes(1));
+        var request = new ScheduleJobRequest
+        {
+            Target = GrainId.Create("test", "job"),
+            JobName = jobName!,
+            DueTime = dueTime
+        };
+
+        var exception = await Assert.ThrowsAnyAsync<ArgumentException>(
+            () => shard.TryScheduleJobAsync(request, CancellationToken.None));
+
+        Assert.Equal("JobName", exception.ParamName);
+    }
+
     [Fact]
     public async Task TryScheduleJobAsync_ForwardsCompleteJobForPersistence()
     {

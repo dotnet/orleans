@@ -82,7 +82,7 @@ internal partial class LocalDurableJobManager : SystemTarget, ILocalDurableJobMa
         request = EnsureScheduleRequestHasTraceContext(request, activity);
         try
         {
-            ArgumentException.ThrowIfNullOrWhiteSpace(request.JobName, nameof(request.JobName));
+            request.Validate();
             LogSchedulingJob(_logger, request.JobName, request.Target, request.DueTime);
 
             var shardKey = GetWritableShardKey(request);
