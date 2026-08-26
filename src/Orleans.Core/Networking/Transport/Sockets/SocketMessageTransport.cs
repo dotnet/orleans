@@ -634,7 +634,9 @@ RefreshRequestQueue:
                         buffers.Clear();
                     }
                 }
-                else if (buffers.Count > 1 && totalBytes <= coalescingBuffer.Length)
+                else if (bufferLimit == SmallRequestBufferLimit
+                    && buffers.Count > 1
+                    && totalBytes <= coalescingBuffer.Length)
                 {
                     var offset = 0;
                     foreach (var buffer in buffers)

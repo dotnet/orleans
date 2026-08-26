@@ -10,11 +10,14 @@ namespace Orleans.Runtime.Messaging;
 
 internal sealed class MessageWriteRequest : WriteRequest
 {
+    private const int LargeMessageSize = 8 * 1024;
+    private const int SendPageSize = 32 * 1024;
     private readonly MessageHandlerShared _shared;
     private readonly ArcBufferWriter _buffer = new();
     private readonly List<(int TotalLength, int HeaderLength)> _messageSizes = [];
     private Connection? _connection;
     private MessageSerializer? _messageSerializer;
+    private bool _hasLargeMessages;
 
     public MessageWriteRequest(MessageHandlerShared shared)
     {
@@ -24,8 +27,7 @@ internal sealed class MessageWriteRequest : WriteRequest
 
     public List<Message> Messages { get; } = [];
     public int Length => _buffer.Length;
-    internal override bool HasLargeMessages
-        => _messageSizes.Exists(static size => size.TotalLength >= 8 * 1024);
+    internal override bool HasLargeMessages => _hasLargeMessages;
 
     public void Initialize(Connection connection) => _connection = connection;
 
@@ -47,7 +49,9 @@ internal sealed class MessageWriteRequest : WriteRequest
             BinaryPrimitives.WriteInt32LittleEndian(framingBytes[sizeof(int)..], bodyLength);
 
             Messages.Add(message);
-            _messageSizes.Add((headerLength + bodyLength, headerLength));
+            var totalLength = headerLength + bodyLength;
+            _messageSizes.Add((totalLength, headerLength));
+            _hasLargeMessages |= totalLength >= LargeMessageSize;
         }
         catch
         {
@@ -101,10 +105,15 @@ internal sealed class MessageWriteRequest : WriteRequest
 
     public void Reset()
     {
+        var nextPageSize = _messageSizes.Count == 1
+            && _messageSizes[0].TotalLength is >= LargeMessageSize and < SendPageSize
+                ? SendPageSize
+                : 0;
         CompleteWriting();
         Messages.Clear();
         _messageSizes.Clear();
-        _buffer.Reset();
+        _hasLargeMessages = false;
+        _buffer.Reset(nextPageSize);
         _connection = null;
         _shared.Return(this);
     }
