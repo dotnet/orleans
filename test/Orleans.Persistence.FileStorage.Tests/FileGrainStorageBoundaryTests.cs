@@ -121,6 +121,24 @@ public sealed class FileGrainStorageBoundaryTests
         Assert.False(state.RecordExists);
     }
 
+    [Fact]
+    public async Task CancellationToken_CancelsStorageOperations()
+    {
+        using var directory = new TemporaryDirectory();
+        IGrainStorage storage = FileGrainStorageTestContext.CreateStorage(directory.RootDirectory);
+        var grainId = GrainId.Create("type", "key");
+        var state = new GrainState<FileStorageTestState>(new FileStorageTestState());
+        using var cancellation = new CancellationTokenSource();
+        cancellation.Cancel();
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(
+            () => storage.ReadStateAsync("state", grainId, state, cancellation.Token));
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(
+            () => storage.WriteStateAsync("state", grainId, state, cancellation.Token));
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(
+            () => storage.ClearStateAsync("state", grainId, state, cancellation.Token));
+    }
+
     private sealed class ConstructorlessState(string value)
     {
         public string? Value { get; } = value;
