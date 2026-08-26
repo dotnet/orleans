@@ -73,14 +73,13 @@ namespace UnitTests.OrleansRuntime
         {
             if (operationsInProgress > 0) Assert.Fail($"1: Operation {opNumber} found {operationsInProgress} operationsInProgress.");
             operationsInProgress++;
-            var delay = RandomTimeSpan.Next(TimeSpan.FromSeconds(2));
 
             output.WriteLine("Task {0} Staring", opNumber);
-            await Task.Delay(delay);
+            await Task.Yield();
             if (operationsInProgress != 1) Assert.Fail($"2: Operation {opNumber} found {operationsInProgress} operationsInProgress.");
 
             output.WriteLine("Task {0} after first delay", opNumber);
-            await Task.Delay(delay);
+            await Task.Yield();
             if (operationsInProgress != 1) Assert.Fail($"3: Operation {opNumber} found {operationsInProgress} operationsInProgress.");
 
             operationsInProgress--;
