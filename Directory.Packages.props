@@ -178,6 +178,7 @@
     <PackageVersion Update="System.CommandLine" Version="2.0.0-beta1.21308.1" />
     <PackageVersion Update="System.Diagnostics.PerformanceCounter" Version="10.0.3" />
     <PackageVersion Update="System.Drawing.Common" Version="10.0.3" />
+    <PackageVersion Update="System.IO.Hashing" Version="10.0.8" />
     <PackageVersion Update="System.IO.Pipelines" Version="10.0.5" />
     <PackageVersion Update="System.Memory.Data" Version="10.0.3" />
     <PackageVersion Update="System.Text.Json" Version="10.0.5" />

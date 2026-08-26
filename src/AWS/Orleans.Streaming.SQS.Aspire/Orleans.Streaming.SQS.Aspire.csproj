@@ -13,8 +13,8 @@
   <ItemGroup>
     <AssemblyAttribute Remove="Orleans.Metadata.FrameworkPartAttribute" />
     <Compile Include="..\Shared\Storage\SqsQueueName.cs" Link="Storage\SqsQueueName.cs" />
-    <PackageReference Include="Amazon.CDK.Lib" VersionOverride="2.262.0" />
-    <PackageReference Include="Aspire.Hosting.AWS" VersionOverride="13.6.0" />
+    <PackageReference Include="Amazon.CDK.Lib" />
+    <PackageReference Include="Aspire.Hosting.AWS" />
     <PackageReference Include="Aspire.Hosting.Orleans" VersionOverride="13.4.6" />
   </ItemGroup>
 
