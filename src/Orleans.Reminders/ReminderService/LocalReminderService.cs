@@ -399,26 +399,36 @@ namespace Orleans.Runtime.ReminderService
             CheckRuntimeContext();
 
             _ = base.OnRangeChange(oldRange, newRange, increased);
-            var status = Status;
-            var task = status == GrainServiceStatus.Started
-                ? ReadAndUpdateReminders()
-                : Task.CompletedTask;
-            if (status != GrainServiceStatus.Started)
-            {
-                LogIgnoringRangeChange(status);
-            }
-
+            var reconciliationTaskSource = new TaskCompletionSource<Task>(TaskCreationOptions.RunContinuationsAsynchronously);
             TaskCompletionSource previousGenerationChanged;
             lock (_rangeChangeLock)
             {
                 previousGenerationChanged = rangeChangeGenerationChanged;
                 rangeChangeGenerationChanged = new(TaskCreationOptions.RunContinuationsAsynchronously);
                 rangeChangeGeneration++;
-                rangeChangeTask = task;
+                rangeChangeTask = reconciliationTaskSource.Task.Unwrap();
             }
 
             previousGenerationChanged.TrySetResult();
-            return task;
+            try
+            {
+                var status = Status;
+                var task = status == GrainServiceStatus.Started
+                    ? ReadAndUpdateReminders()
+                    : Task.CompletedTask;
+                if (status != GrainServiceStatus.Started)
+                {
+                    LogIgnoringRangeChange(status);
+                }
+
+                reconciliationTaskSource.SetResult(task);
+                return task;
+            }
+            catch (Exception exception)
+            {
+                reconciliationTaskSource.SetException(exception);
+                throw;
+            }
         }
 
         internal async Task TestOnlyWaitForRangeChangeReconciliation(CancellationToken cancellationToken)
