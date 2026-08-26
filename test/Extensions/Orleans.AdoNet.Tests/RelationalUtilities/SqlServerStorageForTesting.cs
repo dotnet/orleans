@@ -67,6 +67,7 @@ namespace UnitTests.General
                 return;
             }
 
+            var setupSucceeded = false;
             try
             {
                 await ExecuteCommandAsync(
@@ -77,12 +78,21 @@ namespace UnitTests.General
                 {
                     await ExecuteCommandAsync(connection, scriptEnumerator.Current);
                 }
+
+                setupSucceeded = true;
             }
             finally
             {
-                await ExecuteCommandAsync(
-                    connection,
-                    $"ALTER DATABASE {quotedDatabaseName} SET MULTI_USER;");
+                try
+                {
+                    await ExecuteCommandAsync(
+                        connection,
+                        $"ALTER DATABASE {quotedDatabaseName} SET MULTI_USER;");
+                }
+                catch when (!setupSucceeded)
+                {
+                    // Preserve the setup failure instead of replacing it with a cleanup failure.
+                }
 
                 using var pooledConnection = new SqlConnection(CurrentConnectionString);
                 SqlConnection.ClearPool(pooledConnection);
