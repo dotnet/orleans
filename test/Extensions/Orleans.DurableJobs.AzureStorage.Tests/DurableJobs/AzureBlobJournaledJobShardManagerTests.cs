@@ -22,7 +22,7 @@ public sealed class AzureBlobJournaledJobShardManagerTests(AzureBlobJournaledJob
 
 public sealed class AzureBlobJournaledJobShardManagerTestFixture : IJobShardManagerTestFixture
 {
-    public async Task<IJobShardManagerTestScope> CreateScopeAsync()
+    public async Task<IJobShardManagerTestScope> CreateScopeAsync(CancellationToken cancellationToken)
     {
         TestUtils.CheckForAzureStorage();
 
@@ -44,7 +44,7 @@ public sealed class AzureBlobJournaledJobShardManagerTestFixture : IJobShardMana
         var storageProvider = serviceProvider.GetRequiredService<IJournalStorageProvider>();
         Assert.IsAssignableFrom<ILifecycleParticipant<ISiloLifecycle>>(storageProvider).Participate(lifecycle);
 
-        using var cts = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
+        using var cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         cts.CancelAfter(TimeSpan.FromSeconds(60));
         await lifecycle.OnStart(cts.Token);
         return new AzureBlobJournaledJobShardManagerTestScope(serviceProvider, lifecycle, CreateContainerClient(containerName));

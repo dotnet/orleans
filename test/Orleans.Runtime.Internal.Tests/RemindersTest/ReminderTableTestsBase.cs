@@ -184,7 +184,8 @@ namespace UnitTests.RemindersTest
 
         [Fact, TestCategory("ModelBased")]
         public Task ReminderTable_ModelBasedGeneratedConformance()
-            => new ReminderTableModelBasedTestRunner(remindersTable, GetType().Name).RunGeneratedConformanceTests();
+            => new ReminderTableModelBasedTestRunner(remindersTable, GetType().Name)
+                .RunGeneratedConformanceTests(TestContext.Current.CancellationToken);
 
         private sealed class ProviderReminderTableTestRunner(IReminderTable table, string providerName)
             : ReminderTableTestRunner(table, providerName);

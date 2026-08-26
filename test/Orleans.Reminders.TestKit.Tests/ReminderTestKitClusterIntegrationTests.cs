@@ -28,7 +28,7 @@ public sealed class ReminderTestKitClusterIntegrationTests
 
         try
         {
-            await cluster.DeployAsync().WaitAsync(cancellationToken);
+            await cluster.DeployAsync(cancellationToken);
 
             Assert.Equal(2, cluster.Silos.Count);
             foreach (var silo in cluster.Silos)
@@ -454,7 +454,7 @@ public sealed class ReminderTestKitClusterIntegrationTests
         ReminderDiagnosticObserver observer,
         CancellationToken cancellationToken)
     {
-        await cluster.DeployAsync().WaitAsync(cancellationToken);
+        await cluster.DeployAsync(cancellationToken);
 
         using var cancellation = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         cancellation.CancelAfter(TimeSpan.FromSeconds(30));
