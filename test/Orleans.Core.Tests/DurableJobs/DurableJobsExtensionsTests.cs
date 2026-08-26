@@ -41,8 +41,8 @@ public class DurableJobsExtensionsTests
             .Returns(ValueTask.FromResult(DurableJobRunResult.Completed));
         handlerB.ExecuteJobAsync(Arg.Any<IJobRunContext>(), Arg.Any<CancellationToken>())
             .Returns(ValueTask.FromResult(DurableJobRunResult.Completed));
-        handlerA.CanHandle(Arg.Is<DurableJob>(static job => job.Name == "feature")).Returns(true);
-        handlerB.CanHandle(Arg.Is<DurableJob>(static job => job.Name == "feature")).Returns(true);
+        handlerA.CanHandle("feature").Returns(true);
+        handlerB.CanHandle("feature").Returns(true);
         registryA.Register(handlerA);
         registryB.Register(handlerB);
 
@@ -148,7 +148,7 @@ public class DurableJobsExtensionsTests
         {
         }
 
-        public bool TryGetHandler(DurableJob job, [NotNullWhen(true)] out IDurableJobFeatureHandler? handler)
+        public bool TryGetHandler(string jobName, [NotNullWhen(true)] out IDurableJobFeatureHandler? handler)
         {
             handler = null;
             return false;

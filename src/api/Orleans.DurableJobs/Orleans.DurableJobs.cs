@@ -94,7 +94,7 @@ namespace Orleans.DurableJobs
 
     public partial interface IDurableJobFeatureHandler
     {
-        bool CanHandle(DurableJob job);
+        bool CanHandle(string jobName);
 
         System.Threading.Tasks.ValueTask<DurableJobRunResult> ExecuteJobAsync(IJobRunContext context, System.Threading.CancellationToken attemptCancellationToken);
     }

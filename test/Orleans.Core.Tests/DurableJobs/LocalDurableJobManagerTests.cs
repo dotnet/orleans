@@ -746,6 +746,27 @@ public class LocalDurableJobManagerTests
         MaxConcurrentJobsPerSilo = 10
     };
 
+    [Theory]
+    [InlineData(null)]
+    [InlineData("")]
+    [InlineData(" ")]
+    public async Task ScheduleJobAsync_InvalidJobName_Throws(string? jobName)
+    {
+        var timeProvider = new FakeTimeProvider(new DateTimeOffset(2026, 1, 1, 0, 0, 0, TimeSpan.Zero));
+        var manager = CreateManager(new TestJobShardManager(), timeProvider, CreateOptions());
+        var request = new ScheduleJobRequest
+        {
+            Target = GrainId.Create("test", "target"),
+            JobName = jobName!,
+            DueTime = timeProvider.GetUtcNow()
+        };
+
+        var exception = await Assert.ThrowsAnyAsync<ArgumentException>(
+            () => manager.ScheduleJobAsync(request, CancellationToken.None));
+
+        Assert.Equal("JobName", exception.ParamName);
+    }
+
     private static LocalDurableJobManager CreateManager(
         JobShardManager shardManager,
         FakeTimeProvider timeProvider,

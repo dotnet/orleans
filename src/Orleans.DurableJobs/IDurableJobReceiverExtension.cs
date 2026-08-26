@@ -79,7 +79,7 @@ internal sealed partial class DurableJobReceiverExtension : IDurableJobReceiverE
 
     private Task<DurableJobRunResult> StartJob(IJobRunContext context, CancellationToken attemptCancellationToken)
     {
-        if (_featureHandlers.TryGetHandler(context.Job, out var featureHandler))
+        if (_featureHandlers.TryGetHandler(context.Job.Name, out var featureHandler))
         {
             return ExecuteFeatureHandlerAsync(featureHandler, context, attemptCancellationToken);
         }
@@ -93,44 +93,41 @@ internal sealed partial class DurableJobReceiverExtension : IDurableJobReceiverE
         return ExecuteHandlerAsync(handler, context, attemptCancellationToken);
     }
 
-    private async Task<DurableJobRunResult> ExecuteFeatureHandlerAsync(
+    private Task<DurableJobRunResult> ExecuteFeatureHandlerAsync(
         IDurableJobFeatureHandler handler,
         IJobRunContext context,
-        CancellationToken attemptCancellationToken)
-    {
-        using var tracker = _shared.BeginHandlerExecution(context);
-        try
-        {
-            var result = await handler.ExecuteJobAsync(context, attemptCancellationToken)
-                ?? throw new InvalidOperationException(
-                    $"Durable job feature handler for '{context.Job.Name}' returned a null result.");
-            tracker.RecordResult(result);
-            return result;
-        }
-        catch (OperationCanceledException) when (attemptCancellationToken.IsCancellationRequested)
-        {
-            tracker.AttemptCanceled();
-            throw;
-        }
-        catch (Exception exception)
-        {
-            tracker.Failed(exception);
-            LogErrorExecutingDurableJob(_shared.Logger, exception, context.Job.Id, _grain.GrainId);
-            return DurableJobRunResult.Failed(exception);
-        }
-    }
+        CancellationToken attemptCancellationToken) =>
+        ExecuteHandlerAsync(
+            context,
+            attemptCancellationToken,
+            () => handler.ExecuteJobAsync(context, attemptCancellationToken));
 
-    private async Task<DurableJobRunResult> ExecuteHandlerAsync(
+    private Task<DurableJobRunResult> ExecuteHandlerAsync(
         IDurableJobHandler handler,
         IJobRunContext context,
         CancellationToken attemptCancellationToken)
     {
+        return ExecuteHandlerAsync(context, attemptCancellationToken, ExecuteAsync);
+
+        async ValueTask<DurableJobRunResult> ExecuteAsync()
+        {
+            await handler.ExecuteJobAsync(context, attemptCancellationToken);
+            return DurableJobRunResult.Completed;
+        }
+    }
+
+    private async Task<DurableJobRunResult> ExecuteHandlerAsync(
+        IJobRunContext context,
+        CancellationToken attemptCancellationToken,
+        Func<ValueTask<DurableJobRunResult>> execute)
+    {
         using var tracker = _shared.BeginHandlerExecution(context);
         try
         {
-            await handler.ExecuteJobAsync(context, attemptCancellationToken);
-            tracker.Completed();
-            return DurableJobRunResult.Completed;
+            var result = await execute()
+                ?? throw new InvalidOperationException($"Durable job handler for '{context.Job.Name}' returned a null result.");
+            tracker.RecordResult(result);
+            return result;
         }
         catch (OperationCanceledException) when (attemptCancellationToken.IsCancellationRequested)
         {

@@ -15,7 +15,7 @@ public readonly struct ScheduleJobRequest
     public required GrainId Target { get; init; }
 
     /// <summary>
-    /// Gets the name of the job for identification purposes.
+    /// Gets the non-empty name of the job for identification and handler routing.
     /// </summary>
     public required string JobName { get; init; }
 

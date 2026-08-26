@@ -17,6 +17,7 @@ public interface ILocalDurableJobManager
     /// <param name="request">The request containing the job scheduling parameters.</param>
     /// <param name="cancellationToken">A cancellation token to cancel the operation.</param>
     /// <returns>A <see cref="Task"/> representing the asynchronous operation that returns the durable job.</returns>
+    /// <exception cref="ArgumentException"><see cref="ScheduleJobRequest.JobName"/> is null, empty, or whitespace.</exception>
     Task<DurableJob> ScheduleJobAsync(ScheduleJobRequest request, CancellationToken cancellationToken);
 
     /// <summary>

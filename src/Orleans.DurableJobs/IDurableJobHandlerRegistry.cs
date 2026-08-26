@@ -39,11 +39,11 @@ public interface IDurableJobFeatureHandler
     /// </summary>
     /// <remarks>
     /// Implementations must be deterministic and side-effect free. This method can be called more than once
-    /// for the same durable job.
+    /// for the same durable job name.
     /// </remarks>
-    /// <param name="job">The durable job.</param>
-    /// <returns><see langword="true"/> when this handler handles the job; otherwise, <see langword="false"/>.</returns>
-    bool CanHandle(DurableJob job);
+    /// <param name="jobName">The durable job name.</param>
+    /// <returns><see langword="true"/> when this handler handles the job name; otherwise, <see langword="false"/>.</returns>
+    bool CanHandle(string jobName);
 
     /// <summary>
     /// Executes a durable job and returns its explicit disposition.
@@ -59,7 +59,7 @@ public interface IDurableJobFeatureHandler
 
 internal interface IDurableJobHandlerLookup
 {
-    bool TryGetHandler(DurableJob job, [NotNullWhen(true)] out IDurableJobFeatureHandler? handler);
+    bool TryGetHandler(string jobName, [NotNullWhen(true)] out IDurableJobFeatureHandler? handler);
 }
 
 internal sealed class DurableJobHandlerRegistry : IDurableJobHandlerRegistry, IDurableJobHandlerLookup
@@ -81,14 +81,14 @@ internal sealed class DurableJobHandlerRegistry : IDurableJobHandlerRegistry, ID
         _handlers.Add(handler);
     }
 
-    public bool TryGetHandler(DurableJob job, [NotNullWhen(true)] out IDurableJobFeatureHandler? handler)
+    public bool TryGetHandler(string jobName, [NotNullWhen(true)] out IDurableJobFeatureHandler? handler)
     {
-        ArgumentNullException.ThrowIfNull(job);
+        ArgumentException.ThrowIfNullOrWhiteSpace(jobName);
 
         handler = null;
         foreach (var candidate in _handlers)
         {
-            if (!candidate.CanHandle(job))
+            if (!candidate.CanHandle(jobName))
             {
                 continue;
             }
@@ -96,7 +96,7 @@ internal sealed class DurableJobHandlerRegistry : IDurableJobHandlerRegistry, ID
             if (handler is not null)
             {
                 throw new InvalidOperationException(
-                    $"Multiple durable job feature handlers match job '{job.Name}': "
+                    $"Multiple durable job feature handlers match job '{jobName}': "
                     + $"'{handler.GetType().FullName}' and '{candidate.GetType().FullName}'.");
             }
 
