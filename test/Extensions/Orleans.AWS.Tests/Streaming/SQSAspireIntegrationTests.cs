@@ -1,10 +1,10 @@
-using System.Reflection;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration;
 using Orleans.Hosting;
 using Orleans.Streaming.SQS.Streams;
 using Orleans.Streams;
+using OrleansAWSUtils.Storage;
 using OrleansAWSUtils.Streams;
 using SqsMessage = Amazon.SQS.Model.Message;
 using Xunit;
@@ -271,15 +271,8 @@ public sealed class SQSAspireIntegrationTests
         SqsOptions options,
         string serviceId)
     {
-        var storageType = typeof(SqsStreamProviderBuilder).Assembly.GetType(
-            "OrleansAWSUtils.Storage.SQSStorage",
-            throwOnError: true)!;
-        var constructQueueName = storageType.GetMethod(
-            "ConstructQueueName",
-            BindingFlags.NonPublic | BindingFlags.Static)!;
-
         return queueIds
-            .Select(queueId => (string)constructQueueName.Invoke(null, [queueId.ToString(), options, serviceId])!)
+            .Select(queueId => SqsQueueName.Create(queueId.ToString(), options.FifoQueue, serviceId))
             .Order()
             .ToArray();
     }
