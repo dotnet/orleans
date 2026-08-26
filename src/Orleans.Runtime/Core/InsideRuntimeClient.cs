@@ -178,7 +178,11 @@ namespace Orleans.Runtime
             }
 
             var responseTimeout = request.GetDefaultResponseTimeout() ?? sharedData.ResponseTimeout;
-            message.SetGatewayRequestTimeout(responseTimeout);
+            if (targetGrainId.IsClient())
+            {
+                message.SetGatewayRequestTimeout(responseTimeout);
+            }
+
             if (this.messagingOptions.DropExpiredMessages && message.IsExpirableMessage())
             {
                 message.TimeToLive = responseTimeout;
