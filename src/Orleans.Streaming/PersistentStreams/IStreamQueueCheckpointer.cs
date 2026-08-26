@@ -25,7 +25,9 @@ public interface IStreamQueueCheckpointerFactory
     /// <returns>The stream checkpointer.</returns>
 #pragma warning disable CS0618 // Required for compatibility with providers which only implement the legacy overload.
     Task<IStreamQueueCheckpointer<string>> Create(string partition, CancellationToken cancellationToken)
-        => Create(partition);
+        => cancellationToken.IsCancellationRequested
+            ? Task.FromCanceled<IStreamQueueCheckpointer<string>>(cancellationToken)
+            : Create(partition);
 #pragma warning restore CS0618
 }
 
@@ -70,7 +72,8 @@ public interface IStreamQueueCheckpointer<TCheckpoint>
     /// <param name="cancellationToken">The cancellation token.</param>
     /// <returns>A <see cref="Task"/> representing the operation.</returns>
 #pragma warning disable CS0618 // Required for compatibility with providers which only implement the legacy overload.
-    Task Reset(CancellationToken cancellationToken) => Reset();
+    Task Reset(CancellationToken cancellationToken)
+        => cancellationToken.IsCancellationRequested ? Task.FromCanceled(cancellationToken) : Reset();
 #pragma warning restore CS0618
 
     /// <summary>
