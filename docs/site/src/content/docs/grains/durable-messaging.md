@@ -130,8 +130,9 @@ provisional application state or compete with another activation for the same ow
 The Journaling implementation must provide
 <xref:Orleans.Journaling.IJournaledStateManager.RevertPendingChangesAsync*> and accept
 <xref:Orleans.Journaling.IJournaledStateManager.RegisterObserver*> so Durable Messaging
-receives commit and recovery notifications. Activation reports a
-durable-messaging-specific diagnostic when observer registration is unsupported. Use
+receives commit and recovery notifications. When observer registration is unsupported,
+activation throws an <xref:System.InvalidOperationException> identifying
+<xref:Orleans.Journaling.IJournaledStateManager.RegisterObserver*> as a requirement. Use
 shared, production-grade storage for multi-silo deployments. In-memory Durable Jobs and
 journal storage are suitable only for development and tests.
 
