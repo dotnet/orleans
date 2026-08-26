@@ -2397,6 +2397,61 @@ public class DisseminationProtocolTests
     }
 
     [Fact]
+    public async Task MembershipNamespaceRetainsPostApplySnapshotForRepair()
+    {
+        var local = CreateSilo(11111);
+        var peer = CreateSilo(11112);
+        var currentSnapshot = CreateMembershipSnapshot(
+            version: 1,
+            CreateMembershipEntry(local, SiloStatus.Active, DateTime.UnixEpoch));
+        var incomingSnapshot = CreateMembershipSnapshot(
+            version: 2,
+            CreateMembershipEntry(local, SiloStatus.Active, DateTime.UnixEpoch));
+        var appliedSnapshot = CreateMembershipSnapshot(
+            version: 2,
+            CreateMembershipEntry(
+                local,
+                SiloStatus.Active,
+                DateTime.UnixEpoch,
+                iAmAliveTime: DateTime.UnixEpoch.AddSeconds(1)),
+            CreateMembershipEntry(peer, SiloStatus.Active, DateTime.UnixEpoch));
+        using var serviceProvider = new ServiceCollection().AddSerializer().BuildServiceProvider();
+        var serializer = serviceProvider.GetRequiredService<Serializer>();
+        var manager = new FakeMembershipManager(currentSnapshot);
+        manager.ProcessGossipSnapshotHandler = _ =>
+        {
+            manager.CurrentSnapshot = appliedSnapshot;
+            return Task.FromResult(true);
+        };
+        var disseminationNamespace = CreateMembershipNamespace(manager, serializer);
+        var value = new DisseminationValue(
+            DisseminationKey.Default,
+            fromVersion: 0,
+            toVersion: incomingSnapshot.Version.Value,
+            serializer.SerializeToArray(new MembershipTableSnapshotUpdate { Snapshot = incomingSnapshot }));
+
+        var result = await disseminationNamespace.ApplyValueAsync(value, CancellationToken.None);
+        var repair = disseminationNamespace.CreateRepair(new DisseminationRepairRequest(
+            DisseminationKey.Default,
+            fromVersion: null,
+            toVersion: appliedSnapshot.Version.Value,
+            maxItemCount: 1,
+            maxBatchBytes: 1024 * 1024,
+            maxPayloadBytes: 1024 * 1024));
+
+        Assert.Equal(DisseminationApplyResult.Applied, result);
+        var repairedValue = Assert.Single(repair.Values);
+        var repairedUpdate = Assert.IsType<MembershipTableSnapshotUpdate>(
+            serializer.Deserialize<MembershipTableSnapshotUpdate>(repairedValue.Payload));
+        var repairedSnapshot = Assert.IsType<MembershipTableSnapshot>(repairedUpdate.Snapshot);
+        Assert.Equal(appliedSnapshot.Version, repairedSnapshot.Version);
+        Assert.True(repairedSnapshot.Entries.ContainsKey(peer));
+        Assert.Equal(
+            DateTime.UnixEpoch.AddSeconds(1),
+            repairedSnapshot.Entries[local].IAmAliveTime);
+    }
+
+    [Fact]
     public async Task MembershipNamespacePublishesSameVersionSuccessorAsFullSnapshot()
     {
         var local = CreateSilo(11111);
@@ -4281,6 +4336,8 @@ public class DisseminationProtocolTests
 
         public List<MembershipVersion?> RefreshTargetVersions { get; } = new();
 
+        public Func<MembershipTableSnapshot, Task>? ProcessGossipSnapshotHandler { get; set; }
+
         public IAsyncEnumerable<MembershipTableSnapshot> MembershipUpdates => EmptyUpdates();
 
         public SiloStatus LocalSiloStatus => SiloStatus.Active;
@@ -4300,6 +4357,11 @@ public class DisseminationProtocolTests
 
         public Task ProcessGossipSnapshot(MembershipTableSnapshot snapshot, CancellationToken cancellationToken)
         {
+            if (ProcessGossipSnapshotHandler is { } handler)
+            {
+                return handler(snapshot);
+            }
+
             CurrentSnapshot = snapshot;
             return Task.CompletedTask;
         }

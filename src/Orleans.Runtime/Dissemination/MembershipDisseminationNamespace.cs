@@ -179,7 +179,7 @@ internal sealed class MembershipDisseminationNamespace(
         }
 
         await membershipManager.ProcessGossipSnapshot(snapshot, cancellationToken);
-        RememberSnapshot(snapshot);
+        RememberSnapshot(membershipManager.CurrentSnapshot);
         return DisseminationApplyResult.Applied;
     }
 
