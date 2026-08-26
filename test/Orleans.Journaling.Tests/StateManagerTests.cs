@@ -628,7 +628,7 @@ public class StateManagerTests : JournalingTestBase
     }
 
     [Fact]
-    public async Task StateManager_WriteStateAsync_RetriesRecoveryAfterRepeatedFailures()
+    public async Task StateManager_WriteStateAsync_FencesWritesAfterRepeatedRecoveryFailures()
     {
         var storage = new CapturingStorage();
         var sut = CreateTestSystem(storage: storage);
@@ -652,13 +652,17 @@ public class StateManagerTests : JournalingTestBase
         var secondRecoveryFailure = new IOException("Expected second recovery failure.");
         storage.NextReadException = secondRecoveryFailure;
         var recoveryException = await Assert.ThrowsAsync<IOException>(
-            () => sut.Manager.WriteStateAsync(TestContext.Current.CancellationToken).AsTask()
+            () => sut.Manager.RevertPendingChangesAsync(TestContext.Current.CancellationToken).AsTask()
                 .WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken));
         Assert.Same(secondRecoveryFailure, recoveryException);
 
-        await sut.Manager.WriteStateAsync(TestContext.Current.CancellationToken).AsTask()
-            .WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
+        var writeException = await Assert.ThrowsAsync<InvalidOperationException>(
+            () => sut.Manager.WriteStateAsync(TestContext.Current.CancellationToken).AsTask()
+                .WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken));
+        Assert.Contains("fenced", writeException.Message, StringComparison.OrdinalIgnoreCase);
 
+        await sut.Manager.RevertPendingChangesAsync(TestContext.Current.CancellationToken).AsTask()
+            .WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
         Assert.True(dictionary.ContainsKey("first"));
         Assert.False(dictionary.ContainsKey("second"));
     }
