@@ -49,7 +49,7 @@ namespace UnitTests.Serialization
             var message = this.messageFactory.CreateMessage(null, InvokeMethodOptions.None);
 
             message.TimeToLive = TimeSpan.FromSeconds(1);
-            await Task.Delay(TimeSpan.FromMilliseconds(500));
+            await Task.Delay(TimeSpan.FromMilliseconds(500), TestContext.Current.CancellationToken);
             Assert.InRange(message.TimeToLive.Value, TimeSpan.FromMilliseconds(-1000), TimeSpan.FromMilliseconds(900));
         }
 
@@ -61,7 +61,7 @@ namespace UnitTests.Serialization
             var message = this.messageFactory.CreateMessage(null, InvokeMethodOptions.None);
 
             message.TimeToLive = TimeSpan.FromSeconds(1);
-            await Task.Delay(TimeSpan.FromMilliseconds(500));
+            await Task.Delay(TimeSpan.FromMilliseconds(500), TestContext.Current.CancellationToken);
             var deserializedMessage = RoundTripMessage(message);
 
             Assert.NotNull(deserializedMessage.TimeToLive);

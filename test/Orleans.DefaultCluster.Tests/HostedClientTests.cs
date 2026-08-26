@@ -44,6 +44,7 @@ namespace DefaultCluster.Tests.General
 
             public async ValueTask InitializeAsync()
             {
+                var cancellationToken = TestContext.Current.CancellationToken;
                 var (siloPort, gatewayPort) = portAllocator.AllocateConsecutivePortPairs(1);
                 Host = Microsoft.Extensions.Hosting.Host.CreateApplicationBuilder()
                     .UseOrleans(siloBuilder =>
@@ -60,14 +61,15 @@ namespace DefaultCluster.Tests.General
                             .AddMemoryStreams<DefaultMemoryMessageBodySerializer>("MemStream");
                     })
                     .Build();
-                await Host.StartAsync();
+                await Host.StartAsync(cancellationToken);
             }
 
             public async ValueTask DisposeAsync()
             {
+                var cancellationToken = TestContext.Current.CancellationToken;
                 try
                 {
-                    await Host.StopAsync();
+                    await Host.StopAsync(cancellationToken);
                 }
                 finally
                 {
@@ -107,6 +109,7 @@ namespace DefaultCluster.Tests.General
         [Fact]
         public async Task HostedClient_TimeoutTest()
         {
+            var cancellationToken = TestContext.Current.CancellationToken;
             var client = _host.Services.GetRequiredService<IClusterClient>();
             var runtimeClient = _host.Services.GetRequiredService<IRuntimeClient>();
             var typeResolver = _host.Services.GetRequiredService<GrainInterfaceTypeResolver>();
@@ -128,7 +131,7 @@ namespace DefaultCluster.Tests.General
                             var grain = client.GetGrain<IStuckGrain>(Guid.NewGuid());
                             await grain.RunForever();
                         })
-                    .WaitAsync(maxTimeout);
+                    .WaitAsync(maxTimeout, cancellationToken);
 
                 Assert.Equal(expected: 1, actual: runtimeClient.GetRunningRequestsCount(stuckGrainType));
 
@@ -188,6 +191,7 @@ namespace DefaultCluster.Tests.General
         [Fact]
         public async Task HostedClient_ObserverTest()
         {
+            var cancellationToken = TestContext.Current.CancellationToken;
             var client = _host.Services.GetRequiredService<IClusterClient>();
 
             var handle = new AsyncResultHandle();
@@ -231,7 +235,7 @@ namespace DefaultCluster.Tests.General
             await grain.SetA(3);
             await grain.SetB(2);
 
-            Assert.True(await handle.WaitForFinished(_timeout));
+            Assert.True(await handle.WaitForFinished(_timeout).WaitAsync(cancellationToken));
 
             client.DeleteObjectReference<ISimpleGrainObserver>(reference);
             Assert.NotNull(observer);
@@ -246,6 +250,7 @@ namespace DefaultCluster.Tests.General
         [Fact]
         public async Task HostedClient_StreamTest()
         {
+            var cancellationToken = TestContext.Current.CancellationToken;
             var client = _host.Services.GetRequiredService<IClusterClient>();
 
             var handle = new AsyncResultHandle();
@@ -261,7 +266,7 @@ namespace DefaultCluster.Tests.General
             var stream = client.GetStreamProvider("MemStream").GetStream<int>("hi", Guid.Empty);
             await stream.OnNextAsync(1);
             await stream.OnNextAsync(409);
-            Assert.True(await handle.WaitForFinished(_timeout));
+            Assert.True(await handle.WaitForFinished(_timeout).WaitAsync(cancellationToken));
             Assert.Equal(new[] { 1, 409 }, vals);
         }
     }

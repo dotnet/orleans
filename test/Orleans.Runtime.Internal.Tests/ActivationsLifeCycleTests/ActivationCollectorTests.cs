@@ -32,14 +32,14 @@ namespace UnitTests.ActivationsLifeCycleTests
 
         private ILogger logger = null!;
 
-        private async Task Initialize(TimeSpan collectionAgeLimit, TimeSpan quantum)
+        private async Task Initialize(TimeSpan collectionAgeLimit, TimeSpan quantum, CancellationToken cancellationToken)
         {
             var builder = new TestClusterBuilder(1);
             builder.Properties["CollectionQuantum"] = quantum.ToString();
             builder.Properties["DefaultCollectionAgeLimit"] = collectionAgeLimit.ToString();
             builder.AddSiloBuilderConfigurator<SiloConfigurator>();
             testCluster = builder.Build();
-            await testCluster.DeployAsync();
+            await testCluster.DeployAsync(cancellationToken);
             this.logger = this.testCluster.Client!.ServiceProvider.GetRequiredService<ILogger<ActivationCollectorTests>>();
         }
 
@@ -72,9 +72,9 @@ namespace UnitTests.ActivationsLifeCycleTests
 
         ValueTask IAsyncLifetime.InitializeAsync() => ValueTask.CompletedTask;
 
-        private async Task Initialize(TimeSpan collectionAgeLimit)
+        private async Task Initialize(TimeSpan collectionAgeLimit, CancellationToken cancellationToken)
         {
-            await Initialize(collectionAgeLimit, DEFAULT_COLLECTION_QUANTUM);
+            await Initialize(collectionAgeLimit, DEFAULT_COLLECTION_QUANTUM, cancellationToken);
         }
 
         private static async Task CancelWorkerAsync(CancellationTokenSource cancellation, Task worker)
@@ -84,7 +84,7 @@ namespace UnitTests.ActivationsLifeCycleTests
             {
                 await worker;
             }
-            catch (OperationCanceledException exception) when (exception.CancellationToken == cancellation.Token)
+            catch (OperationCanceledException) when (cancellation.IsCancellationRequested)
             {
             }
         }
@@ -109,7 +109,8 @@ namespace UnitTests.ActivationsLifeCycleTests
         [Fact, TestCategory("ActivationCollector"), TestCategory("Functional")]
         public async Task ActivationCollectorForceCollection()
         {
-            await Initialize(DEFAULT_IDLE_TIMEOUT);
+            var cancellationToken = TestContext.Current.CancellationToken;
+            await Initialize(DEFAULT_IDLE_TIMEOUT, cancellationToken);
 
             const int grainCount = 1000;
             var fullGrainTypeName = RuntimeTypeNameFormatter.Format(typeof(IdleActivationGcTestGrain1));
@@ -123,7 +124,7 @@ namespace UnitTests.ActivationsLifeCycleTests
             }
             await Task.WhenAll(tasks);
 
-            await Task.Delay(FORCED_COLLECTION_WAIT_TIME);
+            await Task.Delay(FORCED_COLLECTION_WAIT_TIME, cancellationToken);
 
             var grain = this.testCluster.GrainFactory!.GetGrain<IManagementGrain>(0);
 
@@ -133,7 +134,8 @@ namespace UnitTests.ActivationsLifeCycleTests
                 fullGrainTypeName,
                 grainCount,
                 DeactivationReasonCode.ActivationIdle,
-                TestConstants.InitTimeout);
+                TestConstants.InitTimeout,
+                cancellationToken);
 
             int activationsNotCollected = await TestUtils.GetActivationCount(this.testCluster.GrainFactory!, fullGrainTypeName);
             Assert.Equal(0, activationsNotCollected);
@@ -146,7 +148,8 @@ namespace UnitTests.ActivationsLifeCycleTests
         [Fact, TestCategory("ActivationCollector"), TestCategory("Functional")]
         public async Task ActivationCollectorShouldCollectIdleActivations()
         {
-            await Initialize(DEFAULT_IDLE_TIMEOUT);
+            var cancellationToken = TestContext.Current.CancellationToken;
+            await Initialize(DEFAULT_IDLE_TIMEOUT, cancellationToken);
 
             const int grainCount = 1000;
             var fullGrainTypeName = RuntimeTypeNameFormatter.Format(typeof(IdleActivationGcTestGrain1));
@@ -166,7 +169,7 @@ namespace UnitTests.ActivationsLifeCycleTests
             logger.LogInformation(
                 "IdleActivationCollectorShouldCollectIdleActivations: grains activated; waiting for activation count to converge to zero (activation GC idle timeout is {DefaultIdleTime} sec).",
                 DEFAULT_IDLE_TIMEOUT.TotalSeconds);
-            await WaitForActivationCountToConverge(fullGrainTypeName, expectedCount: 0);
+            await WaitForActivationCountToConverge(fullGrainTypeName, expectedCount: 0, cancellationToken);
 
             int activationsNotCollected = await TestUtils.GetActivationCount(this.testCluster.GrainFactory!, fullGrainTypeName);
             Assert.Equal(0, activationsNotCollected);
@@ -177,7 +180,8 @@ namespace UnitTests.ActivationsLifeCycleTests
         [Fact, TestCategory("ActivationCollector"), TestCategory("Functional")]
         public async Task ActivationCollectorShouldNotCollectBusyActivations()
         {
-            await Initialize(DEFAULT_IDLE_TIMEOUT);
+            var cancellationToken = TestContext.Current.CancellationToken;
+            await Initialize(DEFAULT_IDLE_TIMEOUT, cancellationToken);
 
             const int idleGrainCount = 500;
             const int busyGrainCount = 500;
@@ -194,7 +198,7 @@ namespace UnitTests.ActivationsLifeCycleTests
                 tasks0.Add(g.Nop());
             }
             await Task.WhenAll(tasks0);
-            using var workerCancellation = new CancellationTokenSource();
+            using var workerCancellation = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
             async Task busyWorker(CancellationToken cancellationToken)
             {
                 logger.LogInformation("ActivationCollectorShouldNotCollectBusyActivations: busyWorker started");
@@ -207,7 +211,7 @@ namespace UnitTests.ActivationsLifeCycleTests
                     await Task.WhenAll(tasks1);
                 }
             }
-            var workerTask = Task.Run(() => busyWorker(workerCancellation.Token));
+            var workerTask = Task.Run(() => busyWorker(workerCancellation.Token), cancellationToken);
             try
             {
                 logger.LogInformation("ActivationCollectorShouldNotCollectBusyActivations: activating {Count} idle grains.", idleGrainCount);
@@ -225,7 +229,7 @@ namespace UnitTests.ActivationsLifeCycleTests
                 logger.LogInformation(
                     "ActivationCollectorShouldNotCollectBusyActivations: grains activated; waiting for idle activation count to converge to zero (activation GC idle timeout is {DefaultIdleTime} sec).",
                     DEFAULT_IDLE_TIMEOUT.TotalSeconds);
-                await WaitForActivationCountToConverge(idleGrainTypeName, expectedCount: 0);
+                await WaitForActivationCountToConverge(idleGrainTypeName, expectedCount: 0, cancellationToken);
 
                 // we should have only collected grains from the idle category (IdleActivationGcTestGrain1).
                 int idleActivationsNotCollected = await TestUtils.GetActivationCount(this.testCluster.GrainFactory!, idleGrainTypeName);
@@ -244,7 +248,8 @@ namespace UnitTests.ActivationsLifeCycleTests
         [Fact, TestCategory("ActivationCollector"), TestCategory("Functional")]
         public async Task ManualCollectionShouldNotCollectBusyActivations()
         {
-            await Initialize(DEFAULT_IDLE_TIMEOUT);
+            var cancellationToken = TestContext.Current.CancellationToken;
+            await Initialize(DEFAULT_IDLE_TIMEOUT, cancellationToken);
 
             TimeSpan shortIdleTimeout = FORCED_COLLECTION_WAIT_TIME;
             const int idleGrainCount = 500;
@@ -262,7 +267,7 @@ namespace UnitTests.ActivationsLifeCycleTests
                 tasks0.Add(g.Nop());
             }
             await Task.WhenAll(tasks0);
-            using var workerCancellation = new CancellationTokenSource();
+            using var workerCancellation = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
             async Task busyWorker(CancellationToken cancellationToken)
             {
                 logger.LogInformation("ManualCollectionShouldNotCollectBusyActivations: busyWorker started");
@@ -275,7 +280,7 @@ namespace UnitTests.ActivationsLifeCycleTests
                     await Task.WhenAll(tasks1);
                 }
             }
-            var workerTask = Task.Run(() => busyWorker(workerCancellation.Token));
+            var workerTask = Task.Run(() => busyWorker(workerCancellation.Token), cancellationToken);
             try
             {
                 logger.LogInformation("ManualCollectionShouldNotCollectBusyActivations: activating {Count} idle grains.", idleGrainCount);
@@ -294,7 +299,7 @@ namespace UnitTests.ActivationsLifeCycleTests
                     "ManualCollectionShouldNotCollectBusyActivations: grains activated; waiting {TotalSeconds} sec (activation GC idle timeout is {DefaultIdleTime} sec).",
                     shortIdleTimeout.TotalSeconds,
                     DEFAULT_IDLE_TIMEOUT.TotalSeconds);
-                await Task.Delay(shortIdleTimeout);
+                await Task.Delay(shortIdleTimeout, cancellationToken);
 
                 TimeSpan everything = TimeSpan.FromMinutes(10);
                 logger.LogInformation("ManualCollectionShouldNotCollectBusyActivations: triggering manual collection (timespan is {TotalSeconds} sec).",  everything.TotalSeconds);
@@ -304,7 +309,7 @@ namespace UnitTests.ActivationsLifeCycleTests
                 logger.LogInformation(
                     "ManualCollectionShouldNotCollectBusyActivations: waiting for idle activation count to converge to zero (activation GC idle timeout is {DefaultIdleTime} sec).",
                     DEFAULT_IDLE_TIMEOUT.TotalSeconds);
-                await WaitForActivationCountToConverge(idleGrainTypeName, expectedCount: 0);
+                await WaitForActivationCountToConverge(idleGrainTypeName, expectedCount: 0, cancellationToken);
 
                 // we should have only collected grains from the idle category (IdleActivationGcTestGrain).
                 int idleActivationsNotCollected = await TestUtils.GetActivationCount(this.testCluster.GrainFactory!, idleGrainTypeName);
@@ -323,9 +328,10 @@ namespace UnitTests.ActivationsLifeCycleTests
         [Fact, TestCategory("ActivationCollector"), TestCategory("Functional")]
         public async Task ActivationCollectorShouldCollectIdleActivationsSpecifiedInPerTypeConfiguration()
         {
+            var cancellationToken = TestContext.Current.CancellationToken;
             //make sure default value won't cause activation collection during wait time
             var defaultCollectionAgeLimit = WAIT_TIME.Multiply(2);
-            await Initialize(defaultCollectionAgeLimit);
+            await Initialize(defaultCollectionAgeLimit, cancellationToken);
 
             const int grainCount = 1000;
             var fullGrainTypeName = RuntimeTypeNameFormatter.Format(typeof(IdleActivationGcTestGrain2));
@@ -345,7 +351,7 @@ namespace UnitTests.ActivationsLifeCycleTests
             logger.LogInformation(
                 "ActivationCollectorShouldCollectIdleActivationsSpecifiedInPerTypeConfiguration: grains activated; waiting for activation count to converge to zero (activation GC idle timeout is {DefaultIdleTime} sec).",
                 DEFAULT_IDLE_TIMEOUT.TotalSeconds);
-            await WaitForActivationCountToConverge(fullGrainTypeName, expectedCount: 0);
+            await WaitForActivationCountToConverge(fullGrainTypeName, expectedCount: 0, cancellationToken);
 
             int activationsNotCollected = await TestUtils.GetActivationCount(this.testCluster.GrainFactory!, fullGrainTypeName);
             Assert.Equal(0, activationsNotCollected);
@@ -356,9 +362,10 @@ namespace UnitTests.ActivationsLifeCycleTests
         [Fact, TestCategory("ActivationCollector"), TestCategory("Functional")]
         public async Task ActivationCollectorShouldNotCollectBusyActivationsSpecifiedInPerTypeConfiguration()
         {
+            var cancellationToken = TestContext.Current.CancellationToken;
             //make sure default value won't cause activation collection during wait time
             var defaultCollectionAgeLimit = WAIT_TIME.Multiply(2);
-            await Initialize(defaultCollectionAgeLimit);
+            await Initialize(defaultCollectionAgeLimit, cancellationToken);
 
             const int idleGrainCount = 500;
             const int busyGrainCount = 500;
@@ -375,7 +382,7 @@ namespace UnitTests.ActivationsLifeCycleTests
                 tasks0.Add(g.Nop());
             }
             await Task.WhenAll(tasks0);
-            using var workerCancellation = new CancellationTokenSource();
+            using var workerCancellation = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
             async Task busyWorker(CancellationToken cancellationToken)
             {
                 logger.LogInformation("ActivationCollectorShouldNotCollectBusyActivationsSpecifiedInPerTypeConfiguration: busyWorker started");
@@ -388,7 +395,7 @@ namespace UnitTests.ActivationsLifeCycleTests
                     await Task.WhenAll(tasks1);
                 }
             }
-            var workerTask = Task.Run(() => busyWorker(workerCancellation.Token));
+            var workerTask = Task.Run(() => busyWorker(workerCancellation.Token), cancellationToken);
             try
             {
                 logger.LogInformation("ActivationCollectorShouldNotCollectBusyActivationsSpecifiedInPerTypeConfiguration: activating {Count} idle grains.", idleGrainCount);
@@ -406,7 +413,7 @@ namespace UnitTests.ActivationsLifeCycleTests
                 logger.LogInformation(
                     "IdleActivationCollectorShouldNotCollectBusyActivations: grains activated; waiting for idle activation count to converge to zero (activation GC idle timeout is {DefaultIdleTime} sec).",
                     DEFAULT_IDLE_TIMEOUT.TotalSeconds);
-                await WaitForActivationCountToConverge(idleGrainTypeName, expectedCount: 0);
+                await WaitForActivationCountToConverge(idleGrainTypeName, expectedCount: 0, cancellationToken);
 
                 // we should have only collected grains from the idle category (IdleActivationGcTestGrain2).
                 int idleActivationsNotCollected = await TestUtils.GetActivationCount(this.testCluster.GrainFactory!, idleGrainTypeName);
@@ -425,7 +432,8 @@ namespace UnitTests.ActivationsLifeCycleTests
         [Fact(Skip = "Flaky test. Needs to be investigated."), TestCategory("ActivationCollector"), TestCategory("Functional")]
         public async Task ActivationCollectorShouldNotCollectBusyStatelessWorkers()
         {
-            await Initialize(DEFAULT_IDLE_TIMEOUT);
+            var cancellationToken = TestContext.Current.CancellationToken;
+            await Initialize(DEFAULT_IDLE_TIMEOUT, cancellationToken);
 
             // the purpose of this test is to determine whether idle stateless worker activations are properly identified by the activation collector.
             // in this test, we:
@@ -454,20 +462,20 @@ namespace UnitTests.ActivationsLifeCycleTests
             bool[] quit = new bool[] { false };
             bool[] matched = new bool[grainCount];
             string[] activationIds = new string[grainCount];
-            async Task workFunc(int index)
+            async Task workFunc(int index, CancellationToken cancellationToken)
             {
                 // (part of) 4. periodically send a message to each grain...
 
                 // take a grain and call Delay to keep it busy.
                 IStatelessWorkerActivationCollectorTestGrain1 g = grains[index];
-                await g.Delay(DEFAULT_IDLE_TIMEOUT.Divide(2));
+                await g.Delay(DEFAULT_IDLE_TIMEOUT.Divide(2)).WaitAsync(cancellationToken);
                 // identify the activation and record whether it matches the activation ID last reported. it probably won't match in the beginning but should always converge on a match as other activations get collected.
                 string aid = await g.IdentifyActivation();
                 logger.LogInformation("ActivationCollectorShouldNotCollectBusyStatelessWorkers: identified {Activation}", aid);
                 matched[index] = aid == activationIds[index];
                 activationIds[index] = aid;
             }
-            async Task workerFunc()
+            async Task workerFunc(CancellationToken cancellationToken)
             {
                 // (part of) 4. periodically send a message to each grain...
                 logger.LogInformation("ActivationCollectorShouldNotCollectBusyStatelessWorkers: busyWorker started");
@@ -475,6 +483,7 @@ namespace UnitTests.ActivationsLifeCycleTests
                 List<Task> tasks1 = new List<Task>();
                 while (!quit[0])
                 {
+                    cancellationToken.ThrowIfCancellationRequested();
                     for (int index = 0; index < grains.Count; ++index)
                     {
                         if (quit[0])
@@ -482,7 +491,7 @@ namespace UnitTests.ActivationsLifeCycleTests
                             break;
                         }
 
-                        tasks1.Add(workFunc(index));
+                        tasks1.Add(workFunc(index, cancellationToken));
                     }
                     await Task.WhenAll(tasks1);
                 }
@@ -511,21 +520,21 @@ namespace UnitTests.ActivationsLifeCycleTests
 
                 // 4. periodically send a message to each grain...
                 this.logger.LogInformation("ActivationCollectorShouldNotCollectBusyStatelessWorkers: grains activated; sending heartbeat to {Count} stateless worker grains.", grainCount);
-                Task workerTask = Task.Run(workerFunc);
+                Task workerTask = Task.Run(() => workerFunc(cancellationToken), cancellationToken);
 
                 // 5. wait long enough for idle activations to be collected.
                 this.logger.LogInformation(
                     "ActivationCollectorShouldNotCollectBusyStatelessWorkers: grains activated; waiting {WaitSeconds} sec (activation GC idle timeout is {DefaultIdleTimeout} sec).",
                     WAIT_TIME.TotalSeconds,
                     DEFAULT_IDLE_TIMEOUT.TotalSeconds);
-                await Task.Delay(WAIT_TIME);
+                await Task.Delay(WAIT_TIME, cancellationToken);
 
                 // 6. verify that only one activation is still active per grain.
                 int busyActivationsNotCollected = await TestUtils.GetActivationCount(this.testCluster.GrainFactory!, grainTypeName);
 
                 // signal that the worker task should stop and wait for it to finish.
                 quit[0] = true;
-                await workerTask;
+                await workerTask.WaitAsync(cancellationToken);
                 quit[0] = false;
 
                 Assert.Equal(grainCount, busyActivationsNotCollected);
@@ -543,9 +552,10 @@ namespace UnitTests.ActivationsLifeCycleTests
         [Fact, TestCategory("ActivationCollector"), TestCategory("Functional")]
         public async Task ActivationCollectorShouldCollectByCollectionSpecificAgeLimit()
         {
+            var cancellationToken = TestContext.Current.CancellationToken;
             var defaultCollectionAge = COLLECTION_SPECIFIC_AGE_LIMIT.Multiply(4);
             //make sure defaultCollectionAge value won't cause activation collection before the per-type limit
-            await Initialize(defaultCollectionAge);
+            await Initialize(defaultCollectionAge, cancellationToken);
 
             const int grainCount = 1000;
 
@@ -569,14 +579,17 @@ namespace UnitTests.ActivationsLifeCycleTests
                 COLLECTION_SPECIFIC_AGE_LIMIT.TotalSeconds);
 
             var activationCollector = this.testCluster.GetSiloServiceProvider().GetRequiredService<ActivationCollector>();
-            await activationCollector.CollectStaleActivations(CancellationToken.None);
+            await activationCollector.CollectStaleActivations(cancellationToken);
             int activationsAfterDefaultCollection = await TestUtils.GetActivationCount(this.testCluster.GrainFactory!, fullGrainTypeName);
             Assert.Equal(grainCount, activationsAfterDefaultCollection);
 
-            await WaitForActivationCountToConverge(fullGrainTypeName, expectedCount: 0);
+            await WaitForActivationCountToConverge(fullGrainTypeName, expectedCount: 0, cancellationToken);
         }
 
-        private async Task WaitForActivationCountToConverge(string grainTypeName, int expectedCount)
+        private async Task WaitForActivationCountToConverge(
+            string grainTypeName,
+            int expectedCount,
+            CancellationToken cancellationToken)
         {
             using var collectionObserver = ActivationCollectionObserver.Create();
             var activationCount = await TestUtils.GetActivationCount(this.testCluster.GrainFactory!, grainTypeName);
@@ -592,7 +605,8 @@ namespace UnitTests.ActivationsLifeCycleTests
                 grainTypeName,
                 expectedCollectedCount,
                 DeactivationReasonCode.ActivationIdle,
-                TestConstants.InitTimeout);
+                TestConstants.InitTimeout,
+                cancellationToken);
 
             activationCount = await TestUtils.GetActivationCount(this.testCluster.GrainFactory!, grainTypeName);
             Assert.Equal(expectedCount, activationCount);
@@ -616,7 +630,8 @@ namespace UnitTests.ActivationsLifeCycleTests
                 string grainTypeName,
                 int expectedCount,
                 DeactivationReasonCode reasonCode,
-                TimeSpan timeout)
+                TimeSpan timeout,
+                CancellationToken cancellationToken)
             {
                 var waiter = new Waiter(grainTypeName, expectedCount, reasonCode);
                 lock (_lock)
@@ -629,14 +644,15 @@ namespace UnitTests.ActivationsLifeCycleTests
                     _waiters.Add(waiter);
                 }
 
-                using var cancellation = new CancellationTokenSource(timeout);
+                using var timeoutCancellation = new CancellationTokenSource(timeout);
+                using var cancellation = CancellationTokenSource.CreateLinkedTokenSource(timeoutCancellation.Token, cancellationToken);
                 using var registration = cancellation.Token.Register(static state => ((Waiter)state!).TrySetCanceled(), waiter);
 
                 try
                 {
                     await waiter.Task;
                 }
-                catch (OperationCanceledException)
+                catch (OperationCanceledException) when (timeoutCancellation.IsCancellationRequested && !cancellationToken.IsCancellationRequested)
                 {
                     var count = GetCollectedCount(waiter);
                     throw new TimeoutException($"Timed out waiting for {expectedCount} collected activations of grain type '{grainTypeName}' with reason {reasonCode}. Current count: {count} after {timeout}.");
@@ -736,7 +752,8 @@ namespace UnitTests.ActivationsLifeCycleTests
         [Fact, TestCategory("ActivationCollector"), TestCategory("Functional")]
         public async Task ActivationCollectorShouldCollectAfterCancellingKeepAlive()
         {
-            await Initialize(DEFAULT_IDLE_TIMEOUT);
+            var cancellationToken = TestContext.Current.CancellationToken;
+            await Initialize(DEFAULT_IDLE_TIMEOUT, cancellationToken);
 
             var fullGrainTypeName = RuntimeTypeNameFormatter.Format(typeof(KeepAliveActivationGcTestGrain));
 
@@ -753,7 +770,7 @@ namespace UnitTests.ActivationsLifeCycleTests
             // Cancel the keep-alive. The grain should now be collectable after the standard idle timeout.
             await grain.CancelKeepAlive();
 
-            await WaitForActivationCountToConverge(fullGrainTypeName, expectedCount: 0);
+            await WaitForActivationCountToConverge(fullGrainTypeName, expectedCount: 0, cancellationToken);
 
             int activationsNotCollected = await TestUtils.GetActivationCount(this.testCluster.GrainFactory!, fullGrainTypeName);
             Assert.Equal(0, activationsNotCollected);
@@ -764,7 +781,8 @@ namespace UnitTests.ActivationsLifeCycleTests
         [Fact, TestCategory("SlowBVT"), TestCategory("Timers")]
         public async Task NonReentrantGrainTimer_NoKeepAlive_Test()
         {
-            await Initialize(DEFAULT_IDLE_TIMEOUT, DEFAULT_COLLECTION_QUANTUM);
+            var cancellationToken = TestContext.Current.CancellationToken;
+            await Initialize(DEFAULT_IDLE_TIMEOUT, DEFAULT_COLLECTION_QUANTUM, cancellationToken);
 
             const string testName = "NonReentrantGrainTimer_NoKeepAlive_Test";
 
@@ -773,7 +791,7 @@ namespace UnitTests.ActivationsLifeCycleTests
 
             // Schedule a timer to fire at the 30s mark which will not extend the grain's lifetime.
             await grain.StartTimer(testName, TimeSpan.FromSeconds(30), keepAlive: false);
-            await WaitForActivationCountToConverge(fullGrainTypeName, expectedCount: 0);
+            await WaitForActivationCountToConverge(fullGrainTypeName, expectedCount: 0, cancellationToken);
 
             var tickCount = await grain.GetTickCount();
 
@@ -786,7 +804,8 @@ namespace UnitTests.ActivationsLifeCycleTests
         [Fact, TestCategory("Functional"), TestCategory("Diagnostics"), TestCategory("Timers")]
         public async Task GrainAndTimerDiagnosticsExposeRuntimeInstances()
         {
-            await Initialize(DEFAULT_IDLE_TIMEOUT);
+            var cancellationToken = TestContext.Current.CancellationToken;
+            await Initialize(DEFAULT_IDLE_TIMEOUT, cancellationToken);
 
             using var grainObserver = GrainDiagnosticObserver.Create();
             using var timerObserver = TimerDiagnosticObserver.Create();

@@ -43,21 +43,21 @@ public class LocalDurableJobManagerTests
         var shard = new BlockingQueueShard("active-shard", shardKey, shardKey.Add(options.ShardDuration));
 
         manager.Participate(lifecycle);
-        await lifecycle.OnStart();
+        await lifecycle.OnStart(TestContext.Current.CancellationToken);
         accessor.AddWritableShard(shardKey, shard);
         accessor.TryActivateShard(shard);
 
-        await shard.ConsumeStarted.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        await shard.ConsumeStarted.Task.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
         Assert.True(accessor.TryGetRunningShardTask(shard.Id, out var runTask));
         Assert.False(runTask!.IsCompleted);
 
-        var stopTask = lifecycle.OnStop();
-        await shard.DisposeStarted.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        var stopTask = lifecycle.OnStop(TestContext.Current.CancellationToken);
+        await shard.DisposeStarted.Task.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
 
         Assert.False(stopTask.IsCompleted);
 
         shard.AllowDispose.SetResult();
-        await stopTask.WaitAsync(TimeSpan.FromSeconds(5));
+        await stopTask.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
 
         Assert.Equal(1, shard.DisposeCallCount);
         Assert.False(accessor.TryGetRunningShardTask(shard.Id, out _));
@@ -79,13 +79,15 @@ public class LocalDurableJobManagerTests
         var shard = new FaultingOnCancellationShard("faulting-shard", shardKey, shardKey.Add(options.ShardDuration));
 
         manager.Participate(lifecycle);
-        await lifecycle.OnStart();
+        await lifecycle.OnStart(TestContext.Current.CancellationToken);
         accessor.AddWritableShard(shardKey, shard);
         accessor.TryActivateShard(shard);
 
-        await shard.ConsumeStarted.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        await shard.ConsumeStarted.Task.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
 
-        await lifecycle.OnStop().WaitAsync(TimeSpan.FromSeconds(5));
+        await lifecycle.OnStop(TestContext.Current.CancellationToken).WaitAsync(
+            TimeSpan.FromSeconds(5),
+            TestContext.Current.CancellationToken);
 
         Assert.Equal(1, shard.DisposeCallCount);
         Assert.Contains(
@@ -175,7 +177,7 @@ public class LocalDurableJobManagerTests
         Assert.True(accessor.TryGetRunningShardTask(shard.Id, out var runTask));
 
         await accessor.ProcessShardCheckCycleAsync(CancellationToken.None);
-        await runTask!.WaitAsync(TimeSpan.FromSeconds(5));
+        await runTask!.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
 
         Assert.Equal(1, shard.MarkAsCompleteCallCount);
         Assert.Equal(1, shard.DisposeCallCount);
@@ -209,9 +211,9 @@ public class LocalDurableJobManagerTests
 
         Assert.True(accessor.TryGetRunningShardTask(shard.Id, out var runTask));
 
-        await shard.ConsumeStarted.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        await shard.ConsumeStarted.Task.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
         await shard.MarkAsCompleteAsync(CancellationToken.None);
-        await runTask!.WaitAsync(TimeSpan.FromSeconds(5));
+        await runTask!.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
     }
 
     [Fact]
@@ -230,9 +232,9 @@ public class LocalDurableJobManagerTests
 
         Assert.True(accessor.TryGetRunningShardTask(shard.Id, out var runTask));
 
-        await shard.ConsumeStarted.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        await shard.ConsumeStarted.Task.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
         await shard.MarkAsCompleteAsync(CancellationToken.None);
-        await runTask!.WaitAsync(TimeSpan.FromSeconds(5));
+        await runTask!.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
 
         Assert.False(accessor.HasWritableShard(shardKey));
         Assert.False(accessor.HasCachedShard(shard.Id));
@@ -258,10 +260,10 @@ public class LocalDurableJobManagerTests
 
         Assert.True(accessor.TryGetRunningShardTask(completedShard.Id, out var runTask));
 
-        await completedShard.ConsumeStarted.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        await completedShard.ConsumeStarted.Task.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
         accessor.AddWritableShard(shardKey, replacementShard);
         await completedShard.MarkAsCompleteAsync(CancellationToken.None);
-        await runTask!.WaitAsync(TimeSpan.FromSeconds(5));
+        await runTask!.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
 
         Assert.True(accessor.TryGetWritableShard(shardKey, out var currentShard));
         Assert.Same(replacementShard, currentShard);
@@ -342,7 +344,7 @@ public class LocalDurableJobManagerTests
             DueTime = shardKey
         }, CancellationToken.None);
 
-        await shard.ScheduleStarted.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        await shard.ScheduleStarted.Task.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
 
         var cycleTask = accessor.ProcessShardCheckCycleAsync(CancellationToken.None);
 
@@ -350,8 +352,8 @@ public class LocalDurableJobManagerTests
 
         shard.AllowScheduleToFinish.SetResult();
 
-        var job = await scheduleTask.WaitAsync(TimeSpan.FromSeconds(5));
-        await cycleTask.WaitAsync(TimeSpan.FromSeconds(5));
+        var job = await scheduleTask.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+        await cycleTask.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
 
         Assert.Equal("late-job", job.Name);
         Assert.Equal(1, shard.MarkAsCompleteCallCount);
@@ -593,11 +595,17 @@ public class LocalDurableJobManagerTests
         timeProvider.Advance(TimeSpan.FromSeconds(3));
         await accessor.ProcessShardCheckCycleAsync(CancellationToken.None);
 
-        var jobContext = await handledJob.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        var jobContext = await handledJob.Task.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
         Assert.Equal(job.Id, jobContext.Job.Id);
-        await AdvanceUntilCompletedAsync(timeProvider, runTask!, TimeSpan.FromSeconds(1));
-        await runTask!.WaitAsync(TimeSpan.FromSeconds(5));
-        Assert.Null(await storageProvider.CreateStorage(JobShardId.Parse(job.ShardId).ToJournalId()).GetMetadataAsync());
+        await AdvanceUntilCompletedAsync(
+            timeProvider,
+            runTask!,
+            TimeSpan.FromSeconds(1),
+            TestContext.Current.CancellationToken);
+        await runTask!.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+        Assert.Null(await storageProvider
+            .CreateStorage(JobShardId.Parse(job.ShardId).ToJournalId())
+            .GetMetadataAsync(TestContext.Current.CancellationToken));
     }
 
     [Fact]
@@ -651,14 +659,18 @@ public class LocalDurableJobManagerTests
         }, CancellationToken.None);
 
         Assert.True(accessor.TryGetRunningShardTask(job.ShardId, out var runTask));
-        var jobContext = await handledJob.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        var jobContext = await handledJob.Task.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
         Assert.Equal(job.Id, jobContext.Job.Id);
         Assert.Equal(1, getHandleCount());
 
         timeProvider.Advance(TimeSpan.FromSeconds(3));
         await accessor.ProcessShardCheckCycleAsync(CancellationToken.None);
-        await AdvanceUntilCompletedAsync(timeProvider, runTask!, TimeSpan.FromSeconds(1));
-        await runTask!.WaitAsync(TimeSpan.FromSeconds(5));
+        await AdvanceUntilCompletedAsync(
+            timeProvider,
+            runTask!,
+            TimeSpan.FromSeconds(1),
+            TestContext.Current.CancellationToken);
+        await runTask!.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
         Assert.Equal(1, getHandleCount());
     }
 
@@ -676,7 +688,7 @@ public class LocalDurableJobManagerTests
 
         accessor.AddWritableShard(shardKey, shard);
         accessor.TryActivateShard(shard);
-        await shard.ConsumeStarted.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        await shard.ConsumeStarted.Task.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
 
         var job = await manager.ScheduleJobAsync(new()
         {
@@ -685,12 +697,14 @@ public class LocalDurableJobManagerTests
             DueTime = shardKey
         }, CancellationToken.None);
 
-        var unexpectedDispatch = await Task.WhenAny(handledJob.Task, Task.Delay(TimeSpan.FromMilliseconds(100)));
+        var unexpectedDispatch = await Task.WhenAny(
+            handledJob.Task,
+            Task.Delay(TimeSpan.FromMilliseconds(100), TestContext.Current.CancellationToken));
         Assert.NotSame(handledJob.Task, unexpectedDispatch);
 
         shard.AllowConsume.SetResult();
 
-        var jobContext = await handledJob.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        var jobContext = await handledJob.Task.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
         Assert.Equal(job.Id, jobContext.Job.Id);
     }
 
@@ -932,10 +946,15 @@ public class LocalDurableJobManagerTests
         return (grainFactory, handledJob, () => Volatile.Read(ref handleCount));
     }
 
-    private static async Task AdvanceUntilCompletedAsync(FakeTimeProvider timeProvider, Task task, TimeSpan advanceBy)
+    private static async Task AdvanceUntilCompletedAsync(
+        FakeTimeProvider timeProvider,
+        Task task,
+        TimeSpan advanceBy,
+        CancellationToken cancellationToken)
     {
         for (var i = 0; i < 10 && !task.IsCompleted; i++)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             await Task.Yield();
             timeProvider.Advance(advanceBy);
         }

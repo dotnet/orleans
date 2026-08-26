@@ -56,7 +56,10 @@ namespace NonSilo.Tests.Membership
         public async Task MembershipTableManager_NewCluster()
         {
             var membershipTable = new InMemoryMembershipTable(new TableVersion(123, "123"));
-            await this.BasicScenarioTest(membershipTable, gracefulShutdown: true);
+            await this.BasicScenarioTest(
+                membershipTable,
+                gracefulShutdown: true,
+                cancellationToken: TestContext.Current.CancellationToken);
         }
 
         /// <summary>
@@ -76,10 +79,16 @@ namespace NonSilo.Tests.Membership
             };
             var membershipTable = new InMemoryMembershipTable(new TableVersion(123, "123"), otherSilos);
 
-            await this.BasicScenarioTest(membershipTable, gracefulShutdown: false);
+            await this.BasicScenarioTest(
+                membershipTable,
+                gracefulShutdown: false,
+                cancellationToken: TestContext.Current.CancellationToken);
         }
 
-        private async Task BasicScenarioTest(InMemoryMembershipTable membershipTable, bool gracefulShutdown = true)
+        private async Task BasicScenarioTest(
+            InMemoryMembershipTable membershipTable,
+            bool gracefulShutdown,
+            CancellationToken cancellationToken)
         {
             var timers = new List<DelegateAsyncTimer>();
             var timerCalls = new BlockingCollection<(TimeSpan? DelayOverride, TaskCompletionSource<bool> Completion)>();
@@ -121,7 +130,7 @@ namespace NonSilo.Tests.Membership
 
             Assert.NotNull(manager.MembershipTableUpdates);
             var changes = manager.MembershipTableUpdates;
-            var currentEnumerator = changes.GetAsyncEnumerator();
+            var currentEnumerator = changes.GetAsyncEnumerator(cancellationToken);
             Assert.True(currentEnumerator.MoveNextAsync().Result);
             Assert.Equal(currentEnumerator.Current.Version, manager.MembershipTableSnapshot.Version);
             Assert.Empty(membershipTable.Calls);
@@ -131,7 +140,7 @@ namespace NonSilo.Tests.Membership
             // see the correct results regardless of initialization order.
             ((ILifecycleParticipant<ISiloLifecycle>)manager).Participate(this.lifecycle);
 
-            await this.lifecycle.OnStart();
+            await this.lifecycle.OnStart(cancellationToken);
 
             var calls = membershipTable.Calls;
             Assert.NotEmpty(calls);
@@ -141,7 +150,7 @@ namespace NonSilo.Tests.Membership
 
             // During initialization, a first read from the table will be performed, transitioning
             // membership to a valid version.currentEnumerator = changes.GetAsyncEnumerator();
-            currentEnumerator = changes.GetAsyncEnumerator();
+            currentEnumerator = changes.GetAsyncEnumerator(cancellationToken);
             Assert.True(currentEnumerator.MoveNextAsync().Result);
             var update1 = currentEnumerator.Current;
 
@@ -154,7 +163,7 @@ namespace NonSilo.Tests.Membership
             Assert.Equal(SiloStatus.Joining, localSiloEntry.Status);
 
             // An update should have been issued.
-            currentEnumerator = changes.GetAsyncEnumerator();
+            currentEnumerator = changes.GetAsyncEnumerator(cancellationToken);
             Assert.True(currentEnumerator.MoveNextAsync().Result);
             Assert.NotEqual(update1.Version, manager.MembershipTableSnapshot.Version);
 
@@ -173,16 +182,16 @@ namespace NonSilo.Tests.Membership
             {
                 // Check that a timer is being requested and that after it expires a call to
                 // refresh the membership table is made.
-                using var cts = new CancellationTokenSource();
+                using var cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
                 cts.CancelAfter(TimeSpan.FromSeconds(10));
                 var (_, completion) = timerCalls.Take(cts.Token);
                 membershipTable.ClearCalls();
                 completion.TrySetResult(true);
-                while (membershipTable.Calls.Count == 0) await Task.Delay(10);
+                while (membershipTable.Calls.Count == 0) await Task.Delay(10, cancellationToken);
                 Assert.Contains(membershipTable.Calls, c => c.Method.Equals(nameof(IMembershipTable.ReadAll)));
             }
 
-            var shutdownCts = new CancellationTokenSource();
+            using var shutdownCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
             if (!gracefulShutdown) shutdownCts.Cancel();
             Assert.Equal(0, timers.First().DisposedCounter);
             var stopped = this.lifecycle.OnStop(shutdownCts.Token);
@@ -206,6 +215,7 @@ namespace NonSilo.Tests.Membership
         [Fact]
         public async Task MembershipTableManager_Restarted()
         {
+            var cancellationToken = TestContext.Current.CancellationToken;
             var now = DateTimeOffset.UtcNow;
 
             // The table includes a predecessor which is still marked as active
@@ -244,7 +254,7 @@ namespace NonSilo.Tests.Membership
             Assert.Equal(SiloStatus.Created, manager.CurrentStatus);
 
             Assert.NotNull(manager.MembershipTableUpdates);
-            var membershipUpdates = manager.MembershipTableUpdates.GetAsyncEnumerator();
+            var membershipUpdates = manager.MembershipTableUpdates.GetAsyncEnumerator(cancellationToken);
             Assert.True(await membershipUpdates.MoveNextAsync());
             var firstSnapshot = membershipUpdates.Current;
             Assert.Equal(firstSnapshot.Version, manager.MembershipTableSnapshot.Version);
@@ -255,7 +265,7 @@ namespace NonSilo.Tests.Membership
             // see the correct results regardless of initialization order.
             ((ILifecycleParticipant<ISiloLifecycle>)manager).Participate(this.lifecycle);
 
-            await this.lifecycle.OnStart();
+            await this.lifecycle.OnStart(cancellationToken);
 
             var calls = membershipTable.Calls;
             Assert.NotEmpty(calls);
@@ -293,7 +303,7 @@ namespace NonSilo.Tests.Membership
             Assert.Contains(calls, call => call.Method.Equals(nameof(IMembershipTable.InsertRow)));
             Assert.Contains(calls, call => call.Method.Equals(nameof(IMembershipTable.ReadAll)));
 
-            await this.lifecycle.OnStop();
+            await this.lifecycle.OnStop(cancellationToken);
             this.fatalErrorHandler.DidNotReceiveWithAnyArgs().OnFatalException(default, default, default);
         }
 
@@ -304,6 +314,7 @@ namespace NonSilo.Tests.Membership
         [Fact]
         public async Task MembershipTableManager_Superseded()
         {
+            var cancellationToken = TestContext.Current.CancellationToken;
             var now = DateTimeOffset.UtcNow;
 
             // The table includes a successor to this silo.
@@ -332,14 +343,14 @@ namespace NonSilo.Tests.Membership
 
             ((ILifecycleParticipant<ISiloLifecycle>)manager).Participate(this.lifecycle);
 
-            await this.lifecycle.OnStart();
+            await this.lifecycle.OnStart(cancellationToken);
 
             // Silo should kill itself during the joining phase
             await manager.UpdateStatus(SiloStatus.Joining);
 
             this.fatalErrorHandler.ReceivedWithAnyArgs().OnFatalException(default, default, default);
 
-            await this.lifecycle.OnStop();
+            await this.lifecycle.OnStop(cancellationToken);
         }
 
         /// <summary>
@@ -351,6 +362,7 @@ namespace NonSilo.Tests.Membership
         [Fact]
         public async Task MembershipTableManager_AlreadyDeclaredDead()
         {
+            var cancellationToken = TestContext.Current.CancellationToken;
             var now = DateTimeOffset.UtcNow;
             var otherSilos = new[]
             {
@@ -375,14 +387,14 @@ namespace NonSilo.Tests.Membership
 
             ((ILifecycleParticipant<ISiloLifecycle>)manager).Participate(this.lifecycle);
 
-            await this.lifecycle.OnStart();
+            await this.lifecycle.OnStart(cancellationToken);
 
             // Silo should kill itself during the joining phase
             await manager.UpdateStatus(SiloStatus.Joining);
 
             this.fatalErrorHandler.ReceivedWithAnyArgs().OnFatalException(default, default, default);
 
-            var cts = new CancellationTokenSource();
+            using var cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
             cts.Cancel();
             await this.lifecycle.OnStop(cts.Token);
         }
@@ -394,6 +406,7 @@ namespace NonSilo.Tests.Membership
         [Fact]
         public async Task MembershipTableManager_DeclaredDead_AfterJoining()
         {
+            var cancellationToken = TestContext.Current.CancellationToken;
             var now = DateTimeOffset.UtcNow;
             var otherSilos = new[]
             {
@@ -412,7 +425,7 @@ namespace NonSilo.Tests.Membership
                 siloLifecycle: this.lifecycle,
                 timeProvider: TimeProvider.System);
             ((ILifecycleParticipant<ISiloLifecycle>)manager).Participate(this.lifecycle);
-            await this.lifecycle.OnStart();
+            await this.lifecycle.OnStart(cancellationToken);
 
             // Silo should kill itself during the joining phase
             await manager.UpdateStatus(SiloStatus.Joining);
@@ -429,21 +442,22 @@ namespace NonSilo.Tests.Membership
             }
 
             // Refresh silo status and check that it determines it's dead.
-            await manager.Refresh();
+            await manager.Refresh(cancellationToken: cancellationToken);
             this.fatalErrorHandler.ReceivedWithAnyArgs().OnFatalException(default, default, default);
 
-            await this.lifecycle.OnStop();
+            await this.lifecycle.OnStop(cancellationToken);
         }
 
         [Fact]
         public async Task MembershipTableManager_DeclaredDead_DuringShutdown_DoesNotTerminate()
         {
+            var cancellationToken = TestContext.Current.CancellationToken;
             var membershipTable = new InMemoryMembershipTable(new TableVersion(123, "123"));
             var manager = this.CreateMembershipTableManager(membershipTable);
             ((ILifecycleParticipant<ISiloLifecycle>)manager).Participate(this.lifecycle);
-            await this.lifecycle.OnStart();
+            await this.lifecycle.OnStart(cancellationToken);
             await manager.UpdateStatus(SiloStatus.Joining);
-            await this.lifecycle.OnStop();
+            await this.lifecycle.OnStop(cancellationToken);
 
             while (true)
             {
@@ -455,17 +469,18 @@ namespace NonSilo.Tests.Membership
                 }
             }
 
-            await manager.Refresh();
+            await manager.Refresh(cancellationToken: cancellationToken);
             this.fatalErrorHandler.DidNotReceiveWithAnyArgs().OnFatalException(default, default, default);
         }
 
         [Fact]
         public async Task MembershipTableManager_ExplicitDeadSnapshot_Terminates()
         {
+            var cancellationToken = TestContext.Current.CancellationToken;
             var membershipTable = new InMemoryMembershipTable(new TableVersion(123, "123"));
             var manager = this.CreateMembershipTableManager(membershipTable);
             ((ILifecycleParticipant<ISiloLifecycle>)manager).Participate(this.lifecycle);
-            await this.lifecycle.OnStart();
+            await this.lifecycle.OnStart(cancellationToken);
             await manager.UpdateStatus(SiloStatus.Joining);
 
             var version = manager.MembershipTableSnapshot.Version;
@@ -478,28 +493,30 @@ namespace NonSilo.Tests.Membership
                 new MembershipVersion(version.Value + 1),
                 Entry(this.localSilo, SiloStatus.Dead, DateTimeOffset.UtcNow)));
             this.fatalErrorHandler.ReceivedWithAnyArgs().OnFatalException(default, default, default);
-            await this.lifecycle.OnStop();
+            await this.lifecycle.OnStop(cancellationToken);
         }
 
         [Fact]
         public async Task MembershipTableManager_DeadTransitionOutsideShutdown_Terminates()
         {
+            var cancellationToken = TestContext.Current.CancellationToken;
             var membershipTable = new InMemoryMembershipTable(new TableVersion(123, "123"));
             var manager = this.CreateMembershipTableManager(membershipTable);
             ((ILifecycleParticipant<ISiloLifecycle>)manager).Participate(this.lifecycle);
-            await this.lifecycle.OnStart();
+            await this.lifecycle.OnStart(cancellationToken);
             await manager.UpdateStatus(SiloStatus.Joining);
 
             await manager.UpdateStatus(SiloStatus.Dead);
 
             Assert.Equal(SiloStatus.Dead, manager.CurrentStatus);
             this.fatalErrorHandler.ReceivedWithAnyArgs().OnFatalException(default, default, default);
-            await this.lifecycle.OnStop();
+            await this.lifecycle.OnStop(cancellationToken);
         }
 
         [Fact]
         public async Task MembershipTableManager_DeadTransitionDuringLaterStopStage_DoesNotTerminate()
         {
+            var cancellationToken = TestContext.Current.CancellationToken;
             var membershipTable = new InMemoryMembershipTable(new TableVersion(123, "123"));
             var manager = this.CreateMembershipTableManager(membershipTable);
             ((ILifecycleParticipant<ISiloLifecycle>)manager).Participate(this.lifecycle);
@@ -508,10 +525,10 @@ namespace NonSilo.Tests.Membership
                 ServiceLifecycleStage.Active + 1,
                 _ => Task.CompletedTask,
                 _ => manager.UpdateStatus(SiloStatus.Dead));
-            await this.lifecycle.OnStart();
+            await this.lifecycle.OnStart(cancellationToken);
             await manager.UpdateStatus(SiloStatus.Joining);
 
-            await this.lifecycle.OnStop();
+            await this.lifecycle.OnStop(cancellationToken);
 
             Assert.Equal(SiloStatus.Dead, manager.CurrentStatus);
             this.fatalErrorHandler.DidNotReceiveWithAnyArgs().OnFatalException(default, default, default);
@@ -520,21 +537,23 @@ namespace NonSilo.Tests.Membership
         [Fact]
         public async Task MembershipTableManager_StopBeforeStart_DoesNotMarkLifecycleStopping()
         {
+            var cancellationToken = TestContext.Current.CancellationToken;
             var membershipTable = new InMemoryMembershipTable(new TableVersion(123, "123"));
             var manager = this.CreateMembershipTableManager(membershipTable);
             ((ILifecycleParticipant<ISiloLifecycle>)manager).Participate(this.lifecycle);
 
-            await this.lifecycle.OnStop();
-            await this.lifecycle.OnStart();
+            await this.lifecycle.OnStop(cancellationToken);
+            await this.lifecycle.OnStart(cancellationToken);
             await manager.UpdateStatus(SiloStatus.Dead);
 
             this.fatalErrorHandler.ReceivedWithAnyArgs().OnFatalException(default, default, default);
-            await this.lifecycle.OnStop();
+            await this.lifecycle.OnStop(cancellationToken);
         }
 
         [Fact]
         public async Task MembershipTableManager_MissingLocalEntry_OnlyNewerSnapshotAfterJoiningTerminates()
         {
+            var cancellationToken = TestContext.Current.CancellationToken;
             var now = DateTimeOffset.UtcNow;
             var otherSilo = Silo("127.0.0.1:200@100");
             var membershipTable = new InMemoryMembershipTable(
@@ -546,7 +565,7 @@ namespace NonSilo.Tests.Membership
             await manager.RefreshFromSnapshot(Snapshot(new MembershipVersion(1)));
             this.fatalErrorHandler.DidNotReceiveWithAnyArgs().OnFatalException(default, default, default);
 
-            await this.lifecycle.OnStart();
+            await this.lifecycle.OnStart(cancellationToken);
             await manager.UpdateStatus(SiloStatus.Joining);
             var currentVersion = manager.MembershipTableSnapshot.Version;
 
@@ -557,7 +576,7 @@ namespace NonSilo.Tests.Membership
             Assert.Equal(SiloStatus.Joining, manager.MembershipTableSnapshot.Entries[this.localSilo].Status);
             this.fatalErrorHandler.DidNotReceiveWithAnyArgs().OnFatalException(default, default, default);
 
-            await using var membershipUpdates = manager.MembershipTableUpdates.GetAsyncEnumerator();
+            await using var membershipUpdates = manager.MembershipTableUpdates.GetAsyncEnumerator(cancellationToken);
             Assert.True(await membershipUpdates.MoveNextAsync());
 
             await manager.RefreshFromSnapshot(Snapshot(
@@ -568,16 +587,17 @@ namespace NonSilo.Tests.Membership
             Assert.Equal(SiloStatus.Dead, manager.MembershipTableSnapshot.Entries[this.localSilo].Status);
             this.fatalErrorHandler.ReceivedWithAnyArgs().OnFatalException(default, default, default);
 
-            await this.lifecycle.OnStop();
+            await this.lifecycle.OnStop(cancellationToken);
         }
 
         [Fact]
         public async Task MembershipTableManager_MissingLocalEntry_WhenJoinSnapshotWasNotPublished_DoesNotTerminate()
         {
+            var cancellationToken = TestContext.Current.CancellationToken;
             var membershipTable = new InMemoryMembershipTable(new TableVersion(123, "123"));
             var manager = this.CreateMembershipTableManager(membershipTable);
             ((ILifecycleParticipant<ISiloLifecycle>)manager).Participate(this.lifecycle);
-            await this.lifecycle.OnStart();
+            await this.lifecycle.OnStart(cancellationToken);
 
             await manager.RefreshFromSnapshot(Snapshot(new MembershipVersion(125)));
             await manager.UpdateStatus(SiloStatus.Joining);
@@ -587,16 +607,17 @@ namespace NonSilo.Tests.Membership
             await manager.RefreshFromSnapshot(Snapshot(new MembershipVersion(126)));
             this.fatalErrorHandler.DidNotReceiveWithAnyArgs().OnFatalException(default, default, default);
 
-            await this.lifecycle.OnStop();
+            await this.lifecycle.OnStop(cancellationToken);
         }
 
         [Fact]
         public async Task MembershipTableManager_DeclaredDeadThenPrunedBeforeRefresh_Terminates()
         {
+            var cancellationToken = TestContext.Current.CancellationToken;
             var membershipTable = new InMemoryMembershipTable(new TableVersion(123, "123"));
             var manager = this.CreateMembershipTableManager(membershipTable);
             ((ILifecycleParticipant<ISiloLifecycle>)manager).Participate(this.lifecycle);
-            await this.lifecycle.OnStart();
+            await this.lifecycle.OnStart(cancellationToken);
             await manager.UpdateStatus(SiloStatus.Joining);
 
             while (true)
@@ -613,11 +634,11 @@ namespace NonSilo.Tests.Membership
             var prunedTable = await membershipTable.ReadAll();
             Assert.DoesNotContain(prunedTable.Members, row => row.Item1.SiloAddress.Equals(this.localSilo));
 
-            await manager.Refresh();
+            await manager.Refresh(cancellationToken: cancellationToken);
             Assert.Equal(SiloStatus.Dead, manager.MembershipTableSnapshot.Entries[this.localSilo].Status);
             this.fatalErrorHandler.ReceivedWithAnyArgs().OnFatalException(default, default, default);
 
-            await this.lifecycle.OnStop();
+            await this.lifecycle.OnStop(cancellationToken);
         }
 
         /// <summary>
@@ -626,6 +647,7 @@ namespace NonSilo.Tests.Membership
         [Fact]
         public async Task MembershipTableManager_TrySuspectOrKill_ButIAmKill()
         {
+            var cancellationToken = TestContext.Current.CancellationToken;
             var now = DateTimeOffset.UtcNow;
             var otherSilos = new[]
             {
@@ -644,7 +666,7 @@ namespace NonSilo.Tests.Membership
                 siloLifecycle: this.lifecycle,
                 timeProvider: TimeProvider.System);
             ((ILifecycleParticipant<ISiloLifecycle>)manager).Participate(this.lifecycle);
-            await this.lifecycle.OnStart();
+            await this.lifecycle.OnStart(cancellationToken);
             await manager.UpdateStatus(SiloStatus.Active);
             using var membershipEvents = new DiagnosticEventCollector(MembershipEvents.ListenerName);
 
@@ -659,7 +681,7 @@ namespace NonSilo.Tests.Membership
 
             this.fatalErrorHandler.DidNotReceiveWithAnyArgs().OnFatalException(default, default, default);
             var victim = otherSilos.First().SiloAddress;
-            var completion = WaitForSuspectOrKillCompletion(membershipEvents, victim);
+            var completion = WaitForSuspectOrKillCompletion(membershipEvents, victim, cancellationToken);
             await manager.TryToSuspectOrKill(victim);
             Assert.True((await completion).Success);
             this.fatalErrorHandler.ReceivedWithAnyArgs().OnFatalException(default, default, default);
@@ -671,6 +693,7 @@ namespace NonSilo.Tests.Membership
         [Fact]
         public async Task MembershipTableManager_TrySuspectOrKill_AlreadyDead()
         {
+            var cancellationToken = TestContext.Current.CancellationToken;
             var now = DateTimeOffset.UtcNow;
             var otherSilos = new[]
             {
@@ -690,12 +713,12 @@ namespace NonSilo.Tests.Membership
                 siloLifecycle: this.lifecycle,
                 timeProvider: TimeProvider.System);
             ((ILifecycleParticipant<ISiloLifecycle>)manager).Participate(this.lifecycle);
-            await this.lifecycle.OnStart();
+            await this.lifecycle.OnStart(cancellationToken);
             await manager.UpdateStatus(SiloStatus.Active);
             using var membershipEvents = new DiagnosticEventCollector(MembershipEvents.ListenerName);
 
             var victim = otherSilos.Last().SiloAddress;
-            var completion = WaitForSuspectOrKillCompletion(membershipEvents, victim);
+            var completion = WaitForSuspectOrKillCompletion(membershipEvents, victim, cancellationToken);
             await manager.TryToSuspectOrKill(victim);
             Assert.True((await completion).Success);
             Assert.Equal(SiloStatus.Dead, manager.MembershipTableSnapshot.GetSiloStatus(victim));
@@ -707,6 +730,7 @@ namespace NonSilo.Tests.Membership
         [Fact]
         public async Task MembershipTableManager_TrySuspectOrKill_DeclareDead_SmallCluster()
         {
+            var cancellationToken = TestContext.Current.CancellationToken;
             var now = DateTimeOffset.UtcNow;
             var otherSilos = new[]
             {
@@ -726,12 +750,12 @@ namespace NonSilo.Tests.Membership
                 siloLifecycle: this.lifecycle,
                 timeProvider: TimeProvider.System);
             ((ILifecycleParticipant<ISiloLifecycle>)manager).Participate(this.lifecycle);
-            await this.lifecycle.OnStart();
+            await this.lifecycle.OnStart(cancellationToken);
             await manager.UpdateStatus(SiloStatus.Active);
             using var membershipEvents = new DiagnosticEventCollector(MembershipEvents.ListenerName);
 
             var victim = otherSilos.First().SiloAddress;
-            var completion = WaitForSuspectOrKillCompletion(membershipEvents, victim);
+            var completion = WaitForSuspectOrKillCompletion(membershipEvents, victim, cancellationToken);
             await manager.TryToSuspectOrKill(victim);
             Assert.True((await completion).Success);
             Assert.Equal(SiloStatus.Dead, manager.MembershipTableSnapshot.GetSiloStatus(victim));
@@ -745,6 +769,7 @@ namespace NonSilo.Tests.Membership
         [Fact]
         public async Task MembershipTableManager_TrySuspectOrKill_ClocksNotSynchronized()
         {
+            var cancellationToken = TestContext.Current.CancellationToken;
             var now = DateTime.UtcNow;
             var otherSilos = new[]
             {
@@ -775,7 +800,7 @@ namespace NonSilo.Tests.Membership
             manager.GetDateTimeUtcNow = () => now;
 
             ((ILifecycleParticipant<ISiloLifecycle>)manager).Participate(this.lifecycle);
-            await this.lifecycle.OnStart();
+            await this.lifecycle.OnStart(cancellationToken);
             await manager.UpdateStatus(SiloStatus.Active);
             using var membershipEvents = new DiagnosticEventCollector(MembershipEvents.ListenerName);
 
@@ -807,13 +832,13 @@ namespace NonSilo.Tests.Membership
             //   a) Adding our vote changes nothing, since our clock is too far behind
             //   b) The silo is not mistakenly declared dead, since the difference between the two votes is larger than DeathVoteExpirationTimeout.
             this.fatalErrorHandler.DidNotReceiveWithAnyArgs().OnFatalException(default, default, default);
-            var completion = WaitForSuspectOrKillCompletion(membershipEvents, victim);
+            var completion = WaitForSuspectOrKillCompletion(membershipEvents, victim, cancellationToken);
             await manager.TryToSuspectOrKill(victim);
             Assert.True((await completion).Success);
             this.fatalErrorHandler.DidNotReceiveWithAnyArgs().OnFatalException(default, default, default);
 
             // The victim should be alive as no second vote fell within the recency window of the latest vote.
-            await manager.Refresh();
+            await manager.Refresh(cancellationToken: cancellationToken);
             Assert.Equal(SiloStatus.Active, manager.MembershipTableSnapshot.GetSiloStatus(victim));
         }
 
@@ -823,6 +848,7 @@ namespace NonSilo.Tests.Membership
         [Fact]
         public async Task MembershipTableManager_TrySuspectOrKill_DeclareDead_LargerCluster()
         {
+            var cancellationToken = TestContext.Current.CancellationToken;
             var now = DateTimeOffset.UtcNow;
             var otherSilos = new[]
             {
@@ -848,13 +874,17 @@ namespace NonSilo.Tests.Membership
                 siloLifecycle: this.lifecycle,
                 timeProvider: TimeProvider.System);
             ((ILifecycleParticipant<ISiloLifecycle>)manager).Participate(this.lifecycle);
-            await this.lifecycle.OnStart();
+            await this.lifecycle.OnStart(cancellationToken);
             await manager.UpdateStatus(SiloStatus.Active);
             using var membershipEvents = new DiagnosticEventCollector(MembershipEvents.ListenerName);
 
             // Multiple votes from the same node should not result in the node being declared dead.
             var victim = otherSilos.First().SiloAddress;
-            var completions = WaitForSuspectOrKillCompletions(membershipEvents, victim, expectedCount: 3);
+            var completions = WaitForSuspectOrKillCompletions(
+                membershipEvents,
+                victim,
+                expectedCount: 3,
+                cancellationToken: cancellationToken);
             await manager.TryToSuspectOrKill(victim);
             await manager.TryToSuspectOrKill(victim);
             await manager.TryToSuspectOrKill(victim);
@@ -872,7 +902,7 @@ namespace NonSilo.Tests.Membership
                 if (await membershipTable.UpdateRow(entry, row.Item2, table.Version.Next())) break;
             }
 
-            var completion = WaitForSuspectOrKillCompletion(membershipEvents, victim);
+            var completion = WaitForSuspectOrKillCompletion(membershipEvents, victim, cancellationToken);
             await manager.TryToSuspectOrKill(victim);
             Assert.True((await completion).Success);
             Assert.Equal(SiloStatus.Dead, manager.MembershipTableSnapshot.GetSiloStatus(victim));
@@ -892,13 +922,13 @@ namespace NonSilo.Tests.Membership
             }
 
             this.fatalErrorHandler.DidNotReceiveWithAnyArgs().OnFatalException(default, default, default);
-            completion = WaitForSuspectOrKillCompletion(membershipEvents, victim);
+            completion = WaitForSuspectOrKillCompletion(membershipEvents, victim, cancellationToken);
             await manager.TryToSuspectOrKill(victim);
             Assert.False((await completion).Success);
             this.fatalErrorHandler.ReceivedWithAnyArgs().OnFatalException(default, default, default);
 
             // We killed ourselves and should not have marked the other silo as dead.
-            await manager.Refresh();
+            await manager.Refresh(cancellationToken: cancellationToken);
             Assert.Equal(SiloStatus.Active, manager.MembershipTableSnapshot.GetSiloStatus(victim));
         }
 
@@ -908,6 +938,7 @@ namespace NonSilo.Tests.Membership
         [Fact]
         public async Task MembershipTableManager_Refresh()
         {
+            var cancellationToken = TestContext.Current.CancellationToken;
             var timers = new List<DelegateAsyncTimer>();
             var timerCalls = new ConcurrentQueue<(TimeSpan? DelayOverride, TaskCompletionSource<bool> Completion)>();
             var timerFactory = new DelegateAsyncTimerFactory(
@@ -942,33 +973,33 @@ namespace NonSilo.Tests.Membership
                 siloLifecycle: this.lifecycle,
                 timeProvider: TimeProvider.System);
             ((ILifecycleParticipant<ISiloLifecycle>)manager).Participate(this.lifecycle);
-            await this.lifecycle.OnStart();
+            await this.lifecycle.OnStart(cancellationToken);
             
             // Test that retries occur after an exception.
             (TimeSpan? DelayOverride, TaskCompletionSource<bool> Completion) timer = (default, default!);
-            while (!timerCalls.TryDequeue(out timer)) await Task.Delay(1);
+            while (!timerCalls.TryDequeue(out timer)) await Task.Delay(1, cancellationToken);
             var counter = 0;
             membershipTable.OnReadAll = () => { if (counter++ == 0) throw new Exception("no"); };
             timer.Completion.TrySetResult(true);
             this.fatalErrorHandler.DidNotReceiveWithAnyArgs().OnFatalException(default, default, default);
 
             // A shorter delay should be provided after a transient failure.
-            while (!timerCalls.TryDequeue(out timer)) await Task.Delay(10);
+            while (!timerCalls.TryDequeue(out timer)) await Task.Delay(10, cancellationToken);
             membershipTable.OnReadAll = null;
             Assert.True(timer.DelayOverride.HasValue);
             timer.Completion.TrySetResult(true);
 
             // The standard delay should be used thereafter.
-            while (!timerCalls.TryDequeue(out timer)) await Task.Delay(10);
+            while (!timerCalls.TryDequeue(out timer)) await Task.Delay(10, cancellationToken);
             Assert.False(timer.DelayOverride.HasValue);
             timer.Completion.TrySetResult(true);
 
             // If for some reason the timer itself fails (or something else), the silo should crash
-            while (!timerCalls.TryDequeue(out timer)) await Task.Delay(10);
+            while (!timerCalls.TryDequeue(out timer)) await Task.Delay(10, cancellationToken);
             timer.Completion.TrySetException(new Exception("no again"));
             this.fatalErrorHandler.ReceivedWithAnyArgs().OnFatalException(default, default, default);
             Assert.False(timerCalls.TryDequeue(out timer));
-            await this.lifecycle.OnStop();
+            await this.lifecycle.OnStop(cancellationToken);
         }
 
         private static SiloAddress Silo(string value) => SiloAddress.FromParsableString(value);
@@ -992,16 +1023,24 @@ namespace NonSilo.Tests.Membership
             return new MembershipTableSnapshot(version, entries.ToImmutableDictionary(entry => entry.SiloAddress));
         }
 
-        private async Task<MembershipEvents.SuspectOrKillRequestCompleted> WaitForSuspectOrKillCompletion(DiagnosticEventCollector membershipEvents, SiloAddress silo)
+        private async Task<MembershipEvents.SuspectOrKillRequestCompleted> WaitForSuspectOrKillCompletion(
+            DiagnosticEventCollector membershipEvents,
+            SiloAddress silo,
+            CancellationToken cancellationToken)
         {
-            var completions = await WaitForSuspectOrKillCompletions(membershipEvents, silo, expectedCount: 1);
+            var completions = await WaitForSuspectOrKillCompletions(
+                membershipEvents,
+                silo,
+                expectedCount: 1,
+                cancellationToken: cancellationToken);
             return completions[0];
         }
 
         private async Task<List<MembershipEvents.SuspectOrKillRequestCompleted>> WaitForSuspectOrKillCompletions(
             DiagnosticEventCollector membershipEvents,
             SiloAddress silo,
-            int expectedCount)
+            int expectedCount,
+            CancellationToken cancellationToken)
         {
             Assert.True(expectedCount > 0);
 
@@ -1017,7 +1056,8 @@ namespace NonSilo.Tests.Membership
                         && completed.RequestType == MembershipEvents.SuspectOrKillRequestType.SuspectOrKill
                         && completed.SiloAddress.Equals(silo)
                         && !completions.Contains(completed),
-                    TimeSpan.FromSeconds(40));
+                    TimeSpan.FromSeconds(40),
+                    cancellationToken);
 
                 completions.Add(Assert.IsType<MembershipEvents.SuspectOrKillRequestCompleted>(diagnosticEvent.Payload));
             }

@@ -13,7 +13,7 @@ public class TimeProviderExtensionsTests
     {
         var timeProvider = new FakeTimeProvider();
 
-        var task = timeProvider.DelayAsync(TimeSpan.Zero);
+        var task = timeProvider.DelayAsync(TimeSpan.Zero, TestContext.Current.CancellationToken);
 
         Assert.True(task.IsCompletedSuccessfully);
         await task;
@@ -25,7 +25,7 @@ public class TimeProviderExtensionsTests
     public async Task DelayAsync_SupportsInfiniteDelay()
     {
         var timeProvider = new FakeTimeProvider();
-        using var cancellation = new CancellationTokenSource();
+        using var cancellation = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
 
         var task = timeProvider.DelayAsync(Timeout.InfiniteTimeSpan, cancellation.Token);
 
@@ -45,7 +45,9 @@ public class TimeProviderExtensionsTests
         var timeProvider = new FakeTimeProvider();
 
         await Assert.ThrowsAsync<ArgumentOutOfRangeException>(
-            () => timeProvider.DelayAsync(TimeSpan.FromMilliseconds(milliseconds)));
+            () => timeProvider.DelayAsync(
+                TimeSpan.FromMilliseconds(milliseconds),
+                TestContext.Current.CancellationToken));
     }
 
     [TestSuite("BVT")]
@@ -56,7 +58,7 @@ public class TimeProviderExtensionsTests
         var timeProvider = new FakeTimeProvider();
         var delay = TimeSpan.FromDays(60);
 
-        var task = timeProvider.DelayAsync(delay);
+        var task = timeProvider.DelayAsync(delay, TestContext.Current.CancellationToken);
 
         Assert.False(task.IsCompleted);
         timeProvider.Advance(TimeSpan.FromDays(50));
@@ -76,7 +78,7 @@ public class TimeProviderExtensionsTests
         var timeProvider = new FakeTimeProvider();
         var dueTime = timeProvider.GetUtcNow() + TimeSpan.FromMilliseconds(milliseconds);
 
-        var task = timeProvider.DelayUntilAsync(dueTime);
+        var task = timeProvider.DelayUntilAsync(dueTime, TestContext.Current.CancellationToken);
 
         Assert.True(task.IsCompletedSuccessfully);
         await task;
@@ -89,7 +91,9 @@ public class TimeProviderExtensionsTests
     {
         var timeProvider = new FakeTimeProvider();
         var delay = TimeSpan.FromDays(60);
-        var task = timeProvider.DelayUntilAsync(timeProvider.GetUtcNow() + delay);
+        var task = timeProvider.DelayUntilAsync(
+            timeProvider.GetUtcNow() + delay,
+            TestContext.Current.CancellationToken);
 
         Assert.False(task.IsCompleted);
         timeProvider.Advance(TimeSpan.FromDays(50));

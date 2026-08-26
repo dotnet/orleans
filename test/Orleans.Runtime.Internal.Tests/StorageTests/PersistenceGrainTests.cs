@@ -660,7 +660,7 @@ namespace UnitTests.StorageTests
             Assert.Equal(expectedVal, val); // Returned value
             await SetErrorInjection(providerName, ErrorInjectionPoint.BeforeRead);
 
-            await CheckStorageProviderErrors(grain.DoRead);
+            await CheckStorageProviderErrors(grain.DoRead, TestContext.Current.CancellationToken);
 
             await SetErrorInjection(providerName, ErrorInjectionPoint.None);
 
@@ -690,7 +690,7 @@ namespace UnitTests.StorageTests
             Assert.Equal(expectedVal, val); // Returned value
 
             await SetErrorInjection(providerName, ErrorInjectionPoint.AfterRead);
-            await CheckStorageProviderErrors(grain.DoRead);
+            await CheckStorageProviderErrors(grain.DoRead, TestContext.Current.CancellationToken);
 
             val = await grain.GetValue();
             Assert.Equal(expectedVal, val); // Returned value
@@ -728,7 +728,7 @@ namespace UnitTests.StorageTests
 
             const int attemptedVal3 = 63;
             await SetErrorInjection(providerName, ErrorInjectionPoint.BeforeWrite);
-            await CheckStorageProviderErrors(() => grain.DoWrite(attemptedVal3));
+            await CheckStorageProviderErrors(() => grain.DoWrite(attemptedVal3), TestContext.Current.CancellationToken);
 
             // Stored value unchanged
             providerState = GetStateForStorageProviderInUse<ErrorInjectionStorageProvider>(providerName);
@@ -770,7 +770,10 @@ namespace UnitTests.StorageTests
                 ErrorInjectionPoint = ErrorInjectionPoint.BeforeWrite,
                 ExceptionType = typeof(InconsistentStateException)
             });
-            await CheckStorageProviderErrors(() => grain.DoWrite(attemptedVal3), typeof(InconsistentStateException));
+            await CheckStorageProviderErrors(
+                () => grain.DoWrite(attemptedVal3),
+                TestContext.Current.CancellationToken,
+                typeof(InconsistentStateException));
 
             // Stored value unchanged
             providerState = GetStateForStorageProviderInUse<ErrorInjectionStorageProvider>(providerName);
@@ -811,7 +814,10 @@ namespace UnitTests.StorageTests
                 ErrorInjectionPoint = ErrorInjectionPoint.BeforeWrite,
                 ExceptionType = typeof(InconsistentStateException)
             });
-            await CheckStorageProviderErrors(() => proxy.DoWrite(63, target), typeof(InconsistentStateException));
+            await CheckStorageProviderErrors(
+                () => proxy.DoWrite(63, target),
+                TestContext.Current.CancellationToken,
+                typeof(InconsistentStateException));
 
             // The target should have been deactivated by the exception.
             Assert.NotEqual(targetActivationId, await target.GetActivationId());
@@ -839,7 +845,7 @@ namespace UnitTests.StorageTests
 
             const int attemptedVal4 = 83;
             await SetErrorInjection(providerName, ErrorInjectionPoint.AfterWrite);
-            await CheckStorageProviderErrors(() => grain.DoWrite(attemptedVal4));
+            await CheckStorageProviderErrors(() => grain.DoWrite(attemptedVal4), TestContext.Current.CancellationToken);
 
             // Stored value has changed
             expectedVal = attemptedVal4;
@@ -873,7 +879,7 @@ namespace UnitTests.StorageTests
             Assert.Equal(expectedVal, providerState.LastStoredGrainState!.Field1); // Store-Field1
 
             await SetErrorInjection(providerName, ErrorInjectionPoint.BeforeRead);
-            await CheckStorageProviderErrors(grain.DoRead);
+            await CheckStorageProviderErrors(grain.DoRead, TestContext.Current.CancellationToken);
 
             await SetErrorInjection(providerName, ErrorInjectionPoint.None);
             val = await grain.GetValue();
@@ -906,7 +912,7 @@ namespace UnitTests.StorageTests
             expectedVal = 94;
             SetStoredValue<ErrorInjectionStorageProvider>(providerName, DefaultGrainStateName, grain, "Field1", expectedVal);
             await SetErrorInjection(providerName, ErrorInjectionPoint.AfterRead);
-            await CheckStorageProviderErrors(grain.DoRead);
+            await CheckStorageProviderErrors(grain.DoRead, TestContext.Current.CancellationToken);
 
             await SetErrorInjection(providerName, ErrorInjectionPoint.None);
             val = await grain.GetValue();
@@ -1003,7 +1009,7 @@ namespace UnitTests.StorageTests
 
             int newVal = expectedVal + 1;
             await SetErrorInjection(providerName, ErrorInjectionPoint.BeforeWrite);
-            await CheckStorageProviderErrors(() => grain.DoWrite(newVal, false));
+            await CheckStorageProviderErrors(() => grain.DoWrite(newVal, false), TestContext.Current.CancellationToken);
 
             val = await grain.GetValue();
             // Stored value unchanged
@@ -1169,6 +1175,7 @@ namespace UnitTests.StorageTests
         [Fact, TestCategory("Persistence"), TestCategory("Serialization"), TestCategory("CorePerf"), TestCategory("Stress")]
         public async Task Serialize_GrainState_DeepCopy_Stress()
         {
+            var cancellationToken = TestContext.Current.CancellationToken;
             int num = 100;
             int loops = num * 100;
             GrainStateContainingGrainReferences[] states = new GrainStateContainingGrainReferences[num];
@@ -1184,10 +1191,10 @@ namespace UnitTests.StorageTests
             for (int i = 0; i < loops; i++)
             {
                 int idx = Random.Shared.Next(num);
-                tasks.Add(Task.Run(() => { var copy = this.HostedCluster.DeepCopy(states[idx]); }));
-                tasks.Add(Task.Run(() => { var other = this.HostedCluster.RoundTripSerializationForTesting(states[idx]); }));
+                tasks.Add(Task.Run(() => { var copy = this.HostedCluster.DeepCopy(states[idx]); }, cancellationToken));
+                tasks.Add(Task.Run(() => { var other = this.HostedCluster.RoundTripSerializationForTesting(states[idx]); }, cancellationToken));
             }
-            await Task.WhenAll(tasks);
+            await Task.WhenAll(tasks).WaitAsync(cancellationToken);
 
             //Task copyTask = Task.Run(() =>
             //{
@@ -1338,13 +1345,16 @@ namespace UnitTests.StorageTests
             await ErrorInjectionStorageProvider.SetErrorInjection(providerName, errorInjectionBehavior, this.HostedCluster.GrainFactory!);
         }
 
-        private async Task CheckStorageProviderErrors(Func<Task> taskFunc, Type? expectedException = null)
+        private async Task CheckStorageProviderErrors(
+            Func<Task> taskFunc,
+            CancellationToken cancellationToken,
+            Type? expectedException = null)
         {
             StackTrace at = new StackTrace();
             TimeSpan timeout = Debugger.IsAttached ? TimeSpan.FromMinutes(5) : TimeSpan.FromSeconds(15);
             try
             {
-                await taskFunc().WaitAsync(timeout);
+                await taskFunc().WaitAsync(timeout, cancellationToken);
 
                 if (ErrorInjectionStorageProvider.DoInjectErrors)
                 {
@@ -1352,6 +1362,10 @@ namespace UnitTests.StorageTests
                     output.WriteLine("Assertion failed: {0}", msg);
                     Assert.Fail(msg);
                 }
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                throw;
             }
             catch (Exception e)
             {

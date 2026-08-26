@@ -58,11 +58,12 @@ namespace UnitTests
         [Fact, TestCategory("Functional"), TestCategory("Tasks"), TestCategory("Reentrancy")]
         public async Task ReentrantGrain()
         {
+            var cancellationToken = TestContext.Current.CancellationToken;
             var reentrant = this.fixture.GrainFactory.GetGrain<IReentrantGrain>(GetRandomGrainId());
             await reentrant.SetSelf(reentrant);
 
             // Should reenter
-            await reentrant.Two().WaitAsync(TimeSpan.FromSeconds(5));
+            await reentrant.Two().WaitAsync(TimeSpan.FromSeconds(5), cancellationToken);
             this.fixture.Logger.LogInformation("Reentrancy ReentrantGrain Test finished OK.");
         }
 
@@ -72,11 +73,12 @@ namespace UnitTests
         [Fact, TestCategory("Functional"), TestCategory("Tasks"), TestCategory("Reentrancy")]
         public async Task NonReentrantGrain_WithMayInterleaveStaticPredicate_WhenPredicateReturnsTrue()
         {
+            var cancellationToken = TestContext.Current.CancellationToken;
             var grain = this.fixture.GrainFactory.GetGrain<IMayInterleaveStaticPredicateGrain>(GetRandomGrainId());
             await grain.SetSelf(grain);
 
             // Should reenter since predicate should return true.
-            await grain.TwoReentrant().WaitAsync(TimeSpan.FromSeconds(5));
+            await grain.TwoReentrant().WaitAsync(TimeSpan.FromSeconds(5), cancellationToken);
             this.fixture.Logger.LogInformation("Reentrancy NonReentrantGrain_WithMayInterleaveStaticPredicate_WhenPredicateReturnsTrue Test finished OK.");
         }
 
@@ -88,15 +90,16 @@ namespace UnitTests
         [InlineData(false)]
         public async Task MayInterleavePredicate_AllowsInterleaving(bool mayInterleaveFirst)
         {
+            var cancellationToken = TestContext.Current.CancellationToken;
             // Create a unique grain per run
             var grainKey = $"grain-{mayInterleaveFirst}";
             var grain = this.fixture.GrainFactory.GetGrain<ICallOrderingGrain>(grainKey);
 
             Task first = mayInterleaveFirst ? grain.MethodA() : grain.MethodB();
-            await Task.Delay(250); // Stagger second call
+            await Task.Delay(250, cancellationToken); // Stagger second call
             Task second = mayInterleaveFirst ? grain.MethodB() : grain.MethodA();
 
-            await Task.Delay(500); // Let both methods reach entry point
+            await Task.Delay(500, cancellationToken); // Let both methods reach entry point
 
             await grain.Unblock();
             await Task.WhenAll(first, second);
@@ -118,11 +121,16 @@ namespace UnitTests
         [Fact, TestCategory("Functional"), TestCategory("Tasks"), TestCategory("Reentrancy")]
         public async Task NonReentrantGrain_WithMayInterleaveStaticPredicate_WhenPredicateThrows()
         {
+            var cancellationToken = TestContext.Current.CancellationToken;
             var grain = this.fixture.GrainFactory.GetGrain<IMayInterleaveStaticPredicateGrain>(GetRandomGrainId());
             await grain.SetSelf(grain);
             try
             {
-                await grain.Exceptional().WaitAsync(TimeSpan.FromSeconds(2));
+                await grain.Exceptional().WaitAsync(TimeSpan.FromSeconds(2), cancellationToken);
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                throw;
             }
             catch (Exception ex)
             {
@@ -139,11 +147,12 @@ namespace UnitTests
         [Fact, TestCategory("Functional"), TestCategory("Tasks"), TestCategory("Reentrancy")]
         public async Task NonReentrantGrain_WithMayInterleaveInstancedPredicate_WhenPredicateReturnsTrue()
         {
+            var cancellationToken = TestContext.Current.CancellationToken;
             var grain = this.fixture.GrainFactory.GetGrain<IMayInterleaveInstancedPredicateGrain>(GetRandomGrainId());
             await grain.SetSelf(grain);
 
             // Grain should reenter when MayInterleave predicate returns true
-            await grain.TwoReentrant().WaitAsync(TimeSpan.FromSeconds(2));
+            await grain.TwoReentrant().WaitAsync(TimeSpan.FromSeconds(2), cancellationToken);
             this.fixture.Logger.LogInformation("Reentrancy NonReentrantGrain_WithMayInterleaveInstancedPredicate_WhenPredicateReturnsTrue Test finished OK.");
         }
 
@@ -153,11 +162,16 @@ namespace UnitTests
         [Fact, TestCategory("Functional"), TestCategory("Tasks"), TestCategory("Reentrancy")]
         public async Task NonReentrantGrain_WithMayInterleaveInstancedPredicate_WhenPredicateThrows()
         {
+            var cancellationToken = TestContext.Current.CancellationToken;
             var grain = this.fixture.GrainFactory.GetGrain<IMayInterleaveInstancedPredicateGrain>(GetRandomGrainId());
             await grain.SetSelf(grain);
             try
             {
-                await grain.Exceptional().WaitAsync(TimeSpan.FromSeconds(2));
+                await grain.Exceptional().WaitAsync(TimeSpan.FromSeconds(2), cancellationToken);
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                throw;
             }
             catch (Exception ex)
             {
@@ -308,7 +322,7 @@ namespace UnitTests
             const int numLoops = 5;
             const int blockSize = 10;
             TimeSpan timeout = TimeSpan.FromSeconds(40);
-            await Do_FanOut_Stress(numLoops, blockSize, timeout, false, false);
+            await Do_FanOut_Stress(numLoops, blockSize, timeout, false, false, TestContext.Current.CancellationToken);
         }
 
         [TestSuite("Functional")]
@@ -319,7 +333,7 @@ namespace UnitTests
             const int numLoops = 5;
             const int blockSize = 10;
             TimeSpan timeout = TimeSpan.FromSeconds(40);
-            await Do_FanOut_Stress(numLoops, blockSize, timeout, true, false);
+            await Do_FanOut_Stress(numLoops, blockSize, timeout, true, false, TestContext.Current.CancellationToken);
         }
 
         [TestSuite("Functional")]
@@ -330,7 +344,7 @@ namespace UnitTests
             const int numLoops = 5;
             const int blockSize = 10;
             TimeSpan timeout = TimeSpan.FromSeconds(40);
-            await Do_FanOut_Stress(numLoops, blockSize, timeout, false, true);
+            await Do_FanOut_Stress(numLoops, blockSize, timeout, false, true, TestContext.Current.CancellationToken);
         }
 
         [TestSuite("Functional")]
@@ -341,7 +355,7 @@ namespace UnitTests
             const int numLoops = 5;
             const int blockSize = 10;
             TimeSpan timeout = TimeSpan.FromSeconds(40);
-            await Do_FanOut_Stress(numLoops, blockSize, timeout, true, true);
+            await Do_FanOut_Stress(numLoops, blockSize, timeout, true, true, TestContext.Current.CancellationToken);
         }
 
         // ---------- Utility methods ----------
@@ -409,7 +423,7 @@ namespace UnitTests
         private readonly TimeSpan MaxStressExecutionTime = TimeSpan.FromMinutes(2);
 
         private async Task Do_FanOut_Stress(int numLoops, int blockSize, TimeSpan timeout,
-            bool doNonReentrant, bool doAC)
+            bool doNonReentrant, bool doAC, CancellationToken cancellationToken)
         {
             Stopwatch totalTime = Stopwatch.StartNew();
             List<Task> promises = new List<Task>();
@@ -426,10 +440,10 @@ namespace UnitTests
                     {
                         return doAC ? Do_FanOut_AC_Join(offset, doNonReentrant, false)
                                     : Do_FanOut_Task_Join(offset, doNonReentrant, false);
-                    });
+                    }, cancellationToken);
                     promises.Add(promise);
                     output.WriteLine("Inner loop {0} - Created Tasks. Elapsed={1}", j, innerClock.Elapsed);
-                    await Task.WhenAll(promises).WaitAsync(timeout);
+                    await Task.WhenAll(promises).WaitAsync(timeout, cancellationToken);
                     output.WriteLine("Inner loop {0} - Finished Join. Elapsed={1}", j, innerClock.Elapsed);
                     promises.Clear();
                 }

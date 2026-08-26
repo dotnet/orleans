@@ -110,7 +110,7 @@ public class ClusterManifestProviderTests
         }
         finally
         {
-            await lifecycle.OnStop();
+            await lifecycle.OnStop(TestContext.Current.CancellationToken);
             membership.Dispose();
         }
     }
@@ -152,7 +152,7 @@ public class ClusterManifestProviderTests
         }
         finally
         {
-            await lifecycle.OnStop();
+            await lifecycle.OnStop(TestContext.Current.CancellationToken);
             membership.Dispose();
         }
     }
@@ -244,12 +244,12 @@ public class ClusterManifestProviderTests
         var suitableSilosRead = membership.ObserveNextSnapshotRead();
         var suitableSilosTask = Task.Run(
             () => selectorManager.GetSuitableSilos(TestGrainType, TestInterfaceType, requestedVersion: 1));
-        await suitableSilosRead.WaitAsync(TimeSpan.FromSeconds(10));
+        await suitableSilosRead.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
         Assert.False(suitableSilosTask.IsCompleted);
 
         clusterManifestProvider.Current = CreateClusterManifest(2, 0, remoteSilo);
 
-        var suitableSilos = await suitableSilosTask.WaitAsync(TimeSpan.FromSeconds(10));
+        var suitableSilos = await suitableSilosTask.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
         Assert.Equal(new[] { remoteSilo }, suitableSilos.SuitableSilos);
 
         membership.Update(CreateMembershipSnapshot(
@@ -258,12 +258,12 @@ public class ClusterManifestProviderTests
             (remoteSilo, SiloStatus.Active)));
         var supportedSilosRead = membership.ObserveNextSnapshotRead();
         var supportedSilosTask = Task.Run(() => selectorManager.GetSupportedSilos(TestGrainType));
-        await supportedSilosRead.WaitAsync(TimeSpan.FromSeconds(10));
+        await supportedSilosRead.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
         Assert.False(supportedSilosTask.IsCompleted);
 
         clusterManifestProvider.Current = CreateClusterManifest(3, 0, localSilo, remoteSilo);
 
-        var supportedSilos = await supportedSilosTask.WaitAsync(TimeSpan.FromSeconds(10));
+        var supportedSilos = await supportedSilosTask.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
         Assert.Equal(new[] { localSilo, remoteSilo }, supportedSilos.OrderBy(static silo => silo));
     }
 

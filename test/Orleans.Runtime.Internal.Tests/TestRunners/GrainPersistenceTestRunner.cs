@@ -327,6 +327,7 @@ public abstract class GrainPersistenceTestsRunner : OrleansTestingBase
     [Fact, TestCategory("Functional")]
     public async Task Grain_GrainStorage_SiloRestart()
     {
+        var cancellationToken = TestContext.Current.CancellationToken;
         if (!IsDurableStorage) 
         {
             throw Xunit.Sdk.SkipException.ForSkip("This provider does not persist state, so cannot survive a silo restart.");
@@ -364,7 +365,7 @@ public abstract class GrainPersistenceTestsRunner : OrleansTestingBase
             await HostedCluster.RestartSiloAsync(silo);
         }
 
-        await HostedCluster.InitializeClientAsync();
+        await HostedCluster.InitializeClientAsync(cancellationToken);
 
         output.WriteLine("Silos restarted");
 

@@ -49,10 +49,10 @@ namespace UnitTests.Runtime
             var testAccessor = GetTestAccessor(target);
             using var collector = new DiagnosticEventCollector(PlacementServiceEvents.ListenerName);
 
-            await StopAsync(target);
+            await StopAsync(target, TestContext.Current.CancellationToken);
 
             Assert.All(testAccessor.WorkerTasks, task => Assert.True(task.IsCompleted));
-            await AssertWorkerStopEventsAsync(target, collector);
+            await AssertWorkerStopEventsAsync(target, collector, TestContext.Current.CancellationToken);
         }
 
         [Fact]
@@ -61,13 +61,14 @@ namespace UnitTests.Runtime
             var target = CreateTarget();
             var testAccessor = GetTestAccessor(target);
             using var collector = new DiagnosticEventCollector(PlacementServiceEvents.ListenerName);
-            using var cts = new CancellationTokenSource();
+            using var cts = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
             cts.Cancel();
 
-            await StopAsync(target, cts.Token);
+            var lifecycle = await StartAsync(target, TestContext.Current.CancellationToken);
+            await lifecycle.OnStop(cts.Token);
 
             Assert.All(testAccessor.WorkerTasks, task => Assert.True(task.IsCompleted));
-            await AssertWorkerStopEventsAsync(target, collector);
+            await AssertWorkerStopEventsAsync(target, collector, TestContext.Current.CancellationToken);
         }
 
         [Fact]
@@ -79,7 +80,7 @@ namespace UnitTests.Runtime
                 TargetGrain = GrainId.Create("test", "grain-1"),
             };
 
-            await StopAsync(target);
+            await StopAsync(target, TestContext.Current.CancellationToken);
 
             await Assert.ThrowsAsync<SiloUnavailableException>(() => target.AddressMessage(message));
         }
@@ -95,7 +96,7 @@ namespace UnitTests.Runtime
                 InterfaceVersion = 1,
             };
 
-            await StopAsync(target);
+            await StopAsync(target, TestContext.Current.CancellationToken);
 
             await Assert.ThrowsAsync<SiloUnavailableException>(() => GetTestAccessor(target).GetOrPlaceActivationAsync(message));
         }
@@ -113,7 +114,7 @@ namespace UnitTests.Runtime
             };
 
             await Assert.ThrowsAsync<OperationCanceledException>(() => GetTestAccessor(target).GetOrPlaceActivationAsync(message));
-            await StopAsync(target);
+            await StopAsync(target, TestContext.Current.CancellationToken);
         }
 
         [Fact]
@@ -149,13 +150,15 @@ namespace UnitTests.Runtime
             await lookupStarted.Task;
             timeProvider.Advance(messagingOptions.PlacementTimeout);
 
-            var completedTask = await Task.WhenAny(placementTask, Task.Delay(TimeSpan.FromSeconds(1)));
+            var completedTask = await Task.WhenAny(
+                placementTask,
+                Task.Delay(TimeSpan.FromSeconds(1), TestContext.Current.CancellationToken));
             Assert.Same(placementTask, completedTask);
             var exception = await Assert.ThrowsAsync<TimeoutException>(() => placementTask);
             Assert.IsType<Polly.Timeout.TimeoutRejectedException>(exception.InnerException);
 
             lookupCompletion.TrySetResult(default);
-            await StopAsync(fixture.Target);
+            await StopAsync(fixture.Target, TestContext.Current.CancellationToken);
         }
 
         [Fact]
@@ -182,7 +185,7 @@ namespace UnitTests.Runtime
 
             var placementTask = GetTestAccessor(fixture.Target).GetOrPlaceActivationAsync(message);
             await lookupStarted.Task;
-            await StopAsync(fixture.Target);
+            await StopAsync(fixture.Target, TestContext.Current.CancellationToken);
 
             await Assert.ThrowsAsync<SiloUnavailableException>(() => placementTask);
             lookupCompletion.TrySetResult(default);
@@ -194,7 +197,7 @@ namespace UnitTests.Runtime
             var target = CreateTarget();
             var placementTarget = new PlacementTarget(GrainId.Create("test", "grain-1"), new Dictionary<string, object>(), default, 0);
 
-            await StopAsync(target);
+            await StopAsync(target, TestContext.Current.CancellationToken);
 
             Assert.Throws<SiloUnavailableException>(() => target.GetCompatibleSilos(placementTarget));
         }
@@ -209,7 +212,7 @@ namespace UnitTests.Runtime
                 GrainInterfaceType.Create("test.interface"),
                 1);
 
-            await StopAsync(target);
+            await StopAsync(target, TestContext.Current.CancellationToken);
 
             Assert.Throws<SiloUnavailableException>(() => target.GetCompatibleSilosWithVersions(placementTarget));
         }
@@ -227,7 +230,7 @@ namespace UnitTests.Runtime
             Assert.Same(first, second);
             Assert.True(silos.ToHashSet().SetEquals(first));
 
-            await StopAsync(fixture.Target);
+            await StopAsync(fixture.Target, TestContext.Current.CancellationToken);
         }
 
         [Fact]
@@ -243,7 +246,7 @@ namespace UnitTests.Runtime
 
             Assert.Same(first, second);
 
-            await StopAsync(fixture.Target);
+            await StopAsync(fixture.Target, TestContext.Current.CancellationToken);
         }
 
         [Fact]
@@ -259,7 +262,7 @@ namespace UnitTests.Runtime
 
             Assert.Equal(new[] { silos[1] }, result);
 
-            await StopAsync(fixture.Target);
+            await StopAsync(fixture.Target, TestContext.Current.CancellationToken);
         }
 
         [Fact]
@@ -281,7 +284,7 @@ namespace UnitTests.Runtime
 
             Assert.Equal(new[] { silos[1] }, result[1]);
 
-            await StopAsync(fixture.Target);
+            await StopAsync(fixture.Target, TestContext.Current.CancellationToken);
         }
 
         [Fact]
@@ -300,7 +303,7 @@ namespace UnitTests.Runtime
             Assert.NotSame(first, second);
             Assert.Equal(new[] { silos[1] }, second);
 
-            await StopAsync(fixture.Target);
+            await StopAsync(fixture.Target, TestContext.Current.CancellationToken);
         }
 
         [Fact]
@@ -321,7 +324,7 @@ namespace UnitTests.Runtime
             Assert.NotSame(first, second);
             Assert.Equal(new[] { silos[1] }, second);
 
-            await StopAsync(fixture.Target);
+            await StopAsync(fixture.Target, TestContext.Current.CancellationToken);
         }
 
         [Fact]
@@ -337,7 +340,7 @@ namespace UnitTests.Runtime
             Assert.Equal(new[] { silos[1] }, second);
             Assert.Equal(2, fixture.FilterDirector!.CallCount);
 
-            await StopAsync(fixture.Target);
+            await StopAsync(fixture.Target, TestContext.Current.CancellationToken);
         }
 
         private static PlacementService CreateTarget()
@@ -498,23 +501,28 @@ namespace UnitTests.Runtime
             return new GrainLocator(grainLocatorResolver, null!);
         }
 
-        private static async Task<SiloLifecycleSubject> StartAsync(PlacementService target)
+        private static async Task<SiloLifecycleSubject> StartAsync(
+            PlacementService target,
+            CancellationToken cancellationToken)
         {
             var lifecycle = new SiloLifecycleSubject(NullLoggerFactory.Instance.CreateLogger<SiloLifecycleSubject>());
             ((ILifecycleParticipant<ISiloLifecycle>)target).Participate(lifecycle);
-            await lifecycle.OnStart();
+            await lifecycle.OnStart(cancellationToken);
             return lifecycle;
         }
 
-        private static async Task StopAsync(PlacementService target, CancellationToken cancellationToken = default)
+        private static async Task StopAsync(PlacementService target, CancellationToken cancellationToken)
         {
-            var lifecycle = await StartAsync(target);
+            var lifecycle = await StartAsync(target, cancellationToken);
             await lifecycle.OnStop(cancellationToken);
         }
 
         private static PlacementService.ITestAccessor GetTestAccessor(PlacementService target) => target;
 
-        private static async Task AssertWorkerStopEventsAsync(PlacementService target, DiagnosticEventCollector collector)
+        private static async Task AssertWorkerStopEventsAsync(
+            PlacementService target,
+            DiagnosticEventCollector collector,
+            CancellationToken cancellationToken)
         {
             var workerCount = GetTestAccessor(target).WorkerTasks.Length;
             var stoppedEvents = new List<PlacementServiceEvents.WorkerStopped>(workerCount);
@@ -526,7 +534,8 @@ namespace UnitTests.Runtime
                     evt => evt.Payload is PlacementServiceEvents.WorkerStopped stopped
                         && stopped.SiloAddress == target.LocalSilo
                         && stoppedEvents.All(existing => existing.WorkerIndex != stopped.WorkerIndex),
-                    TimeSpan.FromSeconds(10));
+                    TimeSpan.FromSeconds(10),
+                    cancellationToken);
 
                 stoppedEvents.Add(Assert.IsType<PlacementServiceEvents.WorkerStopped>(diagnosticEvent.Payload));
             }

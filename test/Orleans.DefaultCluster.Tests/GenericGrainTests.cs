@@ -342,6 +342,7 @@ namespace DefaultCluster.Tests.General
         [Fact]
         public void Generic_SimpleGrainControlFlow_Blocking()
         {
+            var cancellationToken = TestContext.Current.CancellationToken;
             var a = Random.Shared.Next(100);
             var b = a + 1;
             var expected = a + "x" + b;
@@ -350,9 +351,9 @@ namespace DefaultCluster.Tests.General
 
             // explicitly use .Wait() and .Result to make sure the client does not deadlock in these cases.
 #pragma warning disable xUnit1031 // Do not use blocking task operations in test method
-            grain.SetA(a).Wait();
+            grain.SetA(a).Wait(cancellationToken);
 
-            grain.SetB(b).Wait();
+            grain.SetB(b).Wait(cancellationToken);
 
             Task<string> stringPromise = grain.GetAxB();
             Assert.Equal(expected, stringPromise.Result);
@@ -362,6 +363,7 @@ namespace DefaultCluster.Tests.General
         [Fact]
         public async Task Generic_SimpleGrainDataFlow()
         {
+            var cancellationToken = TestContext.Current.CancellationToken;
             var a = Random.Shared.Next(100);
             var b = a + 1;
             var expected = a + "x" + b;
@@ -370,7 +372,7 @@ namespace DefaultCluster.Tests.General
 
             var setAPromise = grain.SetA(a);
             var setBPromise = grain.SetB(b);
-            var stringPromise = Task.WhenAll(setAPromise, setBPromise).ContinueWith((_) => grain.GetAxB()).Unwrap();
+            var stringPromise = Task.WhenAll(setAPromise, setBPromise).ContinueWith((_) => grain.GetAxB(), cancellationToken).Unwrap();
 
             var x = await stringPromise;
             Assert.Equal(expected, x);
@@ -753,7 +755,8 @@ namespace DefaultCluster.Tests.General
                     return false;
                 },
                 timeout: TimeSpan.FromSeconds(30),
-                delayOnFail: TimeSpan.FromMilliseconds(200));
+                delayOnFail: TimeSpan.FromMilliseconds(200),
+                cancellationToken: TestContext.Current.CancellationToken);
             Assert.Equal(s1, s2);
         }
 

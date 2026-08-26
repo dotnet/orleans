@@ -213,10 +213,11 @@ namespace DefaultCluster.Tests
         [Fact, TestCategory("BVT"), TestCategory("Cast")]
         public async Task FailSideCastAfterContinueWith()
         {
+            var cancellationToken = TestContext.Current.CancellationToken;
             var grain = GrainFactory.GetGrain<IGeneratorTestDerivedGrain1>(GetRandomGrainId());
             IGeneratorTestDerivedGrain2? cast = null;
             var av = grain.StringIsNullOrEmpty();
-            var av2 = av.ContinueWith(t => Assert.True(t.Result))
+            var av2 = av.ContinueWith(t => Assert.True(t.Result), cancellationToken)
                 .ContinueWith(
                     t =>
                     {
@@ -224,14 +225,16 @@ namespace DefaultCluster.Tests
 
                         // Casting is always allowed, so this should succeed.
                         cast = grain.AsReference<IGeneratorTestDerivedGrain2>();
-                    })
+                    },
+                    cancellationToken)
                 .ContinueWith(
                     t =>
                     {
                         // Call a method which the grain does not implement, resulting in a cast failure.
                         Assert.True(t.IsCompletedSuccessfully);
                         return cast!.StringConcat("a", "b", "c");
-                    })
+                    },
+                    cancellationToken)
                 .Unwrap()
                 .ContinueWith(
                     t =>
@@ -240,7 +243,8 @@ namespace DefaultCluster.Tests
                         // This should not throw.
                         Assert.True(t.IsFaulted);
                         return cast!.StringIsNullOrEmpty();
-                    })
+                    },
+                    cancellationToken)
                 .Unwrap();
 
             // Ensure that the last task did not throw.
@@ -443,20 +447,21 @@ namespace DefaultCluster.Tests
         [Fact, TestCategory("BVT"), TestCategory("Cast")]
         public async Task CastCallMethodInheritedFromBaseClass()
         {
+            var cancellationToken = TestContext.Current.CancellationToken;
             Task<bool> isNullStr;
 
             IGeneratorTestDerivedGrain1 grain = this.GrainFactory.GetGrain<IGeneratorTestDerivedGrain1>(GetRandomGrainId());
             isNullStr = grain.StringIsNullOrEmpty();
             Assert.True(await isNullStr, "Value should be null initially");
 
-            isNullStr = grain.StringSet("a").ContinueWith((_) => grain.StringIsNullOrEmpty()).Unwrap();
+            isNullStr = grain.StringSet("a").ContinueWith((_) => grain.StringIsNullOrEmpty(), cancellationToken).Unwrap();
             Assert.False(await isNullStr, "Value should not be null after SetString(a)");
 
-            isNullStr = grain.StringSet(null!).ContinueWith((_) => grain.StringIsNullOrEmpty()).Unwrap();
+            isNullStr = grain.StringSet(null!).ContinueWith((_) => grain.StringIsNullOrEmpty(), cancellationToken).Unwrap();
             Assert.True(await isNullStr, "Value should be null after SetString(null)");
 
             IGeneratorTestGrain cast = grain.AsReference<IGeneratorTestGrain>();
-            isNullStr = cast.StringSet("b").ContinueWith((_) => grain.StringIsNullOrEmpty()).Unwrap();
+            isNullStr = cast.StringSet("b").ContinueWith((_) => grain.StringIsNullOrEmpty(), cancellationToken).Unwrap();
             Assert.False(await isNullStr, "Value should not be null after cast.SetString(b)");
         }
     }

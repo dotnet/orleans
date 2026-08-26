@@ -36,7 +36,7 @@ namespace Tester.Directories
             await Task.Delay(5000, TestContext.Current.CancellationToken);
 
             // Shutdown the secondary silo
-            await this.HostedCluster.StopSecondarySilosAsync();
+            await this.HostedCluster.StopSecondarySilosAsync(TestContext.Current.CancellationToken);
 
             // Activation on the primary silo should still be there, another activation should be
             // created for the other one

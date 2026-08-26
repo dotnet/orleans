@@ -90,6 +90,7 @@ namespace DefaultCluster.Tests.General
         [Fact, TestCategory("BVT"), TestCategory("Echo")]
         public async Task EchoGrain_EchoError()
         {
+            var cancellationToken = TestContext.Current.CancellationToken;
             var grain = this.GrainFactory.GetGrain<IEchoTaskGrain>(Guid.NewGuid());
 
             Task<string> promise = grain.EchoErrorAsync(expectedEchoError);
@@ -101,7 +102,7 @@ namespace DefaultCluster.Tests.General
                 while (exc is AggregateException) exc = exc.InnerException!;
                 string received = exc.Message;
                 Assert.Equal(expectedEchoError, received);
-            }).WaitAsync(timeout);
+            }, cancellationToken).WaitAsync(timeout, cancellationToken);
         }
 
         /// <summary>
@@ -117,6 +118,7 @@ namespace DefaultCluster.Tests.General
         [Fact, TestCategory("SlowBVT"), TestCategory("Echo"), TestCategory("Timeout")]
         public async Task EchoGrain_Timeout_ContinueWith()
         {
+            var cancellationToken = TestContext.Current.CancellationToken;
             var grain = this.GrainFactory.GetGrain<IEchoTaskGrain>(Guid.NewGuid());
 
             TimeSpan delay5 = TimeSpan.FromSeconds(30); // grain call timeout (set in config)
@@ -133,7 +135,7 @@ namespace DefaultCluster.Tests.General
                     Exception exc = t.Exception!;
                     while (exc is AggregateException) exc = exc.InnerException!;
                     Assert.IsAssignableFrom<TimeoutException>(exc);
-                }).WaitAsync(delay45);
+                }, cancellationToken).WaitAsync(delay45, cancellationToken);
             sw.Stop();
             Assert.True(TimeIsLonger(sw.Elapsed, delay5), $"Elapsed time out of range: {sw.Elapsed}");
             Assert.True(TimeIsShorter(sw.Elapsed, delay60), $"Elapsed time out of range: {sw.Elapsed}");
@@ -149,6 +151,7 @@ namespace DefaultCluster.Tests.General
         [Fact, TestCategory("SlowBVT"), TestCategory("Echo")]
         public async Task EchoGrain_Timeout_Await()
         {
+            var cancellationToken = TestContext.Current.CancellationToken;
             var grain = this.GrainFactory.GetGrain<IEchoTaskGrain>(Guid.NewGuid());
 
             TimeSpan delay5 = TimeSpan.FromSeconds(5);
@@ -157,11 +160,12 @@ namespace DefaultCluster.Tests.General
             sw.Start();
             try
             {
-                int res = await grain.BlockingCallTimeoutAsync(delay25);
+                int res = await grain.BlockingCallTimeoutAsync(delay25).WaitAsync(cancellationToken);
                 Assert.Fail($"BlockingCallTimeout should not have completed successfully, but returned {res}");
             }
             catch (Exception exc)
             {
+                cancellationToken.ThrowIfCancellationRequested();
                 while (exc is AggregateException) exc = exc.InnerException!;
                 Assert.IsAssignableFrom<TimeoutException>(exc);
             }
@@ -180,6 +184,7 @@ namespace DefaultCluster.Tests.General
         [Fact, TestCategory("SlowBVT"), TestCategory("Echo"), TestCategory("Timeout")]
         public async Task EchoGrain_Timeout_Result()
         {
+            var cancellationToken = TestContext.Current.CancellationToken;
             var grain = this.GrainFactory.GetGrain<IEchoTaskGrain>(Guid.NewGuid());
 
             TimeSpan delay5 = TimeSpan.FromSeconds(5);
@@ -194,12 +199,13 @@ namespace DefaultCluster.Tests.General
 #pragma warning disable xUnit1031 // Do not use blocking task operations in test method
                     return grain.BlockingCallTimeoutAsync(delay25).Result;
 #pragma warning restore xUnit1031 // Do not use blocking task operations in test method
-                });
+                }, cancellationToken).WaitAsync(cancellationToken);
 
                 Assert.Fail($"BlockingCallTimeout should not have completed successfully, but returned {res}");
             }
             catch (Exception exc)
             {
+                cancellationToken.ThrowIfCancellationRequested();
                 while (exc is AggregateException) exc = exc.InnerException!;
                 Assert.IsAssignableFrom<TimeoutException>(exc);
             }
@@ -221,6 +227,7 @@ namespace DefaultCluster.Tests.General
         [Fact, TestCategory("BVT"), TestCategory("Echo")]
         public async Task EchoGrain_LastEcho()
         {
+            var cancellationToken = TestContext.Current.CancellationToken;
             Stopwatch clock = new Stopwatch();
 
             clock.Start();
@@ -249,7 +256,7 @@ namespace DefaultCluster.Tests.General
                 while (exc is AggregateException) exc = exc.InnerException!;
                 string received = exc.Message;
                 Assert.Equal(expectedEchoError, received);
-            }).WaitAsync(timeout);
+            }, cancellationToken).WaitAsync(timeout, cancellationToken);
 
             clock.Restart();
             received = await grain.GetLastEchoAsync();
@@ -268,6 +275,7 @@ namespace DefaultCluster.Tests.General
         [Fact, TestCategory("BVT"), TestCategory("Echo")]
         public async Task EchoGrain_Ping()
         {
+            var cancellationToken = TestContext.Current.CancellationToken;
             Stopwatch clock = new Stopwatch();
 
             string what = "CreateGrain";
@@ -278,7 +286,7 @@ namespace DefaultCluster.Tests.General
             what = "EchoGrain.Ping";
             clock.Restart();
 
-            await grain.PingAsync().WaitAsync(timeout);
+            await grain.PingAsync().WaitAsync(timeout, cancellationToken);
             this.Logger.LogInformation("{What} took {Elapsed}", what, clock.Elapsed);
         }
 
@@ -292,6 +300,7 @@ namespace DefaultCluster.Tests.General
         [Fact, TestCategory("BVT"), TestCategory("Echo")]
         public async Task EchoGrain_PingSilo_Local()
         {
+            var cancellationToken = TestContext.Current.CancellationToken;
             Stopwatch clock = new Stopwatch();
 
             string what = "CreateGrain";
@@ -301,7 +310,7 @@ namespace DefaultCluster.Tests.General
 
             what = "EchoGrain.PingLocalSilo";
             clock.Restart();
-            await grain.PingLocalSiloAsync().WaitAsync(timeout);
+            await grain.PingLocalSiloAsync().WaitAsync(timeout, cancellationToken);
             this.Logger.LogInformation("{What} took {Elapsed}", what, clock.Elapsed);
         }
 
@@ -315,6 +324,7 @@ namespace DefaultCluster.Tests.General
         [Fact, TestCategory("BVT"), TestCategory("Echo")]
         public async Task EchoGrain_PingSilo_Remote()
         {
+            var cancellationToken = TestContext.Current.CancellationToken;
             Stopwatch clock = new Stopwatch();
 
             string what = "CreateGrain";
@@ -327,12 +337,12 @@ namespace DefaultCluster.Tests.General
 
             what = "EchoGrain.PingRemoteSilo[1]";
             clock.Restart();
-            await grain.PingRemoteSiloAsync(silo1).WaitAsync(timeout);
+            await grain.PingRemoteSiloAsync(silo1).WaitAsync(timeout, cancellationToken);
             this.Logger.LogInformation("{What} took {Elapsed}", what, clock.Elapsed);
 
             what = "EchoGrain.PingRemoteSilo[2]";
             clock.Restart();
-            await grain.PingRemoteSiloAsync(silo2).WaitAsync(timeout);
+            await grain.PingRemoteSiloAsync(silo2).WaitAsync(timeout, cancellationToken);
             this.Logger.LogInformation("{What} took {Elapsed}", what, clock.Elapsed);
         }
 
@@ -346,6 +356,7 @@ namespace DefaultCluster.Tests.General
         [Fact, TestCategory("BVT"), TestCategory("Echo")]
         public async Task EchoGrain_PingSilo_OtherSilo()
         {
+            var cancellationToken = TestContext.Current.CancellationToken;
             Stopwatch clock = new Stopwatch();
 
             string what = "CreateGrain";
@@ -355,7 +366,7 @@ namespace DefaultCluster.Tests.General
 
             what = "EchoGrain.PingOtherSilo";
             clock.Restart();
-            await grain.PingOtherSiloAsync().WaitAsync(timeout);
+            await grain.PingOtherSiloAsync().WaitAsync(timeout, cancellationToken);
             this.Logger.LogInformation("{What} took {Elapsed}", what, clock.Elapsed);
         }
 
@@ -369,6 +380,7 @@ namespace DefaultCluster.Tests.General
         [Fact, TestCategory("BVT"), TestCategory("Echo")]
         public async Task EchoGrain_PingSilo_OtherSilo_Membership()
         {
+            var cancellationToken = TestContext.Current.CancellationToken;
             Stopwatch clock = new Stopwatch();
 
             string what = "CreateGrain";
@@ -378,7 +390,7 @@ namespace DefaultCluster.Tests.General
 
             what = "EchoGrain.PingOtherSiloMembership";
             clock.Restart();
-            await grain.PingClusterMemberAsync().WaitAsync(timeout);
+            await grain.PingClusterMemberAsync().WaitAsync(timeout, cancellationToken);
             this.Logger.LogInformation("{What} took {Elapsed}", what, clock.Elapsed);
         }
 

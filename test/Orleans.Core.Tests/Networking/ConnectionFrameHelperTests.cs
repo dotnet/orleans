@@ -109,7 +109,7 @@ namespace Orleans.Core.Tests.Networking
             var lengthBytes = new byte[4];
             System.Buffers.Binary.BinaryPrimitives.WriteInt32LittleEndian(lengthBytes, 2_000_000);
             output.Write(lengthBytes);
-            await output.FlushAsync();
+            await output.FlushAsync(TestContext.Current.CancellationToken);
             await output.CompleteAsync();
 
             await Assert.ThrowsAsync<InvalidOperationException>(async () =>
@@ -126,7 +126,7 @@ namespace Orleans.Core.Tests.Networking
             var lengthBytes = new byte[4];
             System.Buffers.Binary.BinaryPrimitives.WriteInt32LittleEndian(lengthBytes, 0);
             output.Write(lengthBytes);
-            await output.FlushAsync();
+            await output.FlushAsync(TestContext.Current.CancellationToken);
             await output.CompleteAsync();
 
             await Assert.ThrowsAsync<InvalidOperationException>(async () =>
@@ -171,7 +171,9 @@ namespace Orleans.Core.Tests.Networking
             var writeTask = WriteFrameInChunksAsync(pipe.Writer, 0x04, expectedPayload, 16);
             var readTask = ConnectionFrameHelper.ReadFrameAsync(context, CancellationToken.None).AsTask();
 
-            await Task.WhenAll(writeTask, readTask).WaitAsync(TimeSpan.FromSeconds(10));
+            await Task.WhenAll(writeTask, readTask).WaitAsync(
+                TimeSpan.FromSeconds(10),
+                TestContext.Current.CancellationToken);
 
             var (frameType, payload) = await readTask;
             Assert.Equal(0x04, frameType);

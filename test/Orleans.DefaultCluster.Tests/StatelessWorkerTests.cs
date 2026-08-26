@@ -63,6 +63,7 @@ namespace DefaultCluster.Tests.General
         [Fact, TestCategory("SlowBVT"), TestCategory("StatelessWorker")]
         public async Task StatelessWorkerActivationsPerSiloDoNotExceedMaxLocalWorkersCount()
         {
+            var cancellationToken = TestContext.Current.CancellationToken;
             var gatewayOptions = this.Fixture.Client.ServiceProvider.GetRequiredService<IOptions<StaticGatewayListProviderOptions>>();
             var gatewaysCount = gatewayOptions.Value.Gateways.Count;
             // do extra calls to trigger activation of ExpectedMaxLocalActivations local activations
@@ -76,7 +77,7 @@ namespace DefaultCluster.Tests.General
                 promises.Add(grain.LongCall());
             await Task.WhenAll(promises);
 
-            await Task.Delay(2000);
+            await Task.Delay(2000, cancellationToken);
 
             promises.Clear();
             var stopwatch = Stopwatch.StartNew();
@@ -187,13 +188,14 @@ namespace DefaultCluster.Tests.General
         [Fact, TestCategory("SlowBVT"), TestCategory("StatelessWorker")]
         public async Task StatelessWorker_DoesNotThrow_IfMarkedWithMayInterleave()
         {
+            var cancellationToken = TestContext.Current.CancellationToken;
             var grain = GrainFactory.GetGrain<IStatelessWorkerWithMayInterleaveGrain>(0);
             var observer = new CallbackObserver();
             var reference = GrainFactory.CreateObjectReference<ICallbackGrainObserver>(observer);
             var task = grain.GoFast(reference);
-            await observer.OnCallback.WaitAsync(TimeSpan.FromSeconds(10));
+            await observer.OnCallback.WaitAsync(TimeSpan.FromSeconds(10), cancellationToken);
             observer.Signal();
-            await task;
+            await task.WaitAsync(cancellationToken);
         }
 
         /// <summary>
@@ -207,6 +209,7 @@ namespace DefaultCluster.Tests.General
         [Fact, TestCategory("SlowBVT"), TestCategory("StatelessWorker")]
         public async Task StatelessWorker_ShouldNotInterleaveCalls_IfMayInterleavePredicatedDoesntMatch()
         {
+            var cancellationToken = TestContext.Current.CancellationToken;
             var grain = GrainFactory.GetGrain<IStatelessWorkerWithMayInterleaveGrain>(0);
 
             List<CallbackObserver> callbacks = [new(), new(), new()];
@@ -214,11 +217,19 @@ namespace DefaultCluster.Tests.General
             List<Task> completions = [grain.GoSlow(callbackReferences[0]), grain.GoSlow(callbackReferences[1]), grain.GoSlow(callbackReferences[2])];
             var callbackSignals = callbacks.Select(c => c.OnCallback).ToList();
 
-            var triggered = await Task.WhenAny(callbackSignals).WaitAsync(TimeSpan.FromSeconds(10));
+            var triggered = await Task.WhenAny(callbackSignals).WaitAsync(TimeSpan.FromSeconds(10), cancellationToken);
             callbackSignals.Remove(triggered);
-            await Assert.ThrowsAsync<TimeoutException>(async () => await Task.WhenAny(callbackSignals).WaitAsync(TimeSpan.FromSeconds(5)));
+            try
+            {
+                await Task.WhenAny(callbackSignals).WaitAsync(TimeSpan.FromSeconds(5), cancellationToken);
+                Assert.Fail("A second callback should not have been triggered.");
+            }
+            catch (TimeoutException)
+            {
+            }
+
             callbacks.ForEach(c => c.Signal());
-            await Task.WhenAll(completions).WaitAsync(TimeSpan.FromSeconds(10));
+            await Task.WhenAll(completions).WaitAsync(TimeSpan.FromSeconds(10), cancellationToken);
         }
 
         /// <summary>
@@ -232,7 +243,8 @@ namespace DefaultCluster.Tests.General
         [Fact, TestCategory("SlowBVT"), TestCategory("StatelessWorker")]
         public async Task StatelessWorker_ShouldInterleaveCalls_IfMayInterleavePredicatedMatches()
         {
-            using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+            using var cts = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
+            cts.CancelAfter(TimeSpan.FromSeconds(10));
             var grain = GrainFactory.GetGrain<IStatelessWorkerWithMayInterleaveGrain>(0);
 
             List<CallbackObserver> callbacks = [new(), new(), new()];
@@ -243,7 +255,7 @@ namespace DefaultCluster.Tests.General
             await Task.WhenAll(callbacks.Select(c => c.OnCallback)).WaitAsync(cts.Token);
             callbacks.ForEach(c => c.Signal());
 
-            await completion;
+            await completion.WaitAsync(cts.Token);
         }
 
         private sealed class CallbackObserver : ICallbackGrainObserver

@@ -37,11 +37,12 @@ namespace DefaultCluster.Tests.General
         [Fact, TestCategory("Functional"), TestCategory("Cast")]
         public async Task RWReferences()
         {
+            var cancellationToken = TestContext.Current.CancellationToken;
             writer = this.GrainFactory.GetGrain<IMultifacetWriter>(GetRandomGrainId());
             reader = writer.AsReference<IMultifacetReader>();
 
             int x = 1234;
-            await writer.SetValue(x).WaitAsync(timeout);
+            await writer.SetValue(x).WaitAsync(timeout, cancellationToken);
             int y = await reader.GetValue();
             Assert.Equal(x, y);
         }

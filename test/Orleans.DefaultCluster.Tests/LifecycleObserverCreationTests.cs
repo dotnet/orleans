@@ -45,7 +45,7 @@ namespace DefaultCluster.Tests.General
             });
 
             var cluster = builder.Build();
-            await cluster.DeployAsync();
+            await cluster.DeployAsync(TestContext.Current.CancellationToken);
 
             try
             {

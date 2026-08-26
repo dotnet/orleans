@@ -97,7 +97,7 @@ namespace UnitTests.SchedulerTests
                 return t1;
             });
             wrapped.Start(scheduler);
-            await wrapped.Unwrap().WaitAsync(TimeSpan.FromSeconds(10));
+            await wrapped.Unwrap().WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
         }
 
         [Fact, TestCategory("Functional"), TestCategory("Scheduler")]
@@ -198,7 +198,7 @@ namespace UnitTests.SchedulerTests
             var timeoutLimit = TimeSpan.FromSeconds(10);
             try
             {
-                await result.Task.WaitAsync(timeoutLimit);
+                await result.Task.WaitAsync(timeoutLimit, TestContext.Current.CancellationToken);
             }
             catch (TimeoutException)
             {
@@ -246,7 +246,7 @@ namespace UnitTests.SchedulerTests
             var timeoutLimit = TimeSpan.FromSeconds(10);
             try
             {
-                await finish.Task.WaitAsync(timeoutLimit);
+                await finish.Task.WaitAsync(timeoutLimit, TestContext.Current.CancellationToken);
             }
             catch (TimeoutException)
             {
@@ -301,7 +301,7 @@ namespace UnitTests.SchedulerTests
             var timeoutLimit = TimeSpan.FromSeconds(10);
             try
             {
-                await finish.Task.WaitAsync(timeoutLimit);
+                await finish.Task.WaitAsync(timeoutLimit, TestContext.Current.CancellationToken);
             }
             catch (TimeoutException)
             {
@@ -369,7 +369,7 @@ namespace UnitTests.SchedulerTests
             var timeoutLimit = TimeSpan.FromSeconds(10);
             try
             {
-                await finish.Task.WaitAsync(timeoutLimit);
+                await finish.Task.WaitAsync(timeoutLimit, TestContext.Current.CancellationToken);
             }
             catch (TimeoutException)
             {
@@ -429,7 +429,7 @@ namespace UnitTests.SchedulerTests
             var timeoutLimit = TimeSpan.FromSeconds(10);
             try
             {
-                await finish.Task.WaitAsync(timeoutLimit);
+                await finish.Task.WaitAsync(timeoutLimit, TestContext.Current.CancellationToken);
             }
             catch (TimeoutException)
             {
@@ -492,7 +492,7 @@ namespace UnitTests.SchedulerTests
             var timeoutLimit = TimeSpan.FromSeconds(10);
             try
             {
-                await finish.Task.WaitAsync(timeoutLimit);
+                await finish.Task.WaitAsync(timeoutLimit, TestContext.Current.CancellationToken);
             }
             catch (TimeoutException)
             {
@@ -514,9 +514,9 @@ namespace UnitTests.SchedulerTests
             Task<Task> wrapper = new Task<Task>(async () =>
             {
                 Assert.Equal(scheduler, TaskScheduler.Current);
-                await DoDelay(1);
+                await DoDelay(1, TestContext.Current.CancellationToken);
                 Assert.Equal(scheduler, TaskScheduler.Current);
-                await DoDelay(2);
+                await DoDelay(2, TestContext.Current.CancellationToken);
                 Assert.Equal(scheduler, TaskScheduler.Current);
             });
             wrapper.Start(scheduler);
@@ -524,12 +524,12 @@ namespace UnitTests.SchedulerTests
             await wrapper.Unwrap();
         }
 
-        private async Task DoDelay(int i)
+        private async Task DoDelay(int i, CancellationToken cancellationToken)
         {
             try
             {
                 this.output.WriteLine("Before Task.Delay #{0} TaskScheduler.Current={1}", i, TaskScheduler.Current);
-                await Task.Delay(1);
+                await Task.Delay(1, cancellationToken);
                 this.output.WriteLine("After Task.Delay #{0} TaskScheduler.Current={1}", i, TaskScheduler.Current);
             }
             catch (ObjectDisposedException)
@@ -631,7 +631,7 @@ namespace UnitTests.SchedulerTests
 
                 try
                 {
-                    await resultHandles[i].Task.WaitAsync(waitCheckTime);
+                    await resultHandles[i].Task.WaitAsync(waitCheckTime, TestContext.Current.CancellationToken);
                 }
                 catch (TimeoutException)
                 {
@@ -643,7 +643,9 @@ namespace UnitTests.SchedulerTests
                 try
                 {
                     // since resultHandle being complete doesn't directly imply that the final chain was completed (there's a chance for a race condition), give a small chance for it to complete.
-                    await taskChainEnds[i].WaitAsync(TimeSpan.FromMilliseconds(10));
+                    await taskChainEnds[i].WaitAsync(
+                        TimeSpan.FromMilliseconds(10),
+                        TestContext.Current.CancellationToken);
                 }
                 catch (TimeoutException)
                 {
@@ -660,16 +662,19 @@ namespace UnitTests.SchedulerTests
         [Fact, TestCategory("Functional"), TestCategory("Scheduler")]
         public async Task ActivationSched_Test1()
         {
-            await Run_ActivationSched_Test1(scheduler, false);
+            await Run_ActivationSched_Test1(scheduler, false, TestContext.Current.CancellationToken);
         }
 
         [Fact, TestCategory("Functional"), TestCategory("Scheduler")]
         public async Task ActivationSched_Test1_Bounce()
         {
-            await Run_ActivationSched_Test1(scheduler, true);
+            await Run_ActivationSched_Test1(scheduler, true, TestContext.Current.CancellationToken);
         }
 
-        internal async Task Run_ActivationSched_Test1(TaskScheduler scheduler, bool bounceToThreadPool)
+        internal async Task Run_ActivationSched_Test1(
+            TaskScheduler scheduler,
+            bool bounceToThreadPool,
+            CancellationToken cancellationToken)
         {
             var grainId = LegacyGrainId.GetGrainId(0, Guid.NewGuid());
             var silo = new MockSiloDetails
@@ -712,7 +717,7 @@ namespace UnitTests.SchedulerTests
             var timeoutLimit = TimeSpan.FromSeconds(10);
             try
             {
-                await wrapperDone.Task.WaitAsync(timeoutLimit);
+                await wrapperDone.Task.WaitAsync(timeoutLimit, cancellationToken);
             }
             catch (TimeoutException)
             {
@@ -728,7 +733,7 @@ namespace UnitTests.SchedulerTests
             await wrapped;
             try
             {
-                await wrappedDone.Task.WaitAsync(timeoutLimit);
+                await wrappedDone.Task.WaitAsync(timeoutLimit, cancellationToken);
             }
             catch (TimeoutException)
             {

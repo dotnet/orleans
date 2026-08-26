@@ -189,7 +189,7 @@ namespace Tester
             }
 
             // Close current client connection
-            await this.HostedCluster.StopClusterClientAsync();
+            await this.HostedCluster.StopClusterClientAsync(TestContext.Current.CancellationToken);
             var hostBuilder = new HostBuilder().UseOrleansClient(
                 (ctx, clientBuilder) =>
                 {

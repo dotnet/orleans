@@ -19,7 +19,7 @@ public class InsideRuntimeClientTests
         var builder = new InProcessTestClusterBuilder(1);
         builder.ConfigureHost(hostBuilder => TestDefaultConfiguration.ConfigureHostConfiguration(hostBuilder.Configuration));
         await using var cluster = builder.Build();
-        await cluster.DeployAsync();
+        await cluster.DeployAsync(TestContext.Current.CancellationToken);
 
         var silo = cluster.Silos[0];
         var runtimeClient = silo.ServiceProvider.GetRequiredService<InsideRuntimeClient>();

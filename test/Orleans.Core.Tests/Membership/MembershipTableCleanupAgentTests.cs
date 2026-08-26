@@ -42,18 +42,23 @@ namespace NonSilo.Tests.Membership
         [Fact]
         public async Task MembershipTableCleanupAgent_Enabled_BasicScenario()
         {
-            await this.BasicScenario(enabled: true);
+            await this.BasicScenario(
+                enabled: true,
+                cancellationToken: TestContext.Current.CancellationToken);
         }
 
         [Fact]
         public async Task MembershipTableCleanupAgent_Disabled_BasicScenario()
         {
-            await this.BasicScenario(enabled: false);
+            await this.BasicScenario(
+                enabled: false,
+                cancellationToken: TestContext.Current.CancellationToken);
         }
 
         [Fact]
         public async Task MembershipTableCleanupAgent_NonFirstActiveSilo_DoesNotCleanup()
         {
+            var cancellationToken = TestContext.Current.CancellationToken;
             var options = new ClusterMembershipOptions { DefunctSiloCleanupPeriod = TimeSpan.FromMinutes(90), MaxDefunctSiloEntries = null };
             var membershipManager = new TestMembershipManager();
             var cleanupCalled = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -66,20 +71,21 @@ namespace NonSilo.Tests.Membership
             var lifecycle = new SiloLifecycleSubject(this.loggerFactory.CreateLogger<SiloLifecycleSubject>());
             ((ILifecycleParticipant<ISiloLifecycle>)cleanupAgent).Participate(lifecycle);
 
-            await lifecycle.OnStart();
+            await lifecycle.OnStart(cancellationToken);
             await membershipManager.PublishAndWaitForProcessing(Snapshot(
                 Entry(Silo("127.0.0.1:200@1"), SiloStatus.Active, now),
-                Entry(this.localSilo, SiloStatus.Active, now)));
+                Entry(this.localSilo, SiloStatus.Active, now)), cancellationToken);
 
             Assert.False(cleanupCalled.Task.IsCompleted);
             Assert.DoesNotContain(table.Calls, c => c.Method.Equals(nameof(IMembershipTable.CleanupDefunctSiloEntries)));
 
-            await lifecycle.OnStop();
+            await lifecycle.OnStop(cancellationToken);
         }
 
         [Fact]
         public async Task MembershipTableCleanupAgent_ThresholdCleanup_RemovesExcessDefunctEntries()
         {
+            var cancellationToken = TestContext.Current.CancellationToken;
             var now = this.timeProvider.GetUtcNow();
             var retainedDefunctSilo = Silo("127.0.0.1:700@100");
             var options = new ClusterMembershipOptions { DefunctSiloCleanupPeriod = null, MaxDefunctSiloEntries = 1 };
@@ -96,25 +102,26 @@ namespace NonSilo.Tests.Membership
             var lifecycle = new SiloLifecycleSubject(this.loggerFactory.CreateLogger<SiloLifecycleSubject>());
             ((ILifecycleParticipant<ISiloLifecycle>)cleanupAgent).Participate(lifecycle);
 
-            await lifecycle.OnStart();
+            await lifecycle.OnStart(cancellationToken);
             await membershipManager.PublishAndWaitForProcessing(Snapshot(
                 Entry(this.localSilo, SiloStatus.Active, now),
                 Entry(Silo("127.0.0.1:200@200"), SiloStatus.Active, now),
                 oldestDefunctEntry,
                 removedDefunctEntry,
-                retainedDefunctEntry));
+                retainedDefunctEntry), cancellationToken);
             Assert.DoesNotContain(table.Calls, call => call.Method == nameof(IMembershipTable.ReadAll));
 
             var updatedTable = await table.ReadAll();
             Assert.Single(updatedTable.Members, member => member.Item1.Status == SiloStatus.Dead);
             Assert.Contains(updatedTable.Members, member => member.Item1.SiloAddress.Equals(retainedDefunctSilo));
 
-            await lifecycle.OnStop();
+            await lifecycle.OnStop(cancellationToken);
         }
 
         [Fact]
         public async Task MembershipTableCleanupAgent_ThresholdCleanup_RetainsRecentlySuspectedEntries()
         {
+            var cancellationToken = TestContext.Current.CancellationToken;
             var now = this.timeProvider.GetUtcNow();
             var recentlySuspectedSilo = Silo("127.0.0.1:700@100");
             var options = new ClusterMembershipOptions { DefunctSiloCleanupPeriod = null, MaxDefunctSiloEntries = 1 };
@@ -137,23 +144,24 @@ namespace NonSilo.Tests.Membership
             var lifecycle = new SiloLifecycleSubject(this.loggerFactory.CreateLogger<SiloLifecycleSubject>());
             ((ILifecycleParticipant<ISiloLifecycle>)cleanupAgent).Participate(lifecycle);
 
-            await lifecycle.OnStart();
+            await lifecycle.OnStart(cancellationToken);
             await membershipManager.PublishAndWaitForProcessing(Snapshot(
                 Entry(this.localSilo, SiloStatus.Active, now),
                 Entry(Silo("127.0.0.1:200@200"), SiloStatus.Active, now),
                 newerAliveEntry,
-                recentlySuspectedEntry));
+                recentlySuspectedEntry), cancellationToken);
 
             var updatedTable = await table.ReadAll();
             Assert.Single(updatedTable.Members, member => member.Item1.Status == SiloStatus.Dead);
             Assert.Contains(updatedTable.Members, member => member.Item1.SiloAddress.Equals(recentlySuspectedSilo));
 
-            await lifecycle.OnStop();
+            await lifecycle.OnStop(cancellationToken);
         }
 
         [Fact]
         public async Task MembershipTableCleanupAgent_ExpirationCleanup_SkipsUntilExpiredNonActiveEntryOrCleanupPeriodElapsed()
         {
+            var cancellationToken = TestContext.Current.CancellationToken;
             var options = new ClusterMembershipOptions
             {
                 DefunctSiloCleanupPeriod = TimeSpan.FromMinutes(90),
@@ -166,13 +174,13 @@ namespace NonSilo.Tests.Membership
             var lifecycle = new SiloLifecycleSubject(this.loggerFactory.CreateLogger<SiloLifecycleSubject>());
             ((ILifecycleParticipant<ISiloLifecycle>)cleanupAgent).Participate(lifecycle);
 
-            await lifecycle.OnStart();
+            await lifecycle.OnStart(cancellationToken);
             var now = this.timeProvider.GetUtcNow();
-            await membershipManager.PublishAndWaitForProcessing(Snapshot(Entry(this.localSilo, SiloStatus.Active, now)));
+            await membershipManager.PublishAndWaitForProcessing(Snapshot(Entry(this.localSilo, SiloStatus.Active, now)), cancellationToken);
             Assert.Equal(1, CleanupCallCount(table));
 
             table.ClearCalls();
-            await membershipManager.PublishAndWaitForProcessing(Snapshot(Entry(this.localSilo, SiloStatus.Active, now)));
+            await membershipManager.PublishAndWaitForProcessing(Snapshot(Entry(this.localSilo, SiloStatus.Active, now)), cancellationToken);
             Assert.Equal(0, CleanupCallCount(table));
 
             var expiredNonActiveEntry = Entry(
@@ -181,19 +189,19 @@ namespace NonSilo.Tests.Membership
                 now - options.DefunctSiloExpiration - TimeSpan.FromTicks(1));
             await membershipManager.PublishAndWaitForProcessing(Snapshot(
                 Entry(this.localSilo, SiloStatus.Active, now),
-                expiredNonActiveEntry));
+                expiredNonActiveEntry), cancellationToken);
             Assert.Equal(1, CleanupCallCount(table));
 
             table.ClearCalls();
             this.timeProvider.Advance(options.DefunctSiloCleanupPeriod.Value);
             var later = this.timeProvider.GetUtcNow();
-            await membershipManager.PublishAndWaitForProcessing(Snapshot(Entry(this.localSilo, SiloStatus.Active, later)));
+            await membershipManager.PublishAndWaitForProcessing(Snapshot(Entry(this.localSilo, SiloStatus.Active, later)), cancellationToken);
             Assert.Equal(1, CleanupCallCount(table));
 
-            await lifecycle.OnStop();
+            await lifecycle.OnStop(cancellationToken);
         }
 
-        private async Task BasicScenario(bool enabled)
+        private async Task BasicScenario(bool enabled, CancellationToken cancellationToken)
         {
             var options = new ClusterMembershipOptions
             {
@@ -208,19 +216,21 @@ namespace NonSilo.Tests.Membership
             var lifecycle = new SiloLifecycleSubject(this.loggerFactory.CreateLogger<SiloLifecycleSubject>());
             ((ILifecycleParticipant<ISiloLifecycle>)cleanupAgent).Participate(lifecycle);
 
-            await lifecycle.OnStart();
+            await lifecycle.OnStart(cancellationToken);
             Assert.DoesNotContain(table.Calls, c => c.Method.Equals(nameof(IMembershipTable.CleanupDefunctSiloEntries)));
 
             if (enabled)
             {
-                await membershipManager.PublishAndWaitForProcessing(Snapshot(Entry(this.localSilo, SiloStatus.Active, now)));
+                await membershipManager.PublishAndWaitForProcessing(
+                    Snapshot(Entry(this.localSilo, SiloStatus.Active, now)),
+                    cancellationToken);
             }
             else
             {
                 membershipManager.Publish(Snapshot(Entry(this.localSilo, SiloStatus.Active, now)));
             }
 
-            await lifecycle.OnStop();
+            await lifecycle.OnStop(cancellationToken);
 
             if (enabled)
             {
@@ -279,12 +289,14 @@ namespace NonSilo.Tests.Membership
                 Assert.True(this.updates.Writer.TryWrite((snapshot, new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously))));
             }
 
-            public async Task PublishAndWaitForProcessing(MembershipTableSnapshot snapshot)
+            public async Task PublishAndWaitForProcessing(
+                MembershipTableSnapshot snapshot,
+                CancellationToken cancellationToken)
             {
                 this.CurrentSnapshot = snapshot;
                 var processed = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
                 Assert.True(this.updates.Writer.TryWrite((snapshot, processed)));
-                await processed.Task.WaitAsync(TimeSpan.FromSeconds(10));
+                await processed.Task.WaitAsync(TimeSpan.FromSeconds(10), cancellationToken);
             }
 
             public Task UpdateLocalStatus(SiloStatus status, CancellationToken cancellationToken) => Task.CompletedTask;

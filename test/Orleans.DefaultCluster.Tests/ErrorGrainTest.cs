@@ -123,23 +123,24 @@ namespace DefaultCluster.Tests
         [Fact, TestCategory("BVT"), TestCategory("ErrorHandling")]
         public async Task ErrorHandlingTimedMethod()
         {
+            var cancellationToken = TestContext.Current.CancellationToken;
             var grainFullName = typeof(ErrorGrain).FullName;
             IErrorGrain grain = this.GrainFactory.GetGrain<IErrorGrain>(GetRandomGrainId(), grainFullName);
 
             Task promise = grain.LongMethodUntilReleased();
             try
             {
-                await grain.WaitForLongMethodToStart().WaitAsync(timeout);
+                await grain.WaitForLongMethodToStart().WaitAsync(timeout, cancellationToken);
                 Assert.False(promise.IsCompleted, "The task shouldn't complete before the grain method is released.");
 
-                await grain.ReleaseLongMethod().WaitAsync(timeout);
-                await promise.WaitAsync(timeout);
+                await grain.ReleaseLongMethod().WaitAsync(timeout, cancellationToken);
+                await promise.WaitAsync(timeout, cancellationToken);
 
                 Assert.Equal(TaskStatus.RanToCompletion, promise.Status);
             }
             finally
             {
-                await grain.ReleaseLongMethod().WaitAsync(timeout);
+                await grain.ReleaseLongMethod().WaitAsync(timeout, cancellationToken);
             }
         }
 
@@ -178,6 +179,7 @@ namespace DefaultCluster.Tests
         [Fact, TestCategory("Functional"), TestCategory("ErrorHandling"), TestCategory("Stress")]
         public async Task StressHandlingMultipleDelayedRequests()
         {
+            var cancellationToken = TestContext.Current.CancellationToken;
             IErrorGrain grain = this.GrainFactory.GetGrain<IErrorGrain>(GetRandomGrainId());
             bool once = true;
             List<Task> tasks = new List<Task>();
@@ -192,7 +194,7 @@ namespace DefaultCluster.Tests
                 }
 
             }
-            await Task.WhenAll(tasks).WaitAsync(TimeSpan.FromSeconds(20));
+            await Task.WhenAll(tasks).WaitAsync(TimeSpan.FromSeconds(20), cancellationToken);
         }
 
         /// <summary>
@@ -206,12 +208,13 @@ namespace DefaultCluster.Tests
         [Fact, TestCategory("BVT"), TestCategory("ErrorHandling"), TestCategory("GrainReference")]
         public async Task ArgumentTypes_ListOfGrainReferences()
         {
+            var cancellationToken = TestContext.Current.CancellationToken;
             var grainFullName = typeof(ErrorGrain).FullName;
             List<IErrorGrain> list = new List<IErrorGrain>();
             IErrorGrain grain = this.GrainFactory.GetGrain<IErrorGrain>(GetRandomGrainId(), grainFullName);
             list.Add(this.GrainFactory.GetGrain<IErrorGrain>(GetRandomGrainId(), grainFullName));
             list.Add(this.GrainFactory.GetGrain<IErrorGrain>(GetRandomGrainId(), grainFullName));
-            await grain.AddChildren(list).WaitAsync(timeout);
+            await grain.AddChildren(list).WaitAsync(timeout, cancellationToken);
         }
 
         /// <summary>

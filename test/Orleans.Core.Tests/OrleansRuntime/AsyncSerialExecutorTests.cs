@@ -62,7 +62,7 @@ namespace UnitTests.OrleansRuntime
                     {
                         output.WriteLine("Submitting Task {0}.", capture);
                         tasks.Push(executor.AddNext(() => Operation(capture)));
-                    }));
+                    }, TestContext.Current.CancellationToken));
             }
             await Task.WhenAll(enqueueTasks);
             await Task.WhenAll(tasks);

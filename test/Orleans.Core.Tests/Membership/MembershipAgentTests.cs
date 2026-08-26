@@ -105,7 +105,7 @@ namespace NonSilo.Tests.Membership
             ((ILifecycleParticipant<ISiloLifecycle>)this.clusterHealthMonitor).Participate(this.lifecycle);
 
             this.remoteSiloProber = Substitute.For<IRemoteSiloProber>();
-            remoteSiloProber.Probe(default!, default).ReturnsForAnyArgs(Task.CompletedTask);
+            remoteSiloProber.Probe(default!, default, TestContext.Current.CancellationToken).ReturnsForAnyArgs(Task.CompletedTask);
 
             this.localSiloHealthMonitor = Substitute.For<ILocalSiloHealthMonitor>();
             this.localSiloHealthMonitor.GetLocalHealthStatus(default, default, default).ReturnsForAnyArgs(new LocalSiloHealthStatus(0, []));
@@ -127,6 +127,7 @@ namespace NonSilo.Tests.Membership
         [Fact]
         public async Task MembershipAgent_LifecycleStages_GracefulShutdown()
         {
+            var cancellationToken = TestContext.Current.CancellationToken;
             var levels = new ConcurrentDictionary<int, SiloStatus>();
             Func<CancellationToken, Task> Callback(int level) => ct =>
             {
@@ -155,13 +156,13 @@ namespace NonSilo.Tests.Membership
                 Callback(l - 1));
             }
 
-            await this.lifecycle.OnStart();
+            await this.lifecycle.OnStart(cancellationToken);
             Assert.Equal(SiloStatus.Created, levels[ServiceLifecycleStage.RuntimeInitialize + 1]);
             Assert.Equal(SiloStatus.Joining, levels[ServiceLifecycleStage.AfterRuntimeGrainServices + 1]);
             Assert.Equal(SiloStatus.Joining, levels[ServiceLifecycleStage.ValidateInitialConnectivity + 1]);
             Assert.Equal(SiloStatus.Active, levels[ServiceLifecycleStage.BecomeActive + 1]);
 
-            await StopLifecycle();
+            await StopLifecycle(cancellationToken);
 
             Assert.Equal(SiloStatus.ShuttingDown, levels[ServiceLifecycleStage.GrainDeactivation]);
             Assert.Equal(SiloStatus.ShuttingDown, levels[ServiceLifecycleStage.ValidateInitialConnectivity - 1]);
@@ -172,6 +173,7 @@ namespace NonSilo.Tests.Membership
         [Fact]
         public async Task MembershipAgent_LifecycleStages_UngracefulShutdown()
         {
+            var cancellationToken = TestContext.Current.CancellationToken;
             var levels = new ConcurrentDictionary<int, SiloStatus>();
             Func<CancellationToken, Task> Callback(int level) => ct =>
             {
@@ -200,15 +202,15 @@ namespace NonSilo.Tests.Membership
                 Callback(l - 1));
             }
 
-            await this.lifecycle.OnStart();
+            await this.lifecycle.OnStart(cancellationToken);
             Assert.Equal(SiloStatus.Created, levels[ServiceLifecycleStage.RuntimeInitialize + 1]);
             Assert.Equal(SiloStatus.Joining, levels[ServiceLifecycleStage.AfterRuntimeGrainServices + 1]);
             Assert.Equal(SiloStatus.Joining, levels[ServiceLifecycleStage.ValidateInitialConnectivity + 1]);
             Assert.Equal(SiloStatus.Active, levels[ServiceLifecycleStage.BecomeActive + 1]);
 
-            using var cancellation = new CancellationTokenSource();
+            using var cancellation = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
             cancellation.Cancel();
-            await StopLifecycle(cancellation.Token);
+            await StopLifecycle(cancellationToken, cancellation.Token);
 
             Assert.Equal(SiloStatus.Stopping, levels[ServiceLifecycleStage.GrainDeactivation]);
             Assert.Equal(SiloStatus.Stopping, levels[ServiceLifecycleStage.ValidateInitialConnectivity - 1]);
@@ -219,48 +221,50 @@ namespace NonSilo.Tests.Membership
         [Fact]
         public async Task MembershipAgent_UpdateIAmAlive()
         {
-            await this.lifecycle.OnStart();
-            await Until(() => this.timerCalls.ContainsKey("UpdateIAmAlive"));
+            var cancellationToken = TestContext.Current.CancellationToken;
+            await this.lifecycle.OnStart(cancellationToken);
+            await Until(() => this.timerCalls.ContainsKey("UpdateIAmAlive"), cancellationToken);
 
             var updateCounter = 0;
             var testAccessor = (MembershipAgent.ITestAccessor)this.agent;
             testAccessor.OnUpdateIAmAlive = () => ++updateCounter;
 
             (TimeSpan? DelayOverride, TaskCompletionSource<bool> Completion) timer = (default, default!);
-            while (!this.timerCalls["UpdateIAmAlive"].TryDequeue(out timer)) await Task.Delay(1);
+            while (!this.timerCalls["UpdateIAmAlive"].TryDequeue(out timer)) await Task.Delay(1, cancellationToken);
             timer.Completion.TrySetResult(true);
-            await Until(() => updateCounter == 1);
+            await Until(() => updateCounter == 1, cancellationToken);
 
             testAccessor.OnUpdateIAmAlive = () => { ++updateCounter; throw new Exception("no"); };
 
-            while (!this.timerCalls["UpdateIAmAlive"].TryDequeue(out timer)) await Task.Delay(1);
+            while (!this.timerCalls["UpdateIAmAlive"].TryDequeue(out timer)) await Task.Delay(1, cancellationToken);
             timer.Completion.TrySetResult(true);
             Assert.False(timer.DelayOverride.HasValue);
-            await Until(() => updateCounter == 2);
+            await Until(() => updateCounter == 2, cancellationToken);
 
             testAccessor.OnUpdateIAmAlive = () => ++updateCounter;
 
-            while (!this.timerCalls["UpdateIAmAlive"].TryDequeue(out timer)) await Task.Delay(1);
+            while (!this.timerCalls["UpdateIAmAlive"].TryDequeue(out timer)) await Task.Delay(1, cancellationToken);
             Assert.True(timer.DelayOverride.HasValue);
             timer.Completion.TrySetResult(true);
-            await Until(() => updateCounter == 3);
+            await Until(() => updateCounter == 3, cancellationToken);
             Assert.Equal(3, updateCounter);
 
             // When something goes horribly awry (eg, the timer throws an exception), the silo should fault.
             this.fatalErrorHandler.DidNotReceiveWithAnyArgs().OnFatalException(default, default, default);
-            while (!this.timerCalls["UpdateIAmAlive"].TryDequeue(out timer)) await Task.Delay(1);
+            while (!this.timerCalls["UpdateIAmAlive"].TryDequeue(out timer)) await Task.Delay(1, cancellationToken);
             timer.Completion.TrySetException(new Exception("no"));
             Assert.False(timer.DelayOverride.HasValue);
-            await Until(() => this.fatalErrorHandler.ReceivedCalls().Any());
+            await Until(() => this.fatalErrorHandler.ReceivedCalls().Any(), cancellationToken);
             this.fatalErrorHandler.ReceivedWithAnyArgs().OnFatalException(default, default, default);
 
             // Stop & cancel all timers.
-            await StopLifecycle();
+            await StopLifecycle(cancellationToken);
         }
 
         [Fact]
         public async Task MembershipAgent_LifecycleStages_ValidateInitialConnectivity_Success()
         {
+            var cancellationToken = TestContext.Current.CancellationToken;
             var otherSilos = new[]
             {
                 Entry(Silo("127.0.0.200:100@100"), SiloStatus.Active),
@@ -295,24 +299,25 @@ namespace NonSilo.Tests.Membership
                 manager,
                 this.localSiloDetails,
                 TimeProvider.System);
-            var started = this.lifecycle.OnStart();
+            var started = this.lifecycle.OnStart(cancellationToken);
 
-            await Until(() => remoteSiloProber.ReceivedCalls().Count() >= otherSilos.Length);
+            await Until(() => remoteSiloProber.ReceivedCalls().Count() >= otherSilos.Length, cancellationToken);
 
 
-            await Until(() => started.IsCompleted);
+            await Until(() => started.IsCompleted, cancellationToken);
             await started;
 
-            await StopLifecycle();
+            await StopLifecycle(cancellationToken);
         }
 
         [Fact]
         public async Task MembershipAgent_LifecycleStages_ValidateInitialConnectivity_WaitsForStaleSilosToBeEvicted()
         {
+            var cancellationToken = TestContext.Current.CancellationToken;
             this.clusterMembershipOptions.Value.NumMissedProbesLimit = 1;
             this.clusterMembershipOptions.Value.NumVotesForDeathDeclaration = 1;
             this.clusterMembershipOptions.Value.ProbeTimeout = TimeSpan.FromMilliseconds(20);
-            this.remoteSiloProber.Probe(default!, default).ReturnsForAnyArgs(Task.FromException(new Exception("no")));
+            this.remoteSiloProber.Probe(default!, default, cancellationToken).ReturnsForAnyArgs(Task.FromException(new Exception("no")));
 
             var staleSilo = Silo("127.0.0.200:100@100");
             var staleEntry = Entry(staleSilo, SiloStatus.Active, DateTime.UtcNow.Subtract(TimeSpan.FromHours(1)));
@@ -332,8 +337,8 @@ namespace NonSilo.Tests.Membership
                 this.localSiloDetails,
                 TimeProvider.System);
 
-            var started = this.lifecycle.OnStart();
-            await Until(() => this.timerCalls.ContainsKey(nameof(SiloHealthMonitor)));
+            var started = this.lifecycle.OnStart(cancellationToken);
+            await Until(() => this.timerCalls.ContainsKey(nameof(SiloHealthMonitor)), cancellationToken);
 
             while (!started.IsCompleted)
             {
@@ -342,7 +347,7 @@ namespace NonSilo.Tests.Membership
                     timer.Completion.TrySetResult(true);
                 }
 
-                await Task.Delay(1);
+                await Task.Delay(1, cancellationToken);
             }
 
             await started;
@@ -351,12 +356,13 @@ namespace NonSilo.Tests.Membership
             Assert.Equal(SiloStatus.Dead, table.Members.Single(member => member.Item1.SiloAddress.Equals(staleSilo)).Item1.Status);
             Assert.Equal(SiloStatus.Active, this.manager.CurrentStatus);
 
-            await StopLifecycle();
+            await StopLifecycle(cancellationToken);
         }
 
         [Fact]
         public async Task MembershipAgent_LifecycleStages_ValidateInitialConnectivity_Failure()
         {
+            var cancellationToken = TestContext.Current.CancellationToken;
             this.timerFactory.CreateDelegate = (period, name) => new DelegateAsyncTimer(_ => Task.FromResult(false));
 
             var otherSilos = new[]
@@ -379,7 +385,7 @@ namespace NonSilo.Tests.Membership
                 Assert.True(await this.membershipTable.InsertRow(entry, table.Version.Next()));
             }
 
-            this.remoteSiloProber.Probe(default!, default).ReturnsForAnyArgs(Task.FromException(new Exception("no")));
+            this.remoteSiloProber.Probe(default!, default, cancellationToken).ReturnsForAnyArgs(Task.FromException(new Exception("no")));
 
             var dateTimeIndex = 0;
             var dateTimes = new DateTime[] { DateTime.UtcNow, DateTime.UtcNow.AddMinutes(1) };
@@ -397,15 +403,15 @@ namespace NonSilo.Tests.Membership
                 manager,
                 this.localSiloDetails,
                 TimeProvider.System);
-            var started = this.lifecycle.OnStart();
+            var started = this.lifecycle.OnStart(cancellationToken);
 
-            await Until(() => this.remoteSiloProber.ReceivedCalls().Count() >= otherSilos.Length);
-            await Until(() => started.IsCompleted);
+            await Until(() => this.remoteSiloProber.ReceivedCalls().Count() >= otherSilos.Length, cancellationToken);
+            await Until(() => started.IsCompleted, cancellationToken);
 
             // Startup should have faulted.
             Assert.True(started.IsFaulted);
 
-            await StopLifecycle();
+            await StopLifecycle(cancellationToken);
         }
 
         private static SiloAddress Silo(string value) => SiloAddress.FromParsableString(value);
@@ -417,21 +423,23 @@ namespace NonSilo.Tests.Membership
             return new MembershipEntry { SiloAddress = address, Status = status, StartTime = entryTime, IAmAliveTime = entryTime };
         }
 
-        private static async Task Until(Func<bool> condition)
+        private static async Task Until(Func<bool> condition, CancellationToken cancellationToken)
         {
             var maxTimeout = 40_000;
-            while (!condition() && (maxTimeout -= 10) >= 0) await Task.Delay(10);
+            while (!condition() && (maxTimeout -= 10) >= 0) await Task.Delay(10, cancellationToken);
             Assert.True(maxTimeout > 0);
         }
 
-        private async Task StopLifecycle(CancellationToken cancellation = default)
+        private async Task StopLifecycle(
+            CancellationToken cancellationToken,
+            CancellationToken? lifecycleCancellationToken = null)
         {
-            var stopped = this.lifecycle.OnStop(cancellation);
+            var stopped = this.lifecycle.OnStop(lifecycleCancellationToken ?? cancellationToken);
 
             while (!stopped.IsCompleted)
             {
                 foreach (var pair in this.timerCalls) while (pair.Value.TryDequeue(out var call)) call.Completion.TrySetResult(false);
-                await Task.Delay(15);
+                await Task.Delay(15, cancellationToken);
             }
 
             await stopped;

@@ -14,7 +14,7 @@ public sealed class ClusterManifestStabilizationTests
     {
         var builder = new InProcessTestClusterBuilder(2);
         await using var cluster = builder.Build();
-        await cluster.DeployAsync();
+        await cluster.DeployAsync(TestContext.Current.CancellationToken);
         await cluster.WaitForClusterManifestToStabilizeAsync();
 
         await cluster.StartAdditionalSiloAsync();

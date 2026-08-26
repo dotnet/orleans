@@ -151,6 +151,7 @@ public class ShardExecutorTests
     [Fact]
     public async Task RunShardAsync_WhenCancelledDuringOverloadBackoff_CancelsCleanly()
     {
+        var cancellationToken = TestContext.Current.CancellationToken;
         var options = CreateOptions(maxConcurrentJobs: 10, overloadBackoffDelay: TimeSpan.FromSeconds(10));
         var overloadDetector = CreateOverloadDetector(isOverloaded: true);
         var jobs = CreateJobs(5);
@@ -162,13 +163,13 @@ public class ShardExecutorTests
         ConfigureGrainFactoryToTrackCompletions(grainFactory, completedJobs);
 
         // Cancel shortly after starting, while executor is waiting for overload to clear
-        var cts = new CancellationTokenSource();
+        using var cts = new CancellationTokenSource();
         cts.CancelAfter(TimeSpan.FromMilliseconds(100));
 
         await Assert.ThrowsAnyAsync<OperationCanceledException>(async () =>
         {
             await executor.RunShardAsync(shard, cts.Token);
-        });
+        }).WaitAsync(cancellationToken);
 
         // No jobs should have executed since cancellation occurred during backoff wait
         Assert.Empty(completedJobs);
@@ -328,14 +329,14 @@ public class ShardExecutorTests
 
         var runTask = executor.RunShardAsync(shard, CancellationToken.None);
 
-        await firstCall.Task.WaitAsync(TimeSpan.FromSeconds(5));
-        await timeProvider.TimerCreated.WaitAsync(TimeSpan.FromMinutes(1));
+        await firstCall.Task.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+        await timeProvider.TimerCreated.WaitAsync(TimeSpan.FromMinutes(1), TestContext.Current.CancellationToken);
         Assert.False(secondCall.Task.IsCompleted);
 
         timeProvider.Advance(TimeSpan.FromSeconds(5));
 
-        await secondCall.Task.WaitAsync(TimeSpan.FromSeconds(5));
-        await runTask.WaitAsync(TimeSpan.FromSeconds(5));
+        await secondCall.Task.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+        await runTask.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
         await shard.Received(1).RemoveJobAsync(Arg.Any<string>(), Arg.Any<CancellationToken>());
     }
 
@@ -360,14 +361,14 @@ public class ShardExecutorTests
 
         var runTask = executor.RunShardAsync(shard, CancellationToken.None);
 
-        await timeProvider.TimerCreated.WaitAsync(TimeSpan.FromSeconds(5));
+        await timeProvider.TimerCreated.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
         Assert.False(jobHandled.Task.IsCompleted);
 
         Volatile.Write(ref overloaded, false);
         timeProvider.Advance(options.Value.OverloadBackoffDelay);
 
-        await jobHandled.Task.WaitAsync(TimeSpan.FromSeconds(5));
-        await runTask.WaitAsync(TimeSpan.FromSeconds(5));
+        await jobHandled.Task.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+        await runTask.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
     }
 
     [Fact]
@@ -432,7 +433,8 @@ public class ShardExecutorTests
 
         var executor = new ShardExecutor(grainFactory, options, overloadDetector, NullLogger<ShardExecutor>.Instance);
 
-        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+        using var cts = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
+        cts.CancelAfter(TimeSpan.FromSeconds(5));
         var runTask = executor.RunShardAsync(shard, cts.Token);
 
         await Task.WhenAll(firstJobRegistered.Task, retryPersistenceStarted.Task).WaitAsync(cts.Token);
@@ -450,6 +452,7 @@ public class ShardExecutorTests
     [Fact]
     public async Task RunShardAsync_WhenHandlerCancelsWithoutAttemptCancellation_UsesFailureRetryPolicy()
     {
+        var cancellationToken = TestContext.Current.CancellationToken;
         var retryPolicyInvoked = false;
         var options = CreateOptions(
             maxConcurrentJobs: 10,
@@ -466,7 +469,7 @@ public class ShardExecutorTests
         var grainFactory = CreateGrainFactoryWithCanceledExecution();
         var executor = new ShardExecutor(grainFactory, options, overloadDetector, NullLogger<ShardExecutor>.Instance);
 
-        await executor.RunShardAsync(shard, CancellationToken.None);
+        await executor.RunShardAsync(shard, cancellationToken);
 
         Assert.True(retryPolicyInvoked);
         await shard.Received(1).RetryJobLaterAsync(
@@ -798,7 +801,9 @@ public class ShardExecutorTests
         var runTask = executor.RunShardAsync(shard, CancellationToken.None);
         try
         {
-            var completedTask = await Task.WhenAny(concurrencyIncreased.Task, Task.Delay(TimeSpan.FromSeconds(10)));
+            var completedTask = await Task.WhenAny(
+                concurrencyIncreased.Task,
+                Task.Delay(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken));
             Assert.Same(concurrencyIncreased.Task, completedTask);
         }
         finally

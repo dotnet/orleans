@@ -52,56 +52,57 @@ namespace UnitTests.General
         [Fact, TestCategory("Functional"), TestCategory("Ring")]
         public async Task Ring_Basic()
         {
-            await this.HostedCluster.StartAdditionalSilosAsync(numAdditionalSilos);
+            var cancellationToken = TestContext.Current.CancellationToken;
+            await this.HostedCluster.StartAdditionalSilosAsync(numAdditionalSilos, false, cancellationToken);
             await this.HostedCluster.WaitForLivenessToStabilizeAsync();
-            await VerificationScenario(0);
+            await VerificationScenario(0, cancellationToken);
         }
 
         [Fact, TestCategory("Functional"), TestCategory("Ring")]
         public async Task Ring_1F_Random()
         {
-            await FailureTest(Fail.Random, 1);
+            await FailureTest(Fail.Random, 1, TestContext.Current.CancellationToken);
         }
 
         [Fact, TestCategory("Functional"), TestCategory("Ring")]
         public async Task Ring_1F_Beginning()
         {
-            await FailureTest(Fail.First, 1);
+            await FailureTest(Fail.First, 1, TestContext.Current.CancellationToken);
         }
 
         [Fact, TestCategory("Functional"), TestCategory("Ring")]
         public async Task Ring_1F_End()
         {
-            await FailureTest(Fail.Last, 1);
+            await FailureTest(Fail.Last, 1, TestContext.Current.CancellationToken);
         }
 
         [Fact, TestCategory("Functional"), TestCategory("Ring")]
         public async Task Ring_2F_Random()
         {
-            await FailureTest(Fail.Random, 2);
+            await FailureTest(Fail.Random, 2, TestContext.Current.CancellationToken);
         }
 
         [Fact, TestCategory("Functional"), TestCategory("Ring")]
         public async Task Ring_2F_Beginning()
         {
-            await FailureTest(Fail.First, 2);
+            await FailureTest(Fail.First, 2, TestContext.Current.CancellationToken);
         }
 
         [Fact, TestCategory("Functional"), TestCategory("Ring")]
         public async Task Ring_2F_End()
         {
-            await FailureTest(Fail.Last, 2);
+            await FailureTest(Fail.Last, 2, TestContext.Current.CancellationToken);
         }
 
-        private async Task FailureTest(Fail failCode, int numOfFailures)
+        private async Task FailureTest(Fail failCode, int numOfFailures, CancellationToken cancellationToken)
         {
-            await this.HostedCluster.StartAdditionalSilosAsync(numAdditionalSilos);
+            await this.HostedCluster.StartAdditionalSilosAsync(numAdditionalSilos, false, cancellationToken);
             await this.HostedCluster.WaitForLivenessToStabilizeAsync();
 
-            List<SiloHandle> failures = await getSilosToFail(failCode, numOfFailures);
+            List<SiloHandle> failures = await getSilosToFail(failCode, numOfFailures, cancellationToken);
             foreach (SiloHandle fail in failures) // verify before failure
             {
-                await VerificationScenario(PickKey(fail.SiloAddress)); // fail.SiloAddress.GetConsistentHashCode());
+                await VerificationScenario(PickKey(fail.SiloAddress), cancellationToken); // fail.SiloAddress.GetConsistentHashCode());
             }
 
             logger.LogInformation(
@@ -113,7 +114,7 @@ namespace UnitTests.General
             foreach (SiloHandle fail in failures) // verify before failure
             {
                 keysToTest.Add(PickKey(fail.SiloAddress)); //fail.SiloAddress.GetConsistentHashCode());
-                await this.HostedCluster.StopSiloAsync(fail);
+                await this.HostedCluster.StopSiloAsync(fail, cancellationToken);
             }
             await this.HostedCluster.WaitForLivenessToStabilizeAsync();
 
@@ -121,67 +122,69 @@ namespace UnitTests.General
             {
                 foreach (var key in keysToTest) // verify after failure
                 {
-                    await VerificationScenario(key);
+                    await VerificationScenario(key, cancellationToken);
                 }
-            }, failureTimeout);
+            }, failureTimeout, cancellationToken);
         }
 
         [Fact, TestCategory("Functional"), TestCategory("Ring")]
         public async Task Ring_1J()
         {
-            await JoinTest(1);
+            await JoinTest(1, TestContext.Current.CancellationToken);
         }
 
         [Fact, TestCategory("Functional"), TestCategory("Ring")]
         public async Task Ring_2J()
         {
-            await JoinTest(2);
+            await JoinTest(2, TestContext.Current.CancellationToken);
         }
 
-        private async Task JoinTest(int numOfJoins)
+        private async Task JoinTest(int numOfJoins, CancellationToken cancellationToken)
         {
             logger.LogInformation("JoinTest {NumOfJoins}", numOfJoins);
-            await this.HostedCluster.StartAdditionalSilosAsync(numAdditionalSilos - numOfJoins);
+            await this.HostedCluster.StartAdditionalSilosAsync(numAdditionalSilos - numOfJoins, false, cancellationToken);
             await this.HostedCluster.WaitForLivenessToStabilizeAsync();
 
-            List<SiloHandle> silos = await this.HostedCluster.StartAdditionalSilosAsync(numOfJoins);
+            List<SiloHandle> silos = await this.HostedCluster.StartAdditionalSilosAsync(numOfJoins, false, cancellationToken);
             await this.HostedCluster.WaitForLivenessToStabilizeAsync();
             foreach (SiloHandle sh in silos)
             {
-                await VerificationScenario(PickKey(sh.SiloAddress));
+                await VerificationScenario(PickKey(sh.SiloAddress), cancellationToken);
             }
         }
 
         [Fact, TestCategory("Functional"), TestCategory("Ring")]
         public async Task Ring_1F1J()
         {
-            await this.HostedCluster.StartAdditionalSilosAsync(numAdditionalSilos);
+            var cancellationToken = TestContext.Current.CancellationToken;
+            await this.HostedCluster.StartAdditionalSilosAsync(numAdditionalSilos, false, cancellationToken);
             await this.HostedCluster.WaitForLivenessToStabilizeAsync();
-            List<SiloHandle> failures = await getSilosToFail(Fail.Random, 1);
+            List<SiloHandle> failures = await getSilosToFail(Fail.Random, 1, cancellationToken);
             uint keyToCheck = PickKey(failures[0].SiloAddress);// failures[0].SiloAddress.GetConsistentHashCode();
 
             // kill a silo and join a new one in parallel
             logger.LogInformation("Killing silo {SiloAddress} and joining a silo", failures[0].SiloAddress);
 
-            var killTask = this.HostedCluster.StopSiloAsync(failures[0]);
-            var joinTask = this.HostedCluster.StartAdditionalSilosAsync(1);
-            await Task.WhenAll([killTask, joinTask]).WaitAsync(endWait);
+            var killTask = this.HostedCluster.StopSiloAsync(failures[0], cancellationToken);
+            var joinTask = this.HostedCluster.StartAdditionalSilosAsync(1, false, cancellationToken);
+            await Task.WhenAll([killTask, joinTask]).WaitAsync(endWait, cancellationToken);
             List<SiloHandle> joinedSilos = await joinTask;
 
             await this.HostedCluster.WaitForLivenessToStabilizeAsync();
 
             await AssertEventually(async () =>
             {
-                await VerificationScenario(keyToCheck); // verify failed silo's key
-                await VerificationScenario(PickKey(joinedSilos[0].SiloAddress)); // verify newly joined silo's key
-            }, failureTimeout);
+                await VerificationScenario(keyToCheck, cancellationToken); // verify failed silo's key
+                await VerificationScenario(PickKey(joinedSilos[0].SiloAddress), cancellationToken); // verify newly joined silo's key
+            }, failureTimeout, cancellationToken);
         }
 
         // failing the secondary in this scenario exposed the bug in DomainGrain ... so, we keep it as a separate test than Ring_1F1J
         [Fact, TestCategory("Functional"), TestCategory("Ring")]
         public async Task Ring_1Fsec1J()
         {
-            await this.HostedCluster.StartAdditionalSilosAsync(numAdditionalSilos);
+            var cancellationToken = TestContext.Current.CancellationToken;
+            await this.HostedCluster.StartAdditionalSilosAsync(numAdditionalSilos, false, cancellationToken);
             await this.HostedCluster.WaitForLivenessToStabilizeAsync();
             //List<SiloHandle> failures = getSilosToFail(Fail.Random, 1);
             SiloHandle fail = this.HostedCluster.SecondarySilos.First();
@@ -189,18 +192,18 @@ namespace UnitTests.General
 
             // kill a silo and join a new one in parallel
             logger.LogInformation("Killing secondary silo {SiloAddress} and joining a silo", fail.SiloAddress);
-            var killTask = this.HostedCluster.StopSiloAsync(fail);
-            var joinTask = this.HostedCluster.StartAdditionalSilosAsync(1);
-            await Task.WhenAll([killTask, joinTask]).WaitAsync(endWait);
+            var killTask = this.HostedCluster.StopSiloAsync(fail, cancellationToken);
+            var joinTask = this.HostedCluster.StartAdditionalSilosAsync(1, false, cancellationToken);
+            await Task.WhenAll([killTask, joinTask]).WaitAsync(endWait, cancellationToken);
             var joinedSilo = (await joinTask).Single();
 
             await this.HostedCluster.WaitForLivenessToStabilizeAsync();
 
             await AssertEventually(async () =>
             {
-                await VerificationScenario(keyToCheck); // verify failed silo's key
-                await VerificationScenario(PickKey(joinedSilo.SiloAddress));
-            }, failureTimeout);
+                await VerificationScenario(keyToCheck, cancellationToken); // verify failed silo's key
+                await VerificationScenario(PickKey(joinedSilo.SiloAddress), cancellationToken);
+            }, failureTimeout, cancellationToken);
         }
 
         private uint PickKey(SiloAddress responsibleSilo)
@@ -219,7 +222,7 @@ namespace UnitTests.General
                 responsibleSilo, testHooks.GetConsistentRingProviderDiagnosticInfo().Result));
         }
 
-        private async Task VerificationScenario(uint testKey)
+        private async Task VerificationScenario(uint testKey, CancellationToken cancellationToken)
         {
             // setup
             List<SiloAddress> silos = new List<SiloAddress>();
@@ -232,22 +235,22 @@ namespace UnitTests.General
             }
 
             // verify parameter key
-            await VerifyKey(testKey, silos);
+            await VerifyKey(testKey, silos, cancellationToken);
             // verify some other keys as well, apart from the parameter key            
             // some random keys
             for (int i = 0; i < 3; i++)
             {
-                await VerifyKey((uint)Random.Shared.Next(), silos);
+                await VerifyKey((uint)Random.Shared.Next(), silos, cancellationToken);
             }
             // lowest key
             uint lowest = (uint)(silos.First().GetConsistentHashCode() - 1);
-            await VerifyKey(lowest, silos);
+            await VerifyKey(lowest, silos, cancellationToken);
             // highest key
             uint highest = (uint)(silos.Last().GetConsistentHashCode() + 1);
-            await VerifyKey(lowest, silos);
+            await VerifyKey(lowest, silos, cancellationToken);
         }
 
-        private async Task VerifyKey(uint key, List<SiloAddress> silos)
+        private async Task VerifyKey(uint key, List<SiloAddress> silos, CancellationToken cancellationToken)
         {
             var testHooks = this.Client.GetTestHooks(this.HostedCluster.Primary!);
             SiloAddress truth = testHooks.GetConsistentRingPrimaryTargetSilo(key).Result; //expected;
@@ -264,12 +267,12 @@ namespace UnitTests.General
             foreach (var siloHandle in this.HostedCluster.GetActiveSilos()) // do this for each silo
             {
                 testHooks = this.Client.GetTestHooks(siloHandle);
-                SiloAddress s = await testHooks.GetConsistentRingPrimaryTargetSilo((uint)key);
+                SiloAddress s = await testHooks.GetConsistentRingPrimaryTargetSilo((uint)key).WaitAsync(cancellationToken);
                 Assert.Equal(truth, s);
             }
         }
 
-        private async Task<List<SiloHandle>> getSilosToFail(Fail fail, int numOfFailures)
+        private async Task<List<SiloHandle>> getSilosToFail(Fail fail, int numOfFailures, CancellationToken cancellationToken)
         {
             List<SiloHandle> failures = new List<SiloHandle>();
             int count = 0;
@@ -279,10 +282,10 @@ namespace UnitTests.General
             var tableGrainId = ((GrainReference)tableGrain).GrainId;
 
             // Ping the grain to make sure it is active.
-            await tableGrain.ReadRows(tableGrainId);
+            await tableGrain.ReadRows(tableGrainId).WaitAsync(cancellationToken);
 
             (SiloAddress reminderTableGrainPrimaryDirectoryAddress, SiloAddress reminderGrainActivationSiloAddress) =
-                await GetReminderTableGrainAddresses(tableGrainId);
+                await GetReminderTableGrainAddresses(tableGrainId, cancellationToken);
 
             SortedList<int, SiloHandle> ids = new SortedList<int, SiloHandle>();
             foreach (var siloHandle in this.HostedCluster.GetActiveSilos())
@@ -343,7 +346,9 @@ namespace UnitTests.General
             return failures;
         }
 
-        private async Task<(SiloAddress DirectoryAddress, SiloAddress ActivationSiloAddress)> GetReminderTableGrainAddresses(GrainId tableGrainId)
+        private async Task<(SiloAddress DirectoryAddress, SiloAddress ActivationSiloAddress)> GetReminderTableGrainAddresses(
+            GrainId tableGrainId,
+            CancellationToken cancellationToken)
         {
             SiloAddress? directoryAddress = null;
             SiloAddress? activationSiloAddress = null;
@@ -353,7 +358,7 @@ namespace UnitTests.General
                 var primaryReport = await TestUtils.GetDetailedGrainReport(
                     this.HostedCluster.InternalGrainFactory!,
                     tableGrainId,
-                    this.HostedCluster.Primary!);
+                    this.HostedCluster.Primary!).WaitAsync(cancellationToken);
 
                 if (primaryReport.PrimaryForGrain is not { } primaryForGrain)
                 {
@@ -369,7 +374,7 @@ namespace UnitTests.General
                 var directoryReport = await TestUtils.GetDetailedGrainReport(
                     this.HostedCluster.InternalGrainFactory!,
                     tableGrainId,
-                    directorySilo);
+                    directorySilo).WaitAsync(cancellationToken);
 
                 if (directoryReport.LocalDirectoryActivationAddress is not { } activationAddress)
                 {
@@ -378,24 +383,29 @@ namespace UnitTests.General
 
                 directoryAddress = primaryForGrain;
                 activationSiloAddress = activationAddress.SiloAddress;
-            }, failureTimeout);
+            }, failureTimeout, cancellationToken);
 
             return (
                 directoryAddress ?? throw new XunitException($"No primary directory silo was reported for reminder table grain {tableGrainId}."),
                 activationSiloAddress ?? throw new XunitException($"No activation silo was reported for reminder table grain {tableGrainId}."));
         }
 
-        private static async Task AssertEventually(Func<Task> assertion, TimeSpan timeout)
+        private static async Task AssertEventually(Func<Task> assertion, TimeSpan timeout, CancellationToken cancellationToken)
         {
-            await AssertEventually(assertion, timeout, TimeSpan.FromMilliseconds(500));
+            await AssertEventually(assertion, timeout, TimeSpan.FromMilliseconds(500), cancellationToken);
         }
 
-        private static async Task AssertEventually(Func<Task> assertion, TimeSpan timeout, TimeSpan delayBetweenIterations)
+        private static async Task AssertEventually(
+            Func<Task> assertion,
+            TimeSpan timeout,
+            TimeSpan delayBetweenIterations,
+            CancellationToken cancellationToken)
         {
             var sw = Stopwatch.StartNew();
 
             while (true)
             {
+                cancellationToken.ThrowIfCancellationRequested();
                 try
                 {
                     await assertion();
@@ -411,7 +421,7 @@ namespace UnitTests.General
 
                 if (delayBetweenIterations > TimeSpan.Zero)
                 {
-                    Thread.Sleep(delayBetweenIterations);
+                    await Task.Delay(delayBetweenIterations, cancellationToken);
                 }
             }
         }

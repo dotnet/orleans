@@ -220,7 +220,7 @@ public sealed class ConcurrentLruCacheSoakTests
             {
                 lru.TryRemove(new KeyValuePair<int, string>(5, "x"));
             }
-        });
+        }, TestContext.Current.CancellationToken);
 
         for (var i = 0; i < 100_000; i++)
         {
@@ -290,12 +290,14 @@ public sealed class ConcurrentLruCacheSoakTests
     [Repeat(10)]
     public async Task WhenValueIsBigStructNoLiveLock(int _)
     {
-        using var source = new CancellationTokenSource();
+        using var source = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
         var started = new TaskCompletionSource<bool>();
         var cache = new ConcurrentLruCache<int, Guid>(Capacity, EqualityComparer<int>.Default);
 
-        var setTask = Task.Run(() => Setter(cache, source.Token, started));
-        await started.Task;
+        var setTask = Task.Run(
+            () => Setter(cache, source.Token, started),
+            source.Token);
+        await started.Task.WaitAsync(source.Token);
         Checker(cache, source);
 
         await setTask;

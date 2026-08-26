@@ -139,7 +139,7 @@ public class StateStorageBridgeConcurrencyTests
         InvalidOperationException invalidOperation;
         try
         {
-            await pendingWrite.Task.WaitAsync(WaitTimeout);
+            await pendingWrite.Task.WaitAsync(WaitTimeout, TestContext.Current.CancellationToken);
             invalidOperation = Assert.Throws<InvalidOperationException>(() => { _ = bridge.WriteStateAsync(); });
         }
         finally
@@ -361,7 +361,7 @@ public class StateStorageBridgeConcurrencyTests
         InvalidOperationException invalidOperation;
         try
         {
-            await pendingClear.Task.WaitAsync(WaitTimeout);
+            await pendingClear.Task.WaitAsync(WaitTimeout, TestContext.Current.CancellationToken);
             invalidOperation = Assert.Throws<InvalidOperationException>(() => { _ = bridge.ClearStateAsync(); });
         }
         finally
@@ -619,7 +619,8 @@ public class StateStorageBridgeConcurrencyTests
         var storage = new ControllableGrainStorage();
         IStorage bridge = CreateBridge(context, storage);
         var readCompletion = CreateCompletionSource();
-        using var cancellationTokenSource = new CancellationTokenSource();
+        using var cancellationTokenSource = CancellationTokenSource.CreateLinkedTokenSource(
+            TestContext.Current.CancellationToken);
         storage.ReadAsync = _ => readCompletion.Task;
         storage.WriteWithCancellationAsync = (_, cancellationToken) =>
         {
@@ -653,7 +654,8 @@ public class StateStorageBridgeConcurrencyTests
         var storage = new ControllableGrainStorage();
         IStorage bridge = CreateBridge(context, storage);
         var readCompletion = CreateCompletionSource();
-        using var cancellationTokenSource = new CancellationTokenSource();
+        using var cancellationTokenSource = CancellationTokenSource.CreateLinkedTokenSource(
+            TestContext.Current.CancellationToken);
         storage.ReadAsync = _ => readCompletion.Task;
 
         await RunInGrainContextAsync(context, async () =>
@@ -737,18 +739,22 @@ public class StateStorageBridgeConcurrencyTests
 
     private static Task RunInGrainContextAsync(TestGrainContext context, Func<Task> action)
     {
+        var cancellationToken = TestContext.Current.CancellationToken;
         var task = Task.Factory.StartNew(
             action,
-            CancellationToken.None,
+            cancellationToken,
             TaskCreationOptions.None,
             context.WorkItemGroup.TaskScheduler).Unwrap();
 
-        return task.WaitAsync(WaitTimeout);
+        return task.WaitAsync(WaitTimeout, cancellationToken);
     }
 
     private static async Task WaitUntilAsync(Func<bool> condition)
     {
-        using var cancellationTokenSource = new CancellationTokenSource(WaitTimeout);
+        using var timeoutTokenSource = new CancellationTokenSource(WaitTimeout);
+        using var cancellationTokenSource = CancellationTokenSource.CreateLinkedTokenSource(
+            timeoutTokenSource.Token,
+            TestContext.Current.CancellationToken);
 
         while (!condition())
         {
