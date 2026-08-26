@@ -10,7 +10,7 @@ namespace Orleans.Connections.Transport.Security;
 /// <summary>
 /// Message transport listener which configures transports for TLS.
 /// </summary>
-public class TlsMessageTransportListener(
+internal sealed class TlsMessageTransportListener(
     MessageTransportListener innerListener,
     IOptionsMonitor<TlsOptions> tlsOptions,
     ILoggerFactory loggerFactory) : MessageTransportListener

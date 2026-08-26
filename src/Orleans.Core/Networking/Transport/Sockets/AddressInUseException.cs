@@ -4,7 +4,7 @@ using System;
 namespace Orleans.Connections.Transport.Sockets;
 
 [Serializable]
-public class AddressInUseException : Exception
+internal sealed class AddressInUseException : Exception
 {
     public AddressInUseException()
     {

@@ -14,7 +14,7 @@ using System.Threading.Tasks;
 
 namespace Orleans.Connections.Transport.Streams;
 
-public abstract class StreamMessageTransport : MessageTransportBase
+internal abstract class StreamMessageTransport : MessageTransportBase
 {
     private readonly ILogger _logger;
     private readonly SingleWaiterAutoResetEvent _writerSignal = new();
@@ -66,32 +66,17 @@ public abstract class StreamMessageTransport : MessageTransportBase
         if (_runTask is null)
         {
             DisposeStream();
+            _connectionClosedCts.Cancel();
             return;
         }
 
-        // Wait for processing to complete
-        var completion = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-        using var closedRegistration = _connectionClosedCts.Token.Register(
-            static state => ((TaskCompletionSource)state!).TrySetResult(),
-            completion,
-            useSynchronizationContext: false);
-        using var cancelRegistration = cancellationToken.Register(
-            static state => ((TaskCompletionSource)state!).TrySetCanceled(),
-            completion,
-            useSynchronizationContext: false);
-
         try
         {
-            await completion.Task.ConfigureAwait(false);
+            await _runTask.WaitAsync(cancellationToken).ConfigureAwait(false);
         }
-        catch (TaskCanceledException)
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
-            // Cancellation requested - caller wants to force close
-            // Force dispose the stream to interrupt any pending I/O
             DisposeStream();
-
-            // Signal completion so callers know we're done (even if not gracefully)
-            _connectionClosedCts.Cancel();
         }
     }
 
@@ -132,7 +117,17 @@ public abstract class StreamMessageTransport : MessageTransportBase
 
         // Signal that we're closing if not already done
         _connectionClosingCts.Cancel();
-        _connectionClosedCts.Cancel();
+        _readerSignal.Signal();
+        _writerSignal.Signal();
+
+        if (_runTask is { } runTask)
+        {
+            await runTask.ConfigureAwait(false);
+        }
+        else
+        {
+            _connectionClosedCts.Cancel();
+        }
 
         await base.DisposeAsync().ConfigureAwait(false);
         GC.SuppressFinalize(this);

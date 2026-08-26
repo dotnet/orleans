@@ -980,7 +980,6 @@ namespace NonSilo.Tests.Membership
             protected internal override void OnReceivedMessage(Message msg) { }
             protected internal override void RecordMessageReceive(Message message, int totalBytes, int headerBytes) { }
             protected internal override void RecordMessageSend(Message message, int totalBytes, int headerBytes) { }
-            protected override void OnSendMessageFailure(Message message, string error) { }
             protected override void RetryMessage(Message msg, Exception? ex = null) { }
             public void SimulateMessageReceived() => MarkMessageReceived();
         }

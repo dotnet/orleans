@@ -111,7 +111,7 @@ public class MessageTransportLifecycleTests
         bodyWriter.Write(bodyBytes);
 
         var readRequest = new MessageReadRequest(shared);
-        readRequest._originalHeaders.ResponseType = Message.ResponseTypes.Success;
+        readRequest._originalResponseType = Message.ResponseTypes.Success;
         readRequest.Body = bodyWriter.ConsumeSlice(bodyBytes.Length);
         typeof(MessageReadRequest).GetField("_bodyLength", BindingFlags.Instance | BindingFlags.NonPublic)!.SetValue(readRequest, bodyBytes.Length);
 
@@ -296,7 +296,8 @@ public class MessageTransportLifecycleTests
 
         Assert.Throws<InvalidMessageFrameException>(() => request.WriteMessage(invalid));
         Assert.Equal(validLength, request.Length);
-        Assert.Equal([valid], request.Messages);
+        Assert.Equal(1, request.MessageCount);
+        Assert.Same(valid, request.GetMessage(0));
         request.Reset();
     }
 
@@ -478,6 +479,7 @@ public class MessageTransportLifecycleTests
         private WriteRequest? _write;
 
         public bool CloseCalled { get; private set; }
+        public override CancellationToken Closed => default;
         public override IFeatureCollection Features { get; } = new FeatureCollection();
 
         public override bool EnqueueRead(ReadRequest request)
@@ -505,6 +507,7 @@ public class MessageTransportLifecycleTests
     private sealed class CapturingTransport : MessageTransport
     {
         public byte[]? Written { get; private set; }
+        public override CancellationToken Closed => default;
         public override IFeatureCollection Features { get; } = new FeatureCollection();
         public override bool EnqueueRead(ReadRequest request) => false;
 
@@ -525,6 +528,7 @@ public class MessageTransportLifecycleTests
 
         public ImmediateReadTransport(ReadOnlySpan<byte> bytes) => _buffer.Write(bytes);
 
+        public override CancellationToken Closed => default;
         public override IFeatureCollection Features { get; } = new FeatureCollection();
 
         public override bool EnqueueRead(ReadRequest request)
@@ -587,6 +591,7 @@ public class MessageTransportLifecycleTests
     private sealed class TrackingTransport : MessageTransport
     {
         public bool Disposed { get; private set; }
+        public override CancellationToken Closed => default;
         public override IFeatureCollection Features { get; } = new FeatureCollection();
         public override bool EnqueueRead(ReadRequest request) => false;
         public override bool EnqueueWrite(WriteRequest request) => false;

@@ -13,7 +13,7 @@ namespace Orleans.Connections.Transport.Streams;
 /// <summary>
 /// <see cref="Stream"/> implementation which reads and writes to a <see cref="MessageTransport"/>.
 /// </summary>
-public class MessageTransportStream(MessageTransport transport, MemoryPool<byte> memoryPool) : Stream
+internal sealed class MessageTransportStream(MessageTransport transport, MemoryPool<byte> memoryPool) : Stream
 {
     private readonly MessageTransport _transport = transport;
     private readonly StreamWriteRequest _writeRequest = new();
@@ -89,10 +89,14 @@ public class MessageTransportStream(MessageTransport transport, MemoryPool<byte>
     /// <inheritdoc/>
     public override void Write(ReadOnlySpan<byte> buffer)
     {
-        // TODO: rent once and reuse, only returning on dispose / to rent a larger buffer / to restore a standard-sized buffer (in the case of huge writes)
-        using var bytes = MemoryPool.Rent(buffer.Length);
-        buffer.CopyTo(bytes.Memory.Span);
-        WriteAsync(bytes.Memory[..buffer.Length], CancellationToken.None).AsTask().Wait();
+        _writeRequest.Reset();
+        _writeRequest.Write(buffer);
+        if (!_transport.EnqueueWrite(_writeRequest))
+        {
+            throw new ObjectDisposedException("Network transport is unable to satisfy the request");
+        }
+
+        _writeRequest.OnCompleteAsync().AsTask().GetAwaiter().GetResult();
     }
 
     /// <inheritdoc/>
@@ -155,7 +159,8 @@ public class MessageTransportStream(MessageTransport transport, MemoryPool<byte>
             Buffers = new(_bufferWriter);
         }
 
-        public void Write(ReadOnlyMemory<byte> buffer) => _bufferWriter.Write(buffer.Span);
+        public void Write(ReadOnlyMemory<byte> buffer) => Write(buffer.Span);
+        public void Write(ReadOnlySpan<byte> buffer) => _bufferWriter.Write(buffer);
         public ValueTask OnCompleteAsync() => new(this, _signal.Version);
         public override void SetResult() => _signal.SetResult(true);
         public override void SetException(Exception error) => _signal.SetException(error);

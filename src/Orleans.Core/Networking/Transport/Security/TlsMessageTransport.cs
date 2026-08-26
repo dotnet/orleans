@@ -14,7 +14,7 @@ namespace Orleans.Connections.Transport.Security;
 /// <summary>
 /// <see cref="MessageTransport"/> which encrypts and decrypts all data using TLS.
 /// </summary>
-public abstract class TlsMessageTransport : StreamMessageTransport
+internal abstract class TlsMessageTransport : StreamMessageTransport
 {
     private readonly MessageTransport _innerTransport;
     private readonly TlsOptions _options;
@@ -88,11 +88,6 @@ public abstract class TlsMessageTransport : StreamMessageTransport
     /// Gets the underlying <see cref="SslStream"/>.
     /// </summary>
     protected override SslStream Stream => _sslStream;
-
-    /// <summary>
-    /// Gets the underlying <see cref="MessageTransport"/>.
-    /// </summary>
-    protected MessageTransport InnerTransport => _innerTransport;
 
     private protected TlsConnectionFeature TlsConnectionFeature => _tlsConnectionFeature;
 

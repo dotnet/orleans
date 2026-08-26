@@ -178,16 +178,6 @@ namespace Orleans.Runtime.Messaging
             }
         }
 
-        protected override void OnSendMessageFailure(Message message, string error)
-        {
-            if (message.IsPing())
-            {
-                LogWarningFailedToSendPingMessage(this.Log, message);
-            }
-
-            this.FailMessage(message, error);
-        }
-
         protected override async Task RunAsyncCore()
         {
             Exception? error = default;
@@ -349,12 +339,6 @@ namespace Orleans.Runtime.Messaging
             Message = "Responding to Ping from {Silo} with object id {ObjectId}. Message {Message}"
         )]
         private static partial void LogTraceRespondingToPing(ILogger logger, SiloAddress silo, int objectId, Message message);
-
-        [LoggerMessage(
-            Level = LogLevel.Warning,
-            Message = "Failed to send ping message {Message}"
-        )]
-        private static partial void LogWarningFailedToSendPingMessage(ILogger logger, Message message);
 
         [LoggerMessage(
             Level = LogLevel.Warning,

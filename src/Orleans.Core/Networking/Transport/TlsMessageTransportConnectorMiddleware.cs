@@ -9,7 +9,7 @@ namespace Orleans.Connections.Transport;
 /// <summary>
 /// Middleware which adds TLS to all <see cref="MessageTransport"/> instances created by a <see cref="MessageTransportConnector"/>.
 /// </summary>
-public sealed class TlsMessageTransportConnectorMiddleware : IMessageTransportConnectorMiddleware
+internal sealed class TlsMessageTransportConnectorMiddleware : IMessageTransportConnectorMiddleware
 {
     private readonly IOptionsMonitor<TlsOptions> _tlsOptions;
     private readonly ILoggerFactory _loggerFactory;
@@ -27,7 +27,7 @@ public sealed class TlsMessageTransportConnectorMiddleware : IMessageTransportCo
 /// <summary>
 /// Middleware which adds TLS to all <see cref="MessageTransport"/> instances created by a <see cref="MessageTransportListener"/>.
 /// </summary>
-public sealed class TlsMessageTransportListenerMiddleware : IMessageTransportListenerMiddleware
+internal sealed class TlsMessageTransportListenerMiddleware : IMessageTransportListenerMiddleware
 {
     private readonly IOptionsMonitor<TlsOptions> _tlsOptions;
     private readonly ILoggerFactory _loggerFactory;

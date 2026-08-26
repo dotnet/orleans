@@ -2,7 +2,6 @@
 using System;
 using System.Net;
 using System.Net.Sockets;
-using System.Runtime.CompilerServices;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
@@ -14,7 +13,6 @@ namespace Orleans.TestingHost.UnixSocketTransport;
 
 internal class UnixDomainSocketMessageTransportConnector : MessageTransportConnector
 {
-    public const string PathPropertyName = "path";
     private readonly ILogger _logger;
     private readonly IOptions<UnixSocketConnectionOptions> _options;
 
@@ -40,29 +38,9 @@ internal class UnixDomainSocketMessageTransportConnector : MessageTransportConne
 
         var socket = new Socket(AddressFamily.Unix, SocketType.Stream, ProtocolType.Unspecified);
 
-        using var completion = new SingleUseAwaitableSocketAsyncEventArgs
-        {
-            RemoteEndPoint = unixEndPoint,
-        };
-
         try
         {
-            using var _ = cancellationToken.Register(static state => ((SingleUseAwaitableSocketAsyncEventArgs)state!).Cancel(), completion);
-
-            if (!socket.ConnectAsync(completion))
-            {
-                completion.Complete();
-            }
-
-            if (!await completion)
-            {
-                throw new OperationCanceledException(cancellationToken);
-            }
-
-            if (completion.SocketError != SocketError.Success)
-            {
-                throw new SocketConnectionException($"Unable to connect to {unixEndPoint}. Error: {completion.SocketError}");
-            }
+            await socket.ConnectAsync(unixEndPoint, cancellationToken).ConfigureAwait(false);
 
             var connection = new SocketMessageTransport(socket, _logger);
             connection.Start();
@@ -73,25 +51,5 @@ internal class UnixDomainSocketMessageTransportConnector : MessageTransportConne
             socket.Dispose();
             throw;
         }
-    }
-
-    private class SingleUseAwaitableSocketAsyncEventArgs : SocketAsyncEventArgs, ICriticalNotifyCompletion
-    {
-        private readonly TaskCompletionSource<bool> _completion = new();
-
-        public TaskAwaiter<bool> GetAwaiter() => _completion.Task.GetAwaiter();
-
-        public void Cancel()
-        {
-            _completion.TrySetResult(false);
-        }
-
-        public void Complete() => _completion.TrySetResult(true);
-
-        public void OnCompleted(Action continuation) => GetAwaiter().OnCompleted(continuation);
-
-        public void UnsafeOnCompleted(Action continuation) => GetAwaiter().UnsafeOnCompleted(continuation);
-
-        protected override void OnCompleted(SocketAsyncEventArgs _) => _completion.TrySetResult(true);
     }
 }

@@ -20,10 +20,9 @@ internal sealed class MessageReadRequest(MessageHandlerShared shared) : ReadRequ
     internal ArcBuffer _headers;
     private ArcBuffer _body;
 
-    public int FramedLength => Message.LENGTH_HEADER_SIZE + PayloadLength;
     public int PayloadLength => _headerLength + _bodyLength;
 
-    internal Message.PackedHeaders _originalHeaders;
+    internal Message.ResponseTypes _originalResponseType;
     public ref ArcBuffer Headers => ref _headers;
     public ref ArcBuffer Body => ref _body;
     public int HeaderLength => _headerLength;
@@ -39,12 +38,19 @@ internal sealed class MessageReadRequest(MessageHandlerShared shared) : ReadRequ
     {
         _headerLength = default;
         _bodyLength = default;
+        _originalResponseType = default;
         _connection = default;
         _headers.Dispose();
         _body.Dispose();
         _headers = default;
         _body = default;
         Shared.Return(this);
+    }
+
+    internal void ReleaseHeaders()
+    {
+        _headers.Dispose();
+        _headers = default;
     }
 
     public override void OnError(Exception error)
@@ -123,11 +129,6 @@ internal sealed class MessageReadRequest(MessageHandlerShared shared) : ReadRequ
                 message.SetMessageReadRequest(this);
                 shouldReset = false;
             }
-            else
-            {
-                // Otherwise, return this instance to the pool on exiting this method.
-            }
-
             connection.OnReceivedMessage(message);
         }
         catch (Exception exception)

@@ -38,7 +38,6 @@
     <PackageVersion Include="KubernetesClient" Version="18.0.13" />
     <PackageVersion Include="MessagePack" Version="3.1.7" />
     <PackageVersion Include="Microsoft.Accordant" Version="0.1.6" />
-    <PackageVersion Include="Microsoft.AspNetCore.Connections.Abstractions" Version="8.0.24" />
     <PackageVersion Include="Microsoft.Azure.Cosmos" Version="3.57.0" />
     <PackageVersion Include="Microsoft.Build" Version="17.10.4" />
     <PackageVersion Include="Microsoft.CodeAnalysis.Analyzers" Version="5.9.0" />
@@ -140,7 +139,6 @@
     <PackageVersion Update="Aspire.StackExchange.Redis" Version="13.2.4" />
     <PackageVersion Update="BenchmarkDotNet" Version="0.15.6" />
     <PackageVersion Update="FSharp.Core" Version="10.0.103" />
-    <PackageVersion Update="Microsoft.AspNetCore.Connections.Abstractions" Version="10.0.3" />
     <PackageVersion Update="Microsoft.CodeAnalysis.Common" Version="5.0.0" />
     <PackageVersion Update="Microsoft.CodeAnalysis.CSharp.Workspaces" Version="5.0.0" />
     <PackageVersion Update="Microsoft.CodeAnalysis.CSharp" Version="5.0.0" />

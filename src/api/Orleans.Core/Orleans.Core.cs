@@ -87,14 +87,6 @@ namespace Orleans
         public void Populate(System.IServiceProvider services, System.Type grainClass, Runtime.GrainType grainType, System.Collections.Generic.Dictionary<string, string> properties) { }
     }
 
-    public static partial class ConnectionMiddlewareExtensions
-    {
-        public static Microsoft.AspNetCore.Connections.IConnectionBuilder UseMiddleware(this Microsoft.AspNetCore.Connections.IConnectionBuilder builder, Runtime.Messaging.IConnectionMiddleware middleware) { throw null; }
-
-        public static Microsoft.AspNetCore.Connections.IConnectionBuilder UseMiddleware<T>(this Microsoft.AspNetCore.Connections.IConnectionBuilder builder)
-            where T : Runtime.Messaging.IConnectionMiddleware { throw null; }
-    }
-
     public delegate void ConnectionToClusterLostHandler(object? sender, System.EventArgs e);
     public delegate TInstance Factory<out TInstance>();
     public delegate TInstance Factory<in TParam1, out TInstance>(TParam1 param1);
@@ -704,11 +696,9 @@ namespace Orleans.Connections.Transport
 
     public abstract partial class MessageTransport : System.IAsyncDisposable
     {
-        public virtual System.Threading.CancellationToken Closed { get { throw null; } }
+        public abstract System.Threading.CancellationToken Closed { get; }
 
         public abstract IFeatureCollection Features { get; }
-
-        public virtual bool IsValid { get { throw null; } }
 
         public abstract System.Threading.Tasks.ValueTask CloseAsync(System.Exception? closeException, System.Threading.CancellationToken cancellationToken = default);
         public virtual System.Threading.Tasks.ValueTask DisposeAsync() { throw null; }
@@ -751,20 +741,6 @@ namespace Orleans.Connections.Transport
         public abstract bool OnRead(Serialization.Buffers.ArcBufferReader buffer);
     }
 
-    public sealed partial class TlsMessageTransportConnectorMiddleware : IMessageTransportConnectorMiddleware
-    {
-        public TlsMessageTransportConnectorMiddleware(Microsoft.Extensions.Options.IOptionsMonitor<Security.TlsOptions> tlsOptions, Microsoft.Extensions.Logging.ILoggerFactory loggerFactory) { }
-
-        public MessageTransportConnector Apply(MessageTransportConnector transport) { throw null; }
-    }
-
-    public sealed partial class TlsMessageTransportListenerMiddleware : IMessageTransportListenerMiddleware
-    {
-        public TlsMessageTransportListenerMiddleware(Microsoft.Extensions.Options.IOptionsMonitor<Security.TlsOptions> tlsOptions, Microsoft.Extensions.Logging.ILoggerFactory loggerFactory) { }
-
-        public MessageTransportListener Apply(MessageTransportListener input) { throw null; }
-    }
-
     public abstract partial class WriteRequest
     {
         public Serialization.Buffers.ArcBufferReader Buffers { get { throw null; } protected set { } }
@@ -776,21 +752,7 @@ namespace Orleans.Connections.Transport
 
 namespace Orleans.Connections.Transport.Security
 {
-    public static partial class CertificateLoader
-    {
-        public static System.Security.Cryptography.X509Certificates.X509Certificate2 LoadFromStoreCert(string subject, string storeName, System.Security.Cryptography.X509Certificates.StoreLocation storeLocation, bool allowInvalid, bool server) { throw null; }
-    }
-
     public delegate System.Security.Cryptography.X509Certificates.X509Certificate? ClientCertificateSelectionCallback(object sender, string targetHost, System.Security.Cryptography.X509Certificates.X509CertificateCollection localCertificates, System.Security.Cryptography.X509Certificates.X509Certificate? remoteCertificate, string[] acceptableIssuers);
-    public partial class ClientTlsMessageTransport : TlsMessageTransport
-    {
-        public ClientTlsMessageTransport(MessageTransport transport, TlsOptions options, Microsoft.Extensions.Logging.ILogger logger) : base(default!, default!, default!) { }
-
-        protected override System.Threading.Tasks.Task AuthenticateAsyncCore(MessageTransport transport, bool certificateRequired, System.Threading.CancellationToken cancellationToken) { throw null; }
-
-        protected static void EnsureCertificateIsAllowedForClientAuth(System.Security.Cryptography.X509Certificates.X509Certificate2 certificate) { }
-    }
-
     public partial interface ITlsApplicationProtocolFeature
     {
         System.ReadOnlyMemory<byte> ApplicationProtocol { get; }
@@ -833,15 +795,6 @@ namespace Orleans.Connections.Transport.Security
 
     public delegate bool RemoteCertificateValidator(System.Security.Cryptography.X509Certificates.X509Certificate2 certificate, System.Security.Cryptography.X509Certificates.X509Chain? chain, System.Net.Security.SslPolicyErrors policyErrors);
     public delegate System.Security.Cryptography.X509Certificates.X509Certificate? ServerCertificateSelectionCallback(object sender, string? hostName);
-    public partial class ServerTlsMessageTransport : TlsMessageTransport
-    {
-        public ServerTlsMessageTransport(MessageTransport transport, TlsOptions options, Microsoft.Extensions.Logging.ILogger logger) : base(default!, default!, default!) { }
-
-        protected override System.Threading.Tasks.Task AuthenticateAsyncCore(MessageTransport transport, bool certificateRequired, System.Threading.CancellationToken cancellationToken) { throw null; }
-
-        protected static void EnsureCertificateIsAllowedForServerAuth(System.Security.Cryptography.X509Certificates.X509Certificate2 certificate) { }
-    }
-
     public partial class TlsClientAuthenticationOptions
     {
         public System.Security.Cryptography.X509Certificates.X509RevocationMode CertificateRevocationCheckMode { get { throw null; } set { } }
@@ -857,67 +810,12 @@ namespace Orleans.Connections.Transport.Security
         public string? TargetHost { get { throw null; } set { } }
     }
 
-    public abstract partial class TlsMessageTransport : Streams.StreamMessageTransport
-    {
-        public TlsMessageTransport(MessageTransport transport, TlsOptions options, Microsoft.Extensions.Logging.ILogger logger) : base(default!) { }
-
-        public override FeatureCollection Features { get { throw null; } }
-
-        protected MessageTransport InnerTransport { get { throw null; } }
-
-        protected TlsOptions Options { get { throw null; } }
-
-        protected override System.Net.Security.SslStream Stream { get { throw null; } }
-
-        protected abstract System.Threading.Tasks.Task AuthenticateAsyncCore(MessageTransport transport, bool certificateRequired, System.Threading.CancellationToken cancellationToken);
-        public override System.Threading.Tasks.ValueTask CloseAsync(System.Exception? closeException, System.Threading.CancellationToken cancellationToken = default) { throw null; }
-
-        public override System.Threading.Tasks.ValueTask DisposeAsync() { throw null; }
-
-        protected override System.Threading.Tasks.Task RunAsyncCore() { throw null; }
-
-        public override string ToString() { throw null; }
-    }
-
-    public partial class TlsMessageTransportConnector : MessageTransportConnector
-    {
-        public TlsMessageTransportConnector(MessageTransportConnector innerTransportFactory, Microsoft.Extensions.Options.IOptionsMonitor<TlsOptions> tlsOptions, Microsoft.Extensions.Logging.ILoggerFactory loggerFactory) { }
-
-        public override IFeatureCollection Features { get { throw null; } }
-
-        public override bool IsValid { get { throw null; } }
-
-        public override System.Threading.Tasks.ValueTask<MessageTransport> CreateAsync(System.Net.EndPoint endPoint, System.Threading.CancellationToken cancellationToken = default) { throw null; }
-
-        public override System.Threading.Tasks.ValueTask DisposeAsync() { throw null; }
-    }
-
-    public partial class TlsMessageTransportListener : MessageTransportListener
-    {
-        public TlsMessageTransportListener(MessageTransportListener innerListener, Microsoft.Extensions.Options.IOptionsMonitor<TlsOptions> tlsOptions, Microsoft.Extensions.Logging.ILoggerFactory loggerFactory) { }
-
-        public override IFeatureCollection Features { get { throw null; } }
-
-        public override bool IsValid { get { throw null; } }
-
-        public override string ListenerName { get { throw null; } }
-
-        public override System.Threading.Tasks.ValueTask<MessageTransport?> AcceptAsync(System.Threading.CancellationToken cancellationToken = default) { throw null; }
-
-        public override System.Threading.Tasks.ValueTask BindAsync(System.Threading.CancellationToken cancellationToken = default) { throw null; }
-
-        public override System.Threading.Tasks.ValueTask DisposeAsync() { throw null; }
-
-        public override System.Threading.Tasks.ValueTask UnbindAsync(System.Threading.CancellationToken cancellationToken = default) { throw null; }
-    }
 
     public partial class TlsOptions
     {
         public bool CheckCertificateRevocation { get { throw null; } set { } }
 
         public RemoteCertificateMode ClientCertificateMode { get { throw null; } set { } }
-
-        public bool EnableTransportLayerSecurity { get { throw null; } set { } }
 
         public System.TimeSpan HandshakeTimeout { get { throw null; } set { } }
 
@@ -958,163 +856,6 @@ namespace Orleans.Connections.Transport.Security
     }
 }
 
-namespace Orleans.Connections.Transport.Sockets
-{
-    public partial class AddressInUseException : System.Exception
-    {
-        public AddressInUseException() { }
-
-        public AddressInUseException(string? message, System.Exception? innerException) { }
-
-        public AddressInUseException(string? message) { }
-    }
-
-    public partial class SocketConnectionException : System.Exception
-    {
-        public SocketConnectionException() { }
-
-        public SocketConnectionException(string? message, System.Exception? innerException) { }
-
-        public SocketConnectionException(string? message) { }
-    }
-
-    public sealed partial class SocketMessageTransport : MessageTransportBase
-    {
-        public SocketMessageTransport(System.Net.Sockets.Socket socket, Microsoft.Extensions.Logging.ILogger logger) { }
-
-        public override System.Threading.CancellationToken Closed { get { throw null; } }
-
-        public override System.Threading.Tasks.ValueTask CloseAsync(System.Exception? closeReason, System.Threading.CancellationToken cancellationToken = default) { throw null; }
-
-        public override System.Threading.Tasks.ValueTask DisposeAsync() { throw null; }
-
-        public override bool EnqueueRead(ReadRequest request) { throw null; }
-
-        public override bool EnqueueWrite(WriteRequest request) { throw null; }
-
-        public void Start() { }
-
-        public override string ToString() { throw null; }
-    }
-
-    public partial class TcpMessageTransportConnector : MessageTransportConnector
-    {
-        public const string EndpointAddressPropertyName = "ep";
-        [System.Diagnostics.CodeAnalysis.SetsRequiredMembers]
-        public TcpMessageTransportConnector(Microsoft.Extensions.Options.IOptionsMonitor<TcpMessageTransportOptions> options, Microsoft.Extensions.Logging.ILoggerFactory loggerFactory) { }
-
-        public override IFeatureCollection Features { get { throw null; } }
-
-        public override bool IsValid { get { throw null; } }
-
-        public override System.Threading.Tasks.ValueTask<MessageTransport> CreateAsync(System.Net.EndPoint endPoint, System.Threading.CancellationToken cancellationToken = default) { throw null; }
-    }
-
-    public sealed partial class TcpMessageTransportListener : MessageTransportListener
-    {
-        internal TcpMessageTransportListener() { }
-
-        public override FeatureCollection Features { get { throw null; } }
-
-        public override bool IsValid { get { throw null; } }
-
-        public override string ListenerName { get { throw null; } }
-
-        protected Microsoft.Extensions.Logging.ILogger Logger { get { throw null; } }
-
-        public override System.Threading.Tasks.ValueTask<MessageTransport?> AcceptAsync(System.Threading.CancellationToken cancellationToken = default) { throw null; }
-
-        public override System.Threading.Tasks.ValueTask BindAsync(System.Threading.CancellationToken cancellationToken = default) { throw null; }
-
-        protected System.Net.Sockets.Socket CreateListenSocket() { throw null; }
-
-        public override System.Threading.Tasks.ValueTask DisposeAsync() { throw null; }
-
-        protected void OnAcceptSocket(System.Net.Sockets.Socket socket) { }
-
-        public override System.Threading.Tasks.ValueTask UnbindAsync(System.Threading.CancellationToken cancellationToken) { throw null; }
-    }
-
-    public partial class TcpMessageTransportListenerOptions
-    {
-        public bool Enabled { get { throw null; } set { } }
-
-        public System.Net.IPEndPoint? Endpoint { get { throw null; } set { } }
-    }
-
-    public partial class TcpMessageTransportOptions
-    {
-    }
-}
-
-namespace Orleans.Connections.Transport.Streams
-{
-    public partial class MessageTransportStream : System.IO.Stream
-    {
-        public MessageTransportStream(MessageTransport transport, System.Buffers.MemoryPool<byte> memoryPool) { }
-
-        public override bool CanRead { get { throw null; } }
-
-        public override bool CanSeek { get { throw null; } }
-
-        public override bool CanTimeout { get { throw null; } }
-
-        public override bool CanWrite { get { throw null; } }
-
-        public override long Length { get { throw null; } }
-
-        public System.Buffers.MemoryPool<byte> MemoryPool { get { throw null; } }
-
-        public override long Position { get { throw null; } set { } }
-
-        public override System.Threading.Tasks.ValueTask DisposeAsync() { throw null; }
-
-        public override void Flush() { }
-
-        public override System.Threading.Tasks.Task FlushAsync(System.Threading.CancellationToken cancellationToken) { throw null; }
-
-        public override int Read(byte[] buffer, int offset, int count) { throw null; }
-
-        public override int Read(System.Span<byte> buffer) { throw null; }
-
-        public override System.Threading.Tasks.Task<int> ReadAsync(byte[] buffer, int offset, int count, System.Threading.CancellationToken cancellationToken) { throw null; }
-
-        public override System.Threading.Tasks.ValueTask<int> ReadAsync(System.Memory<byte> buffer, System.Threading.CancellationToken cancellationToken = default) { throw null; }
-
-        public override long Seek(long offset, System.IO.SeekOrigin origin) { throw null; }
-
-        public override void SetLength(long value) { }
-
-        public override void Write(byte[] buffer, int offset, int count) { }
-
-        public override void Write(System.ReadOnlySpan<byte> buffer) { }
-
-        public override System.Threading.Tasks.Task WriteAsync(byte[] buffer, int offset, int count, System.Threading.CancellationToken cancellationToken) { throw null; }
-
-        public override System.Threading.Tasks.ValueTask WriteAsync(System.ReadOnlyMemory<byte> buffer, System.Threading.CancellationToken cancellationToken = default) { throw null; }
-    }
-
-    public abstract partial class StreamMessageTransport : MessageTransportBase
-    {
-        protected StreamMessageTransport(Microsoft.Extensions.Logging.ILogger logger) { }
-
-        public override System.Threading.CancellationToken Closed { get { throw null; } }
-
-        protected abstract System.IO.Stream Stream { get; }
-
-        public override System.Threading.Tasks.ValueTask CloseAsync(System.Exception? closeException, System.Threading.CancellationToken cancellationToken = default) { throw null; }
-
-        public override System.Threading.Tasks.ValueTask DisposeAsync() { throw null; }
-
-        public override bool EnqueueRead(ReadRequest request) { throw null; }
-
-        public override bool EnqueueWrite(WriteRequest request) { throw null; }
-
-        protected virtual System.Threading.Tasks.Task RunAsyncCore() { throw null; }
-
-        public virtual void Start() { }
-    }
-}
 
 namespace Orleans.Core.Diagnostics
 {
@@ -2120,26 +1861,6 @@ namespace Orleans.Runtime.Messaging
         public ConnectionFailedException(string message, System.Exception innerException) { }
 
         public ConnectionFailedException(string message) { }
-    }
-
-    public static partial class ConnectionFrameHelper
-    {
-        public const int DefaultMaxFrameLength = 1048576;
-        public const int FramePrefixSize = 5;
-        public static System.Threading.Tasks.ValueTask<(byte FrameType, byte[] Payload)> ReadFrameAsync(Microsoft.AspNetCore.Connections.ConnectionContext connection, System.Threading.CancellationToken cancellationToken, int maxFrameLength = 1048576) { throw null; }
-
-        public static string ReadLengthPrefixedString(byte[] data, ref int offset) { throw null; }
-
-        public static System.Threading.Tasks.ValueTask WriteFrameAsync(Microsoft.AspNetCore.Connections.ConnectionContext connection, byte frameType, System.Action<System.Buffers.IBufferWriter<byte>> writePayload, System.Threading.CancellationToken cancellationToken) { throw null; }
-
-        public static System.Threading.Tasks.ValueTask WriteFrameAsync(Microsoft.AspNetCore.Connections.ConnectionContext connection, byte frameType, byte[] payload, System.Threading.CancellationToken cancellationToken) { throw null; }
-
-        public static void WriteLengthPrefixedString(System.Buffers.IBufferWriter<byte> writer, string value) { }
-    }
-
-    public partial interface IConnectionMiddleware
-    {
-        System.Threading.Tasks.Task OnConnectionAsync(Microsoft.AspNetCore.Connections.ConnectionContext context, Microsoft.AspNetCore.Connections.ConnectionDelegate next);
     }
 
     [GenerateSerializer]

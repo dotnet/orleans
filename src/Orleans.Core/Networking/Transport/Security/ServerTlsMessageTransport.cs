@@ -11,7 +11,7 @@ namespace Orleans.Connections.Transport.Security;
 /// <summary>
 /// Message transport encrypts and decrypts all data using TLS, authenticating with the remote endpoint as a server.
 /// </summary>
-public class ServerTlsMessageTransport : TlsMessageTransport
+internal sealed class ServerTlsMessageTransport : TlsMessageTransport
 {
     private readonly X509Certificate2? _certificate;
     private readonly Func<MessageTransport, string?, X509Certificate2?>? _certificateSelector;
@@ -82,7 +82,7 @@ public class ServerTlsMessageTransport : TlsMessageTransport
         await Stream.AuthenticateAsServerAsync(sslOptions.Value, cancellationToken);
     }
 
-    protected static void EnsureCertificateIsAllowedForServerAuth(X509Certificate2 certificate)
+    private static void EnsureCertificateIsAllowedForServerAuth(X509Certificate2 certificate)
     {
         if (!CertificateLoader.IsCertificateAllowedForServerAuth(certificate))
         {

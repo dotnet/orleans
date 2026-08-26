@@ -16,9 +16,9 @@ internal sealed class MessageHandlerShared(
     MessagingInstruments messagingInstruments)
 {
     private readonly IServiceProvider _serviceProvider = serviceProvider;
-    private readonly ConcurrentBag<MessageSerializer> _serializerPool = new();
-    private readonly ConcurrentBag<MessageReadRequest> _receivePool = new();
-    private readonly ConcurrentBag<MessageWriteRequest> _sendPool = new();
+    private readonly ConcurrentQueue<MessageSerializer> _serializerPool = new();
+    private readonly ConcurrentQueue<MessageReadRequest> _receivePool = new();
+    private readonly ConcurrentQueue<MessageWriteRequest> _sendPool = new();
 
     public MessagingTrace MessagingTrace { get; } = messagingTrace;
     public ConnectionTrace ConnectionTrace { get; } = connectionTrace;
@@ -29,7 +29,7 @@ internal sealed class MessageHandlerShared(
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     internal MessageSerializer GetMessageSerializer()
     {
-        if (_serializerPool.TryTake(out var result))
+        if (_serializerPool.TryDequeue(out var result))
         {
             return result;
         }
@@ -38,12 +38,12 @@ internal sealed class MessageHandlerShared(
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    internal void Return(MessageSerializer serializer) => _serializerPool.Add(serializer);
+    internal void Return(MessageSerializer serializer) => _serializerPool.Enqueue(serializer);
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     internal MessageReadRequest GetReceiveMessageHandler()
     {
-        if (_receivePool.TryTake(out var result))
+        if (_receivePool.TryDequeue(out var result))
         {
             return result;
         }
@@ -52,12 +52,12 @@ internal sealed class MessageHandlerShared(
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    internal void Return(MessageReadRequest handler) => _receivePool.Add(handler);
+    internal void Return(MessageReadRequest handler) => _receivePool.Enqueue(handler);
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     internal MessageWriteRequest GetSendMessageHandler()
     {
-        if (_sendPool.TryTake(out var result))
+        if (_sendPool.TryDequeue(out var result))
         {
             return result;
         }
@@ -74,5 +74,5 @@ internal sealed class MessageHandlerShared(
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    internal void Return(MessageWriteRequest handler) => _sendPool.Add(handler);
+    internal void Return(MessageWriteRequest handler) => _sendPool.Enqueue(handler);
 }

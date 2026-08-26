@@ -59,19 +59,17 @@ namespace Orleans.Runtime.Messaging
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void ReadHeaders(MessageReadRequest readRequest, out Message message)
         {
-            // Check lengths
-            ValidateFrameLengths(readRequest.HeaderLength, readRequest.BodyLength);
-
             try
             {
                 // Build message
                 message = new();
                 var headersReader = Reader.Create(readRequest._headers, _deserializationSession);
                 DeserializeHeaders(ref headersReader, message);
-                readRequest._originalHeaders = message._headers;
+                readRequest._originalResponseType = message.Result;
             }
             finally
             {
+                readRequest.ReleaseHeaders();
                 _deserializationSession.Reset();
             }
         }
@@ -118,8 +116,7 @@ namespace Orleans.Runtime.Messaging
             var readRequest = bodyObject as MessageReadRequest;
             if (readRequest is not null)
             {
-                var originalHeaders = readRequest._originalHeaders;
-                headers.ResponseType = originalHeaders.ResponseType;
+                headers.ResponseType = readRequest._originalResponseType;
             }
             else if (bodyObject is not null)
             {

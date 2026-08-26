@@ -5,7 +5,7 @@ using System.Security.Cryptography.X509Certificates;
 
 namespace Orleans.Connections.Transport.Security;
 
-public static class CertificateLoader
+internal static class CertificateLoader
 {
     // See http://oid-info.com/get/1.3.6.1.5.5.7.3.1
     // Indicates that a certificate can be used as a TLS server certificate
