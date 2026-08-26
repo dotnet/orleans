@@ -109,6 +109,31 @@ namespace UnitTests.StreamingTests
                 Test_PubSub_Stream(StreamProviderName, StreamId));
         }
 
+        [Fact, TestCategory("Functional"), TestCategory("Streaming"), TestCategory("PubSub")]
+        public async Task Produce_First_Stream_Item_During_Deactivation()
+        {
+            var subscribedStreamId = Orleans.Runtime.StreamId.Create(StreamNamespace, Guid.NewGuid());
+            var producedStreamId = Orleans.Runtime.StreamId.Create(StreamNamespace, Guid.NewGuid());
+            var receivingConsumer = GrainFactory.GetGrain<IStreamLifecycleConsumerGrain>(Guid.NewGuid());
+            await receivingConsumer.BecomeConsumer(producedStreamId, StreamProviderName);
+
+            var deactivatingConsumer = GrainFactory.GetGrain<IStreamLifecycleConsumerGrain>(Guid.NewGuid());
+            await deactivatingConsumer.BecomeConsumer(subscribedStreamId, StreamProviderName);
+
+            var timeout = TimeSpan.FromSeconds(30);
+            using var streamObserver = StreamingDiagnosticObserver.Create();
+            using var grainObserver = GrainDiagnosticObserver.Create();
+            using var cts = new CancellationTokenSource(timeout);
+            var deliveryTask = streamObserver.WaitForItemDeliveryCountAsync(producedStreamId, 1, StreamProviderName, cts.Token);
+            var deactivationTask = grainObserver.WaitForDeactivatedAsync(deactivatingConsumer, timeout);
+
+            await deactivatingConsumer.ProduceOnDeactivate(producedStreamId, StreamProviderName);
+            await deliveryTask;
+            await deactivationTask;
+
+            Assert.Equal(1, await receivingConsumer.GetReceivedCount());
+        }
+
         private async Task Test_PubSub_Stream(string streamProviderName, Guid streamId)
         {
             using var observer = StreamingDiagnosticObserver.Create();

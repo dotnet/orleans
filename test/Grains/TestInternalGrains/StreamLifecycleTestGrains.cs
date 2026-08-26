@@ -150,6 +150,7 @@ namespace UnitTests.Grains
     [Orleans.Providers.StorageProvider(ProviderName = "MemoryStore")]
     internal class StreamLifecycleConsumerGrain : StreamLifecycleTestGrainBase, IStreamLifecycleConsumerGrain
     {
+        private IAsyncStream<int>? _deactivationStream;
         protected readonly InsideRuntimeClient runtimeClient;
         protected readonly IStreamProviderRuntime streamProviderRuntime;
 
@@ -194,6 +195,19 @@ namespace UnitTests.Grains
         public override async Task OnDeactivateAsync(DeactivationReason reason, CancellationToken cancellationToken)
         {
             if (logger.IsEnabled(LogLevel.Debug)) logger.LogDebug("OnDeactivateAsync");
+
+            if (_deactivationStream is not null && !cancellationToken.IsCancellationRequested)
+            {
+                try
+                {
+                    await _deactivationStream.OnNextAsync(1).WaitAsync(cancellationToken);
+                }
+                catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+                {
+                    // Cancellation is expected when shutdown interrupts deactivation.
+                }
+            }
+
             await RecordDeactivate();
         }
 
@@ -253,6 +267,18 @@ namespace UnitTests.Grains
             Observers.Remove(subsHandle);
             State.ConsumerSubscriptionHandles.Remove(subsHandle);
             await WriteStateAsync();
+        }
+
+        public Task ProduceOnDeactivate(StreamId streamId, string providerName)
+        {
+            if (State.Stream is null)
+            {
+                throw new InvalidOperationException("Not a Consumer");
+            }
+
+            _deactivationStream = this.GetStreamProvider(providerName).GetStream<int>(streamId);
+            DeactivateOnIdle();
+            return Task.CompletedTask;
         }
 
         public async Task ClearGrain()
