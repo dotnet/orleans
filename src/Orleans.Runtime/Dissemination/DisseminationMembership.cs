@@ -40,7 +40,7 @@ internal sealed class DisseminationMembership(
     }
 
     public Task RefreshMembership(CancellationToken cancellationToken) =>
-        membershipManager.Refresh(targetVersion: null, cancellationToken);
+        membershipManager.Refresh(targetVersion: null, cancellationToken: cancellationToken);
 
     public async ValueTask<DisseminationMembershipSnapshot?> GetSnapshotContainingMember(
         SiloAddress member,
