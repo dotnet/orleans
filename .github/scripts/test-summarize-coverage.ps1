@@ -327,6 +327,11 @@ try {
         Assert-Matches $invokeCoverageScript 'function Assert-NotReparsePoint' 'Coverage retry logging must reject linked paths.'
         Assert-Equal 2 ([regex]::Matches($invokeCoverageScript, 'Assert-NotReparsePoint \$logDirectory')).Count 'Coverage retry log directory validation count differs.'
         Assert-Equal 1 ([regex]::Matches($invokeCoverageScript, 'Assert-NotReparsePoint \$RetryLogFile')).Count 'Coverage retry log file validation count differs.'
+        Assert-Matches `
+            $invokeCoverageScript `
+            '(?s)function Assert-CoverageOutputPath.*?Assert-NotReparsePoint \$outputDirectory.*?Assert-NotReparsePoint \$Output' `
+            'Coverage collection must reject linked output paths.'
+        Assert-Equal 2 ([regex]::Matches($invokeCoverageScript, '(?m)^ {4}Assert-CoverageOutputPath\r?$')).Count 'Coverage output validation count differs.'
         [IO.File]::WriteAllText(
             $fakeCollector,
             @'
