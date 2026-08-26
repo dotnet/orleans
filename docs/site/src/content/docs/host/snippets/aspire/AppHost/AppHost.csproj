@@ -10,10 +10,7 @@
 
   <!-- <apphost_packages> -->
   <ItemGroup>
-    <!-- Amazon.CDK.Lib is not strong-name signed; the .NET SDK suppresses CS8002 for .NETCoreApp targets. -->
-    <PackageReference Include="Amazon.CDK.Lib" Version="2.262.0" />
     <PackageReference Include="Aspire.Hosting.AppHost" Version="13.4.6" />
-    <PackageReference Include="Aspire.Hosting.AWS" Version="13.6.0" />
     <PackageReference Include="Aspire.Hosting.Orleans" Version="13.4.6" />
     <PackageReference Include="Aspire.Hosting.Redis" Version="13.4.6" />
   </ItemGroup>
@@ -22,6 +19,11 @@
   <ItemGroup>
     <PackageReference Include="Aspire.Hosting.Azure.Storage" Version="13.4.6" />
     <PackageReference Include="Aspire.Hosting.SqlServer" Version="13.4.6" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\..\..\..\..\..\..\..\src\AWS\Orleans.Streaming.SQS.Aspire\Orleans.Streaming.SQS.Aspire.csproj"
+                      IsAspireProjectResource="false" />
   </ItemGroup>
 
   <!-- Project references removed - Silo and Client are library projects

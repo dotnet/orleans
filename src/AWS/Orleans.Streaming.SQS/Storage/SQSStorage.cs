@@ -3,7 +3,6 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
 using System.Net;
-using System.Text;
 using System.Threading.Tasks;
 using Amazon.Runtime;
 using Amazon.SQS;
@@ -58,7 +57,7 @@ namespace OrleansAWSUtils.Storage
         {
             if (sqsOptions is null) throw new ArgumentNullException(nameof(sqsOptions));
             this.sqsOptions = sqsOptions;
-            QueueName = ConstructQueueName(queueName, sqsOptions, serviceId);
+            QueueName = SqsQueueName.Create(queueName, sqsOptions.FifoQueue, serviceId);
             ParseDataConnectionString(sqsOptions.ConnectionString);
             Logger = loggerFactory.CreateLogger<SQSStorage>();
             CreateClient();
@@ -414,24 +413,6 @@ namespace OrleansAWSUtils.Storage
         {
             LogErrorSQSOperation(exc, operation, QueueName);
             throw new AggregateException($"Error doing {operation} for SQS queue {QueueName}", exc);
-        }
-
-        private static string ConstructQueueName(string queueName, SqsOptions sqsOptions, string serviceId)
-        {
-            var queueNameBuilder = new StringBuilder();
-            if (!string.IsNullOrWhiteSpace(serviceId))
-            {
-                queueNameBuilder.Append(serviceId);
-                queueNameBuilder.Append('-');
-            }
-
-            queueNameBuilder.Append(queueName);
-            if (sqsOptions.FifoQueue)
-            {
-                queueNameBuilder.Append(".fifo");
-            }
-
-            return queueNameBuilder.ToString();
         }
 
         [LoggerMessage(
