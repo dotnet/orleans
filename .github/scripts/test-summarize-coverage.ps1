@@ -316,6 +316,7 @@ try {
 
     Invoke-Test 'retries only the uninitialized coverage handle failure' {
         $testCase = New-TestCase
+        $invokeCoverageScript = Get-Content -Raw -LiteralPath $invokeCoverageScriptPath
         $attemptFile = Join-Path $testCase.Root 'attempt.txt'
         $fakeCollector = Join-Path $testCase.Root 'fake-collector.ps1'
         $collectorArguments = Join-Path $testCase.Root 'collector-arguments'
@@ -323,6 +324,9 @@ try {
         $coverageOutput = Join-Path $testCase.ReportDirectory 'coverage.cobertura.xml'
         $retryLog = Join-Path $testCase.Root 'logs/coverage.retry.log'
         [IO.File]::WriteAllText($settings, '<Configuration />', [Text.UTF8Encoding]::new($false))
+        Assert-Matches $invokeCoverageScript 'function Assert-NotReparsePoint' 'Coverage retry logging must reject linked paths.'
+        Assert-Equal 2 ([regex]::Matches($invokeCoverageScript, 'Assert-NotReparsePoint \$logDirectory')).Count 'Coverage retry log directory validation count differs.'
+        Assert-Equal 1 ([regex]::Matches($invokeCoverageScript, 'Assert-NotReparsePoint \$RetryLogFile')).Count 'Coverage retry log file validation count differs.'
         [IO.File]::WriteAllText(
             $fakeCollector,
             @'

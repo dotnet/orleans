@@ -19,6 +19,20 @@ param(
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
+function Assert-NotReparsePoint {
+    param([string] $Path)
+
+    if (-not (Test-Path -LiteralPath $Path)) {
+        return
+    }
+
+    $item = Get-Item -LiteralPath $Path -Force
+    $linkType = $item.PSObject.Properties['LinkType']
+    if (($linkType -and $linkType.Value) -or ($item.Attributes -band [IO.FileAttributes]::ReparsePoint)) {
+        throw "$Path must not be a symbolic link"
+    }
+}
+
 function Invoke-Collector {
     param([switch] $EnableVerboseLog)
 
@@ -39,9 +53,12 @@ function Invoke-Collector {
     if ($EnableVerboseLog -and -not [string]::IsNullOrWhiteSpace($RetryLogFile)) {
         $logDirectory = Split-Path -Parent $RetryLogFile
         if (-not [string]::IsNullOrWhiteSpace($logDirectory)) {
+            Assert-NotReparsePoint $logDirectory
             [void] (New-Item -ItemType Directory -Force -Path $logDirectory)
+            Assert-NotReparsePoint $logDirectory
         }
 
+        Assert-NotReparsePoint $RetryLogFile
         Remove-Item -LiteralPath $RetryLogFile -Force -ErrorAction SilentlyContinue
         $arguments.Add('--log-file')
         $arguments.Add($RetryLogFile)
