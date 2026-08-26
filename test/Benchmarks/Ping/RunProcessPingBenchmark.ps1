@@ -6,6 +6,7 @@ param(
     [int] $SampleCount = 1,
     [int] $Concurrency = 250,
     [switch] $Latency,
+    [switch] $Tls,
     [string] $OutputDirectory = ".",
     [string] $PvanalyzeDll,
     [ValidateSet("cpu", "gc-verbose")]
@@ -120,7 +121,7 @@ $clientError = Join-Path $OutputDirectory "client.err.log"
 
 $serverDuration = $WarmupSeconds + ($MeasurementSeconds * $SampleCount) + 60
 $server = Start-AffinitizedDotnet `
-    @($BenchmarksDll, "ProcessPing_Server", $serverDuration) `
+    @($BenchmarksDll, "ProcessPing_Server", $serverDuration, 11111, 30000, [bool]$Tls) `
     $serverMask `
     $serverOutput `
     $serverError
@@ -150,11 +151,11 @@ try
 
     $clientArguments = if ($Latency)
     {
-        @($BenchmarksDll, "ProcessPing_LatencyClient", $WarmupSeconds, $MeasurementSeconds, $SampleCount, 30000)
+        @($BenchmarksDll, "ProcessPing_LatencyClient", $WarmupSeconds, $MeasurementSeconds, $SampleCount, 30000, [bool]$Tls)
     }
     else
     {
-        @($BenchmarksDll, "ProcessPing_Client", $WarmupSeconds, $MeasurementSeconds, $Concurrency, 30000, $SampleCount)
+        @($BenchmarksDll, "ProcessPing_Client", $WarmupSeconds, $MeasurementSeconds, $Concurrency, 30000, $SampleCount, [bool]$Tls)
     }
     $client = Start-AffinitizedDotnet `
         $clientArguments `
