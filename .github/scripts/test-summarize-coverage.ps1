@@ -471,6 +471,7 @@ exit 0
         Assert-Equal 2 ([regex]::Matches($setupCoverageScript, 'Assert-NotReparsePoint \$toolPath')).Count 'Coverage tool path validation count differs.'
     }
 
+    $global:LASTEXITCODE = 0
     Write-Output "$testsRun coverage tests passed."
 } finally {
     if (Test-Path $temporaryRoot) {
