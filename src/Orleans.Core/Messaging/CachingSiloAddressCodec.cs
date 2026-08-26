@@ -7,7 +7,7 @@ using Orleans.Caching;
 using Orleans.Serialization.Buffers;
 using Orleans.Serialization.Codecs;
 
-#nullable disable
+#nullable enable annotations
 namespace Orleans.Runtime.Messaging
 {
     /// <summary>
@@ -31,10 +31,10 @@ namespace Orleans.Runtime.Messaging
             _lastGarbageCollectionTimestamp = Environment.TickCount64;
         }
 
-        public SiloAddress ReadRaw<TInput>(ref Reader<TInput> reader)
+        public SiloAddress? ReadRaw<TInput>(ref Reader<TInput> reader)
         {
-            SiloAddress result = null;
-            byte[] payloadArray = default;
+            SiloAddress result;
+            byte[]? payloadArray = default;
             var length = (int)reader.ReadVarUInt32();
             if (length == 0)
             {
@@ -46,7 +46,7 @@ namespace Orleans.Runtime.Messaging
                 payloadSpan = payloadArray = reader.ReadBytes((uint)length);
             }
 
-            var innerReader = Reader.Create(payloadSpan, null);
+            var innerReader = Reader.Create(payloadSpan, session: null!);
             var hashCode = innerReader.ReadInt32();
 
             ref var cacheEntry = ref CollectionsMarshal.GetValueRefOrAddDefault(_cache, hashCode, out var exists);
@@ -103,7 +103,7 @@ namespace Orleans.Runtime.Messaging
             return SiloAddress.New(ip, port, generation);
         }
 
-        public void WriteRaw<TBufferWriter>(ref Writer<TBufferWriter> writer, SiloAddress value) where TBufferWriter : IBufferWriter<byte>
+        public void WriteRaw<TBufferWriter>(ref Writer<TBufferWriter> writer, SiloAddress? value) where TBufferWriter : IBufferWriter<byte>
         {
             var currentTimestamp = Environment.TickCount64;
             if (value is null)
@@ -131,7 +131,7 @@ namespace Orleans.Runtime.Messaging
                 return;
             }
 
-            var innerWriter = Writer.Create(new PooledBuffer(), null);
+            var innerWriter = Writer.Create(new PooledBuffer(), session: null!);
             innerWriter.WriteInt32(value.GetConsistentHashCode());
             WriteSiloAddressInner(ref innerWriter, value);
             innerWriter.Commit();

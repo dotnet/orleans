@@ -209,7 +209,7 @@ namespace Orleans.Runtime.Messaging
             Action<IBufferWriter<byte>> writeBody)
         {
             var body = new ArrayBufferWriter<byte>(256);
-            writeBody?.Invoke(body);
+            writeBody(body);
 
             var frameLength = 1 + body.WrittenCount;
             Span<byte> prefix = stackalloc byte[FramePrefixSize];
