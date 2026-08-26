@@ -59,7 +59,7 @@ namespace Orleans
         /// <param name="prefix">A prefix of the grain implementation class name to search for.</param>
         /// <param name="result">The resolved grain type.</param>
         /// <returns><see langword="true"/> if an implementation was found; otherwise <see langword="false"/>.</returns>
-        public bool TryGetGrainType(GrainInterfaceType interfaceType, string? prefix, out GrainType result)
+        internal bool TryGetGrainType(GrainInterfaceType interfaceType, string? prefix, out GrainType result)
         {
             if (string.IsNullOrWhiteSpace(prefix))
             {
