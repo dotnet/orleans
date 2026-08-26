@@ -37,7 +37,9 @@ public class SqlServerStorageForTestingTests
         await using var competingConnection = new SqlConnection(storage.CurrentConnectionString);
         await competingConnection.OpenAsync();
         using var cancellation = new CancellationTokenSource();
-        var reconnectingClient = ReconnectUntilCanceledAsync(storage.CurrentConnectionString, cancellation.Token);
+        var reconnectingClients = Enumerable.Range(0, 4)
+            .Select(_ => ReconnectUntilCanceledAsync(storage.CurrentConnectionString, cancellation.Token))
+            .ToArray();
 
         try
         {
@@ -53,7 +55,7 @@ public class SqlServerStorageForTestingTests
         finally
         {
             await cancellation.CancelAsync();
-            await reconnectingClient;
+            await Task.WhenAll(reconnectingClients);
         }
 
         var databaseState = await storage.Storage.ReadAsync(
