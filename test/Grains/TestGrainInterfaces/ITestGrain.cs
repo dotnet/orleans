@@ -32,6 +32,11 @@ namespace UnitTests.GrainInterfaces
 
         [ResponseTimeout("00:00:10")]
         Task DoLongActionWithDeferredResolutionTimeout(TimeSpan timespan, string str);
+
+        [ResponseTimeout("00:00:02")]
+        Task DoLongActionWithShortDeferredResolutionTimeout(TimeSpan timespan, string str);
+
+        Task SetLabelWithCancellation(string label, CancellationToken cancellationToken);
     }
 
     public interface ITestGrainLongOnActivateAsync : IGrainWithIntegerKey
