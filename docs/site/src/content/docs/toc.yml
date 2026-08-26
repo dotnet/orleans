@@ -381,6 +381,60 @@ items:
     items:
       - name: C# API reference
         href: /docs/api/csharp/
+      - name: Analyzer diagnostics
+        items:
+          - name: Overview
+            href: diagnostics/index.md
+          - name: ORLEANS0001
+            href: diagnostics/orleans0001.md
+          - name: ORLEANS0002
+            href: diagnostics/orleans0002.md
+          - name: ORLEANS0003
+            href: diagnostics/orleans0003.md
+          - name: ORLEANS0004
+            href: diagnostics/orleans0004.md
+          - name: ORLEANS0005
+            href: diagnostics/orleans0005.md
+          - name: ORLEANS0006
+            href: diagnostics/orleans0006.md
+          - name: ORLEANS0007
+            href: diagnostics/orleans0007.md
+          - name: ORLEANS0008
+            href: diagnostics/orleans0008.md
+          - name: ORLEANS0009
+            href: diagnostics/orleans0009.md
+          - name: ORLEANS0010
+            href: diagnostics/orleans0010.md
+          - name: ORLEANS0011
+            href: diagnostics/orleans0011.md
+          - name: ORLEANS0012
+            href: diagnostics/orleans0012.md
+          - name: ORLEANS0013
+            href: diagnostics/orleans0013.md
+          - name: ORLEANS0014
+            href: diagnostics/orleans0014.md
+          - name: ORLEANS0016
+            href: diagnostics/orleans0016.md
+          - name: ORLEANS0017
+            href: diagnostics/orleans0017.md
+          - name: ORLEANS0018
+            href: diagnostics/orleans0018.md
+          - name: ORLEANS0019
+            href: diagnostics/orleans0019.md
+          - name: ORLEANS0020
+            href: diagnostics/orleans0020.md
+          - name: ORLEANS0021
+            href: diagnostics/orleans0021.md
+          - name: ORLEANS0022
+            href: diagnostics/orleans0022.md
+          - name: ORLEANS0023
+            href: diagnostics/orleans0023.md
+          - name: ORLEANS0024
+            href: diagnostics/orleans0024.md
+          - name: ORLEANS0025
+            href: diagnostics/orleans0025.md
+          - name: ORLEANS0026
+            href: diagnostics/orleans0026.md
       - name: API context and examples
         href: resources/api-reference-guide.md
       - name: Best practices

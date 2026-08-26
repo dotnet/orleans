@@ -19,7 +19,8 @@ public class IdClashAttributeAnalyzer : DiagnosticAnalyzer
        isEnabledByDefault: true,
        title: new LocalizableResourceString(nameof(Resources.IdClashDetectedTitle), Resources.ResourceManager, typeof(Resources)),
        messageFormat: new LocalizableResourceString(nameof(Resources.IdClashDetectedMessageFormat), Resources.ResourceManager, typeof(Resources)),
-       description: new LocalizableResourceString(nameof(Resources.IdClashDetectedDescription), Resources.ResourceManager, typeof(Resources)));
+       description: new LocalizableResourceString(nameof(Resources.IdClashDetectedDescription), Resources.ResourceManager, typeof(Resources)),
+       helpLinkUri: Constants.GetDiagnosticHelpLink(RuleId));
 
     public override ImmutableArray<DiagnosticDescriptor> SupportedDiagnostics => ImmutableArray.Create(Rule);
 

@@ -21,7 +21,7 @@ public class AliasClashAttributeAnalyzer : DiagnosticAnalyzer
         title: new LocalizableResourceString(nameof(Resources.AliasClashDetectedTitle), Resources.ResourceManager, typeof(Resources)),
         messageFormat: new LocalizableResourceString(nameof(Resources.AliasClashDetectedMessageFormat), Resources.ResourceManager, typeof(Resources)),
         description: new LocalizableResourceString(nameof(Resources.AliasClashDetectedDescription), Resources.ResourceManager, typeof(Resources)),
-        helpLinkUri: null,
+        helpLinkUri: Constants.GetDiagnosticHelpLink(RuleId),
         customTags: [WellKnownDiagnosticTags.CompilationEnd]);
 
     public override ImmutableArray<DiagnosticDescriptor> SupportedDiagnostics { get; } = [Rule];

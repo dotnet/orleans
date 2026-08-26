@@ -16,7 +16,8 @@ public class IncorrectAttributeUseAnalyzer : DiagnosticAnalyzer
        isEnabledByDefault: true,
        title: new LocalizableResourceString(nameof(Resources.IncorrectAttributeUseTitle), Resources.ResourceManager, typeof(Resources)),
        messageFormat: new LocalizableResourceString(nameof(Resources.IncorrectAttributeUseMessageFormat), Resources.ResourceManager, typeof(Resources)),
-       description: new LocalizableResourceString(nameof(Resources.IncorrectAttributeUseTitleDescription), Resources.ResourceManager, typeof(Resources)));
+       description: new LocalizableResourceString(nameof(Resources.IncorrectAttributeUseTitleDescription), Resources.ResourceManager, typeof(Resources)),
+       helpLinkUri: Constants.GetDiagnosticHelpLink(RuleId));
 
     public override ImmutableArray<DiagnosticDescriptor> SupportedDiagnostics => ImmutableArray.Create(Rule);
 
