@@ -204,6 +204,7 @@ namespace UnitTests.Grains
                 }
                 catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
                 {
+                    // Cancellation is expected when shutdown interrupts deactivation.
                 }
             }
 
