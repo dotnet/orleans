@@ -27,7 +27,7 @@ internal sealed partial class ActivationData
     private void DeactivateStuckActivation()
     {
         IsStuckProcessingMessage = true;
-        var msg = $"Activation {this} has been processing request {_requests.BlockingRequest} since {_requests.BusyDuration} and is likely stuck.";
+        var msg = $"Activation {this} has been processing request {_requests.BlockingRequest} for {_requests.BusyDuration.Elapsed} and is likely stuck.";
         var reason = new DeactivationReason(DeactivationReasonCode.ActivationUnresponsive, msg);
 
         // Mark the grain as deactivating so that messages are forwarded instead of being invoked
