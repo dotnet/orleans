@@ -65,6 +65,9 @@ namespace UnitTests.Grains
             await Task.Delay(timespan);
         }
 
+        public Task DoLongActionWithShortDeferredResolutionTimeout(TimeSpan timespan, string str)
+            => DoLongAction(timespan, str);
+
         public static Task WaitForDeferredLongActionAsync(long grainKey)
             => DeferredLongActionStarted.GetOrAdd(grainKey, static _ => new(TaskCreationOptions.RunContinuationsAsynchronously)).Task;
 
@@ -73,6 +76,12 @@ namespace UnitTests.Grains
             this.label = label;
             logger.LogInformation("SetLabel {Label} received", label);
             return Task.CompletedTask;
+        }
+
+        public Task SetLabelWithCancellation(string label, CancellationToken cancellationToken)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            return SetLabel(label);
         }
 
         public Task StartTimer()

@@ -10,6 +10,7 @@ using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using Orleans.CodeGeneration;
+using Orleans.Configuration;
 using Orleans.Metadata;
 using Orleans.Runtime;
 using Orleans.Runtime.Internal;
@@ -116,6 +117,7 @@ namespace Orleans.GrainReferences
         private readonly GrainInterfaceTypeToGrainTypeResolver _grainTypeResolver;
         private readonly IClusterManifestProvider _clusterManifestProvider;
         private readonly TimeProvider _timeProvider;
+        private readonly TypeManagementOptions _typeManagementOptions;
 
         public StubGrainReferenceActivatorProvider(
             GrainVersionManifest manifest,
@@ -125,7 +127,8 @@ namespace Orleans.GrainReferences
             IServiceProvider serviceProvider,
             GrainInterfaceTypeToGrainTypeResolver grainTypeResolver,
             IClusterManifestProvider clusterManifestProvider,
-            TimeProvider timeProvider)
+            [FromKeyedServices(TimeProviderNames.Messaging)] TimeProvider timeProvider,
+            IOptions<TypeManagementOptions> typeManagementOptions)
         {
             _versionManifest = manifest;
             _rpcProvider = rpcProvider;
@@ -135,11 +138,14 @@ namespace Orleans.GrainReferences
             _grainTypeResolver = grainTypeResolver;
             _clusterManifestProvider = clusterManifestProvider;
             _timeProvider = timeProvider;
+            _typeManagementOptions = typeManagementOptions.Value;
         }
 
         public bool TryGet(GrainType grainType, GrainInterfaceType interfaceType, [NotNullWhen(true)] out IGrainReferenceActivator? activator)
         {
-            if (!grainType.IsStubGrain() || !_rpcProvider.TryGet(interfaceType, out var proxyType))
+            if (!_typeManagementOptions.EnableDeferredGrainTypeResolution
+                || !grainType.IsStubGrain()
+                || !_rpcProvider.TryGet(interfaceType, out var proxyType))
             {
                 activator = default;
                 return false;
@@ -286,7 +292,7 @@ namespace Orleans.GrainReferences
             {
                 if (Volatile.Read(ref _resolvedReference) is GrainReference cachedReference)
                 {
-                    reference.Shared = cachedReference.Shared;
+                    reference.Resolve(this, cachedReference.Shared);
                     return reference;
                 }
 
@@ -328,7 +334,7 @@ namespace Orleans.GrainReferences
                             resolvedReference = (GrainReference)runtimeClient.InternalGrainFactory.GetGrain(grainId, reference.InterfaceType);
                         }
 
-                        reference.Shared = resolvedReference.Shared;
+                        reference.Resolve(this, resolvedReference.Shared);
                         Volatile.Write(ref _resolvedReference, resolvedReference);
                     }
                     finally
