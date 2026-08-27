@@ -2033,6 +2033,16 @@ internal sealed unsafe partial class LinuxIoUringEngine
             var flags = SetupSubmitAll | SetupSingleIssuer | SetupDeferTaskRun | SetupCooperativeTaskRun;
             ThrowIfError(Native.QueueInit(4096, ref _ring, flags));
             _ringInitialized = true;
+            if (GetNapiBusyPollTimeout() is { } busyPollTimeout)
+            {
+                var napi = new IoUringNapi
+                {
+                    BusyPollTimeout = busyPollTimeout,
+                    PreferBusyPoll = 1,
+                };
+                ThrowIfError(Native.RegisterNapi(ref _ring, ref napi));
+            }
+
             _eventFd = Native.EventFd(0, EventFdCloseOnExec | EventFdNonBlocking);
             if (_eventFd < 0)
             {
@@ -2350,6 +2360,14 @@ internal sealed unsafe partial class LinuxIoUringEngine
         }
     }
 
+    private static uint? GetNapiBusyPollTimeout()
+        => uint.TryParse(
+            Environment.GetEnvironmentVariable("ORLEANS_IO_URING_NAPI_BUSY_POLL_US"),
+            out var value)
+            && value > 0
+                ? value
+                : null;
+
     internal static SocketError MapSocketErrorCode(int errno) => errno switch
     {
         4 => SocketError.Interrupted,
@@ -2461,6 +2479,17 @@ internal sealed unsafe partial class LinuxIoUringEngine
         private uint _padding3;
     }
 
+    [StructLayout(LayoutKind.Sequential)]
+    internal struct IoUringNapi
+    {
+        internal uint BusyPollTimeout;
+        internal byte PreferBusyPoll;
+        internal byte Opcode;
+        private ushort _padding;
+        internal uint OperationParameter;
+        private uint _reserved;
+    }
+
     [StructLayout(LayoutKind.Explicit, Size = 64)]
     internal struct IoUringSubmission
     {
@@ -2516,6 +2545,9 @@ internal sealed unsafe partial class LinuxIoUringEngine
             IntPtr bufferRing,
             uint entries,
             int bufferGroup);
+
+        [LibraryImport("liburing.so.2", EntryPoint = "io_uring_register_napi")]
+        internal static partial int RegisterNapi(ref IoUring ring, ref IoUringNapi napi);
 
         [LibraryImport("libc", EntryPoint = "eventfd", SetLastError = true)]
         internal static partial int EventFd(uint initialValue, int flags);
