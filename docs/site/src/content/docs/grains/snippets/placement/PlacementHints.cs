@@ -18,6 +18,8 @@ public interface IOrderCoordinatorGrain : IGrainWithStringKey
     Task ProcessOrder(string orderId);
 
     Task MoveToAnotherSilo();
+
+    Task MoveToAnotherSiloWithExplicitContext();
 }
 
 public sealed class OrderAuditGrain : Grain, IOrderAuditGrain
@@ -98,6 +100,17 @@ public sealed class OrderCoordinatorGrain(
         {
             RestorePlacementHint(previousHint);
         }
+
+        return Task.CompletedTask;
+    }
+
+    public Task MoveToAnotherSiloWithExplicitContext()
+    {
+        GrainContext.Migrate(new Dictionary<string, object>
+        {
+            [IPlacementDirector.PlacementHintKey] =
+                GetActiveRemoteSilo()
+        });
 
         return Task.CompletedTask;
     }
