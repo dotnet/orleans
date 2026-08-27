@@ -54,6 +54,7 @@ Add the generated file to source control and review its diff before committing. 
 
 - A changed `GrainInterfaceType`, `GrainType`, method identity, parameter type, or return type changes a wire identity or signature.
 - A removed source contract becomes `*RETIRED*`, preserving its identity history and preventing accidental reuse.
+- A removed RPC method remains in the manifest and reports `ORLEANS0027` until the method is restored or the wire break is explicitly accepted by removing the retained signature.
 - A `[Version]` change affects version-aware routing and must align with the rolling-upgrade design.
 - A CLR comment-only change records a refactor while the explicit Orleans identity remains stable.
 
@@ -129,6 +130,7 @@ Without an explicit stable identity, Orleans derives the identity from the CLR t
 | [`ORLEANS0023`](../../diagnostics/orleans0023.md) | Warning | A grain class identity differs from the manifest. |
 | [`ORLEANS0024`](../../diagnostics/orleans0024.md) | Warning | A removed grain class isn't marked `*RETIRED*`. |
 | [`ORLEANS0025`](../../diagnostics/orleans0025.md) | Warning | A grain class is declared more than once. |
+| [`ORLEANS0027`](../../diagnostics/orleans0027.md) | Warning | An RPC method remains in the manifest after it is removed from source. |
 
 Standard `.editorconfig` diagnostic configuration can change these severities. Prefer fixing contract drift instead of suppressing diagnostics.
 

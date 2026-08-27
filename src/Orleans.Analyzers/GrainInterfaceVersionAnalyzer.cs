@@ -33,6 +33,7 @@ public sealed partial class GrainInterfaceVersionAnalyzer : DiagnosticAnalyzer
     public const string RuleId0023 = "ORLEANS0023";
     public const string RuleId0024 = "ORLEANS0024";
     public const string RuleId0025 = "ORLEANS0025";
+    public const string RuleId0027 = "ORLEANS0027";
 
     // Property bag keys for code fixes
     internal const string InterfaceNamePropertyKey = "InterfaceName";
@@ -78,6 +79,17 @@ public sealed partial class GrainInterfaceVersionAnalyzer : DiagnosticAnalyzer
         isEnabledByDefault: true,
         description: new LocalizableResourceString(nameof(Resources.GrainInterfaceMemberNotDeclaredDescription), Resources.ResourceManager, typeof(Resources)),
         helpLinkUri: Constants.GetDiagnosticHelpLink(RuleId0018));
+
+    private static readonly DiagnosticDescriptor RemovedMemberRule = new(
+        id: RuleId0027,
+        title: new LocalizableResourceString(nameof(Resources.GrainInterfaceMemberRemovedTitle), Resources.ResourceManager, typeof(Resources)),
+        messageFormat: new LocalizableResourceString(nameof(Resources.GrainInterfaceMemberRemovedMessageFormat), Resources.ResourceManager, typeof(Resources)),
+        category: "Orleans.Versioning",
+        defaultSeverity: DiagnosticSeverity.Warning,
+        isEnabledByDefault: true,
+        description: new LocalizableResourceString(nameof(Resources.GrainInterfaceMemberRemovedDescription), Resources.ResourceManager, typeof(Resources)),
+        helpLinkUri: Constants.GetDiagnosticHelpLink(RuleId0027),
+        customTags: WellKnownDiagnosticTags.CompilationEnd);
 
     private static readonly DiagnosticDescriptor RemovedInterfaceNotRetiredRule = new(
         id: RuleId0019,
@@ -163,7 +175,8 @@ public sealed partial class GrainInterfaceVersionAnalyzer : DiagnosticAnalyzer
             GrainClassNotDeclaredRule,
             GrainClassAliasMismatchRule,
             RemovedGrainClassNotRetiredRule,
-            DuplicateGrainClassDeclarationRule);
+            DuplicateGrainClassDeclarationRule,
+            RemovedMemberRule);
 
     public override void Initialize(AnalysisContext context)
     {
@@ -215,6 +228,7 @@ public sealed partial class GrainInterfaceVersionAnalyzer : DiagnosticAnalyzer
         private readonly List<Diagnostic>? _fileParseErrors;
         private readonly ConcurrentDictionary<string, bool> _visitedInterfaces = new(StringComparer.Ordinal);
         private readonly ConcurrentDictionary<string, bool> _visitedClasses = new(StringComparer.Ordinal);
+        private readonly ConcurrentBag<Diagnostic> _removedMemberDiagnostics = new();
         private readonly INamedTypeSymbol? _iAddressableType;
         private readonly INamedTypeSymbol? _aliasAttributeType;
         private readonly INamedTypeSymbol? _versionAttributeType;
@@ -351,38 +365,23 @@ public sealed partial class GrainInterfaceVersionAnalyzer : DiagnosticAnalyzer
                 // Alias mismatch - could add a separate diagnostic for this
             }
 
-            // Check members
-            foreach (var member in namedType.GetMembers().OfType<IMethodSymbol>())
-            {
-                if (member.MethodKind != MethodKind.Ordinary || member.IsStatic)
-                {
-                    continue;
-                }
+            var sourceMembers = namedType.GetMembers()
+                .OfType<IMethodSymbol>()
+                .Where(member => member.MethodKind == MethodKind.Ordinary && !member.IsStatic)
+                .ToArray();
 
+            // Check members
+            foreach (var member in sourceMembers)
+            {
                 var memberSignature = GetMethodSignature(member);
                 var memberAlias = GetAliasFromAttribute(member);
 
-                if (!declaredInterface.Members.ContainsKey(memberSignature)
-                    && !declaredInterface.Members.Keys.Any(signature =>
-                    {
-                        if (string.Equals(
-                            NormalizeStoredMemberSignature(signature, declaredInterface.Name),
-                            memberSignature,
-                            StringComparison.Ordinal))
-                        {
-                            return true;
-                        }
-
-                        var normalized = NormalizeLegacyMethodSignature(signature);
-                        var clrSignature = GetClrMethodSignature(member);
-                        var containingTypePrefix =
-                            $"{member.ContainingType.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat).Replace("global::", "")}.";
-                        return string.Equals(normalized, NormalizeLegacyMethodSignature(clrSignature), StringComparison.Ordinal)
-                            || string.Equals(
-                                normalized,
-                                NormalizeLegacyMethodSignature(clrSignature.Substring(containingTypePrefix.Length)),
-                                StringComparison.Ordinal);
-                    }))
+                if (!declaredInterface.Members.Values.Any(declaredMember =>
+                    GrainInterfaceVersionAnalyzer.IsMatchingMember(
+                        declaredInterface.Name,
+                        declaredMember.Signature,
+                        declaredMember.Alias,
+                        member)))
                 {
                     // Member not found - interface has changed
                     var properties = ImmutableDictionary<string, string?>.Empty
@@ -403,6 +402,33 @@ public sealed partial class GrainInterfaceVersionAnalyzer : DiagnosticAnalyzer
                     }
                 }
             }
+
+            if (_grainInterfacesFile?.GetText(context.CancellationToken) is { } sourceText)
+            {
+                foreach (var declaredMember in declaredInterface.Members.Values)
+                {
+                    if (sourceMembers.Any(member =>
+                        GrainInterfaceVersionAnalyzer.IsMatchingMember(
+                            declaredInterface.Name,
+                            declaredMember.Signature,
+                            declaredMember.Alias,
+                            member)))
+                    {
+                        continue;
+                    }
+
+                    var properties = ImmutableDictionary<string, string?>.Empty
+                        .Add(InterfaceNamePropertyKey, interfaceName)
+                        .Add(GrainInterfaceTypePropertyKey, grainInterfaceType)
+                        .Add(MemberNamePropertyKey, declaredMember.Signature);
+                    _removedMemberDiagnostics.Add(Diagnostic.Create(
+                        RemovedMemberRule,
+                        declaredMember.GetLocation(sourceText, _grainInterfacesFile.Path),
+                        properties,
+                        declaredMember.Signature,
+                        interfaceName));
+                }
+            }
         }
 
         public void OnCompilationEnd(CompilationAnalysisContext context)
@@ -414,6 +440,11 @@ public sealed partial class GrainInterfaceVersionAnalyzer : DiagnosticAnalyzer
                 {
                     context.ReportDiagnostic(error);
                 }
+            }
+
+            foreach (var diagnostic in _removedMemberDiagnostics)
+            {
+                context.ReportDiagnostic(diagnostic);
             }
 
             // Report file missing if any grain interfaces were found but no file exists
@@ -866,6 +897,78 @@ public sealed partial class GrainInterfaceVersionAnalyzer : DiagnosticAnalyzer
         return Regex.Replace(result, @"alias\(""([^""]+)""\)", "$1");
     }
 
+    internal static bool IsMatchingMember(
+        string declaredInterfaceName,
+        string storedSignature,
+        string? storedAlias,
+        IMethodSymbol member)
+    {
+        var memberSignature = GetMethodSignature(member);
+        if (storedAlias is not null)
+        {
+            if (!string.Equals(
+                storedAlias,
+                GetStringAttributeValue(member, Constants.AliasAttributeFullyQualifiedName),
+                StringComparison.Ordinal))
+            {
+                return false;
+            }
+
+            var storedIdentity = storedAlias + GrainInterfaceFileParser.GetMethodAritySuffix(storedSignature);
+            var parameterListStart = memberSignature.IndexOf('(');
+            if (parameterListStart < 0
+                || !string.Equals(
+                    storedIdentity,
+                    memberSignature.Substring(0, parameterListStart),
+                    StringComparison.Ordinal))
+            {
+                return false;
+            }
+
+            var canonicalStoredSignature = GrainInterfaceFileParser.GetCanonicalMemberSignature(
+                storedSignature,
+                storedAlias);
+            if (string.Equals(
+                NormalizeStoredMemberSignature(canonicalStoredSignature, declaredInterfaceName),
+                memberSignature,
+                StringComparison.Ordinal))
+            {
+                return true;
+            }
+
+            return string.Equals(
+                GetNormalizedSignatureSuffix(storedSignature),
+                GetNormalizedSignatureSuffix(GetClrMethodSignature(member)),
+                StringComparison.Ordinal);
+        }
+
+        if (string.Equals(
+            NormalizeStoredMemberSignature(storedSignature, declaredInterfaceName),
+            memberSignature,
+            StringComparison.Ordinal))
+        {
+            return true;
+        }
+
+        var normalized = NormalizeLegacyMethodSignature(storedSignature);
+        var clrSignature = GetClrMethodSignature(member);
+        var containingTypePrefix =
+            $"{member.ContainingType.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat).Replace("global::", "")}.";
+        return string.Equals(normalized, NormalizeLegacyMethodSignature(clrSignature), StringComparison.Ordinal)
+            || string.Equals(
+                normalized,
+                NormalizeLegacyMethodSignature(clrSignature.Substring(containingTypePrefix.Length)),
+                StringComparison.Ordinal);
+    }
+
+    private static string GetNormalizedSignatureSuffix(string signature)
+    {
+        var parameterListStart = signature.IndexOf('(');
+        return parameterListStart < 0
+            ? NormalizeLegacyMethodSignature(signature)
+            : NormalizeLegacyMethodSignature(signature.Substring(parameterListStart));
+    }
+
     private static string GetContractTypeName(ITypeSymbol type)
     {
         if (type is IArrayTypeSymbol array)
@@ -1010,6 +1113,12 @@ internal sealed class DeclaredGrainMember
     public string Signature { get; }
     public string? Alias { get; set; }
     public TextSpan Span { get; set; }
+
+    public Location GetLocation(SourceText sourceText, string filePath)
+    {
+        var lineSpan = sourceText.Lines.GetLinePositionSpan(Span);
+        return Location.Create(filePath, Span, lineSpan);
+    }
 }
 
 /// <summary>
@@ -1119,15 +1228,77 @@ internal static class GrainInterfaceFileParser
 
     internal static bool TryGetMemberSignature(string line, out string signature)
     {
-        var match = MemberPattern.Match(StripClrComment(line));
-        if (match.Success)
+        if (TryGetMemberDeclaration(line, out signature, out var alias))
         {
-            signature = match.Groups["signature"].Value;
+            signature = GetCanonicalMemberSignature(signature, alias);
             return true;
         }
 
         signature = string.Empty;
         return false;
+    }
+
+    internal static bool TryGetMemberDeclaration(string line, out string signature, out string? alias)
+    {
+        var match = MemberPattern.Match(StripClrComment(line));
+        if (match.Success)
+        {
+            signature = match.Groups["signature"].Value;
+            alias = match.Groups["alias"].Success ? match.Groups["alias"].Value : null;
+            return true;
+        }
+
+        signature = string.Empty;
+        alias = null;
+        return false;
+    }
+
+    internal static string GetCanonicalMemberSignature(string signature, string? alias)
+    {
+        if (alias is null)
+        {
+            return signature;
+        }
+
+        var parameterListStart = signature.IndexOf('(');
+        return parameterListStart < 0
+            ? signature
+            : alias + GetMethodAritySuffix(signature) + signature.Substring(parameterListStart);
+    }
+
+    internal static string GetMethodAritySuffix(string signature)
+    {
+        var parameterListStart = signature.IndexOf('(');
+        if (parameterListStart < 0)
+        {
+            return string.Empty;
+        }
+
+        var methodStart = signature.LastIndexOf('.', parameterListStart - 1) + 1;
+        var methodName = signature.Substring(methodStart, parameterListStart - methodStart);
+        var arityMarker = methodName.LastIndexOf('`');
+        if (arityMarker >= 0)
+        {
+            return methodName.Substring(arityMarker);
+        }
+
+        var genericStart = methodName.IndexOf('<');
+        var genericEnd = methodName.LastIndexOf('>');
+        if (genericStart < 0 || genericEnd <= genericStart)
+        {
+            return string.Empty;
+        }
+
+        var arity = 1;
+        for (var index = genericStart + 1; index < genericEnd; index++)
+        {
+            if (methodName[index] == ',')
+            {
+                arity++;
+            }
+        }
+
+        return $"`{arity}";
     }
 
     internal static string GetClrComment(string line)

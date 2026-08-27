@@ -104,6 +104,8 @@ public class GrainInterfaceVersionCodeFix : CodeFixProvider
         var lines = new List<string>();
         var activeInterfaceIdentities = new HashSet<string>(StringComparer.Ordinal);
         var activeConventionInterfaceNames = new HashSet<string>(StringComparer.Ordinal);
+        var activeInterfaces = new Dictionary<string, INamedTypeSymbol>(StringComparer.Ordinal);
+        var activeInterfacesByName = new Dictionary<string, INamedTypeSymbol>(StringComparer.Ordinal);
         var activeClassIdentities = new HashSet<string>(StringComparer.Ordinal);
         var activeConventionClassNames = new HashSet<string>(StringComparer.Ordinal);
         var iAddressableType = compilation.GetTypeByMetadataName(Constants.IAddressibleFullyQualifiedName);
@@ -117,7 +119,13 @@ public class GrainInterfaceVersionCodeFix : CodeFixProvider
                 && !SymbolEqualityComparer.Default.Equals(type, iAddressableType)
                 && type.AllInterfaces.Any(candidate => SymbolEqualityComparer.Default.Equals(candidate, iAddressableType)))
             {
-                AppendInterface(lines, type, activeInterfaceIdentities, activeConventionInterfaceNames);
+                AppendInterface(
+                    lines,
+                    type,
+                    activeInterfaceIdentities,
+                    activeConventionInterfaceNames,
+                    activeInterfaces,
+                    activeInterfacesByName);
             }
             else if (type.TypeKind == TypeKind.Class && !type.IsAbstract && type.IsGrainClass())
             {
@@ -132,6 +140,8 @@ public class GrainInterfaceVersionCodeFix : CodeFixProvider
                 existingText.ToString(),
                 activeInterfaceIdentities,
                 activeConventionInterfaceNames,
+                activeInterfaces,
+                activeInterfacesByName,
                 activeClassIdentities,
                 activeConventionClassNames);
         }
@@ -297,13 +307,17 @@ public class GrainInterfaceVersionCodeFix : CodeFixProvider
         List<string> lines,
         INamedTypeSymbol type,
         HashSet<string> activeInterfaceIdentities,
-        HashSet<string> activeConventionInterfaceNames)
+        HashSet<string> activeConventionInterfaceNames,
+        Dictionary<string, INamedTypeSymbol> activeInterfaces,
+        Dictionary<string, INamedTypeSymbol> activeInterfacesByName)
     {
         AppendBlockSeparator(lines);
         var interfaceName = GetFullyQualifiedName(type);
         var explicitInterfaceType = GetGrainInterfaceTypeFromAttributes(type);
         var interfaceType = GrainInterfaceVersionAnalyzer.GetGrainInterfaceType(type);
         activeInterfaceIdentities.Add(interfaceType);
+        activeInterfaces[interfaceType] = type;
+        activeInterfacesByName[interfaceName] = type;
         if (explicitInterfaceType is null
             || string.Equals(
                 explicitInterfaceType,
@@ -364,6 +378,8 @@ public class GrainInterfaceVersionCodeFix : CodeFixProvider
         string existingContent,
         HashSet<string> activeInterfaceIdentities,
         HashSet<string> activeConventionInterfaceNames,
+        Dictionary<string, INamedTypeSymbol> activeInterfaces,
+        Dictionary<string, INamedTypeSymbol> activeInterfacesByName,
         HashSet<string> activeClassIdentities,
         HashSet<string> activeConventionClassNames)
     {
@@ -434,10 +450,138 @@ public class GrainInterfaceVersionCodeFix : CodeFixProvider
                             : lines[blockIndex]);
                 }
             }
+            else if (isInterface)
+            {
+                var interfaceIdentity = explicitIdentity
+                    ?? GrainInterfaceVersionAnalyzer.GetDefaultGrainInterfaceType(contractName);
+                if (activeInterfaces.TryGetValue(interfaceIdentity, out var activeInterface)
+                    || activeConventionInterfaceNames.Contains(contractName)
+                    && activeInterfacesByName.TryGetValue(contractName, out activeInterface))
+                {
+                    MergeHistoricalMembers(
+                        result,
+                        lines,
+                        index,
+                        blockEnd,
+                        contractName,
+                        activeInterface);
+                }
+            }
 
             index = blockEnd - 1;
         }
     }
+
+    private static void MergeHistoricalMembers(
+        List<string> result,
+        string[] historicalLines,
+        int historicalDeclarationIndex,
+        int historicalBlockEnd,
+        string historicalInterfaceName,
+        INamedTypeSymbol activeInterface)
+    {
+        var generatedDeclarationIndex = -1;
+        var activeInterfaceIdentity = GrainInterfaceVersionAnalyzer.GetGrainInterfaceType(activeInterface);
+        var activeInterfaceName = GetFullyQualifiedName(activeInterface);
+        for (var index = 0; index < result.Count; index++)
+        {
+            if (!GrainInterfaceFileParser.TryGetInterfaceName(result[index], out var generatedInterfaceName))
+            {
+                continue;
+            }
+
+            var generatedIdentity = GrainInterfaceFileParser.TryGetGrainInterfaceType(
+                result[index],
+                out var generatedInterfaceType)
+                    ? generatedInterfaceType
+                    : GrainInterfaceVersionAnalyzer.GetDefaultGrainInterfaceType(generatedInterfaceName);
+            if (string.Equals(generatedIdentity, activeInterfaceIdentity, StringComparison.Ordinal)
+                || string.Equals(generatedInterfaceName, activeInterfaceName, StringComparison.Ordinal))
+            {
+                generatedDeclarationIndex = index;
+                break;
+            }
+        }
+
+        if (generatedDeclarationIndex < 0)
+        {
+            return;
+        }
+
+        var generatedBlockEnd = generatedDeclarationIndex + 1;
+        var generatedMembers = new HashSet<string>(StringComparer.Ordinal);
+        while (generatedBlockEnd < result.Count)
+        {
+            if (GrainInterfaceFileParser.TryGetContractName(result[generatedBlockEnd], out _)
+                || result[generatedBlockEnd].TrimStart().StartsWith("# ", StringComparison.Ordinal)
+                && generatedBlockEnd + 1 < result.Count
+                && GrainInterfaceFileParser.TryGetContractName(result[generatedBlockEnd + 1], out _))
+            {
+                break;
+            }
+
+            if (GrainInterfaceFileParser.TryGetMemberSignature(result[generatedBlockEnd], out var memberSignature))
+            {
+                generatedMembers.Add(GetHistoricalMemberKey(memberSignature, historicalInterfaceName));
+            }
+
+            generatedBlockEnd++;
+        }
+
+        string? pendingComment = null;
+        for (var index = historicalDeclarationIndex + 1; index < historicalBlockEnd; index++)
+        {
+            var line = historicalLines[index];
+            if (line.TrimStart().StartsWith("# ", StringComparison.Ordinal))
+            {
+                pendingComment = line.Trim();
+                continue;
+            }
+
+            if (!GrainInterfaceFileParser.TryGetMemberDeclaration(
+                line,
+                out var memberSignature,
+                out var memberAlias))
+            {
+                pendingComment = null;
+                continue;
+            }
+
+            if (activeInterface.GetMembers()
+                .OfType<IMethodSymbol>()
+                .Any(member => member.MethodKind == MethodKind.Ordinary
+                    && !member.IsStatic
+                    && GrainInterfaceVersionAnalyzer.IsMatchingMember(
+                        historicalInterfaceName,
+                        memberSignature,
+                        memberAlias,
+                        member)))
+            {
+                pendingComment = null;
+                continue;
+            }
+
+            var normalizedSignature = GrainInterfaceVersionAnalyzer.NormalizeStoredMemberSignature(
+                GrainInterfaceFileParser.GetCanonicalMemberSignature(memberSignature, memberAlias),
+                historicalInterfaceName);
+            var historicalMemberKey = GetHistoricalMemberKey(normalizedSignature, historicalInterfaceName);
+            if (generatedMembers.Add(historicalMemberKey))
+            {
+                if (pendingComment is not null)
+                {
+                    result.Insert(generatedBlockEnd++, $"  {pendingComment}");
+                }
+
+                result.Insert(generatedBlockEnd++, $"  {historicalMemberKey}");
+            }
+
+            pendingComment = null;
+        }
+    }
+
+    private static string GetHistoricalMemberKey(string signature, string interfaceName)
+        => GrainInterfaceVersionAnalyzer.NormalizeLegacyMethodSignature(
+            GrainInterfaceVersionAnalyzer.NormalizeStoredMemberSignature(signature, interfaceName));
 
     private static void AppendBlockSeparator(List<string> lines)
     {

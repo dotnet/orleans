@@ -241,6 +241,15 @@
   <data name="GrainInterfaceMemberNotDeclaredDescription" xml:space="preserve">
     <value>When adding or modifying grain interface members, update OrleansContracts.txt and increment the interface version.</value>
   </data>
+  <data name="GrainInterfaceMemberRemovedTitle" xml:space="preserve">
+    <value>Grain interface member removed from source</value>
+  </data>
+  <data name="GrainInterfaceMemberRemovedMessageFormat" xml:space="preserve">
+    <value>Grain interface member '{0}' is declared in OrleansContracts.txt for interface '{1}' but is absent from source. Restore the method or explicitly remove the manifest entry after reviewing the wire break. See https://aka.ms/orleans/OrleansContracts.txt for details.</value>
+  </data>
+  <data name="GrainInterfaceMemberRemovedDescription" xml:space="preserve">
+    <value>Removing a grain interface method can break calls during a rolling upgrade. OrleansContracts.txt retains the signature until the removal is explicitly accepted.</value>
+  </data>
   <data name="GrainInterfaceRemovedNotRetiredTitle" xml:space="preserve">
     <value>Removed grain interface not marked as retired</value>
   </data>

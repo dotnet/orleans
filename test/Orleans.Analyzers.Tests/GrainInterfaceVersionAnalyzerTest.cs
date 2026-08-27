@@ -523,6 +523,118 @@ interface IMyGrain [Version(1)]
         Assert.Contains(diagnostics, d => d.Id == GrainInterfaceVersionAnalyzer.RuleId0018);
     }
 
+    [Fact]
+    public async Task RemovedMember_ReportsDiagnostic()
+    {
+        const string source = @"
+[Version(1)]
+public interface IMyGrain : IGrain
+{
+    Task ExistingAsync();
+}
+";
+        const string contractsFile = @"
+interface IMyGrain [Version(1)]
+  ExistingAsync() -> Task
+  RemovedAsync() -> Task
+";
+
+        var diagnostics = await GetDiagnosticsAsync(source, contractsFile);
+
+        var diagnostic = Assert.Single(
+            diagnostics,
+            diagnostic => diagnostic.Id == GrainInterfaceVersionAnalyzer.RuleId0027);
+        Assert.Contains("RemovedAsync() -> Task", diagnostic.GetMessage());
+        Assert.Equal(OrleansContractsFileName, Path.GetFileName(diagnostic.Location.GetLineSpan().Path));
+    }
+
+    [Fact]
+    public async Task LegacyAliasedMemberRename_NoDiagnostic()
+    {
+        const string source = @"
+[Version(1)]
+public interface IMyGrain : IGrain
+{
+    [Alias(""stable-method"")]
+    Task NewName(string renamed);
+}
+";
+        const string contractsFile = @"
+interface IMyGrain [Version(1)]
+  [Alias(""stable-method"")] IMyGrain.OldName(string original) -> Task
+";
+
+        var diagnostics = await GetDiagnosticsAsync(source, contractsFile);
+
+        Assert.DoesNotContain(diagnostics, diagnostic => diagnostic.Id == GrainInterfaceVersionAnalyzer.RuleId0018);
+        Assert.DoesNotContain(diagnostics, diagnostic => diagnostic.Id == GrainInterfaceVersionAnalyzer.RuleId0027);
+    }
+
+    [Fact]
+    public async Task AliasedMemberIdentityChange_ReportsAddedAndRemovedSignatures()
+    {
+        const string source = @"
+[Version(1)]
+public interface IMyGrain : IGrain
+{
+    [Alias(""new-method"")]
+    Task Method();
+}
+";
+        const string contractsFile = @"
+interface IMyGrain [Version(1)]
+  [Alias(""old-method"")] IMyGrain.Method() -> Task
+";
+
+        var diagnostics = await GetDiagnosticsAsync(source, contractsFile);
+
+        Assert.Contains(diagnostics, diagnostic => diagnostic.Id == GrainInterfaceVersionAnalyzer.RuleId0018);
+        Assert.Contains(diagnostics, diagnostic => diagnostic.Id == GrainInterfaceVersionAnalyzer.RuleId0027);
+    }
+
+    [Fact]
+    public async Task RemovedAlias_ReportsAddedAndRemovedSignatures()
+    {
+        const string source = @"
+[Version(1)]
+public interface IMyGrain : IGrain
+{
+    Task Method();
+}
+";
+        const string contractsFile = @"
+interface IMyGrain [Version(1)]
+  [Alias(""old-method"")] IMyGrain.Method() -> Task
+";
+
+        var diagnostics = await GetDiagnosticsAsync(source, contractsFile);
+
+        Assert.Contains(diagnostics, diagnostic => diagnostic.Id == GrainInterfaceVersionAnalyzer.RuleId0018);
+        Assert.Contains(diagnostics, diagnostic => diagnostic.Id == GrainInterfaceVersionAnalyzer.RuleId0027);
+    }
+
+    [Fact]
+    public async Task AliasedMemberGenericArityChange_ReportsAddedAndRemovedSignatures()
+    {
+        const string source = @"
+[Version(1)]
+public interface IMyGrain : IGrain
+{
+    [Alias(""stable-method"")]
+    Task Method<T>();
+}
+";
+        const string contractsFile = @"
+interface IMyGrain [Version(1)]
+  [Alias(""stable-method"")] IMyGrain.Method() -> Task
+";
+
+        var diagnostics = await GetDiagnosticsAsync(source, contractsFile);
+
+        Assert.Contains(diagnostics, diagnostic => diagnostic.Id == GrainInterfaceVersionAnalyzer.RuleId0018);
+        Assert.Contains(diagnostics, diagnostic => diagnostic.Id == GrainInterfaceVersionAnalyzer.RuleId0027);
+    }
+
     #endregion
 
     #region ORLEANS0019 - Removed Interface Not Retired
@@ -1429,6 +1541,143 @@ public class Outer<T>
             content);
         Assert.Contains("class [GrainType(\"inner`1\")] Outer<T>.InnerGrain", content);
         Assert.Empty(await GetDiagnosticsAsync(source, content));
+    }
+
+    [Fact]
+    public async Task CodeFix_RegenerateProject_PreservesRemovedMemberSignatures()
+    {
+        const string source = @"
+[Version(1)]
+public interface IMyGrain : IGrain
+{
+    Task ExistingAsync();
+    Task NewAsync();
+}
+";
+        const string contractsFile = @"
+interface IMyGrain [Version(1)]
+  ExistingAsync() -> Task
+  RemovedAsync() -> Task
+";
+
+        var (changedSolution, additionalDocumentId) = await ApplyCodeFixAsync(
+            source,
+            contractsFile,
+            GrainInterfaceVersionAnalyzer.RuleId0018,
+            RegenerateCodeActionTitle);
+
+        var content = (await changedSolution.GetAdditionalDocument(additionalDocumentId!)!
+            .GetTextAsync(TestContext.Current.CancellationToken)).ToString();
+        Assert.Contains("  ExistingAsync() -> Task", content);
+        Assert.Contains("  NewAsync() -> Task", content);
+        Assert.Contains("  RemovedAsync() -> Task", content);
+
+        var diagnostics = await GetDiagnosticsAsync(source, content);
+        Assert.DoesNotContain(diagnostics, diagnostic => diagnostic.Id == GrainInterfaceVersionAnalyzer.RuleId0018);
+        Assert.Contains(diagnostics, diagnostic => diagnostic.Id == GrainInterfaceVersionAnalyzer.RuleId0027);
+    }
+
+    [Fact]
+    public async Task CodeFix_RegenerateProject_PreservesAliasesAndDeduplicatesLegacyMembers()
+    {
+        const string source = @"
+[Version(1)]
+public interface IMyGrain : IGrain
+{
+    Task ExistingAsync();
+    Task NewAsync();
+}
+";
+        const string contractsFile = @"
+interface IMyGrain [Version(1)]
+  ExistingAsync() -> Task
+  [Alias(""removed"")] IMyGrain.RemovedAsync(string value) -> Task
+  removed(string) -> Task
+";
+
+        var (changedSolution, additionalDocumentId) = await ApplyCodeFixAsync(
+            source,
+            contractsFile,
+            GrainInterfaceVersionAnalyzer.RuleId0018,
+            RegenerateCodeActionTitle);
+
+        var content = (await changedSolution.GetAdditionalDocument(additionalDocumentId!)!
+            .GetTextAsync(TestContext.Current.CancellationToken)).ToString();
+        Assert.Equal(1, content.Split(new[] { "removed(string) -> Task" }, StringSplitOptions.None).Length - 1);
+        Assert.DoesNotContain("[Alias(\"removed\")]", content);
+
+        var diagnostics = await GetDiagnosticsAsync(source, content);
+        Assert.Single(diagnostics, diagnostic => diagnostic.Id == GrainInterfaceVersionAnalyzer.RuleId0027);
+    }
+
+    [Fact]
+    public async Task CodeFix_RegenerateProject_DeduplicatesSemanticallyEquivalentLegacyMembers()
+    {
+        const string source = @"
+namespace Models
+{
+    public sealed class Request { }
+}
+
+[Version(1)]
+public interface IMyGrain : IGrain
+{
+    Task Method(Models.Request request);
+    Task NewAsync();
+}
+";
+        const string contractsFile = @"
+interface IMyGrain [Version(1)]
+  Method(Request value) -> Task
+";
+
+        var (changedSolution, additionalDocumentId) = await ApplyCodeFixAsync(
+            source,
+            contractsFile,
+            GrainInterfaceVersionAnalyzer.RuleId0018,
+            RegenerateCodeActionTitle);
+
+        var content = (await changedSolution.GetAdditionalDocument(additionalDocumentId!)!
+            .GetTextAsync(TestContext.Current.CancellationToken)).ToString();
+        Assert.Contains("  Method(Models.Request) -> Task", content);
+        Assert.DoesNotContain("  Method(Request) -> Task", content);
+        Assert.DoesNotContain(
+            await GetDiagnosticsAsync(source, content),
+            diagnostic => diagnostic.Id == GrainInterfaceVersionAnalyzer.RuleId0027);
+    }
+
+    [Fact]
+    public async Task CodeFix_RegenerateProject_PreservesRemovedMembersOnNestedLegacyInterfaces()
+    {
+        const string source = @"
+public class Outer
+{
+    [Version(1)]
+    public interface IInnerGrain : IGrain
+    {
+        Task ExistingAsync();
+        Task NewAsync();
+    }
+}
+";
+        const string contractsFile = @"
+interface Outer.IInnerGrain [Version(1)]
+  ExistingAsync() -> Task
+  RemovedAsync() -> Task
+";
+
+        var (changedSolution, additionalDocumentId) = await ApplyCodeFixAsync(
+            source,
+            contractsFile,
+            GrainInterfaceVersionAnalyzer.RuleId0018,
+            RegenerateCodeActionTitle);
+
+        var content = (await changedSolution.GetAdditionalDocument(additionalDocumentId!)!
+            .GetTextAsync(TestContext.Current.CancellationToken)).ToString();
+        Assert.Contains("  RemovedAsync() -> Task", content);
+        Assert.Contains(
+            await GetDiagnosticsAsync(source, content),
+            diagnostic => diagnostic.Id == GrainInterfaceVersionAnalyzer.RuleId0027);
     }
 
     [Fact]
