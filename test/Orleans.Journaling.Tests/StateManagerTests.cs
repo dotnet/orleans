@@ -893,7 +893,7 @@ public class StateManagerTests : JournalingTestBase
     }
 
     [Fact]
-    public async Task StateManager_WriteStateAsync_CoalescesQueuedWrites()
+    public async Task StateManager_WriteStateAsync_CoalescesConcurrentQueuedWrites()
     {
         var storage = new CapturingStorage();
         var sut = CreateTestSystem(storage: storage);
@@ -918,7 +918,7 @@ public class StateManagerTests : JournalingTestBase
     }
 
     [Fact]
-    public async Task StateManager_FencesStateOperationsUntilFailedRevertIsRetriedSuccessfully()
+    public async Task StateManager_FencesDestructiveOperationsAndRecoversBeforeQueuedWrite()
     {
         var storage = new CapturingStorage();
         var sut = CreateTestSystem(storage: storage);
@@ -935,17 +935,12 @@ public class StateManagerTests : JournalingTestBase
             () => sut.Manager.RevertPendingChangesAsync(TestContext.Current.CancellationToken).AsTask());
         Assert.Same(expected, exception);
 
-        var writeException = await Assert.ThrowsAsync<InvalidOperationException>(
-            () => sut.Manager.WriteStateAsync(TestContext.Current.CancellationToken).AsTask());
-        Assert.Contains("state operations are fenced", writeException.Message, StringComparison.Ordinal);
-        Assert.Contains("fenced", writeException.Message, StringComparison.OrdinalIgnoreCase);
-        Assert.Contains("Call RevertPendingChangesAsync", writeException.Message, StringComparison.Ordinal);
         var deleteException = await Assert.ThrowsAsync<InvalidOperationException>(
             () => sut.Manager.DeleteStateAsync(TestContext.Current.CancellationToken).AsTask());
         Assert.Contains("state operations are fenced", deleteException.Message, StringComparison.Ordinal);
         Assert.Contains("Call RevertPendingChangesAsync", deleteException.Message, StringComparison.Ordinal);
 
-        await sut.Manager.RevertPendingChangesAsync(TestContext.Current.CancellationToken);
+        await sut.Manager.WriteStateAsync(TestContext.Current.CancellationToken);
         Assert.Equal(1, value.Value);
 
         value.Value = 3;
@@ -954,7 +949,7 @@ public class StateManagerTests : JournalingTestBase
     }
 
     [Fact]
-    public async Task StateManager_StateOperations_ReportRecoveryInProgress()
+    public async Task StateManager_QueuesWritesWhileRecoveryIsInProgress()
     {
         var storage = new BlockingRecoveryStorage();
         var sut = CreateTestSystem(storage: storage);
@@ -965,18 +960,17 @@ public class StateManagerTests : JournalingTestBase
             TimeSpan.FromSeconds(10),
             TestContext.Current.CancellationToken);
 
-        var writeException = await Assert.ThrowsAsync<InvalidOperationException>(
-            () => sut.Manager.WriteStateAsync(TestContext.Current.CancellationToken).AsTask());
+        var queuedWrite = sut.Manager.WriteStateAsync(TestContext.Current.CancellationToken).AsTask();
         var deleteException = await Assert.ThrowsAsync<InvalidOperationException>(
             () => sut.Manager.DeleteStateAsync(TestContext.Current.CancellationToken).AsTask());
 
-        Assert.Contains("state operations are unavailable while recovery is in progress", writeException.Message, StringComparison.Ordinal);
+        Assert.False(queuedWrite.IsCompleted);
         Assert.Contains("state operations are unavailable while recovery is in progress", deleteException.Message, StringComparison.Ordinal);
-        Assert.DoesNotContain("RevertPendingChangesAsync", writeException.Message, StringComparison.Ordinal);
         Assert.DoesNotContain("RevertPendingChangesAsync", deleteException.Message, StringComparison.Ordinal);
 
         storage.AllowRecoveryRead.SetResult();
-        await recovery.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
+        await Task.WhenAll(recovery, queuedWrite)
+            .WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
     }
 
     [Fact]

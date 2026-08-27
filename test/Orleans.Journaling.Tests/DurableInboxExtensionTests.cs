@@ -1208,7 +1208,7 @@ public class DurableInboxExtensionTests : IClassFixture<DefaultClusterFixture>
             return Task.FromResult(job);
         }
 
-        public Task<bool> TryCancelDurableJobAsync(DurableJob job, CancellationToken cancellationToken) =>
+        public Task<bool> CancelAsync(DurableJob job, CancellationToken requestCancellationToken) =>
             Task.FromResult(false);
 
         private async Task RunAsync(DurableJob job)

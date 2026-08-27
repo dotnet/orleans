@@ -144,9 +144,14 @@ public class DurableJobsExtensionsTests
 
     private sealed class LookupReplacementRegistry : IDurableJobHandlerRegistry, IDurableJobHandlerLookup
     {
+        public CancellationToken ExecutionToken => CancellationToken.None;
+
         public void Register(IDurableJobFeatureHandler handler, bool requiresTurnIsolation = false)
         {
         }
+
+        public Task<TResult> StartExecution<TResult>(Func<CancellationToken, Task<TResult>> factory) =>
+            factory(CancellationToken.None);
 
         public bool TryGetHandler(string jobName, [NotNullWhen(true)] out IDurableJobFeatureHandler? handler)
         {

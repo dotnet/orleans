@@ -305,6 +305,8 @@ internal sealed class RpcTestJournaledStateManager : IJournaledStateManager
         return ValueTask.CompletedTask;
     }
 
+    public ValueTask RevertPendingChangesAsync(CancellationToken cancellationToken) => ValueTask.CompletedTask;
+
     public ValueTask DeleteStateAsync(CancellationToken cancellationToken) => ValueTask.CompletedTask;
 }
 
