@@ -64,6 +64,26 @@ public sealed class ActivationStartupTests(ActivationStartupTestFixture fixture)
             Assert.Equal(0, scenario.OnActivateCount);
             Assert.Equal(ActivationState.Invalid, context.State);
             Assert.Equal(baselineActivationCount, activationCollector._activationCount);
+
+            var lateRequestData = fixture.CreateRequest(
+                context,
+                scenario,
+                payload: "late-must-not-run",
+                requestContextValue: "late-pre-start",
+                recordResponse: true);
+            var lateRejected = collector.WaitForEventAsync(
+                nameof(DispatcherEvents.Rejected),
+                diagnosticEvent => diagnosticEvent.Payload is DispatcherEvents.Rejected rejection
+                    && ReferenceEquals(rejection.Message, lateRequestData.Message),
+                Timeout,
+                TestContext.Current.CancellationToken);
+            context.ReceiveMessage(lateRequestData.Message);
+            var lateRejection = Assert.IsType<DispatcherEvents.Rejected>((await lateRejected).Payload);
+            Assert.Equal(Message.RejectionTypes.Transient, lateRejection.RejectionType);
+            Assert.Equal(
+                "Activation startup was aborted.",
+                Assert.IsType<InvalidOperationException>(lateRejection.Exception).Message);
+            Assert.Equal(0, scenario.RequestInvocationCount);
         }
         finally
         {
