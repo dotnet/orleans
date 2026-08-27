@@ -1809,7 +1809,7 @@ internal sealed partial class ActivationData :
                 forwardingAddress: ForwardingAddress,
                 failedOperation: DeactivationReason.Description,
                 exc: DeactivationException,
-                rejectMessages: true);
+                rejectMessages: DeactivationException is not null && ForwardingAddress is null);
             return;
         }
 

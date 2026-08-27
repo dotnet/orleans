@@ -156,6 +156,8 @@ namespace Orleans.Runtime
         public IGrainContext Context
             => _context ?? throw new InvalidOperationException("The grain context activation is not initialized.");
 
+        public bool HasStartup => _startup is not null;
+
         public static PreparedGrainContext Create(
             IGrainContextActivator activator,
             GrainAddress address,

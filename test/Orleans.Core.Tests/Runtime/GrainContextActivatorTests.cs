@@ -117,6 +117,36 @@ public class GrainContextActivatorTests
         Assert.Equal(["start", "abort"], events);
     }
 
+    [Fact]
+    public void CatalogAbortPreparedContext_EagerCustomContextIsDeactivated()
+    {
+        var context = Substitute.For<IGrainContext>();
+        var reason = new DeactivationReason(
+            DeactivationReasonCode.ActivationFailed,
+            "pre-start-failure");
+        var preparedContext = new PreparedGrainContext(context, startup: null);
+
+        Catalog.AbortPreparedContext(preparedContext, context, reason);
+
+        context.Received(1).Deactivate(reason, CancellationToken.None);
+    }
+
+    [Fact]
+    public void CatalogAbortPreparedContext_PreparedContextIsAborted()
+    {
+        var events = new List<string>();
+        var context = Substitute.For<IGrainContext>();
+        var reason = new DeactivationReason(
+            DeactivationReasonCode.ActivationFailed,
+            "pre-start-failure");
+        var preparedContext = new PreparedGrainContext(context, new TestGrainContextStartup(events));
+
+        Catalog.AbortPreparedContext(preparedContext, context, reason);
+
+        Assert.Equal(["abort"], events);
+        context.DidNotReceive().Deactivate(Arg.Any<DeactivationReason>(), Arg.Any<CancellationToken>());
+    }
+
     private static GrainContextActivator CreateActivator(
         IGrainContextActivator contextActivator,
         List<string> events) =>
