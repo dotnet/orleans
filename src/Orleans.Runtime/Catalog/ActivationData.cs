@@ -187,17 +187,15 @@ internal sealed partial class ActivationData :
     {
         if (Interlocked.Exchange(ref _startup, null) is { } startup)
         {
-            startup.Abort();
-            using var suppressExecutionContext = new ExecutionContextSuppressor();
-            Task.Factory.StartNew(
-                    static state => DisposeAsync(state!).AsTask(),
-                    _serviceScope,
-                    CancellationToken.None,
-                    TaskCreationOptions.DenyChildAttach,
-                    TaskScheduler.Default)
-                .Unwrap()
-                .GetAwaiter()
-                .GetResult();
+            var exception = new InvalidOperationException("Activation startup was aborted.");
+            Deactivate(
+                new DeactivationReason(
+                    DeactivationReasonCode.ActivationFailed,
+                    exception,
+                    "Activation startup was aborted."),
+                CancellationToken.None);
+            startup.Dispose();
+            Deactivated.GetAwaiter().GetResult();
         }
     }
 
