@@ -35,23 +35,32 @@ internal sealed unsafe class LinuxIoUringSocketReceiver : LinuxIoUringOperation,
                 $"A scatter receive supports at most {MaximumScatterBuffers} buffers.");
         }
 
-        var vectors = (IoVector*)_iovecs;
-        for (var i = 0; i < buffers.Count; i++)
+        BeginPreparation();
+        try
         {
-            var buffer = buffers[i];
-            var array = buffer.Array ?? throw new ArgumentException("The receive buffer must be array-backed.", nameof(buffers));
-            vectors[i] = new()
+            var vectors = (IoVector*)_iovecs;
+            for (var i = 0; i < buffers.Count; i++)
             {
-                Base = Marshal.UnsafeAddrOfPinnedArrayElement(array, buffer.Offset),
-                Length = (nuint)buffer.Count,
+                var buffer = buffers[i];
+                var array = buffer.Array ?? throw new ArgumentException("The receive buffer must be array-backed.", nameof(buffers));
+                vectors[i] = new()
+                {
+                    Base = Marshal.UnsafeAddrOfPinnedArrayElement(array, buffer.Offset),
+                    Length = (nuint)buffer.Count,
+                };
+            }
+
+            *(MessageHeader*)_messageHeader = new()
+            {
+                Vectors = _iovecs,
+                VectorCount = (nuint)buffers.Count,
             };
         }
-
-        *(MessageHeader*)_messageHeader = new()
+        catch
         {
-            Vectors = _iovecs,
-            VectorCount = (nuint)buffers.Count,
-        };
+            CancelPreparation();
+            throw;
+        }
 
         return SubmitPrepared(
             socket,
@@ -135,26 +144,35 @@ internal sealed unsafe class LinuxIoUringSocketSender : LinuxIoUringOperation, I
                 $"A scatter send supports at most {MaximumScatterBuffers} buffers.");
         }
 
-        var vectors = (IoVector*)_iovecs;
-        for (var i = 0; i < buffers.Count; i++)
+        BeginPreparation();
+        try
         {
-            var buffer = buffers[i];
-            var array = buffer.Array ?? throw new ArgumentException("The send buffer must be array-backed.", nameof(buffers));
-            var pin = GCHandle.Alloc(array, GCHandleType.Pinned);
-            _scatterPins[i] = pin;
-            _scatterPinCount++;
-            vectors[i] = new()
+            var vectors = (IoVector*)_iovecs;
+            for (var i = 0; i < buffers.Count; i++)
             {
-                Base = IntPtr.Add(pin.AddrOfPinnedObject(), buffer.Offset),
-                Length = (nuint)buffer.Count,
+                var buffer = buffers[i];
+                var array = buffer.Array ?? throw new ArgumentException("The send buffer must be array-backed.", nameof(buffers));
+                var pin = GCHandle.Alloc(array, GCHandleType.Pinned);
+                _scatterPins[i] = pin;
+                _scatterPinCount++;
+                vectors[i] = new()
+                {
+                    Base = IntPtr.Add(pin.AddrOfPinnedObject(), buffer.Offset),
+                    Length = (nuint)buffer.Count,
+                };
+            }
+
+            *(MessageHeader*)_messageHeader = new()
+            {
+                Vectors = _iovecs,
+                VectorCount = (nuint)buffers.Count,
             };
         }
-
-        *(MessageHeader*)_messageHeader = new()
+        catch
         {
-            Vectors = _iovecs,
-            VectorCount = (nuint)buffers.Count,
-        };
+            CancelPreparation();
+            throw;
+        }
 
         return SubmitPrepared(
             socket,
@@ -229,8 +247,14 @@ internal sealed unsafe class LinuxIoUringSocketSender : LinuxIoUringOperation, I
 
 internal abstract class LinuxIoUringOperation : IValueTaskSource, IDisposable
 {
+    private const int StateIdle = 0;
+    private const int StatePreparing = 1;
+    private const int StatePending = 2;
+    private const int StateCompleting = 3;
+    private const int StateDisposed = 4;
     private static readonly Action<object?> ContinuationCompleted = static _ => { };
-    private readonly LinuxIoUringEngine _engine = LinuxIoUringEngine.GetNext();
+    private readonly LinuxIoUringEngine _engine;
+    private readonly uint _slotToken;
     private Action<object?>? _continuation;
     private object? _continuationState;
     private Socket? _socket;
@@ -242,6 +266,15 @@ internal abstract class LinuxIoUringOperation : IValueTaskSource, IDisposable
     private IntPtr _bufferAddress;
     private bool _waitForNotification;
     private int _primaryResult;
+    private int _state;
+    private ulong _generation;
+    private ulong _userData;
+
+    protected LinuxIoUringOperation()
+    {
+        _engine = LinuxIoUringEngine.GetNext();
+        (_slotToken, _generation) = _engine.Register(this);
+    }
 
     public int BytesTransferred { get; private set; }
 
@@ -265,6 +298,14 @@ internal abstract class LinuxIoUringOperation : IValueTaskSource, IDisposable
 
     internal int PrimaryResult => _primaryResult;
 
+    internal uint SlotToken => _slotToken;
+
+    internal ulong UserData => Volatile.Read(ref _userData);
+
+    internal ulong Generation => _generation;
+
+    internal bool IsPending => Volatile.Read(ref _state) == StatePending;
+
     protected ValueTask Submit(
         Socket socket,
         ArraySegment<byte> buffer,
@@ -277,17 +318,26 @@ internal abstract class LinuxIoUringOperation : IValueTaskSource, IDisposable
         Debug.Assert(!_bufferPin.IsAllocated);
         Debug.Assert(_continuation is null);
 
-        _buffer = buffer.Array ?? throw new ArgumentException("The I/O buffer must be array-backed.", nameof(buffer));
-        _bufferOffset = buffer.Offset;
-        _bufferLength = buffer.Count;
-        if (bufferIsPinned)
+        BeginPreparation();
+        try
         {
-            _bufferAddress = Marshal.UnsafeAddrOfPinnedArrayElement(_buffer, _bufferOffset);
+            _buffer = buffer.Array ?? throw new ArgumentException("The I/O buffer must be array-backed.", nameof(buffer));
+            _bufferOffset = buffer.Offset;
+            _bufferLength = buffer.Count;
+            if (bufferIsPinned)
+            {
+                _bufferAddress = Marshal.UnsafeAddrOfPinnedArrayElement(_buffer, _bufferOffset);
+            }
+            else
+            {
+                _bufferPin = GCHandle.Alloc(_buffer, GCHandleType.Pinned);
+                _bufferAddress = IntPtr.Add(_bufferPin.AddrOfPinnedObject(), _bufferOffset);
+            }
         }
-        else
+        catch
         {
-            _bufferPin = GCHandle.Alloc(_buffer, GCHandleType.Pinned);
-            _bufferAddress = IntPtr.Add(_bufferPin.AddrOfPinnedObject(), _bufferOffset);
+            CancelPreparation();
+            throw;
         }
 
         return SubmitPrepared(socket, _bufferAddress, _bufferLength, operationCode, waitForNotification);
@@ -312,21 +362,56 @@ internal abstract class LinuxIoUringOperation : IValueTaskSource, IDisposable
             BytesTransferred = 0;
             SocketError = SocketError.Success;
             Error = null;
-
-            _engine.Enqueue(this);
-            return new ValueTask(this, 0);
+            var generation = (_generation + 1) & LinuxIoUringEngine.UserDataGenerationMask;
+            _generation = generation == 0 ? 1 : generation;
+            Volatile.Write(
+                ref _userData,
+                (_generation << LinuxIoUringEngine.UserDataSlotBits) | _slotToken);
         }
         catch
         {
-            ReleaseSubmission();
+            CancelPreparation();
             throw;
         }
+
+        if (Volatile.Read(ref _state) != StatePreparing)
+        {
+            throw new InvalidOperationException("The io_uring operation left the preparation state unexpectedly.");
+        }
+
+        Volatile.Write(ref _state, StatePending);
+        _engine.Enqueue(this);
+        return new ValueTask(this, 0);
+    }
+
+    protected void BeginPreparation()
+    {
+        if (Interlocked.CompareExchange(ref _state, StatePreparing, StateIdle) != StateIdle)
+        {
+            throw new InvalidOperationException("The io_uring operation is already active or has been disposed.");
+        }
+    }
+
+    protected void CancelPreparation()
+    {
+        ReleaseSubmission();
+        if (Volatile.Read(ref _state) != StatePreparing)
+        {
+            throw new InvalidOperationException("The io_uring operation left the preparation state unexpectedly.");
+        }
+
+        Volatile.Write(ref _state, StateIdle);
     }
 
     internal void SetPrimaryResult(int result) => _primaryResult = result;
 
     internal void Complete(int result)
     {
+        if (Interlocked.CompareExchange(ref _state, StateCompleting, StatePending) != StatePending)
+        {
+            throw new InvalidOperationException("The io_uring operation received an unexpected completion.");
+        }
+
         ReleaseSubmission();
         if (result >= 0)
         {
@@ -341,15 +426,22 @@ internal abstract class LinuxIoUringOperation : IValueTaskSource, IDisposable
             Error = new SocketException((int)SocketError);
         }
 
+        Volatile.Write(ref _state, StateIdle);
         SignalCompletion();
     }
 
     internal void Complete(Exception error)
     {
+        if (Interlocked.CompareExchange(ref _state, StateCompleting, StatePending) != StatePending)
+        {
+            return;
+        }
+
         ReleaseSubmission();
         BytesTransferred = 0;
         SocketError = SocketError.SocketError;
         Error = error;
+        Volatile.Write(ref _state, StateIdle);
         SignalCompletion();
     }
 
@@ -382,9 +474,15 @@ internal abstract class LinuxIoUringOperation : IValueTaskSource, IDisposable
 
     public virtual void Dispose()
     {
+        if (Interlocked.CompareExchange(ref _state, StateDisposed, StateIdle) != StateIdle)
+        {
+            throw new InvalidOperationException("An active io_uring operation cannot be disposed.");
+        }
+
         Debug.Assert(_socket is null);
         Debug.Assert(_buffer is null);
         Debug.Assert(!_bufferPin.IsAllocated);
+        _engine.Unregister(this);
     }
 
     private void ReleaseSubmission()
@@ -458,14 +556,22 @@ internal sealed unsafe partial class LinuxIoUringEngine
     private const ulong WakeUserData = 1;
     private const int EventFdCloseOnExec = 0x80000;
     private const int EventFdNonBlocking = 0x800;
+    private const int InitialOperationCapacity = 256;
     private const int TargetProcessorsPerEngine = 4;
     private const int MaximumEngineCount = 4;
+    internal const int UserDataSlotBits = 20;
+    internal const ulong UserDataSlotMask = (1UL << UserDataSlotBits) - 1;
+    internal const ulong UserDataGenerationMask = ulong.MaxValue >> UserDataSlotBits;
 
     private static readonly Lazy<LinuxIoUringEngine>[] Engines = CreateEngines();
     private static int _nextEngine = -1;
     private readonly ConcurrentQueue<LinuxIoUringOperation> _pending = new();
-    private readonly Dictionary<ulong, LinuxIoUringOperation> _inflight = [];
+    private readonly object _operationsLock = new();
+    private readonly Stack<int> _freeOperationSlots = [];
     private readonly ManualResetEventSlim _started = new(initialState: false);
+    private LinuxIoUringOperation?[] _operations = new LinuxIoUringOperation[InitialOperationCapacity];
+    private ulong[] _operationGenerations = new ulong[InitialOperationCapacity];
+    private int _operationCount;
     private IoUring _ring;
     private Exception? _fatalError;
     private int _enqueuers;
@@ -475,7 +581,6 @@ internal sealed unsafe partial class LinuxIoUringEngine
     private long _zeroCopyPrimaryCompletions;
     private long _zeroCopyNotificationCompletions;
     private long _zeroCopyFallbackCompletions;
-    private ulong _nextUserData = WakeUserData;
     private bool _wakePollArmed;
 
     private LinuxIoUringEngine(int engineId)
@@ -536,6 +641,52 @@ internal sealed unsafe partial class LinuxIoUringEngine
         }
 
         return (primary, notifications, fallbacks);
+    }
+
+    internal (uint SlotToken, ulong Generation) Register(LinuxIoUringOperation operation)
+    {
+        lock (_operationsLock)
+        {
+            int index;
+            if (!_freeOperationSlots.TryPop(out index))
+            {
+                index = _operationCount++;
+                if ((ulong)index > UserDataSlotMask - 2)
+                {
+                    throw new InvalidOperationException("The io_uring engine has no available operation slots.");
+                }
+
+                if (index == _operations.Length)
+                {
+                    var resized = new LinuxIoUringOperation[checked(index * 2)];
+                    var resizedGenerations = new ulong[resized.Length];
+                    Array.Copy(_operations, resized, index);
+                    Array.Copy(_operationGenerations, resizedGenerations, index);
+                    Volatile.Write(ref _operations, resized);
+                    Volatile.Write(ref _operationGenerations, resizedGenerations);
+                }
+            }
+
+            Volatile.Write(ref _operations[index], operation);
+            return (checked((uint)index + 2), _operationGenerations[index]);
+        }
+    }
+
+    internal void Unregister(LinuxIoUringOperation operation)
+    {
+        var index = checked((int)operation.SlotToken - 2);
+        lock (_operationsLock)
+        {
+            var operations = Volatile.Read(ref _operations);
+            if (!ReferenceEquals(Volatile.Read(ref operations[index]), operation))
+            {
+                throw new InvalidOperationException("The io_uring operation is not registered with this engine.");
+            }
+
+            _operationGenerations[index] = operation.Generation;
+            Volatile.Write(ref operations[index], null);
+            _freeOperationSlots.Push(index);
+        }
     }
 
     private static Lazy<LinuxIoUringEngine>[] CreateEngines()
@@ -631,13 +782,19 @@ internal sealed unsafe partial class LinuxIoUringEngine
                 spinner.SpinOnce();
             }
 
-            while (_pending.TryDequeue(out var operation))
+            while (_pending.TryDequeue(out _))
             {
-                failedOperations.Add(operation);
             }
 
-            failedOperations.AddRange(_inflight.Values);
-            _inflight.Clear();
+            var operations = Volatile.Read(ref _operations);
+            foreach (var operation in operations)
+            {
+                if (operation is { IsPending: true })
+                {
+                    failedOperations.Add(operation);
+                }
+            }
+
             if (_ringInitialized)
             {
                 _ringInitialized = false;
@@ -674,14 +831,12 @@ internal sealed unsafe partial class LinuxIoUringEngine
                 throw;
             }
 
-            var userData = NextUserData();
             *sqe = default;
             sqe->Opcode = operation.OperationCode;
             sqe->FileDescriptor = operation.FileDescriptor;
             sqe->Address = (ulong)operation.BufferAddress;
             sqe->Length = checked((uint)operation.BufferLength);
-            sqe->UserData = userData;
-            _inflight.Add(userData, operation);
+            sqe->UserData = operation.UserData;
 
             submitted++;
             if (submitted == 1024)
@@ -735,7 +890,7 @@ internal sealed unsafe partial class LinuxIoUringEngine
                 continue;
             }
 
-            if (!_inflight.TryGetValue(userData, out var operation))
+            if (!TryGetOperation(userData, out var operation))
             {
                 throw new InvalidOperationException($"io_uring completion {userData} has no owner.");
             }
@@ -745,7 +900,6 @@ internal sealed unsafe partial class LinuxIoUringEngine
                 if ((flags & CompletionIsNotification) != 0)
                 {
                     Interlocked.Increment(ref _zeroCopyNotificationCompletions);
-                    _inflight.Remove(userData);
                     operation.Complete(operation.PrimaryResult);
                 }
                 else if ((flags & CompletionHasMore) == 0)
@@ -755,7 +909,6 @@ internal sealed unsafe partial class LinuxIoUringEngine
                         Interlocked.Increment(ref _zeroCopyFallbackCompletions);
                     }
 
-                    _inflight.Remove(userData);
                     operation.Complete(result);
                 }
                 else
@@ -766,10 +919,30 @@ internal sealed unsafe partial class LinuxIoUringEngine
             }
             else
             {
-                _inflight.Remove(userData);
                 operation.Complete(result);
             }
         }
+    }
+
+    private bool TryGetOperation(ulong userData, [NotNullWhen(true)] out LinuxIoUringOperation? operation)
+    {
+        var slotToken = userData & UserDataSlotMask;
+        if (slotToken < 2)
+        {
+            operation = null;
+            return false;
+        }
+
+        var index = checked((int)slotToken - 2);
+        var operations = Volatile.Read(ref _operations);
+        if (index >= operations.Length)
+        {
+            operation = null;
+            return false;
+        }
+
+        operation = Volatile.Read(ref operations[index]);
+        return operation is not null && operation.UserData == userData;
     }
 
     private IoUringSubmission* GetSubmission()
@@ -819,17 +992,6 @@ internal sealed unsafe partial class LinuxIoUringEngine
     {
         var head = Volatile.Read(ref *_ring.Completion.KernelHead);
         Volatile.Write(ref *_ring.Completion.KernelHead, head + 1);
-    }
-
-    private ulong NextUserData()
-    {
-        do
-        {
-            _nextUserData++;
-        }
-        while (_nextUserData <= WakeUserData);
-
-        return _nextUserData;
     }
 
     private static void ThrowIfError(int result)
