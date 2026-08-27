@@ -650,6 +650,7 @@ public abstract class AdoNetStreamPartitionTests(string invariant) : IAsyncLifet
 
         Assert.NotNull(bounds);
         Assert.Equal(state.OwnerEpoch, bounds!.OwnerEpoch);
+        Assert.Equal(second.MessageId + 1, bounds.NextMessageId);
         Assert.Equal(second.MessageId, bounds.Checkpoint);
         Assert.Equal(1, bounds.EarliestMessageId);
         Assert.Equal(second.MessageId, bounds.TailMessageId);
@@ -764,6 +765,46 @@ public abstract class AdoNetStreamPartitionTests(string invariant) : IAsyncLifet
         Assert.Equal(acks[0].MessageId, result.HardDeletedFromMessageId);
         Assert.Equal(acks[^1].MessageId, result.HardDeletedThroughMessageId);
         Assert.Null(result.Checkpoint);
+    }
+
+    [Fact]
+    public async Task FullyPurgedUncheckpointedHistory_RemainsDetectableAsRetentionGap()
+    {
+        var serviceId = RandomServiceId();
+        var providerId = RandomProviderId();
+        var queueId = RandomQueueId();
+        var initial = await _queries.AcquireStreamPartitionAsync(
+            serviceId,
+            providerId,
+            queueId,
+            startFromNow: false);
+        Assert.Equal(0, initial.Checkpoint);
+        Assert.Equal(1, initial.NextMessageId);
+
+        for (var i = 0; i < 3; i++)
+        {
+            await AppendAsync(serviceId, providerId, queueId);
+        }
+
+        await AgePartitionMessagesAsync(serviceId, providerId, queueId);
+        await MakeCleanupDueAsync(serviceId, providerId, queueId);
+        var cleanup = await _queries.CleanupStreamMessagesAsync(
+            serviceId,
+            providerId,
+            queueId,
+            retentionPeriodSeconds: 60,
+            maximumRetentionPeriodSeconds: 120,
+            cleanupIntervalSeconds: 60,
+            cleanupBatchSize: 100);
+        Assert.Equal(3, cleanup.HardDeletedCount);
+
+        var bounds = await _queries.GetStreamPartitionBoundsAsync(serviceId, providerId, queueId);
+        Assert.NotNull(bounds);
+        Assert.Equal(0, bounds.Checkpoint);
+        Assert.Equal(4, bounds.NextMessageId);
+        Assert.Null(bounds.EarliestMessageId);
+        Assert.Null(bounds.TailMessageId);
+        Assert.True(AdoNetRecoverableStream.HasRetentionGap(bounds));
     }
 
     [Fact]

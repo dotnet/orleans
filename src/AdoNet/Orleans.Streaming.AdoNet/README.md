@@ -58,9 +58,11 @@ The provider stores each queue as an immutable, ordered stream partition. Its st
 - `MaximumRetentionPeriod`: optionally delete older records even when they are not checkpointed. This is a hard capacity ceiling and can create a diagnosed retention gap. Fractional seconds round upward.
 - `CleanupInterval` and `CleanupBatchSize`: bound cleanup frequency and work. Fractional cleanup intervals round upward.
 
-The partitioned stream provider is rewindable while requested records remain retained. Inclusive subscription start positions remain pending until the corresponding record is delivered or intentionally filtered. The queue checkpoint advances through the earliest contiguous position which is safe for every subscription, including unrelated partition records which quiet-stream cursors have scanned. It resumes strictly after that durable, ownership-fenced checkpoint and can redeliver records after a crash without skipping uncheckpointed data.
+The partitioned stream provider is rewindable while requested records remain retained. Inclusive subscription start positions remain pending until the corresponding record is delivered or intentionally filtered. The queue checkpoint advances through the earliest contiguous position which is safe for every subscription, including unrelated partition records which quiet-stream cursors have scanned. It resumes strictly after that durable, ownership-fenced checkpoint and can redeliver records after a crash without skipping uncheckpointed data. Partition state retains the next message identifier, so recovery detects a hard-retention gap even when the purge leaves no records.
 
 Partition acquisition is cancellation-aware. A receiver whose acquisition command is still completing retains its queue reservation, so a late database result settles before a replacement receiver acquires a newer ownership epoch.
+
+Message creation and checkpoint-eligibility timestamps are sampled after the partition lock is acquired. Lock contention therefore does not consume the configured retention window.
 
 ## Alpha schema upgrade
 

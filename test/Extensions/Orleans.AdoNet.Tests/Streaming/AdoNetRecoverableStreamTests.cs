@@ -207,6 +207,31 @@ public class AdoNetRecoverableStreamTests
         Assert.Equal(9, parameters[nameof(DbStoredQueries.Columns.CleanupBatchSize)]);
     }
 
+    [Theory]
+    [InlineData(null, 1L, null, false)]
+    [InlineData(0L, 1L, null, false)]
+    [InlineData(3L, 4L, null, false)]
+    [InlineData(0L, 4L, null, true)]
+    [InlineData(0L, 4L, 2L, true)]
+    public void HasRetentionGap_UsesNextMessageIdWhenRetainedHistoryIsEmpty(
+        long? checkpoint,
+        long nextMessageId,
+        long? earliestMessageId,
+        bool expected)
+    {
+        var state = new AdoNetStreamPartitionState(
+            "service",
+            "provider",
+            "queue",
+            OwnerEpoch: 1,
+            NextMessageId: nextMessageId,
+            Checkpoint: checkpoint,
+            EarliestMessageId: earliestMessageId,
+            TailMessageId: null);
+
+        Assert.Equal(expected, AdoNetRecoverableStream.HasRetentionGap(state));
+    }
+
     private static RelationalOrleansQueries CreateQueries(IRelationalStorage storage)
     {
         var queryValues = typeof(DbStoredQueries)
@@ -236,6 +261,7 @@ public class AdoNetRecoverableStreamTests
                 "provider",
                 "queue",
                 ownerEpoch,
+                NextMessageId: 1,
                 Checkpoint: 0,
                 EarliestMessageId: null,
                 TailMessageId: null));
@@ -258,6 +284,7 @@ public class AdoNetRecoverableStreamTests
                 [nameof(AdoNetStreamPartitionState.ProviderId)] = state.ProviderId,
                 [nameof(AdoNetStreamPartitionState.QueueId)] = state.QueueId,
                 [nameof(AdoNetStreamPartitionState.OwnerEpoch)] = state.OwnerEpoch,
+                [nameof(AdoNetStreamPartitionState.NextMessageId)] = state.NextMessageId,
                 [nameof(AdoNetStreamPartitionState.Checkpoint)] = state.Checkpoint,
                 [nameof(AdoNetStreamPartitionState.EarliestMessageId)] = state.EarliestMessageId,
                 [nameof(AdoNetStreamPartitionState.TailMessageId)] = state.TailMessageId,
