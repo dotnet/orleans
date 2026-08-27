@@ -136,7 +136,33 @@ public class DurableOutboxTests : JournalingTestBase
     private static void SendAndMarkDurable(DurableOutbox outbox, DurableEnvelope envelope)
     {
         outbox.Send(envelope);
+        ((IJournaledStateWriteParticipant)outbox).OnWritePreparing();
         ((IJournaledState)outbox).OnWriteCompleted();
+    }
+
+    [Fact]
+    public async Task OnWriteCompleted_LeavesMutationsAddedAfterWritePreparationPending()
+    {
+        var h = CreateOutbox();
+        var included = CreateEnvelope();
+        var later = CreateEnvelope();
+        h.Outbox.Send(included);
+        ((IJournaledStateWriteParticipant)h.Outbox).OnWritePreparing();
+        h.Outbox.Send(later);
+
+        ((IJournaledState)h.Outbox).OnWriteCompleted();
+        await h.Outbox.DeliverPendingMessagesAsync();
+
+        Assert.Single(h.Extension.DeliveredEnvelopes);
+        Assert.Equal(included.MessageId, h.Extension.DeliveredEnvelopes[0].MessageId);
+        Assert.True(h.Outbox.TryGetMessage(later.MessageId, out _));
+
+        ((IJournaledStateWriteParticipant)h.Outbox).OnWritePreparing();
+        ((IJournaledState)h.Outbox).OnWriteCompleted();
+        await h.Outbox.DeliverPendingMessagesAsync();
+
+        Assert.Equal(2, h.Extension.DeliveredEnvelopes.Count);
+        Assert.Equal(later.MessageId, h.Extension.DeliveredEnvelopes[1].MessageId);
     }
 
     [Fact]
@@ -529,7 +555,8 @@ public class DurableOutboxTests : JournalingTestBase
     private sealed class TestJobHandlerRegistry : IDurableJobHandlerRegistry
     {
         public IDurableJobFeatureHandler? Handler { get; private set; }
-        public void Register(IDurableJobFeatureHandler handler, bool requiresTurnIsolation = false) => Handler = handler;
+        public void Register(IDurableJobFeatureHandler handler) => Handler = handler;
+        public void Register(IDurableJobFeatureHandler handler, bool requiresTurnIsolation) => Handler = handler;
     }
 
     /// <summary>

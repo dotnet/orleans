@@ -69,7 +69,9 @@ internal sealed partial class DurableOutbox :
     /// Set of message IDs that have been added to the outbox but not yet durably persisted.
     /// Messages in this set will be skipped by the delivery pump until they become durable.
     /// </summary>
-    private readonly HashSet<Guid> _pendingMessageIds = [];
+    private readonly Dictionary<Guid, long> _pendingMessageIds = [];
+    private readonly Dictionary<Guid, long> _writingMessageIds = [];
+    private long _pendingGeneration;
 
     private int _metricsActive;
 
@@ -161,11 +163,12 @@ internal sealed partial class DurableOutbox :
         EnsureMetricsActive();
         var isNewMessage = !ContainsKey(envelope.MessageId);
 
-        // Track this message as pending (not yet durable)
-        _pendingMessageIds.Add(envelope.MessageId);
-
         // Store envelope keyed by MessageId for O(1) lookup during removal
         this[envelope.MessageId] = envelope;
+
+        // Track the mutation after its journal entry is complete so write-boundary snapshots
+        // cannot include an entry which is still active.
+        _pendingMessageIds[envelope.MessageId] = ++_pendingGeneration;
         if (isNewMessage)
         {
             _messageStates[envelope.MessageId] = new OutboxMessageState();
@@ -185,16 +188,39 @@ internal sealed partial class DurableOutbox :
     /// Called when the outbox dictionary's pending writes have been durably persisted.
     /// This is when we schedule the pump to deliver the now-durable messages.
     /// </summary>
+    protected override void OnWritePreparing()
+    {
+        _writingMessageIds.Clear();
+        foreach (var entry in _pendingMessageIds)
+        {
+            _writingMessageIds.Add(entry.Key, entry.Value);
+        }
+    }
+
     protected override void OnWriteCompleted()
     {
-        // Clear the pending set - all messages in the outbox are now durable
-        _pendingMessageIds.Clear();
+        foreach (var (messageId, generation) in _writingMessageIds)
+        {
+            if (_pendingMessageIds.TryGetValue(messageId, out var currentGeneration)
+                && currentGeneration == generation)
+            {
+                _pendingMessageIds.Remove(messageId);
+            }
+        }
+
+        _writingMessageIds.Clear();
 
         // Schedule a durable job to deliver the durable messages.
         if (Count > 0)
         {
             _ = EnsureJobScheduledAsync();
         }
+    }
+
+    protected override void OnReset()
+    {
+        _pendingMessageIds.Clear();
+        _writingMessageIds.Clear();
     }
 
     /// <summary>
@@ -254,7 +280,7 @@ internal sealed partial class DurableOutbox :
             var now = _timeProvider.GetUtcNow();
             var pending = Values
                 .Where(envelope =>
-                    !_pendingMessageIds.Contains(envelope.MessageId)
+                    !_pendingMessageIds.ContainsKey(envelope.MessageId)
                     && (!_messageStates.TryGetValue(envelope.MessageId, out var state)
                         || state.NextAttemptAt is null
                         || state.NextAttemptAt <= now))

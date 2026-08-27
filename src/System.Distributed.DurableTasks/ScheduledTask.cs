@@ -96,24 +96,30 @@ public abstract class ScheduledTask
 
     public static async Task WhenAll(List<ScheduledTask> tasks, CancellationToken cancellationToken = default)
     {
-        var innerTasks = new List<Task>(tasks.Count);
+        var innerTasks = new List<Task<DurableTaskResponse>>(tasks.Count);
         foreach (var task in tasks)
         {
             innerTasks.Add(task.GetResponseAsync(cancellationToken));
         }
 
-        await Task.WhenAll(innerTasks);
+        foreach (var response in await Task.WhenAll(innerTasks))
+        {
+            response.ThrowIfExceptionResponse();
+        }
     }
 
     public static async Task WhenAll<TResult>(List<ScheduledTask<TResult>> tasks, CancellationToken cancellationToken = default)
     {
-        var innerTasks = new List<Task>(tasks.Count);
+        var innerTasks = new List<Task<DurableTaskResponse>>(tasks.Count);
         foreach (var task in tasks)
         {
             innerTasks.Add(task.GetResponseAsync(cancellationToken));
         }
 
-        await Task.WhenAll(innerTasks);
+        foreach (var response in await Task.WhenAll(innerTasks))
+        {
+            _ = response.GetResult<TResult>();
+        }
     }
 
     public static async Task<ScheduledTask> WhenAny(List<ScheduledTask> tasks, CancellationToken cancellationToken = default)

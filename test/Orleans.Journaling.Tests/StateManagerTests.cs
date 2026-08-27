@@ -935,6 +935,8 @@ public class StateManagerTests : JournalingTestBase
             () => sut.Manager.RevertPendingChangesAsync(TestContext.Current.CancellationToken).AsTask());
         Assert.Same(expected, exception);
 
+        var mutationException = Assert.Throws<InvalidOperationException>(() => value.Value = 3);
+        Assert.Contains("mutations are fenced", mutationException.Message, StringComparison.Ordinal);
         var deleteException = await Assert.ThrowsAsync<InvalidOperationException>(
             () => sut.Manager.DeleteStateAsync(TestContext.Current.CancellationToken).AsTask());
         Assert.Contains("state operations are fenced", deleteException.Message, StringComparison.Ordinal);

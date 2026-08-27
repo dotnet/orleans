@@ -22,6 +22,7 @@ namespace Orleans.DurableMessaging;
 internal sealed partial class DurableInboxExtension :
     IDurableInboxExtension,
     IDurableJobFeatureHandler,
+    ILifecycleObserver,
     IDisposable
 {
     internal const string JobName = "orleans.messaging.inbox-drain";
@@ -795,6 +796,8 @@ internal sealed partial class DurableInboxExtension :
         await Task.WhenAll(processing).ConfigureAwait(ConfigureAwaitOptions.SuppressThrowing);
         DisposeShutdownToken();
     }
+
+    public Task OnStart(CancellationToken cancellationToken = default) => Task.CompletedTask;
 
     public void Dispose()
     {

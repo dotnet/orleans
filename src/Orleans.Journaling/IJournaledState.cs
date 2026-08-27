@@ -92,3 +92,8 @@ public interface IJournaledState
     /// <returns>A replica of this instance.</returns>
     IJournaledState DeepCopy();
 }
+
+internal interface IJournaledStateWriteParticipant
+{
+    void OnWritePreparing();
+}

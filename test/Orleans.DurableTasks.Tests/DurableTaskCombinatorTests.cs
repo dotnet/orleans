@@ -33,6 +33,24 @@ public class DurableTaskCombinatorTests
     }
 
     [Fact]
+    public async Task WhenAll_PropagatesFailedChild()
+    {
+        var expected = new InvalidOperationException("child failed");
+        var runtime = Substitute.For<IDurableTaskGrainRuntime>();
+        var handles = CreateHandles(
+            ("0", DurableTaskResponse.Completed),
+            ("1", DurableTaskResponse.FromException(expected)));
+        ConfigureRuntime(runtime, handles);
+        var context = new GrainDurableExecutionContext(TaskId.Create("root"), runtime);
+        var combinator = DurableTask.WhenAll(
+            [DurableTask.Run(static _ => { }), DurableTask.Run(static _ => { })]);
+
+        var response = await RunAsync(combinator, context);
+
+        Assert.Same(expected, response.Exception);
+    }
+
+    [Fact]
     public async Task GenericWhenAll_ReturnsSerializableResults()
     {
         var runtime = Substitute.For<IDurableTaskGrainRuntime>();

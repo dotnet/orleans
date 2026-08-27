@@ -9,7 +9,7 @@ using Orleans.Storage;
 
 namespace Orleans.Journaling;
 
-internal sealed partial class JournaledStateManager : IJournaledStateManager, IJournalStorageConsumer, ILifecycleParticipant<IGrainLifecycle>, ILifecycleObserver, IDisposable
+internal sealed partial class JournaledStateManager : IJournaledStateManager, IJournalStorageConsumer, ILifecycleParticipant<IGrainLifecycle>, ILifecycleObserver, IJournaledStateMutationGuard, IDisposable
 {
     private const uint MinApplicationJournalStreamId = 8u;
 #if NET9_0_OR_GREATER
@@ -328,6 +328,7 @@ internal sealed partial class JournaledStateManager : IJournaledStateManager, IJ
                                                 statesScanned++;
                                             }
 
+                                            NotifyWritePreparing();
                                             bufferToConsume = _journalWriter.GetCommittedBuffer();
                                             if (bufferToConsume.Length > 0)
                                             {
@@ -362,6 +363,7 @@ internal sealed partial class JournaledStateManager : IJournaledStateManager, IJ
                                                 }
                                             }
 
+                                            NotifyWritePreparing();
                                             committedBuffer = _journalWriter.GetCommittedBuffer();
                                             bufferToConsume = committedBuffer;
                                             bufferToConsumeIsCommittedBuffer = true;
@@ -709,12 +711,47 @@ internal sealed partial class JournaledStateManager : IJournaledStateManager, IJ
     }
 
     private JournalStreamWriter CreateJournalStreamWriter(JournalStreamId streamId) =>
-        _journalWriter.CreateJournalStreamWriter(streamId, _mutationGuard);
+        _journalWriter.CreateJournalStreamWriter(
+            streamId,
+            streamId.Value < MinApplicationJournalStreamId ? _mutationGuard : this);
+
+    void IJournaledStateMutationGuard.ThrowIfMutationBlocked()
+    {
+        lock (_lock)
+        {
+            _shutdownCancellation.Token.ThrowIfCancellationRequested();
+            switch (_state)
+            {
+                case ManagerState.Unknown:
+                case ManagerState.Ready:
+                    break;
+                case ManagerState.Recovering:
+                    throw new InvalidOperationException("Journaled state mutations are unavailable while recovery is in progress.");
+                case ManagerState.Fenced:
+                    throw new InvalidOperationException("Journaled state mutations are fenced because recovery failed. Call RevertPendingChangesAsync to retry recovery.");
+                default:
+                    throw new UnreachableException();
+            }
+        }
+
+        _mutationGuard?.ThrowIfMutationBlocked();
+    }
 
     internal void SetMutationGuard(IJournaledStateMutationGuard mutationGuard)
     {
         ArgumentNullException.ThrowIfNull(mutationGuard);
         _mutationGuard = mutationGuard;
+    }
+
+    private void NotifyWritePreparing()
+    {
+        foreach (var state in _states.Values)
+        {
+            if (state is IJournaledStateWriteParticipant participant)
+            {
+                participant.OnWritePreparing();
+            }
+        }
     }
 
     private static void AppendUpdatesOrSnapshotState(JournalBufferWriter journalWriter, bool isSnapshot, uint id, IJournaledState state)

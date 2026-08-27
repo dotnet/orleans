@@ -23,12 +23,19 @@ public interface IDurableJobHandlerRegistry
     /// Registers <paramref name="handler"/> for this grain activation.
     /// </summary>
     /// <param name="handler">The activation-scoped feature handler.</param>
+    /// <exception cref="InvalidOperationException">The handler is already registered.</exception>
+    void Register(IDurableJobFeatureHandler handler);
+
+    /// <summary>
+    /// Registers <paramref name="handler"/> for this grain activation.
+    /// </summary>
+    /// <param name="handler">The activation-scoped feature handler.</param>
     /// <param name="requiresTurnIsolation">
     /// <see langword="true"/> to execute every handler poll under an activation-level exclusive turn lease.
     /// If the handler returns <see cref="DurableJobRunStatus.InProgress"/>, the lease is released between polls.
     /// </param>
     /// <exception cref="InvalidOperationException">The handler is already registered.</exception>
-    void Register(IDurableJobFeatureHandler handler, bool requiresTurnIsolation = false);
+    void Register(IDurableJobFeatureHandler handler, bool requiresTurnIsolation) => Register(handler);
 }
 
 /// <summary>
@@ -93,7 +100,9 @@ internal sealed class DurableJobHandlerRegistry : IDurableJobHandlerRegistry, ID
     public Task<TResult> StartExecution<TResult>(Func<CancellationToken, Task<TResult>> factory) =>
         _lifetime?.Start(factory) ?? factory(CancellationToken.None);
 
-    public void Register(IDurableJobFeatureHandler handler, bool requiresTurnIsolation = false)
+    public void Register(IDurableJobFeatureHandler handler) => Register(handler, requiresTurnIsolation: false);
+
+    public void Register(IDurableJobFeatureHandler handler, bool requiresTurnIsolation)
     {
         ArgumentNullException.ThrowIfNull(handler);
 

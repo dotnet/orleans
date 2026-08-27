@@ -130,12 +130,20 @@ internal sealed partial class DurableTaskGrainRuntime(
 
     internal async ValueTask AcceptResponseAsync(
         TaskId taskId,
+        GrainId sender,
         DurableTaskResponse response,
         CancellationToken cancellationToken)
     {
         if (!_storage.TryGetTask(taskId, out var state))
         {
-            state = _storage.GetOrCreateTask(taskId, request: null);
+            throw new InvalidOperationException($"Cannot accept a response for unknown durable task '{taskId}'.");
+        }
+
+        var expectedSender = state.RemoteTarget.IsDefault ? GrainId : state.RemoteTarget;
+        if (sender != expectedSender)
+        {
+            throw new InvalidOperationException(
+                $"Cannot accept a response for durable task '{taskId}' from '{sender}'; expected '{expectedSender}'.");
         }
 
         var changed = false;
