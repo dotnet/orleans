@@ -53,7 +53,8 @@ internal sealed class RedisStreamSequenceToken : EventSequenceTokenV2
     /// </summary>
     /// <param name="eventIndex">The event index within the Orleans batch.</param>
     /// <returns>A token for the specified event.</returns>
-    public new RedisStreamSequenceToken CreateSequenceTokenForEvent(int eventIndex) => new(EntryId, SequenceNumber, RedisSequenceNumber, eventIndex);
+    public override RedisStreamSequenceToken CreateSequenceTokenForEvent(int eventIndex)
+        => new(EntryId, SequenceNumber, RedisSequenceNumber, eventIndex);
 
     /// <inheritdoc />
     public override bool Equals(StreamSequenceToken? other)

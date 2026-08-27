@@ -66,10 +66,12 @@ namespace Orleans.Providers.Streams.Common
         /// Creates a sequence token for a specific event in the current batch.
         /// </summary>
         /// <param name="eventInd">The event index, for events which are part of a batch.</param>
-        /// <returns>The sequence token.</returns>
-        public EventSequenceToken CreateSequenceTokenForEvent(int eventInd)
+        /// <returns>A token with the same concrete runtime type and position metadata, targeting the specified event.</returns>
+        public virtual EventSequenceToken CreateSequenceTokenForEvent(int eventInd)
         {
-            return new EventSequenceToken(SequenceNumber, eventInd);
+            var result = (EventSequenceToken)MemberwiseClone();
+            result.EventIndex = eventInd;
+            return result;
         }
 
         /// <inheritdoc />

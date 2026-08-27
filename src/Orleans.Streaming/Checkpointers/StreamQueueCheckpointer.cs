@@ -186,11 +186,7 @@ namespace Orleans.Streams
 
                     if (_options.CheckpointComparer is not { } comparer)
                     {
-                        if (string.Equals(_latestCheckpoint, checkpoint, StringComparison.Ordinal))
-                        {
-                            _latestCheckpoint = persistedState.Checkpoint;
-                        }
-
+                        _latestCheckpoint = persistedState.Checkpoint;
                         return;
                     }
 
