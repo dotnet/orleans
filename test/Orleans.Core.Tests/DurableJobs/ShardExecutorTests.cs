@@ -482,6 +482,7 @@ public class ShardExecutorTests
     [Fact]
     public async Task RunShardAsync_WhenAttemptCancellationIsRequested_DoesNotRetryOrRemove()
     {
+        var cancellationToken = TestContext.Current.CancellationToken;
         var retryPolicyInvoked = false;
         var options = CreateOptions(
             maxConcurrentJobs: 10,
@@ -503,10 +504,10 @@ public class ShardExecutorTests
         using var attemptCancellation = new CancellationTokenSource();
 
         var runTask = executor.RunShardAsync(shard, attemptCancellation.Token);
-        await attemptStarted.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        await attemptStarted.Task.WaitAsync(TimeSpan.FromSeconds(5), cancellationToken);
         attemptCancellation.Cancel();
 
-        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => runTask);
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => runTask.WaitAsync(cancellationToken));
         Assert.False(retryPolicyInvoked);
         await shard.DidNotReceive().RetryJobLaterAsync(
             Arg.Any<IJobRunContext>(),

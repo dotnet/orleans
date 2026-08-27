@@ -15,10 +15,11 @@ public abstract class JobShardManagerTestsRunner(IJobShardManagerTestFixture fix
     [InlineData(" ")]
     public async Task TryScheduleJobAsync_InvalidJobName_Throws(string? jobName)
     {
-        await using var scope = await fixture.CreateScopeAsync();
+        var cancellationToken = TestContext.Current.CancellationToken;
+        await using var scope = await fixture.CreateScopeAsync(cancellationToken);
         var manager = scope.CreateManager(scope.ActiveSilo);
         var now = scope.Now;
-        var shard = await manager.CreateShardAsync(now, now.AddMinutes(5), new Dictionary<string, string>(), CancellationToken.None);
+        var shard = await manager.CreateShardAsync(now, now.AddMinutes(5), new Dictionary<string, string>(), cancellationToken);
         var request = new ScheduleJobRequest
         {
             Target = GrainId.Create("durable-job-test", "target"),
@@ -27,7 +28,7 @@ public abstract class JobShardManagerTestsRunner(IJobShardManagerTestFixture fix
         };
 
         var exception = await Assert.ThrowsAnyAsync<ArgumentException>(
-            () => shard.TryScheduleJobAsync(request, CancellationToken.None));
+            () => shard.TryScheduleJobAsync(request, cancellationToken));
 
         Assert.Equal("JobName", exception.ParamName);
     }
@@ -184,18 +185,19 @@ public abstract class JobShardManagerTestsRunner(IJobShardManagerTestFixture fix
     [Fact]
     public async Task AttemptCancellationPreservesJobForReassignment()
     {
-        await using var scope = await fixture.CreateScopeAsync();
+        var cancellationToken = TestContext.Current.CancellationToken;
+        await using var scope = await fixture.CreateScopeAsync(cancellationToken);
         var first = scope.CreateManager(scope.ActiveSilo);
         var second = scope.CreateManager(scope.SecondActiveSilo);
         var now = scope.Now;
-        var shard = await first.CreateShardAsync(now, now.AddMinutes(5), Metadata("purpose", "attempt-cancellation"), CancellationToken.None);
-        var job = await ScheduleJobAsync(shard, now.AddMinutes(-1), "attempt-canceled-job");
-        var firstAttempt = await TakeOneAsync(shard);
+        var shard = await first.CreateShardAsync(now, now.AddMinutes(5), Metadata("purpose", "attempt-cancellation"), cancellationToken);
+        var job = await ScheduleJobAsync(shard, now.AddMinutes(-1), "attempt-canceled-job", cancellationToken);
+        var firstAttempt = await TakeOneAsync(shard, cancellationToken);
 
-        await first.UnregisterShardAsync(shard, CancellationToken.None);
+        await first.UnregisterShardAsync(shard, cancellationToken);
 
-        var reassigned = Assert.Single(await second.AssignJobShardsAsync(now.AddMinutes(5), int.MaxValue, CancellationToken.None));
-        var secondAttempt = await TakeOneAsync(reassigned);
+        var reassigned = Assert.Single(await second.AssignJobShardsAsync(now.AddMinutes(5), int.MaxValue, cancellationToken));
+        var secondAttempt = await TakeOneAsync(reassigned, cancellationToken);
 
         Assert.Equal(job!.Id, secondAttempt.Job.Id);
         Assert.NotEqual(firstAttempt.RunId, secondAttempt.RunId);

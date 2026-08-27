@@ -152,6 +152,7 @@ public class JobShardTests
     [Fact]
     public async Task MarkAsCompleteAsync_WaitsForInFlightSchedulePersistence()
     {
+        var cancellationToken = TestContext.Current.CancellationToken;
         var now = DateTimeOffset.UtcNow;
         var shard = new GateableJobShard(now.AddMinutes(-1), now.AddMinutes(1));
         var scheduleTask = shard.TryScheduleJobAsync(
@@ -161,16 +162,16 @@ public class JobShardTests
                 JobName = "job",
                 DueTime = now
             },
-            CancellationToken.None);
+            cancellationToken);
 
-        await shard.PersistAddStarted.Task.WaitAsync(TimeSpan.FromSeconds(5));
-        var completionTask = shard.MarkAsCompleteAsync(CancellationToken.None);
+        await shard.PersistAddStarted.Task.WaitAsync(TimeSpan.FromSeconds(5), cancellationToken);
+        var completionTask = shard.MarkAsCompleteAsync(cancellationToken);
 
         Assert.False(completionTask.IsCompleted);
         shard.AllowPersistAdd.SetResult();
 
-        Assert.NotNull(await scheduleTask.WaitAsync(TimeSpan.FromSeconds(5)));
-        await completionTask.WaitAsync(TimeSpan.FromSeconds(5));
+        Assert.NotNull(await scheduleTask.WaitAsync(TimeSpan.FromSeconds(5), cancellationToken));
+        await completionTask.WaitAsync(TimeSpan.FromSeconds(5), cancellationToken);
         Assert.True(shard.IsAddingCompleted);
         Assert.Equal(1, await shard.GetJobCountAsync());
         Assert.Null(await shard.TryScheduleJobAsync(
@@ -180,7 +181,7 @@ public class JobShardTests
                 JobName = "later",
                 DueTime = now
             },
-            CancellationToken.None));
+            cancellationToken));
     }
 
     private static async Task<TestJobShard> CreateShardWithDueJobAsync(string id, DateTimeOffset now)

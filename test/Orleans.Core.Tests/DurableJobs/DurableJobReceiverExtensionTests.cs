@@ -87,9 +87,9 @@ public class DurableJobReceiverExtensionTests
 
         firstAttemptCancellation.Cancel();
         await Assert.ThrowsAnyAsync<OperationCanceledException>(
-            () => attemptTask!.WaitAsync(TimeSpan.FromSeconds(5)));
+            () => attemptTask!.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken));
 
-        var redelivery = await extension.HandleDurableJobAsync(context, CancellationToken.None);
+        var redelivery = await extension.HandleDurableJobAsync(context, TestContext.Current.CancellationToken);
 
         Assert.Equal(DurableJobRunStatus.Completed, redelivery.Status);
         await handler.Received(2).ExecuteJobAsync(context, Arg.Any<CancellationToken>());

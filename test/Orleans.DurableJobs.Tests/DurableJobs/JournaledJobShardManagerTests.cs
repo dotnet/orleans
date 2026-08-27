@@ -296,6 +296,7 @@ public class JournaledJobShardManagerTests
     [Fact]
     public async Task AttemptReservation_WaitsForPrecedingRemovalToPersist()
     {
+        var cancellationToken = TestContext.Current.CancellationToken;
         var storageProvider = new CountingJournalStorageProvider(delayAppends: false);
         using var services = CreateServices(storageProvider);
         var membership = new TestClusterMembershipService();
@@ -311,24 +312,24 @@ public class JournaledJobShardManagerTests
             start,
             start.AddHours(1),
             new Dictionary<string, string> { ["Purpose"] = "AttemptReservationPersistence" },
-            CancellationToken.None);
-        var scheduled = await ScheduleJobAsync(shard, "attempt-reservation-persistence");
-        await using var enumerator = shard.ConsumeDurableJobsAsync().GetAsyncEnumerator(TestContext.Current.CancellationToken);
+            cancellationToken);
+        var scheduled = await ScheduleJobAsync(shard, "attempt-reservation-persistence", cancellationToken);
+        await using var enumerator = shard.ConsumeDurableJobsAsync().GetAsyncEnumerator(cancellationToken);
         Assert.True(await enumerator.MoveNextAsync());
         var jobContext = enumerator.Current;
 
         storageProvider.BlockAppends();
-        var removeTask = shard.RemoveJobAsync(scheduled.Id, CancellationToken.None);
-        var startAttemptTask = shard.TryStartAttemptAsync(jobContext, CancellationToken.None);
+        var removeTask = shard.RemoveJobAsync(scheduled.Id, cancellationToken);
+        var startAttemptTask = shard.TryStartAttemptAsync(jobContext, cancellationToken);
 
-        await storageProvider.AppendStarted.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+        await storageProvider.AppendStarted.WaitAsync(TimeSpan.FromSeconds(5), cancellationToken);
         Assert.False(startAttemptTask.IsCompleted);
 
         storageProvider.AllowAppends();
         Assert.Equal(DurableJobMutationResult.Applied, await removeTask);
         Assert.Equal(DurableJobMutationResult.JobNotFound, await startAttemptTask);
 
-        await manager.UnregisterShardAsync(shard, CancellationToken.None);
+        await manager.UnregisterShardAsync(shard, cancellationToken);
     }
 
     [Fact]
