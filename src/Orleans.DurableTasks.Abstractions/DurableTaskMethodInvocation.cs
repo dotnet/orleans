@@ -9,6 +9,7 @@ internal abstract class DeferredMethodInvocation : DurableTask
     private DurableExecutionContext? _context;
     private ExecutionContext? _executionContext;
     private Action? _moveNextAction;
+    private DurableTaskResponse? _terminalResponse;
     private int _started;
 
     public Action MoveNextAction => _moveNextAction ??= MoveNext;
@@ -34,17 +35,34 @@ internal abstract class DeferredMethodInvocation : DurableTask
 
     private void MoveNextInContext()
     {
-        using var scope = DurableExecutionContext.Enter(_context
-            ?? throw new InvalidOperationException("The deferred durable task has not started."));
-        MoveNextCore();
+        DurableTaskResponse? terminalResponse;
+        using (DurableExecutionContext.Enter(_context
+            ?? throw new InvalidOperationException("The deferred durable task has not started.")))
+        {
+            MoveNextCore();
+            terminalResponse = _terminalResponse;
+            if (terminalResponse is not null)
+            {
+                _context = null;
+                _executionContext = null;
+                ReleaseStateMachine();
+            }
+        }
+
+        if (terminalResponse is not null)
+        {
+            _completion.TrySetResult(terminalResponse);
+        }
     }
 
     protected abstract void MoveNextCore();
 
+    protected abstract void ReleaseStateMachine();
+
     protected void Complete(DurableTaskResponse response)
     {
         _executionContext = null;
-        _completion.TrySetResult(response);
+        _terminalResponse = response;
     }
 
     protected internal sealed override ValueTask<DurableTaskResponse> RunAsync(DurableExecutionContext context)
@@ -77,6 +95,8 @@ internal sealed class VoidDurableTaskMethodInvocation<TStateMachine> : VoidDurab
 
     protected override void MoveNextCore() => _stateMachine.MoveNext();
 
+    protected override void ReleaseStateMachine() => _stateMachine = default!;
+
     public override void SetResult() => Complete(DurableTaskResponse.Completed);
 
     public override void SetException(Exception exception) => Complete(DurableTaskResponse.FromException(exception));
@@ -89,6 +109,7 @@ internal abstract class DurableTaskMethodInvocation<TResult> : DurableTask<TResu
     private DurableExecutionContext? _context;
     private ExecutionContext? _executionContext;
     private Action? _moveNextAction;
+    private DurableTaskResponse? _terminalResponse;
     private int _started;
 
     public Action MoveNextAction => _moveNextAction ??= MoveNext;
@@ -114,12 +135,29 @@ internal abstract class DurableTaskMethodInvocation<TResult> : DurableTask<TResu
 
     private void MoveNextInContext()
     {
-        using var scope = DurableExecutionContext.Enter(_context
-            ?? throw new InvalidOperationException("The deferred durable task has not started."));
-        MoveNextCore();
+        DurableTaskResponse? terminalResponse;
+        using (DurableExecutionContext.Enter(_context
+            ?? throw new InvalidOperationException("The deferred durable task has not started.")))
+        {
+            MoveNextCore();
+            terminalResponse = _terminalResponse;
+            if (terminalResponse is not null)
+            {
+                _context = null;
+                _executionContext = null;
+                ReleaseStateMachine();
+            }
+        }
+
+        if (terminalResponse is not null)
+        {
+            _completion.TrySetResult(terminalResponse);
+        }
     }
 
     protected abstract void MoveNextCore();
+
+    protected abstract void ReleaseStateMachine();
 
     public abstract void SetResult(TResult result);
 
@@ -128,7 +166,7 @@ internal abstract class DurableTaskMethodInvocation<TResult> : DurableTask<TResu
     protected void Complete(DurableTaskResponse response)
     {
         _executionContext = null;
-        _completion.TrySetResult(response);
+        _terminalResponse = response;
     }
 
     protected internal sealed override ValueTask<DurableTaskResponse> RunAsync(DurableExecutionContext context)
@@ -153,6 +191,8 @@ internal sealed class DurableTaskMethodInvocation<TResult, TStateMachine> : Dura
     public void SetStateMachine(TStateMachine stateMachine) => _stateMachine = stateMachine;
 
     protected override void MoveNextCore() => _stateMachine.MoveNext();
+
+    protected override void ReleaseStateMachine() => _stateMachine = default!;
 
     public override void SetResult(TResult result) => Complete(DurableTaskResponse.FromResult(result));
 
