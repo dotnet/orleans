@@ -809,7 +809,11 @@ internal sealed unsafe partial class LinuxIoUringEngine
             while (true)
             {
                 SubmitPending();
-                SubmitAndWait();
+                if (!HasCompletions())
+                {
+                    SubmitAndWait();
+                }
+
                 DrainCompletions();
             }
         }
@@ -1051,6 +1055,11 @@ internal sealed unsafe partial class LinuxIoUringEngine
         Volatile.Write(ref *_ring.Completion.KernelHead, head + 1);
         return true;
     }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private bool HasCompletions()
+        => Volatile.Read(ref *_ring.Completion.KernelHead)
+            != Volatile.Read(ref *_ring.Completion.KernelTail);
 
     private static void ThrowIfError(int result)
     {
