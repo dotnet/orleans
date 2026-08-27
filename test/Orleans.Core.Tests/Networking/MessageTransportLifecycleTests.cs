@@ -766,6 +766,32 @@ public class MessageTransportLifecycleTests
     }
 
     [Fact]
+    public async Task SocketMessageTransport_LinuxIoUring_DisposeBeforeStart_Closes()
+    {
+        if (!OperatingSystem.IsLinux()
+            || !string.Equals(
+                Environment.GetEnvironmentVariable("ORLEANS_TEST_IO_URING"),
+                "1",
+                StringComparison.Ordinal))
+        {
+            return;
+        }
+
+        using var listener = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
+        listener.Bind(new IPEndPoint(IPAddress.Loopback, 0));
+        listener.Listen(1);
+        using var client = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
+        var connect = client.ConnectAsync(listener.LocalEndPoint!);
+        using var server = await listener.AcceptAsync();
+        await connect;
+        var transport = new SocketMessageTransport(client, NullLogger.Instance, useLinuxIoUring: true);
+
+        await transport.DisposeAsync();
+
+        Assert.True(transport.Closed.IsCancellationRequested);
+    }
+
+    [Fact]
     public async Task StreamMessageTransport_WriteFailure_WakesIdleReadLoop()
     {
         await using var transport = new TestStreamMessageTransport(new FailingWriteStream());

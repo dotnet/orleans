@@ -45,6 +45,7 @@ internal sealed partial class SocketMessageTransport : MessageTransportBase
         bufferSize: 256);
     private bool _readsCompleted;
     private int _pendingWriteCount;
+    private int _socketOperationsDisposed;
     private int _writeEnqueuers;
     private int _writesCompleted;
     private Task? _processingTask;
@@ -63,23 +64,48 @@ internal sealed partial class SocketMessageTransport : MessageTransportBase
         _socket = socket;
         _logger = logger;
         _useLinuxIoUring = useLinuxIoUring;
-        _socketReceiver = useLinuxIoUring ? new LinuxIoUringSocketReceiver() : new SocketReceiver();
-        _socketSender = useLinuxIoUring ? new LinuxIoUringSocketSender() : new SocketSender();
-
-        var remoteEndPoint = NormalizeEndpoint(_socket.RemoteEndPoint);
-        var localEndPoint = NormalizeEndpoint(_socket.LocalEndPoint);
-        _useZeroCopy = useLinuxIoUring
-            && remoteEndPoint is IPEndPoint { Address: var remoteAddress }
-            && !IPAddress.IsLoopback(remoteAddress);
-
-        Features.Set<IConnectionEndPointFeature>(new ConnectionEndPointFeature
+        if (useLinuxIoUring)
         {
-            RemoteEndPoint = remoteEndPoint,
-            LocalEndPoint = localEndPoint,
-        });
+            var receiver = new LinuxIoUringSocketReceiver();
+            try
+            {
+                _socketSender = new LinuxIoUringSocketSender();
+                _socketReceiver = receiver;
+            }
+            catch
+            {
+                receiver.Dispose();
+                throw;
+            }
+        }
+        else
+        {
+            _socketReceiver = new SocketReceiver();
+            _socketSender = new SocketSender();
+        }
 
-        _remoteEndpointString = remoteEndPoint?.ToString() ?? "null";
-        _localEndpointString = localEndPoint?.ToString() ?? "null";
+        try
+        {
+            var remoteEndPoint = NormalizeEndpoint(_socket.RemoteEndPoint);
+            var localEndPoint = NormalizeEndpoint(_socket.LocalEndPoint);
+            _useZeroCopy = useLinuxIoUring
+                && remoteEndPoint is IPEndPoint { Address: var remoteAddress }
+                && !IPAddress.IsLoopback(remoteAddress);
+
+            Features.Set<IConnectionEndPointFeature>(new ConnectionEndPointFeature
+            {
+                RemoteEndPoint = remoteEndPoint,
+                LocalEndPoint = localEndPoint,
+            });
+
+            _remoteEndpointString = remoteEndPoint?.ToString() ?? "null";
+            _localEndpointString = localEndPoint?.ToString() ?? "null";
+        }
+        catch
+        {
+            DisposeSocketOperations();
+            throw;
+        }
     }
 
     public override CancellationToken Closed => _connectionClosedCts.Token;
@@ -120,8 +146,6 @@ internal sealed partial class SocketMessageTransport : MessageTransportBase
                 LogProcessWritesFailure(_logger, ex);
             }
 
-            _socketReceiver.Dispose();
-            _socketSender.Dispose();
         }
         catch (Exception ex)
         {
@@ -130,10 +154,16 @@ internal sealed partial class SocketMessageTransport : MessageTransportBase
         }
         finally
         {
-            Shutdown();
-
-            await _connectionClosingCts.CancelAsync().ConfigureAwait(false);
-            await _connectionClosedCts.CancelAsync().ConfigureAwait(false);
+            try
+            {
+                DisposeSocketOperations();
+            }
+            finally
+            {
+                Shutdown();
+                await _connectionClosingCts.CancelAsync().ConfigureAwait(false);
+                await _connectionClosedCts.CancelAsync().ConfigureAwait(false);
+            }
         }
     }
 
@@ -289,7 +319,15 @@ internal sealed partial class SocketMessageTransport : MessageTransportBase
         if (_processingTask is null)
         {
             Shutdown();
-            await _connectionClosedCts.CancelAsync().ConfigureAwait(false);
+            try
+            {
+                DisposeSocketOperations();
+            }
+            finally
+            {
+                await _connectionClosedCts.CancelAsync().ConfigureAwait(false);
+            }
+
             return;
         }
 
@@ -361,6 +399,21 @@ internal sealed partial class SocketMessageTransport : MessageTransportBase
             _connectionClosingCts.Dispose();
             _connectionClosedCts.Dispose();
             GC.SuppressFinalize(this);
+        }
+    }
+
+    private void DisposeSocketOperations()
+    {
+        if (Interlocked.Exchange(ref _socketOperationsDisposed, 1) == 0)
+        {
+            try
+            {
+                _socketReceiver.Dispose();
+            }
+            finally
+            {
+                _socketSender.Dispose();
+            }
         }
     }
 
