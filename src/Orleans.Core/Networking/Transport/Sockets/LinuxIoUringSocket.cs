@@ -405,7 +405,7 @@ internal abstract class LinuxIoUringOperation : IValueTaskSource, IDisposable
 
     internal void SetPrimaryResult(int result) => _primaryResult = result;
 
-    internal void Complete(int result)
+    internal void Complete(int result, bool queueContinuation)
     {
         if (Interlocked.CompareExchange(ref _state, StateCompleting, StatePending) != StatePending)
         {
@@ -427,7 +427,7 @@ internal abstract class LinuxIoUringOperation : IValueTaskSource, IDisposable
         }
 
         Volatile.Write(ref _state, StateIdle);
-        SignalCompletion();
+        SignalCompletion(queueContinuation);
     }
 
     internal void Complete(Exception error)
@@ -442,7 +442,7 @@ internal abstract class LinuxIoUringOperation : IValueTaskSource, IDisposable
         SocketError = SocketError.SocketError;
         Error = error;
         Volatile.Write(ref _state, StateIdle);
-        SignalCompletion();
+        SignalCompletion(queueContinuation: false);
     }
 
     public void GetResult(short token)
@@ -523,7 +523,7 @@ internal abstract class LinuxIoUringOperation : IValueTaskSource, IDisposable
         _ => SocketError.SocketError,
     };
 
-    private void SignalCompletion()
+    private void SignalCompletion(bool queueContinuation)
     {
         var continuation = _continuation;
         if (continuation is not null
@@ -532,7 +532,14 @@ internal abstract class LinuxIoUringOperation : IValueTaskSource, IDisposable
             var state = _continuationState;
             _continuationState = null;
             _continuation = ContinuationCompleted;
-            continuation(state);
+            if (queueContinuation)
+            {
+                ThreadPool.UnsafeQueueUserWorkItem(continuation, state, preferLocal: false);
+            }
+            else
+            {
+                continuation(state);
+            }
         }
     }
 }
@@ -557,6 +564,8 @@ internal sealed unsafe partial class LinuxIoUringEngine
     private const int EventFdCloseOnExec = 0x80000;
     private const int EventFdNonBlocking = 0x800;
     private const int InitialOperationCapacity = 256;
+    // Preserve low latency for small completions while keeping batched I/O work off the ring thread.
+    private const int QueueContinuationThreshold = 4 * 1024;
     private const int TargetProcessorsPerEngine = 4;
     private const int MaximumEngineCount = 4;
     internal const int UserDataSlotBits = 20;
@@ -900,7 +909,9 @@ internal sealed unsafe partial class LinuxIoUringEngine
                 if ((flags & CompletionIsNotification) != 0)
                 {
                     Interlocked.Increment(ref _zeroCopyNotificationCompletions);
-                    operation.Complete(operation.PrimaryResult);
+                    operation.Complete(
+                        operation.PrimaryResult,
+                        operation.PrimaryResult >= QueueContinuationThreshold);
                 }
                 else if ((flags & CompletionHasMore) == 0)
                 {
@@ -909,7 +920,7 @@ internal sealed unsafe partial class LinuxIoUringEngine
                         Interlocked.Increment(ref _zeroCopyFallbackCompletions);
                     }
 
-                    operation.Complete(result);
+                    operation.Complete(result, result >= QueueContinuationThreshold);
                 }
                 else
                 {
@@ -919,7 +930,7 @@ internal sealed unsafe partial class LinuxIoUringEngine
             }
             else
             {
-                operation.Complete(result);
+                operation.Complete(result, result >= QueueContinuationThreshold);
             }
         }
     }
