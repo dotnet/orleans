@@ -58,4 +58,18 @@ public sealed class RedisStreamBatchContainerTests
         Assert.True(sameEntryNextEvent.CompareTo(nextEntrySameMillisecond) < 0);
         Assert.True(nextEntrySameMillisecond.CompareTo(nextMillisecond) < 0);
     }
+
+    [Fact]
+    public void CreateSequenceTokenForEventPreservesRedisPosition()
+    {
+        var batchToken = new RedisStreamSequenceToken("100-7", 100, 7, 0);
+
+        var eventToken = batchToken.CreateSequenceTokenForEvent(2);
+
+        Assert.Equal("100-7", eventToken.EntryId);
+        Assert.Equal(100, eventToken.SequenceNumber);
+        Assert.Equal(7, eventToken.RedisSequenceNumber);
+        Assert.Equal(2, eventToken.EventIndex);
+        Assert.True(batchToken.CompareTo(eventToken) < 0);
+    }
 }

@@ -146,14 +146,24 @@ internal sealed partial class AdoNetRecoverableStream(
 
     private void ThrowIfRetentionGap(AdoNetStreamPartitionState state)
     {
-        if (state.Checkpoint is { } checkpoint
-            && state.EarliestMessageId is { } earliest
-            && checkpoint < earliest - 1)
+        if (HasRetentionGap(state))
         {
             throw new DataNotAvailableException(
                 $"ADO.NET stream partition '{serviceId}/{providerId}/{queueId}' has a retention gap: "
-                + $"checkpoint {checkpoint}, earliest retained record {earliest}, tail {state.TailMessageId?.ToString(CultureInfo.InvariantCulture) ?? "<empty>"}.");
+                + $"checkpoint {state.Checkpoint}, earliest retained record {state.EarliestMessageId?.ToString(CultureInfo.InvariantCulture) ?? "<empty>"}, "
+                + $"next message id {state.NextMessageId}, tail {state.TailMessageId?.ToString(CultureInfo.InvariantCulture) ?? "<empty>"}.");
         }
+    }
+
+    internal static bool HasRetentionGap(AdoNetStreamPartitionState state)
+    {
+        if (state.Checkpoint is not { } checkpoint)
+        {
+            return false;
+        }
+
+        var earliestAvailablePosition = state.EarliestMessageId ?? state.NextMessageId;
+        return checkpoint < earliestAvailablePosition - 1;
     }
 
     [LoggerMessage(

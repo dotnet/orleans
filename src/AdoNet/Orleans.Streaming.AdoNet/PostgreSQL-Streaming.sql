@@ -95,7 +95,7 @@ LANGUAGE plpgsql
 AS $$
 #VARIABLE_CONFLICT USE_COLUMN
 DECLARE
-    _Now TIMESTAMP(6) WITHOUT TIME ZONE := CURRENT_TIMESTAMP AT TIME ZONE 'UTC';
+    _Now TIMESTAMP(6) WITHOUT TIME ZONE;
     _MessageId BIGINT;
 BEGIN
     INSERT INTO OrleansStreamPartition
@@ -118,20 +118,22 @@ BEGIN
         1,
         NULL,
         0,
-        _Now,
-        _Now,
-        _Now
+        clock_timestamp() AT TIME ZONE 'UTC',
+        clock_timestamp() AT TIME ZONE 'UTC',
+        clock_timestamp() AT TIME ZONE 'UTC'
     )
     ON CONFLICT (ServiceId, ProviderId, QueueId) DO NOTHING;
 
     UPDATE OrleansStreamPartition AS P
     SET
         NextMessageId = P.NextMessageId + 1,
-        ModifiedOn = _Now
+        ModifiedOn = clock_timestamp() AT TIME ZONE 'UTC'
     WHERE P.ServiceId = _ServiceId
         AND P.ProviderId = _ProviderId
         AND P.QueueId = _QueueId
     RETURNING P.NextMessageId - 1 INTO _MessageId;
+
+    _Now := clock_timestamp() AT TIME ZONE 'UTC';
 
     INSERT INTO OrleansStreamMessage
     (
@@ -174,6 +176,7 @@ RETURNS TABLE
     ProviderId VARCHAR(150),
     QueueId VARCHAR(150),
     OwnerEpoch BIGINT,
+    NextMessageId BIGINT,
     Checkpoint BIGINT,
     EarliestMessageId BIGINT,
     TailMessageId BIGINT
@@ -182,7 +185,7 @@ LANGUAGE plpgsql
 AS $$
 #VARIABLE_CONFLICT USE_COLUMN
 DECLARE
-    _Now TIMESTAMP(6) WITHOUT TIME ZONE := CURRENT_TIMESTAMP AT TIME ZONE 'UTC';
+    _Now TIMESTAMP(6) WITHOUT TIME ZONE;
     _NextMessageId BIGINT;
     _Checkpoint BIGINT;
     _OwnerEpoch BIGINT;
@@ -209,9 +212,9 @@ BEGIN
         1,
         NULL,
         0,
-        _Now,
-        _Now,
-        _Now
+        clock_timestamp() AT TIME ZONE 'UTC',
+        clock_timestamp() AT TIME ZONE 'UTC',
+        clock_timestamp() AT TIME ZONE 'UTC'
     )
     ON CONFLICT (ServiceId, ProviderId, QueueId) DO NOTHING;
 
@@ -222,6 +225,8 @@ BEGIN
         AND P.ProviderId = _ProviderId
         AND P.QueueId = _QueueId
     FOR UPDATE;
+
+    _Now := clock_timestamp() AT TIME ZONE 'UTC';
 
     SELECT MIN(M.MessageId), MAX(M.MessageId)
     INTO _EarliestMessageId, _TailMessageId
@@ -261,6 +266,7 @@ BEGIN
         _ProviderId,
         _QueueId,
         _OwnerEpoch,
+        _NextMessageId,
         _Checkpoint,
         _EarliestMessageId,
         _TailMessageId;
@@ -288,14 +294,25 @@ LANGUAGE plpgsql
 AS $$
 #VARIABLE_CONFLICT USE_COLUMN
 DECLARE
+    _Now TIMESTAMP(6) WITHOUT TIME ZONE;
     _CurrentOwnerEpoch BIGINT;
     _CurrentCheckpoint BIGINT;
     _Updated BOOLEAN := FALSE;
 BEGIN
+    SELECT P.OwnerEpoch, P.Checkpoint
+    INTO _CurrentOwnerEpoch, _CurrentCheckpoint
+    FROM OrleansStreamPartition AS P
+    WHERE P.ServiceId = _ServiceId
+        AND P.ProviderId = _ProviderId
+        AND P.QueueId = _QueueId
+    FOR UPDATE;
+
+    _Now := clock_timestamp() AT TIME ZONE 'UTC';
+
     UPDATE OrleansStreamPartition AS P
     SET
         Checkpoint = _Checkpoint,
-        ModifiedOn = CURRENT_TIMESTAMP AT TIME ZONE 'UTC'
+        ModifiedOn = _Now
     WHERE P.ServiceId = _ServiceId
         AND P.ProviderId = _ProviderId
         AND P.QueueId = _QueueId
@@ -308,7 +325,7 @@ BEGIN
     IF FOUND THEN
         _Updated := TRUE;
         UPDATE OrleansStreamMessage AS M
-        SET CheckpointedOn = COALESCE(M.CheckpointedOn, CURRENT_TIMESTAMP AT TIME ZONE 'UTC')
+        SET CheckpointedOn = COALESCE(M.CheckpointedOn, _Now)
         WHERE M.ServiceId = _ServiceId
             AND M.ProviderId = _ProviderId
             AND M.QueueId = _QueueId
@@ -487,5 +504,5 @@ VALUES
     ('AcquireStreamPartitionKey', 'SELECT * FROM AcquireStreamPartition(@ServiceId, @ProviderId, @QueueId, @StartFromNow)'),
     ('ReadStreamMessagesKey', 'SELECT ServiceId, ProviderId, QueueId, MessageId, StreamIdBytes, StreamNamespaceLength, CreatedOn, Payload FROM OrleansStreamMessage WHERE ServiceId = @ServiceId AND ProviderId = @ProviderId AND QueueId = @QueueId AND MessageId > @AfterMessageId ORDER BY MessageId LIMIT @MaxCount'),
     ('AdvanceStreamCheckpointKey', 'SELECT * FROM AdvanceStreamCheckpoint(@ServiceId, @ProviderId, @QueueId, @OwnerEpoch, @Checkpoint)'),
-    ('GetStreamPartitionBoundsKey', 'SELECT P.ServiceId, P.ProviderId, P.QueueId, P.OwnerEpoch, P.Checkpoint, MIN(M.MessageId) AS EarliestMessageId, MAX(M.MessageId) AS TailMessageId FROM OrleansStreamPartition AS P LEFT JOIN OrleansStreamMessage AS M ON M.ServiceId = P.ServiceId AND M.ProviderId = P.ProviderId AND M.QueueId = P.QueueId WHERE P.ServiceId = @ServiceId AND P.ProviderId = @ProviderId AND P.QueueId = @QueueId GROUP BY P.ServiceId, P.ProviderId, P.QueueId, P.OwnerEpoch, P.Checkpoint'),
+    ('GetStreamPartitionBoundsKey', 'SELECT P.ServiceId, P.ProviderId, P.QueueId, P.OwnerEpoch, P.NextMessageId, P.Checkpoint, MIN(M.MessageId) AS EarliestMessageId, MAX(M.MessageId) AS TailMessageId FROM OrleansStreamPartition AS P LEFT JOIN OrleansStreamMessage AS M ON M.ServiceId = P.ServiceId AND M.ProviderId = P.ProviderId AND M.QueueId = P.QueueId WHERE P.ServiceId = @ServiceId AND P.ProviderId = @ProviderId AND P.QueueId = @QueueId GROUP BY P.ServiceId, P.ProviderId, P.QueueId, P.OwnerEpoch, P.NextMessageId, P.Checkpoint'),
     ('CleanupStreamMessagesKey', 'SELECT * FROM CleanupStreamMessages(@ServiceId, @ProviderId, @QueueId, @RetentionPeriodSeconds, @MaximumRetentionPeriodSeconds, @CleanupIntervalSeconds, @CleanupBatchSize)');
