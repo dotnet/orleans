@@ -147,29 +147,48 @@ namespace Orleans.Runtime
                 return null;
             }
 
-            lock (GetStripedLock(grainId))
+            try
             {
-                if (TryGetGrainContext(grainId, out result))
+                lock (GetStripedLock(grainId))
+                {
+                    if (TryGetGrainContext(grainId, out result))
+                    {
+                        rehydrationContext?.Dispose();
+                        return result;
+                    }
+
+                    if (_siloStatusOracle.CurrentStatus == SiloStatus.Active)
+                    {
+                        var address = new GrainAddress
+                        {
+                            SiloAddress = Silo,
+                            GrainId = grainId,
+                            ActivationId = ActivationId.NewId(),
+                            MembershipVersion = MembershipVersion.MinValue,
+                        };
+
+                        preparedContext = this.grainActivator.CreatePreparedContext(address);
+                        result = preparedContext.Context;
+                        activations.RecordNewTarget(result);
+                    }
+                }
+            }
+            catch (Exception exception) when (result is null)
+            {
+                try
                 {
                     rehydrationContext?.Dispose();
-                    return result;
                 }
-
-                if (_siloStatusOracle.CurrentStatus == SiloStatus.Active)
+                catch (Exception cleanupException)
                 {
-                    var address = new GrainAddress
-                    {
-                        SiloAddress = Silo,
-                        GrainId = grainId,
-                        ActivationId = ActivationId.NewId(),
-                        MembershipVersion = MembershipVersion.MinValue,
-                    };
-
-                    preparedContext = this.grainActivator.CreatePreparedContext(address);
-                    result = preparedContext.Context;
-                    activations.RecordNewTarget(result);
+                    throw new AggregateException(
+                        "Error creating grain activation and disposing its rehydration context.",
+                        exception,
+                        cleanupException);
                 }
-            } // End lock
+
+                throw;
+            }
 
             if (result is null)
             {

@@ -5,6 +5,7 @@ using Microsoft.Extensions.Diagnostics.Metrics.Testing;
 using Microsoft.Extensions.Logging.Abstractions;
 using Orleans.Metadata;
 using Orleans.Runtime;
+using Orleans.Serialization.Session;
 using Orleans.TestingHost;
 using TestExtensions;
 using UnitTests.GrainInterfaces;
@@ -217,6 +218,35 @@ namespace UnitTests.General
             Assert.DoesNotContain(
                 collector.GetMeasurementSnapshot(),
                 measurement => Equals(measurement.Tags["type"], grainTypeName));
+        }
+
+        [Fact]
+        public void ConfigurationFailureDisposesRehydrationContext()
+        {
+            var primary = Assert.IsType<InProcessSiloHandle>(fixture.HostedCluster.Primary);
+            var services = primary.ServiceProvider;
+            var grainType = services.GetRequiredService<GrainTypeResolver>()
+                .GetGrainType(typeof(ExplicitlyRegisteredSimpleDIGrain));
+            var grainId = GrainId.Create(grainType, Guid.NewGuid().ToString());
+            using var migrationContext = new MigrationContext(
+                services.GetRequiredService<SerializerSessionPool>());
+            migrationContext.AddBytes("test", [1, 2, 3]);
+
+            ConfigurationFailureState.Arm(grainId);
+            try
+            {
+                var exception = Assert.Throws<InvalidOperationException>(
+                    () => services.GetRequiredService<Catalog>()
+                        .GetOrCreateActivation(grainId, requestContextData: null, migrationContext));
+                Assert.Equal("configuration-fault", exception.Message);
+            }
+            finally
+            {
+                ConfigurationFailureState.Clear();
+            }
+
+            Assert.False(migrationContext.TryGetBytes("test", out _));
+            Assert.Null(services.GetRequiredService<ActivationDirectory>().FindTarget(grainId));
         }
 
         /// <summary>
