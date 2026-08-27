@@ -11,8 +11,8 @@ namespace Orleans.CodeGenerator;
 
 internal static class GeneratedSourceOutput
 {
-    private const string GeneratedCodeWarningDisable = "#pragma warning disable CS1591, RS0016, RS0041";
-    private const string GeneratedCodeWarningRestore = "#pragma warning restore CS1591, RS0016, RS0041";
+    private const string GeneratedCodeWarningDisable = "#pragma warning disable";
+    private const string GeneratedCodeWarningRestore = "#pragma warning restore";
 
     internal static void EmitSourceOutputResult(SourceProductionContext context, SourceOutputResult result)
     {
@@ -379,5 +379,4 @@ internal static class GeneratedSourceOutput
         return result.Length > 0 ? result : "generated";
     }
 }
-
 

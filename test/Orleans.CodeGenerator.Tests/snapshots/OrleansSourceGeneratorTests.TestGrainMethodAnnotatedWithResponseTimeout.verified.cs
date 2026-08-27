@@ -1,4 +1,4 @@
-#pragma warning disable CS1591, RS0016, RS0041
+﻿#pragma warning disable
 [assembly: global::Orleans.ApplicationPartAttribute("TestProject")]
 [assembly: global::Orleans.ApplicationPartAttribute("Orleans.Core.Abstractions")]
 [assembly: global::Orleans.ApplicationPartAttribute("Orleans.Serialization")]
@@ -168,4 +168,4 @@ namespace OrleansCodeGen.TestProject
         }
     }
 }
-#pragma warning restore CS1591, RS0016, RS0041
+#pragma warning restore
