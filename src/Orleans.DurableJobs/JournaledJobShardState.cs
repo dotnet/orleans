@@ -62,6 +62,8 @@ internal sealed class JournaledJobShardState : IJournaledState, IDurableValueCom
 
     public int Count => _jobQueue.Count;
 
+    public bool ContainsJob(string jobId) => _jobQueue.ContainsJob(jobId);
+
     public IAsyncEnumerable<IJobRunContext> ConsumeDurableJobsAsync() => _jobQueue;
 
     public DurableJob? TryScheduleJob(ScheduleJobRequest request)
@@ -96,6 +98,10 @@ internal sealed class JournaledJobShardState : IJournaledState, IDurableValueCom
     public bool RemoveJob(string jobId)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(jobId);
+        if (!_jobQueue.ContainsJob(jobId))
+        {
+            return false;
+        }
 
         Write(DurableJobShardJournalRecord.ForRemove(jobId));
         return ApplyRemove(jobId);
@@ -114,6 +120,10 @@ internal sealed class JournaledJobShardState : IJournaledState, IDurableValueCom
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(jobId);
         ValidateDequeueCount(dequeueCount);
+        if (!_jobQueue.ContainsJob(jobId))
+        {
+            return false;
+        }
 
         Write(DurableJobShardJournalRecord.ForRetry(jobId, newDueTime, dequeueCount, executionGeneration));
         return ApplyRetry(jobId, newDueTime, dequeueCount, executionGeneration);
@@ -196,7 +206,7 @@ internal sealed class JournaledJobShardState : IJournaledState, IDurableValueCom
 
     private void ApplySchedule(DurableJob job) => _jobQueue.Enqueue(job, dequeueCount: 0);
 
-    private bool ApplyRemove(string jobId) => _jobQueue.CancelJob(jobId);
+    private bool ApplyRemove(string jobId) => _jobQueue.RemoveJob(jobId);
 
     private bool ApplyRetry(string jobId, DateTimeOffset dueTime, int dequeueCount, long? executionGeneration)
     {

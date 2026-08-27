@@ -16,7 +16,9 @@ internal sealed class DurableJobsInstruments(OrleansInstruments instruments)
     private const string StatusFailed = "failed";
     private const string StatusRetried = "retried";
     private const string StatusRescheduled = "rescheduled";
-    private const string StatusCanceled = "canceled";
+    private const string StatusAttemptCanceled = "attempt_canceled";
+    private const string StatusCancellationRequested = "cancellation_requested";
+    private const string StatusOperationCanceled = "operation_canceled";
     private const string StatusError = "error";
     private const string StatusOk = "ok";
     private const string StatusNotFound = "not_found";
@@ -36,7 +38,7 @@ internal sealed class DurableJobsInstruments(OrleansInstruments instruments)
     private readonly Counter<long> JobsFailed = instruments.Meter.CreateCounter<long>("orleans-durablejobs-jobs-failed");
     private readonly Counter<long> JobsRetried = instruments.Meter.CreateCounter<long>("orleans-durablejobs-jobs-retried");
     private readonly Counter<long> JobsRescheduled = instruments.Meter.CreateCounter<long>("orleans-durablejobs-jobs-rescheduled");
-    private readonly Counter<long> JobsCanceled = instruments.Meter.CreateCounter<long>("orleans-durablejobs-jobs-canceled");
+    private readonly Counter<long> JobCancellationRequests = instruments.Meter.CreateCounter<long>("orleans-durablejobs-job-cancellation-requests");
     private readonly Counter<long> ShardsProcessed = instruments.Meter.CreateCounter<long>("orleans-durablejobs-shards-processed");
     private readonly Counter<long> ScheduleJobCalls = instruments.Meter.CreateCounter<long>("orleans-durablejobs-schedule-job-calls");
     private readonly Counter<long> CancelJobCalls = instruments.Meter.CreateCounter<long>("orleans-durablejobs-cancel-job-calls");
@@ -94,20 +96,21 @@ internal sealed class DurableJobsInstruments(OrleansInstruments instruments)
         Record(JobAttemptDuration, latency, StatusRescheduled);
     }
 
-    internal void OnJobCanceled()
+    internal void OnJobCancellationRequested()
     {
-        JobsCanceled.Add(1);
+        JobCancellationRequests.Add(1);
     }
 
     internal void OnScheduleJobCallSucceeded(TimeSpan latency) => OnScheduleJobCall(latency, StatusOk);
 
-    internal void OnScheduleJobCallCanceled(TimeSpan latency) => OnScheduleJobCall(latency, StatusCanceled);
+    internal void OnScheduleJobCallCanceled(TimeSpan latency) => OnScheduleJobCall(latency, StatusOperationCanceled);
 
     internal void OnScheduleJobCallFailed(TimeSpan latency) => OnScheduleJobCall(latency, StatusError);
 
-    internal void OnCancelJobCall(TimeSpan latency, bool canceledJob) => OnCancelJobCall(latency, canceledJob ? StatusOk : StatusNotFound);
+    internal void OnCancelJobCall(TimeSpan latency, bool cancellationRequested) =>
+        OnCancelJobCall(latency, cancellationRequested ? StatusCancellationRequested : StatusNotFound);
 
-    internal void OnCancelJobCallCanceled(TimeSpan latency) => OnCancelJobCall(latency, StatusCanceled);
+    internal void OnCancelJobCallCanceled(TimeSpan latency) => OnCancelJobCall(latency, StatusOperationCanceled);
 
     internal void OnCancelJobCallFailed(TimeSpan latency) => OnCancelJobCall(latency, StatusError);
 
@@ -118,20 +121,20 @@ internal sealed class DurableJobsInstruments(OrleansInstruments instruments)
 
     internal void OnHandlerExecutionCompleted(TimeSpan latency) => OnHandlerExecution(latency, StatusCompleted);
 
-    internal void OnHandlerExecutionCanceled(TimeSpan latency) => OnHandlerExecution(latency, StatusCanceled);
+    internal void OnHandlerExecutionAttemptCanceled(TimeSpan latency) => OnHandlerExecution(latency, StatusAttemptCanceled);
 
     internal void OnHandlerExecutionFailed(TimeSpan latency) => OnHandlerExecution(latency, StatusFailed);
 
-    internal void OnShardProcessed(TimeSpan latency, bool canceled, bool error)
+    internal void OnShardProcessed(TimeSpan latency, bool attemptCanceled, bool error)
     {
-        var status = error ? StatusError : canceled ? StatusCanceled : StatusCompleted;
+        var status = error ? StatusError : attemptCanceled ? StatusAttemptCanceled : StatusCompleted;
         ShardsProcessed.Add(1, [new KeyValuePair<string, object?>(StatusTagName, status)]);
         Record(ShardProcessingDuration, latency, status);
     }
 
-    internal void OnStorageBatchWritten(long operationCount, bool canceled, bool error)
+    internal void OnStorageBatchWritten(long operationCount, bool operationCanceled, bool error)
     {
-        var status = error ? StatusError : canceled ? StatusCanceled : StatusOk;
+        var status = error ? StatusError : operationCanceled ? StatusOperationCanceled : StatusOk;
         var tags = new KeyValuePair<string, object?>[] { new(StatusTagName, status) };
         StorageBatches.Add(1, tags);
         if (StorageBatchSize.Enabled)

@@ -6,6 +6,6 @@ interface [GrainInterfaceType("Orleans.DurableJobs.IDurableJobReceiverExtension"
   HandleDurableJobAsync(Orleans.DurableJobs.IJobRunContext, System.Threading.CancellationToken) -> ValueTask<Orleans.DurableJobs.DurableJobRunResult>
 
 interface [GrainInterfaceType("Orleans.DurableJobs.ILocalDurableJobManagerSystemTarget")] Orleans.DurableJobs.ILocalDurableJobManagerSystemTarget [Version(0)]
-  TryCancelDurableJobAsync(Orleans.DurableJobs.DurableJob, System.Threading.CancellationToken) -> Task<bool>
+  CancelAsync(Orleans.DurableJobs.DurableJob, System.Threading.CancellationToken) -> Task<bool>
 
 class [GrainType("localdurablejobmanager")] Orleans.DurableJobs.LocalDurableJobManager

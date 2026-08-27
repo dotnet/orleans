@@ -50,6 +50,17 @@ internal sealed partial class ShardExecutor
 
     [LoggerMessage(
         Level = LogLevel.Debug,
+        Message = "Did not apply {Mutation} for job {JobId} (Name: '{JobName}'): {MutationResult}"
+    )]
+    private static partial void LogJobMutationNotApplied(
+        ILogger logger,
+        string jobId,
+        string jobName,
+        string mutation,
+        DurableJobMutationResult mutationResult);
+
+    [LoggerMessage(
+        Level = LogLevel.Debug,
         Message = "Polling job {JobId} (Name: '{JobName}') - will check status again in {PollDelay}"
     )]
     private static partial void LogPollingJob(ILogger logger, string jobId, string jobName, TimeSpan pollDelay);
@@ -74,9 +85,15 @@ internal sealed partial class ShardExecutor
 
     [LoggerMessage(
         Level = LogLevel.Debug,
-        Message = "Shard {ShardId} processing cancelled"
+        Message = "Shard {ShardId} processing stopped after attempt cancellation was requested"
     )]
-    private static partial void LogShardCancelled(ILogger logger, string shardId);
+    private static partial void LogShardAttemptCanceled(ILogger logger, string shardId);
+
+    [LoggerMessage(
+        Level = LogLevel.Debug,
+        Message = "Shard {ShardId} processing stopped after ownership was lost"
+    )]
+    private static partial void LogShardOwnershipLost(ILogger logger, string shardId);
 
     [LoggerMessage(
         Level = LogLevel.Warning,

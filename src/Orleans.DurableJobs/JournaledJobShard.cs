@@ -126,7 +126,27 @@ internal sealed class JournaledJobShard : IJobShard
     }
 
     /// <inheritdoc/>
-    public async Task<bool> RemoveJobAsync(string jobId, CancellationToken cancellationToken)
+    public async Task<DurableJobMutationResult> TryStartAttemptAsync(
+        IJobRunContext jobContext,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(jobContext);
+        ThrowIfDisposed();
+
+        var operation = new StartAttemptOperation(jobContext.Job.Id, cancellationToken);
+        try
+        {
+            EnqueueOperation(operation);
+            return await operation.Task.ConfigureAwait(false);
+        }
+        finally
+        {
+            operation.Dispose();
+        }
+    }
+
+    /// <inheritdoc/>
+    public async Task<DurableJobMutationResult> RemoveJobAsync(string jobId, CancellationToken cancellationToken)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(jobId);
         ThrowIfDisposed();
@@ -144,7 +164,10 @@ internal sealed class JournaledJobShard : IJobShard
     }
 
     /// <inheritdoc/>
-    public async Task RetryJobLaterAsync(IJobRunContext jobContext, DateTimeOffset newDueTime, CancellationToken cancellationToken)
+    public async Task<DurableJobMutationResult> RetryJobLaterAsync(
+        IJobRunContext jobContext,
+        DateTimeOffset newDueTime,
+        CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(jobContext);
         ThrowIfDisposed();
@@ -153,7 +176,7 @@ internal sealed class JournaledJobShard : IJobShard
         try
         {
             EnqueueOperation(operation);
-            await operation.Task.ConfigureAwait(false);
+            return await operation.Task.ConfigureAwait(false);
         }
         finally
         {
@@ -162,7 +185,7 @@ internal sealed class JournaledJobShard : IJobShard
     }
 
     /// <inheritdoc/>
-    public async Task RescheduleJobAsync(
+    public async Task<DurableJobMutationResult> RescheduleJobAsync(
         IJobRunContext jobContext,
         DateTimeOffset newDueTime,
         CancellationToken cancellationToken)
@@ -178,7 +201,7 @@ internal sealed class JournaledJobShard : IJobShard
         try
         {
             EnqueueOperation(operation);
-            await operation.Task.ConfigureAwait(false);
+            return await operation.Task.ConfigureAwait(false);
         }
         finally
         {
@@ -189,6 +212,7 @@ internal sealed class JournaledJobShard : IJobShard
     /// <inheritdoc/>
     public async Task<DurableJob?> TryScheduleJobAsync(ScheduleJobRequest request, CancellationToken cancellationToken)
     {
+        request.Validate();
         ThrowIfDisposed();
 
         var operation = new ScheduleJobOperation(request, cancellationToken);
@@ -361,6 +385,7 @@ internal sealed class JournaledJobShard : IJobShard
     {
         var startedOperations = new List<PendingMutationOperation>(operations.Count);
         var appliedOperations = new List<PendingMutationOperation>(operations.Count);
+        var operationsAwaitingWrite = new List<PendingMutationOperation>(operations.Count);
 
         try
         {
@@ -411,9 +436,15 @@ internal sealed class JournaledJobShard : IJobShard
             {
                 try
                 {
-                    if (operation.Apply(this))
+                    var hasPendingWrite = appliedOperations.Count > 0;
+                    if (operation.Apply(this, hasPendingWrite))
                     {
                         appliedOperations.Add(operation);
+                        operationsAwaitingWrite.Add(operation);
+                    }
+                    else if (hasPendingWrite && !operation.Completion.IsCompleted)
+                    {
+                        operationsAwaitingWrite.Add(operation);
                     }
                 }
                 catch (Exception exception)
@@ -438,25 +469,25 @@ internal sealed class JournaledJobShard : IJobShard
             {
                 using var batchActivity = DurableJobsDiagnostics.StartPersistBatchActivity(appliedOperations, Id);
                 await _stateManager.WriteStateAsync(_shutdownCancellation.Token).ConfigureAwait(false);
-                _durableJobsInstruments.OnStorageBatchWritten(appliedOperations.Count, canceled: false, error: false);
+                _durableJobsInstruments.OnStorageBatchWritten(appliedOperations.Count, operationCanceled: false, error: false);
                 batchActivity?.SetStatus(System.Diagnostics.ActivityStatusCode.Ok);
-                foreach (var operation in appliedOperations)
+                foreach (var operation in operationsAwaitingWrite)
                 {
                     operation.CompleteAfterWrite();
                 }
             }
             catch (OperationCanceledException exception) when (_shutdownCancellation.IsCancellationRequested)
             {
-                _durableJobsInstruments.OnStorageBatchWritten(appliedOperations.Count, canceled: true, error: false);
-                foreach (var operation in appliedOperations)
+                _durableJobsInstruments.OnStorageBatchWritten(appliedOperations.Count, operationCanceled: true, error: false);
+                foreach (var operation in operationsAwaitingWrite)
                 {
                     operation.TrySetCanceled(exception.CancellationToken);
                 }
             }
             catch (Exception exception)
             {
-                _durableJobsInstruments.OnStorageBatchWritten(appliedOperations.Count, canceled: false, error: true);
-                foreach (var operation in appliedOperations)
+                _durableJobsInstruments.OnStorageBatchWritten(appliedOperations.Count, operationCanceled: false, error: true);
+                foreach (var operation in operationsAwaitingWrite)
                 {
                     operation.TrySetException(exception);
                 }
@@ -614,7 +645,7 @@ internal sealed class JournaledJobShard : IJobShard
 
         public abstract void CompleteNotOwned();
 
-        public abstract bool Apply(JournaledJobShard shard);
+        public abstract bool Apply(JournaledJobShard shard, bool deferCompletion);
 
         public abstract void CompleteAfterWrite();
     }
@@ -642,10 +673,10 @@ internal sealed class JournaledJobShard : IJobShard
 
         public override void CompleteNotOwned() => _completion.TrySetResult(NotOwnedResult);
 
-        public override bool Apply(JournaledJobShard shard)
+        public override bool Apply(JournaledJobShard shard, bool deferCompletion)
         {
             var writeRequired = Apply(shard, out _result);
-            if (!writeRequired)
+            if (!writeRequired && !deferCompletion)
             {
                 _completion.TrySetResult(_result);
             }
@@ -682,14 +713,30 @@ internal sealed class JournaledJobShard : IJobShard
     }
 
     private sealed class RemoveJobOperation(string jobId, CancellationToken cancellationToken)
-        : PendingMutationOperation<bool>(cancellationToken)
+        : PendingMutationOperation<DurableJobMutationResult>(cancellationToken)
     {
-        protected override bool NotOwnedResult => false;
+        protected override DurableJobMutationResult NotOwnedResult => DurableJobMutationResult.OwnershipLost;
 
-        protected override bool Apply(JournaledJobShard shard, out bool result)
+        protected override bool Apply(JournaledJobShard shard, out DurableJobMutationResult result)
         {
-            result = shard._state.RemoveJob(jobId);
-            return true;
+            result = shard._state.RemoveJob(jobId)
+                ? DurableJobMutationResult.Applied
+                : DurableJobMutationResult.JobNotFound;
+            return result == DurableJobMutationResult.Applied;
+        }
+    }
+
+    private sealed class StartAttemptOperation(string jobId, CancellationToken cancellationToken)
+        : PendingMutationOperation<DurableJobMutationResult>(cancellationToken)
+    {
+        protected override DurableJobMutationResult NotOwnedResult => DurableJobMutationResult.OwnershipLost;
+
+        protected override bool Apply(JournaledJobShard shard, out DurableJobMutationResult result)
+        {
+            result = shard._state.ContainsJob(jobId)
+                ? DurableJobMutationResult.Applied
+                : DurableJobMutationResult.JobNotFound;
+            return false;
         }
     }
 
@@ -698,19 +745,20 @@ internal sealed class JournaledJobShard : IJobShard
         DateTimeOffset newDueTime,
         bool resetDequeueCount,
         CancellationToken cancellationToken)
-        : PendingMutationOperation<bool>(cancellationToken)
+        : PendingMutationOperation<DurableJobMutationResult>(cancellationToken)
     {
-        protected override bool NotOwnedResult => true;
+        protected override DurableJobMutationResult NotOwnedResult => DurableJobMutationResult.OwnershipLost;
 
-        protected override bool Apply(JournaledJobShard shard, out bool result)
+        protected override bool Apply(JournaledJobShard shard, out DurableJobMutationResult result)
         {
-            shard._state.RetryJobLater(
+            result = shard._state.RetryJobLater(
                 jobContext.Job.Id,
                 newDueTime,
                 resetDequeueCount ? 0 : jobContext.DequeueCount,
-                resetDequeueCount ? checked(jobContext.Job.ExecutionGeneration + 1) : null);
-            result = true;
-            return true;
+                resetDequeueCount ? checked(jobContext.Job.ExecutionGeneration + 1) : null)
+                ? DurableJobMutationResult.Applied
+                : DurableJobMutationResult.JobNotFound;
+            return result == DurableJobMutationResult.Applied;
         }
     }
 

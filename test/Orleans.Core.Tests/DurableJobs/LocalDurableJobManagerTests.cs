@@ -360,6 +360,122 @@ public class LocalDurableJobManagerTests
     }
 
     [Fact]
+    public async Task CancelAsync_WhenRemoveSucceeds_ReportsCancellationRequestAccepted()
+    {
+        var timeProvider = new FakeTimeProvider(new DateTimeOffset(2026, 1, 1, 0, 0, 0, TimeSpan.Zero));
+        var options = CreateOptions();
+        var manager = CreateManager(new TestJobShardManager(), timeProvider, options);
+        var accessor = new LocalDurableJobManager.TestAccessor(manager);
+        var shardKey = timeProvider.GetUtcNow();
+        var shard = CreateSubstituteShard("cancellation-shard", shardKey, shardKey.Add(options.ShardDuration));
+        shard.RemoveJobAsync("job-1", Arg.Any<CancellationToken>()).Returns(DurableJobMutationResult.Applied);
+        accessor.AddWritableShard(shardKey, shard);
+        var job = new DurableJob
+        {
+            Id = "job-1",
+            Name = "job",
+            DueTime = shardKey,
+            TargetGrainId = GrainId.Create("test", "job"),
+            ShardId = shard.Id
+        };
+
+        var cancellationRequested = await manager.CancelAsync(job, CancellationToken.None);
+
+        Assert.True(cancellationRequested);
+        await shard.Received(1).RemoveJobAsync(job.Id, Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task CancelAsync_NullJob_Throws()
+    {
+        var timeProvider = new FakeTimeProvider(new DateTimeOffset(2026, 1, 1, 0, 0, 0, TimeSpan.Zero));
+        var manager = CreateManager(new TestJobShardManager(), timeProvider, CreateOptions());
+
+        var exception = await Assert.ThrowsAsync<ArgumentNullException>(
+            () => manager.CancelAsync(null!, CancellationToken.None));
+
+        Assert.Equal("job", exception.ParamName);
+    }
+
+    [Fact]
+    public async Task CancelAsync_WhenCachedShardOwnershipMoved_RoutesToCurrentOwner()
+    {
+        var timeProvider = new FakeTimeProvider(new DateTimeOffset(2026, 1, 1, 0, 0, 0, TimeSpan.Zero));
+        var options = CreateOptions();
+        var owner = SiloAddress.New(new IPEndPoint(IPAddress.Loopback, 5001), 0);
+        var shardManager = new TestJobShardManager
+        {
+            IsLocallyOwned = false,
+            ShardOwner = owner
+        };
+        var grainFactory = Substitute.For<IInternalGrainFactory>();
+        var remoteManager = Substitute.For<ILocalDurableJobManagerSystemTarget>();
+        remoteManager.CancelAsync(Arg.Any<DurableJob>(), Arg.Any<CancellationToken>()).Returns(true);
+        grainFactory.GetSystemTarget<ILocalDurableJobManagerSystemTarget>(
+                LocalDurableJobManager.JobManagerGrainType,
+                owner)
+            .Returns(remoteManager);
+        var manager = CreateManager(shardManager, timeProvider, options, grainFactory);
+        var accessor = new LocalDurableJobManager.TestAccessor(manager);
+        var shardKey = timeProvider.GetUtcNow();
+        var shard = CreateSubstituteShard("cancellation-shard", shardKey, shardKey.Add(options.ShardDuration));
+        accessor.AddWritableShard(shardKey, shard);
+        var job = new DurableJob
+        {
+            Id = "job-1",
+            Name = "job",
+            DueTime = shardKey,
+            TargetGrainId = GrainId.Create("test", "job"),
+            ShardId = shard.Id
+        };
+
+        var cancellationRequested = await manager.CancelAsync(job, CancellationToken.None);
+
+        Assert.True(cancellationRequested);
+        Assert.False(accessor.HasCachedShard(shard.Id));
+        await shard.DidNotReceive().RemoveJobAsync(Arg.Any<string>(), Arg.Any<CancellationToken>());
+        await remoteManager.Received(1).CancelAsync(job, Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task CancelAsync_WhenOwnershipReturnsLocally_UsesReplacementCachedShard()
+    {
+        var timeProvider = new FakeTimeProvider(new DateTimeOffset(2026, 1, 1, 0, 0, 0, TimeSpan.Zero));
+        var options = CreateOptions();
+        var localOwner = SiloAddress.New(new IPEndPoint(IPAddress.Loopback, 5000), 0);
+        var shardManager = new TestJobShardManager { IsLocallyOwned = false };
+        var manager = CreateManager(shardManager, timeProvider, options);
+        var accessor = new LocalDurableJobManager.TestAccessor(manager);
+        var shardKey = timeProvider.GetUtcNow();
+        var staleShard = CreateSubstituteShard("cancellation-shard", shardKey, shardKey.Add(options.ShardDuration));
+        var replacementShard = CreateSubstituteShard("cancellation-shard", shardKey, shardKey.Add(options.ShardDuration));
+        replacementShard.RemoveJobAsync("job-1", Arg.Any<CancellationToken>())
+            .Returns(DurableJobMutationResult.Applied);
+        accessor.AddWritableShard(shardKey, staleShard);
+        shardManager.GetShardOwner = (_, _) =>
+        {
+            accessor.AddWritableShard(shardKey, replacementShard);
+            shardManager.IsLocallyOwned = true;
+            return ValueTask.FromResult<SiloAddress?>(localOwner);
+        };
+        var job = new DurableJob
+        {
+            Id = "job-1",
+            Name = "job",
+            DueTime = shardKey,
+            TargetGrainId = GrainId.Create("test", "job"),
+            ShardId = staleShard.Id
+        };
+
+        var cancellationRequested = await manager.CancelAsync(job, CancellationToken.None);
+
+        Assert.True(cancellationRequested);
+        Assert.True(accessor.HasCachedShard(replacementShard.Id));
+        await staleShard.DidNotReceive().RemoveJobAsync(Arg.Any<string>(), Arg.Any<CancellationToken>());
+        await replacementShard.Received(1).RemoveJobAsync(job.Id, Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
     public async Task ScheduleJobAsync_WhenShardStripingEnabled_DistributesJobsAcrossWritableShards()
     {
         var timeProvider = new FakeTimeProvider(new DateTimeOffset(2026, 1, 1, 0, 0, 0, TimeSpan.Zero));
@@ -642,6 +758,27 @@ public class LocalDurableJobManagerTests
         MaxConcurrentJobsPerSilo = 10
     };
 
+    [Theory]
+    [InlineData(null)]
+    [InlineData("")]
+    [InlineData(" ")]
+    public async Task ScheduleJobAsync_InvalidJobName_Throws(string? jobName)
+    {
+        var timeProvider = new FakeTimeProvider(new DateTimeOffset(2026, 1, 1, 0, 0, 0, TimeSpan.Zero));
+        var manager = CreateManager(new TestJobShardManager(), timeProvider, CreateOptions());
+        var request = new ScheduleJobRequest
+        {
+            Target = GrainId.Create("test", "target"),
+            JobName = jobName!,
+            DueTime = timeProvider.GetUtcNow()
+        };
+
+        var exception = await Assert.ThrowsAnyAsync<ArgumentException>(
+            () => manager.ScheduleJobAsync(request, CancellationToken.None));
+
+        Assert.Equal("JobName", exception.ParamName);
+    }
+
     private static LocalDurableJobManager CreateManager(
         JobShardManager shardManager,
         FakeTimeProvider timeProvider,
@@ -834,13 +971,16 @@ public class LocalDurableJobManagerTests
 
         public ValueTask<int> GetJobCountAsync() => ValueTask.FromResult(0);
 
+        public Task<DurableJobMutationResult> TryStartAttemptAsync(IJobRunContext jobContext, CancellationToken cancellationToken) =>
+            Task.FromResult(DurableJobMutationResult.Applied);
+
         public Task MarkAsCompleteAsync(CancellationToken cancellationToken) => Task.CompletedTask;
 
-        public Task<bool> RemoveJobAsync(string jobId, CancellationToken cancellationToken) => Task.FromResult(false);
+        public Task<DurableJobMutationResult> RemoveJobAsync(string jobId, CancellationToken cancellationToken) => Task.FromResult(DurableJobMutationResult.JobNotFound);
 
-        public Task RetryJobLaterAsync(IJobRunContext jobContext, DateTimeOffset newDueTime, CancellationToken cancellationToken) => Task.CompletedTask;
+        public Task<DurableJobMutationResult> RetryJobLaterAsync(IJobRunContext jobContext, DateTimeOffset newDueTime, CancellationToken cancellationToken) => Task.FromResult(DurableJobMutationResult.Applied);
 
-        public Task RescheduleJobAsync(IJobRunContext jobContext, DateTimeOffset newDueTime, CancellationToken cancellationToken) => Task.CompletedTask;
+        public Task<DurableJobMutationResult> RescheduleJobAsync(IJobRunContext jobContext, DateTimeOffset newDueTime, CancellationToken cancellationToken) => Task.FromResult(DurableJobMutationResult.Applied);
 
         public Task<DurableJob?> TryScheduleJobAsync(ScheduleJobRequest request, CancellationToken cancellationToken) => Task.FromResult<DurableJob?>(null);
 
@@ -872,13 +1012,16 @@ public class LocalDurableJobManagerTests
 
         public ValueTask<int> GetJobCountAsync() => ValueTask.FromResult(0);
 
+        public Task<DurableJobMutationResult> TryStartAttemptAsync(IJobRunContext jobContext, CancellationToken cancellationToken) =>
+            Task.FromResult(DurableJobMutationResult.Applied);
+
         public Task MarkAsCompleteAsync(CancellationToken cancellationToken) => Task.CompletedTask;
 
-        public Task<bool> RemoveJobAsync(string jobId, CancellationToken cancellationToken) => Task.FromResult(false);
+        public Task<DurableJobMutationResult> RemoveJobAsync(string jobId, CancellationToken cancellationToken) => Task.FromResult(DurableJobMutationResult.JobNotFound);
 
-        public Task RetryJobLaterAsync(IJobRunContext jobContext, DateTimeOffset newDueTime, CancellationToken cancellationToken) => Task.CompletedTask;
+        public Task<DurableJobMutationResult> RetryJobLaterAsync(IJobRunContext jobContext, DateTimeOffset newDueTime, CancellationToken cancellationToken) => Task.FromResult(DurableJobMutationResult.Applied);
 
-        public Task RescheduleJobAsync(IJobRunContext jobContext, DateTimeOffset newDueTime, CancellationToken cancellationToken) => Task.CompletedTask;
+        public Task<DurableJobMutationResult> RescheduleJobAsync(IJobRunContext jobContext, DateTimeOffset newDueTime, CancellationToken cancellationToken) => Task.FromResult(DurableJobMutationResult.Applied);
 
         public Task<DurableJob?> TryScheduleJobAsync(ScheduleJobRequest request, CancellationToken cancellationToken) => Task.FromResult<DurableJob?>(null);
 
@@ -942,6 +1085,9 @@ public class LocalDurableJobManagerTests
 
         public ValueTask<int> GetJobCountAsync() => ValueTask.FromResult(0);
 
+        public Task<DurableJobMutationResult> TryStartAttemptAsync(IJobRunContext jobContext, CancellationToken cancellationToken) =>
+            Task.FromResult(DurableJobMutationResult.Applied);
+
         public Task MarkAsCompleteAsync(CancellationToken cancellationToken)
         {
             Interlocked.Increment(ref MarkAsCompleteCallCount);
@@ -949,11 +1095,11 @@ public class LocalDurableJobManagerTests
             return Task.CompletedTask;
         }
 
-        public Task<bool> RemoveJobAsync(string jobId, CancellationToken cancellationToken) => Task.FromResult(false);
+        public Task<DurableJobMutationResult> RemoveJobAsync(string jobId, CancellationToken cancellationToken) => Task.FromResult(DurableJobMutationResult.JobNotFound);
 
-        public Task RetryJobLaterAsync(IJobRunContext jobContext, DateTimeOffset newDueTime, CancellationToken cancellationToken) => Task.CompletedTask;
+        public Task<DurableJobMutationResult> RetryJobLaterAsync(IJobRunContext jobContext, DateTimeOffset newDueTime, CancellationToken cancellationToken) => Task.FromResult(DurableJobMutationResult.Applied);
 
-        public Task RescheduleJobAsync(IJobRunContext jobContext, DateTimeOffset newDueTime, CancellationToken cancellationToken) => Task.CompletedTask;
+        public Task<DurableJobMutationResult> RescheduleJobAsync(IJobRunContext jobContext, DateTimeOffset newDueTime, CancellationToken cancellationToken) => Task.FromResult(DurableJobMutationResult.Applied);
 
         public Task<DurableJob?> TryScheduleJobAsync(ScheduleJobRequest request, CancellationToken cancellationToken) => Task.FromResult<DurableJob?>(null);
 
@@ -993,13 +1139,16 @@ public class LocalDurableJobManagerTests
 
         public ValueTask<int> GetJobCountAsync() => ValueTask.FromResult(_scheduledJob.Task.IsCompleted ? 1 : 0);
 
+        public Task<DurableJobMutationResult> TryStartAttemptAsync(IJobRunContext jobContext, CancellationToken cancellationToken) =>
+            Task.FromResult(DurableJobMutationResult.Applied);
+
         public Task MarkAsCompleteAsync(CancellationToken cancellationToken) => Task.CompletedTask;
 
-        public Task<bool> RemoveJobAsync(string jobId, CancellationToken cancellationToken) => Task.FromResult(true);
+        public Task<DurableJobMutationResult> RemoveJobAsync(string jobId, CancellationToken cancellationToken) => Task.FromResult(DurableJobMutationResult.Applied);
 
-        public Task RetryJobLaterAsync(IJobRunContext jobContext, DateTimeOffset newDueTime, CancellationToken cancellationToken) => Task.CompletedTask;
+        public Task<DurableJobMutationResult> RetryJobLaterAsync(IJobRunContext jobContext, DateTimeOffset newDueTime, CancellationToken cancellationToken) => Task.FromResult(DurableJobMutationResult.Applied);
 
-        public Task RescheduleJobAsync(IJobRunContext jobContext, DateTimeOffset newDueTime, CancellationToken cancellationToken) => Task.CompletedTask;
+        public Task<DurableJobMutationResult> RescheduleJobAsync(IJobRunContext jobContext, DateTimeOffset newDueTime, CancellationToken cancellationToken) => Task.FromResult(DurableJobMutationResult.Applied);
 
         public Task<DurableJob?> TryScheduleJobAsync(ScheduleJobRequest request, CancellationToken cancellationToken)
         {
@@ -1044,13 +1193,16 @@ public class LocalDurableJobManagerTests
 
         public ValueTask<int> GetJobCountAsync() => ValueTask.FromResult(0);
 
+        public Task<DurableJobMutationResult> TryStartAttemptAsync(IJobRunContext jobContext, CancellationToken cancellationToken) =>
+            Task.FromResult(DurableJobMutationResult.Applied);
+
         public Task MarkAsCompleteAsync(CancellationToken cancellationToken) => throw new ObjectDisposedException(GetType().FullName);
 
-        public Task<bool> RemoveJobAsync(string jobId, CancellationToken cancellationToken) => throw new ObjectDisposedException(GetType().FullName);
+        public Task<DurableJobMutationResult> RemoveJobAsync(string jobId, CancellationToken cancellationToken) => throw new ObjectDisposedException(GetType().FullName);
 
-        public Task RetryJobLaterAsync(IJobRunContext jobContext, DateTimeOffset newDueTime, CancellationToken cancellationToken) => throw new ObjectDisposedException(GetType().FullName);
+        public Task<DurableJobMutationResult> RetryJobLaterAsync(IJobRunContext jobContext, DateTimeOffset newDueTime, CancellationToken cancellationToken) => throw new ObjectDisposedException(GetType().FullName);
 
-        public Task RescheduleJobAsync(IJobRunContext jobContext, DateTimeOffset newDueTime, CancellationToken cancellationToken) => throw new ObjectDisposedException(GetType().FullName);
+        public Task<DurableJobMutationResult> RescheduleJobAsync(IJobRunContext jobContext, DateTimeOffset newDueTime, CancellationToken cancellationToken) => throw new ObjectDisposedException(GetType().FullName);
 
         public Task<DurableJob?> TryScheduleJobAsync(ScheduleJobRequest request, CancellationToken cancellationToken) => throw new ObjectDisposedException(GetType().FullName);
 
@@ -1079,13 +1231,16 @@ public class LocalDurableJobManagerTests
 
         public ValueTask<int> GetJobCountAsync() => ValueTask.FromResult(0);
 
+        public Task<DurableJobMutationResult> TryStartAttemptAsync(IJobRunContext jobContext, CancellationToken cancellationToken) =>
+            Task.FromResult(DurableJobMutationResult.Applied);
+
         public Task MarkAsCompleteAsync(CancellationToken cancellationToken) => Task.CompletedTask;
 
-        public Task<bool> RemoveJobAsync(string jobId, CancellationToken cancellationToken) => Task.FromResult(false);
+        public Task<DurableJobMutationResult> RemoveJobAsync(string jobId, CancellationToken cancellationToken) => Task.FromResult(DurableJobMutationResult.JobNotFound);
 
-        public Task RetryJobLaterAsync(IJobRunContext jobContext, DateTimeOffset newDueTime, CancellationToken cancellationToken) => Task.CompletedTask;
+        public Task<DurableJobMutationResult> RetryJobLaterAsync(IJobRunContext jobContext, DateTimeOffset newDueTime, CancellationToken cancellationToken) => Task.FromResult(DurableJobMutationResult.Applied);
 
-        public Task RescheduleJobAsync(IJobRunContext jobContext, DateTimeOffset newDueTime, CancellationToken cancellationToken) => Task.CompletedTask;
+        public Task<DurableJobMutationResult> RescheduleJobAsync(IJobRunContext jobContext, DateTimeOffset newDueTime, CancellationToken cancellationToken) => Task.FromResult(DurableJobMutationResult.Applied);
 
         public Task<DurableJob?> TryScheduleJobAsync(ScheduleJobRequest request, CancellationToken cancellationToken)
         {
@@ -1134,6 +1289,9 @@ public class LocalDurableJobManagerTests
 
         public ValueTask<int> GetJobCountAsync() => ValueTask.FromResult(0);
 
+        public Task<DurableJobMutationResult> TryStartAttemptAsync(IJobRunContext jobContext, CancellationToken cancellationToken) =>
+            Task.FromResult(DurableJobMutationResult.Applied);
+
         public async Task MarkAsCompleteAsync(CancellationToken cancellationToken)
         {
             await _lock.WaitAsync(cancellationToken);
@@ -1148,11 +1306,11 @@ public class LocalDurableJobManagerTests
             }
         }
 
-        public Task<bool> RemoveJobAsync(string jobId, CancellationToken cancellationToken) => Task.FromResult(false);
+        public Task<DurableJobMutationResult> RemoveJobAsync(string jobId, CancellationToken cancellationToken) => Task.FromResult(DurableJobMutationResult.JobNotFound);
 
-        public Task RetryJobLaterAsync(IJobRunContext jobContext, DateTimeOffset newDueTime, CancellationToken cancellationToken) => Task.CompletedTask;
+        public Task<DurableJobMutationResult> RetryJobLaterAsync(IJobRunContext jobContext, DateTimeOffset newDueTime, CancellationToken cancellationToken) => Task.FromResult(DurableJobMutationResult.Applied);
 
-        public Task RescheduleJobAsync(IJobRunContext jobContext, DateTimeOffset newDueTime, CancellationToken cancellationToken) => Task.CompletedTask;
+        public Task<DurableJobMutationResult> RescheduleJobAsync(IJobRunContext jobContext, DateTimeOffset newDueTime, CancellationToken cancellationToken) => Task.FromResult(DurableJobMutationResult.Applied);
 
         public async Task<DurableJob?> TryScheduleJobAsync(ScheduleJobRequest request, CancellationToken cancellationToken)
         {
@@ -1203,6 +1361,12 @@ public class LocalDurableJobManagerTests
 
         public Func<DateTimeOffset, DateTimeOffset, IDictionary<string, string>, CancellationToken, Task<IJobShard>>? CreateShard { get; set; }
 
+        public Func<string, CancellationToken, ValueTask<SiloAddress?>>? GetShardOwner { get; set; }
+
+        public bool IsLocallyOwned { get; set; } = true;
+
+        public SiloAddress? ShardOwner { get; set; }
+
         public int CreateShardCallCount { get; private set; }
 
         public DateTimeOffset LastMaxDueTime { get; private set; }
@@ -1226,6 +1390,14 @@ public class LocalDurableJobManagerTests
             UnregisteredShards.Add(shard);
             return Task.CompletedTask;
         }
+
+        internal override ValueTask<SiloAddress?> GetShardOwnerAsync(string shardId, CancellationToken cancellationToken) =>
+            GetShardOwner is { } getShardOwner
+                ? getShardOwner(shardId, cancellationToken)
+                : ValueTask.FromResult(ShardOwner);
+
+        internal override ValueTask<bool> IsShardOwnedByLocalSiloAsync(string shardId, CancellationToken cancellationToken) =>
+            ValueTask.FromResult(IsLocallyOwned);
     }
 
     private sealed class TestLocalSiloDetails(SiloAddress siloAddress) : ILocalSiloDetails

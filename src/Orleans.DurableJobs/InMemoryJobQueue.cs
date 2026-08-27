@@ -75,15 +75,16 @@ internal sealed class InMemoryJobQueue : IAsyncEnumerable<IJobRunContext>
     }
 
     /// <summary>
-    /// Cancels a durable job by removing it from the queue.
+    /// Removes a durable job from the queue.
     /// </summary>
-    /// <param name="jobId">The unique identifier of the job to cancel.</param>
+    /// <param name="jobId">The unique identifier of the job to remove.</param>
     /// <returns>True if the job was found and removed; false if the job was not found.</returns>
     /// <remarks>
     /// The job's bucket remains in the priority queue until processed, but the job itself is removed immediately.
     /// </remarks>
-    public bool CancelJob(string jobId)
+    public bool RemoveJob(string jobId)
     {
+        ArgumentException.ThrowIfNullOrWhiteSpace(jobId);
         lock (_syncLock)
         {
             if (_jobsIdToBucket.TryGetValue(jobId, out var bucket))
@@ -97,6 +98,18 @@ internal sealed class InMemoryJobQueue : IAsyncEnumerable<IJobRunContext>
             }
 
             return false;
+        }
+    }
+
+    /// <summary>
+    /// Returns whether the queue still contains the supplied durable job.
+    /// </summary>
+    public bool ContainsJob(string jobId)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(jobId);
+        lock (_syncLock)
+        {
+            return _jobsIdToBucket.ContainsKey(jobId);
         }
     }
 
@@ -262,7 +275,7 @@ internal sealed class InMemoryJobQueue : IAsyncEnumerable<IJobRunContext>
                 // Process all jobs in the bucket outside the lock for better concurrency
                 foreach (var (job, dequeueCount) in jobsToYield)
                 {
-                    // Verify job hasn't been cancelled while we were processing
+                    // Verify the job has not been removed while we were processing.
                     bool shouldYield;
                     lock (_syncLock)
                     {

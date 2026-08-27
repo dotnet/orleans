@@ -15,7 +15,7 @@ public readonly struct ScheduleJobRequest
     public required GrainId Target { get; init; }
 
     /// <summary>
-    /// Gets the name of the job for identification purposes.
+    /// Gets the non-empty name of the job for identification and handler routing.
     /// </summary>
     public required string JobName { get; init; }
 
@@ -40,4 +40,7 @@ public readonly struct ScheduleJobRequest
     /// If <see langword="null"/>, the value of <see cref="System.Diagnostics.Activity.Current"/> at the time <see cref="ILocalDurableJobManager.ScheduleJobAsync"/> is invoked will be used.
     /// </summary>
     public string? TraceState { get; init; }
+
+    internal void Validate() =>
+        ArgumentException.ThrowIfNullOrWhiteSpace(JobName, nameof(JobName));
 }

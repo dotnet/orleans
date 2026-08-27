@@ -36,8 +36,8 @@ public class DurableJobTestsRunner
         var job3 = await grain.ScheduleJobAsync("TestJob3", dueTime.AddSeconds(4)).WaitAsync(cancellationToken);
         var job4 = await grain.ScheduleJobAsync("TestJob4", dueTime).WaitAsync(cancellationToken);
         var job5 = await grain.ScheduleJobAsync("TestJob5", dueTime.AddSeconds(1)).WaitAsync(cancellationToken);
-        var canceledJob = await grain.ScheduleJobAsync("CanceledJob", dueTime.AddSeconds(2)).WaitAsync(cancellationToken);
-        Assert.True(await grain.TryCancelJobAsync(canceledJob).WaitAsync(cancellationToken));
+        var cancellationRequestedJob = await grain.ScheduleJobAsync("CancellationRequestedJob", dueTime.AddSeconds(2)).WaitAsync(cancellationToken);
+        Assert.True(await grain.CancelAsync(cancellationRequestedJob).WaitAsync(cancellationToken));
         // Wait for the job to run
         foreach (var job in new[] { job1, job2, job3, job4, job5 })
         {
@@ -50,8 +50,8 @@ public class DurableJobTestsRunner
                 Assert.Fail($"The durable job {job.Name} did not run within the expected time.");
             }
         }
-        // Verify the canceled job did not run
-        Assert.False(await grain.HasJobRan(canceledJob.Id).WaitAsync(cancellationToken));
+        // Verify the job with a durable cancellation request did not run.
+        Assert.False(await grain.HasJobRan(cancellationRequestedJob.Id).WaitAsync(cancellationToken));
     }
 
     public async Task JobExecutionOrder(CancellationToken cancellationToken)
@@ -180,8 +180,8 @@ public class DurableJobTestsRunner
             TargetGrainId = job.TargetGrainId
         };
 
-        var cancelResult = await grain.TryCancelJobAsync(fakeJob).WaitAsync(cancellationToken);
-        Assert.False(cancelResult);
+        var cancellationRequested = await grain.CancelAsync(fakeJob).WaitAsync(cancellationToken);
+        Assert.False(cancellationRequested);
 
         await Task.Delay(100, cancellationToken);
         Assert.False(await grain.HasJobRan(fakeJob.Id).WaitAsync(cancellationToken));
@@ -197,8 +197,8 @@ public class DurableJobTestsRunner
         await grain.WaitForJobToRun(job.Id).WaitAsync(cancellationToken);
         Assert.True(await grain.HasJobRan(job.Id).WaitAsync(cancellationToken));
 
-        var cancelResult = await grain.TryCancelJobAsync(job).WaitAsync(cancellationToken);
-        Assert.False(cancelResult);
+        var cancellationRequested = await grain.CancelAsync(job).WaitAsync(cancellationToken);
+        Assert.False(cancellationRequested);
     }
 
     public async Task ConcurrentScheduling(CancellationToken cancellationToken)

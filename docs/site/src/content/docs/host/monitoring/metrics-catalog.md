@@ -206,30 +206,30 @@ Failure and exception counters can both increment for one operation. Duration co
 
 | Instrument | Type | Unit | Attributes | Description |
 |---|---|---|---|---|
-| `orleans-durablejobs-cancel-job-call-duration` | H | `ms` | `status` | Duration of cancel-job API calls, split by `ok`, `not_found`, `canceled`, or `error`. |
-| `orleans-durablejobs-cancel-job-calls` | C | Calls, implicit | `status` | Completed cancel-job API calls by outcome. |
-| `orleans-durablejobs-handler-execution-duration` | H | `ms` | `status` | Duration of completed handler executions, split by `completed`, `canceled`, or `failed`. |
+| `orleans-durablejobs-cancel-job-call-duration` | H | `ms` | `status` | Duration of `CancelAsync` calls, split by `cancellation_requested`, `not_found`, `operation_canceled`, or `error`. |
+| `orleans-durablejobs-cancel-job-calls` | C | Calls, implicit | `status` | Completed `CancelAsync` calls by request outcome. |
+| `orleans-durablejobs-handler-execution-duration` | H | `ms` | `status` | Duration of completed handler executions, split by `completed`, `attempt_canceled`, or `failed`. |
 | `orleans-durablejobs-handler-executions` | C | Executions, implicit | `status` | Handler executions which reached a terminal outcome. |
 | `orleans-durablejobs-handler-executions-started` | C | Executions, implicit | - | Durable-job handler executions started. |
-| `orleans-durablejobs-job-attempt-duration` | H | `ms` | `status` | Duration of job attempts ending as `completed`, `failed`, or `retried`. |
+| `orleans-durablejobs-job-attempt-duration` | H | `ms` | `status` | Duration of job attempts ending as `completed`, `failed`, `retried`, or `rescheduled`. |
 | `orleans-durablejobs-job-attempts-started` | C | Attempts, implicit | - | Durable-job attempts started. |
 | `orleans-durablejobs-job-dispatch-lag` | H | `ms` | - | Delay between a job's due time and the start of its attempt. |
 | `orleans-durablejobs-job-schedule-duration` | H | `ms` | - | Time required to persist and schedule a job. |
-| `orleans-durablejobs-jobs-canceled` | C | Jobs, implicit | - | Durable jobs canceled. |
+| `orleans-durablejobs-job-cancellation-requests` | C | Requests, implicit | - | Durable job cancellation requests which were durably recorded. |
 | `orleans-durablejobs-jobs-completed` | C | Jobs, implicit | - | Durable jobs completed successfully. |
 | `orleans-durablejobs-jobs-failed` | C | Jobs, implicit | - | Durable-job attempts recorded as failed. |
 | `orleans-durablejobs-jobs-retried` | C | Jobs, implicit | - | Durable-job attempts scheduled for retry. |
 | `orleans-durablejobs-jobs-scheduled` | C | Jobs, implicit | - | Durable jobs successfully scheduled. |
 | `orleans-durablejobs-ownership-check-duration` | H | `ms` | - | Duration of shard-ownership checks. |
-| `orleans-durablejobs-schedule-job-call-duration` | H | `ms` | `status` | Duration of schedule-job API calls, split by `ok`, `canceled`, or `error`. |
+| `orleans-durablejobs-schedule-job-call-duration` | H | `ms` | `status` | Duration of schedule-job API calls, split by `ok`, `operation_canceled`, or `error`. |
 | `orleans-durablejobs-schedule-job-calls` | C | Calls, implicit | `status` | Completed schedule-job API calls by outcome. |
 | `orleans-durablejobs-shard-batch-bytes` | H | `bytes` | - | Serialized byte size of durable-job shard mutation batches. |
 | `orleans-durablejobs-shard-batch-mutations` | H | Mutations, implicit | - | Mutation count in durable-job shard batches. |
 | `orleans-durablejobs-shard-pending-depth` | H | Mutations, implicit | - | Pending mutation operations collected into each shard batch immediately before processing. |
-| `orleans-durablejobs-shard-processing-duration` | H | `ms` | `status` | Shard processing duration, split by `completed`, `canceled`, or `error`. |
+| `orleans-durablejobs-shard-processing-duration` | H | `ms` | `status` | Shard processing duration, split by `completed`, `attempt_canceled`, or `error`. |
 | `orleans-durablejobs-shards-processed` | C | Shards, implicit | `status` | Shard processing passes completed by outcome. |
 | `orleans-durablejobs-storage-batch-size` | H | Mutations, implicit | `status` | Applied shard mutations included in each state-write attempt, split by outcome. |
-| `orleans-durablejobs-storage-batches` | C | Batches, implicit | `status` | Durable-job storage batches written, canceled, or failed. |
+| `orleans-durablejobs-storage-batches` | C | Batches, implicit | `status` | Durable-job storage batches split by `ok`, `operation_canceled`, or `error`. |
 | `orleans-durablejobs-stripe-distribution` | C | Assignments, implicit | `stripe` | Job assignments by durable-job stripe number. |
 
 ## Journaling

@@ -59,14 +59,28 @@ internal sealed partial class ShardExecutor
     }
 
     /// <summary>
-    /// Runs a shard, processing all jobs within it until completion or cancellation.
+    /// Runs a shard, processing all jobs within it until completion or attempt cancellation.
     /// </summary>
     /// <param name="shard">The shard to execute.</param>
-    /// <param name="cancellationToken">Cancellation token to stop processing.</param>
+    /// <param name="attemptCancellationToken">
+    /// A token which cooperatively requests cancellation of the current shard and job execution attempts.
+    /// Durable jobs remain eligible for processing by another owner.
+    /// </param>
     /// <returns>A task representing the asynchronous operation.</returns>
-    public async Task RunShardAsync(IJobShard shard, CancellationToken cancellationToken)
+    public async Task RunShardAsync(IJobShard shard, CancellationToken attemptCancellationToken)
     {
         await Task.CompletedTask.ConfigureAwait(ConfigureAwaitOptions.ForceYielding | ConfigureAwaitOptions.ContinueOnCapturedContext);
+        using var shardAttemptCancellation = CancellationTokenSource.CreateLinkedTokenSource(attemptCancellationToken);
+        var shardAttemptCancellationToken = shardAttemptCancellation.Token;
+        var ownershipLost = 0;
+
+        void NotifyOwnershipLost()
+        {
+            if (Interlocked.Exchange(ref ownershipLost, 1) == 0)
+            {
+                shardAttemptCancellation.Cancel();
+            }
+        }
 
         EnsureSlowStartRampUpStarted();
 
@@ -74,7 +88,7 @@ internal sealed partial class ShardExecutor
         var taskFailures = new ConcurrentQueue<ExceptionDispatchInfo>();
         var processingStarted = false;
         var processingStartTimestamp = 0L;
-        var canceled = false;
+        var attemptCanceled = false;
         var error = false;
         try
         {
@@ -84,7 +98,7 @@ internal sealed partial class ShardExecutor
                 // Wait until the shard's start time
                 var delay = shard.StartTime - now;
                 LogWaitingForShardStartTime(_logger, shard.Id, delay, shard.StartTime);
-                await Task.Delay(delay, _timeProvider, cancellationToken);
+                await Task.Delay(delay, _timeProvider, shardAttemptCancellationToken);
             }
 
             LogBeginProcessingShard(_logger, shard.Id);
@@ -92,24 +106,66 @@ internal sealed partial class ShardExecutor
             processingStartTimestamp = _timeProvider.GetTimestamp();
 
             // Process all jobs in the shard
-            await foreach (var jobContext in shard.ConsumeDurableJobsAsync().WithCancellation(cancellationToken))
+            await foreach (var jobContext in shard.ConsumeDurableJobsAsync().WithCancellation(shardAttemptCancellationToken))
             {
-                await WaitForOverloadToClearAsync(shard.Id, cancellationToken);
+                await WaitForOverloadToClearAsync(shard.Id, shardAttemptCancellationToken);
 
                 // Wait for concurrency slot
-                await _jobConcurrencyLimiter.WaitAsync(cancellationToken);
+                await _jobConcurrencyLimiter.WaitAsync(shardAttemptCancellationToken);
 
-                // Start processing the job. ExecuteJobAsync will release the semaphore when done and remove itself from the tasks dictionary
-                tasks[jobContext.Job.Id] = ExecuteJobAsync(jobContext, shard, tasks, taskFailures, cancellationToken);
+                var attemptStarted = false;
+                try
+                {
+                    var startResult = await shard.TryStartAttemptAsync(jobContext, shardAttemptCancellationToken);
+                    if (startResult == DurableJobMutationResult.JobNotFound)
+                    {
+                        continue;
+                    }
+
+                    if (startResult == DurableJobMutationResult.OwnershipLost)
+                    {
+                        NotifyOwnershipLost();
+                        shardAttemptCancellationToken.ThrowIfCancellationRequested();
+                    }
+
+                    if (startResult != DurableJobMutationResult.Applied)
+                    {
+                        throw new InvalidOperationException($"Unsupported durable job mutation result: {startResult}.");
+                    }
+
+                    // ExecuteJobAsync owns the concurrency slot after this point.
+                    tasks[jobContext.RunId] = ExecuteJobAsync(
+                        jobContext,
+                        shard,
+                        tasks,
+                        taskFailures,
+                        shardAttemptCancellationToken,
+                        NotifyOwnershipLost);
+                    attemptStarted = true;
+                }
+                finally
+                {
+                    if (!attemptStarted)
+                    {
+                        _jobConcurrencyLimiter.Release();
+                    }
+                }
             }
 
             LogCompletedProcessingShard(_logger, shard.Id);
         }
-        catch (OperationCanceledException)
+        catch (OperationCanceledException) when (shardAttemptCancellationToken.IsCancellationRequested)
         {
-            canceled = true;
-            LogShardCancelled(_logger, shard.Id);
-            throw;
+            attemptCanceled = true;
+            if (Volatile.Read(ref ownershipLost) != 0)
+            {
+                LogShardOwnershipLost(_logger, shard.Id);
+            }
+            else
+            {
+                LogShardAttemptCanceled(_logger, shard.Id);
+                throw;
+            }
         }
         catch
         {
@@ -127,15 +183,25 @@ internal sealed partial class ShardExecutor
                     failure.Throw();
                 }
             }
-            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            catch (OperationCanceledException) when (shardAttemptCancellationToken.IsCancellationRequested)
             {
-                if (!canceled)
+                if (!attemptCanceled)
                 {
-                    canceled = true;
-                    LogShardCancelled(_logger, shard.Id);
+                    attemptCanceled = true;
+                    if (Volatile.Read(ref ownershipLost) != 0)
+                    {
+                        LogShardOwnershipLost(_logger, shard.Id);
+                    }
+                    else
+                    {
+                        LogShardAttemptCanceled(_logger, shard.Id);
+                    }
                 }
 
-                throw;
+                if (Volatile.Read(ref ownershipLost) == 0)
+                {
+                    throw;
+                }
             }
             catch
             {
@@ -146,7 +212,16 @@ internal sealed partial class ShardExecutor
             {
                 if (processingStarted)
                 {
-                    _durableJobsInstruments.OnShardProcessed(_timeProvider.GetElapsedTime(processingStartTimestamp), canceled, error);
+                    if (!attemptCanceled && Volatile.Read(ref ownershipLost) != 0)
+                    {
+                        attemptCanceled = true;
+                        LogShardOwnershipLost(_logger, shard.Id);
+                    }
+
+                    _durableJobsInstruments.OnShardProcessed(
+                        _timeProvider.GetElapsedTime(processingStartTimestamp),
+                        attemptCanceled,
+                        error);
                 }
             }
         }
@@ -234,7 +309,8 @@ internal sealed partial class ShardExecutor
         IJobShard shard,
         ConcurrentDictionary<string, Task>? runningTasks,
         ConcurrentQueue<ExceptionDispatchInfo> taskFailures,
-        CancellationToken cancellationToken)
+        CancellationToken attemptCancellationToken,
+        Action notifyOwnershipLost)
     {
         await Task.CompletedTask.ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext | ConfigureAwaitOptions.ForceYielding);
 
@@ -247,11 +323,12 @@ internal sealed partial class ShardExecutor
         {
             try
             {
+                attemptCancellationToken.ThrowIfCancellationRequested();
                 LogExecutingJob(_logger, jobContext.Job.Id, jobContext.Job.Name, jobContext.Job.TargetGrainId, jobContext.Job.DueTime);
 
                 var target = _grainFactory.GetGrain<IDurableJobReceiverExtension>(jobContext.Job.TargetGrainId);
 
-                var result = await target.HandleDurableJobAsync(jobContext, cancellationToken);
+                var result = await target.HandleDurableJobAsync(jobContext, attemptCancellationToken);
 
                 // Handle the result based on status
                 while (result.IsInProgress)
@@ -259,26 +336,71 @@ internal sealed partial class ShardExecutor
                     // Enter polling loop
                     LogPollingJob(_logger, jobContext.Job.Id, jobContext.Job.Name, result.PollAfterDelay.Value);
 
-                    await Task.Delay(result.PollAfterDelay.Value, _timeProvider, cancellationToken);
+                    await Task.Delay(result.PollAfterDelay.Value, _timeProvider, attemptCancellationToken);
 
-                    result = await target.HandleDurableJobAsync(jobContext, cancellationToken);
+                    result = await target.HandleDurableJobAsync(jobContext, attemptCancellationToken);
                 }
 
                 switch (result.Status)
                 {
                     case DurableJobRunStatus.Completed:
-                        await shard.RemoveJobAsync(jobContext.Job.Id, cancellationToken);
-                        LogJobExecutedSuccessfully(_logger, jobContext.Job.Id, jobContext.Job.Name);
-                        _durableJobsInstruments.OnJobCompleted(_timeProvider.GetElapsedTime(attemptStartTimestamp));
-                        activity?.SetTag(ActivityTagKeys.DurableJobStatus, "completed");
-                        activity?.SetStatus(ActivityStatusCode.Ok);
+                        var removeResult = await shard.RemoveJobAsync(jobContext.Job.Id, attemptCancellationToken);
+                        if (removeResult == DurableJobMutationResult.Applied)
+                        {
+                            LogJobExecutedSuccessfully(_logger, jobContext.Job.Id, jobContext.Job.Name);
+                            _durableJobsInstruments.OnJobCompleted(_timeProvider.GetElapsedTime(attemptStartTimestamp));
+                            activity?.SetTag(ActivityTagKeys.DurableJobStatus, "completed");
+                            activity?.SetStatus(ActivityStatusCode.Ok);
+                        }
+                        else if (removeResult == DurableJobMutationResult.JobNotFound)
+                        {
+                            LogJobMutationNotApplied(
+                                _logger,
+                                jobContext.Job.Id,
+                                jobContext.Job.Name,
+                                "completion",
+                                removeResult);
+                            activity?.SetTag(ActivityTagKeys.DurableJobStatus, "cancellation_requested");
+                        }
+                        else
+                        {
+                            LogJobMutationNotApplied(
+                                _logger,
+                                jobContext.Job.Id,
+                                jobContext.Job.Name,
+                                "completion",
+                                removeResult);
+                            activity?.SetTag(ActivityTagKeys.DurableJobStatus, "ownership_lost");
+                            notifyOwnershipLost();
+                        }
                         break;
                     case DurableJobRunStatus.RescheduleRequested when result.RescheduleTime is { } rescheduleTime:
-                        LogReschedulingJob(_logger, jobContext.Job.Id, jobContext.Job.Name, rescheduleTime);
-                        await shard.RescheduleJobAsync(jobContext, rescheduleTime, cancellationToken);
-                        _durableJobsInstruments.OnJobRescheduled(_timeProvider.GetElapsedTime(attemptStartTimestamp));
-                        activity?.SetTag(ActivityTagKeys.DurableJobStatus, "rescheduled");
-                        activity?.SetStatus(ActivityStatusCode.Ok);
+                        var rescheduleResult = await shard.RescheduleJobAsync(jobContext, rescheduleTime, attemptCancellationToken);
+                        if (rescheduleResult == DurableJobMutationResult.Applied)
+                        {
+                            LogReschedulingJob(_logger, jobContext.Job.Id, jobContext.Job.Name, rescheduleTime);
+                            _durableJobsInstruments.OnJobRescheduled(_timeProvider.GetElapsedTime(attemptStartTimestamp));
+                            activity?.SetTag(ActivityTagKeys.DurableJobStatus, "rescheduled");
+                            activity?.SetStatus(ActivityStatusCode.Ok);
+                        }
+                        else
+                        {
+                            LogJobMutationNotApplied(
+                                _logger,
+                                jobContext.Job.Id,
+                                jobContext.Job.Name,
+                                "reschedule",
+                                rescheduleResult);
+                            activity?.SetTag(
+                                ActivityTagKeys.DurableJobStatus,
+                                rescheduleResult == DurableJobMutationResult.JobNotFound
+                                    ? "cancellation_requested"
+                                    : "ownership_lost");
+                            if (rescheduleResult == DurableJobMutationResult.OwnershipLost)
+                            {
+                                notifyOwnershipLost();
+                            }
+                        }
                         break;
                     case DurableJobRunStatus.RescheduleRequested:
                         failureException = new InvalidOperationException(
@@ -301,7 +423,11 @@ internal sealed partial class ShardExecutor
                         break;
                 }
             }
-            catch (Exception ex) when (ex is not OperationCanceledException)
+            catch (OperationCanceledException) when (attemptCancellationToken.IsCancellationRequested)
+            {
+                throw;
+            }
+            catch (Exception ex)
             {
                 LogErrorExecutingJob(_logger, ex, jobContext.Job.Id);
                 failureException = ex;
@@ -313,11 +439,32 @@ internal sealed partial class ShardExecutor
                 var retryTime = _options.ShouldRetry(jobContext, failureException);
                 if (retryTime is not null)
                 {
-                    LogRetryingJob(_logger, jobContext.Job.Id, jobContext.Job.Name, retryTime.Value, jobContext.DequeueCount);
-                    await shard.RetryJobLaterAsync(jobContext, retryTime.Value, cancellationToken);
-                    _durableJobsInstruments.OnJobRetried(_timeProvider.GetElapsedTime(attemptStartTimestamp));
-                    activity?.SetTag(ActivityTagKeys.DurableJobStatus, "retried");
-                    DurableJobsDiagnostics.SetError(activity, failureException);
+                    var retryResult = await shard.RetryJobLaterAsync(jobContext, retryTime.Value, attemptCancellationToken);
+                    if (retryResult == DurableJobMutationResult.Applied)
+                    {
+                        LogRetryingJob(_logger, jobContext.Job.Id, jobContext.Job.Name, retryTime.Value, jobContext.DequeueCount);
+                        _durableJobsInstruments.OnJobRetried(_timeProvider.GetElapsedTime(attemptStartTimestamp));
+                        activity?.SetTag(ActivityTagKeys.DurableJobStatus, "retried");
+                        DurableJobsDiagnostics.SetError(activity, failureException);
+                    }
+                    else
+                    {
+                        LogJobMutationNotApplied(
+                            _logger,
+                            jobContext.Job.Id,
+                            jobContext.Job.Name,
+                            "retry",
+                            retryResult);
+                        activity?.SetTag(
+                            ActivityTagKeys.DurableJobStatus,
+                            retryResult == DurableJobMutationResult.JobNotFound
+                                ? "cancellation_requested"
+                                : "ownership_lost");
+                        if (retryResult == DurableJobMutationResult.OwnershipLost)
+                        {
+                            notifyOwnershipLost();
+                        }
+                    }
                 }
                 else
                 {
@@ -329,9 +476,9 @@ internal sealed partial class ShardExecutor
             }
 
         }
-        catch (OperationCanceledException exception) when (cancellationToken.IsCancellationRequested)
+        catch (OperationCanceledException exception) when (attemptCancellationToken.IsCancellationRequested)
         {
-            activity?.SetTag(ActivityTagKeys.DurableJobStatus, "canceled");
+            activity?.SetTag(ActivityTagKeys.DurableJobStatus, "attempt_canceled");
             taskFailures.Enqueue(ExceptionDispatchInfo.Capture(exception));
         }
         catch (Exception exception)
@@ -343,7 +490,7 @@ internal sealed partial class ShardExecutor
         {
             // Cleanup must happen even when retry persistence throws, otherwise slots leak and shard processing can stall.
             _jobConcurrencyLimiter.Release();
-            runningTasks?.TryRemove(jobContext.Job.Id, out _);
+            runningTasks?.TryRemove(jobContext.RunId, out _);
         }
     }
 

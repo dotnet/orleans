@@ -17,18 +17,26 @@ public interface ILocalDurableJobManager
     /// <param name="request">The request containing the job scheduling parameters.</param>
     /// <param name="cancellationToken">A cancellation token to cancel the operation.</param>
     /// <returns>A <see cref="Task"/> representing the asynchronous operation that returns the durable job.</returns>
+    /// <exception cref="ArgumentException"><see cref="ScheduleJobRequest.JobName"/> is null, empty, or whitespace.</exception>
     Task<DurableJob> ScheduleJobAsync(ScheduleJobRequest request, CancellationToken cancellationToken);
 
     /// <summary>
-    /// Attempts to cancel a previously scheduled durable job.
+    /// Requests cancellation of a previously scheduled durable job.
     /// </summary>
-    /// <param name="job">The durable job to cancel.</param>
-    /// <param name="cancellationToken">A cancellation token to cancel the operation.</param>
-    /// <returns>A <see cref="Task"/> representing the asynchronous operation that returns <see langword="true"/> if the job was successfully canceled; otherwise, <see langword="false"/>.</returns>
-    Task<bool> TryCancelDurableJobAsync(DurableJob job, CancellationToken cancellationToken);
+    /// <param name="job">The durable job for which cancellation is requested.</param>
+    /// <param name="requestCancellationToken">
+    /// A token which cancels this request operation. It does not cancel a job execution attempt.
+    /// </param>
+    /// <returns>
+    /// A <see cref="Task"/> representing the asynchronous operation. The result is <see langword="true"/> when
+    /// the cancellation request was durably recorded, preventing future attempts; otherwise, <see langword="false"/>.
+    /// An already-running attempt is cooperatively independent of this request and may still complete.
+    /// </returns>
+    /// <exception cref="ArgumentNullException"><paramref name="job"/> is <see langword="null"/>.</exception>
+    Task<bool> CancelAsync(DurableJob job, CancellationToken requestCancellationToken);
 }
 
 internal interface ILocalDurableJobManagerSystemTarget : ISystemTarget
 {
-    Task<bool> TryCancelDurableJobAsync(DurableJob job, CancellationToken cancellationToken);
+    Task<bool> CancelAsync(DurableJob job, CancellationToken requestCancellationToken);
 }

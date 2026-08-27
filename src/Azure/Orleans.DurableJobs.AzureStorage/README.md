@@ -119,7 +119,7 @@ using Orleans.DurableJobs;
 public interface IEmailGrain : IGrainWithStringKey
 {
     Task ScheduleEmail(string subject, string body, DateTimeOffset sendTime);
-    Task CancelScheduledEmail();
+    Task CancelScheduledEmail(CancellationToken requestCancellationToken);
 }
 
 public class EmailGrain : Grain, IEmailGrain, IDurableJobHandler
@@ -127,7 +127,7 @@ public class EmailGrain : Grain, IEmailGrain, IDurableJobHandler
     private readonly ILocalDurableJobManager _jobManager;
     private readonly IEmailService _emailService;
     private readonly ILogger<EmailGrain> _logger;
-    private IDurableJob? _durableEmailJob;
+    private DurableJob? _durableEmailJob;
 
     public EmailGrain(
         ILocalDurableJobManager jobManager,
@@ -163,7 +163,7 @@ public class EmailGrain : Grain, IEmailGrain, IDurableJobHandler
             emailAddress, sendTime, _durableEmailJob.Id);
     }
 
-    public async Task CancelScheduledEmail()
+    public async Task CancelScheduledEmail(CancellationToken requestCancellationToken)
     {
         if (_durableEmailJob is null)
         {
@@ -171,19 +171,24 @@ public class EmailGrain : Grain, IEmailGrain, IDurableJobHandler
             return;
         }
 
-        var canceled = await _jobManager.TryCancelDurableJobAsync(_durableEmailJob);
-        if (canceled)
+        var cancellationRequested = await _jobManager.CancelAsync(_durableEmailJob, requestCancellationToken);
+        if (cancellationRequested)
         {
-            _logger.LogInformation("Email job {JobId} canceled successfully", _durableEmailJob.Id);
+            _logger.LogInformation(
+                "Email job {JobId} cancellation request recorded; no future attempt will start",
+                _durableEmailJob.Id);
+            // An already-running attempt may still complete.
             _durableEmailJob = null;
         }
         else
         {
-            _logger.LogWarning("Failed to cancel email job {JobId} (may have already executed)", _durableEmailJob.Id);
+            _logger.LogWarning(
+                "Cancellation request was not recorded for email job {JobId} (it may have already completed)",
+                _durableEmailJob.Id);
         }
     }
 
-    public async Task ExecuteJobAsync(IDurableJobContext context, CancellationToken cancellationToken)
+    public async Task ExecuteJobAsync(IJobRunContext context, CancellationToken attemptCancellationToken)
     {
         var emailAddress = this.GetPrimaryKeyString();
         var subject = context.Job.Metadata?["Subject"];
@@ -195,7 +200,7 @@ public class EmailGrain : Grain, IEmailGrain, IDurableJobHandler
 
         try
         {
-            await _emailService.SendEmailAsync(emailAddress, subject, body, cancellationToken);
+            await _emailService.SendEmailAsync(emailAddress, subject, body, attemptCancellationToken);
             _logger.LogInformation("Email sent successfully to {EmailAddress}", emailAddress);
             _durableEmailJob = null;
         }
@@ -289,7 +294,7 @@ public class OrderGrain : Grain, IOrderGrain, IDurableJobHandler
         _logger.LogInformation("Order {OrderId} canceled", orderId);
     }
 
-    public async Task ExecuteJobAsync(IDurableJobContext context, CancellationToken cancellationToken)
+    public async Task ExecuteJobAsync(IJobRunContext context, CancellationToken attemptCancellationToken)
     {
         var step = context.Job.Metadata!["Step"];
         var orderId = this.GetPrimaryKey();
@@ -301,11 +306,11 @@ public class OrderGrain : Grain, IOrderGrain, IDurableJobHandler
         switch (step)
         {
             case "PaymentReminder":
-                await HandlePaymentReminder(context, cancellationToken);
+                await HandlePaymentReminder(context, attemptCancellationToken);
                 break;
 
             case "OrderExpiration":
-                await HandleOrderExpiration(cancellationToken);
+                await HandleOrderExpiration(attemptCancellationToken);
                 break;
 
             default:
@@ -314,10 +319,10 @@ public class OrderGrain : Grain, IOrderGrain, IDurableJobHandler
         }
     }
 
-    private async Task HandlePaymentReminder(IDurableJobContext context, CancellationToken ct)
+    private async Task HandlePaymentReminder(IJobRunContext context, CancellationToken attemptCancellationToken)
     {
         var orderId = this.GetPrimaryKey();
-        var order = await _orderService.GetOrderAsync(orderId, ct);
+        var order = await _orderService.GetOrderAsync(orderId, attemptCancellationToken);
         
         if (order?.Status == OrderStatus.Pending)
         {
@@ -339,14 +344,14 @@ public class OrderGrain : Grain, IOrderGrain, IDurableJobHandler
         }
     }
 
-    private async Task HandleOrderExpiration(CancellationToken ct)
+    private async Task HandleOrderExpiration(CancellationToken attemptCancellationToken)
     {
         var orderId = this.GetPrimaryKey();
-        var order = await _orderService.GetOrderAsync(orderId, ct);
+        var order = await _orderService.GetOrderAsync(orderId, attemptCancellationToken);
         
         if (order?.Status == OrderStatus.Pending)
         {
-            await _orderService.CancelOrderAsync(orderId, ct);
+            await _orderService.CancelOrderAsync(orderId, attemptCancellationToken);
             _logger.LogInformation("Order {OrderId} expired and canceled", orderId);
 
             // Notify customer
