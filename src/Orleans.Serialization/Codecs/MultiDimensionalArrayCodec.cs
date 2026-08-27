@@ -36,6 +36,11 @@ namespace Orleans.Serialization.Codecs
         /// <inheritdoc/>
         public void WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, [System.Diagnostics.CodeAnalysis.AllowNull] Type expectedType, [System.Diagnostics.CodeAnalysis.AllowNull] object? value) where TBufferWriter : IBufferWriter<byte>
         {
+            if (value is Array input)
+            {
+                EnsureZeroLowerBounds(input);
+            }
+
             if (ReferenceCodec.TryWriteReferenceField(ref writer, fieldIdDelta, expectedType, value!))
             {
                 return;
@@ -186,6 +191,22 @@ namespace Orleans.Serialization.Codecs
             $"Declared dimensions [{string.Join(", ", lengths)}] require more elements than the remaining length of the input, {remaining}.");
 
         private static void ThrowLengthsFieldMissing() => throw new RequiredFieldMissingException("Serialized array is missing its lengths field.");
+
+        private static void EnsureZeroLowerBounds(Array array)
+        {
+            for (var i = 0; i < array.Rank; i++)
+            {
+                if (array.GetLowerBound(i) != 0)
+                {
+                    ThrowNonZeroLowerBoundsNotSupported();
+                }
+            }
+        }
+
+        [DoesNotReturn]
+        [MethodImpl(MethodImplOptions.NoInlining)]
+        private static void ThrowNonZeroLowerBoundsNotSupported() => throw new NotSupportedException(
+            "Serialization of multi-dimensional arrays with non-zero lower bounds is not supported.");
     }
 
     /// <summary>
@@ -208,33 +229,39 @@ namespace Orleans.Serialization.Codecs
             var elementType = type.GetElementType();
             if (ShallowCopyableTypes.Contains(elementType!))
             {
-                return originalArray.Clone();
+                result = (Array)originalArray.Clone();
+                context.RecordCopy(original, result);
+                return result;
             }
 
-            // We assume that all arrays have lower bound 0. In .NET 4.0, it's hard to create an array with a non-zero lower bound.
             var rank = originalArray.Rank;
             var lengths = new int[rank];
+            var lowerBounds = new int[rank];
             for (var i = 0; i < rank; i++)
             {
                 lengths[i] = originalArray.GetLength(i);
+                lowerBounds[i] = originalArray.GetLowerBound(i);
             }
 
-            result = Array.CreateInstance(elementType!, lengths);
-            context.RecordCopy(original, result); 
+            result = Array.CreateInstance(elementType!, lengths, lowerBounds);
+            context.RecordCopy(original, result);
 
             if (rank == 1)
             {
-                for (var i = 0; i < lengths[0]; i++)
+                for (var offset = 0; offset < lengths[0]; offset++)
                 {
+                    var i = lowerBounds[0] + offset;
                     result.SetValue(ObjectCopier.DeepCopy(originalArray.GetValue(i), context), i);
                 }
             }
             else if (rank == 2)
             {
-                for (var i = 0; i < lengths[0]; i++)
+                for (var iOffset = 0; iOffset < lengths[0]; iOffset++)
                 {
-                    for (var j = 0; j < lengths[1]; j++)
+                    var i = lowerBounds[0] + iOffset;
+                    for (var jOffset = 0; jOffset < lengths[1]; jOffset++)
                     {
+                        var j = lowerBounds[1] + jOffset;
                         result.SetValue(ObjectCopier.DeepCopy(originalArray.GetValue(i, j), context), i, j);
                     }
                 }
@@ -256,7 +283,7 @@ namespace Orleans.Serialization.Codecs
                     {
                         int offset = k / sizes[n];
                         k -= offset * sizes[n];
-                        index[n] = offset;
+                        index[n] = offset + lowerBounds[n];
                     }
 
                     result.SetValue(ObjectCopier.DeepCopy(originalArray.GetValue(index), context), index);
