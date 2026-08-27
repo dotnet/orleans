@@ -238,6 +238,35 @@ public class DurableInboxExtensionTests : IClassFixture<DefaultClusterFixture>
     }
 
     [Fact]
+    public async Task DeliverAsync_RetryAfterAdmissionWriteFailurePersistsBeforeReturningDuplicate()
+    {
+        var expected = new IOException("admission write failed");
+        var stateManager = new TestStateManager { NextWriteException = expected };
+        var extension = CreateInboxExtension(stateManager: stateManager);
+        extension.RegisterHandler("test.route", new TestMessageHandler());
+        var envelope = CreateTestEnvelope(
+            GrainId.Create("test", "retry-sender"),
+            GrainId.Create("test", "retry-receiver"),
+            "test.route",
+            "payload");
+
+        var exception = await Assert.ThrowsAsync<IOException>(
+            () => extension.DeliverAsync(
+                envelope,
+                new DeliveryOptions { PollTimeout = TimeSpan.Zero },
+                CancellationToken.None).AsTask());
+        Assert.Same(expected, exception);
+
+        var retry = await extension.DeliverAsync(
+            envelope,
+            new DeliveryOptions { PollTimeout = TimeSpan.Zero },
+            CancellationToken.None);
+
+        Assert.Equal(DeliveryStatus.Duplicate, retry.Status);
+        Assert.Equal(3, stateManager.WriteCount);
+    }
+
+    [Fact]
     public async Task DeliverAsync_WithProcessedMessage_ReturnsDuplicate()
     {
         // Arrange
@@ -1135,6 +1164,7 @@ public class DurableInboxExtensionTests : IClassFixture<DefaultClusterFixture>
         public int WriteCount { get; private set; }
         public int RevertCount { get; private set; }
         public bool BlockNextWrite { get; set; }
+        public Exception? NextWriteException { get; set; }
         public TaskCompletionSource WriteStarted { get; } =
             new(TaskCreationOptions.RunContinuationsAsynchronously);
         public TaskCompletionSource AllowWrite { get; } =
@@ -1153,6 +1183,12 @@ public class DurableInboxExtensionTests : IClassFixture<DefaultClusterFixture>
         public async ValueTask WriteStateAsync(CancellationToken cancellationToken = default)
         {
             WriteCount++;
+            if (NextWriteException is { } exception)
+            {
+                NextWriteException = null;
+                throw exception;
+            }
+
             if (BlockNextWrite)
             {
                 BlockNextWrite = false;

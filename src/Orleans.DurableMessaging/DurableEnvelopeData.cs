@@ -70,6 +70,18 @@ public sealed class DurableEnvelopeData : IDisposable
     /// <returns>True if the key exists in the context; otherwise, false.</returns>
     public bool HasContextKey(string key) => _contextIndices?.ContainsKey(key) ?? false;
 
+    internal DurableEnvelopeData Retain()
+    {
+        var sessionPool = _sessionPool
+            ?? throw new InvalidOperationException("The durable envelope data has no serializer session pool.");
+        return new DurableEnvelopeData(sessionPool)
+        {
+            _buffer = _buffer.Length == 0 ? default : _buffer.Slice(0, _buffer.Length),
+            _bodySlice = _bodySlice,
+            _contextIndices = _contextIndices
+        };
+    }
+
     /// <summary>
     /// Attempts to deserialize the body as the specified type.
     /// Returns false if deserialization fails (type mismatch, corruption, etc.).

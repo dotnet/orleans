@@ -445,35 +445,26 @@ internal sealed class HierarchicalKey : ISpanFormattable, IEquatable<Hierarchica
     /// <inheritdoc/>
     public bool TryFormat(Span<char> destination, out int charsWritten, ReadOnlySpan<char> format, IFormatProvider? provider)
     {
-        if (_parent is not null)
-        {
-            if (_parent.TryFormat(destination, out charsWritten, format, provider))
-            {
-                destination = destination[charsWritten..];
-                if (destination.Length > 0)
-                {
-                    destination[0] = SegmentSeparator;
-                    destination = destination[1..];
-                    ++charsWritten;
-                }
-            }
-            else
-            {
-                return false;
-            }
-        }
-        else
+        charsWritten = Length;
+        if (destination.Length < charsWritten)
         {
             charsWritten = 0;
+            return false;
         }
 
-        if (_value.Span.TryCopyTo(destination))
+        var position = charsWritten;
+        for (var current = this; current is not null; current = current._parent)
         {
-            charsWritten += _value.Length;
-            return true;
+            position -= current._value.Length;
+            current._value.Span.CopyTo(destination[position..]);
+            if (current._parent is not null)
+            {
+                destination[--position] = SegmentSeparator;
+            }
         }
 
-        return false;
+        Debug.Assert(position == 0);
+        return true;
     }
 
     public string ToString(string? format, IFormatProvider? formatProvider) => ToString();

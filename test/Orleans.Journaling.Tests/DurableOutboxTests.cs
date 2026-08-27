@@ -181,6 +181,23 @@ public class DurableOutboxTests : JournalingTestBase
     }
 
     [Fact]
+    public void TryGetMessage_ReturnsIndependentlyOwnedEnvelope()
+    {
+        var h = CreateOutbox();
+        var envelope = CreateEnvelope();
+        h.Outbox.Send(envelope);
+
+        Assert.True(h.Outbox.TryGetMessage(envelope.MessageId, out var first));
+        first.Dispose();
+        Assert.True(h.Outbox.TryGetMessage(envelope.MessageId, out var second));
+        using (second)
+        {
+            Assert.True(second.Data.TryGetBody<string>(out var body));
+            Assert.Equal("payload", body);
+        }
+    }
+
+    [Fact]
     public async Task DeliverPendingMessagesAsync_WhenReceiverReportsBackpressure_KeepsMessageAndSchedulesRetry()
     {
         var h = CreateOutbox();
