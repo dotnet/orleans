@@ -20,21 +20,23 @@ public sealed class ActivationStartupTests(ActivationStartupTestFixture fixture)
     private static readonly TimeSpan Timeout = TimeSpan.FromSeconds(30);
 
     [Fact]
-    public void FailureBeforeStartAbortsAndUnregistersPreparedContext()
+    public async Task FailureBeforeStartAbortsRejectsRequestAndUnregistersPreparedContext()
     {
         var (grainId, scenario) = fixture.CreateScenario(
             ActivationStartupCompletion.ImmediateSuccess,
             ActivationStartupDisposal.Synchronous);
         var failActivityCreation = new AsyncLocal<bool>();
         var expected = new InvalidOperationException("activity-start-fault");
+        using var collector = new DiagnosticEventCollector(DispatcherEvents.ListenerName);
+        ActivationData? context = null;
+        ActivationStartupRequest? request = null;
+        Task<DiagnosticEvent>? rejected = null;
         using var listener = new ActivityListener
         {
             ShouldListenTo = static source =>
                 source.Name == ActivitySources.LifecycleActivitySourceName,
-            Sample = (ref ActivityCreationOptions<ActivityContext> _) =>
-                failActivityCreation.Value ? throw expected : ActivitySamplingResult.None,
-            SampleUsingParentId = (ref ActivityCreationOptions<string> _) =>
-                failActivityCreation.Value ? throw expected : ActivitySamplingResult.None,
+            Sample = (ref ActivityCreationOptions<ActivityContext> _) => OnSample(),
+            SampleUsingParentId = (ref ActivityCreationOptions<string> _) => OnSample(),
         };
         ActivitySource.AddActivityListener(listener);
 
@@ -44,15 +46,52 @@ public sealed class ActivationStartupTests(ActivationStartupTestFixture fixture)
             var actual = Assert.Throws<InvalidOperationException>(() => fixture.StartActivation(grainId));
 
             Assert.Same(expected, actual);
+            Assert.NotNull(context);
+            await context.Deactivated.WaitAsync(Timeout, TestContext.Current.CancellationToken);
+            Assert.NotNull(rejected);
+            var rejectionEvent = await rejected;
+            var rejection = Assert.IsType<DispatcherEvents.Rejected>(rejectionEvent.Payload);
+            Assert.Same(request, rejection.Message.BodyObject);
+            Assert.Equal(Message.RejectionTypes.Transient, rejection.RejectionType);
+            Assert.Equal(
+                "Activation startup was aborted.",
+                Assert.IsType<InvalidOperationException>(rejection.Exception).Message);
             Assert.Null(fixture.ActivationDirectory.FindTarget(grainId));
             Assert.Equal(0, scenario.CreateCount);
             Assert.Equal(0, scenario.ConstructorCount);
             Assert.Equal(0, scenario.OnActivateCount);
+            Assert.Equal(ActivationState.Invalid, context.State);
         }
         finally
         {
             failActivityCreation.Value = false;
             fixture.RemoveScenario(grainId);
+        }
+
+        ActivitySamplingResult OnSample()
+        {
+            if (!failActivityCreation.Value)
+            {
+                return ActivitySamplingResult.None;
+            }
+
+            context = Assert.IsType<ActivationData>(fixture.ActivationDirectory.FindTarget(grainId));
+            var requestData = fixture.CreateRequest(
+                context,
+                scenario,
+                payload: "must-not-run",
+                requestContextValue: "pre-start",
+                recordResponse: true);
+            request = requestData.Request;
+            rejected = collector.WaitForEventAsync(
+                nameof(DispatcherEvents.Rejected),
+                diagnosticEvent => diagnosticEvent.Payload is DispatcherEvents.Rejected rejection
+                    && ReferenceEquals(rejection.Message, requestData.Message),
+                Timeout,
+                TestContext.Current.CancellationToken);
+            context.ReceiveMessage(requestData.Message);
+            failActivityCreation.Value = false;
+            throw expected;
         }
     }
 
