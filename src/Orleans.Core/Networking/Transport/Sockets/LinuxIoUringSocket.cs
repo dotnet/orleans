@@ -11,6 +11,7 @@ using System.Runtime.InteropServices;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Threading.Tasks.Sources;
+using Orleans.Serialization.Buffers;
 
 namespace Orleans.Connections.Transport.Sockets;
 
@@ -85,6 +86,8 @@ internal sealed unsafe class LinuxIoUringSocketReceiver : LinuxIoUringOperation,
             waitForNotification: false);
     }
 
+    public ValueTask StopAsync() => default;
+
     public override void Dispose()
     {
         base.Dispose();
@@ -109,6 +112,997 @@ internal sealed unsafe class LinuxIoUringSocketReceiver : LinuxIoUringOperation,
         [FieldOffset(32)] private IntPtr _control;
         [FieldOffset(40)] private nuint _controlLength;
         [FieldOffset(48)] private int _flags;
+    }
+}
+
+internal sealed unsafe class LinuxIoUringSocketMultishotReceiver : LinuxIoUringOperation, IOwnedPageSocketReceiver
+{
+    private const int BufferCount = 16;
+    private const int BufferSize = 16 * 1024;
+    private const uint IncrementalBufferConsumption = 2;
+    private readonly BufferState[] _buffers = new BufferState[BufferCount];
+    private readonly Queue<ReceivedSegment> _receivedSegments = new();
+    private readonly ReceiveWaiter _receiveWaiter = new();
+    private readonly object _stateLock = new();
+    private readonly ushort _bufferGroup;
+    private IntPtr _bufferRing;
+    private ArcBufferWriter? _receiveWriter;
+    private TaskCompletionSource? _stopCompletion;
+    private Socket? _socketForRearm;
+    private bool _bufferGroupReleased;
+    private bool _stopping;
+    private bool _finished;
+    private bool _needsRearm;
+    private bool _receiveWaiting;
+    private int _refillQueued;
+    private ulong _pendingRefillMask;
+    private Exception? _terminalError;
+    private ArcBufferPage? _firstAdoptedPage;
+    private long _adoptedPageCount;
+    private long _completedSegmentCount;
+    private long _finalBufferCount;
+    private long _replacementPageCount;
+    private long _noBufferCompletionCount;
+    private long _receiveStartCount;
+
+    public LinuxIoUringSocketMultishotReceiver(LinuxIoUringEngine? engine = null)
+        : base(engine)
+    {
+        var bufferGroupAllocated = false;
+        try
+        {
+            _bufferGroup = Engine.AllocateBufferGroup();
+            bufferGroupAllocated = true;
+            for (var i = 0; i < BufferCount; i++)
+            {
+                _buffers[i] = new BufferState();
+                AssignFreshPage(_buffers[i], BufferOwnership.ReceiverOwned);
+            }
+        }
+        catch
+        {
+            ReleaseReceiverPages();
+            if (bufferGroupAllocated)
+            {
+                ReleaseBufferGroup();
+            }
+
+            base.Dispose();
+            throw;
+        }
+    }
+
+    public ValueTask ReceiveAsync(Socket socket, List<ArraySegment<byte>> buffers)
+        => throw new NotSupportedException("The multishot receiver writes received pages directly to an ArcBufferWriter.");
+
+    public ValueTask ReceiveAsync(Socket socket, ArcBufferWriter writer)
+    {
+        lock (_stateLock)
+        {
+            if (_receiveWaiting)
+            {
+                throw new InvalidOperationException("A multishot receive is already waiting for data.");
+            }
+
+            var appended = AppendReceivedPages(writer);
+            if (appended > 0)
+            {
+                BytesTransferred = appended;
+                SocketError = SocketError.Success;
+                Error = null;
+                return default;
+            }
+
+            if (_terminalError is { } terminalError)
+            {
+                return ValueTask.FromException(terminalError);
+            }
+
+            if (_finished && !_needsRearm)
+            {
+                BytesTransferred = 0;
+                SocketError = SocketError.Success;
+                Error = null;
+                return default;
+            }
+
+            _receiveWriter = writer;
+            var pendingReceive = _receiveWaiter.Reset();
+            _receiveWaiting = true;
+            try
+            {
+                RefillFreeBuffers();
+                if (!IsPending)
+                {
+                    StartReceive(socket);
+                }
+            }
+            catch
+            {
+                _receiveWriter = null;
+                _receiveWaiting = false;
+                throw;
+            }
+
+            return pendingReceive;
+        }
+    }
+
+    public ValueTask StopAsync()
+    {
+        lock (_stateLock)
+        {
+            if (!IsPending)
+            {
+                if (_receiveWaiting && _needsRearm)
+                {
+                    _terminalError = new SocketException((int)SocketError.OperationAborted);
+                    _finished = true;
+                    _needsRearm = false;
+                    CompleteWaitingReceive();
+                }
+
+                return default;
+            }
+
+            if (_stopCompletion is not null)
+            {
+                return new ValueTask(_stopCompletion.Task);
+            }
+
+            _stopping = true;
+            _stopCompletion = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            _ = new LinuxIoUringCancelOperation(
+                Engine,
+                UserData,
+                CompleteCancellation,
+                CompleteCancellation);
+            return new ValueTask(_stopCompletion.Task);
+        }
+    }
+
+    internal override bool IsMultishot => true;
+
+    internal override void PrepareSubmission(LinuxIoUringEngine.IoUringSubmission* submission)
+    {
+        if (_bufferRing == IntPtr.Zero)
+        {
+            var error = 0;
+            _bufferRing = LinuxIoUringEngine.Native.SetupBufRing(
+                ref Engine.Ring,
+                BufferCount,
+                _bufferGroup,
+                IncrementalBufferConsumption,
+                &error);
+            if (_bufferRing == IntPtr.Zero)
+            {
+                throw new InvalidOperationException($"Unable to create the io_uring provided buffer ring. errno={error}");
+            }
+
+            var ring = (LinuxIoUringEngine.IoUringBufferRing*)_bufferRing;
+            ring->Tail = 0;
+            var added = 0;
+            for (var i = 0; i < BufferCount; i++)
+            {
+                var state = _buffers[i];
+                var page = state.Page
+                    ?? throw new InvalidOperationException("A provided-buffer page was released before initial publication.");
+                if (state.Ownership != BufferOwnership.ReceiverOwned)
+                {
+                    throw new InvalidOperationException("A provided-buffer page has invalid initial ownership.");
+                }
+
+                AddBuffer(ring, page, i, added++);
+            }
+
+            LinuxIoUringEngine.AdvanceBufferRing(ring, added);
+            for (var i = 0; i < BufferCount; i++)
+            {
+                _buffers[i].Ownership = BufferOwnership.Published;
+            }
+        }
+
+        submission->Flags = LinuxIoUringEngine.BufferSelect;
+        submission->IoPriority = checked((ushort)LinuxIoUringEngine.ReceiveMultishot);
+        submission->BufferIndex = _bufferGroup;
+    }
+
+    internal override void HandleCompletion(int result, uint flags)
+    {
+        lock (_stateLock)
+        {
+            if (!IsPending)
+            {
+                throw new InvalidOperationException("A multishot receive completed after it had been retired.");
+            }
+
+            if ((flags & LinuxIoUringEngine.CompletionIsNotification) != 0)
+            {
+                Fail(new InvalidOperationException("A multishot receive produced a notification CQE."));
+                return;
+            }
+
+            if (result > 0)
+            {
+                const uint AllowedCompletionFlags =
+                    LinuxIoUringEngine.CompletionHasBuffer
+                    | LinuxIoUringEngine.CompletionHasMore
+                    | LinuxIoUringEngine.CompletionHasSocketData
+                    | LinuxIoUringEngine.CompletionBufferMore;
+                var completionFlags = flags & ushort.MaxValue;
+                if ((completionFlags & LinuxIoUringEngine.CompletionHasBuffer) == 0
+                    || (completionFlags & ~AllowedCompletionFlags) != 0)
+                {
+                    Fail(new InvalidOperationException("A multishot receive produced an invalid provided-buffer CQE."));
+                    return;
+                }
+
+                var bufferId = (int)(flags >> 16);
+                if ((uint)bufferId >= BufferCount)
+                {
+                    Fail(new InvalidOperationException("A multishot receive produced an invalid buffer ID."));
+                    return;
+                }
+
+                var state = _buffers[bufferId];
+                if (state.Page is not { } page
+                    || state.Ownership is not (BufferOwnership.Published or BufferOwnership.PartiallyConsumed))
+                {
+                    Fail(new InvalidOperationException("A multishot receive produced a stale or reused buffer ID."));
+                    return;
+                }
+
+                var offset = state.CompletedOffset;
+                if (result > page.Array.Length - offset)
+                {
+                    Fail(new InvalidOperationException("A multishot receive exceeded the remaining provided buffer capacity."));
+                    return;
+                }
+
+                var finalOffset = offset + result;
+                var bufferHasMore = (completionFlags & LinuxIoUringEngine.CompletionBufferMore) != 0;
+                var receiveHasMore = (completionFlags & LinuxIoUringEngine.CompletionHasMore) != 0;
+                if (bufferHasMore && (!receiveHasMore || finalOffset == page.Array.Length))
+                {
+                    Fail(new InvalidOperationException("A multishot receive produced inconsistent incremental-buffer flags."));
+                    return;
+                }
+
+                _receivedSegments.Enqueue(
+                    new ReceivedSegment(
+                        bufferId,
+                        state.Generation,
+                        page,
+                        state.PageVersion,
+                        offset,
+                        result,
+                        FinalForBuffer: !bufferHasMore));
+                state.CompletedOffset = finalOffset;
+                state.Ownership = bufferHasMore
+                    ? BufferOwnership.PartiallyConsumed
+                    : BufferOwnership.FinalQueued;
+                Interlocked.Increment(ref _completedSegmentCount);
+                if (!bufferHasMore)
+                {
+                    Interlocked.Increment(ref _finalBufferCount);
+                }
+
+                if (!receiveHasMore)
+                {
+                    Finish(needsRearm: true);
+                }
+
+                CompleteWaitingReceive();
+                return;
+            }
+
+            if ((flags & ~LinuxIoUringEngine.CompletionHasSocketData) != 0)
+            {
+                Fail(new InvalidOperationException($"A terminal multishot receive produced invalid CQE flags 0x{flags:x8} for result {result}."));
+                return;
+            }
+
+            if (result == 0)
+            {
+                Finish();
+                CompleteWaitingReceive();
+                return;
+            }
+
+            var socketError = LinuxIoUringEngine.MapSocketErrorCode(-result);
+            if (socketError == SocketError.OperationAborted && (_stopping || Engine.IsShuttingDown))
+            {
+                var hasWaitingReceive = _receiveWaiting;
+                Finish(
+                    hasWaitingReceive ? new SocketException((int)SocketError.OperationAborted) : null,
+                    needsRearm: _stopping && !Engine.IsShuttingDown && !hasWaitingReceive,
+                    stopSucceeded: true);
+                CompleteWaitingReceive();
+                return;
+            }
+
+            if (socketError == SocketError.NoBufferSpaceAvailable)
+            {
+                Interlocked.Increment(ref _noBufferCompletionCount);
+                if (_stopping)
+                {
+                    var hasWaitingReceive = _receiveWaiting;
+                    Finish(
+                        hasWaitingReceive ? new SocketException((int)SocketError.OperationAborted) : null,
+                        needsRearm: !Engine.IsShuttingDown && !hasWaitingReceive,
+                        stopSucceeded: true);
+                    CompleteWaitingReceive();
+                    return;
+                }
+
+                Finish(needsRearm: true);
+                if (_receiveWaiting
+                    && _receivedSegments.Count == 0
+                    && _socketForRearm is { } socket)
+                {
+                    StartReceive(socket);
+                }
+
+                CompleteWaitingReceive();
+                return;
+            }
+
+            Finish(new SocketException((int)socketError));
+            CompleteWaitingReceive();
+        }
+    }
+
+    internal override void Complete(Exception error)
+    {
+        lock (_stateLock)
+        {
+            if (!IsPending)
+            {
+                return;
+            }
+
+            _terminalError = error;
+            _finished = true;
+            _needsRearm = false;
+            RetireSubmission();
+            CompleteWaitingReceive();
+            _stopCompletion?.TrySetException(error);
+        }
+    }
+
+    internal override void OnEngineShutdown()
+    {
+        lock (_stateLock)
+        {
+            if (_bufferRing != IntPtr.Zero)
+            {
+                LinuxIoUringEngine.Native.FreeBufRing(ref Engine.Ring, _bufferRing, BufferCount, _bufferGroup);
+                _bufferRing = IntPtr.Zero;
+            }
+        }
+    }
+
+    internal override void OnEngineShutdownComplete()
+    {
+        lock (_stateLock)
+        {
+            ReleaseReceiverPages();
+            ReleaseBufferGroup();
+        }
+    }
+
+    public override void Dispose()
+    {
+        if (IsPending)
+        {
+            throw new InvalidOperationException("An active multishot receive cannot be disposed.");
+        }
+
+        UnregisterBufferRing();
+
+        lock (_stateLock)
+        {
+            ReleaseReceiverPages();
+            ReleaseBufferGroup();
+        }
+
+        base.Dispose();
+    }
+
+    internal ushort BufferGroup => _bufferGroup;
+
+    internal long AdoptedPageCount => Volatile.Read(ref _adoptedPageCount);
+
+    internal long CompletedSegmentCount => Volatile.Read(ref _completedSegmentCount);
+
+    internal long FinalBufferCount => Volatile.Read(ref _finalBufferCount);
+
+    internal long ReplacementPageCount => Volatile.Read(ref _replacementPageCount);
+
+    internal long NoBufferCompletionCount => Volatile.Read(ref _noBufferCompletionCount);
+
+    internal long ReceiveStartCount => Volatile.Read(ref _receiveStartCount);
+
+    internal ArcBufferPage? FirstAdoptedPage => _firstAdoptedPage;
+
+    internal long PayloadCopyCount => 0;
+
+    internal int ActiveIncrementalPageCount
+    {
+        get
+        {
+            lock (_stateLock)
+            {
+                var result = 0;
+                foreach (var state in _buffers)
+                {
+                    if (state.Ownership == BufferOwnership.PartiallyConsumed)
+                    {
+                        result++;
+                    }
+                }
+
+                return result;
+            }
+        }
+    }
+
+    internal int DrainReceivedPages(ArcBufferWriter writer)
+    {
+        lock (_stateLock)
+        {
+            return AppendReceivedPages(writer);
+        }
+    }
+
+    internal void TransitionToOneShot(ArcBufferWriter writer)
+    {
+        if (IsPending)
+        {
+            throw new InvalidOperationException("A multishot receive must stop before transitioning to one-shot receive.");
+        }
+
+        DrainReceivedPages(writer);
+        UnregisterBufferRing();
+        lock (_stateLock)
+        {
+            AppendReceivedPages(writer);
+            _pendingRefillMask = 0;
+            Volatile.Write(ref _refillQueued, 0);
+            foreach (var state in _buffers)
+            {
+                switch (state.Ownership)
+                {
+                    case BufferOwnership.Free:
+                        AssignFreshPage(state, BufferOwnership.ReceiverOwned);
+                        break;
+                    case BufferOwnership.ReceiverOwned:
+                    case BufferOwnership.PendingPublication:
+                    case BufferOwnership.Published:
+                        if (state.Adopted)
+                        {
+                            throw new InvalidOperationException("A reusable provided-buffer page is still adopted by the receive writer.");
+                        }
+
+                        state.CompletedOffset = 0;
+                        state.Ownership = BufferOwnership.ReceiverOwned;
+                        break;
+                    case BufferOwnership.PartiallyConsumed:
+                        var page = state.Page
+                            ?? throw new InvalidOperationException("A partially consumed provided buffer has no page.");
+                        var pageVersion = state.PageVersion;
+                        ClearState(state);
+                        page.Unpin(pageVersion);
+                        AssignFreshPage(state, BufferOwnership.ReceiverOwned);
+                        break;
+                    case BufferOwnership.FinalQueued:
+                        throw new InvalidOperationException("A final provided-buffer segment remained queued after draining.");
+                    default:
+                        throw new InvalidOperationException("A provided buffer has an invalid ownership state.");
+                }
+            }
+
+            _needsRearm = true;
+        }
+    }
+
+    private void CompleteCancellation(int result)
+    {
+        lock (_stateLock)
+        {
+            if (result != 0 && result != -2 && result != -114)
+            {
+                _stopCompletion?.TrySetException(new InvalidOperationException($"Unable to cancel the multishot receive. errno={-result}"));
+            }
+            else if (!IsPending)
+            {
+                _stopCompletion?.TrySetResult();
+            }
+        }
+    }
+
+    private void CompleteCancellation(Exception error)
+    {
+        lock (_stateLock)
+        {
+            _stopCompletion?.TrySetException(error);
+        }
+    }
+
+    private void CompleteWaitingReceive()
+    {
+        if (!_receiveWaiting || _receiveWriter is not { } writer)
+        {
+            return;
+        }
+
+        var appended = AppendReceivedPages(writer);
+        if (appended > 0)
+        {
+            BytesTransferred = appended;
+            SocketError = SocketError.Success;
+            Error = null;
+            _receiveWriter = null;
+            _receiveWaiting = false;
+            _receiveWaiter.SetResult();
+        }
+        else if (_terminalError is { } error)
+        {
+            Error = error;
+            SocketError = error is SocketException socketException
+                ? socketException.SocketErrorCode
+                : SocketError.SocketError;
+            BytesTransferred = 0;
+            _receiveWriter = null;
+            _receiveWaiting = false;
+            _receiveWaiter.SetException(error);
+        }
+        else if (_finished && !_needsRearm)
+        {
+            BytesTransferred = 0;
+            SocketError = SocketError.Success;
+            Error = null;
+            _receiveWriter = null;
+            _receiveWaiting = false;
+            _receiveWaiter.SetResult();
+        }
+    }
+
+    private int AppendReceivedPages(ArcBufferWriter writer)
+    {
+        var appended = 0;
+        while (_receivedSegments.TryPeek(out var received))
+        {
+            var state = _buffers[received.BufferId];
+            if (state.Generation != received.Generation
+                || !ReferenceEquals(state.Page, received.Page)
+                || state.PageVersion != received.PageVersion)
+            {
+                throw new InvalidOperationException("A received segment refers to a stale provided-buffer generation.");
+            }
+
+            if (received.Offset == 0)
+            {
+                if (state.Adopted)
+                {
+                    throw new InvalidOperationException("A provided-buffer page was adopted more than once.");
+                }
+
+                writer.AppendReceivedPage(received.Page, received.Length);
+                state.Adopted = true;
+                _firstAdoptedPage ??= received.Page;
+                Interlocked.Increment(ref _adoptedPageCount);
+            }
+            else
+            {
+                if (!state.Adopted)
+                {
+                    throw new InvalidOperationException("A later provided-buffer segment arrived before its page was adopted.");
+                }
+
+                writer.AdvanceReceivedPage(received.Page, received.Offset, received.Length);
+            }
+
+            _receivedSegments.Dequeue();
+            appended = checked(appended + received.Length);
+            if (received.FinalForBuffer)
+            {
+                if (state.Ownership != BufferOwnership.FinalQueued
+                    || state.CompletedOffset != received.Offset + received.Length)
+                {
+                    throw new InvalidOperationException("A final provided-buffer segment has inconsistent ownership state.");
+                }
+
+                state.Page = null;
+                state.PageVersion = 0;
+                state.CompletedOffset = 0;
+                state.Adopted = false;
+                state.Ownership = BufferOwnership.Free;
+                received.Page.Unpin(received.PageVersion);
+            }
+        }
+
+        return appended;
+    }
+
+    private void RefillFreeBuffers()
+    {
+        ulong addedBufferMask = 0;
+        for (var i = 0; i < BufferCount; i++)
+        {
+            var state = _buffers[i];
+            if (state.Ownership == BufferOwnership.Free)
+            {
+                AssignFreshPage(state, BufferOwnership.PendingPublication);
+                addedBufferMask |= 1UL << i;
+                Interlocked.Increment(ref _replacementPageCount);
+            }
+        }
+
+        if (addedBufferMask == 0 || _bufferRing == IntPtr.Zero)
+        {
+            return;
+        }
+
+        _pendingRefillMask |= addedBufferMask;
+        try
+        {
+            if (Interlocked.Exchange(ref _refillQueued, 1) == 0)
+            {
+                Engine.EnqueueBufferRefill(this);
+            }
+        }
+        catch
+        {
+            _pendingRefillMask &= ~addedBufferMask;
+            Volatile.Write(ref _refillQueued, 0);
+            for (var bufferId = 0; bufferId < BufferCount; bufferId++)
+            {
+                if ((addedBufferMask & (1UL << bufferId)) == 0)
+                {
+                    continue;
+                }
+
+                var state = _buffers[bufferId];
+                var page = state.Page!;
+                var pageVersion = state.PageVersion;
+                ClearState(state);
+                page.Unpin(pageVersion);
+            }
+
+            throw;
+        }
+    }
+
+    internal void PublishPendingBuffers()
+    {
+        lock (_stateLock)
+        {
+            var bufferMask = _pendingRefillMask;
+            _pendingRefillMask = 0;
+            Volatile.Write(ref _refillQueued, 0);
+            if (_bufferRing == IntPtr.Zero)
+            {
+                return;
+            }
+
+            var ring = (LinuxIoUringEngine.IoUringBufferRing*)_bufferRing;
+            var added = 0;
+            for (var bufferId = 0; bufferId < BufferCount; bufferId++)
+            {
+                if ((bufferMask & (1UL << bufferId)) == 0)
+                {
+                    continue;
+                }
+
+                var state = _buffers[bufferId];
+                var page = state.Page
+                    ?? throw new InvalidOperationException("A provided-buffer page was detached before publication.");
+                if (state.Ownership != BufferOwnership.PendingPublication)
+                {
+                    throw new InvalidOperationException("A provided-buffer page has invalid publication ownership.");
+                }
+
+                AddBuffer(ring, page, bufferId, added++);
+            }
+
+            LinuxIoUringEngine.AdvanceBufferRing(ring, added);
+            for (var bufferId = 0; bufferId < BufferCount; bufferId++)
+            {
+                if ((bufferMask & (1UL << bufferId)) != 0)
+                {
+                    _buffers[bufferId].Ownership = BufferOwnership.Published;
+                }
+            }
+        }
+    }
+
+    private static void AddBuffer(
+        LinuxIoUringEngine.IoUringBufferRing* ring,
+        ArcBufferPage page,
+        int bufferId,
+        int offset)
+    {
+        var buffers = (LinuxIoUringEngine.IoUringBuffer*)ring;
+        var buffer = &buffers[(ring->Tail + offset) & (BufferCount - 1)];
+        buffer->Address = (ulong)Marshal.UnsafeAddrOfPinnedArrayElement(page.Array, 0);
+        buffer->Length = checked((uint)page.Array.Length);
+        buffer->Id = checked((ushort)bufferId);
+    }
+
+    private void Finish(Exception? error = null, bool needsRearm = false, bool stopSucceeded = false)
+    {
+        if (_finished)
+        {
+            return;
+        }
+
+        _finished = true;
+        _needsRearm = needsRearm;
+        _terminalError = error;
+        RetireSubmission();
+        if (_stopCompletion is { } stopCompletion)
+        {
+            if (error is null || stopSucceeded)
+            {
+                stopCompletion.TrySetResult();
+            }
+            else
+            {
+                stopCompletion.TrySetException(error);
+            }
+        }
+    }
+
+    private void Fail(Exception error)
+    {
+        _terminalError = error;
+        _finished = true;
+        _needsRearm = false;
+        RetireSubmission();
+        CompleteWaitingReceive();
+        _stopCompletion?.TrySetException(error);
+    }
+
+    private static ArcBufferPage RentPage()
+    {
+        var page = ArcBufferPagePool.Shared.Rent(BufferSize);
+        if (!page.IsMinimumSize || page.ReferenceCount != 0)
+        {
+            throw new InvalidOperationException("The provided-buffer pool returned an invalid page.");
+        }
+
+        return page;
+    }
+
+    private static void AssignFreshPage(BufferState state, BufferOwnership ownership)
+    {
+        var page = RentPage();
+        var pageVersion = page.Version;
+        page.Pin(pageVersion);
+        state.Page = page;
+        state.PageVersion = pageVersion;
+        state.CompletedOffset = 0;
+        state.Adopted = false;
+        state.Generation = unchecked(state.Generation + 1);
+        if (state.Generation == 0)
+        {
+            state.Generation = 1;
+        }
+
+        state.Ownership = ownership;
+    }
+
+    private void ReleaseReceiverPages()
+    {
+        _pendingRefillMask = 0;
+        Volatile.Write(ref _refillQueued, 0);
+        _receivedSegments.Clear();
+        foreach (var state in _buffers)
+        {
+            if (state?.Page is not { } page)
+            {
+                continue;
+            }
+
+            var pageVersion = state.PageVersion;
+            ClearState(state);
+            page.Unpin(pageVersion);
+        }
+    }
+
+    private static void ClearState(BufferState state)
+    {
+        state.Page = null;
+        state.PageVersion = 0;
+        state.CompletedOffset = 0;
+        state.Adopted = false;
+        state.Ownership = BufferOwnership.Free;
+    }
+
+    private void ReleaseBufferGroup()
+    {
+        if (!_bufferGroupReleased)
+        {
+            _bufferGroupReleased = true;
+            Engine.ReleaseBufferGroup(_bufferGroup);
+        }
+    }
+
+    private void UnregisterBufferRing()
+    {
+        if (_bufferRing == IntPtr.Zero)
+        {
+            return;
+        }
+
+        Engine.RunOnEngineThread(() =>
+        {
+            if (_bufferRing != IntPtr.Zero)
+            {
+                var result = LinuxIoUringEngine.Native.FreeBufRing(ref Engine.Ring, _bufferRing, BufferCount, _bufferGroup);
+                if (result < 0)
+                {
+                    throw new InvalidOperationException($"Unable to free the io_uring provided buffer ring. errno={-result}");
+                }
+
+                _bufferRing = IntPtr.Zero;
+            }
+        });
+    }
+
+    private void StartReceive(Socket socket)
+    {
+        if (IsPending)
+        {
+            throw new InvalidOperationException("A multishot receive is already active.");
+        }
+
+        _socketForRearm = socket;
+        _finished = false;
+        _needsRearm = false;
+        _terminalError = null;
+        _stopping = false;
+        _stopCompletion = null;
+        Interlocked.Increment(ref _receiveStartCount);
+        BeginPreparation();
+        try
+        {
+            SubmitPrepared(
+                checked((int)socket.Handle),
+                IntPtr.Zero,
+                0,
+                LinuxIoUringEngine.ReceiveOperation,
+                waitForNotification: false);
+        }
+        catch
+        {
+            _socketForRearm = null;
+            throw;
+        }
+    }
+
+    private enum BufferOwnership : byte
+    {
+        Free,
+        ReceiverOwned,
+        PendingPublication,
+        Published,
+        PartiallyConsumed,
+        FinalQueued,
+    }
+
+    private sealed class BufferState
+    {
+        internal ArcBufferPage? Page;
+        internal int PageVersion;
+        internal int CompletedOffset;
+        internal uint Generation;
+        internal bool Adopted;
+        internal BufferOwnership Ownership;
+    }
+
+    private readonly record struct ReceivedSegment(
+        int BufferId,
+        uint Generation,
+        ArcBufferPage Page,
+        int PageVersion,
+        int Offset,
+        int Length,
+        bool FinalForBuffer);
+
+    private sealed class ReceiveWaiter : IValueTaskSource
+    {
+        private ManualResetValueTaskSourceCore<bool> _source = new()
+        {
+            RunContinuationsAsynchronously = true,
+        };
+
+        public ValueTask Reset()
+        {
+            _source.Reset();
+            return new ValueTask(this, _source.Version);
+        }
+
+        public void SetResult() => _source.SetResult(true);
+
+        public void SetException(Exception error) => _source.SetException(error);
+
+        public void GetResult(short token) => _source.GetResult(token);
+
+        public ValueTaskSourceStatus GetStatus(short token) => _source.GetStatus(token);
+
+        public void OnCompleted(
+            Action<object?> continuation,
+            object? state,
+            short token,
+            ValueTaskSourceOnCompletedFlags flags)
+            => _source.OnCompleted(continuation, state, token, flags);
+    }
+}
+
+internal sealed unsafe class LinuxIoUringCancelOperation : LinuxIoUringOperation
+{
+    private const byte AsyncCancelOperation = 14;
+    private const uint AsyncCancelUserData = 1 << 4;
+    private readonly ulong _target;
+    private readonly Action<int> _completed;
+    private readonly Action<Exception> _failed;
+
+    public LinuxIoUringCancelOperation(
+        LinuxIoUringEngine engine,
+        ulong target,
+        Action<int> completed,
+        Action<Exception> failed)
+        : base(engine)
+    {
+        _target = target;
+        _completed = completed;
+        _failed = failed;
+        try
+        {
+            BeginPreparation();
+            SubmitPrepared(
+                fileDescriptor: -1,
+                bufferAddress: (IntPtr)target,
+                bufferLength: 0,
+                operationCode: AsyncCancelOperation,
+                waitForNotification: false);
+        }
+        catch
+        {
+            base.Dispose();
+            throw;
+        }
+    }
+
+    internal override void PrepareSubmission(LinuxIoUringEngine.IoUringSubmission* submission)
+        => submission->OperationFlags = AsyncCancelUserData;
+
+    internal override void HandleCompletion(int result, uint flags)
+    {
+        Complete(result, queueContinuation: false);
+        try
+        {
+            _completed(result);
+        }
+        finally
+        {
+            Dispose();
+        }
+    }
+
+    internal override void Complete(Exception error)
+    {
+        base.Complete(error);
+        try
+        {
+            _failed(error);
+        }
+        finally
+        {
+            Dispose();
+        }
     }
 }
 
@@ -307,11 +1301,11 @@ internal abstract class LinuxIoUringOperation : IValueTaskSource, IDisposable
         (_slotToken, _generation) = _engine.Register(this);
     }
 
-    public int BytesTransferred { get; private set; }
+    public int BytesTransferred { get; protected set; }
 
-    public SocketError SocketError { get; private set; }
+    public SocketError SocketError { get; protected set; }
 
-    public Exception? Error { get; private set; }
+    public Exception? Error { get; protected set; }
 
     [MemberNotNullWhen(true, nameof(Error))]
     public bool HasError => Error is not null;
@@ -338,6 +1332,20 @@ internal abstract class LinuxIoUringOperation : IValueTaskSource, IDisposable
     internal ulong Generation => _generation;
 
     internal bool IsPending => Volatile.Read(ref _state) == StatePending;
+
+    internal virtual bool IsMultishot => false;
+
+    internal virtual void PrepareSubmission(LinuxIoUringEngine.IoUringSubmission* submission)
+    {
+    }
+
+    internal virtual void OnEngineShutdown()
+    {
+    }
+
+    internal virtual void OnEngineShutdownComplete()
+    {
+    }
 
     protected ValueTask Submit(
         Socket socket,
@@ -382,11 +1390,40 @@ internal abstract class LinuxIoUringOperation : IValueTaskSource, IDisposable
         int bufferLength,
         byte operationCode,
         bool waitForNotification)
+        => SubmitPrepared(
+            checked((int)socket.Handle),
+            bufferAddress,
+            bufferLength,
+            operationCode,
+            waitForNotification,
+            socket);
+
+    protected ValueTask SubmitPrepared(
+        int fileDescriptor,
+        IntPtr bufferAddress,
+        int bufferLength,
+        byte operationCode,
+        bool waitForNotification)
+        => SubmitPrepared(
+            fileDescriptor,
+            bufferAddress,
+            bufferLength,
+            operationCode,
+            waitForNotification,
+            socket: null);
+
+    private ValueTask SubmitPrepared(
+        int fileDescriptor,
+        IntPtr bufferAddress,
+        int bufferLength,
+        byte operationCode,
+        bool waitForNotification,
+        Socket? socket)
     {
         try
         {
             _socket = socket;
-            _fileDescriptor = checked((int)socket.Handle);
+            _fileDescriptor = fileDescriptor;
             _bufferAddress = bufferAddress;
             _bufferLength = bufferLength;
             OperationCode = operationCode;
@@ -438,7 +1475,12 @@ internal abstract class LinuxIoUringOperation : IValueTaskSource, IDisposable
 
     internal void SetPrimaryResult(int result) => _primaryResult = result;
 
-    internal void Complete(int result, bool queueContinuation)
+    internal virtual void HandleCompletion(int result, uint flags)
+    {
+        Complete(result, result >= 0);
+    }
+
+    internal virtual void Complete(int result, bool queueContinuation)
     {
         if (Interlocked.CompareExchange(ref _state, StateCompleting, StatePending) != StatePending)
         {
@@ -463,7 +1505,7 @@ internal abstract class LinuxIoUringOperation : IValueTaskSource, IDisposable
         SignalCompletion(queueContinuation);
     }
 
-    internal void Complete(Exception error)
+    internal virtual void Complete(Exception error)
     {
         if (Interlocked.CompareExchange(ref _state, StateCompleting, StatePending) != StatePending)
         {
@@ -518,6 +1560,16 @@ internal abstract class LinuxIoUringOperation : IValueTaskSource, IDisposable
         _engine.Unregister(this);
     }
 
+    protected void RetireSubmission()
+    {
+        if (Interlocked.CompareExchange(ref _state, StateIdle, StatePending) != StatePending)
+        {
+            throw new InvalidOperationException("The io_uring operation received an unexpected final completion.");
+        }
+
+        ReleaseSubmission();
+    }
+
     private void ReleaseSubmission()
     {
         _socket = null;
@@ -540,21 +1592,7 @@ internal abstract class LinuxIoUringOperation : IValueTaskSource, IDisposable
         }
     }
 
-    private static SocketError MapSocketError(int errno) => errno switch
-    {
-        4 => SocketError.Interrupted,
-        9 or 125 => SocketError.OperationAborted,
-        11 => SocketError.WouldBlock,
-        12 or 105 => SocketError.NoBufferSpaceAvailable,
-        22 => SocketError.InvalidArgument,
-        32 => SocketError.Shutdown,
-        103 => SocketError.ConnectionAborted,
-        104 => SocketError.ConnectionReset,
-        107 => SocketError.NotConnected,
-        110 => SocketError.TimedOut,
-        111 => SocketError.ConnectionRefused,
-        _ => SocketError.SocketError,
-    };
+    private static SocketError MapSocketError(int errno) => LinuxIoUringEngine.MapSocketErrorCode(errno);
 
     private void SignalCompletion(bool queueContinuation)
     {
@@ -585,11 +1623,16 @@ internal sealed unsafe partial class LinuxIoUringEngine
     internal const byte ReceiveMessageOperation = 10;
     internal const byte SendZeroCopyOperation = 47;
     internal const byte SendMessageZeroCopyOperation = 48;
+    internal const byte BufferSelect = 1 << 5;
+    internal const uint ReceiveMultishot = 1 << 1;
+    internal const uint CompletionHasBuffer = 1;
+    internal const uint CompletionBufferMore = 1 << 4;
 
     private const byte PollOperation = 6;
     private const uint PollIn = 1;
-    private const uint CompletionHasMore = 1 << 1;
-    private const uint CompletionIsNotification = 1 << 3;
+    internal const uint CompletionHasMore = 1 << 1;
+    internal const uint CompletionHasSocketData = 1 << 2;
+    internal const uint CompletionIsNotification = 1 << 3;
     private const uint SetupSubmitAll = 1 << 7;
     private const uint SetupCooperativeTaskRun = 1 << 8;
     private const uint SetupSingleIssuer = 1 << 12;
@@ -609,13 +1652,17 @@ internal sealed unsafe partial class LinuxIoUringEngine
 
     private static readonly Lazy<LinuxIoUringEngine>[] Engines = CreateEngines();
     private static int _nextEngine = -1;
+    private readonly ConcurrentQueue<LinuxIoUringSocketMultishotReceiver> _bufferRefills = new();
     private readonly ConcurrentQueue<LinuxIoUringOperation> _pending = new();
+    private readonly object _bufferGroupsLock = new();
     private readonly object _operationsLock = new();
+    private readonly Stack<ushort> _freeBufferGroups = [];
     private readonly Stack<int> _freeOperationSlots = [];
     private readonly ManualResetEventSlim _started = new(initialState: false);
     private readonly int _engineId;
     private LinuxIoUringOperation?[] _operations = new LinuxIoUringOperation[InitialOperationCapacity];
     private ulong[] _operationGenerations = new ulong[InitialOperationCapacity];
+    private int _actionEnqueuers;
     private int _operationCount;
     private IoUring _ring;
     private Exception? _fatalError;
@@ -627,6 +1674,8 @@ internal sealed unsafe partial class LinuxIoUringEngine
     private long _zeroCopyNotificationCompletions;
     private long _zeroCopyFallbackCompletions;
     private bool _wakePollArmed;
+    private readonly ConcurrentQueue<EngineAction> _actions = new();
+    private int _nextBufferGroup = 1;
 
     private LinuxIoUringEngine(int engineId)
     {
@@ -671,6 +1720,89 @@ internal sealed unsafe partial class LinuxIoUringEngine
                     out var enabled)
                 && enabled);
 
+    internal ref IoUring Ring => ref _ring;
+
+    internal bool IsShuttingDown => Volatile.Read(ref _fatalError) is not null;
+
+    internal bool IsEngineThread => Environment.CurrentManagedThreadId == Volatile.Read(ref _engineThreadId);
+
+    internal void EnqueueAction(Action action)
+    {
+        if (IsEngineThread)
+        {
+            action();
+            return;
+        }
+
+        Interlocked.Increment(ref _actionEnqueuers);
+        try
+        {
+            if (Volatile.Read(ref _fatalError) is { } error)
+            {
+                throw new InvalidOperationException("The io_uring engine is not available.", error);
+            }
+
+            _actions.Enqueue(new EngineAction(action, completion: null));
+            Wake();
+        }
+        finally
+        {
+            Interlocked.Decrement(ref _actionEnqueuers);
+        }
+    }
+
+    internal void EnqueueBufferRefill(LinuxIoUringSocketMultishotReceiver receiver)
+    {
+        if (IsEngineThread)
+        {
+            receiver.PublishPendingBuffers();
+            return;
+        }
+
+        Interlocked.Increment(ref _actionEnqueuers);
+        try
+        {
+            if (Volatile.Read(ref _fatalError) is { } error)
+            {
+                throw new InvalidOperationException("The io_uring engine is not available.", error);
+            }
+
+            _bufferRefills.Enqueue(receiver);
+            Wake();
+        }
+        finally
+        {
+            Interlocked.Decrement(ref _actionEnqueuers);
+        }
+    }
+
+    internal void RunOnEngineThread(Action action)
+    {
+        if (IsEngineThread)
+        {
+            action();
+            return;
+        }
+
+        var completion = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        Interlocked.Increment(ref _actionEnqueuers);
+        try
+        {
+            if (Volatile.Read(ref _fatalError) is { } error)
+            {
+                throw new InvalidOperationException("The io_uring engine is not available.", error);
+            }
+
+            _actions.Enqueue(new EngineAction(action, completion));
+            Wake();
+        }
+        finally
+        {
+            Interlocked.Decrement(ref _actionEnqueuers);
+        }
+        completion.Task.GetAwaiter().GetResult();
+    }
+
     internal static LinuxIoUringEngine GetOther(LinuxIoUringEngine engine)
         => Engines.Length == 1
             ? engine
@@ -692,6 +1824,32 @@ internal sealed unsafe partial class LinuxIoUringEngine
         }
 
         return (primary, notifications, fallbacks);
+    }
+
+    internal ushort AllocateBufferGroup()
+    {
+        lock (_bufferGroupsLock)
+        {
+            if (_freeBufferGroups.TryPop(out var bufferGroup))
+            {
+                return bufferGroup;
+            }
+
+            if (_nextBufferGroup > ushort.MaxValue)
+            {
+                throw new InvalidOperationException("The io_uring engine has no available provided-buffer groups.");
+            }
+
+            return checked((ushort)_nextBufferGroup++);
+        }
+    }
+
+    internal void ReleaseBufferGroup(ushort bufferGroup)
+    {
+        lock (_bufferGroupsLock)
+        {
+            _freeBufferGroups.Push(bufferGroup);
+        }
     }
 
     internal (uint SlotToken, ulong Generation) Register(LinuxIoUringOperation operation)
@@ -773,6 +1931,12 @@ internal sealed unsafe partial class LinuxIoUringEngine
             return;
         }
 
+        Wake();
+        Interlocked.Decrement(ref _enqueuers);
+    }
+
+    private void Wake()
+    {
         ulong value = 1;
         while (Native.Write(_eventFd, &value, sizeof(ulong)) < 0)
         {
@@ -795,8 +1959,6 @@ internal sealed unsafe partial class LinuxIoUringEngine
 
             break;
         }
-
-        Interlocked.Decrement(ref _enqueuers);
     }
 
     private void Run()
@@ -818,6 +1980,16 @@ internal sealed unsafe partial class LinuxIoUringEngine
 
             while (true)
             {
+                while (_bufferRefills.TryDequeue(out var receiver))
+                {
+                    receiver.PublishPendingBuffers();
+                }
+
+                while (_actions.TryDequeue(out var action))
+                {
+                    action.Execute();
+                }
+
                 SubmitPending();
                 if (!HasCompletions())
                 {
@@ -837,8 +2009,22 @@ internal sealed unsafe partial class LinuxIoUringEngine
                 spinner.SpinOnce();
             }
 
+            while (Volatile.Read(ref _actionEnqueuers) != 0)
+            {
+                spinner.SpinOnce();
+            }
+
             while (_pending.TryDequeue(out _))
             {
+            }
+
+            while (_bufferRefills.TryDequeue(out _))
+            {
+            }
+
+            while (_actions.TryDequeue(out var action))
+            {
+                action.Fail(error);
             }
 
             var operations = Volatile.Read(ref _operations);
@@ -852,8 +2038,17 @@ internal sealed unsafe partial class LinuxIoUringEngine
 
             if (_ringInitialized)
             {
+                foreach (var operation in operations)
+                {
+                    operation?.OnEngineShutdown();
+                }
+
                 _ringInitialized = false;
                 Native.QueueExit(ref _ring);
+                foreach (var operation in operations)
+                {
+                    operation?.OnEngineShutdownComplete();
+                }
             }
 
             if (_eventFd >= 0)
@@ -896,6 +2091,7 @@ internal sealed unsafe partial class LinuxIoUringEngine
                 sqe->Address = (ulong)operation.BufferAddress;
                 sqe->Length = checked((uint)operation.BufferLength);
                 sqe->UserData = operation.UserData;
+                operation.PrepareSubmission(sqe);
 
                 submitted++;
                 if (submitted == 1024)
@@ -955,7 +2151,11 @@ internal sealed unsafe partial class LinuxIoUringEngine
                 throw new InvalidOperationException($"io_uring completion {userData} has no owner.");
             }
 
-            if (operation.WaitForNotification)
+            if (operation.IsMultishot)
+            {
+                operation.HandleCompletion(result, flags);
+            }
+            else if (operation.WaitForNotification)
             {
                 if ((flags & CompletionIsNotification) != 0)
                 {
@@ -1079,6 +2279,22 @@ internal sealed unsafe partial class LinuxIoUringEngine
         }
     }
 
+    internal static SocketError MapSocketErrorCode(int errno) => errno switch
+    {
+        4 => SocketError.Interrupted,
+        9 or 125 => SocketError.OperationAborted,
+        11 => SocketError.WouldBlock,
+        12 or 105 => SocketError.NoBufferSpaceAvailable,
+        22 => SocketError.InvalidArgument,
+        32 => SocketError.Shutdown,
+        103 => SocketError.ConnectionAborted,
+        104 => SocketError.ConnectionReset,
+        107 => SocketError.NotConnected,
+        110 => SocketError.TimedOut,
+        111 => SocketError.ConnectionRefused,
+        _ => SocketError.SocketError,
+    };
+
     private bool Submit()
     {
         var drainedCompletions = false;
@@ -1120,7 +2336,7 @@ internal sealed unsafe partial class LinuxIoUringEngine
     }
 
     [StructLayout(LayoutKind.Sequential)]
-    private struct IoUringSubmissionQueue
+    internal struct IoUringSubmissionQueue
     {
         internal uint* KernelHead;
         internal uint* KernelTail;
@@ -1141,7 +2357,7 @@ internal sealed unsafe partial class LinuxIoUringEngine
     }
 
     [StructLayout(LayoutKind.Sequential)]
-    private struct IoUringCompletionQueue
+    internal struct IoUringCompletionQueue
     {
         internal uint* KernelHead;
         internal uint* KernelTail;
@@ -1159,7 +2375,7 @@ internal sealed unsafe partial class LinuxIoUringEngine
     }
 
     [StructLayout(LayoutKind.Sequential)]
-    private struct IoUring
+    internal struct IoUring
     {
         internal IoUringSubmissionQueue Submission;
         internal IoUringCompletionQueue Completion;
@@ -1175,7 +2391,7 @@ internal sealed unsafe partial class LinuxIoUringEngine
     }
 
     [StructLayout(LayoutKind.Explicit, Size = 64)]
-    private struct IoUringSubmission
+    internal struct IoUringSubmission
     {
         [FieldOffset(0)] internal byte Opcode;
         [FieldOffset(1)] internal byte Flags;
@@ -1194,14 +2410,14 @@ internal sealed unsafe partial class LinuxIoUringEngine
     }
 
     [StructLayout(LayoutKind.Sequential)]
-    private readonly struct IoUringCompletion
+    internal readonly struct IoUringCompletion
     {
         internal readonly ulong UserData;
         internal readonly int Result;
         internal readonly uint Flags;
     }
 
-    private static partial class Native
+    internal static partial class Native
     {
         [LibraryImport("liburing.so.2", EntryPoint = "io_uring_queue_init")]
         internal static partial int QueueInit(uint entries, ref IoUring ring, uint flags);
@@ -1215,6 +2431,21 @@ internal sealed unsafe partial class LinuxIoUringEngine
         [LibraryImport("liburing.so.2", EntryPoint = "io_uring_queue_exit")]
         internal static partial void QueueExit(ref IoUring ring);
 
+        [LibraryImport("liburing.so.2", EntryPoint = "io_uring_setup_buf_ring")]
+        internal static partial IntPtr SetupBufRing(
+            ref IoUring ring,
+            uint entries,
+            int bufferGroup,
+            uint flags,
+            int* error);
+
+        [LibraryImport("liburing.so.2", EntryPoint = "io_uring_free_buf_ring")]
+        internal static partial int FreeBufRing(
+            ref IoUring ring,
+            IntPtr bufferRing,
+            uint entries,
+            int bufferGroup);
+
         [LibraryImport("libc", EntryPoint = "eventfd", SetLastError = true)]
         internal static partial int EventFd(uint initialValue, int flags);
 
@@ -1226,5 +2457,61 @@ internal sealed unsafe partial class LinuxIoUringEngine
 
         [LibraryImport("libc", EntryPoint = "close")]
         internal static partial int Close(int fileDescriptor);
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    internal struct IoUringBuffer
+    {
+        internal ulong Address;
+        internal uint Length;
+        internal ushort Id;
+        private ushort _reserved;
+    }
+
+    [StructLayout(LayoutKind.Explicit, Size = 16)]
+    internal struct IoUringBufferRing
+    {
+        [FieldOffset(0)] internal ulong Reserved1;
+        [FieldOffset(8)] internal uint Reserved2;
+        [FieldOffset(12)] internal ushort Reserved3;
+        [FieldOffset(14)] internal ushort Tail;
+    }
+
+    internal static void AdvanceBufferRing(IoUringBufferRing* ring, int count)
+    {
+        Volatile.Write(ref ring->Tail, unchecked((ushort)(ring->Tail + count)));
+    }
+
+    private sealed class EngineAction
+    {
+        private readonly Action _action;
+        private readonly TaskCompletionSource? _completion;
+
+        internal EngineAction(Action action, TaskCompletionSource? completion)
+        {
+            _action = action;
+            _completion = completion;
+        }
+
+        internal void Execute()
+        {
+            if (_completion is null)
+            {
+                _action();
+                return;
+            }
+
+            try
+            {
+                _action();
+                _completion.TrySetResult();
+            }
+            catch (Exception error)
+            {
+                _completion.TrySetException(error);
+            }
+        }
+
+        internal void Fail(Exception error) => _completion?.TrySetException(error);
     }
 }
