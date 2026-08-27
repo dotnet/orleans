@@ -350,7 +350,8 @@ internal static class ProcessPingBenchmark
             Console.WriteLine(
                 $"PING_IOURING zeroCopyPrimary={statistics.Primary} " +
                 $"zeroCopyNotifications={statistics.Notifications} " +
-                $"zeroCopyFallbacks={statistics.Fallbacks}");
+                $"zeroCopyFallbacks={statistics.Fallbacks} " +
+                $"zeroCopyCopied={statistics.Copied}");
         }
     }
 

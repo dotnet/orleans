@@ -1111,6 +1111,8 @@ internal sealed unsafe class LinuxIoUringSocketSender : LinuxIoUringOperation, I
     private const int ZeroCopyThreshold = 16 * 1024;
     private const int MaximumScatterBuffers = 64;
     private const ushort SendVectorized = 1 << 5;
+    private const ushort SendZeroCopyReportUsage = 1 << 3;
+    private const uint ZeroCopyCopied = 1U << 31;
     private static readonly bool UseVectorizedSend =
         OperatingSystem.IsLinux()
         && (Environment.OSVersion.Version.Major > 6
@@ -1123,6 +1125,8 @@ internal sealed unsafe class LinuxIoUringSocketSender : LinuxIoUringOperation, I
     private readonly IntPtr _iovecs;
     private readonly IntPtr _messageHeader;
     private int _scatterPinCount;
+    private int _consecutiveCopiedZeroCopySends;
+    private int _zeroCopyDisabled;
     private bool _vectorized;
 
     public LinuxIoUringSocketSender(LinuxIoUringEngine? engine = null)
@@ -1159,7 +1163,9 @@ internal sealed unsafe class LinuxIoUringSocketSender : LinuxIoUringOperation, I
             totalLength += buffer.Count;
         }
 
-        var useZeroCopyOperation = useZeroCopy && totalLength >= ZeroCopyThreshold;
+        var useZeroCopyOperation = useZeroCopy
+            && Volatile.Read(ref _zeroCopyDisabled) == 0
+            && totalLength >= ZeroCopyThreshold;
 
         if (buffers.Count == 1)
         {
@@ -1243,7 +1249,9 @@ internal sealed unsafe class LinuxIoUringSocketSender : LinuxIoUringOperation, I
             throw new ArgumentException("The send buffer must be array-backed.", nameof(memory));
         }
 
-        var operation = useZeroCopy && buffer.Count >= ZeroCopyThreshold
+        var operation = useZeroCopy
+            && Volatile.Read(ref _zeroCopyDisabled) == 0
+            && buffer.Count >= ZeroCopyThreshold
             ? LinuxIoUringEngine.SendZeroCopyOperation
             : LinuxIoUringEngine.SendOperation;
         return Submit(
@@ -1276,9 +1284,26 @@ internal sealed unsafe class LinuxIoUringSocketSender : LinuxIoUringOperation, I
 
     internal override void PrepareSubmission(LinuxIoUringEngine.IoUringSubmission* submission)
     {
+        if (WaitForNotification)
+        {
+            submission->IoPriority |= SendZeroCopyReportUsage;
+        }
+
         if (_vectorized)
         {
-            submission->IoPriority = SendVectorized;
+            submission->IoPriority |= SendVectorized;
+        }
+    }
+
+    internal override void SetZeroCopyUsage(int result)
+    {
+        if (((uint)result & ZeroCopyCopied) == 0)
+        {
+            Volatile.Write(ref _consecutiveCopiedZeroCopySends, 0);
+        }
+        else if (Interlocked.Increment(ref _consecutiveCopiedZeroCopySends) >= 4)
+        {
+            Volatile.Write(ref _zeroCopyDisabled, 1);
         }
     }
 
@@ -1376,6 +1401,10 @@ internal abstract class LinuxIoUringOperation : IValueTaskSource, IDisposable
     }
 
     internal virtual void OnEngineShutdownComplete()
+    {
+    }
+
+    internal virtual void SetZeroCopyUsage(int result)
     {
     }
 
@@ -1705,6 +1734,7 @@ internal sealed unsafe partial class LinuxIoUringEngine
     private long _zeroCopyPrimaryCompletions;
     private long _zeroCopyNotificationCompletions;
     private long _zeroCopyFallbackCompletions;
+    private long _zeroCopyCopiedCompletions;
     private bool _wakePollArmed;
     private readonly ConcurrentQueue<EngineAction> _actions = new();
     private int _nextBufferGroup = 1;
@@ -1840,11 +1870,12 @@ internal sealed unsafe partial class LinuxIoUringEngine
             ? engine
             : Engines[(engine._engineId + 1) % Engines.Length].Value;
 
-    internal static (long Primary, long Notifications, long Fallbacks) GetZeroCopyStatistics()
+    internal static (long Primary, long Notifications, long Fallbacks, long Copied) GetZeroCopyStatistics()
     {
         long primary = 0;
         long notifications = 0;
         long fallbacks = 0;
+        long copied = 0;
         foreach (var engine in Engines)
         {
             if (engine.IsValueCreated)
@@ -1852,10 +1883,11 @@ internal sealed unsafe partial class LinuxIoUringEngine
                 primary += Volatile.Read(ref engine.Value._zeroCopyPrimaryCompletions);
                 notifications += Volatile.Read(ref engine.Value._zeroCopyNotificationCompletions);
                 fallbacks += Volatile.Read(ref engine.Value._zeroCopyFallbackCompletions);
+                copied += Volatile.Read(ref engine.Value._zeroCopyCopiedCompletions);
             }
         }
 
-        return (primary, notifications, fallbacks);
+        return (primary, notifications, fallbacks, copied);
     }
 
     internal ushort AllocateBufferGroup()
@@ -2192,6 +2224,12 @@ internal sealed unsafe partial class LinuxIoUringEngine
                 if ((flags & CompletionIsNotification) != 0)
                 {
                     Interlocked.Increment(ref _zeroCopyNotificationCompletions);
+                    operation.SetZeroCopyUsage(result);
+                    if (((uint)result & (1U << 31)) != 0)
+                    {
+                        Interlocked.Increment(ref _zeroCopyCopiedCompletions);
+                    }
+
                     operation.Complete(
                         operation.PrimaryResult,
                         operation.PrimaryResult >= QueueContinuationThreshold);
@@ -2201,6 +2239,7 @@ internal sealed unsafe partial class LinuxIoUringEngine
                     if (result >= 0)
                     {
                         Interlocked.Increment(ref _zeroCopyFallbackCompletions);
+                        operation.SetZeroCopyUsage(unchecked((int)(1U << 31)));
                     }
 
                     operation.Complete(result, result >= QueueContinuationThreshold);
