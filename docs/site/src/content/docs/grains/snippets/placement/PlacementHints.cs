@@ -34,7 +34,6 @@ public sealed class OrderCoordinatorGrain(
             ?? throw new InvalidOperationException(
                 "No active remote silo is available.");
 
-        var worker = GrainFactory.GetGrain<IOrderWorkerGrain>(orderId);
         var previousHint = RequestContext.Get(
             IPlacementDirector.PlacementHintKey);
 
@@ -44,6 +43,7 @@ public sealed class OrderCoordinatorGrain(
 
         try
         {
+            var worker = GrainFactory.GetGrain<IOrderWorkerGrain>(orderId);
             await worker.ProcessOrder();
         }
         finally

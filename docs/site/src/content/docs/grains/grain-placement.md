@@ -84,7 +84,7 @@ Placement happens when creating an activation. Changing cluster membership or a 
 
 ## Direct placement with placement hints
 
-A placement hint directs a new activation to a specific silo. Set <xref:Orleans.Runtime.Placement.IPlacementDirector.PlacementHintKey> in <xref:Orleans.Runtime.RequestContext> before making the grain call which can trigger activation. The built-in placement directors select the hinted silo when it belongs to the compatible candidate set after version compatibility and placement filters are applied.
+A placement hint directs a new activation to a specific silo. Set <xref:Orleans.Runtime.Placement.IPlacementDirector.PlacementHintKey> in <xref:Orleans.Runtime.RequestContext> before making the grain call that can trigger activation. The built-in placement directors select the hinted silo when it belongs to the compatible candidate set after version compatibility and placement filters are applied.
 
 The following grain injects <xref:Orleans.Runtime.IClusterMembershipService> and <xref:Orleans.Runtime.ILocalSiloDetails>, selects an active silo other than its own, and directs a worker activation there:
 
