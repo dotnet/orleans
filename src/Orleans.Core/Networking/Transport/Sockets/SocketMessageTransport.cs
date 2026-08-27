@@ -25,8 +25,8 @@ internal sealed partial class SocketMessageTransport : MessageTransportBase
     private static readonly bool IsWindows = RuntimeInformation.IsOSPlatform(OSPlatform.Windows);
     private static readonly bool IsMacOS = RuntimeInformation.IsOSPlatform(OSPlatform.OSX);
 
-    private readonly SocketSender _socketSender = new();
-    private readonly SocketReceiver _socketReceiver = new();
+    private readonly ISocketSender _socketSender;
+    private readonly ISocketReceiver _socketReceiver;
     private readonly Socket _socket;
     private readonly Queue<ReadRequest> _readRequests = new();
     private readonly SingleWaiterAutoResetEvent _readSignal = new() { RunContinuationsAsynchronously = false };
@@ -36,6 +36,7 @@ internal sealed partial class SocketMessageTransport : MessageTransportBase
     private readonly CancellationTokenSource _connectionClosedCts = new();
     private readonly object _shutdownLock = new();
     private readonly object _readsLock = new();
+    private readonly bool _useLinuxIoUring;
     private readonly string _remoteEndpointString; // For diagnostics only
     private readonly string _localEndpointString; // For diagnostics only
     private readonly StripedMpscBuffer<WriteRequest> _writeRequests = new(
@@ -52,9 +53,17 @@ internal sealed partial class SocketMessageTransport : MessageTransportBase
     private int _disposeStarted;
 
     public SocketMessageTransport(Socket socket, ILogger logger)
+        : this(socket, logger, useLinuxIoUring: false)
+    {
+    }
+
+    internal SocketMessageTransport(Socket socket, ILogger logger, bool useLinuxIoUring)
     {
         _socket = socket;
         _logger = logger;
+        _useLinuxIoUring = useLinuxIoUring;
+        _socketReceiver = useLinuxIoUring ? new LinuxIoUringSocketReceiver() : new SocketReceiver();
+        _socketSender = useLinuxIoUring ? new LinuxIoUringSocketSender() : new SocketSender();
 
         var remoteEndPoint = NormalizeEndpoint(_socket.RemoteEndPoint);
         var localEndPoint = NormalizeEndpoint(_socket.LocalEndPoint);
@@ -291,7 +300,17 @@ internal sealed partial class SocketMessageTransport : MessageTransportBase
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
-            Shutdown();
+            if (_useLinuxIoUring)
+            {
+                // The descriptor remains valid until the ring has retired every operation.
+                ShutdownSocket();
+                await _processingTask.ConfigureAwait(false);
+            }
+            else
+            {
+                // Cancellation requested - force shutdown immediately
+                Shutdown();
+            }
         }
     }
 
@@ -304,23 +323,31 @@ internal sealed partial class SocketMessageTransport : MessageTransportBase
 
         try
         {
-            // Ensure socket is shutdown and disposed, even if CloseAsync wasn't called or timed out
-            Shutdown();
-
-            // Signal that we're closing if not already done
-            await _connectionClosingCts.CancelAsync().ConfigureAwait(false);
-            _readSignal.Signal();
-            _writeSignal.Signal();
-
-            if (_processingTask is { } processingTask)
+            if (_useLinuxIoUring)
             {
-                await processingTask.ConfigureAwait(false);
+                // Keep the file descriptor valid until io_uring has retired every operation.
+                await CloseAsync(new ConnectionAbortedException("The Socket transport is being disposed.")).ConfigureAwait(false);
             }
             else
             {
-                _socketReceiver.Dispose();
-                _socketSender.Dispose();
-                await _connectionClosedCts.CancelAsync().ConfigureAwait(false);
+                // Ensure socket is shutdown and disposed, even if CloseAsync wasn't called or timed out
+                Shutdown();
+
+                // Signal that we're closing if not already done
+                await _connectionClosingCts.CancelAsync().ConfigureAwait(false);
+                _readSignal.Signal();
+                _writeSignal.Signal();
+
+                if (_processingTask is { } processingTask)
+                {
+                    await processingTask.ConfigureAwait(false);
+                }
+                else
+                {
+                    _socketReceiver.Dispose();
+                    _socketSender.Dispose();
+                    await _connectionClosedCts.CancelAsync().ConfigureAwait(false);
+                }
             }
 
             await base.DisposeAsync().ConfigureAwait(false);
@@ -513,12 +540,15 @@ exit:
         const int SmallRequestBufferLimit = 32;
         const int LargeRequestBufferLimit = 64;
         const int CoalescingBufferSize = 64 * 1024;
+        const int IoUringCoalescingBufferSize = 128 * 1024;
         Exception? error = null;
         Queue<WriteRequest> requests = new();
         WriteRequest[] requestBuffer = new WriteRequest[256];
         List<ArraySegment<byte>> buffers = new(capacity: LargeRequestBufferLimit);
         List<(WriteRequest, ArcBuffer)> processingRequests = new(capacity: LargeRequestBufferLimit);
-        var coalescingBuffer = ArrayPool<byte>.Shared.Rent(CoalescingBufferSize);
+        var coalescingBuffer = _useLinuxIoUring
+            ? GC.AllocateUninitializedArray<byte>(IoUringCoalescingBufferSize, pinned: true)
+            : ArrayPool<byte>.Shared.Rent(CoalescingBufferSize);
         ArcBuffer.ArraySegmentEnumerator enumerator = default;
         var bufferLimit = SmallRequestBufferLimit;
 
@@ -607,7 +637,11 @@ RefreshRequestQueue:
                     var remaining = new ReadOnlyMemory<byte>(buffer.Array!, buffer.Offset, buffer.Count);
                     while (!remaining.IsEmpty)
                     {
-                        await _socketSender.SendAsync(_socket, remaining).ConfigureAwait(false);
+                        await _socketSender.SendAsync(
+                            _socket,
+                            remaining,
+                            buffer.Array!.Length == ArcBufferWriter.MinimumPageSize,
+                            useZeroCopy: _useLinuxIoUring && bufferLimit == LargeRequestBufferLimit).ConfigureAwait(false);
                         if (_socketSender.HasError)
                         {
                             error = GetSendAsyncError();
@@ -629,7 +663,8 @@ RefreshRequestQueue:
                         buffers.Clear();
                     }
                 }
-                else if (bufferLimit == SmallRequestBufferLimit
+                else if (((_useLinuxIoUring && totalBytes < 16 * 1024)
+                        || bufferLimit == SmallRequestBufferLimit)
                     && buffers.Count > 1
                     && totalBytes <= coalescingBuffer.Length)
                 {
@@ -643,7 +678,11 @@ RefreshRequestQueue:
                     var remaining = new ReadOnlyMemory<byte>(coalescingBuffer, 0, totalBytes);
                     while (!remaining.IsEmpty)
                     {
-                        await _socketSender.SendAsync(_socket, remaining).ConfigureAwait(false);
+                        await _socketSender.SendAsync(
+                            _socket,
+                            remaining,
+                            bufferIsPinned: _useLinuxIoUring,
+                            useZeroCopy: false).ConfigureAwait(false);
                         if (_socketSender.HasError)
                         {
                             error = GetSendAsyncError();
@@ -669,7 +708,11 @@ RefreshRequestQueue:
                 {
                     while (buffers.Count > 0)
                     {
-                        await _socketSender.SendAsync(_socket, buffers).ConfigureAwait(false);
+                        await _socketSender.SendAsync(
+                            _socket,
+                            buffers,
+                            buffersArePinned: false,
+                            useZeroCopy: _useLinuxIoUring && bufferLimit == LargeRequestBufferLimit).ConfigureAwait(false);
                         if (_socketSender.HasError)
                         {
                             error = GetSendAsyncError();
@@ -758,7 +801,10 @@ RefreshRequestQueue:
             }
             while (drained > 0);
 
-            ArrayPool<byte>.Shared.Return(coalescingBuffer);
+            if (!_useLinuxIoUring)
+            {
+                ArrayPool<byte>.Shared.Return(coalescingBuffer);
+            }
         }
 
         int RefreshRequestQueue(Queue<WriteRequest> queue, WriteRequest[] buffer)

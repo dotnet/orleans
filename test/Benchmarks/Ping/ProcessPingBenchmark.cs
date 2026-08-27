@@ -9,6 +9,7 @@ using BenchmarkGrainInterfaces.Ping;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
+using Orleans.Connections.Transport.Sockets;
 using Orleans.Hosting;
 
 namespace Benchmarks.Ping;
@@ -31,6 +32,7 @@ internal static class ProcessPingBenchmark
             .UseOrleans((_, siloBuilder) =>
             {
                 siloBuilder.UseLocalhostClustering(siloPort, gatewayPort, primarySiloEndpoint);
+                ConfigureTransport(siloBuilder.Services);
                 if (certificate is not null)
                 {
                     siloBuilder.UseTls(certificate, options =>
@@ -66,6 +68,7 @@ internal static class ProcessPingBenchmark
             .ConfigureLogging(logging => logging.SetMinimumLevel(LogLevel.Warning))
             .UseOrleansClient((_, clientBuilder) =>
             {
+                ConfigureTransport(clientBuilder.Services);
                 if (secondaryGatewayPort > 0)
                 {
                     clientBuilder.UseStaticClustering([
@@ -180,6 +183,7 @@ internal static class ProcessPingBenchmark
             $"payloadMBps={medianThroughput * payloadSize / 1_000_000:F2} " +
             $"allocatedBytes={totalAllocatedBytes} bytesPerOperation={(double)totalAllocatedBytes / totalCompleted:F2} " +
             $"samples={sampleCount}");
+        WriteIoUringStatistics();
 
         await host.StopAsync();
     }
@@ -197,6 +201,7 @@ internal static class ProcessPingBenchmark
             .ConfigureLogging(logging => logging.SetMinimumLevel(LogLevel.Warning))
             .UseOrleansClient((_, clientBuilder) =>
             {
+                ConfigureTransport(clientBuilder.Services);
                 clientBuilder.UseLocalhostClustering(gatewayPort);
                 if (useTls)
                 {
@@ -249,6 +254,8 @@ internal static class ProcessPingBenchmark
                 $"p99us={Percentile(durations, count, 0.99) * tickToMicroseconds:F2} " +
                 $"p100us={durations[count - 1] * tickToMicroseconds:F2}");
         }
+
+        WriteIoUringStatistics();
 
         await host.StopAsync();
     }
@@ -316,6 +323,36 @@ internal static class ProcessPingBenchmark
 
     private static bool GetBoolean(string[] args, int index)
         => args.Length > index && bool.TryParse(args[index], out var value) && value;
+
+    private static void ConfigureTransport(IServiceCollection services)
+    {
+        if (IsIoUringEnabled())
+        {
+            static void Configure(TcpMessageTransportOptions options) => options.UseLinuxIoUring = true;
+            services.Configure<TcpMessageTransportOptions>(Configure);
+            services.Configure<TcpMessageTransportOptions>("gateway", Configure);
+            services.Configure<TcpMessageTransportOptions>("silo", Configure);
+        }
+    }
+
+    private static bool IsIoUringEnabled()
+        => OperatingSystem.IsLinux()
+            && string.Equals(
+                Environment.GetEnvironmentVariable("ORLEANS_USE_IO_URING"),
+                "1",
+                StringComparison.Ordinal);
+
+    private static void WriteIoUringStatistics()
+    {
+        if (IsIoUringEnabled())
+        {
+            var statistics = LinuxIoUringEngine.Instance.GetZeroCopyStatistics();
+            Console.WriteLine(
+                $"PING_IOURING zeroCopyPrimary={statistics.Primary} " +
+                $"zeroCopyNotifications={statistics.Notifications} " +
+                $"zeroCopyFallbacks={statistics.Fallbacks}");
+        }
+    }
 
     private static void SetTlsMode(object options, string propertyName, string value)
     {

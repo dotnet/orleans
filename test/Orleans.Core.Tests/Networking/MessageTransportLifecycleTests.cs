@@ -574,6 +574,47 @@ public class MessageTransportLifecycleTests
     }
 
     [Fact]
+    public async Task SocketMessageTransport_LinuxIoUring_RoundTripsData()
+    {
+        if (!OperatingSystem.IsLinux()
+            || !string.Equals(
+                Environment.GetEnvironmentVariable("ORLEANS_TEST_IO_URING"),
+                "1",
+                StringComparison.Ordinal))
+        {
+            return;
+        }
+
+        using var listener = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
+        listener.Bind(new IPEndPoint(IPAddress.Loopback, 0));
+        listener.Listen(1);
+
+        using var client = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
+        await client.ConnectAsync(listener.LocalEndPoint!);
+        using var server = await listener.AcceptAsync();
+        await using var transport = new SocketMessageTransport(client, NullLogger.Instance, useLinuxIoUring: true);
+        byte[] payload = [1, 2, 3, 4, 5];
+        using var writeRequest = new BufferedWriteRequest(payload);
+        using var readRequest = new FixedLengthReadRequest(payload.Length);
+
+        transport.Start();
+        Assert.True(transport.EnqueueWrite(writeRequest));
+        var receivedByServer = new byte[payload.Length];
+        var receivedLength = await server.ReceiveAsync(receivedByServer);
+        await writeRequest.Completion.WaitAsync(TimeSpan.FromSeconds(10));
+
+        Assert.True(transport.EnqueueRead(readRequest));
+        var sentLength = await server.SendAsync(payload);
+        var receivedByTransport = await readRequest.Completion.WaitAsync(TimeSpan.FromSeconds(10));
+
+        Assert.Equal(payload.Length, receivedLength);
+        Assert.Equal(payload, receivedByServer);
+        Assert.Equal(payload.Length, sentLength);
+        Assert.Equal(payload, receivedByTransport);
+        await transport.CloseAsync(null);
+    }
+
+    [Fact]
     public async Task StreamMessageTransport_WriteFailure_WakesIdleReadLoop()
     {
         await using var transport = new TestStreamMessageTransport(new FailingWriteStream());
@@ -814,6 +855,39 @@ public class MessageTransportLifecycleTests
         public override void SetResult() => _completion.TrySetResult();
         public override void SetException(Exception error) => _completion.TrySetException(error);
         public void Dispose() => _buffer.Dispose();
+    }
+
+    private sealed class FixedLengthReadRequest(int length) : ReadRequest, IDisposable
+    {
+        public TaskCompletionSource<byte[]> CompletionSource { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        public Task<byte[]> Completion => CompletionSource.Task;
+
+        public override bool OnRead(ArcBufferReader buffer)
+        {
+            if (buffer.Length < length)
+            {
+                return false;
+            }
+
+            using var slice = buffer.ConsumeSlice(length);
+            var result = new byte[length];
+            var offset = 0;
+            foreach (var segment in slice)
+            {
+                segment.CopyTo(result.AsSpan(offset));
+                offset += segment.Length;
+            }
+
+            CompletionSource.TrySetResult(result);
+            return true;
+        }
+
+        public override void OnError(Exception error) => CompletionSource.TrySetException(error);
+
+        public override void OnCanceled() => CompletionSource.TrySetCanceled();
+
+        public void Dispose() => CompletionSource.TrySetCanceled();
     }
 
     private sealed class TestStreamMessageTransport(Stream stream) : StreamMessageTransport(NullLogger.Instance)

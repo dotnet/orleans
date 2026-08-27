@@ -116,7 +116,10 @@ internal sealed class TcpMessageTransportListener : MessageTransportListener
                 var acceptSocket = await _listenSocket!.AcceptAsync(ct.Token).ConfigureAwait(false);
                 OnAcceptSocket(acceptSocket);
 
-                var transport = new SocketMessageTransport(acceptSocket, Logger);
+                var transport = new SocketMessageTransport(
+                    acceptSocket,
+                    Logger,
+                    _tcpOptions.Get(ListenerName).UseLinuxIoUring);
                 transport.Start();
 
                 return transport;

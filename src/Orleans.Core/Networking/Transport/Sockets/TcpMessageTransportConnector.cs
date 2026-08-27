@@ -17,6 +17,15 @@ internal sealed class TcpMessageTransportOptions
     internal bool NoDelay { get; set; } = true;
     internal bool FastPath { get; set; } = true;
     internal bool DualMode { get; set; } = true;
+
+    /// <summary>
+    /// Gets or sets a value indicating whether the transport uses the Linux <c>io_uring</c> engine.
+    /// </summary>
+    /// <remarks>
+    /// This option requires a little-endian 64-bit Linux process, Linux kernel 6.1 or later,
+    /// and <c>liburing.so.2</c>.
+    /// </remarks>
+    internal bool UseLinuxIoUring { get; set; }
 }
 
 /// <summary>
@@ -69,7 +78,7 @@ internal sealed class TcpMessageTransportConnector : MessageTransportConnector
         {
             await socket.ConnectAsync(ip, cancellationToken).ConfigureAwait(false);
 
-            var connection = new SocketMessageTransport(socket, _logger);
+            var connection = new SocketMessageTransport(socket, _logger, options.UseLinuxIoUring);
             connection.Start();
             return connection;
         }

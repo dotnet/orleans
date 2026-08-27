@@ -13,7 +13,17 @@ using System.Threading.Tasks;
 
 namespace Orleans.Connections.Transport.Sockets;
 
-internal sealed class SocketSender : SocketAwaitableEventArgs
+internal interface ISocketSender : IDisposable
+{
+    int BytesTransferred { get; }
+    SocketError SocketError { get; }
+    Exception? Error { get; }
+    bool HasError { get; }
+    ValueTask SendAsync(Socket socket, List<ArraySegment<byte>> buffers, bool buffersArePinned, bool useZeroCopy);
+    ValueTask SendAsync(Socket socket, ReadOnlyMemory<byte> memory, bool bufferIsPinned, bool useZeroCopy);
+}
+
+internal sealed class SocketSender : SocketAwaitableEventArgs, ISocketSender
 {
     private List<ArraySegment<byte>>? _bufferList;
 
@@ -39,7 +49,11 @@ internal sealed class SocketSender : SocketAwaitableEventArgs
         return error is not null ? ValueTask.FromException(error) : default;
     }
 
-    public ValueTask SendAsync(Socket socket, List<ArraySegment<byte>> buffers)
+    public ValueTask SendAsync(
+        Socket socket,
+        List<ArraySegment<byte>> buffers,
+        bool buffersArePinned = false,
+        bool useZeroCopy = false)
     {
         if (!MemoryBuffer.IsEmpty)
         {
@@ -74,7 +88,11 @@ internal sealed class SocketSender : SocketAwaitableEventArgs
         }
     }
 
-    public ValueTask SendAsync(Socket socket, ReadOnlyMemory<byte> memory)
+    public ValueTask SendAsync(
+        Socket socket,
+        ReadOnlyMemory<byte> memory,
+        bool bufferIsPinned = false,
+        bool useZeroCopy = false)
     {
         if (BufferList is not null)
         {
