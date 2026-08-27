@@ -3953,6 +3953,44 @@ public class SchedulingTests
     }
 
     [Fact]
+    public async Task CancellationRegistrationCompletionCanRaceDisposal()
+    {
+        const int AttemptCount = 100;
+        var host = new TestHost(DateTimeOffset.UnixEpoch);
+
+        for (var attempt = 0; attempt < AttemptCount; attempt++)
+        {
+            var context = host.CreateContext(TaskId.CreateRoot($"dispose-completion-race-{attempt}"));
+            var callbackEntered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            var releaseCallback = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            var registration = await context.RegisterCancellationCallbackAsync(async _ =>
+            {
+                callbackEntered.SetResult();
+                await releaseCallback.Task;
+            });
+            var cancellation = DurableTaskRuntimeHelper.RequestCancellationAsync(context);
+            await callbackEntered.Task.WaitAsync(TimeSpan.FromSeconds(10));
+            using var raceGate = new ManualResetEventSlim();
+            var disposal = Task.Run(async () =>
+            {
+                raceGate.Wait();
+                await registration.DisposeAsync();
+            });
+            var release = Task.Run(() =>
+            {
+                raceGate.Wait();
+                releaseCallback.SetResult();
+            });
+
+            raceGate.Set();
+            await Task.WhenAll(cancellation, disposal, release).WaitAsync(TimeSpan.FromSeconds(10));
+
+            Assert.True(cancellation.IsCompletedSuccessfully);
+            Assert.True(disposal.IsCompletedSuccessfully);
+        }
+    }
+
+    [Fact]
     public async Task CancellationRegistrationDisposeAfterCallbackCompletionIsIdempotent()
     {
         var host = new TestHost(DateTimeOffset.UnixEpoch);

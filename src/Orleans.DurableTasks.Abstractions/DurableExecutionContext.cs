@@ -476,7 +476,7 @@ public abstract class DurableExecutionContext
             {
                 Current.Value = previous;
                 _previous = null;
-                Volatile.Write(ref _state, Completed);
+                Interlocked.Exchange(ref _state, Completed);
                 CompleteInvocation(Volatile.Read(ref _completion));
             }
         }
