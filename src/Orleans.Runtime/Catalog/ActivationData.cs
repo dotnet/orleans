@@ -1788,9 +1788,29 @@ internal sealed partial class ActivationData :
             return;
         }
 
+        var invalid = false;
         lock (_lock)
         {
-            _waitingRequests.Add((message, CoarseStopwatch.StartNew()));
+            if (State is ActivationState.Invalid)
+            {
+                invalid = true;
+            }
+            else
+            {
+                _waitingRequests.Add((message, CoarseStopwatch.StartNew()));
+            }
+        }
+
+        if (invalid)
+        {
+            _shared.InternalRuntime.MessageCenter.ProcessRequestsToInvalidActivation(
+                [message],
+                Address,
+                forwardingAddress: ForwardingAddress,
+                failedOperation: DeactivationReason.Description,
+                exc: DeactivationException,
+                rejectMessages: true);
+            return;
         }
 
         _workSignal.Signal();
@@ -2083,8 +2103,8 @@ internal sealed partial class ActivationData :
                     if (State is ActivationState.Activating)
                     {
                         SetState(ActivationState.Valid);
-                        _shared.InternalRuntime.ActivationWorkingSet.OnActivated(this);
                         _wasActivated = true;
+                        _shared.InternalRuntime.ActivationWorkingSet.OnActivated(this);
                     }
                 }
                 _activationActivity?.AddEvent(new ActivityEvent("state-valid"));
