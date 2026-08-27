@@ -19,6 +19,15 @@ internal sealed class TcpMessageTransportOptions
     internal int KeepAliveTimeSeconds { get; set; } = 90;
     internal int KeepAliveIntervalSeconds { get; set; } = 30;
     internal int KeepAliveRetryCount { get; set; } = 10;
+
+    /// <summary>
+    /// Gets or sets a value indicating whether the transport uses the Linux <c>io_uring</c> engine.
+    /// </summary>
+    /// <remarks>
+    /// This option requires a little-endian 64-bit Linux process, Linux kernel 6.1 or later,
+    /// and <c>liburing.so.2</c>.
+    /// </remarks>
+    internal bool UseLinuxIoUring { get; set; }
 }
 
 /// <summary>
@@ -77,6 +86,6 @@ internal sealed class TcpMessageTransportConnector : MessageTransportConnector
             throw;
         }
 
-        return await SocketMessageTransport.CreateAndStartAsync(socket, _logger).ConfigureAwait(false);
+        return await SocketMessageTransport.CreateAndStartAsync(socket, _logger, options.UseLinuxIoUring).ConfigureAwait(false);
     }
 }
