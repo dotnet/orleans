@@ -1,4 +1,3 @@
-using System.Collections.Concurrent;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Orleans.Runtime;
@@ -10,7 +9,6 @@ namespace UnitTests.Grains
 {
     public class TestGrain : Grain, ITestGrain
     {
-        private static readonly ConcurrentDictionary<long, TaskCompletionSource> DeferredLongActionStarted = new();
         private readonly string _id = Guid.NewGuid().ToString();
         private string label = null!;
         private readonly ILogger logger;
@@ -54,34 +52,11 @@ namespace UnitTests.Grains
             await Task.Delay(timespan);
         }
 
-        public async Task DoLongActionWithDeferredResolutionTimeout(TimeSpan timespan, string str)
-        {
-            logger.LogInformation("DoLongActionWithDeferredResolutionTimeout {String} received", str);
-            if (DeferredLongActionStarted.TryRemove(this.GetPrimaryKeyLong(), out var started))
-            {
-                started.TrySetResult();
-            }
-
-            await Task.Delay(timespan);
-        }
-
-        public Task DoLongActionWithShortDeferredResolutionTimeout(TimeSpan timespan, string str)
-            => DoLongAction(timespan, str);
-
-        public static Task WaitForDeferredLongActionAsync(long grainKey)
-            => DeferredLongActionStarted.GetOrAdd(grainKey, static _ => new(TaskCreationOptions.RunContinuationsAsynchronously)).Task;
-
         public Task SetLabel(string label)
         {
             this.label = label;
             logger.LogInformation("SetLabel {Label} received", label);
             return Task.CompletedTask;
-        }
-
-        public Task SetLabelWithCancellation(string label, CancellationToken cancellationToken)
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-            return SetLabel(label);
         }
 
         public Task StartTimer()

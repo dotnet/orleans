@@ -92,7 +92,7 @@ namespace Orleans.Runtime
 
         private long GetResponseTimeoutTimestampTicks()
         {
-            var defaultResponseTimeout = Message.BodyObject is IInvokable request ? InvocationResponseTimeout.Get(request) : null;
+            var defaultResponseTimeout = (Message.BodyObject as IInvokable)?.GetDefaultResponseTimeout();
             if (defaultResponseTimeout.HasValue)
             {
                 return shared.GetTimestampTicks(defaultResponseTimeout.Value);
@@ -101,7 +101,7 @@ namespace Orleans.Runtime
             return shared.ResponseTimeoutTimestampTicks;
         }
 
-        private TimeSpan GetResponseTimeout() => Message.BodyObject is IInvokable request ? InvocationResponseTimeout.Get(request) ?? shared.ResponseTimeout : shared.ResponseTimeout;
+        private TimeSpan GetResponseTimeout() => (Message.BodyObject as IInvokable)?.GetDefaultResponseTimeout() ?? shared.ResponseTimeout;
 
         private string GetTargetGrainType()
         {
