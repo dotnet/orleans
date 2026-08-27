@@ -557,12 +557,14 @@ internal sealed unsafe partial class LinuxIoUringEngine
     private const uint PollIn = 1;
     private const uint CompletionHasMore = 1 << 1;
     private const uint CompletionIsNotification = 1 << 3;
+    private const uint SetupSubmitAll = 1 << 7;
     private const uint SetupCooperativeTaskRun = 1 << 8;
     private const uint SetupSingleIssuer = 1 << 12;
     private const uint SetupDeferTaskRun = 1 << 13;
     private const ulong WakeUserData = 1;
     private const int EventFdCloseOnExec = 0x80000;
     private const int EventFdNonBlocking = 0x800;
+    private const int ErrorBusy = 16;
     private const int InitialOperationCapacity = 256;
     // Preserve low latency for small completions while keeping batched I/O work off the ring thread.
     private const int QueueContinuationThreshold = 4 * 1024;
@@ -762,7 +764,7 @@ internal sealed unsafe partial class LinuxIoUringEngine
         try
         {
             Volatile.Write(ref _engineThreadId, Environment.CurrentManagedThreadId);
-            var flags = SetupSingleIssuer | SetupDeferTaskRun | SetupCooperativeTaskRun;
+            var flags = SetupSubmitAll | SetupSingleIssuer | SetupDeferTaskRun | SetupCooperativeTaskRun;
             ThrowIfError(Native.QueueInit(4096, ref _ring, flags));
             _ringInitialized = true;
             _eventFd = Native.EventFd(0, EventFdCloseOnExec | EventFdNonBlocking);
@@ -1033,6 +1035,11 @@ internal sealed unsafe partial class LinuxIoUringEngine
             result = Native.SubmitAndWait(ref _ring, 1);
         }
         while (result == -4);
+
+        if (result == -ErrorBusy)
+        {
+            return;
+        }
 
         ThrowIfError(result);
     }
