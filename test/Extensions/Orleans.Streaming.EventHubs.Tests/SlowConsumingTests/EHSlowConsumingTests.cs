@@ -72,38 +72,106 @@ namespace ServiceBus.Tests.SlowConsumingTests
         [Fact, TestCategory("Functional")]
         public async Task EHSlowConsuming_ShouldFavorSlowConsumer()
         {
+            var testCancellationToken = TestContext.Current.CancellationToken;
             var streamGuid = Guid.NewGuid();
             var streamId = StreamId.Create(StreamNamespace, streamGuid);
-            //set up one slow consumer grain
             var slowConsumer = this.fixture.GrainFactory.GetGrain<ISlowConsumingGrain>(Guid.NewGuid());
-            await slowConsumer.BecomeConsumer(streamGuid, StreamNamespace, StreamProviderName);
-
-            //set up 30 healthy consumer grain to show how much we favor slow consumer 
-            int healthyConsumerCount = 30;
-            var healthyConsumers = await SetUpHealthyConsumerGrain(this.fixture.GrainFactory, streamGuid, StreamNamespace, StreamProviderName, healthyConsumerCount);
-
-            //configure data generator for stream and start producing
             var mgmtGrain = this.fixture.GrainFactory.GetGrain<IManagementGrain>(0);
-            var randomStreamPlacementArg = new EventDataGeneratorAdapterFactory.StreamRandomPlacementArg(streamId, this.seed.Next(100));
-            await mgmtGrain.SendControlCommandToProvider<PersistentStreamProvider>(StreamProviderName,
-                (int)EventDataGeneratorAdapterFactory.Commands.Randomly_Place_Stream_To_Queue, randomStreamPlacementArg);
-            //since there's an extreme slow consumer, so the back pressure algorithm should be triggered
-            await TestingUtils.WaitUntilAsync((lastTry, cancellationToken) => AssertCacheBackPressureTriggered(true, lastTry, cancellationToken), timeout);
+            List<ISampleStreaming_ConsumerGrain> healthyConsumers = [];
+            var productionStarted = false;
+            var slowConsumerStopped = false;
+            try
+            {
+                //set up one slow consumer grain
+                await slowConsumer.BecomeConsumer(streamGuid, StreamNamespace, StreamProviderName);
 
-            //make slow consumer stop consuming
-            await slowConsumer.StopConsuming();
+                //set up 30 healthy consumer grain to show how much we favor slow consumer
+                int healthyConsumerCount = 30;
+                healthyConsumers = await SetUpHealthyConsumerGrain(
+                    this.fixture.GrainFactory,
+                    streamGuid,
+                    StreamNamespace,
+                    StreamProviderName,
+                    healthyConsumerCount,
+                    testCancellationToken);
 
-            //slowConsumer stopped consuming, back pressure algorithm should be cleared in next check period.
-            await Task.Delay(monitorPressureWindowSize);
-            await TestingUtils.WaitUntilAsync((lastTry, cancellationToken) => AssertCacheBackPressureTriggered(false, lastTry, cancellationToken), timeout);
+                //configure data generator for stream and start producing
+                var randomStreamPlacementArg = new EventDataGeneratorAdapterFactory.StreamRandomPlacementArg(streamId, this.seed.Next(100));
+                await mgmtGrain.SendControlCommandToProvider<PersistentStreamProvider>(StreamProviderName,
+                    (int)EventDataGeneratorAdapterFactory.Commands.Randomly_Place_Stream_To_Queue, randomStreamPlacementArg);
+                productionStarted = true;
 
-            //clean up test
-            await StopHealthyConsumerGrainComing(healthyConsumers);
-            await mgmtGrain.SendControlCommandToProvider<PersistentStreamProvider>(StreamProviderName,
-                (int)EventDataGeneratorAdapterFactory.Commands.Stop_Producing_On_Stream, streamId);
+                //since there's an extreme slow consumer, so the back pressure algorithm should be triggered
+                await TestingUtils.WaitUntilAsync(
+                    (lastTry, cancellationToken) => AssertCacheBackPressureTriggered(true, lastTry, cancellationToken),
+                    timeout,
+                    cancellationToken: testCancellationToken);
+
+                //make slow consumer stop consuming
+                await slowConsumer.StopConsuming();
+                slowConsumerStopped = true;
+
+                //slowConsumer stopped consuming, back pressure algorithm should be cleared in next check period.
+                await Task.Delay(monitorPressureWindowSize, testCancellationToken);
+                await TestingUtils.WaitUntilAsync(
+                    (lastTry, cancellationToken) => AssertCacheBackPressureTriggered(false, lastTry, cancellationToken),
+                    timeout,
+                    cancellationToken: testCancellationToken);
+            }
+            finally
+            {
+                if (!slowConsumerStopped)
+                {
+                    await CleanupAsync(() => slowConsumer.StopConsuming(), testCancellationToken);
+                }
+                await CleanupAsync(
+                    cancellationToken => StopHealthyConsumerGrainComing(healthyConsumers, cancellationToken),
+                    testCancellationToken);
+                if (productionStarted)
+                {
+                    await CleanupAsync(
+                        () => mgmtGrain.SendControlCommandToProvider<PersistentStreamProvider>(
+                            StreamProviderName,
+                            (int)EventDataGeneratorAdapterFactory.Commands.Stop_Producing_On_Stream,
+                            streamId),
+                        testCancellationToken);
+                }
+            }
         }
 
-        public static async Task<List<ISampleStreaming_ConsumerGrain>> SetUpHealthyConsumerGrain(IGrainFactory GrainFactory, Guid streamId, string streamNameSpace, string streamProvider, int grainCount)
+        private static async Task CleanupAsync(Func<CancellationToken, Task> cleanup, CancellationToken testCancellationToken)
+        {
+            using var cancellation = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+            try
+            {
+                await cleanup(cancellation.Token);
+            }
+            catch (OperationCanceledException) when (testCancellationToken.IsCancellationRequested)
+            {
+                // Preserve the original test cancellation after bounded cleanup.
+            }
+        }
+
+        private static async Task CleanupAsync(Func<Task> cleanup, CancellationToken testCancellationToken)
+        {
+            using var cancellation = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+            try
+            {
+                await cleanup().WaitAsync(cancellation.Token);
+            }
+            catch (OperationCanceledException) when (testCancellationToken.IsCancellationRequested)
+            {
+                // Preserve the original test cancellation after bounded cleanup.
+            }
+        }
+
+        public static async Task<List<ISampleStreaming_ConsumerGrain>> SetUpHealthyConsumerGrain(
+            IGrainFactory GrainFactory,
+            Guid streamId,
+            string streamNameSpace,
+            string streamProvider,
+            int grainCount,
+            CancellationToken cancellationToken)
         {
             List<ISampleStreaming_ConsumerGrain> grains = new List<ISampleStreaming_ConsumerGrain>();
             List<Task> tasks = new List<Task>();
@@ -111,19 +179,21 @@ namespace ServiceBus.Tests.SlowConsumingTests
             {
                 var consumer = GrainFactory.GetGrain<ISampleStreaming_ConsumerGrain>(Guid.NewGuid());
                 grains.Add(consumer);
-                tasks.Add(consumer.BecomeConsumer(streamId, streamNameSpace, streamProvider));
+                tasks.Add(consumer.BecomeConsumer(streamId, streamNameSpace, streamProvider, cancellationToken));
                 grainCount--;
             }
             await Task.WhenAll(tasks);
             return grains;
         }
 
-        private static async Task StopHealthyConsumerGrainComing(List<ISampleStreaming_ConsumerGrain> grains)
+        private static async Task StopHealthyConsumerGrainComing(
+            List<ISampleStreaming_ConsumerGrain> grains,
+            CancellationToken cancellationToken)
         {
             List<Task> tasks = new List<Task>();
             foreach (var grain in grains)
             {
-                tasks.Add(grain.StopConsuming());
+                tasks.Add(grain.StopConsuming(cancellationToken));
             }
             await Task.WhenAll(tasks);
         }

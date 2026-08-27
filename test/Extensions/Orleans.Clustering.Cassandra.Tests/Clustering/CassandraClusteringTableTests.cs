@@ -35,7 +35,8 @@ public sealed class CassandraClusteringTableTests : IClassFixture<CassandraConta
     [Fact]
     public async Task MembershipTable_GetGateways()
     {
-        var (membershipTable, gatewayListProvider) = await CreateNewMembershipTableAsync();
+        var (membershipTable, gatewayListProvider) = await CreateNewMembershipTableAsync(
+            TestContext.Current.CancellationToken);
 
         var membershipEntries = Enumerable.Range(0, 10).Select(_ => CreateMembershipEntryForTest()).ToArray();
 
@@ -71,7 +72,8 @@ public sealed class CassandraClusteringTableTests : IClassFixture<CassandraConta
     [Fact]
     public async Task MembershipTable_ReadAll_EmptyTable()
     {
-        var (membershipTable, _) = await CreateNewMembershipTableAsync();
+        var (membershipTable, _) = await CreateNewMembershipTableAsync(
+            TestContext.Current.CancellationToken);
 
         var data = await membershipTable.ReadAll();
         Assert.NotNull(data);
@@ -86,7 +88,8 @@ public sealed class CassandraClusteringTableTests : IClassFixture<CassandraConta
     [Fact]
     public async Task MembershipTable_InsertRow()
     {
-        var (membershipTable, _) = await CreateNewMembershipTableAsync();
+        var (membershipTable, _) = await CreateNewMembershipTableAsync(
+            TestContext.Current.CancellationToken);
 
         var membershipEntry = CreateMembershipEntryForTest();
 
@@ -109,7 +112,10 @@ public sealed class CassandraClusteringTableTests : IClassFixture<CassandraConta
     [Fact]
     public async Task MembershipTable_ReadRow_Insert_Read()
     {
-        var (membershipTable, gatewayProvider) = await CreateNewMembershipTableAsync("Phalanx", "blu");
+        var (membershipTable, gatewayProvider) = await CreateNewMembershipTableAsync(
+            "Phalanx",
+            "blu",
+            TestContext.Current.CancellationToken);
 
         MembershipTableData data = await membershipTable.ReadAll();
 
@@ -163,7 +169,8 @@ public sealed class CassandraClusteringTableTests : IClassFixture<CassandraConta
     [Fact]
     public async Task MembershipTable_ReadAll_Insert_ReadAll()
     {
-        var (membershipTable, _) = await CreateNewMembershipTableAsync();
+        var (membershipTable, _) = await CreateNewMembershipTableAsync(
+            TestContext.Current.CancellationToken);
 
         var data = await membershipTable.ReadAll();
         _testOutputHelper.WriteLine("Membership.ReadAll returned TableVersion={0} Data={1}", data.Version, data);
@@ -196,7 +203,8 @@ public sealed class CassandraClusteringTableTests : IClassFixture<CassandraConta
     [Fact]
     public async Task MembershipTable_UpdateRow()
     {
-        var (membershipTable, _) = await CreateNewMembershipTableAsync();
+        var (membershipTable, _) = await CreateNewMembershipTableAsync(
+            TestContext.Current.CancellationToken);
 
         var tableData = await membershipTable.ReadAll();
         Assert.NotNull(tableData.Version);
@@ -294,11 +302,14 @@ public sealed class CassandraClusteringTableTests : IClassFixture<CassandraConta
         var tasks = new List<Task>();
         for (var i = 0; i < 50; i++)
         {
-            tasks.Add(Task.Run(async () =>
-            {
-                await Task.Yield();
-                var (membershipTable, _) = await CreateNewMembershipTableAsync();
-            }));
+            tasks.Add(Task.Run(
+                async () =>
+                {
+                    await Task.Yield();
+                    var (membershipTable, _) = await CreateNewMembershipTableAsync(
+                        TestContext.Current.CancellationToken);
+                },
+                TestContext.Current.CancellationToken));
         }
         await Task.WhenAll(tasks);
     }
@@ -306,7 +317,8 @@ public sealed class CassandraClusteringTableTests : IClassFixture<CassandraConta
     [Fact]
     public async Task MembershipTable_UpdateRowInParallel()
     {
-        var (membershipTable, _) = await CreateNewMembershipTableAsync();
+        var (membershipTable, _) = await CreateNewMembershipTableAsync(
+            TestContext.Current.CancellationToken);
 
         var tableData = await membershipTable.ReadAll();
 
@@ -326,7 +338,7 @@ public sealed class CassandraClusteringTableTests : IClassFixture<CassandraConta
                 var updatedTableData = await membershipTable.ReadAll();
                 var updatedRow = updatedTableData.TryGet(data.SiloAddress);
 
-                await Task.Delay(10);
+                await Task.Delay(10, TestContext.Current.CancellationToken);
                 if (updatedRow is null) continue;
 
                 var tableVersion = updatedTableData.Version.Next();
@@ -339,7 +351,7 @@ public sealed class CassandraClusteringTableTests : IClassFixture<CassandraConta
                     done = false;
                 }
             } while (!done);
-        })).WithTimeout(TimeSpan.FromSeconds(30));
+        })).WithTimeout(TimeSpan.FromSeconds(30), TestContext.Current.CancellationToken);
 
 
         tableData = await membershipTable.ReadAll();
@@ -355,11 +367,15 @@ public sealed class CassandraClusteringTableTests : IClassFixture<CassandraConta
     [InlineData(false)]
     public async Task MembershipTable_UpdateIAmAlive(bool cassandraTtl)
     {
+        var testCancellationToken = TestContext.Current.CancellationToken;
+
         // Drop the membership table before starting because the TTL behavior depends on the table creation
-        ISession ttlSession = await CreateSession();
+        ISession ttlSession = await CreateSession(testCancellationToken);
         await ttlSession.ExecuteAsync(new SimpleStatement("DROP TABLE IF EXISTS membership;"));
 
-        var (membershipTable, _) = await CreateNewMembershipTableAsync(cassandraTtl:cassandraTtl);
+        var (membershipTable, _) = await CreateNewMembershipTableAsync(
+            testCancellationToken,
+            cassandraTtl: cassandraTtl);
 
         var tableData = await membershipTable.ReadAll();
 
@@ -413,14 +429,17 @@ public sealed class CassandraClusteringTableTests : IClassFixture<CassandraConta
 
         // Validate data automatically expires when using Cassandra TTL, and is still present if not
         // The Cassandra TTL is set to 20 seconds for this testing
-        using var cts = new CancellationTokenSource(delay:TimeSpan.FromSeconds(30));
+        using var timeoutCts = new CancellationTokenSource(delay: TimeSpan.FromSeconds(30));
+        using var cts = CancellationTokenSource.CreateLinkedTokenSource(
+            timeoutCts.Token,
+            testCancellationToken);
         if (cassandraTtl)
         {
-            await ValidateDataIsDeleted(cts.Token);
+            await ValidateDataIsDeleted(cts.Token, timeoutCts.Token);
         }
         else
         {
-            await ValidateDataIsNotDeleted(cts.Token);
+            await ValidateDataIsNotDeleted(cts.Token, timeoutCts.Token);
         }
 
         return;
@@ -430,7 +449,7 @@ public sealed class CassandraClusteringTableTests : IClassFixture<CassandraConta
             if (cassandraTtl && initial)
             {
                 // When actually using the TTL, wait 5 seconds so the TTL values will be less than 20
-                await Task.Delay(TimeSpan.FromSeconds(5), CancellationToken.None);
+                await Task.Delay(TimeSpan.FromSeconds(5), testCancellationToken);
             }
 
             // Cassandra columns that are part of the primary key are not available with the TTL command
@@ -515,11 +534,14 @@ public sealed class CassandraClusteringTableTests : IClassFixture<CassandraConta
             }
         }
 
-        async Task ValidateDataIsDeleted(CancellationToken ct)
+        async Task ValidateDataIsDeleted(
+            CancellationToken cancellationToken,
+            CancellationToken timeoutToken)
         {
             while (true)
             {
-                if (ct.IsCancellationRequested)
+                testCancellationToken.ThrowIfCancellationRequested();
+                if (timeoutToken.IsCancellationRequested)
                 {
                     throw new TimeoutException("Did not validate Cassandra data deletion within timeout");
                 }
@@ -531,21 +553,47 @@ public sealed class CassandraClusteringTableTests : IClassFixture<CassandraConta
                     return;
                 }
 
-                await Task.Delay(TimeSpan.FromSeconds(1), CancellationToken.None);
+                try
+                {
+                    await Task.Delay(TimeSpan.FromSeconds(1), cancellationToken);
+                }
+                catch (OperationCanceledException) when (
+                    timeoutToken.IsCancellationRequested
+                    && !testCancellationToken.IsCancellationRequested)
+                {
+                    throw new TimeoutException("Did not validate Cassandra data deletion within timeout");
+                }
             }
         }
 
-        async Task ValidateDataIsNotDeleted(CancellationToken ct)
+        async Task ValidateDataIsNotDeleted(
+            CancellationToken cancellationToken,
+            CancellationToken timeoutToken)
         {
-            while (!ct.IsCancellationRequested)
+            while (true)
             {
+                testCancellationToken.ThrowIfCancellationRequested();
+                if (timeoutToken.IsCancellationRequested)
+                {
+                    return;
+                }
+
                 tableData = await membershipTable.ReadAll();
                 if (tableData.Members.Count == 0)
                 {
                     throw new Exception("Cassandra data was unexpectedly deleted when not using a TTL");
                 }
 
-                await Task.Delay(TimeSpan.FromSeconds(1), CancellationToken.None);
+                try
+                {
+                    await Task.Delay(TimeSpan.FromSeconds(1), cancellationToken);
+                }
+                catch (OperationCanceledException) when (
+                    timeoutToken.IsCancellationRequested
+                    && !testCancellationToken.IsCancellationRequested)
+                {
+                    return;
+                }
             }
         }
     }
@@ -553,7 +601,8 @@ public sealed class CassandraClusteringTableTests : IClassFixture<CassandraConta
     [Fact]
     public async Task MembershipTable_CleanupDefunctSiloEntries()
     {
-        var (membershipTable, _) = await CreateNewMembershipTableAsync();
+        var (membershipTable, _) = await CreateNewMembershipTableAsync(
+            TestContext.Current.CancellationToken);
 
         var data = await membershipTable.ReadAll();
         _testOutputHelper.WriteLine("Membership.ReadAll returned TableVersion={0} Data={1}", data.Version, data);
@@ -650,6 +699,7 @@ public sealed class CassandraClusteringTableTests : IClassFixture<CassandraConta
     private async Task<(IMembershipTable, IGatewayListProvider)> CreateNewMembershipTableAsync(
         string serviceId,
         string clusterId,
+        CancellationToken cancellationToken,
         bool cassandraTtl = false)
     {
         var services = new ServiceCollection()
@@ -658,7 +708,7 @@ public sealed class CassandraClusteringTableTests : IClassFixture<CassandraConta
             .Configure<ClusterOptions>(o => { o.ServiceId = serviceId; o.ClusterId = clusterId; })
             .Configure<CassandraClusteringOptions>(o =>
             {
-                o.ConfigureClient(async _ => await CreateSession());
+                o.ConfigureClient(async _ => await CreateSession(cancellationToken));
                 o.UseCassandraTtl = cassandraTtl;
             })
             .Configure<ClusterMembershipOptions>(o =>
@@ -680,19 +730,25 @@ public sealed class CassandraClusteringTableTests : IClassFixture<CassandraConta
         return (membershipTable, gatewayProvider);
     }
 
-    private async Task<ISession> CreateSession()
+    private async Task<ISession> CreateSession(CancellationToken cancellationToken)
     {
-        var container = await _cassandraContainer.RunImage();
+        var container = await _cassandraContainer.RunImage(cancellationToken);
 
         return container.session;
     }
 
-    private Task<(IMembershipTable, IGatewayListProvider)> CreateNewMembershipTableAsync(bool cassandraTtl = false)
+    private Task<(IMembershipTable, IGatewayListProvider)> CreateNewMembershipTableAsync(
+        CancellationToken cancellationToken,
+        bool cassandraTtl = false)
     {
         var serviceId = $"Service_{Guid.NewGuid()}";
         var clusterId = $"Cluster_{Guid.NewGuid()}";
 
-        return CreateNewMembershipTableAsync(serviceId, clusterId, cassandraTtl);
+        return CreateNewMembershipTableAsync(
+            serviceId,
+            clusterId,
+            cancellationToken,
+            cassandraTtl);
     }
 
     [Fact]
@@ -702,9 +758,15 @@ public sealed class CassandraClusteringTableTests : IClassFixture<CassandraConta
         var clusterId = $"Cluster_{Guid.NewGuid()}";
         var clusterOptions = new ClusterOptions { ServiceId = serviceId, ClusterId = clusterId + "_1" };
         var clusterIdentifier = clusterOptions.ServiceId + "-" + clusterOptions.ClusterId;
-        var (membershipTable, gatewayProvider) = await CreateNewMembershipTableAsync(serviceId, clusterId + "_1");
+        var (membershipTable, gatewayProvider) = await CreateNewMembershipTableAsync(
+            serviceId,
+            clusterId + "_1",
+            TestContext.Current.CancellationToken);
 
-        var (otherMembershipTable, _) = await CreateNewMembershipTableAsync(serviceId, clusterId + "_2");
+        var (otherMembershipTable, _) = await CreateNewMembershipTableAsync(
+            serviceId,
+            clusterId + "_2",
+            TestContext.Current.CancellationToken);
 
         var tableData = await membershipTable.ReadAll();
 

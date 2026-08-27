@@ -60,30 +60,58 @@ namespace Tester.StreamingTests.BroadcastChannel
         }
 
         [Fact]
-        public async Task ClientPublishSingleChannelTest() => await ClientPublishSingleChannelTestImpl(_provider);
+        public async Task ClientPublishSingleChannelTest() =>
+            await ClientPublishSingleChannelTestImpl(
+                _provider,
+                cancellationToken: TestContext.Current.CancellationToken);
 
         [Fact]
-        public async Task ClientPublishSingleChannelMultipleConsumersTest() => await MultipleSubscribersChannelTestImpl(_provider);
+        public async Task ClientPublishSingleChannelMultipleConsumersTest() =>
+            await MultipleSubscribersChannelTestImpl(
+                _provider,
+                cancellationToken: TestContext.Current.CancellationToken);
 
         [Fact]
-        public async Task ClientPublishMultipleChannelTest() => await ClientPublishMultipleChannelTestImpl(_provider);
+        public async Task ClientPublishMultipleChannelTest() =>
+            await ClientPublishMultipleChannelTestImpl(_provider, TestContext.Current.CancellationToken);
 
         [Fact]
-        public async Task MultipleSubscribersOneBadActorChannelTest() => await MultipleSubscribersOneBadActorChannelTestImpl(_provider);
+        public async Task MultipleSubscribersOneBadActorChannelTest() =>
+            await MultipleSubscribersOneBadActorChannelTestImpl(
+                _provider,
+                cancellationToken: TestContext.Current.CancellationToken);
 
         [Fact]
-        public async Task NonFireAndForgetClientPublishSingleChannelTest() => await ClientPublishSingleChannelTestImpl(_providerNonFireAndForget, false);
+        public async Task NonFireAndForgetClientPublishSingleChannelTest() =>
+            await ClientPublishSingleChannelTestImpl(
+                _providerNonFireAndForget,
+                fireAndForget: false,
+                cancellationToken: TestContext.Current.CancellationToken);
 
         [Fact]
-        public async Task NonFireAndForgetClientPublishMultipleChannelTest() => await ClientPublishMultipleChannelTestImpl(_providerNonFireAndForget);
+        public async Task NonFireAndForgetClientPublishMultipleChannelTest() =>
+            await ClientPublishMultipleChannelTestImpl(
+                _providerNonFireAndForget,
+                TestContext.Current.CancellationToken);
 
         [Fact]
-        public async Task NonFireAndForgetClientPublishSingleChannelMultipleConsumersTest() => await MultipleSubscribersChannelTestImpl(_providerNonFireAndForget, false);
+        public async Task NonFireAndForgetClientPublishSingleChannelMultipleConsumersTest() =>
+            await MultipleSubscribersChannelTestImpl(
+                _providerNonFireAndForget,
+                fireAndForget: false,
+                cancellationToken: TestContext.Current.CancellationToken);
 
         [Fact]
-        public async Task NonFireAndForgetMultipleSubscribersOneBadActorChannelTest() => await MultipleSubscribersOneBadActorChannelTestImpl(_providerNonFireAndForget, false);
+        public async Task NonFireAndForgetMultipleSubscribersOneBadActorChannelTest() =>
+            await MultipleSubscribersOneBadActorChannelTestImpl(
+                _providerNonFireAndForget,
+                fireAndForget: false,
+                cancellationToken: TestContext.Current.CancellationToken);
 
-        private async Task ClientPublishSingleChannelTestImpl(IBroadcastChannelProvider provider, bool fireAndForget = true)
+        private async Task ClientPublishSingleChannelTestImpl(
+            IBroadcastChannelProvider provider,
+            bool fireAndForget = true,
+            CancellationToken cancellationToken = default)
         {
             var grainKey = Guid.NewGuid().ToString("N");
             var channelId = ChannelId.Create("some-namespace", grainKey);
@@ -95,7 +123,8 @@ namespace Tester.StreamingTests.BroadcastChannel
             await stream.Publish(2);
             await stream.Publish(3);
 
-            using var cts = new CancellationTokenSource(CallTimeout);
+            using var cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+            cts.CancelAfter(CallTimeout);
             await observer.WaitForDeliveryCountAsync(channelId, 3, providerName: null, cancellationToken: cts.Token);
 
             var grain = _fixture.Client.GetGrain<ISimpleSubscriberGrain>(grainKey);
@@ -116,7 +145,9 @@ namespace Tester.StreamingTests.BroadcastChannel
             }
         }
 
-        private async Task ClientPublishMultipleChannelTestImpl(IBroadcastChannelProvider provider)
+        private async Task ClientPublishMultipleChannelTestImpl(
+            IBroadcastChannelProvider provider,
+            CancellationToken cancellationToken)
         {
             var grainKey = Guid.NewGuid().ToString("N");
 
@@ -137,7 +168,8 @@ namespace Tester.StreamingTests.BroadcastChannel
 
             foreach (var channel in channels)
             {
-                using var cts = new CancellationTokenSource(CallTimeout);
+                using var cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+                cts.CancelAfter(CallTimeout);
                 await observer.WaitForDeliveryCountAsync(channel.ChannelId, 1, providerName: null, cancellationToken: cts.Token);
 
                 var values = await grain.GetValues(channel.ChannelId);
@@ -147,7 +179,10 @@ namespace Tester.StreamingTests.BroadcastChannel
             }
         }
 
-        private async Task MultipleSubscribersChannelTestImpl(IBroadcastChannelProvider provider, bool fireAndForget = true)
+        private async Task MultipleSubscribersChannelTestImpl(
+            IBroadcastChannelProvider provider,
+            bool fireAndForget = true,
+            CancellationToken cancellationToken = default)
         {
             var grainKey = Guid.NewGuid().ToString("N");
             var channelId = ChannelId.Create("multiple-namespaces-0", grainKey);
@@ -160,7 +195,8 @@ namespace Tester.StreamingTests.BroadcastChannel
             await stream.Publish(3);
 
             // 3 items × 2 subscribers = 6 deliveries
-            using var cts = new CancellationTokenSource(CallTimeout);
+            using var cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+            cts.CancelAfter(CallTimeout);
             await observer.WaitForDeliveryCountAsync(channelId, 6, providerName: null, cancellationToken: cts.Token);
 
             var grains = new ISubscriberGrain[]
@@ -189,7 +225,10 @@ namespace Tester.StreamingTests.BroadcastChannel
             }
         }
 
-        private async Task MultipleSubscribersOneBadActorChannelTestImpl(IBroadcastChannelProvider provider, bool fireAndForget = true)
+        private async Task MultipleSubscribersOneBadActorChannelTestImpl(
+            IBroadcastChannelProvider provider,
+            bool fireAndForget = true,
+            CancellationToken cancellationToken = default)
         {
             var grainKey = Guid.NewGuid().ToString("N");
             var channelId = ChannelId.Create("multiple-namespaces-0", grainKey);
@@ -204,7 +243,8 @@ namespace Tester.StreamingTests.BroadcastChannel
             if (fireAndForget)
             {
                 // 1 item × 2 subscribers = 2 deliveries
-                using var cts1 = new CancellationTokenSource(CallTimeout);
+                using var cts1 = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+                cts1.CancelAfter(CallTimeout);
                 await observer.WaitForDeliveryCountAsync(channelId, 2, providerName: null, cancellationToken: cts1.Token);
 
                 var values = await badGrain.GetValues(channelId);
@@ -215,18 +255,20 @@ namespace Tester.StreamingTests.BroadcastChannel
             {
                 await stream.Publish(2);
                 // Wait for good grain delivery (total: 3 successful deliveries)
-                using var cts2 = new CancellationTokenSource(CallTimeout);
+                using var cts2 = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+                cts2.CancelAfter(CallTimeout);
                 await observer.WaitForDeliveryCountAsync(channelId, 3, providerName: null, cancellationToken: cts2.Token);
 
                 // Bad grain callback is still invoked (but throws), so emit doesn't fire.
                 // Poll for the counter as the diagnostic event can't observe failed deliveries.
                 var counter = 0;
-                using var cts = new CancellationTokenSource(CallTimeout);
+                using var cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+                cts.CancelAfter(CallTimeout);
                 while (!cts.IsCancellationRequested)
                 {
                     counter = await badGrain.GetOnPublishedCounter();
                     if (counter == 2) break;
-                    await Task.Delay(10);
+                    await Task.Delay(10, cancellationToken);
                 }
                 Assert.Equal(2, counter);
             }
@@ -239,7 +281,8 @@ namespace Tester.StreamingTests.BroadcastChannel
             await stream.Publish(3);
 
             // Wait for all remaining deliveries: 5 total (good: 3, bad: 2)
-            using var ctsFinal = new CancellationTokenSource(CallTimeout);
+            using var ctsFinal = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+            ctsFinal.CancelAfter(CallTimeout);
             await observer.WaitForDeliveryCountAsync(channelId, 5, providerName: null, cancellationToken: ctsFinal.Token);
 
             var goodValues = await goodGrain.GetValues(channelId);

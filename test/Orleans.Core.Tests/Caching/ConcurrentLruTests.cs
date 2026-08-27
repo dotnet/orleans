@@ -878,7 +878,7 @@ public class ConcurrentLruTests(ITestOutputHelper testOutputHelper)
             lru.AddOrUpdate(1, item);
             timeProvider.Advance(TimeSpan.FromMinutes(2));
 
-            await item.Disposed.WaitAsync(TimeSpan.FromSeconds(10));
+            await item.Disposed.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
 
             timeProvider.Advance(TimeSpan.FromMinutes(1));
 

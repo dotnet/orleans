@@ -14,9 +14,13 @@ namespace Consul.Tests
 
         private const string WindowsDockerModeSkipReason = "Docker is running in Windows container mode (OSType=windows), so Consul tests are skipped.";
 
-        private static readonly Lazy<string?> DockerDaemonOsTypeLazy = new(GetDockerDaemonOsType);
+        private static readonly Lazy<string?> DockerDaemonOsTypeLazy = new(
+            GetDockerDaemonOsType,
+            LazyThreadSafetyMode.PublicationOnly);
 
-        private static readonly Lazy<string?> EnsureConsulSkipReasonLazy = new(() => EnsureConsulAndGetSkipReasonAsync().GetAwaiter().GetResult());
+        private static readonly Lazy<string?> EnsureConsulSkipReasonLazy = new(
+            () => EnsureConsulAndGetSkipReasonAsync().GetAwaiter().GetResult(),
+            LazyThreadSafetyMode.PublicationOnly);
 
         private static readonly ConsulContainer _container = new ConsulBuilder("public.ecr.aws/hashicorp/consul:1.19")
             .WithCreateParameterModifier(parameters =>
@@ -44,8 +48,9 @@ namespace Consul.Tests
                 throw Xunit.Sdk.SkipException.ForSkip(skipReason);
         }
 
-        public static Task<bool> EnsureConsulAsync()
+        public static Task<bool> EnsureConsulAsync(CancellationToken cancellationToken = default)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             return Task.FromResult(EnsureConsulSkipReasonLazy.Value is null);
         }
 
@@ -59,14 +64,14 @@ namespace Consul.Tests
 
             try
             {
-                await _container.StartAsync();
+                await _container.StartAsync(TestContext.Current.CancellationToken);
                 return null;
             }
             catch (HttpRequestException)
             {
                 return DockerUnavailableSkipReason;
             }
-            catch (OperationCanceledException)
+            catch (OperationCanceledException) when (!TestContext.Current.CancellationToken.IsCancellationRequested)
             {
                 return DockerUnavailableSkipReason;
             }
@@ -104,14 +109,17 @@ namespace Consul.Tests
                 using var dockerClient = TestcontainersSettings.OS.DockerEndpointAuthConfig
                     .GetDockerClientConfiguration(Guid.NewGuid())
                     .CreateClient();
-                var dockerInfo = dockerClient.System.GetSystemInfoAsync().GetAwaiter().GetResult();
+                var dockerInfo = dockerClient.System
+                    .GetSystemInfoAsync(TestContext.Current.CancellationToken)
+                    .GetAwaiter()
+                    .GetResult();
                 return dockerInfo.OSType;
             }
             catch (HttpRequestException)
             {
                 return null;
             }
-            catch (OperationCanceledException)
+            catch (OperationCanceledException) when (!TestContext.Current.CancellationToken.IsCancellationRequested)
             {
                 return null;
             }

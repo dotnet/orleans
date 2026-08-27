@@ -92,7 +92,7 @@ namespace Tester.AzureUtils.Persistence
             var storage = await InitAzureTableGrainStorage(deleteStateOnClear: false);
             var runner = new GrainStorageModelBasedTestRunner(storage, "AzureTable", output.WriteLine);
 
-            await runner.RunGeneratedConformanceTests();
+            await runner.RunGeneratedConformanceTests(TestContext.Current.CancellationToken);
         }
 
         [Fact, TestCategory("Functional"), TestCategory("AzureStorage"), TestCategory("ModelBased")]
@@ -105,7 +105,7 @@ namespace Tester.AzureUtils.Persistence
             var storage = await InitAzureTableGrainStorage(deleteStateOnClear: true);
             var runner = new GrainStorageModelBasedTestRunner(storage, "AzureTableDeleteStateOnClear", output.WriteLine);
 
-            await runner.RunGeneratedConformanceTests();
+            await runner.RunGeneratedConformanceTests(TestContext.Current.CancellationToken);
         }
 
         [Theory, TestCategory("Functional"), TestCategory("AzureStorage")]

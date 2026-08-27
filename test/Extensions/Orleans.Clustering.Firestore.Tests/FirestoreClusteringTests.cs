@@ -27,14 +27,14 @@ public class FirestoreClusteringTests : IAsyncLifetime
     public async Task CleanDeadSiloInstance()
     {
         this._generation = 0;
-        await WriteSiloInstance(SiloStatus.Dead);
+        await WriteSiloInstance(SiloStatus.Dead, TestContext.Current.CancellationToken);
 
         // Create new active entries
         for (int i = 1; i < 5; i++)
         {
             this._generation = i;
             this._siloAddress = SiloAddressUtils.NewLocalSiloAddress(this._generation);
-            await WriteSiloInstance(SiloStatus.Active);
+            await WriteSiloInstance(SiloStatus.Active, TestContext.Current.CancellationToken);
         }
 
         await this._membershipTable.CleanupDefunctSiloEntries(TestStartTime.AddTicks(1));
@@ -64,7 +64,9 @@ public class FirestoreClusteringTests : IAsyncLifetime
 
         foreach (var chunk in entries.Chunk(50))
         {
-            await Task.WhenAll(chunk.Select(entity => this._storage.UpsertEntity(entity)));
+            await Task.WhenAll(chunk.Select(entity => this._storage.UpsertEntity(
+                entity,
+                TestContext.Current.CancellationToken)));
         }
 
         await this._membershipTable.CleanupDefunctSiloEntries(TestStartTime.AddTicks(1));
@@ -76,13 +78,13 @@ public class FirestoreClusteringTests : IAsyncLifetime
     [Fact]
     public async Task FindAllGatewayProxyEndpoints()
     {
-        await WriteSiloInstance(SiloStatus.Created);
+        await WriteSiloInstance(SiloStatus.Created, TestContext.Current.CancellationToken);
 
         var gateways = await this._gatewayProvider.GetGateways();
         Assert.Empty(gateways);  // "Number of gateways before Silo.Activate"
 
         this._entity.Status = (int)SiloStatus.Active;
-        await this._storage.UpsertEntity(this._entity);
+        await this._storage.UpsertEntity(this._entity, TestContext.Current.CancellationToken);
 
         gateways = await this._gatewayProvider.GetGateways();
         Assert.Single(gateways);  // "Number of gateways after Silo.Activate"
@@ -96,7 +98,7 @@ public class FirestoreClusteringTests : IAsyncLifetime
     public async Task UpdateIAmAliveDoesNotOverwriteNewerHeartbeat()
     {
         var current = TestStartTime.AddMinutes(2);
-        await WriteSiloInstance(SiloStatus.Active, current);
+        await WriteSiloInstance(SiloStatus.Active, TestContext.Current.CancellationToken, current);
 
         var entry = this._entity.ToMembershipEntry();
         entry.IAmAliveTime = current.AddMinutes(-1).UtcDateTime;
@@ -147,7 +149,10 @@ public class FirestoreClusteringTests : IAsyncLifetime
         Assert.NotEqual(insertedEtag, Assert.Single(updated.Members).Item2);
     }
 
-    private async Task WriteSiloInstance(SiloStatus status, DateTimeOffset? iAmAliveTime = null)
+    private async Task WriteSiloInstance(
+        SiloStatus status,
+        CancellationToken cancellationToken,
+        DateTimeOffset? iAmAliveTime = null)
     {
         IPEndPoint myEndpoint = this._siloAddress.Endpoint;
 
@@ -168,7 +173,7 @@ public class FirestoreClusteringTests : IAsyncLifetime
             IAmAliveTime = iAmAliveTime ?? TestStartTime,
         };
 
-        var etag = await this._storage.UpsertEntity(this._entity);
+        var etag = await this._storage.UpsertEntity(this._entity, cancellationToken);
         this._entity.ETag = Clustering.Firestore.Utils.ParseTimestamp(etag);
     }
 

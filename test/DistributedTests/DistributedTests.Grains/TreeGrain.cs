@@ -25,12 +25,13 @@ public class TreeGrain : Grain, ITreeGrain
         }
     }
 
-    public async ValueTask Ping()
+    public async ValueTask Ping(CancellationToken cancellationToken)
     {
+        cancellationToken.ThrowIfCancellationRequested();
         var tasks = new List<ValueTask>(_children.Count);
         foreach (var child in _children)
         {
-            tasks.Add(child.Ping());
+            tasks.Add(child.Ping(cancellationToken));
         }
 
         // Wait for the tasks to complete.

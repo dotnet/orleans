@@ -80,25 +80,34 @@ namespace ServiceBus.Tests.MonitorTests
             var streamId = new FullStreamIdentity(Guid.NewGuid(), StreamNamespace, StreamProviderName);
             //set up 30 healthy consumer grain to show how much we favor slow consumer 
             int healthyConsumerCount = 30;
-            _ = await EHSlowConsumingTests.SetUpHealthyConsumerGrain(this.fixture.GrainFactory, streamId.Guid, StreamNamespace, StreamProviderName, healthyConsumerCount);
+            _ = await EHSlowConsumingTests.SetUpHealthyConsumerGrain(
+                this.fixture.GrainFactory,
+                streamId.Guid,
+                StreamNamespace,
+                StreamProviderName,
+                healthyConsumerCount,
+                TestContext.Current.CancellationToken);
 
             //configure data generator for stream and start producing
             var mgmtGrain = this.fixture.GrainFactory.GetGrain<IManagementGrain>(0);
             await TestingUtils.WaitUntilAsync(
                 (lastTry, cancellationToken) => CheckReceiversInitialized(mgmtGrain, lastTry, cancellationToken),
-                timeout);
+                timeout,
+                cancellationToken: TestContext.Current.CancellationToken);
             var randomStreamPlacementArg = new EHStreamProviderForMonitorTestsAdapterFactory.StreamRandomPlacementArg(streamId, this.seed.Next(100));
             await mgmtGrain.SendControlCommandToProvider<PersistentStreamProvider>(StreamProviderName,
                 (int)EHStreamProviderForMonitorTestsAdapterFactory.Commands.Randomly_Place_Stream_To_Queue, randomStreamPlacementArg);
             await TestingUtils.WaitUntilAsync(
                 (lastTry, cancellationToken) => CheckMonitorCounters(mgmtGrain, requireCachePressure: false, lastTry, cancellationToken),
-                timeout);
+                timeout,
+                cancellationToken: TestContext.Current.CancellationToken);
 
             await mgmtGrain.SendControlCommandToProvider<PersistentStreamProvider>(StreamProviderName,
                 (int)EHStreamProviderForMonitorTestsAdapterFactory.QueryCommands.ChangeCachePressure, null);
             await TestingUtils.WaitUntilAsync(
                 (lastTry, cancellationToken) => CheckMonitorCounters(mgmtGrain, requireCachePressure: true, lastTry, cancellationToken),
-                timeout);
+                timeout,
+                cancellationToken: TestContext.Current.CancellationToken);
         }
 
         private static async Task<bool> CheckReceiversInitialized(IManagementGrain mgmtGrain, bool lastTry, CancellationToken cancellationToken)

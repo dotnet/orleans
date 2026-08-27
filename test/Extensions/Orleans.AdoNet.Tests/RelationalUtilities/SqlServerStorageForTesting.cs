@@ -29,7 +29,7 @@ namespace UnitTests.General
             SqlConnection.ClearPool(databaseConnection);
         }
 
-        protected override async Task WaitForDatabaseReadyAsync()
+        protected override async Task WaitForDatabaseReadyAsync(CancellationToken cancellationToken)
         {
             var databaseConnectionStringBuilder = new SqlConnectionStringBuilder(CurrentConnectionString)
             {
@@ -38,17 +38,26 @@ namespace UnitTests.General
             };
 
             await using var connection = new SqlConnection(databaseConnectionStringBuilder.ConnectionString);
-            await OpenConnectionAsync(connection);
+            await OpenConnectionAsync(connection, cancellationToken);
             await using var command = connection.CreateCommand();
             command.CommandText = "SELECT 1";
             command.CommandTimeout = 5;
-            _ = await command.ExecuteScalarAsync();
+            _ = await command.ExecuteScalarAsync(cancellationToken);
         }
 
-        protected override Task ExecuteSetupScript(string setupScript, string dataBaseName) =>
-            ExecuteSetupScriptBatchesAsync(ConvertToExecutableBatches(setupScript, dataBaseName), dataBaseName);
+        protected override Task ExecuteSetupScript(
+            string setupScript,
+            string dataBaseName,
+            CancellationToken cancellationToken) =>
+            ExecuteSetupScriptBatchesAsync(
+                ConvertToExecutableBatches(setupScript, dataBaseName),
+                dataBaseName,
+                cancellationToken);
 
-        internal async Task ExecuteSetupScriptBatchesAsync(IEnumerable<string> scripts, string databaseName)
+        internal async Task ExecuteSetupScriptBatchesAsync(
+            IEnumerable<string> scripts,
+            string databaseName,
+            CancellationToken cancellationToken)
         {
             var connectionStringBuilder = new SqlConnectionStringBuilder(CurrentConnectionString)
             {
@@ -57,7 +66,7 @@ namespace UnitTests.General
             };
 
             await using var connection = new SqlConnection(connectionStringBuilder.ConnectionString);
-            await OpenConnectionAsync(connection);
+            await OpenConnectionAsync(connection, cancellationToken);
 
             using var commandBuilder = new SqlCommandBuilder();
             var quotedDatabaseName = commandBuilder.QuoteIdentifier(databaseName);
@@ -72,22 +81,25 @@ namespace UnitTests.General
             {
                 await ExecuteCommandAsync(
                     connection,
-                    $"ALTER DATABASE {quotedDatabaseName} SET SINGLE_USER WITH ROLLBACK IMMEDIATE;\n{scriptEnumerator.Current}");
+                    $"ALTER DATABASE {quotedDatabaseName} SET SINGLE_USER WITH ROLLBACK IMMEDIATE;\n{scriptEnumerator.Current}",
+                    cancellationToken);
 
                 while (scriptEnumerator.MoveNext())
                 {
-                    await ExecuteCommandAsync(connection, scriptEnumerator.Current);
+                    await ExecuteCommandAsync(connection, scriptEnumerator.Current, cancellationToken);
                 }
 
                 setupSucceeded = true;
             }
             finally
             {
+                using var cleanupCancellation = new CancellationTokenSource(TimeSpan.FromSeconds(30));
                 try
                 {
                     await ExecuteCommandAsync(
                         connection,
-                        $"ALTER DATABASE {quotedDatabaseName} SET MULTI_USER;");
+                        $"ALTER DATABASE {quotedDatabaseName} SET MULTI_USER;",
+                        cleanupCancellation.Token);
                 }
                 catch when (!setupSucceeded)
                 {
@@ -99,7 +111,7 @@ namespace UnitTests.General
             }
         }
 
-        private static async Task OpenConnectionAsync(SqlConnection connection)
+        private static async Task OpenConnectionAsync(SqlConnection connection, CancellationToken cancellationToken)
         {
             const int maxAttempts = 10;
 
@@ -107,22 +119,25 @@ namespace UnitTests.General
             {
                 try
                 {
-                    await connection.OpenAsync();
+                    await connection.OpenAsync(cancellationToken);
                     return;
                 }
                 catch (SqlException exception) when (exception.Number == 18456 && exception.State == 1 && attempt < maxAttempts)
                 {
                     SqlConnection.ClearPool(connection);
-                    await Task.Delay(TimeSpan.FromMilliseconds(500));
+                    await Task.Delay(TimeSpan.FromMilliseconds(500), cancellationToken);
                 }
             }
         }
 
-        private static async Task ExecuteCommandAsync(SqlConnection connection, string script)
+        private static async Task ExecuteCommandAsync(
+            SqlConnection connection,
+            string script,
+            CancellationToken cancellationToken)
         {
             await using var command = connection.CreateCommand();
             command.CommandText = script;
-            await command.ExecuteNonQueryAsync();
+            await command.ExecuteNonQueryAsync(cancellationToken);
         }
 
         public override string CancellationTestQuery { get { return "WAITFOR DELAY '00:00:010'; SELECT 1; "; } }
@@ -154,7 +169,7 @@ namespace UnitTests.General
             }
         }
 
-        protected override async Task DropDatabaseAsync(string databaseName)
+        protected override async Task DropDatabaseAsync(string databaseName, CancellationToken cancellationToken)
         {
             const int maxAttempts = 3;
 
@@ -162,7 +177,7 @@ namespace UnitTests.General
             {
                 try
                 {
-                    await base.DropDatabaseAsync(databaseName);
+                    await base.DropDatabaseAsync(databaseName, cancellationToken);
                     return;
                 }
                 catch (SqlException exception) when (exception.Number == 3702 && attempt < maxAttempts)

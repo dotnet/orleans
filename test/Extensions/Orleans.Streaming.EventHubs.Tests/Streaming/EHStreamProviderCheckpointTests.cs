@@ -89,17 +89,29 @@ namespace ServiceBus.Tests.StreamingTests
         public async Task ReloadFromCheckpointTest()
         {
             logger.LogInformation("************************ EHReloadFromCheckpointTest *********************************");
-            await this.ReloadFromCheckpointTestRunner(ImplicitSubscription_RecoverableStream_CollectorGrain.StreamNamespace, 1, 256);
+            await this.ReloadFromCheckpointTestRunner(
+                ImplicitSubscription_RecoverableStream_CollectorGrain.StreamNamespace,
+                1,
+                256,
+                TestContext.Current.CancellationToken);
         }
 
         [Fact(Skip = "https://github.com/dotnet/orleans/issues/5356")]
         public async Task RestartSiloAfterCheckpointTest()
         {
             logger.LogInformation("************************ EHRestartSiloAfterCheckpointTest *********************************");
-            await this.RestartSiloAfterCheckpointTestRunner(ImplicitSubscription_RecoverableStream_CollectorGrain.StreamNamespace, 8, 32);
+            await this.RestartSiloAfterCheckpointTestRunner(
+                ImplicitSubscription_RecoverableStream_CollectorGrain.StreamNamespace,
+                8,
+                32,
+                TestContext.Current.CancellationToken);
         }
 
-        private async Task ReloadFromCheckpointTestRunner(string streamNamespace, int streamCount, int eventsInStream)
+        private async Task ReloadFromCheckpointTestRunner(
+            string streamNamespace,
+            int streamCount,
+            int eventsInStream,
+            CancellationToken cancellationToken)
         {
             List<Guid> streamGuids = Enumerable.Range(0, streamCount).Select(_ => Guid.NewGuid()).ToList();
             try
@@ -115,11 +127,15 @@ namespace ServiceBus.Tests.StreamingTests
             finally
             {
                 var reporter = this.GrainFactory.GetGrain<IGeneratedEventReporterGrain>(GeneratedStreamTestConstants.ReporterId);
-                reporter.Reset().Ignore();
+                reporter.Reset(cancellationToken).Ignore();
             }
         }
 
-        private async Task RestartSiloAfterCheckpointTestRunner(string streamNamespace, int streamCount, int eventsInStream)
+        private async Task RestartSiloAfterCheckpointTestRunner(
+            string streamNamespace,
+            int streamCount,
+            int eventsInStream,
+            CancellationToken cancellationToken)
         {
             List<Guid> streamGuids = Enumerable.Range(0, streamCount).Select(_ => Guid.NewGuid()).ToList();
             try
@@ -136,7 +152,7 @@ namespace ServiceBus.Tests.StreamingTests
             finally
             {
                 var reporter = this.GrainFactory.GetGrain<IGeneratedEventReporterGrain>(GeneratedStreamTestConstants.ReporterId);
-                reporter.Reset().Ignore();
+                reporter.Reset(cancellationToken).Ignore();
             }
         }
 

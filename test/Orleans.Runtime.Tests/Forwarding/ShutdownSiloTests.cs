@@ -93,7 +93,7 @@ namespace Tester.Forwarding
 
             // Shutdown the silo where the grain is
             await Task.Delay(500, TestContext.Current.CancellationToken);
-            await HostedCluster.StopSiloAsync(HostedCluster.SecondarySilos.First());
+            await HostedCluster.StopSiloAsync(HostedCluster.SecondarySilos.First(), TestContext.Current.CancellationToken);
 
             var results = await Task.WhenAll(tasks);
             Assert.Equal(results[99], HostedCluster.Primary!.SiloAddress.ToString());
@@ -110,7 +110,7 @@ namespace Tester.Forwarding
             var promise = grain.StartAndWaitTimerTick(PendingRequestTimerDueTime);
 
             await timerCreated.Task.WaitAsync(TimerReadinessTimeout, TestContext.Current.CancellationToken);
-            await HostedCluster.StopSiloAsync(HostedCluster.SecondarySilos.First());
+            await HostedCluster.StopSiloAsync(HostedCluster.SecondarySilos.First(), TestContext.Current.CancellationToken);
 
             await promise;
         }
@@ -129,7 +129,7 @@ namespace Tester.Forwarding
 
             await timerStarted.Task.WaitAsync(TimerReadinessTimeout, TestContext.Current.CancellationToken);
             AssertTimerTickDidNotCompleteSuccessfully(timerStopped.Task);
-            await HostedCluster.StopSiloAsync(HostedCluster.SecondarySilos.First());
+            await HostedCluster.StopSiloAsync(HostedCluster.SecondarySilos.First(), TestContext.Current.CancellationToken);
             AssertTimerTickDidNotCompleteSuccessfully(timerStopped.Task);
         }
 
@@ -145,7 +145,7 @@ namespace Tester.Forwarding
 
             await timerCreated.Task.WaitAsync(TimerReadinessTimeout, TestContext.Current.CancellationToken);
             AssertTaskDidNotCompleteSuccessfully(promise);
-            await HostedCluster.StopSiloAsync(HostedCluster.SecondarySilos.First());
+            await HostedCluster.StopSiloAsync(HostedCluster.SecondarySilos.First(), TestContext.Current.CancellationToken);
             AssertTaskDidNotCompleteSuccessfully(promise);
         }
 

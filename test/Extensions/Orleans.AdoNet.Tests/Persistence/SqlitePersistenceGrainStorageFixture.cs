@@ -41,19 +41,28 @@ namespace Tester.AdoNet.Persistence
 
         public async ValueTask InitializeAsync()
         {
-            await this.InitializeSchemaAsync();
-            this.Storage = await this.CreateGrainStorageAsync();
+            var cancellationToken = TestContext.Current.CancellationToken;
+            await this.InitializeSchemaAsync(cancellationToken);
+            this.Storage = await this.CreateGrainStorageAsync(cancellationToken);
         }
 
         public ValueTask DisposeAsync() => ValueTask.CompletedTask;
 
-        public async Task InitializeSchemaAsync()
+        public async Task InitializeSchemaAsync(CancellationToken cancellationToken)
         {
-            await this.DatabaseStorage.ExecuteAsync(await LoadScriptAsync("Sqlite-Main.sql"), command => { }).ConfigureAwait(false);
-            await this.DatabaseStorage.ExecuteAsync(await LoadScriptAsync("Sqlite-Persistence.sql"), command => { }).ConfigureAwait(false);
+            await this.DatabaseStorage.ExecuteAsync(
+                await LoadScriptAsync("Sqlite-Main.sql", cancellationToken),
+                command => { },
+                cancellationToken: cancellationToken).ConfigureAwait(false);
+            await this.DatabaseStorage.ExecuteAsync(
+                await LoadScriptAsync("Sqlite-Persistence.sql", cancellationToken),
+                command => { },
+                cancellationToken: cancellationToken).ConfigureAwait(false);
         }
 
-        public async Task<AdoNetGrainStorage> CreateGrainStorageAsync(string storageName = "SqliteGrainStorageForTest")
+        public async Task<AdoNetGrainStorage> CreateGrainStorageAsync(
+            CancellationToken cancellationToken,
+            string storageName = "SqliteGrainStorageForTest")
         {
             var providerRuntime = new ClientProviderRuntime(
                 this.InternalGrainFactory,
@@ -76,11 +85,11 @@ namespace Tester.AdoNet.Persistence
 
             ISiloLifecycleSubject siloLifeCycle = new SiloLifecycleSubject(NullLoggerFactory.Instance.CreateLogger<SiloLifecycleSubject>());
             storageProvider.Participate(siloLifeCycle);
-            await siloLifeCycle.OnStart(CancellationToken.None).ConfigureAwait(false);
+            await siloLifeCycle.OnStart(cancellationToken).ConfigureAwait(false);
             return storageProvider;
         }
 
-        private static async Task<string> LoadScriptAsync(string fileName)
+        private static async Task<string> LoadScriptAsync(string fileName, CancellationToken cancellationToken)
         {
             var scriptPath = Path.Combine(AppContext.BaseDirectory, fileName);
             if (!File.Exists(scriptPath))
@@ -93,11 +102,12 @@ namespace Tester.AdoNet.Persistence
                 throw new FileNotFoundException($"Unable to locate SQL script '{fileName}'.", fileName);
             }
 
-            return await File.ReadAllTextAsync(scriptPath).ConfigureAwait(false);
+            return await File.ReadAllTextAsync(scriptPath, cancellationToken).ConfigureAwait(false);
         }
 
         public async Task<AdoNetGrainStorage> CreateGrainStorageAsync(
             System.Data.Common.DbDataSource dataSource,
+            CancellationToken cancellationToken,
             string storageName = "SqliteDataSourceGrainStorageForTest")
         {
             var providerRuntime = new ClientProviderRuntime(
@@ -121,7 +131,7 @@ namespace Tester.AdoNet.Persistence
 
             ISiloLifecycleSubject siloLifeCycle = new SiloLifecycleSubject(NullLoggerFactory.Instance.CreateLogger<SiloLifecycleSubject>());
             storageProvider.Participate(siloLifeCycle);
-            await siloLifeCycle.OnStart(CancellationToken.None).ConfigureAwait(false);
+            await siloLifeCycle.OnStart(cancellationToken).ConfigureAwait(false);
             return storageProvider;
         }
     }

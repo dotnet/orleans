@@ -85,6 +85,7 @@ public abstract class StreamFilteringTestsBase : OrleansTestingBase
 
     public virtual async Task IgnoreBadFilter()
     {
+        var cancellationToken = TestContext.Current.CancellationToken;
         EnsureStreamFilterIsRegistered();
 
         const int numberOfEvents = 10;
@@ -93,6 +94,7 @@ public abstract class StreamFilteringTestsBase : OrleansTestingBase
 
         try
         {
+            cancellationToken.ThrowIfCancellationRequested();
             await grain.BecomeConsumer(streamId, ProviderName, "throw");
 
             var stream = this.clusterClient.GetStreamProvider(ProviderName).GetStream<int>(streamId);
@@ -102,7 +104,7 @@ public abstract class StreamFilteringTestsBase : OrleansTestingBase
                 await stream.OnNextAsync(i);
             }
 
-            var history = await WaitForReceivedItemsAsync(grain, numberOfEvents);
+            var history = await WaitForReceivedItemsAsync(grain, numberOfEvents, cancellationToken: cancellationToken);
 
             Assert.Equal(numberOfEvents, history.Count);
             for (var i = 0; i < numberOfEvents; i++)
@@ -118,6 +120,7 @@ public abstract class StreamFilteringTestsBase : OrleansTestingBase
 
     public virtual async Task OnlyEvenItems()
     {
+        var cancellationToken = TestContext.Current.CancellationToken;
         EnsureStreamFilterIsRegistered();
 
         const int numberOfEvents = 10;
@@ -126,6 +129,7 @@ public abstract class StreamFilteringTestsBase : OrleansTestingBase
 
         try
         {
+            cancellationToken.ThrowIfCancellationRequested();
             await grain.BecomeConsumer(streamId, ProviderName, "even");
 
             var stream = this.clusterClient.GetStreamProvider(ProviderName).GetStream<int>(streamId);
@@ -135,7 +139,7 @@ public abstract class StreamFilteringTestsBase : OrleansTestingBase
                 await stream.OnNextAsync(i);
             }
 
-            var history = await WaitForReceivedItemsAsync(grain, numberOfEvents / 2);
+            var history = await WaitForReceivedItemsAsync(grain, numberOfEvents / 2, cancellationToken: cancellationToken);
 
             var idx = 0;
             for (var i = 0; i < numberOfEvents; i++)
@@ -155,6 +159,7 @@ public abstract class StreamFilteringTestsBase : OrleansTestingBase
 
     public virtual async Task MultipleSubscriptionsDifferentFilterData()
     {
+        var cancellationToken = TestContext.Current.CancellationToken;
         EnsureStreamFilterIsRegistered();
 
         const int numberOfEvents = 10;
@@ -163,6 +168,7 @@ public abstract class StreamFilteringTestsBase : OrleansTestingBase
 
         try
         {
+            cancellationToken.ThrowIfCancellationRequested();
             await grain.BecomeConsumer(streamId, ProviderName, "only3");
             await grain.BecomeConsumer(streamId, ProviderName, "only7");
 
@@ -173,7 +179,7 @@ public abstract class StreamFilteringTestsBase : OrleansTestingBase
                 await stream.OnNextAsync(i);
             }
 
-            var history = await WaitForReceivedItemsAsync(grain, 2);
+            var history = await WaitForReceivedItemsAsync(grain, 2, cancellationToken: cancellationToken);
 
             Assert.Equal(2, history.Count);
             Assert.Contains(3, history);
@@ -185,10 +191,15 @@ public abstract class StreamFilteringTestsBase : OrleansTestingBase
         }
     }
 
-    private static async Task<List<int>> WaitForReceivedItemsAsync(IStreamingHistoryGrain grain, int expectedCount, TimeSpan? timeout = null)
+    private static async Task<List<int>> WaitForReceivedItemsAsync(
+        IStreamingHistoryGrain grain,
+        int expectedCount,
+        TimeSpan? timeout = null,
+        CancellationToken cancellationToken = default)
     {
         var effectiveTimeout = timeout ?? TimeSpan.FromSeconds(30);
-        using var cts = new CancellationTokenSource(effectiveTimeout);
+        using var cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        cts.CancelAfter(effectiveTimeout);
 
         while (!cts.Token.IsCancellationRequested)
         {
@@ -202,12 +213,13 @@ public abstract class StreamFilteringTestsBase : OrleansTestingBase
             {
                 await Task.Delay(100, cts.Token);
             }
-            catch (OperationCanceledException)
+            catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
             {
                 break;
             }
         }
 
+        cancellationToken.ThrowIfCancellationRequested();
         var finalHistory = await grain.GetReceivedItems();
         Assert.True(finalHistory.Count >= expectedCount,
             $"Expected at least {expectedCount} items but got {finalHistory.Count} after {effectiveTimeout}");

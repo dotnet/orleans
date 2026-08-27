@@ -27,16 +27,32 @@ public sealed class FileGrainStorage(
     private readonly string _rootDirectory = Path.GetFullPath(options.RootDirectory);
 
     /// <inheritdoc />
-    public async Task ClearStateAsync<T>(
+    public Task ClearStateAsync<T>(
         string stateName,
         GrainId grainId,
-        IGrainState<T> grainState)
+        IGrainState<T> grainState) =>
+        ClearStateAsync(stateName, grainId, grainState, CancellationToken.None);
+
+    Task IGrainStorage.ClearStateAsync<T>(
+        string stateName,
+        GrainId grainId,
+        IGrainState<T> grainState,
+        CancellationToken cancellationToken) =>
+        ClearStateAsync(stateName, grainId, grainState, cancellationToken);
+
+    private async Task ClearStateAsync<T>(
+        string stateName,
+        GrainId grainId,
+        IGrainState<T> grainState,
+        CancellationToken cancellationToken)
     {
+        cancellationToken.ThrowIfCancellationRequested();
         var path = GetRecordPath(stateName, grainId);
-        var record = await TryReadRecordAsync(path).ConfigureAwait(false);
+        var record = await TryReadRecordAsync(path, cancellationToken).ConfigureAwait(false);
         if (record is not null)
         {
             ValidateETag<T>("ClearState", grainId, grainState.ETag, record.Value.ETag);
+            cancellationToken.ThrowIfCancellationRequested();
             File.Delete(path);
         }
 
@@ -44,31 +60,64 @@ public sealed class FileGrainStorage(
     }
 
     /// <inheritdoc />
-    public async Task ReadStateAsync<T>(
+    public Task ReadStateAsync<T>(
         string stateName,
         GrainId grainId,
-        IGrainState<T> grainState)
+        IGrainState<T> grainState) =>
+        ReadStateAsync(stateName, grainId, grainState, CancellationToken.None);
+
+    Task IGrainStorage.ReadStateAsync<T>(
+        string stateName,
+        GrainId grainId,
+        IGrainState<T> grainState,
+        CancellationToken cancellationToken) =>
+        ReadStateAsync(stateName, grainId, grainState, cancellationToken);
+
+    private async Task ReadStateAsync<T>(
+        string stateName,
+        GrainId grainId,
+        IGrainState<T> grainState,
+        CancellationToken cancellationToken)
     {
-        var record = await TryReadRecordAsync(GetRecordPath(stateName, grainId)).ConfigureAwait(false);
+        cancellationToken.ThrowIfCancellationRequested();
+        var record = await TryReadRecordAsync(
+            GetRecordPath(stateName, grainId),
+            cancellationToken).ConfigureAwait(false);
         if (record is null)
         {
             ResetState(grainState);
             return;
         }
 
+        cancellationToken.ThrowIfCancellationRequested();
         grainState.State = options.GrainStorageSerializer.Deserialize<T>(new BinaryData(record.Value.Payload));
         grainState.ETag = record.Value.ETag;
         grainState.RecordExists = true;
     }
 
     /// <inheritdoc />
-    public async Task WriteStateAsync<T>(
+    public Task WriteStateAsync<T>(
         string stateName,
         GrainId grainId,
-        IGrainState<T> grainState)
+        IGrainState<T> grainState) =>
+        WriteStateAsync(stateName, grainId, grainState, CancellationToken.None);
+
+    Task IGrainStorage.WriteStateAsync<T>(
+        string stateName,
+        GrainId grainId,
+        IGrainState<T> grainState,
+        CancellationToken cancellationToken) =>
+        WriteStateAsync(stateName, grainId, grainState, cancellationToken);
+
+    private async Task WriteStateAsync<T>(
+        string stateName,
+        GrainId grainId,
+        IGrainState<T> grainState,
+        CancellationToken cancellationToken)
     {
+        cancellationToken.ThrowIfCancellationRequested();
         var path = GetRecordPath(stateName, grainId);
-        var existingRecord = await TryReadRecordAsync(path).ConfigureAwait(false);
+        var existingRecord = await TryReadRecordAsync(path, cancellationToken).ConfigureAwait(false);
         if (existingRecord is not null)
         {
             ValidateETag<T>("WriteState", grainId, grainState.ETag, existingRecord.Value.ETag);
@@ -79,8 +128,14 @@ public sealed class FileGrainStorage(
         }
 
         var etag = Guid.NewGuid().ToString("N");
+        cancellationToken.ThrowIfCancellationRequested();
         var payload = options.GrainStorageSerializer.Serialize(grainState.State).ToArray();
-        await File.WriteAllBytesAsync(path, CreateRecord(etag, payload)).ConfigureAwait(false);
+        cancellationToken.ThrowIfCancellationRequested();
+        // Once the write begins, complete it so cancellation cannot leave a partial record.
+        await File.WriteAllBytesAsync(
+            path,
+            CreateRecord(etag, payload),
+            CancellationToken.None).ConfigureAwait(false);
 
         grainState.ETag = etag;
         grainState.RecordExists = true;
@@ -106,11 +161,13 @@ public sealed class FileGrainStorage(
         return result;
     }
 
-    private static async Task<StoredRecord?> TryReadRecordAsync(string path)
+    private static async Task<StoredRecord?> TryReadRecordAsync(
+        string path,
+        CancellationToken cancellationToken)
     {
         try
         {
-            var bytes = await File.ReadAllBytesAsync(path).ConfigureAwait(false);
+            var bytes = await File.ReadAllBytesAsync(path, cancellationToken).ConfigureAwait(false);
             if (bytes.Length < RecordHeaderLength ||
                 !bytes.AsSpan(0, RecordMagic.Length).SequenceEqual(RecordMagic))
             {

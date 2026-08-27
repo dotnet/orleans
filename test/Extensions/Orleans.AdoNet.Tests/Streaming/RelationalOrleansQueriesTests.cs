@@ -20,7 +20,8 @@ namespace Tester.AdoNet.Streaming;
 public class SqlServerRelationalOrleansQueriesTests() : RelationalOrleansQueriesTests(AdoNetInvariants.InvariantNameSqlServer, 90)
 {
     [Fact]
-    public Task RelationalOrleansQueries_SerializesQueueMessageCommits() => VerifySqlServerQueueMessageCommitsAreSerialized();
+    public Task RelationalOrleansQueries_SerializesQueueMessageCommits() =>
+        VerifySqlServerQueueMessageCommitsAreSerialized(TestContext.Current.CancellationToken);
 }
 
 /// <summary>
@@ -37,7 +38,8 @@ public class MySqlRelationalOrleansQueriesTests : RelationalOrleansQueriesTests
     }
 
     [Fact]
-    public Task RelationalOrleansQueries_OrdersProviderResults() => VerifyProviderResultsAreOrdered();
+    public Task RelationalOrleansQueries_OrdersProviderResults() =>
+        VerifyProviderResultsAreOrdered(TestContext.Current.CancellationToken);
 }
 
 /// <summary>
@@ -69,7 +71,10 @@ public abstract class RelationalOrleansQueriesTests(string invariant, int concur
 
     public async ValueTask InitializeAsync()
     {
-        var testing = await RelationalStorageForTesting.SetupInstance(invariant, TestDatabaseName);
+        var testing = await RelationalStorageForTesting.SetupInstance(
+            invariant,
+            TestDatabaseName,
+            cancellationToken: TestContext.Current.CancellationToken);
         Assert.SkipWhen(IsNullOrEmpty(testing.CurrentConnectionString), $"Database '{TestDatabaseName}' not initialized");
 
         _storage = RelationalStorage.CreateInstance(invariant, testing.CurrentConnectionString);
@@ -98,26 +103,68 @@ public abstract class RelationalOrleansQueriesTests(string invariant, int concur
         string queueId,
         byte[] payload,
         int expiryTimeout,
-        int count)
+        int count,
+        CancellationToken cancellationToken)
     {
         using var semaphore = new SemaphoreSlim(concurrency);
         return await Task.WhenAll(Enumerable.Range(0, count).Select(async _ =>
         {
-            await semaphore.WaitAsync();
-            try
-            {
-                return await _queries.QueueStreamMessageAsync(serviceId, providerId, queueId, payload, expiryTimeout);
-            }
-            finally
-            {
-                semaphore.Release();
-            }
+            return await ExecuteProviderOperationAsync(
+                semaphore,
+                () => _queries.QueueStreamMessageAsync(serviceId, providerId, queueId, payload, expiryTimeout),
+                cancellationToken);
         }));
+    }
+
+    private static async Task<T> ExecuteProviderOperationAsync<T>(
+        SemaphoreSlim semaphore,
+        Func<Task<T>> operationFactory,
+        CancellationToken cancellationToken)
+    {
+        await semaphore.WaitAsync(cancellationToken);
+        Task<T>? operation = null;
+        try
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            operation = operationFactory();
+            return await operation.WaitAsync(cancellationToken);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            if (operation is not null)
+            {
+                if (operation.IsCompleted)
+                {
+                    await ObserveLateCompletionAsync(operation);
+                }
+                else
+                {
+                    _ = ObserveLateCompletionAsync(operation);
+                }
+            }
+
+            throw;
+        }
+        finally
+        {
+            semaphore.Release();
+        }
+    }
+
+    private static async Task ObserveLateCompletionAsync(Task operation)
+    {
+        try
+        {
+            await operation;
+        }
+        catch
+        {
+        }
     }
 
     public ValueTask DisposeAsync() => ValueTask.CompletedTask;
 
-    protected async Task VerifyProviderResultsAreOrdered()
+    protected async Task VerifyProviderResultsAreOrdered(CancellationToken cancellationToken)
     {
         const string reverseQuery = """
             SELECT ServiceId, ProviderId, QueueId, MessageId, Dequeued, VisibleOn, ExpiresOn, CreatedOn, ModifiedOn, Payload
@@ -132,7 +179,7 @@ public abstract class RelationalOrleansQueriesTests(string invariant, int concur
         var queueId = RandomQueueId();
         var payload = new byte[] { 0xFF };
 
-        await QueueMessagesAsync(serviceId, providerId, queueId, payload, 100, 100);
+        await QueueMessagesAsync(serviceId, providerId, queueId, payload, 100, 100, cancellationToken);
 
         await _storage.ExecuteAsync(
             "UPDATE OrleansQuery SET QueryText = @QueryText WHERE QueryKey = 'GetStreamMessagesKey'",
@@ -142,7 +189,8 @@ public abstract class RelationalOrleansQueriesTests(string invariant, int concur
                 parameter.ParameterName = "QueryText";
                 parameter.Value = reverseQuery;
                 command.Parameters.Add(parameter);
-            });
+            },
+            cancellationToken: cancellationToken);
 
         var queries = await RelationalOrleansQueries.CreateInstance(invariant, _storage.ConnectionString);
         var messages = await queries.GetStreamMessagesAsync(serviceId, providerId, queueId, 100, 3, 10, 100, 10, 1000);
@@ -150,7 +198,7 @@ public abstract class RelationalOrleansQueriesTests(string invariant, int concur
         Assert.Equal(messages.OrderBy(message => message.MessageId), messages);
     }
 
-    protected async Task VerifySqlServerQueueMessageCommitsAreSerialized()
+    protected async Task VerifySqlServerQueueMessageCommitsAreSerialized(CancellationToken cancellationToken)
     {
         var serviceId = RandomServiceId();
         var providerId = RandomProviderId();
@@ -159,23 +207,23 @@ public abstract class RelationalOrleansQueriesTests(string invariant, int concur
         const int expiryTimeout = 100;
 
         await using var firstConnection = new SqlConnection(_storage.ConnectionString);
-        await firstConnection.OpenAsync();
-        await using var firstTransaction = (SqlTransaction)await firstConnection.BeginTransactionAsync();
+        await firstConnection.OpenAsync(cancellationToken);
+        await using var firstTransaction = (SqlTransaction)await firstConnection.BeginTransactionAsync(cancellationToken);
         await using var firstCommand = CreateQueueCommand(firstConnection, firstTransaction, serviceId, providerId, queueId, payload, expiryTimeout);
-        var firstMessageId = await ReadMessageId(firstCommand);
+        var firstMessageId = await ReadMessageId(firstCommand, cancellationToken);
 
         await using (var secondConnection = new SqlConnection(_storage.ConnectionString))
         {
-            await secondConnection.OpenAsync();
+            await secondConnection.OpenAsync(cancellationToken);
             await using var secondCommand = CreateQueueCommand(secondConnection, transaction: null, serviceId, providerId, queueId, payload, expiryTimeout);
             secondCommand.CommandType = CommandType.Text;
             secondCommand.CommandText = "SET LOCK_TIMEOUT 0; EXECUTE QueueStreamMessage @ServiceId, @ProviderId, @QueueId, @Payload, @ExpiryTimeout;";
 
-            var exception = await Assert.ThrowsAsync<SqlException>(() => secondCommand.ExecuteReaderAsync());
+            var exception = await Assert.ThrowsAsync<SqlException>(() => secondCommand.ExecuteReaderAsync(cancellationToken));
             Assert.Equal(51000, exception.Number);
         }
 
-        await firstTransaction.CommitAsync();
+        await firstTransaction.CommitAsync(cancellationToken);
 
         var secondAck = await _queries.QueueStreamMessageAsync(serviceId, providerId, queueId, payload, expiryTimeout);
         var messages = await _queries.GetStreamMessagesAsync(serviceId, providerId, queueId, 2, 3, 10, 100, 10, 1000);
@@ -204,10 +252,10 @@ public abstract class RelationalOrleansQueriesTests(string invariant, int concur
         return command;
     }
 
-    private static async Task<long> ReadMessageId(SqlCommand command)
+    private static async Task<long> ReadMessageId(SqlCommand command, CancellationToken cancellationToken)
     {
-        await using var reader = await command.ExecuteReaderAsync();
-        Assert.True(await reader.ReadAsync());
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+        Assert.True(await reader.ReadAsync(cancellationToken));
         return reader.GetInt64(reader.GetOrdinal(nameof(AdoNetStreamMessage.MessageId)));
     }
 
@@ -237,7 +285,9 @@ public abstract class RelationalOrleansQueriesTests(string invariant, int concur
         Assert.Equal(1, ack.MessageId);
 
         // assert - storage
-        var messages = await _storage.ReadAsync<AdoNetStreamMessage>("SELECT * FROM OrleansStreamMessage");
+        var messages = await _storage.ReadAsync<AdoNetStreamMessage>(
+            "SELECT * FROM OrleansStreamMessage",
+            TestContext.Current.CancellationToken);
         var message = Assert.Single(messages);
         Assert.Equal(serviceId, message.ServiceId);
         Assert.Equal(providerId, message.ProviderId);
@@ -261,6 +311,8 @@ public abstract class RelationalOrleansQueriesTests(string invariant, int concur
     [Fact]
     public async Task RelationalOrleansQueries_QueuesManyMessagesInParallel()
     {
+        var cancellationToken = TestContext.Current.CancellationToken;
+
         // arrange
         var serviceId = RandomServiceId();
         var providerId = RandomProviderId();
@@ -278,16 +330,11 @@ public abstract class RelationalOrleansQueriesTests(string invariant, int concur
             .Range(0, count)
             .Select(i => Task.Run(async () =>
             {
-                await semaphore.WaitAsync();
-                try
-                {
-                    return await _queries.QueueStreamMessageAsync(serviceId, providerId, queueId, payload, expiryTimeout);
-                }
-                finally
-                {
-                    semaphore.Release();
-                }
-            }))
+                return await ExecuteProviderOperationAsync(
+                    semaphore,
+                    () => _queries.QueueStreamMessageAsync(serviceId, providerId, queueId, payload, expiryTimeout),
+                    cancellationToken);
+            }, cancellationToken))
             .ToList());
         var after = DateTime.UtcNow.AddSeconds(1);
 
@@ -308,7 +355,9 @@ public abstract class RelationalOrleansQueriesTests(string invariant, int concur
         }
 
         // assert - messages were stored as expected
-        var stored = (await _storage.ReadAsync<AdoNetStreamMessage>("SELECT * FROM OrleansStreamMessage"))
+        var stored = (await _storage.ReadAsync<AdoNetStreamMessage>(
+            "SELECT * FROM OrleansStreamMessage",
+            cancellationToken))
             .OrderBy(x => x.ServiceId)
             .ThenBy(x => x.ProviderId)
             .ThenBy(x => x.QueueId)
@@ -339,6 +388,8 @@ public abstract class RelationalOrleansQueriesTests(string invariant, int concur
     [Fact]
     public async Task RelationalOrleansQueries_QueuesManyMessagesInParallelOnManyQueues()
     {
+        var cancellationToken = TestContext.Current.CancellationToken;
+
         // arrange - create up to 27 random partition keys with around 1000 random messages per partition in random order
         var expiryTimeout = RandomExpiryTimeout();
         var count = 3 * 3 * 3 * 1000;
@@ -361,17 +412,12 @@ public abstract class RelationalOrleansQueriesTests(string invariant, int concur
         var results = await Task.WhenAll(partitions
             .Select(p => Task.Run(async () =>
             {
-                await semaphore.WaitAsync();
-                try
-                {
-                    var ack = await _queries.QueueStreamMessageAsync(p.ServiceId, p.ProviderId, p.QueueId, p.Payload, expiryTimeout);
-                    return (Partition: p, Ack: ack);
-                }
-                finally
-                {
-                    semaphore.Release();
-                }
-            }))
+                var ack = await ExecuteProviderOperationAsync(
+                    semaphore,
+                    () => _queries.QueueStreamMessageAsync(p.ServiceId, p.ProviderId, p.QueueId, p.Payload, expiryTimeout),
+                    cancellationToken);
+                return (Partition: p, Ack: ack);
+            }, cancellationToken))
             .ToList());
         var after = DateTime.UtcNow.AddSeconds(1);
 
@@ -391,7 +437,9 @@ public abstract class RelationalOrleansQueriesTests(string invariant, int concur
         Assert.Equal(messageIds.Count, messageIds.Max);
 
         // assert - messages were stored as expected
-        var stored = (await _storage.ReadAsync<AdoNetStreamMessage>("SELECT * FROM OrleansStreamMessage"))
+        var stored = (await _storage.ReadAsync<AdoNetStreamMessage>(
+            "SELECT * FROM OrleansStreamMessage",
+            cancellationToken))
             .ToDictionary(x => (x.ServiceId, x.ProviderId, x.QueueId, x.MessageId));
 
         foreach (var (partition, ack) in results)
@@ -418,7 +466,7 @@ public abstract class RelationalOrleansQueriesTests(string invariant, int concur
     public async Task RelationalOrleansQueries_DequeuesSingleMessage()
     {
         // arrange
-        await _storage.ExecuteAsync("DELETE FROM OrleansStreamMessage");
+        await _storage.ExecuteAsync("DELETE FROM OrleansStreamMessage", TestContext.Current.CancellationToken);
         var serviceId = RandomServiceId();
         var providerId = RandomProviderId();
         var queueId = RandomQueueId();
@@ -467,7 +515,9 @@ public abstract class RelationalOrleansQueriesTests(string invariant, int concur
         Assert.Equal(payload, message.Payload);
 
         // assert - the stored message changed
-        var stored = Assert.Single(await _storage.ReadAsync<AdoNetStreamMessage>("SELECT * FROM OrleansStreamMessage"));
+        var stored = Assert.Single(await _storage.ReadAsync<AdoNetStreamMessage>(
+            "SELECT * FROM OrleansStreamMessage",
+            TestContext.Current.CancellationToken));
         Assert.Equal(message.ServiceId, stored.ServiceId);
         Assert.Equal(message.ProviderId, stored.ProviderId);
         Assert.Equal(message.QueueId, stored.QueueId);
@@ -502,7 +552,14 @@ public abstract class RelationalOrleansQueriesTests(string invariant, int concur
 
         // arrange - enqueue messages concurrently
         var beforeQueueing = DateTime.UtcNow.AddSeconds(-1);
-        var acks = await QueueMessagesAsync(serviceId, providerId, queueId, payload, expiryTimeout, total);
+        var acks = await QueueMessagesAsync(
+            serviceId,
+            providerId,
+            queueId,
+            payload,
+            expiryTimeout,
+            total,
+            TestContext.Current.CancellationToken);
         var afterQueueing = DateTime.UtcNow.AddSeconds(1);
 
         // act - dequeue all messages
@@ -545,7 +602,9 @@ public abstract class RelationalOrleansQueriesTests(string invariant, int concur
 
         // assert - stored messages are consistent with dequeued messages
         var messageLookup = messages.ToDictionary(x => (x.ServiceId, x.ProviderId, x.QueueId, x.MessageId));
-        var stored = await _storage.ReadAsync<AdoNetStreamMessage>("SELECT * FROM OrleansStreamMessage");
+        var stored = await _storage.ReadAsync<AdoNetStreamMessage>(
+            "SELECT * FROM OrleansStreamMessage",
+            TestContext.Current.CancellationToken);
         foreach (var item in stored)
         {
             Assert.True(messageLookup.TryGetValue((item.ServiceId, item.ProviderId, item.QueueId, item.MessageId), out var message), "Message not found");
@@ -621,7 +680,9 @@ public abstract class RelationalOrleansQueriesTests(string invariant, int concur
         Assert.Empty(results[maxAttempts]);
 
         // assert - final stored message is consistent with final dequeued message
-        var stored = Assert.Single(await _storage.ReadAsync<AdoNetStreamMessage>("SELECT * FROM OrleansStreamMessage"));
+        var stored = Assert.Single(await _storage.ReadAsync<AdoNetStreamMessage>(
+            "SELECT * FROM OrleansStreamMessage",
+            TestContext.Current.CancellationToken));
         var final = Assert.Single(results[maxAttempts - 1]);
         Assert.Equal(final.ServiceId, stored.ServiceId);
         Assert.Equal(final.ProviderId, stored.ProviderId);
@@ -668,7 +729,9 @@ public abstract class RelationalOrleansQueriesTests(string invariant, int concur
         Assert.Equal(ack.MessageId, first.MessageId);
 
         // assert - stored message is consistent with first message
-        var stored = Assert.Single(await _storage.ReadAsync<AdoNetStreamMessage>("SELECT * FROM OrleansStreamMessage"));
+        var stored = Assert.Single(await _storage.ReadAsync<AdoNetStreamMessage>(
+            "SELECT * FROM OrleansStreamMessage",
+            TestContext.Current.CancellationToken));
         Assert.Equal(first.ServiceId, stored.ServiceId);
         Assert.Equal(first.ProviderId, stored.ProviderId);
         Assert.Equal(first.QueueId, stored.QueueId);
@@ -752,7 +815,9 @@ public abstract class RelationalOrleansQueriesTests(string invariant, int concur
         Assert.Empty(messages);
 
         // assert - stored message are as expected
-        var stored = Assert.Single(await _storage.ReadAsync<AdoNetStreamMessage>("SELECT * FROM OrleansStreamMessage"));
+        var stored = Assert.Single(await _storage.ReadAsync<AdoNetStreamMessage>(
+            "SELECT * FROM OrleansStreamMessage",
+            TestContext.Current.CancellationToken));
         Assert.Equal(ack.ServiceId, stored.ServiceId);
         Assert.Equal(ack.ProviderId, stored.ProviderId);
         Assert.Equal(ack.QueueId, stored.QueueId);
@@ -813,7 +878,9 @@ public abstract class RelationalOrleansQueriesTests(string invariant, int concur
         }
 
         // assert - no data remains in storage
-        var stored = await _storage.ReadAsync<AdoNetStreamMessage>("SELECT * FROM OrleansStreamMessage");
+        var stored = await _storage.ReadAsync<AdoNetStreamMessage>(
+            "SELECT * FROM OrleansStreamMessage",
+            TestContext.Current.CancellationToken);
         Assert.Empty(stored);
     }
 
@@ -855,7 +922,9 @@ public abstract class RelationalOrleansQueriesTests(string invariant, int concur
         Assert.Empty(results);
 
         // assert - data remains in storage
-        var stored = await _storage.ReadAsync<AdoNetStreamMessage>("SELECT * FROM OrleansStreamMessage");
+        var stored = await _storage.ReadAsync<AdoNetStreamMessage>(
+            "SELECT * FROM OrleansStreamMessage",
+            TestContext.Current.CancellationToken);
         Assert.Equal(maxCount, stored.Count());
     }
 
@@ -899,7 +968,9 @@ public abstract class RelationalOrleansQueriesTests(string invariant, int concur
 
         // assert - confirmed messages are as expected
         var lookup = acks.ToDictionary(x => (x.ServiceId, x.ProviderId, x.QueueId, x.MessageId));
-        var stored = (await _storage.ReadAsync<AdoNetStreamMessage>("SELECT * FROM OrleansStreamMessage"))
+        var stored = (await _storage.ReadAsync<AdoNetStreamMessage>(
+            "SELECT * FROM OrleansStreamMessage",
+            TestContext.Current.CancellationToken))
             .ToDictionary(x => (x.ServiceId, x.ProviderId, x.QueueId, x.MessageId));
         foreach (var item in confirmed)
         {
@@ -928,6 +999,8 @@ public abstract class RelationalOrleansQueriesTests(string invariant, int concur
     [Fact]
     public async Task RelationalOrleansQueries_ChaosTest()
     {
+        var cancellationToken = TestContext.Current.CancellationToken;
+
         // arrange - generate test data
         var total = 10000;
         var serviceIds = Enumerable.Range(0, 3).Select(x => $"ServiceId{x}").ToList();
@@ -961,19 +1034,13 @@ public abstract class RelationalOrleansQueriesTests(string invariant, int concur
                     var providerId = providerIds[Random.Shared.Next(providerIds.Count)];
                     var queueId = queueIds[Random.Shared.Next(queueIds.Count)];
 
-                    AdoNetStreamMessageAck ack;
-                    await semaphore.WaitAsync();
-                    try
-                    {
-                        ack = await _queries.QueueStreamMessageAsync(serviceId, providerId, queueId, payload, visibilityTimeout);
-                    }
-                    finally
-                    {
-                        semaphore.Release();
-                    }
+                    var ack = await ExecuteProviderOperationAsync(
+                        semaphore,
+                        () => _queries.QueueStreamMessageAsync(serviceId, providerId, queueId, payload, visibilityTimeout),
+                        cancellationToken);
 
                     acks.Add(ack);
-                });
+                }, cancellationToken);
 
                 // spin up a random dequeuing task that does not confirm
                 var dequeue = Task.Run(async () =>
@@ -982,22 +1049,16 @@ public abstract class RelationalOrleansQueriesTests(string invariant, int concur
                     var providerId = providerIds[Random.Shared.Next(providerIds.Count)];
                     var queueId = queueIds[Random.Shared.Next(queueIds.Count)];
 
-                    IEnumerable<AdoNetStreamMessage> messages;
-                    await semaphore.WaitAsync();
-                    try
-                    {
-                        messages = await _queries.GetStreamMessagesAsync(serviceId, providerId, queueId, maxCount, maxAttempts, visibilityTimeout, removalTimeout, evictionInterval, evictionBatchSize);
-                    }
-                    finally
-                    {
-                        semaphore.Release();
-                    }
+                    var messages = await ExecuteProviderOperationAsync(
+                        semaphore,
+                        () => _queries.GetStreamMessagesAsync(serviceId, providerId, queueId, maxCount, maxAttempts, visibilityTimeout, removalTimeout, evictionInterval, evictionBatchSize),
+                        cancellationToken);
 
                     foreach (var item in messages)
                     {
                         dequeued1.Add(item);
                     }
-                });
+                }, cancellationToken);
 
                 // spin a random dequeuing task that also confirms
                 var confirm = Task.Run(async () =>
@@ -1006,38 +1067,30 @@ public abstract class RelationalOrleansQueriesTests(string invariant, int concur
                     var providerId = providerIds[Random.Shared.Next(providerIds.Count)];
                     var queueId = queueIds[Random.Shared.Next(queueIds.Count)];
 
-                    IEnumerable<AdoNetStreamMessage> messages;
-                    await semaphore.WaitAsync();
-                    try
-                    {
-                        messages = await _queries.GetStreamMessagesAsync(serviceId, providerId, queueId, maxCount, maxAttempts, visibilityTimeout, removalTimeout, evictionInterval, evictionBatchSize);
-                    }
-                    finally
-                    {
-                        semaphore.Release();
-                    }
+                    var messages = await ExecuteProviderOperationAsync(
+                        semaphore,
+                        () => _queries.GetStreamMessagesAsync(serviceId, providerId, queueId, maxCount, maxAttempts, visibilityTimeout, removalTimeout, evictionInterval, evictionBatchSize),
+                        cancellationToken);
 
                     foreach (var item in messages)
                     {
                         dequeued2.Add(item);
                     }
 
-                    IEnumerable<AdoNetStreamConfirmationAck> confirmation;
-                    await semaphore.WaitAsync();
-                    try
-                    {
-                        confirmation = await _queries.ConfirmStreamMessagesAsync(serviceId, providerId, queueId, messages.Select(x => new AdoNetStreamConfirmation(x.MessageId, x.Dequeued)).ToList());
-                    }
-                    finally
-                    {
-                        semaphore.Release();
-                    }
+                    var confirmation = await ExecuteProviderOperationAsync(
+                        semaphore,
+                        () => _queries.ConfirmStreamMessagesAsync(
+                            serviceId,
+                            providerId,
+                            queueId,
+                            messages.Select(x => new AdoNetStreamConfirmation(x.MessageId, x.Dequeued)).ToList()),
+                        cancellationToken);
 
                     foreach (var item in confirmation)
                     {
                         confirmed.Add(item);
                     }
-                });
+                }, cancellationToken);
 
                 // wait for all to complete
                 await Task.WhenAll(enqueue, dequeue, confirm);
@@ -1055,7 +1108,9 @@ public abstract class RelationalOrleansQueriesTests(string invariant, int concur
         Assert.NotEmpty(confirmed);
 
         // assert - some messages were left behind (rng dependant, remove assert if flaky)
-        var stored = await _storage.ReadAsync<AdoNetStreamMessage>("SELECT * FROM OrleansStreamMessage");
+        var stored = await _storage.ReadAsync<AdoNetStreamMessage>(
+            "SELECT * FROM OrleansStreamMessage",
+            cancellationToken);
         Assert.NotEmpty(stored);
 
         // assert - confirmed messages were not left behind
@@ -1085,16 +1140,22 @@ public abstract class RelationalOrleansQueriesTests(string invariant, int concur
 
         // arrange - dequeue the message and make immediately available
         await _queries.GetStreamMessagesAsync(ack.ServiceId, ack.ProviderId, ack.QueueId, cacheOptions.CacheSize, streamOptions.MaxAttempts, 0, streamOptions.DeadLetterEvictionTimeout.TotalSecondsCeiling(), streamOptions.EvictionInterval.TotalSecondsCeiling(), streamOptions.EvictionBatchSize);
-        Assert.Empty(await _storage.ReadAsync<AdoNetStreamDeadLetter>("SELECT * FROM OrleansStreamDeadLetter"));
+        Assert.Empty(await _storage.ReadAsync<AdoNetStreamDeadLetter>(
+            "SELECT * FROM OrleansStreamDeadLetter",
+            TestContext.Current.CancellationToken));
 
         // act - clean up with max attempts of one so the message above is flagged
         await _queries.FailStreamMessageAsync(ack.ServiceId, ack.ProviderId, ack.QueueId, ack.MessageId, 1, streamOptions.DeadLetterEvictionTimeout.TotalSecondsCeiling());
 
         // assert - message no longer in the message table
-        Assert.Empty(await _storage.ReadAsync<AdoNetStreamMessage>("SELECT * FROM OrleansStreamMessage"));
+        Assert.Empty(await _storage.ReadAsync<AdoNetStreamMessage>(
+            "SELECT * FROM OrleansStreamMessage",
+            TestContext.Current.CancellationToken));
 
         // assert - message was moved
-        var dead = Assert.Single(await _storage.ReadAsync<AdoNetStreamDeadLetter>("SELECT * FROM OrleansStreamDeadLetter"));
+        var dead = Assert.Single(await _storage.ReadAsync<AdoNetStreamDeadLetter>(
+            "SELECT * FROM OrleansStreamDeadLetter",
+            TestContext.Current.CancellationToken));
         Assert.Equal(serviceId, dead.ServiceId);
         Assert.Equal(providerId, dead.ProviderId);
         Assert.Equal(queueId, dead.QueueId);
@@ -1130,7 +1191,9 @@ public abstract class RelationalOrleansQueriesTests(string invariant, int concur
         await _queries.FailStreamMessageAsync(ack.ServiceId, ack.ProviderId, ack.QueueId, ack.MessageId, streamOptions.MaxAttempts, streamOptions.DeadLetterEvictionTimeout.TotalSecondsCeiling());
 
         // assert - the message is still in the table and was made visible again
-        var saved = Assert.Single(await _storage.ReadAsync<AdoNetStreamMessage>("SELECT * FROM OrleansStreamMessage"));
+        var saved = Assert.Single(await _storage.ReadAsync<AdoNetStreamMessage>(
+            "SELECT * FROM OrleansStreamMessage",
+            TestContext.Current.CancellationToken));
         Assert.Equal(ack.ServiceId, saved.ServiceId);
         Assert.Equal(ack.ProviderId, saved.ProviderId);
         Assert.Equal(ack.QueueId, saved.QueueId);
@@ -1139,7 +1202,9 @@ public abstract class RelationalOrleansQueriesTests(string invariant, int concur
         Assert.Equal(saved.ModifiedOn, saved.VisibleOn);
 
         // assert - no message arrived at dead letters
-        Assert.Empty(await _storage.ReadAsync<AdoNetStreamDeadLetter>("SELECT * FROM OrleansStreamDeadLetter"));
+        Assert.Empty(await _storage.ReadAsync<AdoNetStreamDeadLetter>(
+            "SELECT * FROM OrleansStreamDeadLetter",
+            TestContext.Current.CancellationToken));
     }
 
     private static List<T> Randomize<T>(IEnumerable<T> source)

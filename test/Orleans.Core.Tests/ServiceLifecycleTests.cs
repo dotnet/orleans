@@ -63,21 +63,21 @@ public class ServiceLifecycleTests
 
         var (task, _) = RegisterCallback(_lifecycle.Started, (state, ct) => { }, callbackState);
 
-        await _subject.OnStart();
+        await _subject.OnStart(TestContext.Current.CancellationToken);
 
-        var result = await task.WaitAsync(Timeout);
+        var result = await task.WaitAsync(Timeout, TestContext.Current.CancellationToken);
         Assert.Equal(callbackState, result);
     }
 
     [Fact]
     public async Task Stage_WaitAsync()
     {
-        var waitTask = _lifecycle.Started.WaitAsync();
+        var waitTask = _lifecycle.Started.WaitAsync(TestContext.Current.CancellationToken);
 
         Assert.False(waitTask.IsCompleted);
 
-        await _subject.OnStart();
-        await waitTask.WaitAsync(Timeout);
+        await _subject.OnStart(TestContext.Current.CancellationToken);
+        await waitTask.WaitAsync(Timeout, TestContext.Current.CancellationToken);
     }
 
     [Fact]
@@ -85,7 +85,7 @@ public class ServiceLifecycleTests
     {
         var tcs = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
 
-        using var cts = new CancellationTokenSource();
+        using var cts = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
 
         // We register a blocking callback to keep the stage in a "running" state.
         // This forces WaitAsync to actually block, allowing us to verify that cancelling
@@ -93,7 +93,7 @@ public class ServiceLifecycleTests
 
         _lifecycle.Started.Register((_, _) => tcs.Task);
 
-        var startTask = _subject.OnStart();
+        var startTask = _subject.OnStart(TestContext.Current.CancellationToken);
         var waitTask = _lifecycle.Started.WaitAsync(cts.Token);
 
         Assert.False(waitTask.IsCompleted, "WaitAsync should be paused waiting for the stage to complete");
@@ -125,9 +125,9 @@ public class ServiceLifecycleTests
         Assert.False(second.IsCompleted);
 
         gate.SetResult();
-        await Task.WhenAll(first, second).WaitAsync(Timeout);
+        await Task.WhenAll(first, second).WaitAsync(Timeout, TestContext.Current.CancellationToken);
 
-        await stage.NotifyCompleted(CancellationToken.None).WaitAsync(Timeout);
+        await stage.NotifyCompleted(TestContext.Current.CancellationToken).WaitAsync(Timeout, TestContext.Current.CancellationToken);
 
         Assert.Equal(1, executionCount);
     }
@@ -139,8 +139,8 @@ public class ServiceLifecycleTests
 
         registration.Dispose();
 
-        await _subject.OnStart();
-        await _subject.OnStop();
+        await _subject.OnStart(TestContext.Current.CancellationToken);
+        await _subject.OnStop(TestContext.Current.CancellationToken);
 
         Assert.False(task.IsCompleted);
     }
@@ -152,10 +152,10 @@ public class ServiceLifecycleTests
 
         using var registration = _lifecycle.Stopping.Token.Register(tcs.SetResult);
 
-        await _subject.OnStart();
-        await _subject.OnStop();
+        await _subject.OnStart(TestContext.Current.CancellationToken);
+        await _subject.OnStop(TestContext.Current.CancellationToken);
 
-        await tcs.Task.WaitAsync(Timeout);
+        await tcs.Task.WaitAsync(Timeout, TestContext.Current.CancellationToken);
     }
 
     [Fact]
@@ -166,9 +166,10 @@ public class ServiceLifecycleTests
         (state, ct) => throw new InvalidOperationException("Test"),
         terminateOnError: false);
 
-        await _subject.OnStart();
+        await _subject.OnStart(TestContext.Current.CancellationToken);
 
-        var ex = await Assert.ThrowsAsync<InvalidOperationException>(() => task.WaitAsync(Timeout));
+        var ex = await Assert.ThrowsAsync<InvalidOperationException>(
+            () => task.WaitAsync(Timeout, TestContext.Current.CancellationToken));
         Assert.Equal("Test", ex.Message);
     }
 
@@ -180,10 +181,11 @@ public class ServiceLifecycleTests
             (state, ct) => throw new InvalidOperationException("Test"),
             terminateOnError: true);
 
-        var startTask = _subject.OnStart();
+        var startTask = _subject.OnStart(TestContext.Current.CancellationToken);
 
         // This ensures the callback actually executed and we aren't just catching the lifecycle aborting.
-        var ex = await Assert.ThrowsAsync<InvalidOperationException>(() => task.WaitAsync(Timeout));
+        var ex = await Assert.ThrowsAsync<InvalidOperationException>(
+            () => task.WaitAsync(Timeout, TestContext.Current.CancellationToken));
         Assert.Equal("Test", ex.Message);
 
         // Now verify the lifecycle start failed as expected.
@@ -193,6 +195,7 @@ public class ServiceLifecycleTests
     [Fact]
     public async Task ErrorHandling_TerminateOnErrorTrue_MultipleFailures()
     {
+        var cancellationToken = TestContext.Current.CancellationToken;
         var (task1, _) = RegisterCallback(
             _lifecycle.Started,
             (_, _) => throw new InvalidOperationException("first"),
@@ -203,12 +206,16 @@ public class ServiceLifecycleTests
             (_, _) => throw new ArgumentException("second"),
             terminateOnError: true);
 
-        var startTask = _subject.OnStart();
+        var startTask = _subject.OnStart(cancellationToken);
 
         // We swallow the start exception initially so we can inspect the individual tasks.
         try
         {
             await startTask;
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
         }
         catch
         {
@@ -218,23 +225,25 @@ public class ServiceLifecycleTests
         // Now we wait for both TCS signals to complete (rather 'fail') before asserting.
         // This prevents racing between the OnStart exception propagation and the TCS setting.
 
-        try { await task1.WaitAsync(Timeout); } catch { }
-        try { await task2.WaitAsync(Timeout); } catch { }
+        var firstException = await Record.ExceptionAsync(() => task1.WaitAsync(Timeout, cancellationToken));
+        cancellationToken.ThrowIfCancellationRequested();
+        Assert.IsType<InvalidOperationException>(firstException);
 
-        await Assert.ThrowsAsync<InvalidOperationException>(() => task1);
-        await Assert.ThrowsAsync<ArgumentException>(() => task2);
+        var secondException = await Record.ExceptionAsync(() => task2.WaitAsync(Timeout, cancellationToken));
+        cancellationToken.ThrowIfCancellationRequested();
+        Assert.IsType<ArgumentException>(secondException);
     }
 
     [Fact]
     public async Task LateRegistration_ExecutedImmediately()
     {
-        await _subject.OnStart();
-        await _subject.OnStop();
+        await _subject.OnStart(TestContext.Current.CancellationToken);
+        await _subject.OnStop(TestContext.Current.CancellationToken);
 
         // Registering after stage completes should run immediately
         var (task, _) = RegisterCallback(_lifecycle.Stopping);
 
-        await task.WaitAsync(Timeout);
+        await task.WaitAsync(Timeout, TestContext.Current.CancellationToken);
     }
 
     [Fact]
@@ -250,15 +259,15 @@ public class ServiceLifecycleTests
         {
             tasks[i] = Task.Run(() =>
             {
-                startSignal.Wait();
+                startSignal.Wait(TestContext.Current.CancellationToken);
                 RegisterCallback(_lifecycle.Started, (_, _) => Interlocked.Increment(ref executionCount));
-            });
+            }, TestContext.Current.CancellationToken);
         }
 
         startSignal.Set();
 
         await Task.WhenAll(tasks);
-        await _subject.OnStart();
+        await _subject.OnStart(TestContext.Current.CancellationToken);
 
         Assert.Equal(Count, executionCount);
     }
@@ -274,9 +283,9 @@ public class ServiceLifecycleTests
         // We capture the stopped task to wait on it specifically.
         var (stoppedTask, _) = RegisterCallback(_lifecycle.Stopped, (_, _) => executionOrder.Enqueue("Stopped"));
 
-        await _subject.OnStart();
-        await _subject.OnStop();
-        await stoppedTask.WaitAsync(Timeout);
+        await _subject.OnStart(TestContext.Current.CancellationToken);
+        await _subject.OnStop(TestContext.Current.CancellationToken);
+        await stoppedTask.WaitAsync(Timeout, TestContext.Current.CancellationToken);
 
         var order = executionOrder.ToArray();
 
@@ -302,17 +311,18 @@ public class ServiceLifecycleTests
             {
                 workerExited.SetResult();
             }
-        });
+        }, TestContext.Current.CancellationToken);
 
-        await _subject.OnStart();
-        await _subject.OnStop();
+        await _subject.OnStart(TestContext.Current.CancellationToken);
+        await _subject.OnStop(TestContext.Current.CancellationToken);
 
-        await workerExited.Task.WaitAsync(Timeout);
+        await workerExited.Task.WaitAsync(Timeout, TestContext.Current.CancellationToken);
     }
 
     [Fact]
     public async Task Lifecycle_CancellationToken_PassedToCallback()
     {
+        var cancellationToken = TestContext.Current.CancellationToken;
         var tcs = new TaskCompletionSource<bool>();
 
         // We manually register here because the logic is specific to CT handling inside the callback
@@ -323,13 +333,13 @@ public class ServiceLifecycleTests
             {
                 await Task.Delay(System.Threading.Timeout.InfiniteTimeSpan, ct);
             }
-            catch (OperationCanceledException)
+            catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
             {
                 tcs.SetResult(true);
             }
         });
 
-        var startTask = _subject.OnStart();
+        var startTask = _subject.OnStart(cancellationToken);
 
         await _subject.CancelStartAsync();
 
@@ -337,12 +347,12 @@ public class ServiceLifecycleTests
         {
             await startTask;
         }
-        catch (OperationCanceledException)
+        catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
         {
 
         }
 
-        var tokenWasCancelled = await tcs.Task.WaitAsync(Timeout);
+        var tokenWasCancelled = await tcs.Task.WaitAsync(Timeout, cancellationToken);
         Assert.True(tokenWasCancelled);
     }
 

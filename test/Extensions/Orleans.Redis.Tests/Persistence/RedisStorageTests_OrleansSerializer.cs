@@ -22,7 +22,9 @@ namespace Tester.Redis.Persistence
         {
             TestUtils.CheckForRedis();
             this.fixture = commonFixture;
-            var storageProvider = fixture.CreateRedisGrainStorage(true).Result;
+            var storageProvider = fixture.CreateRedisGrainStorage(
+                true,
+                cancellationToken: TestContext.Current.CancellationToken).Result;
             this.commonStorageTests = new CommonStorageTests(storageProvider);
         }
 

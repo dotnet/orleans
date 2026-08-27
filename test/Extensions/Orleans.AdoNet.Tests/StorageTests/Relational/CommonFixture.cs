@@ -65,9 +65,11 @@ namespace UnitTests.StorageTests.Relational
         /// </summary>
         /// <remarks>If the environment invariants have failed to hold upon creation of the storage provider,
         /// a <em>null</em> value will be provided.</remarks>
-        public async Task<IGrainStorage?> GetStorageProvider(string storageInvariant)
+        public async Task<IGrainStorage?> GetStorageProvider(
+            string storageInvariant,
+            CancellationToken cancellationToken)
         {
-            return await GetStorageProvider(storageInvariant, deleteStateOnClear: false);
+            return await GetStorageProvider(storageInvariant, deleteStateOnClear: false, cancellationToken);
         }
 
         /// <summary>
@@ -77,7 +79,10 @@ namespace UnitTests.StorageTests.Relational
         /// <param name="deleteStateOnClear">If <see langword="true"/>, the provider will delete the row from the database when clearing state.</param>
         /// <remarks>If the environment invariants have failed to hold upon creation of the storage provider,
         /// a <em>null</em> value will be provided.</remarks>
-        public async Task<IGrainStorage?> GetStorageProvider(string storageInvariant, bool deleteStateOnClear)
+        public async Task<IGrainStorage?> GetStorageProvider(
+            string storageInvariant,
+            bool deleteStateOnClear,
+            CancellationToken cancellationToken)
         {
             //Make sure the environment invariants hold before trying to give a functioning SUT instantiation.
             //This is done instead of the constructor to have more granularity on how the environment should be initialized.
@@ -98,7 +103,10 @@ namespace UnitTests.StorageTests.Relational
                         {
                             // Each storage mode has its own class fixture, so it must not recreate a database used by the other mode.
                             var storageName = deleteStateOnClear ? "OrleansStorageTestsDeleteOnClear" : "OrleansStorageTests";
-                            Storage = await Invariants.EnsureStorageForTestingAsync(connectionString, storageName);
+                            Storage = await Invariants.EnsureStorageForTestingAsync(
+                                connectionString,
+                                storageName,
+                                cancellationToken);
 
                             var options = new AdoNetGrainStorageOptions()
                             {
@@ -119,7 +127,7 @@ namespace UnitTests.StorageTests.Relational
                                 storageInvariant + "_StorageProvider");
                             ISiloLifecycleSubject siloLifeCycle = new SiloLifecycleSubject(NullLoggerFactory.Instance.CreateLogger<SiloLifecycleSubject>());
                             storageProvider.Participate(siloLifeCycle);
-                            await siloLifeCycle.OnStart(CancellationToken.None);
+                            await siloLifeCycle.OnStart(cancellationToken);
 
                             StorageProviders[cacheKey] = storageProvider;
                         }

@@ -66,7 +66,12 @@ namespace Tester.StreamingTests.PlugableQueueBalancerTests
         [Fact, TestCategory("BVT")]
         public Task PluggableQueueBalancerTest_ShouldUseInjectedQueueBalancerAndBalanceCorrectly()
         {
-            return base.ShouldUseInjectedQueueBalancerAndBalanceCorrectly(this.fixture, StreamProviderName, siloCount, totalQueueCount);
+            return base.ShouldUseInjectedQueueBalancerAndBalanceCorrectly(
+                this.fixture,
+                StreamProviderName,
+                siloCount,
+                totalQueueCount,
+                TestContext.Current.CancellationToken);
         }
     }
 }

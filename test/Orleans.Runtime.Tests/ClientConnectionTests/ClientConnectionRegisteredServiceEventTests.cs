@@ -89,7 +89,7 @@ namespace Tester
                     await grain.SetLabel(i.ToString());
                 }
 
-                await this.HostedCluster.StopAllSilosAsync();
+                await this.HostedCluster.StopAllSilosAsync(TestContext.Current.CancellationToken);
 
                 Assert.True(await semaphore.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken));
             }
@@ -122,7 +122,7 @@ namespace Tester
             try
             {
                 var silo = this.HostedCluster.SecondarySilos[0];
-                await silo.StopSiloAsync(true);
+                await silo.StopSiloAsync(true, TestContext.Current.CancellationToken);
 
                 Assert.True(await lostGatewaySemaphore.WaitAsync(TimeSpan.FromSeconds(20), TestContext.Current.CancellationToken));
 

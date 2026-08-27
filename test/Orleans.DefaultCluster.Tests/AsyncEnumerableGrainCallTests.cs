@@ -55,21 +55,22 @@ public class AsyncEnumerableGrainCallTests
     [Fact, TestCategory("BVT"), TestCategory("Observable")]
     public async Task ObservableGrain_AsyncEnumerable()
     {
+        var cancellationToken = TestContext.Current.CancellationToken;
         var grain = GrainFactory.GetGrain<IObservableGrain>(Guid.NewGuid());
 
         var producer = Task.Run(async () =>
         {
             foreach (var value in Enumerable.Range(0, 5))
             {
-                await Task.Delay(200);
+                await Task.Delay(200, cancellationToken);
                 await grain.OnNext(value.ToString());
             }
 
             await grain.Complete();
-        });
+        }, cancellationToken);
 
         var values = new List<string>();
-        await foreach (var entry in grain.GetValues())
+        await foreach (var entry in grain.GetValues(cancellationToken).WithCancellation(cancellationToken))
         {
             values.Add(entry);
             Logger.LogInformation("ObservableGrain_AsyncEnumerable: {Entry}", entry);
@@ -93,11 +94,13 @@ public class AsyncEnumerableGrainCallTests
     [Fact, TestCategory("BVT"), TestCategory("Observable")]
     public async Task ObservableGrain_AsyncEnumerable_CancelBeforeYield()
     {
+        var cancellationToken = TestContext.Current.CancellationToken;
         var grain = GrainFactory.GetGrain<IObservableGrain>(Guid.NewGuid());
 
         // Set up cancellation tokens - one for test timeout, one for the grain call
-        using var testCts = new CancellationTokenSource(TimeSpan.FromSeconds(35));
-        using var callCts = new CancellationTokenSource();
+        using var testCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        testCts.CancelAfter(TimeSpan.FromSeconds(35));
+        using var callCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         var callId = Guid.NewGuid();
 
         // Task to cancel the enumeration after it starts but before it yields
@@ -105,7 +108,7 @@ public class AsyncEnumerableGrainCallTests
         {
             await grain.WaitForCall(callId); // Wait for enumeration to begin
             callCts.Cancel(); // Cancel before any values are yielded
-        });
+        }, cancellationToken);
 
         try
         {
@@ -119,6 +122,8 @@ public class AsyncEnumerableGrainCallTests
         }
         catch (OperationCanceledException)
         {
+            cancellationToken.ThrowIfCancellationRequested();
+
             // Verify the cancellation token was indeed cancelled
             Assert.True(callCts.Token.IsCancellationRequested);
         }
@@ -134,9 +139,10 @@ public class AsyncEnumerableGrainCallTests
                 break;
             }
 
-            await Task.Delay(TimeSpan.FromMilliseconds(10));
+            await Task.Delay(TimeSpan.FromMilliseconds(10), cancellationToken);
             if (testCts.IsCancellationRequested)
             {
+                cancellationToken.ThrowIfCancellationRequested();
                 Assert.Fail("Test timed out waiting for cancellation to be recorded.");
             }
         }
@@ -163,13 +169,14 @@ public class AsyncEnumerableGrainCallTests
     [InlineData(11, true)]
     public async Task ObservableGrain_AsyncEnumerable_Throws(int errorIndex, bool waitAfterYield)
     {
+        var cancellationToken = TestContext.Current.CancellationToken;
         const string ErrorMessage = "This is my error!";
         var grain = GrainFactory.GetGrain<IObservableGrain>(Guid.NewGuid());
 
         var values = new List<int>();
         try
         {
-            await foreach (var entry in grain.GetValuesWithError(errorIndex, waitAfterYield, ErrorMessage).WithBatchSize(10))
+            await foreach (var entry in grain.GetValuesWithError(errorIndex, waitAfterYield, ErrorMessage, cancellationToken).WithBatchSize(10).WithCancellation(cancellationToken))
             {
                 values.Add(entry);
                 Logger.LogInformation("ObservableGrain_AsyncEnumerable: {Entry}", entry);
@@ -207,6 +214,7 @@ public class AsyncEnumerableGrainCallTests
     [InlineData(11, true)]
     public async Task ObservableGrain_AsyncEnumerable_Cancellation(int errorIndex, bool waitAfterYield)
     {
+        var cancellationToken = TestContext.Current.CancellationToken;
         // This special error message is interpreted to indicate that cancellation
         // should occur when the index is reached.
         const string ErrorMessage = "cancel";
@@ -215,7 +223,7 @@ public class AsyncEnumerableGrainCallTests
         var values = new List<int>();
         try
         {
-            await foreach (var entry in grain.GetValuesWithError(errorIndex, waitAfterYield, ErrorMessage).WithBatchSize(10))
+            await foreach (var entry in grain.GetValuesWithError(errorIndex, waitAfterYield, ErrorMessage, cancellationToken).WithBatchSize(10).WithCancellation(cancellationToken))
             {
                 values.Add(entry);
                 Logger.LogInformation("ObservableGrain_AsyncEnumerable: {Entry}", entry);
@@ -223,6 +231,7 @@ public class AsyncEnumerableGrainCallTests
         }
         catch (OperationCanceledException oce)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             var expectedMessage = new OperationCanceledException().Message;
             Assert.Equal(expectedMessage, oce.Message);
         }
@@ -256,13 +265,14 @@ public class AsyncEnumerableGrainCallTests
     [InlineData(11, true)]
     public async Task ObservableGrain_AsyncEnumerable_CancellationToken(int errorIndex, bool waitAfterYield)
     {
+        var cancellationToken = TestContext.Current.CancellationToken;
         const string ErrorMessage = "Throwing!";
         var grain = GrainFactory.GetGrain<IObservableGrain>(Guid.NewGuid());
 
         var values = new List<int>();
         try
         {
-            using var cts = new CancellationTokenSource();
+            using var cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
             if (errorIndex == 0)
             {
                 cts.Cancel();
@@ -281,6 +291,7 @@ public class AsyncEnumerableGrainCallTests
         }
         catch (OperationCanceledException oce)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             var expectedMessage = new OperationCanceledException().Message;
             Assert.Equal(expectedMessage, oce.Message);
         }
@@ -323,19 +334,20 @@ public class AsyncEnumerableGrainCallTests
     [InlineData(11, true)]
     public async Task ObservableGrain_AsyncEnumerable_CancellationToken_WithCancellationExtension(int errorIndex, bool waitAfterYield)
     {
+        var cancellationToken = TestContext.Current.CancellationToken;
         const string ErrorMessage = "Throwing!";
         var grain = GrainFactory.GetGrain<IObservableGrain>(Guid.NewGuid());
 
         var values = new List<int>();
         try
         {
-            using var cts = new CancellationTokenSource();
+            using var cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
             if (errorIndex == 0)
             {
                 cts.Cancel();
             }
 
-            await foreach (var entry in grain.GetValuesWithError(int.MaxValue, waitAfterYield, ErrorMessage).WithBatchSize(10).WithCancellation(cts.Token))
+            await foreach (var entry in grain.GetValuesWithError(int.MaxValue, waitAfterYield, ErrorMessage, cancellationToken).WithBatchSize(10).WithCancellation(cts.Token))
             {
                 values.Add(entry);
                 if (values.Count == errorIndex)
@@ -348,6 +360,7 @@ public class AsyncEnumerableGrainCallTests
         }
         catch (OperationCanceledException oce)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             var expectedMessage = new OperationCanceledException().Message;
             Assert.Equal(expectedMessage, oce.Message);
         }
@@ -380,6 +393,7 @@ public class AsyncEnumerableGrainCallTests
     [Fact, TestCategory("BVT"), TestCategory("Observable")]
     public async Task ObservableGrain_AsyncEnumerable_Batch()
     {
+        var cancellationToken = TestContext.Current.CancellationToken;
         var grain = GrainFactory.GetGrain<IObservableGrain>(Guid.NewGuid());
 
         foreach (var value in Enumerable.Range(0, 50))
@@ -390,7 +404,7 @@ public class AsyncEnumerableGrainCallTests
         await grain.Complete();
 
         var values = new List<string>();
-        await foreach (var entry in grain.GetValues())
+        await foreach (var entry in grain.GetValues(cancellationToken).WithCancellation(cancellationToken))
         {
             values.Add(entry);
             Logger.LogInformation("ObservableGrain_AsyncEnumerable: {Entry}", entry);
@@ -418,6 +432,7 @@ public class AsyncEnumerableGrainCallTests
     [Fact, TestCategory("BVT"), TestCategory("Observable")]
     public async Task ObservableGrain_AsyncEnumerable_SplitBatch()
     {
+        var cancellationToken = TestContext.Current.CancellationToken;
         var grain = GrainFactory.GetGrain<IObservableGrain>(Guid.NewGuid());
 
         foreach (var value in Enumerable.Range(0, 50))
@@ -428,7 +443,7 @@ public class AsyncEnumerableGrainCallTests
         await grain.Complete();
 
         var values = new List<string>();
-        await foreach (var entry in grain.GetValues().WithBatchSize(25))
+        await foreach (var entry in grain.GetValues(cancellationToken).WithBatchSize(25).WithCancellation(cancellationToken))
         {
             values.Add(entry);
             Logger.LogInformation("ObservableGrain_AsyncEnumerable: {Entry}", entry);
@@ -456,6 +471,7 @@ public class AsyncEnumerableGrainCallTests
     [Fact, TestCategory("BVT"), TestCategory("Observable")]
     public async Task ObservableGrain_AsyncEnumerable_NoBatching()
     {
+        var cancellationToken = TestContext.Current.CancellationToken;
         var grain = GrainFactory.GetGrain<IObservableGrain>(Guid.NewGuid());
 
         foreach (var value in Enumerable.Range(0, 50))
@@ -466,7 +482,7 @@ public class AsyncEnumerableGrainCallTests
         await grain.Complete();
 
         var values = new List<string>();
-        await foreach (var entry in grain.GetValues().WithBatchSize(1))
+        await foreach (var entry in grain.GetValues(cancellationToken).WithBatchSize(1).WithCancellation(cancellationToken))
         {
             values.Add(entry);
             Logger.LogInformation("ObservableGrain_AsyncEnumerable: {Entry}", entry);
@@ -496,24 +512,25 @@ public class AsyncEnumerableGrainCallTests
     [Fact, TestCategory("BVT"), TestCategory("Observable")]
     public async Task ObservableGrain_AsyncEnumerable_WithCancellation()
     {
+        var cancellationToken = TestContext.Current.CancellationToken;
         var grain = GrainFactory.GetGrain<IObservableGrain>(Guid.NewGuid());
 
         var producer = Task.Run(async () =>
         {
             foreach (var value in Enumerable.Range(0, 5))
             {
-                await Task.Delay(200);
+                await Task.Delay(200, cancellationToken);
                 await grain.OnNext(value.ToString());
             }
 
             await grain.Complete();
-        });
+        }, cancellationToken);
 
         var values = new List<string>();
-        using var cts = new CancellationTokenSource();
+        using var cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         try
         {
-            await foreach (var entry in grain.GetValues().WithCancellation(cts.Token))
+            await foreach (var entry in grain.GetValues(cancellationToken).WithCancellation(cts.Token))
             {
                 values.Add(entry);
                 if (values.Count == 3)
@@ -528,6 +545,7 @@ public class AsyncEnumerableGrainCallTests
         }
         catch (OperationCanceledException)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             // Expected
         }
 
@@ -548,21 +566,22 @@ public class AsyncEnumerableGrainCallTests
     [Fact, TestCategory("BVT"), TestCategory("Observable")]
     public async Task ObservableGrain_AsyncEnumerable_SlowProducer()
     {
+        var cancellationToken = TestContext.Current.CancellationToken;
         var grain = GrainFactory.GetGrain<IObservableGrain>(Guid.NewGuid());
 
         var producer = Task.Run(async () =>
         {
             foreach (var value in Enumerable.Range(0, 5))
             {
-                await Task.Delay(2000);
+                await Task.Delay(2000, cancellationToken);
                 await grain.OnNext(value.ToString());
             }
 
             await grain.Complete();
-        });
+        }, cancellationToken);
 
         var values = new List<string>();
-        await foreach (var entry in grain.GetValues())
+        await foreach (var entry in grain.GetValues(cancellationToken).WithCancellation(cancellationToken))
         {
             values.Add(entry);
             if (values.Count == 2)
@@ -590,7 +609,8 @@ public class AsyncEnumerableGrainCallTests
     [Fact, TestCategory("BVT"), TestCategory("Observable")]
     public async Task ObservableGrain_AsyncEnumerable_SlowConsumer()
     {
-        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+        using var cts = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
+        cts.CancelAfter(TimeSpan.FromSeconds(30));
         var grain = GrainFactory.GetGrain<IObservableGrain>(Guid.NewGuid());
         using var listener = new AsyncEnumerableGrainExtensionListener(grain.GetGrainId());
 
@@ -602,10 +622,10 @@ public class AsyncEnumerableGrainCallTests
             }
 
             await grain.Complete();
-        });
+        }, cts.Token);
 
         var values = new List<string>();
-        await foreach (var entry in grain.GetValues().WithBatchSize(1))
+        await foreach (var entry in grain.GetValues(cts.Token).WithBatchSize(1).WithCancellation(cts.Token))
         {
             values.Add(entry);
 
@@ -631,7 +651,8 @@ public class AsyncEnumerableGrainCallTests
     [Fact, TestCategory("BVT"), TestCategory("Observable")]
     public async Task ObservableGrain_AsyncEnumerable_SlowConsumer_Evicted()
     {
-        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+        using var cts = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
+        cts.CancelAfter(TimeSpan.FromSeconds(30));
         var grain = GrainFactory.GetGrain<IObservableGrain>(Guid.NewGuid());
         using var listener = new AsyncEnumerableGrainExtensionListener(grain.GetGrainId());
 
@@ -643,12 +664,12 @@ public class AsyncEnumerableGrainCallTests
             }
 
             await grain.Complete();
-        });
+        }, cts.Token);
 
         var values = new List<string>();
         try
         {
-            await foreach (var entry in grain.GetValues().WithBatchSize(1))
+            await foreach (var entry in grain.GetValues(cts.Token).WithBatchSize(1).WithCancellation(cts.Token))
             {
                 values.Add(entry);
 
@@ -685,28 +706,29 @@ public class AsyncEnumerableGrainCallTests
     [Fact, TestCategory("BVT"), TestCategory("Observable")]
     public async Task ObservableGrain_AsyncEnumerable_Deactivate()
     {
+        var cancellationToken = TestContext.Current.CancellationToken;
         var grain = GrainFactory.GetGrain<IObservableGrain>(Guid.NewGuid());
 
         var producer = Task.Run(async () =>
         {
             foreach (var value in Enumerable.Range(0, 2))
             {
-                await Task.Delay(200);
+                await Task.Delay(200, cancellationToken);
                 await grain.OnNext(value.ToString());
             }
 
             await grain.Deactivate();
-        });
+        }, cancellationToken);
 
         var values = new List<string>();
         await Assert.ThrowsAsync<EnumerationAbortedException>(async () =>
         {
-            await foreach (var entry in grain.GetValues())
+            await foreach (var entry in grain.GetValues(cancellationToken))
             {
                 values.Add(entry);
                 Logger.LogInformation("ObservableGrain_AsyncEnumerable: {Entry}", entry);
             }
-        });
+        }).WaitAsync(cancellationToken);
 
         Assert.Equal(2, values.Count);
     }
@@ -716,7 +738,7 @@ public class AsyncEnumerableGrainCallTests
         var cleanupCount = listener.CleanupCount + 1;
         var timer = listener.Timer;
         var timerChangeCount = _fixture.GetTimerChangeCount(timer);
-        await _fixture.AdvanceTimeByResponseTimeoutAsync();
+        await _fixture.AdvanceTimeByResponseTimeoutAsync().WaitAsync(cancellationToken);
         await listener.WaitForCleanupCountAsync(cleanupCount, cancellationToken);
 
         // Cleanup is reported from inside the callback, before the one-shot timer is rearmed.

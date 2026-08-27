@@ -65,7 +65,7 @@ public static class GoogleEmulatorHost
         try
         {
             client.ConnectAsync(IPAddress.Loopback, port)
-                .WaitAsync(TimeSpan.FromSeconds(1))
+                .WaitAsync(TimeSpan.FromSeconds(1), Xunit.TestContext.Current.CancellationToken)
                 .GetAwaiter()
                 .GetResult();
         }

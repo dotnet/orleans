@@ -110,7 +110,7 @@ public class EventHubCheckpointerTests
         {
             if (PurgeOffsetToReport is not null)
             {
-                checkpointer?.Update(PurgeOffsetToReport, DateTime.UtcNow, CancellationToken.None);
+                checkpointer?.Update(PurgeOffsetToReport, DateTime.UtcNow, TestContext.Current.CancellationToken);
             }
         }
 
@@ -273,7 +273,7 @@ public class EventHubCheckpointerTests
         var eventHubReceiver = new NullReturningEventHubReceiver();
         var receiver = await CreateReceiver(new TestCheckpointer(), cache, eventHubReceiver);
 
-        var messages = await receiver.GetQueueMessagesAsync(10, CancellationToken.None);
+        var messages = await receiver.GetQueueMessagesAsync(10, TestContext.Current.CancellationToken);
 
         Assert.Empty(messages);
         Assert.Equal(1, eventHubReceiver.ReceiveCount);
@@ -288,10 +288,12 @@ public class EventHubCheckpointerTests
         var receiver = await CreateReceiver(
             new TestCheckpointer(),
             eventHubReceiver: eventHubReceiver);
-        using var cancellation = new CancellationTokenSource();
+        using var cancellation = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
 
         var operation = receiver.GetQueueMessagesAsync(10, cancellation.Token);
-        Assert.Equal(cancellation.Token, await eventHubReceiver.ReceiveStarted.Task);
+        Assert.Equal(
+            cancellation.Token,
+            await eventHubReceiver.ReceiveStarted.Task.WaitAsync(TestContext.Current.CancellationToken));
         cancellation.Cancel();
 
         var exception = await Assert.ThrowsAnyAsync<OperationCanceledException>(() => operation);
@@ -303,7 +305,7 @@ public class EventHubCheckpointerTests
     public async Task CancellationOverloads_FallBackToLegacyReceiver()
     {
         IEventHubReceiver receiver = new TestEventHubReceiver();
-        using var cancellation = new CancellationTokenSource();
+        using var cancellation = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
         cancellation.Cancel();
 
         Assert.Empty(await receiver.ReceiveAsync(10, TimeSpan.Zero, cancellation.Token));
@@ -353,7 +355,9 @@ public class EventHubCheckpointerTests
         var receiver = await CreateReceiver(checkpointer, cache, eventHubReceiver);
 
         await Assert.ThrowsAnyAsync<OperationCanceledException>(
-            () => receiver.Shutdown(TimeSpan.FromMilliseconds(50)).WaitAsync(TimeSpan.FromSeconds(5)));
+            () => receiver.Shutdown(TimeSpan.FromMilliseconds(50)).WaitAsync(
+                TimeSpan.FromSeconds(5),
+                TestContext.Current.CancellationToken));
 
         Assert.Equal(1, checkpointer.FlushCount);
         Assert.Equal(1, cache.DisposeCount);
@@ -366,7 +370,7 @@ public class EventHubCheckpointerTests
     {
         var checkpointer = CreateUninitializedCheckpointer();
 
-        await checkpointer.FlushAsync(CancellationToken.None);
+        await checkpointer.FlushAsync(TestContext.Current.CancellationToken);
 
         Assert.False(checkpointer.CheckpointExists);
         Assert.Equal(string.Empty, GetLatestOffset(checkpointer));
@@ -383,7 +387,7 @@ public class EventHubCheckpointerTests
         SetPersistedOffset(checkpointer, "20");
 
         checkpointer.Update(candidate, new DateTime(2026, 1, 2, 3, 4, 5, DateTimeKind.Utc));
-        await checkpointer.FlushAsync(CancellationToken.None);
+        await checkpointer.FlushAsync(TestContext.Current.CancellationToken);
 
         Assert.True(checkpointer.CheckpointExists);
         Assert.Equal("20", GetLatestOffset(checkpointer));
@@ -471,7 +475,7 @@ public class EventHubCheckpointerTests
         Assert.NotNull(constructor);
         var checkpointer = (EventHubCheckpointer)constructor.Invoke([inner]);
 
-        Assert.Equal(expected, await checkpointer.Load(CancellationToken.None));
+        Assert.Equal(expected, await checkpointer.Load(TestContext.Current.CancellationToken));
     }
 
     [TestSuite("BVT")]

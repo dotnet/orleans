@@ -31,6 +31,25 @@ internal static class ReminderTableRetryPolicy
         string operation,
         string expected,
         Func<T, string> describe)
+        => ReadUntilAsync(
+            read,
+            hasConverged,
+            providerName,
+            guarantee,
+            operation,
+            expected,
+            describe,
+            CancellationToken.None);
+
+    public static Task<T> ReadUntilAsync<T>(
+        Func<Task<T>> read,
+        Func<T, bool> hasConverged,
+        string providerName,
+        string guarantee,
+        string operation,
+        string expected,
+        Func<T, string> describe,
+        CancellationToken cancellationToken)
         => ExecuteUntilAsync(
             read,
             hasConverged,
@@ -41,7 +60,8 @@ internal static class ReminderTableRetryPolicy
             describe,
             "read convergence",
             Timeout,
-            Delay);
+            Delay,
+            cancellationToken);
 
     public static Task<T> MutateUntilAsync<T>(
         Func<Task<T>> mutation,
@@ -51,6 +71,25 @@ internal static class ReminderTableRetryPolicy
         string operation,
         string expected,
         Func<T, string> describe)
+        => MutateUntilAsync(
+            mutation,
+            succeeded,
+            providerName,
+            guarantee,
+            operation,
+            expected,
+            describe,
+            CancellationToken.None);
+
+    public static Task<T> MutateUntilAsync<T>(
+        Func<Task<T>> mutation,
+        Func<T, bool> succeeded,
+        string providerName,
+        string guarantee,
+        string operation,
+        string expected,
+        Func<T, string> describe,
+        CancellationToken cancellationToken)
         => ExecuteUntilAsync(
             mutation,
             succeeded,
@@ -61,7 +100,8 @@ internal static class ReminderTableRetryPolicy
             describe,
             "mutation retry",
             Timeout,
-            Delay);
+            Delay,
+            cancellationToken);
 
     internal static async Task<T> ExecuteUntilAsync<T>(
         Func<Task<T>> operation,
@@ -73,7 +113,8 @@ internal static class ReminderTableRetryPolicy
         Func<T, string> describe,
         string policyName,
         TimeSpan timeout,
-        TimeSpan delay)
+        TimeSpan delay,
+        CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(operation);
         ArgumentNullException.ThrowIfNull(succeeded);
@@ -95,6 +136,7 @@ internal static class ReminderTableRetryPolicy
 
         while (true)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             var remaining = timeout - stopwatch.Elapsed;
             if (attempts > 0 && remaining <= TimeSpan.Zero)
             {
@@ -112,7 +154,7 @@ internal static class ReminderTableRetryPolicy
                     ThrowTimeout();
                 }
 
-                var value = await attempt.WaitAsync(remaining);
+                var value = await attempt.WaitAsync(remaining, cancellationToken);
                 lastException = null;
                 lastObservation = describe(value);
                 if (succeeded(value))
@@ -121,7 +163,9 @@ internal static class ReminderTableRetryPolicy
                 }
 
             }
-            catch (Exception exception) when (exception is not ReminderConformanceException)
+            catch (Exception exception) when (
+                exception is not ReminderConformanceException
+                && !cancellationToken.IsCancellationRequested)
             {
                 lastException = exception;
             }
@@ -132,7 +176,7 @@ internal static class ReminderTableRetryPolicy
                 ThrowTimeout();
             }
 
-            await Task.Delay(remaining < delay ? remaining : delay);
+            await Task.Delay(remaining < delay ? remaining : delay, cancellationToken);
         }
 
         void ThrowTimeout()

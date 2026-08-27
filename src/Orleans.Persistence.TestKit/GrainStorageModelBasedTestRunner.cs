@@ -79,9 +79,22 @@ public sealed class GrainStorageModelBasedTestRunner
     /// </summary>
     /// <returns>A task which represents the asynchronous test run.</returns>
     /// <exception cref="InvalidOperationException">One or more generated test cases failed.</exception>
-    public async Task RunGeneratedConformanceTests()
+    public Task RunGeneratedConformanceTests() =>
+        RunGeneratedConformanceTests(CancellationToken.None);
+
+    /// <summary>
+    /// Generates and executes storage operation sequences.
+    /// </summary>
+    /// <param name="cancellationToken">A token which cancels the storage operations.</param>
+    /// <returns>A task which represents the asynchronous test run.</returns>
+    /// <exception cref="InvalidOperationException">One or more generated test cases failed.</exception>
+    public async Task RunGeneratedConformanceTests(CancellationToken cancellationToken)
     {
-        var results = await GrainStorageModelBasedConformance.RunGeneratedTests(storage, options, output);
+        var results = await GrainStorageModelBasedConformance.RunGeneratedTests(
+            storage,
+            options,
+            output,
+            cancellationToken);
         var failures = results.Where(result => !result.Success).Select(GrainStorageModelBasedConformance.BuildFailureMessage).ToList();
         if (failures.Count > 0)
         {
@@ -92,21 +105,47 @@ public sealed class GrainStorageModelBasedTestRunner
 
 internal static class GrainStorageModelBasedConformance
 {
-    public static async Task<IList<TestCaseExecutionResult>> RunGeneratedTests(IGrainStorage storage, string storageName, Action<string>? output = null)
+    public static Task<IList<TestCaseExecutionResult>> RunGeneratedTests(
+        IGrainStorage storage,
+        string storageName,
+        Action<string>? output = null) =>
+        RunGeneratedTests(storage, storageName, output, CancellationToken.None);
+
+    public static async Task<IList<TestCaseExecutionResult>> RunGeneratedTests(
+        IGrainStorage storage,
+        string storageName,
+        Action<string>? output,
+        CancellationToken cancellationToken)
     {
         return await RunGeneratedTests(
             storage,
             new GrainStorageModelBasedConformanceOptions { ProviderName = storageName },
-            output);
+            output,
+            cancellationToken);
     }
 
-    public static async Task<IList<TestCaseExecutionResult>> RunGeneratedTests(IGrainStorage storage, GrainStorageModelBasedConformanceOptions options, Action<string>? output = null)
+    public static Task<IList<TestCaseExecutionResult>> RunGeneratedTests(
+        IGrainStorage storage,
+        GrainStorageModelBasedConformanceOptions options,
+        Action<string>? output = null) =>
+        RunGeneratedTests(storage, options, output, CancellationToken.None);
+
+    public static async Task<IList<TestCaseExecutionResult>> RunGeneratedTests(
+        IGrainStorage storage,
+        GrainStorageModelBasedConformanceOptions options,
+        Action<string>? output,
+        CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(storage);
         ArgumentNullException.ThrowIfNull(options);
+        cancellationToken.ThrowIfCancellationRequested();
 
         var runId = options.KeyPrefix ?? $"{SanitizeStorageName(options.ProviderName)}-{Guid.NewGuid():N}";
-        var deleteStateOnClear = await DetectDeleteStateOnClear(storage, options.GrainType, $"{runId}-clear-behavior-{Guid.NewGuid():N}");
+        var deleteStateOnClear = await DetectDeleteStateOnClear(
+            storage,
+            options.GrainType,
+            $"{runId}-clear-behavior-{Guid.NewGuid():N}",
+            cancellationToken);
         var spec = new GrainStorageBehavioralSpec(deleteStateOnClear);
         var initialState = new GrainStorageBehavioralModelState();
         var inputSet = spec.CreateInputSet();
@@ -125,7 +164,7 @@ internal static class GrainStorageModelBasedConformance
         context.ResponsePrinter = response => response?.ToString() ?? "<null>";
 
         var testIndex = 0;
-        return await spec.RunTests(
+        var results = await spec.RunTests(
             context,
             initialState,
             testCases,
@@ -134,7 +173,12 @@ internal static class GrainStorageModelBasedConformance
                 StopOnFirstFailure = true,
                 BeforeEach = info =>
                 {
-                    info.Context.Register(new GrainStorageExecutionContext(storage, options.GrainType, $"{runId}-{testIndex++:D4}"));
+                    cancellationToken.ThrowIfCancellationRequested();
+                    info.Context.Register(new GrainStorageExecutionContext(
+                        storage,
+                        options.GrainType,
+                        $"{runId}-{testIndex++:D4}",
+                        cancellationToken));
                 },
                 AfterEach = info =>
                 {
@@ -144,13 +188,27 @@ internal static class GrainStorageModelBasedConformance
                     }
                 }
             });
+        cancellationToken.ThrowIfCancellationRequested();
+        return results;
     }
 
-    private static async Task<bool> DetectDeleteStateOnClear(IGrainStorage storage, string grainType, string key)
+    private static async Task<bool> DetectDeleteStateOnClear(
+        IGrainStorage storage,
+        string grainType,
+        string key,
+        CancellationToken cancellationToken)
     {
         var grainState = new GrainState<TestState1> { State = CreateState(StorageValue.One) };
-        await storage.WriteStateAsync(grainType, GrainId.Create(grainType, key), grainState);
-        await storage.ClearStateAsync(grainType, GrainId.Create(grainType, key), grainState);
+        await storage.WriteStateAsync(
+            grainType,
+            GrainId.Create(grainType, key),
+            grainState,
+            cancellationToken);
+        await storage.ClearStateAsync(
+            grainType,
+            GrainId.Create(grainType, key),
+            grainState,
+            cancellationToken);
         return grainState.ETag is null;
     }
 
@@ -349,12 +407,18 @@ internal static class GrainStorageModelBasedConformance
         private readonly IGrainStorage storage;
         private readonly string grainType;
         private readonly string keyPrefix;
+        private readonly CancellationToken cancellationToken;
 
-        public GrainStorageExecutionContext(IGrainStorage storage, string grainType, string keyPrefix)
+        public GrainStorageExecutionContext(
+            IGrainStorage storage,
+            string grainType,
+            string keyPrefix,
+            CancellationToken cancellationToken)
         {
             this.storage = storage;
             this.grainType = grainType;
             this.keyPrefix = keyPrefix;
+            this.cancellationToken = cancellationToken;
         }
 
         public async Task<StorageOperationResult> ReadAsync(StorageRequest request)
@@ -362,7 +426,11 @@ internal static class GrainStorageModelBasedConformance
             var grainState = new GrainState<TestState1> { State = new TestState1() };
             try
             {
-                await storage.ReadStateAsync(grainType, ToGrainId(request.Key), grainState);
+                await storage.ReadStateAsync(
+                    grainType,
+                    ToGrainId(request.Key),
+                    grainState,
+                    cancellationToken);
                 if (grainState.RecordExists)
                 {
                     records[request.Key] = new GrainStorageBehavioralRecord
@@ -386,6 +454,10 @@ internal static class GrainStorageModelBasedConformance
 
                 return StorageOperationResult.Success(grainState.ETag, grainState.RecordExists, ToStorageValue(grainState.State));
             }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                throw;
+            }
             catch (Exception exception)
             {
                 return StorageOperationResult.Failure(exception, grainState.ETag, grainState.RecordExists, ToStorageValue(grainState.State));
@@ -404,7 +476,11 @@ internal static class GrainStorageModelBasedConformance
 
             try
             {
-                await storage.WriteStateAsync(grainType, ToGrainId(request.Key), grainState);
+                await storage.WriteStateAsync(
+                    grainType,
+                    ToGrainId(request.Key),
+                    grainState,
+                    cancellationToken);
                 records[request.Key] = new GrainStorageBehavioralRecord
                 {
                     Value = request.Value,
@@ -414,6 +490,10 @@ internal static class GrainStorageModelBasedConformance
                 };
 
                 return StorageOperationResult.Success(grainState.ETag, grainState.RecordExists, ToStorageValue(grainState.State));
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                throw;
             }
             catch (Exception exception)
             {
@@ -433,7 +513,11 @@ internal static class GrainStorageModelBasedConformance
             try
             {
                 var priorRecord = records.TryGetValue(request.Key, out var existing) ? existing : null;
-                await storage.ClearStateAsync(grainType, ToGrainId(request.Key), grainState);
+                await storage.ClearStateAsync(
+                    grainType,
+                    ToGrainId(request.Key),
+                    grainState,
+                    cancellationToken);
                 if (string.IsNullOrEmpty(grainState.ETag))
                 {
                     records.Remove(request.Key);
@@ -450,6 +534,10 @@ internal static class GrainStorageModelBasedConformance
                 }
 
                 return StorageOperationResult.Success(grainState.ETag, grainState.RecordExists, ToStorageValue(grainState.State));
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                throw;
             }
             catch (Exception exception)
             {

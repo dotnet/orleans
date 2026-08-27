@@ -258,7 +258,7 @@ namespace Orleans.Serialization.UnitTests
                 return (writer.Position, writer.Session.ReferencedObjects.CurrentReferenceId);
             }
 
-            _ = await pipe.Writer.FlushAsync();
+            _ = await pipe.Writer.FlushAsync(TestContext.Current.CancellationToken);
             pipe.Writer.Complete();
 
             _ = pipe.Reader.TryRead(out var readResult);
@@ -323,7 +323,7 @@ namespace Orleans.Serialization.UnitTests
                 return (writer.Position, writer.Session.ReferencedObjects.CurrentReferenceId);
             }
 
-            _ = await pipe.Writer.FlushAsync();
+            _ = await pipe.Writer.FlushAsync(TestContext.Current.CancellationToken);
             pipe.Writer.Complete();
 
             _ = pipe.Reader.TryRead(out var readResult);

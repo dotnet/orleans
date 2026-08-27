@@ -8,11 +8,19 @@ namespace Tester.StreamingTests
     public class PluggableQueueBalancerTestBase : OrleansTestingBase
     {
         private readonly TimeSpan Timeout = TimeSpan.FromSeconds(30);
-        public virtual async Task ShouldUseInjectedQueueBalancerAndBalanceCorrectly(BaseTestClusterFixture fixture, string streamProviderName, int siloCount, int totalQueueCount)
+        public virtual async Task ShouldUseInjectedQueueBalancerAndBalanceCorrectly(
+            BaseTestClusterFixture fixture,
+            string streamProviderName,
+            int siloCount,
+            int totalQueueCount,
+            CancellationToken cancellationToken = default)
         {
             var leaseManager = fixture.GrainFactory.GetGrain<ILeaseManagerGrain>(streamProviderName);
             var expectedResponsibilityPerBalancer = totalQueueCount / siloCount;
-            await TestingUtils.WaitUntilAsync((lastTry, cancellationToken) => CheckLeases(leaseManager, siloCount, expectedResponsibilityPerBalancer, lastTry, cancellationToken), Timeout);
+            await TestingUtils.WaitUntilAsync(
+                (lastTry, token) => CheckLeases(leaseManager, siloCount, expectedResponsibilityPerBalancer, lastTry, token),
+                Timeout,
+                cancellationToken: cancellationToken);
         }
 
         private async Task<bool> CheckLeases(ILeaseManagerGrain leaseManager, int siloCount, int expectedResponsibilityPerBalancer, bool lastTry, CancellationToken cancellationToken)

@@ -219,7 +219,8 @@ public class ReferencedAssemblyDiagnosticParityTests
         libraryDriver = libraryDriver.RunGeneratorsAndUpdateCompilation(
             libraryCompilation,
             out var generatedLibraryCompilation,
-            out var libraryGeneratorDiagnostics);
+            out var libraryGeneratorDiagnostics,
+            TestContext.Current.CancellationToken);
         Assert.Empty(libraryGeneratorDiagnostics.Where(static diagnostic => diagnostic.Severity == DiagnosticSeverity.Error));
         AssertNoCompilationErrors(generatedLibraryCompilation);
 

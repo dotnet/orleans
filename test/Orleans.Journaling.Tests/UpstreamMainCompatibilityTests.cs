@@ -36,7 +36,7 @@ public sealed class UpstreamMainCompatibilityTests : JournalingTestBase
     {
         var journalBytes = LoadUpstreamMainJournal();
         var storage = new VolatileJournalStorage();
-        await storage.AppendAsync(new ReadOnlySequence<byte>(journalBytes), default);
+        await storage.AppendAsync(new ReadOnlySequence<byte>(journalBytes), TestContext.Current.CancellationToken);
 
         var states = CreateStates(storage);
         using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));

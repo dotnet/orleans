@@ -56,7 +56,7 @@ namespace UnitTests.MembershipTests
             var promise = grain.CallOtherLongRunningTask(target, true, TimeSpan.FromSeconds(7));
 
             await Task.Delay(500, TestContext.Current.CancellationToken);
-            await HostedCluster.KillSiloAsync(HostedCluster.SecondarySilos[0]);
+            await HostedCluster.KillSiloAsync(HostedCluster.SecondarySilos[0], TestContext.Current.CancellationToken);
 
             await Assert.ThrowsAsync<SiloUnavailableException>(() => promise);
         }

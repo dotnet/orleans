@@ -65,16 +65,36 @@ namespace Tester.AzureUtils.Lease
         {
             var mgmtGrain = this.GrainFactory.GetGrain<IManagementGrain>(0);
             //6 queue and 4 silo, then each agent manager should own queues/agents in range of [1, 2]
-            await WaitUntilAgentManagersOwnCorrectAmountOfAgents(1, 2, mgmtGrain);
+            await WaitUntilAgentManagersOwnCorrectAmountOfAgents(
+                1,
+                2,
+                mgmtGrain,
+                TestContext.Current.CancellationToken);
             //stop one silo, 6 queues, 3 silo, then each agent manager should own 2 queues 
-            await this.HostedCluster.StopSiloAsync(this.HostedCluster.SecondarySilos[0]);
-            await WaitUntilAgentManagersOwnCorrectAmountOfAgents(2, 2, mgmtGrain);
+            await this.HostedCluster.StopSiloAsync(
+                this.HostedCluster.SecondarySilos[0],
+                TestContext.Current.CancellationToken);
+            await WaitUntilAgentManagersOwnCorrectAmountOfAgents(
+                2,
+                2,
+                mgmtGrain,
+                TestContext.Current.CancellationToken);
             //stop another silo, 6 queues, 2 silo, then each agent manager should own 3 queues
-            await this.HostedCluster.StopSiloAsync(this.HostedCluster.SecondarySilos[0]);
-            await WaitUntilAgentManagersOwnCorrectAmountOfAgents(3, 3, mgmtGrain);
+            await this.HostedCluster.StopSiloAsync(
+                this.HostedCluster.SecondarySilos[0],
+                TestContext.Current.CancellationToken);
+            await WaitUntilAgentManagersOwnCorrectAmountOfAgents(
+                3,
+                3,
+                mgmtGrain,
+                TestContext.Current.CancellationToken);
             //start one silo, 6 queues, 3 silo, then each agent manager should own 2 queues
             this.HostedCluster.StartAdditionalSilo(true);
-            await WaitUntilAgentManagersOwnCorrectAmountOfAgents(2, 2, mgmtGrain);
+            await WaitUntilAgentManagersOwnCorrectAmountOfAgents(
+                2,
+                2,
+                mgmtGrain,
+                TestContext.Current.CancellationToken);
         }
 
         [Fact]
@@ -82,19 +102,43 @@ namespace Tester.AzureUtils.Lease
         {
             var mgmtGrain = this.GrainFactory.GetGrain<IManagementGrain>(0);
             //6 queue and 4 silo, then each agent manager should own queues/agents in range of [1, 2]
-            await WaitUntilAgentManagersOwnCorrectAmountOfAgents(1, 2, mgmtGrain);
+            await WaitUntilAgentManagersOwnCorrectAmountOfAgents(
+                1,
+                2,
+                mgmtGrain,
+                TestContext.Current.CancellationToken);
             //stop one silo, 6 queues, 3 silo, then each agent manager should own 2 queues 
-            await this.HostedCluster.KillSiloAsync(this.HostedCluster.SecondarySilos[0]);
-            await WaitUntilAgentManagersOwnCorrectAmountOfAgents(2, 2, mgmtGrain);
+            await this.HostedCluster.KillSiloAsync(
+                this.HostedCluster.SecondarySilos[0],
+                TestContext.Current.CancellationToken);
+            await WaitUntilAgentManagersOwnCorrectAmountOfAgents(
+                2,
+                2,
+                mgmtGrain,
+                TestContext.Current.CancellationToken);
             //stop another silo, 6 queues, 2 silo, then each agent manager should own 3 queues
-            await this.HostedCluster.KillSiloAsync(this.HostedCluster.SecondarySilos[0]);
-            await WaitUntilAgentManagersOwnCorrectAmountOfAgents(3, 3, mgmtGrain);
+            await this.HostedCluster.KillSiloAsync(
+                this.HostedCluster.SecondarySilos[0],
+                TestContext.Current.CancellationToken);
+            await WaitUntilAgentManagersOwnCorrectAmountOfAgents(
+                3,
+                3,
+                mgmtGrain,
+                TestContext.Current.CancellationToken);
             //start one silo, 6 queues, 3 silo, then each agent manager should own 2 queues
             this.HostedCluster.StartAdditionalSilo(true);
-            await WaitUntilAgentManagersOwnCorrectAmountOfAgents(2, 2, mgmtGrain);
+            await WaitUntilAgentManagersOwnCorrectAmountOfAgents(
+                2,
+                2,
+                mgmtGrain,
+                TestContext.Current.CancellationToken);
         }
 
-        private static async Task WaitUntilAgentManagersOwnCorrectAmountOfAgents(int expectedAgentCountMin, int expectedAgentCountMax, IManagementGrain mgmtGrain)
+        private static async Task WaitUntilAgentManagersOwnCorrectAmountOfAgents(
+            int expectedAgentCountMin,
+            int expectedAgentCountMax,
+            IManagementGrain mgmtGrain,
+            CancellationToken cancellationToken)
         {
             int[]? lastObservedCounts = null;
             Exception? lastException = null;
@@ -103,6 +147,7 @@ namespace Tester.AzureUtils.Lease
 
             while (stopwatch.Elapsed < TimeOut)
             {
+                cancellationToken.ThrowIfCancellationRequested();
                 var observedVersion = queueChanges.Version;
                 try
                 {
@@ -113,18 +158,27 @@ namespace Tester.AzureUtils.Lease
                         return;
                     }
                 }
+                catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+                {
+                    throw;
+                }
                 catch (Exception exception)
                 {
                     lastException = exception;
                 }
 
                 var remaining = TimeOut - stopwatch.Elapsed;
-                if (remaining <= TimeSpan.Zero || !await queueChanges.WaitForNextChangeAsync(observedVersion, remaining))
+                if (remaining <= TimeSpan.Zero
+                    || !await queueChanges.WaitForNextChangeAsync(
+                        observedVersion,
+                        remaining,
+                        cancellationToken))
                 {
                     break;
                 }
             }
 
+            cancellationToken.ThrowIfCancellationRequested();
             try
             {
                 lastObservedCounts = await GetRunningAgentCounts(mgmtGrain);
@@ -191,7 +245,10 @@ namespace Tester.AzureUtils.Lease
                 }
             }
 
-            public async Task<bool> WaitForNextChangeAsync(long observedVersion, TimeSpan timeout)
+            public async Task<bool> WaitForNextChangeAsync(
+                long observedVersion,
+                TimeSpan timeout,
+                CancellationToken cancellationToken)
             {
                 Task task;
                 lock (lockObj)
@@ -206,7 +263,7 @@ namespace Tester.AzureUtils.Lease
 
                 try
                 {
-                    await task.WaitAsync(timeout);
+                    await task.WaitAsync(timeout, cancellationToken);
                     return true;
                 }
                 catch (TimeoutException)

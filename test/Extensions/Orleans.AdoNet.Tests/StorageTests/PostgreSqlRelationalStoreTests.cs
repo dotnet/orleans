@@ -24,7 +24,10 @@ namespace UnitTests.StorageTests.AdoNet
 
             public async ValueTask InitializeAsync()
             {
-                Storage = await RelationalStorageForTesting.SetupInstance(AdoNetInvariantName, TestDatabaseName);
+                Storage = await RelationalStorageForTesting.SetupInstance(
+                    AdoNetInvariantName,
+                    TestDatabaseName,
+                    cancellationToken: TestContext.Current.CancellationToken);
             }
 
             public ValueTask DisposeAsync() => ValueTask.CompletedTask;
@@ -38,8 +41,9 @@ namespace UnitTests.StorageTests.AdoNet
         [Fact, TestCategory("Functional")]
         public async Task Streaming_PostgreSql_Test()
         {
-            using(var tokenSource = new CancellationTokenSource(StreamCancellationTimeoutLimit))
+            using(var tokenSource = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken))
             {             
+                tokenSource.CancelAfter(StreamCancellationTimeoutLimit);
                 var isMatch = await Task.WhenAll(InsertAndReadStreamsAndCheckMatch(_storage, StreamSizeToBeInsertedInBytes, NumberOfParallelStreams, tokenSource.Token));
                 Assert.True(isMatch.All(i => i), "All inserted streams should be equal to read streams.");
             }
@@ -48,7 +52,7 @@ namespace UnitTests.StorageTests.AdoNet
         [Fact, TestCategory("Functional")]
         public async Task CancellationToken_PostgreSql_Test()
         {
-            await CancellationTokenTest(_storage, CancellationTestTimeoutLimit);
+            await CancellationTokenTest(_storage, CancellationTestTimeoutLimit, TestContext.Current.CancellationToken);
         }
 
         [Fact, TestCategory("Functional")]
@@ -61,7 +65,8 @@ namespace UnitTests.StorageTests.AdoNet
             var values = await storage.ReadAsync(
                 "SELECT 47;",
                 parameterProvider: null,
-                (record, _, _) => Task.FromResult(record.GetInt32(0)));
+                (record, _, _) => Task.FromResult(record.GetInt32(0)),
+                cancellationToken: TestContext.Current.CancellationToken);
 
             Assert.Equal([47], values);
         }

@@ -126,25 +126,25 @@ namespace AWSUtils.Tests.Streaming
         [Fact]
         public async Task SQS_01_OneProducerGrainOneConsumerGrain()
         {
-            await runner.StreamTest_01_OneProducerGrainOneConsumerGrain();
+            await runner.StreamTest_01_OneProducerGrainOneConsumerGrain(TestContext.Current.CancellationToken);
         }
 
         [Fact]
         public async Task SQS_02_OneProducerGrainOneConsumerClient()
         {
-            await runner.StreamTest_02_OneProducerGrainOneConsumerClient();
+            await runner.StreamTest_02_OneProducerGrainOneConsumerClient(TestContext.Current.CancellationToken);
         }
 
         [Fact]
         public async Task SQS_03_OneProducerClientOneConsumerGrain()
         {
-            await runner.StreamTest_03_OneProducerClientOneConsumerGrain();
+            await runner.StreamTest_03_OneProducerClientOneConsumerGrain(TestContext.Current.CancellationToken);
         }
 
         [Fact]
         public async Task SQS_04_OneProducerClientOneConsumerClient()
         {
-            await runner.StreamTest_04_OneProducerClientOneConsumerClient();
+            await runner.StreamTest_04_OneProducerClientOneConsumerClient(TestContext.Current.CancellationToken);
         }
 
         //------------------------ MANY to Many different grains ----------------------//
@@ -152,50 +152,50 @@ namespace AWSUtils.Tests.Streaming
         [Fact]
         public async Task SQS_05_ManyDifferent_ManyProducerGrainsManyConsumerGrains()
         {
-            await runner.StreamTest_05_ManyDifferent_ManyProducerGrainsManyConsumerGrains();
+            await runner.StreamTest_05_ManyDifferent_ManyProducerGrainsManyConsumerGrains(TestContext.Current.CancellationToken);
         }
 
         [Fact]
         public async Task SQS_06_ManyDifferent_ManyProducerGrainManyConsumerClients()
         {
-            await runner.StreamTest_06_ManyDifferent_ManyProducerGrainManyConsumerClients();
+            await runner.StreamTest_06_ManyDifferent_ManyProducerGrainManyConsumerClients(TestContext.Current.CancellationToken);
         }
 
         [Fact]
         public async Task SQS_07_ManyDifferent_ManyProducerClientsManyConsumerGrains()
         {
-            await runner.StreamTest_07_ManyDifferent_ManyProducerClientsManyConsumerGrains();
+            await runner.StreamTest_07_ManyDifferent_ManyProducerClientsManyConsumerGrains(TestContext.Current.CancellationToken);
         }
 
         [Fact]
         public async Task SQS_08_ManyDifferent_ManyProducerClientsManyConsumerClients()
         {
-            await runner.StreamTest_08_ManyDifferent_ManyProducerClientsManyConsumerClients();
+            await runner.StreamTest_08_ManyDifferent_ManyProducerClientsManyConsumerClients(TestContext.Current.CancellationToken);
         }
 
         //------------------------ MANY to Many Same grains ----------------------//
         [Fact]
         public async Task SQS_09_ManySame_ManyProducerGrainsManyConsumerGrains()
         {
-            await runner.StreamTest_09_ManySame_ManyProducerGrainsManyConsumerGrains();
+            await runner.StreamTest_09_ManySame_ManyProducerGrainsManyConsumerGrains(TestContext.Current.CancellationToken);
         }
 
         [Fact]
         public async Task SQS_10_ManySame_ManyConsumerGrainsManyProducerGrains()
         {
-            await runner.StreamTest_10_ManySame_ManyConsumerGrainsManyProducerGrains();
+            await runner.StreamTest_10_ManySame_ManyConsumerGrainsManyProducerGrains(TestContext.Current.CancellationToken);
         }
 
         [Fact]
         public async Task SQS_11_ManySame_ManyProducerGrainsManyConsumerClients()
         {
-            await runner.StreamTest_11_ManySame_ManyProducerGrainsManyConsumerClients();
+            await runner.StreamTest_11_ManySame_ManyProducerGrainsManyConsumerClients(TestContext.Current.CancellationToken);
         }
 
         [Fact]
         public async Task SQS_12_ManySame_ManyProducerClientsManyConsumerGrains()
         {
-            await runner.StreamTest_12_ManySame_ManyProducerClientsManyConsumerGrains();
+            await runner.StreamTest_12_ManySame_ManyProducerClientsManyConsumerGrains(TestContext.Current.CancellationToken);
         }
 
         //------------------------ MANY to Many producer consumer same grain ----------------------//
@@ -203,13 +203,13 @@ namespace AWSUtils.Tests.Streaming
         [Fact]
         public async Task SQS_13_SameGrain_ConsumerFirstProducerLater()
         {
-            await runner.StreamTest_13_SameGrain_ConsumerFirstProducerLater(false);
+            await runner.StreamTest_13_SameGrain_ConsumerFirstProducerLater(false, TestContext.Current.CancellationToken);
         }
 
         [Fact]
         public async Task SQS_14_SameGrain_ProducerFirstConsumerLater()
         {
-            await runner.StreamTest_14_SameGrain_ProducerFirstConsumerLater(false);
+            await runner.StreamTest_14_SameGrain_ProducerFirstConsumerLater(false, TestContext.Current.CancellationToken);
         }
 
         //----------------------------------------------//
@@ -217,14 +217,15 @@ namespace AWSUtils.Tests.Streaming
         [Fact]
         public async Task SQS_15_ConsumeAtProducersRequest()
         {
-            await runner.StreamTest_15_ConsumeAtProducersRequest();
+            await runner.StreamTest_15_ConsumeAtProducersRequest(TestContext.Current.CancellationToken);
         }
 
         [Fact]
         public async Task SQS_16_MultipleStreams_ManyDifferent_ManyProducerGrainsManyConsumerGrains()
         {
             var multiRunner = new MultipleStreamsTestRunner(this.InternalClient, SQS_STREAM_PROVIDER_NAME, 16, false);
-            await multiRunner.StreamTest_MultipleStreams_ManyDifferent_ManyProducerGrainsManyConsumerGrains();
+            await multiRunner.StreamTest_MultipleStreams_ManyDifferent_ManyProducerGrainsManyConsumerGrains(
+                cancellationToken: TestContext.Current.CancellationToken);
         }
 
         [Fact]
@@ -232,7 +233,8 @@ namespace AWSUtils.Tests.Streaming
         {
             var multiRunner = new MultipleStreamsTestRunner(this.InternalClient, SQS_STREAM_PROVIDER_NAME, 17, false);
             await multiRunner.StreamTest_MultipleStreams_ManyDifferent_ManyProducerGrainsManyConsumerGrains(
-                () => HostedCluster.StartAdditionalSilo());
+                () => HostedCluster.StartAdditionalSilo(),
+                cancellationToken: TestContext.Current.CancellationToken);
         }
     }
 }

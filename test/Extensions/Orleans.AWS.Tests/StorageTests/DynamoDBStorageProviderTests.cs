@@ -180,7 +180,7 @@ namespace AWSUtils.Tests.StorageTests
             var storage = await InitDynamoDBGrainStorage();
             var runner = new GrainStorageModelBasedTestRunner(storage, "DynamoDB", output.WriteLine);
 
-            await runner.RunGeneratedConformanceTests();
+            await runner.RunGeneratedConformanceTests(TestContext.Current.CancellationToken);
         }
 
         [Fact, TestCategory("Functional"), TestCategory("ModelBased")]
@@ -194,7 +194,7 @@ namespace AWSUtils.Tests.StorageTests
             var storage = await InitDynamoDBGrainStorage(deleteStateOnClear: true);
             var runner = new GrainStorageModelBasedTestRunner(storage, "DynamoDBDeleteStateOnClear", output.WriteLine);
 
-            await runner.RunGeneratedConformanceTests();
+            await runner.RunGeneratedConformanceTests(TestContext.Current.CancellationToken);
         }
 
         private async Task<DynamoDBGrainStorage> InitDynamoDBGrainStorage(DynamoDBStorageOptions options)

@@ -8,7 +8,7 @@ namespace DistributedTests.Client.LoadGeneratorScenario
 
         TState GetStateForWorker(IClusterClient client, int workerId);
 
-        ValueTask IssueRequest(TState state);
+        ValueTask IssueRequest(TState state, CancellationToken cancellationToken);
     }
 
     public class PingScenario : ILoadGeneratorScenario<IPingGrain>
@@ -17,7 +17,8 @@ namespace DistributedTests.Client.LoadGeneratorScenario
 
         public IPingGrain GetStateForWorker(IClusterClient client, int workerId) => client.GetGrain<IPingGrain>(Guid.NewGuid());
 
-        public ValueTask IssueRequest(IPingGrain state) => state.Ping();
+        public ValueTask IssueRequest(IPingGrain state, CancellationToken cancellationToken) =>
+            state.Ping(cancellationToken);
     }
 
     public class FanOutScenario : ILoadGeneratorScenario<ITreeGrain>
@@ -26,6 +27,7 @@ namespace DistributedTests.Client.LoadGeneratorScenario
 
         public ITreeGrain GetStateForWorker(IClusterClient client, int workerId) => client.GetGrain<ITreeGrain>(primaryKey: 0, keyExtension: workerId.ToString());
 
-        public ValueTask IssueRequest(ITreeGrain root) => root.Ping();
+        public ValueTask IssueRequest(ITreeGrain root, CancellationToken cancellationToken) =>
+            root.Ping(cancellationToken);
     }
 }

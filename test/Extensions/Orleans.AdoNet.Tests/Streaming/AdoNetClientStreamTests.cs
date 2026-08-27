@@ -72,7 +72,10 @@ public abstract class AdoNetClientStreamTests : TestClusterPerTest
     public override async ValueTask InitializeAsync()
     {
         // set up the adonet environment before the base initializes
-        _testing = await RelationalStorageForTesting.SetupInstance(_invariant, TestDatabaseName);
+        _testing = await RelationalStorageForTesting.SetupInstance(
+            _invariant,
+            TestDatabaseName,
+            cancellationToken: TestContext.Current.CancellationToken);
 
         Assert.SkipWhen(IsNullOrEmpty(_testing.CurrentConnectionString), $"Database '{TestDatabaseName}' not initialized");
 
@@ -122,11 +125,15 @@ public abstract class AdoNetClientStreamTests : TestClusterPerTest
     }
 
     [Fact, TestCategory("Functional")]
-    public Task AdoNetStreamProducerOnDroppedClientTest() => _runner.StreamProducerOnDroppedClientTest(AdoNetStreamProviderName, StreamNamespace);
+    public Task AdoNetStreamProducerOnDroppedClientTest() => _runner.StreamProducerOnDroppedClientTest(
+        AdoNetStreamProviderName,
+        StreamNamespace,
+        TestContext.Current.CancellationToken);
 
     [Fact, TestCategory("Functional")]
     public virtual Task AdoNetStreamConsumerOnDroppedClientTest()
     {
+        var cancellationToken = TestContext.Current.CancellationToken;
         return _runner.StreamConsumerOnDroppedClientTest(
             AdoNetStreamProviderName,
             StreamNamespace,
@@ -134,7 +141,9 @@ public abstract class AdoNetClientStreamTests : TestClusterPerTest
             async () => (await _testing.Storage.ReadAsync(
                 "SELECT COUNT(*) FROM OrleansStreamDeadLetter",
                 _ => { },
-                (record, i, ct) => Task.FromResult(record.GetInt32(0))))
-                .Single());
+                (record, i, ct) => Task.FromResult(record.GetInt32(0)),
+                cancellationToken: cancellationToken))
+                .Single(),
+            cancellationToken: cancellationToken);
     }
 }

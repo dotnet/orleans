@@ -2,46 +2,61 @@ namespace Tester.Cassandra.Utility
 {
     public static class TestExtensions
     {
-        public static async Task WithTimeout(this Task taskToComplete, TimeSpan timeout)
+        public static async Task WithTimeout(
+            this Task taskToComplete,
+            TimeSpan timeout,
+            CancellationToken cancellationToken)
         {
-            if (taskToComplete.IsCompleted)
+            using var timeoutCancellationTokenSource = new CancellationTokenSource(timeout);
+            using var linkedCancellationTokenSource = CancellationTokenSource.CreateLinkedTokenSource(
+                timeoutCancellationTokenSource.Token,
+                cancellationToken);
+
+            try
             {
-                await taskToComplete;
-                return;
+                await taskToComplete.WaitAsync(linkedCancellationTokenSource.Token);
             }
-
-            using var timeoutCancellationTokenSource = new CancellationTokenSource();
-            var completedTask = await Task.WhenAny(taskToComplete, Task.Delay(timeout, timeoutCancellationTokenSource.Token));
-
-            if (taskToComplete == completedTask)
+            catch (OperationCanceledException) when (
+                timeoutCancellationTokenSource.IsCancellationRequested
+                && !cancellationToken.IsCancellationRequested)
             {
-                timeoutCancellationTokenSource.Cancel();
-                await taskToComplete;
-                return;
-            }
+                if (taskToComplete.IsCompleted)
+                {
+                    await taskToComplete;
+                    return;
+                }
 
-            taskToComplete.Ignore();
-            throw new TimeoutException(string.Format("WithTimeout has timed out after {0}.", timeout));
+                taskToComplete.Ignore();
+                throw new TimeoutException(string.Format("WithTimeout has timed out after {0}.", timeout));
+            }
         }
 
-        public static async Task<T> WithTimeout<T>(this Task<T> taskToComplete, TimeSpan timeout)
+        public static async Task<T> WithTimeout<T>(
+            this Task<T> taskToComplete,
+            TimeSpan timeout,
+            CancellationToken cancellationToken)
         {
-            if (taskToComplete.IsCompleted)
+            using var timeoutCancellationTokenSource = new CancellationTokenSource(timeout);
+            using var linkedCancellationTokenSource = CancellationTokenSource.CreateLinkedTokenSource(
+                timeoutCancellationTokenSource.Token,
+                cancellationToken);
+
+            try
             {
-                return await taskToComplete;
+                return await taskToComplete.WaitAsync(linkedCancellationTokenSource.Token);
             }
-
-            using var timeoutCancellationTokenSource = new CancellationTokenSource();
-            var completedTask = await Task.WhenAny(taskToComplete, Task.Delay(timeout, timeoutCancellationTokenSource.Token));
-
-            if (taskToComplete == completedTask)
+            catch (OperationCanceledException) when (
+                timeoutCancellationTokenSource.IsCancellationRequested
+                && !cancellationToken.IsCancellationRequested)
             {
-                timeoutCancellationTokenSource.Cancel();
-                return await taskToComplete;
-            }
+                if (taskToComplete.IsCompleted)
+                {
+                    return await taskToComplete;
+                }
 
-            taskToComplete.Ignore();
-            throw new TimeoutException(string.Format("WithTimeout has timed out after {0}.", timeout));
+                taskToComplete.Ignore();
+                throw new TimeoutException(string.Format("WithTimeout has timed out after {0}.", timeout));
+            }
         }
     }
 }

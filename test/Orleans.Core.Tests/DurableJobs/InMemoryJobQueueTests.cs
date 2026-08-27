@@ -128,7 +128,7 @@ public class InMemoryJobQueueTests
 
         timeProvider.Advance(TimeSpan.FromSeconds(3));
 
-        Assert.True(await moveNextTask.WaitAsync(TimeSpan.FromSeconds(5)));
+        Assert.True(await moveNextTask.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken));
         Assert.Equal(job.Id, enumerator.Current.Job.Id);
     }
 
@@ -145,7 +145,7 @@ public class InMemoryJobQueueTests
         var job = CreateJob("job1", timeProvider.GetUtcNow());
         queue.Enqueue(job, 0);
 
-        Assert.True(await moveNextTask.WaitAsync(TimeSpan.FromSeconds(5)));
+        Assert.True(await moveNextTask.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken));
         Assert.Equal(job.Id, enumerator.Current.Job.Id);
     }
 
@@ -384,7 +384,7 @@ public class InMemoryJobQueueTests
     public async Task GetAsyncEnumerator_CancellationToken_StopsEnumeration()
     {
         var queue = new InMemoryJobQueue();
-        var cts = new CancellationTokenSource();
+        using var cts = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
 
         cts.Cancel();
 
@@ -413,7 +413,7 @@ public class InMemoryJobQueueTests
 
         // Drain the first job. After this returns, the enumerator is between yields with
         // the bucket already dequeued from _queue.
-        Assert.True(await enumerator.MoveNextAsync().AsTask().WaitAsync(TimeSpan.FromSeconds(5)));
+        Assert.True(await enumerator.MoveNextAsync().AsTask().WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken));
         Assert.Equal("job1", enumerator.Current.Job.Name);
         queue.RemoveJob(enumerator.Current.Job.Id);
 
@@ -422,11 +422,11 @@ public class InMemoryJobQueueTests
         queue.Enqueue(job2, 0);
         queue.MarkAsComplete();
 
-        Assert.True(await enumerator.MoveNextAsync().AsTask().WaitAsync(TimeSpan.FromSeconds(5)));
+        Assert.True(await enumerator.MoveNextAsync().AsTask().WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken));
         Assert.Equal("job2", enumerator.Current.Job.Name);
         queue.RemoveJob(enumerator.Current.Job.Id);
 
-        Assert.False(await enumerator.MoveNextAsync().AsTask().WaitAsync(TimeSpan.FromSeconds(5)));
+        Assert.False(await enumerator.MoveNextAsync().AsTask().WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken));
     }
 
     [Fact]
@@ -443,7 +443,7 @@ public class InMemoryJobQueueTests
 
         await using var enumerator = queue.GetAsyncEnumerator(CancellationToken.None);
 
-        Assert.True(await enumerator.MoveNextAsync().AsTask().WaitAsync(TimeSpan.FromSeconds(5)));
+        Assert.True(await enumerator.MoveNextAsync().AsTask().WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken));
         Assert.Equal("job1", enumerator.Current.Job.Name);
         queue.RemoveJob(enumerator.Current.Job.Id);
 
@@ -453,11 +453,11 @@ public class InMemoryJobQueueTests
         queue.Enqueue(job2, 0);
         queue.MarkAsComplete();
 
-        Assert.True(await enumerator.MoveNextAsync().AsTask().WaitAsync(TimeSpan.FromSeconds(5)));
+        Assert.True(await enumerator.MoveNextAsync().AsTask().WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken));
         Assert.Equal("job2", enumerator.Current.Job.Name);
         queue.RemoveJob(enumerator.Current.Job.Id);
 
-        Assert.False(await enumerator.MoveNextAsync().AsTask().WaitAsync(TimeSpan.FromSeconds(5)));
+        Assert.False(await enumerator.MoveNextAsync().AsTask().WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken));
     }
 
     private static DurableJob CreateJob(string id, DateTimeOffset dueTime, string? traceParent = null, string? traceState = null)

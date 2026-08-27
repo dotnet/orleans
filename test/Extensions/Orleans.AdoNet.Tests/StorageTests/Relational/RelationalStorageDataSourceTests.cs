@@ -18,7 +18,7 @@ public sealed class RelationalStorageDataSourceTests
     {
         using var dataSource = new TrackingSqliteDataSource("Data Source=:memory:");
         var storage = RelationalStorage.CreateInstance(AdoNetInvariants.InvariantNameSqlLite, dataSource);
-        using var cancellation = new CancellationTokenSource();
+        using var cancellation = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
 
         var values = await storage.ReadAsync(
             "SELECT 42;",

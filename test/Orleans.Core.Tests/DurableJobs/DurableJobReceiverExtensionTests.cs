@@ -87,9 +87,9 @@ public class DurableJobReceiverExtensionTests
 
         firstAttemptCancellation.Cancel();
         await Assert.ThrowsAnyAsync<OperationCanceledException>(
-            () => attemptTask!.WaitAsync(TimeSpan.FromSeconds(5)));
+            () => attemptTask!.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken));
 
-        var redelivery = await extension.HandleDurableJobAsync(context, CancellationToken.None);
+        var redelivery = await extension.HandleDurableJobAsync(context, TestContext.Current.CancellationToken);
 
         Assert.Equal(DurableJobRunStatus.Completed, redelivery.Status);
         await handler.Received(2).ExecuteJobAsync(context, Arg.Any<CancellationToken>());
@@ -122,7 +122,7 @@ public class DurableJobReceiverExtensionTests
             jobStatusPollInterval: TimeSpan.FromHours(1),
             timeProvider: timeProvider);
         var context = CreateJobContext("run-1");
-        using var cts = new CancellationTokenSource();
+        using var cts = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
 
         var firstCall = extension.HandleDurableJobAsync(context, cts.Token).AsTask();
         await timeProvider.TimerCreated;
@@ -130,7 +130,7 @@ public class DurableJobReceiverExtensionTests
         Assert.Equal(1, timeProvider.ActiveTimerCount);
 
         cts.Cancel();
-        var first = await firstCall.WaitAsync(TimeSpan.FromSeconds(5));
+        var first = await firstCall.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
         var second = await extension.HandleDurableJobAsync(context, cts.Token);
 
         Assert.True(first.IsInProgress);
@@ -204,7 +204,9 @@ public class DurableJobReceiverExtensionTests
 
         executionTask.SetResult(true);
 
-        var completed = await first.AsTask().WaitAsync(TimeSpan.FromMinutes(1));
+        var completed = await first.AsTask().WaitAsync(
+            TimeSpan.FromMinutes(1),
+            TestContext.Current.CancellationToken);
         Assert.Equal(DurableJobRunStatus.Completed, completed.Status);
         await handler.Received(1).ExecuteJobAsync(Arg.Any<IJobRunContext>(), Arg.Any<CancellationToken>());
 

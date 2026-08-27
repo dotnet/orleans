@@ -48,10 +48,10 @@ namespace Tester.AzureUtils.TimerTests
             storageOptions.Value.ConfigureTestDefaults();
 
             IReminderTable table = new AzureBasedReminderTable(this.loggerFactory, clusterOptions, storageOptions);
-            await table.StartAsync();
+            await table.StartAsync(TestContext.Current.CancellationToken);
 
-            await TestTableInsertRate(table, 10);
-            await TestTableInsertRate(table, 500);
+            await TestTableInsertRate(table, 10, TestContext.Current.CancellationToken);
+            await TestTableInsertRate(table, 500, TestContext.Current.CancellationToken);
         }
 
         [Fact, TestCategory("Reminders"), TestCategory("Functional")]
@@ -62,7 +62,7 @@ namespace Tester.AzureUtils.TimerTests
             var storageOptions = Options.Create(new AzureTableReminderStorageOptions());
             storageOptions.Value.ConfigureTestDefaults();
             IReminderTable table = new AzureBasedReminderTable(this.loggerFactory, clusterOptions, storageOptions);
-            await table.StartAsync();
+            await table.StartAsync(TestContext.Current.CancellationToken);
 
             ReminderEntry[] rows = (await GetAllRows(table)).ToArray();
             Assert.Empty(rows); // "The reminder table (sid={0}, did={1}) was not empty.", ServiceId, clusterId);
@@ -81,7 +81,10 @@ namespace Tester.AzureUtils.TimerTests
             Assert.False(string.IsNullOrWhiteSpace(actual.ETag), $"The newly inserted reminder table (sid={this.serviceId}, did={clusterId}) row contains an invalid etag.");
         }
 
-        private async Task TestTableInsertRate(IReminderTable reminderTable, double numOfInserts)
+        private async Task TestTableInsertRate(
+            IReminderTable reminderTable,
+            double numOfInserts,
+            CancellationToken cancellationToken)
         {
             DateTime startedAt = DateTime.UtcNow;
 
@@ -101,17 +104,19 @@ namespace Tester.AzureUtils.TimerTests
                 };
 
                 int capture = i;
-                Task<bool> promise = Task.Run(async () =>
-                {
-                    await reminderTable.UpsertRow(e);
-                    this.output.WriteLine("Done " + capture);
-                    return true;
-                });
+                Task<bool> promise = Task.Run(
+                    async () =>
+                    {
+                        await reminderTable.UpsertRow(e);
+                        this.output.WriteLine("Done " + capture);
+                        return true;
+                    },
+                    cancellationToken);
                 promises.Add(promise);
                 this.log.LogInformation("Started {Capture}", capture);
             }
             this.log.LogInformation("Started all, now waiting...");
-            await Task.WhenAll(promises).WaitAsync(TimeSpan.FromSeconds(500));
+            await Task.WhenAll(promises).WaitAsync(TimeSpan.FromSeconds(500), cancellationToken);
 
             TimeSpan dur = DateTime.UtcNow - startedAt;
             this.log.LogInformation(

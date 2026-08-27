@@ -75,7 +75,7 @@ namespace ServiceBus.Tests.EvictionStrategyTests
             //add items into cache, make sure will allocate multiple buffers from the pool
             int itemAddToCache = 100;
             foreach(var cache in this.cacheList)
-                tasks.Add(AddDataIntoCache(cache, itemAddToCache));
+                tasks.Add(AddDataIntoCache(cache, itemAddToCache, TestContext.Current.CancellationToken));
             await Task.WhenAll(tasks);
 
             //set cachePressureMonitor to be underPressure
@@ -98,7 +98,7 @@ namespace ServiceBus.Tests.EvictionStrategyTests
             //add items into cache
             int itemAddToCache = 100;
             foreach (var cache in this.cacheList)
-                tasks.Add(AddDataIntoCache(cache, itemAddToCache));
+                tasks.Add(AddDataIntoCache(cache, itemAddToCache, TestContext.Current.CancellationToken));
             await Task.WhenAll(tasks);
 
             //set cachePressureMonitor to be underPressure
@@ -123,7 +123,7 @@ namespace ServiceBus.Tests.EvictionStrategyTests
             //add items into cache
             int itemAddToCache = 100;
             foreach (var cache in this.cacheList)
-                tasks.Add(AddDataIntoCache(cache, itemAddToCache));
+                tasks.Add(AddDataIntoCache(cache, itemAddToCache, TestContext.Current.CancellationToken));
             await Task.WhenAll(tasks);
 
             //set cachePressureMonitor to be underPressure
@@ -149,7 +149,7 @@ namespace ServiceBus.Tests.EvictionStrategyTests
             //add items into cache
             int itemAddToCache = 100;
             foreach (var cache in this.cacheList)
-                tasks.Add(AddDataIntoCache(cache, itemAddToCache));
+                tasks.Add(AddDataIntoCache(cache, itemAddToCache, TestContext.Current.CancellationToken));
             await Task.WhenAll(tasks);
 
             //set up condition so that purge will be performed
@@ -185,7 +185,7 @@ namespace ServiceBus.Tests.EvictionStrategyTests
             //add items into cache again
             itemAddToCache = 100;
             foreach (var cache in this.cacheList)
-                tasks.Add(AddDataIntoCache(cache, itemAddToCache));
+                tasks.Add(AddDataIntoCache(cache, itemAddToCache, TestContext.Current.CancellationToken));
             await Task.WhenAll(tasks);
             //block pool should have purged buffers returned by now, and used those to allocate buffer for new item
             var newBufferAllocated = new List<FixedSizeBuffer>();
@@ -227,9 +227,12 @@ namespace ServiceBus.Tests.EvictionStrategyTests
             return itemCount;
         }
 
-        private static async Task AddDataIntoCache(EventHubQueueCacheForTesting cache, int count)
+        private static async Task AddDataIntoCache(
+            EventHubQueueCacheForTesting cache,
+            int count,
+            CancellationToken cancellationToken)
         {
-            await Task.Delay(10);
+            await Task.Delay(10, cancellationToken);
             List<EventData> messages = Enumerable.Range(0, count)
                 .Select(i => MakeEventData(i))
                 .ToList();

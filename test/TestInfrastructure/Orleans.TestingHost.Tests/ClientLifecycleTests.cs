@@ -21,11 +21,11 @@ public class ClientLifecycleTests
         AssertClientUnavailable(() => cluster.Client);
         AssertClientUnavailable(() => cluster.GrainFactory);
 
-        await cluster.DeployAsync();
+        await cluster.DeployAsync(TestContext.Current.CancellationToken);
 
         Assert.Same(cluster.Client, cluster.GrainFactory);
 
-        await cluster.StopClusterClientAsync();
+        await cluster.StopClusterClientAsync(TestContext.Current.CancellationToken);
 
         AssertClientUnavailable(() => cluster.Client);
         AssertClientUnavailable(() => cluster.GrainFactory);
@@ -42,12 +42,12 @@ public class ClientLifecycleTests
 
         AssertClientUnavailable(() => cluster.Client);
 
-        await cluster.DeployAsync();
+        await cluster.DeployAsync(TestContext.Current.CancellationToken);
 
         var client = cluster.Client;
         Assert.Same(client, cluster.Client);
 
-        await cluster.StopClusterClientAsync();
+        await cluster.StopClusterClientAsync(TestContext.Current.CancellationToken);
 
         AssertClientUnavailable(() => cluster.Client);
     }
@@ -63,7 +63,7 @@ public class ClientLifecycleTests
         builder.AddClientBuilderConfigurator<FailingClientConfigurator>();
         await using var cluster = builder.Build();
 
-        await Assert.ThrowsAsync<TimeoutException>(() => cluster.DeployAsync());
+        await Assert.ThrowsAsync<TimeoutException>(() => cluster.DeployAsync(TestContext.Current.CancellationToken));
 
         AssertClientUnavailable(() => cluster.Client);
         AssertClientUnavailable(() => cluster.GrainFactory);
@@ -79,7 +79,7 @@ public class ClientLifecycleTests
         builder.ConfigureClientHost(hostBuilder => hostBuilder.Services.AddSingleton<IHostedService, FailingHostedService>());
         await using var cluster = builder.Build();
 
-        await Assert.ThrowsAsync<TimeoutException>(() => cluster.DeployAsync());
+        await Assert.ThrowsAsync<TimeoutException>(() => cluster.DeployAsync(TestContext.Current.CancellationToken));
 
         AssertClientUnavailable(() => cluster.Client);
     }

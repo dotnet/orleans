@@ -27,6 +27,7 @@ public class DefaultToleranceTests(DefaultToleranceTests.Fixture fixture) : Repa
     [Fact]
     public async Task A_ShouldMoveToSilo2__B_And_C_ShouldStayOnSilo2()
     {
+        var cancellationToken = TestContext.Current.CancellationToken;
         RequestContext.Set(IPlacementDirector.PlacementHintKey, Silo1);
 
         var scenario = Scenario._1;
@@ -51,12 +52,13 @@ public class DefaultToleranceTests(DefaultToleranceTests.Fixture fixture) : Repa
         Assert.Equal(Silo2, b_host);
         Assert.Equal(Silo2, c_host);
 
-        await TriggerExchangeRequestAfterFlushingBuffers(Silo1Repartitioner);
+        await TriggerExchangeRequestAfterFlushingBuffers(Silo1Repartitioner, cancellationToken);
 
         await WaitForConditionAsync(
             async () => (a_host = await a.GetAddress()) != Silo1,
             MigrationTimeout,
-            () => $"Expected A to move from {Silo1}, but it remained on {a_host}.");
+            () => $"Expected A to move from {Silo1}, but it remained on {a_host}.",
+            cancellationToken);
 
         // refresh
         a_host = await a.GetAddress();
@@ -67,12 +69,13 @@ public class DefaultToleranceTests(DefaultToleranceTests.Fixture fixture) : Repa
         Assert.Equal(Silo2, b_host);
         Assert.Equal(Silo2, c_host);
 
-        await ResetCounters();
+        await ResetCounters(cancellationToken);
     }
 
     [Fact]
     public async Task C_ShouldMoveToSilo1__A_And_B_ShouldStayOnSilo1()
     {
+        var cancellationToken = TestContext.Current.CancellationToken;
         RequestContext.Set(IPlacementDirector.PlacementHintKey, Silo1);
 
         var scenario = Scenario._2;
@@ -100,12 +103,13 @@ public class DefaultToleranceTests(DefaultToleranceTests.Fixture fixture) : Repa
         Assert.Equal(Silo1, b_host);
         Assert.Equal(Silo2, c_host);
 
-        await TriggerExchangeRequestAfterFlushingBuffers(Silo1Repartitioner);
+        await TriggerExchangeRequestAfterFlushingBuffers(Silo1Repartitioner, cancellationToken);
 
         await WaitForConditionAsync(
             async () => (c_host = await c.GetAddress()) != Silo2,
             MigrationTimeout,
-            () => $"Expected C to move from {Silo2}, but it remained on {c_host}.");
+            () => $"Expected C to move from {Silo2}, but it remained on {c_host}.",
+            cancellationToken);
 
         // refresh
         a_host = await a.GetAddress();
@@ -116,12 +120,13 @@ public class DefaultToleranceTests(DefaultToleranceTests.Fixture fixture) : Repa
         Assert.Equal(Silo1, b_host);
         Assert.Equal(Silo1, c_host);  // C is now in silo 1
 
-        await ResetCounters();
+        await ResetCounters(cancellationToken);
     }
 
     [Fact]
     public async Task Immovable_C_ShouldStayOnSilo2__A_And_B_ShouldMoveToSilo2()
     {
+        var cancellationToken = TestContext.Current.CancellationToken;
         RequestContext.Set(IPlacementDirector.PlacementHintKey, Silo1);
 
         var scenario = Scenario._3;
@@ -149,7 +154,7 @@ public class DefaultToleranceTests(DefaultToleranceTests.Fixture fixture) : Repa
         Assert.Equal(Silo1, b_host);
         Assert.Equal(Silo2, c_host);
 
-        await TriggerExchangeRequestAfterFlushingBuffers(Silo1Repartitioner);
+        await TriggerExchangeRequestAfterFlushingBuffers(Silo1Repartitioner, cancellationToken);
 
         await WaitForConditionAsync(
             async () =>
@@ -159,7 +164,8 @@ public class DefaultToleranceTests(DefaultToleranceTests.Fixture fixture) : Repa
                 return a_host != Silo1 && b_host != Silo1;
             },
             MigrationTimeout,
-            () => $"Expected A and B to move from {Silo1}, but A was on {a_host} and B was on {b_host}.");
+            () => $"Expected A and B to move from {Silo1}, but A was on {a_host} and B was on {b_host}.",
+            cancellationToken);
 
         // refresh
         a_host = await a.GetAddress();
@@ -170,12 +176,13 @@ public class DefaultToleranceTests(DefaultToleranceTests.Fixture fixture) : Repa
         Assert.Equal(Silo2, b_host);  // B is now in silo 2
         Assert.Equal(Silo2, c_host);  // C is still in silo 2
 
-        await ResetCounters();
+        await ResetCounters(cancellationToken);
     }
 
     [Fact]
     public async Task A_ShouldMoveToSilo2_Or_C_ShouldMoveToSilo1__B_And_D_ShouldStayOnTheirSilos()
     {
+        var cancellationToken = TestContext.Current.CancellationToken;
         RequestContext.Set(IPlacementDirector.PlacementHintKey, Silo1);
 
         var scenario = Scenario._4;
@@ -204,7 +211,7 @@ public class DefaultToleranceTests(DefaultToleranceTests.Fixture fixture) : Repa
         Assert.Equal(Silo2, c_host);
         Assert.Equal(Silo2, d_host);
 
-        await TriggerExchangeRequestAfterFlushingBuffers(Silo1Repartitioner);
+        await TriggerExchangeRequestAfterFlushingBuffers(Silo1Repartitioner, cancellationToken);
 
         await WaitForConditionAsync(
             async () =>
@@ -214,7 +221,8 @@ public class DefaultToleranceTests(DefaultToleranceTests.Fixture fixture) : Repa
                 return a_host != Silo1 || c_host != Silo2;
             },
             MigrationTimeout,
-            () => $"Expected A to move from {Silo1} or C to move from {Silo2}, but A was on {a_host} and C was on {c_host}.");
+            () => $"Expected A to move from {Silo1} or C to move from {Silo2}, but A was on {a_host} and C was on {c_host}.",
+            cancellationToken);
 
         // refresh
         a_host = await a.GetAddress();
@@ -243,12 +251,13 @@ public class DefaultToleranceTests(DefaultToleranceTests.Fixture fixture) : Repa
             return;
         }
 
-        await ResetCounters();
+        await ResetCounters(cancellationToken);
     }
 
     [Fact]
     public async Task Receivers_ShouldMoveCloseTo_PullingAgent()
     {
+        var cancellationToken = TestContext.Current.CancellationToken;
         var silo1Control = GrainFactory.GetSystemTarget<ISiloControl>(Constants.SiloControlType, Silo1);
         var silo2Control = GrainFactory.GetSystemTarget<ISiloControl>(Constants.SiloControlType, Silo2);
         var allowedDuration = TimeSpan.FromSeconds(3);
@@ -293,7 +302,7 @@ public class DefaultToleranceTests(DefaultToleranceTests.Fixture fixture) : Repa
                 break;
             }
 
-            await Task.Delay(50);
+            await Task.Delay(50, cancellationToken);
         }
         while (stopwatch.Elapsed < allowedDuration);
 
@@ -342,7 +351,7 @@ public class DefaultToleranceTests(DefaultToleranceTests.Fixture fixture) : Repa
 
             if (!sr1_GotHit || !sr2_GotHit || !sr3_GotHit)
             {
-                await Task.Delay(10);
+                await Task.Delay(10, cancellationToken);
             }
         }
 
@@ -358,7 +367,7 @@ public class DefaultToleranceTests(DefaultToleranceTests.Fixture fixture) : Repa
         Assert.Equal(receiverSilo, sr2_host);
         Assert.Equal(pullingAgentSilo, sr3_host);
 
-        await TriggerExchangeRequestAfterFlushingBuffers(receiverRepartitioner);
+        await TriggerExchangeRequestAfterFlushingBuffers(receiverRepartitioner, cancellationToken);
 
         stopwatch.Restart();
 
@@ -372,7 +381,7 @@ public class DefaultToleranceTests(DefaultToleranceTests.Fixture fixture) : Repa
                 break;
             }
 
-            await Task.Delay(10);
+            await Task.Delay(10, cancellationToken);
         }
 
         Assert.True(
@@ -388,7 +397,7 @@ public class DefaultToleranceTests(DefaultToleranceTests.Fixture fixture) : Repa
         Assert.Equal(pullingAgentSilo, sr2_host);
         Assert.Equal(pullingAgentSilo, sr3_host);
 
-        await ResetCounters();
+        await ResetCounters(cancellationToken);
     }
 
     public enum Scenario { _1, _2, _3, _4 }

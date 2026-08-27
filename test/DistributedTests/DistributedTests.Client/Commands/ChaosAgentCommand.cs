@@ -37,16 +37,19 @@ namespace DistributedTests.Client.Commands
             AddOption(OptionHelper.CreateOption<bool>("--graceful", defaultValue: false));
             AddOption(OptionHelper.CreateOption<bool>("--restart", defaultValue: false));
 
-            Handler = CommandHandler.Create<Parameters>(RunAsync);
+            Handler = CommandHandler.Create<Parameters, CancellationToken>(RunAsync);
             _logger = logger;
         }
 
-        private async Task RunAsync(Parameters parameters)
+        private async Task RunAsync(Parameters parameters, CancellationToken cancellationToken)
         {
-            var channel = await Channels.CreateSendChannel(parameters.ClusterId, parameters.AzureQueueUri);
+            var channel = await Channels.CreateSendChannel(
+                parameters.ClusterId,
+                parameters.AzureQueueUri,
+                cancellationToken);
 
             _logger.LogInformation("Waiting {WaitSeconds} seconds before starting...", parameters.Wait);
-            await Task.Delay(TimeSpan.FromSeconds(parameters.Wait));
+            await Task.Delay(TimeSpan.FromSeconds(parameters.Wait), cancellationToken);
 
             for (var i=0; i<parameters.Rounds; i++)
             {
@@ -56,15 +59,15 @@ namespace DistributedTests.Client.Commands
                     parameters.ServersPerRound,
                     parameters.Restart,
                     parameters.Graceful);
-                var responses = await channel.SendMessages(
-                    GetMessages(),
-                    new CancellationTokenSource(TimeSpan.FromSeconds(parameters.RoundDelay)).Token);
+                using var roundCancellation = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+                roundCancellation.CancelAfter(TimeSpan.FromSeconds(parameters.RoundDelay));
+                var responses = await channel.SendMessages(GetMessages(), roundCancellation.Token);
                 _logger.LogInformation(
                     "Round #{Round}: silos {Silos} acked",
                     i + 1,
                     string.Join(",", responses.Select(r => r.ServerName)));
                 _logger.LogInformation("Round #{Round}: waiting {RoundDelay}", i + 1, parameters.RoundDelay);
-                await Task.Delay(TimeSpan.FromSeconds(parameters.RoundDelay));
+                await Task.Delay(TimeSpan.FromSeconds(parameters.RoundDelay), cancellationToken);
             }
 
             List<ServerMessage> GetMessages()

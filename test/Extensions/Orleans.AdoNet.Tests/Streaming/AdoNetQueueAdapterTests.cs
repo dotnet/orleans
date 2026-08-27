@@ -63,7 +63,10 @@ public abstract class AdoNetQueueAdapterTests(string invariant, TestEnvironmentF
 
     public async ValueTask InitializeAsync()
     {
-        _testing = await RelationalStorageForTesting.SetupInstance(invariant, TestDatabaseName);
+        _testing = await RelationalStorageForTesting.SetupInstance(
+            invariant,
+            TestDatabaseName,
+            cancellationToken: TestContext.Current.CancellationToken);
 
         Assert.SkipWhen(IsNullOrEmpty(_testing.CurrentConnectionString), $"Database '{TestDatabaseName}' not initialized");
 
@@ -141,7 +144,9 @@ public abstract class AdoNetQueueAdapterTests(string invariant, TestEnvironmentF
         var afterEnqueued = DateTime.UtcNow.AddSeconds(1);
 
         // assert - stored messages are as expected
-        var stored = (await _storage.ReadAsync<AdoNetStreamMessage>("SELECT * FROM OrleansStreamMessage")).ToList();
+        var stored = (await _storage.ReadAsync<AdoNetStreamMessage>(
+            "SELECT * FROM OrleansStreamMessage",
+            TestContext.Current.CancellationToken)).ToList();
         for (var i = 0; i < stored.Count; i++)
         {
             var item = stored[i];
@@ -210,7 +215,7 @@ public abstract class AdoNetQueueAdapterTests(string invariant, TestEnvironmentF
         var receiver = adapter.CreateReceiver(queueId);
         await receiver.Initialize(TimeSpan.FromSeconds(10));
         var beforeDequeued = DateTime.UtcNow.AddSeconds(-1);
-        var messages = await receiver.GetQueueMessagesAsync(10, CancellationToken.None);
+        var messages = await receiver.GetQueueMessagesAsync(10, TestContext.Current.CancellationToken);
         var afterDequeued = DateTime.UtcNow.AddSeconds(1);
 
         // assert - dequeued messages are as expected
@@ -227,7 +232,9 @@ public abstract class AdoNetQueueAdapterTests(string invariant, TestEnvironmentF
         }
 
         // assert - stored messages are as expected
-        var stored = (await _storage.ReadAsync<AdoNetStreamMessage>("SELECT * FROM OrleansStreamMessage")).ToList();
+        var stored = (await _storage.ReadAsync<AdoNetStreamMessage>(
+            "SELECT * FROM OrleansStreamMessage",
+            TestContext.Current.CancellationToken)).ToList();
         for (var i = 0; i < stored.Count; i++)
         {
             var item = stored[i];

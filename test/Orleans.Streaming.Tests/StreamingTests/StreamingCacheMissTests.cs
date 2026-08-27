@@ -60,7 +60,8 @@ namespace Tester.StreamingTests
         public virtual async Task PreviousEventEvictedFromCacheTest()
         {
             using var observer = StreamingDiagnosticObserver.Create();
-            using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+            using var cts = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
+            cts.CancelAfter(TimeSpan.FromSeconds(30));
             var streamProvider = this.Client.GetStreamProvider(StreamProviderName);
 
             // Tested stream and corresponding grain
@@ -84,7 +85,7 @@ namespace Tester.StreamingTests
 
             // Wait for cache expiration time to pass
             // Then send events to other streams to trigger cache cleaning/eviction
-            await Task.Delay(DataMaxAgeInCache + TimeSpan.FromSeconds(1));
+            await Task.Delay(DataMaxAgeInCache + TimeSpan.FromSeconds(1), TestContext.Current.CancellationToken);
             await Task.WhenAll(otherStreams.Select(s => s.OnNextAsync(interestingData)));
 
             // Should be delivered
@@ -93,7 +94,7 @@ namespace Tester.StreamingTests
             await WaitForEventCounterAsync(grain, 2);
 
             Assert.Equal(0, await grain.GetErrorCounter());
-            Assert.Equal(2, await grain.GetEventCounter());
+            Assert.Equal(2, await grain.GetEventCounter(TestContext.Current.CancellationToken));
         }
 
         /// <summary>
@@ -107,7 +108,8 @@ namespace Tester.StreamingTests
         public virtual async Task PreviousEventEvictedFromCacheWithFilterTest()
         {
             using var observer = StreamingDiagnosticObserver.Create();
-            using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+            using var cts = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
+            cts.CancelAfter(TimeSpan.FromSeconds(30));
             var streamProvider = this.Client.GetStreamProvider(StreamProviderName);
 
             // Tested stream and corresponding grain
@@ -135,7 +137,7 @@ namespace Tester.StreamingTests
 
             // Wait for cache expiration and trigger eviction with more filtered events
             // This tests that filtered events in cache don't affect delivery guarantees
-            await Task.Delay(DataMaxAgeInCache + TimeSpan.FromSeconds(1));
+            await Task.Delay(DataMaxAgeInCache + TimeSpan.FromSeconds(1), TestContext.Current.CancellationToken);
             await Task.WhenAll(otherStreams.Select(s => s.OnNextAsync(skippedData)));
 
             // Should be delivered
@@ -144,7 +146,7 @@ namespace Tester.StreamingTests
             await WaitForEventCounterAsync(grain, 1);
 
             Assert.Equal(0, await grain.GetErrorCounter());
-            Assert.Equal(1, await grain.GetEventCounter());
+            Assert.Equal(1, await grain.GetEventCounter(TestContext.Current.CancellationToken));
         }
 
         private static Task WaitForEventCounterAsync(IImplicitSubscriptionCounterGrain grain, int expected)

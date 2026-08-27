@@ -1,5 +1,6 @@
 using System;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 using Orleans.Runtime;
 
@@ -71,7 +72,15 @@ public abstract class ReminderServiceTestRunner
     /// Guarantee: registration is visible through lookup and enumeration, and unregister is explicitly observed by
     /// both the service and the table.
     /// </summary>
-    public virtual async Task ReminderService_RegisterLookupEnumerateAndUnregister()
+    public virtual Task ReminderService_RegisterLookupEnumerateAndUnregister()
+        => RunReminderService_RegisterLookupEnumerateAndUnregister(CancellationToken.None);
+
+    /// <summary>
+    /// Guarantee: registration is visible through lookup and enumeration, and unregister is explicitly observed by
+    /// both the service and the table.
+    /// </summary>
+    /// <param name="cancellationToken">A cancellation token.</param>
+    public virtual async Task RunReminderService_RegisterLookupEnumerateAndUnregister(CancellationToken cancellationToken)
     {
         const string Guarantee = nameof(ReminderService_RegisterLookupEnumerateAndUnregister);
         var grain = CreateGrain(Guarantee);
@@ -79,11 +88,11 @@ public abstract class ReminderServiceTestRunner
         const string Name = "service-lifecycle";
         var period = TimeSpan.FromMinutes(5);
 
-        var registeredName = await grain.RegisterOrUpdateAsync(Name, period, period);
+        var registeredName = await grain.RegisterOrUpdateAsync(Name, period, period).WaitAsync(cancellationToken);
         var registrationState = await ReminderTableRetryPolicy.ReadUntilAsync(
             async () => (
-                Persisted: await ReminderTable.ReadRow(grainId, Name),
-                Names: await grain.GetReminderNamesAsync()),
+                Persisted: await ReminderTable.ReadRow(grainId, Name).WaitAsync(cancellationToken),
+                Names: await grain.GetReminderNamesAsync().WaitAsync(cancellationToken)),
             state => state.Persisted is { } persisted
                 && persisted.GrainId == grainId
                 && persisted.ReminderName == Name
@@ -94,7 +103,8 @@ public abstract class ReminderServiceTestRunner
             Guarantee,
             "RegisterOrUpdateReminder/Read",
             $"one persisted row and one enumerated reminder named '{Name}'",
-            state => $"names=[{string.Join(", ", state.Names)}], row={Describe(state.Persisted)}");
+            state => $"names=[{string.Join(", ", state.Names)}], row={Describe(state.Persisted)}",
+            cancellationToken);
         var persisted = registrationState.Persisted;
         var names = registrationState.Names;
 
@@ -114,18 +124,19 @@ public abstract class ReminderServiceTestRunner
                 .Throw();
         }
 
-        var removed = await grain.UnregisterAsync(Name);
-        var removedAgain = await grain.UnregisterAsync(Name);
+        var removed = await grain.UnregisterAsync(Name).WaitAsync(cancellationToken);
+        var removedAgain = await grain.UnregisterAsync(Name).WaitAsync(cancellationToken);
         var removalState = await ReminderTableRetryPolicy.ReadUntilAsync(
             async () => (
-                Persisted: await ReminderTable.ReadRow(grainId, Name),
-                Names: await grain.GetReminderNamesAsync()),
+                Persisted: await ReminderTable.ReadRow(grainId, Name).WaitAsync(cancellationToken),
+                Names: await grain.GetReminderNamesAsync().WaitAsync(cancellationToken)),
             state => state.Persisted is null && state.Names.Length == 0,
             ProviderName,
             Guarantee,
             "UnregisterReminder/Read",
             "no persisted or enumerated reminder after unregister",
-            state => $"names=[{string.Join(", ", state.Names)}], row={Describe(state.Persisted)}");
+            state => $"names=[{string.Join(", ", state.Names)}], row={Describe(state.Persisted)}",
+            cancellationToken);
         var afterRemoval = removalState.Persisted;
         var namesAfterRemoval = removalState.Names;
         if (!removed || removedAgain || afterRemoval is not null || namesAfterRemoval.Length != 0)
@@ -143,7 +154,15 @@ public abstract class ReminderServiceTestRunner
     /// Guarantee: updating an existing service reminder replaces its schedule and ETag without duplicating its
     /// identity.
     /// </summary>
-    public virtual async Task ReminderService_UpdateReplacesScheduleAndETagWithoutDuplicate()
+    public virtual Task ReminderService_UpdateReplacesScheduleAndETagWithoutDuplicate()
+        => RunReminderService_UpdateReplacesScheduleAndETagWithoutDuplicate(CancellationToken.None);
+
+    /// <summary>
+    /// Guarantee: updating an existing service reminder replaces its schedule and ETag without duplicating its
+    /// identity.
+    /// </summary>
+    /// <param name="cancellationToken">A cancellation token.</param>
+    public virtual async Task RunReminderService_UpdateReplacesScheduleAndETagWithoutDuplicate(CancellationToken cancellationToken)
     {
         const string Guarantee = nameof(ReminderService_UpdateReplacesScheduleAndETagWithoutDuplicate);
         var grain = CreateGrain(Guarantee);
@@ -153,10 +172,10 @@ public abstract class ReminderServiceTestRunner
         var originalPeriod = TimeSpan.FromMinutes(7);
         var originalNotBefore = _reminderTimeProvider.GetUtcNow().UtcDateTime.Add(originalDueTime);
 
-        await grain.RegisterOrUpdateAsync(Name, originalDueTime, originalPeriod);
+        await grain.RegisterOrUpdateAsync(Name, originalDueTime, originalPeriod).WaitAsync(cancellationToken);
         var originalNotAfter = _reminderTimeProvider.GetUtcNow().UtcDateTime.Add(originalDueTime);
         var original = await ReminderTableRetryPolicy.ReadUntilAsync(
-            () => ReminderTable.ReadRow(grainId, Name),
+            () => ReminderTable.ReadRow(grainId, Name).WaitAsync(cancellationToken),
             entry => entry is not null
                 && !string.IsNullOrEmpty(entry.ETag)
                 && entry.Period == originalPeriod
@@ -165,17 +184,18 @@ public abstract class ReminderServiceTestRunner
             Guarantee,
             "RegisterOrUpdateReminder/ReadOriginal",
             $"the initially registered reminder with Period={originalPeriod} and StartAt within the requested due-time window",
-            Describe);
+            Describe,
+            cancellationToken);
         var originalEntry = original!;
         var updatedDueTime = TimeSpan.FromMinutes(9);
         var updatedPeriod = TimeSpan.FromMinutes(11);
         var updatedNotBefore = _reminderTimeProvider.GetUtcNow().UtcDateTime.Add(updatedDueTime);
-        await grain.RegisterOrUpdateAsync(Name, updatedDueTime, updatedPeriod);
+        await grain.RegisterOrUpdateAsync(Name, updatedDueTime, updatedPeriod).WaitAsync(cancellationToken);
         var updatedNotAfter = _reminderTimeProvider.GetUtcNow().UtcDateTime.Add(updatedDueTime);
         var updateState = await ReminderTableRetryPolicy.ReadUntilAsync(
             async () =>
             {
-                var updated = await ReminderTable.ReadRow(grainId, Name);
+                var updated = await ReminderTable.ReadRow(grainId, Name).WaitAsync(cancellationToken);
                 if (updated is not null
                     && updated.StartAt != originalEntry.StartAt
                     && updated.Period == updatedPeriod
@@ -191,7 +211,7 @@ public abstract class ReminderServiceTestRunner
 
                 return (
                     Updated: updated,
-                    Rows: await ReminderTable.ReadRows(grainId));
+                    Rows: await ReminderTable.ReadRows(grainId).WaitAsync(cancellationToken));
             },
             state => state.Updated is { } updated
                 && !string.IsNullOrEmpty(updated.ETag)
@@ -210,7 +230,8 @@ public abstract class ReminderServiceTestRunner
             Guarantee,
             "RegisterOrUpdateReminder/ReadUpdated",
             $"one exact updated row with StartAt within the requested due-time window, Period={updatedPeriod}, and a new ETag",
-            state => $"updated={Describe(state.Updated)}, rowCount={state.Rows.Reminders.Count}, enumerated={Describe(state.Rows.Reminders.Count == 1 ? state.Rows.Reminders[0] : null)}");
+            state => $"updated={Describe(state.Updated)}, rowCount={state.Rows.Reminders.Count}, enumerated={Describe(state.Rows.Reminders.Count == 1 ? state.Rows.Reminders[0] : null)}",
+            cancellationToken);
         var updated = updateState.Updated;
         var rows = updateState.Rows;
         var enumerated = rows.Reminders.Count == 1 ? rows.Reminders[0] : null;
@@ -241,7 +262,7 @@ public abstract class ReminderServiceTestRunner
                 .Throw();
         }
 
-        await grain.UnregisterAsync(Name);
+        await grain.UnregisterAsync(Name).WaitAsync(cancellationToken);
     }
 
     private IReminderServiceTestGrain CreateGrain(string label)

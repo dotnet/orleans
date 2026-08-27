@@ -40,10 +40,11 @@ public sealed class AzureTableJournalStorageProviderTests
             return $"tenant!{Uri.EscapeDataString(journalId.Value)}";
         };
         using var context = CreateProvider(options);
-        await StartAsync(context.Provider);
+        await StartAsync(context.Provider, TestContext.Current.CancellationToken);
         var journalId = new JournalId("orders/42");
 
-        var created = await context.Provider.CreateStorage(journalId).CreateIfNotExistsAsync();
+        var created = await context.Provider.CreateStorage(journalId)
+            .CreateIfNotExistsAsync(cancellationToken: TestContext.Current.CancellationToken);
 
         Assert.True(created);
         Assert.Equal(journalId, mappedJournalId);
@@ -84,7 +85,7 @@ public sealed class AzureTableJournalStorageProviderTests
         using var cts = new CancellationTokenSource();
 
         await lifecycle.StartAsync(cts.Token);
-        var listed = await ToListAsync(context.Provider.ListAsync(cancellationToken: cts.Token));
+        var listed = await ToListAsync(context.Provider.ListAsync(cancellationToken: cts.Token), cts.Token);
 
         Assert.Equal(cts.Token, receivedToken);
         Assert.Equal("tenantJournal", service.RequestedTableName);
@@ -111,7 +112,9 @@ public sealed class AzureTableJournalStorageProviderTests
         var exception = await Assert.ThrowsAnyAsync<OperationCanceledException>(
             () => StartAsync(context.Provider, cts.Token));
         var unavailable = await Assert.ThrowsAsync<InvalidOperationException>(
-            () => ToListAsync(context.Provider.ListAsync()));
+            () => ToListAsync(
+                context.Provider.ListAsync(cancellationToken: TestContext.Current.CancellationToken),
+                TestContext.Current.CancellationToken));
 
         Assert.Equal(cts.Token, receivedToken);
         Assert.Equal(cts.Token, exception.CancellationToken);
@@ -128,9 +131,12 @@ public sealed class AzureTableJournalStorageProviderTests
         options.ConfigureTableServiceClient(_ => Task.FromException<TableServiceClient>(expected));
         using var context = CreateProvider(options);
 
-        var actual = await Assert.ThrowsAsync<InvalidOperationException>(() => StartAsync(context.Provider));
+        var actual = await Assert.ThrowsAsync<InvalidOperationException>(
+            () => StartAsync(context.Provider, TestContext.Current.CancellationToken));
         var unavailable = await Assert.ThrowsAsync<InvalidOperationException>(
-            () => ToListAsync(context.Provider.ListAsync()));
+            () => ToListAsync(
+                context.Provider.ListAsync(cancellationToken: TestContext.Current.CancellationToken),
+                TestContext.Current.CancellationToken));
 
         Assert.Same(expected, actual);
         Assert.Contains("has not been initialized", unavailable.Message);
@@ -141,7 +147,8 @@ public sealed class AzureTableJournalStorageProviderTests
     {
         using var context = CreateProvider(new AzureTableJournalStorageOptions());
 
-        var exception = await Assert.ThrowsAsync<InvalidOperationException>(() => StartAsync(context.Provider));
+        var exception = await Assert.ThrowsAsync<InvalidOperationException>(
+            () => StartAsync(context.Provider, TestContext.Current.CancellationToken));
 
         Assert.Contains(nameof(AzureTableJournalStorageOptions.TableServiceClient), exception.Message);
         Assert.Contains(nameof(AzureTableJournalStorageOptions.ConfigureTableServiceClient), exception.Message);
@@ -154,7 +161,8 @@ public sealed class AzureTableJournalStorageProviderTests
         options.ConfigureTableServiceClient(_ => Task.FromResult<TableServiceClient>(null!));
         using var context = CreateProvider(options);
 
-        var exception = await Assert.ThrowsAsync<InvalidOperationException>(() => StartAsync(context.Provider));
+        var exception = await Assert.ThrowsAsync<InvalidOperationException>(
+            () => StartAsync(context.Provider, TestContext.Current.CancellationToken));
 
         Assert.Equal("The configured Azure Table service client factory returned null.", exception.Message);
     }
@@ -166,9 +174,12 @@ public sealed class AzureTableJournalStorageProviderTests
         var table = new FakeTableClient { CreateException = expected };
         using var context = CreateProvider(CreateOptions(table));
 
-        var actual = await Assert.ThrowsAsync<RequestFailedException>(() => StartAsync(context.Provider));
+        var actual = await Assert.ThrowsAsync<RequestFailedException>(
+            () => StartAsync(context.Provider, TestContext.Current.CancellationToken));
         var unavailable = await Assert.ThrowsAsync<InvalidOperationException>(
-            () => ToListAsync(context.Provider.ListAsync()));
+            () => ToListAsync(
+                context.Provider.ListAsync(cancellationToken: TestContext.Current.CancellationToken),
+                TestContext.Current.CancellationToken));
 
         Assert.Same(expected, actual);
         Assert.Equal(1, table.CreateIfNotExistsCalls);
@@ -242,12 +253,12 @@ public sealed class AzureTableJournalStorageProviderTests
     {
         var table = new FakeTableClient();
         using var context = CreateProvider(CreateOptions(table));
-        await StartAsync(context.Provider);
+        await StartAsync(context.Provider, TestContext.Current.CancellationToken);
 
         var storage = context.Provider.CreateStorage(new JournalId("matching-format"));
 
         Assert.IsType<AzureTableJournalStorage>(storage);
-        Assert.True(await storage.CreateIfNotExistsAsync());
+        Assert.True(await storage.CreateIfNotExistsAsync(cancellationToken: TestContext.Current.CancellationToken));
         var header = Assert.Single(table.AddedEntities);
         Assert.Equal(FormatKey, header[AzureTableJournalStorage.FormatPropertyName]);
         Assert.Equal(0L, header[AzureTableJournalStorage.RowCountPropertyName]);
@@ -258,9 +269,11 @@ public sealed class AzureTableJournalStorageProviderTests
     public async Task ListAsync_EmptyTable_ReturnsEmptyAndSelectsOnlyCanonicalJournalId()
     {
         var table = new FakeTableClient();
-        using var context = await CreateStartedProviderAsync(table);
+        using var context = await CreateStartedProviderAsync(table, TestContext.Current.CancellationToken);
 
-        var result = await ToListAsync(context.Provider.ListAsync());
+        var result = await ToListAsync(
+            context.Provider.ListAsync(cancellationToken: TestContext.Current.CancellationToken),
+            TestContext.Current.CancellationToken);
 
         Assert.Empty(result);
         var query = Assert.Single(table.QueryCalls);
@@ -280,9 +293,11 @@ public sealed class AzureTableJournalStorageProviderTests
         table.AddHeader(last);
         table.AddHeader(lower);
         table.AddHeader(upper);
-        using var context = await CreateStartedProviderAsync(table);
+        using var context = await CreateStartedProviderAsync(table, TestContext.Current.CancellationToken);
 
-        var result = await ToListAsync(context.Provider.ListAsync());
+        var result = await ToListAsync(
+            context.Provider.ListAsync(cancellationToken: TestContext.Current.CancellationToken),
+            TestContext.Current.CancellationToken);
 
         Assert.Equal([upper, lower, last], result);
         Assert.Equal(3, result.Count);
@@ -300,9 +315,11 @@ public sealed class AzureTableJournalStorageProviderTests
         table.AddHeader(new JournalId("tenant/payments"));
         table.AddHeader(child);
         table.AddHeader(exact);
-        using var context = await CreateStartedProviderAsync(table);
+        using var context = await CreateStartedProviderAsync(table, TestContext.Current.CancellationToken);
 
-        var result = await ToListAsync(context.Provider.ListAsync(prefix));
+        var result = await ToListAsync(
+            context.Provider.ListAsync(prefix, TestContext.Current.CancellationToken),
+            TestContext.Current.CancellationToken);
 
         Assert.Equal([exact, child], result);
         var query = Assert.Single(table.QueryCalls);
@@ -320,9 +337,11 @@ public sealed class AzureTableJournalStorageProviderTests
         table.AddHeader(retained);
         table.AddHeader(deleted);
         table.RemoveHeader(deleted);
-        using var context = await CreateStartedProviderAsync(table);
+        using var context = await CreateStartedProviderAsync(table, TestContext.Current.CancellationToken);
 
-        var result = await ToListAsync(context.Provider.ListAsync());
+        var result = await ToListAsync(
+            context.Provider.ListAsync(cancellationToken: TestContext.Current.CancellationToken),
+            TestContext.Current.CancellationToken);
 
         Assert.Equal([retained], result);
         Assert.DoesNotContain(deleted, result);
@@ -339,9 +358,11 @@ public sealed class AzureTableJournalStorageProviderTests
             AzureTableJournalStorageOptions.GetDefaultPartitionKey(orphan),
             "g00000000000000000001-r0000000000");
         table.AddEntity("%20", AzureTableJournalStorage.HeaderRowKey);
-        using var context = await CreateStartedProviderAsync(table);
+        using var context = await CreateStartedProviderAsync(table, TestContext.Current.CancellationToken);
 
-        var result = await ToListAsync(context.Provider.ListAsync());
+        var result = await ToListAsync(
+            context.Provider.ListAsync(cancellationToken: TestContext.Current.CancellationToken),
+            TestContext.Current.CancellationToken);
 
         Assert.Equal([valid], result);
         Assert.DoesNotContain(orphan, result);
@@ -353,9 +374,11 @@ public sealed class AzureTableJournalStorageProviderTests
         var table = new FakeTableClient();
         var escaped = new JournalId("tenant/slash\\hash#query?control\u0001");
         table.AddHeader(escaped);
-        using var context = await CreateStartedProviderAsync(table);
+        using var context = await CreateStartedProviderAsync(table, TestContext.Current.CancellationToken);
 
-        var result = await ToListAsync(context.Provider.ListAsync());
+        var result = await ToListAsync(
+            context.Provider.ListAsync(cancellationToken: TestContext.Current.CancellationToken),
+            TestContext.Current.CancellationToken);
 
         var listed = Assert.Single(result);
         Assert.Equal(escaped, listed);
@@ -375,9 +398,11 @@ public sealed class AzureTableJournalStorageProviderTests
         var options = CreateOptions(table);
         options.GetPartitionKey = static journalId => journalId.Value == "tenant/orders/42" ? "hash-a" : "hash-b";
         using var context = CreateProvider(options);
-        await StartAsync(context.Provider);
+        await StartAsync(context.Provider, TestContext.Current.CancellationToken);
 
-        var result = await ToListAsync(context.Provider.ListAsync(new JournalId("tenant/orders")));
+        var result = await ToListAsync(
+            context.Provider.ListAsync(new JournalId("tenant/orders"), TestContext.Current.CancellationToken),
+            TestContext.Current.CancellationToken);
 
         Assert.Equal([included], result);
         Assert.Equal(
@@ -391,9 +416,11 @@ public sealed class AzureTableJournalStorageProviderTests
         var table = new FakeTableClient();
         var journalId = new JournalId("legacy/orders/42");
         table.AddLegacyHeader(journalId);
-        using var context = await CreateStartedProviderAsync(table);
+        using var context = await CreateStartedProviderAsync(table, TestContext.Current.CancellationToken);
 
-        var result = await ToListAsync(context.Provider.ListAsync(new JournalId("legacy/orders")));
+        var result = await ToListAsync(
+            context.Provider.ListAsync(new JournalId("legacy/orders"), TestContext.Current.CancellationToken),
+            TestContext.Current.CancellationToken);
 
         Assert.Equal([journalId], result);
     }
@@ -403,12 +430,12 @@ public sealed class AzureTableJournalStorageProviderTests
     {
         var table = new FakeTableClient();
         table.AddHeader(new JournalId("never-returned"));
-        using var context = await CreateStartedProviderAsync(table);
+        using var context = await CreateStartedProviderAsync(table, TestContext.Current.CancellationToken);
         using var cts = new CancellationTokenSource();
         cts.Cancel();
 
         var exception = await Assert.ThrowsAnyAsync<OperationCanceledException>(
-            () => ToListAsync(context.Provider.ListAsync(cancellationToken: cts.Token)));
+            () => ToListAsync(context.Provider.ListAsync(cancellationToken: cts.Token), cts.Token));
 
         Assert.Equal(cts.Token, exception.CancellationToken);
         Assert.Empty(table.QueryCalls);
@@ -420,10 +447,10 @@ public sealed class AzureTableJournalStorageProviderTests
         using var cts = new CancellationTokenSource();
         var table = new FakeTableClient { AfterQuery = cts.Cancel };
         table.AddHeader(new JournalId("buffered"));
-        using var context = await CreateStartedProviderAsync(table);
+        using var context = await CreateStartedProviderAsync(table, TestContext.Current.CancellationToken);
 
         var exception = await Assert.ThrowsAnyAsync<OperationCanceledException>(
-            () => ToListAsync(context.Provider.ListAsync(cancellationToken: cts.Token)));
+            () => ToListAsync(context.Provider.ListAsync(cancellationToken: cts.Token), cts.Token));
 
         Assert.Equal(cts.Token, exception.CancellationToken);
         Assert.Single(table.QueryCalls);
@@ -462,12 +489,14 @@ public sealed class AzureTableJournalStorageProviderTests
             serviceProvider,
             NullLogger<AzureTableJournalStorage>.Instance);
 
-    private static async Task<ProviderContext> CreateStartedProviderAsync(FakeTableClient table)
+    private static async Task<ProviderContext> CreateStartedProviderAsync(
+        FakeTableClient table,
+        CancellationToken cancellationToken)
     {
         var context = CreateProvider(CreateOptions(table));
         try
         {
-            await StartAsync(context.Provider);
+            await StartAsync(context.Provider, cancellationToken);
             return context;
         }
         catch
@@ -486,10 +515,12 @@ public sealed class AzureTableJournalStorageProviderTests
         return lifecycle.StartAsync(cancellationToken);
     }
 
-    private static async Task<List<T>> ToListAsync<T>(IAsyncEnumerable<T> source)
+    private static async Task<List<T>> ToListAsync<T>(
+        IAsyncEnumerable<T> source,
+        CancellationToken cancellationToken)
     {
         var result = new List<T>();
-        await foreach (var item in source)
+        await foreach (var item in source.WithCancellation(cancellationToken))
         {
             result.Add(item);
         }

@@ -2,6 +2,5 @@
 
 public interface ITreeGrain : IGrainWithIntegerCompoundKey
 {
-    public ValueTask Ping();
+    public ValueTask Ping(CancellationToken cancellationToken);
 }
-

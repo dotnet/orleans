@@ -24,8 +24,10 @@ public class CustomToleranceTests(CustomToleranceTests.Fixture fixture, ITestOut
     [Fact]
     public async Task Should_ConvertAllRemoteCalls_ToLocalCalls_WhileRespectingTolerance()
     {
-        using var cts = new CancellationTokenSource(TimeSpan.FromMinutes(1));
-        await AdjustActivationCountOffsets();
+        using var cts = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
+        cts.CancelAfter(TimeSpan.FromMinutes(1));
+        var cancellationToken = cts.Token;
+        await AdjustActivationCountOffsets(cancellationToken);
 
         var e1 = GrainFactory.GetGrain<IE>(1);
         var e2 = GrainFactory.GetGrain<IE>(2);
@@ -73,7 +75,7 @@ public class CustomToleranceTests(CustomToleranceTests.Fixture fixture, ITestOut
 
         Assert.Equal(Silo2, await x.GetAddress()); // X remains in silo 2
 
-        await TriggerExchangeRequestAfterFlushingBuffers(Silo1Repartitioner);
+        await TriggerExchangeRequestAfterFlushingBuffers(Silo1Repartitioner, cancellationToken);
 
         // At this point the layout is like follows:
 
@@ -84,7 +86,7 @@ public class CustomToleranceTests(CustomToleranceTests.Fixture fixture, ITestOut
         // we end up with a total of 4 activations in silo1, and 2 in silo 2, which means the tolerance has been respected, and all remote calls have
         // been converted to local calls.
 
-        await Test();
+        await Test().WaitAsync(cancellationToken);
 
         // To make sure, we trigger 's1_rebalancer' again, which should yield to no further migrations.
         i = 0;
@@ -97,10 +99,10 @@ public class CustomToleranceTests(CustomToleranceTests.Fixture fixture, ITestOut
             i++;
         }
 
-        await LogEdgesAsync(Silo1Repartitioner);
-        await LogEdgesAsync(Silo2Repartitioner);
-        await TriggerExchangeRequestAfterFlushingBuffers(Silo1Repartitioner);
-        await Test();
+        await LogEdgesAsync(Silo1Repartitioner, cancellationToken);
+        await LogEdgesAsync(Silo2Repartitioner, cancellationToken);
+        await TriggerExchangeRequestAfterFlushingBuffers(Silo1Repartitioner, cancellationToken);
+        await Test().WaitAsync(cancellationToken);
 
         // To make extra sure, we now trigger 's2_rebalancer', which again should yield to no further migrations.
         i = 0;
@@ -113,9 +115,9 @@ public class CustomToleranceTests(CustomToleranceTests.Fixture fixture, ITestOut
             i++;
         }
 
-        await TriggerExchangeRequestAfterFlushingBuffers(Silo2Repartitioner);
+        await TriggerExchangeRequestAfterFlushingBuffers(Silo2Repartitioner, cancellationToken);
 
-        await Test();
+        await Test().WaitAsync(cancellationToken);
 
         async Task Test()
         {
@@ -140,9 +142,11 @@ public class CustomToleranceTests(CustomToleranceTests.Fixture fixture, ITestOut
         }
     }
 
-    private async Task LogEdgesAsync(IActivationRepartitionerSystemTarget repartitioner)
+    private async Task LogEdgesAsync(
+        IActivationRepartitionerSystemTarget repartitioner,
+        CancellationToken cancellationToken)
     {
-        var edgeCounts = await repartitioner.GetGrainCallFrequencies();
+        var edgeCounts = await repartitioner.GetGrainCallFrequencies().AsTask().WaitAsync(cancellationToken);
         output.WriteLine($"{repartitioner.GetGrainId()} call frequencies:");
         foreach (var (edge, freq) in edgeCounts)
         {

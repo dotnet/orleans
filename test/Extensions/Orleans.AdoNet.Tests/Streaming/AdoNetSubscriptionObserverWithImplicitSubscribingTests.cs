@@ -79,7 +79,10 @@ public abstract class AdoNetSubscriptionObserverWithImplicitSubscribingTests(Ado
         public override async ValueTask InitializeAsync()
         {
             // set up the adonet environment before the base initializes
-            _testing = await RelationalStorageForTesting.SetupInstance(_invariant, TestDatabaseName);
+            _testing = await RelationalStorageForTesting.SetupInstance(
+                _invariant,
+                TestDatabaseName,
+                cancellationToken: TestContext.Current.CancellationToken);
 
             Assert.SkipWhen(IsNullOrEmpty(_testing.CurrentConnectionString), $"Database '{TestDatabaseName}' not initialized");
 

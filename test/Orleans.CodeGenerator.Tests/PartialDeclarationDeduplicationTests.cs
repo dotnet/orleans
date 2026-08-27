@@ -153,7 +153,9 @@ public class PartialDeclarationDeduplicationTests
             """;
 
         var compilation = await CreateCompilation(code);
-        Assert.Empty(compilation.GetDiagnostics().Where(static diagnostic => diagnostic.Severity == DiagnosticSeverity.Error));
+        Assert.Empty(
+            compilation.GetDiagnostics(TestContext.Current.CancellationToken)
+                .Where(static diagnostic => diagnostic.Severity == DiagnosticSeverity.Error));
 
         var result = RunSourceGenerator(compilation);
 

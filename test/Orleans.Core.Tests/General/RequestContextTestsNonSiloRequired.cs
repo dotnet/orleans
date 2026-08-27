@@ -55,9 +55,9 @@ namespace UnitTests.General
                 RequestContext.Set(key, i);
                 promises[i] = Task.Run(() =>
                 {
-                    flag.Wait();
+                    flag.Wait(TestContext.Current.CancellationToken);
                     msg.RequestContextData = RequestContextExtensions.Export(this.fixture.DeepCopier);
-                });
+                }, TestContext.Current.CancellationToken);
                 flag.Set();
                 Thread.Sleep(1);
                 RequestContext.Remove(key);
@@ -198,17 +198,17 @@ namespace UnitTests.General
                 string str = i.ToString(CultureInfo.InvariantCulture);
                 promises[i] = Task.Run(async () =>
                 {
-                    await Task.Delay(5);
+                    await Task.Delay(5, TestContext.Current.CancellationToken);
                     Assert.Equal(data1, RequestContext.Get(name1));  // "RC.GetData-Task.Run-0"
-                    await Task.Delay(5);
+                    await Task.Delay(5, TestContext.Current.CancellationToken);
                     // Set New value
                     RequestContext.Set(name1, str);
                     Assert.Equal(str, RequestContext.Get(name1));  // "RC.GetData-Task.Run-1-" + str
-                    await Task.Delay(5);
+                    await Task.Delay(5, TestContext.Current.CancellationToken);
                     Assert.Equal(str, RequestContext.Get(name1));  // "RC.GetData-Task.Run-2-" + str
-                    await Task.Delay(5);
+                    await Task.Delay(5, TestContext.Current.CancellationToken);
                     Assert.Equal(str, RequestContext.Get(name1));  // "RC.GetData-Task.Run-3-" + str
-                });
+                }, TestContext.Current.CancellationToken);
             }
             await Task.WhenAll(promises);
             Assert.Equal(data1, RequestContext.Get(name1));  // "RC.GetData-Main-Final"

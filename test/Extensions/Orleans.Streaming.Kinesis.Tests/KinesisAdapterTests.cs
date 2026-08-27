@@ -45,7 +45,7 @@ namespace Orleans.Streaming.Kinesis.Tests
 
         public async ValueTask InitializeAsync()
         {
-            await KinesisStreamTestResource.Create(KinesisStreamName);
+            await KinesisStreamTestResource.Create(KinesisStreamName, TestContext.Current.CancellationToken);
             streamCreated = true;
         }
 
@@ -53,7 +53,9 @@ namespace Orleans.Streaming.Kinesis.Tests
         {
             if (streamCreated)
             {
-                await KinesisStreamTestResource.Delete(KinesisStreamName);
+                await KinesisStreamTestResource.DeleteForCleanup(
+                    KinesisStreamName,
+                    TestContext.Current.CancellationToken);
             }
         }
 
@@ -81,12 +83,14 @@ namespace Orleans.Streaming.Kinesis.Tests
                 serviceProvider.GetRequiredService<Serializer<KinesisBatchContainer.Body>>(),
                 new TestStreamQueueCheckpointerFactory(),
                 NullLoggerFactory.Instance);
-            await SendAndReceiveFromQueueAdapter(adapterFactory);
+            await SendAndReceiveFromQueueAdapter(adapterFactory, TestContext.Current.CancellationToken);
         }
 
-        private async Task SendAndReceiveFromQueueAdapter(IQueueAdapterFactory adapterFactory)
+        private async Task SendAndReceiveFromQueueAdapter(
+            IQueueAdapterFactory adapterFactory,
+            CancellationToken cancellationToken)
         {
-            IQueueAdapter adapter = await adapterFactory.CreateAdapter(CancellationToken.None);
+            IQueueAdapter adapter = await adapterFactory.CreateAdapter(cancellationToken);
             IQueueAdapterCache cache = adapterFactory.GetQueueAdapterCache();
 
             // Create receiver per queue
@@ -118,7 +122,7 @@ namespace Orleans.Streaming.Kinesis.Tests
             {
                 foreach (var (queueId, receiver) in receivers)
                 {
-                    var messages = (await receiver.GetQueueMessagesAsync(10, CancellationToken.None)).ToArray();
+                    var messages = (await receiver.GetQueueMessagesAsync(10, cancellationToken)).ToArray();
                     foreach (var message in messages.Cast<KinesisBatchContainer>())
                     {
                         output.WriteLine($"Queue {queueId} received message on stream {message.StreamId}");

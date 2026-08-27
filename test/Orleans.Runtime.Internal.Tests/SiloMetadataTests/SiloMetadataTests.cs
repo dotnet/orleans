@@ -108,7 +108,7 @@ public class SiloMetadataTests(SiloMetadataTests.Fixture fixture) : IClassFixtur
         Assert.NotNull(metadata);
         Assert.NotEmpty(metadata.Metadata);
 
-        await fixture.Cluster.StopSiloAsync(second);
+        await fixture.Cluster.StopSiloAsync(second, TestContext.Current.CancellationToken);
         metadata = firstSiloMetadataCache.GetSiloMetadata(second.SiloAddress);
         Assert.NotNull(metadata);
         Assert.Empty(metadata.Metadata);

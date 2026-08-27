@@ -41,7 +41,11 @@ namespace Orleans.TestingHost.Tests.Grains
 
         public static void Release(Guid key) => GetState(key).Release.TrySetResult();
 
-        public static Task<bool> WaitForEntered(Guid key, TimeSpan timeout) => GetState(key).Entered.WaitAsync(timeout);
+        public static Task<bool> WaitForEntered(Guid key, TimeSpan timeout)
+            => WaitForEntered(key, timeout, CancellationToken.None);
+
+        public static Task<bool> WaitForEntered(Guid key, TimeSpan timeout, CancellationToken cancellationToken)
+            => GetState(key).Entered.WaitAsync(timeout, cancellationToken);
 
         public Task<string> GetSiloIdentity() =>
             Task.FromResult(this.ServiceProvider.GetRequiredService<ILocalSiloDetails>().SiloAddress.ToString());

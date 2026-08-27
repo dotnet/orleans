@@ -52,9 +52,11 @@ public class MemoryGrainStorageTests : GrainStorageTestRunner, IClassFixture<Mem
     [Fact]
     public async Task ProviderViolation_ThrowsFrameworkNeutralException()
     {
+        var cancellationToken = TestContext.Current.CancellationToken;
         var runner = new TestRunner(new NullStateGrainStorage());
 
-        var exception = await Assert.ThrowsAsync<InvalidOperationException>(runner.PersistenceStorage_WriteRead_StringKey);
+        var exception = await Assert.ThrowsAsync<InvalidOperationException>(
+            () => runner.PersistenceStorage_WriteRead_StringKeyAsync(cancellationToken));
 
         Assert.Contains("found '<null>'", exception.Message);
     }
@@ -81,147 +83,149 @@ public class MemoryGrainStorageTests : GrainStorageTestRunner, IClassFixture<Mem
     [Fact]
     public override Task PersistenceStorage_WriteReadIdCyrillic()
     {
-        return base.PersistenceStorage_WriteReadIdCyrillic();
+        return base.PersistenceStorage_WriteReadIdCyrillicAsync(TestContext.Current.CancellationToken);
     }
 
     [Fact]
     public override Task PersistenceStorage_WriteDuplicateFailsWithInconsistentStateException()
     {
-        return base.PersistenceStorage_WriteDuplicateFailsWithInconsistentStateException();
+        return base.PersistenceStorage_WriteDuplicateFailsWithInconsistentStateExceptionAsync(TestContext.Current.CancellationToken);
     }
 
     [Fact]
     public override Task PersistenceStorage_WriteInconsistentFailsWithInconsistentStateException()
     {
-        return base.PersistenceStorage_WriteInconsistentFailsWithInconsistentStateException();
+        return base.PersistenceStorage_WriteInconsistentFailsWithInconsistentStateExceptionAsync(TestContext.Current.CancellationToken);
     }
 
     [Fact]
     public override Task PersistenceStorage_WriteReadWriteReadStatesInParallel()
     {
-        return RunPersistenceStorage_WriteReadWriteReadStatesInParallel("MemoryTest", 50);
+        return RunPersistenceStorage_WriteReadWriteReadStatesInParallel("MemoryTest", 50, TestContext.Current.CancellationToken);
     }
 
     [Fact]
     public override Task PersistenceStorage_ReadNonExistentState()
     {
-        return base.PersistenceStorage_ReadNonExistentState();
+        return base.PersistenceStorage_ReadNonExistentStateAsync(TestContext.Current.CancellationToken);
     }
 
     [Fact]
     public override Task PersistenceStorage_ReadNonExistentStateHasNonNullState()
     {
-        return base.PersistenceStorage_ReadNonExistentStateHasNonNullState();
+        return base.PersistenceStorage_ReadNonExistentStateHasNonNullStateAsync(TestContext.Current.CancellationToken);
     }
 
     [Fact]
     public override Task PersistenceStorage_WriteClearWrite()
     {
-        return base.PersistenceStorage_WriteClearWrite();
+        return base.PersistenceStorage_WriteClearWriteAsync(TestContext.Current.CancellationToken);
     }
 
     [Fact]
     public override Task PersistenceStorage_WriteClearRead()
     {
-        return base.PersistenceStorage_WriteClearRead();
+        return base.PersistenceStorage_WriteClearReadAsync(TestContext.Current.CancellationToken);
     }
 
     [Fact]
     public override Task PersistenceStorage_WriteReadClearReadCycle()
     {
-        return base.PersistenceStorage_WriteReadClearReadCycle();
+        return base.PersistenceStorage_WriteReadClearReadCycleAsync(TestContext.Current.CancellationToken);
     }
 
     [Fact]
     public override Task PersistenceStorage_WriteRead_StringKey()
     {
-        return base.PersistenceStorage_WriteRead_StringKey();
+        return base.PersistenceStorage_WriteRead_StringKeyAsync(TestContext.Current.CancellationToken);
     }
 
     [Fact]
     public override Task PersistenceStorage_WriteRead_IntegerKey()
     {
-        return base.PersistenceStorage_WriteRead_IntegerKey();
+        return base.PersistenceStorage_WriteRead_IntegerKeyAsync(TestContext.Current.CancellationToken);
     }
 
     [Fact]
     public override Task PersistenceStorage_ETagChangesOnWrite()
     {
-        return base.PersistenceStorage_ETagChangesOnWrite();
+        return base.PersistenceStorage_ETagChangesOnWriteAsync(TestContext.Current.CancellationToken);
     }
 
     [Fact]
     public override Task PersistenceStorage_ClearBeforeWrite()
     {
-        return base.PersistenceStorage_ClearBeforeWrite();
+        return base.PersistenceStorage_ClearBeforeWriteAsync(TestContext.Current.CancellationToken);
     }
 
     [Fact]
     public override Task PersistenceStorage_ClearStateDoesNotNullifyState()
     {
-        return base.PersistenceStorage_ClearStateDoesNotNullifyState();
+        return base.PersistenceStorage_ClearStateDoesNotNullifyStateAsync(TestContext.Current.CancellationToken);
     }
 
     [Fact]
     public override Task PersistenceStorage_ClearUpdatesETag()
     {
-        return base.PersistenceStorage_ClearUpdatesETag();
+        return base.PersistenceStorage_ClearUpdatesETagAsync(TestContext.Current.CancellationToken);
     }
 
     [Fact]
     public override Task PersistenceStorage_ReadAfterClear()
     {
-        return base.PersistenceStorage_ReadAfterClear();
+        return base.PersistenceStorage_ReadAfterClearAsync(TestContext.Current.CancellationToken);
     }
 
     [Fact]
     public override Task PersistenceStorage_MultipleClearOperations()
     {
-        return base.PersistenceStorage_MultipleClearOperations();
+        return base.PersistenceStorage_MultipleClearOperationsAsync(TestContext.Current.CancellationToken);
     }
 
     [Fact]
     public override Task PersistenceStorage_WriteWithSameValuesUpdatesETag()
     {
-        return base.PersistenceStorage_WriteWithSameValuesUpdatesETag();
+        return base.PersistenceStorage_WriteWithSameValuesUpdatesETagAsync(TestContext.Current.CancellationToken);
     }
 
     [Fact]
     public override Task PersistenceStorage_StateNamesUseIndependentRecords()
     {
-        return base.PersistenceStorage_StateNamesUseIndependentRecords();
+        return base.PersistenceStorage_StateNamesUseIndependentRecordsAsync(TestContext.Current.CancellationToken);
     }
 
     [Fact]
     public override Task PersistenceStorage_ClearInconsistentFailsWithInconsistentStateException()
     {
-        return base.PersistenceStorage_ClearInconsistentFailsWithInconsistentStateException();
+        return base.PersistenceStorage_ClearInconsistentFailsWithInconsistentStateExceptionAsync(TestContext.Current.CancellationToken);
     }
 
     [Fact, TestCategory("ModelBased")]
     public Task GrainStorage_ModelBasedGeneratedConformance()
     {
         var runner = new GrainStorageModelBasedTestRunner(Storage, "MemoryStore");
-        return runner.RunGeneratedConformanceTests();
+        return runner.RunGeneratedConformanceTests(TestContext.Current.CancellationToken);
     }
 
     [Fact, TestCategory("ModelBased")]
     public Task GrainStorageWithLatency_ModelBasedGeneratedConformance()
     {
         var runner = new GrainStorageModelBasedTestRunner(_fixture.CreateStorageWithLatency(), "MemoryStoreWithLatency");
-        return runner.RunGeneratedConformanceTests();
+        return runner.RunGeneratedConformanceTests(TestContext.Current.CancellationToken);
     }
 
     [Fact, TestCategory("ModelBased")]
     public async Task GrainStorage_ModelBasedGeneratedConformance_ReportsInvalidProviderBehavior()
     {
+        var cancellationToken = TestContext.Current.CancellationToken;
         string? failureOutput = null;
         var runner = new GrainStorageModelBasedTestRunner(
             new InvalidGrainStorage(),
             "InvalidStorage",
             message => failureOutput = message);
 
-        var exception = await Assert.ThrowsAsync<InvalidOperationException>(runner.RunGeneratedConformanceTests);
+        var exception = await Assert.ThrowsAsync<InvalidOperationException>(
+            () => runner.RunGeneratedConformanceTests(cancellationToken));
 
         Assert.Contains("Model-based grain storage conformance test failed.", exception.Message);
         Assert.NotNull(failureOutput);
@@ -231,10 +235,11 @@ public class MemoryGrainStorageTests : GrainStorageTestRunner, IClassFixture<Mem
     [Fact, TestCategory("ModelBased")]
     public async Task GrainStorage_ModelBasedGeneratedConformance_ExcludesCurrentETagSameValueWrites()
     {
+        var cancellationToken = TestContext.Current.CancellationToken;
         var storage = new StableNoOpETagGrainStorage();
         var runner = new GrainStorageModelBasedTestRunner(storage, "StableNoOpETagStorage");
 
-        await runner.RunGeneratedConformanceTests();
+        await runner.RunGeneratedConformanceTests(cancellationToken);
 
         Assert.Equal(0, storage.SameValueWriteCount);
     }

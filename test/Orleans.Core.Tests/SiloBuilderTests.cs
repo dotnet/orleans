@@ -114,7 +114,7 @@ namespace NonSilo.Tests
                         .Configure<GrainCollectionOptions>(options => options
                                     .ClassSpecificCollectionAge
                                     .Add(typeof(CollectionSpecificAgeLimitForZeroSecondsActivationGcTestGrain).FullName!, TimeSpan.Zero));
-                }).RunConsoleAsync();
+                }).RunConsoleAsync(TestContext.Current.CancellationToken);
             });
         }
 
@@ -131,7 +131,7 @@ namespace NonSilo.Tests
                     siloBuilder
                         .UseLocalhostClustering()
                         .Configure<ClusterMembershipOptions>(options => { options.NumVotesForDeathDeclaration = 10; options.NumProbedSilos = 1; });
-                }).RunConsoleAsync();
+                }).RunConsoleAsync(TestContext.Current.CancellationToken);
             });
 
             await Assert.ThrowsAsync<OrleansConfigurationException>(async () =>
@@ -141,7 +141,7 @@ namespace NonSilo.Tests
                     siloBuilder
                         .UseLocalhostClustering()
                         .Configure<ClusterMembershipOptions>(options => { options.NumVotesForDeathDeclaration = 0; });
-                }).RunConsoleAsync();
+                }).RunConsoleAsync(TestContext.Current.CancellationToken);
             });
 
             await Assert.ThrowsAsync<OrleansConfigurationException>(async () =>
@@ -151,7 +151,7 @@ namespace NonSilo.Tests
                     siloBuilder
                         .UseLocalhostClustering()
                         .Configure<ClusterMembershipOptions>(options => options.MaxDefunctSiloEntries = -1);
-                }).RunConsoleAsync();
+                }).RunConsoleAsync(TestContext.Current.CancellationToken);
             });
 
             await Assert.ThrowsAsync<OrleansConfigurationException>(async () =>
@@ -161,7 +161,7 @@ namespace NonSilo.Tests
                     siloBuilder
                         .UseLocalhostClustering()
                         .Configure<ClusterMembershipOptions>(options => options.ProbeTimeout = TimeSpan.Zero);
-                }).RunConsoleAsync();
+                }).RunConsoleAsync(TestContext.Current.CancellationToken);
             });
 
             await Assert.ThrowsAsync<OrleansConfigurationException>(async () =>
@@ -171,7 +171,7 @@ namespace NonSilo.Tests
                     siloBuilder
                         .UseLocalhostClustering()
                         .Configure<ClusterMembershipOptions>(options => options.MinProbeTimeout = TimeSpan.FromSeconds(6));
-                }).RunConsoleAsync();
+                }).RunConsoleAsync(TestContext.Current.CancellationToken);
             });
 
             await Assert.ThrowsAsync<OrleansConfigurationException>(async () =>
@@ -185,7 +185,7 @@ namespace NonSilo.Tests
                             options.MinProbeTimeout = TimeSpan.FromSeconds(1);
                             options.MaxProbeTimeout = TimeSpan.FromSeconds(4);
                         });
-                }).RunConsoleAsync();
+                }).RunConsoleAsync(TestContext.Current.CancellationToken);
             });
 
             await Assert.ThrowsAsync<OrleansConfigurationException>(async () =>
@@ -195,7 +195,7 @@ namespace NonSilo.Tests
                     siloBuilder
                         .UseLocalhostClustering()
                         .Configure<ClusterMembershipOptions>(options => options.MaxProbeTimeout = TimeSpan.FromDays(50));
-                }).RunConsoleAsync();
+                }).RunConsoleAsync(TestContext.Current.CancellationToken);
             });
 
             await Assert.ThrowsAsync<OrleansConfigurationException>(async () =>
@@ -210,7 +210,7 @@ namespace NonSilo.Tests
                             options.MaxProbeTimeout = TimeSpan.FromDays(49);
                             options.NumMissedProbesLimit = int.MaxValue;
                         });
-                }).RunConsoleAsync();
+                }).RunConsoleAsync(TestContext.Current.CancellationToken);
             });
 
             await Assert.ThrowsAsync<OrleansConfigurationException>(async () =>
@@ -225,7 +225,7 @@ namespace NonSilo.Tests
                             options.MaxProbeTimeout = options.ProbeTimeout;
                             options.NumMissedProbesLimit = 2_000_000_000;
                         });
-                }).RunConsoleAsync();
+                }).RunConsoleAsync(TestContext.Current.CancellationToken);
             });
         }
 
@@ -249,7 +249,7 @@ namespace NonSilo.Tests
                             options.LoadSheddingEnabled = true;
                             options.CpuThreshold = 101;
                         });
-                }).RunConsoleAsync();
+                }).RunConsoleAsync(TestContext.Current.CancellationToken);
             });
         }
 
@@ -272,7 +272,8 @@ namespace NonSilo.Tests
                     });
                 }).Build();
 
-            await Assert.ThrowsAsync<OrleansConfigurationException>(() => host.StartAsync());
+            await Assert.ThrowsAsync<OrleansConfigurationException>(
+                () => host.StartAsync(TestContext.Current.CancellationToken));
         }
 
         /// <summary>

@@ -36,7 +36,10 @@ public sealed class KinesisRuntimeTests
                     });
             });
 
-        var result = await KinesisAdapterFactory.GetPartitionIdsAsync(client, "stream");
+        var result = await KinesisAdapterFactory.GetPartitionIdsAsync(
+            client,
+            "stream",
+            TestContext.Current.CancellationToken);
 
         Assert.Equal(["shard-1", "shard-2", "shard-3"], result);
         await client.Received(2).ListShardsAsync(Arg.Any<ListShardsRequest>(), Arg.Any<CancellationToken>());
@@ -46,7 +49,7 @@ public sealed class KinesisRuntimeTests
     public async Task GetPartitionIdsForwardsCancellationToken()
     {
         var client = Substitute.For<IAmazonKinesis>();
-        using var cancellation = new CancellationTokenSource();
+        using var cancellation = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
         client.ListShardsAsync(Arg.Any<ListShardsRequest>(), cancellation.Token)
             .Returns(async _ =>
             {
@@ -107,8 +110,8 @@ public sealed class KinesisRuntimeTests
             new FakeTimeProvider(),
             NullLogger<KinesisShardTopologyMonitor>.Instance);
 
-        Assert.False(await monitor.CheckTopology(force: true));
-        Assert.False(await monitor.CheckTopology(force: true));
+        Assert.False(await monitor.CheckTopology(force: true, TestContext.Current.CancellationToken));
+        Assert.False(await monitor.CheckTopology(force: true, TestContext.Current.CancellationToken));
         await client.Received(1).ListShardsAsync(Arg.Any<ListShardsRequest>(), Arg.Any<CancellationToken>());
     }
 
@@ -135,7 +138,7 @@ public sealed class KinesisRuntimeTests
         var receiver = CreateReceiver(client, checkpointerFactory, timeProvider);
 
         await receiver.Initialize(TimeSpan.FromSeconds(5));
-        var records = await receiver.GetQueueMessagesAsync(10);
+        var records = await receiver.GetQueueMessagesAsync(10, TestContext.Current.CancellationToken);
 
         Assert.Empty(records);
         await checkpointer.Received(2).Load(Arg.Any<CancellationToken>());
@@ -162,8 +165,8 @@ public sealed class KinesisRuntimeTests
         var receiver = CreateReceiver(client, checkpointerFactory, timeProvider);
         await receiver.Initialize(TimeSpan.FromSeconds(5));
 
-        await receiver.GetQueueMessagesAsync(10);
-        var secondRead = receiver.GetQueueMessagesAsync(10);
+        await receiver.GetQueueMessagesAsync(10, TestContext.Current.CancellationToken);
+        var secondRead = receiver.GetQueueMessagesAsync(10, TestContext.Current.CancellationToken);
 
         Assert.False(secondRead.IsCompleted);
         timeProvider.Advance(TimeSpan.FromMilliseconds(200));
@@ -188,8 +191,8 @@ public sealed class KinesisRuntimeTests
         var receiver = CreateReceiver(client, checkpointerFactory, new FakeTimeProvider());
         await receiver.Initialize(TimeSpan.FromSeconds(5));
 
-        Assert.Empty(await receiver.GetQueueMessagesAsync(10));
-        Assert.Empty(await receiver.GetQueueMessagesAsync(10));
+        Assert.Empty(await receiver.GetQueueMessagesAsync(10, TestContext.Current.CancellationToken));
+        Assert.Empty(await receiver.GetQueueMessagesAsync(10, TestContext.Current.CancellationToken));
 
         await client.Received(1).GetRecordsAsync(Arg.Any<GetRecordsRequest>(), Arg.Any<CancellationToken>());
     }
@@ -231,7 +234,7 @@ public sealed class KinesisRuntimeTests
         var receiver = CreateReceiver(client, checkpointerFactory, new FakeTimeProvider());
 
         var operation = receiver.Initialize(TimeSpan.FromMilliseconds(100));
-        var initializationToken = await tokenObserved.Task;
+        var initializationToken = await tokenObserved.Task.WaitAsync(TestContext.Current.CancellationToken);
         var exception = await Assert.ThrowsAnyAsync<OperationCanceledException>(() => operation);
 
         Assert.True(initializationToken.CanBeCanceled);
@@ -271,13 +274,13 @@ public sealed class KinesisRuntimeTests
 
         await Assert.ThrowsAnyAsync<OperationCanceledException>(
             () => receiver.Initialize(TimeSpan.FromMilliseconds(100)));
-        var messages = await receiver.GetQueueMessagesAsync(10, CancellationToken.None);
+        var messages = await receiver.GetQueueMessagesAsync(10, TestContext.Current.CancellationToken);
 
         Assert.Empty(messages);
         Assert.Equal(2, createCount);
         await client.Received(1).GetRecordsAsync(
             Arg.Any<GetRecordsRequest>(),
-            CancellationToken.None);
+            TestContext.Current.CancellationToken);
     }
 
     [Fact]
@@ -302,10 +305,10 @@ public sealed class KinesisRuntimeTests
             });
         var receiver = CreateReceiver(client, checkpointerFactory, new FakeTimeProvider());
         await receiver.Initialize(TimeSpan.FromSeconds(5));
-        using var cancellation = new CancellationTokenSource();
+        using var cancellation = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
 
         var operation = receiver.GetQueueMessagesAsync(10, cancellation.Token);
-        Assert.Equal(cancellation.Token, await tokenObserved.Task);
+        Assert.Equal(cancellation.Token, await tokenObserved.Task.WaitAsync(TestContext.Current.CancellationToken));
         cancellation.Cancel();
 
         var exception = await Assert.ThrowsAnyAsync<OperationCanceledException>(() => operation);

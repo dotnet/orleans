@@ -156,6 +156,7 @@ namespace Orleans.Connections.Security.Tests
         [InlineData(new[] { TestCertificateHelper.ClientAuthenticationOid, TestCertificateHelper.ServerAuthenticationOid }, RemoteCertificateMode.RequireCertificate)]
         public async Task TlsEndToEnd(string[]? oids, RemoteCertificateMode certificateMode)
         {
+            var cancellationToken = TestContext.Current.CancellationToken;
             TestCluster? testCluster = default;
             try
             {
@@ -173,7 +174,7 @@ namespace Orleans.Connections.Security.Tests
                 builder.Properties[ClientCertificateModeKey] = certificateMode.ToString();
 
                 testCluster = builder.Build();
-                await testCluster.DeployAsync();
+                await testCluster.DeployAsync(cancellationToken);
 
                 var client = testCluster.Client;
 
@@ -187,8 +188,14 @@ namespace Orleans.Connections.Security.Tests
             {
                 if (testCluster != null)
                 {
-                    await testCluster.StopAllSilosAsync();
-                    testCluster.Dispose();
+                    try
+                    {
+                        await testCluster.StopAllSilosAsync(cancellationToken);
+                    }
+                    finally
+                    {
+                        testCluster.Dispose();
+                    }
                 }
             }
         }

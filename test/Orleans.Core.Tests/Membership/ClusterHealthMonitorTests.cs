@@ -94,7 +94,10 @@ namespace NonSilo.Tests.Membership
         [Fact]
         public async Task ClusterHealthMonitor_BasicScenario()
         {
-            await ClusterHealthMonitor_BasicScenario_Runner(enableIndirectProbes: true, numVotesForDeathDeclaration: 2);
+            await ClusterHealthMonitor_BasicScenario_Runner(
+                enableIndirectProbes: true,
+                numVotesForDeathDeclaration: 2,
+                cancellationToken: TestContext.Current.CancellationToken);
         }
 
         /// <summary>
@@ -103,12 +106,17 @@ namespace NonSilo.Tests.Membership
         [Fact]
         public async Task ClusterHealthMonitor_MonitorAllStaleSilos()
         {
-            await ClusterHealthMonitor_BasicScenario_Runner(enableIndirectProbes: true, numVotesForDeathDeclaration: 2, otherSilosAreStale: true);
+            await ClusterHealthMonitor_BasicScenario_Runner(
+                enableIndirectProbes: true,
+                numVotesForDeathDeclaration: 2,
+                otherSilosAreStale: true,
+                cancellationToken: TestContext.Current.CancellationToken);
         }
 
         [Fact]
         public async Task ClusterHealthMonitor_JoiningSiloMonitorsStaleAndSuspectedEvictableSilos()
         {
+            var cancellationToken = TestContext.Current.CancellationToken;
             var now = DateTimeOffset.UtcNow;
             var clusterMembershipOptions = new ClusterMembershipOptions
             {
@@ -116,7 +124,7 @@ namespace NonSilo.Tests.Membership
             };
 
             var testRig = CreateClusterHealthMonitorTestRig(clusterMembershipOptions);
-            await this.lifecycle.OnStart();
+            await this.lifecycle.OnStart(cancellationToken);
 
             var staleSilo = Silo("127.0.0.200:100@100");
             var freshSilo = Silo("127.0.0.200:200@100");
@@ -140,21 +148,21 @@ namespace NonSilo.Tests.Membership
                 Assert.True(await this.membershipTable.InsertRow(entry, table.Version.Next()));
             }
 
-            await testRig.Manager.Refresh();
-            await Until(() => testRig.TestAccessor.ObservedVersion > lastVersion);
+            await testRig.Manager.Refresh(cancellationToken: cancellationToken);
+            await Until(() => testRig.TestAccessor.ObservedVersion > lastVersion, cancellationToken);
             Assert.Empty(testRig.TestAccessor.MonitoredSilos);
 
             lastVersion = testRig.TestAccessor.ObservedVersion;
             await testRig.Manager.UpdateStatus(SiloStatus.Joining);
-            await Until(() => testRig.TestAccessor.ObservedVersion > lastVersion);
-            await Until(() => testRig.TestAccessor.MonitoredSilos.Count == 3);
+            await Until(() => testRig.TestAccessor.ObservedVersion > lastVersion, cancellationToken);
+            await Until(() => testRig.TestAccessor.MonitoredSilos.Count == 3, cancellationToken);
 
             Assert.Contains(testRig.TestAccessor.MonitoredSilos, pair => pair.Key.Equals(staleSilo));
             Assert.Contains(testRig.TestAccessor.MonitoredSilos, pair => pair.Key.Equals(suspectedSilo));
             Assert.Contains(testRig.TestAccessor.MonitoredSilos, pair => pair.Key.Equals(shuttingDownSilo));
             Assert.DoesNotContain(testRig.TestAccessor.MonitoredSilos, pair => pair.Key.Equals(freshSilo));
 
-            await StopLifecycle();
+            await StopLifecycle(cancellationToken);
         }
 
         /// <summary>
@@ -163,7 +171,10 @@ namespace NonSilo.Tests.Membership
         [Fact]
         public async Task ClusterHealthMonitor_NoIndirectProbes()
         {
-            await ClusterHealthMonitor_BasicScenario_Runner(enableIndirectProbes: false, numVotesForDeathDeclaration: 2);
+            await ClusterHealthMonitor_BasicScenario_Runner(
+                enableIndirectProbes: false,
+                numVotesForDeathDeclaration: 2,
+                cancellationToken: TestContext.Current.CancellationToken);
         }
 
         /// <summary>
@@ -172,7 +183,10 @@ namespace NonSilo.Tests.Membership
         [Fact]
         public async Task ClusterHealthMonitor_ThreeVotesNeededToKill()
         {
-            await ClusterHealthMonitor_BasicScenario_Runner(enableIndirectProbes: true, numVotesForDeathDeclaration: 3);
+            await ClusterHealthMonitor_BasicScenario_Runner(
+                enableIndirectProbes: true,
+                numVotesForDeathDeclaration: 3,
+                cancellationToken: TestContext.Current.CancellationToken);
         }
 
         /// <summary>
@@ -181,7 +195,10 @@ namespace NonSilo.Tests.Membership
         [Fact]
         public async Task ClusterHealthMonitor_OneVoteNeededToKill()
         {
-            await ClusterHealthMonitor_BasicScenario_Runner(enableIndirectProbes: false, numVotesForDeathDeclaration: 1);
+            await ClusterHealthMonitor_BasicScenario_Runner(
+                enableIndirectProbes: false,
+                numVotesForDeathDeclaration: 1,
+                cancellationToken: TestContext.Current.CancellationToken);
         }
 
         /// <summary>
@@ -190,7 +207,10 @@ namespace NonSilo.Tests.Membership
         [Fact]
         public async Task ClusterHealthMonitor_SilosWithStaleCreatedOrJoiningState_OneVoteNeededToKill()
         {
-            await ClusterHealthMonitor_StaleJoinOrCreatedSilos_Runner(evictWhenMaxJoinAttemptTimeExceeded: true, numVotesForDeathDeclaration: 1);
+            await ClusterHealthMonitor_StaleJoinOrCreatedSilos_Runner(
+                evictWhenMaxJoinAttemptTimeExceeded: true,
+                numVotesForDeathDeclaration: 1,
+                cancellationToken: TestContext.Current.CancellationToken);
         }
 
         /// <summary>
@@ -199,7 +219,10 @@ namespace NonSilo.Tests.Membership
         [Fact]
         public async Task ClusterHealthMonitor_SilosWithStaleCreatedOrJoiningState_TwoVotesNeededToKill()
         {
-            await ClusterHealthMonitor_StaleJoinOrCreatedSilos_Runner(evictWhenMaxJoinAttemptTimeExceeded: true, numVotesForDeathDeclaration: 2);
+            await ClusterHealthMonitor_StaleJoinOrCreatedSilos_Runner(
+                evictWhenMaxJoinAttemptTimeExceeded: true,
+                numVotesForDeathDeclaration: 2,
+                cancellationToken: TestContext.Current.CancellationToken);
         }
 
         /// <summary>
@@ -208,7 +231,10 @@ namespace NonSilo.Tests.Membership
         [Fact]
         public async Task ClusterHealthMonitor_SilosWithStaleCreatedOrJoiningState_ThreeVotesNeededToKill()
         {
-            await ClusterHealthMonitor_StaleJoinOrCreatedSilos_Runner(evictWhenMaxJoinAttemptTimeExceeded: true, numVotesForDeathDeclaration: 3);
+            await ClusterHealthMonitor_StaleJoinOrCreatedSilos_Runner(
+                evictWhenMaxJoinAttemptTimeExceeded: true,
+                numVotesForDeathDeclaration: 3,
+                cancellationToken: TestContext.Current.CancellationToken);
         }
 
         /// <summary>
@@ -217,7 +243,10 @@ namespace NonSilo.Tests.Membership
         [Fact]
         public async Task ClusterHealthMonitor_SilosWithStaleCreatedOrJoiningState_Disabled()
         {
-            await ClusterHealthMonitor_StaleJoinOrCreatedSilos_Runner(evictWhenMaxJoinAttemptTimeExceeded: false, numVotesForDeathDeclaration: 3);
+            await ClusterHealthMonitor_StaleJoinOrCreatedSilos_Runner(
+                evictWhenMaxJoinAttemptTimeExceeded: false,
+                numVotesForDeathDeclaration: 3,
+                cancellationToken: TestContext.Current.CancellationToken);
         }
 
         /// <summary>
@@ -227,6 +256,7 @@ namespace NonSilo.Tests.Membership
         [Fact]
         public async Task ClusterHealthMonitor_ConnectionCanary_SuppressesVoteWhenConnectionActive()
         {
+            var cancellationToken = TestContext.Current.CancellationToken;
             var now = DateTimeOffset.UtcNow;
             var clusterMembershipOptions = new ClusterMembershipOptions
             {
@@ -244,21 +274,21 @@ namespace NonSilo.Tests.Membership
 
             // Set up probes to always fail.
             var probeCalls = new ConcurrentQueue<SiloAddress>();
-            this.prober.Probe(default!, default).ReturnsForAnyArgs(info =>
+            this.prober.Probe(default!, default, cancellationToken).ReturnsForAnyArgs(info =>
             {
                 probeCalls.Enqueue(info.ArgAt<SiloAddress>(0));
                 return Task.FromException(new Exception("probe failed"));
             });
 
-            await this.lifecycle.OnStart();
+            await this.lifecycle.OnStart(cancellationToken);
 
             var targetSilo = Silo("127.0.0.200:100@100");
             await this.membershipTable.InsertRow(Entry(targetSilo, SiloStatus.Active, now), this.membershipTable.Version.Next());
-            await testRig.Manager.Refresh();
+            await testRig.Manager.Refresh(cancellationToken: cancellationToken);
             await testRig.Manager.UpdateStatus(SiloStatus.Active);
-            await testRig.Manager.Refresh();
+            await testRig.Manager.Refresh(cancellationToken: cancellationToken);
 
-            await Until(() => testRig.TestAccessor.MonitoredSilos.Count > 0);
+            await Until(() => testRig.TestAccessor.MonitoredSilos.Count > 0, cancellationToken);
 
             // Register a test connection and simulate recent message activity.
             var testConnection = CreateTestConnection(this.loggerFactory);
@@ -275,11 +305,11 @@ namespace NonSilo.Tests.Membership
 
                 // Keep re-stamping the canary so it stays fresh.
                 testConnection.SimulateMessageReceived();
-                await Task.Delay(50);
+                await Task.Delay(50, cancellationToken);
             }
 
-            await Until(() => probeCalls.Count >= clusterMembershipOptions.NumMissedProbesLimit);
-            await Task.Delay(100);
+            await Until(() => probeCalls.Count >= clusterMembershipOptions.NumMissedProbesLimit, cancellationToken);
+            await Task.Delay(100, cancellationToken);
 
             // The silo should NOT be dead because the canary detected active connection traffic.
             var table = await this.membershipTable.ReadAll();
@@ -287,7 +317,7 @@ namespace NonSilo.Tests.Membership
             Assert.NotNull(entry);
             Assert.NotEqual(SiloStatus.Dead, entry.Item1.Status);
 
-            await StopLifecycle();
+            await StopLifecycle(cancellationToken);
         }
 
         /// <summary>
@@ -298,7 +328,10 @@ namespace NonSilo.Tests.Membership
         public async Task ClusterHealthMonitor_ConnectionCanary_AllowsVoteWhenNoConnection()
         {
             // With no connections in the connection manager, canary returns null -> vote proceeds.
-            await ClusterHealthMonitor_BasicScenario_Runner(enableIndirectProbes: false, numVotesForDeathDeclaration: 1);
+            await ClusterHealthMonitor_BasicScenario_Runner(
+                enableIndirectProbes: false,
+                numVotesForDeathDeclaration: 1,
+                cancellationToken: TestContext.Current.CancellationToken);
         }
 
         /// <summary>
@@ -308,6 +341,7 @@ namespace NonSilo.Tests.Membership
         [Fact]
         public async Task ClusterHealthMonitor_ConnectionCanary_DisabledByOption()
         {
+            var cancellationToken = TestContext.Current.CancellationToken;
             var now = DateTimeOffset.UtcNow;
             var clusterMembershipOptions = new ClusterMembershipOptions
             {
@@ -325,21 +359,21 @@ namespace NonSilo.Tests.Membership
             var testRig = CreateClusterHealthMonitorTestRig(clusterMembershipOptions, canaryConnectionManager);
 
             var probeCalls = new ConcurrentQueue<SiloAddress>();
-            this.prober.Probe(default!, default).ReturnsForAnyArgs(info =>
+            this.prober.Probe(default!, default, cancellationToken).ReturnsForAnyArgs(info =>
             {
                 probeCalls.Enqueue(info.ArgAt<SiloAddress>(0));
                 return Task.FromException(new Exception("probe failed"));
             });
 
-            await this.lifecycle.OnStart();
+            await this.lifecycle.OnStart(cancellationToken);
 
             var targetSilo = Silo("127.0.0.200:100@100");
             await this.membershipTable.InsertRow(Entry(targetSilo, SiloStatus.Active, now), this.membershipTable.Version.Next());
-            await testRig.Manager.Refresh();
+            await testRig.Manager.Refresh(cancellationToken: cancellationToken);
             await testRig.Manager.UpdateStatus(SiloStatus.Active);
-            await testRig.Manager.Refresh();
+            await testRig.Manager.Refresh(cancellationToken: cancellationToken);
 
-            await Until(() => testRig.TestAccessor.MonitoredSilos.Count > 0);
+            await Until(() => testRig.TestAccessor.MonitoredSilos.Count > 0, cancellationToken);
 
             // Register a test connection and simulate recent message activity.
             var testConnection = CreateTestConnection(this.loggerFactory);
@@ -355,14 +389,14 @@ namespace NonSilo.Tests.Membership
                 }
 
                 testConnection.SimulateMessageReceived();
-                await Task.Delay(50);
+                await Task.Delay(50, cancellationToken);
             }
 
             await Until(async () =>
             {
                 var snapshot = await this.membershipTable.ReadAll();
                 return snapshot.Members.Any(m => m.Item1.SiloAddress.Equals(targetSilo) && m.Item1.Status == SiloStatus.Dead);
-            });
+            }, cancellationToken);
 
             // Despite an active connection, the silo SHOULD be dead because the option is disabled.
             var table = await this.membershipTable.ReadAll();
@@ -370,10 +404,14 @@ namespace NonSilo.Tests.Membership
             Assert.NotNull(entry);
             Assert.Equal(SiloStatus.Dead, entry.Item1.Status);
 
-            await StopLifecycle();
+            await StopLifecycle(cancellationToken);
         }
 
-        private async Task ClusterHealthMonitor_BasicScenario_Runner(bool enableIndirectProbes, int? numVotesForDeathDeclaration = default, bool otherSilosAreStale = false)
+        private async Task ClusterHealthMonitor_BasicScenario_Runner(
+            bool enableIndirectProbes,
+            int? numVotesForDeathDeclaration,
+            CancellationToken cancellationToken,
+            bool otherSilosAreStale = false)
         {
             var now = DateTimeOffset.UtcNow;
             var clusterMembershipOptions = new ClusterMembershipOptions
@@ -390,12 +428,12 @@ namespace NonSilo.Tests.Membership
             var testRig = CreateClusterHealthMonitorTestRig(clusterMembershipOptions);
             using var membershipEvents = new DiagnosticEventCollector(MembershipEvents.ListenerName);
             var probeCalls = new ConcurrentQueue<(SiloAddress Target, int ProbeNumber, bool IsIndirect)>();
-            this.prober.Probe(default!, default).ReturnsForAnyArgs(info =>
+            this.prober.Probe(default!, default, cancellationToken).ReturnsForAnyArgs(info =>
             {
                 probeCalls.Enqueue((info.ArgAt<SiloAddress>(0), info.ArgAt<int>(1), false));
                 return Task.CompletedTask;
             });
-            this.prober.ProbeIndirectly(default!, default!, default, default).ReturnsForAnyArgs(info =>
+            this.prober.ProbeIndirectly(default!, default!, default, default, cancellationToken).ReturnsForAnyArgs(info =>
             {
                 probeCalls.Enqueue((info.ArgAt<SiloAddress>(1), info.ArgAt<int>(3), true));
                 return Task.FromResult(new IndirectProbeResponse
@@ -406,7 +444,7 @@ namespace NonSilo.Tests.Membership
                 });
             });
 
-            await this.lifecycle.OnStart();
+            await this.lifecycle.OnStart(cancellationToken);
             Assert.Empty(testRig.TestAccessor.MonitoredSilos);
 
             var iAmAliveTime = otherSilosAreStale ? now.Subtract(TimeSpan.FromHours(1)) : now;
@@ -433,9 +471,9 @@ namespace NonSilo.Tests.Membership
                 Assert.True(await this.membershipTable.InsertRow(entry, table.Version.Next()));
             }
 
-            await testRig.Manager.Refresh();
+            await testRig.Manager.Refresh(cancellationToken: cancellationToken);
 
-            await Until(() => testRig.TestAccessor.ObservedVersion > lastVersion);
+            await Until(() => testRig.TestAccessor.ObservedVersion > lastVersion, cancellationToken);
             lastVersion = testRig.TestAccessor.ObservedVersion;
 
             // No silos should be monitored by this silo until it becomes active.
@@ -443,11 +481,11 @@ namespace NonSilo.Tests.Membership
 
             await testRig.Manager.UpdateStatus(SiloStatus.Active);
 
-            await Until(() => testRig.TestAccessor.ObservedVersion > lastVersion);
+            await Until(() => testRig.TestAccessor.ObservedVersion > lastVersion, cancellationToken);
             lastVersion = testRig.TestAccessor.ObservedVersion;
 
             // Now that this silo is active, it should be monitoring some fraction of the other active silos
-            await Until(() => testRig.TestAccessor.MonitoredSilos.Count > 0);
+            await Until(() => testRig.TestAccessor.MonitoredSilos.Count > 0, cancellationToken);
             Assert.NotEmpty(this.timers);
             Assert.DoesNotContain(testRig.TestAccessor.MonitoredSilos, s => s.Key.Equals(this.localSilo));
             var expectedNumProbedSilos = otherSilosAreStale ? otherSilos.Length : clusterMembershipOptions.NumProbedSilos;
@@ -464,7 +502,7 @@ namespace NonSilo.Tests.Membership
                 }
 
                 return probeCalls.Count;
-            });
+            }, cancellationToken);
             Assert.Equal(expectedNumProbedSilos, probeCalls.Count);
             while (probeCalls.TryDequeue(out var call)) Assert.Contains(testRig.TestAccessor.MonitoredSilos, k => k.Key.Equals(call.Item1));
 
@@ -475,12 +513,12 @@ namespace NonSilo.Tests.Membership
             }
 
             // Make the probes fail.
-            this.prober.Probe(default!, default).ReturnsForAnyArgs(info =>
+            this.prober.Probe(default!, default, cancellationToken).ReturnsForAnyArgs(info =>
             {
                 probeCalls.Enqueue((info.ArgAt<SiloAddress>(0), info.ArgAt<int>(1), true));
                 return Task.FromException(new Exception("no"));
             });
-            this.prober.ProbeIndirectly(default!, default!, default, default).ReturnsForAnyArgs(info =>
+            this.prober.ProbeIndirectly(default!, default!, default, default, cancellationToken).ReturnsForAnyArgs(info =>
             {
                 probeCalls.Enqueue((info.ArgAt<SiloAddress>(1), info.ArgAt<int>(3), true));
                 return Task.FromResult(new IndirectProbeResponse
@@ -508,7 +546,7 @@ namespace NonSilo.Tests.Membership
                     }
 
                     return probeCalls.Count;
-                });
+                }, cancellationToken);
 
                 while (probeCalls.TryDequeue(out var call)) ;
 
@@ -527,7 +565,7 @@ namespace NonSilo.Tests.Membership
                             var votes = entry.GetFreshVotes(now.UtcDateTime, clusterMembershipOptions.DeathVoteExpirationTimeout);
                             return votes.Any(vote => vote.Item1.Equals(localSiloDetails.SiloAddress)) && (!expectDead || entry.Status == SiloStatus.Dead);
                         });
-                    });
+                    }, cancellationToken);
                 }
 
                 // Check that probes match the expected missed probes
@@ -563,15 +601,15 @@ namespace NonSilo.Tests.Membership
                 return;
             }
 
-            await testRig.Manager.Refresh();
+            await testRig.Manager.Refresh(cancellationToken: cancellationToken);
 
             // Make the probes succeed again.
-            this.prober.Probe(default!, default).ReturnsForAnyArgs(info =>
+            this.prober.Probe(default!, default, cancellationToken).ReturnsForAnyArgs(info =>
             {
                 probeCalls.Enqueue((info.ArgAt<SiloAddress>(0), info.ArgAt<int>(1), false));
                 return Task.CompletedTask;
             });
-            this.prober.ProbeIndirectly(default!, default!, default, default).ReturnsForAnyArgs(info =>
+            this.prober.ProbeIndirectly(default!, default!, default, default, cancellationToken).ReturnsForAnyArgs(info =>
             {
                 probeCalls.Enqueue((info.ArgAt<SiloAddress>(1), info.ArgAt<int>(3), true));
                 return Task.FromResult(new IndirectProbeResponse
@@ -601,7 +639,7 @@ namespace NonSilo.Tests.Membership
                 }
 
                 return probesReceived.Count;
-            });
+            }, cancellationToken);
 
             foreach (var siloMonitor in testRig.TestAccessor.MonitoredSilos.Values)
             {
@@ -609,10 +647,13 @@ namespace NonSilo.Tests.Membership
                 Assert.Equal(0, ((SiloHealthMonitor.ITestAccessor)siloMonitor).MissedProbes);
             }
 
-            await StopLifecycle();
+            await StopLifecycle(cancellationToken);
         }
 
-        private async Task ClusterHealthMonitor_StaleJoinOrCreatedSilos_Runner(bool evictWhenMaxJoinAttemptTimeExceeded = true, int? numVotesForDeathDeclaration = default)
+        private async Task ClusterHealthMonitor_StaleJoinOrCreatedSilos_Runner(
+            bool evictWhenMaxJoinAttemptTimeExceeded,
+            int? numVotesForDeathDeclaration,
+            CancellationToken cancellationToken)
         {
             var now = DateTimeOffset.UtcNow;
             var clusterMembershipOptions = new ClusterMembershipOptions
@@ -714,9 +755,9 @@ namespace NonSilo.Tests.Membership
             }
 
             // now we start the lifecycle and let the local silo add the final vote.
-            await this.lifecycle.OnStart();
+            await this.lifecycle.OnStart(cancellationToken);
 
-            await testRig.Manager.Refresh();
+            await testRig.Manager.Refresh(cancellationToken: cancellationToken);
 
             if (evictWhenMaxJoinAttemptTimeExceeded)
             {
@@ -726,10 +767,10 @@ namespace NonSilo.Tests.Membership
                         && joining.Status == SiloStatus.Dead
                         && snapshot.Entries.TryGetValue(Silo(createdSilo), out var created)
                         && created.Status == SiloStatus.Dead;
-                });
+                }, cancellationToken);
             }
 
-            await Until(() => testRig.TestAccessor.ObservedVersion > lastVersion);
+            await Until(() => testRig.TestAccessor.ObservedVersion > lastVersion, cancellationToken);
             
             lastVersion = testRig.TestAccessor.ObservedVersion;
 
@@ -757,7 +798,7 @@ namespace NonSilo.Tests.Membership
             Assert.Equal(expected: evictWhenMaxJoinAttemptTimeExceeded ? SiloStatus.Dead : SiloStatus.Joining, actual: joiningEntry.Item1.Status);
             Assert.Equal(expected: evictWhenMaxJoinAttemptTimeExceeded ? SiloStatus.Dead : SiloStatus.Created, actual: createdEntry.Item1.Status);
 
-            await StopLifecycle();
+            await StopLifecycle(cancellationToken);
 
             static Tuple<MembershipEntry, string>? GetEntryFromTable(MembershipTableData table, string siloAddress)
             {
@@ -769,14 +810,17 @@ namespace NonSilo.Tests.Membership
 
         private static MembershipEntry Entry(SiloAddress address, SiloStatus status, DateTimeOffset startTime = default) => new MembershipEntry { SiloAddress = address, Status = status, StartTime = startTime.UtcDateTime, IAmAliveTime = startTime.UtcDateTime };
 
-        private static async Task UntilEqual<T>(T expected, Func<T> getActual)
+        private static async Task UntilEqual<T>(
+            T expected,
+            Func<T> getActual,
+            CancellationToken cancellationToken)
         {
             var maxTimeout = 40_000;
             var equalityComparer = EqualityComparer<T>.Default;
             var actual = getActual();
             while (!equalityComparer.Equals(expected, actual) && (maxTimeout -= 10) > 0)
             {
-                await Task.Delay(10);
+                await Task.Delay(10, cancellationToken);
                 actual = getActual();
             }
 
@@ -784,38 +828,48 @@ namespace NonSilo.Tests.Membership
             Assert.True(maxTimeout > 0);
         }
 
-        private static async Task Until(Func<bool> condition)
+        private static async Task Until(Func<bool> condition, CancellationToken cancellationToken)
         {
             var maxTimeout = 40_000;
-            while (!condition() && (maxTimeout -= 10) > 0) await Task.Delay(10);
+            while (!condition() && (maxTimeout -= 10) > 0) await Task.Delay(10, cancellationToken);
             Assert.True(maxTimeout > 0);
         }
 
-        private static async Task Until(Func<Task<bool>> condition)
+        private static async Task Until(
+            Func<Task<bool>> condition,
+            CancellationToken cancellationToken)
         {
             var maxTimeout = 40_000;
-            while (!await condition() && (maxTimeout -= 10) > 0) await Task.Delay(10);
+            while (!await condition() && (maxTimeout -= 10) > 0)
+            {
+                await Task.Delay(10, cancellationToken);
+            }
+
             Assert.True(maxTimeout > 0);
         }
 
-        private static async Task<MembershipTableSnapshot> WaitForMembershipSnapshot(DiagnosticEventCollector membershipEvents, Func<MembershipTableSnapshot, bool> condition)
+        private static async Task<MembershipTableSnapshot> WaitForMembershipSnapshot(
+            DiagnosticEventCollector membershipEvents,
+            Func<MembershipTableSnapshot, bool> condition,
+            CancellationToken cancellationToken)
         {
             var diagnosticEvent = await membershipEvents.WaitForEventAsync(
                 nameof(MembershipEvents.ViewChanged),
                 evt => evt.Payload is MembershipEvents.ViewChanged viewChanged && condition(viewChanged.Snapshot),
-                TimeSpan.FromSeconds(40));
+                TimeSpan.FromSeconds(40),
+                cancellationToken);
 
             return Assert.IsType<MembershipEvents.ViewChanged>(diagnosticEvent.Payload).Snapshot;
         }
 
-        private async Task StopLifecycle(CancellationToken cancellation = default)
+        private async Task StopLifecycle(CancellationToken cancellationToken)
         {
-            var stopped = this.lifecycle.OnStop(cancellation);
+            var stopped = this.lifecycle.OnStop(cancellationToken);
 
             while (!stopped.IsCompleted)
             {
                 while (this.timerCalls.TryDequeue(out var call)) call.Completion.TrySetResult(false);
-                await Task.Delay(15);
+                await Task.Delay(15, cancellationToken);
             }
 
             await stopped;
@@ -934,6 +988,7 @@ namespace NonSilo.Tests.Membership
         [Fact]
         public async Task ClusterHealthMonitor_StaleJoinEvictionUsesInjectedTimeProvider()
         {
+            var cancellationToken = TestContext.Current.CancellationToken;
             var start = new DateTimeOffset(2026, 1, 1, 12, 0, 0, TimeSpan.Zero);
             var maxJoinAttemptTime = TimeSpan.FromMinutes(5);
             var timeProvider = new FakeTimeProvider(start);
@@ -943,7 +998,7 @@ namespace NonSilo.Tests.Membership
                 MembershipVersion.MinValue,
                 ImmutableDictionary<SiloAddress, MembershipEntry>.Empty));
             manager.MembershipUpdates.Returns(updates);
-            manager.TrySuspectSilo(default!, default, default).ReturnsForAnyArgs(true);
+            manager.TrySuspectSilo(default!, default, cancellationToken).ReturnsForAnyArgs(true);
             var options = new ClusterMembershipOptions
             {
                 EvictWhenMaxJoinAttemptTimeExceeded = true,
@@ -967,13 +1022,13 @@ namespace NonSilo.Tests.Membership
             var joiningSilo = Silo("127.0.0.200:111@100");
             var joiningEntry = Entry(joiningSilo, SiloStatus.Joining, start);
 
-            await lifecycle.OnStart();
+            await lifecycle.OnStart(cancellationToken);
             try
             {
-                await updates.WaitForReadAsync(1);
+                await updates.WaitForReadAsync(1, cancellationToken);
                 timeProvider.Advance(maxJoinAttemptTime);
                 updates.Publish(CreateSnapshot(1, joiningEntry));
-                await updates.WaitForReadAsync(2);
+                await updates.WaitForReadAsync(2, cancellationToken);
 
                 Assert.Equal(new MembershipVersion(1), accessor.ObservedVersion);
                 await manager.DidNotReceive().TrySuspectSilo(
@@ -983,7 +1038,7 @@ namespace NonSilo.Tests.Membership
 
                 timeProvider.Advance(TimeSpan.FromTicks(1));
                 updates.Publish(CreateSnapshot(2, joiningEntry));
-                await updates.WaitForReadAsync(3);
+                await updates.WaitForReadAsync(3, cancellationToken);
 
                 Assert.Equal(new MembershipVersion(2), accessor.ObservedVersion);
                 await manager.Received(1).TrySuspectSilo(
@@ -993,10 +1048,10 @@ namespace NonSilo.Tests.Membership
             }
             finally
             {
-                var stopTask = lifecycle.OnStop();
+                var stopTask = lifecycle.OnStop(cancellationToken);
                 updates.Complete();
                 await stopTask;
-                await updates.Completed;
+                await updates.Completed.WaitAsync(cancellationToken);
             }
 
             static MembershipTableSnapshot CreateSnapshot(long version, MembershipEntry joiningEntry)
@@ -1019,7 +1074,7 @@ namespace NonSilo.Tests.Membership
 
             public void Complete() => _updates.Writer.TryComplete();
 
-            public Task WaitForReadAsync(int readCount)
+            public Task WaitForReadAsync(int readCount, CancellationToken cancellationToken)
             {
                 lock (_lock)
                 {
@@ -1034,7 +1089,7 @@ namespace NonSilo.Tests.Membership
                         _readWaiters.Add(readCount, waiter);
                     }
 
-                    return waiter.Task;
+                    return waiter.Task.WaitAsync(cancellationToken);
                 }
             }
 

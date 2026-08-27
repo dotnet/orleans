@@ -132,7 +132,7 @@ namespace UnitTests.SchedulerTests
             _rootContext.Scheduler.QueueAction(item2);
 
             // Wait for completion
-            await completed.Task.WaitAsync(TimeSpan.FromSeconds(5));
+            await completed.Task.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
 
             // N should be 15, because the two tasks should execute in order
             Assert.True(n != 0, "Work items did not get executed");
@@ -160,7 +160,9 @@ namespace UnitTests.SchedulerTests
             // Release task1 to proceed
             gate.Release();
 
-            await Task.WhenAll(task1, task2).WaitAsync(TimeSpan.FromSeconds(5));
+            await Task.WhenAll(task1, task2).WaitAsync(
+                TimeSpan.FromSeconds(5),
+                TestContext.Current.CancellationToken);
 
             // N should be 15, because the two tasks should execute in order
             Assert.True(n != 0, "Work items did not get executed");
@@ -201,7 +203,7 @@ namespace UnitTests.SchedulerTests
             }
 
             foreach (var flag in flags) flag.Set();
-            await Task.WhenAll(workItems).WaitAsync(workItemCompletionTimeout);
+            await Task.WhenAll(workItems).WaitAsync(workItemCompletionTimeout, TestContext.Current.CancellationToken);
 
 
             for (var i = 0; i < tasks.Length; i++)
@@ -245,14 +247,14 @@ namespace UnitTests.SchedulerTests
                 }
             });
 
-            await result0.Task.WaitAsync(TimeSpan.FromMinutes(1));
+            await result0.Task.WaitAsync(TimeSpan.FromMinutes(1), TestContext.Current.CancellationToken);
             Assert.True(result0.Task.Exception == null, "Task-0 should not throw exception: " + result0.Task.Exception);
             Assert.True(await result0.Task, "Task-0 completed");
 
             Assert.NotNull(t1); // Task-1 started
-            await result1.Task.WaitAsync(TimeSpan.FromMinutes(1));
+            await result1.Task.WaitAsync(TimeSpan.FromMinutes(1), TestContext.Current.CancellationToken);
             // give a minimum extra chance to yield after result0 has been set, as it might not have finished the t1 task
-            await t1.WaitAsync(TimeSpan.FromMilliseconds(1));
+            await t1.WaitAsync(TimeSpan.FromMilliseconds(1), TestContext.Current.CancellationToken);
 
             Assert.True(t1.IsCompleted, "Task-1 completed");
             Assert.False(t1.IsFaulted, "Task-1 faulted: " + t1.Exception);
@@ -318,7 +320,7 @@ namespace UnitTests.SchedulerTests
 
             // Wait for completion
             _output.WriteLine("Main-task waiting");
-            await finished.Task.WaitAsync(TimeSpan.FromSeconds(10));
+            await finished.Task.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
             _output.WriteLine("Main-task done");
 
             // N should be 10, because all tasks should execute serially
@@ -359,7 +361,7 @@ namespace UnitTests.SchedulerTests
                 });
                 await t2.WaitAsync(TimeSpan.FromSeconds(5));
             }).Unwrap();
-            await t0.WaitAsync(TimeSpan.FromSeconds(10));
+            await t0.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
             Assert.True(t0.IsCompleted, "Task #0 FAULTED=" + t0.Exception);
         }
 

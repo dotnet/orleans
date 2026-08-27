@@ -703,7 +703,12 @@ namespace UnitTests.Streaming.Reliability
 
             string when = "After restart all silos";
             CheckSilosRunning(when, _numExpectedSilos);
-            await WaitForGrainsReachableAsync(when, false, producerGrainId, consumerGrainId);
+            await WaitForGrainsReachableAsync(
+                when,
+                false,
+                TestContext.Current.CancellationToken,
+                producerGrainId,
+                consumerGrainId);
 
             when = "SendItem";
             var producerGrain = GetGrain(producerGrainId);
@@ -739,7 +744,12 @@ namespace UnitTests.Streaming.Reliability
 
             when = "After restart all silos";
             CheckSilosRunning(when, _numExpectedSilos);
-            await WaitForGrainsReachableAsync(when, false, producerGrainId, consumerGrainId);
+            await WaitForGrainsReachableAsync(
+                when,
+                false,
+                TestContext.Current.CancellationToken,
+                producerGrainId,
+                consumerGrainId);
             // Note: It is not guaranteed that the list of producers will not get modified / cleaned up during silo shutdown, so can't assume count will be 1 here.
             // Expected == -1 means don't care.
             await StreamTestUtils.CheckPubSubCounts(this.InternalClient, _output, when, -1, 1, _streamId, _streamProviderName, StreamTestsConstants.StreamReliabilityNamespace);
@@ -786,7 +796,12 @@ namespace UnitTests.Streaming.Reliability
 
             when = "After kill one silo";
             CheckSilosRunning(when, _numExpectedSilos - 1);
-            await WaitForGrainsReachableAsync(when, true, producerGrainId, consumerGrainId);
+            await WaitForGrainsReachableAsync(
+                when,
+                true,
+                TestContext.Current.CancellationToken,
+                producerGrainId,
+                consumerGrainId);
 
             when = "SendItem";
             await SendItemAndWaitForDeliveryAsync(when, producerGrain, _subscriptionId, 1);
@@ -825,7 +840,12 @@ namespace UnitTests.Streaming.Reliability
 
             when = "After kill one silo";
             CheckSilosRunning(when, _numExpectedSilos - 1);
-            await WaitForGrainsReachableAsync(when, true, producerGrainId, consumerGrainId);
+            await WaitForGrainsReachableAsync(
+                when,
+                true,
+                TestContext.Current.CancellationToken,
+                producerGrainId,
+                consumerGrainId);
 
             when = "SendItem";
             await SendItemAndWaitForDeliveryAsync(when, producerGrain, _subscriptionId, 1);
@@ -864,7 +884,12 @@ namespace UnitTests.Streaming.Reliability
 
             when = "After restart one silo";
             CheckSilosRunning(when, _numExpectedSilos);
-            await WaitForGrainsReachableAsync(when, true, producerGrainId, consumerGrainId);
+            await WaitForGrainsReachableAsync(
+                when,
+                true,
+                TestContext.Current.CancellationToken,
+                producerGrainId,
+                consumerGrainId);
 
             when = "SendItem";
             await SendItemAndWaitForDeliveryAsync(when, producerGrain, _subscriptionId, 1);
@@ -903,7 +928,12 @@ namespace UnitTests.Streaming.Reliability
 
             when = "After restart one silo";
             CheckSilosRunning(when, _numExpectedSilos);
-            await WaitForGrainsReachableAsync(when, true, producerGrainId, consumerGrainId);
+            await WaitForGrainsReachableAsync(
+                when,
+                true,
+                TestContext.Current.CancellationToken,
+                producerGrainId,
+                consumerGrainId);
 
             when = "SendItem";
             await SendItemAndWaitForDeliveryAsync(when, producerGrain, _subscriptionId, 1);
@@ -1363,6 +1393,7 @@ namespace UnitTests.Streaming.Reliability
         {
             foreach (var task in tasks)
             {
+                // Fault observation must run even after the test is canceled.
                 _ = task.ContinueWith(
                     static completed => _ = completed.Exception,
                     CancellationToken.None,
@@ -1394,7 +1425,11 @@ namespace UnitTests.Streaming.Reliability
         private readonly record struct ConsumerSubscription(IStreamReliabilityTestGrain Grain, Guid SubscriptionId);
 #endif
 
-        private async Task WaitForGrainsReachableAsync(string when, bool didKill, params long[] grainIds)
+        private async Task WaitForGrainsReachableAsync(
+            string when,
+            bool didKill,
+            CancellationToken cancellationToken,
+            params long[] grainIds)
         {
             var stopwatch = Stopwatch.StartNew();
             Exception? lastException = null;
@@ -1425,7 +1460,10 @@ namespace UnitTests.Streaming.Reliability
 
                 try
                 {
-                    await WaitForLifecycleAndStreamingReadinessAsync($"{when} after transient grain reachability failure", didKill).WaitAsync(remaining);
+                    await WaitForLifecycleAndStreamingReadinessAsync(
+                            $"{when} after transient grain reachability failure",
+                            didKill)
+                        .WaitAsync(remaining, cancellationToken);
                 }
                 catch (Exception exception) when (exception is TimeoutException || IsTransientLifecycleException(exception))
                 {

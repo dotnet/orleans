@@ -386,6 +386,8 @@ namespace Orleans.Transactions.TestKit.xUnit
     {
         public TransactionRecoveryTestsRunnerxUnit(TestingHost.TestCluster cluster, Xunit.ITestOutputHelper testOutput) : base(default!, default!) { }
 
+        protected override System.Threading.Tasks.Task TransactionWillRecoverAfterRandomSiloFailure(string transactionTestGrainClassName, int concurrent, bool gracefulShutdown) { throw null; }
+
         [Xunit.Theory("/_/src/Orleans.Transactions.TestKit.xUnit/TransactionRecoveryTestsRunner.cs", 14)]
         [Xunit.InlineData(new[] { "SingleStateTransactionalGrain", 30 })]
         [Xunit.InlineData(new[] { "DoubleStateTransactionalGrain", 20 })]

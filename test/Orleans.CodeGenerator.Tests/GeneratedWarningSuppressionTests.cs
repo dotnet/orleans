@@ -58,7 +58,7 @@ public sealed class GeneratedWarningSuppressionTests
         var generatedTreePaths = result.GeneratedSources
             .Select(static source => source.HintName)
             .ToHashSet(StringComparer.Ordinal);
-        var missingXmlCommentErrors = generatedCompilation.GetDiagnostics()
+        var missingXmlCommentErrors = generatedCompilation.GetDiagnostics(TestContext.Current.CancellationToken)
             .Where(diagnostic => diagnostic.Id == MissingXmlCommentDiagnosticId
                 && diagnostic.Severity == DiagnosticSeverity.Error
                 && diagnostic.Location.SourceTree is { } tree
@@ -130,7 +130,9 @@ public sealed class GeneratedWarningSuppressionTests
             """;
 
         var libraryCompilation = await TestCompilationHelper.CreateCompilation(librarySource, "LibraryProject");
-        Assert.Empty(libraryCompilation.GetDiagnostics().Where(static diagnostic => diagnostic.Severity == DiagnosticSeverity.Error));
+        Assert.Empty(
+            libraryCompilation.GetDiagnostics(TestContext.Current.CancellationToken)
+                .Where(static diagnostic => diagnostic.Severity == DiagnosticSeverity.Error));
 
         var compilation = await CreateCompilationWithDocumentationDiagnostics(
             consumerSource,
@@ -146,7 +148,7 @@ public sealed class GeneratedWarningSuppressionTests
         var generatedTreePaths = result.GeneratedSources
             .Select(static source => source.HintName)
             .ToHashSet(StringComparer.Ordinal);
-        var generatedErrors = generatedCompilation.GetDiagnostics()
+        var generatedErrors = generatedCompilation.GetDiagnostics(TestContext.Current.CancellationToken)
             .Where(diagnostic => diagnostic.Severity == DiagnosticSeverity.Error
                 && diagnostic.Location.SourceTree is { } tree
                 && generatedTreePaths.Contains(tree.FilePath))

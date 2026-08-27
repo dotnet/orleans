@@ -165,9 +165,13 @@ public class SubscriptionMultiplicityTestRunner
         this.testCluster = testCluster;
     }
 
-    public async Task MultipleParallelSubscriptionTest(Guid streamGuid, string streamNamespace)
+    public async Task MultipleParallelSubscriptionTest(
+        Guid streamGuid,
+        string streamNamespace,
+        CancellationToken cancellationToken = default)
     {
-        using var cts = new CancellationTokenSource(Timeout);
+        using var cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        cts.CancelAfter(Timeout);
 
         // get producer and consumer
         var producer = this.testCluster.GrainFactory!.GetGrain<ISampleStreaming_ProducerGrain>(Guid.NewGuid());
@@ -180,7 +184,7 @@ public class SubscriptionMultiplicityTestRunner
         StreamSubscriptionHandle<int> secondSubscriptionHandle = null!;
         await WaitForSubscriptionRegisteredAsync(streamId, async () => secondSubscriptionHandle = await consumer.BecomeConsumer(streamGuid, streamNamespace, streamProviderName), cts.Token);
         // produce some messages
-        await producer.BecomeProducer(streamGuid, streamNamespace, streamProviderName);
+        await producer.BecomeProducer(streamGuid, streamNamespace, streamProviderName, cts.Token);
         await WarmUpColdStreamAsync(
             producer,
             this.testCluster.Client!,
@@ -203,16 +207,20 @@ public class SubscriptionMultiplicityTestRunner
         await consumer.StopConsuming(secondSubscriptionHandle);
     }
 
-    public async Task MultipleLinearSubscriptionTest(Guid streamGuid, string streamNamespace)
+    public async Task MultipleLinearSubscriptionTest(
+        Guid streamGuid,
+        string streamNamespace,
+        CancellationToken cancellationToken = default)
     {
-        using var cts = new CancellationTokenSource(Timeout);
+        using var cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        cts.CancelAfter(Timeout);
 
         // get producer and consumer
         var producer = this.testCluster.GrainFactory!.GetGrain<ISampleStreaming_ProducerGrain>(Guid.NewGuid());
         var consumer = this.testCluster.GrainFactory!.GetGrain<IMultipleSubscriptionConsumerGrain>(Guid.NewGuid());
         var streamId = StreamId.Create(streamNamespace, streamGuid);
 
-        await producer.BecomeProducer(streamGuid, streamNamespace, streamProviderName);
+        await producer.BecomeProducer(streamGuid, streamNamespace, streamProviderName, cts.Token);
 
         // setup one subscription and send messsages
         StreamSubscriptionHandle<int> firstSubscriptionHandle = null!;
@@ -238,16 +246,20 @@ public class SubscriptionMultiplicityTestRunner
         await consumer.StopConsuming(secondSubscriptionHandle);
     }
 
-    public async Task MultipleSubscriptionTest_AddRemove(Guid streamGuid, string streamNamespace)
+    public async Task MultipleSubscriptionTest_AddRemove(
+        Guid streamGuid,
+        string streamNamespace,
+        CancellationToken cancellationToken = default)
     {
-        using var cts = new CancellationTokenSource(Timeout);
+        using var cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        cts.CancelAfter(Timeout);
 
         // get producer and consumer
         var producer = this.testCluster.GrainFactory!.GetGrain<ISampleStreaming_ProducerGrain>(Guid.NewGuid());
         var consumer = this.testCluster.GrainFactory!.GetGrain<IMultipleSubscriptionConsumerGrain>(Guid.NewGuid());
         var streamId = StreamId.Create(streamNamespace, streamGuid);
 
-        await producer.BecomeProducer(streamGuid, streamNamespace, streamProviderName);
+        await producer.BecomeProducer(streamGuid, streamNamespace, streamProviderName, cts.Token);
 
         // setup one subscription and send messsages
         StreamSubscriptionHandle<int> firstSubscriptionHandle = null!;
@@ -294,16 +306,20 @@ public class SubscriptionMultiplicityTestRunner
         await consumer.StopConsuming(secondSubscriptionHandle);
     }
 
-    public async Task ResubscriptionTest(Guid streamGuid, string streamNamespace)
+    public async Task ResubscriptionTest(
+        Guid streamGuid,
+        string streamNamespace,
+        CancellationToken cancellationToken = default)
     {
-        using var cts = new CancellationTokenSource(Timeout);
+        using var cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        cts.CancelAfter(Timeout);
 
         // get producer and consumer
         var producer = this.testCluster.GrainFactory!.GetGrain<ISampleStreaming_ProducerGrain>(Guid.NewGuid());
         var consumer = this.testCluster.GrainFactory!.GetGrain<IMultipleSubscriptionConsumerGrain>(Guid.NewGuid());
         var streamId = StreamId.Create(streamNamespace, streamGuid);
 
-        await producer.BecomeProducer(streamGuid, streamNamespace, streamProviderName);
+        await producer.BecomeProducer(streamGuid, streamNamespace, streamProviderName, cts.Token);
 
         // setup one subscription and send messsages
         StreamSubscriptionHandle<int> firstSubscriptionHandle = null!;
@@ -325,17 +341,21 @@ public class SubscriptionMultiplicityTestRunner
         await consumer.StopConsuming(resumeHandle);
     }
 
-    public async Task ResubscriptionAfterDeactivationTest(Guid streamGuid, string streamNamespace)
+    public async Task ResubscriptionAfterDeactivationTest(
+        Guid streamGuid,
+        string streamNamespace,
+        CancellationToken cancellationToken = default)
     {
         using var grainObserver = GrainDiagnosticObserver.Create();
-        using var cts = new CancellationTokenSource(Timeout);
+        using var cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        cts.CancelAfter(Timeout);
 
         // get producer and consumer
         var producer = this.testCluster.GrainFactory!.GetGrain<ISampleStreaming_ProducerGrain>(Guid.NewGuid());
         var consumer = this.testCluster.GrainFactory!.GetGrain<IMultipleSubscriptionConsumerGrain>(Guid.NewGuid());
         var streamId = StreamId.Create(streamNamespace, streamGuid);
 
-        await producer.BecomeProducer(streamGuid, streamNamespace, streamProviderName);
+        await producer.BecomeProducer(streamGuid, streamNamespace, streamProviderName, cts.Token);
 
         // setup one subscription and send messsages
         StreamSubscriptionHandle<int> firstSubscriptionHandle = null!;
@@ -364,7 +384,10 @@ public class SubscriptionMultiplicityTestRunner
         await consumer.StopConsuming(resumeHandle);
     }
 
-    public async Task ActiveSubscriptionTest(Guid streamGuid, string streamNamespace)
+    public async Task ActiveSubscriptionTest(
+        Guid streamGuid,
+        string streamNamespace,
+        CancellationToken cancellationToken = default)
     {
         const int subscriptionCount = 10;
 
@@ -374,7 +397,11 @@ public class SubscriptionMultiplicityTestRunner
         // create expected subscriptions
         IEnumerable<Task<StreamSubscriptionHandle<int>>> subscriptionTasks =
             Enumerable.Range(0, subscriptionCount)
-                .Select(async i => await consumer.BecomeConsumer(streamGuid, streamNamespace, streamProviderName));
+                .Select(async i =>
+                {
+                    cancellationToken.ThrowIfCancellationRequested();
+                    return await consumer.BecomeConsumer(streamGuid, streamNamespace, streamProviderName);
+                });
         List<StreamSubscriptionHandle<int>> expectedSubscriptions = (await Task.WhenAll(subscriptionTasks)).ToList();
 
         // query actuall subscriptions
@@ -390,6 +417,7 @@ public class SubscriptionMultiplicityTestRunner
 
         // unsubscribe from one of the subscriptions
         StreamSubscriptionHandle<int> firstHandle = expectedSubscriptions.First();
+        cancellationToken.ThrowIfCancellationRequested();
         await consumer.StopConsuming(firstHandle);
         expectedSubscriptions.Remove(firstHandle);
 
@@ -405,6 +433,7 @@ public class SubscriptionMultiplicityTestRunner
         }
 
         // unsubscribe from the rest of the subscriptions
+        cancellationToken.ThrowIfCancellationRequested();
         await Task.WhenAll(expectedSubscriptions.Select(h => consumer.StopConsuming(h)));
 
         // query actuall subscriptions again
@@ -414,18 +443,21 @@ public class SubscriptionMultiplicityTestRunner
         Assert.Empty(actualSubscriptions);
     }
 
-    public async Task TwoIntermittentStreamTest(Guid streamGuid)
+    public async Task TwoIntermittentStreamTest(
+        Guid streamGuid,
+        CancellationToken cancellationToken = default)
     {
         const string streamNamespace1 = "streamNamespace1";
         const string streamNamespace2 = "streamNamespace2";
-        using var cts = new CancellationTokenSource(Timeout);
+        using var cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        cts.CancelAfter(Timeout);
 
         // send events on first stream /////////////////////////////
         var producer = this.testCluster.GrainFactory!.GetGrain<ISampleStreaming_ProducerGrain>(Guid.NewGuid());
         var consumer = this.testCluster.GrainFactory!.GetGrain<IMultipleSubscriptionConsumerGrain>(Guid.NewGuid());
         var streamId1 = StreamId.Create(streamNamespace1, streamGuid);
 
-        await producer.BecomeProducer(streamGuid, streamNamespace1, streamProviderName);
+        await producer.BecomeProducer(streamGuid, streamNamespace1, streamProviderName, cts.Token);
 
         StreamSubscriptionHandle<int> handle = null!;
         await WaitForSubscriptionRegisteredAsync(streamId1, async () => handle = await consumer.BecomeConsumer(streamGuid, streamNamespace1, streamProviderName), cts.Token);
@@ -438,7 +470,7 @@ public class SubscriptionMultiplicityTestRunner
         var consumer2 = this.testCluster.GrainFactory!.GetGrain<IMultipleSubscriptionConsumerGrain>(Guid.NewGuid());
         var streamId2 = StreamId.Create(streamNamespace2, streamGuid);
 
-        await producer2.BecomeProducer(streamGuid, streamNamespace2, streamProviderName);
+        await producer2.BecomeProducer(streamGuid, streamNamespace2, streamProviderName, cts.Token);
 
         StreamSubscriptionHandle<int> handle2 = null!;
         await WaitForSubscriptionRegisteredAsync(streamId2, async () => handle2 = await consumer2.BecomeConsumer(streamGuid, streamNamespace2, streamProviderName), cts.Token);
@@ -454,9 +486,13 @@ public class SubscriptionMultiplicityTestRunner
         await consumer2.StopConsuming(handle2);
     }
 
-    public async Task SubscribeFromClientTest(Guid streamGuid, string streamNamespace)
+    public async Task SubscribeFromClientTest(
+        Guid streamGuid,
+        string streamNamespace,
+        CancellationToken cancellationToken = default)
     {
-        using var cts = new CancellationTokenSource(Timeout);
+        using var cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        cts.CancelAfter(Timeout);
 
         // get producer and consumer
         var producer = this.testCluster.GrainFactory!.GetGrain<ISampleStreaming_ProducerGrain>(Guid.NewGuid());
@@ -480,7 +516,7 @@ public class SubscriptionMultiplicityTestRunner
             cts.Token);
 
         // produce some messages
-        await producer.BecomeProducer(streamGuid, streamNamespace, streamProviderName);
+        await producer.BecomeProducer(streamGuid, streamNamespace, streamProviderName, cts.Token);
         await WarmUpColdClientStreamAsync(producer, cts.Token, eventCount);
         var produced = await ProduceUntilClientConsumedAsync(producer, cts.Token, eventCount, EventCountPerPhase);
         await AssertCountersAsync(producer, () => eventCount.CurrentCount, produced);
@@ -489,11 +525,14 @@ public class SubscriptionMultiplicityTestRunner
         await handle.UnsubscribeAsync();
     }
 
-    private static async Task ProduceExactCountAsync(ISampleStreaming_ProducerGrain producer, int count)
+    private static async Task ProduceExactCountAsync(
+        ISampleStreaming_ProducerGrain producer,
+        int count,
+        CancellationToken cancellationToken)
     {
         for (var i = 0; i < count; i++)
         {
-            await producer.Produce();
+            await producer.Produce(cancellationToken);
         }
     }
 
@@ -528,6 +567,7 @@ public class SubscriptionMultiplicityTestRunner
             }
             catch (OperationCanceledException exception) when (cancellationToken.IsCancellationRequested)
             {
+                TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
                 var snapshots = new List<string>(waits.Length);
                 foreach (var wait in waits)
                 {
@@ -574,7 +614,7 @@ public class SubscriptionMultiplicityTestRunner
         }
 
         using var deliveryObserver = StreamingDiagnosticObserver.Create();
-        await ProduceExactCountAsync(producer, target);
+        await ProduceExactCountAsync(producer, target, cancellationToken);
         var produced = await producer.GetNumberProduced();
 
         try
@@ -606,6 +646,7 @@ public class SubscriptionMultiplicityTestRunner
         }
         catch (OperationCanceledException exception) when (cancellationToken.IsCancellationRequested)
         {
+            TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
             var currentProduced = await producer.GetNumberProduced();
             throw new TimeoutException(
                 $"Timed out waiting for client consumer count to reach {expectedCount}. Current produced={currentProduced}, current client count={countObserver.CurrentCount}.",
@@ -621,7 +662,7 @@ public class SubscriptionMultiplicityTestRunner
     {
         countObserver.Reset();
         await producer.ClearNumberProduced();
-        await ProduceExactCountAsync(producer, target);
+        await ProduceExactCountAsync(producer, target, cancellationToken);
         var produced = await producer.GetNumberProduced();
         await WaitForClientCountAsync(producer, cancellationToken, countObserver, produced);
 
@@ -679,14 +720,16 @@ public class SubscriptionMultiplicityTestRunner
 
         await producer.ClearNumberProduced();
         using var deliveryObserver = StreamingDiagnosticObserver.Create();
-        await producer.StartPeriodicProducing();
         try
         {
+            await producer.StartPeriodicProducing(cancellationToken);
             await WaitForConsumerCountsAsync(grainFactory, cancellationToken, 1, waits);
         }
         finally
         {
-            await producer.StopPeriodicProducing().ConfigureAwait(ConfigureAwaitOptions.SuppressThrowing | ConfigureAwaitOptions.ContinueOnCapturedContext);
+            using var cleanup = new CancellationTokenSource(Timeout);
+            await producer.StopPeriodicProducing(cleanup.Token)
+                .ConfigureAwait(ConfigureAwaitOptions.SuppressThrowing | ConfigureAwaitOptions.ContinueOnCapturedContext);
         }
 
         var produced = await WaitForConsumersToCatchUpAsync(producer, grainFactory, cancellationToken, waits);
@@ -720,14 +763,16 @@ public class SubscriptionMultiplicityTestRunner
     {
         countObserver.Reset();
         await producer.ClearNumberProduced();
-        await producer.StartPeriodicProducing();
         try
         {
+            await producer.StartPeriodicProducing(cancellationToken);
             await WaitForClientCountAsync(producer, cancellationToken, countObserver, 1);
         }
         finally
         {
-            await producer.StopPeriodicProducing().ConfigureAwait(ConfigureAwaitOptions.SuppressThrowing | ConfigureAwaitOptions.ContinueOnCapturedContext);
+            using var cleanup = new CancellationTokenSource(Timeout);
+            await producer.StopPeriodicProducing(cleanup.Token)
+                .ConfigureAwait(ConfigureAwaitOptions.SuppressThrowing | ConfigureAwaitOptions.ContinueOnCapturedContext);
         }
 
         await WaitForClientToCatchUpAsync(producer, cancellationToken, countObserver);

@@ -241,7 +241,8 @@ public class LocalReminderServiceCompatibilityTests : IClassFixture<LocalReminde
     public async Task InitialRead_TreatsNullTableResultAsNoWork()
     {
         var silo = Assert.Single(fixture.HostedCluster.Silos);
-        using var cancellation = new CancellationTokenSource(TestConstants.InitTimeout);
+        using var cancellation = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
+        cancellation.CancelAfter(TestConstants.InitTimeout);
 
         var started = await fixture.ReminderObserver.WaitForReminderServiceStartedAsync(cancellation.Token, silo.SiloAddress);
 
@@ -256,7 +257,8 @@ public class LocalReminderServiceCompatibilityTests : IClassFixture<LocalReminde
     public async Task RangeChangeBarrier_FollowsLatestReconciliation()
     {
         var silo = Assert.Single(fixture.HostedCluster.Silos);
-        using var cancellation = new CancellationTokenSource(TestConstants.InitTimeout);
+        using var cancellation = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
+        cancellation.CancelAfter(TestConstants.InitTimeout);
         _ = await fixture.ReminderObserver.WaitForReminderServiceStartedAsync(cancellation.Token, silo.SiloAddress);
 
         var reminderTable = silo.ServiceProvider.GetRequiredService<NullReturningReminderTable>();
@@ -264,7 +266,7 @@ public class LocalReminderServiceCompatibilityTests : IClassFixture<LocalReminde
         var oldRange = RangeFactory.CreateRange(0, uint.MaxValue / 2);
         var intermediateRange = RangeFactory.CreateRange(0, uint.MaxValue / 3);
         var newRange = RangeFactory.CreateRange(0, uint.MaxValue / 4);
-        var firstReadGate = reminderTable.BlockNextRangeRead();
+        var firstReadGate = reminderTable.BlockNextRangeRead(cancellation.Token);
         RangeReadGate? secondReadGate = null;
         try
         {
@@ -274,7 +276,7 @@ public class LocalReminderServiceCompatibilityTests : IClassFixture<LocalReminde
             var reconciliationTask = reminderService.TestOnlyWaitForRangeChangeReconciliation(cancellation.Token);
             Assert.False(reconciliationTask.IsCompleted);
 
-            secondReadGate = reminderTable.BlockNextRangeRead();
+            secondReadGate = reminderTable.BlockNextRangeRead(cancellation.Token);
             var secondRangeChangeTask = reminderService.TestOnlyChangeRange(intermediateRange, newRange, increased: false);
             await secondReadGate.WaitUntilBlockedAsync(cancellation.Token);
             Assert.False(reconciliationTask.IsCompleted);
@@ -299,20 +301,21 @@ public class LocalReminderServiceCompatibilityTests : IClassFixture<LocalReminde
     public async Task RangeChangeBarrier_StopsWaitingWhenCanceled()
     {
         var silo = Assert.Single(fixture.HostedCluster.Silos);
-        using var cancellation = new CancellationTokenSource(TestConstants.InitTimeout);
+        using var cancellation = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
+        cancellation.CancelAfter(TestConstants.InitTimeout);
         _ = await fixture.ReminderObserver.WaitForReminderServiceStartedAsync(cancellation.Token, silo.SiloAddress);
 
         var reminderTable = silo.ServiceProvider.GetRequiredService<NullReturningReminderTable>();
         var reminderService = silo.ServiceProvider.GetRequiredService<LocalReminderService>();
         var oldRange = RangeFactory.CreateRange(0, uint.MaxValue / 2);
         var newRange = RangeFactory.CreateRange(0, uint.MaxValue / 4);
-        var readGate = reminderTable.BlockNextRangeRead();
+        var readGate = reminderTable.BlockNextRangeRead(cancellation.Token);
         try
         {
             var rangeChangeTask = reminderService.TestOnlyChangeRange(oldRange, newRange, increased: false);
             await readGate.WaitUntilBlockedAsync(cancellation.Token);
 
-            using var barrierCancellation = new CancellationTokenSource();
+            using var barrierCancellation = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
             var reconciliationTask = reminderService.TestOnlyWaitForRangeChangeReconciliation(barrierCancellation.Token);
             Assert.False(reconciliationTask.IsCompleted);
 
@@ -334,7 +337,8 @@ public class LocalReminderServiceCompatibilityTests : IClassFixture<LocalReminde
     public async Task RangeChangeBarrier_DoesNotDependOnServiceSchedulerAvailability()
     {
         var silo = Assert.Single(fixture.HostedCluster.Silos);
-        using var cancellation = new CancellationTokenSource(TestConstants.InitTimeout);
+        using var cancellation = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
+        cancellation.CancelAfter(TestConstants.InitTimeout);
         _ = await fixture.ReminderObserver.WaitForReminderServiceStartedAsync(cancellation.Token, silo.SiloAddress);
 
         var reminderService = silo.ServiceProvider.GetRequiredService<LocalReminderService>();
@@ -352,7 +356,8 @@ public class LocalReminderServiceCompatibilityTests : IClassFixture<LocalReminde
 
         try
         {
-            using var barrierCancellation = new CancellationTokenSource(TimeSpan.FromSeconds(1));
+            using var barrierCancellation = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
+            barrierCancellation.CancelAfter(TimeSpan.FromSeconds(1));
             await reminderService.TestOnlyWaitForRangeChangeReconciliation(barrierCancellation.Token);
         }
         finally
@@ -385,7 +390,8 @@ public class LocalReminderServiceCompatibilityTests : IClassFixture<LocalReminde
         {
             try
             {
-                await base.DisposeAsync();
+                using var cleanupCancellation = new CancellationTokenSource(TestConstants.InitTimeout);
+                await base.DisposeAsync().AsTask().WaitAsync(cleanupCancellation.Token);
             }
             finally
             {
@@ -401,9 +407,9 @@ public class LocalReminderServiceCompatibilityTests : IClassFixture<LocalReminde
 
         public int RangeReadCount => Volatile.Read(ref rangeReadCount);
 
-        public RangeReadGate BlockNextRangeRead()
+        public RangeReadGate BlockNextRangeRead(CancellationToken cancellationToken)
         {
-            var gate = new RangeReadGate();
+            var gate = new RangeReadGate(cancellationToken);
             if (Interlocked.CompareExchange(ref nextRangeRead, gate, null) is not null)
             {
                 throw new InvalidOperationException("A range read is already blocked.");
@@ -438,7 +444,7 @@ public class LocalReminderServiceCompatibilityTests : IClassFixture<LocalReminde
         public Task TestOnlyClearTable() => throw new NotSupportedException();
     }
 
-    private sealed class RangeReadGate
+    private sealed class RangeReadGate(CancellationToken cancellationToken)
     {
         private readonly TaskCompletionSource blocked = new(TaskCreationOptions.RunContinuationsAsynchronously);
         private readonly TaskCompletionSource release = new(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -447,7 +453,7 @@ public class LocalReminderServiceCompatibilityTests : IClassFixture<LocalReminde
 
         public Task WaitUntilBlockedAsync(CancellationToken cancellationToken) => blocked.Task.WaitAsync(cancellationToken);
 
-        public Task WaitForReleaseAsync() => release.Task;
+        public Task WaitForReleaseAsync() => release.Task.WaitAsync(cancellationToken);
 
         public void Release() => release.TrySetResult();
     }

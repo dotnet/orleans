@@ -39,83 +39,83 @@ public sealed class IdealizedReminderTableTests : ReminderTableTestRunner
     // -------------------------------------------------------------------------------------------------------------
 
     [Fact]
-    public override Task ReminderTable_StartAsync_IsIdempotent() => base.ReminderTable_StartAsync_IsIdempotent();
+    public override Task ReminderTable_StartAsync_IsIdempotent() => base.RunReminderTable_StartAsync_IsIdempotent(TestContext.Current.CancellationToken);
 
     [Fact]
-    public override Task ReminderTable_StopAsync_ThenRestart_ResumesService() => base.ReminderTable_StopAsync_ThenRestart_ResumesService();
+    public override Task ReminderTable_StopAsync_ThenRestart_ResumesService() => base.RunReminderTable_StopAsync_ThenRestart_ResumesService(TestContext.Current.CancellationToken);
 
     [Fact]
-    public override Task ReminderTable_UpsertRow_ReturnsNewNonEmptyETag() => base.ReminderTable_UpsertRow_ReturnsNewNonEmptyETag();
+    public override Task ReminderTable_UpsertRow_ReturnsNewNonEmptyETag() => base.RunReminderTable_UpsertRow_ReturnsNewNonEmptyETag(TestContext.Current.CancellationToken);
 
     [Fact]
-    public override Task ReminderTable_UpsertRow_PersistsScheduleForPointRead() => base.ReminderTable_UpsertRow_PersistsScheduleForPointRead();
+    public override Task ReminderTable_UpsertRow_PersistsScheduleForPointRead() => base.RunReminderTable_UpsertRow_PersistsScheduleForPointRead(TestContext.Current.CancellationToken);
 
     [Fact]
-    public override Task ReminderTable_ReadRow_MissingReminder_ReturnsNull() => base.ReminderTable_ReadRow_MissingReminder_ReturnsNull();
+    public override Task ReminderTable_ReadRow_MissingReminder_ReturnsNull() => base.RunReminderTable_ReadRow_MissingReminder_ReturnsNull(TestContext.Current.CancellationToken);
 
     [Fact]
-    public override Task ReminderTable_ReadRows_ForGrain_ReturnsOnlyThatGrainsReminders() => base.ReminderTable_ReadRows_ForGrain_ReturnsOnlyThatGrainsReminders();
+    public override Task ReminderTable_ReadRows_ForGrain_ReturnsOnlyThatGrainsReminders() => base.RunReminderTable_ReadRows_ForGrain_ReturnsOnlyThatGrainsReminders(TestContext.Current.CancellationToken);
 
     [Fact]
-    public override Task ReminderTable_ReadRows_ForUnknownGrain_ReturnsEmpty() => base.ReminderTable_ReadRows_ForUnknownGrain_ReturnsEmpty();
+    public override Task ReminderTable_ReadRows_ForUnknownGrain_ReturnsEmpty() => base.RunReminderTable_ReadRows_ForUnknownGrain_ReturnsEmpty(TestContext.Current.CancellationToken);
 
     [Fact]
-    public override Task ReminderTable_Identity_IsGrainIdAndReminderName() => base.ReminderTable_Identity_IsGrainIdAndReminderName();
+    public override Task ReminderTable_Identity_IsGrainIdAndReminderName() => base.RunReminderTable_Identity_IsGrainIdAndReminderName(TestContext.Current.CancellationToken);
 
     [Fact]
-    public override Task ReminderTable_Identity_WithSpecialCharacters_RoundTrips() => base.ReminderTable_Identity_WithSpecialCharacters_RoundTrips();
+    public override Task ReminderTable_Identity_WithSpecialCharacters_RoundTrips() => base.RunReminderTable_Identity_WithSpecialCharacters_RoundTrips(TestContext.Current.CancellationToken);
 
     [Fact]
-    public override Task ReminderTable_UpsertRow_ReplacesETagOnEachWrite() => base.ReminderTable_UpsertRow_ReplacesETagOnEachWrite();
+    public override Task ReminderTable_UpsertRow_ReplacesETagOnEachWrite() => base.RunReminderTable_UpsertRow_ReplacesETagOnEachWrite(TestContext.Current.CancellationToken);
 
     [Fact]
-    public override Task ReminderTable_RemoveRow_WithCurrentETag_RemovesRow() => base.ReminderTable_RemoveRow_WithCurrentETag_RemovesRow();
+    public override Task ReminderTable_RemoveRow_WithCurrentETag_RemovesRow() => base.RunReminderTable_RemoveRow_WithCurrentETag_RemovesRow(TestContext.Current.CancellationToken);
 
     [Fact]
-    public override Task ReminderTable_RemoveRow_WithStaleETag_FailsAndRetainsRow() => base.ReminderTable_RemoveRow_WithStaleETag_FailsAndRetainsRow();
+    public override Task ReminderTable_RemoveRow_WithStaleETag_FailsAndRetainsRow() => base.RunReminderTable_RemoveRow_WithStaleETag_FailsAndRetainsRow(TestContext.Current.CancellationToken);
 
     [Fact]
-    public override Task ReminderTable_RemoveRow_WithUnknownReminderName_ReturnsFalse() => base.ReminderTable_RemoveRow_WithUnknownReminderName_ReturnsFalse();
+    public override Task ReminderTable_RemoveRow_WithUnknownReminderName_ReturnsFalse() => base.RunReminderTable_RemoveRow_WithUnknownReminderName_ReturnsFalse(TestContext.Current.CancellationToken);
 
     [Fact]
-    public override Task ReminderTable_RemoveRow_Repeated_ReturnsFalseAfterFirstSuccess() => base.ReminderTable_RemoveRow_Repeated_ReturnsFalseAfterFirstSuccess();
+    public override Task ReminderTable_RemoveRow_Repeated_ReturnsFalseAfterFirstSuccess() => base.RunReminderTable_RemoveRow_Repeated_ReturnsFalseAfterFirstSuccess(TestContext.Current.CancellationToken);
 
     [Fact]
-    public override Task ReminderTable_UpsertRow_UpdatesStartAtAndPeriod() => base.ReminderTable_UpsertRow_UpdatesStartAtAndPeriod();
+    public override Task ReminderTable_UpsertRow_UpdatesStartAtAndPeriod() => base.RunReminderTable_UpsertRow_UpdatesStartAtAndPeriod(TestContext.Current.CancellationToken);
 
     [Fact]
-    public override Task ReminderTable_UpsertRow_MovesReminderBetweenLoadingWindows() => base.ReminderTable_UpsertRow_MovesReminderBetweenLoadingWindows();
+    public override Task ReminderTable_UpsertRow_MovesReminderBetweenLoadingWindows() => base.RunReminderTable_UpsertRow_MovesReminderBetweenLoadingWindows(TestContext.Current.CancellationToken);
 
     [Fact]
-    public override Task ReminderTable_ReadRows_FullRange_ReturnsAllReminders() => base.ReminderTable_ReadRows_FullRange_ReturnsAllReminders();
+    public override Task ReminderTable_ReadRows_FullRange_ReturnsAllReminders() => base.RunReminderTable_ReadRows_FullRange_ReturnsAllReminders(TestContext.Current.CancellationToken);
 
     [Fact]
     public override Task ReminderTable_ReadRows_UnsignedBoundary_UsesUInt32Ordering()
-        => base.ReminderTable_ReadRows_UnsignedBoundary_UsesUInt32Ordering();
+        => base.RunReminderTable_ReadRows_UnsignedBoundary_UsesUInt32Ordering(TestContext.Current.CancellationToken);
 
     [Fact]
-    public override Task ReminderTable_ReadRows_Range_ExcludesBeginAndIncludesEnd() => base.ReminderTable_ReadRows_Range_ExcludesBeginAndIncludesEnd();
+    public override Task ReminderTable_ReadRows_Range_ExcludesBeginAndIncludesEnd() => base.RunReminderTable_ReadRows_Range_ExcludesBeginAndIncludesEnd(TestContext.Current.CancellationToken);
 
     [Fact]
-    public override Task ReminderTable_ReadRows_WrapAroundRange_ReturnsWrappedSegment() => base.ReminderTable_ReadRows_WrapAroundRange_ReturnsWrappedSegment();
+    public override Task ReminderTable_ReadRows_WrapAroundRange_ReturnsWrappedSegment() => base.RunReminderTable_ReadRows_WrapAroundRange_ReturnsWrappedSegment(TestContext.Current.CancellationToken);
 
     [Fact]
-    public override Task ReminderTable_ReadRows_OutsideRange_DoesNotDeleteReminder() => base.ReminderTable_ReadRows_OutsideRange_DoesNotDeleteReminder();
+    public override Task ReminderTable_ReadRows_OutsideRange_DoesNotDeleteReminder() => base.RunReminderTable_ReadRows_OutsideRange_DoesNotDeleteReminder(TestContext.Current.CancellationToken);
 
     [Fact]
-    public override Task ReminderTable_ReadRows_AfterRemoval_OmitsRemovedReminder() => base.ReminderTable_ReadRows_AfterRemoval_OmitsRemovedReminder();
+    public override Task ReminderTable_ReadRows_AfterRemoval_OmitsRemovedReminder() => base.RunReminderTable_ReadRows_AfterRemoval_OmitsRemovedReminder(TestContext.Current.CancellationToken);
 
     [Fact]
-    public override Task ReminderTable_ReadRow_AfterRemoval_ReturnsNull() => base.ReminderTable_ReadRow_AfterRemoval_ReturnsNull();
+    public override Task ReminderTable_ReadRow_AfterRemoval_ReturnsNull() => base.RunReminderTable_ReadRow_AfterRemoval_ReturnsNull(TestContext.Current.CancellationToken);
 
     [Fact]
-    public override Task ReminderTable_ConcurrentUpserts_ProduceDistinctETags() => base.ReminderTable_ConcurrentUpserts_ProduceDistinctETags();
+    public override Task ReminderTable_ConcurrentUpserts_ProduceDistinctETags() => base.RunReminderTable_ConcurrentUpserts_ProduceDistinctETags(TestContext.Current.CancellationToken);
 
     [Fact]
-    public override Task ReminderTable_ParallelUpserts_AcrossGrains_RemainIsolated() => base.ReminderTable_ParallelUpserts_AcrossGrains_RemainIsolated();
+    public override Task ReminderTable_ParallelUpserts_AcrossGrains_RemainIsolated() => base.RunReminderTable_ParallelUpserts_AcrossGrains_RemainIsolated(TestContext.Current.CancellationToken);
 
     [Fact]
-    public override Task ReminderTable_TestOnlyClearTable_RemovesAllReminders() => base.ReminderTable_TestOnlyClearTable_RemovesAllReminders();
+    public override Task ReminderTable_TestOnlyClearTable_RemovesAllReminders() => base.RunReminderTable_TestOnlyClearTable_RemovesAllReminders(TestContext.Current.CancellationToken);
 
     // -------------------------------------------------------------------------------------------------------------
     // Model-based conformance.
@@ -125,7 +125,7 @@ public sealed class IdealizedReminderTableTests : ReminderTableTestRunner
     public Task Oracle_ModelBasedGeneratedConformance()
     {
         var runner = new ReminderTableModelBasedTestRunner(_oracle, "Oracle");
-        return runner.RunGeneratedConformanceTests();
+        return runner.RunGeneratedConformanceTests(TestContext.Current.CancellationToken);
     }
 
     [Fact, TestCategory("ModelBased")]
@@ -142,8 +142,8 @@ public sealed class IdealizedReminderTableTests : ReminderTableTestRunner
             MaxSequenceLength = 2
         };
 
-        await new ReminderTableModelBasedTestRunner(first, options).RunGeneratedConformanceTests();
-        await new ReminderTableModelBasedTestRunner(second, options).RunGeneratedConformanceTests();
+        await new ReminderTableModelBasedTestRunner(first, options).RunGeneratedConformanceTests(TestContext.Current.CancellationToken);
+        await new ReminderTableModelBasedTestRunner(second, options).RunGeneratedConformanceTests(TestContext.Current.CancellationToken);
 
         Assert.NotEmpty(first.Operations);
         Assert.Equal(first.Operations.Count, second.Operations.Count);
@@ -174,8 +174,14 @@ public sealed class IdealizedReminderTableTests : ReminderTableTestRunner
     public async Task Oracle_Snapshot_ExposesPersistedRecordsWithETagLineage()
     {
         var grainId = NewGrainId("introspection");
-        var first = await UpsertAsync(NewEntry(grainId, "introspection", BaseTime, TimeSpan.FromMinutes(2)), nameof(Oracle_Snapshot_ExposesPersistedRecordsWithETagLineage));
-        var second = await UpsertAsync(NewEntry(grainId, "introspection", BaseTime.AddMinutes(5), TimeSpan.FromMinutes(3)), nameof(Oracle_Snapshot_ExposesPersistedRecordsWithETagLineage));
+        var first = await UpsertAsync(
+            NewEntry(grainId, "introspection", BaseTime, TimeSpan.FromMinutes(2)),
+            nameof(Oracle_Snapshot_ExposesPersistedRecordsWithETagLineage),
+            TestContext.Current.CancellationToken);
+        var second = await UpsertAsync(
+            NewEntry(grainId, "introspection", BaseTime.AddMinutes(5), TimeSpan.FromMinutes(3)),
+            nameof(Oracle_Snapshot_ExposesPersistedRecordsWithETagLineage),
+            TestContext.Current.CancellationToken);
 
         var record = Assert.Single(_oracle.Snapshot());
         Assert.Equal(grainId, record.GrainId);
@@ -197,9 +203,12 @@ public sealed class IdealizedReminderTableTests : ReminderTableTestRunner
         var grainId = NewGrainId("operation-log");
         _oracle.ClearOperations();
 
-        var etag = await UpsertAsync(NewEntry(grainId, "operation-log"), nameof(Oracle_Operations_RecordSequenceIdentityAndOutcome));
-        _ = await ReminderTable.ReadRow(grainId, "operation-log");
-        var removed = await ReminderTable.RemoveRow(grainId, "operation-log", "not-the-current-etag");
+        var etag = await UpsertAsync(
+            NewEntry(grainId, "operation-log"),
+            nameof(Oracle_Operations_RecordSequenceIdentityAndOutcome),
+            TestContext.Current.CancellationToken);
+        _ = await ReminderTable.ReadRow(grainId, "operation-log").WaitAsync(TestContext.Current.CancellationToken);
+        var removed = await ReminderTable.RemoveRow(grainId, "operation-log", "not-the-current-etag").WaitAsync(TestContext.Current.CancellationToken);
 
         Assert.False(removed);
 
@@ -233,15 +242,21 @@ public sealed class IdealizedReminderTableTests : ReminderTableTestRunner
         var etags = new List<string>();
         for (var index = 0; index < 4; index++)
         {
-            etags.Add(await UpsertAsync(NewEntry(grainId, $"etag-sequence-{index.ToString(CultureInfo.InvariantCulture)}"), nameof(Oracle_ETags_AreMonotonicAndNeverReused)));
+            etags.Add(await UpsertAsync(
+                NewEntry(grainId, $"etag-sequence-{index.ToString(CultureInfo.InvariantCulture)}"),
+                nameof(Oracle_ETags_AreMonotonicAndNeverReused),
+                TestContext.Current.CancellationToken));
         }
 
         Assert.Equal(etags.Count, etags.Distinct(StringComparer.Ordinal).Count());
         Assert.Equal(new[] { "etag-000001", "etag-000002", "etag-000003", "etag-000004" }, etags);
 
         // Removing and re-adding must not recycle an ETag.
-        Assert.True(await ReminderTable.RemoveRow(grainId, "etag-sequence-0", etags[0]));
-        var reAdded = await UpsertAsync(NewEntry(grainId, "etag-sequence-0"), nameof(Oracle_ETags_AreMonotonicAndNeverReused));
+        Assert.True(await ReminderTable.RemoveRow(grainId, "etag-sequence-0", etags[0]).WaitAsync(TestContext.Current.CancellationToken));
+        var reAdded = await UpsertAsync(
+            NewEntry(grainId, "etag-sequence-0"),
+            nameof(Oracle_ETags_AreMonotonicAndNeverReused),
+            TestContext.Current.CancellationToken);
         Assert.Equal("etag-000005", reAdded);
         Assert.DoesNotContain(reAdded, etags);
     }
@@ -254,21 +269,27 @@ public sealed class IdealizedReminderTableTests : ReminderTableTestRunner
     public async Task Oracle_Unavailable_FailsEveryOperationUntilRecovered()
     {
         var grainId = NewGrainId("outage");
-        var etag = await UpsertAsync(NewEntry(grainId, "outage"), nameof(Oracle_Unavailable_FailsEveryOperationUntilRecovered));
+        var etag = await UpsertAsync(
+            NewEntry(grainId, "outage"),
+            nameof(Oracle_Unavailable_FailsEveryOperationUntilRecovered),
+            TestContext.Current.CancellationToken);
 
         _oracle.SetAvailable(false);
         Assert.False(_oracle.IsAvailable);
 
-        await Assert.ThrowsAsync<ReminderTableUnavailableException>(() => ReminderTable.ReadRow(grainId, "outage"));
-        await Assert.ThrowsAsync<ReminderTableUnavailableException>(() => ReminderTable.ReadRows(0, 0));
-        await Assert.ThrowsAsync<ReminderTableUnavailableException>(() => ReminderTable.UpsertRow(NewEntry(grainId, "outage-2")));
+        await Assert.ThrowsAsync<ReminderTableUnavailableException>(
+            () => ReminderTable.ReadRow(grainId, "outage").WaitAsync(TestContext.Current.CancellationToken));
+        await Assert.ThrowsAsync<ReminderTableUnavailableException>(
+            () => ReminderTable.ReadRows(0, 0).WaitAsync(TestContext.Current.CancellationToken));
+        await Assert.ThrowsAsync<ReminderTableUnavailableException>(
+            () => ReminderTable.UpsertRow(NewEntry(grainId, "outage-2")).WaitAsync(TestContext.Current.CancellationToken));
 
         // The outage is recorded so a test can assert on what the reminder service attempted while storage was down.
         Assert.Equal(3, _oracle.Operations.Count(operation => operation.Failure == nameof(ReminderTableUnavailableException)));
 
         // Durable state survives the outage: it was an availability failure, not a deletion.
         _oracle.SetAvailable(true);
-        var recovered = await ReminderTable.ReadRow(grainId, "outage");
+        var recovered = await ReminderTable.ReadRow(grainId, "outage").WaitAsync(TestContext.Current.CancellationToken);
         Assert.NotNull(recovered);
         Assert.Equal(etag, recovered.ETag);
         Assert.Null(_oracle.Find(grainId, "outage-2"));
@@ -280,19 +301,21 @@ public sealed class IdealizedReminderTableTests : ReminderTableTestRunner
         var grainId = NewGrainId("injected-failure");
         _oracle.InjectFailure(ReminderTableOperationKind.UpsertRow, count: 2, () => new InvalidOperationException("transient store failure"));
 
-        var first = await Assert.ThrowsAsync<InvalidOperationException>(() => ReminderTable.UpsertRow(NewEntry(grainId, "injected-failure")));
+        var first = await Assert.ThrowsAsync<InvalidOperationException>(
+            () => ReminderTable.UpsertRow(NewEntry(grainId, "injected-failure")).WaitAsync(TestContext.Current.CancellationToken));
         Assert.Equal("transient store failure", first.Message);
-        await Assert.ThrowsAsync<InvalidOperationException>(() => ReminderTable.UpsertRow(NewEntry(grainId, "injected-failure")));
+        await Assert.ThrowsAsync<InvalidOperationException>(
+            () => ReminderTable.UpsertRow(NewEntry(grainId, "injected-failure")).WaitAsync(TestContext.Current.CancellationToken));
 
         // The third attempt is not affected, and the failures did not create partial state.
-        var etag = await ReminderTable.UpsertRow(NewEntry(grainId, "injected-failure"));
+        var etag = await ReminderTable.UpsertRow(NewEntry(grainId, "injected-failure")).WaitAsync(TestContext.Current.CancellationToken);
         Assert.NotNull(etag);
         Assert.Equal("etag-000001", etag);
         Assert.Equal(2, _oracle.Operations.Count(operation => operation.Failure == nameof(InvalidOperationException)));
         Assert.Single(_oracle.Snapshot());
 
         // Reads were never targeted, so they were never failed.
-        Assert.NotNull(await ReminderTable.ReadRow(grainId, "injected-failure"));
+        Assert.NotNull(await ReminderTable.ReadRow(grainId, "injected-failure").WaitAsync(TestContext.Current.CancellationToken));
     }
 
     [Fact]
@@ -302,7 +325,7 @@ public sealed class IdealizedReminderTableTests : ReminderTableTestRunner
         _oracle.InjectFailure(ReminderTableOperationKind.ReadRow, count: 2);
 
         _oracle.ClearInjectedFailures();
-        var result = await ReminderTable.ReadRow(grainId, "missing");
+        var result = await ReminderTable.ReadRow(grainId, "missing").WaitAsync(TestContext.Current.CancellationToken);
 
         Assert.Null(result);
         Assert.Single(_oracle.Operations, operation =>
@@ -317,9 +340,13 @@ public sealed class IdealizedReminderTableTests : ReminderTableTestRunner
     public async Task Oracle_BlockNext_ProvidesADeterministicBarrierWithoutSleeping()
     {
         var grainId = NewGrainId("barrier");
-        var etag = await UpsertAsync(NewEntry(grainId, "barrier", BaseTime, TimeSpan.FromMinutes(1)), nameof(Oracle_BlockNext_ProvidesADeterministicBarrierWithoutSleeping));
+        var etag = await UpsertAsync(
+            NewEntry(grainId, "barrier", BaseTime, TimeSpan.FromMinutes(1)),
+            nameof(Oracle_BlockNext_ProvidesADeterministicBarrierWithoutSleeping),
+            TestContext.Current.CancellationToken);
 
-        using var cancellation = new CancellationTokenSource(TestConstants.InitTimeout);
+        using var cancellation = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
+        cancellation.CancelAfter(TestConstants.InitTimeout);
         await using var gate = _oracle.BlockNext(ReminderTableOperationKind.ReadRange);
 
         var rangeRead = ReminderTable.ReadRows(0, 0);
@@ -327,7 +354,10 @@ public sealed class IdealizedReminderTableTests : ReminderTableTestRunner
         Assert.False(rangeRead.IsCompleted);
 
         // While the range read is parked at the barrier, a concurrent write is applied and observed by the oracle.
-        var updated = await UpsertAsync(NewEntry(grainId, "barrier", BaseTime.AddMinutes(5), TimeSpan.FromMinutes(2)), nameof(Oracle_BlockNext_ProvidesADeterministicBarrierWithoutSleeping));
+        var updated = await UpsertAsync(
+            NewEntry(grainId, "barrier", BaseTime.AddMinutes(5), TimeSpan.FromMinutes(2)),
+            nameof(Oracle_BlockNext_ProvidesADeterministicBarrierWithoutSleeping),
+            cancellation.Token);
         Assert.NotEqual(etag, updated);
         Assert.False(rangeRead.IsCompleted);
 
@@ -342,7 +372,8 @@ public sealed class IdealizedReminderTableTests : ReminderTableTestRunner
     public async Task Oracle_DisposingBlockGate_ReleasesTheWaitingOperation()
     {
         var grainId = NewGrainId("disposed-barrier");
-        using var cancellation = new CancellationTokenSource(TestConstants.InitTimeout);
+        using var cancellation = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
+        cancellation.CancelAfter(TestConstants.InitTimeout);
         var gate = _oracle.BlockNext(ReminderTableOperationKind.ReadRow);
 
         var read = ReminderTable.ReadRow(grainId, "missing");
@@ -364,14 +395,20 @@ public sealed class IdealizedReminderTableTests : ReminderTableTestRunner
     public async Task Oracle_FreezeReads_ServesAStaleSnapshotWhileWritesStillApply()
     {
         var grainId = NewGrainId("stale-snapshot");
-        var original = await UpsertAsync(NewEntry(grainId, "stale-snapshot", BaseTime, TimeSpan.FromMinutes(1)), nameof(Oracle_FreezeReads_ServesAStaleSnapshotWhileWritesStillApply));
+        var original = await UpsertAsync(
+            NewEntry(grainId, "stale-snapshot", BaseTime, TimeSpan.FromMinutes(1)),
+            nameof(Oracle_FreezeReads_ServesAStaleSnapshotWhileWritesStillApply),
+            TestContext.Current.CancellationToken);
 
         using (_oracle.FreezeReads())
         {
-            var updated = await UpsertAsync(NewEntry(grainId, "stale-snapshot", BaseTime.AddMinutes(20), TimeSpan.FromMinutes(9)), nameof(Oracle_FreezeReads_ServesAStaleSnapshotWhileWritesStillApply));
+            var updated = await UpsertAsync(
+                NewEntry(grainId, "stale-snapshot", BaseTime.AddMinutes(20), TimeSpan.FromMinutes(9)),
+                nameof(Oracle_FreezeReads_ServesAStaleSnapshotWhileWritesStillApply),
+                TestContext.Current.CancellationToken);
             Assert.NotEqual(original, updated);
 
-            var stale = await ReminderTable.ReadRow(grainId, "stale-snapshot");
+            var stale = await ReminderTable.ReadRow(grainId, "stale-snapshot").WaitAsync(TestContext.Current.CancellationToken);
             Assert.NotNull(stale);
             Assert.Equal(original, stale.ETag);
             Assert.Equal(BaseTime.Ticks, stale.StartAt.Ticks);
@@ -380,7 +417,7 @@ public sealed class IdealizedReminderTableTests : ReminderTableTestRunner
             Assert.Equal(updated, _oracle.Find(grainId, "stale-snapshot")!.ETag);
         }
 
-        var live = await ReminderTable.ReadRow(grainId, "stale-snapshot");
+        var live = await ReminderTable.ReadRow(grainId, "stale-snapshot").WaitAsync(TestContext.Current.CancellationToken);
         Assert.NotNull(live);
         Assert.Equal(BaseTime.AddMinutes(20).Ticks, live.StartAt.Ticks);
         Assert.Equal(TimeSpan.FromMinutes(9), live.Period);
@@ -389,7 +426,7 @@ public sealed class IdealizedReminderTableTests : ReminderTableTestRunner
     [Fact]
     public async Task Oracle_StopAsync_WithCanceledToken_IsObservable()
     {
-        using var cancellation = new CancellationTokenSource();
+        using var cancellation = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
         await cancellation.CancelAsync();
 
         await Assert.ThrowsAnyAsync<OperationCanceledException>(() => ReminderTable.StopAsync(cancellation.Token));
@@ -404,12 +441,13 @@ public sealed class IdealizedReminderTableTests : ReminderTableTestRunner
     {
         if (operationKind == ReminderTableOperationKind.Stop)
         {
-            await ReminderTable.StartAsync();
+            await ReminderTable.StartAsync(TestContext.Current.CancellationToken);
         }
 
         var expectedStarted = operationKind == ReminderTableOperationKind.Stop;
-        using var operationCancellation = new CancellationTokenSource();
-        using var waitCancellation = new CancellationTokenSource(TestConstants.InitTimeout);
+        using var operationCancellation = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
+        using var waitCancellation = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
+        waitCancellation.CancelAfter(TestConstants.InitTimeout);
         await using var gate = _oracle.BlockNext(operationKind);
 
         var operation = operationKind == ReminderTableOperationKind.Start
@@ -449,7 +487,7 @@ public sealed class IdealizedReminderTableTests : ReminderTableTestRunner
     {
         _oracle.ClearOperations();
 
-        await base.ReminderTable_ReadRows_FullRange_ReturnsExactRequestedCardinality(7);
+        await base.RunReminderTable_ReadRows_FullRange_ReturnsExactRequestedCardinality(7, TestContext.Current.CancellationToken);
 
         var upserts = _oracle.Operations.Where(operation => operation.Kind == ReminderTableOperationKind.UpsertRow).ToList();
         Assert.Equal(7, upserts.Count);

@@ -98,7 +98,10 @@ namespace AWSUtils.Tests.Streaming
         public async Task SQSStreamProducerOnDroppedClientTest()
         {
             logger.LogInformation("************************ AQStreamProducerOnDroppedClientTest *********************************");
-            await runner.StreamProducerOnDroppedClientTest(SQSStreamProviderName, StreamNamespace);
+            await runner.StreamProducerOnDroppedClientTest(
+                SQSStreamProviderName,
+                StreamNamespace,
+                TestContext.Current.CancellationToken);
         }
     }
 }

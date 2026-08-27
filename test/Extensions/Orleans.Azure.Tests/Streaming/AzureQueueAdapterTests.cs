@@ -66,12 +66,16 @@ namespace Tester.AzureUtils.Streaming
                 queueDataAdapter,
                 loggerFactory);
             adapterFactory.Init();
-            await SendAndReceiveFromQueueAdapter(adapterFactory);
+            await SendAndReceiveFromQueueAdapter(
+                adapterFactory,
+                TestContext.Current.CancellationToken);
         }
 
-        private async Task SendAndReceiveFromQueueAdapter(IQueueAdapterFactory adapterFactory)
+        private async Task SendAndReceiveFromQueueAdapter(
+            IQueueAdapterFactory adapterFactory,
+            CancellationToken cancellationToken)
         {
-            IQueueAdapter adapter = await adapterFactory.CreateAdapter(CancellationToken.None);
+            IQueueAdapter adapter = await adapterFactory.CreateAdapter(cancellationToken);
             IQueueAdapterCache cache = adapterFactory.GetQueueAdapterCache();
 
             // Create receiver per queue
@@ -79,7 +83,8 @@ namespace Tester.AzureUtils.Streaming
             Dictionary<QueueId, IQueueAdapterReceiver> receivers = mapper.GetAllQueues().ToDictionary(queueId => queueId, adapter.CreateReceiver);
             Dictionary<QueueId, IQueueCache> caches = mapper.GetAllQueues().ToDictionary(queueId => queueId, cache.CreateQueueCache);
 
-            await Task.WhenAll(receivers.Values.Select(receiver => receiver.Initialize(TimeSpan.FromSeconds(5))));
+            await Task.WhenAll(receivers.Values.Select(receiver =>
+                receiver.Initialize(TimeSpan.FromSeconds(5)))).WaitAsync(cancellationToken);
 
             // test using 2 streams
             Guid streamId1 = Guid.NewGuid();
@@ -95,49 +100,60 @@ namespace Tester.AzureUtils.Streaming
                 QueueId queueId = receiverKvp.Key;
                 var receiver = receiverKvp.Value;
                 var qCache = caches[queueId];
-                Task task = Task.Factory.StartNew(() =>
-                {
-                    while (receivedBatches < NumBatches)
+                Task task = Task.Run(
+                    async () =>
                     {
-                        var receivedMessages = receiver.GetQueueMessagesAsync(
+                        while (Volatile.Read(ref receivedBatches) < NumBatches)
+                        {
+                            var receivedMessages = await receiver.GetQueueMessagesAsync(
                             QueueAdapterConstants.UNLIMITED_GET_QUEUE_MSG,
-                            CancellationToken.None).Result;
-                        Assert.NotNull(receivedMessages);
-                        var messages = receivedMessages.ToArray();
-                        if (!messages.Any())
-                        {
-                            continue;
+                               cancellationToken);
+                            Assert.NotNull(receivedMessages);
+                            var messages = receivedMessages.ToArray();
+                            if (!messages.Any())
+                            {
+                               continue;
+                            }
+                            foreach (IBatchContainer message in messages)
+                            {
+                               streamsPerQueue.AddOrUpdate(queueId,
+                                   id => new HashSet<StreamId> { message.StreamId },
+                                   (id, set) =>
+                                   {
+                                       set.Add(message.StreamId);
+                                       return set;
+                                   });
+                               this.output.WriteLine("Queue {0} received message on stream {1}", queueId,
+                                   message.StreamId);
+                               Assert.Equal(NumMessagesPerBatch / 2, message.GetEvents<int>().Count());  // "Half the events were ints"
+                               Assert.Equal(NumMessagesPerBatch / 2, message.GetEvents<string>().Count());  // "Half the events were strings"
+                            }
+                            Interlocked.Add(ref receivedBatches, messages.Length);
+                            qCache.AddToCache(messages);
                         }
-                        foreach (IBatchContainer message in messages)
-                        {
-                            streamsPerQueue.AddOrUpdate(queueId,
-                                id => new HashSet<StreamId> { message.StreamId },
-                                (id, set) =>
-                                {
-                                    set.Add(message.StreamId);
-                                    return set;
-                                });
-                            this.output.WriteLine("Queue {0} received message on stream {1}", queueId,
-                                message.StreamId);
-                            Assert.Equal(NumMessagesPerBatch / 2, message.GetEvents<int>().Count());  // "Half the events were ints"
-                            Assert.Equal(NumMessagesPerBatch / 2, message.GetEvents<string>().Count());  // "Half the events were strings"
-                        }
-                        Interlocked.Add(ref receivedBatches, messages.Length);
-                        qCache.AddToCache(messages);
-                    }
-                });
+                    },
+                    cancellationToken);
                 work.Add(task);
             }
 
             // send events
             List<object> events = CreateEvents(NumMessagesPerBatch);
-            work.Add(Task.Factory.StartNew(() => Enumerable.Range(0, NumBatches)
-                .Select(i => i % 2 == 0 ? streamId1 : streamId2)
-                .ToList()
-                .ForEach(streamId =>
-                    adapter.QueueMessageBatchAsync(StreamId.Create(streamId.ToString(), streamId),
-                        events.Take(NumMessagesPerBatch).ToArray(), null!, RequestContextExtensions.Export(this.fixture.DeepCopier)!).Wait())));
-            await Task.WhenAll(work);
+            work.Add(Task.Run(
+                async () =>
+                {
+                    foreach (var streamId in Enumerable.Range(0, NumBatches)
+                        .Select(i => i % 2 == 0 ? streamId1 : streamId2))
+                    {
+                        cancellationToken.ThrowIfCancellationRequested();
+                        await adapter.QueueMessageBatchAsync(
+                            StreamId.Create(streamId.ToString(), streamId),
+                            events.Take(NumMessagesPerBatch).ToArray(),
+                            null!,
+                            RequestContextExtensions.Export(this.fixture.DeepCopier)!);
+                    }
+                },
+                cancellationToken));
+            await Task.WhenAll(work).WaitAsync(cancellationToken);
 
             // Make sure we got back everything we sent
             Assert.Equal(NumBatches, receivedBatches);

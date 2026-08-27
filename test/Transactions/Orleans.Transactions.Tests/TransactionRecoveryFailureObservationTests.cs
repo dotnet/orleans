@@ -46,7 +46,8 @@ public class TransactionRecoveryFailureObservationTests
             failure.Task,
             stopProducing,
             responseWindow,
-            schedulingMargin);
+            schedulingMargin,
+            TestContext.Current.CancellationToken);
 
         Assert.Equal(TransactionRecoveryFailureObservation.OutcomeKind.AttemptTimedOut, outcome.Kind);
         Assert.Null(outcome.Failure);
@@ -81,7 +82,8 @@ public class TransactionRecoveryFailureObservationTests
             failure.Task,
             stopProducing,
             observationWindow: TimeSpan.Zero,
-            producerDrainTimeout: TimeSpan.FromSeconds(1));
+            producerDrainTimeout: TimeSpan.FromSeconds(1),
+            cancellationToken: TestContext.Current.CancellationToken);
 
         Assert.Equal(TransactionRecoveryFailureObservation.OutcomeKind.FailureObserved, outcome.Kind);
         Assert.Same(expectedFailure, outcome.Failure);
@@ -113,27 +115,28 @@ public class TransactionRecoveryFailureObservationTests
                 maximumActiveAttempts = Math.Max(maximumActiveAttempts, active);
                 Interlocked.Increment(ref attemptCount);
                 firstAttemptStarted.TrySetResult();
-                await finishFirstAttempt.Task;
+                await finishFirstAttempt.Task.WaitAsync(TestContext.Current.CancellationToken);
                 Interlocked.Decrement(ref activeAttempts);
 
                 betweenAttempts.TrySetResult();
-                await cancellationObserved.Task;
+                await cancellationObserved.Task.WaitAsync(TestContext.Current.CancellationToken);
             }
 
             return attemptCount;
         }
 
         var producer = ProduceAsync();
-        await firstAttemptStarted.Task;
+        await firstAttemptStarted.Task.WaitAsync(TestContext.Current.CancellationToken);
         finishFirstAttempt.TrySetResult();
-        await betweenAttempts.Task;
+        await betweenAttempts.Task.WaitAsync(TestContext.Current.CancellationToken);
 
         var outcome = await TransactionRecoveryFailureObservation.DetectAsync(
             producer,
             failure.Task,
             stopProducing,
             observationWindow: TimeSpan.Zero,
-            producerDrainTimeout: TimeSpan.FromSeconds(1));
+            producerDrainTimeout: TimeSpan.FromSeconds(1),
+            cancellationToken: TestContext.Current.CancellationToken);
 
         Assert.Equal(TransactionRecoveryFailureObservation.OutcomeKind.StoppedWithoutFailure, outcome.Kind);
         Assert.Null(outcome.Failure);
@@ -156,11 +159,11 @@ public class TransactionRecoveryFailureObservationTests
             (_, observedAt) => observedFailure.TrySetResult(observedAt));
 
         inFlight.TrySetResult();
-        await inFlight.Task;
+        await inFlight.Task.WaitAsync(TestContext.Current.CancellationToken);
         mutation.TrySetException(new InvalidOperationException("Pre-shutdown transaction fault"));
-        var observedAt = await observedFailure.Task;
+        var observedAt = await observedFailure.Task.WaitAsync(TestContext.Current.CancellationToken);
         var shutdownRequestedAt = Stopwatch.GetTimestamp();
-        await observation;
+        await observation.WaitAsync(TestContext.Current.CancellationToken);
 
         Assert.True(TransactionRecoveryFailureObservation.IsPremature(observedAt, shutdownRequestedAt));
     }

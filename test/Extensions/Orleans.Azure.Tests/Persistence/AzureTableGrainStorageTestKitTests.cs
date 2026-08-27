@@ -57,7 +57,10 @@ public class AzureTableGrainStorageTestKitTests : GrainStorageTestRunner, IClass
     [Fact]
     public override Task PersistenceStorage_WriteReadWriteReadStatesInParallel()
     {
-        return RunPersistenceStorage_WriteReadWriteReadStatesInParallel("AzureTableTest", 50);
+        return RunPersistenceStorage_WriteReadWriteReadStatesInParallel(
+            "AzureTableTest",
+            50,
+            TestContext.Current.CancellationToken);
     }
 
     [Fact]

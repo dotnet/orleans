@@ -56,23 +56,30 @@ namespace UnitTests.Grains
             return Task.CompletedTask;
         }
 
-        public Task BecomeProducer(Guid streamId, string streamNamespace, string providerToUse)
+        public Task BecomeProducer(
+            Guid streamId,
+            string streamNamespace,
+            string providerToUse,
+            CancellationToken cancellationToken)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             logger.LogInformation("BecomeProducer");
             IStreamProvider streamProvider = this.GetStreamProvider(providerToUse);
             producer = streamProvider.GetStream<int>(streamNamespace, streamId);
             return Task.CompletedTask;
         }
 
-        public Task StartPeriodicProducing()
+        public Task StartPeriodicProducing(CancellationToken cancellationToken)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             logger.LogInformation("StartPeriodicProducing");
             producerTimer = this.RegisterGrainTimer(TimerCallback, TimeSpan.Zero, TimeSpan.FromMilliseconds(10));
             return Task.CompletedTask;
         }
 
-        public Task StopPeriodicProducing()
+        public Task StopPeriodicProducing(CancellationToken cancellationToken)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             logger.LogInformation("StopPeriodicProducing");
             producerTimer!.Dispose();
             producerTimer = null;
@@ -92,18 +99,19 @@ namespace UnitTests.Grains
             return Task.CompletedTask;
         }
 
-        public Task Produce()
+        public Task Produce(CancellationToken cancellationToken)
         {
-            return Fire();
+            return Fire(cancellationToken);
         }
 
         private Task TimerCallback()
         {
-            return producerTimer != null? Fire(): Task.CompletedTask;
+            return producerTimer != null ? Fire(CancellationToken.None) : Task.CompletedTask;
         }
 
-        private async Task Fire([CallerMemberName] string? caller = null)
+        private async Task Fire(CancellationToken cancellationToken, [CallerMemberName] string? caller = null)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             RequestContext.Set(RequestContextKey, RequestContextValue);
             await producer.OnNextAsync(numProducedItems);
             numProducedItems++;
@@ -138,8 +146,13 @@ namespace UnitTests.Grains
             return Task.CompletedTask;
         }
 
-        public async Task BecomeConsumer(Guid streamId, string streamNamespace, string providerToUse)
+        public async Task BecomeConsumer(
+            Guid streamId,
+            string streamNamespace,
+            string providerToUse,
+            CancellationToken cancellationToken)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             logger.LogInformation("BecomeConsumer");
             consumerObserver = new SampleConsumerObserver<int>(this);
             IStreamProvider streamProvider = this.GetStreamProvider(providerToUse);
@@ -147,8 +160,9 @@ namespace UnitTests.Grains
             consumerHandle = await consumer.SubscribeAsync(consumerObserver);
         }
 
-        public async Task StopConsuming()
+        public async Task StopConsuming(CancellationToken cancellationToken)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             logger.LogInformation("StopConsuming");
             if (consumerHandle != null)
             {
@@ -190,16 +204,22 @@ namespace UnitTests.Grains
             return Task.CompletedTask;
         }
 
-        public async Task BecomeConsumer(Guid streamId, string streamNamespace, string providerToUse)
+        public async Task BecomeConsumer(
+            Guid streamId,
+            string streamNamespace,
+            string providerToUse,
+            CancellationToken cancellationToken)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             logger.LogInformation( "BecomeConsumer" );
             IStreamProvider streamProvider = this.GetStreamProvider( providerToUse );
             consumer = streamProvider.GetStream<int>(streamNamespace, streamId);
             consumerHandle = await consumer.SubscribeAsync( OnNextAsync, OnErrorAsync, OnCompletedAsync );
         }
 
-        public async Task StopConsuming()
+        public async Task StopConsuming(CancellationToken cancellationToken)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             logger.LogInformation( "StopConsuming" );
             if ( consumerHandle != null )
             {

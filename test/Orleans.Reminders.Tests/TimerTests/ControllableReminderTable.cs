@@ -35,9 +35,9 @@ internal sealed class ReminderTableReadController
     private readonly object _lock = new();
     private readonly List<ReminderTableReadGate> _gates = [];
 
-    public ReminderTableReadGate BlockNextRangeRead(GrainId grainId)
+    public ReminderTableReadGate BlockNextRangeRead(GrainId grainId, CancellationToken cancellationToken)
     {
-        var gate = new ReminderTableReadGate(this, grainId.GetUniformHashCode());
+        var gate = new ReminderTableReadGate(this, grainId.GetUniformHashCode(), cancellationToken);
         lock (_lock)
         {
             _gates.Add(gate);
@@ -78,7 +78,10 @@ internal sealed class ReminderTableReadController
     }
 }
 
-internal sealed class ReminderTableReadGate(ReminderTableReadController owner, uint grainHash) : IAsyncDisposable
+internal sealed class ReminderTableReadGate(
+    ReminderTableReadController owner,
+    uint grainHash,
+    CancellationToken cancellationToken) : IAsyncDisposable
 {
     private readonly TaskCompletionSource _blocked = new(TaskCreationOptions.RunContinuationsAsynchronously);
     private readonly TaskCompletionSource _release = new(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -91,7 +94,7 @@ internal sealed class ReminderTableReadGate(ReminderTableReadController owner, u
 
     internal void MarkBlocked() => _blocked.TrySetResult();
 
-    internal Task WaitForReleaseAsync() => _release.Task;
+    internal Task WaitForReleaseAsync() => _release.Task.WaitAsync(cancellationToken);
 
     public Task WaitUntilBlockedAsync(CancellationToken cancellationToken)
         => _blocked.Task.WaitAsync(cancellationToken);

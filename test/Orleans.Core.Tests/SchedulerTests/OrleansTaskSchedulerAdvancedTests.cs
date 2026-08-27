@@ -124,7 +124,7 @@ namespace UnitTests.SchedulerTests
             var timeoutLimit = TimeSpan.FromMilliseconds(3000);
             try
             {
-                await result.Task.WaitAsync(timeoutLimit);
+                await result.Task.WaitAsync(timeoutLimit, TestContext.Current.CancellationToken);
             }
             catch (TimeoutException)
             {
@@ -174,9 +174,9 @@ namespace UnitTests.SchedulerTests
             // Release the gate to allow main turn to complete
             mainTurnGate.SetResult(true);
 
-            try { await result1.Task.WaitAsync(WaitTimeout); }
+            try { await result1.Task.WaitAsync(WaitTimeout, TestContext.Current.CancellationToken); }
             catch (TimeoutException) { Assert.Fail("Timeout-1"); }
-            try { await result2.Task.WaitAsync(WaitTimeout); }
+            try { await result2.Task.WaitAsync(WaitTimeout, TestContext.Current.CancellationToken); }
             catch (TimeoutException) { Assert.Fail("Timeout-2"); }
 
             Assert.NotEqual(0, stageNum1); // "Work items did not get executed-1"
@@ -236,17 +236,21 @@ namespace UnitTests.SchedulerTests
             await await ScheduleTask();
 
             var taskAfterStopped = ScheduleTask();
-            var resultTask = await Task.WhenAny(taskAfterStopped, Task.Delay(WaitTimeout));
+            var resultTask = await Task.WhenAny(
+                taskAfterStopped,
+                Task.Delay(WaitTimeout, TestContext.Current.CancellationToken));
             Assert.Same(taskAfterStopped, resultTask);
 
             await await taskAfterStopped;
 
             // Wait for the WorkItemGroup to upgrade the warning to an error and try again.
             // This delay is based upon SchedulingOptions.StoppedActivationWarningInterval.
-            await Task.Delay(TimeSpan.FromMilliseconds(300));
+            await Task.Delay(TimeSpan.FromMilliseconds(300), TestContext.Current.CancellationToken);
 
             taskAfterStopped = ScheduleTask();
-            resultTask = await Task.WhenAny(taskAfterStopped, Task.Delay(WaitTimeout));
+            resultTask = await Task.WhenAny(
+                taskAfterStopped,
+                Task.Delay(WaitTimeout, TestContext.Current.CancellationToken));
             Assert.Same(taskAfterStopped, resultTask);
 
             await await taskAfterStopped;
@@ -368,7 +372,7 @@ namespace UnitTests.SchedulerTests
             });
 
             Log(17, "Waiting for ClosureWorkItem to spawn wrapper Task");
-            wrapper = await wrapperCreated.Task.WaitAsync(WaitTimeout);
+            wrapper = await wrapperCreated.Task.WaitAsync(WaitTimeout, TestContext.Current.CancellationToken);
             Assert.NotNull(wrapper); // Wrapper Task was not created
 
             // Release gates to allow execution to proceed
@@ -376,7 +380,7 @@ namespace UnitTests.SchedulerTests
             mainTurnGate.SetResult(true);
 
             Log(18, "Waiting for wrapper Task Id=" + wrapper.Id + " to complete");
-            await wrapper.WaitAsync(WaitTimeout);
+            await wrapper.WaitAsync(WaitTimeout, TestContext.Current.CancellationToken);
             Assert.False(wrapper.IsFaulted, "Wrapper Task faulted: " + wrapper.Exception);
             Assert.True(wrapper.IsCompleted, "Wrapper Task should be completed");
 
@@ -384,7 +388,7 @@ namespace UnitTests.SchedulerTests
             // Wait for mainDone using a reasonable timeout
             for (var i = 0; i < 100 && !mainDone; i++)
             {
-                await Task.Delay(10);
+                await Task.Delay(10, TestContext.Current.CancellationToken);
             }
             Log(21, "Done waiting for TaskWorkItem to complete MainDone=" + mainDone);
             Assert.True(mainDone, "Main Task should be completed");
@@ -392,13 +396,13 @@ namespace UnitTests.SchedulerTests
             Assert.NotNull(finalPromise2); // Task chain #2 not created
 
             Log(22, "Waiting for final task #1 to complete");
-            await finalTask1.WaitAsync(WaitTimeout);
+            await finalTask1.WaitAsync(WaitTimeout, TestContext.Current.CancellationToken);
             Assert.False(finalTask1.IsFaulted, "Final Task faulted: " + finalTask1.Exception);
             Assert.True(finalTask1.IsCompleted, "Final Task completed");
             Assert.True(await result1.Task, "Timeout-1");
 
             Log(24, "Waiting for final promise #2 to complete");
-            await finalPromise2.WaitAsync(WaitTimeout);
+            await finalPromise2.WaitAsync(WaitTimeout, TestContext.Current.CancellationToken);
             Log(25, "Done waiting for final promise #2");
             Assert.False(finalPromise2.IsFaulted, "Final Task faulted: " + finalPromise2.Exception);
             Assert.True(finalPromise2.IsCompleted, "Final Task completed");
@@ -487,7 +491,7 @@ namespace UnitTests.SchedulerTests
             });
 
             Log(13, "Waiting for ClosureWorkItem to spawn wrapper Task");
-            wrapper = await wrapperCreated.Task.WaitAsync(WaitTimeout);
+            wrapper = await wrapperCreated.Task.WaitAsync(WaitTimeout, TestContext.Current.CancellationToken);
             Assert.NotNull(wrapper); // Wrapper Task was not created
 
             // Release gates to allow execution to proceed
@@ -495,7 +499,7 @@ namespace UnitTests.SchedulerTests
             mainTurnGate.SetResult(true);
 
             Log(14, "Waiting for wrapper Task Id=" + wrapper.Id + " to complete");
-            await wrapper.WaitAsync(WaitTimeout);
+            await wrapper.WaitAsync(WaitTimeout, TestContext.Current.CancellationToken);
             Assert.False(wrapper.IsFaulted, "Wrapper Task faulted: " + wrapper.Exception);
             Assert.True(wrapper.IsCompleted, "Wrapper Task should be completed");
 
@@ -503,14 +507,14 @@ namespace UnitTests.SchedulerTests
             // Wait for mainDone using a reasonable timeout
             for (var i = 0; i < 100 && !mainDone; i++)
             {
-                await Task.Delay(10);
+                await Task.Delay(10, TestContext.Current.CancellationToken);
             }
             Log(17, "Done waiting for TaskWorkItem to complete MainDone=" + mainDone);
             Assert.True(mainDone, "Main Task should be completed");
             Assert.NotNull(finalPromise); // AC chain not created
 
             Log(18, "Waiting for final AC promise to complete");
-            await finalPromise.WaitAsync(WaitTimeout);
+            await finalPromise.WaitAsync(WaitTimeout, TestContext.Current.CancellationToken);
             Log(19, "Done waiting for final promise");
             Assert.False(finalPromise.IsFaulted, "Final AC faulted: " + finalPromise.Exception);
             Assert.True(finalPromise.IsCompleted, "Final AC completed");
@@ -542,7 +546,7 @@ namespace UnitTests.SchedulerTests
             });
             // ReSharper restore AccessToModifiedClosure
 
-            await result.Task.WaitAsync(WaitTimeout);
+            await result.Task.WaitAsync(WaitTimeout, TestContext.Current.CancellationToken);
             Assert.True(n != 0, "Work items did not get executed");
             Assert.Equal(1, n);  // "Work items executed out of order"
         }
@@ -580,7 +584,7 @@ namespace UnitTests.SchedulerTests
                 }
             });
 
-            await result.Task.WaitAsync(WaitTimeout); // Wait for main (one that creates tasks) work item to finish.
+            await result.Task.WaitAsync(WaitTimeout, TestContext.Current.CancellationToken); // Wait for main (one that creates tasks) work item to finish.
 
             var promise = Task<int[]>.Factory.ContinueWhenAll(tasks, (res) =>
             {
@@ -601,7 +605,7 @@ namespace UnitTests.SchedulerTests
                 return results;
             });
 
-            await promise.WaitAsync(WaitTimeout);
+            await promise.WaitAsync(WaitTimeout, TestContext.Current.CancellationToken);
 
             Assert.True(n != 0, "Work items did not get executed");
             Assert.Equal(12, n);  // "Not all work items executed"
@@ -658,8 +662,8 @@ namespace UnitTests.SchedulerTests
             // Release the gate to allow task1 to throw
             gate.Release();
 
-            await result1.Task.WaitAsync(WaitTimeout);
-            await result2.Task.WaitAsync(WaitTimeout);
+            await result1.Task.WaitAsync(WaitTimeout, TestContext.Current.CancellationToken);
+            await result2.Task.WaitAsync(WaitTimeout, TestContext.Current.CancellationToken);
             Assert.True(failed1);  // "First ContinueWith did not fire error handler."
             Assert.True(failed2);  // "Second ContinueWith did not fire error handler."
         }
@@ -719,11 +723,11 @@ namespace UnitTests.SchedulerTests
                 gate.Release();
             });
             wrapper.Start(context.WorkItemGroup.TaskScheduler);
-            await wrapper.WaitAsync(WaitTimeout);
+            await wrapper.WaitAsync(WaitTimeout, TestContext.Current.CancellationToken);
 
             Assert.False(wrapper.IsFaulted, "Wrapper Task Faulted with Exception=" + wrapper.Exception);
             Assert.True(wrapper.IsCompleted, "Wrapper Task completed");
-            await result.Task.WaitAsync(WaitTimeout);
+            await result.Task.WaitAsync(WaitTimeout, TestContext.Current.CancellationToken);
             Assert.NotNull(endOfChain); // End of chain Task created successfully
             Assert.False(endOfChain.IsFaulted, "Task chain Faulted with Exception=" + endOfChain.Exception);
             Assert.True(n != 0, "Work items did not get executed");

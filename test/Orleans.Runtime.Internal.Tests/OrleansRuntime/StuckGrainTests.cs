@@ -57,21 +57,22 @@ namespace UnitTests.StuckGrainTests
         [Fact, TestCategory("Functional"), TestCategory("ActivationCollection")]
         public async Task StuckGrainTest_Basic()
         {
+            var cancellationToken = TestContext.Current.CancellationToken;
             var id = Guid.NewGuid();
             var stuckGrain = this.fixture.GrainFactory.GetGrain<IStuckGrain>(id);
             var task = stuckGrain.RunForever();
 
             // Should timeout
-            await Assert.ThrowsAsync<TimeoutException>(() => task.WaitAsync(TimeSpan.FromSeconds(1)));
+            await Assert.ThrowsAsync<TimeoutException>(() => task.WaitAsync(TimeSpan.FromSeconds(1), cancellationToken));
 
             var cleaner = this.fixture.GrainFactory.GetGrain<IStuckCleanGrain>(id);
             await cleaner.Release(id);
 
             // Should complete now
-            await task.WaitAsync(TimeSpan.FromSeconds(1));
+            await task.WaitAsync(TimeSpan.FromSeconds(1), cancellationToken);
 
             // wait for activation collection
-            await Task.Delay(TimeSpan.FromSeconds(6));
+            await Task.Delay(TimeSpan.FromSeconds(6), cancellationToken);
 
             Assert.False(await cleaner.IsActivated(id), "Grain activation is supposed be garbage collected, but it is still running.");
         }
@@ -79,34 +80,36 @@ namespace UnitTests.StuckGrainTests
         [Fact, TestCategory("Functional"), TestCategory("ActivationCollection")]
         public async Task StuckGrainTest_StuckDetectionAndForward()
         {
+            var cancellationToken = TestContext.Current.CancellationToken;
             var id = Guid.NewGuid();
             var stuckGrain = this.fixture.GrainFactory.GetGrain<IStuckGrain>(id);
             var task = stuckGrain.RunForever();
 
             // Should timeout
-            await Assert.ThrowsAsync<TimeoutException>(() => task.WaitAsync(TimeSpan.FromSeconds(1)));
+            await Assert.ThrowsAsync<TimeoutException>(() => task.WaitAsync(TimeSpan.FromSeconds(1), cancellationToken));
 
             var calls = new Task[3];
             for (var i = 0; i < calls.Length; i++)
             {
                 var call = stuckGrain.NonBlockingCall();
                 calls[i] = call;
-                await Task.WhenAny(call, Task.Delay(TimeSpan.FromMilliseconds(500)));
+                await Task.WhenAny(call, Task.Delay(TimeSpan.FromMilliseconds(500), cancellationToken));
             }
 
             // Wait so the first task will reach with DefaultCollectionAge timeout
-            await Task.Delay(TimeSpan.FromSeconds(3));
+            await Task.Delay(TimeSpan.FromSeconds(3), cancellationToken);
 
             // No issue on this one
             await stuckGrain.NonBlockingCall();
 
             // All otherwise stuck calls should have been forwarded to a new activation.
-            await Task.WhenAll(calls).WaitAsync(TimeSpan.FromSeconds(10));
+            await Task.WhenAll(calls).WaitAsync(TimeSpan.FromSeconds(10), cancellationToken);
         }
 
         [Fact, TestCategory("Functional"), TestCategory("ActivationCollection")]
         public async Task StuckGrainTest_StuckDetectionOnDeactivation()
         {
+            var cancellationToken = TestContext.Current.CancellationToken;
             var id = Guid.NewGuid();
             var stuckGrain = this.fixture.GrainFactory.GetGrain<IStuckGrain>(id);
             await stuckGrain.BlockingDeactivation();
@@ -116,7 +119,7 @@ namespace UnitTests.StuckGrainTests
             for (var i = 0; i < 3; i++)
             {
                 var call = stuckGrain.NonBlockingCall();
-                await Task.WhenAny(call, Task.Delay(TimeSpan.FromMilliseconds(500)));
+                await Task.WhenAny(call, Task.Delay(TimeSpan.FromMilliseconds(500), cancellationToken));
             }
 
             await TestingUtils.WaitUntilAsync(
@@ -131,13 +134,14 @@ namespace UnitTests.StuckGrainTests
                     return count == 3;
                 },
                 TimeSpan.FromSeconds(10),
-                TimeSpan.FromMilliseconds(200));
+                TimeSpan.FromMilliseconds(200),
+                cancellationToken);
 
             // No issue on this one
             await stuckGrain.NonBlockingCall();
 
             // All 4 otherwise stuck calls should have been forwarded to a new activation
-            Assert.Equal(4, await stuckGrain.GetNonBlockingCallCounter());
+            Assert.Equal(4, await stuckGrain.GetNonBlockingCallCounter(cancellationToken));
         }
 
         [Fact, TestCategory("Functional"), TestCategory("ActivationCollection")]

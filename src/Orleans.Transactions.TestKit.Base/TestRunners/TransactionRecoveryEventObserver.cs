@@ -604,11 +604,16 @@ internal sealed class TransactionRecoveryEventObserver : IObserver<TransactionDi
 
         internal void Release() => this.release.TrySetResult();
 
-        internal async Task<RecoveryTransition> WaitAsync(long deadline)
+        internal Task<RecoveryTransition> WaitAsync(long deadline) =>
+            WaitAsync(deadline, CancellationToken.None);
+
+        internal async Task<RecoveryTransition> WaitAsync(
+            long deadline,
+            CancellationToken cancellationToken)
         {
             if (this.reached.Task.IsCompleted)
             {
-                return await this.reached.Task;
+                return await this.reached.Task.WaitAsync(cancellationToken);
             }
 
             var now = Stopwatch.GetTimestamp();
@@ -619,7 +624,9 @@ internal sealed class TransactionRecoveryEventObserver : IObserver<TransactionDi
 
             try
             {
-                return await this.reached.Task.WaitAsync(Stopwatch.GetElapsedTime(now, deadline));
+                return await this.reached.Task.WaitAsync(
+                    Stopwatch.GetElapsedTime(now, deadline),
+                    cancellationToken);
             }
             catch (TimeoutException)
             {

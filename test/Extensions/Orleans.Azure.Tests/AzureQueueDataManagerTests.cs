@@ -112,7 +112,7 @@ namespace Tester.AzureUtils
             {
                 promises.Add(manager.DeleteQueueMessage(msg));
             }
-            await Task.WhenAll(promises);
+            await Task.WhenAll(promises).WaitAsync(TestContext.Current.CancellationToken);
             Assert.Equal(0, await manager.GetApproximateMessageCount());
         }
 
@@ -126,13 +126,15 @@ namespace Tester.AzureUtils
 
             for (int i = 0; i < NumThreads; i++)
             {
-                promises[i] = Task.Run(async () =>
-                {
-                    AzureQueueDataManager manager = await GetTableManager(queueName);
-                    return true;
-                });
+                promises[i] = Task.Run(
+                    async () =>
+                    {
+                        AzureQueueDataManager manager = await GetTableManager(queueName);
+                        return true;
+                    },
+                    TestContext.Current.CancellationToken);
             }
-            await Task.WhenAll(promises);
+            await Task.WhenAll(promises).WaitAsync(TestContext.Current.CancellationToken);
         }
 
         [Fact, TestCategory("Functional")]
@@ -173,7 +175,8 @@ namespace Tester.AzureUtils
                     return false;
                 },
                 TimeSpan.FromSeconds(30),
-                TimeSpan.FromMilliseconds(100));
+                TimeSpan.FromMilliseconds(100),
+                TestContext.Current.CancellationToken);
 
             var outMessage2 = await manager.GetQueueMessage();
             Assert.NotNull(outMessage2);

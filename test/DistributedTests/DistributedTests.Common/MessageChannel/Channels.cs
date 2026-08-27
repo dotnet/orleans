@@ -14,7 +14,7 @@ namespace DistributedTests.Common.MessageChannel
     {
         Task<ServerMessage> WaitForMessage(CancellationToken cancellationToken);
 
-        Task SendAck(ServerMessage message);
+        Task SendAck(ServerMessage message, CancellationToken cancellationToken);
     }
 
     public class SendChannel : ISendChannel
@@ -59,10 +59,10 @@ namespace DistributedTests.Common.MessageChannel
 
         public async Task<ServerMessage> WaitForMessage(CancellationToken cancellationToken) => await _readQueue.WaitForMessage<ServerMessage>(cancellationToken);
 
-        public async Task SendAck(ServerMessage message)
+        public async Task SendAck(ServerMessage message, CancellationToken cancellationToken)
         {
             var ack = AckMessage.CreateAckMessage(message, _serverName);
-            await _writeQueue.SendMessageAsync(JsonSerializer.Serialize(ack));
+            await _writeQueue.SendMessageAsync(JsonSerializer.Serialize(ack), cancellationToken);
         }
     }
 
@@ -71,52 +71,72 @@ namespace DistributedTests.Common.MessageChannel
         private static readonly string CLIENT_TO_SERVER_QUEUE = "servers-{0}";
         private static readonly string SILO_TO_CLIENT_QUEUE = "client-{0}";
 
-        public static Task<ISendChannel> CreateSendChannel(string clusterId, Uri azureQueueUri)
-            => CreateSendChannel(clusterId, azureQueueUri.CreateQueueServiceClient());
+        public static Task<ISendChannel> CreateSendChannel(
+            string clusterId,
+            Uri azureQueueUri,
+            CancellationToken cancellationToken)
+            => CreateSendChannel(clusterId, azureQueueUri.CreateQueueServiceClient(), cancellationToken);
 
-        public static async Task<ISendChannel> CreateSendChannel(string clusterId, QueueServiceClient queueServiceClient)
+        public static async Task<ISendChannel> CreateSendChannel(
+            string clusterId,
+            QueueServiceClient queueServiceClient,
+            CancellationToken cancellationToken)
         {
             var writeQueue = queueServiceClient.GetQueueClient(string.Format(CLIENT_TO_SERVER_QUEUE, clusterId));
             var readQueue = queueServiceClient.GetQueueClient(string.Format(SILO_TO_CLIENT_QUEUE, clusterId));
 
-            await writeQueue.CreateIfNotExistsAsync();
-            await readQueue.CreateIfNotExistsAsync();
+            await writeQueue.CreateIfNotExistsAsync(cancellationToken: cancellationToken);
+            await readQueue.CreateIfNotExistsAsync(cancellationToken: cancellationToken);
 
             return new SendChannel(writeQueue, readQueue);
         }
 
-        public static Task<IReceiveChannel> CreateReceiveChannel(string serverName, string clusterId, Uri azureQueueUri)
-            => CreateReceiveChannel(serverName, clusterId, azureQueueUri.CreateQueueServiceClient());
+        public static Task<IReceiveChannel> CreateReceiveChannel(
+            string serverName,
+            string clusterId,
+            Uri azureQueueUri,
+            CancellationToken cancellationToken)
+            => CreateReceiveChannel(serverName, clusterId, azureQueueUri.CreateQueueServiceClient(), cancellationToken);
 
-        public static async Task<IReceiveChannel> CreateReceiveChannel(string serverName, string clusterId, QueueServiceClient queueServiceClient)
+        public static async Task<IReceiveChannel> CreateReceiveChannel(
+            string serverName,
+            string clusterId,
+            QueueServiceClient queueServiceClient,
+            CancellationToken cancellationToken)
         {
             var writeQueue = queueServiceClient.GetQueueClient(string.Format(SILO_TO_CLIENT_QUEUE, clusterId));
             var readQueue = queueServiceClient.GetQueueClient(string.Format(CLIENT_TO_SERVER_QUEUE, clusterId));
 
-            await writeQueue.CreateIfNotExistsAsync();
-            await readQueue.CreateIfNotExistsAsync();
+            await writeQueue.CreateIfNotExistsAsync(cancellationToken: cancellationToken);
+            await readQueue.CreateIfNotExistsAsync(cancellationToken: cancellationToken);
 
             return new ReceiveChannel(writeQueue, readQueue, serverName);
         }
 
-        internal static async Task<T> WaitForMessage<T>(this QueueClient queueClient, CancellationToken ct)
+        internal static async Task<T> WaitForMessage<T>(
+            this QueueClient queueClient,
+            CancellationToken cancellationToken)
         {
-            while (!ct.IsCancellationRequested)
+            while (true)
             {
-                var result = await queueClient.ReceiveMessagesAsync(maxMessages: 1, cancellationToken: ct);
+                cancellationToken.ThrowIfCancellationRequested();
+                var result = await queueClient.ReceiveMessagesAsync(
+                    maxMessages: 1,
+                    cancellationToken: cancellationToken);
                 var msg = result.Value?.FirstOrDefault();
 
                 if (msg != null)
                 {
-                    await queueClient.DeleteMessageAsync(msg.MessageId, msg.PopReceipt);
+                    await queueClient.DeleteMessageAsync(
+                        msg.MessageId,
+                        msg.PopReceipt,
+                        cancellationToken);
                     // A message that was just dequeued is expected to deserialize to a valid T.
                     return JsonSerializer.Deserialize<T>(msg.MessageText)!;
                 }
 
-                await Task.Delay(1000, ct);
+                await Task.Delay(1000, cancellationToken);
             }
-            ct.ThrowIfCancellationRequested();
-            throw new Exception("No message");
         }
     }
 }

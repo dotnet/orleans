@@ -55,8 +55,9 @@ namespace TestGrains
             return Task.FromResult<IDictionary<Guid, int>>(counts);
         }
 
-        public Task Reset()
+        public Task Reset(CancellationToken cancellationToken)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             reports = new Dictionary<Tuple<string, string>, Dictionary<Guid, int>>();
             return Task.CompletedTask;
         }

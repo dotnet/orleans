@@ -58,7 +58,7 @@ namespace Tester.AzureUtils.Streaming
         {
             logger.LogInformation("************************ SampleStreamingTests_4 *********************************");
             var runner = new SampleStreamingTests(StreamProvider, this.logger, this.HostedCluster);
-            await runner.StreamingTests_Consumer_Producer(Guid.NewGuid());
+            await runner.StreamingTests_Consumer_Producer(Guid.NewGuid(), TestContext.Current.CancellationToken);
         }
 
         [Fact, TestCategory("Functional")]
@@ -66,7 +66,7 @@ namespace Tester.AzureUtils.Streaming
         {
             logger.LogInformation("************************ SampleStreamingTests_5 *********************************");
             var runner = new SampleStreamingTests(StreamProvider, this.logger, this.HostedCluster);
-            await runner.StreamingTests_Producer_Consumer(Guid.NewGuid());
+            await runner.StreamingTests_Producer_Consumer(Guid.NewGuid(), TestContext.Current.CancellationToken);
         }
     }
 }

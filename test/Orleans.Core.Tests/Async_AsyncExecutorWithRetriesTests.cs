@@ -31,6 +31,7 @@ namespace NonSilo.Tests
         [Fact, TestCategory("Functional"), TestCategory("AsynchronyPrimitives")]
         public async Task Async_AsyncExecutorWithRetriesTest_1()
         {
+            var cancellationToken = TestContext.Current.CancellationToken;
             int counter = 0;
             Func<int, Task<int>> myFunc = ((int funcCounter) =>
             {
@@ -49,15 +50,21 @@ namespace NonSilo.Tests
                 return true;
             });
 
-            Task<int> promise = AsyncExecutorWithRetries.ExecuteWithRetries(myFunc, 10, 10, null, errorFilter);
+            Task<int> promise = AsyncExecutorWithRetries.ExecuteWithRetries(
+                myFunc, 10, 10, null, errorFilter, cancellationToken: cancellationToken);
             int value = await promise;
             this.output.WriteLine("Value is {0}.", value);
             counter = 0;
             try
             {
-                promise = AsyncExecutorWithRetries.ExecuteWithRetries(myFunc, 3, 3, null, errorFilter);
+                promise = AsyncExecutorWithRetries.ExecuteWithRetries(
+                    myFunc, 3, 3, null, errorFilter, cancellationToken: cancellationToken);
                 value = await promise;
                 this.output.WriteLine("Value is {0}.", value);
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                throw;
             }
             catch (Exception)
             {
@@ -87,7 +94,14 @@ namespace NonSilo.Tests
 
             int maxRetries = 10;
             int expectedRetries = countLimit;
-            Task<int> promise = AsyncExecutorWithRetries.ExecuteWithRetries(myFunc, maxRetries, maxRetries, successFilter, null, Timeout.InfiniteTimeSpan);
+            Task<int> promise = AsyncExecutorWithRetries.ExecuteWithRetries(
+                myFunc,
+                maxRetries,
+                maxRetries,
+                successFilter,
+                null,
+                Timeout.InfiniteTimeSpan,
+                cancellationToken: TestContext.Current.CancellationToken);
             int value = await promise;
             this.output.WriteLine("Value={0} Counter={1} ExpectedRetries={2}", value, counter, expectedRetries);
             Assert.Equal(expectedRetries, value); // "Returned value"
@@ -96,7 +110,13 @@ namespace NonSilo.Tests
             counter = 0;
             maxRetries = 3;
             expectedRetries = maxRetries;
-            promise = AsyncExecutorWithRetries.ExecuteWithRetries(myFunc, maxRetries, maxRetries, successFilter, null);
+            promise = AsyncExecutorWithRetries.ExecuteWithRetries(
+                myFunc,
+                maxRetries,
+                maxRetries,
+                successFilter,
+                null,
+                cancellationToken: TestContext.Current.CancellationToken);
             value = await promise;
             this.output.WriteLine("Value={0} Counter={1} ExpectedRetries={2}", value, counter, expectedRetries);
             Assert.Equal(expectedRetries, value); // "Returned value"
@@ -132,7 +152,8 @@ namespace NonSilo.Tests
                 maxRetries, 
                 errorFilter,
                 default,
-                new FixedBackoff(TimeSpan.FromSeconds(1)));
+                new FixedBackoff(TimeSpan.FromSeconds(1)),
+                TestContext.Current.CancellationToken);
 
             int value = await promise;
             this.output.WriteLine("Value={0} Counter={1} ExpectedRetries={2}", value, counter, 0);
@@ -175,11 +196,16 @@ namespace NonSilo.Tests
                 maxRetries,
                 errorFilter,
                 default,
-                new FixedBackoff(TimeSpan.FromSeconds(1)));
+                new FixedBackoff(TimeSpan.FromSeconds(1)),
+                TestContext.Current.CancellationToken);
             try
             {
                 int value = await promise;
                 Assert.Fail("Should have thrown");
+            }
+            catch (OperationCanceledException) when (TestContext.Current.CancellationToken.IsCancellationRequested)
+            {
+                throw;
             }
             catch (Exception exc)
             {

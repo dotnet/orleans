@@ -15,7 +15,7 @@ public sealed class InProcessTestClusterDirectoryTests
         var builder = new InProcessTestClusterBuilder(1);
 
         await using var cluster = builder.Build();
-        await cluster.DeployAsync();
+        await cluster.DeployAsync(TestContext.Current.CancellationToken);
 
         Assert.Equal("InProcessGrainDirectory", GetDefaultDirectory(cluster).GetType().Name);
     }
@@ -31,7 +31,7 @@ public sealed class InProcessTestClusterDirectoryTests
 #pragma warning restore ORLEANSEXP003
 
         await using var cluster = builder.Build();
-        await cluster.DeployAsync();
+        await cluster.DeployAsync(TestContext.Current.CancellationToken);
 
         Assert.Equal("DistributedGrainDirectory", GetDefaultDirectory(cluster).GetType().Name);
     }
@@ -48,7 +48,7 @@ public sealed class InProcessTestClusterDirectoryTests
 #pragma warning restore ORLEANSEXP003
 
         await using var cluster = builder.Build();
-        await cluster.DeployAsync();
+        await cluster.DeployAsync(TestContext.Current.CancellationToken);
 
         var defaultDirectory = GetDefaultDirectory(cluster);
         var namedDirectory = cluster.Silos[0].ServiceProvider.GetRequiredKeyedService<IGrainDirectory>("named");

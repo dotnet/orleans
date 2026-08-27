@@ -98,6 +98,7 @@ public abstract class SystemTargetCancellationTokenTests(SystemTargetCancellatio
     [InlineData(300)]
     public async Task SystemTargetTaskCancellation(int delay)
     {
+        var cancellationToken = TestContext.Current.CancellationToken;
         var siloAddress = fixture.HostedCluster.Silos.First().SiloAddress;
         var systemTarget = fixture.GetSystemTarget(siloAddress);
 
@@ -108,7 +109,7 @@ public abstract class SystemTargetCancellationTokenTests(SystemTargetCancellatio
         await Assert.ThrowsAnyAsync<OperationCanceledException>(() => task);
         if (delay > 0)
         {
-            await WaitForCallCancellation(systemTarget, callId);
+            await WaitForCallCancellation(systemTarget, callId, cancellationToken);
         }
     }
 
@@ -118,6 +119,7 @@ public abstract class SystemTargetCancellationTokenTests(SystemTargetCancellatio
     [InlineData(300)]
     public async Task MultipleSystemTargetsTaskCancellation(int delay)
     {
+        var cancellationToken = TestContext.Current.CancellationToken;
         using var cts = new CancellationTokenSource();
         var callId = Guid.NewGuid();
         var systemTargets = fixture.HostedCluster.Silos
@@ -135,7 +137,7 @@ public abstract class SystemTargetCancellationTokenTests(SystemTargetCancellatio
         {
             foreach (var st in systemTargets)
             {
-                await WaitForCallCancellation(st, callId);
+                await WaitForCallCancellation(st, callId, cancellationToken);
             }
         }
     }
@@ -150,6 +152,7 @@ public abstract class SystemTargetCancellationTokenTests(SystemTargetCancellatio
     [InlineData(300)]
     public async Task SystemTargetMultipleConcurrentCancellations(int delay)
     {
+        var cancellationToken = TestContext.Current.CancellationToken;
         var siloAddress = fixture.HostedCluster.Silos.First().SiloAddress;
         var systemTarget = fixture.GetSystemTarget(siloAddress);
 
@@ -170,7 +173,7 @@ public abstract class SystemTargetCancellationTokenTests(SystemTargetCancellatio
         {
             foreach (var callId in callIds)
             {
-                await WaitForCallCancellation(systemTarget, callId);
+                await WaitForCallCancellation(systemTarget, callId, cancellationToken);
             }
         }
     }
@@ -209,6 +212,7 @@ public abstract class SystemTargetCancellationTokenTests(SystemTargetCancellatio
     [Fact, TestCategory("BVT"), TestCategory("Cancellation")]
     public async Task CancellationTokenCallbacksExecutionContext()
     {
+        var cancellationToken = TestContext.Current.CancellationToken;
         var siloAddress = fixture.HostedCluster.Silos.First().SiloAddress;
         var systemTarget = fixture.GetSystemTarget(siloAddress);
 
@@ -227,12 +231,13 @@ public abstract class SystemTargetCancellationTokenTests(SystemTargetCancellatio
             await Assert.ThrowsAnyAsync<OperationCanceledException>(() => task);
         }
 
-        await WaitForCallCancellation(systemTarget, callId);
+        await WaitForCallCancellation(systemTarget, callId, cancellationToken);
     }
 
     [Fact, TestCategory("BVT"), TestCategory("Cancellation")]
     public async Task CancellationTokenCallbacksTaskSchedulerContext()
     {
+        var cancellationToken = TestContext.Current.CancellationToken;
         var silos = fixture.HostedCluster.Silos.ToArray();
         var sourceTarget = fixture.GetSystemTarget(silos[0].SiloAddress);
         var destinationTarget = fixture.GetSystemTarget(silos.Length > 1 ? silos[1].SiloAddress : silos[0].SiloAddress);
@@ -250,12 +255,13 @@ public abstract class SystemTargetCancellationTokenTests(SystemTargetCancellatio
             await Assert.ThrowsAnyAsync<OperationCanceledException>(() => task);
         }
 
-        await WaitForCallCancellation(destinationTarget, callId);
+        await WaitForCallCancellation(destinationTarget, callId, cancellationToken);
     }
 
     [Fact, TestCategory("Cancellation")]
     public async Task CancellationTokenCallbacksThrow_ExceptionDoesNotPropagate()
     {
+        var cancellationToken = TestContext.Current.CancellationToken;
         var siloAddress = fixture.HostedCluster.Silos.First().SiloAddress;
         var systemTarget = fixture.GetSystemTarget(siloAddress);
 
@@ -264,7 +270,7 @@ public abstract class SystemTargetCancellationTokenTests(SystemTargetCancellatio
         systemTarget.CancellationTokenCallbackThrow(cts.Token, callId).Ignore();
         // Cancellation is a cooperative mechanism, so we don't expect the exception to propagate
         cts.CancelAfter(100);
-        await WaitForCallCancellation(systemTarget, callId);
+        await WaitForCallCancellation(systemTarget, callId, cancellationToken);
     }
 
     [Theory, TestCategory("BVT"), TestCategory("Cancellation")]
@@ -274,7 +280,7 @@ public abstract class SystemTargetCancellationTokenTests(SystemTargetCancellatio
     public async Task InSiloCancellation(int delay)
     {
         var siloAddress = fixture.HostedCluster.Silos.First().SiloAddress;
-        await CancellationTestCore(siloAddress, siloAddress, delay);
+        await CancellationTestCore(siloAddress, siloAddress, delay, TestContext.Current.CancellationToken);
     }
 
     [Theory, TestCategory("BVT"), TestCategory("Cancellation")]
@@ -290,7 +296,7 @@ public abstract class SystemTargetCancellationTokenTests(SystemTargetCancellatio
             return;
         }
 
-        await CancellationTestCore(silos[0].SiloAddress, silos[1].SiloAddress, delay);
+        await CancellationTestCore(silos[0].SiloAddress, silos[1].SiloAddress, delay, TestContext.Current.CancellationToken);
     }
 
     [Theory, TestCategory("BVT"), TestCategory("Cancellation")]
@@ -306,7 +312,11 @@ public abstract class SystemTargetCancellationTokenTests(SystemTargetCancellatio
             return;
         }
 
-        await ClientCancellationTokenPassing(delay, silos[0].SiloAddress, silos[1].SiloAddress);
+        await ClientCancellationTokenPassing(
+            delay,
+            silos[0].SiloAddress,
+            silos[1].SiloAddress,
+            TestContext.Current.CancellationToken);
     }
 
     [Theory, TestCategory("BVT"), TestCategory("Cancellation")]
@@ -316,10 +326,14 @@ public abstract class SystemTargetCancellationTokenTests(SystemTargetCancellatio
     public async Task InSiloClientCancellationTokenPassing(int delay)
     {
         var siloAddress = fixture.HostedCluster.Silos.First().SiloAddress;
-        await ClientCancellationTokenPassing(delay, siloAddress, siloAddress);
+        await ClientCancellationTokenPassing(delay, siloAddress, siloAddress, TestContext.Current.CancellationToken);
     }
 
-    private async Task ClientCancellationTokenPassing(int delay, SiloAddress sourceAddress, SiloAddress targetAddress)
+    private async Task ClientCancellationTokenPassing(
+        int delay,
+        SiloAddress sourceAddress,
+        SiloAddress targetAddress,
+        CancellationToken cancellationToken)
     {
         var sourceTarget = fixture.GetSystemTarget(sourceAddress);
         var target = fixture.GetSystemTarget(targetAddress);
@@ -331,11 +345,15 @@ public abstract class SystemTargetCancellationTokenTests(SystemTargetCancellatio
         await Assert.ThrowsAnyAsync<OperationCanceledException>(() => task);
         if (delay > 0)
         {
-            await WaitForCallCancellation(target, callId);
+            await WaitForCallCancellation(target, callId, cancellationToken);
         }
     }
 
-    private async Task CancellationTestCore(SiloAddress sourceAddress, SiloAddress targetAddress, int delay)
+    private async Task CancellationTestCore(
+        SiloAddress sourceAddress,
+        SiloAddress targetAddress,
+        int delay,
+        CancellationToken cancellationToken)
     {
         var sourceTarget = fixture.GetSystemTarget(sourceAddress);
         var target = fixture.GetSystemTarget(targetAddress);
@@ -345,13 +363,18 @@ public abstract class SystemTargetCancellationTokenTests(SystemTargetCancellatio
         await Assert.ThrowsAnyAsync<OperationCanceledException>(() => task);
         if (delay > 0)
         {
-            await WaitForCallCancellation(target, callId);
+            await WaitForCallCancellation(target, callId, cancellationToken);
         }
     }
 
-    private static async Task WaitForCallCancellation(ICancellationTestSystemTarget systemTarget, Guid callId)
+    private static async Task WaitForCallCancellation(
+        ICancellationTestSystemTarget systemTarget,
+        Guid callId,
+        CancellationToken cancellationToken)
     {
-        var (wasCancelled, error) = await systemTarget.WaitForCancellation(callId, TimeSpan.FromSeconds(30));
+        var (wasCancelled, error) = await systemTarget
+            .WaitForCancellation(callId, TimeSpan.FromSeconds(30))
+            .WaitAsync(cancellationToken);
         if (!wasCancelled)
         {
             Assert.Fail($"Did not encounter the expected call id {callId}");
@@ -370,6 +393,7 @@ public abstract class SystemTargetCancellationTokenTests(SystemTargetCancellatio
     [Fact, TestCategory("BVT"), TestCategory("Cancellation")]
     public async Task MultipleConcurrentSystemTargetRequestsCancellation()
     {
+        var cancellationToken = TestContext.Current.CancellationToken;
         var siloAddress = fixture.HostedCluster.Silos.First().SiloAddress;
         var systemTarget = fixture.GetSystemTarget(siloAddress);
 
@@ -387,12 +411,12 @@ public abstract class SystemTargetCancellationTokenTests(SystemTargetCancellatio
         var task3 = systemTarget.LongWait(cts3.Token, TimeSpan.FromSeconds(10), callId3);
 
         // Wait for all to be running
-        await Task.Delay(100);
+        await Task.Delay(100, cancellationToken);
 
         // Cancel only the second request
         await cts2.CancelAsync();
         await Assert.ThrowsAnyAsync<OperationCanceledException>(() => task2);
-        await WaitForCallCancellation(systemTarget, callId2);
+        await WaitForCallCancellation(systemTarget, callId2, cancellationToken);
 
         // First and third should still be running, cancel them
         await cts1.CancelAsync();
@@ -401,8 +425,8 @@ public abstract class SystemTargetCancellationTokenTests(SystemTargetCancellatio
         await Assert.ThrowsAnyAsync<OperationCanceledException>(() => task1);
         await Assert.ThrowsAnyAsync<OperationCanceledException>(() => task3);
 
-        await WaitForCallCancellation(systemTarget, callId1);
-        await WaitForCallCancellation(systemTarget, callId3);
+        await WaitForCallCancellation(systemTarget, callId1, cancellationToken);
+        await WaitForCallCancellation(systemTarget, callId3, cancellationToken);
     }
 }
 

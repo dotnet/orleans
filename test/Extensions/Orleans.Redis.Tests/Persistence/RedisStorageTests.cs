@@ -27,7 +27,9 @@ namespace Tester.Redis.Persistence
             TestUtils.CheckForRedis();
             this.fixture = commonFixture;
             this.output = output;
-            this.storageProvider = commonFixture.CreateRedisGrainStorage(false).GetAwaiter().GetResult();
+            this.storageProvider = commonFixture.CreateRedisGrainStorage(
+                false,
+                cancellationToken: TestContext.Current.CancellationToken).GetAwaiter().GetResult();
             this.commonStorageTests = new CommonStorageTests(storageProvider);
         }
 
@@ -143,7 +145,7 @@ namespace Tester.Redis.Persistence
         public async Task GrainStorage_ModelBasedGeneratedConformance()
         {
             var runner = new GrainStorageModelBasedTestRunner(storageProvider, "Redis", output.WriteLine);
-            await runner.RunGeneratedConformanceTests();
+            await runner.RunGeneratedConformanceTests(TestContext.Current.CancellationToken);
         }
     }
 }

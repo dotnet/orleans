@@ -101,7 +101,11 @@ namespace UnitTests.General
             Assert.SkipWhen(string.IsNullOrEmpty(connectionString), "Connection string not provided.");
         }
 
-        public static async Task<RelationalStorageForTesting> SetupInstance(string invariantName, string testDatabaseName, string? connectionString = null)
+        public static async Task<RelationalStorageForTesting> SetupInstance(
+            string invariantName,
+            string testDatabaseName,
+            string? connectionString = null,
+            CancellationToken cancellationToken = default)
         {
             CheckPreconditionsOrThrow(invariantName, connectionString);
             if (string.IsNullOrWhiteSpace(invariantName))
@@ -128,16 +132,16 @@ namespace UnitTests.General
             Console.WriteLine("Dropping and recreating database '{0}' with ConnectionString '{1}'", testDatabaseName, testStorage.CurrentConnectionString);
             testStorage.PrepareForDatabaseReset(testDatabaseName);
 
-            if (await testStorage.ExistsDatabaseAsync(testDatabaseName))
+            if (await testStorage.ExistsDatabaseAsync(testDatabaseName, cancellationToken))
             {
-                await testStorage.DropDatabaseAsync(testDatabaseName);
+                await testStorage.DropDatabaseAsync(testDatabaseName, cancellationToken);
             }
 
-            await testStorage.CreateDatabaseAsync(testDatabaseName);
+            await testStorage.CreateDatabaseAsync(testDatabaseName, cancellationToken);
 
             //The old storage instance has the previous connection string, time have a new handle with a new connection string...
             testStorage = testStorage.CopyInstance(testDatabaseName);
-            await testStorage.WaitForDatabaseReadyAsync();
+            await testStorage.WaitForDatabaseReadyAsync(cancellationToken);
 
             Console.WriteLine("Creating database tables...");
 
@@ -146,13 +150,13 @@ namespace UnitTests.General
             // Concatenate scripts
             foreach (var fileName in testStorage.SetupSqlScriptFileNames)
             {
-                setupScript += File.ReadAllText(fileName);
+                setupScript += await File.ReadAllTextAsync(fileName, cancellationToken);
 
                 // Just in case add a CRLF between files, but they should end in a new line.
                 setupScript += "\r\n";
             }
 
-            await testStorage.ExecuteSetupScript(setupScript, testDatabaseName);
+            await testStorage.ExecuteSetupScript(setupScript, testDatabaseName, cancellationToken);
 
             Console.WriteLine("Initializing relational databases done.");
 
@@ -185,7 +189,7 @@ namespace UnitTests.General
         {
         }
 
-        protected virtual Task WaitForDatabaseReadyAsync() => Task.CompletedTask;
+        protected virtual Task WaitForDatabaseReadyAsync(CancellationToken cancellationToken) => Task.CompletedTask;
 
         /// <summary>
         /// Executes the given script in a test context.
@@ -193,18 +197,21 @@ namespace UnitTests.General
         /// <param name="setupScript">the script. usually CreateOrleansTables_xxxx.sql</param>
         /// <param name="dataBaseName">the target database to be populated</param>
         /// <returns></returns>
-        protected virtual async Task ExecuteSetupScript(string setupScript, string dataBaseName)
+        protected virtual async Task ExecuteSetupScript(
+            string setupScript,
+            string dataBaseName,
+            CancellationToken cancellationToken)
         {
             var splitScripts = ConvertToExecutableBatches(setupScript, dataBaseName);
             foreach (var script in splitScripts)
             {
-                await ExecuteSetupScriptBatchAsync(script);
+                await ExecuteSetupScriptBatchAsync(script, cancellationToken);
             }
         }
 
-        protected virtual async Task ExecuteSetupScriptBatchAsync(string script)
+        protected virtual async Task ExecuteSetupScriptBatchAsync(string script, CancellationToken cancellationToken)
         {
-            _ = await Storage.ExecuteAsync(script);
+            _ = await Storage.ExecuteAsync(script, cancellationToken);
         }
 
         /// <summary>
@@ -212,10 +219,10 @@ namespace UnitTests.General
         /// </summary>
         /// <param name="databaseName">The name of the database existence of which to check.</param>
         /// <returns><em>TRUE</em> if the given database exists. <em>FALSE</em> otherwise.</returns>
-        private async Task<bool> ExistsDatabaseAsync(string databaseName)
+        private async Task<bool> ExistsDatabaseAsync(string databaseName, CancellationToken cancellationToken)
         {
             var ret = await Storage.ReadAsync(string.Format(ExistsDatabaseTemplate, databaseName), command =>
-            { }, (selector, resultSetCount, cancellationToken) => { return Task.FromResult(selector.GetBoolean(0)); }).ConfigureAwait(continueOnCapturedContext: false);
+            { }, (selector, resultSetCount, _) => { return Task.FromResult(selector.GetBoolean(0)); }, cancellationToken: cancellationToken).ConfigureAwait(continueOnCapturedContext: false);
 
             return ret.First();
         }
@@ -225,9 +232,12 @@ namespace UnitTests.General
         /// </summary>
         /// <param name="databaseName">The name of the database to create.</param>
         /// <returns>The call will be successful if the DDL query is successful. Otherwise an exception will be thrown.</returns>
-        private async Task CreateDatabaseAsync(string databaseName)
+        private async Task CreateDatabaseAsync(string databaseName, CancellationToken cancellationToken)
         {
-            await Storage.ExecuteAsync(string.Format(CreateDatabaseTemplate, databaseName), command => { }).ConfigureAwait(continueOnCapturedContext: false);
+            await Storage.ExecuteAsync(
+                string.Format(CreateDatabaseTemplate, databaseName),
+                command => { },
+                cancellationToken: cancellationToken).ConfigureAwait(continueOnCapturedContext: false);
         }
 
         /// <summary>
@@ -235,9 +245,12 @@ namespace UnitTests.General
         /// </summary>
         /// <param name="databaseName">The name of the database to drop.</param>
         /// <returns>The call will be successful if the DDL query is successful. Otherwise an exception will be thrown.</returns>
-        protected virtual async Task DropDatabaseAsync(string databaseName)
+        protected virtual async Task DropDatabaseAsync(string databaseName, CancellationToken cancellationToken)
         {
-            await Storage.ExecuteAsync(string.Format(DropDatabaseTemplate, databaseName), command => { });
+            await Storage.ExecuteAsync(
+                string.Format(DropDatabaseTemplate, databaseName),
+                command => { },
+                cancellationToken: cancellationToken);
         }
 
         /// <summary>

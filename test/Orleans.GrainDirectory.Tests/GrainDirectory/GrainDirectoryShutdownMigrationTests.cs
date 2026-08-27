@@ -20,6 +20,7 @@ public sealed class GrainDirectoryShutdownMigrationTests
     [Fact]
     public async Task PreferLocalGrain_MigratesWhenHostingSiloShutsDown()
     {
+        var cancellationToken = TestContext.Current.CancellationToken;
         var builder = new InProcessTestClusterBuilder(2);
         builder.ConfigureSilo((_, siloBuilder) =>
         {
@@ -31,10 +32,10 @@ public sealed class GrainDirectoryShutdownMigrationTests
         });
 
         await using var cluster = builder.Build();
-        await cluster.DeployAsync();
-        await cluster.WaitForLivenessToStabilizeAsync();
-        await cluster.WaitForClusterManifestToStabilizeAsync();
-        await WaitForDirectoryMembershipAsync(cluster);
+        await cluster.DeployAsync(cancellationToken);
+        await cluster.WaitForLivenessToStabilizeAsync().WaitAsync(cancellationToken);
+        await cluster.WaitForClusterManifestToStabilizeAsync().WaitAsync(cancellationToken);
+        await WaitForDirectoryMembershipAsync(cluster, cancellationToken);
 
         var survivingSilo = cluster.Silos[0];
         var shuttingDownSilo = cluster.Silos[1];
@@ -45,10 +46,14 @@ public sealed class GrainDirectoryShutdownMigrationTests
         RequestContext.Set(IPlacementDirector.PlacementHintKey, shuttingDownSilo.SiloAddress);
         try
         {
-            await immediateGrain.SetState(42, waitForDirectoryHandoff: false);
-            await postHandoffGrain.SetState(43, waitForDirectoryHandoff: true);
-            Assert.Equal(shuttingDownSilo.SiloAddress, await immediateGrain.GetLocation());
-            Assert.Equal(shuttingDownSilo.SiloAddress, await postHandoffGrain.GetLocation());
+            await immediateGrain.SetState(42, waitForDirectoryHandoff: false).AsTask().WaitAsync(cancellationToken);
+            await postHandoffGrain.SetState(43, waitForDirectoryHandoff: true).AsTask().WaitAsync(cancellationToken);
+            Assert.Equal(
+                shuttingDownSilo.SiloAddress,
+                await immediateGrain.GetLocation().AsTask().WaitAsync(cancellationToken));
+            Assert.Equal(
+                shuttingDownSilo.SiloAddress,
+                await postHandoffGrain.GetLocation().AsTask().WaitAsync(cancellationToken));
         }
         finally
         {
@@ -56,50 +61,67 @@ public sealed class GrainDirectoryShutdownMigrationTests
         }
 
         ShutdownMigrationTestCoordinator.Reset();
-        var stopTask = cluster.StopSiloAsync(shuttingDownSilo);
+        var stopTask = cluster.StopSiloAsync(shuttingDownSilo, cancellationToken);
         try
         {
-            using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+            using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+            timeout.CancelAfter(TimeSpan.FromSeconds(30));
             await WaitForDirectoryMembershipAsync(
                 survivingSilo.ServiceProvider.GetRequiredService<DirectoryMembershipService>(),
                 [survivingSilo.SiloAddress],
-                timeout.Token);
+                timeout.Token,
+                cancellationToken);
         }
         finally
         {
             ShutdownMigrationTestCoordinator.CompleteDirectoryHandoff();
-            await stopTask;
+            using var cleanupCancellation = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+            await stopTask.WaitAsync(cleanupCancellation.Token);
         }
 
-        await cluster.WaitForLivenessToStabilizeAsync();
+        await cluster.WaitForLivenessToStabilizeAsync().WaitAsync(cancellationToken);
 
-        await AssertMigrated(immediateGrain, 42);
-        await AssertMigrated(postHandoffGrain, 43);
+        await AssertMigrated(immediateGrain, 42, cancellationToken);
+        await AssertMigrated(postHandoffGrain, 43, cancellationToken);
 
-        async Task AssertMigrated(IShutdownMigrationGrain grain, int expectedState)
+        async Task AssertMigrated(
+            IShutdownMigrationGrain grain,
+            int expectedState,
+            CancellationToken cancellationToken)
         {
-            Assert.Equal(survivingSilo.SiloAddress, await grain.GetLocation());
-            Assert.Equal(expectedState, await grain.GetState());
-            Assert.Equal(DeactivationReasonCode.ShuttingDown, await grain.GetPreviousDeactivationReason());
-            Assert.Equal(SiloStatus.ShuttingDown, await grain.GetPreviousSiloStatus());
+            Assert.Equal(
+                survivingSilo.SiloAddress,
+                await grain.GetLocation().AsTask().WaitAsync(cancellationToken));
+            Assert.Equal(expectedState, await grain.GetState().AsTask().WaitAsync(cancellationToken));
+            Assert.Equal(
+                DeactivationReasonCode.ShuttingDown,
+                await grain.GetPreviousDeactivationReason().AsTask().WaitAsync(cancellationToken));
+            Assert.Equal(
+                SiloStatus.ShuttingDown,
+                await grain.GetPreviousSiloStatus().AsTask().WaitAsync(cancellationToken));
         }
     }
 
-    private static async Task WaitForDirectoryMembershipAsync(InProcessTestCluster cluster)
+    private static async Task WaitForDirectoryMembershipAsync(
+        InProcessTestCluster cluster,
+        CancellationToken cancellationToken)
     {
         var expectedMembers = cluster.Silos.Select(static silo => silo.SiloAddress).ToHashSet();
-        using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+        using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        timeout.CancelAfter(TimeSpan.FromSeconds(30));
         await Task.WhenAll(cluster.Silos.Select(
             silo => WaitForDirectoryMembershipAsync(
                 silo.ServiceProvider.GetRequiredService<DirectoryMembershipService>(),
                 expectedMembers,
-                timeout.Token)));
+                timeout.Token,
+                cancellationToken)));
     }
 
     private static async Task WaitForDirectoryMembershipAsync(
         DirectoryMembershipService membershipService,
         HashSet<SiloAddress> expectedMembers,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        CancellationToken testCancellationToken)
     {
         if (expectedMembers.SetEquals(membershipService.CurrentView.Members))
         {
@@ -116,7 +138,8 @@ public sealed class GrainDirectoryShutdownMigrationTests
                 }
             }
         }
-        catch (OperationCanceledException exception) when (cancellationToken.IsCancellationRequested)
+        catch (OperationCanceledException exception)
+            when (!testCancellationToken.IsCancellationRequested && cancellationToken.IsCancellationRequested)
         {
             throw new TimeoutException("Timed out waiting for the distributed grain directory membership to stabilize.", exception);
         }

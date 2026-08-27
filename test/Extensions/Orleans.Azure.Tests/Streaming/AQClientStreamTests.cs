@@ -102,7 +102,10 @@ namespace Tester.AzureUtils.Streaming
         public async Task AQStreamProducerOnDroppedClientTest()
         {
             logger.LogInformation("************************ AQStreamProducerOnDroppedClientTest *********************************");
-            await runner.StreamProducerOnDroppedClientTest(AQStreamProviderName, StreamNamespace);
+            await runner.StreamProducerOnDroppedClientTest(
+                AQStreamProviderName,
+                StreamNamespace,
+                TestContext.Current.CancellationToken);
         }
 
         [Fact(Skip = "AzureQueue has unpredictable event delivery counts - re-enable when we figure out how to handle this."), TestCategory("Functional"), TestCategory("AzureStorage"), TestCategory("Storage"), TestCategory("Streaming")]
@@ -110,7 +113,8 @@ namespace Tester.AzureUtils.Streaming
         {
             logger.LogInformation("************************ AQStreamConsumerOnDroppedClientTest *********************************");
             await runner.StreamConsumerOnDroppedClientTest(AQStreamProviderName, StreamNamespace, output,
-                    () => TestAzureTableStorageStreamFailureHandler.GetDeliveryFailureCount(AQStreamProviderName));
+                    () => TestAzureTableStorageStreamFailureHandler.GetDeliveryFailureCount(AQStreamProviderName),
+                    cancellationToken: TestContext.Current.CancellationToken);
         }
     }
 }

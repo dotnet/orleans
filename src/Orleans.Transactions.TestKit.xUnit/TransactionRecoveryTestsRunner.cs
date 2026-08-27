@@ -26,5 +26,18 @@ namespace Orleans.Transactions.TestKit.xUnit
         {
             return base.TransactionWillRecoverAfterRandomSiloUnGracefulShutdown(transactionTestGrainClassName, concurrent);
         }
+
+        /// <inheritdoc />
+        protected override Task TransactionWillRecoverAfterRandomSiloFailure(
+            string transactionTestGrainClassName,
+            int concurrent,
+            bool gracefulShutdown)
+        {
+            return base.TransactionWillRecoverAfterRandomSiloFailure(
+                transactionTestGrainClassName,
+                concurrent,
+                gracefulShutdown,
+                TestContext.Current.CancellationToken);
+        }
     }
 }

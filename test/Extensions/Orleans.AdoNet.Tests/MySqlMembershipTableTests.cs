@@ -55,7 +55,10 @@ namespace UnitTests.MembershipTests
 
         protected override async Task<string> GetConnectionString()
         {
-            var instance = await RelationalStorageForTesting.SetupInstance(GetAdoInvariant(), testDatabaseName);
+            var instance = await RelationalStorageForTesting.SetupInstance(
+                GetAdoInvariant(),
+                testDatabaseName,
+                cancellationToken: TestContext.Current.CancellationToken);
             return instance.CurrentConnectionString;
         }
 

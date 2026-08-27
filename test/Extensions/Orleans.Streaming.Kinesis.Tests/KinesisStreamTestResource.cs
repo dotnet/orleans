@@ -7,33 +7,49 @@ internal static class KinesisStreamTestResource
 {
     private static readonly TimeSpan OperationTimeout = TimeSpan.FromMinutes(1);
 
-    public static async Task Create(string streamName)
+    public static async Task Create(string streamName, CancellationToken cancellationToken)
     {
-        await Delete(streamName);
+        await Delete(streamName, cancellationToken);
 
-        using var cancellation = new CancellationTokenSource(OperationTimeout);
+        using var cancellation = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        cancellation.CancelAfter(OperationTimeout);
         using var client = CreateClient(streamName);
-        await client.CreateStreamAsync(
-            new CreateStreamRequest { StreamName = streamName, ShardCount = 4 },
-            cancellation.Token);
-
-        while (true)
+        var creationAttempted = false;
+        try
         {
-            var response = await client.DescribeStreamAsync(
-                new DescribeStreamRequest { StreamName = streamName },
+            creationAttempted = true;
+            await client.CreateStreamAsync(
+                new CreateStreamRequest { StreamName = streamName, ShardCount = 4 },
                 cancellation.Token);
-            if (response.StreamDescription.StreamStatus == StreamStatus.ACTIVE)
+
+            while (true)
             {
-                return;
+                var response = await client.DescribeStreamAsync(
+                    new DescribeStreamRequest { StreamName = streamName },
+                    cancellation.Token);
+                if (response.StreamDescription.StreamStatus == StreamStatus.ACTIVE)
+                {
+                    return;
+                }
+
+                await Task.Delay(TimeSpan.FromMilliseconds(100), cancellation.Token);
+            }
+        }
+        catch
+        {
+            if (creationAttempted)
+            {
+                await DeleteForCleanup(streamName, cancellationToken);
             }
 
-            await Task.Delay(TimeSpan.FromMilliseconds(100), cancellation.Token);
+            throw;
         }
     }
 
-    public static async Task Delete(string streamName)
+    public static async Task Delete(string streamName, CancellationToken cancellationToken)
     {
-        using var cancellation = new CancellationTokenSource(OperationTimeout);
+        using var cancellation = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        cancellation.CancelAfter(OperationTimeout);
         using var client = CreateClient(streamName);
         try
         {
@@ -59,6 +75,19 @@ internal static class KinesisStreamTestResource
             {
                 return;
             }
+        }
+    }
+
+    public static async Task DeleteForCleanup(string streamName, CancellationToken testCancellationToken)
+    {
+        using var cleanup = new CancellationTokenSource(OperationTimeout);
+        try
+        {
+            await Delete(streamName, cleanup.Token);
+        }
+        catch (OperationCanceledException) when (testCancellationToken.IsCancellationRequested)
+        {
+            // Preserve the original test cancellation after bounded cleanup.
         }
     }
 

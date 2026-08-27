@@ -29,6 +29,8 @@ internal static class TestCompilationHelper
         string assemblyName = "TestProject",
         params MetadataReference[] additionalReferences)
     {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        cancellationToken.ThrowIfCancellationRequested();
         var references = FrameworkReferences.AddRange(
             MetadataReference.CreateFromFile(typeof(GrainId).Assembly.Location),
             MetadataReference.CreateFromFile(typeof(IClusterClientLifecycle).Assembly.Location),
@@ -42,7 +44,7 @@ internal static class TestCompilationHelper
             references = references.AddRange(additionalReferences);
         }
 
-        var syntaxTree = CSharpSyntaxTree.ParseText(sourceCode);
+        var syntaxTree = CSharpSyntaxTree.ParseText(sourceCode, cancellationToken: cancellationToken);
         return Task.FromResult(CSharpCompilation.Create(
             assemblyName,
             [syntaxTree],

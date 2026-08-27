@@ -21,6 +21,8 @@ namespace DistributedTests.Server
 
     public class ServerRunner<T>
     {
+        private static readonly TimeSpan AbruptShutdownTimeout = TimeSpan.FromSeconds(5);
+
         private readonly ISiloConfigurator<T> _siloConfigurator;
         private readonly string _siloName;
 
@@ -30,15 +32,22 @@ namespace DistributedTests.Server
             _siloName = $"{Environment.MachineName}-{Guid.NewGuid().ToString("N")[..5]}";
         }
 
-        public async Task Run(CommonParameters commonParameters, T configuratorParameters)
+        public async Task Run(
+            CommonParameters commonParameters,
+            T configuratorParameters,
+            CancellationToken cancellationToken)
         {
-            var channel = await Channels.CreateReceiveChannel(_siloName, commonParameters.ClusterId, commonParameters.AzureQueueUri);
+            var channel = await Channels.CreateReceiveChannel(
+                _siloName,
+                commonParameters.ClusterId,
+                commonParameters.AzureQueueUri,
+                cancellationToken);
 
             ServerMessage? msg = null;
 
             while (true)
             {
-                var host = Host
+                using var host = Host
                     .CreateDefaultBuilder()
                     .ConfigureLogging(logging =>
                     {
@@ -47,22 +56,40 @@ namespace DistributedTests.Server
                     .UseOrleans((ctx, siloBuilder) => ConfigureOrleans(siloBuilder, commonParameters, configuratorParameters))
                     .Build();
 
-                var hostTask = host.RunAsync();
+                await host.StartAsync(cancellationToken);
 
                 if (msg != null)
                 {
                     // we did restart the silo
-                    await channel.SendAck(msg);
+                    await channel.SendAck(msg, cancellationToken);
                     msg = null;
                 }
 
-                msg = await channel.WaitForMessage(CancellationToken.None);
+                msg = await channel.WaitForMessage(cancellationToken);
 
-                await host.StopAsync(new CancellationToken(!msg.IsGraceful));
+                if (msg.IsGraceful)
+                {
+                    await host.StopAsync(cancellationToken);
+                }
+                else
+                {
+                    using var stopCancellation = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+                    stopCancellation.CancelAfter(AbruptShutdownTimeout);
+                    try
+                    {
+                        await host.StopAsync(stopCancellation.Token);
+                    }
+                    catch (OperationCanceledException) when (
+                        stopCancellation.IsCancellationRequested
+                        && !cancellationToken.IsCancellationRequested)
+                    {
+                        // Host disposal completes the abrupt shutdown after the bounded stop attempt.
+                    }
+                }
 
                 if (!msg.Restart)
                 {
-                    await channel.SendAck(msg);
+                    await channel.SendAck(msg, cancellationToken);
                     break;
                 }
             }

@@ -16,6 +16,7 @@ public sealed class GrainDirectoryOptionsTests
     [Fact]
     public async Task PartitionsPerSilo_IsConfigurable()
     {
+        var cancellationToken = TestContext.Current.CancellationToken;
         var builder = new InProcessTestClusterBuilder(1);
         builder.ConfigureSilo((_, siloBuilder) =>
         {
@@ -28,7 +29,7 @@ public sealed class GrainDirectoryOptionsTests
         var cluster = builder.Build();
         try
         {
-            await cluster.DeployAsync();
+            await cluster.DeployAsync(cancellationToken);
             var membershipService = cluster.Silos[0].ServiceProvider.GetRequiredService<DirectoryMembershipService>();
 
             Assert.Equal(3, membershipService.PartitionsPerSilo);

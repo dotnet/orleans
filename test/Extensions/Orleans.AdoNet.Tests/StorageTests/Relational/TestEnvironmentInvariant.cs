@@ -93,7 +93,10 @@ namespace UnitTests.StorageTests.Relational
         /// <param name="connection">The connection with which to ensure the storage is functional.</param>
         /// <param name="storageName">Storage name. This is optional.</param>
         /// <returns></returns>
-        public async Task<RelationalStorageForTesting?> EnsureStorageForTestingAsync(StorageConnection connection, string? storageName = null)
+        public async Task<RelationalStorageForTesting?> EnsureStorageForTestingAsync(
+            StorageConnection connection,
+            string? storageName,
+            CancellationToken cancellationToken)
         {
             if (AdoNetInvariants.Invariants.Contains(connection.StorageInvariant))
             {
@@ -101,7 +104,8 @@ namespace UnitTests.StorageTests.Relational
                 return await RelationalStorageForTesting.SetupInstance(
                     connection.StorageInvariant,
                     storageName ?? RelationalStorageTestDb,
-                    connection.ConnectionString);
+                    connectionString: connection.ConnectionString,
+                    cancellationToken: cancellationToken);
             }
 
             return null;
@@ -148,7 +152,9 @@ namespace UnitTests.StorageTests.Relational
         /// </summary>
         /// <param name="connection">The connection to check.</param>
         /// <returns></returns>
-        private static async Task<bool> CanConnectToStorage(StorageConnection connection)
+        private static async Task<bool> CanConnectToStorage(
+            StorageConnection connection,
+            CancellationToken cancellationToken)
         {
             //How detect if a database can be connected is surprisingly tricky. Some information at
             //http://stackoverflow.com/questions/3668506/efficient-sql-test-query-or-validation-query-that-will-work-across-all-or-most.
@@ -156,7 +162,7 @@ namespace UnitTests.StorageTests.Relational
             var query = connection.ConnectionString != AdoNetInvariants.InvariantNameOracleDatabase ? "SELECT 1;" : "SELECT 1 FROM DUAL;";
             try
             {
-                await storage.ExecuteAsync(query);
+                await storage.ExecuteAsync(query, cancellationToken);
             }
             catch
             {

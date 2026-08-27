@@ -20,6 +20,7 @@ namespace UnitTests.General
         [TestCategory("BVT"), TestCategory("Placement")]
         public async Task PreferLocalPlacementGrain_ShouldMigrateWhenHostSiloKilled(string value)
         {
+            var cancellationToken = TestContext.Current.CancellationToken;
             foreach (SiloHandle silo in HostedCluster.GetActiveSilos())
             {
                 output.WriteLine(
@@ -57,7 +58,7 @@ namespace UnitTests.General
 
             SiloHandle siloToKill = HostedCluster.GetActiveSilos().First(s => s.SiloAddress.Endpoint.Equals(expected));
             output.WriteLine("Killing silo {0} hosting locally placed grain", siloToKill);
-            await HostedCluster.StopSiloAsync(siloToKill);
+            await HostedCluster.StopSiloAsync(siloToKill, cancellationToken);
             await HostedCluster.WaitForLivenessToStabilizeAsync();
 
             IPEndPoint newActual = await grain.GetEndpoint();

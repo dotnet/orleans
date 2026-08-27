@@ -60,7 +60,10 @@ public abstract class RelationalOrleansQueriesTests(string invariant, int concur
 
     public async ValueTask InitializeAsync()
     {
-        var testing = await RelationalStorageForTesting.SetupInstance(invariant, TestDatabaseName);
+        var testing = await RelationalStorageForTesting.SetupInstance(
+            invariant,
+            TestDatabaseName,
+            cancellationToken: TestContext.Current.CancellationToken);
         Assert.SkipWhen(IsNullOrEmpty(testing.CurrentConnectionString), $"Database '{TestDatabaseName}' not initialized");
 
         _storage = RelationalStorage.CreateInstance(invariant, testing.CurrentConnectionString);
@@ -93,7 +96,7 @@ public abstract class RelationalOrleansQueriesTests(string invariant, int concur
         var siloAddress = RandomSiloAddress();
         var activationId = RandomActivationId();
 
-        await _storage.ExecuteAsync("DELETE FROM OrleansGrainDirectory");
+        await _storage.ExecuteAsync("DELETE FROM OrleansGrainDirectory", TestContext.Current.CancellationToken);
 
         // act
         var entry = await _queries.RegisterGrainActivationAsync(clusterId, providerId, grainId, siloAddress, activationId);
@@ -106,7 +109,7 @@ public abstract class RelationalOrleansQueriesTests(string invariant, int concur
         Assert.Equal(siloAddress, entry.SiloAddress);
         Assert.Equal(activationId, entry.ActivationId);
 
-        var results = await _storage.ReadAsync<AdoNetGrainDirectoryEntry>("SELECT * FROM OrleansGrainDirectory");
+        var results = await _storage.ReadAsync<AdoNetGrainDirectoryEntry>("SELECT * FROM OrleansGrainDirectory", TestContext.Current.CancellationToken);
         var result = Assert.Single(results);
         Assert.Equal(clusterId, result.ClusterId);
         Assert.Equal(providerId, result.ProviderId);
@@ -128,7 +131,7 @@ public abstract class RelationalOrleansQueriesTests(string invariant, int concur
         var siloAddress = RandomSiloAddress();
         var activationId = RandomActivationId();
 
-        await _storage.ExecuteAsync("DELETE FROM OrleansGrainDirectory");
+        await _storage.ExecuteAsync("DELETE FROM OrleansGrainDirectory", TestContext.Current.CancellationToken);
 
         // act
         var entry = await _queries.RegisterGrainActivationAsync(clusterId, providerId, grainId, siloAddress, activationId);
@@ -138,7 +141,7 @@ public abstract class RelationalOrleansQueriesTests(string invariant, int concur
         Assert.NotNull(entry);
         Assert.Equal(1, count);
 
-        var results = await _storage.ReadAsync<AdoNetGrainDirectoryEntry>("SELECT * FROM OrleansGrainDirectory");
+        var results = await _storage.ReadAsync<AdoNetGrainDirectoryEntry>("SELECT * FROM OrleansGrainDirectory", TestContext.Current.CancellationToken);
         Assert.Empty(results);
     }
 
@@ -155,7 +158,7 @@ public abstract class RelationalOrleansQueriesTests(string invariant, int concur
         var siloAddress = RandomSiloAddress();
         var activationId = RandomActivationId();
 
-        await _storage.ExecuteAsync("DELETE FROM OrleansGrainDirectory");
+        await _storage.ExecuteAsync("DELETE FROM OrleansGrainDirectory", TestContext.Current.CancellationToken);
 
         // act
         var entry = await _queries.RegisterGrainActivationAsync(clusterId, providerId, grainId, siloAddress, activationId);
@@ -183,7 +186,7 @@ public abstract class RelationalOrleansQueriesTests(string invariant, int concur
         var grainId = RandomGrainId();
         var activationId = RandomActivationId();
 
-        await _storage.ExecuteAsync("DELETE FROM OrleansGrainDirectory");
+        await _storage.ExecuteAsync("DELETE FROM OrleansGrainDirectory", TestContext.Current.CancellationToken);
 
         await _queries.RegisterGrainActivationAsync(clusterId, providerId, "G1", "A", "A1");
         await _queries.RegisterGrainActivationAsync(clusterId, providerId, "G2", "B", "A2");
@@ -197,7 +200,7 @@ public abstract class RelationalOrleansQueriesTests(string invariant, int concur
         // assert
         Assert.Equal(3, count);
 
-        var remaining = await _storage.ReadAsync<AdoNetGrainDirectoryEntry>("SELECT * FROM OrleansGrainDirectory");
+        var remaining = await _storage.ReadAsync<AdoNetGrainDirectoryEntry>("SELECT * FROM OrleansGrainDirectory", TestContext.Current.CancellationToken);
         Assert.Collection(remaining.OrderBy(x => x.GrainId),
             entry => Assert.Equal("G2", entry.GrainId),
             entry => Assert.Equal("G4", entry.GrainId));
@@ -220,7 +223,11 @@ public abstract class RelationalOrleansQueriesTests(string invariant, int concur
         var providerId = RandomProviderId();
 
         // act
-        await Parallel.ForAsync(0, 10000, new ParallelOptions { MaxDegreeOfParallelism = concurrency }, async (x, ct) =>
+        await Parallel.ForAsync(0, 10000, new ParallelOptions
+        {
+            MaxDegreeOfParallelism = concurrency,
+            CancellationToken = TestContext.Current.CancellationToken
+        }, async (x, ct) =>
         {
             var grainId = RandomGrainId();
             var siloAddress = RandomSiloAddress();
@@ -237,7 +244,7 @@ public abstract class RelationalOrleansQueriesTests(string invariant, int concur
         });
 
         // assert
-        var remaining = await _storage.ReadAsync<AdoNetGrainDirectoryEntry>("SELECT * FROM OrleansGrainDirectory");
+        var remaining = await _storage.ReadAsync<AdoNetGrainDirectoryEntry>("SELECT * FROM OrleansGrainDirectory", TestContext.Current.CancellationToken);
         Assert.Empty(remaining);
     }
 }

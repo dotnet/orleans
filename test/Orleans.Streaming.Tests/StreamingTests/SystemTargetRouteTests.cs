@@ -81,17 +81,38 @@ namespace Tester.StreamingTests
                 .ToList();
 
             // become producers
-            await Task.WhenAll(Enumerable.Range(0, streamCount).Select(i => producers[i].BecomeProducer(streamIds[i], null!, Fixture.StreamProviderName)));
+            await Task.WhenAll(Enumerable.Range(0, streamCount).Select(i => producers[i].BecomeProducer(
+                streamIds[i],
+                null!,
+                Fixture.StreamProviderName,
+                TestContext.Current.CancellationToken)));
 
             // produce some events
-            await Task.WhenAll(Enumerable.Range(0, streamCount).Select(i => producers[i].StartPeriodicProducing()));
-            await Task.Delay(TimeSpan.FromMilliseconds(1000));
-            await Task.WhenAll(Enumerable.Range(0, streamCount).Select(i => producers[i].StopPeriodicProducing()));
+            var periodicProducingStarted = true;
+            try
+            {
+                await Task.WhenAll(Enumerable.Range(0, streamCount).Select(i => producers[i].StartPeriodicProducing(TestContext.Current.CancellationToken)));
+                await Task.Delay(TimeSpan.FromMilliseconds(1000), TestContext.Current.CancellationToken);
+                await Task.WhenAll(Enumerable.Range(0, streamCount).Select(i => producers[i].StopPeriodicProducing(TestContext.Current.CancellationToken)));
+                periodicProducingStarted = false;
+            }
+            finally
+            {
+                if (periodicProducingStarted)
+                {
+                    using var cleanup = new CancellationTokenSource(Timeout);
+                    await Task.WhenAll(producers.Select(producer => producer.StopPeriodicProducing(cleanup.Token)))
+                        .ConfigureAwait(ConfigureAwaitOptions.SuppressThrowing | ConfigureAwaitOptions.ContinueOnCapturedContext);
+                }
+            }
 
             int[] counts = await Task.WhenAll(Enumerable.Range(0, streamCount).Select(i => producers[i].GetNumberProduced()));
 
             // make sure all went well
-            await TestingUtils.WaitUntilAsync((lastTry, cancellationToken) => CheckCounters(counts.Sum(), lastTry, cancellationToken), Timeout);
+            await TestingUtils.WaitUntilAsync(
+                (lastTry, cancellationToken) => CheckCounters(counts.Sum(), lastTry, cancellationToken),
+                Timeout,
+                cancellationToken: TestContext.Current.CancellationToken);
         }
 
         private Task OnNextAsync(int e, StreamSequenceToken? token)

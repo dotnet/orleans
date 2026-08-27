@@ -77,7 +77,8 @@ namespace UnitTests.StreamingTests
             await runner.Recoverable100EventStreamsWithTransientErrors(GenerateEvents,
                 ImplicitSubscription_TransientError_RecoverableStream_CollectorGrain.StreamNamespace,
                 TotalQueueCount,
-                100);
+                100,
+                TestContext.Current.CancellationToken);
         }
 
         [Fact, TestCategory("Functional"), TestCategory("Streaming")]
@@ -87,10 +88,15 @@ namespace UnitTests.StreamingTests
             await runner.Recoverable100EventStreamsWith1NonTransientError(GenerateEvents,
                 ImplicitSubscription_NonTransientError_RecoverableStream_CollectorGrain.StreamNamespace,
                 TotalQueueCount,
-                100);
+                100,
+                TestContext.Current.CancellationToken);
         }
 
-        private async Task GenerateEvents(string streamNamespace, int streamCount, int eventsInStream)
+        private async Task GenerateEvents(
+            string streamNamespace,
+            int streamCount,
+            int eventsInStream,
+            CancellationToken cancellationToken)
         {
             var generatorConfig = new SimpleGeneratorOptions
             {
@@ -99,7 +105,10 @@ namespace UnitTests.StreamingTests
             };
 
             var mgmt = this.fixture.GrainFactory.GetGrain<IManagementGrain>(0);
-            object?[] results = await mgmt.SendControlCommandToProvider<PersistentStreamProvider>(Fixture.StreamProviderName, (int)StreamGeneratorCommand.Configure, generatorConfig);
+            object?[] results = await mgmt.SendControlCommandToProvider<PersistentStreamProvider>(
+                Fixture.StreamProviderName,
+                (int)StreamGeneratorCommand.Configure,
+                generatorConfig);
             Assert.Equal(2, results.Length);
             bool[] bResults = results.Cast<bool>().ToArray();
             foreach (var result in bResults)

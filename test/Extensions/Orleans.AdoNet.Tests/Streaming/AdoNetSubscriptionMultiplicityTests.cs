@@ -69,7 +69,10 @@ public abstract class AdoNetSubscriptionMultiplicityTests : TestClusterPerTest
     public override async ValueTask InitializeAsync()
     {
         // set up the adonet environment before the base initializes
-        _testing = await RelationalStorageForTesting.SetupInstance(_invariant, TestDatabaseName);
+        _testing = await RelationalStorageForTesting.SetupInstance(
+            _invariant,
+            TestDatabaseName,
+            cancellationToken: TestContext.Current.CancellationToken);
 
         Assert.SkipWhen(IsNullOrEmpty(_testing.CurrentConnectionString), $"Database '{TestDatabaseName}' not initialized");
 
@@ -118,26 +121,26 @@ public abstract class AdoNetSubscriptionMultiplicityTests : TestClusterPerTest
     }
 
     [Fact, TestCategory("Functional")]
-    public Task AdoNetMultipleParallelSubscriptionTest() => _runner.MultipleParallelSubscriptionTest(Guid.NewGuid(), StreamNamespace);
+    public Task AdoNetMultipleParallelSubscriptionTest() => _runner.MultipleParallelSubscriptionTest(Guid.NewGuid(), StreamNamespace, TestContext.Current.CancellationToken);
 
     [Fact, TestCategory("Functional")]
-    public Task AdoNetMultipleLinearSubscriptionTest() => _runner.MultipleLinearSubscriptionTest(Guid.NewGuid(), StreamNamespace);
+    public Task AdoNetMultipleLinearSubscriptionTest() => _runner.MultipleLinearSubscriptionTest(Guid.NewGuid(), StreamNamespace, TestContext.Current.CancellationToken);
 
     [Fact, TestCategory("Functional")]
-    public Task AdoNetMultipleSubscriptionTest_AddRemove() => _runner.MultipleSubscriptionTest_AddRemove(Guid.NewGuid(), StreamNamespace);
+    public Task AdoNetMultipleSubscriptionTest_AddRemove() => _runner.MultipleSubscriptionTest_AddRemove(Guid.NewGuid(), StreamNamespace, TestContext.Current.CancellationToken);
 
     [Fact, TestCategory("Functional")]
-    public Task AdoNetResubscriptionTest() => _runner.ResubscriptionTest(Guid.NewGuid(), StreamNamespace);
+    public Task AdoNetResubscriptionTest() => _runner.ResubscriptionTest(Guid.NewGuid(), StreamNamespace, TestContext.Current.CancellationToken);
 
     [Fact, TestCategory("Functional")]
-    public Task AdoNetResubscriptionAfterDeactivationTest() => _runner.ResubscriptionAfterDeactivationTest(Guid.NewGuid(), StreamNamespace);
+    public Task AdoNetResubscriptionAfterDeactivationTest() => _runner.ResubscriptionAfterDeactivationTest(Guid.NewGuid(), StreamNamespace, TestContext.Current.CancellationToken);
 
     [Fact, TestCategory("Functional")]
-    public Task AdoNetActiveSubscriptionTest() => _runner.ActiveSubscriptionTest(Guid.NewGuid(), StreamNamespace);
+    public Task AdoNetActiveSubscriptionTest() => _runner.ActiveSubscriptionTest(Guid.NewGuid(), StreamNamespace, TestContext.Current.CancellationToken);
 
     [Fact, TestCategory("Functional")]
-    public Task AdoNetTwoIntermittentStreamTest() => _runner.TwoIntermittentStreamTest(Guid.NewGuid());
+    public Task AdoNetTwoIntermittentStreamTest() => _runner.TwoIntermittentStreamTest(Guid.NewGuid(), TestContext.Current.CancellationToken);
 
     [Fact, TestCategory("Functional")]
-    public Task AdoNetSubscribeFromClientTest() => _runner.SubscribeFromClientTest(Guid.NewGuid(), StreamNamespace);
+    public Task AdoNetSubscribeFromClientTest() => _runner.SubscribeFromClientTest(Guid.NewGuid(), StreamNamespace, TestContext.Current.CancellationToken);
 }

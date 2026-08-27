@@ -25,7 +25,7 @@ public class ClientConnectionEventTests
             c.AddClusterConnectionLostHandler((sender, args) => tcs.TrySetResult());
         });
         await using var cluster = builder.Build();
-        await cluster.DeployAsync();
+        await cluster.DeployAsync(TestContext.Current.CancellationToken);
 
         // Burst lot of call, to be sure that we are connected to all silos
         for (int i = 0; i < 100; i++)
@@ -34,7 +34,7 @@ public class ClientConnectionEventTests
             await grain.SetLabel(i.ToString());
         }
 
-        await cluster.StopAllSilosAsync();
+        await cluster.StopAllSilosAsync(TestContext.Current.CancellationToken);
         await tcs.Task.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
     }
 
@@ -60,10 +60,10 @@ public class ClientConnectionEventTests
             });
         });
         await using var cluster = builder.Build();
-        await cluster.DeployAsync();
+        await cluster.DeployAsync(TestContext.Current.CancellationToken);
 
         var silo = cluster.Silos[0];
-        await silo.StopSiloAsync(true);
+        await silo.StopSiloAsync(true, TestContext.Current.CancellationToken);
 
         await lostGatewayTcs.Task.WaitAsync(TimeSpan.FromSeconds(20), TestContext.Current.CancellationToken);
 

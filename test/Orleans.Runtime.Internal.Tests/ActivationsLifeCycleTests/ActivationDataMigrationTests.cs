@@ -20,31 +20,33 @@ public class ActivationDataMigrationTests(ActivationDataMigrationTests.Fixture f
     [Fact]
     public async Task TryStartMigration_ReturnsTrue_WhenActivationCanStartMigration()
     {
-        var activation = await GetActivation();
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var activation = await GetActivation(cancellationToken);
 
-        Assert.True(activation.TryStartMigration(requestContext: null));
+        Assert.True(activation.TryStartMigration(requestContext: null, cancellationToken));
 
         Assert.Equal(ActivationState.Deactivating, activation.State);
 
-        await activation.Deactivated.WaitAsync(TimeSpan.FromSeconds(10));
+        await activation.Deactivated.WaitAsync(TimeSpan.FromSeconds(10), cancellationToken);
     }
 
     [Fact]
     public async Task TryStartMigration_ReturnsFalse_WhenActivationIsInvalid()
     {
-        var activation = await GetActivation();
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var activation = await GetActivation(cancellationToken);
         var originalDeactivated = activation.Deactivated;
-        activation.Deactivate(new DeactivationReason(DeactivationReasonCode.RuntimeRequested, "test"), CancellationToken.None);
-        await originalDeactivated.WaitAsync(TimeSpan.FromSeconds(10));
+        activation.Deactivate(new DeactivationReason(DeactivationReasonCode.RuntimeRequested, "test"), cancellationToken);
+        await originalDeactivated.WaitAsync(TimeSpan.FromSeconds(10), cancellationToken);
 
         Assert.Equal(ActivationState.Invalid, activation.State);
-        Assert.False(activation.TryStartMigration(requestContext: null));
+        Assert.False(activation.TryStartMigration(requestContext: null, cancellationToken));
     }
 
-    private async Task<ActivationData> GetActivation()
+    private async Task<ActivationData> GetActivation(CancellationToken cancellationToken)
     {
         var grain = _fixture.GrainFactory.GetGrain<IIdleActivationGcTestGrain1>(Guid.NewGuid());
-        await grain.Nop();
+        await grain.Nop().WaitAsync(cancellationToken);
 
         var grainId = ((GrainReference)grain).GrainId;
         var directory = PrimarySilo.SiloHost.Services.GetRequiredService<ActivationDirectory>();

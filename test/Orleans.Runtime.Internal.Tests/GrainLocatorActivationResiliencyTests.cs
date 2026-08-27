@@ -54,6 +54,7 @@ namespace UnitTests
         [Fact, TestCategory("BVT")]
         public async Task ReactivateGrainWithPoisonGrainDirectoryEntry_LocalSilo()
         {
+            var cancellationToken = TestContext.Current.CancellationToken;
             var primarySilo = (InProcessSiloHandle)Fixture.HostedCluster.Primary!;
             var primarySiloAddress = primarySilo.SiloAddress;
             var grain = GrainFactory.GetGrain<IGuidTestGrain>(Guid.NewGuid());
@@ -64,7 +65,7 @@ namespace UnitTests
             // This simulates a stale entry from a crashed/deactivated grain
             var grainLocator = primarySilo.SiloHost.Services.GetRequiredService<GrainLocator>();
             var badAddress = GrainAddress.GetAddress(primarySiloAddress, grain.GetGrainId(), ActivationId.NewId());
-            await grainLocator.Register(badAddress, previousRegistration: null);
+            await grainLocator.Register(badAddress, previousRegistration: null, cancellationToken);
 
             {
                 // Force placement on the primary silo using placement hint
@@ -90,6 +91,7 @@ namespace UnitTests
         [Fact, TestCategory("BVT")]
         public async Task ReactivateGrainWithPoisonGrainDirectoryEntry_RemoteSilo()
         {
+            var cancellationToken = TestContext.Current.CancellationToken;
             var primarySilo = (InProcessSiloHandle)Fixture.HostedCluster.Primary!;
             var secondarySiloAddress = Fixture.HostedCluster.SecondarySilos.First().SiloAddress;
             var primarySiloAddress = primarySilo.SiloAddress;
@@ -100,7 +102,7 @@ namespace UnitTests
             // and forward the request to primary, where recovery will occur
             var grainLocator = primarySilo.SiloHost.Services.GetRequiredService<GrainLocator>();
             var badAddress = GrainAddress.GetAddress(primarySiloAddress, grain.GetGrainId(), ActivationId.NewId());
-            await grainLocator.Register(badAddress, previousRegistration: null);
+            await grainLocator.Register(badAddress, previousRegistration: null, cancellationToken);
 
             {
                 // Attempt placement on secondary silo, but the directory entry

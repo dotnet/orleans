@@ -346,32 +346,33 @@ namespace UnitTests.General
         [Fact, TestCategory("Functional"), TestCategory("RequestContext")]
         public async Task Halo_RequestContextShouldBeMaintainedWhenThreadHoppingOccurs()
         {
+            var cancellationToken = TestContext.Current.CancellationToken;
             int numTasks = 20;
             Task[] tasks = new Task[numTasks];
 
             for (int i = 0; i < numTasks; i++)
             {
                 var closureInt = i;
-                async Task func() { await ContextTester(closureInt); }
-                tasks[i] = Task.Run(func);
+                async Task func() { await ContextTester(closureInt, cancellationToken); }
+                tasks[i] = Task.Run(func, cancellationToken);
             }
 
             await Task.WhenAll(tasks);
         }
 
-        private async Task ContextTester(int i)
+        private async Task ContextTester(int i, CancellationToken cancellationToken)
         {
             RequestContext.Set("threadId", i);
             int contextId = (int)(RequestContext.Get("threadId") ?? -1);
             output.WriteLine("ExplicitId={0}, ContextId={2}, ManagedThreadId={1}", i, Environment.CurrentManagedThreadId, contextId);
-            await FrameworkContextVerification(i).ConfigureAwait(false);
+            await FrameworkContextVerification(i, cancellationToken).ConfigureAwait(false);
         }
 
-        private async Task FrameworkContextVerification(int id)
+        private async Task FrameworkContextVerification(int id, CancellationToken cancellationToken)
         {
             for (int i = 0; i < 10; i++)
             {
-                await Task.Delay(10);
+                await Task.Delay(10, cancellationToken);
                 int contextId = (int)(RequestContext.Get("threadId") ?? -1);
                 output.WriteLine("Inner, in loop {0}, Explicit Id={2}, ContextId={3}, ManagedThreadId={1}", i, Environment.CurrentManagedThreadId, id, contextId);
                 Assert.Equal(id, contextId);
@@ -396,32 +397,33 @@ namespace UnitTests.General
         [Fact, TestCategory("Functional"), TestCategory("RequestContext")]
         public async Task Halo_LogicalCallContextShouldBeMaintainedWhenThreadHoppingOccurs()
         {
+            var cancellationToken = TestContext.Current.CancellationToken;
             int numTasks = 20;
             Task[] tasks = new Task[numTasks];
 
             for (int i = 0; i < numTasks; i++)
             {
                 var closureInt = i;
-                async Task func() { await ContextTester(closureInt); }
-                tasks[i] = Task.Run(func);
+                async Task func() { await ContextTester(closureInt, cancellationToken); }
+                tasks[i] = Task.Run(func, cancellationToken);
             }
 
             await Task.WhenAll(tasks);
         }
 
-        private async Task ContextTester(int i)
+        private async Task ContextTester(int i, CancellationToken cancellationToken)
         {
             threadId.Value = i;
             int contextId = threadId.Value;
             output.WriteLine("ExplicitId={0}, ContextId={2}, ManagedThreadId={1}", i, Environment.CurrentManagedThreadId, contextId);
-            await FrameworkContextVerification(i).ConfigureAwait(false);
+            await FrameworkContextVerification(i, cancellationToken).ConfigureAwait(false);
         }
 
-        private async Task FrameworkContextVerification(int id)
+        private async Task FrameworkContextVerification(int id, CancellationToken cancellationToken)
         {
             for (int i = 0; i < 10; i++)
             {
-                await Task.Delay(10);
+                await Task.Delay(10, cancellationToken);
                 int contextId = threadId.Value;
                 output.WriteLine("Inner, in loop {0}, Explicit Id={2}, ContextId={3}, ManagedThreadId={1}", i, Environment.CurrentManagedThreadId, id, contextId);
                 Assert.Equal(id, contextId);

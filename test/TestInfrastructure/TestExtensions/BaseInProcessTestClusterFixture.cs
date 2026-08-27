@@ -90,7 +90,7 @@ public abstract class BaseInProcessTestClusterFixture : Xunit.IAsyncLifetime
         ConfigureTestCluster(builder);
 
         var testCluster = builder.Build();
-        await testCluster.DeployAsync().ConfigureAwait(false);
+        await testCluster.DeployAsync(Xunit.TestContext.Current.CancellationToken).ConfigureAwait(false);
 
         HostedCluster = testCluster;
         Logger = Client.ServiceProvider.GetRequiredService<ILoggerFactory>().CreateLogger("Application");
@@ -103,7 +103,7 @@ public abstract class BaseInProcessTestClusterFixture : Xunit.IAsyncLifetime
 
         try
         {
-            await cluster.StopAllSilosAsync().ConfigureAwait(false);
+            await cluster.StopAllSilosAsync(Xunit.TestContext.Current.CancellationToken).ConfigureAwait(false);
         }
         finally
         {

@@ -21,27 +21,36 @@ namespace Tester.StreamingTests
             this.testHost = testHost;
         }
 
-        public async Task StreamProducerOnDroppedClientTest(string streamProviderName, string streamNamespace)
+        public async Task StreamProducerOnDroppedClientTest(
+            string streamProviderName,
+            string streamNamespace,
+            CancellationToken cancellationToken = default)
         {
             const int eventsProduced = 10;
             Guid streamGuid = Guid.NewGuid();
 
-            await ProduceEventsFromClient(streamProviderName, streamGuid, streamNamespace, eventsProduced);
+            await ProduceEventsFromClient(streamProviderName, streamGuid, streamNamespace, eventsProduced, cancellationToken);
 
             // Hard kill client
             var droppedClients = GetConnectedClients();
             using var gatewayObserver = GatewayDiagnosticObserver.Create();
             await testHost.KillClientAsync();
-            await WaitForDroppedClientsAsync(droppedClients, gatewayObserver);
+            await WaitForDroppedClientsAsync(droppedClients, gatewayObserver, cancellationToken);
 
             // initialize new client
-            await testHost.InitializeClientAsync();
+            await testHost.InitializeClientAsync(cancellationToken);
 
             // run test again.
-            await ProduceEventsFromClient(streamProviderName, streamGuid, streamNamespace, eventsProduced);
+            await ProduceEventsFromClient(streamProviderName, streamGuid, streamNamespace, eventsProduced, cancellationToken);
         }
 
-        public async Task StreamConsumerOnDroppedClientTest(string streamProviderName, string streamNamespace, ITestOutputHelper? output, Func<Task<int>>? getDeliveryFailureCount = null, bool waitForRetryTimeouts = false)
+        public async Task StreamConsumerOnDroppedClientTest(
+            string streamProviderName,
+            string streamNamespace,
+            ITestOutputHelper? output,
+            Func<Task<int>>? getDeliveryFailureCount = null,
+            bool waitForRetryTimeouts = false,
+            CancellationToken cancellationToken = default)
         {
             var hasDeliveryFailureCounter = getDeliveryFailureCount is not null;
             getDeliveryFailureCount ??= DefaultDeliveryFailureCount;
@@ -50,26 +59,27 @@ namespace Tester.StreamingTests
             var streamId = StreamId.Create(streamNamespace, streamGuid);
             int[] eventCount = {0};
 
-            var droppedSubscriptionId = await ProduceEventsToClient(streamProviderName, streamGuid, streamNamespace, 10, eventCount);
+            var droppedSubscriptionId = await ProduceEventsToClient(streamProviderName, streamGuid, streamNamespace, 10, eventCount, cancellationToken);
 
             // Hard kill client
             var droppedClients = GetConnectedClients();
             using var gatewayObserver = GatewayDiagnosticObserver.Create();
             using var streamingObserver = StreamingDiagnosticObserver.Create();
             await testHost.KillClientAsync();
-            await WaitForDroppedClientsAsync(droppedClients, gatewayObserver);
+            await WaitForDroppedClientsAsync(droppedClients, gatewayObserver, cancellationToken);
 
             // initialize new client
-            await testHost.InitializeClientAsync();
+            await testHost.InitializeClientAsync(cancellationToken);
 
             eventCount[0] = 0;
 
-            await ProduceEventsToClient(streamProviderName, streamGuid, streamNamespace, 10, eventCount);
+            await ProduceEventsToClient(streamProviderName, streamGuid, streamNamespace, 10, eventCount, cancellationToken);
 
             // Wait for the dropped client's subscription to be removed after delivery fails.
             if (waitForRetryTimeouts && hasDeliveryFailureCounter)
             {
-                using var cts = new CancellationTokenSource(_timeout);
+                using var cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+                cts.CancelAfter(_timeout);
                 await streamingObserver.WaitForSubscriptionUnregisteredAsync(streamId, droppedSubscriptionId, streamProviderName, cts.Token);
             }
 
@@ -85,17 +95,23 @@ namespace Tester.StreamingTests
             return stream.SubscribeAsync(onNextAsync);
         }
 
-        private async Task ProduceEventsFromClient(string streamProviderName, Guid streamGuid, string streamNamespace, int eventsProduced)
+        private async Task ProduceEventsFromClient(
+            string streamProviderName,
+            Guid streamGuid,
+            string streamNamespace,
+            int eventsProduced,
+            CancellationToken cancellationToken)
         {
             using var observer = StreamingDiagnosticObserver.Create();
-            using var cts = new CancellationTokenSource(_timeout);
+            using var cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+            cts.CancelAfter(_timeout);
             var streamId = StreamId.Create(streamNamespace, streamGuid);
 
             // get reference to a consumer
             var consumer = this.testHost.GrainFactory!.GetGrain<ISampleStreaming_ConsumerGrain>(Guid.NewGuid()); // The runner deploys the client.
 
             // subscribe
-            await consumer.BecomeConsumer(streamGuid, streamNamespace, streamProviderName);
+            await consumer.BecomeConsumer(streamGuid, streamNamespace, streamProviderName, cts.Token);
             var subscription = await observer.WaitForSubscriptionRegisteredAsync(streamId, streamProviderName, cts.Token);
             try
             {
@@ -107,7 +123,9 @@ namespace Tester.StreamingTests
             }
             finally
             {
-                await consumer.StopConsuming();
+                using var cleanup = new CancellationTokenSource(_timeout);
+                await consumer.StopConsuming(cleanup.Token)
+                    .ConfigureAwait(ConfigureAwaitOptions.SuppressThrowing | ConfigureAwaitOptions.ContinueOnCapturedContext);
             }
         }
 
@@ -121,10 +139,17 @@ namespace Tester.StreamingTests
             }
         }
 
-        private async Task<Guid> ProduceEventsToClient(string streamProviderName, Guid streamGuid, string streamNamespace, int eventsProduced, int[] eventCount)
+        private async Task<Guid> ProduceEventsToClient(
+            string streamProviderName,
+            Guid streamGuid,
+            string streamNamespace,
+            int eventsProduced,
+            int[] eventCount,
+            CancellationToken cancellationToken)
         {
             using var observer = StreamingDiagnosticObserver.Create();
-            using var cts = new CancellationTokenSource(_timeout);
+            using var cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+            cts.CancelAfter(_timeout);
             var streamId = StreamId.Create(streamNamespace, streamGuid);
 
             var subscription = await SubscribeToStream(streamProviderName, streamGuid, streamNamespace,
@@ -135,9 +160,9 @@ namespace Tester.StreamingTests
                 });
 
             var producer = this.testHost.GrainFactory!.GetGrain<ISampleStreaming_ProducerGrain>(Guid.NewGuid()); // The runner deploys the client.
-            await producer.BecomeProducer(streamGuid, streamNamespace, streamProviderName);
+            await producer.BecomeProducer(streamGuid, streamNamespace, streamProviderName, cts.Token);
 
-            await ProduceExactCountAsync(producer, eventsProduced);
+            await ProduceExactCountAsync(producer, eventsProduced, cts.Token);
             await observer.WaitForItemDeliveryCountAsync(streamId, eventsProduced, streamProviderName, cts.Token);
 
             Assert.Equal(eventsProduced, eventCount[0]);
@@ -145,14 +170,18 @@ namespace Tester.StreamingTests
             return subscription.HandleId;
         }
 
-        private async Task WaitForDroppedClientsAsync(HashSet<ConnectedClient> droppedClients, GatewayDiagnosticObserver observer)
+        private async Task WaitForDroppedClientsAsync(
+            HashSet<ConnectedClient> droppedClients,
+            GatewayDiagnosticObserver observer,
+            CancellationToken cancellationToken)
         {
             if (droppedClients.Count == 0)
             {
                 return;
             }
 
-            using var cts = new CancellationTokenSource(GetClientDropWaitTimeout());
+            using var cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+            cts.CancelAfter(GetClientDropWaitTimeout());
             await observer.WaitForClientsDroppedAsync(droppedClients.Select(client => (client.SiloAddress, client.ClientId)), cts.Token);
 
             var remainingClients = GetConnectedClients();
@@ -190,11 +219,14 @@ namespace Tester.StreamingTests
             return (maxDropTimeout * 2) + TimeSpan.FromSeconds(10);
         }
 
-        private static async Task ProduceExactCountAsync(ISampleStreaming_ProducerGrain producer, int count)
+        private static async Task ProduceExactCountAsync(
+            ISampleStreaming_ProducerGrain producer,
+            int count,
+            CancellationToken cancellationToken)
         {
             for (var i = 0; i < count; i++)
             {
-                await producer.Produce();
+                await producer.Produce(cancellationToken);
             }
         }
 

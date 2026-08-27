@@ -46,7 +46,10 @@ namespace UnitTests.StorageTests.Relational
 
         public async ValueTask InitializeAsync()
         {
-            var persistenceStorage = await Fixture.GetStorageProvider(_adoNetInvariant, _deleteStateOnClear);
+            var persistenceStorage = await Fixture.GetStorageProvider(
+                _adoNetInvariant,
+                _deleteStateOnClear,
+                TestContext.Current.CancellationToken);
             Assert.SkipWhen(persistenceStorage is null, $"Persistence storage not available for {_adoNetInvariant}.");
             PersistenceStorageTests = new CommonStorageTests(persistenceStorage);
         }

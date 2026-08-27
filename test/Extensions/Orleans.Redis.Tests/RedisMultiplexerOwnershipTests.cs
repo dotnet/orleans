@@ -266,7 +266,7 @@ public sealed class RedisMultiplexerOwnershipTests
         {
             ISiloLifecycleSubject lifecycle = new SiloLifecycleSubject(NullLoggerFactory.Instance.CreateLogger<SiloLifecycleSubject>());
             storage.Participate(lifecycle);
-            await lifecycle.OnStart(CancellationToken.None);
+            await lifecycle.OnStart(TestContext.Current.CancellationToken);
         });
     }
 

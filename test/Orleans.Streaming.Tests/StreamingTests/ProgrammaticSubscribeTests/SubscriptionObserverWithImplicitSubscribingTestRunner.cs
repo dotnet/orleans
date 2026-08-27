@@ -31,14 +31,17 @@ namespace Tester.StreamingTests.ProgrammaticSubscribeTests
         public virtual async Task StreamingTests_Consumer_Producer_Subscribe()
         {
             using var observer = StreamingDiagnosticObserver.Create();
-            using var cts = new CancellationTokenSource(_timeout);
+            using var cts = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
+            cts.CancelAfter(_timeout);
             var streamId = new FullStreamIdentity(Guid.NewGuid(), ImplicitSubscribeGrain.StreamNameSpace, StreamProviderName);
             var rxStreamId = StreamId.Create(ImplicitSubscribeGrain.StreamNameSpace, streamId.Guid);
             var producer = this.fixture.HostedCluster.GrainFactory!.GetGrain<ITypedProducerGrainProducingApple>(Guid.NewGuid());
+            cts.Token.ThrowIfCancellationRequested();
             await producer.BecomeProducer(streamId.Guid, streamId.Namespace, streamId.ProviderName);
 
             for (var i = 0; i< 10; i++)
             {
+                cts.Token.ThrowIfCancellationRequested();
                 await producer.Produce();
             }
 
@@ -54,24 +57,29 @@ namespace Tester.StreamingTests.ProgrammaticSubscribeTests
         public virtual async Task StreamingTests_Consumer_Producer_SubscribeToTwoStream_MessageWithPolymorphism()
         {
             using var observer = StreamingDiagnosticObserver.Create();
-            using var cts = new CancellationTokenSource(_timeout);
+            using var cts = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
+            cts.CancelAfter(_timeout);
             var streamId = new FullStreamIdentity(Guid.NewGuid(), ImplicitSubscribeGrain.StreamNameSpace, StreamProviderName);
             var rxStreamId = StreamId.Create(ImplicitSubscribeGrain.StreamNameSpace, streamId.Guid);
             var producer = this.fixture.GrainFactory.GetGrain<ITypedProducerGrainProducingApple>(Guid.NewGuid());
+            cts.Token.ThrowIfCancellationRequested();
             await producer.BecomeProducer(streamId.Guid, streamId.Namespace, streamId.ProviderName);
 
             // set up the new stream with the same guid, but different namespace, so it would invoke the same consumer grain
             var streamId2 = new FullStreamIdentity(streamId.Guid, ImplicitSubscribeGrain.StreamNameSpace2, StreamProviderName);
             var rxStreamId2 = StreamId.Create(ImplicitSubscribeGrain.StreamNameSpace2, streamId2.Guid);
             var producer2 = this.fixture.GrainFactory.GetGrain<ITypedProducerGrainProducingApple>(Guid.NewGuid());
+            cts.Token.ThrowIfCancellationRequested();
             await producer2.BecomeProducer(streamId2.Guid, streamId2.Namespace, streamId2.ProviderName);
 
             // Produce 10 events in streamId, 8 on streamId2
             for (var i = 0; i < 10; i++)
             {
+                cts.Token.ThrowIfCancellationRequested();
                 await producer.Produce();
                 if (i < 8)
                 {
+                    cts.Token.ThrowIfCancellationRequested();
                     await producer2.Produce();
                 }
             }
@@ -91,25 +99,30 @@ namespace Tester.StreamingTests.ProgrammaticSubscribeTests
         public virtual async Task StreamingTests_Consumer_Producer_SubscribeToStreamsHandledByDifferentStreamProvider()
         {
             using var observer = StreamingDiagnosticObserver.Create();
-            using var cts = new CancellationTokenSource(_timeout);
+            using var cts = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
+            cts.CancelAfter(_timeout);
             var streamId = new FullStreamIdentity(Guid.NewGuid(), ImplicitSubscribeGrain.StreamNameSpace, StreamProviderName);
             var rxStreamId = StreamId.Create(ImplicitSubscribeGrain.StreamNameSpace, streamId.Guid);
 
             var producer = this.fixture.GrainFactory.GetGrain<ITypedProducerGrainProducingApple>(Guid.NewGuid());
+            cts.Token.ThrowIfCancellationRequested();
             await producer.BecomeProducer(streamId.Guid, streamId.Namespace, streamId.ProviderName);
 
             // set up the new stream with the same guid, but different namespace, so it would invoke the same consumer grain
             var streamId2 = new FullStreamIdentity(streamId.Guid, ImplicitSubscribeGrain.StreamNameSpace2, StreamProviderName2);
             var rxStreamId2 = StreamId.Create(ImplicitSubscribeGrain.StreamNameSpace2, streamId2.Guid);
             var producer2 = this.fixture.GrainFactory.GetGrain<ITypedProducerGrainProducingApple>(Guid.NewGuid());
+            cts.Token.ThrowIfCancellationRequested();
             await producer2.BecomeProducer(streamId2.Guid, streamId2.Namespace, streamId2.ProviderName);
 
             // Produce 10 events in streamId, 8 on streamId2
             for (var i = 0; i < 10; i++)
             {
+                cts.Token.ThrowIfCancellationRequested();
                 await producer.Produce();
                 if (i < 8)
                 {
+                    cts.Token.ThrowIfCancellationRequested();
                     await producer2.Produce();
                 }
             }

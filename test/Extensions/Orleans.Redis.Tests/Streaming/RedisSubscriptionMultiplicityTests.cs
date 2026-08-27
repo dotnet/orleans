@@ -18,28 +18,28 @@ public sealed class RedisSubscriptionMultiplicityTests : TestClusterPerTest
     private SubscriptionMultiplicityTestRunner _runner = null!;
 
     [Fact]
-    public async Task Redis_MultipleParallelSubscriptionTest() => await _runner.MultipleParallelSubscriptionTest(Guid.NewGuid(), StreamNamespace);
+    public async Task Redis_MultipleParallelSubscriptionTest() => await _runner.MultipleParallelSubscriptionTest(Guid.NewGuid(), StreamNamespace, TestContext.Current.CancellationToken);
 
     [Fact]
-    public async Task Redis_MultipleLinearSubscriptionTest() => await _runner.MultipleLinearSubscriptionTest(Guid.NewGuid(), StreamNamespace);
+    public async Task Redis_MultipleLinearSubscriptionTest() => await _runner.MultipleLinearSubscriptionTest(Guid.NewGuid(), StreamNamespace, TestContext.Current.CancellationToken);
 
     [Fact]
-    public async Task Redis_MultipleSubscriptionTest_AddRemove() => await _runner.MultipleSubscriptionTest_AddRemove(Guid.NewGuid(), StreamNamespace);
+    public async Task Redis_MultipleSubscriptionTest_AddRemove() => await _runner.MultipleSubscriptionTest_AddRemove(Guid.NewGuid(), StreamNamespace, TestContext.Current.CancellationToken);
 
     [Fact]
-    public async Task Redis_ResubscriptionTest() => await _runner.ResubscriptionTest(Guid.NewGuid(), StreamNamespace);
+    public async Task Redis_ResubscriptionTest() => await _runner.ResubscriptionTest(Guid.NewGuid(), StreamNamespace, TestContext.Current.CancellationToken);
 
     [Fact]
-    public async Task Redis_ResubscriptionAfterDeactivationTest() => await _runner.ResubscriptionAfterDeactivationTest(Guid.NewGuid(), StreamNamespace);
+    public async Task Redis_ResubscriptionAfterDeactivationTest() => await _runner.ResubscriptionAfterDeactivationTest(Guid.NewGuid(), StreamNamespace, TestContext.Current.CancellationToken);
 
     [Fact]
-    public async Task Redis_ActiveSubscriptionTest() => await _runner.ActiveSubscriptionTest(Guid.NewGuid(), StreamNamespace);
+    public async Task Redis_ActiveSubscriptionTest() => await _runner.ActiveSubscriptionTest(Guid.NewGuid(), StreamNamespace, TestContext.Current.CancellationToken);
 
     [Fact]
-    public async Task Redis_TwoIntermittentStreamTest() => await _runner.TwoIntermittentStreamTest(Guid.NewGuid());
+    public async Task Redis_TwoIntermittentStreamTest() => await _runner.TwoIntermittentStreamTest(Guid.NewGuid(), TestContext.Current.CancellationToken);
 
     [Fact]
-    public async Task Redis_SubscribeFromClientTest() => await _runner.SubscribeFromClientTest(Guid.NewGuid(), StreamNamespace);
+    public async Task Redis_SubscribeFromClientTest() => await _runner.SubscribeFromClientTest(Guid.NewGuid(), StreamNamespace, TestContext.Current.CancellationToken);
 
     public override async ValueTask InitializeAsync()
     {

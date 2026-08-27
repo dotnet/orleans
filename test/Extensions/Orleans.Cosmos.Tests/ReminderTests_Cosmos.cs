@@ -69,21 +69,21 @@ public class ReminderTests_Cosmos : ReminderTestsBase, IClassFixture<ReminderTes
     [Fact, TestCategory("Functional")]
     public async Task Rem_Azure_Basic_StopByRef()
     {
-        await Test_Reminders_Basic_StopByRef();
+        await Test_Reminders_Basic_StopByRef(TestContext.Current.CancellationToken);
     }
 
     [TestSuite("Functional")]
     [Fact, TestCategory("Functional")]
     public async Task Rem_Cosmos_UpdateReminder_DoesNotRestartLocalReminder()
     {
-        await Test_Reminders_UpdateReminder_DoesNotRestartLocalReminder();
+        await Test_Reminders_UpdateReminder_DoesNotRestartLocalReminder(TestContext.Current.CancellationToken);
     }
 
     [TestSuite("Functional")]
     [Fact, TestCategory("Functional")]
     public async Task Rem_Azure_Basic_ListOps()
     {
-        await Test_Reminders_Basic_ListOps();
+        await Test_Reminders_Basic_ListOps(TestContext.Current.CancellationToken);
     }
 
     // Single join tests ... multi grain, multi reminders
@@ -92,14 +92,14 @@ public class ReminderTests_Cosmos : ReminderTestsBase, IClassFixture<ReminderTes
     [Fact, TestCategory("Functional")]
     public async Task Rem_Azure_1J_MultiGrainMultiReminders()
     {
-        await Test_Reminders_1J_MultiGrainMultiReminders();
+        await Test_Reminders_1J_MultiGrainMultiReminders(TestContext.Current.CancellationToken);
     }
 
     [TestSuite("Functional")]
     [Fact, TestCategory("Functional")]
     public async Task Rem_Azure_ReminderNotFound()
     {
-        await Test_Reminders_ReminderNotFound();
+        await Test_Reminders_ReminderNotFound(TestContext.Current.CancellationToken);
     }
 
     [TestSuite("Functional")]
@@ -111,11 +111,11 @@ public class ReminderTests_Cosmos : ReminderTestsBase, IClassFixture<ReminderTes
         TimeSpan period = await grain.GetReminderPeriod(DR);
         // start up the 'DR' reminder and wait for two ticks to pass.
         await grain.StartReminder(DR);
-        long last = await WaitForReminderCounterAsync(grain, DR, () => grain.GetCounter(DR), 2);
+        long last = await WaitForReminderCounterAsync(grain, DR, () => grain.GetCounter(DR), 2, TestContext.Current.CancellationToken);
         Assert.Equal(2, last);
         // stop the timer and wait for a whole period.
-        await StopReminderAndWaitForQuiescenceAsync(grain, DR, grain.StopReminder);
-        await AdvanceReminderTimeAsync(period);
+        await StopReminderAndWaitForQuiescenceAsync(grain, DR, grain.StopReminder, TestContext.Current.CancellationToken);
+        await AdvanceReminderTimeAsync(period, TestContext.Current.CancellationToken);
         long curr = await grain.GetCounter(DR);
         Assert.Equal(last, curr);
     }
@@ -127,12 +127,12 @@ public class ReminderTests_Cosmos : ReminderTestsBase, IClassFixture<ReminderTes
         IReminderTestGrain2 grain = GrainFactory.GetGrain<IReminderTestGrain2>(Guid.NewGuid());
         TimeSpan period = await grain.GetReminderPeriod(DR);
         await grain.StartReminder(DR);
-        long last = await WaitForReminderCounterAsync(grain, DR, () => grain.GetCounter(DR), 2);
+        long last = await WaitForReminderCounterAsync(grain, DR, () => grain.GetCounter(DR), 2, TestContext.Current.CancellationToken);
         Assert.Equal(2, last);
 
-        await StopReminderAndWaitForQuiescenceAsync(grain, DR, grain.StopReminder);
+        await StopReminderAndWaitForQuiescenceAsync(grain, DR, grain.StopReminder, TestContext.Current.CancellationToken);
         TimeSpan sleepFor = period;
-        await AdvanceReminderTimeAsync(sleepFor);
+        await AdvanceReminderTimeAsync(sleepFor, TestContext.Current.CancellationToken);
         long curr = await grain.GetCounter(DR);
         Assert.Equal(last, curr);
         AssertIsInRange(curr, last, last + 1, grain, DR, sleepFor);
@@ -140,9 +140,9 @@ public class ReminderTests_Cosmos : ReminderTestsBase, IClassFixture<ReminderTes
         // start the same reminder again
         await grain.StartReminder(DR);
         sleepFor = period.Multiply(2);
-        curr = await WaitForReminderCounterAsync(grain, DR, () => grain.GetCounter(DR), 2);
+        curr = await WaitForReminderCounterAsync(grain, DR, () => grain.GetCounter(DR), 2, TestContext.Current.CancellationToken);
         AssertIsInRange(curr, 2, 3, grain, DR, sleepFor);
-        await StopReminderAndWaitForQuiescenceAsync(grain, DR, grain.StopReminder); // cleanup
+        await StopReminderAndWaitForQuiescenceAsync(grain, DR, grain.StopReminder, TestContext.Current.CancellationToken); // cleanup
     }
 
     [TestSuite("Functional")]
@@ -150,14 +150,14 @@ public class ReminderTests_Cosmos : ReminderTestsBase, IClassFixture<ReminderTes
     public async Task Rem_Azure_MultipleReminders()
     {
         IReminderTestGrain2 grain = GrainFactory.GetGrain<IReminderTestGrain2>(Guid.NewGuid());
-        await PerGrainMultiReminderTest(grain);
+        await PerGrainMultiReminderTest(grain, TestContext.Current.CancellationToken);
     }
 
     [TestSuite("Functional")]
     [Fact, TestCategory("Functional")]
     public async Task Rem_Azure_2J_MultiGrainMultiReminders()
     {
-        await Test_Reminders_2J_MultiGrainMultiReminders();
+        await Test_Reminders_2J_MultiGrainMultiReminders(TestContext.Current.CancellationToken);
     }
 
     [TestSuite("Functional")]
@@ -169,7 +169,8 @@ public class ReminderTests_Cosmos : ReminderTestsBase, IClassFixture<ReminderTes
         IReminderTestGrain2 g3 = GrainFactory.GetGrain<IReminderTestGrain2>(Guid.NewGuid());
         IReminderTestGrain2 g4 = GrainFactory.GetGrain<IReminderTestGrain2>(Guid.NewGuid());
         IReminderTestGrain2 g5 = GrainFactory.GetGrain<IReminderTestGrain2>(Guid.NewGuid());
-        using var cts = new CancellationTokenSource(ENDWAIT);
+        using var cts = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
+        cts.CancelAfter(ENDWAIT);
 
         await Test_Reminders_MultiGrainMultiReminders(
             afterFirstTick: null,
@@ -186,7 +187,8 @@ public class ReminderTests_Cosmos : ReminderTestsBase, IClassFixture<ReminderTes
     public async Task Rem_Azure_1F_Basic()
     {
         IReminderTestGrain2 g1 = GrainFactory.GetGrain<IReminderTestGrain2>(Guid.NewGuid());
-        using var cts = new CancellationTokenSource(ENDWAIT);
+        using var cts = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
+        cts.CancelAfter(ENDWAIT);
 
         await PrepareForGrainFailureAsync(cts.Token, g1);
 
@@ -206,7 +208,8 @@ public class ReminderTests_Cosmos : ReminderTestsBase, IClassFixture<ReminderTes
     [Fact, TestCategory("Functional")]
     public async Task Rem_Azure_2F_MultiGrain()
     {
-        using var cts = new CancellationTokenSource(ENDWAIT);
+        using var cts = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
+        cts.CancelAfter(ENDWAIT);
         _ = await StartAdditionalSilosAndWaitForReminderServicesAsync(
             2,
             cts.Token,
@@ -239,7 +242,8 @@ public class ReminderTests_Cosmos : ReminderTestsBase, IClassFixture<ReminderTes
     [Fact, TestCategory("Functional")]
     public async Task Rem_Azure_1F1J_MultiGrain()
     {
-        using var cts = new CancellationTokenSource(ENDWAIT);
+        using var cts = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
+        cts.CancelAfter(ENDWAIT);
         _ = await StartAdditionalSilosAndWaitForReminderServicesAsync(1, cts.Token);
 
         IReminderTestGrain2 g1 = GrainFactory.GetGrain<IReminderTestGrain2>(Guid.NewGuid());
@@ -274,7 +278,7 @@ public class ReminderTests_Cosmos : ReminderTestsBase, IClassFixture<ReminderTes
         Task<IGrainReminder> promise1 = grain.StartReminder(DR);
         Task<IGrainReminder> promise2 = grain.StartReminder(DR);
         Task<IGrainReminder>[] tasks = { promise1, promise2 };
-        await Task.WhenAll(tasks).WaitAsync(TimeSpan.FromSeconds(15));
+        await Task.WhenAll(tasks).WaitAsync(TimeSpan.FromSeconds(15), TestContext.Current.CancellationToken);
         //Assert.NotEqual(promise1.Result, promise2.Result);
         // TODO: write tests where period of a reminder is changed
     }
@@ -286,7 +290,8 @@ public class ReminderTests_Cosmos : ReminderTestsBase, IClassFixture<ReminderTes
         IReminderTestGrain2 g1 = GrainFactory.GetGrain<IReminderTestGrain2>(Guid.NewGuid());
         IReminderTestCopyGrain g2 = GrainFactory.GetGrain<IReminderTestCopyGrain>(Guid.NewGuid());
         TimeSpan period = await g1.GetReminderPeriod(DR); // using same period
-        using var cts = new CancellationTokenSource(ENDWAIT);
+        using var cts = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
+        cts.CancelAfter(ENDWAIT);
 
         var reminder1 = await g1.StartReminder(DR);
         Assert.Equal(DR, reminder1.ReminderName);
@@ -314,7 +319,8 @@ public class ReminderTests_Cosmos : ReminderTestsBase, IClassFixture<ReminderTes
     [Fact(Skip = "https://github.com/dotnet/orleans/issues/4319"), TestCategory("Functional")]
     public async Task Rem_Azure_GT_1F1J_MultiGrain()
     {
-        using var cts = new CancellationTokenSource(ENDWAIT);
+        using var cts = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
+        cts.CancelAfter(ENDWAIT);
         _ = await StartAdditionalSilosAndWaitForReminderServicesAsync(1, cts.Token);
 
         IReminderTestGrain2 g1 = GrainFactory.GetGrain<IReminderTestGrain2>(Guid.NewGuid());

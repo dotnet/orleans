@@ -38,13 +38,44 @@ namespace Orleans.TestingHost
             string siloName,
             IConfiguration configuration,
             Action<IHostBuilder>? postConfigureHostBuilder = null)
+            => await CreateAsync(siloName, configuration, postConfigureHostBuilder, CancellationToken.None);
+
+        /// <summary>
+        /// Create a silo handle.
+        /// </summary>
+        /// <param name="siloName">Name of the silo.</param>
+        /// <param name="configuration">The configuration.</param>
+        /// <param name="postConfigureHostBuilder">An optional delegate which is invoked just prior to building the host builder.</param>
+        /// <param name="cancellationToken">The token used to cancel silo startup.</param>
+        /// <returns>The silo handle.</returns>
+        public static async Task<InProcessSiloHandle> CreateAsync(
+            string siloName,
+            IConfiguration configuration,
+            Action<IHostBuilder>? postConfigureHostBuilder,
+            CancellationToken cancellationToken)
         {
             var host = await Task.Run(async () =>
             {
                 var result = TestClusterHostFactory.CreateSiloHost(siloName, configuration, postConfigureHostBuilder);
-                await result.StartAsync();
-                return result;
-            });
+                try
+                {
+                    await result.StartAsync(cancellationToken);
+                    return result;
+                }
+                catch
+                {
+                    if (result is IAsyncDisposable asyncDisposable)
+                    {
+                        await asyncDisposable.DisposeAsync();
+                    }
+                    else
+                    {
+                        result.Dispose();
+                    }
+
+                    throw;
+                }
+            }, cancellationToken);
 
             var retValue = new InProcessSiloHandle
             {

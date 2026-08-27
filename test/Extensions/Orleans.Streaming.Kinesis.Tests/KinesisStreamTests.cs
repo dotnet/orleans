@@ -96,9 +96,9 @@ namespace Orleans.Streaming.Kinesis.Tests
         public override async ValueTask InitializeAsync()
         {
             EnsurePreconditionsMet();
-            await KinesisStreamTestResource.Create(KinesisStreamName);
+            await KinesisStreamTestResource.Create(KinesisStreamName, TestContext.Current.CancellationToken);
             streamCreated = true;
-            await KinesisStreamTestResource.Create(KinesisStreamName2);
+            await KinesisStreamTestResource.Create(KinesisStreamName2, TestContext.Current.CancellationToken);
             stream2Created = true;
             await base.InitializeAsync();
             if (!PreconditionsMet)
@@ -120,14 +120,18 @@ namespace Orleans.Streaming.Kinesis.Tests
                 {
                     if (streamCreated)
                     {
-                        await KinesisStreamTestResource.Delete(KinesisStreamName);
+                        await KinesisStreamTestResource.DeleteForCleanup(
+                            KinesisStreamName,
+                            TestContext.Current.CancellationToken);
                     }
                 }
                 finally
                 {
                     if (stream2Created)
                     {
-                        await KinesisStreamTestResource.Delete(KinesisStreamName2);
+                        await KinesisStreamTestResource.DeleteForCleanup(
+                            KinesisStreamName2,
+                            TestContext.Current.CancellationToken);
                     }
                 }
             }
@@ -138,25 +142,25 @@ namespace Orleans.Streaming.Kinesis.Tests
         [Fact]
         public async Task Kinesis_01_OneProducerGrainOneConsumerGrain()
         {
-            await runner.StreamTest_01_OneProducerGrainOneConsumerGrain();
+            await runner.StreamTest_01_OneProducerGrainOneConsumerGrain(TestContext.Current.CancellationToken);
         }
 
         [Fact]
         public async Task Kinesis_02_OneProducerGrainOneConsumerClient()
         {
-            await runner.StreamTest_02_OneProducerGrainOneConsumerClient();
+            await runner.StreamTest_02_OneProducerGrainOneConsumerClient(TestContext.Current.CancellationToken);
         }
 
         [Fact]
         public async Task Kinesis_03_OneProducerClientOneConsumerGrain()
         {
-            await runner.StreamTest_03_OneProducerClientOneConsumerGrain();
+            await runner.StreamTest_03_OneProducerClientOneConsumerGrain(TestContext.Current.CancellationToken);
         }
 
         [Fact]
         public async Task Kinesis_04_OneProducerClientOneConsumerClient()
         {
-            await runner.StreamTest_04_OneProducerClientOneConsumerClient();
+            await runner.StreamTest_04_OneProducerClientOneConsumerClient(TestContext.Current.CancellationToken);
         }
 
         //------------------------- MANY to Many different grains ----------------------//
@@ -164,50 +168,50 @@ namespace Orleans.Streaming.Kinesis.Tests
         [Fact]
         public async Task Kinesis_05_ManyDifferent_ManyProducerGrainsManyConsumerGrains()
         {
-            await runner.StreamTest_05_ManyDifferent_ManyProducerGrainsManyConsumerGrains();
+            await runner.StreamTest_05_ManyDifferent_ManyProducerGrainsManyConsumerGrains(TestContext.Current.CancellationToken);
         }
 
         [Fact]
         public async Task Kinesis_06_ManyDifferent_ManyProducerGrainManyConsumerClients()
         {
-            await runner.StreamTest_06_ManyDifferent_ManyProducerGrainManyConsumerClients();
+            await runner.StreamTest_06_ManyDifferent_ManyProducerGrainManyConsumerClients(TestContext.Current.CancellationToken);
         }
 
         [Fact]
         public async Task Kinesis_07_ManyDifferent_ManyProducerClientsManyConsumerGrains()
         {
-            await runner.StreamTest_07_ManyDifferent_ManyProducerClientsManyConsumerGrains();
+            await runner.StreamTest_07_ManyDifferent_ManyProducerClientsManyConsumerGrains(TestContext.Current.CancellationToken);
         }
 
         [Fact]
         public async Task Kinesis_08_ManyDifferent_ManyProducerClientsManyConsumerClients()
         {
-            await runner.StreamTest_08_ManyDifferent_ManyProducerClientsManyConsumerClients();
+            await runner.StreamTest_08_ManyDifferent_ManyProducerClientsManyConsumerClients(TestContext.Current.CancellationToken);
         }
 
         //------------------------- MANY to Many Same grains ----------------------//
         [Fact]
         public async Task Kinesis_09_ManySame_ManyProducerGrainsManyConsumerGrains()
         {
-            await runner.StreamTest_09_ManySame_ManyProducerGrainsManyConsumerGrains();
+            await runner.StreamTest_09_ManySame_ManyProducerGrainsManyConsumerGrains(TestContext.Current.CancellationToken);
         }
 
         [Fact]
         public async Task Kinesis_10_ManySame_ManyConsumerGrainsManyProducerGrains()
         {
-            await runner.StreamTest_10_ManySame_ManyConsumerGrainsManyProducerGrains();
+            await runner.StreamTest_10_ManySame_ManyConsumerGrainsManyProducerGrains(TestContext.Current.CancellationToken);
         }
 
         [Fact]
         public async Task Kinesis_11_ManySame_ManyProducerGrainsManyConsumerClients()
         {
-            await runner.StreamTest_11_ManySame_ManyProducerGrainsManyConsumerClients();
+            await runner.StreamTest_11_ManySame_ManyProducerGrainsManyConsumerClients(TestContext.Current.CancellationToken);
         }
 
         [Fact]
         public async Task Kinesis_12_ManySame_ManyProducerClientsManyConsumerGrains()
         {
-            await runner.StreamTest_12_ManySame_ManyProducerClientsManyConsumerGrains();
+            await runner.StreamTest_12_ManySame_ManyProducerClientsManyConsumerGrains(TestContext.Current.CancellationToken);
         }
 
         //------------------------ MANY to Many producer consumer same grain ----------------------//
@@ -215,13 +219,13 @@ namespace Orleans.Streaming.Kinesis.Tests
         [Fact]
         public async Task Kinesis_13_SameGrain_ConsumerFirstProducerLater()
         {
-            await runner.StreamTest_13_SameGrain_ConsumerFirstProducerLater(false);
+            await runner.StreamTest_13_SameGrain_ConsumerFirstProducerLater(false, TestContext.Current.CancellationToken);
         }
 
         [Fact]
         public async Task Kinesis_14_SameGrain_ProducerFirstConsumerLater()
         {
-            await runner.StreamTest_14_SameGrain_ProducerFirstConsumerLater(false);
+            await runner.StreamTest_14_SameGrain_ProducerFirstConsumerLater(false, TestContext.Current.CancellationToken);
         }
 
         //----------------------------------------------//
@@ -229,14 +233,15 @@ namespace Orleans.Streaming.Kinesis.Tests
         [Fact]
         public async Task Kinesis_15_ConsumeAtProducersRequest()
         {
-            await runner.StreamTest_15_ConsumeAtProducersRequest();
+            await runner.StreamTest_15_ConsumeAtProducersRequest(TestContext.Current.CancellationToken);
         }
 
         [Fact]
         public async Task Kinesis_16_MultipleStreams_ManyDifferent_ManyProducerGrainsManyConsumerGrains()
         {
             var multiRunner = new MultipleStreamsTestRunner(this.InternalClient, KINESIS_STREAM_PROVIDER_NAME, 16, false);
-            await multiRunner.StreamTest_MultipleStreams_ManyDifferent_ManyProducerGrainsManyConsumerGrains();
+            await multiRunner.StreamTest_MultipleStreams_ManyDifferent_ManyProducerGrainsManyConsumerGrains(
+                cancellationToken: TestContext.Current.CancellationToken);
         }
 
         [Fact]
@@ -244,7 +249,8 @@ namespace Orleans.Streaming.Kinesis.Tests
         {
             var multiRunner = new MultipleStreamsTestRunner(this.InternalClient, KINESIS_STREAM_PROVIDER_NAME, 17, false);
             await multiRunner.StreamTest_MultipleStreams_ManyDifferent_ManyProducerGrainsManyConsumerGrains(
-                () => HostedCluster.StartAdditionalSilo());
+                () => HostedCluster.StartAdditionalSilo(),
+                cancellationToken: TestContext.Current.CancellationToken);
         }
 
 

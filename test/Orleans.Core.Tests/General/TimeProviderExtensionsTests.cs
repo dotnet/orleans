@@ -16,7 +16,7 @@ public class TimeProviderExtensionsTests
     {
         var start = new DateTimeOffset(2026, 1, 1, 0, 0, 0, TimeSpan.Zero);
         var timeProvider = new FakeTimeProvider(start);
-        var delayTask = timeProvider.DelayUntilAsync(start.Add(delay));
+        var delayTask = timeProvider.DelayUntilAsync(start.Add(delay), TestContext.Current.CancellationToken);
 
         Assert.False(delayTask.IsCompleted);
 
@@ -26,7 +26,7 @@ public class TimeProviderExtensionsTests
 
         timeProvider.Advance(TimeSpan.FromMilliseconds(1));
 
-        await delayTask.WaitAsync(TimeSpan.FromSeconds(5));
+        await delayTask.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
         Assert.Equal(start.Add(delay), timeProvider.GetUtcNow());
     }
 
@@ -37,7 +37,7 @@ public class TimeProviderExtensionsTests
     {
         var start = new DateTimeOffset(2026, 1, 1, 0, 0, 0, TimeSpan.Zero);
         var timeProvider = new FakeTimeProvider(start);
-        using var cancellation = new CancellationTokenSource();
+        using var cancellation = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
         var delayTask = timeProvider.DelayUntilAsync(
             start.Add(MaximumTimerDelay).AddDays(1),
             cancellation.Token);

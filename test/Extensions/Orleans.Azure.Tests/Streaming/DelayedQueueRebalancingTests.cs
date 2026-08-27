@@ -113,32 +113,62 @@ namespace Tester.AzureUtils.Streaming
         [Fact, TestCategory("Functional")]
         public async Task DelayedQueueRebalancingTests_1()
         {
-            await WaitForAgentsState(2, "1", includeHistory: true);
+            await WaitForAgentsState(
+                2,
+                "1",
+                TestContext.Current.CancellationToken,
+                includeHistory: true);
 
-            await WaitForAgentsState(4, "2");
+            await WaitForAgentsState(4, "2", TestContext.Current.CancellationToken);
         }
 
         [Fact, TestCategory("Functional")]
         public async Task DelayedQueueRebalancingTests_2()
         {
-            await WaitForAgentsState(2, "1", includeHistory: true);
+            await WaitForAgentsState(
+                2,
+                "1",
+                TestContext.Current.CancellationToken,
+                includeHistory: true);
 
             var existingSilos = this.HostedCluster.GetActiveSilos().Select(silo => silo.SiloAddress).ToArray();
-            var addedSilos = await this.HostedCluster.StartAdditionalSilosAsync(2, true);
+            var addedSilos = await this.HostedCluster.StartAdditionalSilosAsync(
+                2,
+                true,
+                TestContext.Current.CancellationToken);
             var addedSiloAddresses = addedSilos.Select(silo => silo.SiloAddress).ToArray();
             var activeSiloAddresses = this.HostedCluster.GetActiveSilos().Select(silo => silo.SiloAddress).ToArray();
 
-            await WaitForAgentsState(2, "2");
+            await WaitForAgentsState(2, "2", TestContext.Current.CancellationToken);
 
-            await diagnosticObserver.WaitForLocalMaturityAsync(activeSiloAddresses, AGENT_STATE_TIMEOUT, "3");
-            await diagnosticObserver.WaitForRemoteMaturityAsync(existingSilos, addedSiloAddresses, AGENT_STATE_TIMEOUT, "3");
-            await WaitForAgentsState(2, "3");
+            await diagnosticObserver.WaitForLocalMaturityAsync(
+                activeSiloAddresses,
+                AGENT_STATE_TIMEOUT,
+                "3",
+                TestContext.Current.CancellationToken);
+            await diagnosticObserver.WaitForRemoteMaturityAsync(
+                existingSilos,
+                addedSiloAddresses,
+                AGENT_STATE_TIMEOUT,
+                "3",
+                TestContext.Current.CancellationToken);
+            await WaitForAgentsState(2, "3", TestContext.Current.CancellationToken);
         }
 
-        private Task WaitForAgentsState(int numExpectedAgentsPerSilo, string callContext, bool includeHistory = false)
+        private Task WaitForAgentsState(
+            int numExpectedAgentsPerSilo,
+            string callContext,
+            CancellationToken cancellationToken,
+            bool includeHistory = false)
         {
             var activeSilos = this.HostedCluster.GetActiveSilos().Select(silo => silo.SiloAddress).ToArray();
-            return diagnosticObserver.WaitForAgentsStateAsync(activeSilos, numExpectedAgentsPerSilo, includeHistory, AGENT_STATE_TIMEOUT, callContext);
+            return diagnosticObserver.WaitForAgentsStateAsync(
+                activeSilos,
+                numExpectedAgentsPerSilo,
+                includeHistory,
+                AGENT_STATE_TIMEOUT,
+                callContext,
+                cancellationToken);
         }
 
         private sealed class StreamQueueDiagnosticObserver : IDisposable, IObserver<StreamingEvents.StreamingEvent>
@@ -163,23 +193,40 @@ namespace Tester.AzureUtils.Streaming
                 return new StreamQueueDiagnosticObserver(streamProvider);
             }
 
-            public Task WaitForAgentsStateAsync(SiloAddress[] expectedSilos, int expectedAgentsPerSilo, bool includeHistory, TimeSpan timeout, string callContext)
+            public Task WaitForAgentsStateAsync(
+                SiloAddress[] expectedSilos,
+                int expectedAgentsPerSilo,
+                bool includeHistory,
+                TimeSpan timeout,
+                string callContext,
+                CancellationToken cancellationToken)
             {
                 return WaitUntilAsync(
                     () => HasAgentState(expectedSilos, expectedAgentsPerSilo, includeHistory),
                     timeout,
-                    () => $"Call {callContext}: expected silos {Utils.EnumerableToString(expectedSilos)} to have {expectedAgentsPerSilo} agents each, got {FormatAgentStates(expectedSilos)}.");
+                    () => $"Call {callContext}: expected silos {Utils.EnumerableToString(expectedSilos)} to have {expectedAgentsPerSilo} agents each, got {FormatAgentStates(expectedSilos)}.",
+                    cancellationToken);
             }
 
-            public Task WaitForLocalMaturityAsync(SiloAddress[] siloAddresses, TimeSpan timeout, string callContext)
+            public Task WaitForLocalMaturityAsync(
+                SiloAddress[] siloAddresses,
+                TimeSpan timeout,
+                string callContext,
+                CancellationToken cancellationToken)
             {
                 return WaitUntilAsync(
                     () => siloAddresses.All(locallyMaturedSilos.Contains),
                     timeout,
-                    () => $"Call {callContext}: timed out waiting for local queue balancer maturity on silos {Utils.EnumerableToString(siloAddresses)}. Matured silos: {Utils.EnumerableToString(locallyMaturedSilos)}.");
+                    () => $"Call {callContext}: timed out waiting for local queue balancer maturity on silos {Utils.EnumerableToString(siloAddresses)}. Matured silos: {Utils.EnumerableToString(locallyMaturedSilos)}.",
+                    cancellationToken);
             }
 
-            public Task WaitForRemoteMaturityAsync(SiloAddress[] localSilos, SiloAddress[] maturedSilos, TimeSpan timeout, string callContext)
+            public Task WaitForRemoteMaturityAsync(
+                SiloAddress[] localSilos,
+                SiloAddress[] maturedSilos,
+                TimeSpan timeout,
+                string callContext,
+                CancellationToken cancellationToken)
             {
                 var expectedMaturities =
                     (from localSilo in localSilos
@@ -189,7 +236,8 @@ namespace Tester.AzureUtils.Streaming
                 return WaitUntilAsync(
                     () => expectedMaturities.All(remotelyMaturedSilos.Contains),
                     timeout,
-                    () => $"Call {callContext}: timed out waiting for remote queue balancer maturity. Expected: {FormatMaturities(expectedMaturities)}. Completed: {FormatMaturities(remotelyMaturedSilos)}.");
+                    () => $"Call {callContext}: timed out waiting for remote queue balancer maturity. Expected: {FormatMaturities(expectedMaturities)}. Completed: {FormatMaturities(remotelyMaturedSilos)}.",
+                    cancellationToken);
             }
 
             public void OnNext(StreamingEvents.StreamingEvent value)
@@ -244,7 +292,11 @@ namespace Tester.AzureUtils.Streaming
                         : agentStates.TryGetValue(silo, out var state) && state.RunningAgents == expectedAgentsPerSilo);
             }
 
-            private Task WaitUntilAsync(Func<bool> predicate, TimeSpan timeout, Func<string> timeoutMessage)
+            private Task WaitUntilAsync(
+                Func<bool> predicate,
+                TimeSpan timeout,
+                Func<string> timeoutMessage,
+                CancellationToken cancellationToken)
             {
                 lock (lockObj)
                 {
@@ -255,15 +307,23 @@ namespace Tester.AzureUtils.Streaming
 
                     var waiter = new ConditionWaiter(predicate);
                     waiters.Add(waiter);
-                    return WaitWithTimeoutAsync(waiter, timeout, timeoutMessage);
+                    return WaitWithTimeoutAsync(
+                        waiter,
+                        timeout,
+                        timeoutMessage,
+                        cancellationToken);
                 }
             }
 
-            private async Task WaitWithTimeoutAsync(ConditionWaiter waiter, TimeSpan timeout, Func<string> timeoutMessage)
+            private async Task WaitWithTimeoutAsync(
+                ConditionWaiter waiter,
+                TimeSpan timeout,
+                Func<string> timeoutMessage,
+                CancellationToken cancellationToken)
             {
                 try
                 {
-                    await waiter.Task.WaitAsync(timeout);
+                    await waiter.Task.WaitAsync(timeout, cancellationToken);
                 }
                 catch (TimeoutException)
                 {
@@ -275,6 +335,15 @@ namespace Tester.AzureUtils.Streaming
                     }
 
                     throw new TimeoutException(message);
+                }
+                catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+                {
+                    lock (lockObj)
+                    {
+                        waiters.Remove(waiter);
+                    }
+
+                    throw;
                 }
             }
 

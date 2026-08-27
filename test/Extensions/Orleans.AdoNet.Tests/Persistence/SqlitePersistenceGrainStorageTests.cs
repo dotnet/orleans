@@ -59,13 +59,15 @@ namespace Tester.AdoNet.Persistence
         {
             var runner = new GrainStorageModelBasedTestRunner(this.fixture.Storage, "Sqlite");
 
-            await runner.RunGeneratedConformanceTests();
+            await runner.RunGeneratedConformanceTests(TestContext.Current.CancellationToken);
         }
 
         [Fact]
         public async Task ClearInconsistentFailsWithInconsistentStateException()
         {
-            var storage = await this.fixture.CreateGrainStorageAsync($"SqliteClearInconsistent-{Guid.NewGuid():N}");
+            var storage = await this.fixture.CreateGrainStorageAsync(
+                TestContext.Current.CancellationToken,
+                $"SqliteClearInconsistent-{Guid.NewGuid():N}");
             const string grainType = "sqlite-clear-inconsistent-grain";
             var grainId = GrainId.Create(GrainType.Create(grainType), GrainIdKeyExtensions.CreateIntegerKey(Random.Shared.NextInt64()));
 
@@ -90,7 +92,9 @@ namespace Tester.AdoNet.Persistence
         [Fact]
         public async Task HashCollisionWriteReadWriteRead()
         {
-            var storage = await this.fixture.CreateGrainStorageAsync($"SqliteHashCollision-{Guid.NewGuid():N}");
+            var storage = await this.fixture.CreateGrainStorageAsync(
+                TestContext.Current.CancellationToken,
+                $"SqliteHashCollision-{Guid.NewGuid():N}");
             storage.HashPicker = new StorageHasherPicker(new[] { new ConstantHasher() });
             var storageTests = new CommonStorageTests(storage);
             await storageTests.PersistenceStorage_WriteReadWriteReadStatesInParallel(nameof(HashCollisionWriteReadWriteRead), 2);
@@ -99,7 +103,9 @@ namespace Tester.AdoNet.Persistence
         [Fact]
         public async Task ExtensionStringIdentityMatching()
         {
-            var storage = await this.fixture.CreateGrainStorageAsync($"SqliteExtension-{Guid.NewGuid():N}");
+            var storage = await this.fixture.CreateGrainStorageAsync(
+                TestContext.Current.CancellationToken,
+                $"SqliteExtension-{Guid.NewGuid():N}");
             storage.HashPicker = new StorageHasherPicker(new[] { new ConstantHasher() });
 
             const string grainType = "sqlite-extension-string-sensitive-grain";
@@ -125,7 +131,10 @@ namespace Tester.AdoNet.Persistence
         [Fact]
         public async Task ConcurrentFirstWriteRaceUsesOptimisticConcurrency()
         {
-            var storage = await this.fixture.CreateGrainStorageAsync($"SqliteConcurrentFirstWrite-{Guid.NewGuid():N}");
+            var cancellationToken = TestContext.Current.CancellationToken;
+            var storage = await this.fixture.CreateGrainStorageAsync(
+                cancellationToken,
+                $"SqliteConcurrentFirstWrite-{Guid.NewGuid():N}");
             const string grainType = "sqlite-concurrent-first-write-grain";
             var inconsistentStateExceptionCount = 0;
 
@@ -136,17 +145,17 @@ namespace Tester.AdoNet.Persistence
 
                 var firstWrite = Task.Run(async () =>
                 {
-                    await startGate.Task;
+                    await startGate.Task.WaitAsync(cancellationToken);
                     var state = new GrainState<TestState1> { State = new TestState1 { A = "first", B = i, C = i } };
                     return await Record.ExceptionAsync(() => storage.WriteStateAsync(grainType, grainId, state));
-                });
+                }, cancellationToken);
 
                 var secondWrite = Task.Run(async () =>
                 {
-                    await startGate.Task;
+                    await startGate.Task.WaitAsync(cancellationToken);
                     var state = new GrainState<TestState1> { State = new TestState1 { A = "second", B = i + 1000, C = i + 1000 } };
                     return await Record.ExceptionAsync(() => storage.WriteStateAsync(grainType, grainId, state));
-                });
+                }, cancellationToken);
 
                 startGate.SetResult();
                 var exceptions = await Task.WhenAll(firstWrite, secondWrite);
@@ -191,7 +200,10 @@ namespace Tester.AdoNet.Persistence
         public async Task DataSource_WriteReadClear_LeavesCallerOwnedDataSourceUsable()
         {
             using var dataSource = new TrackingSqliteDataSource(this.fixture.ConnectionString);
-            var storage = await this.fixture.CreateGrainStorageAsync(dataSource, $"SqliteDataSource-{Guid.NewGuid():N}");
+            var storage = await this.fixture.CreateGrainStorageAsync(
+                dataSource,
+                TestContext.Current.CancellationToken,
+                $"SqliteDataSource-{Guid.NewGuid():N}");
             const string grainType = "sqlite-data-source-grain";
             var grainId = GrainId.Create(GrainType.Create(grainType), GrainIdKeyExtensions.CreateIntegerKey(Random.Shared.NextInt64()));
             var written = new GrainState<TestState1> { State = new TestState1 { A = "from-data-source", B = 17, C = 29 } };
@@ -211,11 +223,11 @@ namespace Tester.AdoNet.Persistence
             Assert.NotEqual(etagBeforeClear, read.ETag);
             Assert.False(dataSource.IsDisposed);
 
-            await using (var connection = await dataSource.OpenConnectionAsync())
+            await using (var connection = await dataSource.OpenConnectionAsync(TestContext.Current.CancellationToken))
             await using (var command = connection.CreateCommand())
             {
                 command.CommandText = "SELECT 43;";
-                Assert.Equal(43L, await command.ExecuteScalarAsync());
+                Assert.Equal(43L, await command.ExecuteScalarAsync(TestContext.Current.CancellationToken));
             }
 
             Assert.True(dataSource.OpenConnectionAsyncCallCount >= 5);

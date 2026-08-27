@@ -219,7 +219,7 @@ namespace UnitTests.StreamingTests
             timeProvider.Advance(new StreamPullingAgentOptions().StreamInactivityPeriod + TimeSpan.FromTicks(1));
             await testAccessor.ReadFromQueue(queueId, receiver, 1);
 
-            await inactive.WaitAsync(TimeSpan.FromSeconds(5));
+            await inactive.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
             Assert.Empty(await testAccessor.GetPubSubCache());
         }
 
@@ -283,7 +283,8 @@ namespace UnitTests.StreamingTests
             secondConsumerData.Cursor = queueCache.GetCacheCursor(streamId, firstToken);
 
             Assert.True(await testAccessor.ReadFromQueue(queueId, receiver, 10));
-            await Task.WhenAll(firstConsumer.Delivered.Task, secondConsumer.Delivered.Task).WaitAsync(TimeSpan.FromSeconds(5));
+            await Task.WhenAll(firstConsumer.Delivered.Task, secondConsumer.Delivered.Task)
+                .WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
 
             Assert.False(await testAccessor.ReadFromQueue(queueId, receiver, 10));
             await receiver.DidNotReceive().MessagesDeliveredAsync(
@@ -291,25 +292,27 @@ namespace UnitTests.StreamingTests
                 Arg.Any<CancellationToken>());
 
             firstConsumer.ReleaseDelivery();
-            await WaitForInactive(firstConsumerData);
+            await WaitForInactive(firstConsumerData, TestContext.Current.CancellationToken);
             Assert.False(await testAccessor.ReadFromQueue(queueId, receiver, 10));
             await receiver.DidNotReceive().MessagesDeliveredAsync(
                 Arg.Any<IList<IBatchContainer>>(),
                 Arg.Any<CancellationToken>());
 
             secondConsumer.ReleaseDelivery();
-            await WaitForInactive(secondConsumerData);
+            await WaitForInactive(secondConsumerData, TestContext.Current.CancellationToken);
             Assert.False(await testAccessor.ReadFromQueue(queueId, receiver, 10));
             await receiver.Received(1).MessagesDeliveredAsync(
                 Arg.Is<IList<IBatchContainer>>(items => items.Count == messages.Count),
                 Arg.Any<CancellationToken>());
 
-            static async Task WaitForInactive(StreamConsumerData consumerData)
+            static async Task WaitForInactive(
+                StreamConsumerData consumerData,
+                CancellationToken cancellationToken)
             {
                 var timeout = DateTime.UtcNow + TimeSpan.FromSeconds(5);
                 while (consumerData.State != StreamConsumerDataState.Inactive && DateTime.UtcNow < timeout)
                 {
-                    await Task.Delay(10);
+                    await Task.Delay(10, cancellationToken);
                 }
 
                 Assert.Equal(StreamConsumerDataState.Inactive, consumerData.State);
@@ -674,13 +677,13 @@ namespace UnitTests.StreamingTests
             queueCache.Purge();
 
             Assert.True(await testAccessor.ReadFromQueue(queueId, receiver, 1));
-            await consumer.Delivered.Task.WaitAsync(TimeSpan.FromSeconds(5));
+            await consumer.Delivered.Task.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
             consumer.ReleaseDelivery();
 
             var timeout = DateTime.UtcNow + TimeSpan.FromSeconds(5);
             while (consumerData.State != StreamConsumerDataState.Inactive && DateTime.UtcNow < timeout)
             {
-                await Task.Delay(10);
+                await Task.Delay(10, TestContext.Current.CancellationToken);
             }
 
             Assert.Equal(StreamConsumerDataState.Inactive, consumerData.State);
@@ -736,7 +739,7 @@ namespace UnitTests.StreamingTests
 
             queueCache.ClearDeliveryProgress();
             await testAccessor.ReadFromQueue(queueId, receiver, maxCacheAddCount: 1);
-            await consumer.Delivered.Task.WaitAsync(TimeSpan.FromSeconds(5));
+            await consumer.Delivered.Task.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
 
             queueCache.ClearDeliveryProgress();
             await testAccessor.Shutdown();
@@ -1056,7 +1059,7 @@ namespace UnitTests.StreamingTests
 
             queueCache.ClearDeliveryProgress();
             var shutdownTask = testAccessor.Shutdown();
-            await receiverShutdownStarted.Task.WaitAsync(TimeSpan.FromSeconds(5));
+            await receiverShutdownStarted.Task.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
 
             Assert.Empty(queueCache.DeliveryProgressTokens);
             Assert.Equal(0, queueCache.DeliveryProgressCallCount);

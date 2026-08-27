@@ -30,7 +30,7 @@ namespace Orleans.TestingHost.Tests
             var builder = new InProcessTestClusterBuilder(1);
             builder.ConfigureHost(hostBuilder => TestDefaultConfiguration.ConfigureHostConfiguration(hostBuilder.Configuration));
             var cluster = builder.Build();
-            await cluster.DeployAsync();
+            await cluster.DeployAsync(TestContext.Current.CancellationToken);
 
             var serviceProvider = cluster.Silos[0].ServiceProvider;
 
@@ -38,7 +38,7 @@ namespace Orleans.TestingHost.Tests
             Assert.NotNull(serviceProvider.GetService<ILocalSiloDetails>());
 
             // The pattern from the issue: stop the silos first, then dispose the cluster.
-            await cluster.StopAllSilosAsync();
+            await cluster.StopAllSilosAsync(TestContext.Current.CancellationToken);
             await cluster.DisposeAsync();
 
             // If the host was disposed, its service provider is disposed too and resolving throws.
@@ -53,14 +53,16 @@ namespace Orleans.TestingHost.Tests
             var builder = new InProcessTestClusterBuilder(1);
             builder.ConfigureHost(hostBuilder => TestDefaultConfiguration.ConfigureHostConfiguration(hostBuilder.Configuration));
             var cluster = builder.Build();
-            await cluster.DeployAsync();
+            await cluster.DeployAsync(TestContext.Current.CancellationToken);
 
             var handle = cluster.Silos[0];
             var serviceProvider = handle.ServiceProvider;
 
             // Stop the silo, then dispose the handle directly. Disposal must dispose the host even
             // though the handle is no longer active.
-            await handle.StopSiloAsync(stopGracefully: true);
+            await handle.StopSiloAsync(
+                stopGracefully: true,
+                TestContext.Current.CancellationToken);
             await handle.DisposeAsync();
 
             Assert.Throws<ObjectDisposedException>(() => serviceProvider.GetService<ILocalSiloDetails>());
@@ -101,7 +103,7 @@ namespace Orleans.TestingHost.Tests
             var builder = new InProcessTestClusterBuilder(2);
             builder.ConfigureHost(hostBuilder => TestDefaultConfiguration.ConfigureHostConfiguration(hostBuilder.Configuration));
             await using var cluster = builder.Build();
-            await cluster.DeployAsync();
+            await cluster.DeployAsync(TestContext.Current.CancellationToken);
 
             var client = cluster.Client;
             var launcherHandle = cluster.Silos[0];
@@ -142,12 +144,19 @@ namespace Orleans.TestingHost.Tests
                 // Trigger the outbound call from a stateless worker co-located on the launcher's silo.
                 var worker = client.GetGrain<ILocalWorkerGrain>(Guid.NewGuid());
                 await launcher.StartBlockingCall(worker, remote);
-                Assert.True(await RemoteBlockerGrain.WaitForEntered(remoteKey, TimeSpan.FromSeconds(30)), "The blocking call was never entered.");
+                Assert.True(
+                    await RemoteBlockerGrain.WaitForEntered(
+                        remoteKey,
+                        TimeSpan.FromSeconds(30),
+                        TestContext.Current.CancellationToken),
+                    "The blocking call was never entered.");
             }
 
             // Kill the launcher's silo (ungraceful) and dispose its host. Prior to the fix this can hang
             // if cancellation interrupts callback timer shutdown before the callbacks are faulted.
-            var killAndDispose = cluster.KillSiloAsync(launcherHandle);
+            var killAndDispose = cluster.KillSiloAsync(
+                launcherHandle,
+                TestContext.Current.CancellationToken);
             var completed = await Task.WhenAny(killAndDispose, Task.Delay(TimeSpan.FromSeconds(60), TestContext.Current.CancellationToken));
             Assert.True(completed == killAndDispose, "Killing a silo with an in-flight outbound call should not hang host disposal.");
             await killAndDispose;
@@ -182,9 +191,9 @@ namespace Orleans.TestingHost.Tests
         private static WeakReference DeployStopAndDispose()
         {
             var cluster = BuildCluster();
-            cluster.DeployAsync().GetAwaiter().GetResult();
+            cluster.DeployAsync(TestContext.Current.CancellationToken).GetAwaiter().GetResult();
             var weakRef = new WeakReference(cluster.Silos[0].ServiceProvider);
-            cluster.StopAllSilosAsync().GetAwaiter().GetResult();
+            cluster.StopAllSilosAsync(TestContext.Current.CancellationToken).GetAwaiter().GetResult();
             cluster.DisposeAsync().AsTask().GetAwaiter().GetResult();
             return weakRef;
         }
@@ -193,9 +202,9 @@ namespace Orleans.TestingHost.Tests
         private static WeakReference DeployKillAndDispose()
         {
             var cluster = BuildCluster();
-            cluster.DeployAsync().GetAwaiter().GetResult();
+            cluster.DeployAsync(TestContext.Current.CancellationToken).GetAwaiter().GetResult();
             var weakRef = new WeakReference(cluster.Silos[0].ServiceProvider);
-            cluster.KillSiloAsync(cluster.Silos[0]).GetAwaiter().GetResult();
+            cluster.KillSiloAsync(cluster.Silos[0], TestContext.Current.CancellationToken).GetAwaiter().GetResult();
             cluster.DisposeAsync().AsTask().GetAwaiter().GetResult();
             return weakRef;
         }

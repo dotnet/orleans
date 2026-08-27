@@ -27,7 +27,7 @@ namespace DistributedTests.Server
                 AddOption(opt);
             }
 
-            Handler = CommandHandler.Create<CommonParameters, T>(_siloRunner.Run);
+            Handler = CommandHandler.Create<CommonParameters, T, CancellationToken>(_siloRunner.Run);
         }
     }
 

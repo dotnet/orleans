@@ -45,7 +45,8 @@ public abstract class ProgrammaticSubscribeTestsRunner
     public async Task StreamingTests_Consumer_Producer_Subscribe()
     {
         using var observer = StreamingDiagnosticObserver.Create();
-        using var cts = new CancellationTokenSource(_timeout);
+        using var cts = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
+        cts.CancelAfter(_timeout);
         var subscriptionManager = new SubscriptionManager(this.fixture.HostedCluster);
         var streamId = new FullStreamIdentity(Guid.NewGuid(), "EmptySpace", StreamProviderName);
         var rxStreamId = StreamId.Create(streamId.Namespace, streamId.Guid);
@@ -54,9 +55,10 @@ public abstract class ProgrammaticSubscribeTestsRunner
         var consumers = subscriptions.Select(sub => this.fixture.HostedCluster.GrainFactory!.GetGrain<IPassive_ConsumerGrain>(sub.GrainId)).ToList();
 
         var producer = this.fixture.HostedCluster.GrainFactory!.GetGrain<ITypedProducerGrainProducingApple>(Guid.NewGuid());
+        cts.Token.ThrowIfCancellationRequested();
         await producer.BecomeProducer(streamId.Guid, streamId.Namespace, streamId.ProviderName);
 
-        await ProduceExactCountAsync(producer, EventCountPerPhase);
+        await ProduceExactCountAsync(producer, EventCountPerPhase, cts.Token);
         await observer.WaitForItemDeliveryCountAsync(rxStreamId, EventCountPerPhase * consumers.Count, StreamProviderName, cts.Token);
         await AssertCountersAsync(new[] { producer }, consumers, this.fixture.Logger);
 
@@ -67,7 +69,8 @@ public abstract class ProgrammaticSubscribeTestsRunner
     [Fact(Skip = "https://github.com/dotnet/orleans/issues/5635")]
     public async Task StreamingTests_Consumer_Producer_UnSubscribe()
     {
-        using var cts = new CancellationTokenSource(_timeout);
+        using var cts = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
+        cts.CancelAfter(_timeout);
         var subscriptionManager = new SubscriptionManager(this.fixture.HostedCluster);
         var streamId = new FullStreamIdentity(Guid.NewGuid(), "EmptySpace", StreamProviderName);
         var rxStreamId = StreamId.Create(streamId.Namespace, streamId.Guid);
@@ -75,11 +78,12 @@ public abstract class ProgrammaticSubscribeTestsRunner
         var subscriptions = await subscriptionManager.SetupStreamingSubscriptionForStream<IPassive_ConsumerGrain>(streamId, 2);
 
         var producer = this.fixture.GrainFactory.GetGrain<ITypedProducerGrainProducingApple>(Guid.NewGuid());
+        cts.Token.ThrowIfCancellationRequested();
         await producer.BecomeProducer(streamId.Guid, streamId.Namespace, streamId.ProviderName);
 
         using (var phaseOneObserver = StreamingDiagnosticObserver.Create())
         {
-            await ProduceExactCountAsync(producer, EventCountPerPhase);
+            await ProduceExactCountAsync(producer, EventCountPerPhase, cts.Token);
             await phaseOneObserver.WaitForItemDeliveryCountAsync(rxStreamId, EventCountPerPhase * subscriptions.Count, StreamProviderName, cts.Token);
         }
 
@@ -99,7 +103,7 @@ public abstract class ProgrammaticSubscribeTestsRunner
 
         using (var phaseTwoObserver = StreamingDiagnosticObserver.Create())
         {
-            await ProduceExactCountAsync(producer, EventCountPerPhase);
+            await ProduceExactCountAsync(producer, EventCountPerPhase, cts.Token);
             await phaseTwoObserver.WaitForItemDeliveryCountAsync(rxStreamId, EventCountPerPhase, StreamProviderName, cts.Token);
         }
 
@@ -152,13 +156,15 @@ public abstract class ProgrammaticSubscribeTestsRunner
         await subscriptionManager.SetupStreamingSubscriptionForStream<IJerk_ConsumerGrain>(streamId, 10);
 
         using var observer = StreamingDiagnosticObserver.Create();
-        using var cts = new CancellationTokenSource(_timeout);
+        using var cts = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
+        cts.CancelAfter(_timeout);
 
         //producer start producing 
         var producer = this.fixture.GrainFactory.GetGrain<ITypedProducerGrainProducingInt>(Guid.NewGuid());
+        cts.Token.ThrowIfCancellationRequested();
         await producer.BecomeProducer(streamId.Guid, streamId.Namespace, streamId.ProviderName);
 
-        await ProduceExactCountAsync(producer, 1);
+        await ProduceExactCountAsync(producer, 1, cts.Token);
 
         //wait for consumers to unsubscribe via diagnostic events
         var rxStreamId = StreamId.Create("EmptySpace", streamId.Guid);
@@ -174,7 +180,8 @@ public abstract class ProgrammaticSubscribeTestsRunner
     public async Task StreamingTests_Consumer_Producer_SubscribeToTwoStream_MessageWithPolymorphism()
     {
         using var observer = StreamingDiagnosticObserver.Create();
-        using var cts = new CancellationTokenSource(_timeout);
+        using var cts = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
+        cts.CancelAfter(_timeout);
         var subscriptionManager = new SubscriptionManager(this.fixture.HostedCluster);
         var streamId = new FullStreamIdentity(Guid.NewGuid(), "EmptySpace", StreamProviderName);
         var rxStreamId = StreamId.Create(streamId.Namespace, streamId.Guid);
@@ -183,12 +190,14 @@ public abstract class ProgrammaticSubscribeTestsRunner
         var consumers = subscriptions.Select(sub => this.fixture.GrainFactory.GetGrain<IPassive_ConsumerGrain>(sub.GrainId)).ToList();
 
         var producer = this.fixture.GrainFactory.GetGrain<ITypedProducerGrainProducingApple>(Guid.NewGuid());
+        cts.Token.ThrowIfCancellationRequested();
         await producer.BecomeProducer(streamId.Guid, streamId.Namespace, streamId.ProviderName);
 
         // set up the new stream to subscribe, which produce strings
         var streamId2 = new FullStreamIdentity(Guid.NewGuid(), "EmptySpace2", StreamProviderName);
         var rxStreamId2 = StreamId.Create(streamId2.Namespace, streamId2.Guid);
         var producer2 = this.fixture.GrainFactory.GetGrain<ITypedProducerGrainProducingApple>(Guid.NewGuid());
+        cts.Token.ThrowIfCancellationRequested();
         await producer2.BecomeProducer(streamId2.Guid, streamId2.Namespace, streamId2.ProviderName);
 
         //register the consumer grain to second stream
@@ -197,9 +206,11 @@ public abstract class ProgrammaticSubscribeTestsRunner
 
         for (var i = 0; i < EventCountPerPhase; i++)
         {
+            cts.Token.ThrowIfCancellationRequested();
             await producer.Produce();
             if (i < EventCountPerPhase - 2)
             {
+                cts.Token.ThrowIfCancellationRequested();
                 await producer2.Produce();
             }
         }
@@ -216,7 +227,8 @@ public abstract class ProgrammaticSubscribeTestsRunner
     public async Task StreamingTests_Consumer_Producer_SubscribeToStreamsHandledByDifferentStreamProvider()
     {
         using var observer = StreamingDiagnosticObserver.Create();
-        using var cts = new CancellationTokenSource(_timeout);
+        using var cts = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
+        cts.CancelAfter(_timeout);
         var subscriptionManager = new SubscriptionManager(this.fixture.HostedCluster);
         var streamId = new FullStreamIdentity(Guid.NewGuid(), "EmptySpace", StreamProviderName);
         var rxStreamId = StreamId.Create(streamId.Namespace, streamId.Guid);
@@ -225,12 +237,14 @@ public abstract class ProgrammaticSubscribeTestsRunner
         var consumers = subscriptions.Select(sub => this.fixture.GrainFactory.GetGrain<IPassive_ConsumerGrain>(sub.GrainId)).ToList();
 
         var producer = this.fixture.GrainFactory.GetGrain<ITypedProducerGrainProducingApple>(Guid.NewGuid());
+        cts.Token.ThrowIfCancellationRequested();
         await producer.BecomeProducer(streamId.Guid, streamId.Namespace, streamId.ProviderName);
 
         // set up the new stream to subscribe, which produce strings
         var streamId2 = new FullStreamIdentity(Guid.NewGuid(), "EmptySpace2", StreamProviderName2);
         var rxStreamId2 = StreamId.Create(streamId2.Namespace, streamId2.Guid);
         var producer2 = this.fixture.GrainFactory.GetGrain<ITypedProducerGrainProducingApple>(Guid.NewGuid());
+        cts.Token.ThrowIfCancellationRequested();
         await producer2.BecomeProducer(streamId2.Guid, streamId2.Namespace, streamId2.ProviderName);
 
         //register the consumer grain to second stream
@@ -239,9 +253,11 @@ public abstract class ProgrammaticSubscribeTestsRunner
 
         for (var i = 0; i < EventCountPerPhase; i++)
         {
+            cts.Token.ThrowIfCancellationRequested();
             await producer.Produce();
             if (i < EventCountPerPhase - 2)
             {
+                cts.Token.ThrowIfCancellationRequested();
                 await producer2.Produce();
             }
         }
@@ -257,10 +273,14 @@ public abstract class ProgrammaticSubscribeTestsRunner
     //test utilities and statics
     private static readonly TimeSpan _timeout = TimeSpan.FromSeconds(30);
 
-    private static async Task ProduceExactCountAsync(ITypedProducerGrain producer, int count)
+    private static async Task ProduceExactCountAsync(
+        ITypedProducerGrain producer,
+        int count,
+        CancellationToken cancellationToken)
     {
         for (var i = 0; i < count; i++)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             await producer.Produce();
         }
     }

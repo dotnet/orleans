@@ -176,9 +176,9 @@ public sealed class AzureTableJournalStorageTests
         var first = CreateStorage(store, configure: Configure, journalId: new JournalId("journal-a"));
         var second = CreateStorage(store, configure: Configure, journalId: new JournalId("journal-b"));
 
-        Assert.True(await first.CreateIfNotExistsAsync());
+        Assert.True(await first.CreateIfNotExistsAsync(cancellationToken: TestContext.Current.CancellationToken));
         var exception = await Assert.ThrowsAsync<InvalidOperationException>(
-            () => second.CreateIfNotExistsAsync().AsTask());
+            () => second.CreateIfNotExistsAsync(cancellationToken: TestContext.Current.CancellationToken).AsTask());
 
         Assert.Contains("journal-a", exception.Message);
         Assert.Contains("journal-b", exception.Message);
@@ -635,8 +635,12 @@ public sealed class AzureTableJournalStorageTests
         var store = new FakeTableStore();
         var storage = CreateStorage(store);
 
-        Assert.True(await storage.CreateIfNotExistsAsync(new Dictionary<string, string> { ["owner"] = "first" }));
-        Assert.False(await CreateStorage(store).CreateIfNotExistsAsync(new Dictionary<string, string> { ["owner"] = "second" }));
+        Assert.True(await storage.CreateIfNotExistsAsync(
+            new Dictionary<string, string> { ["owner"] = "first" },
+            TestContext.Current.CancellationToken));
+        Assert.False(await CreateStorage(store).CreateIfNotExistsAsync(
+            new Dictionary<string, string> { ["owner"] = "second" },
+            TestContext.Current.CancellationToken));
 
         var metadata = await storage.GetMetadataAsync(CancellationToken.None);
         Assert.NotNull(metadata);
@@ -669,7 +673,9 @@ public sealed class AzureTableJournalStorageTests
     {
         var store = new FakeTableStore();
         var storage = CreateStorage(store);
-        Assert.True(await storage.CreateIfNotExistsAsync(new Dictionary<string, string> { ["a"] = "1", ["b"] = "2" }));
+        Assert.True(await storage.CreateIfNotExistsAsync(
+            new Dictionary<string, string> { ["a"] = "1", ["b"] = "2" },
+            TestContext.Current.CancellationToken));
 
         var updated = await storage.UpdateMetadataAsync(
             set: new Dictionary<string, string> { ["c"] = "3" },
@@ -689,7 +695,9 @@ public sealed class AzureTableJournalStorageTests
     {
         var store = new FakeTableStore();
         var storage = CreateStorage(store);
-        Assert.True(await storage.CreateIfNotExistsAsync(new Dictionary<string, string> { ["a"] = "1" }));
+        Assert.True(await storage.CreateIfNotExistsAsync(
+            new Dictionary<string, string> { ["a"] = "1" },
+            TestContext.Current.CancellationToken));
 
         var updated = await storage.UpdateMetadataAsync(
             set: new Dictionary<string, string> { ["a"] = "2" },
@@ -708,11 +716,17 @@ public sealed class AzureTableJournalStorageTests
         var storage = CreateStorage(new FakeTableStore());
 
         await Assert.ThrowsAsync<ArgumentException>(
-            () => storage.CreateIfNotExistsAsync(new Dictionary<string, string> { ["$provider"] = "1" }).AsTask());
+            () => storage.CreateIfNotExistsAsync(
+                new Dictionary<string, string> { ["$provider"] = "1" },
+                TestContext.Current.CancellationToken).AsTask());
         await Assert.ThrowsAsync<ArgumentException>(
-            () => storage.UpdateMetadataAsync(set: new Dictionary<string, string> { ["$provider"] = "1" }).AsTask());
+            () => storage.UpdateMetadataAsync(
+                set: new Dictionary<string, string> { ["$provider"] = "1" },
+                cancellationToken: TestContext.Current.CancellationToken).AsTask());
         await Assert.ThrowsAsync<ArgumentException>(
-            () => storage.UpdateMetadataAsync(remove: ["$provider"]).AsTask());
+            () => storage.UpdateMetadataAsync(
+                remove: ["$provider"],
+                cancellationToken: TestContext.Current.CancellationToken).AsTask());
     }
 
     [Fact]
@@ -1610,7 +1624,9 @@ public sealed class AzureTableJournalStorageTests
     {
         var store = new FakeTableStore();
         var storage = CreateStorage(store);
-        Assert.True(await storage.CreateIfNotExistsAsync(new Dictionary<string, string> { ["owner"] = "alice" }));
+        Assert.True(await storage.CreateIfNotExistsAsync(
+            new Dictionary<string, string> { ["owner"] = "alice" },
+            TestContext.Current.CancellationToken));
         var before = await storage.GetMetadataAsync(CancellationToken.None);
         Assert.NotNull(before);
 
@@ -1714,21 +1730,30 @@ public sealed class AzureTableJournalStorageTests
         var storage = CreateStorage(store);
 
         await Assert.ThrowsAsync<ArgumentException>(
-            () => storage.CreateIfNotExistsAsync(new Dictionary<string, string> { [" \t"] = "value" }).AsTask());
+            () => storage.CreateIfNotExistsAsync(
+                new Dictionary<string, string> { [" \t"] = "value" },
+                TestContext.Current.CancellationToken).AsTask());
         await Assert.ThrowsAsync<ArgumentException>(
-            () => storage.UpdateMetadataAsync(remove: ["bad\0key"]).AsTask());
+            () => storage.UpdateMetadataAsync(
+                remove: ["bad\0key"],
+                cancellationToken: TestContext.Current.CancellationToken).AsTask());
         await Assert.ThrowsAsync<ArgumentNullException>(
-            () => storage.UpdateMetadataAsync(set: new Dictionary<string, string> { ["key"] = null! }).AsTask());
+            () => storage.UpdateMetadataAsync(
+                set: new Dictionary<string, string> { ["key"] = null! },
+                cancellationToken: TestContext.Current.CancellationToken).AsTask());
         await Assert.ThrowsAsync<ArgumentException>(
             () => storage.UpdateMetadataAsync(
                 set: new Dictionary<string, string> { ["same"] = "value" },
-                remove: ["same"]).AsTask());
+                remove: ["same"],
+                cancellationToken: TestContext.Current.CancellationToken).AsTask());
         Assert.Empty(store.AddCalls);
         Assert.Empty(store.UpdateCalls);
 
-        Assert.True(await storage.CreateIfNotExistsAsync());
+        Assert.True(await storage.CreateIfNotExistsAsync(cancellationToken: TestContext.Current.CancellationToken));
         await Assert.ThrowsAsync<ArgumentException>(
-            () => storage.UpdateMetadataAsync(expectedETag: " \t").AsTask());
+            () => storage.UpdateMetadataAsync(
+                expectedETag: " \t",
+                cancellationToken: TestContext.Current.CancellationToken).AsTask());
         Assert.Empty(store.UpdateCalls);
     }
 

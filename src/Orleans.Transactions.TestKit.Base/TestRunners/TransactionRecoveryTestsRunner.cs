@@ -63,6 +63,29 @@ namespace Orleans.Transactions.TestKit
 
         private sealed record InFlightBatch(int Index, int PendingCount);
 
+        private sealed class ProducerCancellationScope(
+            CancellationTokenSource stopProducing,
+            Task producer) : IDisposable
+        {
+            public void Dispose()
+            {
+                stopProducing.Cancel();
+                producer.Ignore();
+                if (producer.IsCompleted)
+                {
+                    stopProducing.Dispose();
+                    return;
+                }
+
+                _ = producer.ContinueWith(
+                    static (_, state) => ((CancellationTokenSource)state!).Dispose(),
+                    stopProducing,
+                    CancellationToken.None,
+                    TaskContinuationOptions.ExecuteSynchronously,
+                    TaskScheduler.Default);
+            }
+        }
+
         private sealed record RecoveryResult(
             bool Succeeded,
             bool LastProbeSucceeded,
@@ -89,13 +112,51 @@ namespace Orleans.Transactions.TestKit
         }
 
         public virtual Task TransactionWillRecoverAfterRandomSiloGracefulShutdown(string transactionTestGrainClassName, int concurrent)
+            => TransactionWillRecoverAfterRandomSiloFailure(
+                transactionTestGrainClassName,
+                concurrent,
+                gracefulShutdown: true);
+
+        /// <summary>
+        /// Verifies transaction recovery after gracefully stopping a randomly selected silo.
+        /// </summary>
+        /// <param name="transactionTestGrainClassName">The transaction test grain class name.</param>
+        /// <param name="concurrent">The number of concurrent transaction groups.</param>
+        /// <param name="cancellationToken">A token which cancels the recovery test.</param>
+        public virtual Task TransactionWillRecoverAfterRandomSiloGracefulShutdown(
+            string transactionTestGrainClassName,
+            int concurrent,
+            CancellationToken cancellationToken)
         {
-            return TransactionWillRecoverAfterRandomSiloFailure(transactionTestGrainClassName, concurrent, true);
+            return TransactionWillRecoverAfterRandomSiloFailure(
+                transactionTestGrainClassName,
+                concurrent,
+                gracefulShutdown: true,
+                cancellationToken);
         }
 
         public virtual Task TransactionWillRecoverAfterRandomSiloUnGracefulShutdown(string transactionTestGrainClassName, int concurrent)
+            => TransactionWillRecoverAfterRandomSiloFailure(
+                transactionTestGrainClassName,
+                concurrent,
+                gracefulShutdown: false);
+
+        /// <summary>
+        /// Verifies transaction recovery after abruptly stopping a randomly selected silo.
+        /// </summary>
+        /// <param name="transactionTestGrainClassName">The transaction test grain class name.</param>
+        /// <param name="concurrent">The number of concurrent transaction groups.</param>
+        /// <param name="cancellationToken">A token which cancels the recovery test.</param>
+        public virtual Task TransactionWillRecoverAfterRandomSiloUnGracefulShutdown(
+            string transactionTestGrainClassName,
+            int concurrent,
+            CancellationToken cancellationToken)
         {
-            return TransactionWillRecoverAfterRandomSiloFailure(transactionTestGrainClassName, concurrent, false);
+            return TransactionWillRecoverAfterRandomSiloFailure(
+                transactionTestGrainClassName,
+                concurrent,
+                gracefulShutdown: false,
+                cancellationToken);
         }
 
         /// <summary>
@@ -282,7 +343,28 @@ namespace Orleans.Transactions.TestKit
         private static long GetDeadline(TimeSpan timeout)
             => Stopwatch.GetTimestamp() + (long)(timeout.TotalSeconds * Stopwatch.Frequency);
 
-        protected virtual async Task TransactionWillRecoverAfterRandomSiloFailure(string transactionTestGrainClassName, int concurrent, bool gracefulShutdown)
+        protected virtual Task TransactionWillRecoverAfterRandomSiloFailure(
+            string transactionTestGrainClassName,
+            int concurrent,
+            bool gracefulShutdown)
+            => TransactionWillRecoverAfterRandomSiloFailure(
+                transactionTestGrainClassName,
+                concurrent,
+                gracefulShutdown,
+                CancellationToken.None);
+
+        /// <summary>
+        /// Verifies transaction recovery after stopping a randomly selected silo.
+        /// </summary>
+        /// <param name="transactionTestGrainClassName">The transaction test grain class name.</param>
+        /// <param name="concurrent">The number of concurrent transaction groups.</param>
+        /// <param name="gracefulShutdown">Whether to stop the silo gracefully.</param>
+        /// <param name="cancellationToken">A token which cancels the recovery test.</param>
+        protected virtual async Task TransactionWillRecoverAfterRandomSiloFailure(
+            string transactionTestGrainClassName,
+            int concurrent,
+            bool gracefulShutdown,
+            CancellationToken cancellationToken)
         {
             var index = 0;
             int getIndex() => Interlocked.Increment(ref index) - 1;
@@ -291,19 +373,19 @@ namespace Orleans.Transactions.TestKit
                 .Select(grainId => new ExpectedGrainActivity(grainId, TestGrain<ITransactionalBitArrayGrain>(transactionTestGrainClassName, grainId)))
                 .ToList();
             //ping all grains to activate them
-            await WakeupGrains(txGrains.Select(g=>g.Grain).ToList());
+            await WakeupGrains(txGrains.Select(g=>g.Grain).ToList()).WaitAsync(cancellationToken);
             List<ExpectedGrainActivity>[] transactionGroups = txGrains
                 .Select((txGrain, i) => new { index = i, value = txGrain })
                 .GroupBy(v => v.index / 2)
                 .Select(g => g.Select(i => i.value).ToList())
                 .ToArray();
             using var recoveryEvents = new TransactionRecoveryEventObserver(txGrains.Select(grain => grain.RuntimeGrainId));
-            var txSucceedBeforeInterruption = await AllTxSucceed(transactionGroups, getIndex());
+            var txSucceedBeforeInterruption = await AllTxSucceed(transactionGroups, getIndex()).WaitAsync(cancellationToken);
             txSucceedBeforeInterruption.Should().BeTrue();
-            await ValidateResults(txGrains, transactionGroups);
+            await ValidateResults(txGrains, transactionGroups).WaitAsync(cancellationToken);
 
             // have transactions in flight when silo goes down
-            using var stopProducing = new CancellationTokenSource();
+            var stopProducing = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
             var firstFailure = new TaskCompletionSource<TransactionFailure>(TaskCreationOptions.RunContinuationsAsynchronously);
             var firstInFlightBatch = new TaskCompletionSource<InFlightBatch>(TaskCreationOptions.RunContinuationsAsynchronously);
             Task<List<ExpectedGrainActivity>[]?> producer = RunWhileSucceeding(
@@ -312,13 +394,14 @@ namespace Orleans.Transactions.TestKit
                 stopProducing,
                 firstFailure,
                 firstInFlightBatch);
-            var inFlightBatch = await firstInFlightBatch.Task.WaitAsync(this.failureDetectionTimeout);
+            using var producerCancellationScope = new ProducerCancellationScope(stopProducing, producer);
+            var inFlightBatch = await firstInFlightBatch.Task.WaitAsync(this.failureDetectionTimeout, cancellationToken);
 
             if (firstFailure.Task.IsCompleted)
             {
                 stopProducing.Cancel();
                 producer.Ignore();
-                var prematureFailure = await firstFailure.Task;
+                var prematureFailure = await firstFailure.Task.WaitAsync(cancellationToken);
                 throw new InvalidOperationException(
                     $"A transaction failed before the silo was terminated. Index: {prematureFailure.Index}. "
                     + $"Groups: {string.Join(":", prematureFailure.GrainIds)}. Exception: {prematureFailure.Exception.GetType().Name}.");
@@ -338,9 +421,9 @@ namespace Orleans.Transactions.TestKit
 
             var shutdownStartedAt = Stopwatch.GetTimestamp();
             if (gracefulShutdown)
-                await this.testCluster.StopSiloAsync(siloToTerminate);
+                await this.testCluster.StopSiloAsync(siloToTerminate, cancellationToken);
             else
-                await this.testCluster.KillSiloAsync(siloToTerminate);
+                await this.testCluster.KillSiloAsync(siloToTerminate, cancellationToken);
             var shutdownElapsed = Stopwatch.GetElapsedTime(shutdownStartedAt);
             this.Log(
                 $"Recovery phase=silo-shutdown completed, timestamp={DateTime.UtcNow:O}. Silo={siloToTerminate.SiloAddress}, "
@@ -363,7 +446,8 @@ namespace Orleans.Transactions.TestKit
                 firstFailure.Task,
                 stopProducing,
                 failureObservationTimeout.ObservationWindow,
-                failureObservationTimeout.ProducerDrainTimeout);
+                failureObservationTimeout.ProducerDrainTimeout,
+                cancellationToken);
             this.Log(
                 $"Recovery phase=failure-watchdog completed, timestamp={DateTime.UtcNow:O}. "
                 + $"Outcome={failureDetection.Kind}, elapsed={failureDetection.Elapsed}, "
@@ -445,7 +529,8 @@ namespace Orleans.Transactions.TestKit
             this.Log(
                 $"Recovery phase=membership-directory-convergence started, timestamp={DateTime.UtcNow:O}, "
                 + $"groups={FormatGroups(groupsToRecover)}.");
-            await this.testCluster.WaitForLivenessToStabilizeAsync(didKill: !gracefulShutdown);
+            await this.testCluster.WaitForLivenessToStabilizeAsync(didKill: !gracefulShutdown)
+                .WaitAsync(cancellationToken);
             var convergenceElapsed = Stopwatch.GetElapsedTime(convergenceStartedAt);
             this.Log(
                 $"Recovery phase=membership-directory-convergence completed, timestamp={DateTime.UtcNow:O}, "
@@ -461,7 +546,8 @@ namespace Orleans.Transactions.TestKit
                 getIndex,
                 this.recoveryTimeout,
                 this.failureDetectionTimeout,
-                recoveryEvents);
+                recoveryEvents,
+                cancellationToken);
             this.Log(
                 $"Recovery phase=transaction-path-probe completed, timestamp={DateTime.UtcNow:O}. Succeeded={recovery.Succeeded}, "
                 + $"lastProbeSucceeded={recovery.LastProbeSucceeded}, "
@@ -477,7 +563,7 @@ namespace Orleans.Transactions.TestKit
                 $"Recovery phase=final-validation started, timestamp={DateTime.UtcNow:O}. "
                 + $"Performed {Volatile.Read(ref index)} transactions on each group.");
             var validationStartedAt = Stopwatch.GetTimestamp();
-            await ValidateResults(txGrains, transactionGroups);
+            await ValidateResults(txGrains, transactionGroups).WaitAsync(cancellationToken);
             this.Log(
                 $"Recovery phase=final-validation completed, timestamp={DateTime.UtcNow:O}, "
                 + $"elapsed={Stopwatch.GetElapsedTime(validationStartedAt)}. Transaction results validated.");
@@ -536,7 +622,8 @@ namespace Orleans.Transactions.TestKit
             Func<int> getIndex,
             TimeSpan timeout,
             TimeSpan cleanupTimeout,
-            TransactionRecoveryEventObserver recoveryEvents)
+            TransactionRecoveryEventObserver recoveryEvents,
+            CancellationToken cancellationToken = default)
         {
             var startedAt = Stopwatch.GetTimestamp();
             var deadline = startedAt + (long)(timeout.TotalSeconds * Stopwatch.Frequency);
@@ -549,9 +636,13 @@ namespace Orleans.Transactions.TestKit
 
             while (Stopwatch.GetTimestamp() < deadline)
             {
+                cancellationToken.ThrowIfCancellationRequested();
                 if (probeRequiresTransition)
                 {
-                    var transition = await recoveryEvents.WaitForNextTransitionAsync(waitForTransitionAfter, deadline);
+                    var transition = await recoveryEvents.WaitForNextTransitionAsync(
+                        waitForTransitionAfter,
+                        deadline,
+                        cancellationToken);
                     waitForTransitionAfter = transition.Sequence;
                     if (transition.Sequence > timelineLogCursor)
                     {
@@ -580,11 +671,14 @@ namespace Orleans.Transactions.TestKit
                 try
                 {
                     var now = Stopwatch.GetTimestamp();
-                    failedGroups = await probeTask.WaitAsync(Stopwatch.GetElapsedTime(now, deadline));
+                    failedGroups = await probeTask.WaitAsync(
+                        Stopwatch.GetElapsedTime(now, deadline),
+                        cancellationToken);
                 }
                 catch (TimeoutException)
                 {
-                    var cleanup = await Task.WhenAny(probeTask, Task.Delay(cleanupTimeout));
+                    var cleanup = await Task.WhenAny(probeTask, Task.Delay(cleanupTimeout, cancellationToken));
+                    cancellationToken.ThrowIfCancellationRequested();
                     var cleanupSettled = ReferenceEquals(cleanup, probeTask);
                     if (cleanupSettled)
                     {

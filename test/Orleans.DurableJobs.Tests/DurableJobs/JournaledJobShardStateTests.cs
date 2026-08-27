@@ -136,6 +136,7 @@ public class JournaledJobShardStateTests
     [Fact]
     public async Task ConsumeDurableJobsAsync_YieldsDueJobsInDueTimeOrderAndIncrementsDequeueCount()
     {
+        var cancellationToken = TestContext.Current.CancellationToken;
         var shardId = new JobShardId("shard-d");
         var start = DateTimeOffset.UtcNow.AddMinutes(-1);
         var state = new JournaledJobShardState(shardId, start, DateTimeOffset.UtcNow.AddMinutes(1));
@@ -148,7 +149,7 @@ public class JournaledJobShardStateTests
         state.Apply(DurableJobShardJournalRecord.ForSchedule(second));
 
         var consumed = new List<IJobRunContext>();
-        await foreach (var jobContext in state.ConsumeDurableJobsAsync())
+        await foreach (var jobContext in state.ConsumeDurableJobsAsync().WithCancellation(cancellationToken))
         {
             consumed.Add(jobContext);
             if (consumed.Count == 3)

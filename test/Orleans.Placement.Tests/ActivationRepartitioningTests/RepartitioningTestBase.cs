@@ -31,9 +31,12 @@ public abstract class RepartitioningTestBase<TFixture> : IAsyncLifetime where TF
 
     public virtual async ValueTask InitializeAsync()
     {
-        await GrainFactory.GetGrain<IManagementGrain>(0).ForceActivationCollection(TimeSpan.FromSeconds(0));
-        await ResetCounters();
-        await AdjustActivationCountOffsets();
+        var cancellationToken = TestContext.Current.CancellationToken;
+        await GrainFactory.GetGrain<IManagementGrain>(0)
+            .ForceActivationCollection(TimeSpan.FromSeconds(0))
+            .WaitAsync(cancellationToken);
+        await ResetCounters(cancellationToken);
+        await AdjustActivationCountOffsets(cancellationToken);
     }
 
     public virtual ValueTask DisposeAsync()
@@ -41,20 +44,26 @@ public abstract class RepartitioningTestBase<TFixture> : IAsyncLifetime where TF
         return ValueTask.CompletedTask;
     }
 
-    public async ValueTask ResetCounters()
+    public async ValueTask ResetCounters(CancellationToken cancellationToken)
     {
-        await Silo1Repartitioner.ResetCounters();
-        await Silo2Repartitioner.ResetCounters();
+        await Silo1Repartitioner.ResetCounters().AsTask().WaitAsync(cancellationToken);
+        await Silo2Repartitioner.ResetCounters().AsTask().WaitAsync(cancellationToken);
     }
 
-    private protected async ValueTask TriggerExchangeRequestAfterFlushingBuffers(IActivationRepartitionerSystemTarget repartitioner)
+    private protected async ValueTask TriggerExchangeRequestAfterFlushingBuffers(
+        IActivationRepartitionerSystemTarget repartitioner,
+        CancellationToken cancellationToken)
     {
-        await Silo1Repartitioner.FlushBuffers();
-        await Silo2Repartitioner.FlushBuffers();
-        await repartitioner.TriggerExchangeRequest();
+        await Silo1Repartitioner.FlushBuffers().AsTask().WaitAsync(cancellationToken);
+        await Silo2Repartitioner.FlushBuffers().AsTask().WaitAsync(cancellationToken);
+        await repartitioner.TriggerExchangeRequest().AsTask().WaitAsync(cancellationToken);
     }
 
-    private protected static Task WaitForConditionAsync(Func<Task<bool>> predicate, TimeSpan timeout, Func<string> timeoutMessage)
+    private protected static Task WaitForConditionAsync(
+        Func<Task<bool>> predicate,
+        TimeSpan timeout,
+        Func<string> timeoutMessage,
+        CancellationToken cancellationToken)
         => TestingUtils.WaitUntilAsync(
             async (lastTry, _) =>
             {
@@ -68,9 +77,9 @@ public abstract class RepartitioningTestBase<TFixture> : IAsyncLifetime where TF
             },
             timeout,
             TimeSpan.FromMilliseconds(10),
-            TestContext.Current.CancellationToken);
+            cancellationToken);
 
-    public async Task AdjustActivationCountOffsets()
+    public async Task AdjustActivationCountOffsets(CancellationToken cancellationToken)
     {
         // Account for imbalances in the initial activation counts.
         Dictionary<SiloAddress, int> counts = [];
@@ -78,7 +87,7 @@ public abstract class RepartitioningTestBase<TFixture> : IAsyncLifetime where TF
         foreach (var silo in (IEnumerable<SiloHandle>)_fixture.HostedCluster.Silos)
         {
             var sysTarget = GrainFactory.GetSystemTarget<IActivationRepartitionerSystemTarget>(Constants.ActivationRepartitionerType, silo.SiloAddress);
-            var count = counts[silo.SiloAddress] = await sysTarget.GetActivationCount();
+            var count = counts[silo.SiloAddress] = await sysTarget.GetActivationCount().AsTask().WaitAsync(cancellationToken);
             max = Math.Max(max, count);
         }
 
@@ -86,7 +95,7 @@ public abstract class RepartitioningTestBase<TFixture> : IAsyncLifetime where TF
         {
             var sysTarget = GrainFactory.GetSystemTarget<IActivationRepartitionerSystemTarget>(Constants.ActivationRepartitionerType, silo.SiloAddress);
             var myCount = counts[silo.SiloAddress];
-            await sysTarget.SetActivationCountOffset(max - myCount);
+            await sysTarget.SetActivationCountOffset(max - myCount).AsTask().WaitAsync(cancellationToken);
         }
     }
 

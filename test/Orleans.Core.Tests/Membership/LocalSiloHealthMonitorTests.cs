@@ -459,6 +459,7 @@ namespace NonSilo.Tests.Membership
         [Fact]
         public async Task GetLocalHealthStatus_ConcurrentCallersShareOneNonOverlappingParticipantPass()
         {
+            var cancellationToken = TestContext.Current.CancellationToken;
             var entered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
             var release = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
             var activeCalls = 0;
@@ -487,14 +488,14 @@ namespace NonSilo.Tests.Membership
                 .Select(index => Task.Run(async () =>
                 {
                     ready[index].SetResult();
-                    await start.Task;
+                    await start.Task.WaitAsync(cancellationToken);
                     return monitor.GetLocalHealthStatus(TimeSpan.Zero, LocalSiloHealthCheckCategory.Local);
-                }))
+                }, cancellationToken))
                 .ToArray();
 
-            await Task.WhenAll(ready.Select(item => item.Task));
+            await Task.WhenAll(ready.Select(item => item.Task)).WaitAsync(cancellationToken);
             start.SetResult();
-            await entered.Task;
+            await entered.Task.WaitAsync(cancellationToken);
             try
             {
                 Assert.Equal(1, participant.CallCount);
@@ -507,7 +508,7 @@ namespace NonSilo.Tests.Membership
                 release.TrySetResult();
             }
 
-            var results = await Task.WhenAll(workers);
+            var results = await Task.WhenAll(workers).WaitAsync(cancellationToken);
             var expected = results[0];
             var expectedEvents = expected.Events
                 .Select(item => (item.Timestamp, item.Kind, item.Category, item.Source, item.Score, item.Complaint, item.Duration))
@@ -532,6 +533,7 @@ namespace NonSilo.Tests.Membership
         [Fact]
         public async Task RecordHealthEvent_DoesNotWaitForHealthCheckParticipants()
         {
+            var cancellationToken = TestContext.Current.CancellationToken;
             var entered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
             var release = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
             var participant = new TestHealthCheckParticipant(_ =>
@@ -542,9 +544,10 @@ namespace NonSilo.Tests.Membership
             });
             var monitor = CreateMonitor(participant);
             var checkTask = Task.Run(
-                () => monitor.GetLocalHealthStatus(TimeSpan.Zero, LocalSiloHealthCheckCategory.Local));
+                () => monitor.GetLocalHealthStatus(TimeSpan.Zero, LocalSiloHealthCheckCategory.Local),
+                cancellationToken);
 
-            await entered.Task;
+            await entered.Task.WaitAsync(cancellationToken);
             try
             {
                 var recordTask = Task.Run(
@@ -552,9 +555,10 @@ namespace NonSilo.Tests.Membership
                         LocalSiloHealthCheckKind.ComponentHealthCheckStall,
                         score: 1,
                         complaint: "participant check stalled",
-                        duration: TimeSpan.FromSeconds(2)));
+                        duration: TimeSpan.FromSeconds(2)),
+                    cancellationToken);
 
-                await recordTask.WaitAsync(TimeSpan.FromSeconds(5));
+                await recordTask.WaitAsync(TimeSpan.FromSeconds(5), cancellationToken);
                 Assert.False(checkTask.IsCompleted);
             }
             finally
@@ -562,7 +566,7 @@ namespace NonSilo.Tests.Membership
                 release.TrySetResult();
             }
 
-            await checkTask;
+            await checkTask.WaitAsync(cancellationToken);
             var status = monitor.GetLocalHealthStatus(TimeSpan.Zero, LocalSiloHealthCheckCategory.Local);
             Assert.Contains(
                 status.Events,

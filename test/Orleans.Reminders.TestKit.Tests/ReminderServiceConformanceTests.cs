@@ -21,7 +21,7 @@ public sealed class IdealizedReminderServiceFixture : IAsyncLifetime
         var builder = new InProcessTestClusterBuilder(1);
         builder.UseIdealizedReminderTable(Oracle);
         _cluster = builder.Build();
-        await _cluster.DeployAsync();
+        await _cluster.DeployAsync(TestContext.Current.CancellationToken);
 
         Assert.Same(
             Oracle,
@@ -35,8 +35,16 @@ public sealed class IdealizedReminderServiceFixture : IAsyncLifetime
             return;
         }
 
-        await cluster.StopAllSilosAsync();
-        await cluster.DisposeAsync();
+        try
+        {
+            using var stopCancellation = new CancellationTokenSource(TimeSpan.FromMinutes(1));
+            await cluster.StopAllSilosAsync(stopCancellation.Token);
+        }
+        finally
+        {
+            using var disposeCancellation = new CancellationTokenSource(TimeSpan.FromMinutes(1));
+            await cluster.DisposeAsync().AsTask().WaitAsync(disposeCancellation.Token);
+        }
     }
 }
 
@@ -54,11 +62,11 @@ public sealed class ReminderServiceConformanceTests : ReminderServiceTestRunner,
 
     [Fact]
     public override Task ReminderService_RegisterLookupEnumerateAndUnregister()
-        => base.ReminderService_RegisterLookupEnumerateAndUnregister();
+        => base.RunReminderService_RegisterLookupEnumerateAndUnregister(TestContext.Current.CancellationToken);
 
     [Fact]
     public override Task ReminderService_UpdateReplacesScheduleAndETagWithoutDuplicate()
-        => base.ReminderService_UpdateReplacesScheduleAndETagWithoutDuplicate();
+        => base.RunReminderService_UpdateReplacesScheduleAndETagWithoutDuplicate(TestContext.Current.CancellationToken);
 }
 
 public sealed class EventuallyVisibleReminderServiceFixture : IAsyncLifetime
@@ -80,7 +88,7 @@ public sealed class EventuallyVisibleReminderServiceFixture : IAsyncLifetime
             siloBuilder.Services.AddSingleton<IReminderTable>(Table);
         });
         _cluster = builder.Build();
-        await _cluster.DeployAsync();
+        await _cluster.DeployAsync(TestContext.Current.CancellationToken);
     }
 
     public async ValueTask DisposeAsync()
@@ -90,8 +98,16 @@ public sealed class EventuallyVisibleReminderServiceFixture : IAsyncLifetime
             return;
         }
 
-        await cluster.StopAllSilosAsync();
-        await cluster.DisposeAsync();
+        try
+        {
+            using var stopCancellation = new CancellationTokenSource(TimeSpan.FromMinutes(1));
+            await cluster.StopAllSilosAsync(stopCancellation.Token);
+        }
+        finally
+        {
+            using var disposeCancellation = new CancellationTokenSource(TimeSpan.FromMinutes(1));
+            await cluster.DisposeAsync().AsTask().WaitAsync(disposeCancellation.Token);
+        }
     }
 }
 
@@ -113,7 +129,7 @@ public sealed class EventuallyVisibleReminderServiceTests
     [Fact]
     public override async Task ReminderService_RegisterLookupEnumerateAndUnregister()
     {
-        await base.ReminderService_RegisterLookupEnumerateAndUnregister();
+        await base.RunReminderService_RegisterLookupEnumerateAndUnregister(TestContext.Current.CancellationToken);
 
         Assert.True(_table.HiddenPointReads > 0);
         Assert.True(_table.HiddenEnumerationReads > 0);
@@ -122,7 +138,7 @@ public sealed class EventuallyVisibleReminderServiceTests
     [Fact]
     public override async Task ReminderService_UpdateReplacesScheduleAndETagWithoutDuplicate()
     {
-        await base.ReminderService_UpdateReplacesScheduleAndETagWithoutDuplicate();
+        await base.RunReminderService_UpdateReplacesScheduleAndETagWithoutDuplicate(TestContext.Current.CancellationToken);
 
         Assert.True(_table.HiddenPointReads > 0);
         Assert.True(_table.HiddenEnumerationReads > 0);
@@ -148,7 +164,7 @@ public sealed class NonRotatingReminderServiceFixture : IAsyncLifetime
             siloBuilder.Services.AddSingleton<IReminderTable>(Table);
         });
         _cluster = builder.Build();
-        await _cluster.DeployAsync();
+        await _cluster.DeployAsync(TestContext.Current.CancellationToken);
 
         Assert.Same(
             Table,
@@ -162,8 +178,16 @@ public sealed class NonRotatingReminderServiceFixture : IAsyncLifetime
             return;
         }
 
-        await cluster.StopAllSilosAsync();
-        await cluster.DisposeAsync();
+        try
+        {
+            using var stopCancellation = new CancellationTokenSource(TimeSpan.FromMinutes(1));
+            await cluster.StopAllSilosAsync(stopCancellation.Token);
+        }
+        finally
+        {
+            using var disposeCancellation = new CancellationTokenSource(TimeSpan.FromMinutes(1));
+            await cluster.DisposeAsync().AsTask().WaitAsync(disposeCancellation.Token);
+        }
     }
 }
 
@@ -189,7 +213,7 @@ public sealed class NonRotatingReminderServiceConformanceTests
     public override async Task ReminderService_UpdateReplacesScheduleAndETagWithoutDuplicate()
     {
         var exception = await Assert.ThrowsAsync<ReminderConformanceException>(
-            base.ReminderService_UpdateReplacesScheduleAndETagWithoutDuplicate);
+            () => base.RunReminderService_UpdateReplacesScheduleAndETagWithoutDuplicate(TestContext.Current.CancellationToken));
 
         Assert.Equal(2, _table.UpsertCount);
         Assert.Equal(["non-rotating-etag", "non-rotating-etag"], _table.ReturnedETags);
@@ -221,7 +245,7 @@ public abstract class CorruptingReminderServiceFixture : IAsyncLifetime
             siloBuilder.Services.AddSingleton<IReminderTable>(Table);
         });
         _cluster = builder.Build();
-        await _cluster.DeployAsync();
+        await _cluster.DeployAsync(TestContext.Current.CancellationToken);
     }
 
     public async ValueTask DisposeAsync()
@@ -231,8 +255,16 @@ public abstract class CorruptingReminderServiceFixture : IAsyncLifetime
             return;
         }
 
-        await cluster.StopAllSilosAsync();
-        await cluster.DisposeAsync();
+        try
+        {
+            using var stopCancellation = new CancellationTokenSource(TimeSpan.FromMinutes(1));
+            await cluster.StopAllSilosAsync(stopCancellation.Token);
+        }
+        finally
+        {
+            using var disposeCancellation = new CancellationTokenSource(TimeSpan.FromMinutes(1));
+            await cluster.DisposeAsync().AsTask().WaitAsync(disposeCancellation.Token);
+        }
     }
 }
 
@@ -258,7 +290,7 @@ public sealed class DuplicateEnumerationReminderServiceTests
     public async Task ReminderService_UpdateRejectsDuplicateEnumeratedIdentity()
     {
         var exception = await Assert.ThrowsAsync<ReminderConformanceException>(
-            ReminderService_UpdateReplacesScheduleAndETagWithoutDuplicate);
+            () => RunReminderService_UpdateReplacesScheduleAndETagWithoutDuplicate(TestContext.Current.CancellationToken));
 
         Assert.Contains("provider=DuplicateEnumeration", exception.Message, StringComparison.Ordinal);
         Assert.Contains("rowCount=2", exception.Message, StringComparison.Ordinal);
@@ -282,7 +314,7 @@ public sealed class StaleScheduleReminderServiceTests
     public async Task ReminderService_UpdateRejectsStaleEnumeratedSchedule()
     {
         var exception = await Assert.ThrowsAsync<ReminderConformanceException>(
-            ReminderService_UpdateReplacesScheduleAndETagWithoutDuplicate);
+            () => RunReminderService_UpdateReplacesScheduleAndETagWithoutDuplicate(TestContext.Current.CancellationToken));
 
         Assert.Contains("provider=StaleScheduleEnumeration", exception.Message, StringComparison.Ordinal);
         Assert.Contains("rowCount=1", exception.Message, StringComparison.Ordinal);

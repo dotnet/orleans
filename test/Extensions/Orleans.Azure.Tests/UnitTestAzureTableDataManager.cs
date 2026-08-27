@@ -54,11 +54,14 @@ namespace Tester.AzureUtils
     {
         protected const string INSTANCE_TABLE_NAME = "UnitTestAzureData";
 
-        public UnitTestAzureTableDataManager()
+        public UnitTestAzureTableDataManager(CancellationToken cancellationToken)
             : base(new AzureStorageOperationOptions { TableName = INSTANCE_TABLE_NAME }.ConfigureTestDefaults(),
                   NullLoggerFactory.Instance.CreateLogger<UnitTestAzureTableDataManager>())
         {
-            InitTableAsync().WaitAsync(new AzureStoragePolicyOptions().CreationTimeout).Wait();
+            InitTableAsync()
+                .WaitAsync(new AzureStoragePolicyOptions().CreationTimeout, cancellationToken)
+                .GetAwaiter()
+                .GetResult();
         }
     }
 }

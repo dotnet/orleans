@@ -15,7 +15,7 @@ namespace Orleans.DurableJobs.Tests;
 
 public interface IJobShardManagerTestFixture
 {
-    Task<IJobShardManagerTestScope> CreateScopeAsync();
+    Task<IJobShardManagerTestScope> CreateScopeAsync(CancellationToken cancellationToken);
 }
 
 public interface IJobShardManagerTestScope : IAsyncDisposable
@@ -39,8 +39,9 @@ public sealed record TestSilo(SiloAddress SiloAddress);
 
 public sealed class VolatileJobShardManagerTestFixture : IJobShardManagerTestFixture
 {
-    public Task<IJobShardManagerTestScope> CreateScopeAsync()
+    public Task<IJobShardManagerTestScope> CreateScopeAsync(CancellationToken cancellationToken)
     {
+        cancellationToken.ThrowIfCancellationRequested();
         var builder = new TestSiloBuilder();
         builder.AddJournalStorage();
         builder.UseJsonJournalFormat(options => options.AddTypeInfoResolver(DurableJobsJsonContext.Default));

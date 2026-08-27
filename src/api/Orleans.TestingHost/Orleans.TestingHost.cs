@@ -67,6 +67,8 @@ namespace Orleans.TestingHost
 
         public Microsoft.Extensions.Hosting.IHost SiloHost { get { throw null; } init { } }
 
+        public static System.Threading.Tasks.Task<InProcessSiloHandle> CreateAsync(string siloName, Microsoft.Extensions.Configuration.IConfiguration configuration, System.Action<Microsoft.Extensions.Hosting.IHostBuilder>? postConfigureHostBuilder, System.Threading.CancellationToken cancellationToken) { throw null; }
+
         public static System.Threading.Tasks.Task<InProcessSiloHandle> CreateAsync(string siloName, Microsoft.Extensions.Configuration.IConfiguration configuration, System.Action<Microsoft.Extensions.Hosting.IHostBuilder>? postConfigureHostBuilder = null) { throw null; }
 
         protected override void Dispose(bool disposing) { }
@@ -90,6 +92,8 @@ namespace Orleans.TestingHost
 
         public System.Collections.ObjectModel.ReadOnlyCollection<InProcessSiloHandle> Silos { get { throw null; } }
 
+        public System.Threading.Tasks.Task<InProcessSiloHandle> CreateSiloAsync(InProcessTestSiloSpecificOptions siloOptions, System.Threading.CancellationToken cancellationToken) { throw null; }
+
         public System.Threading.Tasks.Task<InProcessSiloHandle> CreateSiloAsync(InProcessTestSiloSpecificOptions siloOptions) { throw null; }
 
         public System.Threading.Tasks.Task DeactivateAsync(Runtime.GrainId grainId) { throw null; }
@@ -97,6 +101,8 @@ namespace Orleans.TestingHost
         public System.Threading.Tasks.Task DeactivateAsync(Runtime.IAddressable grain) { throw null; }
 
         public System.Threading.Tasks.Task DeployAsync() { throw null; }
+
+        public System.Threading.Tasks.Task DeployAsync(System.Threading.CancellationToken cancellationToken) { throw null; }
 
         public void Dispose() { }
 
@@ -114,7 +120,11 @@ namespace Orleans.TestingHost
 
         public System.Threading.Tasks.Task InitializeClientAsync() { throw null; }
 
+        public System.Threading.Tasks.Task InitializeClientAsync(System.Threading.CancellationToken cancellationToken) { throw null; }
+
         public System.Threading.Tasks.Task KillClientAsync() { throw null; }
+
+        public System.Threading.Tasks.Task KillSiloAsync(InProcessSiloHandle instance, System.Threading.CancellationToken cancellationToken) { throw null; }
 
         public System.Threading.Tasks.Task KillSiloAsync(InProcessSiloHandle instance) { throw null; }
 
@@ -143,10 +153,14 @@ namespace Orleans.TestingHost
         [System.Obsolete("Use the overload which does not have a 'startSiloOnNewPort' parameter.")]
         public System.Threading.Tasks.Task<InProcessSiloHandle> StartSiloAsync(int instanceNumber, InProcessTestClusterOptions clusterOptions, System.Collections.Generic.IReadOnlyList<Microsoft.Extensions.Configuration.IConfigurationSource> configurationOverrides, bool startSiloOnNewPort) { throw null; }
 
+        public System.Threading.Tasks.Task<InProcessSiloHandle> StartSiloAsync(int instanceNumber, InProcessTestClusterOptions clusterOptions, System.Threading.CancellationToken cancellationToken) { throw null; }
+
         public System.Threading.Tasks.Task<InProcessSiloHandle> StartSiloAsync(int instanceNumber, InProcessTestClusterOptions clusterOptions) { throw null; }
 
         [System.Obsolete("Use overload which does not have a 'startAdditionalSiloOnNewPort' parameter.")]
         public System.Threading.Tasks.Task<System.Collections.Generic.List<InProcessSiloHandle>> StartSilosAsync(int silosToStart, bool startAdditionalSiloOnNewPort) { throw null; }
+
+        public System.Threading.Tasks.Task<System.Collections.Generic.List<InProcessSiloHandle>> StartSilosAsync(int silosToStart, System.Threading.CancellationToken cancellationToken) { throw null; }
 
         public System.Threading.Tasks.Task<System.Collections.Generic.List<InProcessSiloHandle>> StartSilosAsync(int silosToStart) { throw null; }
 
@@ -154,11 +168,19 @@ namespace Orleans.TestingHost
 
         public System.Threading.Tasks.Task StopAllSilosAsync() { throw null; }
 
+        public System.Threading.Tasks.Task StopAllSilosAsync(System.Threading.CancellationToken cancellationToken) { throw null; }
+
         public System.Threading.Tasks.Task StopClusterClientAsync() { throw null; }
+
+        public System.Threading.Tasks.Task StopClusterClientAsync(System.Threading.CancellationToken cancellationToken) { throw null; }
+
+        public System.Threading.Tasks.Task StopSiloAsync(InProcessSiloHandle instance, System.Threading.CancellationToken cancellationToken) { throw null; }
 
         public System.Threading.Tasks.Task StopSiloAsync(InProcessSiloHandle instance) { throw null; }
 
         public System.Threading.Tasks.Task StopSilosAsync() { throw null; }
+
+        public System.Threading.Tasks.Task StopSilosAsync(System.Threading.CancellationToken cancellationToken) { throw null; }
 
         public bool TryGetGrainContext(Runtime.GrainId grainId, out Runtime.IGrainContext? grainContext) { throw null; }
 
@@ -292,6 +314,8 @@ namespace Orleans.TestingHost
         ~SiloHandle() {
         }
 
+        public virtual System.Threading.Tasks.Task StopSiloAsync(bool stopGracefully, System.Threading.CancellationToken cancellationToken) { throw null; }
+
         public abstract System.Threading.Tasks.Task StopSiloAsync(bool stopGracefully);
         public abstract System.Threading.Tasks.Task StopSiloAsync(System.Threading.CancellationToken ct);
         public override string ToString() { throw null; }
@@ -355,6 +379,8 @@ namespace Orleans.TestingHost
 
         public System.Func<string, Microsoft.Extensions.Configuration.IConfiguration, System.Threading.Tasks.Task<SiloHandle>> CreateSiloAsync { set { } }
 
+        public System.Func<string, Microsoft.Extensions.Configuration.IConfiguration, System.Threading.CancellationToken, System.Threading.Tasks.Task<SiloHandle>> CreateSiloAsyncWithCancellation { set { } }
+
         public IGrainFactory GrainFactory { get { throw null; } }
 
         public TestClusterOptions Options { get { throw null; } }
@@ -373,11 +399,15 @@ namespace Orleans.TestingHost
 
         public System.Threading.Tasks.Task DeactivateAsync(Runtime.IAddressable grain) { throw null; }
 
+        public System.Threading.Tasks.Task<SiloHandle> DefaultCreateSiloAsync(string siloName, Microsoft.Extensions.Configuration.IConfiguration configuration, System.Threading.CancellationToken cancellationToken) { throw null; }
+
         public System.Threading.Tasks.Task<SiloHandle> DefaultCreateSiloAsync(string siloName, Microsoft.Extensions.Configuration.IConfiguration configuration) { throw null; }
 
         public void Deploy() { }
 
         public System.Threading.Tasks.Task DeployAsync() { throw null; }
+
+        public System.Threading.Tasks.Task DeployAsync(System.Threading.CancellationToken cancellationToken) { throw null; }
 
         public void Dispose() { }
 
@@ -395,7 +425,11 @@ namespace Orleans.TestingHost
 
         public System.Threading.Tasks.Task InitializeClientAsync() { throw null; }
 
+        public System.Threading.Tasks.Task InitializeClientAsync(System.Threading.CancellationToken cancellationToken) { throw null; }
+
         public System.Threading.Tasks.Task KillClientAsync() { throw null; }
+
+        public System.Threading.Tasks.Task KillSiloAsync(SiloHandle instance, System.Threading.CancellationToken cancellationToken) { throw null; }
 
         public System.Threading.Tasks.Task KillSiloAsync(SiloHandle instance) { throw null; }
 
@@ -411,9 +445,13 @@ namespace Orleans.TestingHost
 
         public System.Threading.Tasks.Task<SiloHandle> StartAdditionalSiloAsync(bool startAdditionalSiloOnNewPort = false) { throw null; }
 
+        public System.Threading.Tasks.Task<System.Collections.Generic.List<SiloHandle>> StartAdditionalSilosAsync(int silosToStart, bool startAdditionalSiloOnNewPort, System.Threading.CancellationToken cancellationToken) { throw null; }
+
         public System.Threading.Tasks.Task<System.Collections.Generic.List<SiloHandle>> StartAdditionalSilosAsync(int silosToStart, bool startAdditionalSiloOnNewPort = false) { throw null; }
 
         public static System.Threading.Tasks.Task<SiloHandle> StartSiloAsync(TestCluster cluster, int instanceNumber, TestClusterOptions clusterOptions, System.Collections.Generic.IReadOnlyList<Microsoft.Extensions.Configuration.IConfigurationSource>? configurationOverrides = null, bool startSiloOnNewPort = false) { throw null; }
+
+        public System.Threading.Tasks.Task<SiloHandle> StartSiloAsync(int instanceNumber, TestClusterOptions clusterOptions, System.Collections.Generic.IReadOnlyList<Microsoft.Extensions.Configuration.IConfigurationSource>? configurationOverrides, bool startSiloOnNewPort, System.Threading.CancellationToken cancellationToken) { throw null; }
 
         public System.Threading.Tasks.Task<SiloHandle> StartSiloAsync(int instanceNumber, TestClusterOptions clusterOptions, System.Collections.Generic.IReadOnlyList<Microsoft.Extensions.Configuration.IConfigurationSource>? configurationOverrides = null, bool startSiloOnNewPort = false) { throw null; }
 
@@ -421,11 +459,21 @@ namespace Orleans.TestingHost
 
         public System.Threading.Tasks.Task StopAllSilosAsync() { throw null; }
 
+        public System.Threading.Tasks.Task StopAllSilosAsync(System.Threading.CancellationToken cancellationToken) { throw null; }
+
         public System.Threading.Tasks.Task StopClusterClientAsync() { throw null; }
+
+        public System.Threading.Tasks.Task StopClusterClientAsync(System.Threading.CancellationToken cancellationToken) { throw null; }
 
         public System.Threading.Tasks.Task StopPrimarySiloAsync() { throw null; }
 
+        public System.Threading.Tasks.Task StopPrimarySiloAsync(System.Threading.CancellationToken cancellationToken) { throw null; }
+
         public System.Threading.Tasks.Task StopSecondarySilosAsync() { throw null; }
+
+        public System.Threading.Tasks.Task StopSecondarySilosAsync(System.Threading.CancellationToken cancellationToken) { throw null; }
+
+        public System.Threading.Tasks.Task StopSiloAsync(SiloHandle instance, System.Threading.CancellationToken cancellationToken) { throw null; }
 
         public System.Threading.Tasks.Task StopSiloAsync(SiloHandle instance) { throw null; }
 
@@ -447,6 +495,8 @@ namespace Orleans.TestingHost
         public TestClusterBuilder(short initialSilosCount) { }
 
         public System.Func<string, Microsoft.Extensions.Configuration.IConfiguration, System.Threading.Tasks.Task<SiloHandle>> CreateSiloAsync { set { } }
+
+        public System.Func<string, Microsoft.Extensions.Configuration.IConfiguration, System.Threading.CancellationToken, System.Threading.Tasks.Task<SiloHandle>> CreateSiloAsyncWithCancellation { set { } }
 
         public TestClusterOptions Options { get { throw null; } }
 

@@ -61,6 +61,7 @@ namespace UnitTests
         [Fact, TestCategory("Functional"), TestCategory("Timeout")]
         public async Task Timeout_LongMethod()
         {
+            var cancellationToken = TestContext.Current.CancellationToken;
             bool finished = false;
             var grainName = typeof (ErrorGrain).FullName;
             IErrorGrain grain = this.GrainFactory.GetGrain<IErrorGrain>(GetRandomGrainId(), grainName);
@@ -79,9 +80,13 @@ namespace UnitTests
             stopwatch.Start();
             try
             {
-                await promise.WaitAsync(timeout.Multiply(3));
+                await promise.WaitAsync(timeout.Multiply(3), cancellationToken);
                 finished = true;
                 Assert.Fail("Should have thrown");
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                throw;
             }
             catch (Exception exc)
             {
@@ -139,6 +144,7 @@ namespace UnitTests
         [Fact(Skip = "https://github.com/dotnet/orleans/issues/3995"), TestCategory("SlowBVT")]
         public async Task CallThatShouldHaveBeenDroppedNotExecutedTest()
         {
+            var cancellationToken = TestContext.Current.CancellationToken;
             var responseTimeout = TimeSpan.FromSeconds(2);
             this.runtimeClient.SetResponseTimeout(responseTimeout);
 
@@ -147,7 +153,7 @@ namespace UnitTests
             // First call: Takes 5 seconds but client times out after 2 seconds
             var delay = TimeSpan.FromSeconds(5);
             var firstCall = target.LongRunningTask(1, responseTimeout + delay);
-            await Task.Delay(TimeSpan.FromMilliseconds(100));
+            await Task.Delay(TimeSpan.FromMilliseconds(100), cancellationToken);
             // Second call: Should be dropped because grain is still busy with first call
             var secondCall = target.LongRunningTask(2, TimeSpan.Zero);
 
@@ -164,7 +170,7 @@ namespace UnitTests
             }
 
             // Wait for first call to complete on the silo
-            await Task.Delay(delay);
+            await Task.Delay(delay, cancellationToken);
 
             // Verify only the first call executed (value = 1), second call was dropped
             Assert.Equal(1, await target.GetLastValue());

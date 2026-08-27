@@ -255,7 +255,7 @@ namespace UnitTests.Runtime
 
             // Now we have 500 buckets. Let's trigger the race condition.
             var exceptions = new ConcurrentBag<Exception>();
-            var cts = new CancellationTokenSource();
+            using var cts = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
 
             // Task 1: Aggressively ADD new activations (creates NEW buckets in the dictionary)
             var addTask = Task.Run(async () =>
@@ -275,7 +275,7 @@ namespace UnitTests.Runtime
 
                     await Task.Yield();
                 }
-            });
+            }, cts.Token);
 
             // Task 2: Aggressively REMOVE activations (empties buckets, causing REMOVAL from dictionary)
             var removeTask = Task.Run(async () =>
@@ -298,7 +298,7 @@ namespace UnitTests.Runtime
 
                     await Task.Yield();
                 }
-            });
+            }, cts.Token);
 
             // Task 3: Run DeactivateInDueTimeOrder MANY times concurrently
             // This is where the collector snapshots and sorts buckets while they are being added and removed.
@@ -310,15 +310,19 @@ namespace UnitTests.Runtime
                     {
                         // Deactivation iterates through the buckets, and if code is not resilient for concurrent modification,
                         // it will blow up with some form of collection modification exception.                        
-                        await collector.DeactivateInDueTimeOrder(50, CancellationToken.None);
-                        await Task.Delay(1);
+                        await collector.DeactivateInDueTimeOrder(50, cts.Token);
+                        await Task.Delay(1, cts.Token);
+                    }
+                    catch (OperationCanceledException) when (cts.IsCancellationRequested)
+                    {
+                        throw;
                     }
                     catch (Exception ex)
                     {
                         exceptions.Add(ex);
                     }
                 }
-            })).ToArray();
+            }, cts.Token)).ToArray();
 
             // Wait for all deactivation attempts
             await Task.WhenAll(deactivateTasks);

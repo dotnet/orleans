@@ -289,7 +289,7 @@ public class FirestoreStorageProviderTests : IClassFixture<TestEnvironmentFixtur
         var storage = await CreateStorage(deleteStateOnClear: true);
         var runner = new GrainStorageModelBasedTestRunner(storage, "Firestore", _output.WriteLine);
 
-        await runner.RunGeneratedConformanceTests();
+        await runner.RunGeneratedConformanceTests(TestContext.Current.CancellationToken);
     }
 
     [Fact, TestCategory("Functional"), TestCategory("ModelBased")]
@@ -297,7 +297,7 @@ public class FirestoreStorageProviderTests : IClassFixture<TestEnvironmentFixtur
     {
         var storage = await CreateStorage(deleteStateOnClear: false);
         var runner = new GrainStorageModelBasedTestRunner(storage, "FirestoreClearWritesTombstone", _output.WriteLine);
-        await runner.RunGeneratedConformanceTests();
+        await runner.RunGeneratedConformanceTests(TestContext.Current.CancellationToken);
     }
 
     [TestSuite("Functional")]

@@ -74,7 +74,7 @@ public sealed class DynamoDBStreamCheckpointStoreTests
             });
         var store = CreateStore(client);
 
-        await store.Update(checkpoint, string.Empty, CancellationToken.None);
+        await store.Update(checkpoint, string.Empty, TestContext.Current.CancellationToken);
 
         Assert.NotNull(write);
         Assert.Equal(checkpoint, write.Item[DynamoDBStreamCheckpointStore.CheckpointAttribute].S);
@@ -99,12 +99,12 @@ public sealed class DynamoDBStreamCheckpointStoreTests
                 new ConditionalCheckFailedException("stale checkpoint")));
         var store = CreateStore(client);
 
-        Assert.Equal("20", await store.Update("10", string.Empty, CancellationToken.None));
+        Assert.Equal("20", await store.Update("10", string.Empty, TestContext.Current.CancellationToken));
 
         await client.Received(1).PutItemAsync(
             Arg.Any<PutItemRequest>(),
             Arg.Any<CancellationToken>());
-        Assert.Equal("20", await store.Load(CancellationToken.None));
+        Assert.Equal("20", await store.Load(TestContext.Current.CancellationToken));
     }
 
     [Fact]
@@ -131,8 +131,8 @@ public sealed class DynamoDBStreamCheckpointStoreTests
             });
         var store = CreateStore(client);
 
-        Assert.Equal("20", await store.Update("30", string.Empty, CancellationToken.None));
-        Assert.Equal("30", await store.Update("30", "20", CancellationToken.None));
+        Assert.Equal("20", await store.Update("30", string.Empty, TestContext.Current.CancellationToken));
+        Assert.Equal("30", await store.Update("30", "20", TestContext.Current.CancellationToken));
 
         Assert.Equal(2, writes.Count);
         Assert.Equal("#version = :expectedVersion", writes[1].ConditionExpression);
@@ -142,7 +142,7 @@ public sealed class DynamoDBStreamCheckpointStoreTests
             writes[1].ExpressionAttributeNames["#version"]);
         Assert.Equal("7", writes[1].ExpressionAttributeValues[":expectedVersion"].N);
         Assert.Equal("8", writes[1].Item[DynamoDBStreamCheckpointStore.VersionAttribute].N);
-        Assert.Equal("30", await store.Load(CancellationToken.None));
+        Assert.Equal("30", await store.Load(TestContext.Current.CancellationToken));
     }
 
     [Fact]
@@ -153,7 +153,7 @@ public sealed class DynamoDBStreamCheckpointStoreTests
             .Returns(Task.FromResult(CreateReadResponse("20", 7)));
         var store = CreateStore(client);
 
-        var result = await store.Update("30", "10", CancellationToken.None);
+        var result = await store.Update("30", "10", TestContext.Current.CancellationToken);
 
         Assert.Equal("20", result);
         await client.DidNotReceive().PutItemAsync(
@@ -166,7 +166,7 @@ public sealed class DynamoDBStreamCheckpointStoreTests
     {
         var client = Substitute.For<IAmazonDynamoDB>();
         var store = CreateStore(client);
-        using var cancellation = new CancellationTokenSource();
+        using var cancellation = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
         cancellation.Cancel();
 
         await Assert.ThrowsAnyAsync<OperationCanceledException>(
@@ -190,7 +190,7 @@ public sealed class DynamoDBStreamCheckpointStoreTests
             Options.Create(new ClusterOptions { ClusterId = "cluster", ServiceId = "service" }),
             NullLoggerFactory.Instance,
             client);
-        using var cancellation = new CancellationTokenSource();
+        using var cancellation = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
         cancellation.Cancel();
 
         var exception = await Assert.ThrowsAnyAsync<OperationCanceledException>(
@@ -227,7 +227,8 @@ public sealed class DynamoDBStreamCheckpointStoreTests
         await DynamoDBStreamCheckpointStore.InitializeTable(
             client,
             options,
-            NullLogger<DynamoDBStreamCheckpointStore>.Instance);
+            NullLogger<DynamoDBStreamCheckpointStore>.Instance,
+            TestContext.Current.CancellationToken);
 
         Assert.NotNull(create);
         Assert.Equal(BillingMode.PAY_PER_REQUEST, create.BillingMode);
@@ -266,7 +267,8 @@ public sealed class DynamoDBStreamCheckpointStoreTests
             () => DynamoDBStreamCheckpointStore.InitializeTable(
                 client,
                 options,
-                NullLogger<DynamoDBStreamCheckpointStore>.Instance));
+                NullLogger<DynamoDBStreamCheckpointStore>.Instance,
+                TestContext.Current.CancellationToken));
 
         Assert.Contains(options.TableName, exception.Message, StringComparison.Ordinal);
     }
@@ -306,7 +308,8 @@ public sealed class DynamoDBStreamCheckpointStoreTests
         await DynamoDBStreamCheckpointStore.InitializeTable(
             client,
             options,
-            NullLogger<DynamoDBStreamCheckpointStore>.Instance);
+            NullLogger<DynamoDBStreamCheckpointStore>.Instance,
+            TestContext.Current.CancellationToken);
 
         Assert.Equal(3, describeCount);
     }
@@ -334,7 +337,8 @@ public sealed class DynamoDBStreamCheckpointStoreTests
             () => DynamoDBStreamCheckpointStore.InitializeTable(
                 client,
                 options,
-                NullLogger<DynamoDBStreamCheckpointStore>.Instance));
+                NullLogger<DynamoDBStreamCheckpointStore>.Instance,
+                TestContext.Current.CancellationToken));
 
         Assert.Contains(options.TableName, exception.Message, StringComparison.Ordinal);
         Assert.IsAssignableFrom<OperationCanceledException>(exception.InnerException);
@@ -355,7 +359,7 @@ public sealed class DynamoDBStreamCheckpointStoreTests
                 await Task.Delay(Timeout.InfiniteTimeSpan, call.Arg<CancellationToken>());
                 return null!;
             });
-        using var cancellation = new CancellationTokenSource();
+        using var cancellation = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
 
         var operation = DynamoDBStreamCheckpointStore.InitializeTable(
             client,
@@ -401,8 +405,8 @@ public sealed class DynamoDBStreamCheckpointStoreTests
             client);
 
         await Assert.ThrowsAsync<AmazonDynamoDBException>(
-            () => factory.Create("shard-1", CancellationToken.None));
-        var checkpointer = await factory.Create("shard-1", CancellationToken.None);
+            () => factory.Create("shard-1", TestContext.Current.CancellationToken));
+        var checkpointer = await factory.Create("shard-1", TestContext.Current.CancellationToken);
 
         Assert.False(checkpointer.CheckpointExists);
         await client.Received(2).DescribeTableAsync(
@@ -468,6 +472,7 @@ public sealed class DynamoDBStreamQueueCheckpointerIntegrationTests
     public async Task CheckpointsAreDurableAndIsolatedByProviderAndPartition()
     {
         KinesisTestConstants.CheckDynamoDbPreconditionsOrThrow();
+        var cancellationToken = TestContext.Current.CancellationToken;
         var tableName = CreateTableName();
         var options = CreateOptions(tableName);
 
@@ -475,32 +480,32 @@ public sealed class DynamoDBStreamQueueCheckpointerIntegrationTests
         {
             using var factory = CreateFactory("provider-a", "service-a", options);
             using var otherProviderFactory = CreateFactory("provider-b", "service-a", options);
-            var first = await factory.Create("shard-1", CancellationToken.None);
-            var otherPartition = await factory.Create("shard-2", CancellationToken.None);
-            var otherProvider = await otherProviderFactory.Create("shard-1", CancellationToken.None);
+            var first = await factory.Create("shard-1", cancellationToken);
+            var otherPartition = await factory.Create("shard-2", cancellationToken);
+            var otherProvider = await otherProviderFactory.Create("shard-1", cancellationToken);
 
-            first.Update("123456789012345678901234567890123456789", TestTimeUtc, CancellationToken.None);
-            otherPartition.Update("20", TestTimeUtc, CancellationToken.None);
-            otherProvider.Update("30", TestTimeUtc, CancellationToken.None);
-            await first.FlushAsync(CancellationToken.None);
-            await otherPartition.FlushAsync(CancellationToken.None);
-            await otherProvider.FlushAsync(CancellationToken.None);
+            first.Update("123456789012345678901234567890123456789", TestTimeUtc, cancellationToken);
+            otherPartition.Update("20", TestTimeUtc, cancellationToken);
+            otherProvider.Update("30", TestTimeUtc, cancellationToken);
+            await first.FlushAsync(cancellationToken);
+            await otherPartition.FlushAsync(cancellationToken);
+            await otherProvider.FlushAsync(cancellationToken);
 
             using var reloadedFactory = CreateFactory("provider-a", "service-a", options);
             using var reloadedOtherProviderFactory = CreateFactory("provider-b", "service-a", options);
             Assert.Equal(
                 "123456789012345678901234567890123456789",
-                await (await reloadedFactory.Create("shard-1", CancellationToken.None)).Load(CancellationToken.None));
+                await (await reloadedFactory.Create("shard-1", cancellationToken)).Load(cancellationToken));
             Assert.Equal(
                 "20",
-                await (await reloadedFactory.Create("shard-2", CancellationToken.None)).Load(CancellationToken.None));
+                await (await reloadedFactory.Create("shard-2", cancellationToken)).Load(cancellationToken));
             Assert.Equal(
                 "30",
-                await (await reloadedOtherProviderFactory.Create("shard-1", CancellationToken.None)).Load(CancellationToken.None));
+                await (await reloadedOtherProviderFactory.Create("shard-1", cancellationToken)).Load(cancellationToken));
         }
         finally
         {
-            await DeleteTable(tableName, options);
+            await DeleteTable(tableName, options, cancellationToken);
         }
     }
 
@@ -508,6 +513,7 @@ public sealed class DynamoDBStreamQueueCheckpointerIntegrationTests
     public async Task StaleWriterCannotMoveCheckpointBackward()
     {
         KinesisTestConstants.CheckDynamoDbPreconditionsOrThrow();
+        var cancellationToken = TestContext.Current.CancellationToken;
         var tableName = CreateTableName();
         var options = CreateOptions(tableName);
 
@@ -515,29 +521,29 @@ public sealed class DynamoDBStreamQueueCheckpointerIntegrationTests
         {
             using var firstFactory = CreateFactory("provider", "service", options);
             using var staleFactory = CreateFactory("provider", "service", options);
-            var first = await firstFactory.Create("shard-1", CancellationToken.None);
-            var stale = await staleFactory.Create("shard-1", CancellationToken.None);
+            var first = await firstFactory.Create("shard-1", cancellationToken);
+            var stale = await staleFactory.Create("shard-1", cancellationToken);
 
-            first.Update("20", TestTimeUtc, CancellationToken.None);
-            await first.FlushAsync(CancellationToken.None);
-            stale.Update("10", TestTimeUtc, CancellationToken.None);
-            await stale.FlushAsync(CancellationToken.None);
+            first.Update("20", TestTimeUtc, cancellationToken);
+            await first.FlushAsync(cancellationToken);
+            stale.Update("10", TestTimeUtc, cancellationToken);
+            await stale.FlushAsync(cancellationToken);
 
             using var reloadedFactory = CreateFactory("provider", "service", options);
             Assert.Equal(
                 "20",
-                await (await reloadedFactory.Create("shard-1", CancellationToken.None)).Load(CancellationToken.None));
+                await (await reloadedFactory.Create("shard-1", cancellationToken)).Load(cancellationToken));
 
-            stale.Update("30", TestTimeUtc + options.PersistInterval, CancellationToken.None);
-            await stale.FlushAsync(CancellationToken.None);
+            stale.Update("30", TestTimeUtc + options.PersistInterval, cancellationToken);
+            await stale.FlushAsync(cancellationToken);
             using var finalFactory = CreateFactory("provider", "service", options);
             Assert.Equal(
                 "30",
-                await (await finalFactory.Create("shard-1", CancellationToken.None)).Load(CancellationToken.None));
+                await (await finalFactory.Create("shard-1", cancellationToken)).Load(cancellationToken));
         }
         finally
         {
-            await DeleteTable(tableName, options);
+            await DeleteTable(tableName, options, cancellationToken);
         }
     }
 
@@ -550,7 +556,7 @@ public sealed class DynamoDBStreamQueueCheckpointerIntegrationTests
         using var factory = CreateFactory("provider", "service", options);
 
         var exception = await Assert.ThrowsAsync<OrleansConfigurationException>(
-            () => factory.Create("shard-1", CancellationToken.None));
+            () => factory.Create("shard-1", TestContext.Current.CancellationToken));
 
         Assert.Contains(options.TableName, exception.Message, StringComparison.Ordinal);
     }
@@ -580,17 +586,23 @@ public sealed class DynamoDBStreamQueueCheckpointerIntegrationTests
 
     private static async Task DeleteTable(
         string tableName,
-        DynamoDBStreamQueueCheckpointerOptions options)
+        DynamoDBStreamQueueCheckpointerOptions options,
+        CancellationToken testCancellationToken)
     {
         using var client = DynamoDBStreamQueueCheckpointerFactory.CreateClient(options);
+        using var cleanup = new CancellationTokenSource(TimeSpan.FromSeconds(10));
         try
         {
             _ = await client.DeleteTableAsync(
                 new DeleteTableRequest { TableName = tableName },
-                CancellationToken.None);
+                cleanup.Token);
         }
         catch (ResourceNotFoundException)
         {
+        }
+        catch (OperationCanceledException) when (testCancellationToken.IsCancellationRequested)
+        {
+            // Preserve the original test cancellation after bounded cleanup.
         }
     }
 }

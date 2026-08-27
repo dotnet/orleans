@@ -208,7 +208,7 @@ public sealed class AzureTableJournalStorageOptionsTests
         var client = await options.CreateClient!(CancellationToken.None);
 
         var exception = await Assert.ThrowsAsync<InvalidOperationException>(
-            () => client.GetPropertiesAsync());
+            () => client.GetPropertiesAsync(TestContext.Current.CancellationToken));
 
         Assert.Equal(ThrowingPipelinePolicy.ExceptionMessage, exception.Message);
         Assert.Equal(1, policy.InvocationCount);

@@ -84,7 +84,10 @@ namespace Tester.StreamingTests
         public async Task MemoryStreamProducerOnDroppedClientTest()
         {
             this.fixture.Logger.LogInformation("************************ MemoryStreamProducerOnDroppedClientTest *********************************");
-            await runner.StreamProducerOnDroppedClientTest(Fixture.StreamProviderName, Fixture.StreamNamespace);
+            await runner.StreamProducerOnDroppedClientTest(
+                Fixture.StreamProviderName,
+                Fixture.StreamNamespace,
+                TestContext.Current.CancellationToken);
         }
 
         /// <summary>
@@ -98,8 +101,13 @@ namespace Tester.StreamingTests
         public async Task MemoryStreamConsumerOnDroppedClientTest()
         {
             this.fixture.Logger.LogInformation("************************ MemoryStreamConsumerOnDroppedClientTest *********************************");
-            await runner.StreamConsumerOnDroppedClientTest(Fixture.StreamProviderName, Fixture.StreamNamespace, output,
-                    null, true);
+            await runner.StreamConsumerOnDroppedClientTest(
+                Fixture.StreamProviderName,
+                Fixture.StreamNamespace,
+                output,
+                null,
+                true,
+                TestContext.Current.CancellationToken);
         }
     }
 }

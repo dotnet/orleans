@@ -246,7 +246,8 @@ namespace DefaultCluster.Tests.General
         [Fact, TestCategory("BVT")]
         public async Task FailDehydrationTest()
         {
-            using var cts = new CancellationTokenSource(TimeSpan.FromMinutes(1));
+            using var cts = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
+            cts.CancelAfter(TimeSpan.FromMinutes(1));
             var grain = GrainFactory.GetGrain<IMigrationTestGrain>(GetRandomGrainId());
             var expectedState = Random.Shared.Next();
             await grain.SetState(expectedState);
@@ -264,7 +265,7 @@ namespace DefaultCluster.Tests.General
                 var grainOnOtherSilo = primaryGrainFactory.GetGrain<IMigrationTestGrain>(GetRandomGrainId());
                 var addr = await grainOnOtherSilo.GetGrainAddress();
                 grainOnOtherSiloAddr = addr.SiloAddress;
-                await Task.Delay(100);
+                await Task.Delay(100, cts.Token);
             } while (!targetHost.Equals(grainOnOtherSiloAddr));
 
             // Trigger migration, setting a placement hint to coerce the placement director to use the target silo
@@ -321,6 +322,7 @@ namespace DefaultCluster.Tests.General
         [Fact, TestCategory("BVT")]
         public async Task StuckDeactivatingActivationIsAbandoned()
         {
+            var cancellationToken = TestContext.Current.CancellationToken;
             var grain = GrainFactory.GetGrain<IStuckDeactivationTestGrain>(GetRandomGrainId());
             var grainId = grain.GetGrainId();
             var originalAddress = await grain.GetGrainAddress();
@@ -329,11 +331,11 @@ namespace DefaultCluster.Tests.General
 
             try
             {
-                await grain.WaitUntilBlocked().WaitAsync(TimeSpan.FromSeconds(10));
-                await grain.StartMigrationTo(targetHost).AsTask().WaitAsync(TimeSpan.FromSeconds(10));
-                await Task.Delay(TimeSpan.FromSeconds(1));
+                await grain.WaitUntilBlocked().WaitAsync(TimeSpan.FromSeconds(10), cancellationToken);
+                await grain.StartMigrationTo(targetHost).AsTask().WaitAsync(TimeSpan.FromSeconds(10), cancellationToken);
+                await Task.Delay(TimeSpan.FromSeconds(1), cancellationToken);
 
-                var newAddress = await grain.GetGrainAddress().AsTask().WaitAsync(TimeSpan.FromSeconds(10));
+                var newAddress = await grain.GetGrainAddress().AsTask().WaitAsync(TimeSpan.FromSeconds(10), cancellationToken);
 
                 Assert.NotEqual(originalAddress.ActivationId, newAddress.ActivationId);
             }
@@ -342,7 +344,8 @@ namespace DefaultCluster.Tests.General
                 StuckDeactivationTestGrain.Release(grainId);
             }
 
-            var completed = await Task.WhenAny(blockingCall, Task.Delay(TimeSpan.FromSeconds(10)));
+            var completed = await Task.WhenAny(blockingCall, Task.Delay(TimeSpan.FromSeconds(10), cancellationToken));
+            cancellationToken.ThrowIfCancellationRequested();
             Assert.Same(blockingCall, completed);
             await blockingCall;
         }

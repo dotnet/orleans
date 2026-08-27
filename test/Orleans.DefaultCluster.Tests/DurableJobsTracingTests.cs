@@ -97,6 +97,7 @@ public class DurableJobsTracingTests : IClassFixture<DurableJobsTracingTests.Fix
     [Fact, TestCategory("BVT"), TestCategory("DurableJobs")]
     public async Task ScheduleAndExecuteShareTraceId()
     {
+        var testCancellationToken = TestContext.Current.CancellationToken;
         Activity.DefaultIdFormat = ActivityIdFormat.W3C;
 
         var grain = _fixture.GrainFactory.GetGrain<IDurableJobGrain>(Guid.NewGuid().ToString());
@@ -113,7 +114,8 @@ public class DurableJobsTracingTests : IClassFixture<DurableJobsTracingTests.Fix
                 scheduledTime: DateTimeOffset.UtcNow.AddMilliseconds(250));
         }
 
-        using var cts = new CancellationTokenSource(TimeSpan.FromMinutes(1));
+        using var cts = CancellationTokenSource.CreateLinkedTokenSource(testCancellationToken);
+        cts.CancelAfter(TimeSpan.FromMinutes(1));
         await grain.WaitForJobToRun(job.Id).WaitAsync(cts.Token);
 
         Assert.False(string.IsNullOrEmpty(job.TraceParent), "TraceParent should be persisted on the scheduled job.");
@@ -123,7 +125,7 @@ public class DurableJobsTracingTests : IClassFixture<DurableJobsTracingTests.Fix
         Assert.Equal(expectedTraceId, handlerTraceId);
 
         // Allow the post-execute follow-up storage write (RemoveJob) to settle before snapshotting.
-        await Task.Delay(250);
+        await Task.Delay(250, testCancellationToken);
 
         var traceActivities = CapturedActivities
             .Where(a => a.TraceId.ToString() == expectedTraceId)

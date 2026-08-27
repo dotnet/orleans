@@ -89,56 +89,56 @@ namespace AWSUtils.Tests.Streaming
         public async Task SQSMultipleParallelSubscriptionTest()
         {
             logger.LogInformation("************************ SQSMultipleParallelSubscriptionTest *********************************");
-            await runner.MultipleParallelSubscriptionTest(Guid.NewGuid(), StreamNamespace);
+            await runner.MultipleParallelSubscriptionTest(Guid.NewGuid(), StreamNamespace, TestContext.Current.CancellationToken);
         }
 
         [Fact, TestCategory("AWS")]
         public async Task SQSMultipleLinearSubscriptionTest()
         {
             logger.LogInformation("************************ SQSMultipleLinearSubscriptionTest *********************************");
-            await runner.MultipleLinearSubscriptionTest(Guid.NewGuid(), StreamNamespace);
+            await runner.MultipleLinearSubscriptionTest(Guid.NewGuid(), StreamNamespace, TestContext.Current.CancellationToken);
         }
 
         [Fact, TestCategory("AWS")]
         public async Task SQSMultipleSubscriptionTest_AddRemove()
         {
             logger.LogInformation("************************ SQSMultipleSubscriptionTest_AddRemove *********************************");
-            await runner.MultipleSubscriptionTest_AddRemove(Guid.NewGuid(), StreamNamespace);
+            await runner.MultipleSubscriptionTest_AddRemove(Guid.NewGuid(), StreamNamespace, TestContext.Current.CancellationToken);
         }
 
         [Fact, TestCategory("AWS")]
         public async Task SQSResubscriptionTest()
         {
             logger.LogInformation("************************ SQSResubscriptionTest *********************************");
-            await runner.ResubscriptionTest(Guid.NewGuid(), StreamNamespace);
+            await runner.ResubscriptionTest(Guid.NewGuid(), StreamNamespace, TestContext.Current.CancellationToken);
         }
 
         [Fact, TestCategory("AWS")]
         public async Task SQSResubscriptionAfterDeactivationTest()
         {
             logger.LogInformation("************************ ResubscriptionAfterDeactivationTest *********************************");
-            await runner.ResubscriptionAfterDeactivationTest(Guid.NewGuid(), StreamNamespace);
+            await runner.ResubscriptionAfterDeactivationTest(Guid.NewGuid(), StreamNamespace, TestContext.Current.CancellationToken);
         }
 
         [Fact, TestCategory("AWS")]
         public async Task SQSActiveSubscriptionTest()
         {
             logger.LogInformation("************************ SQSActiveSubscriptionTest *********************************");
-            await runner.ActiveSubscriptionTest(Guid.NewGuid(), StreamNamespace);
+            await runner.ActiveSubscriptionTest(Guid.NewGuid(), StreamNamespace, TestContext.Current.CancellationToken);
         }
 
         [Fact, TestCategory("AWS")]
         public async Task SQSTwoIntermittentStreamTest()
         {
             logger.LogInformation("************************ SQSTwoIntermittentStreamTest *********************************");
-            await runner.TwoIntermittentStreamTest(Guid.NewGuid());
+            await runner.TwoIntermittentStreamTest(Guid.NewGuid(), TestContext.Current.CancellationToken);
         }
 
         [Fact, TestCategory("AWS")]
         public async Task SQSSubscribeFromClientTest()
         {
             logger.LogInformation("************************ SQSSubscribeFromClientTest *********************************");
-            await runner.SubscribeFromClientTest(Guid.NewGuid(), StreamNamespace);
+            await runner.SubscribeFromClientTest(Guid.NewGuid(), StreamNamespace, TestContext.Current.CancellationToken);
         }
     }
 }

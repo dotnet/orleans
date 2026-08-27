@@ -28,7 +28,8 @@ public class DiagnosticInfrastructureRegressionTests
         var waitTask = collector.WaitForEventAsync(
             "Value",
             evt => evt.Payload is int value && value == 2,
-            TimeSpan.FromMilliseconds(100));
+            TimeSpan.FromMilliseconds(100),
+            TestContext.Current.CancellationToken);
 
         listener.Write("Value", 1);
 
@@ -37,7 +38,8 @@ public class DiagnosticInfrastructureRegressionTests
         var secondWaitTask = collector.WaitForEventAsync(
             "Value",
             evt => evt.Payload is int value && value == 2,
-            TimeSpan.FromSeconds(1));
+            TimeSpan.FromSeconds(1),
+            TestContext.Current.CancellationToken);
 
         listener.Write("Value", 2);
 

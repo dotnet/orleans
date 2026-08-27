@@ -1036,7 +1036,7 @@ public class DemoClass
             """;
 
         var compilation = await CreateCompilation(code, "TestProject");
-        Assert.Empty(compilation.GetDiagnostics());
+        Assert.Empty(compilation.GetDiagnostics(TestContext.Current.CancellationToken));
 
         var result = RunSourceGenerator(compilation);
         Assert.Empty(result.Diagnostics);
@@ -1076,7 +1076,7 @@ public class DemoClass
             """;
 
         var compilation = await CreateCompilation(code, "TestProject");
-        Assert.Empty(compilation.GetDiagnostics());
+        Assert.Empty(compilation.GetDiagnostics(TestContext.Current.CancellationToken));
 
         var result = RunSourceGenerator(compilation);
         Assert.Empty(result.Diagnostics);
@@ -1111,7 +1111,9 @@ public class DemoClass
         """;
 
         var libraryCompilation = await CreateCompilation(libraryCode, "LibraryProject");
-        Assert.Empty(libraryCompilation.GetDiagnostics().Where(d => d.Severity == DiagnosticSeverity.Error));
+        Assert.Empty(
+            libraryCompilation.GetDiagnostics(TestContext.Current.CancellationToken)
+                .Where(d => d.Severity == DiagnosticSeverity.Error));
 
         // Run the generator on the library so its output assembly includes the generated metadata
         var libraryGeneratorResult = RunSourceGenerator(libraryCompilation);
@@ -1128,7 +1130,9 @@ public class DemoClass
 
         // Add the library as a metadata reference so the consumer can see its types
         consumerCompilation = consumerCompilation.AddReferences(libraryCompilation.ToMetadataReference());
-        Assert.Empty(consumerCompilation.GetDiagnostics().Where(d => d.Severity == DiagnosticSeverity.Error));
+        Assert.Empty(
+            consumerCompilation.GetDiagnostics(TestContext.Current.CancellationToken)
+                .Where(d => d.Severity == DiagnosticSeverity.Error));
 
         var consumerResult = RunSourceGenerator(consumerCompilation);
         Assert.Empty(consumerResult.Diagnostics);
@@ -1175,7 +1179,9 @@ public class DemoClass
         """;
 
         var libraryCompilation = await CreateCompilation(libraryCode, "LibraryProject");
-        Assert.Empty(libraryCompilation.GetDiagnostics().Where(d => d.Severity == DiagnosticSeverity.Error));
+        Assert.Empty(
+            libraryCompilation.GetDiagnostics(TestContext.Current.CancellationToken)
+                .Where(d => d.Severity == DiagnosticSeverity.Error));
 
         var consumerCode = """
             using Orleans;
@@ -1185,7 +1191,9 @@ public class DemoClass
 
         var consumerCompilation = (await CreateCompilation(consumerCode, "ConsumerProject"))
             .AddReferences(libraryCompilation.ToMetadataReference());
-        Assert.Empty(consumerCompilation.GetDiagnostics().Where(d => d.Severity == DiagnosticSeverity.Error));
+        Assert.Empty(
+            consumerCompilation.GetDiagnostics(TestContext.Current.CancellationToken)
+                .Where(d => d.Severity == DiagnosticSeverity.Error));
 
         var consumerResult = RunSourceGenerator(consumerCompilation);
         Assert.Empty(consumerResult.Diagnostics);
@@ -1231,7 +1239,9 @@ public class DemoClass
         """;
 
         var libraryCompilation = await CreateCompilation(libraryCode, "LibraryProject");
-        Assert.Empty(libraryCompilation.GetDiagnostics().Where(d => d.Severity == DiagnosticSeverity.Error));
+        Assert.Empty(
+            libraryCompilation.GetDiagnostics(TestContext.Current.CancellationToken)
+                .Where(d => d.Severity == DiagnosticSeverity.Error));
 
         var consumerCode = """
             using Orleans;
@@ -1248,7 +1258,9 @@ public class DemoClass
 
         var consumerCompilation = (await CreateCompilation(consumerCode, "ConsumerProject"))
             .AddReferences(libraryCompilation.ToMetadataReference());
-        Assert.Empty(consumerCompilation.GetDiagnostics().Where(d => d.Severity == DiagnosticSeverity.Error));
+        Assert.Empty(
+            consumerCompilation.GetDiagnostics(TestContext.Current.CancellationToken)
+                .Where(d => d.Severity == DiagnosticSeverity.Error));
 
         var consumerResult = RunSourceGenerator(consumerCompilation);
         Assert.Empty(consumerResult.Diagnostics);
@@ -1291,7 +1303,9 @@ public class DemoClass
         """;
 
         var compilation = await CreateCompilation(code, "TestProject");
-        Assert.Empty(compilation.GetDiagnostics().Where(d => d.Severity == DiagnosticSeverity.Error));
+        Assert.Empty(
+            compilation.GetDiagnostics(TestContext.Current.CancellationToken)
+                .Where(d => d.Severity == DiagnosticSeverity.Error));
 
         var result = RunSourceGenerator(compilation);
         Assert.Empty(result.Diagnostics);
@@ -1340,7 +1354,7 @@ public class DemoClass
         var assemblyAttr = SyntaxFactory.AttributeList(
             SyntaxFactory.SingletonSeparatedList(referenceAssemblyAttribute))
             .WithTarget(SyntaxFactory.AttributeTargetSpecifier(SyntaxFactory.Token(SyntaxKind.AssemblyKeyword)));
-        var root = (CSharpSyntaxNode)compilation.SyntaxTrees[0].GetRoot();
+        var root = (CSharpSyntaxNode)compilation.SyntaxTrees[0].GetRoot(TestContext.Current.CancellationToken);
         var newRoot = ((CompilationUnitSyntax)root).AddAttributeLists(assemblyAttr);
         var newTree = compilation.SyntaxTrees[0].WithRootAndOptions(newRoot, compilation.SyntaxTrees[0].Options);
 
@@ -1367,7 +1381,9 @@ public class DemoClass
             """;
 
         var compilation = await CreateCompilation(code, "TestProject");
-        Assert.Empty(compilation.GetDiagnostics().Where(d => d.Severity == DiagnosticSeverity.Error));
+        Assert.Empty(
+            compilation.GetDiagnostics(TestContext.Current.CancellationToken)
+                .Where(d => d.Severity == DiagnosticSeverity.Error));
 
         var result = RunSourceGenerator(compilation);
         var diagnostic = Assert.Single(result.Diagnostics, d => d.Id == CanNotGenerateImplicitFieldIdsDiagnostic.DiagnosticId);
@@ -1576,7 +1592,9 @@ public class DemoClass
 
         var outputCompilation = compilation.AddSyntaxTrees(
             result.GeneratedSources.Select(static source => CSharpSyntaxTree.ParseText(source.SourceText, path: source.HintName)));
-        Assert.Empty(outputCompilation.GetDiagnostics().Where(static diagnostic => diagnostic.Severity == DiagnosticSeverity.Error));
+        Assert.Empty(
+            outputCompilation.GetDiagnostics(TestContext.Current.CancellationToken)
+                .Where(static diagnostic => diagnostic.Severity == DiagnosticSeverity.Error));
     }
 
     [Fact]
@@ -1608,7 +1626,9 @@ public class DemoClass
             .AddReferences(MetadataReference.CreateFromFile(typeof(Microsoft.Extensions.Options.IConfigureOptions<>).Assembly.Location))
             .AddSyntaxTrees(
             result.GeneratedSources.Select(static source => CSharpSyntaxTree.ParseText(source.SourceText, path: source.HintName)));
-        Assert.Empty(outputCompilation.GetDiagnostics().Where(static diagnostic => diagnostic.Severity == DiagnosticSeverity.Error));
+        Assert.Empty(
+            outputCompilation.GetDiagnostics(TestContext.Current.CancellationToken)
+                .Where(static diagnostic => diagnostic.Severity == DiagnosticSeverity.Error));
     }
 
     [Fact]
@@ -1758,12 +1778,18 @@ public class DemoClass
         GeneratorDriver driver = CSharpGeneratorDriver.Create(
             generators: [generator],
             driverOptions: new GeneratorDriverOptions(default));
-        driver = driver.RunGeneratorsAndUpdateCompilation(compilation, out var outputCompilation, out var generatorDiagnostics);
+        driver = driver.RunGeneratorsAndUpdateCompilation(
+            compilation,
+            out var outputCompilation,
+            out var generatorDiagnostics,
+            TestContext.Current.CancellationToken);
         var result = driver.GetRunResult().Results.Single();
 
         Assert.Empty(generatorDiagnostics.Where(static diagnostic => diagnostic.Severity == DiagnosticSeverity.Error));
         Assert.Empty(result.Diagnostics);
-        Assert.Empty(outputCompilation.GetDiagnostics().Where(static diagnostic => diagnostic.Severity == DiagnosticSeverity.Error));
+        Assert.Empty(
+            outputCompilation.GetDiagnostics(TestContext.Current.CancellationToken)
+                .Where(static diagnostic => diagnostic.Severity == DiagnosticSeverity.Error));
 
         var serializerSource = Assert.Single(
             result.GeneratedSources,

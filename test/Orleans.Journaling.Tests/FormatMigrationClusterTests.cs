@@ -39,7 +39,7 @@ public sealed class FormatMigrationClusterTests
 
         try
         {
-            await cluster.DeployAsync();
+            await cluster.DeployAsync(TestContext.Current.CancellationToken);
             var binarySilo = Assert.Single(cluster.Silos);
             var grainId = Guid.NewGuid();
             var grain = cluster.Client!.GetGrain<ITestDurableGrain>(grainId); // DeployAsync initializes the client.
@@ -51,9 +51,9 @@ public sealed class FormatMigrationClusterTests
 
             var jsonSilo = await cluster.StartAdditionalSiloAsync();
             await cluster.WaitForLivenessToStabilizeAsync();
-            await cluster.StopSiloAsync(binarySilo);
+            await cluster.StopSiloAsync(binarySilo, TestContext.Current.CancellationToken);
             await cluster.WaitForLivenessToStabilizeAsync();
-            await cluster.InitializeClientAsync();
+            await cluster.InitializeClientAsync(TestContext.Current.CancellationToken);
 
             grain = cluster.Client.GetGrain<ITestDurableGrain>(grainId);
             Assert.Equal("binary", await grain.GetName());
@@ -70,7 +70,8 @@ public sealed class FormatMigrationClusterTests
         }
         finally
         {
-            await cluster.StopAllSilosAsync();
+            using var cleanup = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+            await cluster.StopAllSilosAsync(cleanup.Token);
             await cluster.DisposeAsync();
         }
     }

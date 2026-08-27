@@ -94,7 +94,10 @@ namespace ServiceBus.Tests.StreamingTests
         public async Task EHStreamProducerOnDroppedClientTest()
         {
             logger.LogInformation("************************ EHStreamProducerOnDroppedClientTest *********************************");
-            await runner.StreamProducerOnDroppedClientTest(StreamProviderName, StreamNamespace);
+            await runner.StreamProducerOnDroppedClientTest(
+                StreamProviderName,
+                StreamNamespace,
+                TestContext.Current.CancellationToken);
         }
 
         [Fact(Skip = "https://github.com/dotnet/orleans/issues/5634")]
@@ -102,7 +105,9 @@ namespace ServiceBus.Tests.StreamingTests
         {
             logger.LogInformation("************************ EHStreamConsumerOnDroppedClientTest *********************************");
             await runner.StreamConsumerOnDroppedClientTest(StreamProviderName, StreamNamespace, output,
-                    () => TestAzureTableStorageStreamFailureHandler.GetDeliveryFailureCount(StreamProviderName), true);
+                    () => TestAzureTableStorageStreamFailureHandler.GetDeliveryFailureCount(StreamProviderName),
+                    true,
+                    TestContext.Current.CancellationToken);
         }
     }
 }

@@ -110,8 +110,14 @@ namespace UnitTests.HaloTests.Streaming
             _streamProvider = AzureQueueStreamProviderName;
             Guid consumerGuid = Guid.NewGuid();
             Guid producerGuid = Guid.NewGuid();
-            await ConsumerProducerTest(consumerGuid, producerGuid);
-            await ConsumerProducerTest(consumerGuid, producerGuid);
+            await ConsumerProducerTest(
+                consumerGuid,
+                producerGuid,
+                TestContext.Current.CancellationToken);
+            await ConsumerProducerTest(
+                consumerGuid,
+                producerGuid,
+                TestContext.Current.CancellationToken);
         }
 
         [Fact, TestCategory("Functional")]
@@ -122,11 +128,20 @@ namespace UnitTests.HaloTests.Streaming
             _streamProvider = AzureQueueStreamProviderName;
             Guid producerGuid = Guid.NewGuid();
             Guid consumerGuid = Guid.NewGuid();
-            await ProducerConsumerTest(producerGuid, consumerGuid);
-            await ProducerConsumerTest(producerGuid, consumerGuid);
+            await ProducerConsumerTest(
+                producerGuid,
+                consumerGuid,
+                TestContext.Current.CancellationToken);
+            await ProducerConsumerTest(
+                producerGuid,
+                consumerGuid,
+                TestContext.Current.CancellationToken);
         }
 
-        private async Task ConsumerProducerTest(Guid consumerGuid, Guid producerGuid)
+        private async Task ConsumerProducerTest(
+            Guid consumerGuid,
+            Guid producerGuid,
+            CancellationToken cancellationToken)
         {
             // consumer joins first, producer later
             IConsumerEventCountingGrain consumer = this.fixture.GrainFactory.GetGrain<IConsumerEventCountingGrain>(consumerGuid);
@@ -136,19 +151,26 @@ namespace UnitTests.HaloTests.Streaming
             await producer.BecomeProducer(_streamId, _streamProvider);
 
             using var observer = StreamingDiagnosticObserver.Create();
-            using var cts = new CancellationTokenSource(Timeout);
+            using var cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+            cts.CancelAfter(Timeout);
 
             await producer.SendEvent();
 
             var streamId = Orleans.Runtime.StreamId.Create("HaloStreamingNamespace", _streamId);
             await observer.WaitForMessageDeliveredAsync(streamId, _streamProvider, cts.Token);
 
-            await TestingUtils.WaitUntilAsync((_, cancellationToken) => CheckCounters(producer, consumer, cancellationToken), Timeout);
+            await TestingUtils.WaitUntilAsync(
+                (_, token) => CheckCounters(producer, consumer, token),
+                Timeout,
+                cancellationToken: cts.Token);
 
             await consumer.StopConsuming();
         }
 
-        private async Task ProducerConsumerTest(Guid producerGuid, Guid consumerGuid)
+        private async Task ProducerConsumerTest(
+            Guid producerGuid,
+            Guid consumerGuid,
+            CancellationToken cancellationToken)
         {
             // producer joins first, consumer later
             IProducerEventCountingGrain producer = this.fixture.GrainFactory.GetGrain<IProducerEventCountingGrain>(producerGuid);
@@ -158,14 +180,18 @@ namespace UnitTests.HaloTests.Streaming
             await consumer.BecomeConsumer(_streamId, _streamProvider);
 
             using var observer = StreamingDiagnosticObserver.Create();
-            using var cts = new CancellationTokenSource(Timeout);
+            using var cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+            cts.CancelAfter(Timeout);
 
             await producer.SendEvent();
 
             var streamId = Orleans.Runtime.StreamId.Create("HaloStreamingNamespace", _streamId);
             await observer.WaitForMessageDeliveredAsync(streamId, _streamProvider, cts.Token);
 
-            await TestingUtils.WaitUntilAsync((_, cancellationToken) => CheckCounters(producer, consumer, cancellationToken), Timeout);
+            await TestingUtils.WaitUntilAsync(
+                (_, token) => CheckCounters(producer, consumer, token),
+                Timeout,
+                cancellationToken: cts.Token);
 
             await consumer.StopConsuming();
         }

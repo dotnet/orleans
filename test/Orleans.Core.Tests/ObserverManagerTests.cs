@@ -559,6 +559,7 @@ public sealed class ObserverManagerTests
     [Fact]
     public async Task ClearDuringNotification_WorksCorrectly()
     {
+        var cancellationToken = TestContext.Current.CancellationToken;
         var observerManager = new ObserverManager<int, int>(TimeSpan.FromHours(1), NullLogger.Instance);
         var notifiedObservers = new ConcurrentBag<int>();
 
@@ -577,14 +578,14 @@ public sealed class ObserverManagerTests
                 notifyStartedTcs.TrySetResult();
                 notifiedObservers.Add(observer);
             });
-        });
+        }, cancellationToken);
 
         // Clear while notification is happening.
-        await notifyStartedTcs.Task;
+        await notifyStartedTcs.Task.WaitAsync(cancellationToken);
         observerManager.Clear();
 
         // Wait for notification to complete.
-        await notifyTask;
+        await notifyTask.WaitAsync(cancellationToken);
 
         // Assert - We should still have notified all the original observers in the snapshot.
         Assert.Equal(10, notifiedObservers.Count);

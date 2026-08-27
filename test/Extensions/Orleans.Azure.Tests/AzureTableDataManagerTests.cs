@@ -27,7 +27,7 @@ namespace Tester.AzureUtils
         public AzureTableDataManagerTests()
         {
             // Pre-create table, if required
-            manager = new UnitTestAzureTableDataManager();
+            manager = new UnitTestAzureTableDataManager(TestContext.Current.CancellationToken);
             PartitionKey = "PK-AzureTableDataManagerTests-" + Guid.NewGuid();
         }
 
@@ -52,7 +52,10 @@ namespace Tester.AzureUtils
                 Assert.Equal(HttpStatusCode.Conflict, httpStatusCode);
                 Assert.Equal("EntityAlreadyExists", restStatus);
             }
-            var tuple = await manager.ReadSingleTableEntryAsync(data.PartitionKey, data.RowKey);
+            var tuple = await manager.ReadSingleTableEntryAsync(
+                data.PartitionKey,
+                data.RowKey,
+                TestContext.Current.CancellationToken);
             Assert.NotNull(tuple.Entity);
             Assert.Equal(data.StringData, tuple.Entity.StringData);
         }
@@ -62,14 +65,20 @@ namespace Tester.AzureUtils
         {
             var data = GenerateNewData();
             await manager.UpsertTableEntryAsync(data);
-            var tuple = await manager.ReadSingleTableEntryAsync(data.PartitionKey, data.RowKey);
+            var tuple = await manager.ReadSingleTableEntryAsync(
+                data.PartitionKey,
+                data.RowKey,
+                TestContext.Current.CancellationToken);
             Assert.NotNull(tuple.Entity);
             Assert.Equal(data.StringData, tuple.Entity.StringData);
 
             var data2 = data.Clone();
             data2.StringData = "NewData";
             await manager.UpsertTableEntryAsync(data2);
-            tuple = await manager.ReadSingleTableEntryAsync(data2.PartitionKey, data2.RowKey);
+            tuple = await manager.ReadSingleTableEntryAsync(
+                data2.PartitionKey,
+                data2.RowKey,
+                TestContext.Current.CancellationToken);
             Assert.NotNull(tuple.Entity);
             Assert.Equal(data2.StringData, tuple.Entity.StringData);
         }
@@ -95,21 +104,30 @@ namespace Tester.AzureUtils
             }
 
             await manager.UpsertTableEntryAsync(data);
-            var tuple = await manager.ReadSingleTableEntryAsync(data.PartitionKey, data.RowKey);
+            var tuple = await manager.ReadSingleTableEntryAsync(
+                data.PartitionKey,
+                data.RowKey,
+                TestContext.Current.CancellationToken);
             Assert.NotNull(tuple.Entity);
             Assert.Equal(data.StringData, tuple.Entity.StringData);
 
             var data2 = data.Clone();
             data2.StringData = "NewData";
             string eTag1 = await manager.UpdateTableEntryAsync(data2, AzureTableUtils.ANY_ETAG);
-            tuple = await manager.ReadSingleTableEntryAsync(data2.PartitionKey, data2.RowKey);
+            tuple = await manager.ReadSingleTableEntryAsync(
+                data2.PartitionKey,
+                data2.RowKey,
+                TestContext.Current.CancellationToken);
             Assert.NotNull(tuple.Entity);
             Assert.Equal(data2.StringData, tuple.Entity.StringData);
 
             var data3 = data.Clone();
             data3.StringData = "EvenNewerData";
             _ = await manager.UpdateTableEntryAsync(data3, eTag1);
-            tuple = await manager.ReadSingleTableEntryAsync(data3.PartitionKey, data3.RowKey);
+            tuple = await manager.ReadSingleTableEntryAsync(
+                data3.PartitionKey,
+                data3.RowKey,
+                TestContext.Current.CancellationToken);
             Assert.NotNull(tuple.Entity);
             Assert.Equal(data3.StringData, tuple.Entity.StringData);
 
@@ -162,7 +180,10 @@ namespace Tester.AzureUtils
                 Assert.Equal(HttpStatusCode.NotFound, httpStatusCode);
             }
 
-            var tuple = await manager.ReadSingleTableEntryAsync(data.PartitionKey, data.RowKey);
+            var tuple = await manager.ReadSingleTableEntryAsync(
+                data.PartitionKey,
+                data.RowKey,
+                TestContext.Current.CancellationToken);
             Assert.Null(tuple.Entity);
         }
 
@@ -206,7 +227,10 @@ namespace Tester.AzureUtils
                 Assert.True(restStatus == TableErrorCode.UpdateConditionNotSatisfied.ToString());
             }
 
-            var tuple = await manager.ReadSingleTableEntryAsync(data.PartitionKey, data.RowKey);
+            var tuple = await manager.ReadSingleTableEntryAsync(
+                data.PartitionKey,
+                data.RowKey,
+                TestContext.Current.CancellationToken);
             Assert.NotNull(tuple.Entity);
             Assert.Equal("NewData", tuple.Entity.StringData);
         }
@@ -215,7 +239,10 @@ namespace Tester.AzureUtils
         public async Task AzureTableDataManager_ReadSingleTableEntryAsync()
         {
             var data = GenerateNewData();
-            var tuple = await manager.ReadSingleTableEntryAsync(data.PartitionKey, data.RowKey);
+            var tuple = await manager.ReadSingleTableEntryAsync(
+                data.PartitionKey,
+                data.RowKey,
+                TestContext.Current.CancellationToken);
             Assert.Null(tuple.Entity);
         }
 
