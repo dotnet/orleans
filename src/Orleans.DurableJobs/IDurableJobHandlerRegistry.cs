@@ -98,7 +98,22 @@ internal sealed class DurableJobHandlerRegistry : IDurableJobHandlerRegistry, ID
     public CancellationToken ExecutionToken => _lifetime?.Token ?? CancellationToken.None;
 
     public Task<TResult> StartExecution<TResult>(Func<CancellationToken, Task<TResult>> factory) =>
-        _lifetime?.Start(factory) ?? factory(CancellationToken.None);
+        _lifetime?.Start(token => StartUnderOrdinaryLease(factory, token))
+        ?? StartUnderOrdinaryLease(factory, CancellationToken.None);
+
+    private async Task<TResult> StartUnderOrdinaryLease<TResult>(
+        Func<CancellationToken, Task<TResult>> factory,
+        CancellationToken cancellationToken)
+    {
+        if (_turnIsolation is null)
+        {
+            return await factory(cancellationToken);
+        }
+
+        using var lease = await _turnIsolation.EnterOrdinaryAsync();
+        lease.Activate();
+        return await factory(cancellationToken);
+    }
 
     public void Register(IDurableJobFeatureHandler handler) => Register(handler, requiresTurnIsolation: false);
 

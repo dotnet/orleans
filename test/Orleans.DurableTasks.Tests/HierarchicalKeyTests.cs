@@ -85,6 +85,21 @@ public class HierarchicalKeyTests
     }
 
     [Fact]
+    public void DeepKeysFormatIteratively()
+    {
+        OrleansHierarchicalKey orleansKey = OrleansHierarchicalKey.Create("root");
+        HierarchicalKey durableTaskKey = HierarchicalKey.Create("root");
+        for (var i = 0; i < 10_000; i++)
+        {
+            orleansKey = orleansKey.CreateChildKey("x");
+            durableTaskKey = durableTaskKey.CreateChildKey("x");
+        }
+
+        Assert.Equal(orleansKey.Length, orleansKey.ToString().Length);
+        Assert.Equal(durableTaskKey.Length, durableTaskKey.ToString().Length);
+    }
+
+    [Fact]
     public void OnlyValidValuesAreAllowed()
     {
         Assert.Throws<ArgumentNullException>(() => HierarchicalKey.Create(null!));

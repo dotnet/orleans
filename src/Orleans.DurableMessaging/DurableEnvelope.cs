@@ -261,6 +261,8 @@ public readonly struct DurableEnvelope : IDisposable
     [Id(7)]
     public DateTimeOffset CreatedAt { get; init; }
 
+    internal DurableEnvelope Retain() => this with { Data = Data.Retain() };
+
     /// <inheritdoc />
     public void Dispose() => Data?.Dispose();
 }

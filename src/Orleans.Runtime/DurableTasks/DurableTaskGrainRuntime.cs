@@ -212,8 +212,18 @@ internal sealed partial class DurableTaskGrainRuntime(
         foreach (var (taskId, state) in _storage.Tasks.ToList())
         {
             if (state.Result is { IsCompleted: true }
-                || state.Request is null
                 || _runningRequests.ContainsKey(taskId))
+            {
+                continue;
+            }
+
+            if (!state.RemoteTarget.IsDefault)
+            {
+                _taskHandles.TryAdd(taskId, new TaskHandle(taskId, this, state.RemoteTarget));
+                continue;
+            }
+
+            if (state.Request is null)
             {
                 continue;
             }
@@ -632,6 +642,7 @@ internal sealed partial class DurableTaskGrainRuntime(
             throw new InvalidOperationException($"Cannot complete unknown task '{taskId}'.");
         }
 
+        var storageChanged = false;
         if (state.Result is not { IsCompleted: true })
         {
             if (state is DurableTaskState durableState)
@@ -653,18 +664,23 @@ internal sealed partial class DurableTaskGrainRuntime(
             }
 
             _storage.SetResponse(taskId, state, response);
+            storageChanged = true;
+        }
+
+        _taskHandles.TryGetValue(taskId, out var handle);
+        storageChanged |= PruneCompletedTasks();
+        if (storageChanged)
+        {
             await _storage.WriteAsync(cancellationToken);
         }
 
-        if (_taskHandles.TryGetValue(taskId, out var handle))
+        if (handle is not null)
         {
             if (handle is TaskHandle localHandle)
             {
                 PublishAfterCommit(() => localHandle.TrySetResponse(response));
             }
         }
-
-        PruneCompletedTasks();
     }
 
     private bool PruneCompletedTasks()

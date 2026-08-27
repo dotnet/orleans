@@ -141,7 +141,16 @@ internal sealed partial class DurableOutbox :
     /// <summary>
     /// Gets all pending outbound messages (no ordering guarantee).
     /// </summary>
-    public IEnumerable<DurableEnvelope> Messages => Values;
+    public IEnumerable<DurableEnvelope> Messages
+    {
+        get
+        {
+            foreach (var envelope in Values)
+            {
+                yield return envelope.Retain();
+            }
+        }
+    }
 
     /// <summary>
     /// Enqueues a fully-built envelope for delivery (non-generic).
@@ -254,7 +263,14 @@ internal sealed partial class DurableOutbox :
     /// <returns>True if the message was found; otherwise, false.</returns>
     public bool TryGetMessage(Guid messageId, [MaybeNullWhen(false)] out DurableEnvelope envelope)
     {
-        return TryGetValue(messageId, out envelope);
+        if (TryGetValue(messageId, out var stored))
+        {
+            envelope = stored.Retain();
+            return true;
+        }
+
+        envelope = default;
+        return false;
     }
 
     /// <summary>

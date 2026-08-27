@@ -991,6 +991,31 @@ public class DurableTaskGrainRuntimeTests
     }
 
     [Fact]
+    public async Task ResumePendingTasksAsync_DoesNotExecuteRecoveredOutboundRequestLocally()
+    {
+        var fixture = CreateFixture(withTransport: true);
+        var taskId = TaskId.Create("recovered-outbound");
+        var target = GrainId.Create("target", "recovered");
+        var request = new RuntimeTestDurableTaskRequest(() => DurableTask.FromResult(1))
+        {
+            Context = new DurableTaskRequestContext { TargetId = target },
+        };
+        await fixture.Runtime.ScheduleRemoteAsync(taskId, request, CancellationToken.None);
+        await fixture.Storage.ReadAsync(CancellationToken.None);
+        Assert.True(fixture.Storage.TryGetTask(taskId, out var recoveredState));
+        var recoveredRequest = Assert.IsType<RuntimeTestDurableTaskRequest>(recoveredState.Request);
+
+        var restarted = CreateSecondRuntime(fixture);
+        await restarted.ResumePendingTasksAsync(CancellationToken.None);
+
+        Assert.Equal(0, recoveredRequest.CreateTaskCallCount);
+        await restarted.GetScheduledTaskHandle(taskId).CancelAsync(CancellationToken.None);
+        Assert.Contains(
+            fixture.Transport!.Cancellations,
+            cancellation => cancellation.Target == target && cancellation.TaskId == taskId);
+    }
+
+    [Fact]
     public async Task ScheduleAsync_CompletionNotificationCommitsStateAndOutboxOnce()
     {
         var storage = new RpcTestDurableTaskGrainStorage();

@@ -247,6 +247,7 @@ internal sealed partial class DurableInboxExtension :
                     envelope.Data.Dispose();
                 }
 
+                await _stateManager.WriteStateAsync(CancellationToken.None).ConfigureAwait(true);
                 await EnsureJobScheduledUnderGateAsync(CancellationToken.None).ConfigureAwait(true);
                 result = DeliveryResult.Duplicate();
                 shouldWait = _enableLongPolling && pollTimeout > TimeSpan.Zero;

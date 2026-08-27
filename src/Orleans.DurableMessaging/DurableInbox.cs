@@ -88,7 +88,16 @@ internal sealed class DurableInbox : IDurableInbox, ILifecycleObserver
     /// <summary>
     /// Gets all pending messages (no ordering guarantee).
     /// </summary>
-    public IEnumerable<DurableEnvelope> Messages => _inbox.Values;
+    public IEnumerable<DurableEnvelope> Messages
+    {
+        get
+        {
+            foreach (var envelope in _inbox.Values)
+            {
+                yield return envelope.Retain();
+            }
+        }
+    }
 
     /// <summary>
     /// Tries to get a specific message by its key.
@@ -100,7 +109,14 @@ internal sealed class DurableInbox : IDurableInbox, ILifecycleObserver
     public bool TryGetMessage(GrainId senderId, Guid messageId, [MaybeNullWhen(false)] out DurableEnvelope envelope)
     {
         var key = (senderId, messageId);
-        return _inbox.TryGetValue(key, out envelope);
+        if (_inbox.TryGetValue(key, out var stored))
+        {
+            envelope = stored.Retain();
+            return true;
+        }
+
+        envelope = default;
+        return false;
     }
 
     /// <summary>
