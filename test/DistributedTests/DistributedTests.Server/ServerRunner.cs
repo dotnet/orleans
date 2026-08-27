@@ -21,6 +21,8 @@ namespace DistributedTests.Server
 
     public class ServerRunner<T>
     {
+        private static readonly TimeSpan AbruptShutdownTimeout = TimeSpan.FromSeconds(5);
+
         private readonly ISiloConfigurator<T> _siloConfigurator;
         private readonly string _siloName;
 
@@ -65,13 +67,25 @@ namespace DistributedTests.Server
 
                 msg = await channel.WaitForMessage(cancellationToken);
 
-                using var stopCancellation = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-                if (!msg.IsGraceful)
+                if (msg.IsGraceful)
                 {
-                    stopCancellation.Cancel();
+                    await host.StopAsync(cancellationToken);
                 }
-
-                await host.StopAsync(stopCancellation.Token);
+                else
+                {
+                    using var stopCancellation = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+                    stopCancellation.CancelAfter(AbruptShutdownTimeout);
+                    try
+                    {
+                        await host.StopAsync(stopCancellation.Token);
+                    }
+                    catch (OperationCanceledException) when (
+                        stopCancellation.IsCancellationRequested
+                        && !cancellationToken.IsCancellationRequested)
+                    {
+                        // Host disposal completes the abrupt shutdown after the bounded stop attempt.
+                    }
+                }
 
                 if (!msg.Restart)
                 {
