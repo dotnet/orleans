@@ -115,19 +115,16 @@ internal sealed unsafe class LinuxIoUringSocketSender : LinuxIoUringOperation, I
             totalLength += buffer.Count;
         }
 
-        if (!useZeroCopy || totalLength < ZeroCopyThreshold)
-        {
-            return Submit(socket, buffers[0], LinuxIoUringEngine.SendOperation, buffersArePinned);
-        }
+        var useZeroCopyOperation = useZeroCopy && totalLength >= ZeroCopyThreshold;
 
         if (buffers.Count == 1)
         {
             return Submit(
                 socket,
                 buffers[0],
-                LinuxIoUringEngine.SendZeroCopyOperation,
+                useZeroCopyOperation ? LinuxIoUringEngine.SendZeroCopyOperation : LinuxIoUringEngine.SendOperation,
                 buffersArePinned,
-                waitForNotification: true);
+                waitForNotification: useZeroCopyOperation);
         }
 
         if (buffers.Count > MaximumScatterBuffers)
@@ -135,7 +132,7 @@ internal sealed unsafe class LinuxIoUringSocketSender : LinuxIoUringOperation, I
             throw new ArgumentOutOfRangeException(
                 nameof(buffers),
                 buffers.Count,
-                $"A zero-copy send supports at most {MaximumScatterBuffers} buffers.");
+                $"A scatter send supports at most {MaximumScatterBuffers} buffers.");
         }
 
         var vectors = (IoVector*)_iovecs;
@@ -163,8 +160,10 @@ internal sealed unsafe class LinuxIoUringSocketSender : LinuxIoUringOperation, I
             socket,
             _messageHeader,
             bufferLength: 1,
-            LinuxIoUringEngine.SendMessageZeroCopyOperation,
-            waitForNotification: true);
+            useZeroCopyOperation
+                ? LinuxIoUringEngine.SendMessageZeroCopyOperation
+                : LinuxIoUringEngine.SendMessageOperation,
+            waitForNotification: useZeroCopyOperation);
     }
 
     public ValueTask SendAsync(
@@ -444,6 +443,7 @@ internal sealed unsafe partial class LinuxIoUringEngine
 {
     internal const byte SendOperation = 26;
     internal const byte ReceiveOperation = 27;
+    internal const byte SendMessageOperation = 9;
     internal const byte ReceiveMessageOperation = 10;
     internal const byte SendZeroCopyOperation = 47;
     internal const byte SendMessageZeroCopyOperation = 48;

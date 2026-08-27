@@ -573,8 +573,10 @@ public class MessageTransportLifecycleTests
         }
     }
 
-    [Fact]
-    public async Task SocketMessageTransport_LinuxIoUring_RoundTripsData()
+    [Theory]
+    [InlineData(5, false)]
+    [InlineData((64 * 1024) + 7, true)]
+    public async Task SocketMessageTransport_LinuxIoUring_RoundTripsData(int payloadSize, bool useMultipleBuffers)
     {
         if (!OperatingSystem.IsLinux()
             || !string.Equals(
@@ -593,18 +595,35 @@ public class MessageTransportLifecycleTests
         await client.ConnectAsync(listener.LocalEndPoint!);
         using var server = await listener.AcceptAsync();
         await using var transport = new SocketMessageTransport(client, NullLogger.Instance, useLinuxIoUring: true);
-        byte[] payload = [1, 2, 3, 4, 5];
-        using var writeRequest = new BufferedWriteRequest(payload);
+        var payload = GC.AllocateUninitializedArray<byte>(payloadSize);
+        for (var i = 0; i < payload.Length; i++)
+        {
+            payload[i] = (byte)i;
+        }
+
+        using var writeRequest = new BufferedWriteRequest(payload, useMultipleBuffers);
         using var readRequest = new FixedLengthReadRequest(payload.Length);
 
         transport.Start();
         Assert.True(transport.EnqueueWrite(writeRequest));
         var receivedByServer = new byte[payload.Length];
-        var receivedLength = await server.ReceiveAsync(receivedByServer);
+        var receivedLength = 0;
+        while (receivedLength < receivedByServer.Length)
+        {
+            var length = await server.ReceiveAsync(receivedByServer.AsMemory(receivedLength));
+            Assert.NotEqual(0, length);
+            receivedLength += length;
+        }
+
         await writeRequest.Completion.WaitAsync(TimeSpan.FromSeconds(10));
 
         Assert.True(transport.EnqueueRead(readRequest));
-        var sentLength = await server.SendAsync(payload);
+        var sentLength = 0;
+        while (sentLength < payload.Length)
+        {
+            sentLength += await server.SendAsync(payload.AsMemory(sentLength));
+        }
+
         var receivedByTransport = await readRequest.Completion.WaitAsync(TimeSpan.FromSeconds(10));
 
         Assert.Equal(payload.Length, receivedLength);
@@ -844,12 +863,30 @@ public class MessageTransportLifecycleTests
     {
         private readonly ArcBufferWriter _buffer = new();
         private readonly TaskCompletionSource _completion = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        private readonly bool _hasLargeMessages;
 
-        public BufferedWriteRequest(ReadOnlySpan<byte> bytes)
+        public BufferedWriteRequest(ReadOnlySpan<byte> bytes, bool useMultipleBuffers = false)
         {
-            _buffer.Write(bytes);
+            _hasLargeMessages = useMultipleBuffers;
+            if (useMultipleBuffers)
+            {
+                const int SegmentSize = 8 * 1024;
+                while (!bytes.IsEmpty)
+                {
+                    var count = Math.Min(bytes.Length, SegmentSize);
+                    _buffer.Write(bytes[..count]);
+                    bytes = bytes[count..];
+                }
+            }
+            else
+            {
+                _buffer.Write(bytes);
+            }
+
             Buffers = new(_buffer);
         }
+
+        internal override bool HasLargeMessages => _hasLargeMessages;
 
         public Task Completion => _completion.Task;
         public override void SetResult() => _completion.TrySetResult();

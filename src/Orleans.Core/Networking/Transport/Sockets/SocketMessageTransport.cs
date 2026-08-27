@@ -37,6 +37,7 @@ internal sealed partial class SocketMessageTransport : MessageTransportBase
     private readonly object _shutdownLock = new();
     private readonly object _readsLock = new();
     private readonly bool _useLinuxIoUring;
+    private readonly bool _useZeroCopy;
     private readonly string _remoteEndpointString; // For diagnostics only
     private readonly string _localEndpointString; // For diagnostics only
     private readonly StripedMpscBuffer<WriteRequest> _writeRequests = new(
@@ -67,6 +68,9 @@ internal sealed partial class SocketMessageTransport : MessageTransportBase
 
         var remoteEndPoint = NormalizeEndpoint(_socket.RemoteEndPoint);
         var localEndPoint = NormalizeEndpoint(_socket.LocalEndPoint);
+        _useZeroCopy = useLinuxIoUring
+            && remoteEndPoint is IPEndPoint { Address: var remoteAddress }
+            && !IPAddress.IsLoopback(remoteAddress);
 
         Features.Set<IConnectionEndPointFeature>(new ConnectionEndPointFeature
         {
@@ -641,7 +645,7 @@ RefreshRequestQueue:
                             _socket,
                             remaining,
                             buffer.Array!.Length == ArcBufferWriter.MinimumPageSize,
-                            useZeroCopy: _useLinuxIoUring && bufferLimit == LargeRequestBufferLimit).ConfigureAwait(false);
+                            useZeroCopy: _useZeroCopy && bufferLimit == LargeRequestBufferLimit).ConfigureAwait(false);
                         if (_socketSender.HasError)
                         {
                             error = GetSendAsyncError();
@@ -712,7 +716,7 @@ RefreshRequestQueue:
                             _socket,
                             buffers,
                             buffersArePinned: false,
-                            useZeroCopy: _useLinuxIoUring && bufferLimit == LargeRequestBufferLimit).ConfigureAwait(false);
+                            useZeroCopy: _useZeroCopy && bufferLimit == LargeRequestBufferLimit).ConfigureAwait(false);
                         if (_socketSender.HasError)
                         {
                             error = GetSendAsyncError();
