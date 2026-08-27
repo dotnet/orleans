@@ -203,6 +203,7 @@ internal sealed class DurableTaskResponseCodec<TResult> : IFieldCodec<DurableTas
         else
         {
             value = default;
+            return DurableTaskResponse.FromResult(value!);
         }
 
         var result = DurableTaskResponse.FromResult(value!);

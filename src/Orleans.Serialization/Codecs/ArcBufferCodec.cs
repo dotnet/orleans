@@ -3,6 +3,7 @@ using System;
 using System.Buffers;
 using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
+using System.Runtime.CompilerServices;
 using Orleans.Serialization.Buffers;
 using Orleans.Serialization.Cloning;
 using Orleans.Serialization.WireProtocol;
@@ -36,7 +37,14 @@ public sealed class ArcBufferCodec : IFieldCodec<ArcBuffer>
         ReferenceCodec.MarkValueField(reader.Session);
         field.EnsureWireType(WireType.LengthPrefixed);
 
-        var length = (int)reader.ReadVarUInt32();
+        var encodedLength = reader.ReadVarUInt32();
+        if (encodedLength > int.MaxValue)
+        {
+            ThrowInvalidSizeException(encodedLength);
+        }
+
+        reader.EnsureAvailable(encodedLength);
+        var length = (int)encodedLength;
         if (length == 0)
         {
             return default;
@@ -60,6 +68,11 @@ public sealed class ArcBufferCodec : IFieldCodec<ArcBuffer>
         // The returned slice owns its page references after the writer is disposed.
         return bufferWriter.ConsumeSlice(bufferWriter.Length);
     }
+
+    [DoesNotReturn]
+    [MethodImpl(MethodImplOptions.NoInlining)]
+    private static void ThrowInvalidSizeException(uint length) => throw new IndexOutOfRangeException(
+        $"The declared ArcBuffer length, {length}, exceeds the maximum supported length, {int.MaxValue}.");
 }
 
 /// <summary>

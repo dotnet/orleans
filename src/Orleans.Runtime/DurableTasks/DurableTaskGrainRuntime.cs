@@ -81,6 +81,32 @@ internal sealed partial class DurableTaskGrainRuntime(
             "Durable messaging is not configured. Call AddDurableTasks on the silo builder.");
         var context = request.Context ?? throw new InvalidOperationException("The durable task request has no context.");
         context.CallerId = GrainId;
+        if (_storage.TryGetTask(taskId, out var existingState)
+            && existingState.Request is { } persistedRequest
+            && !IDurableTaskRequest.AreRequestsEquivalent(persistedRequest, request, _shared.Serializer))
+        {
+            throw new InvalidOperationException(
+                $"Task id '{taskId}' is already associated with a different durable task request.");
+        }
+
+        var state = _storage.GetOrCreateTask(taskId, request);
+        if (state.Request is null)
+        {
+            _storage.SetRequest(taskId, state, request);
+        }
+
+        if (!state.RemoteTarget.IsDefault && state.RemoteTarget != context.TargetId)
+        {
+            throw new InvalidOperationException(
+                $"Task id '{taskId}' is already associated with remote target '{state.RemoteTarget}'.");
+        }
+
+        if (state.Result is { IsCompleted: true } completed)
+        {
+            return completed;
+        }
+
+        _storage.SetRemoteTarget(taskId, state, context.TargetId);
         transport.SendInvocation(GrainId, context.TargetId, taskId, request);
         await _storage.WriteAsync(cancellationToken);
         return DurableTaskResponse.Pending;

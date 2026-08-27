@@ -958,6 +958,16 @@ public class DurableTaskGrainRuntimeTests
         Assert.Equal(target, invocation.Target);
         Assert.Equal(taskId, invocation.TaskId);
         Assert.Same(request, invocation.Request);
+        Assert.True(fixture.Storage.TryGetTask(taskId, out var state));
+        Assert.Same(request, state.Request);
+        Assert.Equal(target, state.RemoteTarget);
+        await fixture.Runtime.AcceptResponseAsync(
+            taskId,
+            target,
+            DurableTaskResponse.FromResult(9),
+            CancellationToken.None);
+        Assert.True(fixture.Storage.TryGetTask(taskId, out state));
+        Assert.Equal(9, state.Result!.GetResult<int>());
         Assert.Equal(0, fixture.Transport.CommitCount);
     }
 
