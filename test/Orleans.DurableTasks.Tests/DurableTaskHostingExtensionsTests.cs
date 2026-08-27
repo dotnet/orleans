@@ -443,6 +443,7 @@ public class DurableTaskHostingExtensionsTests
         public void RegisterState(string name, IJournaledState state) => throw new NotImplementedException();
         public bool TryGetState(string name, [System.Diagnostics.CodeAnalysis.NotNullWhen(true)] out IJournaledState? state) => throw new NotImplementedException();
         public ValueTask WriteStateAsync(CancellationToken cancellationToken) => throw new NotImplementedException();
+        public ValueTask RevertPendingChangesAsync(CancellationToken cancellationToken) => throw new NotImplementedException();
         public ValueTask DeleteStateAsync(CancellationToken cancellationToken) => throw new NotImplementedException();
 
         // The DI container's synchronous scope disposal requires IDisposable in addition to the interface's

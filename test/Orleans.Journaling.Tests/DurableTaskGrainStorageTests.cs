@@ -583,6 +583,9 @@ public class DurableTaskGrainStorageTests : JournalingTestBase
             return inner.WriteStateAsync(cancellationToken);
         }
 
+        public ValueTask RevertPendingChangesAsync(CancellationToken cancellationToken) =>
+            inner.RevertPendingChangesAsync(cancellationToken);
+
         public ValueTask DeleteStateAsync(CancellationToken cancellationToken) => inner.DeleteStateAsync(cancellationToken);
     }
 

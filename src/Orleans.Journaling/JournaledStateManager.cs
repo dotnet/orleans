@@ -176,6 +176,7 @@ internal sealed partial class JournaledStateManager : IJournaledStateManager, IJ
     {
         await Task.CompletedTask.ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext | ConfigureAwaitOptions.ForceYielding);
         var needsRecovery = true;
+        var blockQueuedWorkUntilRecovery = false;
         WorkItem? recoveryTrigger = null;
         Exception? recoveryTriggerException = null;
         while (!_shutdownCancellation.Token.IsCancellationRequested)
@@ -211,6 +212,7 @@ internal sealed partial class JournaledStateManager : IJournaledStateManager, IJ
                             }
 
                             needsRecovery = false;
+                            blockQueuedWorkUntilRecovery = false;
                             CompleteRecoveryTrigger();
                         }
                         catch
@@ -219,7 +221,7 @@ internal sealed partial class JournaledStateManager : IJournaledStateManager, IJ
                             {
                                 if (fenceOnFailure)
                                 {
-                                    _state = ManagerState.Ready;
+                                    _state = ManagerState.Fenced;
                                 }
                             }
 
@@ -258,6 +260,7 @@ internal sealed partial class JournaledStateManager : IJournaledStateManager, IJ
                         storageActivity.SetTag(ActivityTagKeys.JournalStorageOperation, queueOperation);
                     }
 
+                    var waitForRecoverySignal = false;
                     try
                     {
                         // Note that the implementation of each command is inlined to avoid allocating unnecessary async states.
@@ -553,7 +556,19 @@ internal sealed partial class JournaledStateManager : IJournaledStateManager, IJ
                             }
                         }
 
-                        if (IsRecoverySignal(exception))
+                        if (workItem is RevertPendingChangesWorkItem)
+                        {
+                            needsRecovery = true;
+                            blockQueuedWorkUntilRecovery = true;
+                            lock (_lock)
+                            {
+                                _state = ManagerState.Fenced;
+                                waitForRecoverySignal = _workQueue.Count == 0;
+                            }
+
+                            workItem.SetException(exception);
+                        }
+                        else if (IsRecoverySignal(exception))
                         {
                             Debug.Assert(recoveryTrigger is null);
                             recoveryTrigger = workItem;
@@ -568,13 +583,6 @@ internal sealed partial class JournaledStateManager : IJournaledStateManager, IJ
                         else
                         {
                             workItem.SetException(exception);
-                            if (workItem is RevertPendingChangesWorkItem)
-                            {
-                                lock (_lock)
-                                {
-                                    _state = ManagerState.Fenced;
-                                }
-                            }
                         }
                     }
                     finally
@@ -582,6 +590,10 @@ internal sealed partial class JournaledStateManager : IJournaledStateManager, IJ
                         storageActivity?.Dispose();
                     }
 
+                    if (waitForRecoverySignal)
+                    {
+                        break;
+                    }
                 }
             }
             catch (Exception exception)
@@ -591,6 +603,12 @@ internal sealed partial class JournaledStateManager : IJournaledStateManager, IJ
                 {
                     CompleteRecoveryTrigger();
                     return;
+                }
+
+                if (blockQueuedWorkUntilRecovery)
+                {
+                    LogErrorProcessingWorkItems(_shared.Logger, exception);
+                    continue;
                 }
 
                 try
@@ -936,18 +954,25 @@ internal sealed partial class JournaledStateManager : IJournaledStateManager, IJ
 
         Task pendingWrite;
         bool didEnqueue;
+        bool recoveryRequired;
         string operation;
         lock (_lock)
         {
-            ThrowIfStateOperationsUnavailable();
+            _shutdownCancellation.Token.ThrowIfCancellationRequested();
+            if (_state is ManagerState.Unknown)
+            {
+                throw new InvalidOperationException("The journaled state manager has not been initialized.");
+            }
+
             var isSnapshot = _migrationSnapshotRequired || _storage.IsCompactionRequested;
             operation = isSnapshot ? JournalingInstruments.OperationSnapshot : JournalingInstruments.OperationAppend;
             pendingWrite = isSnapshot
                 ? EnqueueOrGetPendingWorkItem<WriteSnapshotWorkItem>(out didEnqueue)
                 : EnqueueOrGetPendingWorkItem<AppendJournalWorkItem>(out didEnqueue);
+            recoveryRequired = _state is ManagerState.Recovering or ManagerState.Fenced;
         }
 
-        if (didEnqueue)
+        if (didEnqueue || recoveryRequired)
         {
             _workSignal.Signal();
         }
@@ -970,6 +995,7 @@ internal sealed partial class JournaledStateManager : IJournaledStateManager, IJ
         cancellationToken.ThrowIfCancellationRequested();
         Task pendingRecovery;
         bool didEnqueue;
+        bool recoveryRequired;
         lock (_lock)
         {
             _shutdownCancellation.Token.ThrowIfCancellationRequested();
@@ -979,10 +1005,11 @@ internal sealed partial class JournaledStateManager : IJournaledStateManager, IJ
             }
 
             pendingRecovery = EnqueueOrGetPendingWorkItem<RevertPendingChangesWorkItem>(out didEnqueue);
+            recoveryRequired = _state is ManagerState.Recovering or ManagerState.Fenced;
             _state = ManagerState.Recovering;
         }
 
-        if (didEnqueue)
+        if (didEnqueue || recoveryRequired)
         {
             _workSignal.Signal();
         }

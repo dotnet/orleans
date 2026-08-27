@@ -550,7 +550,7 @@ public class DurableOutboxTests : JournalingTestBase
                 ShardId = "test"
             });
 
-        public Task<bool> TryCancelDurableJobAsync(DurableJob job, CancellationToken cancellationToken) => Task.FromResult(false);
+        public Task<bool> CancelAsync(DurableJob job, CancellationToken requestCancellationToken) => Task.FromResult(false);
     }
 
     private sealed class TestJobRunContext(string jobId) : IJobRunContext
