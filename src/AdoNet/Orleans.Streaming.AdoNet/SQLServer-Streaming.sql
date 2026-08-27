@@ -87,7 +87,8 @@ BEGIN
     SET XACT_ABORT ON;
 
     DECLARE @StartedTransaction BIT = 0;
-    DECLARE @Now DATETIME2(7) = SYSUTCDATETIME();
+    DECLARE @Now DATETIME2(7);
+    DECLARE @LockedNextMessageId BIGINT;
     DECLARE @Allocated TABLE (MessageId BIGINT NOT NULL);
 
     BEGIN TRY
@@ -166,12 +167,20 @@ BEGIN
                     1,
                     NULL,
                     0,
-                    @Now,
-                    @Now,
-                    @Now
+                    SYSUTCDATETIME(),
+                    SYSUTCDATETIME(),
+                    SYSUTCDATETIME()
                 );
             END;
         END;
+
+        SELECT @LockedNextMessageId = NextMessageId
+        FROM OrleansStreamPartition WITH (UPDLOCK, ROWLOCK)
+        WHERE ServiceId = @ServiceId
+            AND ProviderId = @ProviderId
+            AND QueueId = @QueueId;
+
+        SET @Now = SYSUTCDATETIME();
 
         UPDATE OrleansStreamPartition WITH (UPDLOCK, ROWLOCK)
         SET
@@ -238,7 +247,7 @@ BEGIN
     SET XACT_ABORT ON;
 
     DECLARE @StartedTransaction BIT = 0;
-    DECLARE @Now DATETIME2(7) = SYSUTCDATETIME();
+    DECLARE @Now DATETIME2(7);
     DECLARE @NextMessageId BIGINT;
     DECLARE @Checkpoint BIGINT;
     DECLARE @OwnerEpoch BIGINT;
@@ -321,9 +330,9 @@ BEGIN
                     1,
                     NULL,
                     0,
-                    @Now,
-                    @Now,
-                    @Now
+                    SYSUTCDATETIME(),
+                    SYSUTCDATETIME(),
+                    SYSUTCDATETIME()
                 );
             END;
         END;
@@ -335,6 +344,8 @@ BEGIN
         WHERE ServiceId = @ServiceId
             AND ProviderId = @ProviderId
             AND QueueId = @QueueId;
+
+        SET @Now = SYSUTCDATETIME();
 
         SELECT
             @EarliestMessageId = MIN(MessageId),
@@ -385,6 +396,7 @@ BEGIN
             @ProviderId AS ProviderId,
             @QueueId AS QueueId,
             @OwnerEpoch AS OwnerEpoch,
+            @NextMessageId AS NextMessageId,
             @Checkpoint AS [Checkpoint],
             @EarliestMessageId AS EarliestMessageId,
             @TailMessageId AS TailMessageId;
@@ -420,7 +432,8 @@ BEGIN
         [Checkpoint] BIGINT NULL,
         Updated BIT NOT NULL
     );
-    DECLARE @Now DATETIME2(7) = SYSUTCDATETIME();
+    DECLARE @Now DATETIME2(7);
+    DECLARE @LockedCheckpoint BIGINT;
     DECLARE @StartedTransaction BIT = 0;
 
     BEGIN TRY
@@ -429,6 +442,14 @@ BEGIN
             BEGIN TRANSACTION;
             SET @StartedTransaction = 1;
         END;
+
+        SELECT @LockedCheckpoint = [Checkpoint]
+        FROM OrleansStreamPartition WITH (UPDLOCK, ROWLOCK)
+        WHERE ServiceId = @ServiceId
+            AND ProviderId = @ProviderId
+            AND QueueId = @QueueId;
+
+        SET @Now = SYSUTCDATETIME();
 
         UPDATE OrleansStreamPartition WITH (UPDLOCK, ROWLOCK)
         SET
@@ -645,6 +666,6 @@ VALUES
     ('AcquireStreamPartitionKey', 'EXECUTE AcquireStreamPartition @ServiceId = @ServiceId, @ProviderId = @ProviderId, @QueueId = @QueueId, @StartFromNow = @StartFromNow'),
     ('ReadStreamMessagesKey', 'SELECT ServiceId, ProviderId, QueueId, MessageId, StreamIdBytes, StreamNamespaceLength, CreatedOn, Payload FROM OrleansStreamMessage WHERE ServiceId = @ServiceId AND ProviderId = @ProviderId AND QueueId = @QueueId AND MessageId > @AfterMessageId ORDER BY MessageId OFFSET 0 ROWS FETCH NEXT @MaxCount ROWS ONLY'),
     ('AdvanceStreamCheckpointKey', 'EXECUTE AdvanceStreamCheckpoint @ServiceId = @ServiceId, @ProviderId = @ProviderId, @QueueId = @QueueId, @OwnerEpoch = @OwnerEpoch, @Checkpoint = @Checkpoint'),
-    ('GetStreamPartitionBoundsKey', 'SELECT P.ServiceId, P.ProviderId, P.QueueId, P.OwnerEpoch, P.[Checkpoint] AS [Checkpoint], MIN(M.MessageId) AS EarliestMessageId, MAX(M.MessageId) AS TailMessageId FROM OrleansStreamPartition AS P LEFT JOIN OrleansStreamMessage AS M ON M.ServiceId = P.ServiceId AND M.ProviderId = P.ProviderId AND M.QueueId = P.QueueId WHERE P.ServiceId = @ServiceId AND P.ProviderId = @ProviderId AND P.QueueId = @QueueId GROUP BY P.ServiceId, P.ProviderId, P.QueueId, P.OwnerEpoch, P.[Checkpoint]'),
+    ('GetStreamPartitionBoundsKey', 'SELECT P.ServiceId, P.ProviderId, P.QueueId, P.OwnerEpoch, P.NextMessageId, P.[Checkpoint] AS [Checkpoint], MIN(M.MessageId) AS EarliestMessageId, MAX(M.MessageId) AS TailMessageId FROM OrleansStreamPartition AS P LEFT JOIN OrleansStreamMessage AS M ON M.ServiceId = P.ServiceId AND M.ProviderId = P.ProviderId AND M.QueueId = P.QueueId WHERE P.ServiceId = @ServiceId AND P.ProviderId = @ProviderId AND P.QueueId = @QueueId GROUP BY P.ServiceId, P.ProviderId, P.QueueId, P.OwnerEpoch, P.NextMessageId, P.[Checkpoint]'),
     ('CleanupStreamMessagesKey', 'EXECUTE CleanupStreamMessages @ServiceId = @ServiceId, @ProviderId = @ProviderId, @QueueId = @QueueId, @RetentionPeriodSeconds = @RetentionPeriodSeconds, @MaximumRetentionPeriodSeconds = @MaximumRetentionPeriodSeconds, @CleanupIntervalSeconds = @CleanupIntervalSeconds, @CleanupBatchSize = @CleanupBatchSize');
 GO
