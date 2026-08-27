@@ -502,6 +502,17 @@ internal sealed unsafe partial class LinuxIoUringEngine
 
     public static LinuxIoUringEngine Instance => LazyInstance.Value;
 
+    internal static bool IsRequested
+        => OperatingSystem.IsLinux()
+            && (string.Equals(
+                    Environment.GetEnvironmentVariable("ORLEANS_USE_IO_URING"),
+                    "1",
+                    StringComparison.Ordinal)
+                || AppContext.TryGetSwitch(
+                    "Orleans.Connections.Transport.Sockets.UseIoUring",
+                    out var enabled)
+                && enabled);
+
     internal (long Primary, long Notifications, long Fallbacks) GetZeroCopyStatistics()
         => (
             Volatile.Read(ref _zeroCopyPrimaryCompletions),
