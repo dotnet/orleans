@@ -537,7 +537,7 @@ public class ReminderTestsBase : OrleansTestingBase, IDisposable
         {
             await SynchronizeReminderSchedulesAsync(cancellationToken, reminders);
 
-            var counterWaitTasks = new List<Task>(reminders.Length);
+            var previousCounters = new long[reminders.Length];
             var previousTickCounts = new int[reminders.Length];
             var tickTasks = new Task[reminders.Length];
             for (var reminderIndex = 0; reminderIndex < reminders.Length; reminderIndex++)
@@ -551,19 +551,10 @@ public class ReminderTestsBase : OrleansTestingBase, IDisposable
                     previousTickCounts[reminderIndex] + 1,
                     cancellationToken,
                     reminder.ReminderName);
-            }
-
-            foreach (var reminder in reminders)
-            {
-                var current = await GetReminderCounterOrZeroAsync(
+                previousCounters[reminderIndex] = await GetReminderCounterOrZeroAsync(
                     reminder.Grain,
                     reminder.ReminderName,
                     cancellationToken);
-                counterWaitTasks.Add(GetReminderCounterWaitTask(
-                    reminder.Grain,
-                    reminder.ReminderName,
-                    current + 1,
-                    cancellationToken));
             }
 
             var periods = await Task.WhenAll(reminders.Select(reminder =>
@@ -577,12 +568,16 @@ public class ReminderTestsBase : OrleansTestingBase, IDisposable
                 tickCount,
                 reminders.Length);
             await AdvanceReminderTimeAsync(period, cancellationToken);
-            await Task.WhenAll(Task.WhenAll(counterWaitTasks), Task.WhenAll(tickTasks));
+            // TickCompleted is emitted after ReceiveReminder returns, so the counter is already persisted.
+            await Task.WhenAll(tickTasks).WaitAsync(cancellationToken);
 
             await SynchronizeReminderSchedulesAsync(cancellationToken, reminders);
             for (var reminderIndex = 0; reminderIndex < reminders.Length; reminderIndex++)
             {
                 var reminder = reminders[reminderIndex];
+                Assert.Equal(
+                    previousCounters[reminderIndex] + 1,
+                    await GetReminderCounterAsync(reminder.Grain, reminder.ReminderName).WaitAsync(cancellationToken));
                 Assert.Equal(
                     1,
                     observer.GetActiveReminderCount(
@@ -1026,53 +1021,6 @@ public class ReminderTestsBase : OrleansTestingBase, IDisposable
         catch (FileNotFoundException)
         {
             return 0;
-        }
-    }
-
-    private async Task GetReminderCounterWaitTask(
-        IAddressable grain,
-        string reminderName,
-        long target,
-        CancellationToken cancellationToken)
-    {
-        try
-        {
-            while (true)
-            {
-                cancellationToken.ThrowIfCancellationRequested();
-                var current = await GetReminderCounterOrZeroAsync(grain, reminderName, cancellationToken);
-                if (!HostedCluster.TryGetGrainContext(grain.GetGrainId(), out var grainContext))
-                {
-                    await Task.Yield();
-                    continue;
-                }
-
-                var completed = grainContext.GrainInstance switch
-                {
-                    ReminderTestGrain2 reminderTestGrain => await reminderTestGrain.WaitForCounterForTestAsync(reminderName, target, current, cancellationToken),
-                    ReminderTestCopyGrain reminderTestCopyGrain => await reminderTestCopyGrain.WaitForCounterForTestAsync(reminderName, target, current, cancellationToken),
-                    { } instance => throw new InvalidOperationException($"Unexpected grain instance type {instance.GetType()} for grain {grain.GetGrainId()}."),
-                    null => false
-                };
-                if (completed)
-                {
-                    return;
-                }
-            }
-        }
-        catch (OperationCanceledException exception) when (
-            cancellationToken.IsCancellationRequested
-            && !TestContext.Current.CancellationToken.IsCancellationRequested)
-        {
-            using var diagnosticsCancellation = new CancellationTokenSource(TimeSpan.FromSeconds(5));
-            var current = await GetReminderCounterOrZeroAsync(
-                grain,
-                reminderName,
-                diagnosticsCancellation.Token);
-            var activeOwners = observer.GetActiveReminderCount(grain.GetGrainId(), reminderName);
-            throw new InvalidOperationException(
-                $"Timed out waiting for reminder '{reminderName}' on grain {grain.GetGrainId()} to reach counter {target}. Current counter: {current}. Active owners: {activeOwners}.",
-                exception);
         }
     }
 
