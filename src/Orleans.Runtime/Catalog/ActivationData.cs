@@ -58,6 +58,7 @@ internal sealed partial class ActivationData :
     private Queue<object>? _pendingOperations;
     private Message? _blockingRequest;
     private bool _isInWorkingSet = true;
+    private bool _wasActivated;
     private CoarseStopwatch _busyDuration;
     private CoarseStopwatch _idleDuration;
     private GrainReference? _selfReference;
@@ -187,15 +188,42 @@ internal sealed partial class ActivationData :
     {
         if (Interlocked.Exchange(ref _startup, null) is { } startup)
         {
-            var exception = new InvalidOperationException("Activation startup was aborted.");
-            Deactivate(
-                new DeactivationReason(
-                    DeactivationReasonCode.ActivationFailed,
-                    exception,
-                    "Activation startup was aborted."),
-                CancellationToken.None);
-            startup.Dispose();
-            Deactivated.GetAwaiter().GetResult();
+            startup.Abort();
+            using var suppressExecutionContext = new ExecutionContextSuppressor();
+            Task.Factory.StartNew(
+                    static state => ((ActivationData)state!).AbortStartupAsync().AsTask(),
+                    this,
+                    CancellationToken.None,
+                    TaskCreationOptions.DenyChildAttach,
+                    TaskScheduler.Default)
+                .Unwrap()
+                .GetAwaiter()
+                .GetResult();
+        }
+    }
+
+    private async ValueTask AbortStartupAsync()
+    {
+        var exception = new InvalidOperationException("Activation startup was aborted.");
+        DeactivationReason = new(
+            DeactivationReasonCode.ActivationFailed,
+            exception,
+            exception.Message);
+
+        lock (this)
+        {
+            SetState(ActivationState.Invalid);
+        }
+
+        try
+        {
+            RejectAllQueuedMessages();
+        }
+        finally
+        {
+            await DisposeAsync();
+            GetDeactivationCompletionSource().TrySetResult(true);
+            _workSignal.Signal();
         }
     }
 
@@ -1067,7 +1095,11 @@ internal sealed partial class ActivationData :
 
         lock (_lock)
         {
-            _shared.InternalRuntime.ActivationWorkingSet.OnDeactivated(this);
+            if (_wasActivated)
+            {
+                _shared.InternalRuntime.ActivationWorkingSet.OnDeactivated(this);
+            }
+
             SetState(ActivationState.Invalid);
         }
 
@@ -2052,6 +2084,7 @@ internal sealed partial class ActivationData :
                     {
                         SetState(ActivationState.Valid);
                         _shared.InternalRuntime.ActivationWorkingSet.OnActivated(this);
+                        _wasActivated = true;
                     }
                 }
                 _activationActivity?.AddEvent(new ActivityEvent("state-valid"));
