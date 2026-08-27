@@ -192,6 +192,17 @@ namespace Orleans.Runtime.Messaging
                     return;
                 }
 
+                if (directoryCacheEntry is not null)
+                {
+                    Debug.Assert(msg.TargetSilo?.Matches(_siloAddress) == true);
+                    Debug.Assert(!msg.TargetGrain.IsClient());
+                    Debug.Assert(msg.Direction is Message.Directions.Request or Message.Directions.OneWay);
+                    MessagingEvents.EmitSent(msg);
+                    _messagingInstruments.LocalMessagesSentCounterAggregator.Add(1);
+                    ReceiveMessage(msg, directoryCacheEntry);
+                    return;
+                }
+
                 // First check to see if it's really destined for a proxied client, instead of a local grain.
                 if (TryDeliverToProxy(msg))
                 {
@@ -208,7 +219,7 @@ namespace Orleans.Runtime.Messaging
 
                 MessagingEvents.EmitSent(msg);
 
-                if (directoryCacheEntry is not null || targetSilo.Matches(_siloAddress))
+                if (targetSilo.Matches(_siloAddress))
                 {
                     LogTraceMessageLoopedBack(log, msg);
 
@@ -603,7 +614,11 @@ namespace Orleans.Runtime.Messaging
             try
             {
                 this.messagingTrace.OnIncomingMessageAgentReceiveMessage(msg);
-                if (TryDeliverToProxy(msg))
+                if (directoryCacheEntry is not null)
+                {
+                    ReceiveApplicationMessage(msg, directoryCacheEntry);
+                }
+                else if (TryDeliverToProxy(msg))
                 {
                     return;
                 }
@@ -613,30 +628,7 @@ namespace Orleans.Runtime.Messaging
                 }
                 else
                 {
-                    IGrainContext? targetActivation = GetCachedActivation(directoryCacheEntry);
-                    if (targetActivation is null)
-                    {
-                        targetActivation = catalog.GetOrCreateActivation(
-                            msg.TargetGrain,
-                            msg.RequestContextData,
-                            rehydrationContext: null);
-
-                        if (targetActivation is ActivationData { IsValid: true } activation
-                            && directoryCacheEntry is { } entry
-                            && entry.Address.Matches(activation.Address))
-                        {
-                            entry.TrySetMessageTarget(activation);
-                        }
-                    }
-
-                    if (targetActivation is null)
-                    {
-                        ProcessMessageToNonExistentActivation(msg);
-                        return;
-                    }
-
-                    targetActivation.ReceiveMessage(msg);
-                    _messageObserver?.Invoke(msg);
+                    ReceiveApplicationMessage(msg, null);
                 }
             }
             catch (Exception ex)
@@ -651,6 +643,34 @@ namespace Orleans.Runtime.Messaging
 
                 this.RejectMessage(msg, Message.RejectionTypes.Transient, ex);
             }
+        }
+
+        private void ReceiveApplicationMessage(Message message, GrainDirectoryCacheEntry? directoryCacheEntry)
+        {
+            IGrainContext? targetActivation = GetCachedActivation(directoryCacheEntry);
+            if (targetActivation is null)
+            {
+                targetActivation = catalog.GetOrCreateActivation(
+                    message.TargetGrain,
+                    message.RequestContextData,
+                    rehydrationContext: null);
+
+                if (targetActivation is ActivationData { IsValid: true } activation
+                    && directoryCacheEntry is { } entry
+                    && entry.Address.Matches(activation.Address))
+                {
+                    entry.TrySetMessageTarget(activation);
+                }
+            }
+
+            if (targetActivation is null)
+            {
+                ProcessMessageToNonExistentActivation(message);
+                return;
+            }
+
+            targetActivation.ReceiveMessage(message);
+            _messageObserver?.Invoke(message);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
