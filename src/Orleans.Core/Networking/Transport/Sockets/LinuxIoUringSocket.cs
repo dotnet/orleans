@@ -231,6 +231,7 @@ internal sealed unsafe class LinuxIoUringSocketSender : LinuxIoUringOperation, I
 internal abstract class LinuxIoUringOperation : IValueTaskSource, IDisposable
 {
     private static readonly Action<object?> ContinuationCompleted = static _ => { };
+    private readonly LinuxIoUringEngine _engine = LinuxIoUringEngine.GetNext();
     private Action<object?>? _continuation;
     private object? _continuationState;
     private Socket? _socket;
@@ -302,7 +303,6 @@ internal abstract class LinuxIoUringOperation : IValueTaskSource, IDisposable
     {
         try
         {
-            var engine = LinuxIoUringEngine.Instance;
             _socket = socket;
             _fileDescriptor = checked((int)socket.Handle);
             _bufferAddress = bufferAddress;
@@ -314,7 +314,7 @@ internal abstract class LinuxIoUringOperation : IValueTaskSource, IDisposable
             SocketError = SocketError.Success;
             Error = null;
 
-            engine.Enqueue(this);
+            _engine.Enqueue(this);
             return new ValueTask(this, 0);
         }
         catch
@@ -458,8 +458,11 @@ internal sealed unsafe partial class LinuxIoUringEngine
     private const ulong WakeUserData = 1;
     private const int EventFdCloseOnExec = 0x80000;
     private const int EventFdNonBlocking = 0x800;
+    private const int TargetProcessorsPerEngine = 4;
+    private const int MaximumEngineCount = 4;
 
-    private static readonly Lazy<LinuxIoUringEngine> LazyInstance = new(static () => new LinuxIoUringEngine());
+    private static readonly Lazy<LinuxIoUringEngine>[] Engines = CreateEngines();
+    private static int _nextEngine = -1;
     private readonly ConcurrentQueue<LinuxIoUringOperation> _pending = new();
     private readonly Dictionary<ulong, LinuxIoUringOperation> _inflight = [];
     private readonly ManualResetEventSlim _started = new(initialState: false);
@@ -475,7 +478,7 @@ internal sealed unsafe partial class LinuxIoUringEngine
     private ulong _nextUserData = WakeUserData;
     private bool _wakePollArmed;
 
-    private LinuxIoUringEngine()
+    private LinuxIoUringEngine(int engineId)
     {
         if (!OperatingSystem.IsLinux())
         {
@@ -490,7 +493,7 @@ internal sealed unsafe partial class LinuxIoUringEngine
         var thread = new Thread(Run)
         {
             IsBackground = true,
-            Name = "Orleans io_uring",
+            Name = $"Orleans io_uring {engineId}",
         };
         thread.Start();
         _started.Wait();
@@ -500,7 +503,11 @@ internal sealed unsafe partial class LinuxIoUringEngine
         }
     }
 
-    public static LinuxIoUringEngine Instance => LazyInstance.Value;
+    internal static LinuxIoUringEngine GetNext()
+    {
+        var index = (uint)Interlocked.Increment(ref _nextEngine) % (uint)Engines.Length;
+        return Engines[index].Value;
+    }
 
     internal static bool IsRequested
         => OperatingSystem.IsLinux()
@@ -513,11 +520,39 @@ internal sealed unsafe partial class LinuxIoUringEngine
                     out var enabled)
                 && enabled);
 
-    internal (long Primary, long Notifications, long Fallbacks) GetZeroCopyStatistics()
-        => (
-            Volatile.Read(ref _zeroCopyPrimaryCompletions),
-            Volatile.Read(ref _zeroCopyNotificationCompletions),
-            Volatile.Read(ref _zeroCopyFallbackCompletions));
+    internal static (long Primary, long Notifications, long Fallbacks) GetZeroCopyStatistics()
+    {
+        long primary = 0;
+        long notifications = 0;
+        long fallbacks = 0;
+        foreach (var engine in Engines)
+        {
+            if (engine.IsValueCreated)
+            {
+                primary += Volatile.Read(ref engine.Value._zeroCopyPrimaryCompletions);
+                notifications += Volatile.Read(ref engine.Value._zeroCopyNotificationCompletions);
+                fallbacks += Volatile.Read(ref engine.Value._zeroCopyFallbackCompletions);
+            }
+        }
+
+        return (primary, notifications, fallbacks);
+    }
+
+    private static Lazy<LinuxIoUringEngine>[] CreateEngines()
+    {
+        var count = Math.Clamp(
+            (Environment.ProcessorCount + TargetProcessorsPerEngine - 1) / TargetProcessorsPerEngine,
+            1,
+            MaximumEngineCount);
+        var result = new Lazy<LinuxIoUringEngine>[count];
+        for (var i = 0; i < result.Length; i++)
+        {
+            var engineId = i;
+            result[i] = new(() => new LinuxIoUringEngine(engineId));
+        }
+        return result;
+    }
+    }
 
     public void Enqueue(LinuxIoUringOperation operation)
     {
