@@ -215,7 +215,13 @@ namespace Orleans.Runtime
 
                     try
                     {
-                        preparedContext.Abort();
+                        AbortPreparedContext(
+                            preparedContext,
+                            result,
+                            new DeactivationReason(
+                                DeactivationReasonCode.ActivationFailed,
+                                exception,
+                                "Error preparing grain activation."));
                     }
                     catch (Exception cleanupException)
                     {
@@ -316,6 +322,21 @@ namespace Orleans.Runtime
             {
                 activations.RemoveTarget(context);
                 throw;
+            }
+        }
+
+        internal static void AbortPreparedContext(
+            PreparedGrainContext preparedContext,
+            IGrainContext context,
+            DeactivationReason reason)
+        {
+            if (preparedContext.HasStartup)
+            {
+                preparedContext.Abort();
+            }
+            else
+            {
+                context.Deactivate(reason, CancellationToken.None);
             }
         }
 
