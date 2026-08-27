@@ -24,6 +24,7 @@ internal sealed partial class SocketMessageTransport : MessageTransportBase
     private static readonly bool IsMacOS = RuntimeInformation.IsOSPlatform(OSPlatform.OSX);
 
     private readonly ISocketSender _socketSender;
+    private readonly ISocketSender _largeSocketSender;
     private readonly ISocketReceiver _socketReceiver;
     private readonly Socket _socket;
     private readonly Queue<ReadRequest> _readRequests = new();
@@ -65,13 +66,17 @@ internal sealed partial class SocketMessageTransport : MessageTransportBase
         if (useLinuxIoUring)
         {
             var receiver = new LinuxIoUringSocketReceiver();
+            LinuxIoUringSocketSender? sender = null;
             try
             {
-                _socketSender = new LinuxIoUringSocketSender();
+                sender = new LinuxIoUringSocketSender(receiver.Engine);
+                _largeSocketSender = new LinuxIoUringSocketSender(LinuxIoUringEngine.GetOther(receiver.Engine));
+                _socketSender = sender;
                 _socketReceiver = receiver;
             }
             catch
             {
+                sender?.Dispose();
                 receiver.Dispose();
                 throw;
             }
@@ -80,6 +85,7 @@ internal sealed partial class SocketMessageTransport : MessageTransportBase
         {
             _socketReceiver = new SocketReceiver();
             _socketSender = new SocketSender();
+            _largeSocketSender = _socketSender;
         }
 
         try
@@ -434,7 +440,17 @@ internal sealed partial class SocketMessageTransport : MessageTransportBase
             }
             finally
             {
-                _socketSender.Dispose();
+                try
+                {
+                    _socketSender.Dispose();
+                }
+                finally
+                {
+                    if (!ReferenceEquals(_largeSocketSender, _socketSender))
+                    {
+                        _largeSocketSender.Dispose();
+                    }
+                }
             }
         }
     }
@@ -708,6 +724,7 @@ RefreshRequestQueue:
                     totalBytes += buffer.Count;
                 }
 
+                var socketSender = totalBytes >= 4 * 1024 ? _largeSocketSender : _socketSender;
                 if (buffers.Count == 1
                     && processingRequests.Count == 1
                     && requests.Count == 0
@@ -717,18 +734,18 @@ RefreshRequestQueue:
                     var remaining = new ReadOnlyMemory<byte>(buffer.Array!, buffer.Offset, buffer.Count);
                     while (!remaining.IsEmpty)
                     {
-                        await _socketSender.SendAsync(
+                        await socketSender.SendAsync(
                             _socket,
                             remaining,
                             buffer.Array!.Length == ArcBufferWriter.MinimumPageSize,
                             useZeroCopy: _useZeroCopy && bufferLimit == LargeRequestBufferLimit).ConfigureAwait(false);
-                        if (_socketSender.HasError)
+                        if (socketSender.HasError)
                         {
-                            error = GetSendAsyncError();
+                            error = GetSendAsyncError(socketSender);
                             break;
                         }
 
-                        var transferred = _socketSender.BytesTransferred;
+                        var transferred = socketSender.BytesTransferred;
                         if (transferred == 0)
                         {
                             error = new ConnectionClosedException("The socket closed before all queued data was sent.");
@@ -758,18 +775,18 @@ RefreshRequestQueue:
                     var remaining = new ReadOnlyMemory<byte>(coalescingBuffer, 0, totalBytes);
                     while (!remaining.IsEmpty)
                     {
-                        await _socketSender.SendAsync(
+                        await socketSender.SendAsync(
                             _socket,
                             remaining,
                             bufferIsPinned: _useLinuxIoUring,
                             useZeroCopy: false).ConfigureAwait(false);
-                        if (_socketSender.HasError)
+                        if (socketSender.HasError)
                         {
-                            error = GetSendAsyncError();
+                            error = GetSendAsyncError(socketSender);
                             break;
                         }
 
-                        var transferred = _socketSender.BytesTransferred;
+                        var transferred = socketSender.BytesTransferred;
                         if (transferred == 0)
                         {
                             error = new ConnectionClosedException("The socket closed before all queued data was sent.");
@@ -788,18 +805,18 @@ RefreshRequestQueue:
                 {
                     while (buffers.Count > 0)
                     {
-                        await _socketSender.SendAsync(
+                        await socketSender.SendAsync(
                             _socket,
                             buffers,
                             buffersArePinned: false,
                             useZeroCopy: _useZeroCopy && bufferLimit == LargeRequestBufferLimit).ConfigureAwait(false);
-                        if (_socketSender.HasError)
+                        if (socketSender.HasError)
                         {
-                            error = GetSendAsyncError();
+                            error = GetSendAsyncError(socketSender);
                             break;
                         }
 
-                        var transferred = _socketSender.BytesTransferred;
+                        var transferred = socketSender.BytesTransferred;
                         if (transferred == 0)
                         {
                             error = new ConnectionClosedException("The socket closed before all queued data was sent.");
@@ -922,13 +939,13 @@ RefreshRequestQueue:
         }
     }
 
-    private Exception GetSendAsyncError()
+    private Exception GetSendAsyncError(ISocketSender socketSender)
     {
         Exception error;
-        if (IsConnectionResetError(_socketSender.SocketError))
+        if (IsConnectionResetError(socketSender.SocketError))
         {
             // This could be ignored if _shutdownReason is already set.
-            var ex = _socketSender.Error!;
+            var ex = socketSender.Error!;
             error = new ConnectionResetException(ex.Message, ex);
 
             // There's still a small chance that both DoReceive() and DoSend() can log the same connection reset.
@@ -938,10 +955,10 @@ RefreshRequestQueue:
                 SocketsLog.ConnectionReset(_logger, this);
             }
         }
-        else if (IsConnectionAbortError(_socketSender.SocketError))
+        else if (IsConnectionAbortError(socketSender.SocketError))
         {
             // This exception should always be ignored because _shutdownReason should be set.
-            error = _socketSender.Error!;
+            error = socketSender.Error!;
 
             if (!_socketDisposed)
             {
@@ -952,7 +969,7 @@ RefreshRequestQueue:
         else
         {
             // This is unexpected.
-            error = _socketSender.Error!;
+            error = socketSender.Error!;
             if (!_socketDisposed)
             {
                 SocketsLog.ConnectionError(_logger, this, error);
