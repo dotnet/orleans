@@ -25,7 +25,7 @@ internal sealed class TcpMessageTransportOptions
     /// This option requires a little-endian 64-bit Linux process, Linux kernel 6.1 or later,
     /// and <c>liburing.so.2</c>.
     /// </remarks>
-    internal bool UseLinuxIoUring { get; set; }
+    internal bool UseLinuxIoUring { get; set; } = LinuxIoUringEngine.IsRequested;
 }
 
 /// <summary>
