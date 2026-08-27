@@ -96,7 +96,7 @@ public sealed class ReminderTestClock : IDisposable
     /// </summary>
     /// <param name="amount">The amount of time to advance.</param>
     /// <param name="cancellationToken">A cancellation token.</param>
-    public async Task AdvanceAsync(TimeSpan amount, CancellationToken cancellationToken)
+    public async Task AdvanceAsync(TimeSpan amount, CancellationToken cancellationToken = default)
     {
         if (amount < TimeSpan.Zero)
         {
@@ -122,7 +122,7 @@ public sealed class ReminderTestClock : IDisposable
     /// </summary>
     /// <param name="cancellationToken">A cancellation token.</param>
     /// <returns>An async-disposable handle which resumes clock advances when disposed.</returns>
-    public async Task<IAsyncDisposable> FreezeAsync(CancellationToken cancellationToken)
+    public async Task<IAsyncDisposable> FreezeAsync(CancellationToken cancellationToken = default)
     {
         await _advanceLock.WaitAsync(cancellationToken);
         try

@@ -445,8 +445,9 @@ public abstract class StreamQueueCheckpointerTests
 
         public async Task RunNext(CancellationToken cancellationToken)
         {
-            await _callbackPosted.WaitAsync(cancellationToken)
-                .WaitAsync(TimeSpan.FromSeconds(10), cancellationToken);
+            Assert.True(
+                await _callbackPosted.WaitAsync(TimeSpan.FromSeconds(10), cancellationToken),
+                "Timed out waiting for a synchronization-context callback.");
             (SendOrPostCallback Callback, object? State) workItem;
             lock (_callbacks)
             {
