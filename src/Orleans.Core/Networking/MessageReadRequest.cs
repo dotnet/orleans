@@ -10,7 +10,12 @@ using System.Diagnostics;
 
 namespace Orleans.Runtime.Messaging;
 
-internal sealed partial class MessageReadRequest(MessageHandlerShared shared) : ReadRequest, IThreadPoolWorkItem, IDisposable
+internal interface IFramedReadRequest
+{
+    bool OnRead(ArcBufferReader bufferReader, out int framedLength);
+}
+
+internal sealed partial class MessageReadRequest(MessageHandlerShared shared) : ReadRequest, IFramedReadRequest, IThreadPoolWorkItem, IDisposable
 {
     [System.Diagnostics.CodeAnalysis.SuppressMessage(
         "Usage",
@@ -21,6 +26,7 @@ internal sealed partial class MessageReadRequest(MessageHandlerShared shared) : 
     private Connection? _connection;
     private int _headerLength;
     private int _bodyLength;
+    private bool _hasFrameLengths;
     internal ArcBuffer _headers;
     private ArcBuffer _body;
 
@@ -43,6 +49,7 @@ internal sealed partial class MessageReadRequest(MessageHandlerShared shared) : 
         _headerLength = default;
         _bodyLength = default;
         _originalResponseType = default;
+        _hasFrameLengths = default;
         _connection = default;
         _headers.Dispose();
         _body.Dispose();
@@ -74,15 +81,22 @@ internal sealed partial class MessageReadRequest(MessageHandlerShared shared) : 
         "CA2000:Dispose objects before losing scope",
         Justification = "The serializer is borrowed from and returned to MessageHandlerShared.")]
     public override bool OnRead(ArcBufferReader bufferReader)
+        => OnRead(bufferReader, out _);
+
+    bool IFramedReadRequest.OnRead(ArcBufferReader bufferReader, out int framedLength)
+        => OnRead(bufferReader, out framedLength);
+
+    private bool OnRead(ArcBufferReader bufferReader, out int framedLength)
     {
         Debug.Assert(_connection is not null);
 
         if (bufferReader.Length < Message.LENGTH_HEADER_SIZE)
         {
+            framedLength = 0;
             return false;
         }
 
-        if (_headerLength == 0 && _bodyLength == 0)
+        if (!_hasFrameLengths)
         {
             Span<byte> scratch = stackalloc byte[Message.LENGTH_HEADER_SIZE];
             var lengthBytes = bufferReader.Peek(in scratch);
@@ -98,9 +112,11 @@ internal sealed partial class MessageReadRequest(MessageHandlerShared shared) : 
                 Shared.Return(messageSerializer);
             }
 
+            _hasFrameLengths = true;
             bufferReader.Skip(Message.LENGTH_HEADER_SIZE);
         }
 
+        framedLength = FramedLength;
         if (bufferReader.Length < PayloadLength)
         {
             return false;
