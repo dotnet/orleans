@@ -136,4 +136,21 @@ public class ScheduledTaskTests
         Assert.Same(first, any);
         Assert.Same(firstGeneric, anyGeneric);
     }
+
+    [Fact]
+    public async Task StaticWhenAll_PropagatesFailedResponses()
+    {
+        var expected = new InvalidOperationException("child failed");
+        var failed = DurableTaskResponse.FromException(expected);
+        var task = new CompletedScheduledDurableTask(TaskId.Create("failed"), failed);
+        var genericTask = new CompletedScheduledDurableTask<int>(TaskId.Create("failed-generic"), failed);
+
+        var exception = await Assert.ThrowsAsync<InvalidOperationException>(
+            () => ScheduledTask.WhenAll([task]));
+        var genericException = await Assert.ThrowsAsync<InvalidOperationException>(
+            () => ScheduledTask.WhenAll([genericTask]));
+
+        Assert.Same(expected, exception);
+        Assert.Same(expected, genericException);
+    }
 }

@@ -137,7 +137,11 @@ public class DurableJobsExtensionsTests
 
     private sealed class ReplacementRegistry : IDurableJobHandlerRegistry
     {
-        public void Register(IDurableJobFeatureHandler handler, bool requiresTurnIsolation = false)
+        public void Register(IDurableJobFeatureHandler handler)
+        {
+        }
+
+        public void Register(IDurableJobFeatureHandler handler, bool requiresTurnIsolation)
         {
         }
     }
@@ -146,7 +150,11 @@ public class DurableJobsExtensionsTests
     {
         public CancellationToken ExecutionToken => CancellationToken.None;
 
-        public void Register(IDurableJobFeatureHandler handler, bool requiresTurnIsolation = false)
+        public void Register(IDurableJobFeatureHandler handler)
+        {
+        }
+
+        public void Register(IDurableJobFeatureHandler handler, bool requiresTurnIsolation)
         {
         }
 

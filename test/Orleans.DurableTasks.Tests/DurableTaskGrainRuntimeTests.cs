@@ -353,10 +353,12 @@ public class DurableTaskGrainRuntimeTests
 
         await fixture.Runtime.AcceptResponseAsync(
             taskId,
+            fixture.GrainId,
             DurableTaskResponse.FromResult(1),
             CancellationToken.None);
         await fixture.Runtime.AcceptResponseAsync(
             taskId,
+            fixture.GrainId,
             DurableTaskResponse.FromResult(2),
             CancellationToken.None);
 
@@ -377,6 +379,7 @@ public class DurableTaskGrainRuntimeTests
 
         await fixture.Runtime.AcceptResponseAsync(
             taskId,
+            fixture.GrainId,
             DurableTaskResponse.FromResult(7),
             CancellationToken.None);
 
@@ -1312,11 +1315,48 @@ public class DurableTaskGrainRuntimeTests
             target,
             authoritative,
             CancellationToken.None);
-        await fixture.Runtime.AcceptResponseAsync(taskId, authoritative, CancellationToken.None);
+        await fixture.Runtime.AcceptResponseAsync(taskId, target, authoritative, CancellationToken.None);
 
         Assert.True(fixture.Storage.TryGetTask(taskId, out var state));
         Assert.Equal(73, state.Result!.GetResult<int>());
         Assert.True(Assert.IsType<DurableTaskState>(state).PendingCancellationDestination.IsDefault);
+    }
+
+    [Fact]
+    public async Task AcceptResponse_UnknownTask_RejectsCompletion()
+    {
+        var fixture = CreateFixture();
+        var taskId = TaskId.Create("unknown-completion");
+
+        var exception = await Assert.ThrowsAsync<InvalidOperationException>(
+            () => fixture.Runtime.AcceptResponseAsync(
+                taskId,
+                fixture.GrainId,
+                DurableTaskResponse.Completed,
+                CancellationToken.None).AsTask());
+
+        Assert.Contains("unknown durable task", exception.Message, StringComparison.Ordinal);
+        Assert.False(fixture.Storage.TryGetTask(taskId, out _));
+    }
+
+    [Fact]
+    public async Task AcceptResponse_WrongRemoteSender_RejectsCompletion()
+    {
+        var fixture = CreateFixture();
+        var taskId = TaskId.Create("wrong-completion-sender");
+        var expectedSender = GrainId.Create("remote-target", "expected");
+        var state = fixture.Storage.GetOrCreateTask(taskId, request: null);
+        fixture.Storage.SetRemoteTarget(taskId, state, expectedSender);
+
+        var exception = await Assert.ThrowsAsync<InvalidOperationException>(
+            () => fixture.Runtime.AcceptResponseAsync(
+                taskId,
+                GrainId.Create("remote-target", "other"),
+                DurableTaskResponse.Completed,
+                CancellationToken.None).AsTask());
+
+        Assert.Contains(expectedSender.ToString(), exception.Message, StringComparison.Ordinal);
+        Assert.Null(state.Result);
     }
 
     [Fact]

@@ -56,9 +56,10 @@ public class DurableInboxExtensionTests : IClassFixture<DefaultClusterFixture>
         DurableMessagingCommitCoordinator? commitCoordinator = null,
         IDurableInboxFaultInjector? faultInjector = null,
         int maxProcessingAttempts = 1,
-        Dictionary<(GrainId, Guid), InboxDeadLetter>? deadLetters = null)
+        Dictionary<(GrainId, Guid), InboxDeadLetter>? deadLetters = null,
+        MockGrainContext? grainContext = null)
     {
-        var grainContext = new MockGrainContext();
+        grainContext ??= new MockGrainContext();
         stateManager ??= new TestStateManager();
         var sessionPool = _fixture.Client.ServiceProvider.GetRequiredService<SerializerSessionPool>();
         var logger = NullLogger<DurableInboxExtension>.Instance;
@@ -509,6 +510,42 @@ public class DurableInboxExtensionTests : IClassFixture<DefaultClusterFixture>
         Assert.False(stop.IsCompleted);
 
         handler.Release.SetResult();
+        await stop.WaitAsync(TimeSpan.FromSeconds(10));
+    }
+
+    [Fact]
+    public async Task GrainLifecycleStop_DrainsNonCooperativeHandler()
+    {
+        var grainContext = new MockGrainContext();
+        var extension = CreateInboxExtension(grainContext: grainContext);
+        var services = new ServiceCollection();
+        services.AddSingleton(extension);
+        services.AddSingleton<IDurableOutbox>(new TestOutbox());
+        services.AddSingleton<IDurableMessageScheduler>(new TestMessageScheduler());
+        services.AddSingleton<IGrainContext>(grainContext);
+        using var serviceProvider = services.BuildServiceProvider();
+        new DurableMessagingGrainParticipant(serviceProvider).Initialize();
+        await grainContext.StartAsync();
+        var handler = new NonCooperativeHandler();
+        extension.RegisterHandler("test.route", handler);
+        var envelope = CreateTestEnvelope(
+            GrainId.Create("test", "lifecycle-sender"),
+            GrainId.Create("test", "lifecycle-receiver"),
+            "test.route",
+            "payload");
+
+        var delivery = extension.DeliverAsync(
+            envelope,
+            new DeliveryOptions { PollTimeout = TimeSpan.Zero },
+            CancellationToken.None);
+        await handler.Started.Task.WaitAsync(TimeSpan.FromSeconds(10));
+
+        var stop = grainContext.StopAsync();
+        await Task.Yield();
+        Assert.False(stop.IsCompleted);
+
+        handler.Release.SetResult();
+        await delivery;
         await stop.WaitAsync(TimeSpan.FromSeconds(10));
     }
 
@@ -1080,6 +1117,10 @@ public class DurableInboxExtensionTests : IClassFixture<DefaultClusterFixture>
         public void Rehydrate(IRehydrationContext context) { }
         public void Migrate(Dictionary<string, object>? requestContext, CancellationToken cancellationToken) { }
         public bool Equals(IGrainContext? other) => ReferenceEquals(this, other);
+
+        public Task StartAsync() => _lifecycle.OnStart();
+
+        public Task StopAsync() => _lifecycle.OnStop();
     }
 
     private sealed class TestInboxGrainLifecycle(ILogger logger) : LifecycleSubject(logger), IGrainLifecycle
@@ -1176,6 +1217,14 @@ public class DurableInboxExtensionTests : IClassFixture<DefaultClusterFixture>
         public Task DeliverPendingMessagesAsync(CancellationToken cancellationToken = default) => Task.CompletedTask;
     }
 
+    private sealed class TestMessageScheduler : IDurableMessageScheduler
+    {
+        public ValueTask ScheduleAsync(
+            DurableEnvelope message,
+            DateTimeOffset dueTime,
+            CancellationToken cancellationToken = default) => ValueTask.CompletedTask;
+    }
+
     private sealed class TestDurableValue<T> : IDurableValue<T>
     {
         public T? Value { get; set; }
@@ -1185,7 +1234,8 @@ public class DurableInboxExtensionTests : IClassFixture<DefaultClusterFixture>
     {
         public IDurableJobFeatureHandler? Handler { get; private set; }
 
-        public void Register(IDurableJobFeatureHandler handler, bool requiresTurnIsolation = false) => Handler = handler;
+        public void Register(IDurableJobFeatureHandler handler) => Handler = handler;
+        public void Register(IDurableJobFeatureHandler handler, bool requiresTurnIsolation) => Handler = handler;
     }
 
     private sealed class TestJobManager(TestJobHandlerRegistry handlers) : ILocalDurableJobManager

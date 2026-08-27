@@ -30,6 +30,7 @@ internal class DurableDictionary<K, V> :
     IDurableDictionary<K, V>,
     IDurableDictionaryOwnership<K>,
     IJournaledState,
+    IJournaledStateWriteParticipant,
     IDurableDictionaryCommandHandler<K, V>
     where K : notnull
 {
@@ -86,6 +87,7 @@ internal class DurableDictionary<K, V> :
     {
         ApplyClear();
         _writer = writer;
+        OnReset();
     }
 
     void IJournaledState.AppendEntries(JournalStreamWriter writer)
@@ -138,10 +140,22 @@ internal class DurableDictionary<K, V> :
     protected virtual void OnSet(K key, V value) { }
 
     /// <summary>
+    /// Called after this state has contributed its pending mutations to the current durable write.
+    /// </summary>
+    protected virtual void OnWritePreparing() { }
+
+    void IJournaledStateWriteParticipant.OnWritePreparing() => OnWritePreparing();
+
+    /// <summary>
     /// Called when pending writes have been durably persisted.
     /// Override in derived classes to receive write completion notifications.
     /// </summary>
     protected virtual void OnWriteCompleted() { }
+
+    /// <summary>
+    /// Called when recovery resets this state before replaying durable entries.
+    /// </summary>
+    protected virtual void OnReset() { }
 
     void IJournaledState.OnWriteCompleted() => OnWriteCompleted();
 
@@ -223,6 +237,7 @@ internal class DurableDictionary<K, V> :
     {
         ApplyClear();
         _items.EnsureCapacity(capacityHint);
+        OnReset();
     }
 
     protected virtual JournalStreamWriter GetWriter()

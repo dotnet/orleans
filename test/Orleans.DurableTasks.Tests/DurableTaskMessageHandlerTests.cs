@@ -214,13 +214,15 @@ public class DurableTaskMessageHandlerTests
         var (handler, storage, _, _, grainId, sessionPool) = CreateHandler();
         var sender = GrainId.Create("rpc-caller", "caller-6");
         var taskId = TaskId.CreateRandom();
+        var state = storage.GetOrCreateTask(taskId, request: null);
+        storage.SetRemoteTarget(taskId, state, sender);
         var context = CreateContext(sessionPool, sender, grainId, DurableTaskMessageTransport.CompletionRoute,
             new DurableTaskCompletionMessage { TaskId = taskId, Response = DurableTaskResponse.FromResult(5) });
 
         await ((IInboxHandler)handler).HandleAsync(context, CancellationToken.None);
 
-        Assert.True(storage.TryGetTask(taskId, out var state));
-        Assert.NotNull(state!.Result);
+        Assert.True(storage.TryGetTask(taskId, out state));
+        Assert.NotNull(state.Result);
         Assert.True(state.Result!.IsCompleted);
         Assert.Equal(5, state.Result.GetResult<int>());
     }
@@ -276,12 +278,10 @@ public class DurableTaskMessageHandlerTests
     public async Task ResumeRoute_DelegatesToRuntimeAcceptResponseWithCompleted()
     {
         var (handler, storage, _, _, grainId, sessionPool) = CreateHandler();
-        var sender = GrainId.Create("rpc-caller", "caller-10");
         var taskId = TaskId.CreateRandom();
-        var context = CreateContext(sessionPool, sender, grainId, DurableTaskMessageTransport.ResumeRoute,
+        storage.GetOrCreateTask(taskId, request: null);
+        var context = CreateContext(sessionPool, grainId, grainId, DurableTaskMessageTransport.ResumeRoute,
             new DurableTaskResumeMessage { TaskId = taskId });
-
-        Assert.False(storage.TryGetTask(taskId, out _));
 
         await ((IInboxHandler)handler).HandleAsync(context, CancellationToken.None);
 

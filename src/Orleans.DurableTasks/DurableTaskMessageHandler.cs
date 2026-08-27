@@ -45,6 +45,7 @@ internal sealed class DurableTaskMessageHandler(
 
                 await runtime.AcceptResponseAsync(
                     completion.TaskId,
+                    context.Envelope.SenderId,
                     completion.Response,
                     cancellationToken);
                 break;
@@ -82,6 +83,7 @@ internal sealed class DurableTaskMessageHandler(
 
                 await runtime.AcceptResponseAsync(
                     resume.TaskId,
+                    context.Envelope.SenderId,
                     DurableTaskResponse.Completed,
                     cancellationToken);
                 break;

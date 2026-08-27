@@ -40,7 +40,7 @@ public abstract class DurableTask
 
         foreach (var task in result)
         {
-            await task.GetResponseAsync(cancellationToken);
+            (await task.GetResponseAsync(cancellationToken)).ThrowIfExceptionResponse();
         }
 
     }, tasks);
