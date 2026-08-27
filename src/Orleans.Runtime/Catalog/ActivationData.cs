@@ -197,8 +197,7 @@ internal sealed partial class ActivationData :
                     TaskCreationOptions.DenyChildAttach,
                     TaskScheduler.Default)
                 .Unwrap()
-                .GetAwaiter()
-                .GetResult();
+                .Ignore();
         }
     }
 
@@ -221,9 +220,15 @@ internal sealed partial class ActivationData :
         }
         finally
         {
-            await DisposeAsync();
-            GetDeactivationCompletionSource().TrySetResult(true);
-            _workSignal.Signal();
+            try
+            {
+                await DisposeAsync();
+            }
+            finally
+            {
+                GetDeactivationCompletionSource().TrySetResult(true);
+                _workSignal.Signal();
+            }
         }
     }
 
