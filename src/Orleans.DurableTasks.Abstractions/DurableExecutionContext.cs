@@ -91,9 +91,17 @@ public abstract class DurableExecutionContext
         CancellationToken cancellationToken);
 
     /// <summary>
-    /// Creates a replay-stable child identifier, using <paramref name="name"/> when supplied.
+    /// Creates a child identifier, using <paramref name="name"/> when supplied.
     /// Explicit names beginning with <c>$</c> are reserved for generated identifiers.
     /// </summary>
+    /// <remarks>
+    /// Generated identifiers are replay-stable when unnamed children are created in the same
+    /// deterministic order. A concurrent batch can use
+    /// <see cref="DurableTask.WhenAll(IReadOnlyList{DurableTask})"/> and
+    /// <see cref="DurableTask.WhenAny(IReadOnlyList{DurableTask})"/>, whose input indexes provide
+    /// stable logical slots. Concurrent independent scheduling operations, including concurrent
+    /// combinator invocations, must use explicit names or otherwise begin in deterministic order.
+    /// </remarks>
     protected internal virtual TaskId CreateChildTaskId(string? name)
     {
         if (name is not null)
