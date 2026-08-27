@@ -671,9 +671,10 @@ public class DurableJobReceiverExtensionTests
                 meterFactory,
                 "Microsoft.Orleans",
                 "orleans-durablejobs-handler-executions");
+            var activitySource = DurableJobsDiagnostics.Source;
             _activityListener = new ActivityListener
             {
-                ShouldListenTo = static source => ReferenceEquals(source, DurableJobsDiagnostics.Source),
+                ShouldListenTo = source => ReferenceEquals(source, activitySource),
                 Sample = static (ref ActivityCreationOptions<ActivityContext> _) => ActivitySamplingResult.AllDataAndRecorded,
                 SampleUsingParentId = static (ref ActivityCreationOptions<string> _) => ActivitySamplingResult.AllDataAndRecorded,
                 ActivityStopped = activity =>
