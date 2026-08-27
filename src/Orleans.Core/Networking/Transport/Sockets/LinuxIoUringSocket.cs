@@ -121,7 +121,8 @@ internal sealed unsafe class LinuxIoUringSocketSender : LinuxIoUringOperation, I
     private readonly IntPtr _messageHeader;
     private int _scatterPinCount;
 
-    public LinuxIoUringSocketSender()
+    public LinuxIoUringSocketSender(LinuxIoUringEngine? engine = null)
+        : base(engine)
     {
         try
         {
@@ -300,9 +301,9 @@ internal abstract class LinuxIoUringOperation : IValueTaskSource, IDisposable
     private ulong _generation;
     private ulong _userData;
 
-    protected LinuxIoUringOperation()
+    protected LinuxIoUringOperation(LinuxIoUringEngine? engine = null)
     {
-        _engine = LinuxIoUringEngine.GetNext();
+        _engine = engine ?? LinuxIoUringEngine.GetNext();
         (_slotToken, _generation) = _engine.Register(this);
     }
 
@@ -316,6 +317,8 @@ internal abstract class LinuxIoUringOperation : IValueTaskSource, IDisposable
     public bool HasError => Error is not null;
 
     internal int FileDescriptor => _fileDescriptor;
+
+    internal LinuxIoUringEngine Engine => _engine;
 
     internal IntPtr BufferAddress
         => _bufferAddress;
@@ -610,6 +613,7 @@ internal sealed unsafe partial class LinuxIoUringEngine
     private readonly object _operationsLock = new();
     private readonly Stack<int> _freeOperationSlots = [];
     private readonly ManualResetEventSlim _started = new(initialState: false);
+    private readonly int _engineId;
     private LinuxIoUringOperation?[] _operations = new LinuxIoUringOperation[InitialOperationCapacity];
     private ulong[] _operationGenerations = new ulong[InitialOperationCapacity];
     private int _operationCount;
@@ -636,6 +640,7 @@ internal sealed unsafe partial class LinuxIoUringEngine
             throw new PlatformNotSupportedException("The io_uring transport requires a little-endian 64-bit process.");
         }
 
+        _engineId = engineId;
         var thread = new Thread(Run)
         {
             IsBackground = true,
@@ -665,6 +670,11 @@ internal sealed unsafe partial class LinuxIoUringEngine
                     "Orleans.Connections.Transport.Sockets.UseIoUring",
                     out var enabled)
                 && enabled);
+
+    internal static LinuxIoUringEngine GetOther(LinuxIoUringEngine engine)
+        => Engines.Length == 1
+            ? engine
+            : Engines[(engine._engineId + 1) % Engines.Length].Value;
 
     internal static (long Primary, long Notifications, long Fallbacks) GetZeroCopyStatistics()
     {
