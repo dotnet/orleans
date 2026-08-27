@@ -12,11 +12,17 @@ on this abstractions assembly.
 
 ## Execution model
 
-- An `async DurableTask` call creates a deferred definition. Its compiler-generated state
-  machine begins when a host runs the definition.
+- An `async DurableTask` call creates a single-use deferred definition. Its compiler-generated
+  state machine begins when a host runs the definition and releases captured state after terminal
+  completion. Create a new instance for each execution. Definitions created with `DurableTask.Run`
+  can be scheduled repeatedly.
 - Every root execution has an explicit `TaskId`. Child IDs append either a caller-provided
-  segment or a replay-stable generated segment to the parent ID. Generated segments begin
-  with `$`; that prefix is reserved and rejected for explicit child names.
+  segment or a generated segment to the parent ID. Generated segments are replay-stable when
+  unnamed children are created in the same deterministic order. One `WhenAll` or `WhenAny`
+  invocation assigns stable indexed slots to its concurrent batch. Independent concurrent
+  scheduling operations, including concurrent combinator invocations, use explicit `WithId`
+  segments or otherwise begin in deterministic order. Generated segments begin with `$`; that
+  prefix is reserved and rejected for explicit child names.
 - Scheduling the same definition under an existing ID reattaches to the response recorded
   for that ID. Hosts preserve the first definition associated with an ID.
 - A wait cancellation token abandons that scheduling, polling, or wait operation. It does
