@@ -3,7 +3,6 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration;
-using Orleans.Metadata;
 using Orleans.Runtime;
 using Orleans.Serialization.TypeSystem;
 using Orleans.TestingHost;
@@ -28,15 +27,11 @@ namespace Tester.HeterogeneousSilosTests
         private TestCluster? cluster;
 
         private void SetupAndDeployCluster(Type defaultPlacementStrategy, params Type[] blackListedTypes)
-            => SetupAndDeployCluster(defaultPlacementStrategy, enableDeferredGrainTypeResolution: true, blackListedTypes);
-
-        private void SetupAndDeployCluster(Type defaultPlacementStrategy, bool enableDeferredGrainTypeResolution, params Type[] blackListedTypes)
         {
             cluster?.StopAllSilos();
             var builder = new TestClusterBuilder(1);
             builder.Properties["DefaultPlacementStrategy"] = RuntimeTypeNameFormatter.Format(defaultPlacementStrategy);
             builder.Properties["BlockedGrainTypes"] = string.Join("|", blackListedTypes.Select(t => RuntimeTypeNameFormatter.Format(t)));
-            builder.Properties["EnableDeferredGrainTypeResolution"] = enableDeferredGrainTypeResolution.ToString();
             builder.AddSiloBuilderConfigurator<SiloConfigurator>();
             builder.AddClientBuilderConfigurator<ClientConfigurator>();
             cluster = builder.Build();
@@ -50,11 +45,7 @@ namespace Tester.HeterogeneousSilosTests
                 hostBuilder.ConfigureServices(services =>
                 {
                     services.Configure<SiloMessagingOptions>(options => options.AssumeHomogenousSilosForTesting = false);
-                    services.Configure<TypeManagementOptions>(options =>
-                    {
-                        options.TypeMapRefreshInterval = RefreshInterval;
-                        options.EnableDeferredGrainTypeResolution = hostBuilder.GetConfiguration().GetValue("EnableDeferredGrainTypeResolution", true);
-                    });
+                    services.Configure<TypeManagementOptions>(options => options.TypeMapRefreshInterval = RefreshInterval);
                     services.AddOptions<GrainTypeOptions>().Configure((GrainTypeOptions options, IOptions<SiloOptions> siloOptions) =>
                     {
                         var cfg = hostBuilder.GetConfiguration();
@@ -81,11 +72,7 @@ namespace Tester.HeterogeneousSilosTests
         {
             public void Configure(IConfiguration configuration, IClientBuilder clientBuilder)
             {
-                clientBuilder.Configure<TypeManagementOptions>(options =>
-                {
-                    options.TypeMapRefreshInterval = ClientRefreshDelay;
-                    options.EnableDeferredGrainTypeResolution = configuration.GetValue("EnableDeferredGrainTypeResolution", true);
-                });
+                clientBuilder.Configure<TypeManagementOptions>(options => options.TypeMapRefreshInterval = ClientRefreshDelay);
             }
         }
 
@@ -96,84 +83,60 @@ namespace Tester.HeterogeneousSilosTests
         }
 
         [Fact]
-        public void GrainReferenceIsCreatedWhenImplementationIsUnavailable()
+        public void GrainExcludedTest()
         {
             SetupAndDeployCluster(typeof(RandomPlacement), typeof(TestGrain));
 
-            var grain = this.cluster!.GrainFactory!.GetGrain<ITestGrain>(0);
-            Assert.True(grain.GetGrainId().Type.IsStubGrain());
+            // Should fail
+            var exception = Assert.Throws<ArgumentException>(() => this.cluster!.GrainFactory!.GetGrain<ITestGrain>(0));
+            Assert.Contains("Could not find an implementation for interface", exception.Message);
 
+            // Should not fail
             this.cluster!.GrainFactory!.GetGrain<ISimpleGrainWithAsyncMethods>(0);
         }
 
         [Fact]
-        public void DeferredResolutionCanBeDisabled()
-        {
-            SetupAndDeployCluster(typeof(RandomPlacement), enableDeferredGrainTypeResolution: false, typeof(TestGrain));
-
-            Assert.Throws<ArgumentException>(() => this.cluster!.GrainFactory!.GetGrain<ITestGrain>(0));
-
-            var clientServices = this.cluster!.ServiceProvider;
-            var interfaceType = clientServices.GetRequiredService<GrainInterfaceTypeResolver>().GetGrainInterfaceType(typeof(ITestGrain));
-            var grainId = GrainId.Create(GrainTypePrefix.CreateStubGrainType(interfaceType, grainClassPrefix: null), IdSpan.Create("0"));
-            var clientFactory = clientServices.GetRequiredService<IInternalGrainFactory>();
-            var siloFactory = this.cluster.GetSiloServiceProvider().GetRequiredService<IInternalGrainFactory>();
-
-            Assert.Throws<InvalidOperationException>(() => { _ = clientFactory.GetGrain(grainId, interfaceType); });
-            Assert.Throws<InvalidOperationException>(() => { _ = siloFactory.GetGrain(grainId, interfaceType); });
-        }
-
-        [Fact]
-        public async Task DeferredResolutionPreservesResponseDeadline()
+        public async Task GetGrainAsyncWaitsForImplementation()
         {
             SetupAndDeployCluster(typeof(RandomPlacement), typeof(TestGrain));
-            var grainKey = Random.Shared.NextInt64();
-            var grain = this.cluster!.GrainFactory!.GetGrain<ITestGrain>(grainKey);
-            var invocationStarted = TestGrain.WaitForDeferredLongActionAsync(grainKey);
-            var call = grain.DoLongActionWithDeferredResolutionTimeout(TimeSpan.FromSeconds(8), nameof(DeferredResolutionPreservesResponseDeadline));
+            using var cancellation = new CancellationTokenSource(TestConstants.InitTimeout);
+            var pending = this.cluster!.Client.GetGrainAsync<ITestGrain>(0, cancellationToken: cancellation.Token);
+            Assert.False(pending.IsCompleted);
 
-            await Task.Delay(TimeSpan.FromSeconds(3), TestContext.Current.CancellationToken);
-            await cluster!.StartAdditionalSiloAsync();
+            await cluster.StartAdditionalSiloAsync();
             await WaitForClusterStateToStabilizeAsync(restartClient: false);
 
-            var firstCompleted = await Task.WhenAny(invocationStarted, call);
-            Assert.Same(invocationStarted, firstCompleted);
-            await invocationStarted;
-            await Assert.ThrowsAsync<TimeoutException>(() => call);
+            var grain = await pending;
+            var resolvedType = await this.cluster.Client.WaitForGrainTypeAsync<ITestGrain>(cancellationToken: cancellation.Token);
+            Assert.Equal(resolvedType, grain.GetGrainId().Type);
+            Assert.Equal(0, await grain.GetKey());
+            Assert.Equal(this.cluster.GrainFactory!.GetGrain<ITestGrain>(0), grain);
         }
 
         [Fact]
-        public async Task TimedOutCallDoesNotPreventLaterResolution()
+        public async Task GetGrainAsyncCanBeCanceled()
         {
             SetupAndDeployCluster(typeof(RandomPlacement), typeof(TestGrain));
-            var grainKey = Random.Shared.NextInt64();
-            var grain = this.cluster!.GrainFactory!.GetGrain<ITestGrain>(grainKey);
-            var longInvocationStarted = TestGrain.WaitForDeferredLongActionAsync(grainKey);
-            var shortCall = grain.DoLongActionWithShortDeferredResolutionTimeout(TimeSpan.Zero, nameof(TimedOutCallDoesNotPreventLaterResolution));
-            var longCall = grain.DoLongActionWithDeferredResolutionTimeout(TimeSpan.Zero, nameof(TimedOutCallDoesNotPreventLaterResolution));
-
-            await Assert.ThrowsAsync<TimeoutException>(() => shortCall);
-            await cluster!.StartAdditionalSiloAsync();
-            await WaitForClusterStateToStabilizeAsync(restartClient: false);
-
-            await longInvocationStarted.WaitAsync(TestConstants.InitTimeout);
-            await longCall.WaitAsync(TestConstants.InitTimeout);
-        }
-
-        [Fact]
-        public async Task CanceledCallDoesNotPreventLaterResolution()
-        {
-            SetupAndDeployCluster(typeof(RandomPlacement), typeof(TestGrain));
-            var grain = this.cluster!.GrainFactory!.GetGrain<ITestGrain>(Random.Shared.NextInt64());
             using var cancellation = new CancellationTokenSource();
-            var canceledCall = grain.SetLabelWithCancellation(nameof(CanceledCallDoesNotPreventLaterResolution), cancellation.Token);
+            var pending = this.cluster!.Client.GetGrainAsync<ITestGrain>(0, cancellationToken: cancellation.Token);
 
             cancellation.Cancel();
-            await Assert.ThrowsAnyAsync<OperationCanceledException>(() => canceledCall);
-            await cluster!.StartAdditionalSiloAsync();
+
+            await Assert.ThrowsAnyAsync<OperationCanceledException>(async () => await pending);
+        }
+
+        [Fact]
+        public async Task WaitForGrainTypeAsyncSupportsImplementationPrefixes()
+        {
+            SetupAndDeployCluster(typeof(RandomPlacement), typeof(TestGrain));
+            using var cancellation = new CancellationTokenSource(TestConstants.InitTimeout);
+            var pending = this.cluster!.Client.WaitForGrainTypeAsync<ITestGrain>(typeof(TestGrain).FullName, cancellation.Token);
+            Assert.False(pending.IsCompleted);
+
+            await cluster.StartAdditionalSiloAsync();
             await WaitForClusterStateToStabilizeAsync(restartClient: false);
 
-            await grain.SetLabel(nameof(CanceledCallDoesNotPreventLaterResolution)).WaitAsync(TestConstants.InitTimeout);
+            Assert.False((await pending).IsDefault);
         }
 
 
@@ -262,47 +225,28 @@ namespace Tester.HeterogeneousSilosTests
         {
             SetupAndDeployCluster(defaultPlacementStrategy, blackListedTypes);
 
-            var grain = this.cluster!.GrainFactory!.GetGrain<T>(0);
-            var unresolvedGrainId = grain.GetGrainId();
-            var unresolvedGrainHashCode = grain.GetHashCode();
-            Assert.True(grain.GetGrainId().Type.IsStubGrain());
-            Task[]? pendingCalls = null;
-            if (!restartClient)
-            {
-                pendingCalls = [func(grain), func(grain)];
-                Assert.All(pendingCalls, static call => Assert.False(call.IsCompleted));
-            }
+            // Should fail
+            var exception = Assert.Throws<ArgumentException>(() => this.cluster!.GrainFactory!.GetGrain<T>(0));
+            Assert.Contains("Could not find an implementation for interface", exception.Message);
 
+            // Start a new silo with TestGrain
             await cluster!.StartAdditionalSiloAsync();
             await WaitForClusterStateToStabilizeAsync(restartClient);
-            if (pendingCalls is not null)
-            {
-                await Task.WhenAll(pendingCalls).WaitAsync(TestConstants.InitTimeout);
-                var resolvedGrain = this.cluster.GrainFactory!.GetGrain<T>(0);
-                Assert.NotEqual(unresolvedGrainId, grain.GetGrainId());
-                Assert.Equal(unresolvedGrainHashCode, grain.GetHashCode());
-                Assert.Equal(resolvedGrain, grain);
-                Assert.Equal(resolvedGrain.GetHashCode(), grain.GetHashCode());
-                var references = new HashSet<IGrain> { grain };
-                Assert.Contains(resolvedGrain, references);
-            }
-            else
-            {
-                grain = this.cluster.GrainFactory!.GetGrain<T>(0);
-                await func(grain);
-            }
 
             for (var i = 0; i < 5; i++)
             {
+                // Success
                 var g = this.cluster.GrainFactory!.GetGrain<T>(i);
                 await func(g);
             }
 
+            // Stop the latest silos
             await cluster.StopSecondarySilosAsync();
             await WaitForClusterStateToStabilizeAsync(restartClient);
 
-            var unresolvedGrain = this.cluster.GrainFactory!.GetGrain<T>(0);
-            Assert.True(unresolvedGrain.GetGrainId().Type.IsStubGrain());
+            // Should fail
+            exception = Assert.Throws<ArgumentException>(() => this.cluster.GrainFactory!.GetGrain<T>(0));
+            Assert.Contains("Could not find an implementation for interface", exception.Message);
         }
 
         public ValueTask InitializeAsync()

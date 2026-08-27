@@ -93,7 +93,7 @@ namespace Orleans.Runtime
 
         private long GetResponseTimeoutStopwatchTicks()
         {
-            var defaultResponseTimeout = Message.BodyObject is IInvokable request ? InvocationResponseTimeout.Get(request) : null;
+            var defaultResponseTimeout = (Message.BodyObject as IInvokable)?.GetDefaultResponseTimeout();
             if (defaultResponseTimeout.HasValue)
             {
                 return (long)(defaultResponseTimeout.Value.TotalSeconds * Stopwatch.Frequency);
@@ -102,7 +102,7 @@ namespace Orleans.Runtime
             return shared.ResponseTimeoutStopwatchTicks;
         }
 
-        private TimeSpan GetResponseTimeout() => Message.BodyObject is IInvokable request ? InvocationResponseTimeout.Get(request) ?? shared.ResponseTimeout : shared.ResponseTimeout;
+        private TimeSpan GetResponseTimeout() => (Message.BodyObject as IInvokable)?.GetDefaultResponseTimeout() ?? shared.ResponseTimeout;
 
         private string GetTargetGrainType()
         {

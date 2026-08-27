@@ -63,7 +63,6 @@ namespace Orleans.Runtime
             GrainReferenceActivator referenceActivator,
             GrainInterfaceTypeResolver interfaceIdResolver,
             GrainInterfaceTypeToGrainTypeResolver interfaceToTypeResolver,
-            IOptions<TypeManagementOptions> typeManagementOptions,
             DeepCopier deepCopier,
             [FromKeyedServices(TimeProviderNames.Messaging)] TimeProvider timeProvider,
             InterfaceToImplementationMappingCache interfaceToImplementationMapping,
@@ -77,7 +76,7 @@ namespace Orleans.Runtime
             this.MySilo = siloDetails.SiloAddress;
             this.callbacks = new ConcurrentDictionary<(GrainId, CorrelationId), CallbackData>();
             this.messageFactory = messageFactory;
-            this.ConcreteGrainFactory = new GrainFactory(this, referenceActivator, interfaceIdResolver, interfaceToTypeResolver, typeManagementOptions);
+            this.ConcreteGrainFactory = new GrainFactory(this, referenceActivator, interfaceIdResolver, interfaceToTypeResolver);
             this.logger = loggerFactory.CreateLogger<InsideRuntimeClient>();
             this.invokeExceptionLogger = loggerFactory.CreateLogger($"{typeof(Grain).FullName}.InvokeException");
             this.loggerFactory = loggerFactory;
@@ -179,7 +178,7 @@ namespace Orleans.Runtime
 
             if (this.messagingOptions.DropExpiredMessages && message.IsExpirableMessage())
             {
-                message.TimeToLive = InvocationResponseTimeout.Get(request) ?? sharedData.ResponseTimeout;
+                message.TimeToLive = request.GetDefaultResponseTimeout() ?? sharedData.ResponseTimeout;
             }
 
             var oneWay = (options & InvokeMethodOptions.OneWay) != 0;

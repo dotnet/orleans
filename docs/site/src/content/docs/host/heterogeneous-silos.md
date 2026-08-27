@@ -1,7 +1,7 @@
 ---
 title: Heterogeneous Orleans silos
 description: Host different Orleans grain types on different silos.
-ms.date: 08/26/2026
+ms.date: 08/27/2026
 ms.topic: how-to
 ---
 
@@ -46,18 +46,20 @@ Use heterogeneous grain type registration when a silo cannot host the implementa
 ## Deployment rules
 
 - Keep <xref:Orleans.Configuration.ClusterOptions.ServiceId>, <xref:Orleans.Configuration.ClusterOptions.ClusterId>, clustering, and protocol configuration consistent across all roles.
-- Deploy at least one healthy silo for every supported grain type before the response deadline for calls targeting that type.
+- Deploy at least one healthy silo for every supported grain type before clients invoke it.
 - Maintain capacity and redundancy independently for each specialized grain set.
 - Roll out contract changes before implementations that require them.
 - Avoid removing the last silo for a grain type while requests or durable work still target it.
 
-Clients obtain cluster type information after connecting. <xref:Orleans.Configuration.TypeManagementOptions.EnableDeferredGrainTypeResolution> defaults to `true`, so a client can create a grain reference before the cluster manifest contains a compatible implementation. Calls through that reference wait for a manifest update and retain their original response deadline. An explicit grain class prefix continues to require an immediate match.
+Clients obtain cluster type information after connecting. The synchronous <xref:Orleans.IGrainFactory.GetGrain*> methods require the current cluster manifest to contain a compatible grain implementation.
 
-Set <xref:Orleans.Configuration.TypeManagementOptions.EnableDeferredGrainTypeResolution> to `false` when every grain reference must resolve against the current cluster manifest during creation.
+When a client can connect before a specialized silo is available, use <xref:Orleans.ClusterClientGrainResolutionExtensions.GetGrainAsync*>. The operation waits until the cluster advertises the selected grain implementation with the client's interface version, then returns a normal grain reference with its complete, immutable grain identity. Pass a cancellation token or deadline appropriate for application startup.
+
+Use <xref:Orleans.ClusterClientGrainResolutionExtensions.WaitForGrainTypeAsync*> when startup needs an availability barrier without creating a grain reference.
 
 ## Limitations
 
-- A request reaches its response deadline when no active silo advertises a compatible target grain type.
+- A request fails when no active silo supports its target grain type.
 - Every silo that supports one grain type must use a compatible implementation and contract.
 - Stateless worker grains should be consistently available across the cluster rather than split into incompatible heterogeneous sets.
 - Implicit stream subscriptions require compatible grain availability; use [explicit subscriptions](../streaming/streams-programming-apis.md) when heterogeneous deployment makes ownership ambiguous.

@@ -87,11 +87,16 @@ namespace DefaultCluster.Tests
 
         /// <summary>
         /// Tests that non-existent grain prefixes throw an exception.
+        /// Validates proper error handling when attempting to resolve grains
+        /// with prefixes that don't match any registered implementations.
         /// </summary>
         [Fact, TestCategory("BVT"), TestCategory("Factory"), TestCategory("GetGrain")]
         public void GetGrain_WrongPrefix()
         {
-            Assert.Throws<ArgumentException>(() => this.GrainFactory.GetGrain<IBase>(GetRandomGrainId(), "Foo"));
+            Assert.Throws<ArgumentException>(() =>
+            {
+                var g = this.GrainFactory.GetGrain<IBase>(GetRandomGrainId(), "Foo");
+            });
         }
 
         /// <summary>
@@ -148,12 +153,17 @@ namespace DefaultCluster.Tests
         }
 
         /// <summary>
-        /// Tests that invalid prefixes for derived grain interfaces throw an exception.
+        /// Tests error handling for invalid prefixes with derived grains.
+        /// Validates that incorrect prefixes throw appropriate exceptions
+        /// even in inheritance scenarios.
         /// </summary>
         [Fact, TestCategory("BVT"), TestCategory("Factory"), TestCategory("GetGrain")]
         public void GetGrain_Derived_WithWrongPrefix()
         {
-            Assert.Throws<ArgumentException>(() => this.GrainFactory.GetGrain<IDerivedFromBase>(GetRandomGrainId(), "Foo"));
+            Assert.Throws<ArgumentException>(() =>
+            {
+                var g = this.GrainFactory.GetGrain<IDerivedFromBase>(GetRandomGrainId(), "Foo");
+            });
         }
 
         /// <summary>

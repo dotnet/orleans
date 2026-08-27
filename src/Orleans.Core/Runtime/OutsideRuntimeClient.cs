@@ -288,7 +288,7 @@ namespace Orleans
             if (this.clientMessagingOptions.DropExpiredMessages && message.IsExpirableMessage())
             {
                 // don't set expiration for system target messages.
-                var ttl = InvocationResponseTimeout.Get(request) ?? this.clientMessagingOptions.ResponseTimeout;
+                var ttl = request.GetDefaultResponseTimeout() ?? this.clientMessagingOptions.ResponseTimeout;
                 message.TimeToLive = ttl;
             }
 
