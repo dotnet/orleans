@@ -6,6 +6,8 @@ namespace Orleans.CodeGenerator.Tests;
 
 public sealed class GeneratedWarningSuppressionTests
 {
+    private const string ObsoleteWithoutMessageDiagnosticId = "CS0612";
+    private const string ObsoleteWithMessageDiagnosticId = "CS0618";
     private const string MissingXmlCommentDiagnosticId = "CS1591";
     private const string PublicApiAnalyzerDiagnosticId = "RS0016";
     private const string CompilerApiAnalyzerDiagnosticId = "RS0041";
@@ -46,7 +48,7 @@ public sealed class GeneratedWarningSuppressionTests
             }
             """;
 
-        var compilation = await CreateCompilationWithDocumentationDiagnostics(source);
+        var compilation = await CreateCompilationWithStrictDiagnostics(source);
         var result = RunGenerator(compilation);
 
         Assert.Empty(result.Diagnostics.Where(static diagnostic => diagnostic.Severity == DiagnosticSeverity.Error));
@@ -72,7 +74,65 @@ public sealed class GeneratedWarningSuppressionTests
     }
 
     [Fact]
-    public async Task GeneratedSources_CompileCleanlyUnderStrictDiagnosticsForMixedSourceAndReferences()
+    public async Task GeneratedProxySourcesSuppressObsoleteMemberWarnings()
+    {
+        const string source = """
+            using Orleans;
+            using System;
+            using System.Threading.Tasks;
+
+            namespace TestProject;
+
+            public interface IWarningGrain : IGrainWithIntegerKey
+            {
+                [Obsolete]
+                Task OldMethodWithoutMessage();
+
+                [Obsolete("Use NewMethod instead.")]
+                Task OldMethodWithMessage();
+
+                Task NewMethod();
+            }
+
+            public static class WarningCaller
+            {
+                public static async Task CallObsoleteMethods(IWarningGrain grain)
+                {
+                    await grain.OldMethodWithoutMessage();
+                    await grain.OldMethodWithMessage();
+                }
+            }
+            """;
+
+        var compilation = await CreateCompilationWithStrictDiagnostics(source);
+        var result = RunGenerator(compilation);
+
+        Assert.Empty(result.Diagnostics.Where(static diagnostic => diagnostic.Severity == DiagnosticSeverity.Error));
+        Assert.Contains(result.GeneratedSources, static source => source.HintName.Contains(".orleans.proxy.", StringComparison.Ordinal));
+
+        var generatedCompilation = compilation.AddSyntaxTrees(CreateGeneratedSyntaxTrees(result));
+        var generatedTreePaths = result.GeneratedSources
+            .Select(static source => source.HintName)
+            .ToHashSet(StringComparer.Ordinal);
+        var obsoleteErrors = generatedCompilation.GetDiagnostics()
+            .Where(static diagnostic => (diagnostic.Id is ObsoleteWithoutMessageDiagnosticId or ObsoleteWithMessageDiagnosticId)
+                && diagnostic.Severity == DiagnosticSeverity.Error)
+            .ToArray();
+
+        Assert.Equal(
+            new[] { ObsoleteWithoutMessageDiagnosticId, ObsoleteWithMessageDiagnosticId },
+            obsoleteErrors
+                .Where(diagnostic => diagnostic.Location.SourceTree is { } tree && !generatedTreePaths.Contains(tree.FilePath))
+                .Select(static diagnostic => diagnostic.Id)
+                .OrderBy(static id => id, StringComparer.Ordinal)
+                .ToArray());
+        Assert.DoesNotContain(
+            obsoleteErrors,
+            diagnostic => diagnostic.Location.SourceTree is { } tree && generatedTreePaths.Contains(tree.FilePath));
+    }
+
+    [Fact]
+    public async Task GeneratedSourcesCompileCleanlyWhenWarningsAreErrorsForMixedSourceAndReferences()
     {
         const string librarySource = """
             using Orleans;
@@ -134,7 +194,7 @@ public sealed class GeneratedWarningSuppressionTests
             libraryCompilation.GetDiagnostics(TestContext.Current.CancellationToken)
                 .Where(static diagnostic => diagnostic.Severity == DiagnosticSeverity.Error));
 
-        var compilation = await CreateCompilationWithDocumentationDiagnostics(
+        var compilation = await CreateCompilationWithStrictDiagnostics(
             consumerSource,
             libraryCompilation.ToMetadataReference());
         var result = RunGenerator(compilation);
@@ -160,7 +220,7 @@ public sealed class GeneratedWarningSuppressionTests
             string.Join(Environment.NewLine, generatedErrors));
     }
 
-    private static async Task<CSharpCompilation> CreateCompilationWithDocumentationDiagnostics(
+    private static async Task<CSharpCompilation> CreateCompilationWithStrictDiagnostics(
         string source,
         params MetadataReference[] additionalReferences)
     {
@@ -170,11 +230,15 @@ public sealed class GeneratedWarningSuppressionTests
             DocumentationParseOptions,
             path: "WarningSuppressionInput.cs",
             encoding: Encoding.UTF8);
-        var options = compilation.Options.WithSpecificDiagnosticOptions(
-            compilation.Options.SpecificDiagnosticOptions
-                .SetItem(MissingXmlCommentDiagnosticId, ReportDiagnostic.Error)
-                .SetItem(PublicApiAnalyzerDiagnosticId, ReportDiagnostic.Error)
-                .SetItem(CompilerApiAnalyzerDiagnosticId, ReportDiagnostic.Error));
+        var options = compilation.Options
+            .WithGeneralDiagnosticOption(ReportDiagnostic.Error)
+            .WithSpecificDiagnosticOptions(
+                compilation.Options.SpecificDiagnosticOptions
+                    .SetItem(ObsoleteWithoutMessageDiagnosticId, ReportDiagnostic.Error)
+                    .SetItem(ObsoleteWithMessageDiagnosticId, ReportDiagnostic.Error)
+                    .SetItem(MissingXmlCommentDiagnosticId, ReportDiagnostic.Error)
+                    .SetItem(PublicApiAnalyzerDiagnosticId, ReportDiagnostic.Error)
+                    .SetItem(CompilerApiAnalyzerDiagnosticId, ReportDiagnostic.Error));
 
         return compilation
             .ReplaceSyntaxTree(compilation.SyntaxTrees.Single(), syntaxTree)

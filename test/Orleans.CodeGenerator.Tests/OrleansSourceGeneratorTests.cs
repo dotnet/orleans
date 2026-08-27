@@ -1895,7 +1895,7 @@ public class DemoClass
         resultText = resultText.Replace(".Add(typeof(int));", ".Add(typeof( int ));", StringComparison.Ordinal);
         if (assemblyAttributes.Count > 0)
         {
-            resultText += $"{Environment.NewLine}#pragma warning restore CS1591, RS0016, RS0041";
+            resultText += $"{Environment.NewLine}#pragma warning restore";
         }
 
         return resultText;
