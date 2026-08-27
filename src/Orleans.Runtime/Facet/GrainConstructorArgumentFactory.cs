@@ -30,9 +30,12 @@ namespace Orleans.Runtime
             foreach (var parameter in parameters)
             {
                 Factory<IGrainContext, object> argumentFactory;
-                if (parameter.GetCustomAttribute<FromKeyedServicesAttribute>() is { } keyedServiceAttr)
+                if (parameter.GetCustomAttribute<FromKeyedServicesAttribute>() is not null)
                 {
-                    argumentFactory = grainContext => grainContext.ActivationServices.GetRequiredKeyedService(parameter.ParameterType, keyedServiceAttr.Key);
+                    // ActivatorUtilities resolves keyed constructor parameters by position and attribute.
+                    // Supplying them as explicit typed arguments can bind to an earlier unkeyed parameter
+                    // when both parameters have the same type.
+                    continue;
                 }
                 else
                 {

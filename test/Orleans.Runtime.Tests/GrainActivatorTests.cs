@@ -112,6 +112,25 @@ namespace UnitTests.General
             Assert.True(state.WasConfiguredAtConstruction);
         }
 
+        [Fact]
+        public void KeyedDependencyWithSameTypeAsRegularDependencyBindsByParameter()
+        {
+            var regular = new ConstructorService("regular");
+            var keyed = new ConstructorService("keyed");
+            var services = new ServiceCollection();
+            services.AddSingleton<IConstructorService>(regular);
+            services.AddKeyedSingleton<IConstructorService>("special", keyed);
+            using var serviceProvider = services.BuildServiceProvider();
+            var argumentFactory = new GrainConstructorArgumentFactory(serviceProvider, typeof(KeyedConstructorTarget));
+            var activator = ActivatorUtilities.CreateFactory(typeof(KeyedConstructorTarget), argumentFactory.ArgumentTypes);
+
+            var instance = Assert.IsType<KeyedConstructorTarget>(
+                activator(serviceProvider, argumentFactory.CreateArguments(null!)));
+
+            Assert.Same(regular, instance.Regular);
+            Assert.Same(keyed, instance.Keyed);
+        }
+
         /// <summary>
         /// Custom grain activator that bypasses dependency injection entirely.
         /// Implements both IGrainActivator (for creation/disposal) and IConfigureGrainTypeComponents
@@ -220,6 +239,19 @@ namespace UnitTests.General
         private sealed class ConfiguredContextMarker
         {
             public static ConfiguredContextMarker Instance { get; } = new();
+        }
+
+        private interface IConstructorService;
+
+        private sealed record ConstructorService(string Name) : IConstructorService;
+
+        private sealed class KeyedConstructorTarget(
+            IConstructorService regular,
+            [FromKeyedServices("special")] IConstructorService keyed)
+        {
+            public IConstructorService Regular { get; } = regular;
+
+            public IConstructorService Keyed { get; } = keyed;
         }
     }
 }

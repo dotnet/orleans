@@ -303,6 +303,7 @@ internal sealed class DurableMessagingCommitCoordinator :
 internal sealed class CoordinatedJournaledStateManager :
     IJournaledStateManager,
     ILifecycleParticipant<IGrainLifecycle>,
+    IJournaledStateMutationGuard,
     IDisposable
 {
     private readonly IJournaledStateManager _inner;
@@ -330,6 +331,18 @@ internal sealed class CoordinatedJournaledStateManager :
     }
 
     public long PendingWriteByteCount => _inner.PendingWriteByteCount;
+
+    void IJournaledStateMutationGuard.ThrowIfMutationBlocked()
+    {
+        if (_inner is IJournaledStateMutationGuard guard)
+        {
+            guard.ThrowIfMutationBlocked();
+        }
+        else
+        {
+            _coordinator.ThrowIfMutationBlocked();
+        }
+    }
 
     public void Participate(IGrainLifecycle lifecycle)
     {

@@ -7,6 +7,7 @@ using Orleans.Serialization.Cloning;
 using Orleans.Serialization.Codecs;
 using Orleans.Serialization.Session;
 using Orleans.Serialization.TestKit;
+using Orleans.Serialization.WireProtocol;
 using Xunit;
 
 namespace Orleans.Serialization.UnitTests;
@@ -209,6 +210,28 @@ public class ArcBufferCodecTests
 
         Assert.Equal(1, deserialized.Length);
         Assert.Equal(42, deserialized.ToArray()[0]);
+    }
+
+    [Fact]
+    public void ArcBufferCodec_OversizedLength_Throws()
+    {
+        var output = new ArrayBufferWriter<byte>();
+        var writer = Writer.Create(output, session: null!);
+        writer.WriteVarUInt32(uint.MaxValue);
+        writer.Commit();
+        using var session = _serviceProvider.GetRequiredService<SerializerSessionPool>().GetSession();
+        var reader = Reader.Create(output.WrittenMemory, session);
+        var field = new Field(new Tag((byte)WireType.LengthPrefixed));
+
+        try
+        {
+            _ = new ArcBufferCodec().ReadValue(ref reader, field);
+            Assert.Fail("Expected an oversized ArcBuffer length to be rejected.");
+        }
+        catch (IndexOutOfRangeException exception)
+        {
+            Assert.Contains("exceeds the maximum supported length", exception.Message, StringComparison.Ordinal);
+        }
     }
 
     /// <summary>

@@ -44,6 +44,7 @@ internal sealed class DurableState<T> : IPersistentState<T>, IJournaledState, IP
     {
         get
         {
+            _mutationGuard?.ThrowIfMutationBlocked();
             _hasState = true;
             return _value ??= Activator.CreateInstance<T>();
         }

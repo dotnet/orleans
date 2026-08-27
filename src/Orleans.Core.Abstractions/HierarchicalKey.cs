@@ -141,7 +141,7 @@ public sealed class HierarchicalKey : ISpanFormattable, IEquatable<HierarchicalK
         var charactersToEscape = CharactersToEscape(value.Span);
         if (charactersToEscape == 0)
         {
-            return new HierarchicalKey(parent, value);
+            return new HierarchicalKey(parent, new string(value.Span).AsMemory());
         }
 
         return new HierarchicalKey(parent, Escape(value.Span, charactersToEscape).AsMemory());

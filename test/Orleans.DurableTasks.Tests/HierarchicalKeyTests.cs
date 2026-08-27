@@ -74,6 +74,17 @@ public class HierarchicalKeyTests
     }
 
     [Fact]
+    public void OrleansEscapedKeyCopiesMutableInput()
+    {
+        var value = "value".ToCharArray();
+        var key = OrleansHierarchicalKey.CreateEscaped(parent: null, value);
+
+        value[0] = 'X';
+
+        Assert.Equal("value", key.ToString());
+    }
+
+    [Fact]
     public void OnlyValidValuesAreAllowed()
     {
         Assert.Throws<ArgumentNullException>(() => HierarchicalKey.Create(null!));

@@ -34,6 +34,20 @@ public sealed class DurableTaskResponseCopierTests(ITestOutputHelper output, Ser
         => left?.TypedResult == right?.TypedResult;
 }
 
+public sealed class NullableDurableTaskResponseCodecTests(ITestOutputHelper output, SerializationTesterFixture fixture)
+    : FieldCodecTester<DurableTaskResponse<string>, IFieldCodec<DurableTaskResponse<string>>>(output, fixture), IClassFixture<SerializationTesterFixture>
+{
+    protected override IFieldCodec<DurableTaskResponse<string>> CreateCodec() =>
+        ServiceProvider.GetRequiredService<ICodecProvider>().GetCodec<DurableTaskResponse<string>>();
+
+    protected override DurableTaskResponse<string> CreateValue() => new(null!);
+
+    protected override DurableTaskResponse<string>[] TestValues => [new(null!), new("value")];
+
+    protected override bool Equals(DurableTaskResponse<string>? left, DurableTaskResponse<string>? right)
+        => left?.TypedResult == right?.TypedResult;
+}
+
 public sealed class ExceptionDurableTaskResponseCodecTests(ITestOutputHelper output, SerializationTesterFixture fixture)
     : FieldCodecTester<ExceptionDurableTaskResponse, IFieldCodec<ExceptionDurableTaskResponse>>(output, fixture), IClassFixture<SerializationTesterFixture>
 {
