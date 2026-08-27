@@ -175,7 +175,11 @@ internal sealed class StripedCallbackDictionary<TValue>
 
     private sealed class Stripe
     {
+#if NET9_0_OR_GREATER
+        public readonly System.Threading.Lock Lock = new();
+#else
         public readonly object Lock = new();
+#endif
         public readonly Dictionary<CallbackKey, TValue> Dictionary = new();
     }
 

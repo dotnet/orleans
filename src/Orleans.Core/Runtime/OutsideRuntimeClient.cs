@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
@@ -24,7 +25,7 @@ namespace Orleans
         private readonly ILogger logger;
         private readonly ClientMessagingOptions clientMessagingOptions;
 
-        private readonly StripedCallbackDictionary<CallbackData> callbacks;
+        private readonly ConcurrentDictionary<CorrelationId, CallbackData> callbacks;
         private InvokableObjectManager? localObjects;
         private int _isStopping;
         private bool disposing;
@@ -83,7 +84,7 @@ namespace Orleans
             this.loggerFactory = loggerFactory;
             this.messagingTrace = messagingTrace;
             this.logger = loggerFactory.CreateLogger<OutsideRuntimeClient>();
-            callbacks = new StripedCallbackDictionary<CallbackData>();
+            callbacks = new ConcurrentDictionary<CorrelationId, CallbackData>();
             this.clientMessagingOptions = clientMessagingOptions.Value;
             var period = Max(
                 TimeSpan.FromMilliseconds(1),
@@ -92,7 +93,7 @@ namespace Orleans
                     TimeSpan.FromSeconds(1)));
             this.callbackTimer = new PeriodicTimer(period, timeProvider);
             this.sharedCallbackData = new SharedCallbackData(
-                msg => this.UnregisterCallback(msg.SendingGrain, msg.Id),
+                msg => this.UnregisterCallback(msg.Id),
                 this.loggerFactory.CreateLogger<CallbackData>(),
                 this.clientMessagingOptions.ResponseTimeout,
                 this.clientMessagingOptions.CancelRequestOnTimeout,
@@ -296,7 +297,7 @@ namespace Orleans
                     return;
                 }
 
-                callbacks.TryAdd(message.SendingGrain, message.Id, callbackData);
+                callbacks.TryAdd(message.Id, callbackData);
                 callbackData.SubscribeForCancellation(cancellationToken);
 
                 if (Volatile.Read(ref _isStopping) != 0)
@@ -327,7 +328,7 @@ namespace Orleans
             if (response.Result is Message.ResponseTypes.Status)
             {
                 var status = (StatusResponse)response.BodyObject!;
-                callbacks.TryGetValue(response.TargetGrain, response.Id, out var callback);
+                callbacks.TryGetValue(response.Id, out var callback);
                 var request = callback?.Message;
                 if (request is not null)
                 {
@@ -360,7 +361,7 @@ namespace Orleans
             }
 
             CallbackData? callbackData;
-            var found = callbacks.TryRemove(response.TargetGrain, response.Id, out callbackData);
+            var found = callbacks.TryRemove(response.Id, out callbackData);
             if (found)
             {
                 // We need to import the RequestContext here as well.
@@ -374,9 +375,9 @@ namespace Orleans
             }
         }
 
-        private void UnregisterCallback(GrainId owner, CorrelationId id)
+        private void UnregisterCallback(CorrelationId id)
         {
-            callbacks.TryRemove(owner, id, out _);
+            callbacks.TryRemove(id, out _);
         }
 
         private void ConstructorReset()
@@ -446,18 +447,18 @@ namespace Orleans
 
         public void BreakOutstandingMessagesToSilo(SiloAddress deadSilo)
         {
-            callbacks.ForEach(deadSilo, static (callback, deadSilo) =>
+            foreach (var callback in callbacks)
             {
-                if (deadSilo.Equals(callback.Message.TargetSilo))
+                if (deadSilo.Equals(callback.Value.Message.TargetSilo))
                 {
-                    callback.OnTargetSiloFail();
+                    callback.Value.OnTargetSiloFail();
                 }
-            });
+            }
         }
 
         private void BreakOutstandingMessages()
         {
-            callbacks.ForEach(this, static (callback, self) =>
+            foreach (var (_, callback) in callbacks)
             {
                 try
                 {
@@ -465,13 +466,13 @@ namespace Orleans
                 }
                 catch (Exception exception)
                 {
-                    LogErrorWhileProcessingCallbackExpiry(self.logger, exception);
+                    LogErrorWhileProcessingCallbackExpiry(logger, exception);
                 }
-            });
+            }
         }
 
         public int GetRunningRequestsCount(GrainInterfaceType grainInterfaceType)
-            => this.callbacks.CountWhere(c => c.Message.InterfaceType == grainInterfaceType);
+            => this.callbacks.Count(c => c.Value.Message.InterfaceType == grainInterfaceType);
 
         /// <inheritdoc />
         public void NotifyClusterConnectionLost()
@@ -515,18 +516,18 @@ namespace Orleans
                 try
                 {
                     var currentStopwatchTicks = ValueStopwatch.GetTimestamp();
-                    callbacks.ForEach((Self: this, CurrentStopwatchTicks: currentStopwatchTicks), static (callback, state) =>
+                    foreach (var (_, callback) in callbacks)
                     {
                         if (callback.IsCompleted)
                         {
-                            return;
+                            continue;
                         }
 
-                        if (callback.IsExpired(state.CurrentStopwatchTicks))
+                        if (callback.IsExpired(currentStopwatchTicks))
                         {
                             callback.OnTimeout();
                         }
-                    });
+                    }
                 }
                 catch (Exception ex)
                 {
