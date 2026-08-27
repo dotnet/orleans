@@ -363,6 +363,44 @@ public class DurableTaskTests
     }
 
     [Fact]
+    public async Task CompilerLoweredContinuationRestoresCompletingThreadAmbientContext()
+    {
+        var host = new TestHost(DateTimeOffset.UnixEpoch);
+        var outer = host.CreateContext(TaskId.CreateRoot("outer-completing-thread"));
+        var inner = host.CreateContext(TaskId.CreateRoot("inner-completing-thread"));
+        var awaitable = new ControlledUnsafeAwaitable<int>(42);
+        Task<DurableTaskResponse>? innerExecution = null;
+        var outerTask = DurableTask.Run(_ =>
+        {
+            Assert.Same(outer, DurableExecutionContext.Current);
+            using (ExecutionContext.SuppressFlow())
+            {
+                innerExecution = DurableTaskRuntimeHelper.RunAsync(InnerAsync(), inner).AsTask();
+            }
+
+            Assert.NotNull(innerExecution);
+            Assert.False(innerExecution.IsCompleted);
+            awaitable.Complete();
+            Assert.Same(outer, DurableExecutionContext.Current);
+        });
+
+        var outerResponse = await DurableTaskRuntimeHelper.RunAsync(outerTask, outer);
+        var innerResponse = await innerExecution!;
+
+        Assert.Equal(DurableTaskStatus.CompletedSuccessfully, outerResponse.Status);
+        Assert.Equal(42, innerResponse.GetResult<int>());
+        Assert.Null(DurableExecutionContext.Current);
+
+        async DurableTask<int> InnerAsync()
+        {
+            Assert.Same(inner, DurableExecutionContext.Current);
+            var result = await awaitable;
+            Assert.Same(inner, DurableExecutionContext.Current);
+            return result;
+        }
+    }
+
+    [Fact]
     public async Task CompilerLoweredTasksFlowExecutionContextAcrossSuccessiveSafeAndUnsafeAwaits()
     {
         var host = new TestHost(DateTimeOffset.UnixEpoch);
@@ -508,6 +546,23 @@ public class DurableTaskTests
             await Task.CompletedTask;
             return 42;
         }
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task CompletedCompilerLoweredTaskReleasesCapturedState(bool generic)
+    {
+        var host = new TestHost(DateTimeOffset.UnixEpoch);
+        var (task, capturedState) = CreateCompilerLoweredTaskWithCapturedState(generic);
+        var context = host.CreateContext(TaskId.CreateRoot($"release-state-{generic}"));
+
+        var response = await DurableTaskRuntimeHelper.RunAsync(task, context);
+        ForceFullCollection();
+
+        Assert.Equal(DurableTaskStatus.CompletedSuccessfully, response.Status);
+        Assert.False(capturedState.IsAlive);
+        GC.KeepAlive(task);
     }
 
     [Theory]
@@ -2003,6 +2058,36 @@ public class DurableTaskTests
         public void MoveNext() { }
 
         public void SetStateMachine(IAsyncStateMachine stateMachine) { }
+    }
+
+    [MethodImpl(MethodImplOptions.NoInlining)]
+    private static (DurableTask Task, WeakReference CapturedState) CreateCompilerLoweredTaskWithCapturedState(bool generic)
+    {
+        var state = new object();
+        var result = new WeakReference(state);
+        return (generic ? GenericAsync(state) : NonGenericAsync(state), result);
+
+        static async DurableTask NonGenericAsync(object state)
+        {
+            await Task.Yield();
+            GC.KeepAlive(state);
+        }
+
+        static async DurableTask<int> GenericAsync(object state)
+        {
+            await Task.Yield();
+            GC.KeepAlive(state);
+            return 42;
+        }
+    }
+
+    private static void ForceFullCollection()
+    {
+        for (var attempt = 0; attempt < 3; attempt++)
+        {
+            GC.Collect(GC.MaxGeneration, GCCollectionMode.Forced, blocking: true, compacting: true);
+            GC.WaitForPendingFinalizers();
+        }
     }
 
     private readonly struct NonCriticalYieldAwaitable
