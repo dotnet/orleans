@@ -9,12 +9,15 @@ $coverageConfigPath = Join-Path $PSScriptRoot '../coverage.config.xml'
 $coverageReportScriptPath = Join-Path $PSScriptRoot 'coverage-report.ps1'
 $coverageStaticConfigPath = Join-Path $PSScriptRoot '../coverage.static.config.xml'
 $archiveTestResultsActionPath = Join-Path $PSScriptRoot '../actions/archive-test-results/action.yml'
+$expectedCoverageArtifactsPath = Join-Path $PSScriptRoot '../coverage-artifacts.txt'
 $azureBuildTemplatePath = Join-Path $PSScriptRoot '../../.azure/pipelines/templates/build.yaml'
 $azureVariablesPath = Join-Path $PSScriptRoot '../../.azure/pipelines/templates/vars.yaml'
 $dotnetTestActionPath = Join-Path $PSScriptRoot '../actions/dotnet-test/action.yml'
 $invokeCoverageScriptPath = Join-Path $PSScriptRoot 'invoke-coverage.ps1'
 $runTestsActionPath = Join-Path $PSScriptRoot '../actions/run-tests/action.yml'
 $setupCoverageScriptPath = Join-Path $PSScriptRoot 'setup-coverage.ps1'
+$testResultsWorkflowPath = Join-Path $PSScriptRoot '../workflows/test-results.yml'
+$validateCoverageArtifactsScriptPath = Join-Path $PSScriptRoot 'validate-coverage-artifacts.ps1'
 $workflowPath = Join-Path $PSScriptRoot '../workflows/ci.yml'
 $temporaryRoot = Join-Path ([IO.Path]::GetTempPath()) "orleans-coverage-tests-$([guid]::NewGuid())"
 $testsRun = 0
@@ -69,6 +72,13 @@ function New-TestCase {
     $sourceRoot = Join-Path $caseRoot 'src'
     $reportDirectory = Join-Path $caseRoot 'reports'
     [void] (New-Item -ItemType Directory -Path $sourceRoot, $reportDirectory)
+    [IO.File]::WriteAllLines(
+        (Join-Path $sourceRoot 'Example.cs'),
+        @(
+            1..30 | ForEach-Object { "line $_" }
+        ),
+        [Text.UTF8Encoding]::new($false)
+    )
     return @{
         Root = $caseRoot
         SourceRoot = $sourceRoot
@@ -122,6 +132,36 @@ function Invoke-Summarizer {
         -MarkdownOutput $TestCase.MarkdownOutput
 }
 
+function Invoke-ArtifactValidator {
+    param(
+        [string] $ReportDirectory,
+        [string] $ExpectedArtifacts
+    )
+
+    & $validateCoverageArtifactsScriptPath `
+        -ReportDirectory $ReportDirectory `
+        -ExpectedArtifacts $ExpectedArtifacts `
+        -JsonOutput (Join-Path (Split-Path $ReportDirectory -Parent) 'validation.json')
+}
+
+function Write-ArtifactMetadata {
+    param(
+        [string] $ArtifactDirectory,
+        [string] $CoverageId,
+        [string] $CommitSha = '0123456789abcdef0123456789abcdef01234567'
+    )
+
+    $metadata = [ordered]@{
+        artifact_name = "coverage_$CoverageId"
+        commit_sha = $CommitSha
+        coverage_id = $CoverageId
+        format_version = 1
+    }
+    $metadata |
+        ConvertTo-Json |
+        Set-Content -LiteralPath (Join-Path $ArtifactDirectory "$CoverageId.coverage.json") -Encoding utf8NoBOM
+}
+
 function Invoke-Test {
     param(
         [string] $Name,
@@ -145,6 +185,7 @@ try {
         Assert-Equal 2 $summary.total_lines 'Total lines differ.'
         Assert-Equal '50.00%' $summary.line_rate_display 'Displayed line rate differs.'
         Assert-Equal 1 $summary.source_files 'Source file count differs.'
+        Assert-Equal 0 $summary.total_branches 'Branch count differs.'
     }
 
     Invoke-Test 'accepts a UTF-8 BOM' {
@@ -184,8 +225,59 @@ try {
         Assert-Equal 1 $summary.total_lines 'Duplicate total lines differ.'
     }
 
+    Invoke-Test 'combines duplicate branch coverage conservatively' {
+        $testCase = New-TestCase
+        $sourceFile = [Security.SecurityElement]::Escape((Join-Path $testCase.SourceRoot 'Example.cs'))
+        $xml = @"
+<coverage><packages><package><classes>
+  <class filename="$sourceFile"><lines>
+    <line number="10" hits="1" branch="True" condition-coverage="50% (1/2)">
+      <conditions><condition number="0" type="jump" coverage="50%" /></conditions>
+    </line>
+  </lines></class>
+  <class filename="$sourceFile"><lines>
+    <line number="10" hits="1" branch="True" condition-coverage="100% (2/2)">
+      <conditions><condition number="0" type="jump" coverage="100%" /></conditions>
+    </line>
+  </lines></class>
+</classes></package></packages></coverage>
+"@
+        [void] (Write-Report $testCase $xml)
+        Invoke-Summarizer $testCase
+        $summary = Get-Content -Raw $testCase.JsonOutput | ConvertFrom-Json
+        Assert-Equal 2 $summary.covered_branches 'Covered branches differ.'
+        Assert-Equal 2 $summary.total_branches 'Total branches differ.'
+        Assert-Equal '100.00%' $summary.branch_rate_display 'Displayed branch rate differs.'
+    }
+
+    Invoke-Test 'rejects inconsistent branch coverage' {
+        $testCase = New-TestCase
+        $lines = @'
+<line number="10" hits="1" branch="True" condition-coverage="50% (1/4)">
+  <conditions><condition number="0" type="jump" coverage="50%" /></conditions>
+</line>
+'@
+        [void] (Write-Report $testCase (Get-ReportXml (Join-Path $testCase.SourceRoot 'Example.cs') $lines))
+        Assert-Throws { Invoke-Summarizer $testCase } 'inconsistent condition coverage'
+    }
+
+    Invoke-Test 'rejects missing source files' {
+        $testCase = New-TestCase
+        [void] (Write-Report $testCase (Get-ReportXml (Join-Path $testCase.SourceRoot 'Missing.cs')))
+        Assert-Throws { Invoke-Summarizer $testCase } 'references missing source file'
+    }
+
+    Invoke-Test 'rejects lines beyond the source file' {
+        $testCase = New-TestCase
+        [void] (Write-Report $testCase (Get-ReportXml (Join-Path $testCase.SourceRoot 'Example.cs') '<line number="31" hits="1" />'))
+        Assert-Throws { Invoke-Summarizer $testCase } 'beyond the end'
+    }
+
     Invoke-Test 'counts distinct source files' {
         $testCase = New-TestCase
+        $sourceLines = @(1..20 | ForEach-Object { "line $_" })
+        [IO.File]::WriteAllLines((Join-Path $testCase.SourceRoot 'First.cs'), $sourceLines, [Text.UTF8Encoding]::new($false))
+        [IO.File]::WriteAllLines((Join-Path $testCase.SourceRoot 'Second.cs'), $sourceLines, [Text.UTF8Encoding]::new($false))
         $firstSourceFile = [Security.SecurityElement]::Escape((Join-Path $testCase.SourceRoot 'First.cs'))
         $secondSourceFile = [Security.SecurityElement]::Escape((Join-Path $testCase.SourceRoot 'Second.cs'))
         $xml = @"
@@ -226,7 +318,15 @@ try {
     Invoke-Test 'rejects parent traversal' {
         $testCase = New-TestCase
         [void] (Write-Report $testCase (Get-ReportXml "$($testCase.SourceRoot)/../test/ExampleTests.cs"))
-        Assert-Throws { Invoke-Summarizer $testCase } 'no measured lines'
+        Assert-Throws { Invoke-Summarizer $testCase } 'invalid repository source path'
+    }
+
+    Invoke-Test 'rejects non-canonical repository paths' {
+        foreach ($sourcePath in '/_/src//Example.cs', '/_/src/./Example.cs') {
+            $testCase = New-TestCase
+            [void] (Write-Report $testCase (Get-ReportXml $sourcePath))
+            Assert-Throws { Invoke-Summarizer $testCase } 'invalid repository source path'
+        }
     }
 
     Invoke-Test 'rejects invalid UTF-8' {
@@ -436,44 +536,146 @@ exit 0
         }
     }
 
-    Invoke-Test 'downloads only coverage artifacts for merging' {
-        $workflow = Get-Content -Raw -LiteralPath $workflowPath
+    Invoke-Test 'validates the exact coverage matrix before trusted merging' {
+        $workflow = Get-Content -Raw -LiteralPath $testResultsWorkflowPath
+        $validator = Get-Content -Raw -LiteralPath $validateCoverageArtifactsScriptPath
+        $expectedArtifacts = @(Get-Content -LiteralPath $expectedCoverageArtifactsPath)
         Assert-Matches `
             $workflow `
-            '(?s)pattern:\s*coverage_test_output_\*.*?merge-multiple:\s*true' `
-            'Coverage reports must download directly into the merge directory.'
-    }
-
-    Invoke-Test 'requires every test matrix job before merging' {
-        $workflow = Get-Content -Raw -LiteralPath $workflowPath
-        $archiveTestResultsAction = Get-Content -Raw -LiteralPath $archiveTestResultsActionPath
+            'pattern:\s*coverage_test_output_\*' `
+            'Coverage reporting must download every raw coverage artifact.'
+        Assert-Equal 0 ([regex]::Matches($workflow, 'merge-multiple:\s*true')).Count 'Coverage downloads must preserve artifact identities.'
         Assert-Matches `
             $workflow `
-            "if: github\.event_name == 'pull_request' && needs\.ci\.result == 'success'" `
-            'Coverage merge must run only after every CI job succeeds.'
+            '(?s)Validate coverage matrix.*?Merge coverage' `
+            'Coverage artifact validation must run before merging.'
         Assert-Matches `
             $workflow `
-            'needs: ci' `
-            'Coverage merge must depend on the aggregate CI job.'
+            '(?s)validate-coverage-artifacts\.ps1.*?coverage-artifacts\.txt' `
+            'Trusted coverage reporting must use the reviewed artifact manifest.'
         Assert-Matches `
             $workflow `
-            '(?s)coverage-merge:.*?actions/checkout@.*?actions/setup-dotnet@.*?actions/setup-coverage' `
-            'Coverage merge must check out scripts before running local actions.'
-        Assert-Matches `
-            $workflow `
-            'dotnet-coverage merge "coverage-data/\*\.cobertura\.xml"' `
+            'dotnet-coverage merge @reports' `
             'Coverage reports must be merged directly by dotnet-coverage.'
         Assert-Matches `
+            $validator `
+            'Coverage artifact set differs from the expected CI matrix' `
+            'Coverage validation must reject missing and unexpected reports.'
+        Assert-Matches `
             $workflow `
-            'New-Item -ItemType Directory -Force TestResults' `
-            'Coverage merge must create its output directory.'
+            'ref: \$\{\{ steps\.coverage-matrix\.outputs\.tested-sha \}\}' `
+            'Source validation must use the exact commit recorded by every coverage artifact.'
+        Assert-Matches `
+            $workflow `
+            '(?s)Verify tested commit.*?parents -notcontains \$env:HEAD_SHA.*?Checkout covered source' `
+            'The trusted reporter must bind the recorded merge commit to the triggering pull request head.'
+        Assert-Equal 60 $expectedArtifacts.Count 'Expected coverage artifact count differs.'
+        Assert-Equal 60 (@($expectedArtifacts | Sort-Object -Unique)).Count 'Expected coverage artifact identities must be unique.'
+    }
+
+    Invoke-Test 'rejects missing and unexpected coverage artifacts' {
+        $testCase = New-TestCase
+        $expectedArtifacts = Join-Path $testCase.Root 'expected.txt'
+        [IO.File]::WriteAllLines(
+            $expectedArtifacts,
+            @('test_output_first', 'test_output_second'),
+            [Text.UTF8Encoding]::new($false)
+        )
+        $firstArtifact = Join-Path $testCase.ReportDirectory 'coverage_test_output_first'
+        [void] (New-Item -ItemType Directory -Path $firstArtifact)
+        [IO.File]::WriteAllText(
+            (Join-Path $firstArtifact 'test_output_first.cobertura.xml'),
+            '<coverage />',
+            [Text.UTF8Encoding]::new($false)
+        )
+        Write-ArtifactMetadata $firstArtifact 'test_output_first'
+        Assert-Throws `
+            { Invoke-ArtifactValidator $testCase.ReportDirectory $expectedArtifacts } `
+            'Missing: coverage_test_output_second'
+
+        $secondArtifact = Join-Path $testCase.ReportDirectory 'coverage_test_output_second'
+        [void] (New-Item -ItemType Directory -Path $secondArtifact)
+        [IO.File]::WriteAllText(
+            (Join-Path $secondArtifact 'test_output_second.cobertura.xml'),
+            '<coverage />',
+            [Text.UTF8Encoding]::new($false)
+        )
+        Write-ArtifactMetadata $secondArtifact 'test_output_second'
+        Invoke-ArtifactValidator $testCase.ReportDirectory $expectedArtifacts | Out-Null
+
+        $unexpectedArtifact = Join-Path $testCase.ReportDirectory 'coverage_test_output_unexpected'
+        [void] (New-Item -ItemType Directory -Path $unexpectedArtifact)
+        [IO.File]::WriteAllText(
+            (Join-Path $unexpectedArtifact 'test_output_unexpected.cobertura.xml'),
+            '<coverage />',
+            [Text.UTF8Encoding]::new($false)
+        )
+        Write-ArtifactMetadata $unexpectedArtifact 'test_output_unexpected'
+        Assert-Throws `
+            { Invoke-ArtifactValidator $testCase.ReportDirectory $expectedArtifacts } `
+            'Unexpected: coverage_test_output_unexpected'
+    }
+
+    Invoke-Test 'rejects coverage artifacts from different commits' {
+        $testCase = New-TestCase
+        $expectedArtifacts = Join-Path $testCase.Root 'expected.txt'
+        [IO.File]::WriteAllLines(
+            $expectedArtifacts,
+            @('test_output_first', 'test_output_second'),
+            [Text.UTF8Encoding]::new($false)
+        )
+        foreach ($coverageId in 'test_output_first', 'test_output_second') {
+            $artifact = Join-Path $testCase.ReportDirectory "coverage_$coverageId"
+            [void] (New-Item -ItemType Directory -Path $artifact)
+            [IO.File]::WriteAllText(
+                (Join-Path $artifact "$coverageId.cobertura.xml"),
+                '<coverage />',
+                [Text.UTF8Encoding]::new($false)
+            )
+            $commitSha = if ($coverageId -eq 'test_output_first') {
+                '0123456789abcdef0123456789abcdef01234567'
+            } else {
+                '89abcdef0123456789abcdef0123456789abcdef'
+            }
+            Write-ArtifactMetadata $artifact $coverageId $commitSha
+        }
+
+        Assert-Throws `
+            { Invoke-ArtifactValidator $testCase.ReportDirectory $expectedArtifacts } `
+            'reference multiple tested commits'
+    }
+
+    Invoke-Test 'merges coverage only in the trusted reporting workflow' {
+        $ciWorkflow = Get-Content -Raw -LiteralPath $workflowPath
+        $reportingWorkflow = Get-Content -Raw -LiteralPath $testResultsWorkflowPath
+        Assert-Equal 0 ([regex]::Matches($ciWorkflow, 'dotnet-coverage merge')).Count 'Pull request code must not merge its own coverage.'
+        Assert-Matches `
+            $reportingWorkflow `
+            '(?s)Checkout trusted reporter.*?Validate coverage matrix.*?Verify tested commit.*?Checkout covered source.*?Merge coverage.*?Summarize coverage' `
+            'Trusted reporting must validate raw reports against the covered source before summarizing.'
+        Assert-Matches `
+            $reportingWorkflow `
+            'github\.event\.workflow_run\.conclusion == ''success''' `
+            'Coverage reporting must require a successful complete CI run.'
+        Assert-Matches `
+            $reportingWorkflow `
+            'conclusion: "success"' `
+            'Coverage comparison must remain report-only during calibration.'
+        Assert-Matches `
+            $reportingWorkflow `
+            'branch coverage: \$BRANCH_RATE' `
+            'The coverage check must publish canonical branch coverage.'
+    }
+
+    Invoke-Test 'requires every successful test job to upload coverage' {
+        $archiveTestResultsAction = Get-Content -Raw -LiteralPath $archiveTestResultsActionPath
         Assert-Matches `
             $archiveTestResultsAction `
             'if-no-files-found: error' `
             'Each successful pull request test job must publish coverage.'
         Assert-Matches `
             $archiveTestResultsAction `
-            'path: TestResults/\$\{\{ inputs\.name \}\}\.cobertura\.xml' `
+            '(?s)path:\s*\|.*?TestResults/\$\{\{ inputs\.name \}\}\.cobertura\.xml.*?TestResults/\$\{\{ inputs\.name \}\}\.coverage\.json' `
             'Each test job must publish its exact coverage report.'
         Assert-Equal 4 ([regex]::Matches($archiveTestResultsAction, 'uses: actions/upload-artifact@')).Count 'Artifact upload attempt count differs.'
         Assert-Equal 2 ([regex]::Matches($archiveTestResultsAction, 'run: Start-Sleep -Seconds 30')).Count 'Artifact upload retry delay count differs.'

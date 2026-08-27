@@ -11,6 +11,9 @@ permissions:
   contents: read
   actions: read
 
+env:
+  DOTNET_COVERAGE_VERSION: 18.5.2
+
 jobs:
   report:
     name: Report test results
@@ -67,13 +70,55 @@ jobs:
       - name: Test coverage reporting
         shell: pwsh
         run: ./.github/scripts/test-summarize-coverage.ps1
+      - name: Setup .NET
+        uses: actions/setup-dotnet@c2fa09f4bde5ebb9d1777cf28262a3eb3db3ced7 # v5
+        with:
+          global-json-file: global.json
+      - uses: ./.github/actions/setup-coverage
       - name: Download coverage
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
           github-token: ${{ github.token }}
-          name: coverage_output
-          path: coverage
+          path: coverage-data
+          pattern: coverage_test_output_*
           run-id: ${{ github.event.workflow_run.id }}
+      - name: Validate coverage matrix
+        id: coverage-matrix
+        shell: pwsh
+        run: |
+          ./.github/scripts/validate-coverage-artifacts.ps1 `
+            -ReportDirectory coverage-data `
+            -ExpectedArtifacts ./.github/coverage-artifacts.txt `
+            -JsonOutput coverage-matrix.json
+
+          $matrix = Get-Content -Raw -LiteralPath coverage-matrix.json | ConvertFrom-Json
+          "tested-sha=$($matrix.tested_sha)" >> $env:GITHUB_OUTPUT
+      - name: Verify tested commit
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+          HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
+          TESTED_SHA: ${{ steps.coverage-matrix.outputs.tested-sha }}
+        run: |
+          $commit = gh api "repos/$env:GITHUB_REPOSITORY/git/commits/$env:TESTED_SHA" | ConvertFrom-Json
+          $parents = @($commit.parents | ForEach-Object sha)
+          if ($commit.sha -ne $env:TESTED_SHA -or $parents.Count -ne 2 -or $parents -notcontains $env:HEAD_SHA) {
+            throw "Coverage commit $env:TESTED_SHA is not the tested merge commit for head $env:HEAD_SHA"
+          }
+      - name: Checkout covered source
+        uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
+        with:
+          path: coverage-source
+          persist-credentials: false
+          ref: ${{ steps.coverage-matrix.outputs.tested-sha }}
+          repository: ${{ github.repository }}
+          sparse-checkout: src
+      - name: Merge coverage
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force coverage | Out-Null
+          $reports = @(Get-ChildItem -LiteralPath coverage-data -Recurse -File -Filter '*.cobertura.xml' | ForEach-Object FullName)
+          dotnet-coverage merge @reports --output coverage/coverage.cobertura.xml --output-format cobertura --nologo
       - name: Summarize coverage
         id: coverage
         shell: pwsh
@@ -85,20 +130,24 @@ jobs:
         run: |
           ./.github/scripts/summarize-coverage.ps1 `
             -ReportDirectory coverage `
-            -SourceRoot "$env:GITHUB_WORKSPACE/src" `
+            -SourceRoot "$env:GITHUB_WORKSPACE/coverage-source/src" `
             -MarkdownOutput coverage-summary.md `
             -JsonOutput coverage-summary.json
 
           $coverage = Get-Content -Raw coverage-summary.json | ConvertFrom-Json
           $culture = [Globalization.CultureInfo]::InvariantCulture
           $coveredLines = $coverage.covered_lines.ToString('N0', $culture)
+          $coveredBranches = $coverage.covered_branches.ToString('N0', $culture)
           $totalLines = $coverage.total_lines.ToString('N0', $culture)
+          $totalBranches = $coverage.total_branches.ToString('N0', $culture)
           $sourceFiles = $coverage.source_files.ToString('N0', $culture)
           $comment = @(
             '<!-- orleans-code-coverage -->'
             '## Code coverage'
             ''
             ('**{0} line coverage** - **{1} / {2} lines**' -f $coverage.line_rate_display, $coveredLines, $totalLines)
+            ''
+            ('**{0} branch coverage** - **{1} / {2} branches**' -f $coverage.branch_rate_display, $coveredBranches, $totalBranches)
             ''
             '<details>'
             '<summary>Coverage details</summary>'
@@ -115,6 +164,7 @@ jobs:
           Set-Content -LiteralPath coverage-comment.md -Value $comment -Encoding utf8NoBOM
 
           Get-Content -Raw coverage-summary.md >> $env:GITHUB_STEP_SUMMARY
+          "branch-rate=$($coverage.branch_rate_display)" >> $env:GITHUB_OUTPUT
           "line-rate=$($coverage.line_rate_display)" >> $env:GITHUB_OUTPUT
       - name: Publish coverage check
         env:
@@ -122,13 +172,14 @@ jobs:
           EXTERNAL_ID: coverage-${{ github.event.workflow_run.id }}
           GH_TOKEN: ${{ github.token }}
           HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
+          BRANCH_RATE: ${{ steps.coverage.outputs.branch-rate }}
           LINE_RATE: ${{ steps.coverage.outputs.line-rate }}
         run: |
           jq -n \
            --arg details_url "$DETAILS_URL" \
            --arg external_id "$EXTERNAL_ID" \
            --arg head_sha "$HEAD_SHA" \
-           --arg title "Line coverage: $LINE_RATE" \
+           --arg title "Line coverage: $LINE_RATE, branch coverage: $BRANCH_RATE" \
            --rawfile summary coverage-summary.md \
            '{
              name: "Code Coverage",
