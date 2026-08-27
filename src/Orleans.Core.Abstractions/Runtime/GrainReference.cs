@@ -267,6 +267,18 @@ namespace Orleans.Runtime
         [NonSerialized]
         private readonly IdSpan _key;
 
+        [NonSerialized]
+        private object? _directoryCacheEntry;
+
+        internal object? DirectoryCacheEntry
+        {
+            get => Volatile.Read(ref _directoryCacheEntry);
+            set => Volatile.Write(ref _directoryCacheEntry, value);
+        }
+
+        internal void ClearDirectoryCacheEntry(object expected)
+            => Interlocked.CompareExchange(ref _directoryCacheEntry, null, expected);
+
         /// <summary>
         /// Gets the grain reference functionality which is shared by all grain references of a given type.
         /// </summary>

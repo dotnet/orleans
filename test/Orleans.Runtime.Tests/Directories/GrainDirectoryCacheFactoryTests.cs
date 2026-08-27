@@ -1,3 +1,4 @@
+using System.Reflection;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Time.Testing;
 using Orleans.Configuration;
@@ -256,4 +257,394 @@ public class GrainDirectoryCacheFactoryTests
 
         public void Dispose() => DisposeCalled = true;
     }
+
+    [Fact]
+    public async Task CreateGrainDirectoryCache_AddOrUpdateInvalidatesReplacedRouteHandle()
+    {
+        var (cache, entrySource) = CreateEntryCache();
+        var disposableCache = Assert.IsAssignableFrom<IAsyncDisposable>(cache);
+        var grainId = CreateGrainId();
+        var originalAddress = CreateGrainAddress(grainId, port: 11111);
+        var replacementAddress = CreateGrainAddress(grainId, port: 22222);
+        var originalTarget = CreateMessageTarget();
+        var replacementTarget = CreateMessageTarget();
+
+        try
+        {
+            cache.AddOrUpdate(originalAddress, version: 1);
+            var originalEntry = GetEntry(entrySource, grainId);
+            Assert.True(originalEntry.TrySetMessageTarget(originalTarget));
+
+            cache.AddOrUpdate(replacementAddress, version: 2);
+            var replacementEntry = GetEntry(entrySource, grainId);
+            Assert.True(replacementEntry.TrySetMessageTarget(replacementTarget));
+
+            Assert.NotSame(originalEntry, replacementEntry);
+            AssertInvalidEntry(originalEntry);
+            AssertMessageTarget(replacementEntry, replacementTarget);
+            Assert.True(cache.LookUp(grainId, out var result, out var version));
+            Assert.Equal(replacementAddress, result);
+            Assert.Equal(2, version);
+        }
+        finally
+        {
+            await disposableCache.DisposeAsync();
+        }
+    }
+
+    [Fact]
+    public async Task CreateGrainDirectoryCache_RemoveByGrainIdInvalidatesRouteHandle()
+    {
+        var (cache, entrySource) = CreateEntryCache();
+        var disposableCache = Assert.IsAssignableFrom<IAsyncDisposable>(cache);
+        var address = CreateGrainAddress(CreateGrainId(), port: 11111);
+        var target = CreateMessageTarget();
+
+        try
+        {
+            cache.AddOrUpdate(address, version: 3);
+            var entry = GetEntry(entrySource, address.GrainId);
+            Assert.True(entry.TrySetMessageTarget(target));
+
+            Assert.True(cache.Remove(address.GrainId));
+
+            AssertInvalidEntry(entry);
+            Assert.False(cache.LookUp(address.GrainId, out _, out _));
+            Assert.False(cache.Remove(address.GrainId));
+            AssertInvalidEntry(entry);
+        }
+        finally
+        {
+            await disposableCache.DisposeAsync();
+        }
+    }
+
+    [Fact]
+    public async Task CreateGrainDirectoryCache_RemoveByAddressInvalidatesOnlyMatchingRouteHandle()
+    {
+        var (cache, entrySource) = CreateEntryCache();
+        var disposableCache = Assert.IsAssignableFrom<IAsyncDisposable>(cache);
+        var grainId = CreateGrainId();
+        var address = CreateGrainAddress(grainId, port: 11111);
+        var mismatchedAddress = CreateGrainAddress(grainId, port: 22222);
+        var controlAddress = CreateGrainAddress(CreateGrainId(), port: 33333);
+        var target = CreateMessageTarget();
+        var controlTarget = CreateMessageTarget();
+
+        try
+        {
+            cache.AddOrUpdate(address, version: 4);
+            cache.AddOrUpdate(controlAddress, version: 5);
+            var entry = GetEntry(entrySource, grainId);
+            var controlEntry = GetEntry(entrySource, controlAddress.GrainId);
+            Assert.True(entry.TrySetMessageTarget(target));
+            Assert.True(controlEntry.TrySetMessageTarget(controlTarget));
+
+            Assert.False(cache.Remove(mismatchedAddress));
+            AssertMessageTarget(entry, target);
+            Assert.True(cache.LookUp(grainId, out var retainedAddress, out var retainedVersion));
+            Assert.Equal(address, retainedAddress);
+            Assert.Equal(4, retainedVersion);
+
+            Assert.True(cache.Remove(address));
+
+            AssertInvalidEntry(entry);
+            Assert.False(cache.LookUp(grainId, out _, out _));
+            AssertMessageTarget(controlEntry, controlTarget);
+            Assert.True(cache.LookUp(controlAddress.GrainId, out var controlResult, out var controlVersion));
+            Assert.Equal(controlAddress, controlResult);
+            Assert.Equal(5, controlVersion);
+        }
+        finally
+        {
+            await disposableCache.DisposeAsync();
+        }
+    }
+
+    [Fact]
+    public async Task CreateGrainDirectoryCache_ClearInvalidatesAllRouteHandles()
+    {
+        var (cache, entrySource) = CreateEntryCache();
+        var disposableCache = Assert.IsAssignableFrom<IAsyncDisposable>(cache);
+        var addresses = new[]
+        {
+            CreateGrainAddress(CreateGrainId(), port: 11111),
+            CreateGrainAddress(CreateGrainId(), port: 22222),
+            CreateGrainAddress(CreateGrainId(), port: 33333)
+        };
+        var entries = new GrainDirectoryCacheEntry[addresses.Length];
+
+        try
+        {
+            for (var i = 0; i < addresses.Length; i++)
+            {
+                cache.AddOrUpdate(addresses[i], version: i + 1);
+                entries[i] = GetEntry(entrySource, addresses[i].GrainId);
+                Assert.True(entries[i].TrySetMessageTarget(CreateMessageTarget()));
+            }
+
+            cache.Clear();
+
+            Assert.Empty(cache.KeyValues);
+            for (var i = 0; i < addresses.Length; i++)
+            {
+                AssertInvalidEntry(entries[i]);
+                Assert.False(cache.LookUp(addresses[i].GrainId, out _, out _));
+            }
+
+            cache.Clear();
+            Assert.Empty(cache.KeyValues);
+            foreach (var entry in entries)
+            {
+                AssertInvalidEntry(entry);
+            }
+        }
+        finally
+        {
+            await disposableCache.DisposeAsync();
+        }
+    }
+
+    [Fact]
+    public async Task CreateGrainDirectoryCache_ExpirationInvalidatesRouteHandle()
+    {
+        var timeProvider = new FakeTimeProvider();
+        var timeToLive = TimeSpan.FromMinutes(1);
+        var (cache, entrySource) = CreateEntryCache(cacheSize: 10, timeToLive, timeProvider);
+        var disposableCache = Assert.IsAssignableFrom<IAsyncDisposable>(cache);
+        using var listener = new ConcurrentLruCacheExpirationCleanupListener(cache);
+        var expiredAddress = CreateGrainAddress(CreateGrainId(), port: 11111);
+        var freshAddress = CreateGrainAddress(CreateGrainId(), port: 22222);
+
+        try
+        {
+            cache.AddOrUpdate(expiredAddress, version: 6);
+            var expiredEntry = GetEntry(entrySource, expiredAddress.GrainId);
+            Assert.True(expiredEntry.TrySetMessageTarget(CreateMessageTarget()));
+
+            timeProvider.Advance(timeToLive);
+            Assert.Equal(0, await listener.WaitForCleanupAsync());
+
+            cache.AddOrUpdate(freshAddress, version: 7);
+            var freshEntry = GetEntry(entrySource, freshAddress.GrainId);
+            var freshTarget = CreateMessageTarget();
+            Assert.True(freshEntry.TrySetMessageTarget(freshTarget));
+
+            timeProvider.Advance(timeToLive);
+            Assert.Equal(1, await listener.WaitForCleanupAsync());
+
+            AssertInvalidEntry(expiredEntry);
+            Assert.False(cache.LookUp(expiredAddress.GrainId, out _, out _));
+            AssertMessageTarget(freshEntry, freshTarget);
+            Assert.True(cache.LookUp(freshAddress.GrainId, out var result, out var version));
+            Assert.Equal(freshAddress, result);
+            Assert.Equal(7, version);
+        }
+        finally
+        {
+            await disposableCache.DisposeAsync();
+        }
+    }
+
+    [Fact]
+    public async Task CreateGrainDirectoryCache_EvictionInvalidatesRouteHandle()
+    {
+        var (cache, entrySource) = CreateEntryCache(cacheSize: 3);
+        var disposableCache = Assert.IsAssignableFrom<IAsyncDisposable>(cache);
+        var lruCache = Assert.IsType<LruGrainDirectoryCache>(cache);
+        var addresses = new[]
+        {
+            CreateGrainAddress(CreateGrainId(), port: 11111),
+            CreateGrainAddress(CreateGrainId(), port: 22222),
+            CreateGrainAddress(CreateGrainId(), port: 33333),
+            CreateGrainAddress(CreateGrainId(), port: 44444)
+        };
+        var entries = new GrainDirectoryCacheEntry[addresses.Length];
+        var targets = new IGrainContext[addresses.Length];
+
+        try
+        {
+            for (var i = 0; i < entries.Length; i++)
+            {
+                entries[i] = new GrainDirectoryCacheEntry(addresses[i], version: i + 1);
+                targets[i] = CreateMessageTarget();
+                Assert.True(entries[i].TrySetMessageTarget(targets[i]));
+            }
+
+            for (var i = 0; i < 3; i++)
+            {
+                lruCache.AddOrUpdate(addresses[i].GrainId, entries[i]);
+            }
+
+            lruCache.AddOrUpdate(addresses[3].GrainId, entries[3]);
+
+            AssertInvalidEntry(entries[0]);
+            Assert.False(entrySource.TryGetEntry(addresses[0].GrainId, out _));
+            for (var i = 1; i < entries.Length; i++)
+            {
+                Assert.Same(entries[i], GetEntry(entrySource, addresses[i].GrainId));
+                AssertMessageTarget(entries[i], targets[i]);
+                Assert.True(cache.LookUp(addresses[i].GrainId, out var result, out var version));
+                Assert.Equal(addresses[i], result);
+                Assert.Equal(i + 1, version);
+            }
+
+            Assert.Equal(3, cache.KeyValues.Count());
+        }
+        finally
+        {
+            await disposableCache.DisposeAsync();
+        }
+    }
+
+    [Fact]
+    public void GrainDirectoryCacheEntry_DisposedEntryCannotBindMessageTarget()
+    {
+        var address = CreateGrainAddress(CreateGrainId(), port: 11111);
+        var entry = new GrainDirectoryCacheEntry(address, version: 8);
+
+        entry.Dispose();
+
+        AssertInvalidEntry(entry);
+        Assert.Equal(address, entry.Address);
+        Assert.Equal(8, entry.Version);
+    }
+
+    [Fact]
+    public void GrainDirectoryCacheEntry_SecondTargetCannotReplaceBoundTarget()
+    {
+        var entry = new GrainDirectoryCacheEntry(CreateGrainAddress(CreateGrainId(), port: 11111), version: 9);
+        var originalTarget = CreateMessageTarget();
+
+        Assert.True(entry.TrySetMessageTarget(originalTarget));
+        Assert.False(entry.TrySetMessageTarget(CreateMessageTarget()));
+        AssertMessageTarget(entry, originalTarget);
+    }
+
+    [Fact]
+    public void GrainDirectoryCacheEntry_ClearRequiresBoundTargetIdentity()
+    {
+        var entry = new GrainDirectoryCacheEntry(CreateGrainAddress(CreateGrainId(), port: 11111), version: 10);
+        var originalTarget = CreateMessageTarget();
+        var replacementTarget = CreateMessageTarget();
+        Assert.True(entry.TrySetMessageTarget(originalTarget));
+
+        entry.ClearMessageTarget(CreateMessageTarget());
+        AssertMessageTarget(entry, originalTarget);
+
+        entry.ClearMessageTarget(originalTarget);
+        Assert.False(entry.TryGetMessageTarget(out _));
+        Assert.True(entry.TrySetMessageTarget(replacementTarget));
+        AssertMessageTarget(entry, replacementTarget);
+    }
+
+    [Fact]
+    public async Task CreateGrainDirectoryCache_RemoveByGrainIdReleasesMessageTargetReference()
+    {
+        var (cache, entrySource) = CreateEntryCache();
+        var disposableCache = Assert.IsAssignableFrom<IAsyncDisposable>(cache);
+        var address = CreateGrainAddress(CreateGrainId(), port: 11111);
+
+        try
+        {
+            cache.AddOrUpdate(address, version: 9);
+            var entry = GetEntry(entrySource, address.GrainId);
+            var targetReference = BindMessageTarget(entry);
+
+            Assert.True(cache.Remove(address.GrainId));
+            AssertInvalidEntry(entry);
+            AssertEventuallyCollected(targetReference);
+        }
+        finally
+        {
+            await disposableCache.DisposeAsync();
+        }
+    }
+
+    private static (IGrainDirectoryCache Cache, IGrainDirectoryCacheEntrySource EntrySource) CreateEntryCache(
+        int cacheSize = 10,
+        TimeSpan? timeToLive = null,
+        FakeTimeProvider? timeProvider = null)
+    {
+        var services = new ServiceCollection();
+        if (timeProvider is not null)
+        {
+            services.AddKeyedSingleton<TimeProvider>(TimeProviderNames.GrainDirectory, timeProvider);
+        }
+
+        var cache = GrainDirectoryCacheFactory.CreateGrainDirectoryCache(
+            services.BuildServiceProvider(),
+            new GrainDirectoryOptions
+            {
+                CacheSize = cacheSize,
+                MaximumCacheTTL = timeToLive ?? TimeSpan.FromHours(1)
+            });
+
+        return (cache, Assert.IsAssignableFrom<IGrainDirectoryCacheEntrySource>(cache));
+    }
+
+    private static GrainDirectoryCacheEntry GetEntry(IGrainDirectoryCacheEntrySource entrySource, GrainId grainId)
+    {
+        Assert.True(entrySource.TryGetEntry(grainId, out var entry));
+        return Assert.IsType<GrainDirectoryCacheEntry>(entry);
+    }
+
+    private static void AssertMessageTarget(GrainDirectoryCacheEntry entry, IGrainContext expected)
+    {
+        Assert.True(entry.IsValid);
+        Assert.True(entry.TryGetMessageTarget(out var actual));
+        Assert.Same(expected, actual);
+    }
+
+    private static void AssertInvalidEntry(GrainDirectoryCacheEntry entry)
+    {
+        Assert.False(entry.IsValid);
+        Assert.False(entry.TryGetMessageTarget(out var actual));
+        Assert.Null(actual);
+        Assert.False(entry.TrySetMessageTarget(CreateMessageTarget()));
+    }
+
+    [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.NoInlining)]
+    private static WeakReference<IGrainContext> BindMessageTarget(GrainDirectoryCacheEntry entry)
+    {
+        var target = CreateMessageTarget();
+        Assert.True(entry.TrySetMessageTarget(target));
+        return new WeakReference<IGrainContext>(target);
+    }
+
+    [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.NoInlining)]
+    private static void AssertEventuallyCollected(WeakReference<IGrainContext> targetReference)
+    {
+        for (var attempt = 0; attempt < 3; attempt++)
+        {
+            GC.Collect();
+            GC.WaitForPendingFinalizers();
+            GC.Collect();
+
+            if (!targetReference.TryGetTarget(out _))
+            {
+                return;
+            }
+        }
+
+        Assert.False(targetReference.TryGetTarget(out _));
+    }
+
+    private static GrainId CreateGrainId() => GrainId.Parse($"user/{Guid.NewGuid():N}");
+
+    private static IGrainContext CreateMessageTarget() => DispatchProxy.Create<IGrainContext, GrainContextProxy>();
+
+    private class GrainContextProxy : DispatchProxy
+    {
+        protected override object? Invoke(MethodInfo? targetMethod, object?[]? args)
+            => targetMethod?.ReturnType.IsValueType == true ? Activator.CreateInstance(targetMethod.ReturnType) : null;
+    }
+
+    private static GrainAddress CreateGrainAddress(GrainId grainId, int port) => new()
+    {
+        ActivationId = ActivationId.NewId(),
+        GrainId = grainId,
+        SiloAddress = SiloAddress.FromParsableString($"127.0.0.1:{port}@1"),
+        MembershipVersion = new MembershipVersion(1)
+    };
 }

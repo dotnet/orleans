@@ -836,6 +836,19 @@ namespace Orleans.Runtime.GrainDirectory
             return IsDefunctActivation(cache, clusterMembershipService.CurrentSnapshot) ? null : cache;
         }
 
+        internal bool TryGetCacheEntry(GrainId grainId, SiloAddress siloAddress, [NotNullWhen(true)] out GrainDirectoryCacheEntry? entry)
+        {
+            if (DirectoryCache is IGrainDirectoryCacheEntrySource entrySource
+                && entrySource.TryGetEntry(grainId, out entry)
+                && entry.Address.SiloAddress?.Equals(siloAddress) == true)
+            {
+                return true;
+            }
+
+            entry = null;
+            return false;
+        }
+
         public async Task<AddressAndTag> LookupAsync(GrainId grainId, int hopCount = 0)
         {
             if (hopCount > 0)

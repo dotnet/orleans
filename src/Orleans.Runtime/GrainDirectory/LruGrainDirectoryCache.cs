@@ -6,9 +6,9 @@ using Orleans.Caching;
 
 namespace Orleans.Runtime.GrainDirectory;
 
-internal sealed class LruGrainDirectoryCache : ConcurrentLruCache<GrainId, (GrainAddress ActivationAddress, int Version)>, IGrainDirectoryCache, IAsyncDisposable
+internal sealed class LruGrainDirectoryCache : ConcurrentLruCache<GrainId, GrainDirectoryCacheEntry>, IGrainDirectoryCache, IGrainDirectoryCacheEntrySource, IAsyncDisposable
 {
-    private static readonly Func<(GrainAddress Address, int Version), GrainAddress, bool> ActivationAddressesMatch = (value, state) => GrainAddress.MatchesGrainIdAndSilo(state, value.Address);
+    private static readonly Func<GrainDirectoryCacheEntry, GrainAddress, bool> ActivationAddressesMatch = (value, state) => GrainAddress.MatchesGrainIdAndSilo(state, value.Address);
     private readonly IDisposable _cacheSizeRegistration;
 
     public LruGrainDirectoryCache(
@@ -27,7 +27,7 @@ internal sealed class LruGrainDirectoryCache : ConcurrentLruCache<GrainId, (Grai
             : directoryInstruments.RegisterCacheSizeObserve(() => Count);
     }
 
-    public void AddOrUpdate(GrainAddress activationAddress, int version) => AddOrUpdate(activationAddress.GrainId, (activationAddress, version));
+    public void AddOrUpdate(GrainAddress activationAddress, int version) => AddOrUpdate(activationAddress.GrainId, new GrainDirectoryCacheEntry(activationAddress, version));
 
     public bool Remove(GrainId key) => TryRemove(key);
 
@@ -35,10 +35,10 @@ internal sealed class LruGrainDirectoryCache : ConcurrentLruCache<GrainId, (Grai
 
     public bool LookUp(GrainId key, [NotNullWhen(true)] out GrainAddress? result, out int version)
     {
-        if (TryGet(key, out var entry))
+        if (TryGetEntry(key, out var entry))
         {
             version = entry.Version;
-            result = entry.ActivationAddress;
+            result = entry.Address;
             return true;
         }
 
@@ -53,9 +53,23 @@ internal sealed class LruGrainDirectoryCache : ConcurrentLruCache<GrainId, (Grai
         {
             foreach (var entry in this)
             {
-                yield return (entry.Value.ActivationAddress, entry.Value.Version);
+                if (entry.Value.IsValid)
+                {
+                    yield return (entry.Value.Address, entry.Value.Version);
+                }
             }
         }
+    }
+
+    public bool TryGetEntry(GrainId key, [NotNullWhen(true)] out GrainDirectoryCacheEntry? entry)
+    {
+        if (TryGet(key, out entry) && entry.IsValid)
+        {
+            return true;
+        }
+
+        entry = null;
+        return false;
     }
 
     public new async ValueTask DisposeAsync()

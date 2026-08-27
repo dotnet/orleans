@@ -1,6 +1,8 @@
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Diagnostics.CodeAnalysis;
+using System.Runtime.CompilerServices;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -141,7 +143,11 @@ namespace Orleans.Runtime.Messaging
             get => this.sniffIncomingMessageHandler;
         }
 
-        public void SendMessage(Message msg)
+        public void SendMessage(Message msg) => SendMessage(msg, null);
+
+        private void SendMessage(
+            Message msg,
+            GrainDirectoryCacheEntry? directoryCacheEntry)
         {
             Debug.Assert(!msg.IsLocalOnly);
 
@@ -202,13 +208,13 @@ namespace Orleans.Runtime.Messaging
 
                 MessagingEvents.EmitSent(msg);
 
-                if (targetSilo.Matches(_siloAddress))
+                if (directoryCacheEntry is not null || targetSilo.Matches(_siloAddress))
                 {
                     LogTraceMessageLoopedBack(log, msg);
 
                     _messagingInstruments.LocalMessagesSentCounterAggregator.Add(1);
 
-                    this.ReceiveMessage(msg);
+                    this.ReceiveMessage(msg, directoryCacheEntry);
                 }
                 else
                 {
@@ -240,7 +246,10 @@ namespace Orleans.Runtime.Messaging
                         {
                             _ = SendAsync(this, connectionTask, msg);
 
-                            static async Task SendAsync(MessageCenter messageCenter, ValueTask<Connection> connectionTask, Message msg)
+                            static async Task SendAsync(
+                                MessageCenter messageCenter,
+                                ValueTask<Connection> connectionTask,
+                                Message msg)
                             {
                                 try
                                 {
@@ -479,17 +488,24 @@ namespace Orleans.Runtime.Messaging
         /// - add ordering info and maintain send order
         ///
         /// </summary>
-        internal Task AddressAndSendMessage(Message message)
+        internal Task AddressAndSendMessage(Message message, GrainReference? target = null)
         {
             try
             {
-                var messageAddressingTask = placementService.AddressMessage(message);
-                if (messageAddressingTask.Status != TaskStatus.RanToCompletion)
+                if (TryGetDirectoryCacheEntry(target, message, out var directoryCacheEntry))
                 {
-                    return SendMessageAsync(messageAddressingTask, message);
+                    message.TargetSilo = _siloAddress;
+                    SendMessage(message, directoryCacheEntry);
+                    return Task.CompletedTask;
                 }
 
-                SendMessage(message);
+                var messageAddressingTask = placementService.AddressMessage(message);
+                if (!messageAddressingTask.IsCompletedSuccessfully)
+                {
+                    return SendMessageAsync(messageAddressingTask, message, target);
+                }
+
+                SendMessage(message, CaptureDirectoryCacheEntry(target, message));
             }
             catch (Exception ex)
             {
@@ -498,7 +514,7 @@ namespace Orleans.Runtime.Messaging
 
             return Task.CompletedTask;
 
-            async Task SendMessageAsync(Task addressMessageTask, Message m)
+            async Task SendMessageAsync(Task addressMessageTask, Message m, GrainReference? target)
             {
                 try
                 {
@@ -510,7 +526,7 @@ namespace Orleans.Runtime.Messaging
                     return;
                 }
 
-                SendMessage(m);
+                SendMessage(m, CaptureDirectoryCacheEntry(target, m));
             }
 
             void OnAddressingFailure(Message m, Exception ex)
@@ -518,6 +534,51 @@ namespace Orleans.Runtime.Messaging
                 this.messagingTrace.OnDispatcherSelectTargetFailed(m, ex);
                 RejectMessage(m, Message.RejectionTypes.Unrecoverable, ex);
             }
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        internal bool TryGetDirectoryCacheEntry(
+            GrainReference? target,
+            Message message,
+            [NotNullWhen(true)] out GrainDirectoryCacheEntry? entry)
+        {
+            if (target?.DirectoryCacheEntry is not GrainDirectoryCacheEntry candidate)
+            {
+                entry = null;
+                return false;
+            }
+
+            if (message.CacheInvalidationHeader is null && candidate.IsValid)
+            {
+                Debug.Assert(candidate.Address.GrainId.Equals(message.TargetGrain));
+                Debug.Assert(candidate.Address.SiloAddress?.Matches(_siloAddress) == true);
+                entry = candidate;
+                return true;
+            }
+
+            if (!candidate.IsValid)
+            {
+                target.ClearDirectoryCacheEntry(candidate);
+            }
+
+            entry = null;
+            return false;
+        }
+
+        private GrainDirectoryCacheEntry? CaptureDirectoryCacheEntry(GrainReference? target, Message message)
+        {
+            if (target is null
+                || message.CacheInvalidationHeader is not null
+                || message.TargetSilo is not { } targetSilo
+                || !targetSilo.Matches(_siloAddress)
+                || !placementService.IsUsingGrainDirectory(message.TargetGrain)
+                || !_grainLocator.TryGetCacheEntry(message.TargetGrain, targetSilo, out var entry))
+            {
+                return null;
+            }
+
+            target.DirectoryCacheEntry = entry;
+            return entry;
         }
 
         internal void SendResponse(Message request, Response response)
@@ -534,7 +595,9 @@ namespace Orleans.Runtime.Messaging
             SendMessage(message);
         }
 
-        public void ReceiveMessage(Message msg)
+        public void ReceiveMessage(Message msg) => ReceiveMessage(msg, null);
+
+        private void ReceiveMessage(Message msg, GrainDirectoryCacheEntry? directoryCacheEntry)
         {
             Debug.Assert(!msg.IsLocalOnly);
             try
@@ -550,10 +613,21 @@ namespace Orleans.Runtime.Messaging
                 }
                 else
                 {
-                    var targetActivation = catalog.GetOrCreateActivation(
-                        msg.TargetGrain,
-                        msg.RequestContextData,
-                        rehydrationContext: null);
+                    IGrainContext? targetActivation = GetCachedActivation(directoryCacheEntry);
+                    if (targetActivation is null)
+                    {
+                        targetActivation = catalog.GetOrCreateActivation(
+                            msg.TargetGrain,
+                            msg.RequestContextData,
+                            rehydrationContext: null);
+
+                        if (targetActivation is ActivationData { IsValid: true } activation
+                            && directoryCacheEntry is { } entry
+                            && entry.Address.Matches(activation.Address))
+                        {
+                            entry.TrySetMessageTarget(activation);
+                        }
+                    }
 
                     if (targetActivation is null)
                     {
@@ -577,6 +651,23 @@ namespace Orleans.Runtime.Messaging
 
                 this.RejectMessage(msg, Message.RejectionTypes.Transient, ex);
             }
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private static ActivationData? GetCachedActivation(GrainDirectoryCacheEntry? directoryCacheEntry)
+        {
+            if (directoryCacheEntry?.TryGetMessageTarget(out var target) == true
+                && target is ActivationData activation)
+            {
+                if (activation.IsValid)
+                {
+                    return activation;
+                }
+
+                directoryCacheEntry.ClearMessageTarget(activation);
+            }
+
+            return null;
         }
 
         private void ProcessMessageToNonExistentActivation(Message msg)

@@ -107,7 +107,13 @@ namespace Orleans.Runtime
             }
 
             var interfaceType = this.interfaceTypeResolver.GetGrainInterfaceType(grainInterface);
-            return this.referenceActivator.CreateReference(grainId, interfaceType);
+            var result = this.referenceActivator.CreateReference(grainId, interfaceType);
+            if (grain is GrainReference source)
+            {
+                result.DirectoryCacheEntry = source.DirectoryCacheEntry;
+            }
+
+            return result;
         }
 
         /// <summary>
