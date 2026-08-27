@@ -1,7 +1,7 @@
 ---
 title: "ORLEANS0017: Grain interface version mismatch"
 description: Understand and resolve ORLEANS0017 when a grain interface version differs from OrleansContracts.txt.
-ms.date: 08/25/2026
+ms.date: 08/27/2026
 ms.topic: reference
 ---
 
@@ -24,6 +24,8 @@ The manifest no longer describes the numeric version used by runtime compatibili
 ## How to fix
 
 Determine whether the source or manifest changed unintentionally. Restore the previous source version, or review the rolling-upgrade implications and apply **Update version in OrleansContracts.txt** when the new version is intentional.
+
+Apply **Regenerate OrleansContracts.txt** to rebuild the complete project manifest, or use **Fix all in solution** to update every affected project. Review the generated diff using the [contract compatibility guidance](../grains/grain-versioning/contract-compatibility-analyzer.md#regenerate-the-manifest).
 
 ## Suppress the diagnostic
 

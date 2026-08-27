@@ -1,7 +1,7 @@
 ---
 title: "ORLEANS0021: Duplicate grain interface declaration"
 description: Understand and resolve ORLEANS0021 when OrleansContracts.txt declares an interface identity more than once.
-ms.date: 08/25/2026
+ms.date: 08/27/2026
 ms.topic: reference
 ---
 
@@ -15,7 +15,7 @@ ms.topic: reference
 
 ## Cause
 
-`OrleansContracts.txt` repeats an interface CLR name or a non-empty `GrainInterfaceType`, including active and retired declarations with the same identity.
+`OrleansContracts.txt` repeats an effective interface identity. The effective identity is `GrainInterfaceType` when present and the identity derived from the recorded CLR name using Orleans conventions for a legacy declaration.
 
 ## Impact
 
@@ -23,7 +23,7 @@ The manifest is ambiguous. The parser retains the first declaration, so compatib
 
 ## How to fix
 
-Merge the declarations into one canonical entry. Keep one active declaration when the interface exists, or one retired declaration when it has been removed.
+Merge declarations which have the same effective identity into one canonical entry. Active and retired declarations can share a CLR name when they record different explicit `GrainInterfaceType` values across an identity migration.
 
 ## Suppress the diagnostic
 

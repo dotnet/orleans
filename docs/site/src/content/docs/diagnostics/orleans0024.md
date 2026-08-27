@@ -1,7 +1,7 @@
 ---
 title: "ORLEANS0024: Removed grain class is not retired"
 description: Understand and resolve ORLEANS0024 when OrleansContracts.txt contains an active grain class that source no longer defines.
-ms.date: 08/25/2026
+ms.date: 08/27/2026
 ms.topic: reference
 ---
 
@@ -24,6 +24,8 @@ The removal or identity-changing rename is not recorded, and the old grain ident
 ## How to fix
 
 Restore the class if its removal was accidental. Otherwise apply **Mark grain class as *RETIRED* in OrleansContracts.txt** and preserve the declaration.
+
+Apply **Regenerate OrleansContracts.txt** to rebuild the complete project manifest and retire every declaration absent from source, or use **Fix all in solution** to update every affected project. Review the generated diff using the [contract compatibility guidance](../grains/grain-versioning/contract-compatibility-analyzer.md#regenerate-the-manifest).
 
 ## Suppress the diagnostic
 

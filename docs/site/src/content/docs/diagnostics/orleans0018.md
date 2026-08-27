@@ -1,7 +1,7 @@
 ---
 title: "ORLEANS0018: Grain interface member not declared"
 description: Understand and resolve ORLEANS0018 when an RPC method signature is missing from OrleansContracts.txt.
-ms.date: 08/25/2026
+ms.date: 08/27/2026
 ms.topic: reference
 ---
 
@@ -24,6 +24,8 @@ Older activations can receive an unknown RPC, and changed identities or payload 
 ## How to fix
 
 Prefer preserving the existing method and adding a new method for changed behavior. Review payload compatibility, increment the interface version when appropriate, and apply **Add to OrleansContracts.txt**. The code fix records the new signature but does not increment `[Version]`.
+
+Apply **Regenerate OrleansContracts.txt** to rebuild the complete project manifest, or use **Fix all in solution** to update every affected project. Review the generated diff using the [contract compatibility guidance](../grains/grain-versioning/contract-compatibility-analyzer.md#regenerate-the-manifest).
 
 ## Suppress the diagnostic
 

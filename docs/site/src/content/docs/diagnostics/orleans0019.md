@@ -1,7 +1,7 @@
 ---
 title: "ORLEANS0019: Removed grain interface is not retired"
 description: Understand and resolve ORLEANS0019 when OrleansContracts.txt contains an active interface that source no longer defines.
-ms.date: 08/25/2026
+ms.date: 08/27/2026
 ms.topic: reference
 ---
 
@@ -24,6 +24,8 @@ The deletion or identity-changing rename is not recorded as intentional, and the
 ## How to fix
 
 Restore the interface if its removal was accidental. Otherwise apply **Mark as *RETIRED* in OrleansContracts.txt**. Preserve retired declarations as contract history.
+
+Apply **Regenerate OrleansContracts.txt** to rebuild the complete project manifest and retire every declaration absent from source, or use **Fix all in solution** to update every affected project. Review the generated diff using the [contract compatibility guidance](../grains/grain-versioning/contract-compatibility-analyzer.md#regenerate-the-manifest).
 
 ## Suppress the diagnostic
 

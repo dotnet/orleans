@@ -1,7 +1,7 @@
 ---
 title: "ORLEANS0022: Grain class is not active in OrleansContracts.txt"
 description: Understand and resolve ORLEANS0022 when a concrete grain class is missing or retired in the contract manifest.
-ms.date: 08/25/2026
+ms.date: 08/27/2026
 ms.topic: reference
 ---
 
@@ -24,6 +24,8 @@ The implementation identity is not protected by contract review. A CLR rename wi
 ## How to fix
 
 Verify the class's durable grain type, add `[GrainType]` when it must remain independent of the CLR name, and apply **Add to OrleansContracts.txt**. The code fix adds or reactivates the class declaration.
+
+Apply **Regenerate OrleansContracts.txt** to rebuild the complete project manifest, or use **Fix all in solution** to update every affected project. Review the generated diff using the [contract compatibility guidance](../grains/grain-versioning/contract-compatibility-analyzer.md#regenerate-the-manifest).
 
 ## Suppress the diagnostic
 
