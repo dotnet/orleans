@@ -634,6 +634,138 @@ public class MessageTransportLifecycleTests
     }
 
     [Fact]
+    public async Task SocketMessageTransport_LinuxIoUring_ConcurrentConnectionsRoundTripData()
+    {
+        if (!OperatingSystem.IsLinux()
+            || !string.Equals(
+                Environment.GetEnvironmentVariable("ORLEANS_TEST_IO_URING"),
+                "1",
+                StringComparison.Ordinal))
+        {
+            return;
+        }
+
+        const int ConnectionCount = 8;
+        const int IterationCount = 4;
+        const int PayloadSize = (32 * 1024) + 17;
+        using var listener = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
+        listener.Bind(new IPEndPoint(IPAddress.Loopback, 0));
+        listener.Listen(ConnectionCount);
+        var transports = new SocketMessageTransport[ConnectionCount];
+        var serverSockets = new Socket[ConnectionCount];
+
+        try
+        {
+            for (var i = 0; i < ConnectionCount; i++)
+            {
+                var client = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
+                var connect = client.ConnectAsync(listener.LocalEndPoint!);
+                serverSockets[i] = await listener.AcceptAsync();
+                await connect;
+                transports[i] = new SocketMessageTransport(client, NullLogger.Instance, useLinuxIoUring: true);
+                transports[i].Start();
+            }
+
+            var tasks = new Task[ConnectionCount];
+            for (var i = 0; i < tasks.Length; i++)
+            {
+                tasks[i] = RunConnection(transports[i], serverSockets[i], i);
+            }
+
+            await Task.WhenAll(tasks).WaitAsync(TimeSpan.FromSeconds(30));
+        }
+        finally
+        {
+            for (var i = 0; i < transports.Length; i++)
+            {
+                if (transports[i] is { } transport)
+                {
+                    await transport.CloseAsync(null);
+                    await transport.DisposeAsync();
+                }
+
+                serverSockets[i]?.Dispose();
+            }
+        }
+
+        static async Task RunConnection(SocketMessageTransport transport, Socket server, int connectionId)
+        {
+            for (var iteration = 0; iteration < IterationCount; iteration++)
+            {
+                var payload = GC.AllocateUninitializedArray<byte>(PayloadSize);
+                for (var i = 0; i < payload.Length; i++)
+                {
+                    payload[i] = (byte)(i + connectionId + iteration);
+                }
+
+                using var writeRequest = new BufferedWriteRequest(payload, useMultipleBuffers: true);
+                using var readRequest = new FixedLengthReadRequest(payload.Length);
+                Assert.True(transport.EnqueueWrite(writeRequest));
+                var receivedByServer = new byte[payload.Length];
+                await ReceiveExactly(server, receivedByServer);
+                await writeRequest.Completion;
+                Assert.Equal(payload, receivedByServer);
+
+                Assert.True(transport.EnqueueRead(readRequest));
+                await SendExactly(server, payload);
+                var receivedByTransport = await readRequest.Completion;
+                Assert.Equal(payload, receivedByTransport);
+            }
+        }
+
+        static async Task ReceiveExactly(Socket socket, Memory<byte> buffer)
+        {
+            while (!buffer.IsEmpty)
+            {
+                var length = await socket.ReceiveAsync(buffer);
+                Assert.NotEqual(0, length);
+                buffer = buffer[length..];
+            }
+        }
+
+        static async Task SendExactly(Socket socket, ReadOnlyMemory<byte> buffer)
+        {
+            while (!buffer.IsEmpty)
+            {
+                var length = await socket.SendAsync(buffer);
+                Assert.NotEqual(0, length);
+                buffer = buffer[length..];
+            }
+        }
+    }
+
+    [Fact]
+    public async Task LinuxIoUringOperation_DisposeWhilePending_Throws()
+    {
+        if (!OperatingSystem.IsLinux()
+            || !string.Equals(
+                Environment.GetEnvironmentVariable("ORLEANS_TEST_IO_URING"),
+                "1",
+                StringComparison.Ordinal))
+        {
+            return;
+        }
+
+        using var listener = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
+        listener.Bind(new IPEndPoint(IPAddress.Loopback, 0));
+        listener.Listen(1);
+        using var client = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
+        var connect = client.ConnectAsync(listener.LocalEndPoint!);
+        using var server = await listener.AcceptAsync();
+        await connect;
+        using var receiver = new LinuxIoUringSocketReceiver();
+        var buffer = GC.AllocateUninitializedArray<byte>(32, pinned: true);
+
+        var receive = receiver.ReceiveAsync(client, [new ArraySegment<byte>(buffer)]);
+        Assert.Throws<InvalidOperationException>(receiver.Dispose);
+        Assert.Equal(1, await server.SendAsync(new byte[] { 42 }));
+        await receive;
+
+        Assert.Equal(1, receiver.BytesTransferred);
+        Assert.Equal(42, buffer[0]);
+    }
+
+    [Fact]
     public async Task StreamMessageTransport_WriteFailure_WakesIdleReadLoop()
     {
         await using var transport = new TestStreamMessageTransport(new FailingWriteStream());
