@@ -2574,6 +2574,16 @@ namespace UnitTests.StreamingTests
             Assert.True(v1DerivedPeer.Equals(v1Derived));
             Assert.Equal(0, v1Derived.CompareTo(v1DerivedPeer));
             Assert.Equal(v1Derived.GetHashCode(), v1DerivedPeer.GetHashCode());
+
+            var v2EventToken = Assert.IsType<DerivedEventSequenceToken>(
+                ((DerivedEventSequenceToken)derivedToken).CreateSequenceTokenForEvent(3));
+            Assert.Equal(10, v2EventToken.SequenceNumber);
+            Assert.Equal(3, v2EventToken.EventIndex);
+
+            var v1EventToken = Assert.IsType<DerivedEventSequenceTokenV1>(
+                ((DerivedEventSequenceTokenV1)v1Derived).CreateSequenceTokenForEvent(3));
+            Assert.Equal(10, v1EventToken.SequenceNumber);
+            Assert.Equal(3, v1EventToken.EventIndex);
         }
 
         [TestSuite("BVT")]

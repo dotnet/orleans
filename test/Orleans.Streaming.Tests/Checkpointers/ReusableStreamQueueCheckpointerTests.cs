@@ -82,6 +82,25 @@ public sealed class ReusableStreamQueueCheckpointerTests : StreamQueueCheckpoint
         Assert.Equal("20", store.PersistedCheckpoint);
     }
 
+    [Fact]
+    public async Task ConditionalConflict_WithoutComparerAdoptsAuthoritativeCheckpoint()
+    {
+        var store = new BlockingAuthoritativeConflictStore();
+        var checkpointer = new StreamQueueCheckpointer(
+            store,
+            new StreamQueueCheckpointerOptions { CheckpointComparer = null });
+        Assert.Equal("10", await checkpointer.Load(CancellationToken.None));
+
+        checkpointer.Update("20", DateTime.UtcNow, CancellationToken.None);
+        await store.FirstUpdateStarted.Task;
+        checkpointer.Update("30", DateTime.UtcNow, CancellationToken.None);
+        store.ReleaseFirstUpdate.SetResult();
+        await checkpointer.FlushAsync(CancellationToken.None);
+
+        Assert.Equal(["20"], store.Attempts);
+        Assert.Equal("40", (await store.Load(CancellationToken.None)).Checkpoint);
+    }
+
     private sealed class TestCheckpointStore(ControllableCheckpointStore store) : IStreamCheckpointStore
     {
         public async ValueTask<StreamCheckpointStoreState> Load(CancellationToken cancellationToken)
@@ -169,6 +188,38 @@ public sealed class ReusableStreamQueueCheckpointerTests : StreamQueueCheckpoint
             }
 
             return ValueTask.FromResult(state);
+        }
+    }
+
+    private sealed class BlockingAuthoritativeConflictStore : IStreamCheckpointStore
+    {
+        private StreamCheckpointStoreState state = new("10", "version-1");
+
+        public TaskCompletionSource FirstUpdateStarted { get; } =
+            new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        public TaskCompletionSource ReleaseFirstUpdate { get; } =
+            new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        public List<string> Attempts { get; } = [];
+
+        public ValueTask<StreamCheckpointStoreState> Load(CancellationToken cancellationToken)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            return ValueTask.FromResult(state);
+        }
+
+        public async ValueTask<StreamCheckpointStoreState> Update(
+            string checkpoint,
+            string expectedVersion,
+            CancellationToken cancellationToken)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            Attempts.Add(checkpoint);
+            FirstUpdateStarted.TrySetResult();
+            await ReleaseFirstUpdate.Task.WaitAsync(cancellationToken);
+            state = new("40", "version-2");
+            return state;
         }
     }
 }

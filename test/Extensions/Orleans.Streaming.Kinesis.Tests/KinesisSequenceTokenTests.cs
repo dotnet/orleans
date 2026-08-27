@@ -112,6 +112,19 @@ public sealed class KinesisSequenceTokenTests
     }
 
     [Fact]
+    public void CreateSequenceTokenForEventPreservesKinesisPosition()
+    {
+        var batchToken = new KinesisSequenceToken(HugeShardSequence, sequenceNumber: 42, eventIndex: 0);
+
+        var eventToken = Assert.IsType<KinesisSequenceToken>(batchToken.CreateSequenceTokenForEvent(3));
+
+        Assert.Equal(HugeShardSequence, eventToken.ShardSequence);
+        Assert.Equal(42, eventToken.SequenceNumber);
+        Assert.Equal(3, eventToken.EventIndex);
+        Assert.True(batchToken.CompareTo(eventToken) < 0);
+    }
+
+    [Fact]
     public void RepeatedOrderingOperationsDoNotReparseShardSequence()
     {
         var older = new KinesisSequenceToken(HugeShardSequence, sequenceNumber: 0, eventIndex: 0);

@@ -59,6 +59,20 @@ public sealed class EventHubSequenceTokenTests
         Assert.Throws<ArgumentOutOfRangeException>(() => builtIn.CompareTo(first));
     }
 
+    [Fact]
+    public void CreateSequenceTokenForEventPreservesConcreteTypeAndOffset()
+    {
+        var batchToken = new EventHubSequenceTokenV2("offset-10", 10, 0);
+
+        var eventToken = Assert.IsType<EventHubSequenceTokenV2>(
+            batchToken.CreateSequenceTokenForEvent(2));
+
+        Assert.Equal("offset-10", eventToken.EventHubOffset);
+        Assert.Equal(10, eventToken.SequenceNumber);
+        Assert.Equal(2, eventToken.EventIndex);
+        Assert.True(batchToken.CompareTo(eventToken) < 0);
+    }
+
     private sealed class CustomEventHubSequenceToken(
         string eventHubOffset,
         long sequenceNumber,

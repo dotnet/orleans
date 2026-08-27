@@ -24,6 +24,7 @@ internal sealed class KinesisPooledAdapterReceiver : IQueueAdapterReceiver, IQue
     private readonly CancellationTokenSource _lifecycleCancellation = new();
     private RecoverableStreamReceiver<KinesisCacheRecord>? _inner;
     private Task? _initializationTask;
+    private CancellationToken _initializationOwnerToken;
     private int _initialized;
     private int _shutdown;
 
@@ -191,22 +192,43 @@ internal sealed class KinesisPooledAdapterReceiver : IQueueAdapterReceiver, IQue
     public void UpdateDeliveryProgress(StreamSequenceToken? earliestSubscriptionToken, DateTime utcNow)
         => _inner?.UpdateDeliveryProgress(earliestSubscriptionToken, utcNow);
 
-    private Task EnsureInitialized(CancellationToken cancellationToken)
+    private async Task EnsureInitialized(CancellationToken cancellationToken)
     {
-        cancellationToken.ThrowIfCancellationRequested();
-        lock (_lifecycleLock)
+        while (true)
         {
-            if (Volatile.Read(ref _shutdown) != 0 || Volatile.Read(ref _initialized) != 0)
+            cancellationToken.ThrowIfCancellationRequested();
+            Task initializationTask;
+            CancellationToken initializationOwnerToken;
+            lock (_lifecycleLock)
             {
-                return Task.CompletedTask;
+                if (Volatile.Read(ref _shutdown) != 0 || Volatile.Read(ref _initialized) != 0)
+                {
+                    return;
+                }
+
+                if (_initializationTask is null || _initializationTask.IsCompleted)
+                {
+                    _initializationOwnerToken = cancellationToken;
+                    _initializationTask = InitializeCore(cancellationToken);
+                }
+
+                initializationTask = _initializationTask;
+                initializationOwnerToken = _initializationOwnerToken;
             }
 
-            if (_initializationTask is null || _initializationTask.IsCompleted)
+            try
             {
-                _initializationTask = InitializeCore(cancellationToken);
+                await initializationTask.WaitAsync(cancellationToken);
+                return;
             }
-
-            return _initializationTask.WaitAsync(cancellationToken);
+            catch (OperationCanceledException) when (
+                !cancellationToken.IsCancellationRequested
+                && initializationOwnerToken.IsCancellationRequested
+                && initializationTask.IsCanceled)
+            {
+                // The caller which owned the shared initialization attempt canceled.
+                // An unaffected caller retries after that attempt has settled.
+            }
         }
     }
 
