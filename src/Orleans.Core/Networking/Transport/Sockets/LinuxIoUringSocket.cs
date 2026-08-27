@@ -1110,10 +1110,20 @@ internal sealed unsafe class LinuxIoUringSocketSender : LinuxIoUringOperation, I
 {
     private const int ZeroCopyThreshold = 16 * 1024;
     private const int MaximumScatterBuffers = 64;
+    private const ushort SendVectorized = 1 << 5;
+    private static readonly bool UseVectorizedSend =
+        OperatingSystem.IsLinux()
+        && (Environment.OSVersion.Version.Major > 6
+            || Environment.OSVersion.Version is { Major: 6, Minor: >= 17 })
+        && !string.Equals(
+            Environment.GetEnvironmentVariable("ORLEANS_IO_URING_DISABLE_VECTORIZED_SEND"),
+            "1",
+            StringComparison.Ordinal);
     private readonly GCHandle[] _scatterPins;
     private readonly IntPtr _iovecs;
     private readonly IntPtr _messageHeader;
     private int _scatterPinCount;
+    private bool _vectorized;
 
     public LinuxIoUringSocketSender(LinuxIoUringEngine? engine = null)
         : base(engine)
@@ -1187,11 +1197,14 @@ internal sealed unsafe class LinuxIoUringSocketSender : LinuxIoUringOperation, I
                 };
             }
 
-            *(MessageHeader*)_messageHeader = new()
+            if (!UseVectorizedSend)
             {
-                Vectors = _iovecs,
-                VectorCount = (nuint)buffers.Count,
-            };
+                *(MessageHeader*)_messageHeader = new()
+                {
+                    Vectors = _iovecs,
+                    VectorCount = (nuint)buffers.Count,
+                };
+            }
         }
         catch
         {
@@ -1199,14 +1212,24 @@ internal sealed unsafe class LinuxIoUringSocketSender : LinuxIoUringOperation, I
             throw;
         }
 
-        return SubmitPrepared(
-            socket,
-            _messageHeader,
-            bufferLength: 1,
-            useZeroCopyOperation
-                ? LinuxIoUringEngine.SendMessageZeroCopyOperation
-                : LinuxIoUringEngine.SendMessageOperation,
-            waitForNotification: useZeroCopyOperation);
+        _vectorized = UseVectorizedSend && totalLength >= 32 * 1024;
+        return _vectorized
+            ? SubmitPrepared(
+                socket,
+                _iovecs,
+                buffers.Count,
+                useZeroCopyOperation
+                    ? LinuxIoUringEngine.SendZeroCopyOperation
+                    : LinuxIoUringEngine.SendOperation,
+                waitForNotification: useZeroCopyOperation)
+            : SubmitPrepared(
+                socket,
+                _messageHeader,
+                bufferLength: 1,
+                useZeroCopyOperation
+                    ? LinuxIoUringEngine.SendMessageZeroCopyOperation
+                    : LinuxIoUringEngine.SendMessageOperation,
+                waitForNotification: useZeroCopyOperation);
     }
 
     public ValueTask SendAsync(
@@ -1241,6 +1264,7 @@ internal sealed unsafe class LinuxIoUringSocketSender : LinuxIoUringOperation, I
     protected override void ReleaseOperationBuffers()
     {
         base.ReleaseOperationBuffers();
+        _vectorized = false;
         for (var i = 0; i < _scatterPinCount; i++)
         {
             _scatterPins[i].Free();
@@ -1248,6 +1272,14 @@ internal sealed unsafe class LinuxIoUringSocketSender : LinuxIoUringOperation, I
         }
 
         _scatterPinCount = 0;
+    }
+
+    internal override void PrepareSubmission(LinuxIoUringEngine.IoUringSubmission* submission)
+    {
+        if (_vectorized)
+        {
+            submission->IoPriority = SendVectorized;
+        }
     }
 
     [StructLayout(LayoutKind.Sequential)]
