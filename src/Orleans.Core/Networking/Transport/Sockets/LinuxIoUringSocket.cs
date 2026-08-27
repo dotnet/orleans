@@ -912,7 +912,6 @@ internal sealed unsafe partial class LinuxIoUringEngine
             var userData = completion.UserData;
             var result = completion.Result;
             var flags = completion.Flags;
-            AdvanceCompletion();
 
             if (userData == WakeUserData)
             {
@@ -1048,14 +1047,9 @@ internal sealed unsafe partial class LinuxIoUringEngine
             return false;
         }
 
-        completion = _ring.Completion.Completions[head & *_ring.Completion.KernelRingMask];
-        return true;
-    }
-
-    private void AdvanceCompletion()
-    {
-        var head = Volatile.Read(ref *_ring.Completion.KernelHead);
+        completion = _ring.Completion.Completions[head & _ring.Completion.RingMask];
         Volatile.Write(ref *_ring.Completion.KernelHead, head + 1);
+        return true;
     }
 
     private static void ThrowIfError(int result)
