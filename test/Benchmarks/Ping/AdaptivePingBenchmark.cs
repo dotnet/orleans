@@ -269,4 +269,76 @@ public class AdaptivePingBenchmark : IDisposable
 
         Console.WriteLine();
     }
+
+    public static async Task RunDeterministicMatrixAsync(
+        int repetitions = 3,
+        TimeSpan? warmupDuration = null,
+        TimeSpan? measurementInterval = null)
+    {
+        int[] concurrencyLevels = [100, 250, 500];
+        var scenarios = new (BenchmarkMode Mode, int NumSilos)[]
+        {
+            (BenchmarkMode.HostedClient, 1),
+            (BenchmarkMode.ExternalClient, 1),
+            (BenchmarkMode.ExternalClient, 2),
+            (BenchmarkMode.SiloToSilo, 2),
+        };
+        var results = new List<DeterministicResult>();
+
+        foreach (var (mode, numSilos) in scenarios)
+        {
+            using var benchmark = new AdaptivePingBenchmark(mode, numSilos);
+            try
+            {
+                foreach (var concurrency in concurrencyLevels)
+                {
+                    var loadGenerator = new AdaptiveConcurrencyLoadGenerator<IPingGrain>(
+                        issueRequest: grain => grain.Run(),
+                        getStateForWorker: workerId => benchmark.GetGrainFactory().GetGrain<IPingGrain>(workerId),
+                        requestsPerBlock: DefaultRequestsPerBlock,
+                        warmupDuration: warmupDuration ?? TimeSpan.FromSeconds(5),
+                        measurementInterval: measurementInterval ?? TimeSpan.FromSeconds(3),
+                        minConcurrency: concurrency,
+                        maxConcurrency: concurrency,
+                        initialConcurrency: concurrency,
+                        maxStableRounds: 1,
+                        initialStepSize: 1,
+                        sampleInterval: DefaultSampleInterval,
+                        minimumRelativeImprovement: 0);
+                    var samples = await loadGenerator.RunFixedConcurrencyAsync(repetitions);
+                    Array.Sort(samples);
+                    var median = samples.Length % 2 == 0
+                        ? (samples[(samples.Length / 2) - 1] + samples[samples.Length / 2]) / 2
+                        : samples[samples.Length / 2];
+                    results.Add(new(benchmark.Description, concurrency, median, samples[^1]));
+                    Console.WriteLine($"{benchmark.Description}, concurrency {concurrency}: median {median:N0}/s, max {samples[^1]:N0}/s");
+                }
+            }
+            finally
+            {
+                await benchmark.ShutdownAsync();
+            }
+
+            GC.Collect();
+            await Task.Delay(1000);
+        }
+
+        Console.WriteLine();
+        Console.WriteLine("## Deterministic Ping Benchmark Results");
+        Console.WriteLine();
+        Console.WriteLine("| Scenario | Concurrency | Median Throughput | Maximum Throughput |");
+        Console.WriteLine("|----------|------------:|------------------:|-------------------:|");
+        foreach (var result in results)
+        {
+            Console.WriteLine($"| {result.Description} | {result.Concurrency} | {result.MedianThroughput:N0}/s | {result.MaximumThroughput:N0}/s |");
+        }
+
+        Console.WriteLine();
+    }
+
+    private readonly record struct DeterministicResult(
+        string Description,
+        int Concurrency,
+        double MedianThroughput,
+        double MaximumThroughput);
 }

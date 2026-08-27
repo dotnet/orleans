@@ -231,6 +231,10 @@ internal class Program
         {
             AdaptivePingBenchmark.RunAllScenariosAsync().GetAwaiter().GetResult();
         },
+        ["DeterministicPing_All"] = _ =>
+        {
+            AdaptivePingBenchmark.RunDeterministicMatrixAsync().GetAwaiter().GetResult();
+        },
         ["ConcurrentPing_OneSilo_Forever"] = _ =>
         {
             new PingBenchmark(numSilos: 1, startClient: true).PingConcurrentForever().GetAwaiter().GetResult();

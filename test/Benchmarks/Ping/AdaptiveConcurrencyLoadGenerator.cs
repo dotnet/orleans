@@ -156,7 +156,33 @@ public sealed class AdaptiveConcurrencyLoadGenerator<TState>
                 break;
             }
         }
+
     }
+
+    public async Task<double[]> RunFixedConcurrencyAsync(int repetitions, CancellationToken cancellationToken = default)
+        {
+            ArgumentOutOfRangeException.ThrowIfLessThan(repetitions, 1);
+            _cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+
+            try
+            {
+                await RunPhaseAsync(_warmupDuration, isWarmup: true);
+                GC.Collect();
+
+                var results = new double[repetitions];
+                for (var i = 0; i < results.Length; i++)
+                {
+                    results[i] = (await RunPhaseAsync(_measurementInterval, isWarmup: false)).Throughput;
+                }
+
+                return results;
+            }
+            finally
+            {
+                await _cts.CancelAsync();
+                _cts.Dispose();
+            }
+        }
 
     private async Task<Measurement> RunPhaseAsync(TimeSpan duration, bool isWarmup)
     {
