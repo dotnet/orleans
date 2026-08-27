@@ -59,7 +59,10 @@ namespace Orleans.Transactions.DynamoDB.Tests
         [InlineData(TransactionTestConstants.DoubleStateTransactionalGrain, 20)]
         public Task TransactionWillRecoverAfterRandomSiloGracefulShutdown(string transactionTestGrainClassName, int concurrent)
         {
-            return this.testRunner.TransactionWillRecoverAfterRandomSiloGracefulShutdown(transactionTestGrainClassName, concurrent);
+            return this.testRunner.TransactionWillRecoverAfterRandomSiloGracefulShutdown(
+                transactionTestGrainClassName,
+                concurrent,
+                TestContext.Current.CancellationToken);
         }
 
         [Theory]
@@ -67,7 +70,10 @@ namespace Orleans.Transactions.DynamoDB.Tests
         [InlineData(TransactionTestConstants.DoubleStateTransactionalGrain, 20)]
         public Task TransactionWillRecoverAfterRandomSiloUnGracefulShutdown(string transactionTestGrainClassName, int concurrent)
         {
-            return this.testRunner.TransactionWillRecoverAfterRandomSiloUnGracefulShutdown(transactionTestGrainClassName, concurrent);
+            return this.testRunner.TransactionWillRecoverAfterRandomSiloUnGracefulShutdown(
+                transactionTestGrainClassName,
+                concurrent,
+                TestContext.Current.CancellationToken);
         }
 
         [Fact]

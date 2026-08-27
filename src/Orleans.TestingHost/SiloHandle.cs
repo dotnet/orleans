@@ -34,9 +34,13 @@ namespace Orleans.TestingHost
 
         /// <summary>Stop the remote silo.</summary>
         /// <param name="stopGracefully">Specifies whether the silo should be stopped gracefully or abruptly.</param>
-        /// <param name="cancellationToken">Specifies the cancellation token to use for the shutdown sequence.</param>
+        /// <param name="cancellationToken">
+        /// Specifies the cancellation token for graceful shutdown or for canceling the wait for abrupt shutdown.
+        /// </param>
         public virtual Task StopSiloAsync(bool stopGracefully, CancellationToken cancellationToken)
-            => StopSiloAsync(stopGracefully ? cancellationToken : new CancellationToken(canceled: true));
+            => stopGracefully
+                ? StopSiloAsync(cancellationToken)
+                : StopSiloAsync(stopGracefully).WaitAsync(cancellationToken);
 
         /// <summary>Stop the remote silo. This method cannot be use with AppDomain</summary>
         /// <param name="ct">Specifies the cancellation token to use for the shutdown sequence</param>
