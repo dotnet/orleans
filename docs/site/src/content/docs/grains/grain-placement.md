@@ -1,7 +1,7 @@
 ---
 title: Grain placement and migration
 description: Understand placement, resource-optimized defaults, and activation movement in Orleans.
-ms.date: 08/17/2026
+ms.date: 08/27/2026
 ms.topic: concept-article
 ---
 
@@ -82,6 +82,22 @@ Activation-count-based placement applies the power-of-two-choices technique desc
 :::code language="csharp" source="../snippets/compiled/Grains/PlacementSnippets.cs" id="prefer_local_grain":::
 Placement happens when creating an activation. Changing cluster membership or a strategy doesn't move existing activations by itself.
 
+## Direct placement and migration with placement hints
+
+A placement hint directs a new activation or a migrating activation to a specific silo. Set <xref:Orleans.Runtime.Placement.IPlacementDirector.PlacementHintKey> in <xref:Orleans.Runtime.RequestContext> before making the grain call that can trigger activation or before calling <xref:Orleans.Grain.MigrateOnIdle>. The built-in placement directors select the hinted silo when it belongs to the compatible candidate set after version compatibility and placement filters are applied.
+
+The following grain injects <xref:Orleans.Runtime.IClusterMembershipService> and <xref:Orleans.Runtime.ILocalSiloDetails> and selects an active silo other than its own. `ProcessOrder` directs a new worker activation to that silo. `MoveToAnotherSilo` sets the hint in the current request context before calling <xref:Orleans.Grain.MigrateOnIdle>, while `MoveToAnotherSiloWithExplicitContext` passes a migration-specific dictionary directly to <xref:Orleans.Runtime.IGrainContext.Migrate*>:
+
+:::code language="csharp" source="snippets/placement/PlacementHints.cs" id="direct_placement_with_hint":::
+
+The membership snapshot provides the silos known to the caller at that point in time. For a new activation, the grain call, rather than `GetGrain`, triggers placement. If the worker is already active, Orleans routes the call to its existing activation. <xref:Orleans.Grain.MigrateOnIdle> captures the complete current request context. Calling <xref:Orleans.Runtime.IGrainContext.Migrate*> directly uses the provided dictionary as the migration request context and leaves the ambient request context unchanged. Both forms start migration asynchronously after the current work completes. Migration occurs only when placement selects a different compatible silo.
+
+If membership or compatibility changes remove the hinted silo from the candidate set, the configured placement strategy selects from the current compatible silos. After using the ambient request context for an outgoing grain call or <xref:Orleans.Grain.MigrateOnIdle>, restore its previous value because request context propagates to outgoing grain calls.
+
+The receiving grain also sees the placement hint in its request context, including when it already has an activation. Remove the hint before making unrelated outgoing grain calls so that their placement uses their intended context and strategy, then restore the incoming value if the grain continues processing the original request:
+
+:::code language="csharp" source="snippets/placement/PlacementHints.cs" id="contain_received_placement_hint":::
+
 ## Override the cluster default
 
 Register a different default strategy only when all unannotated grains should use it:
@@ -100,7 +116,7 @@ See [Placement filters](grain-placement-filtering.md) for the built-in filters a
 A grain can ask Orleans to move its activation after current work completes:
 
 :::code language="csharp" source="../snippets/compiled/Grains/PlacementSnippets.cs" id="move_grain":::
-Migration is advisory and occurs only if placement chooses another compatible silo. Custom activation state must participate in dehydration and rehydration; see [Grain activation and lifecycle](grain-lifecycle.md#grain-migration).
+Migration is advisory and occurs only if placement chooses another compatible silo. Use a [placement hint](#direct-placement-and-migration-with-placement-hints) to direct the migration to a specific compatible silo. Custom activation state must participate in dehydration and rehydration; see [Grain activation and lifecycle](grain-lifecycle.md#grain-migration).
 
 Use <xref:Orleans.Placement.ImmovableAttribute> to exclude a grain class from automatic movement:
 
