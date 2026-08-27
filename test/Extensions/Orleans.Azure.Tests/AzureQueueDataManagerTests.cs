@@ -98,7 +98,7 @@ namespace Tester.AzureUtils
             {
                 promises.Add(manager.AddQueueMessage(i.ToString()));
             }
-            await Task.WhenAll(promises).WaitAsync(TestContext.Current.CancellationToken);
+            await Task.WhenAll(promises);
             Assert.Equal(numMsgs, await manager.GetApproximateMessageCount());
 
             var receivedMessages = await manager.GetQueueMessages(numMsgs);

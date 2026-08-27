@@ -203,6 +203,10 @@ namespace NonSilo.Tests
                 int value = await promise;
                 Assert.Fail("Should have thrown");
             }
+            catch (OperationCanceledException) when (TestContext.Current.CancellationToken.IsCancellationRequested)
+            {
+                throw;
+            }
             catch (Exception exc)
             {
                 Exception baseExc = exc.GetBaseException();

@@ -81,7 +81,7 @@ public class ReminderTestsBase : OrleansTestingBase, IDisposable
         // ReminderTable.Clear() cannot be called from a non-Orleans thread,
         // so we must proxy the call through a grain.
         var controlProxy = this.GrainFactory.GetGrain<IReminderTestGrain2>(Guid.NewGuid());
-        controlProxy.EraseReminderTable().WaitAsync(TestConstants.InitTimeout, TestContext.Current.CancellationToken).Wait();
+        controlProxy.EraseReminderTable().WaitAsync(TestConstants.InitTimeout).Wait();
     }
 
     public Task Test_Reminders_Basic_StopByRef()
@@ -201,7 +201,7 @@ public class ReminderTestsBase : OrleansTestingBase, IDisposable
         }
         finally
         {
-            await CleanupAdditionalSilosAsync(initialSilos, startSilosTask, cancellationToken);
+            await CleanupAdditionalSilosAsync(initialSilos, startSilosTask);
         }
     }
 
@@ -240,7 +240,7 @@ public class ReminderTestsBase : OrleansTestingBase, IDisposable
         }
         finally
         {
-            await CleanupAdditionalSilosAsync(initialSilos, startSilosTask, cancellationToken);
+            await CleanupAdditionalSilosAsync(initialSilos, startSilosTask);
         }
     }
 
@@ -327,8 +327,7 @@ public class ReminderTestsBase : OrleansTestingBase, IDisposable
 
     private async Task CleanupAdditionalSilosAsync(
         HashSet<InProcessSiloHandle> initialSilos,
-        Task<List<InProcessSiloHandle>>? startSilosTask,
-        CancellationToken cancellationToken)
+        Task<List<InProcessSiloHandle>>? startSilosTask)
     {
         if (startSilosTask is null)
         {
@@ -337,8 +336,7 @@ public class ReminderTestsBase : OrleansTestingBase, IDisposable
 
         try
         {
-            using var startupCompletionCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-            startupCompletionCts.CancelAfter(CHURN_ENDWAIT);
+            using var startupCompletionCts = new CancellationTokenSource(CHURN_ENDWAIT);
             await startSilosTask.WaitAsync(startupCompletionCts.Token);
         }
         catch (Exception exception)
@@ -354,8 +352,7 @@ public class ReminderTestsBase : OrleansTestingBase, IDisposable
             return;
         }
 
-        using var cleanupCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-        cleanupCts.CancelAfter(CHURN_ENDWAIT);
+        using var cleanupCts = new CancellationTokenSource(CHURN_ENDWAIT);
         await Task.WhenAll(additionalSilos.Select(StopSiloAsync)).WaitAsync(cleanupCts.Token);
         await WaitForLivenessToStabilizeAsync().WaitAsync(cleanupCts.Token);
     }

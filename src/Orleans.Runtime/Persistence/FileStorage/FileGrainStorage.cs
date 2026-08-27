@@ -130,10 +130,12 @@ public sealed class FileGrainStorage(
         var etag = Guid.NewGuid().ToString("N");
         cancellationToken.ThrowIfCancellationRequested();
         var payload = options.GrainStorageSerializer.Serialize(grainState.State).ToArray();
+        cancellationToken.ThrowIfCancellationRequested();
+        // Once the write begins, complete it so cancellation cannot leave a partial record.
         await File.WriteAllBytesAsync(
             path,
             CreateRecord(etag, payload),
-            cancellationToken).ConfigureAwait(false);
+            CancellationToken.None).ConfigureAwait(false);
 
         grainState.ETag = etag;
         grainState.RecordExists = true;

@@ -108,7 +108,7 @@ public abstract class ReminderTableTestFixture
         var cluster = builder.Build();
         try
         {
-            await cluster.DeployAsync().WaitAsync(cancellationToken).ConfigureAwait(false);
+            await cluster.DeployAsync(cancellationToken).ConfigureAwait(false);
             var reminderTable = ResolveReminderTable(cluster.Silos[0].ServiceProvider);
             using var cancellation = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
             cancellation.CancelAfter(TimeSpan.FromMinutes(1));
@@ -144,7 +144,7 @@ public abstract class ReminderTableTestFixture
 
         try
         {
-            await cluster.StopAllSilosAsync().WaitAsync(cancellationToken).ConfigureAwait(false);
+            await cluster.StopAllSilosAsync(cancellationToken).ConfigureAwait(false);
         }
         finally
         {

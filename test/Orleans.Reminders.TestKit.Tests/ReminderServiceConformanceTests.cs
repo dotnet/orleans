@@ -21,7 +21,7 @@ public sealed class IdealizedReminderServiceFixture : IAsyncLifetime
         var builder = new InProcessTestClusterBuilder(1);
         builder.UseIdealizedReminderTable(Oracle);
         _cluster = builder.Build();
-        await _cluster.DeployAsync().WaitAsync(TestContext.Current.CancellationToken);
+        await _cluster.DeployAsync(TestContext.Current.CancellationToken);
 
         Assert.Same(
             Oracle,
@@ -38,7 +38,7 @@ public sealed class IdealizedReminderServiceFixture : IAsyncLifetime
         try
         {
             using var stopCancellation = new CancellationTokenSource(TimeSpan.FromMinutes(1));
-            await cluster.StopAllSilosAsync().WaitAsync(stopCancellation.Token);
+            await cluster.StopAllSilosAsync(stopCancellation.Token);
         }
         finally
         {
@@ -88,7 +88,7 @@ public sealed class EventuallyVisibleReminderServiceFixture : IAsyncLifetime
             siloBuilder.Services.AddSingleton<IReminderTable>(Table);
         });
         _cluster = builder.Build();
-        await _cluster.DeployAsync().WaitAsync(TestContext.Current.CancellationToken);
+        await _cluster.DeployAsync(TestContext.Current.CancellationToken);
     }
 
     public async ValueTask DisposeAsync()
@@ -101,7 +101,7 @@ public sealed class EventuallyVisibleReminderServiceFixture : IAsyncLifetime
         try
         {
             using var stopCancellation = new CancellationTokenSource(TimeSpan.FromMinutes(1));
-            await cluster.StopAllSilosAsync().WaitAsync(stopCancellation.Token);
+            await cluster.StopAllSilosAsync(stopCancellation.Token);
         }
         finally
         {
@@ -164,7 +164,7 @@ public sealed class NonRotatingReminderServiceFixture : IAsyncLifetime
             siloBuilder.Services.AddSingleton<IReminderTable>(Table);
         });
         _cluster = builder.Build();
-        await _cluster.DeployAsync().WaitAsync(TestContext.Current.CancellationToken);
+        await _cluster.DeployAsync(TestContext.Current.CancellationToken);
 
         Assert.Same(
             Table,
@@ -181,7 +181,7 @@ public sealed class NonRotatingReminderServiceFixture : IAsyncLifetime
         try
         {
             using var stopCancellation = new CancellationTokenSource(TimeSpan.FromMinutes(1));
-            await cluster.StopAllSilosAsync().WaitAsync(stopCancellation.Token);
+            await cluster.StopAllSilosAsync(stopCancellation.Token);
         }
         finally
         {
@@ -245,7 +245,7 @@ public abstract class CorruptingReminderServiceFixture : IAsyncLifetime
             siloBuilder.Services.AddSingleton<IReminderTable>(Table);
         });
         _cluster = builder.Build();
-        await _cluster.DeployAsync().WaitAsync(TestContext.Current.CancellationToken);
+        await _cluster.DeployAsync(TestContext.Current.CancellationToken);
     }
 
     public async ValueTask DisposeAsync()
@@ -258,7 +258,7 @@ public abstract class CorruptingReminderServiceFixture : IAsyncLifetime
         try
         {
             using var stopCancellation = new CancellationTokenSource(TimeSpan.FromMinutes(1));
-            await cluster.StopAllSilosAsync().WaitAsync(stopCancellation.Token);
+            await cluster.StopAllSilosAsync(stopCancellation.Token);
         }
         finally
         {

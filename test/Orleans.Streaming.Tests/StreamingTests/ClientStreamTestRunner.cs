@@ -38,7 +38,7 @@ namespace Tester.StreamingTests
             await WaitForDroppedClientsAsync(droppedClients, gatewayObserver, cancellationToken);
 
             // initialize new client
-            await testHost.InitializeClientAsync();
+            await testHost.InitializeClientAsync(cancellationToken);
 
             // run test again.
             await ProduceEventsFromClient(streamProviderName, streamGuid, streamNamespace, eventsProduced, cancellationToken);
@@ -69,7 +69,7 @@ namespace Tester.StreamingTests
             await WaitForDroppedClientsAsync(droppedClients, gatewayObserver, cancellationToken);
 
             // initialize new client
-            await testHost.InitializeClientAsync();
+            await testHost.InitializeClientAsync(cancellationToken);
 
             eventCount[0] = 0;
 

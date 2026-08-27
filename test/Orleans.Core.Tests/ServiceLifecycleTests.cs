@@ -195,6 +195,7 @@ public class ServiceLifecycleTests
     [Fact]
     public async Task ErrorHandling_TerminateOnErrorTrue_MultipleFailures()
     {
+        var cancellationToken = TestContext.Current.CancellationToken;
         var (task1, _) = RegisterCallback(
             _lifecycle.Started,
             (_, _) => throw new InvalidOperationException("first"),
@@ -205,12 +206,16 @@ public class ServiceLifecycleTests
             (_, _) => throw new ArgumentException("second"),
             terminateOnError: true);
 
-        var startTask = _subject.OnStart(TestContext.Current.CancellationToken);
+        var startTask = _subject.OnStart(cancellationToken);
 
         // We swallow the start exception initially so we can inspect the individual tasks.
         try
         {
             await startTask;
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
         }
         catch
         {
@@ -220,11 +225,13 @@ public class ServiceLifecycleTests
         // Now we wait for both TCS signals to complete (rather 'fail') before asserting.
         // This prevents racing between the OnStart exception propagation and the TCS setting.
 
-        try { await task1.WaitAsync(Timeout, TestContext.Current.CancellationToken); } catch { }
-        try { await task2.WaitAsync(Timeout, TestContext.Current.CancellationToken); } catch { }
+        var firstException = await Record.ExceptionAsync(() => task1.WaitAsync(Timeout, cancellationToken));
+        cancellationToken.ThrowIfCancellationRequested();
+        Assert.IsType<InvalidOperationException>(firstException);
 
-        await Assert.ThrowsAsync<InvalidOperationException>(() => task1);
-        await Assert.ThrowsAsync<ArgumentException>(() => task2);
+        var secondException = await Record.ExceptionAsync(() => task2.WaitAsync(Timeout, cancellationToken));
+        cancellationToken.ThrowIfCancellationRequested();
+        Assert.IsType<ArgumentException>(secondException);
     }
 
     [Fact]

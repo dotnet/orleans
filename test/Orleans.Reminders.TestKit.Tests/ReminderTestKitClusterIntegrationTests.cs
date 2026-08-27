@@ -440,7 +440,7 @@ public sealed class ReminderTestKitClusterIntegrationTests
         try
         {
             using var stopCancellation = new CancellationTokenSource(TimeSpan.FromMinutes(1));
-            await cluster.StopAllSilosAsync().WaitAsync(stopCancellation.Token);
+            await cluster.StopAllSilosAsync(stopCancellation.Token);
         }
         finally
         {

@@ -313,6 +313,10 @@ namespace UnitTests.Runtime
                         await collector.DeactivateInDueTimeOrder(50, cts.Token);
                         await Task.Delay(1, cts.Token);
                     }
+                    catch (OperationCanceledException) when (cts.IsCancellationRequested)
+                    {
+                        throw;
+                    }
                     catch (Exception ex)
                     {
                         exceptions.Add(ex);
