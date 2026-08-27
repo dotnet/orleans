@@ -19,7 +19,9 @@ using Xunit;
 namespace Tester.AzureUtils.Streaming
 {
     [Collection(TestEnvironmentFixture.DefaultCollection)]
-    [TestCategory("AzureStorage"), TestCategory("Streaming")]
+    [TestSuite("BVT")]
+    [TestProvider("AzureStorage")]
+    [TestArea("Streaming")]
     public class AzureQueueJsonDataAdapterTests
     {
         private const string CompactOrleans3JsonMessage =
@@ -194,6 +196,41 @@ namespace Tester.AzureUtils.Streaming
             Assert.Equal(
                 StreamId.Create("test-namespace", Guid.Parse("00112233-4455-6677-8899-aabbccddeeff")),
                 batchContainer.StreamId);
+        }
+
+        [Theory, TestCategory("BVT")]
+        [InlineData("\"1\"")]
+        [InlineData("2147483648")]
+        [InlineData("2")]
+        public void JsonAdapter_RejectsUnsupportedCompactEnvelopeVersion(string version)
+        {
+            var jsonAdapter = InitializeQueueJsonDataAdapter(new AzureQueueJsonDataAdapterOptions { EnableFallback = false });
+
+            var exception = Assert.Throws<InvalidDataException>(
+                () => jsonAdapter.FromQueueMessage($"{{\"version\":{version}}}", sequenceId: 0));
+
+            Assert.Equal($"Unsupported Azure Queue JSON envelope version: {version}.", exception.Message);
+        }
+
+        [Theory, TestCategory("BVT")]
+        [MemberData(nameof(MalformedCompactEnvelopeCases))]
+        public void JsonAdapter_RejectsMalformedCompactEnvelope(string message, string expectedMessage)
+        {
+            var jsonAdapter = InitializeQueueJsonDataAdapter(new AzureQueueJsonDataAdapterOptions { EnableFallback = false });
+
+            var exception = Assert.Throws<InvalidDataException>(
+                () => jsonAdapter.FromQueueMessage(message, sequenceId: 0));
+
+            Assert.Equal(expectedMessage, exception.Message);
+        }
+
+        [Fact, TestCategory("BVT")]
+        public void JsonAdapter_RejectsInvalidJson()
+        {
+            var jsonAdapter = InitializeQueueJsonDataAdapter(new AzureQueueJsonDataAdapterOptions { EnableFallback = false });
+
+            Assert.ThrowsAny<System.Text.Json.JsonException>(
+                () => jsonAdapter.FromQueueMessage("{\"version\":1", sequenceId: 0));
         }
 
         [Fact, TestCategory("BVT")]
@@ -375,6 +412,50 @@ namespace Tester.AzureUtils.Streaming
             Assert.False(IsValidJson(binaryMessage));
             Assert.True(IsValidJson(jsonMessage));
         }
+
+        public static TheoryData<string, string> MalformedCompactEnvelopeCases => new()
+        {
+            {
+                """{"version":1,"events":[],"requestContext":{}}""",
+                "The Azure Queue JSON envelope property 'stream' must be a Object."
+            },
+            {
+                """{"version":1,"stream":[],"events":[],"requestContext":{}}""",
+                "The Azure Queue JSON envelope property 'stream' must be a Object."
+            },
+            {
+                """{"version":1,"stream":{"key":"key"},"events":[],"requestContext":{}}""",
+                "The Azure Queue JSON envelope property 'namespace' must be a String or Null."
+            },
+            {
+                """{"version":1,"stream":{"namespace":1,"key":"key"},"events":[],"requestContext":{}}""",
+                "The Azure Queue JSON envelope property 'namespace' must be a String or Null."
+            },
+            {
+                """{"version":1,"stream":{"namespace":"namespace"},"events":[],"requestContext":{}}""",
+                "The Azure Queue JSON envelope property 'key' must be a String."
+            },
+            {
+                """{"version":1,"stream":{"namespace":"namespace","key":null},"events":[],"requestContext":{}}""",
+                "The Azure Queue JSON envelope property 'key' must be a String."
+            },
+            {
+                """{"version":1,"stream":{"namespace":"namespace","key":"key"},"requestContext":{}}""",
+                "The Azure Queue JSON envelope property 'events' must be a Array."
+            },
+            {
+                """{"version":1,"stream":{"namespace":"namespace","key":"key"},"events":{},"requestContext":{}}""",
+                "The Azure Queue JSON envelope property 'events' must be a Array."
+            },
+            {
+                """{"version":1,"stream":{"namespace":"namespace","key":"key"},"events":[]}""",
+                "The Azure Queue JSON envelope property 'requestContext' must be a Object."
+            },
+            {
+                """{"version":1,"stream":{"namespace":"namespace","key":"key"},"events":[],"requestContext":[]}""",
+                "The Azure Queue JSON envelope property 'requestContext' must be a Object."
+            }
+        };
 
         [GenerateSerializer]
         public sealed class EventData : IEquatable<EventData>
