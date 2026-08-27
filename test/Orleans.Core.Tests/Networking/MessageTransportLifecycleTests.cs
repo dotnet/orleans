@@ -792,6 +792,64 @@ public class MessageTransportLifecycleTests
     }
 
     [Fact]
+    public async Task SocketMessageTransport_LinuxIoUring_NonLoopbackUsesZeroCopy()
+    {
+        if (!OperatingSystem.IsLinux()
+            || !string.Equals(
+                Environment.GetEnvironmentVariable("ORLEANS_TEST_IO_URING"),
+                "1",
+                StringComparison.Ordinal))
+        {
+            return;
+        }
+
+        var address = (await Dns.GetHostAddressesAsync(Dns.GetHostName()))
+            .FirstOrDefault(static address => address.AddressFamily == AddressFamily.InterNetwork && !IPAddress.IsLoopback(address));
+        if (address is null)
+        {
+            return;
+        }
+
+        const int PayloadSize = (64 * 1024) + 7;
+        using var listener = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
+        listener.Bind(new IPEndPoint(address, 0));
+        listener.Listen(1);
+        using var client = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
+        var connect = client.ConnectAsync(listener.LocalEndPoint!);
+        using var server = await listener.AcceptAsync();
+        await connect;
+        await using var transport = new SocketMessageTransport(client, NullLogger.Instance, useLinuxIoUring: true);
+        var payload = GC.AllocateUninitializedArray<byte>(PayloadSize);
+        for (var i = 0; i < payload.Length; i++)
+        {
+            payload[i] = (byte)i;
+        }
+
+        using var writeRequest = new BufferedWriteRequest(payload, useMultipleBuffers: true);
+        var initialStatistics = LinuxIoUringEngine.GetZeroCopyStatistics();
+        transport.Start();
+        Assert.True(transport.EnqueueWrite(writeRequest));
+        var received = new byte[payload.Length];
+        var offset = 0;
+        while (offset < received.Length)
+        {
+            var length = await server.ReceiveAsync(received.AsMemory(offset));
+            Assert.NotEqual(0, length);
+            offset += length;
+        }
+
+        await writeRequest.Completion.WaitAsync(TimeSpan.FromSeconds(10));
+        var finalStatistics = LinuxIoUringEngine.GetZeroCopyStatistics();
+
+        Assert.Equal(payload, received);
+        Assert.True(finalStatistics.Primary > initialStatistics.Primary);
+        Assert.Equal(
+            finalStatistics.Primary - initialStatistics.Primary,
+            finalStatistics.Notifications - initialStatistics.Notifications);
+        await transport.CloseAsync(null);
+    }
+
+    [Fact]
     public async Task StreamMessageTransport_WriteFailure_WakesIdleReadLoop()
     {
         await using var transport = new TestStreamMessageTransport(new FailingWriteStream());
