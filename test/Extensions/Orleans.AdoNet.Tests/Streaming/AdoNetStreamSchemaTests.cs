@@ -37,6 +37,7 @@ public sealed class AdoNetStreamSchemaTests
         Assert.Contains("'AdvanceStreamCheckpointKey'", script, StringComparison.Ordinal);
         Assert.Contains("'GetStreamPartitionBoundsKey'", script, StringComparison.Ordinal);
         Assert.Contains("'CleanupStreamMessagesKey'", script, StringComparison.Ordinal);
+        Assert.Contains("NextMessageId", GetStoredQuery(script, "GetStreamPartitionBoundsKey"), StringComparison.Ordinal);
 
         Assert.DoesNotContain("CREATE TABLE OrleansStreamDeadLetter", script, StringComparison.Ordinal);
         Assert.DoesNotContain("CREATE TABLE OrleansStreamControl", script, StringComparison.Ordinal);
@@ -86,6 +87,56 @@ public sealed class AdoNetStreamSchemaTests
         Assert.DoesNotContain(batches, string.IsNullOrWhiteSpace);
     }
 
+    [Theory]
+    [InlineData("SQLServer", "SELECT @LockedNextMessageId", "SET @Now = SYSUTCDATETIME()", "INSERT INTO OrleansStreamMessage")]
+    [InlineData("PostgreSQL", "RETURNING P.NextMessageId - 1 INTO _MessageId", "_Now := clock_timestamp()", "INSERT INTO OrleansStreamMessage")]
+    [InlineData("MySQL", "FOR UPDATE;", "SET _Now = UTC_TIMESTAMP(6)", "INSERT INTO OrleansStreamMessage")]
+    public void AppendSamplesMessageTimestampAfterPartitionLock(
+        string provider,
+        string lockMarker,
+        string timestampMarker,
+        string messageInsertMarker)
+    {
+        var script = ReadScript(provider);
+
+        AssertOrder(script, lockMarker, timestampMarker, messageInsertMarker);
+    }
+
+    [Theory]
+    [InlineData("SQLServer", "SELECT @LockedCheckpoint", "SET @Now = SYSUTCDATETIME()", "SET CheckpointedOn")]
+    [InlineData("PostgreSQL", "FOR UPDATE;", "_Now := clock_timestamp()", "SET CheckpointedOn")]
+    [InlineData("MySQL", "FOR UPDATE;", "SET _Now = UTC_TIMESTAMP(6)", "SET CheckpointedOn")]
+    public void CheckpointSamplesEligibilityTimestampAfterPartitionLock(
+        string provider,
+        string lockMarker,
+        string timestampMarker,
+        string eligibilityMarker)
+    {
+        var script = ReadScript(provider);
+        var checkpointProcedure = script[script.IndexOf("AdvanceStreamCheckpoint", StringComparison.Ordinal)..];
+
+        AssertOrder(checkpointProcedure, lockMarker, timestampMarker, eligibilityMarker);
+    }
+
     private static string ReadScript(string provider) =>
         File.ReadAllText(Path.Combine(AppContext.BaseDirectory, $"{provider}-Streaming.sql"));
+
+    private static string GetStoredQuery(string script, string queryKey)
+    {
+        var start = script.IndexOf($"('{queryKey}'", StringComparison.Ordinal);
+        Assert.True(start >= 0);
+        var end = script.IndexOfAny(['\r', '\n'], start);
+        return script[start..end];
+    }
+
+    private static void AssertOrder(string text, params string[] markers)
+    {
+        var previous = -1;
+        foreach (var marker in markers)
+        {
+            var current = text.IndexOf(marker, previous + 1, StringComparison.Ordinal);
+            Assert.True(current > previous, $"Expected '{marker}' after index {previous}.");
+            previous = current;
+        }
+    }
 }
