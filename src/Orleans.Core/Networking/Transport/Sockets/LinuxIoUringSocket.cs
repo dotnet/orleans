@@ -16,9 +16,23 @@ namespace Orleans.Connections.Transport.Sockets;
 internal sealed unsafe class LinuxIoUringSocketReceiver : LinuxIoUringOperation, ISocketReceiver
 {
     private const int MaximumScatterBuffers = 8;
-    private readonly IntPtr _iovecs = (IntPtr)NativeMemory.Alloc(
-        (nuint)(MaximumScatterBuffers * sizeof(IoVector)));
-    private readonly IntPtr _messageHeader = (IntPtr)NativeMemory.Alloc((nuint)sizeof(MessageHeader));
+    private readonly IntPtr _iovecs;
+    private readonly IntPtr _messageHeader;
+
+    public LinuxIoUringSocketReceiver()
+    {
+        try
+        {
+            _iovecs = (IntPtr)NativeMemory.Alloc((nuint)(MaximumScatterBuffers * sizeof(IoVector)));
+            _messageHeader = (IntPtr)NativeMemory.Alloc((nuint)sizeof(MessageHeader));
+        }
+        catch
+        {
+            NativeMemory.Free((void*)_iovecs);
+            base.Dispose();
+            throw;
+        }
+    }
 
     public ValueTask ReceiveAsync(Socket socket, List<ArraySegment<byte>> buffers)
     {
@@ -101,11 +115,26 @@ internal sealed unsafe class LinuxIoUringSocketSender : LinuxIoUringOperation, I
 {
     private const int ZeroCopyThreshold = 16 * 1024;
     private const int MaximumScatterBuffers = 64;
-    private readonly GCHandle[] _scatterPins = new GCHandle[MaximumScatterBuffers];
-    private readonly IntPtr _iovecs = (IntPtr)NativeMemory.Alloc(
-        (nuint)(MaximumScatterBuffers * sizeof(IoVector)));
-    private readonly IntPtr _messageHeader = (IntPtr)NativeMemory.Alloc((nuint)sizeof(MessageHeader));
+    private readonly GCHandle[] _scatterPins;
+    private readonly IntPtr _iovecs;
+    private readonly IntPtr _messageHeader;
     private int _scatterPinCount;
+
+    public LinuxIoUringSocketSender()
+    {
+        try
+        {
+            _scatterPins = new GCHandle[MaximumScatterBuffers];
+            _iovecs = (IntPtr)NativeMemory.Alloc((nuint)(MaximumScatterBuffers * sizeof(IoVector)));
+            _messageHeader = (IntPtr)NativeMemory.Alloc((nuint)sizeof(MessageHeader));
+        }
+        catch
+        {
+            NativeMemory.Free((void*)_iovecs);
+            base.Dispose();
+            throw;
+        }
+    }
 
     public ValueTask SendAsync(
         Socket socket,
@@ -828,45 +857,51 @@ internal sealed unsafe partial class LinuxIoUringEngine
 
     private void SubmitPending()
     {
-        var submitted = 0;
-        while (_pending.TryDequeue(out var operation))
+        bool repeat;
+        do
         {
-            IoUringSubmission* sqe;
-            try
+            repeat = false;
+            var submitted = 0;
+            while (_pending.TryDequeue(out var operation))
             {
-                sqe = GetSubmission();
-            }
-            catch
-            {
-                _pending.Enqueue(operation);
-                throw;
+                IoUringSubmission* sqe;
+                try
+                {
+                    sqe = GetSubmission();
+                }
+                catch
+                {
+                    _pending.Enqueue(operation);
+                    throw;
+                }
+
+                *sqe = default;
+                sqe->Opcode = operation.OperationCode;
+                sqe->FileDescriptor = operation.FileDescriptor;
+                sqe->Address = (ulong)operation.BufferAddress;
+                sqe->Length = checked((uint)operation.BufferLength);
+                sqe->UserData = operation.UserData;
+
+                submitted++;
+                if (submitted == 1024)
+                {
+                    Submit();
+                    submitted = 0;
+                }
             }
 
-            *sqe = default;
-            sqe->Opcode = operation.OperationCode;
-            sqe->FileDescriptor = operation.FileDescriptor;
-            sqe->Address = (ulong)operation.BufferAddress;
-            sqe->Length = checked((uint)operation.BufferLength);
-            sqe->UserData = operation.UserData;
-
-            submitted++;
-            if (submitted == 1024)
+            if (!_wakePollArmed)
             {
-                Submit();
-                submitted = 0;
+                ArmWakePoll();
+                submitted++;
+            }
+
+            if (submitted > 0)
+            {
+                repeat = Submit();
             }
         }
-
-        if (!_wakePollArmed)
-        {
-            ArmWakePoll();
-            submitted++;
-        }
-
-        if (submitted > 0)
-        {
-            Submit();
-        }
+        while (repeat);
     }
 
     private void DrainCompletions()
@@ -1015,16 +1050,27 @@ internal sealed unsafe partial class LinuxIoUringEngine
         }
     }
 
-    private void Submit()
+    private bool Submit()
     {
-        int result;
-        do
+        var drainedCompletions = false;
+        while (true)
         {
-            result = Native.Submit(ref _ring);
-        }
-        while (result == -4);
+            var result = Native.Submit(ref _ring);
+            if (result == -4)
+            {
+                continue;
+            }
 
-        ThrowIfError(result);
+            if (result == -ErrorBusy)
+            {
+                DrainCompletions();
+                drainedCompletions = true;
+                continue;
+            }
+
+            ThrowIfError(result);
+            return drainedCompletions;
+        }
     }
 
     private void SubmitAndWait()
