@@ -1,7 +1,7 @@
 ---
 title: Grain placement and migration
 description: Understand placement, resource-optimized defaults, and activation movement in Orleans.
-ms.date: 08/26/2026
+ms.date: 08/27/2026
 ms.topic: concept-article
 ---
 
@@ -82,15 +82,17 @@ Activation-count-based placement applies the power-of-two-choices technique desc
 :::code language="csharp" source="../snippets/compiled/Grains/PlacementSnippets.cs" id="prefer_local_grain":::
 Placement happens when creating an activation. Changing cluster membership or a strategy doesn't move existing activations by itself.
 
-## Direct placement with placement hints
+## Direct placement and migration with placement hints
 
-A placement hint directs a new activation to a specific silo. Set <xref:Orleans.Runtime.Placement.IPlacementDirector.PlacementHintKey> in <xref:Orleans.Runtime.RequestContext> before making the grain call that can trigger activation. The built-in placement directors select the hinted silo when it belongs to the compatible candidate set after version compatibility and placement filters are applied.
+A placement hint directs a new activation or a migrating activation to a specific silo. Set <xref:Orleans.Runtime.Placement.IPlacementDirector.PlacementHintKey> in <xref:Orleans.Runtime.RequestContext> before making the grain call that can trigger activation or before calling <xref:Orleans.Grain.MigrateOnIdle>. The built-in placement directors select the hinted silo when it belongs to the compatible candidate set after version compatibility and placement filters are applied.
 
-The following grain injects <xref:Orleans.Runtime.IClusterMembershipService> and <xref:Orleans.Runtime.ILocalSiloDetails>, selects an active silo other than its own, and directs a worker activation there:
+The following grain injects <xref:Orleans.Runtime.IClusterMembershipService> and <xref:Orleans.Runtime.ILocalSiloDetails> and selects an active silo other than its own. `ProcessOrder` directs a new worker activation to that silo, while `MoveToAnotherSilo` directs migration of the coordinator activation:
 
 :::code language="csharp" source="snippets/placement/PlacementHints.cs" id="direct_placement_with_hint":::
 
-The membership snapshot provides the silos known to the caller at that point in time. The grain call, rather than `GetGrain`, triggers activation and placement. If the worker is already active, Orleans routes the call to its existing activation. If cluster membership or compatibility changes before placement and the hinted silo isn't a candidate, the configured placement strategy selects another compatible silo. Restore the previous request-context value after the call because request context propagates to outgoing grain calls.
+The membership snapshot provides the silos known to the caller at that point in time. For a new activation, the grain call, rather than `GetGrain`, triggers placement. If the worker is already active, Orleans routes the call to its existing activation. <xref:Orleans.Grain.MigrateOnIdle> captures the current request context and starts migration asynchronously after the current work completes. Migration occurs only when placement selects a different compatible silo.
+
+If membership or compatibility changes remove the hinted silo from the candidate set, the configured placement strategy selects from the current compatible silos. Restore the previous request-context value after each operation because request context propagates to outgoing grain calls.
 
 ## Override the cluster default
 
@@ -110,7 +112,7 @@ See [Placement filters](grain-placement-filtering.md) for the built-in filters a
 A grain can ask Orleans to move its activation after current work completes:
 
 :::code language="csharp" source="../snippets/compiled/Grains/PlacementSnippets.cs" id="move_grain":::
-Migration is advisory and occurs only if placement chooses another compatible silo. Custom activation state must participate in dehydration and rehydration; see [Grain activation and lifecycle](grain-lifecycle.md#grain-migration).
+Migration is advisory and occurs only if placement chooses another compatible silo. Use a [placement hint](#direct-placement-and-migration-with-placement-hints) to direct the migration to a specific compatible silo. Custom activation state must participate in dehydration and rehydration; see [Grain activation and lifecycle](grain-lifecycle.md#grain-migration).
 
 Use <xref:Orleans.Placement.ImmovableAttribute> to exclude a grain class from automatic movement:
 
