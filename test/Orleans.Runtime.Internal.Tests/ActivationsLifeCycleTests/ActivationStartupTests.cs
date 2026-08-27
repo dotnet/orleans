@@ -28,6 +28,8 @@ public sealed class ActivationStartupTests(ActivationStartupTestFixture fixture)
         var failActivityCreation = new AsyncLocal<bool>();
         var expected = new InvalidOperationException("activity-start-fault");
         using var collector = new DiagnosticEventCollector(DispatcherEvents.ListenerName);
+        var activationCollector = fixture.Services.GetRequiredService<ActivationCollector>();
+        var baselineActivationCount = activationCollector._activationCount;
         ActivationData? context = null;
         ActivationStartupRequest? request = null;
         Task<DiagnosticEvent>? rejected = null;
@@ -61,6 +63,7 @@ public sealed class ActivationStartupTests(ActivationStartupTestFixture fixture)
             Assert.Equal(0, scenario.ConstructorCount);
             Assert.Equal(0, scenario.OnActivateCount);
             Assert.Equal(ActivationState.Invalid, context.State);
+            Assert.Equal(baselineActivationCount, activationCollector._activationCount);
         }
         finally
         {
@@ -90,7 +93,6 @@ public sealed class ActivationStartupTests(ActivationStartupTestFixture fixture)
                 Timeout,
                 TestContext.Current.CancellationToken);
             context.ReceiveMessage(requestData.Message);
-            failActivityCreation.Value = false;
             throw expected;
         }
     }
