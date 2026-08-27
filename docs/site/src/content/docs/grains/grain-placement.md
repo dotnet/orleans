@@ -94,6 +94,10 @@ The membership snapshot provides the silos known to the caller at that point in 
 
 If membership or compatibility changes remove the hinted silo from the candidate set, the configured placement strategy selects from the current compatible silos. Restore the previous request-context value after each operation because request context propagates to outgoing grain calls.
 
+The receiving grain also sees the placement hint in its request context, including when it already has an activation. Remove the hint before making unrelated outgoing grain calls so that their placement uses their intended context and strategy, then restore the incoming value if the grain continues processing the original request:
+
+:::code language="csharp" source="snippets/placement/PlacementHints.cs" id="contain_received_placement_hint":::
+
 ## Override the cluster default
 
 Register a different default strategy only when all unannotated grains should use it:

@@ -5,7 +5,12 @@ namespace GrainPlacement;
 
 public interface IOrderWorkerGrain : IGrainWithStringKey
 {
-    Task ProcessOrder();
+    Task ProcessOrder(string orderId);
+}
+
+public interface IOrderAuditGrain : IGrainWithStringKey
+{
+    Task RecordProcessedOrder(string orderId);
 }
 
 public interface IOrderCoordinatorGrain : IGrainWithStringKey
@@ -15,10 +20,40 @@ public interface IOrderCoordinatorGrain : IGrainWithStringKey
     Task MoveToAnotherSilo();
 }
 
+public sealed class OrderAuditGrain : Grain, IOrderAuditGrain
+{
+    public Task RecordProcessedOrder(string orderId) =>
+        Task.CompletedTask;
+}
+
+// <contain_received_placement_hint>
 public sealed class OrderWorkerGrain : Grain, IOrderWorkerGrain
 {
-    public Task ProcessOrder() => Task.CompletedTask;
+    public async Task ProcessOrder(string orderId)
+    {
+        var placementHint = RequestContext.Get(
+            IPlacementDirector.PlacementHintKey);
+
+        RequestContext.Remove(
+            IPlacementDirector.PlacementHintKey);
+
+        try
+        {
+            var audit = GrainFactory.GetGrain<IOrderAuditGrain>("orders");
+            await audit.RecordProcessedOrder(orderId);
+        }
+        finally
+        {
+            if (placementHint is not null)
+            {
+                RequestContext.Set(
+                    IPlacementDirector.PlacementHintKey,
+                    placementHint);
+            }
+        }
+    }
 }
+// </contain_received_placement_hint>
 
 // <direct_placement_with_hint>
 public sealed class OrderCoordinatorGrain(
@@ -38,7 +73,7 @@ public sealed class OrderCoordinatorGrain(
         try
         {
             var worker = GrainFactory.GetGrain<IOrderWorkerGrain>(orderId);
-            await worker.ProcessOrder();
+            await worker.ProcessOrder(orderId);
         }
         finally
         {
