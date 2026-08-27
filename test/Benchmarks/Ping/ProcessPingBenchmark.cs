@@ -346,7 +346,7 @@ internal static class ProcessPingBenchmark
     {
         if (IsIoUringEnabled())
         {
-            var statistics = LinuxIoUringEngine.Instance.GetZeroCopyStatistics();
+            var statistics = LinuxIoUringEngine.GetZeroCopyStatistics();
             Console.WriteLine(
                 $"PING_IOURING zeroCopyPrimary={statistics.Primary} " +
                 $"zeroCopyNotifications={statistics.Notifications} " +
