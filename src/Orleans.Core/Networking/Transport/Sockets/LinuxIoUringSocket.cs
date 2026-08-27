@@ -6,6 +6,7 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
 using System.Net.Sockets;
+using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using System.Threading;
 using System.Threading.Tasks;
@@ -995,20 +996,35 @@ internal sealed unsafe partial class LinuxIoUringEngine
 
     private IoUringSubmission* GetSubmission()
     {
-        var result = Native.GetSubmission(ref _ring);
+        var result = TryGetSubmission();
         if (result != null)
         {
             return result;
         }
 
         Submit();
-        result = Native.GetSubmission(ref _ring);
+        result = TryGetSubmission();
         if (result == null)
         {
             throw new InvalidOperationException("The io_uring submission queue remained full after submission.");
         }
 
         return result;
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private IoUringSubmission* TryGetSubmission()
+    {
+        ref var submission = ref _ring.Submission;
+        var tail = submission.SubmissionTail;
+        var next = tail + 1;
+        if (next - Volatile.Read(ref *submission.KernelHead) > submission.RingEntries)
+        {
+            return null;
+        }
+
+        submission.SubmissionTail = next;
+        return &submission.Submissions[tail & submission.RingMask];
     }
 
     private void ArmWakePoll()
@@ -1176,9 +1192,6 @@ internal sealed unsafe partial class LinuxIoUringEngine
     {
         [LibraryImport("liburing.so.2", EntryPoint = "io_uring_queue_init")]
         internal static partial int QueueInit(uint entries, ref IoUring ring, uint flags);
-
-        [LibraryImport("liburing.so.2", EntryPoint = "io_uring_get_sqe")]
-        internal static partial IoUringSubmission* GetSubmission(ref IoUring ring);
 
         [LibraryImport("liburing.so.2", EntryPoint = "io_uring_submit")]
         internal static partial int Submit(ref IoUring ring);
