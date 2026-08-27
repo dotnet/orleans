@@ -8,6 +8,7 @@ internal record AdoNetStreamPartitionState(
     string ProviderId,
     string QueueId,
     long OwnerEpoch,
+    long NextMessageId,
     long? Checkpoint,
     long? EarliestMessageId,
     long? TailMessageId);
