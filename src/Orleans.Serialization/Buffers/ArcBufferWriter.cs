@@ -130,6 +130,22 @@ public sealed class ArcBufferWriter : IBufferWriter<byte>, IDisposable
         }
     }
 
+    internal void TrimPreallocatedWritePages()
+    {
+        ThrowIfPinnedPages();
+        if (ReferenceEquals(_writePage, _tail))
+        {
+            return;
+        }
+
+        var firstUnused = _writePage.Next
+            ?? throw new InvalidOperationException("The write page is detached from the preallocated tail.");
+        var previousTail = _tail;
+        _writePage.ClearNext(_writePage.Version);
+        _tail = _writePage;
+        UnpinPages(firstUnused, previousTail);
+    }
+
     /// <summary>
     /// Resets this instance, returning all memory.
     /// </summary>
@@ -387,6 +403,107 @@ public sealed class ArcBufferWriter : IBufferWriter<byte>, IDisposable
         _hasPinnedPages = true;
     }
 
+    internal void AppendReceivedPage(ArcBufferPage page, int length)
+    {
+        if (page is null)
+        {
+            throw new ArgumentNullException(nameof(page));
+        }
+
+        ThrowIfPinnedPages();
+        if (length <= 0 || length > page.Array.Length)
+        {
+            throw new ArgumentOutOfRangeException(nameof(length));
+        }
+
+        if (page.ReferenceCount <= 0 || page.Next is not null || page.Length != 0)
+        {
+            throw new InvalidOperationException("A received page must be referenced, empty, and detached.");
+        }
+
+        if (_writePage != _tail)
+        {
+            throw new InvalidOperationException("A received page cannot be appended while writable pages are preallocated.");
+        }
+
+        var token = page.Version;
+        var totalLength = UnconsumedLength == 0
+            ? length
+            : checked(_totalLength + length);
+        page.Pin(token);
+        try
+        {
+            page.SetLength(length, token);
+        }
+        catch
+        {
+            page.Unpin(token);
+            throw;
+        }
+
+        if (UnconsumedLength == 0)
+        {
+            var previousPage = _readPage;
+            var previousTail = _tail;
+            _readPage = _writePage = _tail = page;
+            _readIndex = 0;
+            _totalLength = totalLength;
+            UnpinPages(previousPage, previousTail);
+        }
+        else
+        {
+            try
+            {
+                _tail.SetNext(page, _tail.Version);
+            }
+            catch
+            {
+                page.SetLength(0, token);
+                page.Unpin(token);
+                throw;
+            }
+
+            _writePage = _tail = page;
+            _totalLength = totalLength;
+        }
+    }
+
+    internal void AdvanceReceivedPage(ArcBufferPage page, int expectedOffset, int length)
+    {
+        if (page is null)
+        {
+            throw new ArgumentNullException(nameof(page));
+        }
+
+        ThrowIfPinnedPages();
+        if (length <= 0)
+        {
+            throw new ArgumentOutOfRangeException(nameof(length));
+        }
+
+        if (!ReferenceEquals(page, _tail) || !ReferenceEquals(page, _writePage))
+        {
+            throw new InvalidOperationException("Only the current received tail page can be advanced.");
+        }
+
+        var token = page.Version;
+        page.CheckValidity(token);
+        if (page.Length != expectedOffset)
+        {
+            throw new InvalidOperationException("The received page offset is not contiguous with the writer tail.");
+        }
+
+        if (length > page.Array.Length - expectedOffset)
+        {
+            throw new ArgumentOutOfRangeException(nameof(length));
+        }
+
+        var pageLength = checked(expectedOffset + length);
+        var totalLength = checked(_totalLength + length);
+        page.SetLength(pageLength, token);
+        _totalLength = totalLength;
+    }
+
     private void ThrowIfPinnedPages()
     {
         if (_hasPinnedPages)
@@ -433,11 +550,15 @@ public sealed class ArcBufferWriter : IBufferWriter<byte>, IDisposable
     /// </summary>
     private void UnpinAll()
     {
-        var current = _readPage;
+        UnpinPages(_readPage, _tail);
+    }
+
+    private static void UnpinPages(ArcBufferPage? current, ArcBufferPage tail)
+    {
         while (current != null)
         {
             var previous = current;
-            current = ReferenceEquals(previous, _tail) ? null : previous.Next;
+            current = ReferenceEquals(previous, tail) ? null : previous.Next;
             previous.Unpin(previous.Version);
         }
     }
@@ -847,6 +968,21 @@ public sealed class ArcBufferPage
         {
             Return();
         }
+    }
+
+    internal void ReturnUnreferenced(int token)
+    {
+        if (token != _version)
+        {
+            ThrowInvalidVersion();
+        }
+
+        if (_refCount != 0)
+        {
+            throw new InvalidOperationException("A referenced page cannot be returned directly to the page pool.");
+        }
+
+        Return();
     }
 
     private void Return()

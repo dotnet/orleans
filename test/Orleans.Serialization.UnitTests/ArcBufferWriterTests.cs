@@ -167,6 +167,60 @@ namespace Orleans.Serialization.UnitTests
         }
 
         [Fact]
+        public void AppendReceivedPage_AdvancesSameTailWithoutCopyAndPreservesSlices()
+        {
+            var page = ArcBufferPagePool.Shared.Rent(PageSize);
+            var version = page.Version;
+            page.Pin(version);
+            page.Array.AsSpan(0, 3).Fill(1);
+            var writer = new ArcBufferWriter();
+
+            writer.AppendReceivedPage(page, 3);
+            var earlySlice = writer.ConsumeSlice(3);
+            Assert.Same(page, earlySlice.First);
+            Assert.Equal(new byte[] { 1, 1, 1 }, earlySlice.ToArray());
+
+            page.Array.AsSpan(3, 2).Fill(2);
+            writer.AdvanceReceivedPage(page, expectedOffset: 3, length: 2);
+            var laterSlice = writer.ConsumeSlice(2);
+            Assert.Same(page, laterSlice.First);
+            Assert.Equal(new byte[] { 2, 2 }, laterSlice.ToArray());
+            Assert.Equal(new byte[] { 1, 1, 1 }, earlySlice.ToArray());
+
+            page.Unpin(version);
+            writer.Dispose();
+            laterSlice.Dispose();
+            Assert.Equal(1, page.ReferenceCount);
+            Assert.Equal(new byte[] { 1, 1, 1 }, earlySlice.ToArray());
+
+            earlySlice.Dispose();
+            Assert.Equal(0, page.ReferenceCount);
+            Assert.Equal(version + 1, page.Version);
+        }
+
+        [Fact]
+        public void TrimPreallocatedWritePages_AllowsAppendingReceivedPage()
+        {
+            using var writer = new ArcBufferWriter();
+            var buffers = new List<ArraySegment<byte>>(capacity: 8);
+            writer.ReplenishBuffers(buffers);
+            buffers[0].AsSpan(0, 3).Fill(1);
+            writer.AdvanceWriter(3);
+            buffers.Clear();
+            writer.TrimPreallocatedWritePages();
+
+            var page = ArcBufferPagePool.Shared.Rent(PageSize);
+            var version = page.Version;
+            page.Pin(version);
+            page.Array.AsSpan(0, 2).Fill(2);
+            writer.AppendReceivedPage(page, 2);
+            page.Unpin(version);
+
+            using var slice = writer.ConsumeSlice(5);
+            Assert.Equal(new byte[] { 1, 1, 1, 2, 2 }, slice.ToArray());
+        }
+
+        [Fact]
         public void TestReplenishBuffers()
         {
             var bufferWriter = new ArcBufferWriter();
