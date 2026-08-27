@@ -152,6 +152,7 @@ public abstract class AdoNetQueueAdapterTests(string invariant, TestEnvironmentF
             TestContext.Current.CancellationToken))
             .OrderBy(static message => message.MessageId)
             .ToList();
+        Assert.Equal(3, stored.Count);
         for (var i = 0; i < stored.Count; i++)
         {
             var item = stored[i];
