@@ -604,8 +604,8 @@ public sealed class RecoverableStreamReceiverTests
         var receiver = CreateReceiver(source, checkpointer);
 
         await Assert.ThrowsAnyAsync<OperationCanceledException>(
-            () => receiver.GetQueueMessagesAsync(10, CancellationToken.None)
-                .WaitAsync(TimeSpan.FromSeconds(5)));
+            () => receiver.GetQueueMessagesAsync(10, TestContext.Current.CancellationToken)
+                .WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken));
 
         Assert.Equal(1, checkpointer.LoadCount);
         Assert.Equal(0, source.InitializeCount);
