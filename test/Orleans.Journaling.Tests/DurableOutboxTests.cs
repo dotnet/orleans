@@ -151,7 +151,7 @@ public class DurableOutboxTests : JournalingTestBase
         h.Outbox.Send(later);
 
         ((IJournaledState)h.Outbox).OnWriteCompleted();
-        await h.Outbox.DeliverPendingMessagesAsync();
+        await h.Outbox.DeliverPendingMessagesAsync(TestContext.Current.CancellationToken);
 
         Assert.Single(h.Extension.DeliveredEnvelopes);
         Assert.Equal(included.MessageId, h.Extension.DeliveredEnvelopes[0].MessageId);
@@ -159,7 +159,7 @@ public class DurableOutboxTests : JournalingTestBase
 
         ((IJournaledStateWriteParticipant)h.Outbox).OnWritePreparing();
         ((IJournaledState)h.Outbox).OnWriteCompleted();
-        await h.Outbox.DeliverPendingMessagesAsync();
+        await h.Outbox.DeliverPendingMessagesAsync(TestContext.Current.CancellationToken);
 
         Assert.Equal(2, h.Extension.DeliveredEnvelopes.Count);
         Assert.Equal(later.MessageId, h.Extension.DeliveredEnvelopes[1].MessageId);
@@ -205,7 +205,7 @@ public class DurableOutboxTests : JournalingTestBase
         SendAndMarkDurable(h.Outbox, envelope);
         h.Extension.NextResult = DeliveryResult.Backpressured();
 
-        await h.Outbox.DeliverPendingMessagesAsync();
+        await h.Outbox.DeliverPendingMessagesAsync(TestContext.Current.CancellationToken);
 
         // Message must remain in the outbox (not delivered), with exactly one attempt recorded.
         Assert.True(h.Outbox.TryGetMessage(envelope.MessageId, out _));
@@ -225,7 +225,7 @@ public class DurableOutboxTests : JournalingTestBase
         SendAndMarkDurable(h.Outbox, envelope);
         h.Extension.NextResult = DeliveryResult.RouteNotFound(RouteKey);
 
-        await h.Outbox.DeliverPendingMessagesAsync();
+        await h.Outbox.DeliverPendingMessagesAsync(TestContext.Current.CancellationToken);
 
         Assert.True(h.MessageStates.TryGetValue(envelope.MessageId, out var state));
         Assert.Equal(1, state!.AttemptCount);
@@ -244,7 +244,7 @@ public class DurableOutboxTests : JournalingTestBase
         h.Extension.Throw = new InvalidOperationException("simulated delivery failure");
 
         // Must not propagate: the catch (Exception ex) when (ex is not OperationCanceledException) branch handles it.
-        await h.Outbox.DeliverPendingMessagesAsync();
+        await h.Outbox.DeliverPendingMessagesAsync(TestContext.Current.CancellationToken);
 
         Assert.True(h.MessageStates.TryGetValue(envelope.MessageId, out var state));
         Assert.Equal(1, state!.AttemptCount);
@@ -264,7 +264,7 @@ public class DurableOutboxTests : JournalingTestBase
         SendAndMarkDurable(h.Outbox, envelope);
         h.Extension.NextResult = DeliveryResult.Pending();
 
-        await h.Outbox.DeliverPendingMessagesAsync();
+        await h.Outbox.DeliverPendingMessagesAsync(TestContext.Current.CancellationToken);
 
         // Dead-lettered: removed from the live outbox and recorded with the unexpected-status reason.
         Assert.False(h.Outbox.TryGetMessage(envelope.MessageId, out _));
@@ -290,21 +290,21 @@ public class DurableOutboxTests : JournalingTestBase
         h.Extension.NextResult = DeliveryResult.Backpressured();
 
         // First attempt: backpressured, attempt #1, next retry scheduled ~2s out.
-        await h.Outbox.DeliverPendingMessagesAsync();
+        await h.Outbox.DeliverPendingMessagesAsync(TestContext.Current.CancellationToken);
         Assert.Single(h.Extension.DeliveredEnvelopes);
         h.MessageStates.TryGetValue(envelope.MessageId, out var afterFirst);
         var firstNextAttempt = afterFirst!.NextAttemptAt!.Value;
         Assert.Equal(h.TimeProvider.GetUtcNow() + backpressureDelay, firstNextAttempt);
 
         // Immediately retrying (time unchanged) must skip the message: it is not yet eligible for retry.
-        await h.Outbox.DeliverPendingMessagesAsync();
+        await h.Outbox.DeliverPendingMessagesAsync(TestContext.Current.CancellationToken);
         Assert.Single(h.Extension.DeliveredEnvelopes);
         h.MessageStates.TryGetValue(envelope.MessageId, out var stillFirst);
         Assert.Equal(1, stillFirst!.AttemptCount);
 
         // Advance time past the scheduled retry: the message becomes eligible again, doubling the backoff.
         h.TimeProvider.Advance(backpressureDelay + TimeSpan.FromMilliseconds(1));
-        await h.Outbox.DeliverPendingMessagesAsync();
+        await h.Outbox.DeliverPendingMessagesAsync(TestContext.Current.CancellationToken);
         Assert.Equal(2, h.Extension.DeliveredEnvelopes.Count);
         h.MessageStates.TryGetValue(envelope.MessageId, out var afterSecond);
         Assert.Equal(2, afterSecond!.AttemptCount);
@@ -326,7 +326,7 @@ public class DurableOutboxTests : JournalingTestBase
         h.TimeProvider.SetUtcNow(envelope.CreatedAt.AddDays(1));
         h.Extension.NextResult = DeliveryResult.Backpressured();
 
-        await h.Outbox.DeliverPendingMessagesAsync();
+        await h.Outbox.DeliverPendingMessagesAsync(TestContext.Current.CancellationToken);
 
         Assert.False(h.Outbox.TryGetMessage(envelope.MessageId, out _));
         Assert.True(h.DeadLetters.TryGetValue(envelope.MessageId, out var deadLetter));
@@ -347,14 +347,14 @@ public class DurableOutboxTests : JournalingTestBase
         var uncommitted = CreateEnvelope();
         h.Outbox.Send(uncommitted);
 
-        await h.Outbox.DeliverPendingMessagesAsync();
+        await h.Outbox.DeliverPendingMessagesAsync(TestContext.Current.CancellationToken);
 
         Assert.Equal(2, h.Extension.DeliveredEnvelopes.Count);
         Assert.All(h.Extension.DeliveredEnvelopes, envelope => Assert.Contains(envelope, durable));
         Assert.Single(durable, envelope => h.Outbox.TryGetMessage(envelope.MessageId, out _));
         Assert.True(h.Outbox.TryGetMessage(uncommitted.MessageId, out _));
 
-        await h.Outbox.DeliverPendingMessagesAsync();
+        await h.Outbox.DeliverPendingMessagesAsync(TestContext.Current.CancellationToken);
 
         Assert.Equal(4, h.Extension.DeliveredEnvelopes.Count);
         Assert.Contains(h.Extension.DeliveredEnvelopes, envelope => envelope.MessageId == uncommitted.MessageId);
@@ -369,7 +369,7 @@ public class DurableOutboxTests : JournalingTestBase
         SendAndMarkDurable(h.Outbox, envelope);
         h.Extension.NextResult = DeliveryResult.Duplicate();
 
-        await h.Outbox.DeliverPendingMessagesAsync();
+        await h.Outbox.DeliverPendingMessagesAsync(TestContext.Current.CancellationToken);
 
         Assert.Single(h.Extension.DeliveredEnvelopes);
         Assert.False(h.Outbox.TryGetMessage(envelope.MessageId, out _));

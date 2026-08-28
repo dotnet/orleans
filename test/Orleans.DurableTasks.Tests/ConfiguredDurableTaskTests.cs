@@ -60,7 +60,8 @@ public class ConfiguredDurableTaskTests
     {
         var configured = new ConfiguredDurableTask(DurableTask.Run(static _ => { }));
 
-        var exception = await Assert.ThrowsAsync<InvalidOperationException>(async () => await configured.ScheduleAsync());
+        var exception = await Assert.ThrowsAsync<InvalidOperationException>(
+            async () => await configured.ScheduleAsync(TestContext.Current.CancellationToken));
         Assert.Contains("does not support scheduling", exception.Message);
 
         // A second call on the same instance must also throw (TrySetTaskId's "already set" guard means the
@@ -81,7 +82,8 @@ public class ConfiguredDurableTaskTests
         configured = configured.WithId("second-name");
         Assert.Equal("first-name", configured.TaskId.ToString());
 
-        var exception = await Assert.ThrowsAsync<InvalidOperationException>(async () => await configured.ScheduleAsync());
+        var exception = await Assert.ThrowsAsync<InvalidOperationException>(
+            async () => await configured.ScheduleAsync(TestContext.Current.CancellationToken));
         Assert.Contains("does not support scheduling", exception.Message);
     }
 
@@ -108,7 +110,7 @@ public class ConfiguredDurableTaskTests
 
         var configured = CreateWithAmbientParent(context, DurableTask.Run(static _ => { }));
 
-        var scheduled = await configured.ScheduleAsync();
+        var scheduled = await configured.ScheduleAsync(TestContext.Current.CancellationToken);
 
         var expectedChildTaskId = ownTaskId.Child("unnamed:0");
         Assert.Equal(expectedChildTaskId, capturedTaskId);
@@ -196,7 +198,7 @@ public class ConfiguredDurableTaskTests
 
         var configured = CreateWithAmbientParent(context, DurableTask.FromResult(7));
 
-        var scheduled = await configured.ScheduleAsync();
+        var scheduled = await configured.ScheduleAsync(TestContext.Current.CancellationToken);
 
         var expectedChildTaskId = ownTaskId.Child("unnamed:0");
         Assert.Equal(expectedChildTaskId, capturedTaskId);
@@ -211,7 +213,7 @@ public class ConfiguredDurableTaskTests
         var configured = new ConfiguredDurableTask(task);
         var copy = configured;
 
-        var scheduled = await configured.ScheduleAsync();
+        var scheduled = await configured.ScheduleAsync(TestContext.Current.CancellationToken);
         _ = await copy.PollAsync(new PollingOptions(), CancellationToken.None);
         _ = await configured.CancelAsync(CancellationToken.None);
 
@@ -227,7 +229,7 @@ public class ConfiguredDurableTaskTests
         var configured = new ConfiguredDurableTask<int>(task);
         var copy = configured;
 
-        var scheduled = await copy.ScheduleAsync();
+        var scheduled = await copy.ScheduleAsync(TestContext.Current.CancellationToken);
         _ = await configured.PollAsync(new PollingOptions(), CancellationToken.None);
         _ = await copy.CancelAsync(CancellationToken.None);
 
@@ -252,7 +254,7 @@ public class ConfiguredDurableTaskTests
         var configured = CreateWithAmbientParent(context, DurableTask.Run(static _ => { }));
         var copy = configured;
 
-        var scheduled = await copy.ScheduleAsync();
+        var scheduled = await copy.ScheduleAsync(TestContext.Current.CancellationToken);
         _ = await configured.PollAsync(new PollingOptions(), CancellationToken.None);
         _ = await copy.CancelAsync(CancellationToken.None);
 
@@ -277,7 +279,7 @@ public class ConfiguredDurableTaskTests
         var configured = CreateWithAmbientParent(context, DurableTask.FromResult(1));
         var copy = configured;
 
-        var scheduled = await configured.ScheduleAsync();
+        var scheduled = await configured.ScheduleAsync(TestContext.Current.CancellationToken);
         _ = await copy.PollAsync(new PollingOptions(), CancellationToken.None);
         _ = await configured.CancelAsync(CancellationToken.None);
 

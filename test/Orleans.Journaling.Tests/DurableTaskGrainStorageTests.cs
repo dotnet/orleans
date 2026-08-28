@@ -33,7 +33,7 @@ public class DurableTaskGrainStorageTests : JournalingTestBase
             "$tasks",
             sut.Manager,
             new OrleansBinaryDurableDictionaryCommandCodec<TaskId, DurableTaskState>(keyCodec, valueCodec, SessionPool));
-        await sut.Lifecycle.OnStart();
+        await sut.Lifecycle.OnStart(TestContext.Current.CancellationToken);
 
         var storage = new DurableTaskGrainStorage(
             dictionary,
@@ -453,7 +453,7 @@ public class DurableTaskGrainStorageTests : JournalingTestBase
         // The manager's internal work loop is only started (lazily) by InitializeAsync/lifecycle OnStart - it
         // must run before WriteStateAsync's enqueued work item can ever be dequeued and completed, otherwise
         // the await below would block forever waiting for a loop that was never started.
-        await sut.Lifecycle.OnStart();
+        await sut.Lifecycle.OnStart(TestContext.Current.CancellationToken);
 
         await storage.WriteAsync(CancellationToken.None);
 

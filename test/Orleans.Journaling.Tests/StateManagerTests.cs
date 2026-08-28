@@ -68,7 +68,7 @@ public class StateManagerTests : JournalingTestBase
             CodecProvider.GetCodec<int>(),
             SessionPool);
         var dictionary = new DurableDictionary<string, int>("dict", sut.Manager, codec);
-        await sut.Lifecycle.OnStart();
+        await sut.Lifecycle.OnStart(TestContext.Current.CancellationToken);
 
         await sut.Manager.RevertPendingChangesAsync(CancellationToken.None);
         dictionary["key"] = 42;
@@ -82,7 +82,7 @@ public class StateManagerTests : JournalingTestBase
                 CodecProvider.GetCodec<string>(),
                 CodecProvider.GetCodec<int>(),
                 SessionPool));
-        await recovered.Lifecycle.OnStart();
+        await recovered.Lifecycle.OnStart(TestContext.Current.CancellationToken);
 
         Assert.Equal(42, recoveredDictionary["key"]);
     }
@@ -699,7 +699,7 @@ public class StateManagerTests : JournalingTestBase
         var sut = CreateTestSystem(storage: storage);
         var dictionary = new DurableDictionary<string, int>("dict", sut.Manager, CreateDictionaryCodec<string, int>());
 
-        await sut.Lifecycle.OnStart();
+        await sut.Lifecycle.OnStart(TestContext.Current.CancellationToken);
         dictionary.Add("persisted", 1);
         await sut.Manager.WriteStateAsync(CancellationToken.None);
         dictionary.Add("pending", 2);
@@ -707,20 +707,24 @@ public class StateManagerTests : JournalingTestBase
         var recoveryFailure = new IOException("Expected recovery failure after reset.");
         storage.NextReadException = recoveryFailure;
         var exception = await Assert.ThrowsAsync<IOException>(
-            () => sut.Manager.RevertPendingChangesAsync(CancellationToken.None).AsTask().WaitAsync(TimeSpan.FromSeconds(10)));
+            () => sut.Manager.RevertPendingChangesAsync(TestContext.Current.CancellationToken)
+                .AsTask()
+                .WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken));
 
         Assert.Same(recoveryFailure, exception);
         Assert.Empty(dictionary);
 
         storage.BlockNextRead = true;
         var queuedWrite = sut.Manager.WriteStateAsync(CancellationToken.None).AsTask();
-        await storage.BlockedReadStarted.Task.WaitAsync(TimeSpan.FromSeconds(10));
+        await storage.BlockedReadStarted.Task.WaitAsync(
+            TimeSpan.FromSeconds(10),
+            TestContext.Current.CancellationToken);
 
         Assert.False(queuedWrite.IsCompleted);
         Assert.Empty(dictionary);
 
         storage.AllowBlockedRead.SetResult();
-        await queuedWrite.WaitAsync(TimeSpan.FromSeconds(10));
+        await queuedWrite.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
 
         Assert.Single(dictionary);
         Assert.Equal(1, dictionary["persisted"]);
@@ -733,13 +737,15 @@ public class StateManagerTests : JournalingTestBase
         var storage = new CapturingStorage();
         var sut = CreateTestSystem(storage: storage);
         var dictionary = new DurableDictionary<string, int>("dict", sut.Manager, CreateDictionaryCodec<string, int>());
-        await sut.Lifecycle.OnStart();
+        await sut.Lifecycle.OnStart(TestContext.Current.CancellationToken);
         dictionary.Add("persisted", 1);
         await sut.Manager.WriteStateAsync(CancellationToken.None);
 
         storage.NextReadException = new IOException("Initial recovery failure.");
         await Assert.ThrowsAsync<IOException>(
-            () => sut.Manager.RevertPendingChangesAsync(CancellationToken.None).AsTask().WaitAsync(TimeSpan.FromSeconds(10)));
+            () => sut.Manager.RevertPendingChangesAsync(TestContext.Current.CancellationToken)
+                .AsTask()
+                .WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken));
 
         storage.NextReadException = new IOException("Queued recovery failure.");
         var queuedWrite = sut.Manager.WriteStateAsync(CancellationToken.None).AsTask();
@@ -749,7 +755,8 @@ public class StateManagerTests : JournalingTestBase
         Assert.False(queuedWrite.IsCompleted);
 
         var coalescedRetry = sut.Manager.WriteStateAsync(CancellationToken.None).AsTask();
-        await Task.WhenAll(queuedWrite, coalescedRetry).WaitAsync(TimeSpan.FromSeconds(10));
+        await Task.WhenAll(queuedWrite, coalescedRetry)
+            .WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
 
         Assert.Equal(1, dictionary["persisted"]);
     }
@@ -760,7 +767,7 @@ public class StateManagerTests : JournalingTestBase
         var storage = new CapturingStorage();
         var sut = CreateTestSystem(storage: storage);
         var dictionary = new DurableDictionary<string, int>("dict", sut.Manager, CreateDictionaryCodec<string, int>());
-        await sut.Lifecycle.OnStart();
+        await sut.Lifecycle.OnStart(TestContext.Current.CancellationToken);
         dictionary.Add("persisted", 1);
         await sut.Manager.WriteStateAsync(CancellationToken.None);
 
@@ -768,8 +775,9 @@ public class StateManagerTests : JournalingTestBase
         var revert = sut.Manager.RevertPendingChangesAsync(CancellationToken.None).AsTask();
         var queuedWrite = sut.Manager.WriteStateAsync(CancellationToken.None).AsTask();
 
-        await Assert.ThrowsAsync<IOException>(() => revert.WaitAsync(TimeSpan.FromSeconds(10)));
-        await queuedWrite.WaitAsync(TimeSpan.FromSeconds(10));
+        await Assert.ThrowsAsync<IOException>(
+            () => revert.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken));
+        await queuedWrite.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
 
         Assert.Equal(1, dictionary["persisted"]);
     }
@@ -780,11 +788,13 @@ public class StateManagerTests : JournalingTestBase
         var storage = new CapturingStorage();
         var sut = CreateTestSystem(storage: storage);
         _ = new DurableDictionary<string, int>("dict", sut.Manager, CreateDictionaryCodec<string, int>());
-        await sut.Lifecycle.OnStart();
+        await sut.Lifecycle.OnStart(TestContext.Current.CancellationToken);
 
         storage.NextReadException = new IOException("Initial recovery failure.");
         await Assert.ThrowsAsync<IOException>(
-            () => sut.Manager.RevertPendingChangesAsync(CancellationToken.None).AsTask().WaitAsync(TimeSpan.FromSeconds(10)));
+            () => sut.Manager.RevertPendingChangesAsync(TestContext.Current.CancellationToken)
+                .AsTask()
+                .WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken));
 
         storage.NextReadException = new IOException("Queued recovery failure.");
         var firstRevert = sut.Manager.RevertPendingChangesAsync(CancellationToken.None).AsTask();
@@ -794,7 +804,8 @@ public class StateManagerTests : JournalingTestBase
         Assert.False(firstRevert.IsCompleted);
 
         var coalescedRevert = sut.Manager.RevertPendingChangesAsync(CancellationToken.None).AsTask();
-        await Task.WhenAll(firstRevert, coalescedRevert).WaitAsync(TimeSpan.FromSeconds(10));
+        await Task.WhenAll(firstRevert, coalescedRevert)
+            .WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
     }
 
     [Fact]
@@ -803,14 +814,16 @@ public class StateManagerTests : JournalingTestBase
         var storage = new CapturingStorage();
         var sut = CreateTestSystem(storage: storage);
         var dictionary = new DurableDictionary<string, int>("dict", sut.Manager, CreateDictionaryCodec<string, int>());
-        await sut.Lifecycle.OnStart();
+        await sut.Lifecycle.OnStart(TestContext.Current.CancellationToken);
         dictionary["initial"] = 1;
         await sut.Manager.WriteStateAsync(CancellationToken.None);
 
         storage.BlockNextAppendUntilAllowed = true;
         dictionary["blocking"] = 2;
         var blockingWrite = sut.Manager.WriteStateAsync(CancellationToken.None).AsTask();
-        await storage.BlockedAppendStarted.Task.WaitAsync(TimeSpan.FromSeconds(10));
+        await storage.BlockedAppendStarted.Task.WaitAsync(
+            TimeSpan.FromSeconds(10),
+            TestContext.Current.CancellationToken);
 
         dictionary["queued"] = 3;
         var firstQueuedWrite = sut.Manager.WriteStateAsync(CancellationToken.None).AsTask();
@@ -819,14 +832,17 @@ public class StateManagerTests : JournalingTestBase
         var writeAfterDelete = sut.Manager.WriteStateAsync(CancellationToken.None).AsTask();
 
         storage.AllowBlockedAppend.SetResult();
-        await storage.BlockedDeleteStarted.Task.WaitAsync(TimeSpan.FromSeconds(10));
+        await storage.BlockedDeleteStarted.Task.WaitAsync(
+            TimeSpan.FromSeconds(10),
+            TestContext.Current.CancellationToken);
 
-        await firstQueuedWrite.WaitAsync(TimeSpan.FromSeconds(10));
+        await firstQueuedWrite.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
         Assert.False(delete.IsCompleted);
         Assert.False(writeAfterDelete.IsCompleted);
 
         storage.AllowBlockedDelete.SetResult();
-        await Task.WhenAll(blockingWrite, firstQueuedWrite, delete, writeAfterDelete).WaitAsync(TimeSpan.FromSeconds(10));
+        await Task.WhenAll(blockingWrite, firstQueuedWrite, delete, writeAfterDelete)
+            .WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
     }
 
     [Fact]
@@ -869,21 +885,26 @@ public class StateManagerTests : JournalingTestBase
             sut.Manager,
             new ReplayOnlyDisposableDictionaryCodec());
         sut.Manager.RegisterState("ordering", new OrderingState(events));
-        await sut.Lifecycle.OnStart();
+        await sut.Lifecycle.OnStart(TestContext.Current.CancellationToken);
 
         var exception = await Assert.ThrowsAsync<InvalidOperationException>(
-            () => sut.Manager.RevertPendingChangesAsync(CancellationToken.None).AsTask().WaitAsync(TimeSpan.FromSeconds(10)));
+            () => sut.Manager.RevertPendingChangesAsync(TestContext.Current.CancellationToken)
+                .AsTask()
+                .WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken));
         Assert.Same(firstFailure, exception.InnerException);
         Assert.Equal(1, initial.DisposeCount);
         Assert.Equal(1, firstPartial.DisposeCount);
         Assert.Empty(dictionary);
 
         var queuedWrite = sut.Manager.WriteStateAsync(CancellationToken.None).AsTask();
-        await secondFailureObserved.Task.WaitAsync(TimeSpan.FromSeconds(10));
+        await secondFailureObserved.Task.WaitAsync(
+            TimeSpan.FromSeconds(10),
+            TestContext.Current.CancellationToken);
         Assert.False(queuedWrite.IsCompleted);
 
         var successfulRevert = sut.Manager.RevertPendingChangesAsync(CancellationToken.None).AsTask();
-        await Task.WhenAll(queuedWrite, successfulRevert).WaitAsync(TimeSpan.FromSeconds(10));
+        await Task.WhenAll(queuedWrite, successfulRevert)
+            .WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
 
         Assert.Equal(1, secondPartial.DisposeCount);
         Assert.Equal(1, recovered.DisposeCount);

@@ -17,14 +17,22 @@ public class ScheduledTaskTests
         ScheduledTask task = new CompletedScheduledDurableTask(taskId, response);
 
         Assert.Equal(taskId, task.Id);
-        Assert.True(await task.IsCompletedAsync());
-        Assert.True(await task.IsCompletedAsync(new PollingOptions { PollTimeout = TimeSpan.FromSeconds(1) }));
-        Assert.Equal(DurableTaskStatus.CompletedSuccessfully, await task.GetStatusAsync());
-        Assert.Equal(DurableTaskStatus.CompletedSuccessfully, await task.GetStatusAsync(new PollingOptions()));
-        Assert.Same(response, await task.GetResponseAsync());
-        Assert.Same(response, await task.GetResponseAsync(new PollingOptions()));
-        await task.WaitAsync();
-        await task.CancelAsync();
+        Assert.True(await task.IsCompletedAsync(TestContext.Current.CancellationToken));
+        Assert.True(await task.IsCompletedAsync(
+            new PollingOptions { PollTimeout = TimeSpan.FromSeconds(1) },
+            TestContext.Current.CancellationToken));
+        Assert.Equal(
+            DurableTaskStatus.CompletedSuccessfully,
+            await task.GetStatusAsync(TestContext.Current.CancellationToken));
+        Assert.Equal(
+            DurableTaskStatus.CompletedSuccessfully,
+            await task.GetStatusAsync(new PollingOptions(), TestContext.Current.CancellationToken));
+        Assert.Same(response, await task.GetResponseAsync(TestContext.Current.CancellationToken));
+        Assert.Same(
+            response,
+            await task.GetResponseAsync(new PollingOptions(), TestContext.Current.CancellationToken));
+        await task.WaitAsync(TestContext.Current.CancellationToken);
+        await task.CancelAsync(TestContext.Current.CancellationToken);
         await task;
     }
 
@@ -36,11 +44,11 @@ public class ScheduledTaskTests
         ScheduledTask<int> task = new CompletedScheduledDurableTask<int>(taskId, response);
 
         var result = await task;
-        var waited = await task.WaitAsync();
+        var waited = await task.WaitAsync(TestContext.Current.CancellationToken);
 
         Assert.Equal(73, result);
         Assert.Equal(73, waited);
-        Assert.Same(response, await task.GetResponseAsync());
+        Assert.Same(response, await task.GetResponseAsync(TestContext.Current.CancellationToken));
         Assert.Equal(taskId, task.Id);
     }
 
@@ -55,7 +63,8 @@ public class ScheduledTaskTests
         var awaitException = await Assert.ThrowsAsync<InvalidOperationException>(async () => await task);
         Assert.Same(expected, awaitException);
 
-        var waitException = await Assert.ThrowsAsync<InvalidOperationException>(async () => await task.WaitAsync());
+        var waitException = await Assert.ThrowsAsync<InvalidOperationException>(
+            async () => await task.WaitAsync(TestContext.Current.CancellationToken));
         Assert.Same(expected, waitException);
     }
 
@@ -77,7 +86,7 @@ public class ScheduledTaskTests
         var taskId = TaskId.Create("scheduled");
         var handle = Substitute.For<IScheduledTaskHandle>();
         handle.TaskId.Returns(taskId);
-        handle.PollAsync(default!, default)
+        handle.PollAsync(default!, TestContext.Current.CancellationToken)
             .ReturnsForAnyArgs(new ValueTask<DurableTaskResponse>(DurableTaskResponse.Pending));
         handle.WaitAsync(Arg.Any<CancellationToken>())
             .Returns(new ValueTask<DurableTaskResponse>(DurableTaskResponse.Completed));
@@ -85,12 +94,18 @@ public class ScheduledTaskTests
         var pollingOptions = new PollingOptions { PollTimeout = TimeSpan.FromSeconds(2) };
 
         Assert.Equal(taskId, task.Id);
-        Assert.False(await task.IsCompletedAsync(pollingOptions));
-        Assert.Equal(DurableTaskStatus.Pending, await task.GetStatusAsync(pollingOptions));
-        Assert.Same(DurableTaskResponse.Pending, await task.GetResponseAsync(pollingOptions));
-        Assert.Same(DurableTaskResponse.Completed, await task.GetResponseAsync());
-        await task.WaitAsync();
-        await task.CancelAsync();
+        Assert.False(await task.IsCompletedAsync(pollingOptions, TestContext.Current.CancellationToken));
+        Assert.Equal(
+            DurableTaskStatus.Pending,
+            await task.GetStatusAsync(pollingOptions, TestContext.Current.CancellationToken));
+        Assert.Same(
+            DurableTaskResponse.Pending,
+            await task.GetResponseAsync(pollingOptions, TestContext.Current.CancellationToken));
+        Assert.Same(
+            DurableTaskResponse.Completed,
+            await task.GetResponseAsync(TestContext.Current.CancellationToken));
+        await task.WaitAsync(TestContext.Current.CancellationToken);
+        await task.CancelAsync(TestContext.Current.CancellationToken);
 
         var pollCalls = handle.ReceivedCalls()
             .Where(call => call.GetMethodInfo().Name == nameof(IScheduledTaskHandle.PollAsync))
@@ -112,7 +127,7 @@ public class ScheduledTaskTests
         ScheduledTask<int> task = new ScheduledDurableTask<int>(handle);
 
         var result = await task;
-        var waited = await task.WaitAsync();
+        var waited = await task.WaitAsync(TestContext.Current.CancellationToken);
 
         Assert.Equal(99, result);
         Assert.Equal(99, waited);
@@ -128,10 +143,12 @@ public class ScheduledTaskTests
         var firstGeneric = new CompletedScheduledDurableTask<int>(TaskId.Create("first-generic"), DurableTaskResponse.FromResult(1));
         var secondGeneric = new CompletedScheduledDurableTask<int>(TaskId.Create("second-generic"), DurableTaskResponse.FromResult(2));
 
-        await ScheduledTask.WhenAll([first, second]);
-        await ScheduledTask.WhenAll([firstGeneric, secondGeneric]);
-        var any = await ScheduledTask.WhenAny([first, second]);
-        var anyGeneric = await ScheduledTask.WhenAny([firstGeneric, secondGeneric]);
+        await ScheduledTask.WhenAll([first, second], TestContext.Current.CancellationToken);
+        await ScheduledTask.WhenAll([firstGeneric, secondGeneric], TestContext.Current.CancellationToken);
+        var any = await ScheduledTask.WhenAny([first, second], TestContext.Current.CancellationToken);
+        var anyGeneric = await ScheduledTask.WhenAny(
+            [firstGeneric, secondGeneric],
+            TestContext.Current.CancellationToken);
 
         Assert.Same(first, any);
         Assert.Same(firstGeneric, anyGeneric);
@@ -146,9 +163,9 @@ public class ScheduledTaskTests
         var genericTask = new CompletedScheduledDurableTask<int>(TaskId.Create("failed-generic"), failed);
 
         var exception = await Assert.ThrowsAsync<InvalidOperationException>(
-            () => ScheduledTask.WhenAll([task]));
+            () => ScheduledTask.WhenAll([task], TestContext.Current.CancellationToken));
         var genericException = await Assert.ThrowsAsync<InvalidOperationException>(
-            () => ScheduledTask.WhenAll([genericTask]));
+            () => ScheduledTask.WhenAll([genericTask], TestContext.Current.CancellationToken));
 
         Assert.Same(expected, exception);
         Assert.Same(expected, genericException);

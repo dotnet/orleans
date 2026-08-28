@@ -421,12 +421,12 @@ public class VolatileDurableTaskGrainStorageTests
         var taskId = TaskId.Create("persisted-task");
         storage.AddOrUpdateTask(taskId, new DurableTaskState { CreatedAt = time.GetUtcNow() });
 
-        await storage.WriteAsync(default);
+        await storage.WriteAsync(TestContext.Current.CancellationToken);
 
         storage.Clear();
         Assert.False(storage.TryGetTask(taskId, out _));
 
-        await storage.ReadAsync(default);
+        await storage.ReadAsync(TestContext.Current.CancellationToken);
 
         Assert.True(storage.TryGetTask(taskId, out _));
     }
@@ -437,13 +437,13 @@ public class VolatileDurableTaskGrainStorageTests
         var (storage, time) = CreateStorage();
         var persistedTaskId = TaskId.Create("persisted-only-task");
         storage.AddOrUpdateTask(persistedTaskId, new DurableTaskState { CreatedAt = time.GetUtcNow() });
-        await storage.WriteAsync(default);
+        await storage.WriteAsync(TestContext.Current.CancellationToken);
 
         // A task added after the last WriteAsync should not survive a ReadAsync.
         var unpersistedTaskId = TaskId.Create("unpersisted-task");
         storage.AddOrUpdateTask(unpersistedTaskId, new DurableTaskState { CreatedAt = time.GetUtcNow() });
 
-        await storage.ReadAsync(default);
+        await storage.ReadAsync(TestContext.Current.CancellationToken);
 
         Assert.True(storage.TryGetTask(persistedTaskId, out _));
         Assert.False(storage.TryGetTask(unpersistedTaskId, out _));

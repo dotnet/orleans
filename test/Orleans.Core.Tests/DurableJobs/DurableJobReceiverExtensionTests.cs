@@ -490,7 +490,8 @@ public class DurableJobReceiverExtensionTests
             pollResult = await extension.HandleDurableJobAsync(jobContext, CancellationToken.None);
         });
 
-        await new DurableJobTurnIsolationFilter().Invoke(callContext).WaitAsync(TimeSpan.FromSeconds(10));
+        await new DurableJobTurnIsolationFilter().Invoke(callContext)
+            .WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
 
         Assert.NotNull(pollResult);
         Assert.True(pollResult.IsInProgress);
@@ -500,7 +501,8 @@ public class DurableJobReceiverExtensionTests
         var ordinaryTurn = isolation.EnterOrdinaryAsync();
         Assert.False(ordinaryTurn.IsCompleted);
         execution.SetResult();
-        using var lease = await ordinaryTurn.AsTask().WaitAsync(TimeSpan.FromSeconds(10));
+        using var lease = await ordinaryTurn.AsTask()
+            .WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
         await handler.Received(1).ExecuteJobAsync(jobContext, Arg.Any<CancellationToken>());
     }
 

@@ -24,7 +24,7 @@ public class DurableMessageSchedulerTests(IntegrationTestFixture fixture) : ICla
                 return;
             }
 
-            await Task.Delay(50);
+            await Task.Delay(50, TestContext.Current.CancellationToken);
         }
 
         Assert.Fail("The scheduled message was not delivered.");

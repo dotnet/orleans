@@ -620,8 +620,10 @@ public class JournaledJobShardManagerTests
         var firstRemoval = testShard.RemoveJobAsync("job-a", CancellationToken.None);
         var secondRemoval = testShard.RemoveJobAsync("job-b", CancellationToken.None);
 
-        var firstFault = await Assert.ThrowsAsync<InvalidOperationException>(() => firstRemoval).WaitAsync(TimeSpan.FromSeconds(10));
-        var secondFault = await Assert.ThrowsAsync<InvalidOperationException>(() => secondRemoval).WaitAsync(TimeSpan.FromSeconds(10));
+        var firstFault = await Assert.ThrowsAsync<InvalidOperationException>(() => firstRemoval)
+            .WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
+        var secondFault = await Assert.ThrowsAsync<InvalidOperationException>(() => secondRemoval)
+            .WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
 
         Assert.Same(faultingStateManager.InjectedException, firstFault);
         Assert.Same(faultingStateManager.InjectedException, secondFault);
@@ -664,14 +666,17 @@ public class JournaledJobShardManagerTests
 
         var firstRemoval = testShard.RemoveJobAsync("job-a", CancellationToken.None);
         var secondRemoval = testShard.RemoveJobAsync("job-b", CancellationToken.None);
-        await blockingStateManager.PendingWriteByteCountRead.WaitAsync(TimeSpan.FromSeconds(10));
+        await blockingStateManager.PendingWriteByteCountRead
+            .WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
 
         var disposeTask = testShard.DisposeAsync().AsTask();
         blockingStateManager.ReleasePendingWriteByteCount();
 
-        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => firstRemoval).WaitAsync(TimeSpan.FromSeconds(10));
-        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => secondRemoval).WaitAsync(TimeSpan.FromSeconds(10));
-        await disposeTask.WaitAsync(TimeSpan.FromSeconds(10));
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => firstRemoval)
+            .WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => secondRemoval)
+            .WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
+        await disposeTask.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
 
         await canonicalShard.DisposeAsync();
     }
