@@ -16,6 +16,7 @@
     <PackageReference Include="Amazon.CDK.Lib" />
     <PackageReference Include="Aspire.Hosting.AWS" />
     <PackageReference Include="Aspire.Hosting.Orleans" VersionOverride="13.4.6" />
+    <PackageReference Include="MessagePack" />
   </ItemGroup>
 
   <ItemGroup>
