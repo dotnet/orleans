@@ -210,6 +210,20 @@ namespace Orleans.Runtime
             this.context.Complete(Response.FromException(exception));
         }
 
+        public void OnSendFailure(Exception exception)
+        {
+            if (!TryComplete())
+            {
+                return;
+            }
+
+            this.stopwatch.Stop();
+            this.shared.Unregister(this.Message);
+            DisposeCancellationRegistration();
+            _applicationRequestInstruments.OnAppRequestsEnd((long)this.stopwatch.Elapsed.TotalMilliseconds);
+            this.context.Complete(Response.FromException(exception));
+        }
+
         public void DoCallback(Message response)
         {
             if (!TryComplete())

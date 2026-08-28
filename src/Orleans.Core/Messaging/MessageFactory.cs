@@ -30,35 +30,20 @@ namespace Orleans.Runtime
 
         public Message CreateMessage(object? body, InvokeMethodOptions options)
         {
-            var oneWay = (options & InvokeMethodOptions.OneWay) != 0;
-            var messageBody = body;
-            var ownsBodyObject = false;
-            if (body is RequestBase)
-            {
-                messageBody = CopyBodyObject(body);
-                ownsBodyObject = true;
-            }
-            else if (body is IInvokable)
-            {
-                ownsBodyObject = true;
-            }
-
             var message = new Message
             {
-                Direction = oneWay ? Message.Directions.OneWay : Message.Directions.Request,
+                Direction = (options & InvokeMethodOptions.OneWay) != 0 ? Message.Directions.OneWay : Message.Directions.Request,
                 Id = GetNextCorrelationId(),
                 IsReadOnly = (options & InvokeMethodOptions.ReadOnly) != 0,
                 IsUnordered = (options & InvokeMethodOptions.Unordered) != 0,
                 IsAlwaysInterleave = (options & InvokeMethodOptions.AlwaysInterleave) != 0,
-                BodyObject = messageBody,
-                OwnsBodyObject = ownsBodyObject,
+                BodyObject = body,
+                OwnsBodyObject = body is IInvokable,
                 RequestContextData = RequestContextExtensions.Export(_deepCopier),
             };
 
             return message;
         }
-
-        private object CopyBodyObject(object body) => _deepCopier.Copy(body)!;
 
         private CorrelationId GetNextCorrelationId()
         {

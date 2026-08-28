@@ -27,42 +27,34 @@ public class InvokableMessageOwnershipTests
     [TestSuite("BVT")]
     [TestProvider("None")]
     [Fact, TestCategory("BVT")]
-    public void RequestMessageOwnsIndependentRequestCopy()
+    public void RequestMessageTakesOwnershipOfRequest()
     {
         var request = new TestInvokableRequest { Value = 42 };
 
         var message = _messageFactory.CreateMessage(request, InvokeMethodOptions.None);
-        var copy = Assert.IsType<TestInvokableRequest>(message.BodyObject);
-
-        Assert.NotSame(request, copy);
-        Assert.Equal(request.Value, copy.Value);
+        Assert.Same(request, message.BodyObject);
         Assert.True(message.OwnsBodyObject);
 
         message.DisposeOwnedBody();
 
-        Assert.Equal(0, request.DisposeCount);
-        Assert.Equal(1, copy.DisposeCount);
+        Assert.Equal(1, request.DisposeCount);
     }
 
     [TestSuite("BVT")]
     [TestProvider("None")]
     [Fact, TestCategory("BVT")]
-    public void OneWayMessageOwnsIndependentRequestCopy()
+    public void OneWayMessageTakesOwnershipOfRequest()
     {
         var request = new TestInvokableRequest { Value = 42 };
 
         var message = _messageFactory.CreateMessage(request, InvokeMethodOptions.OneWay);
-        var copy = Assert.IsType<TestInvokableRequest>(message.BodyObject);
-
-        Assert.NotSame(request, copy);
-        Assert.Equal(request.Value, copy.Value);
+        Assert.Same(request, message.BodyObject);
         Assert.True(message.OwnsBodyObject);
 
         message.DisposeOwnedBody();
         message.DisposeOwnedBody();
 
-        Assert.Equal(0, request.DisposeCount);
-        Assert.Equal(1, copy.DisposeCount);
+        Assert.Equal(1, request.DisposeCount);
         Assert.Null(message.BodyObject);
     }
 
@@ -82,8 +74,9 @@ public class InvokableMessageOwnershipTests
         Assert.True(deserializedMessage.OwnsBodyObject);
 
         deserializedMessage.DisposeOwnedBody();
+        message.DisposeOwnedBody();
 
-        Assert.Equal(0, request.DisposeCount);
+        Assert.Equal(1, request.DisposeCount);
         Assert.Equal(1, deserializedRequest.DisposeCount);
     }
 

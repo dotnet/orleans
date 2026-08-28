@@ -191,8 +191,8 @@ namespace Orleans.Messaging
                     return;
                 }
 
-                connection.Send(msg);
                 LogSendingMessage(msg, connection.RemoteEndPoint);
+                connection.Send(msg);
             }
             else
             {
@@ -211,9 +211,8 @@ namespace Orleans.Messaging
                             return;
                         }
 
-                        connection.Send(message);
-
                         LogSendingMessage(message, connection.RemoteEndPoint);
+                        connection.Send(message);
                     }
                     catch (Exception exception)
                     {

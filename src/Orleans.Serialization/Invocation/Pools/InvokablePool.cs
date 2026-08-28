@@ -1,48 +1,50 @@
 using System;
-using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
-using System.Runtime.CompilerServices;
 using System.Threading;
 
 namespace Orleans.Serialization.Invocation;
 
 /// <summary>
-/// Provides bounded thread-local reuse for <see cref="IInvokable"/> implementations.
+/// Provides bounded concurrent reuse for <see cref="IInvokable"/> implementations.
 /// </summary>
 /// <typeparam name="T">The invokable type.</typeparam>
 /// <remarks>
-/// A returned instance becomes available to one subsequent rental on the current thread.
+/// A returned instance becomes available to one subsequent rental.
 /// Callers reset mutable state before returning an instance and transfer exclusive ownership to the pool.
 /// </remarks>
 public sealed class InvokablePool<T> : IDisposable where T : class, IInvokable
 {
-    private const int MaxPoolSizePerThread = 128;
-    private readonly ThreadLocal<Stack<T>> _perThreadStack = new(static () => new());
+    private const int MaxPoolSize = 128;
+    private readonly T?[] _items = new T?[MaxPoolSize];
+    private int _disposed;
 
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private bool TryGetStack([NotNullWhen(true)] out Stack<T>? stack)
-    {
-        try
-        {
-            stack = _perThreadStack.Value;
-            return stack is not null;
-        }
-        catch (ObjectDisposedException)
-        {
-            stack = null;
-            return false;
-        }
-    }
     /// <summary>
-    /// Attempts to take an instance owned by the current thread.
+    /// Attempts to take an instance.
     /// </summary>
     /// <param name="item">The pooled instance, when available.</param>
     /// <returns><see langword="true"/> when an instance was available.</returns>
     public bool TryGet([NotNullWhen(true)] out T? item)
     {
-        if (TryGetStack(out var stack))
+        if (Volatile.Read(ref _disposed) != 0)
         {
-            return stack.TryPop(out item);
+            item = null;
+            return false;
+        }
+
+        var start = Environment.CurrentManagedThreadId & (MaxPoolSize - 1);
+        for (var offset = 0; offset < MaxPoolSize; offset++)
+        {
+            var index = (start + offset) & (MaxPoolSize - 1);
+            if (Volatile.Read(ref _items[index]) is null)
+            {
+                continue;
+            }
+
+            if (Interlocked.Exchange(ref _items[index], null) is { } candidate)
+            {
+                item = candidate;
+                return true;
+            }
         }
 
         item = null;
@@ -50,19 +52,48 @@ public sealed class InvokablePool<T> : IDisposable where T : class, IInvokable
     }
 
     /// <summary>
-    /// Makes an instance available for reuse by the current thread.
+    /// Makes an instance available for reuse.
     /// </summary>
     /// <param name="item">The reset instance whose ownership is transferred to the pool.</param>
     public void Return(T item)
     {
-        if (TryGetStack(out var stack) && stack.Count < MaxPoolSizePerThread)
+        if (Volatile.Read(ref _disposed) != 0)
         {
-            stack.Push(item);
+            return;
+        }
+
+        var start = Environment.CurrentManagedThreadId & (MaxPoolSize - 1);
+        for (var offset = 0; offset < MaxPoolSize; offset++)
+        {
+            var index = (start + offset) & (MaxPoolSize - 1);
+            if (Volatile.Read(ref _items[index]) is not null)
+            {
+                continue;
+            }
+
+            if (Interlocked.CompareExchange(ref _items[index], item, null) is null)
+            {
+                if (Volatile.Read(ref _disposed) != 0)
+                {
+                    Interlocked.Exchange(ref _items[index], null);
+                }
+
+                return;
+            }
         }
     }
 
     /// <inheritdoc />
-    public void Dispose() => _perThreadStack.Dispose();
+    public void Dispose()
+    {
+        if (Interlocked.Exchange(ref _disposed, 1) == 0)
+        {
+            for (var i = 0; i < _items.Length; i++)
+            {
+                Interlocked.Exchange(ref _items[i], null);
+            }
+        }
+    }
 }
 
 /// <summary>
