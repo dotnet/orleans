@@ -192,13 +192,7 @@ public class TypeSymbolResolverTests
     [Fact]
     public async Task TryResolveType_FromAmbiguousAssemblyName_ReturnsFalseAndNull()
     {
-        var firstReference = await CreateShadowedLibraryReference("1.0.0.0", "First");
-        var secondReference = await CreateShadowedLibraryReference("2.0.0.0", "Second");
-        var consumer = await TestCompilationHelper.CreateCompilation(
-            string.Empty,
-            "ResolverConsumer",
-            firstReference,
-            secondReference);
+        var consumer = await CreateAmbiguousAssemblyConsumer();
         var resolver = new TypeSymbolResolver(consumer);
         var metadataIdentity = new TypeMetadataIdentity(
             "ResolverCases.Shadowed",
@@ -208,6 +202,49 @@ public class TypeSymbolResolverTests
         var success = resolver.TryResolveType(
             new TypeRef("global::ResolverCases.Shadowed"),
             metadataIdentity,
+            TestContext.Current.CancellationToken,
+            out var actual);
+
+        AssertFailedResolution(success, actual);
+    }
+
+    [Fact]
+    public async Task TryResolveSerializableType_FromAmbiguousAssemblyName_DoesNotFallBack()
+    {
+        var consumer = await CreateAmbiguousAssemblyConsumer();
+        var resolver = new TypeSymbolResolver(consumer);
+        var model = CreateSerializableModel(
+            new TypeRef("global::ResolverCases.Shadowed"),
+            "ResolverCases",
+            "Shadowed",
+            metadataIdentity: new TypeMetadataIdentity(
+                "ResolverCases.Shadowed",
+                "ResolverLibrary",
+                assemblyIdentity: string.Empty));
+
+        var success = resolver.TryResolveSerializableType(
+            model,
+            TestContext.Current.CancellationToken,
+            out var actual);
+
+        AssertFailedResolution(success, actual);
+    }
+
+    [Fact]
+    public async Task TryResolveProxyInterface_FromAmbiguousAssemblyName_DoesNotFallBack()
+    {
+        var consumer = await CreateAmbiguousAssemblyConsumer();
+        var resolver = new TypeSymbolResolver(consumer);
+        var model = CreateProxyModel(
+            new TypeRef("global::ResolverCases.IShadowed"),
+            "IShadowed",
+            new TypeMetadataIdentity(
+                "ResolverCases.IShadowed",
+                "ResolverLibrary",
+                assemblyIdentity: string.Empty));
+
+        var success = resolver.TryResolveProxyInterface(
+            model,
             TestContext.Current.CancellationToken,
             out var actual);
 
@@ -471,12 +508,27 @@ public class TypeSymbolResolverTests
             public class Shadowed
             {
             }
+
+            public interface IShadowed
+            {
+            }
             """;
         var library = PublicSign(
             await TestCompilationHelper.CreateCompilation(source, "ResolverLibrary"));
         return MetadataReference.CreateFromImage(
             EmitToImage(library),
             new MetadataReferenceProperties(MetadataImageKind.Assembly, aliases: [alias]));
+    }
+
+    private static async Task<CSharpCompilation> CreateAmbiguousAssemblyConsumer()
+    {
+        var firstReference = await CreateShadowedLibraryReference("1.0.0.0", "First");
+        var secondReference = await CreateShadowedLibraryReference("2.0.0.0", "Second");
+        return await TestCompilationHelper.CreateCompilation(
+            string.Empty,
+            "ResolverConsumer",
+            firstReference,
+            secondReference);
     }
 
     private static SerializableTypeModel CreateSerializableModel(
