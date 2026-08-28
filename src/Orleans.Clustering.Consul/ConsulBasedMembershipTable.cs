@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
 using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
 using Consul;
 using Microsoft.Extensions.Logging;
@@ -24,6 +25,9 @@ namespace Orleans.Runtime.Membership
         private readonly string clusterId;
         private readonly string? kvRootFolder;
         private readonly string versionKey;
+        private int metadataRepairCheckCountdown;
+
+        private const int MetadataRepairCheckInterval = 10;
 
         /// <summary>
         /// Initializes a new instance of the <see cref="ConsulBasedMembershipTable"/> class.
@@ -171,7 +175,7 @@ namespace Orleans.Runtime.Membership
             var iAmAliveKV = ConsulSiloRegistrationAssembler.ToIAmAliveKVPair(this.clusterId, this.kvRootFolder, entry.SiloAddress, entry.IAmAliveTime);
             await _consulClient.KV.Put(iAmAliveKV);
 
-            if (entry.Metadata is null)
+            if (entry.Metadata is null || !ShouldCheckMetadata())
             {
                 return;
             }
@@ -189,12 +193,13 @@ namespace Orleans.Runtime.Membership
             var registration = ConsulSiloRegistrationAssembler.FromKVPairs(this.clusterId, membershipPair, null);
             if (registration.Metadata is not null)
             {
+                MetadataChecked();
                 return;
             }
 
             registration.Metadata = entry.Metadata.ToDictionary(kvp => kvp.Key, kvp => kvp.Value);
             var repair = ConsulSiloRegistrationAssembler.ToKVPair(registration, this.kvRootFolder);
-            await _consulClient.KV.Txn(
+            var result = await _consulClient.KV.Txn(
             [
                 new KVTxnOp(repair.Key, KVTxnVerb.CAS)
                 {
@@ -202,7 +207,15 @@ namespace Orleans.Runtime.Membership
                     Value = repair.Value
                 }
             ]);
+            if (result.Response.Success)
+            {
+                MetadataChecked();
+            }
         }
+
+        private bool ShouldCheckMetadata() => Interlocked.Decrement(ref metadataRepairCheckCountdown) < 0;
+
+        private void MetadataChecked() => Volatile.Write(ref metadataRepairCheckCountdown, MetadataRepairCheckInterval);
 
         /// <inheritdoc />
         public async Task DeleteMembershipTableEntries(string clusterId)

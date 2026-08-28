@@ -234,10 +234,16 @@ internal partial class FirestoreMembershipTable : IMembershipTable
                     return false;
                 }
 
-                transaction.Update(document, new Dictionary<string, object?>
+                var updates = new Dictionary<string, object?>
                 {
                     [nameof(SiloInstanceEntity.IAmAliveTime)] = iAmAliveTime,
-                });
+                };
+                if (entry.Metadata is not null && !snapshot.ContainsField(nameof(SiloInstanceEntity.Metadata)))
+                {
+                    updates[nameof(SiloInstanceEntity.Metadata)] = entry.Metadata.ToDictionary(item => item.Key, item => item.Value);
+                }
+
+                transaction.Update(document, updates);
                 return true;
             });
         }

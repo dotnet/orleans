@@ -113,7 +113,7 @@ public sealed class CassandraClusteringTableTests : IClassFixture<CassandraConta
     [Fact]
     public async Task MembershipTable_MetadataRoundTrips()
     {
-        var (membershipTable, _) = await CreateNewMembershipTableAsync();
+        var (membershipTable, _) = await CreateNewMembershipTableAsync(TestContext.Current.CancellationToken);
         var membershipEntry = CreateMembershipEntryForTest();
         membershipEntry.Metadata = ImmutableDictionary<string, string>.Empty
             .Add("region", "west")

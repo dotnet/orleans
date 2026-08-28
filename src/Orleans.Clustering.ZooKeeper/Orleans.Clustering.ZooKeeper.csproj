@@ -14,4 +14,8 @@
     <PackageReference Include="ZooKeeperNetEx" />
   </ItemGroup>
 
+  <ItemGroup>
+    <InternalsVisibleTo Include="Orleans.Clustering.ZooKeeper.Tests" />
+  </ItemGroup>
+
 </Project>

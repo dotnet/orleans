@@ -186,18 +186,18 @@ namespace Consul.Tests
             using var client = options.CreateClient();
             var address = entry.SiloAddress.ToParsableString();
             var membershipKey = $"orleans/{clusterId}/{address}";
-            var legacyPair = (await client.KV.Get(membershipKey)).Response;
+            var legacyPair = (await client.KV.Get(membershipKey, TestContext.Current.CancellationToken)).Response;
             var legacyRegistration = JsonConvert.DeserializeObject<ConsulSiloRegistration>(
                 Encoding.UTF8.GetString(legacyPair.Value))!;
             legacyRegistration.Metadata = null;
             legacyPair.Value = Encoding.UTF8.GetBytes(JsonConvert.SerializeObject(legacyRegistration));
-            Assert.True((await client.KV.Put(legacyPair)).Response);
+            Assert.True((await client.KV.Put(legacyPair, TestContext.Current.CancellationToken)).Response);
 
             var versionBeforeHeartbeat = (await membership.ReadAll()).Version;
             entry.IAmAliveTime = entry.IAmAliveTime.AddMinutes(1);
             await membership.UpdateIAmAlive(entry);
 
-            var repairedPair = (await client.KV.Get(membershipKey)).Response;
+            var repairedPair = (await client.KV.Get(membershipKey, TestContext.Current.CancellationToken)).Response;
             var repairedRegistration = JsonConvert.DeserializeObject<ConsulSiloRegistration>(
                 Encoding.UTF8.GetString(repairedPair.Value))!;
             Assert.Equal(entry.Metadata, repairedRegistration.Metadata);
@@ -220,13 +220,13 @@ namespace Consul.Tests
 
             using var client = options.CreateClient();
             var membershipKey = $"orleans/{clusterId}/{entry.SiloAddress.ToParsableString()}";
-            var originalIndex = (await client.KV.Get(membershipKey)).Response.ModifyIndex;
+            var originalIndex = (await client.KV.Get(membershipKey, TestContext.Current.CancellationToken)).Response.ModifyIndex;
 
             entry.Metadata = ImmutableDictionary<string, string>.Empty.Add("region", "conflict");
             entry.IAmAliveTime = entry.IAmAliveTime.AddMinutes(1);
             await membership.UpdateIAmAlive(entry);
 
-            var storedPair = (await client.KV.Get(membershipKey)).Response;
+            var storedPair = (await client.KV.Get(membershipKey, TestContext.Current.CancellationToken)).Response;
             var storedRegistration = JsonConvert.DeserializeObject<ConsulSiloRegistration>(
                 Encoding.UTF8.GetString(storedPair.Value))!;
             Assert.Equal(expected, storedRegistration.Metadata);
