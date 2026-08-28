@@ -160,6 +160,33 @@ namespace UnitTests.Serialization
             return deserializedMessage!;
         }
 
+        [TestSuite("BVT")]
+        [TestProvider("None")]
+        [Fact, TestCategory("BVT"), TestCategory("Serialization")]
+        public void Message_ResponseTarget_IsProcessLocal()
+        {
+            var target = new object();
+            var request = messageFactory.CreateMessage(body: null, InvokeMethodOptions.None);
+            request.ResponseTarget = target;
+
+            var response = messageFactory.CreateResponseMessage(request);
+            var rejection = messageFactory.CreateRejectionResponse(
+                request,
+                Message.RejectionTypes.Transient,
+                "Rejected");
+            var status = messageFactory.CreateDiagnosticResponseMessage(
+                request,
+                isExecuting: true,
+                isWaiting: false,
+                diagnostics: []);
+            var deserializedResponse = RoundTripMessage(response);
+
+            Assert.Same(target, response.ResponseTarget);
+            Assert.Same(target, rejection.ResponseTarget);
+            Assert.Same(target, status.ResponseTarget);
+            Assert.Null(deserializedResponse.ResponseTarget);
+        }
+
         [TestSuite("Functional")]
         [TestProvider("None")]
         [Theory, TestCategory("Functional"), TestCategory("Serialization")]

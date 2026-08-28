@@ -6,13 +6,13 @@ namespace Orleans.Runtime;
 
 internal sealed class SharedCallbackData
 {
-    public readonly Action<Message> Unregister;
+    public readonly Action<CallbackData> Unregister;
     public readonly ILogger Logger;
     private TimeSpan _responseTimeout;
     public long ResponseTimeoutStopwatchTicks;
 
     public SharedCallbackData(
-        Action<Message> unregister,
+        Action<CallbackData> unregister,
         ILogger logger,
         TimeSpan responseTimeout,
         bool cancelOnTimeout,

@@ -93,7 +93,7 @@ namespace Orleans
                     TimeSpan.FromSeconds(1)));
             this.callbackTimer = new PeriodicTimer(period, timeProvider);
             this.sharedCallbackData = new SharedCallbackData(
-                msg => this.UnregisterCallback(msg.Id),
+                this.UnregisterCallback,
                 this.loggerFactory.CreateLogger<CallbackData>(),
                 this.clientMessagingOptions.ResponseTimeout,
                 this.clientMessagingOptions.CancelRequestOnTimeout,
@@ -375,9 +375,9 @@ namespace Orleans
             }
         }
 
-        private void UnregisterCallback(CorrelationId id)
+        private void UnregisterCallback(CallbackData callback)
         {
-            callbacks.TryRemove(id, out _);
+            callbacks.TryRemove(KeyValuePair.Create(callback.Message.Id, callback));
         }
 
         private void ConstructorReset()
