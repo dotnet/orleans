@@ -15,6 +15,7 @@ internal sealed class ConcurrentObjectPool<T> : ConcurrentObjectPool<T, DefaultC
 
 internal class ConcurrentObjectPool<T, TPoolPolicy> : ObjectPool<T>, IDisposable where T : class where TPoolPolicy : IPooledObjectPolicy<T>
 {
+    private readonly object _identity = new();
     private readonly List<WeakReference<StackHolder>> _stacks = [];
     private readonly TPoolPolicy _policy;
     private int _disposed;
@@ -28,12 +29,27 @@ internal class ConcurrentObjectPool<T, TPoolPolicy> : ObjectPool<T>, IDisposable
     {
         ThrowIfDisposed();
 
-        var stacks = PerThreadStack.Stacks ??= new();
-        var holder = stacks.GetValue(this, static _ => new());
-        if (!holder.IsRegistered)
+        var holderReference = PerThreadStack.CachedHolder;
+        if (holderReference is null
+            || !holderReference.TryGetTarget(out var holder)
+            || !ReferenceEquals(holder.Identity, _identity))
         {
-            Register(holder);
-            holder.IsRegistered = true;
+            var stacks = PerThreadStack.Stacks ??= new();
+            holder = stacks.GetValue(this, static pool => new(pool._identity));
+            if (!holder.IsRegistered)
+            {
+                Register(holder);
+                holder.IsRegistered = true;
+            }
+
+            if (holderReference is null)
+            {
+                PerThreadStack.CachedHolder = new(holder);
+            }
+            else
+            {
+                holderReference.SetTarget(holder);
+            }
         }
 
         var stack = Volatile.Read(ref holder.Stack);
@@ -126,15 +142,18 @@ internal class ConcurrentObjectPool<T, TPoolPolicy> : ObjectPool<T>, IDisposable
         }
     }
 
-    // Weak keys and registrations keep abandoned pools and exited-thread stacks collectible.
     private static class PerThreadStack
     {
         [ThreadStatic]
         internal static ConditionalWeakTable<ConcurrentObjectPool<T, TPoolPolicy>, StackHolder>? Stacks;
+
+        [ThreadStatic]
+        internal static WeakReference<StackHolder>? CachedHolder;
     }
 
-    private sealed class StackHolder
+    private sealed class StackHolder(object identity)
     {
+        internal readonly object Identity = identity;
         internal bool IsRegistered;
         internal Stack<T>? Stack = new();
 
