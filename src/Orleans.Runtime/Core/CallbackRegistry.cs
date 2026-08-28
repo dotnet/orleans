@@ -1,18 +1,31 @@
 using System;
-using System.Collections.Concurrent;
-using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
 
 namespace Orleans.Runtime;
 
 internal sealed class CallbackRegistry
 {
-    private readonly ConcurrentDictionary<(GrainId, CorrelationId), CallbackData> _callbacks = new();
+    // MessageFactory is a singleton and assigns host-unique correlation ids.
+    private readonly StripedCallbackDictionary<CallbackData> _callbacks = new();
 
     internal int Count => _callbacks.Count;
 
-    public bool TryAdd(CallbackData callback)
-        => _callbacks.TryAdd((callback.Message.SendingGrain, callback.Message.Id), callback);
+    public bool TryRegister(CallbackData callback)
+    {
+        if (_callbacks.TryAdd(callback.Message.Id, callback, out var isClosed))
+        {
+            return true;
+        }
+
+        if (isClosed)
+        {
+            return false;
+        }
+
+        throw new InvalidOperationException($"A callback with id '{callback.Message.Id}' is already registered.");
+    }
+
+    public void Close() => _callbacks.Close();
 
     public bool TryCompleteResponse(Message response)
     {
@@ -23,7 +36,7 @@ internal sealed class CallbackRegistry
             return completed;
         }
 
-        if (_callbacks.TryRemove((response.TargetGrain, response.Id), out var callback))
+        if (_callbacks.TryRemove(response.Id, out var callback))
         {
             return callback.TryDoCallback(response);
         }
@@ -45,33 +58,20 @@ internal sealed class CallbackRegistry
             return false;
         }
 
-        return _callbacks.TryGetValue((response.TargetGrain, response.Id), out callback);
+        return _callbacks.TryGetValue(response.Id, out callback);
     }
 
     public bool TryRemove(CallbackData callback)
-        => _callbacks.TryRemove(KeyValuePair.Create(
-            (callback.Message.SendingGrain, callback.Message.Id),
-            callback));
+        => _callbacks.TryRemove(callback.Message.Id, callback);
 
     public int CountWhere<TState>(TState state, Func<CallbackData, TState, bool> predicate)
     {
-        var result = 0;
-        foreach (var callback in _callbacks.Values)
-        {
-            if (predicate(callback, state))
-            {
-                result++;
-            }
-        }
-
-        return result;
+        return _callbacks.CountWhere(state, predicate);
     }
 
     public void ForEach<TState>(TState state, Action<CallbackData, TState> action)
     {
-        foreach (var callback in _callbacks.Values)
-        {
-            action(callback, state);
-        }
+        _callbacks.ForEach(state, action);
     }
+
 }
