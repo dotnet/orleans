@@ -91,6 +91,24 @@ internal sealed class StripedCallbackDictionary<TValue>
     }
 
     /// <summary>
+    /// Attempts to remove the value with the specified key if it is the expected instance.
+    /// </summary>
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public bool TryRemove(CorrelationId id, TValue expected)
+    {
+        var stripe = GetStripe(id);
+        lock (stripe.Lock)
+        {
+            if (!stripe.Dictionary.TryGetValue(id, out var value) || !ReferenceEquals(value, expected))
+            {
+                return false;
+            }
+
+            return stripe.Dictionary.Remove(id);
+        }
+    }
+
+    /// <summary>
     /// Gets the approximate total count of items across all stripes.
     /// </summary>
     public int Count

@@ -46,6 +46,26 @@ public class StripedCallbackDictionaryTests
     }
 
     [Fact]
+    public void ExactRemovalDoesNotRemoveReplacement()
+    {
+        var dictionary = new StripedCallbackDictionary<object>();
+        var id = new CorrelationId(42);
+        var stale = new object();
+        var replacement = new object();
+
+        Assert.True(dictionary.TryAdd(id, stale));
+        Assert.True(dictionary.TryRemove(id, out var removed));
+        Assert.Same(stale, removed);
+        Assert.True(dictionary.TryAdd(id, replacement));
+
+        Assert.False(dictionary.TryRemove(id, stale));
+        Assert.True(dictionary.TryGetValue(id, out var current));
+        Assert.Same(replacement, current);
+        Assert.True(dictionary.TryRemove(id, replacement));
+        Assert.Equal(0, dictionary.Count);
+    }
+
+    [Fact]
     public void EnumerationReturnsSnapshotValues()
     {
         var dictionary = new StripedCallbackDictionary<int>();
