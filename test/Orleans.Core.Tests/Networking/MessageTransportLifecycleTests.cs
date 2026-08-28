@@ -612,8 +612,8 @@ public class MessageTransportLifecycleTests
         listener.Listen(1);
 
         using var client = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
-        await client.ConnectAsync(listener.LocalEndPoint!);
-        using var server = await listener.AcceptAsync();
+        await client.ConnectAsync(listener.LocalEndPoint!, TestContext.Current.CancellationToken);
+        using var server = await listener.AcceptAsync(TestContext.Current.CancellationToken);
         await using var transport = new SocketMessageTransport(client, NullLogger.Instance, useLinuxIoUring: true);
         Assert.Null(transport.MultishotReceiveStatistics);
         var payload = GC.AllocateUninitializedArray<byte>(payloadSize);
@@ -631,27 +631,29 @@ public class MessageTransportLifecycleTests
         var receivedLength = 0;
         while (receivedLength < receivedByServer.Length)
         {
-            var length = await server.ReceiveAsync(receivedByServer.AsMemory(receivedLength));
+            var length = await server.ReceiveAsync(receivedByServer.AsMemory(receivedLength), TestContext.Current.CancellationToken);
             Assert.NotEqual(0, length);
             receivedLength += length;
         }
 
-        await writeRequest.Completion.WaitAsync(TimeSpan.FromSeconds(10));
+        await writeRequest.Completion.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
 
         Assert.True(transport.EnqueueRead(readRequest));
         var sentLength = 0;
         while (sentLength < payload.Length)
         {
-            sentLength += await server.SendAsync(payload.AsMemory(sentLength));
+            sentLength += await server.SendAsync(payload.AsMemory(sentLength), TestContext.Current.CancellationToken);
         }
 
-        var receivedByTransport = await readRequest.Completion.WaitAsync(TimeSpan.FromSeconds(10));
+        var receivedByTransport = await readRequest.Completion.WaitAsync(
+            TimeSpan.FromSeconds(10),
+            TestContext.Current.CancellationToken);
 
         Assert.Equal(payload.Length, receivedLength);
         Assert.Equal(payload, receivedByServer);
         Assert.Equal(payload.Length, sentLength);
         Assert.Equal(payload, receivedByTransport);
-        await transport.CloseAsync(null);
+        await transport.CloseAsync(null, TestContext.Current.CancellationToken);
     }
 
     [Fact]
@@ -683,7 +685,7 @@ public class MessageTransportLifecycleTests
             Assert.Null(transport.MultishotReceiveStatistics);
             Assert.Equal(0, transport.AdaptivePromotionCount);
             Assert.False(transport.IsAdaptiveMultishot);
-            await transport.CloseAsync(null);
+            await transport.CloseAsync(null, TestContext.Current.CancellationToken);
         }
     }
 
@@ -724,7 +726,11 @@ public class MessageTransportLifecycleTests
             {
                 Assert.True(transport.EnqueueRead(unframedRequest));
                 Assert.Equal(1, await server.SendAsync(new byte[] { 42 }));
-                Assert.Equal(new byte[] { 42 }, await unframedRequest.Completion.WaitAsync(TimeSpan.FromSeconds(10)));
+                Assert.Equal(
+                    new byte[] { 42 },
+                    await unframedRequest.Completion.WaitAsync(
+                        TimeSpan.FromSeconds(10),
+                        TestContext.Current.CancellationToken));
             }
 
             var payload = Enumerable.Repeat((byte)43, 16 * 1024).ToArray();
@@ -736,7 +742,11 @@ public class MessageTransportLifecycleTests
             {
                 Assert.True(transport.EnqueueRead(unknownFramedRequest));
                 Assert.Equal(1, await server.SendAsync(new byte[] { 43 }));
-                Assert.Equal(new byte[] { 43 }, await unknownFramedRequest.Completion.WaitAsync(TimeSpan.FromSeconds(10)));
+                Assert.Equal(
+                    new byte[] { 43 },
+                    await unknownFramedRequest.Completion.WaitAsync(
+                        TimeSpan.FromSeconds(10),
+                        TestContext.Current.CancellationToken));
             }
 
             payload[0] = 44;
@@ -753,11 +763,11 @@ public class MessageTransportLifecycleTests
 
             payload[0] = 46;
             Assert.Equal(payload, await SendFramedAsync(transport, server, payload));
-            await promotionCompleted.Task.WaitAsync(TimeSpan.FromSeconds(10));
+            await promotionCompleted.Task.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
             Assert.True(transport.IsAdaptiveMultishot);
             Assert.Equal(1, transport.AdaptivePromotionCount);
             Assert.Equal(0, transport.AdaptiveDemotionCount);
-            await transport.CloseAsync(null);
+            await transport.CloseAsync(null, TestContext.Current.CancellationToken);
         }
     }
 
@@ -804,7 +814,7 @@ public class MessageTransportLifecycleTests
             Assert.Equal(1, statistics.ReceiveStarts);
             Assert.Equal(1, transport.AdaptivePromotionCount);
             Assert.Equal(0, transport.AdaptiveDemotionCount);
-            await transport.CloseAsync(null);
+            await transport.CloseAsync(null, TestContext.Current.CancellationToken);
         }
     }
 
@@ -879,7 +889,7 @@ public class MessageTransportLifecycleTests
             }
 
             await SendExactly(server, batch);
-            await demotionStarted.Task.WaitAsync(TimeSpan.FromSeconds(10));
+            await demotionStarted.Task.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
 
             using var finalRequest = new FramedReadRequest(129);
             var finalPayload = Enumerable.Repeat((byte)99, 129).ToArray();
@@ -890,13 +900,21 @@ public class MessageTransportLifecycleTests
             for (var i = 0; i < requests.Length; i++)
             {
                 var expected = Enumerable.Repeat((byte)(50 + i), 257).ToArray();
-                Assert.Equal(expected, await requests[i].Completion.WaitAsync(TimeSpan.FromSeconds(10)));
+                Assert.Equal(
+                    expected,
+                    await requests[i].Completion.WaitAsync(
+                        TimeSpan.FromSeconds(10),
+                        TestContext.Current.CancellationToken));
                 requests[i].Dispose();
             }
 
             await finalSend;
-            Assert.Equal(finalPayload, await finalRequest.Completion.WaitAsync(TimeSpan.FromSeconds(10)));
-            await demotionCompleted.Task.WaitAsync(TimeSpan.FromSeconds(10));
+            Assert.Equal(
+                finalPayload,
+                await finalRequest.Completion.WaitAsync(
+                    TimeSpan.FromSeconds(10),
+                    TestContext.Current.CancellationToken));
+            await demotionCompleted.Task.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
             Assert.False(transport.IsAdaptiveMultishot);
             Assert.Equal(1, transport.AdaptiveDemotionCount);
 
@@ -905,13 +923,13 @@ public class MessageTransportLifecycleTests
             Assert.False(transport.IsAdaptiveMultishot);
             nextLargePayload[0] = 101;
             Assert.Equal(nextLargePayload, await SendFramedAsync(transport, server, nextLargePayload));
-            await secondPromotionCompleted.Task.WaitAsync(TimeSpan.FromSeconds(10));
+            await secondPromotionCompleted.Task.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
             Assert.True(transport.IsAdaptiveMultishot);
             Assert.Equal(2, transport.AdaptivePromotionCount);
             var multishotProbe = Enumerable.Repeat((byte)102, 193).ToArray();
             Assert.Equal(multishotProbe, await SendFramedAsync(transport, server, multishotProbe));
             Assert.Equal(2, transport.MultishotReceiveStatistics?.ReceiveStarts);
-            await transport.CloseAsync(null);
+            await transport.CloseAsync(null, TestContext.Current.CancellationToken);
         }
     }
 
@@ -980,7 +998,7 @@ public class MessageTransportLifecycleTests
             }
 
             var send = SendExactly(server, batch);
-            await blockedRequestEntered.Task.WaitAsync(TimeSpan.FromSeconds(10));
+            await blockedRequestEntered.Task.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
             Assert.True(transport.IsAdaptiveMultishot);
             Assert.Equal(0, transport.AdaptiveDemotionCount);
 
@@ -989,15 +1007,19 @@ public class MessageTransportLifecycleTests
             for (var i = 0; i < requests.Length; i++)
             {
                 var expected = Enumerable.Repeat((byte)(70 + i), 257).ToArray();
-                Assert.Equal(expected, await requests[i].Completion.WaitAsync(TimeSpan.FromSeconds(10)));
+                Assert.Equal(
+                    expected,
+                    await requests[i].Completion.WaitAsync(
+                        TimeSpan.FromSeconds(10),
+                        TestContext.Current.CancellationToken));
                 requests[i].Dispose();
             }
 
-            await demotionCompleted.Task.WaitAsync(TimeSpan.FromSeconds(10));
+            await demotionCompleted.Task.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
             var finalPayload = Enumerable.Repeat((byte)90, 193).ToArray();
             Assert.Equal(finalPayload, await SendFramedAsync(transport, server, finalPayload));
             Assert.False(transport.IsAdaptiveMultishot);
-            await transport.CloseAsync(null);
+            await transport.CloseAsync(null, TestContext.Current.CancellationToken);
         }
     }
 
@@ -1039,13 +1061,13 @@ public class MessageTransportLifecycleTests
             Assert.True(transport.EnqueueRead(request));
             payload[0] = 92;
             var send = SendExactly(server, CreateFrame(payload));
-            await frameObserved.Task.WaitAsync(TimeSpan.FromSeconds(10));
+            await frameObserved.Task.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
 
-            var close = transport.CloseAsync(null).AsTask();
+            var close = transport.CloseAsync(null, TestContext.Current.CancellationToken).AsTask();
             allowFrameObservation.Set();
 
             await send;
-            await close.WaitAsync(TimeSpan.FromSeconds(10));
+            await close.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
             Assert.Null(transport.MultishotReceiveStatistics);
             Assert.Equal(0, transport.AdaptivePromotionCount);
             Assert.False(transport.IsAdaptiveMultishot);
@@ -1091,14 +1113,16 @@ public class MessageTransportLifecycleTests
             using var request = new FramedReadRequest(payload.Length);
             Assert.True(transport.EnqueueRead(request));
             await SendExactly(server, CreateFrame(payload).AsMemory(0, sizeof(int) * 2));
-            await receiverPublished.Task.WaitAsync(TimeSpan.FromSeconds(10));
+            await receiverPublished.Task.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
 
-            var close = transport.CloseAsync(null).AsTask();
+            var close = transport.CloseAsync(null, TestContext.Current.CancellationToken).AsTask();
             allowPromotion.Set();
 
-            await close.WaitAsync(TimeSpan.FromSeconds(10));
+            await close.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
             await Assert.ThrowsAnyAsync<OperationCanceledException>(
-                () => request.Completion.WaitAsync(TimeSpan.FromSeconds(10)));
+                () => request.Completion.WaitAsync(
+                    TimeSpan.FromSeconds(10),
+                    TestContext.Current.CancellationToken));
             var statistics = Assert.IsType<(
                 long AdoptedPages,
                 long CompletedSegments,
@@ -1159,7 +1183,7 @@ public class MessageTransportLifecycleTests
             Assert.Equal(1, transport.AdaptivePromotionCount);
             Assert.Equal(0, transport.AdaptiveDemotionCount);
             Assert.Equal(1, statistics.ReceiveStarts);
-            await transport.CloseAsync(null);
+            await transport.CloseAsync(null, TestContext.Current.CancellationToken);
         }
     }
 
@@ -1196,9 +1220,13 @@ public class MessageTransportLifecycleTests
             Assert.True(transport.EnqueueRead(request));
             Assert.True(SpinWait.SpinUntil(() => transport.IsSocketReceivePending, TimeSpan.FromSeconds(10)));
 
-            await transport.CloseAsync(null).AsTask().WaitAsync(TimeSpan.FromSeconds(10));
+            await transport.CloseAsync(null, TestContext.Current.CancellationToken).AsTask().WaitAsync(
+                TimeSpan.FromSeconds(10),
+                TestContext.Current.CancellationToken);
             await Assert.ThrowsAnyAsync<OperationCanceledException>(
-                () => request.Completion.WaitAsync(TimeSpan.FromSeconds(10)));
+                () => request.Completion.WaitAsync(
+                    TimeSpan.FromSeconds(10),
+                    TestContext.Current.CancellationToken));
         }
     }
 
@@ -1236,8 +1264,10 @@ public class MessageTransportLifecycleTests
             server.Shutdown(SocketShutdown.Send);
 
             await Assert.ThrowsAnyAsync<OperationCanceledException>(
-                () => request.Completion.WaitAsync(TimeSpan.FromSeconds(10)));
-            await transport.CloseAsync(null);
+                () => request.Completion.WaitAsync(
+                    TimeSpan.FromSeconds(10),
+                    TestContext.Current.CancellationToken));
+            await transport.CloseAsync(null, TestContext.Current.CancellationToken);
         }
     }
 
@@ -1257,8 +1287,8 @@ public class MessageTransportLifecycleTests
         listener.Bind(new IPEndPoint(IPAddress.Loopback, 0));
         listener.Listen(1);
         using var client = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
-        await client.ConnectAsync(listener.LocalEndPoint!);
-        using var server = await listener.AcceptAsync();
+        await client.ConnectAsync(listener.LocalEndPoint!, TestContext.Current.CancellationToken);
+        using var server = await listener.AcceptAsync(TestContext.Current.CancellationToken);
         await using var transport = new SocketMessageTransport(
             client,
             NullLogger.Instance,
@@ -1281,12 +1311,16 @@ public class MessageTransportLifecycleTests
             while (offset < payload.Length)
             {
                 var count = Math.Min(997, payload.Length - offset);
-                var sent = await server.SendAsync(payload.AsMemory(offset, count));
+                var sent = await server.SendAsync(
+                    payload.AsMemory(offset, count),
+                    TestContext.Current.CancellationToken);
                 Assert.Equal(count, sent);
                 offset += sent;
             }
 
-            var received = await request.Completion.WaitAsync(TimeSpan.FromSeconds(10));
+            var received = await request.Completion.WaitAsync(
+                TimeSpan.FromSeconds(10),
+                TestContext.Current.CancellationToken);
             Assert.Equal(payload, received);
         }
 
@@ -1306,7 +1340,7 @@ public class MessageTransportLifecycleTests
         Assert.True(statistics.ReplacementPages > 0);
         Assert.Equal(0, statistics.PayloadCopies);
         Assert.True(statistics.ReceiveStarts >= 1);
-        await transport.CloseAsync(null);
+        await transport.CloseAsync(null, TestContext.Current.CancellationToken);
     }
 
     [Fact]
@@ -1325,8 +1359,8 @@ public class MessageTransportLifecycleTests
         listener.Bind(new IPEndPoint(IPAddress.Loopback, 0));
         listener.Listen(1);
         using var client = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
-        await client.ConnectAsync(listener.LocalEndPoint!);
-        using var server = await listener.AcceptAsync();
+        await client.ConnectAsync(listener.LocalEndPoint!, TestContext.Current.CancellationToken);
+        using var server = await listener.AcceptAsync(TestContext.Current.CancellationToken);
         var writer = new ArcBufferWriter();
         var receiver = new LinuxIoUringSocketMultishotReceiver();
         ArcBuffer earlySlice = default;
@@ -1342,7 +1376,7 @@ public class MessageTransportLifecycleTests
             {
                 var receive = receiver.ReceiveAsync(client, writer);
                 Assert.Equal(1, await server.SendAsync(new byte[] { (byte)i }));
-                await receive.AsTask().WaitAsync(TimeSpan.FromSeconds(10));
+                await receive.AsTask().WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
                 Assert.Equal(1, receiver.BytesTransferred);
 
                 if (i == 0)
@@ -1368,9 +1402,13 @@ public class MessageTransportLifecycleTests
             Assert.Equal(0, receiver.PayloadCopyCount);
 
             var pendingReceive = receiver.ReceiveAsync(client, writer);
-            await receiver.StopAsync().AsTask().WaitAsync(TimeSpan.FromSeconds(10));
+            await receiver.StopAsync().AsTask().WaitAsync(
+                TimeSpan.FromSeconds(10),
+                TestContext.Current.CancellationToken);
             await Assert.ThrowsAsync<SocketException>(
-                () => pendingReceive.AsTask().WaitAsync(TimeSpan.FromSeconds(10)));
+                () => pendingReceive.AsTask().WaitAsync(
+                    TimeSpan.FromSeconds(10),
+                    TestContext.Current.CancellationToken));
             receiver.Dispose();
             receiverDisposed = true;
             writer.Dispose();
@@ -1424,8 +1462,8 @@ public class MessageTransportLifecycleTests
         listener.Bind(new IPEndPoint(IPAddress.Loopback, 0));
         listener.Listen(1);
         using var client = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
-        await client.ConnectAsync(listener.LocalEndPoint!);
-        using var server = await listener.AcceptAsync();
+        await client.ConnectAsync(listener.LocalEndPoint!, TestContext.Current.CancellationToken);
+        using var server = await listener.AcceptAsync(TestContext.Current.CancellationToken);
         using var writer = new ArcBufferWriter();
         using var receiver = new LinuxIoUringSocketMultishotReceiver();
         var payload = GC.AllocateUninitializedArray<byte>(PayloadSize);
@@ -1435,8 +1473,8 @@ public class MessageTransportLifecycleTests
         }
 
         var firstReceive = receiver.ReceiveAsync(client, writer);
-        await SendExactly(server, payload).WaitAsync(TimeSpan.FromSeconds(10));
-        await firstReceive.AsTask().WaitAsync(TimeSpan.FromSeconds(10));
+        await SendExactly(server, payload).WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
+        await firstReceive.AsTask().WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
         Assert.True(
             SpinWait.SpinUntil(
                 () => receiver.NoBufferCompletionCount > 0,
@@ -1445,7 +1483,9 @@ public class MessageTransportLifecycleTests
 
         while (writer.Length < payload.Length)
         {
-            await receiver.ReceiveAsync(client, writer).AsTask().WaitAsync(TimeSpan.FromSeconds(10));
+            await receiver.ReceiveAsync(client, writer).AsTask().WaitAsync(
+                TimeSpan.FromSeconds(10),
+                TestContext.Current.CancellationToken);
         }
 
         using var slice = writer.ConsumeSlice(payload.Length);
@@ -1455,7 +1495,9 @@ public class MessageTransportLifecycleTests
         Assert.True(receiver.ReplacementPageCount > 0);
         Assert.True(receiver.NoBufferCompletionCount > 0);
         Assert.Equal(0, receiver.PayloadCopyCount);
-        await receiver.StopAsync().AsTask().WaitAsync(TimeSpan.FromSeconds(10));
+        await receiver.StopAsync().AsTask().WaitAsync(
+            TimeSpan.FromSeconds(10),
+            TestContext.Current.CancellationToken);
 
         static async Task SendExactly(Socket socket, ReadOnlyMemory<byte> buffer)
         {
@@ -1485,19 +1527,21 @@ public class MessageTransportLifecycleTests
         listener.Bind(new IPEndPoint(IPAddress.Loopback, 0));
         listener.Listen(1);
         using var client = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
-        await client.ConnectAsync(listener.LocalEndPoint!);
-        using var server = await listener.AcceptAsync();
+        await client.ConnectAsync(listener.LocalEndPoint!, TestContext.Current.CancellationToken);
+        using var server = await listener.AcceptAsync(TestContext.Current.CancellationToken);
         var writer = new ArcBufferWriter();
         var receiver = new LinuxIoUringSocketMultishotReceiver();
         var payload = GC.AllocateUninitializedArray<byte>(PayloadSize);
         Random.Shared.NextBytes(payload);
 
         var receive = receiver.ReceiveAsync(client, writer);
-        await SendExactly(server, payload).WaitAsync(TimeSpan.FromSeconds(10));
-        await receive.AsTask().WaitAsync(TimeSpan.FromSeconds(10));
+        await SendExactly(server, payload).WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
+        await receive.AsTask().WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
         while (writer.Length < payload.Length)
         {
-            await receiver.ReceiveAsync(client, writer).AsTask().WaitAsync(TimeSpan.FromSeconds(10));
+            await receiver.ReceiveAsync(client, writer).AsTask().WaitAsync(
+                TimeSpan.FromSeconds(10),
+                TestContext.Current.CancellationToken);
         }
 
         var page = Assert.IsType<ArcBufferPage>(receiver.FirstAdoptedPage);
@@ -1512,7 +1556,9 @@ public class MessageTransportLifecycleTests
             Assert.Equal(payload, slice.ToArray());
         }
 
-        await receiver.StopAsync().AsTask().WaitAsync(TimeSpan.FromSeconds(10));
+        await receiver.StopAsync().AsTask().WaitAsync(
+            TimeSpan.FromSeconds(10),
+            TestContext.Current.CancellationToken);
         receiver.Dispose();
         writer.Dispose();
         Assert.Equal(0, page.ReferenceCount);
@@ -1545,8 +1591,8 @@ public class MessageTransportLifecycleTests
         listener.Bind(new IPEndPoint(IPAddress.Loopback, 0));
         listener.Listen(1);
         using var client = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
-        await client.ConnectAsync(listener.LocalEndPoint!);
-        using var server = await listener.AcceptAsync();
+        await client.ConnectAsync(listener.LocalEndPoint!, TestContext.Current.CancellationToken);
+        using var server = await listener.AcceptAsync(TestContext.Current.CancellationToken);
         var writer = new ArcBufferWriter();
         var receiver = new LinuxIoUringSocketMultishotReceiver();
         var payload = GC.AllocateUninitializedArray<byte>((16 * 16 * 1024) + 29);
@@ -1558,17 +1604,21 @@ public class MessageTransportLifecycleTests
         var sendTask = SendExactly(server, payload);
         while (writer.Length < payload.Length)
         {
-            await receiver.ReceiveAsync(client, writer).AsTask().WaitAsync(TimeSpan.FromSeconds(10));
+            await receiver.ReceiveAsync(client, writer).AsTask().WaitAsync(
+                TimeSpan.FromSeconds(10),
+                TestContext.Current.CancellationToken);
         }
 
-        await sendTask.WaitAsync(TimeSpan.FromSeconds(10));
+        await sendTask.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
         var slice = writer.ConsumeSlice(payload.Length);
         Assert.Same(receiver.FirstAdoptedPage, slice.First);
         Assert.Equal(0, receiver.PayloadCopyCount);
         Assert.True(receiver.AdoptedPageCount > 8);
         Assert.True(receiver.CompletedSegmentCount >= receiver.AdoptedPageCount);
 
-        await receiver.StopAsync().AsTask().WaitAsync(TimeSpan.FromSeconds(10));
+        await receiver.StopAsync().AsTask().WaitAsync(
+            TimeSpan.FromSeconds(10),
+            TestContext.Current.CancellationToken);
         receiver.Dispose();
         writer.Dispose();
 
@@ -1602,8 +1652,8 @@ public class MessageTransportLifecycleTests
         listener.Bind(new IPEndPoint(IPAddress.Loopback, 0));
         listener.Listen(1);
         using var client = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
-        await client.ConnectAsync(listener.LocalEndPoint!);
-        using var server = await listener.AcceptAsync();
+        await client.ConnectAsync(listener.LocalEndPoint!, TestContext.Current.CancellationToken);
+        using var server = await listener.AcceptAsync(TestContext.Current.CancellationToken);
         using var writer = new ArcBufferWriter();
         LinuxIoUringEngine engine;
         ushort releasedGroup;
@@ -1614,14 +1664,16 @@ public class MessageTransportLifecycleTests
             releasedGroup = first.BufferGroup;
             var receive = first.ReceiveAsync(client, writer);
             Assert.Equal(1, await server.SendAsync(new byte[] { 42 }));
-            await receive.AsTask().WaitAsync(TimeSpan.FromSeconds(10));
+            await receive.AsTask().WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
 
             using (var second = new LinuxIoUringSocketMultishotReceiver(engine))
             {
                 Assert.NotEqual(releasedGroup, second.BufferGroup);
             }
 
-            await first.StopAsync().AsTask().WaitAsync(TimeSpan.FromSeconds(10));
+            await first.StopAsync().AsTask().WaitAsync(
+                TimeSpan.FromSeconds(10),
+                TestContext.Current.CancellationToken);
             using var third = new LinuxIoUringSocketMultishotReceiver(engine);
             Assert.NotEqual(releasedGroup, third.BufferGroup);
         }
@@ -1656,8 +1708,8 @@ public class MessageTransportLifecycleTests
             for (var i = 0; i < ConnectionCount; i++)
             {
                 var client = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
-                var connect = client.ConnectAsync(listener.LocalEndPoint!);
-                serverSockets[i] = await listener.AcceptAsync();
+                var connect = client.ConnectAsync(listener.LocalEndPoint!, TestContext.Current.CancellationToken);
+                serverSockets[i] = await listener.AcceptAsync(TestContext.Current.CancellationToken);
                 await connect;
                 transports[i] = new SocketMessageTransport(
                     client,
@@ -1673,7 +1725,7 @@ public class MessageTransportLifecycleTests
                 tasks[i] = RunConnection(transports[i], serverSockets[i], i);
             }
 
-            await Task.WhenAll(tasks).WaitAsync(TimeSpan.FromSeconds(30));
+            await Task.WhenAll(tasks).WaitAsync(TimeSpan.FromSeconds(30), TestContext.Current.CancellationToken);
             foreach (var transport in transports)
             {
                 Assert.True(transport.IsAdaptiveMultishot);
@@ -1687,7 +1739,7 @@ public class MessageTransportLifecycleTests
             {
                 if (transports[i] is { } transport)
                 {
-                    await transport.CloseAsync(null);
+                    await transport.CloseAsync(null, TestContext.Current.CancellationToken);
                     await transport.DisposeAsync();
                 }
 
@@ -1757,8 +1809,8 @@ public class MessageTransportLifecycleTests
         listener.Bind(new IPEndPoint(IPAddress.Loopback, 0));
         listener.Listen(1);
         using var client = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
-        var connect = client.ConnectAsync(listener.LocalEndPoint!);
-        using var server = await listener.AcceptAsync();
+        var connect = client.ConnectAsync(listener.LocalEndPoint!, TestContext.Current.CancellationToken);
+        using var server = await listener.AcceptAsync(TestContext.Current.CancellationToken);
         await connect;
         using var receiver = new LinuxIoUringSocketReceiver();
         var buffer = GC.AllocateUninitializedArray<byte>(32, pinned: true);
@@ -1788,8 +1840,8 @@ public class MessageTransportLifecycleTests
         listener.Bind(new IPEndPoint(IPAddress.Loopback, 0));
         listener.Listen(1);
         using var client = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
-        var connect = client.ConnectAsync(listener.LocalEndPoint!);
-        using var server = await listener.AcceptAsync();
+        var connect = client.ConnectAsync(listener.LocalEndPoint!, TestContext.Current.CancellationToken);
+        using var server = await listener.AcceptAsync(TestContext.Current.CancellationToken);
         await connect;
         var transport = new SocketMessageTransport(client, NullLogger.Instance, useLinuxIoUring: true);
 
@@ -1814,8 +1866,8 @@ public class MessageTransportLifecycleTests
         listener.Bind(new IPEndPoint(IPAddress.Loopback, 0));
         listener.Listen(1);
         using var client = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
-        var connect = client.ConnectAsync(listener.LocalEndPoint!);
-        using var server = await listener.AcceptAsync();
+        var connect = client.ConnectAsync(listener.LocalEndPoint!, TestContext.Current.CancellationToken);
+        using var server = await listener.AcceptAsync(TestContext.Current.CancellationToken);
         await connect;
         var transport = new SocketMessageTransport(
             client,
@@ -1844,8 +1896,8 @@ public class MessageTransportLifecycleTests
         listener.Bind(new IPEndPoint(IPAddress.Loopback, 0));
         listener.Listen(1);
         using var client = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
-        await client.ConnectAsync(listener.LocalEndPoint!);
-        using var server = await listener.AcceptAsync();
+        await client.ConnectAsync(listener.LocalEndPoint!, TestContext.Current.CancellationToken);
+        using var server = await listener.AcceptAsync(TestContext.Current.CancellationToken);
         await using var transport = new SocketMessageTransport(
             client,
             NullLogger.Instance,
@@ -1858,8 +1910,10 @@ public class MessageTransportLifecycleTests
         server.Shutdown(SocketShutdown.Send);
 
         await Assert.ThrowsAnyAsync<OperationCanceledException>(
-            () => request.Completion.WaitAsync(TimeSpan.FromSeconds(10)));
-        await transport.CloseAsync(null);
+            () => request.Completion.WaitAsync(
+                TimeSpan.FromSeconds(10),
+                TestContext.Current.CancellationToken));
+        await transport.CloseAsync(null, TestContext.Current.CancellationToken);
     }
 
     [Fact]
@@ -1878,8 +1932,8 @@ public class MessageTransportLifecycleTests
         listener.Bind(new IPEndPoint(IPAddress.Loopback, 0));
         listener.Listen(1);
         using var client = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
-        await client.ConnectAsync(listener.LocalEndPoint!);
-        using var server = await listener.AcceptAsync();
+        await client.ConnectAsync(listener.LocalEndPoint!, TestContext.Current.CancellationToken);
+        using var server = await listener.AcceptAsync(TestContext.Current.CancellationToken);
         await using var transport = new SocketMessageTransport(
             client,
             NullLogger.Instance,
@@ -1891,9 +1945,13 @@ public class MessageTransportLifecycleTests
         Assert.True(transport.EnqueueRead(request));
         Assert.True(SpinWait.SpinUntil(() => transport.IsSocketReceivePending, TimeSpan.FromSeconds(10)));
 
-        await transport.CloseAsync(null).AsTask().WaitAsync(TimeSpan.FromSeconds(10));
+        await transport.CloseAsync(null, TestContext.Current.CancellationToken).AsTask().WaitAsync(
+            TimeSpan.FromSeconds(10),
+            TestContext.Current.CancellationToken);
         await Assert.ThrowsAnyAsync<OperationCanceledException>(
-            () => request.Completion.WaitAsync(TimeSpan.FromSeconds(10)));
+            () => request.Completion.WaitAsync(
+                TimeSpan.FromSeconds(10),
+                TestContext.Current.CancellationToken));
     }
 
     [Fact]
@@ -1908,7 +1966,7 @@ public class MessageTransportLifecycleTests
             return;
         }
 
-        var address = (await Dns.GetHostAddressesAsync(Dns.GetHostName()))
+        var address = (await Dns.GetHostAddressesAsync(Dns.GetHostName(), TestContext.Current.CancellationToken))
             .FirstOrDefault(static address => address.AddressFamily == AddressFamily.InterNetwork && !IPAddress.IsLoopback(address));
         if (address is null)
         {
@@ -1920,8 +1978,8 @@ public class MessageTransportLifecycleTests
         listener.Bind(new IPEndPoint(address, 0));
         listener.Listen(1);
         using var client = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
-        var connect = client.ConnectAsync(listener.LocalEndPoint!);
-        using var server = await listener.AcceptAsync();
+        var connect = client.ConnectAsync(listener.LocalEndPoint!, TestContext.Current.CancellationToken);
+        using var server = await listener.AcceptAsync(TestContext.Current.CancellationToken);
         await connect;
         await using var transport = new SocketMessageTransport(client, NullLogger.Instance, useLinuxIoUring: true);
         var payload = GC.AllocateUninitializedArray<byte>(PayloadSize);
@@ -1938,12 +1996,12 @@ public class MessageTransportLifecycleTests
         var offset = 0;
         while (offset < received.Length)
         {
-            var length = await server.ReceiveAsync(received.AsMemory(offset));
+            var length = await server.ReceiveAsync(received.AsMemory(offset), TestContext.Current.CancellationToken);
             Assert.NotEqual(0, length);
             offset += length;
         }
 
-        await writeRequest.Completion.WaitAsync(TimeSpan.FromSeconds(10));
+        await writeRequest.Completion.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
         var finalStatistics = LinuxIoUringEngine.GetZeroCopyStatistics();
 
         Assert.Equal(payload, received);
@@ -1951,7 +2009,7 @@ public class MessageTransportLifecycleTests
         Assert.Equal(
             finalStatistics.Primary - initialStatistics.Primary,
             finalStatistics.Notifications - initialStatistics.Notifications);
-        await transport.CloseAsync(null);
+        await transport.CloseAsync(null, TestContext.Current.CancellationToken);
     }
 
     [Fact]
