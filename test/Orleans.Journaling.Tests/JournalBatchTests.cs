@@ -188,7 +188,7 @@ public abstract class JournalBatchTests : IAsyncLifetime
         Assert.Equal("three", list2[2]);
     }
 
-    [SkippableFact]
+    [Fact]
     public async Task RevertPendingChangesAsync_ReplacesUnflushedChanges()
     {
         using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
