@@ -30,6 +30,7 @@ internal sealed partial class MessageReadRequest(MessageHandlerShared shared) : 
     internal ArcBuffer _headers;
     private ArcBuffer _body;
 
+    public int FramedLength => Message.LENGTH_HEADER_SIZE + PayloadLength;
     public int PayloadLength => _headerLength + _bodyLength;
 
     internal Message.ResponseTypes _originalResponseType;
