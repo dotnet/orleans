@@ -1,5 +1,6 @@
 using System;
 using System.Diagnostics.CodeAnalysis;
+using System.Runtime.CompilerServices;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
@@ -14,6 +15,8 @@ namespace Orleans;
 /// </summary>
 public abstract partial class Grain : IGrainBase, IAddressable
 {
+    private static readonly ConditionalWeakTable<Grain, IGrainRuntime> StandaloneRuntimes = new();
+
     // Do not use this directly because we currently don't provide a way to inject it;
     // any interaction with it will result in non unit-testable code. Any behavior that can be accessed
     // from within client code (including subclasses of this class), should be exposed through IGrainRuntime.
@@ -29,7 +32,10 @@ public abstract partial class Grain : IGrainBase, IAddressable
     /// </summary>
     public GrainReference GrainReference { get { return GrainContext.GrainReference; } }
 
-    internal IGrainRuntime Runtime => GrainContext?.GrainRuntime
+    private IGrainRuntime? RuntimeOrDefault => GrainContext?.GrainRuntime
+        ?? (StandaloneRuntimes.TryGetValue(this, out var runtime) ? runtime : null);
+
+    internal IGrainRuntime Runtime => RuntimeOrDefault
         ?? throw new InvalidOperationException("Grain was created outside of the Orleans creation process and no runtime was specified.");
 
     /// <summary>
@@ -43,7 +49,7 @@ public abstract partial class Grain : IGrainBase, IAddressable
     /// <summary>
     /// Gets the IServiceProvider managed by the runtime. Null if this grain is not associated with a Runtime, such as when created directly for unit testing.
     /// </summary>
-    protected internal IServiceProvider ServiceProvider => GrainContext?.ActivationServices ?? GrainContext?.GrainRuntime?.ServiceProvider!;
+    protected internal IServiceProvider ServiceProvider => GrainContext?.ActivationServices ?? RuntimeOrDefault?.ServiceProvider!;
 
     internal GrainId GrainId => GrainContext.GrainId;
 
@@ -61,15 +67,22 @@ public abstract partial class Grain : IGrainBase, IAddressable
     /// the IGrainIdentity and IGrainRuntime with test doubles (mocks/stubs).
     /// </summary>
     /// <remarks>
-    /// When <paramref name="grainRuntime"/> is provided, it is registered as an <see cref="IGrainRuntime"/>
-    /// component on <paramref name="grainContext"/>.
+    /// When <paramref name="grainRuntime"/> is provided, it is associated with this grain and registered as an
+    /// <see cref="IGrainRuntime"/> component when <paramref name="grainContext"/> is available.
     /// </remarks>
     protected Grain(IGrainContext grainContext, IGrainRuntime? grainRuntime = null)
     {
         GrainContext = grainContext;
         if (grainRuntime is not null)
         {
-            grainContext!.GrainRuntime = grainRuntime;
+            if (grainContext is null)
+            {
+                StandaloneRuntimes.Add(this, grainRuntime);
+            }
+            else
+            {
+                grainContext.GrainRuntime = grainRuntime;
+            }
         }
     }
 
@@ -82,7 +95,7 @@ public abstract partial class Grain : IGrainBase, IAddressable
     /// A unique identifier for the current silo.
     /// There is no semantic content to this string, but it may be useful for logging.
     /// </summary>
-    public string RuntimeIdentity => GrainContext?.GrainRuntime?.SiloIdentity ?? string.Empty;
+    public string RuntimeIdentity => RuntimeOrDefault?.SiloIdentity ?? string.Empty;
 
     /// <summary>
     /// Registers a timer to send periodic callbacks to this grain.

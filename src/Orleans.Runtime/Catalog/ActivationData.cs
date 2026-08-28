@@ -412,7 +412,16 @@ internal sealed partial class ActivationData :
         {
             if (componentType == typeof(IGrainRuntime))
             {
-                _extras ??= new();
+                if (_extras is null)
+                {
+                    if (instance is null)
+                    {
+                        return;
+                    }
+
+                    _extras = new();
+                }
+
                 Volatile.Write(ref _extras.GrainRuntime, (IGrainRuntime?)instance);
                 return;
             }

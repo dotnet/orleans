@@ -82,7 +82,13 @@ internal partial class StatelessWorkerGrainContext : IGrainContext, IAsyncDispos
     IGrainRuntime? IGrainContext.GrainRuntime
     {
         get => GrainRuntime;
-        set => _shared.Shared.SetComponent(value);
+        set
+        {
+            if (!ReferenceEquals(value, GrainRuntime))
+            {
+                throw new ArgumentException("The runtime for a stateless worker context is provided by its shared grain type context.", nameof(value));
+            }
+        }
     }
 
     public IServiceProvider ActivationServices => throw new NotImplementedException();

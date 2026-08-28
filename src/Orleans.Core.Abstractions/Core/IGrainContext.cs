@@ -43,11 +43,11 @@ namespace Orleans.Runtime
         IServiceProvider ActivationServices { get; }
 
         /// <summary>
-        /// Gets the grain runtime, if available.
+        /// Gets or sets the grain runtime associated with this context.
         /// </summary>
         /// <remarks>
-        /// Runtime contexts provide this value directly. Custom contexts can override it by registering an
-        /// <see cref="IGrainRuntime"/> component or service.
+        /// Runtime contexts provide the activation runtime directly. Custom contexts resolve an
+        /// <see cref="IGrainRuntime"/> component before resolving an activation service.
         /// </remarks>
         IGrainRuntime? GrainRuntime
         {

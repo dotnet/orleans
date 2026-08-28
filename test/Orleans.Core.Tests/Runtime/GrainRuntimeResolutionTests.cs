@@ -1,4 +1,5 @@
 using System.Reflection;
+using System.Runtime.CompilerServices;
 using Microsoft.Extensions.DependencyInjection;
 using NSubstitute;
 using Orleans;
@@ -142,6 +143,21 @@ public class GrainRuntimeResolutionTests
     }
 
     [Fact, TestCategory("BVT")]
+    public void DirectConstruction_WithExplicitRuntime_PreservesRuntimeBehavior()
+    {
+        using var serviceProvider = new ServiceCollection().BuildServiceProvider();
+        var grainRuntime = Substitute.For<IGrainRuntime>();
+        grainRuntime.ServiceProvider.Returns(serviceProvider);
+        grainRuntime.SiloIdentity.Returns("test-silo");
+
+        var grain = new TestGrain(null!, grainRuntime);
+
+        Assert.Same(grainRuntime, grain.Runtime);
+        Assert.Same(serviceProvider, grain.ServiceProvider);
+        Assert.Equal("test-silo", grain.RuntimeIdentity);
+    }
+
+    [Fact, TestCategory("BVT")]
     public async Task Runtime_RemainsAvailableAcrossLifecycleCallbacks()
     {
         var grainRuntime = Substitute.For<IGrainRuntime>();
@@ -164,6 +180,102 @@ public class GrainRuntimeResolutionTests
             .Where(field => field.FieldType == typeof(IGrainRuntime));
 
         Assert.Empty(runtimeFields);
+    }
+
+    [Fact, TestCategory("BVT")]
+    public void ActivationContext_RuntimeOverride_IsPerActivation()
+    {
+        var defaultRuntime = Substitute.For<IGrainRuntime>();
+        var overrideRuntime = Substitute.For<IGrainRuntime>();
+        var shared = CreateSharedContext(defaultRuntime);
+        var first = CreateActivationData(shared);
+        var second = CreateActivationData(shared);
+
+        ((IGrainContext)first).GrainRuntime = overrideRuntime;
+
+        Assert.Same(overrideRuntime, first.GrainRuntime);
+        Assert.Same(defaultRuntime, second.GrainRuntime);
+        Assert.Same(defaultRuntime, shared.Runtime);
+    }
+
+    [Fact, TestCategory("BVT")]
+    public async Task ActivationContext_RuntimeOverride_IsSafelyPublished()
+    {
+        var defaultRuntime = Substitute.For<IGrainRuntime>();
+        var overrideRuntime = Substitute.For<IGrainRuntime>();
+        var activation = CreateActivationData(CreateSharedContext(defaultRuntime));
+        var context = (IGrainContext)activation;
+
+        var writer = Task.Run(() =>
+        {
+            for (var i = 0; i < 100_000; i++)
+            {
+                context.GrainRuntime = (i & 1) == 0 ? overrideRuntime : null;
+            }
+        }, TestContext.Current.CancellationToken);
+        var reader = Task.Run(() =>
+        {
+            for (var i = 0; i < 100_000; i++)
+            {
+                var runtime = context.GrainRuntime;
+                Assert.True(ReferenceEquals(runtime, defaultRuntime) || ReferenceEquals(runtime, overrideRuntime));
+            }
+        }, TestContext.Current.CancellationToken);
+
+        await Task.WhenAll(writer, reader);
+    }
+
+    [Fact, TestCategory("BVT")]
+    public void ActivationContext_ClearingAbsentRuntimeOverride_DoesNotCreateExtras()
+    {
+        var activation = CreateActivationData(CreateSharedContext(Substitute.For<IGrainRuntime>()));
+
+        ((IGrainContext)activation).GrainRuntime = null;
+
+        Assert.Null(typeof(ActivationData)
+            .GetField("_extras", BindingFlags.Instance | BindingFlags.NonPublic)!
+            .GetValue(activation));
+    }
+
+    [Fact, TestCategory("BVT")]
+    public void StatelessWorkerContext_RuntimeOverride_DoesNotMutateSharedContext()
+    {
+        var defaultRuntime = Substitute.For<IGrainRuntime>();
+        var overrideRuntime = Substitute.For<IGrainRuntime>();
+        var shared = CreateSharedContext(defaultRuntime);
+        var statelessShared = (StatelessWorkerGrainTypeSharedContext)RuntimeHelpers.GetUninitializedObject(typeof(StatelessWorkerGrainTypeSharedContext));
+        typeof(StatelessWorkerGrainTypeSharedContext)
+            .GetField("<Shared>k__BackingField", BindingFlags.Instance | BindingFlags.NonPublic)!
+            .SetValue(statelessShared, shared);
+        var context = (StatelessWorkerGrainContext)RuntimeHelpers.GetUninitializedObject(typeof(StatelessWorkerGrainContext));
+        typeof(StatelessWorkerGrainContext)
+            .GetField("_shared", BindingFlags.Instance | BindingFlags.NonPublic)!
+            .SetValue(context, statelessShared);
+
+        ((IGrainContext)context).GrainRuntime = defaultRuntime;
+        var exception = Assert.Throws<ArgumentException>(() => ((IGrainContext)context).GrainRuntime = overrideRuntime);
+
+        Assert.Equal("value", exception.ParamName);
+        Assert.Same(defaultRuntime, context.GrainRuntime);
+        Assert.Same(defaultRuntime, shared.Runtime);
+    }
+
+    private static GrainTypeSharedContext CreateSharedContext(IGrainRuntime runtime)
+    {
+        var shared = (GrainTypeSharedContext)RuntimeHelpers.GetUninitializedObject(typeof(GrainTypeSharedContext));
+        typeof(GrainTypeSharedContext)
+            .GetField("<Runtime>k__BackingField", BindingFlags.Instance | BindingFlags.NonPublic)!
+            .SetValue(shared, runtime);
+        return shared;
+    }
+
+    private static ActivationData CreateActivationData(GrainTypeSharedContext shared)
+    {
+        var activation = (ActivationData)RuntimeHelpers.GetUninitializedObject(typeof(ActivationData));
+        typeof(ActivationData)
+            .GetField("_shared", BindingFlags.Instance | BindingFlags.NonPublic)!
+            .SetValue(activation, shared);
+        return activation;
     }
 
     private sealed class TestGrain(IGrainContext grainContext, IGrainRuntime? grainRuntime = null)

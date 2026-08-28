@@ -21,10 +21,8 @@ namespace Orleans.Runtime;
 /// </summary>
 public sealed class GrainTypeSharedContext
 {
-    private readonly IGrainRuntime _defaultRuntime;
     private readonly IServiceProvider _serviceProvider;
     private readonly Dictionary<Type, object> _components = [];
-    private IGrainRuntime? _runtimeOverride;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="GrainTypeSharedContext"/> class.
@@ -74,7 +72,7 @@ public sealed class GrainTypeSharedContext
         var grainDirectoryResolver = serviceProvider.GetRequiredService<GrainDirectoryResolver>();
         GrainDirectory = PlacementStrategy.IsUsingGrainDirectory ? grainDirectoryResolver.Resolve(grainType) : null;
         SchedulingOptions = schedulingOptions.Value;
-        _defaultRuntime = grainRuntime;
+        Runtime = grainRuntime;
         MigrationManager = _serviceProvider.GetService<IActivationMigrationManager>();
         CatalogInstruments = serviceProvider.GetRequiredService<CatalogInstruments>();
         GrainInstruments = serviceProvider.GetRequiredService<GrainInstruments>();
@@ -136,11 +134,6 @@ public sealed class GrainTypeSharedContext
             return (TComponent)Logger;
         }
 
-        if (typeof(TComponent) == typeof(IGrainRuntime) && Runtime is TComponent runtime)
-        {
-            return runtime;
-        }
-
         if (_components is null) return default;
         _components.TryGetValue(typeof(TComponent), out var resultObj);
         return (TComponent?)resultObj;
@@ -163,11 +156,6 @@ public sealed class GrainTypeSharedContext
             return Logger;
         }
 
-        if (componentType == typeof(IGrainRuntime))
-        {
-            return Runtime;
-        }
-
         if (_components is null) return default;
         _components.TryGetValue(componentType, out var resultObj);
         return resultObj;
@@ -179,12 +167,6 @@ public sealed class GrainTypeSharedContext
     /// <typeparam name="TComponent">The type which can be used as a key to <see cref="GetComponent{TComponent}"/>.</typeparam>
     public void SetComponent<TComponent>(TComponent? instance)
     {
-        if (typeof(TComponent) == typeof(IGrainRuntime))
-        {
-            Volatile.Write(ref _runtimeOverride, instance as IGrainRuntime);
-            return;
-        }
-
         if (instance == null)
         {
             _components.Remove(typeof(TComponent));
@@ -249,7 +231,7 @@ public sealed class GrainTypeSharedContext
     /// <summary>
     /// Gets the grain runtime.
     /// </summary>
-    public IGrainRuntime Runtime => Volatile.Read(ref _runtimeOverride) ?? _defaultRuntime;
+    public IGrainRuntime Runtime { get; }
 
     /// <summary>
     /// Gets the local activation migration manager.
