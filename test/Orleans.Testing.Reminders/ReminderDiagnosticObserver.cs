@@ -1,9 +1,9 @@
 #nullable enable
 
 using System.Diagnostics.CodeAnalysis;
+using System.Reactive.Disposables;
 using System.Reactive.Linq;
 using System.Reactive.Subjects;
-using System.Reactive.Threading.Tasks;
 using Orleans;
 using Orleans.Internal;
 using Orleans.Runtime;
@@ -149,10 +149,10 @@ public sealed class ReminderDiagnosticObserver : IDisposable
     /// </summary>
     public Task<ReminderEvents.TickCompleted> WaitForReminderTickAsync(GrainId grainId, CancellationToken cancellationToken, string? reminderName = null)
     {
-        return _events
-            .OfType<ReminderEvents.TickCompleted>()
-            .FirstAsync(e => MatchesReminder(e, grainId, reminderName))
-            .ToTask(cancellationToken);
+        return WaitForEventAsync(
+            _events.OfType<ReminderEvents.TickCompleted>(),
+            e => MatchesReminder(e, grainId, reminderName),
+            cancellationToken);
     }
 
     /// <summary>
@@ -206,10 +206,10 @@ public sealed class ReminderDiagnosticObserver : IDisposable
     /// </summary>
     public Task<ReminderEvents.Registered> WaitForReminderRegisteredAsync(GrainId grainId, string reminderName, CancellationToken cancellationToken)
     {
-        return _events
-            .OfType<ReminderEvents.Registered>()
-            .FirstAsync(e => MatchesReminder(e, grainId, reminderName))
-            .ToTask(cancellationToken);
+        return WaitForEventAsync(
+            _events.OfType<ReminderEvents.Registered>(),
+            e => MatchesReminder(e, grainId, reminderName),
+            cancellationToken);
     }
 
     /// <summary>
@@ -217,10 +217,10 @@ public sealed class ReminderDiagnosticObserver : IDisposable
     /// </summary>
     public Task<ReminderEvents.ReminderServiceStarted> WaitForReminderServiceStartedAsync(CancellationToken cancellationToken, SiloAddress? siloAddress = null)
     {
-        return _serviceEvents
-            .OfType<ReminderEvents.ReminderServiceStarted>()
-            .FirstAsync(e => siloAddress is null || Equals(e.SiloAddress, siloAddress))
-            .ToTask(cancellationToken);
+        return WaitForEventAsync(
+            _serviceEvents.OfType<ReminderEvents.ReminderServiceStarted>(),
+            e => siloAddress is null || Equals(e.SiloAddress, siloAddress),
+            cancellationToken);
     }
 
     /// <summary>
@@ -228,10 +228,10 @@ public sealed class ReminderDiagnosticObserver : IDisposable
     /// </summary>
     public Task<ReminderEvents.Unregistered> WaitForReminderUnregisteredAsync(GrainId grainId, string reminderName, CancellationToken cancellationToken)
     {
-        return _events
-            .OfType<ReminderEvents.Unregistered>()
-            .FirstAsync(e => MatchesReminder(e, grainId, reminderName))
-            .ToTask(cancellationToken);
+        return WaitForEventAsync(
+            _events.OfType<ReminderEvents.Unregistered>(),
+            e => MatchesReminder(e, grainId, reminderName),
+            cancellationToken);
     }
 
     /// <summary>
@@ -328,6 +328,70 @@ public sealed class ReminderDiagnosticObserver : IDisposable
         }
 
         return waiter.TaskSource.Task;
+    }
+
+    private static Task<TEvent> WaitForEventAsync<TEvent>(
+        IObservable<TEvent> events,
+        Func<TEvent, bool> predicate,
+        CancellationToken cancellationToken)
+    {
+        if (cancellationToken.IsCancellationRequested)
+        {
+            return Task.FromCanceled<TEvent>(cancellationToken);
+        }
+
+        var completion = new TaskCompletionSource<TEvent>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var subscription = new SingleAssignmentDisposable();
+        var cancellationRegistration = cancellationToken.Register(
+            static state =>
+            {
+                var (source, eventSubscription, token) =
+                    ((TaskCompletionSource<TEvent> Source, SingleAssignmentDisposable Subscription, CancellationToken Token))state!;
+                eventSubscription.Dispose();
+                source.TrySetCanceled(token);
+            },
+            (completion, subscription, cancellationToken));
+        _ = completion.Task.ContinueWith(
+            static (_, state) => ((CancellationTokenRegistration)state!).Dispose(),
+            cancellationRegistration,
+            CancellationToken.None,
+            TaskContinuationOptions.ExecuteSynchronously,
+            TaskScheduler.Default);
+
+        subscription.Disposable = events.Subscribe(
+            value =>
+            {
+                bool matches;
+                try
+                {
+                    matches = predicate(value);
+                }
+                catch (Exception exception)
+                {
+                    subscription.Dispose();
+                    completion.TrySetException(exception);
+                    return;
+                }
+
+                if (!matches)
+                {
+                    return;
+                }
+
+                subscription.Dispose();
+                completion.TrySetResult(value);
+            },
+            error =>
+            {
+                subscription.Dispose();
+                completion.TrySetException(error);
+            },
+            () =>
+            {
+                subscription.Dispose();
+                completion.TrySetException(new InvalidOperationException("The diagnostic event stream completed before a matching event was observed."));
+            });
+        return completion.Task;
     }
 
     private static bool MatchesReminder(ReminderEvents.ReminderEvent evt, GrainId grainId, string? reminderName)

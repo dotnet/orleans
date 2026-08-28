@@ -32,6 +32,34 @@ public class ReminderEventsTests
     [TestSuite("BVT")]
     [TestProvider("None")]
     [Fact, TestCategory("BVT")]
+    public void ReminderDiagnosticObserver_ServiceStartedWait_DoesNotRunContinuationsInline()
+    {
+        using var observer = ReminderDiagnosticObserver.Create();
+        using var continuationRan = new ManualResetEventSlim();
+        var siloAddress = SiloAddress.New(new IPEndPoint(IPAddress.Loopback, 14010), 11);
+        var waitTask = observer.WaitForReminderServiceStartedAsync(TestContext.Current.CancellationToken, siloAddress);
+        var emitterThread = Environment.CurrentManagedThreadId;
+        var continuationThread = 0;
+
+        _ = waitTask.ContinueWith(
+            _ =>
+            {
+                continuationThread = Environment.CurrentManagedThreadId;
+                continuationRan.Set();
+            },
+            TestContext.Current.CancellationToken,
+            TaskContinuationOptions.ExecuteSynchronously,
+            TaskScheduler.Default);
+
+        ReminderEvents.EmitReminderServiceStarted(siloAddress);
+
+        Assert.True(continuationRan.Wait(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken));
+        Assert.NotEqual(emitterThread, continuationThread);
+    }
+
+    [TestSuite("BVT")]
+    [TestProvider("None")]
+    [Fact, TestCategory("BVT")]
     public async Task ReminderDiagnosticObserver_MatchesTickCompleted_ByIdentifiers()
     {
         using var observer = ReminderDiagnosticObserver.Create();
