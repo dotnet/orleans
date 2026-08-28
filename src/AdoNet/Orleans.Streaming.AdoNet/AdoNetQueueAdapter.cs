@@ -44,9 +44,9 @@ internal partial class AdoNetQueueAdapter : IQueueAdapter, IQueueAdapterCache
     public string Name { get; }
 
     /// <summary>
-    /// The ADO.NET partitioned stream provider supports replay from cached and durable checkpoints.
+    /// The ADO.NET partitioned stream provider resumes from its durable partition checkpoint.
     /// </summary>
-    public bool IsRewindable => true;
+    public bool IsRewindable => false;
 
     /// <summary>
     /// The ADO.NET provider works both ways.
