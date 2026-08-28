@@ -586,21 +586,48 @@ public abstract class ReminderServiceLifecycleTestRunner
         CancellationToken cancellationToken)
     {
         await Task.WhenAll(reminders.Select(item =>
-            CleanupAsync(guarantee, item.Grain, item.Name, cancellationToken)));
+            RemovePersistedRowAsync(guarantee, item.Grain.GetGrainId(), item.Name, cancellationToken)));
+        var quiescence = reminders
+            .Select(item => _harness.WaitForOwnerCountAsync(
+                item.Grain.GetGrainId(),
+                item.Name,
+                0,
+                cancellationToken))
+            .ToArray();
+        await _harness.AdvanceAsync(_harness.ReminderRefreshPeriod, cancellationToken);
+        await Task.WhenAll(quiescence);
+        await Task.WhenAll(reminders.Select(item =>
+            AssertAbsentAsync(guarantee, item.Grain.GetGrainId(), item.Name, cancellationToken)));
     }
 
-    private async Task CleanupAsync(
+    private Task CleanupAsync(
         string guarantee,
         IReminderServiceTestGrain grain,
         string name,
         CancellationToken cancellationToken)
+        => CleanupAsync(guarantee, [(grain, name)], cancellationToken);
+
+    private async Task RemovePersistedRowAsync(
+        string guarantee,
+        GrainId grainId,
+        string name,
+        CancellationToken cancellationToken)
     {
-        if (await grain.UnregisterAsync(name).WaitAsync(cancellationToken))
+        var row = await _harness.ReminderTable.ReadRow(grainId, name).WaitAsync(cancellationToken);
+        if (row is null)
         {
-            await _harness.WaitForOwnerCountAsync(grain.GetGrainId(), name, 0, cancellationToken);
+            return;
         }
 
-        await AssertAbsentAsync(guarantee, grain.GetGrainId(), name, cancellationToken);
+        if (!await _harness.ReminderTable.RemoveRow(grainId, name, row.ETag!).WaitAsync(cancellationToken))
+        {
+            Fail(guarantee, "scenario cleanup remove")
+                .WithIdentity(grainId, name)
+                .WithExpected("scenario-owned row removed using its current ETag")
+                .WithObserved(Describe(row))
+                .WithETags(row.ETag, supplied: row.ETag)
+                .Throw();
+        }
     }
 
     private async Task AssertPersistedAsync(

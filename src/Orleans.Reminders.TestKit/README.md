@@ -213,9 +213,10 @@ public sealed class MyLifecycleTests : ReminderServiceLifecycleTestRunner
 ```
 
 Do not replace harness barriers with delays, retry loops, longer timeouts, or provider-specific skips. Scenario cleanup
-uses its own bounded token, unregisters only deterministic scenario identities, and verifies their absence; it never
-clears unrelated provider rows or replaces the original scenario failure. Ownership assertions count local reminder
-instance identities, including duplicate instances on one silo, rather than counting distinct silo addresses.
+uses its own bounded token, removes only deterministic scenario rows using their current ETags, advances one explicit
+refresh for owner quiescence, and verifies their absence; it never clears unrelated provider rows or replaces the
+original scenario failure. Ownership assertions count local reminder instance identities, including duplicate
+instances on one silo, rather than counting distinct silo addresses.
 
 The built-in in-memory, Azure Table, Cosmos DB, ADO.NET SQL Server, PostgreSQL, MySQL, Redis, DynamoDB, and Firestore
 providers all expose these same inherited facts. Their adapters contain only backend precondition/setup and provider

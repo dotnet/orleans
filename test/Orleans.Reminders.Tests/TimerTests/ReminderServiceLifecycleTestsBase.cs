@@ -3,6 +3,7 @@ using Microsoft.Extensions.Options;
 using Orleans.Reminders.TestKit;
 using Orleans.Testing.Reminders;
 using Orleans.TestingHost;
+using TestExtensions;
 using Xunit;
 
 namespace UnitTests.TimerTests;
@@ -10,6 +11,7 @@ namespace UnitTests.TimerTests;
 /// <summary>
 /// Exposes the shared reminder-service lifecycle contract without inheriting provider whole-table cleanup.
 /// </summary>
+[Collection(TestEnvironmentFixture.DefaultCollection)]
 public abstract class ReminderServiceLifecycleTestsBase
 {
     private static readonly TimeSpan ScenarioTimeout = TimeSpan.FromMinutes(2);
