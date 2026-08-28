@@ -1,6 +1,7 @@
 #pragma warning disable StreamingJsonSerializationExperimental // Type is for evaluation purposes only and is subject to change or removal in future updates. Suppress this diagnostic to proceed.
 
 using System.Buffers.Text;
+using JsonValueKind = System.Text.Json.JsonValueKind;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
@@ -20,6 +21,9 @@ namespace Tester.AzureUtils.Streaming
 {
     [Collection(TestEnvironmentFixture.DefaultCollection)]
     [TestCategory("AzureStorage"), TestCategory("Streaming")]
+    [TestSuite("BVT")]
+    [TestProvider("AzureStorage")]
+    [TestArea("Streaming")]
     public class AzureQueueJsonDataAdapterTests
     {
         private const string CompactOrleans3JsonMessage =
@@ -49,7 +53,10 @@ namespace Tester.AzureUtils.Streaming
         {
             var serializer = this.fixture.Services.GetRequiredService<Serializer>();
             var azureQueueDataAdapterV2 = new AzureQueueDataAdapterV2(serializer);
-            var jsonOptions = this.fixture.Services.GetRequiredService<IOptions<OrleansJsonSerializerOptions>>();
+            var jsonOptions = Options.Create(new OrleansJsonSerializerOptions
+            {
+                JsonSerializerSettings = OrleansJsonSerializerSettings.GetDefaultSerializerSettings(this.fixture.Services)
+            });
             var jsonOrleansSerializer = new OrleansJsonSerializer(jsonOptions);
 
             return new AzureQueueJsonDataAdapter(
@@ -194,6 +201,46 @@ namespace Tester.AzureUtils.Streaming
             Assert.Equal(
                 StreamId.Create("test-namespace", Guid.Parse("00112233-4455-6677-8899-aabbccddeeff")),
                 batchContainer.StreamId);
+        }
+
+        [Theory, TestCategory("BVT")]
+        [InlineData("\"1\"")]
+        [InlineData("2147483648")]
+        [InlineData("2")]
+        public void JsonAdapter_RejectsUnsupportedCompactEnvelopeVersion(string version)
+        {
+            var jsonAdapter = InitializeQueueJsonDataAdapter(new AzureQueueJsonDataAdapterOptions { EnableFallback = false });
+
+            var exception = Assert.Throws<InvalidDataException>(
+                () => jsonAdapter.FromQueueMessage($"{{\"version\":{version}}}", sequenceId: 0));
+
+            Assert.Contains("Unsupported Azure Queue JSON envelope version", exception.Message);
+            Assert.Contains(version, exception.Message);
+        }
+
+        [Theory, TestCategory("BVT")]
+        [MemberData(nameof(MalformedCompactEnvelopeCases))]
+        public void JsonAdapter_RejectsMalformedCompactEnvelope(
+            string message,
+            string expectedProperty,
+            string expectedKind)
+        {
+            var jsonAdapter = InitializeQueueJsonDataAdapter(new AzureQueueJsonDataAdapterOptions { EnableFallback = false });
+
+            var exception = Assert.Throws<InvalidDataException>(
+                () => jsonAdapter.FromQueueMessage(message, sequenceId: 0));
+
+            Assert.Contains($"property '{expectedProperty}'", exception.Message);
+            Assert.Contains(expectedKind, exception.Message);
+        }
+
+        [Fact, TestCategory("BVT")]
+        public void JsonAdapter_RejectsInvalidJson()
+        {
+            var jsonAdapter = InitializeQueueJsonDataAdapter(new AzureQueueJsonDataAdapterOptions { EnableFallback = false });
+
+            Assert.ThrowsAny<System.Text.Json.JsonException>(
+                () => jsonAdapter.FromQueueMessage("{\"version\":1", sequenceId: 0));
         }
 
         [Fact, TestCategory("BVT")]
@@ -375,6 +422,60 @@ namespace Tester.AzureUtils.Streaming
             Assert.False(IsValidJson(binaryMessage));
             Assert.True(IsValidJson(jsonMessage));
         }
+
+        public static TheoryData<string, string, string> MalformedCompactEnvelopeCases => new()
+        {
+            {
+                """{"version":1,"events":[],"requestContext":{}}""",
+                "stream",
+                nameof(JsonValueKind.Object)
+            },
+            {
+                """{"version":1,"stream":[],"events":[],"requestContext":{}}""",
+                "stream",
+                nameof(JsonValueKind.Object)
+            },
+            {
+                """{"version":1,"stream":{"key":"key"},"events":[],"requestContext":{}}""",
+                "namespace",
+                $"{nameof(JsonValueKind.String)} or {nameof(JsonValueKind.Null)}"
+            },
+            {
+                """{"version":1,"stream":{"namespace":1,"key":"key"},"events":[],"requestContext":{}}""",
+                "namespace",
+                $"{nameof(JsonValueKind.String)} or {nameof(JsonValueKind.Null)}"
+            },
+            {
+                """{"version":1,"stream":{"namespace":"namespace"},"events":[],"requestContext":{}}""",
+                "key",
+                nameof(JsonValueKind.String)
+            },
+            {
+                """{"version":1,"stream":{"namespace":"namespace","key":null},"events":[],"requestContext":{}}""",
+                "key",
+                nameof(JsonValueKind.String)
+            },
+            {
+                """{"version":1,"stream":{"namespace":"namespace","key":"key"},"requestContext":{}}""",
+                "events",
+                nameof(JsonValueKind.Array)
+            },
+            {
+                """{"version":1,"stream":{"namespace":"namespace","key":"key"},"events":{},"requestContext":{}}""",
+                "events",
+                nameof(JsonValueKind.Array)
+            },
+            {
+                """{"version":1,"stream":{"namespace":"namespace","key":"key"},"events":[]}""",
+                "requestContext",
+                nameof(JsonValueKind.Object)
+            },
+            {
+                """{"version":1,"stream":{"namespace":"namespace","key":"key"},"events":[],"requestContext":[]}""",
+                "requestContext",
+                nameof(JsonValueKind.Object)
+            }
+        };
 
         [GenerateSerializer]
         public sealed class EventData : IEquatable<EventData>
