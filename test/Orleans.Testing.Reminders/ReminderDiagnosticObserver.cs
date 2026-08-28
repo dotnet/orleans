@@ -29,11 +29,15 @@ public sealed class ReminderDiagnosticObserver : IDisposable
     private readonly IDisposable _storageSubscription;
     private readonly Dictionary<GrainId, int> _tickCountsByGrain = [];
     private readonly Dictionary<ReminderTickKey, int> _tickCountsByReminder = [];
+    private readonly Dictionary<ReminderTickKey, int> _localStartCounts = [];
+    private readonly Dictionary<ReminderTickKey, int> _localStopCounts = [];
+    private readonly Dictionary<ReminderTickKey, int> _scheduleChangeCounts = [];
     private readonly Dictionary<ReminderTickKey, Dictionary<LocalReminderInstanceKey, LocalReminderInstanceState>> _activeLocalReminders = [];
     private readonly List<TickCountWaiter> _tickCountWaiters = [];
     private readonly List<ActiveReminderCountWaiter> _activeReminderCountWaiters = [];
     private readonly List<LocalReminderScheduleWaiter> _localReminderScheduleWaiters = [];
     private readonly List<GlobalQuiescenceWaiter> _globalQuiescenceWaiters = [];
+    private readonly List<ScheduleChangeCountWaiter> _scheduleChangeCountWaiters = [];
 
     /// <summary>
     /// Creates a new instance of the observer and starts listening for reminder diagnostic events.
@@ -84,6 +88,7 @@ public sealed class ReminderDiagnosticObserver : IDisposable
                     break;
                 case ReminderEvents.LocalReminderStarted localReminderStarted:
                     var startedKey = new ReminderTickKey(localReminderStarted.GrainId, localReminderStarted.ReminderName);
+                    _localStartCounts[startedKey] = _localStartCounts.GetValueOrDefault(startedKey) + 1;
                     if (!_activeLocalReminders.TryGetValue(startedKey, out var startedInstances))
                     {
                         startedInstances = new Dictionary<LocalReminderInstanceKey, LocalReminderInstanceState>();
@@ -97,6 +102,7 @@ public sealed class ReminderDiagnosticObserver : IDisposable
                     break;
                 case ReminderEvents.LocalReminderStopped localReminderStopped:
                     var stoppedKey = new ReminderTickKey(localReminderStopped.GrainId, localReminderStopped.ReminderName);
+                    _localStopCounts[stoppedKey] = _localStopCounts.GetValueOrDefault(stoppedKey) + 1;
                     if (_activeLocalReminders.TryGetValue(stoppedKey, out var stoppedInstances))
                     {
                         stoppedInstances.Remove(new LocalReminderInstanceKey(
@@ -114,6 +120,7 @@ public sealed class ReminderDiagnosticObserver : IDisposable
                     break;
                 case ReminderEvents.LocalReminderScheduleChanged localReminderScheduleChanged:
                     var changedKey = new ReminderTickKey(localReminderScheduleChanged.GrainId, localReminderScheduleChanged.ReminderName);
+                    _scheduleChangeCounts[changedKey] = _scheduleChangeCounts.GetValueOrDefault(changedKey) + 1;
                     if (TryGetLocalReminderInstance(changedKey, localReminderScheduleChanged.Identity, out var changedInstance))
                     {
                         changedInstance.ScheduleVersion = Math.Max(
@@ -121,6 +128,7 @@ public sealed class ReminderDiagnosticObserver : IDisposable
                             localReminderScheduleChanged.ScheduleVersion);
                     }
 
+                    ReleaseReadyScheduleChangeWaiters(ready);
                     break;
                 case ReminderEvents.LocalReminderTickWaitArmed localReminderTickWaitArmed:
                     var tickWaitArmedKey = new ReminderTickKey(localReminderTickWaitArmed.GrainId, localReminderTickWaitArmed.ReminderName);
@@ -243,6 +251,63 @@ public sealed class ReminderDiagnosticObserver : IDisposable
         {
             return GetTickCountCore(grainId, reminderName);
         }
+    }
+
+    /// <summary>Gets the number of local reminder instances started for an identity.</summary>
+    public int GetLocalStartCount(GrainId grainId, string reminderName)
+    {
+        lock (_lock)
+        {
+            return _localStartCounts.GetValueOrDefault(new ReminderTickKey(grainId, reminderName));
+        }
+    }
+
+    /// <summary>Gets the number of local reminder instances stopped for an identity.</summary>
+    public int GetLocalStopCount(GrainId grainId, string reminderName)
+    {
+        lock (_lock)
+        {
+            return _localStopCounts.GetValueOrDefault(new ReminderTickKey(grainId, reminderName));
+        }
+    }
+
+    /// <summary>Gets the number of local schedule changes for an identity.</summary>
+    public int GetScheduleChangeCount(GrainId grainId, string reminderName)
+    {
+        lock (_lock)
+        {
+            return _scheduleChangeCounts.GetValueOrDefault(new ReminderTickKey(grainId, reminderName));
+        }
+    }
+
+    /// <summary>Waits for the requested number of local schedule changes for an identity.</summary>
+    public Task WaitForScheduleChangeCountAsync(
+        GrainId grainId,
+        string reminderName,
+        int expectedCount,
+        CancellationToken cancellationToken)
+    {
+        ArgumentOutOfRangeException.ThrowIfNegative(expectedCount);
+        ArgumentException.ThrowIfNullOrEmpty(reminderName);
+        if (cancellationToken.IsCancellationRequested)
+        {
+            return Task.FromCanceled(cancellationToken);
+        }
+
+        ScheduleChangeCountWaiter waiter;
+        lock (_lock)
+        {
+            if (_scheduleChangeCounts.GetValueOrDefault(new ReminderTickKey(grainId, reminderName)) >= expectedCount)
+            {
+                return Task.CompletedTask;
+            }
+
+            waiter = new ScheduleChangeCountWaiter(grainId, reminderName, expectedCount);
+            _scheduleChangeCountWaiters.Add(waiter);
+            RegisterCancellation(waiter, _scheduleChangeCountWaiters, cancellationToken);
+        }
+
+        return waiter.TaskSource.Task;
     }
 
     /// <summary>
@@ -545,6 +610,23 @@ public sealed class ReminderDiagnosticObserver : IDisposable
             .Any(instance => instance.SiloAddress is { } address && siloAddresses.Contains(address));
     }
 
+    private void ReleaseReadyScheduleChangeWaiters(List<Waiter> ready)
+    {
+        for (var i = _scheduleChangeCountWaiters.Count - 1; i >= 0; i--)
+        {
+            var waiter = _scheduleChangeCountWaiters[i];
+            var count = _scheduleChangeCounts.GetValueOrDefault(
+                new ReminderTickKey(waiter.GrainId, waiter.ReminderName));
+            if (count < waiter.TargetCount)
+            {
+                continue;
+            }
+
+            _scheduleChangeCountWaiters.RemoveAt(i);
+            ready.Add(waiter);
+        }
+    }
+
     private readonly record struct ReminderTickKey(GrainId GrainId, string ReminderName);
     private readonly record struct LocalReminderInstanceKey(object Identity)
     {
@@ -597,6 +679,16 @@ public sealed class ReminderDiagnosticObserver : IDisposable
     private sealed class GlobalQuiescenceWaiter(IReadOnlySet<SiloAddress> siloAddresses) : Waiter
     {
         public IReadOnlySet<SiloAddress> SiloAddresses { get; } = siloAddresses.ToHashSet();
+    }
+
+    private sealed class ScheduleChangeCountWaiter(
+        GrainId grainId,
+        string reminderName,
+        int targetCount) : Waiter
+    {
+        public GrainId GrainId { get; } = grainId;
+        public string ReminderName { get; } = reminderName;
+        public int TargetCount { get; } = targetCount;
     }
 
     /// <inheritdoc/>

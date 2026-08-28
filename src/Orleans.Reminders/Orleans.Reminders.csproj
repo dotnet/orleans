@@ -21,9 +21,9 @@
     <InternalsVisibleTo Include="Orleans.Azure.Tests" />
     <InternalsVisibleTo Include="Orleans.Core.Tests" />
     <InternalsVisibleTo Include="Orleans.Reminders.Tests" />
+    <InternalsVisibleTo Include="Orleans.Testing.Reminders" />
     <InternalsVisibleTo Include="Orleans.Runtime" />
     <InternalsVisibleTo Include="Orleans.Runtime.Internal.Tests" />
     <InternalsVisibleTo Include="TestInternalGrains" />
   </ItemGroup>
 </Project>
-

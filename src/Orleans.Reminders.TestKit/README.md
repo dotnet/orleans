@@ -12,6 +12,8 @@ cardinality setup and cleanup, bounded retries, diagnostics, and failure message
 | --- | --- |
 | `ReminderTableTestRunner` | Direct conformance facts for every documented table guarantee. |
 | `ReminderServiceTestRunner` | Cluster-level registration, replacement, lookup, enumeration, and removal conformance. |
+| `ReminderServiceLifecycleTestRunner` | Deterministic startup, ownership, exact-due, reconciliation, churn, and cleanup-isolation conformance. |
+| `IReminderServiceLifecycleHarness` | Adapter contract for one cluster, one reminder clock, diagnostics, and explicit topology barriers. |
 | `ReminderTableModelBasedTestRunner` | Generated sequential conformance against the same full contract. |
 | `IdealizedReminderTable` | Deterministic, strongly consistent reference implementation and fault-injection oracle. |
 | `ReminderTableTestFixture` | In-process cluster fixture which deploys and resolves a provider. |
@@ -172,6 +174,46 @@ public sealed class MyReminderServiceTests
         => base.ReminderService_UpdateReplacesScheduleAndETagWithoutDuplicate();
 }
 ```
+
+### Run lifecycle and churn conformance
+
+`ReminderServiceLifecycleTestRunner` adds the shared service-level contract. The same eight scenarios run for every
+service provider: startup readiness, single registration ownership, in-place schedule update, removal quiescence,
+exact-due recovery, stale-owner registration reconciliation, one-silo join/leave transfer, and cleanup isolation.
+
+Use `ReminderTestClock` as the sole time driver and `ReminderDiagnosticObserver` as the lifecycle/tick source. The
+`ReminderServiceLifecycleHarness` adapter for `InProcessTestCluster` supplies explicit membership and reminder-range
+reconciliation barriers:
+
+```csharp
+var observer = ReminderDiagnosticObserver.Create(); // create before deployment
+var clock = builder.AddReminderTestClock();
+var cluster = builder.Build();
+await cluster.DeployAsync();
+
+var options = cluster.Silos[0].ServiceProvider
+    .GetRequiredService<IOptions<ReminderOptions>>().Value;
+var harness = new ReminderServiceLifecycleHarness(
+    cluster,
+    clock,
+    observer,
+    options.ReminderLoadingWindow);
+
+public sealed class MyLifecycleTests : ReminderServiceLifecycleTestRunner
+{
+    public MyLifecycleTests(IReminderServiceLifecycleHarness harness)
+        : base(harness, "MyProvider", seed: 42)
+    {
+    }
+
+    [Fact]
+    public override Task ReminderService_OneSiloJoinLeaveTransfersOwnership()
+        => base.ReminderService_OneSiloJoinLeaveTransfersOwnership();
+}
+```
+
+Do not replace harness barriers with delays, retry loops, longer timeouts, or provider-specific skips. Scenario cleanup
+unregisters only deterministic scenario identities and verifies their absence; it never clears unrelated provider rows.
 
 ## Deterministic oracle and cluster testing
 
