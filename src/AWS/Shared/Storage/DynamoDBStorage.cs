@@ -791,6 +791,12 @@ namespace Orleans.Transactions.DynamoDB
         public Task<(List<TResult> results, Dictionary<string, AttributeValue>? lastEvaluatedKey)> QueryAsync<TResult>(string tableName, Dictionary<string, AttributeValue> keys, string keyConditionExpression, Func<Dictionary<string, AttributeValue>, TResult> resolver, string indexName = "", bool scanIndexForward = true, Dictionary<string, AttributeValue>? lastEvaluatedKey = null, bool consistentRead = true) where TResult : class
             => QueryAsync(tableName, keys, keyConditionExpression, resolver, CancellationToken.None, indexName, scanIndexForward, lastEvaluatedKey, consistentRead);
 
+        /// <summary>
+        /// Queries one page of entries with cancellation support.
+        /// </summary>
+        public Task<(List<TResult> results, Dictionary<string, AttributeValue>? lastEvaluatedKey)> QueryPageAsync<TResult>(string tableName, Dictionary<string, AttributeValue> keys, string keyConditionExpression, Func<Dictionary<string, AttributeValue>, TResult> resolver, string indexName = "", bool scanIndexForward = true, Dictionary<string, AttributeValue>? lastEvaluatedKey = null, bool consistentRead = true, CancellationToken cancellationToken = default) where TResult : class
+            => QueryAsync(tableName, keys, keyConditionExpression, resolver, cancellationToken, indexName, scanIndexForward, lastEvaluatedKey, consistentRead);
+
         /// <summary>Queries a page of entries using the supplied cancellation token.</summary>
         /// <typeparam name="TResult">The result type.</typeparam>
         /// <param name="tableName">The table name.</param>
@@ -955,6 +961,47 @@ namespace Orleans.Transactions.DynamoDB
                 }
 
                 return resultList;
+            }
+            catch (Exception exc)
+            {
+                LogWarningFailedToReadTable(_logger, exc, tableName);
+                throw new OrleansException($"Failed to read table {tableName}: {exc.Message}", exc);
+            }
+        }
+
+        /// <summary>
+        /// Strongly consistently scans one bounded page from a DynamoDB table.
+        /// </summary>
+        public async Task<(List<TResult> results, Dictionary<string, AttributeValue>? lastEvaluatedKey)> ScanPageAsync<TResult>(
+            string tableName,
+            Dictionary<string, AttributeValue> attributes,
+            string expression,
+            Func<Dictionary<string, AttributeValue>, TResult> resolver,
+            int limit,
+            Dictionary<string, AttributeValue>? exclusiveStartKey = null,
+            CancellationToken cancellationToken = default)
+            where TResult : class
+        {
+            try
+            {
+                var request = new ScanRequest
+                {
+                    TableName = tableName,
+                    ConsistentRead = true,
+                    FilterExpression = expression,
+                    ExpressionAttributeValues = attributes,
+                    Select = Select.ALL_ATTRIBUTES,
+                    Limit = limit,
+                    ExclusiveStartKey = exclusiveStartKey,
+                };
+
+                var response = await _ddbClient.ScanAsync(request, cancellationToken);
+                var results = response.Items?.Select(resolver).ToList() ?? [];
+                return (results, response.LastEvaluatedKey);
+            }
+            catch (OperationCanceledException)
+            {
+                throw;
             }
             catch (Exception exc)
             {

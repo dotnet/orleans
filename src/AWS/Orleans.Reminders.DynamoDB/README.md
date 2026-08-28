@@ -51,6 +51,15 @@ await host.WaitForShutdownAsync();
 
 `UseDynamoDBReminderService` configures reminder storage independently from the cluster membership provider. The AWS SDK credential and profile resolution chain supplies credentials when the reminder options omit explicit keys. This example uses on-demand capacity and an infrastructure-managed table.
 
+## Strongly consistent schema migration
+
+The provider defaults to the legacy schema. V2 migration is an explicit two-stage rollout:
+
+1. Deploy every silo with `TableMode=Migrate` to create/backfill `${TableName}-v2` while retaining V1 reads and transactional dual writes.
+2. After all silos are upgraded and migration reports `Ready`, deploy `TableMode=V2`. Cutover verifies the copies and fails if any active silo lacks a V2 compatibility marker.
+
+V2 point, grain, and hash-range reads query the sharded base table with strong consistency. V1 remains transactionally maintained for rollback. After the rollback window, `TableMode=V2Only` performs an irreversible fenced transition before operators retire V1; the provider never deletes it. See [Configure Amazon DynamoDB reminders](https://dotnet.github.io/orleans/docs/grains/reminders/dynamodb/) for prerequisites, recovery, rollback, capacity, and compatibility details.
+
 ## Example - Using Reminders in a Grain
 ```csharp
 using System;
