@@ -78,17 +78,19 @@ internal sealed class JournaledJobShardState : IJournaledState, IDurableValueCom
             throw new ArgumentOutOfRangeException(nameof(request), "Scheduled time is out of shard bounds.");
         }
 
-        var job = new DurableJob
+        if (request.JobId is { } requestedJobId
+            && _jobQueue.TryGetJob(requestedJobId, out var existingJob))
         {
-            Id = Guid.NewGuid().ToString(),
-            TargetGrainId = request.Target,
-            Name = request.JobName,
-            DueTime = request.DueTime,
-            ShardId = Id,
-            Metadata = request.Metadata,
-            TraceParent = request.TraceParent,
-            TraceState = request.TraceState,
-        };
+            if (!request.Matches(existingJob!))
+            {
+                throw new InvalidOperationException(
+                    $"Durable job ID '{requestedJobId}' is already scheduled with different properties.");
+            }
+
+            return existingJob;
+        }
+
+        var job = request.CreateJob(Id);
 
         Write(DurableJobShardJournalRecord.ForSchedule(job));
         ApplySchedule(job);

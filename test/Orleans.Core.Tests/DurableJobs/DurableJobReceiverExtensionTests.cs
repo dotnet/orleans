@@ -237,6 +237,31 @@ public class DurableJobReceiverExtensionTests
     }
 
     [Fact]
+    public async Task HandleDurableJobAsync_SameJobIdInDifferentShardsStartsIndependentExecutions()
+    {
+        var firstExecution = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var secondExecution = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var invocationCount = 0;
+        var handler = Substitute.For<IDurableJobHandler>();
+        handler.ExecuteJobAsync(Arg.Any<IJobRunContext>(), Arg.Any<CancellationToken>())
+            .Returns(_ => Interlocked.Increment(ref invocationCount) == 1
+                ? firstExecution.Task
+                : secondExecution.Task);
+        var extension = CreateExtension(handler, TimeSpan.FromMinutes(1));
+        var firstContext = CreateJobContext("run-1", jobId: "stable-job", shardId: "shard-1");
+        var secondContext = CreateJobContext("run-2", jobId: "stable-job", shardId: "shard-2");
+
+        var first = extension.HandleDurableJobAsync(firstContext, CancellationToken.None);
+        var second = extension.HandleDurableJobAsync(secondContext, CancellationToken.None);
+
+        await handler.Received(2).ExecuteJobAsync(Arg.Any<IJobRunContext>(), Arg.Any<CancellationToken>());
+        firstExecution.SetResult(true);
+        secondExecution.SetResult(true);
+        Assert.Equal(DurableJobRunStatus.Completed, (await first).Status);
+        Assert.Equal(DurableJobRunStatus.Completed, (await second).Status);
+    }
+
+    [Fact]
     public async Task HandleDurableJobAsync_FeatureNameMatchTakesPrecedenceOverGrainHandler()
     {
         var grainHandler = Substitute.For<IDurableJobHandler>();
@@ -569,7 +594,8 @@ public class DurableJobReceiverExtensionTests
         string jobId = "job-1",
         int dequeueCount = 1,
         long executionGeneration = 0,
-        string? jobName = null)
+        string? jobName = null,
+        string shardId = "shard-1")
     {
         var context = Substitute.For<IJobRunContext>();
         context.RunId.Returns(runId);
@@ -580,7 +606,7 @@ public class DurableJobReceiverExtensionTests
             Name = jobName ?? jobId,
             DueTime = DateTimeOffset.UtcNow,
             TargetGrainId = GrainId.Create("test", "grain-1"),
-            ShardId = "shard-1",
+            ShardId = shardId,
             ExecutionGeneration = executionGeneration
         });
 
