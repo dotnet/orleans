@@ -29,7 +29,7 @@ namespace Tester.AzureUtils.TimerTests
         {
             private static readonly TimeSpan ReminderServiceStartupTimeout = TimeSpan.FromMinutes(5);
             private ReminderTestClock? _reminderClock;
-            private readonly ReminderDiagnosticObserver _startupObserver = ReminderDiagnosticObserver.Create();
+            private readonly ReminderLifecycleHarness _startupHarness = new();
             private IReadOnlyList<SiloAddress>? _initialSilos;
             private IReadOnlyList<SiloAddress>? _startedReminderServices;
             internal ReminderTestClock ReminderClock
@@ -70,25 +70,17 @@ namespace Tester.AzureUtils.TimerTests
                 using var cancellation = CancellationTokenSource.CreateLinkedTokenSource(
                     TestContext.Current.CancellationToken);
                 cancellation.CancelAfter(ReminderServiceStartupTimeout);
-                var startedTasks = silos
-                    .Select(silo => _startupObserver.WaitForReminderServiceStartedAsync(cancellation.Token, silo.SiloAddress))
-                    .ToArray();
-
                 try
                 {
-                    _startedReminderServices = (await Task.WhenAll(startedTasks))
-                        .Select(started => started.SiloAddress!)
-                        .ToArray();
+                    _startedReminderServices = await _startupHarness.WaitForServicesReadyAsync(
+                        silos,
+                        cancellation.Token);
                 }
-                catch (OperationCanceledException) when (
-                    cancellation.IsCancellationRequested
-                    && !TestContext.Current.CancellationToken.IsCancellationRequested)
+                catch (TimeoutException exception)
                 {
-                    var missing = silos
-                        .Where((_, index) => !startedTasks[index].IsCompletedSuccessfully)
-                        .Select(silo => silo.SiloAddress);
                     throw new TimeoutException(
-                        $"Azure reminder services did not start within {ReminderServiceStartupTimeout}. Missing silos: {string.Join(", ", missing)}.");
+                        $"Azure reminder services did not start within {ReminderServiceStartupTimeout}. {exception.Message}",
+                        exception);
                 }
             }
 
@@ -101,7 +93,7 @@ namespace Tester.AzureUtils.TimerTests
                 finally
                 {
                     _reminderClock?.Dispose();
-                    _startupObserver.Dispose();
+                    _startupHarness.Dispose();
                 }
             }
         }

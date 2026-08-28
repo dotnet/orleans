@@ -1,13 +1,12 @@
 #nullable enable
 
 using System.Collections.Concurrent;
+using System.Runtime.ExceptionServices;
 using System.Text;
-using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Orleans.Internal;
 using Orleans.Runtime;
 using Orleans.Runtime.Messaging;
-using Orleans.Runtime.ReminderService;
 using Orleans.Testing.Reminders;
 using Orleans.TestingHost;
 using Orleans.TestingHost.Utils;
@@ -26,7 +25,7 @@ namespace UnitTests.TimerTests;
 /// Base class for reminder tests providing common test operations and utilities.
 /// Uses <see cref="ReminderDiagnosticObserver"/> for event-driven waiting instead of Task.Delay.
 /// </summary>
-public class ReminderTestsBase : OrleansTestingBase, IDisposable
+public class ReminderTestsBase : OrleansTestingBase, IAsyncDisposable
 {
     protected InProcessTestCluster HostedCluster { get; }
     protected static readonly TimeSpan LEEWAY = TimeSpan.FromMilliseconds(500);
@@ -42,7 +41,7 @@ public class ReminderTestsBase : OrleansTestingBase, IDisposable
     protected const long failAfter = 2;
     protected const long failCheckAfter = 6;
     protected ILogger log;
-    protected ReminderDiagnosticObserver observer;
+    protected ReminderLifecycleHarness observer { get; }
     private ReminderTestClock ReminderClock { get; }
 
     public ReminderTestsBase(ReminderTestClock reminderClock, InProcessTestCluster hostedCluster)
@@ -67,21 +66,70 @@ public class ReminderTestsBase : OrleansTestingBase, IDisposable
 #endif
 
         log = TestingUtils.CreateDefaultLoggerFactory(TestingUtils.CreateTraceFileName("client", DateTime.Now.ToString("yyyyMMdd_hhmmss")), filters).CreateLogger<ReminderTestsBase>();
-        observer = ReminderDiagnosticObserver.Create();
+        observer = new ReminderLifecycleHarness(hostedCluster);
     }
 
     public IGrainFactory GrainFactory { get; }
 
     protected DateTimeOffset ReminderUtcNow => ReminderClock.UtcNow;
 
-    public void Dispose()
+    public async ValueTask DisposeAsync()
     {
-        observer.Dispose();
+        try
+        {
+            await ExecuteCleanupAsync(
+                ClearReminderTableAsync,
+                observer.RefreshActiveServicesAsync,
+                observer.WaitForGlobalQuiescenceAsync,
+                TestConstants.InitTimeout);
+        }
+        finally
+        {
+            observer.Dispose();
+        }
+    }
 
+    protected Task ClearReminderTableAsync(CancellationToken cancellationToken)
+    {
         // ReminderTable.Clear() cannot be called from a non-Orleans thread,
-        // so we must proxy the call through a grain.
-        var controlProxy = this.GrainFactory.GetGrain<IReminderTestGrain2>(Guid.NewGuid());
-        controlProxy.EraseReminderTable().WaitAsync(TestConstants.InitTimeout).Wait();
+        // so proxy the call through a grain.
+        var controlProxy = GrainFactory.GetGrain<IReminderTestGrain2>(Guid.NewGuid());
+        return controlProxy.EraseReminderTable().WaitAsync(cancellationToken);
+    }
+
+    internal static async Task ExecuteCleanupAsync(
+        Func<CancellationToken, Task> clearReminderTable,
+        Func<CancellationToken, Task> refreshReminderServices,
+        Func<CancellationToken, Task> waitForGlobalQuiescence,
+        TimeSpan timeout)
+    {
+        using var cleanupCancellation = new CancellationTokenSource(timeout);
+        List<Exception>? exceptions = null;
+        await RunPhase(clearReminderTable);
+        await RunPhase(refreshReminderServices);
+        await RunPhase(waitForGlobalQuiescence);
+
+        if (exceptions is [var exception])
+        {
+            ExceptionDispatchInfo.Capture(exception).Throw();
+        }
+
+        if (exceptions is { Count: > 1 })
+        {
+            throw new AggregateException("Reminder test cleanup failed.", exceptions);
+        }
+
+        async Task RunPhase(Func<CancellationToken, Task> phase)
+        {
+            try
+            {
+                await phase(cleanupCancellation.Token);
+            }
+            catch (Exception exception)
+            {
+                (exceptions ??= []).Add(exception);
+            }
+        }
     }
 
     public Task Test_Reminders_Basic_StopByRef()
@@ -313,15 +361,10 @@ public class ReminderTestsBase : OrleansTestingBase, IDisposable
         CancellationToken cancellationToken)
     {
         var result = await startSilosTask.WaitAsync(cancellationToken);
-        var reminderServicesStarted = result.Select(silo =>
-            observer.WaitForReminderServiceStartedAsync(cancellationToken, silo.SiloAddress));
-        await Task.WhenAll(
-            Task.WhenAll(reminderServicesStarted),
-            WaitForLivenessToStabilizeAsync().WaitAsync(cancellationToken));
-        // Membership convergence does not await the reminder services' queued range-change reconciliation.
-        var rangeChangeReconciliations = HostedCluster.GetActiveSilos().Select(silo =>
-            silo.ServiceProvider.GetRequiredService<LocalReminderService>().TestOnlyWaitForRangeChangeReconciliation(cancellationToken));
-        await Task.WhenAll(rangeChangeReconciliations);
+        await observer.WaitForTopologyReconciledAsync(
+            WaitForLivenessToStabilizeAsync(),
+            result,
+            cancellationToken);
         return result;
     }
 
@@ -334,27 +377,17 @@ public class ReminderTestsBase : OrleansTestingBase, IDisposable
             return;
         }
 
-        try
-        {
-            using var startupCompletionCts = new CancellationTokenSource(CHURN_ENDWAIT);
-            await startSilosTask.WaitAsync(startupCompletionCts.Token);
-        }
-        catch (Exception exception)
-        {
-            log.LogInformation(exception, "Additional silo startup did not complete successfully before cleanup.");
-        }
-
-        var additionalSilos = HostedCluster.GetActiveSilos()
-            .Where(silo => !initialSilos.Contains(silo))
-            .ToArray();
-        if (additionalSilos.Length == 0)
-        {
-            return;
-        }
-
+        using var startupCompletionCts = new CancellationTokenSource(CHURN_ENDWAIT);
         using var cleanupCts = new CancellationTokenSource(CHURN_ENDWAIT);
-        await Task.WhenAll(additionalSilos.Select(StopSiloAsync)).WaitAsync(cleanupCts.Token);
-        await WaitForLivenessToStabilizeAsync().WaitAsync(cleanupCts.Token);
+        await ReminderLifecycleHarness.CleanupPartialStartupAsync(
+            initialSilos,
+            startSilosTask,
+            () => HostedCluster.GetActiveSilos().ToArray(),
+            StopSiloAsync,
+            () => WaitForLivenessToStabilizeAsync(),
+            log,
+            startupCompletionCts.Token,
+            cleanupCts.Token);
     }
 
     protected async Task<InProcessSiloHandle> StopSiloAndStartAdditionalSiloAsync(
@@ -367,9 +400,10 @@ public class ReminderTestsBase : OrleansTestingBase, IDisposable
         await Task.WhenAll(stopTask, startTask).WaitAsync(cancellationToken);
 
         var silo = Assert.Single(await startTask);
-        await Task.WhenAll(
-            observer.WaitForReminderServiceStartedAsync(cancellationToken, silo.SiloAddress),
-            WaitForLivenessToStabilizeAsync().WaitAsync(cancellationToken));
+        await observer.WaitForTopologyReconciledAsync(
+            WaitForLivenessToStabilizeAsync(),
+            [silo],
+            cancellationToken);
         return silo;
     }
 
@@ -538,25 +572,16 @@ public class ReminderTestsBase : OrleansTestingBase, IDisposable
             await SynchronizeReminderSchedulesAsync(cancellationToken, reminders);
 
             var previousCounters = new long[reminders.Length];
-            var previousTickCounts = new int[reminders.Length];
-            var tickTasks = new Task[reminders.Length];
             for (var reminderIndex = 0; reminderIndex < reminders.Length; reminderIndex++)
             {
                 var reminder = reminders[reminderIndex];
-                previousTickCounts[reminderIndex] = observer.GetTickCount(
-                    reminder.Grain.GetGrainId(),
-                    reminder.ReminderName);
-                tickTasks[reminderIndex] = observer.WaitForTickCountAsync(
-                    reminder.Grain,
-                    previousTickCounts[reminderIndex] + 1,
-                    cancellationToken,
-                    reminder.ReminderName);
                 previousCounters[reminderIndex] = await GetReminderCounterOrZeroAsync(
                     reminder.Grain,
                     reminder.ReminderName,
                     cancellationToken);
             }
 
+            var tickCompletion = observer.ArmTickCompletion(cancellationToken, reminders);
             var periods = await Task.WhenAll(reminders.Select(reminder =>
                 GetReminderPeriodAsync(reminder.Grain, reminder.ReminderName))).WaitAsync(cancellationToken);
             var period = Assert.Single(periods.Distinct());
@@ -568,8 +593,8 @@ public class ReminderTestsBase : OrleansTestingBase, IDisposable
                 tickCount,
                 reminders.Length);
             await AdvanceReminderTimeAsync(period, cancellationToken);
-            // TickCompleted is emitted after ReceiveReminder returns, so the counter is already persisted.
-            await Task.WhenAll(tickTasks).WaitAsync(cancellationToken);
+            // TickCompleted is emitted after ReceiveReminder returns, so counters are already persisted.
+            await observer.WaitForTickCompletedAsync(tickCompletion).WaitAsync(cancellationToken);
 
             await SynchronizeReminderSchedulesAsync(cancellationToken, reminders);
             for (var reminderIndex = 0; reminderIndex < reminders.Length; reminderIndex++)
@@ -583,8 +608,9 @@ public class ReminderTestsBase : OrleansTestingBase, IDisposable
                     observer.GetActiveReminderCount(
                         reminder.Grain.GetGrainId(),
                         reminder.ReminderName));
+                var tickSnapshot = tickCompletion.Snapshot[reminderIndex];
                 Assert.Equal(
-                    previousTickCounts[reminderIndex] + 1,
+                    tickSnapshot.PreviousCount + 1,
                     observer.GetTickCount(
                         reminder.Grain.GetGrainId(),
                         reminder.ReminderName));
@@ -902,11 +928,11 @@ public class ReminderTestsBase : OrleansTestingBase, IDisposable
             if (observer.GetActiveReminderCount(grain.GetGrainId(), reminderName) > 0)
             {
                 var quiescenceTask = observer.WaitForReminderQuiescenceAsync(grain, reminderName, cancellationToken);
-                await RefreshReminderServicesAsync(cancellationToken);
+                await observer.RefreshActiveServicesAsync(cancellationToken);
                 await quiescenceTask;
             }
 
-            await RefreshReminderServicesAsync(cancellationToken);
+            await observer.RefreshActiveServicesAsync(cancellationToken);
             if (observer.GetActiveReminderCount(grain.GetGrainId(), reminderName) == 0)
             {
                 return;
@@ -914,35 +940,13 @@ public class ReminderTestsBase : OrleansTestingBase, IDisposable
         }
     }
 
-    private async Task RefreshReminderServicesAsync(CancellationToken cancellationToken)
-    {
-        // Each refresh scans the backing reminder table. Serialize this test-only barrier so that
-        // constrained provider emulators observe the same completed-refresh invariant without an artificial query burst.
-        foreach (var silo in HostedCluster.GetActiveSilos())
-        {
-            await silo.ServiceProvider.GetRequiredService<LocalReminderService>().TestOnlyRefresh().WaitAsync(cancellationToken);
-        }
-    }
-
     private async Task SynchronizeReminderSchedulesAsync(
         CancellationToken cancellationToken,
         params (IAddressable Grain, string ReminderName)[] reminders)
     {
-        await RefreshReminderServicesAsync(cancellationToken);
         try
         {
-            await Task.WhenAll(reminders.Select(async reminder =>
-            {
-                await observer.WaitForActiveReminderCountAsync(
-                    reminder.Grain,
-                    1,
-                    cancellationToken,
-                    reminder.ReminderName);
-                await observer.WaitForLocalReminderScheduleAsync(
-                    reminder.Grain,
-                    reminder.ReminderName,
-                    cancellationToken);
-            }));
+            await observer.WaitForSchedulesArmedAsync(cancellationToken, reminders);
         }
         catch (OperationCanceledException exception) when (
             cancellationToken.IsCancellationRequested

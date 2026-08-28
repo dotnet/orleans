@@ -244,9 +244,9 @@ public class LocalReminderServiceCompatibilityTests : IClassFixture<LocalReminde
         using var cancellation = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
         cancellation.CancelAfter(TestConstants.InitTimeout);
 
-        var started = await fixture.ReminderObserver.WaitForReminderServiceStartedAsync(cancellation.Token, silo.SiloAddress);
+        var started = await fixture.ReminderHarness.WaitForServicesReadyAsync([silo], cancellation.Token);
 
-        Assert.Equal(silo.SiloAddress, started.SiloAddress);
+        Assert.Equal([silo.SiloAddress], started);
         var reminderTable = silo.ServiceProvider.GetRequiredService<NullReturningReminderTable>();
         Assert.True(reminderTable.RangeReadCount > 0);
     }
@@ -259,7 +259,7 @@ public class LocalReminderServiceCompatibilityTests : IClassFixture<LocalReminde
         var silo = Assert.Single(fixture.HostedCluster.Silos);
         using var cancellation = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
         cancellation.CancelAfter(TestConstants.InitTimeout);
-        _ = await fixture.ReminderObserver.WaitForReminderServiceStartedAsync(cancellation.Token, silo.SiloAddress);
+        _ = await fixture.ReminderHarness.WaitForServicesReadyAsync([silo], cancellation.Token);
 
         var reminderTable = silo.ServiceProvider.GetRequiredService<NullReturningReminderTable>();
         var reminderService = silo.ServiceProvider.GetRequiredService<LocalReminderService>();
@@ -298,12 +298,96 @@ public class LocalReminderServiceCompatibilityTests : IClassFixture<LocalReminde
     [TestSuite("BVT")]
     [TestProvider("None")]
     [Fact, TestCategory("BVT")]
+    public async Task RangeChangeBarrier_PropagatesCurrentProviderReadFailure()
+    {
+        var silo = Assert.Single(fixture.HostedCluster.Silos);
+        using var cancellation = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
+        cancellation.CancelAfter(TestConstants.InitTimeout);
+        _ = await fixture.ReminderHarness.WaitForServicesReadyAsync([silo], cancellation.Token);
+
+        var reminderTable = silo.ServiceProvider.GetRequiredService<NullReturningReminderTable>();
+        var reminderService = silo.ServiceProvider.GetRequiredService<LocalReminderService>();
+        var oldRange = RangeFactory.CreateRange(0, uint.MaxValue / 2);
+        var newRange = RangeFactory.CreateRange(0, uint.MaxValue / 4);
+        var readGate = reminderTable.BlockNextRangeRead(cancellation.Token);
+        var failure = new ControlledRangeReadException();
+        try
+        {
+            var rangeChangeTask = reminderService.TestOnlyChangeRange(oldRange, newRange, increased: false);
+            await readGate.WaitUntilBlockedAsync(cancellation.Token);
+            var reconciliationTask = reminderService.TestOnlyWaitForRangeChangeReconciliation(cancellation.Token);
+
+            readGate.Fail(failure);
+
+            var rangeChangeException = await Assert.ThrowsAsync<ControlledRangeReadException>(
+                () => rangeChangeTask.WaitAsync(cancellation.Token));
+            var reconciliationException = await Assert.ThrowsAsync<ControlledRangeReadException>(
+                () => reconciliationTask.WaitAsync(cancellation.Token));
+            Assert.Same(failure, rangeChangeException);
+            Assert.Same(failure, reconciliationException);
+
+            await reminderService.TestOnlyChangeRange(newRange, oldRange, increased: true)
+                .WaitAsync(cancellation.Token);
+            await reminderService.TestOnlyWaitForRangeChangeReconciliation(cancellation.Token);
+        }
+        finally
+        {
+            readGate.Release();
+        }
+    }
+
+    [TestSuite("BVT")]
+    [TestProvider("None")]
+    [Fact, TestCategory("BVT")]
+    public async Task RangeChangeBarrier_IgnoresObsoleteProviderReadFailure()
+    {
+        var silo = Assert.Single(fixture.HostedCluster.Silos);
+        using var cancellation = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
+        cancellation.CancelAfter(TestConstants.InitTimeout);
+        _ = await fixture.ReminderHarness.WaitForServicesReadyAsync([silo], cancellation.Token);
+
+        var reminderTable = silo.ServiceProvider.GetRequiredService<NullReturningReminderTable>();
+        var reminderService = silo.ServiceProvider.GetRequiredService<LocalReminderService>();
+        var oldRange = RangeFactory.CreateRange(0, uint.MaxValue / 2);
+        var intermediateRange = RangeFactory.CreateRange(0, uint.MaxValue / 3);
+        var newRange = RangeFactory.CreateRange(0, uint.MaxValue / 4);
+        var obsoleteRead = reminderTable.BlockNextRangeRead(cancellation.Token);
+        RangeReadGate? currentRead = null;
+        var failure = new ControlledRangeReadException();
+        try
+        {
+            var obsoleteRangeChange = reminderService.TestOnlyChangeRange(oldRange, intermediateRange, increased: false);
+            await obsoleteRead.WaitUntilBlockedAsync(cancellation.Token);
+            var reconciliationTask = reminderService.TestOnlyWaitForRangeChangeReconciliation(cancellation.Token);
+
+            currentRead = reminderTable.BlockNextRangeRead(cancellation.Token);
+            var currentRangeChange = reminderService.TestOnlyChangeRange(intermediateRange, newRange, increased: false);
+            await currentRead.WaitUntilBlockedAsync(cancellation.Token);
+            currentRead.Release();
+            await Task.WhenAll(currentRangeChange, reconciliationTask).WaitAsync(cancellation.Token);
+
+            obsoleteRead.Fail(failure);
+            var obsoleteException = await Assert.ThrowsAsync<ControlledRangeReadException>(
+                () => obsoleteRangeChange.WaitAsync(cancellation.Token));
+            Assert.Same(failure, obsoleteException);
+            Assert.True(reconciliationTask.IsCompletedSuccessfully);
+        }
+        finally
+        {
+            obsoleteRead.Release();
+            currentRead?.Release();
+        }
+    }
+
+    [TestSuite("BVT")]
+    [TestProvider("None")]
+    [Fact, TestCategory("BVT")]
     public async Task RangeChangeBarrier_StopsWaitingWhenCanceled()
     {
         var silo = Assert.Single(fixture.HostedCluster.Silos);
         using var cancellation = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
         cancellation.CancelAfter(TestConstants.InitTimeout);
-        _ = await fixture.ReminderObserver.WaitForReminderServiceStartedAsync(cancellation.Token, silo.SiloAddress);
+        _ = await fixture.ReminderHarness.WaitForServicesReadyAsync([silo], cancellation.Token);
 
         var reminderTable = silo.ServiceProvider.GetRequiredService<NullReturningReminderTable>();
         var reminderService = silo.ServiceProvider.GetRequiredService<LocalReminderService>();
@@ -339,7 +423,7 @@ public class LocalReminderServiceCompatibilityTests : IClassFixture<LocalReminde
         var silo = Assert.Single(fixture.HostedCluster.Silos);
         using var cancellation = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
         cancellation.CancelAfter(TestConstants.InitTimeout);
-        _ = await fixture.ReminderObserver.WaitForReminderServiceStartedAsync(cancellation.Token, silo.SiloAddress);
+        _ = await fixture.ReminderHarness.WaitForServicesReadyAsync([silo], cancellation.Token);
 
         var reminderService = silo.ServiceProvider.GetRequiredService<LocalReminderService>();
         await reminderService.TestOnlyWaitForRangeChangeReconciliation(cancellation.Token);
@@ -369,7 +453,7 @@ public class LocalReminderServiceCompatibilityTests : IClassFixture<LocalReminde
 
     public sealed class Fixture : BaseInProcessTestClusterFixture
     {
-        public ReminderDiagnosticObserver ReminderObserver { get; } = ReminderDiagnosticObserver.Create();
+        public ReminderLifecycleHarness ReminderHarness { get; } = new();
 
         protected override void ConfigureTestCluster(InProcessTestClusterBuilder builder)
         {
@@ -395,7 +479,7 @@ public class LocalReminderServiceCompatibilityTests : IClassFixture<LocalReminde
             }
             finally
             {
-                ReminderObserver.Dispose();
+                ReminderHarness.Dispose();
             }
         }
     }
@@ -456,5 +540,9 @@ public class LocalReminderServiceCompatibilityTests : IClassFixture<LocalReminde
         public Task WaitForReleaseAsync() => release.Task.WaitAsync(cancellationToken);
 
         public void Release() => release.TrySetResult();
+
+        public void Fail(Exception exception) => release.TrySetException(exception);
     }
+
+    private sealed class ControlledRangeReadException : Exception;
 }
