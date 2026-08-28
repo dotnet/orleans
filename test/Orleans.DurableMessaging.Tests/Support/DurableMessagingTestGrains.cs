@@ -14,7 +14,8 @@ public interface IDurableMessagingTestGrain : IGrainWithGuidKey
     Task<Guid> SendDuplicateAsync(GrainId target, string route, DurableTestMessage message);
     Task<Guid> SendAndDeactivateAsync(GrainId target, string route, DurableTestMessage message);
     Task<Guid> StageWithoutCommitAsync(GrainId target, string route, DurableTestMessage message);
-    Task RetryWriteStateAsync();
+    Task DeleteThenWriteStateAsync();
+    [AlwaysInterleave] Task RetryWriteStateAsync();
     [AlwaysInterleave] Task RevertStateAsync();
     Task SetInboxJobIdAsync(string jobId);
     [AlwaysInterleave] Task DeactivateOnNextRecoveryAsync();
@@ -42,7 +43,9 @@ public sealed record DurableTestMessage(
     [property: Id(1)] int Sequence,
     [property: Id(2)] string Value,
     [property: Id(3)] GrainId? ForwardTo = null,
-    [property: Id(4)] bool ThrowAfterStaging = false);
+    [property: Id(4)] bool ThrowAfterStaging = false,
+    [property: Id(5)] bool CommitDuringHandling = false,
+    [property: Id(6)] bool DeleteDuringHandling = false);
 
 [GenerateSerializer, Immutable]
 public sealed record DurableEffect(
@@ -166,6 +169,12 @@ public sealed class DurableMessagingTestGrain : DurableGrain, IDurableMessagingT
         return Task.FromResult(envelope.MessageId);
     }
 
+    public async Task DeleteThenWriteStateAsync()
+    {
+        await StateManager.DeleteStateAsync(CancellationToken.None);
+        await WriteStateAsync();
+    }
+
     public async Task RetryWriteStateAsync() => await WriteStateAsync();
 
     public async Task RevertStateAsync() => await StateManager.RevertPendingChangesAsync(CancellationToken.None);
@@ -273,6 +282,16 @@ public sealed class DurableMessagingTestGrain : DurableGrain, IDurableMessagingT
                 (prior?.Count ?? 0) + 1,
                 message.Sequence,
                 message.Value);
+
+            if (message.CommitDuringHandling)
+            {
+                await WriteStateAsync(cancellationToken);
+            }
+
+            if (message.DeleteDuringHandling)
+            {
+                await StateManager.DeleteStateAsync(cancellationToken);
+            }
 
             if (message.ForwardTo is { } target)
             {

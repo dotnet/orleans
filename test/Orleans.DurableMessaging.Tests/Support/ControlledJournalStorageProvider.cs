@@ -11,6 +11,7 @@ public sealed class ControlledJournalStorageProvider : IJournalStorageProvider, 
         Options.Create(new JournaledStateManagerOptions { JournalFormatKey = "orleans-binary" }));
     private readonly ConcurrentDictionary<JournalId, WritePlan> _readPlans = new();
     private readonly ConcurrentDictionary<JournalId, WritePlan> _writePlans = new();
+    private readonly ConcurrentDictionary<JournalId, WritePlan> _postWritePlans = new();
     private readonly ConcurrentDictionary<JournalId, int> _successfulWrites = new();
 
     public IJournalStorage CreateStorage(JournalId journalId) =>
@@ -54,6 +55,15 @@ public sealed class ControlledJournalStorageProvider : IJournalStorageProvider, 
         }
     }
 
+    public void FailAfterWrite(JournalId journalId, int matchingWrite = 1)
+    {
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(matchingWrite);
+        if (!_postWritePlans.TryAdd(journalId, new WritePlan(matchingWrite, fail: true)))
+        {
+            throw new InvalidOperationException($"A post-write plan is already armed for journal '{journalId}'.");
+        }
+    }
+
     public int GetSuccessfulWriteCount(JournalId journalId) =>
         _successfulWrites.TryGetValue(journalId, out var count) ? count : 0;
 
@@ -90,6 +100,18 @@ public sealed class ControlledJournalStorageProvider : IJournalStorageProvider, 
 
     private void OnWriteSucceeded(JournalId journalId) =>
         _successfulWrites.AddOrUpdate(journalId, 1, static (_, count) => count + 1);
+
+    private void AfterWrite(JournalId journalId)
+    {
+        if (!_postWritePlans.TryGetValue(journalId, out var plan)
+            || Interlocked.Increment(ref plan.Seen) != plan.Target)
+        {
+            return;
+        }
+
+        _postWritePlans.TryRemove(new KeyValuePair<JournalId, WritePlan>(journalId, plan));
+        throw new IOException($"Injected post-commit journal response failure for '{journalId}'.");
+    }
 
     internal sealed class WritePlan(int target, bool fail)
     {
@@ -144,6 +166,7 @@ public sealed class ControlledJournalStorageProvider : IJournalStorageProvider, 
             await owner.BeforeWriteAsync(journalId, cancellationToken).ConfigureAwait(false);
             await inner.ReplaceAsync(value, cancellationToken).ConfigureAwait(false);
             owner.OnWriteSucceeded(journalId);
+            owner.AfterWrite(journalId);
         }
 
         public async ValueTask AppendAsync(ReadOnlySequence<byte> value, CancellationToken cancellationToken)
@@ -151,6 +174,7 @@ public sealed class ControlledJournalStorageProvider : IJournalStorageProvider, 
             await owner.BeforeWriteAsync(journalId, cancellationToken).ConfigureAwait(false);
             await inner.AppendAsync(value, cancellationToken).ConfigureAwait(false);
             owner.OnWriteSucceeded(journalId);
+            owner.AfterWrite(journalId);
         }
 
         public ValueTask DeleteAsync(CancellationToken cancellationToken) =>

@@ -36,6 +36,28 @@ public sealed class DurableOutboxDeliveryBatchTests
     }
 
     [Fact]
+    public void DeleteCompletion_RotatesOwnershipEpoch()
+    {
+        var fixture = new OutboxFixture(hasDurableMessage: false);
+        var before = fixture.GetOwnershipEpoch();
+
+        fixture.Manager.NotifyDeleteCompleted();
+
+        Assert.NotEqual(before, fixture.GetOwnershipEpoch());
+    }
+
+    [Fact]
+    public void RecoveryCompletion_RotatesOwnershipEpoch()
+    {
+        var fixture = new OutboxFixture(hasDurableMessage: false);
+        var before = fixture.GetOwnershipEpoch();
+
+        fixture.Manager.NotifyRecoveryCompleted();
+
+        Assert.NotEqual(before, fixture.GetOwnershipEpoch());
+    }
+
+    [Fact]
     public async Task EnsureJobTimerCompletion_ReleasesCoalescingSlot()
     {
         var timerRegistry = Substitute.For<ITimerRegistry>();
@@ -92,6 +114,31 @@ public sealed class DurableOutboxDeliveryBatchTests
         await scheduling;
 
         Assert.Equal(2, jobManager.AttemptCount);
+    }
+
+    [Fact]
+    public async Task RecoveryDuringDelivery_DiscardsStaleFailureResult()
+    {
+        var entered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var release = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var fixture = new OutboxFixture(
+            async _ =>
+            {
+                entered.TrySetResult();
+                await release.Task;
+                throw new IOException("Stale delivery failure.");
+            },
+            maxDeliveryAttempts: 1);
+
+        var delivery = fixture.DeliverAsync();
+        await entered.Task.WaitAsync(TimeSpan.FromSeconds(10));
+        fixture.SimulateRecoveryWithoutMessage();
+        release.TrySetResult();
+        await delivery;
+
+        Assert.False(fixture.Messages.ContainsKey(fixture.MessageId));
+        Assert.False(fixture.MessageStates.ContainsKey(fixture.MessageId));
+        Assert.Equal(0, fixture.DeadLetters.Count);
     }
 
     [Fact]
@@ -489,6 +536,19 @@ public sealed class DurableOutboxDeliveryBatchTests
         public Task StartAsync(CancellationToken cancellationToken = default) =>
             ((ILifecycleObserver)_outbox).OnStart(cancellationToken);
 
+        public void SimulateRecoveryWithoutMessage()
+        {
+            Messages.Remove(MessageId);
+            MessageStates.Remove(MessageId);
+            Manager.NotifyRecoveryStarted();
+            Manager.NotifyRecoveryCompleted();
+        }
+
+        public string GetOwnershipEpoch() =>
+            (string)_outbox.GetType()
+                .GetField("_ownershipEpoch", BindingFlags.Instance | BindingFlags.NonPublic)!
+                .GetValue(_outbox)!;
+
         public async Task RunRegisteredTimerAsync()
         {
             var call = Assert.Single(
@@ -602,6 +662,9 @@ public sealed class DurableOutboxDeliveryBatchTests
         public bool ContainsKey(Guid key) =>
             (bool)_type.GetMethod("ContainsKey")!.Invoke(Instance, [key])!;
 
+        public bool Remove(Guid key) =>
+            (bool)_type.GetMethod("Remove", [typeof(Guid)])!.Invoke(Instance, [key])!;
+
         public T GetProperty<T>(Guid key, string propertyName)
         {
             var value = _type.GetProperty("Item")!.GetValue(Instance, [key])!;
@@ -674,6 +737,10 @@ public sealed class DurableOutboxDeliveryBatchTests
 
         public void NotifyRecoveryCompleted() => _observer?.OnRecoveryCompleted();
 
+        public void NotifyRecoveryStarted() => _observer?.OnRecoveryStarted();
+
+        public void NotifyDeleteCompleted() => _observer?.OnDeleteCompleted();
+
         public void CommitWithInterleavedMutation(Action mutation)
         {
             WriteCount++;
@@ -736,7 +803,7 @@ public sealed class DurableOutboxDeliveryBatchTests
             });
         }
 
-        public Task<bool> TryCancelDurableJobAsync(DurableJob job, CancellationToken cancellationToken) =>
+        public Task<bool> CancelAsync(DurableJob job, CancellationToken cancellationToken) =>
             Task.FromResult(true);
 
         public async Task WaitForAttemptCountAsync(int expected)
