@@ -386,6 +386,23 @@ public sealed class DurableOutboxDeliveryBatchTests
     }
 
     [Fact]
+    public async Task ReceiverDeadLetterRemovesMessageWithoutCreatingSenderDeadLetter()
+    {
+        var fixture = new OutboxFixture(
+            _ => ValueTask.FromResult(DeliveryResult.DeadLettered("Receiver rejected the payload.")));
+
+        await fixture.DeliverAsync();
+        await fixture.DeliverAsync();
+
+        Assert.False(fixture.Messages.ContainsKey(fixture.MessageId));
+        Assert.False(fixture.MessageStates.ContainsKey(fixture.MessageId));
+        Assert.Equal(0, fixture.DeadLetters.Count);
+        Assert.Equal(1, fixture.DeliveryCount);
+        Assert.Equal(1, fixture.Manager.WriteCount);
+        Assert.Equal(0, fixture.Manager.RevertCount);
+    }
+
+    [Fact]
     public async Task CancellationBeforeMutationDoesNotRevert()
     {
         using var cancellation = new CancellationTokenSource();
