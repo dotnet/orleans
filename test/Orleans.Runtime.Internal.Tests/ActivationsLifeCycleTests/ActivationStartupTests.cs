@@ -163,7 +163,9 @@ public sealed class ActivationStartupTests(ActivationStartupTestFixture fixture)
             context.ReceiveMessage(message);
             await scenario.WaitForEvent("RequestInvoked").WaitAsync(Timeout, TestContext.Current.CancellationToken);
 
-            context.Deactivate(new(DeactivationReasonCode.ApplicationRequested, "Lifecycle test complete."));
+            context.Deactivate(
+                new(DeactivationReasonCode.ApplicationRequested, "Lifecycle test complete."),
+                TestContext.Current.CancellationToken);
             await scenario.WaitForEvent("ActivatorDisposeStarted").WaitAsync(Timeout, TestContext.Current.CancellationToken);
             Assert.Equal(0, scenario.DisposeCompletedCount);
             Assert.Equal(0, scenario.ScopeDisposeCount);
@@ -319,7 +321,9 @@ public sealed class ActivationStartupTests(ActivationStartupTestFixture fixture)
             context = fixture.StartActivation(grainId);
             await entered.WaitAsync(Timeout, TestContext.Current.CancellationToken);
 
-            context.Deactivate(new(DeactivationReasonCode.RuntimeRequested, "Cancel startup."));
+            context.Deactivate(
+                new(DeactivationReasonCode.RuntimeRequested, "Cancel startup."),
+                TestContext.Current.CancellationToken);
             await cancellationObserved.WaitAsync(Timeout, TestContext.Current.CancellationToken);
             await disposeStarted.WaitAsync(Timeout, TestContext.Current.CancellationToken);
             Assert.Equal(0, scenario.DisposeCompletedCount);
@@ -388,7 +392,9 @@ public sealed class ActivationStartupTests(ActivationStartupTestFixture fixture)
             Assert.Equal(0, scenario.RequestInvocationCount);
             Assert.Null(request.Result);
 
-            stopTask = shutdownFixture.HostedCluster.StopSiloAsync(primarySilo);
+            stopTask = shutdownFixture.HostedCluster.StopSiloAsync(
+                primarySilo,
+                cancellationToken: TestContext.Current.CancellationToken);
             await cancellationObserved.WaitAsync(Timeout, TestContext.Current.CancellationToken);
             await disposeStarted.WaitAsync(Timeout, TestContext.Current.CancellationToken);
 
@@ -552,13 +558,17 @@ public sealed class ActivationStartupTests(ActivationStartupTestFixture fixture)
             {
                 case ActivationStartupCompletion.ImmediateSuccess:
                     await activated.WaitAsync(Timeout, TestContext.Current.CancellationToken);
-                    context.Deactivate(new(DeactivationReasonCode.ApplicationRequested, "Matrix success complete."));
+                    context.Deactivate(
+                        new(DeactivationReasonCode.ApplicationRequested, "Matrix success complete."),
+                        TestContext.Current.CancellationToken);
                     break;
                 case ActivationStartupCompletion.AsynchronousSuccess:
                     await entered.WaitAsync(Timeout, TestContext.Current.CancellationToken);
                     scenario.ReleaseActivation();
                     await activated.WaitAsync(Timeout, TestContext.Current.CancellationToken);
-                    context.Deactivate(new(DeactivationReasonCode.ApplicationRequested, "Matrix success complete."));
+                    context.Deactivate(
+                        new(DeactivationReasonCode.ApplicationRequested, "Matrix success complete."),
+                        TestContext.Current.CancellationToken);
                     break;
                 case ActivationStartupCompletion.ImmediateFailure:
                     await failed.WaitAsync(Timeout, TestContext.Current.CancellationToken);
@@ -570,7 +580,9 @@ public sealed class ActivationStartupTests(ActivationStartupTestFixture fixture)
                     break;
                 case ActivationStartupCompletion.Cancellation:
                     await entered.WaitAsync(Timeout, TestContext.Current.CancellationToken);
-                    context.Deactivate(new(DeactivationReasonCode.RuntimeRequested, "Matrix cancellation."));
+                    context.Deactivate(
+                        new(DeactivationReasonCode.RuntimeRequested, "Matrix cancellation."),
+                        TestContext.Current.CancellationToken);
                     await cancellationObserved.WaitAsync(Timeout, TestContext.Current.CancellationToken);
                     break;
                 default:
