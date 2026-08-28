@@ -351,6 +351,12 @@ public sealed class ReminderDiagnosticObserver : IDisposable
                 source.TrySetCanceled(token);
             },
             (completion, subscription, cancellationToken));
+        _ = completion.Task.ContinueWith(
+            static (_, state) => ((CancellationTokenRegistration)state!).Dispose(),
+            cancellationRegistration,
+            CancellationToken.None,
+            TaskContinuationOptions.ExecuteSynchronously,
+            TaskScheduler.Default);
 
         subscription.Disposable = events.Subscribe(
             value =>
@@ -360,19 +366,16 @@ public sealed class ReminderDiagnosticObserver : IDisposable
                     return;
                 }
 
-                cancellationRegistration.Dispose();
                 subscription.Dispose();
                 completion.TrySetResult(value);
             },
             error =>
             {
-                cancellationRegistration.Dispose();
                 subscription.Dispose();
                 completion.TrySetException(error);
             },
             () =>
             {
-                cancellationRegistration.Dispose();
                 subscription.Dispose();
                 completion.TrySetException(new InvalidOperationException("The diagnostic event stream completed before a matching event was observed."));
             });
