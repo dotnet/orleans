@@ -91,7 +91,7 @@ internal sealed class StripedCallbackDictionary<TValue>
     }
 
     /// <summary>
-    /// Attempts to remove the value with the specified key if it is the expected instance.
+    /// Attempts to remove the value with the specified key if it is the expected instance or value.
     /// </summary>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public bool TryRemove(CorrelationId id, TValue expected)
@@ -99,7 +99,10 @@ internal sealed class StripedCallbackDictionary<TValue>
         var stripe = GetStripe(id);
         lock (stripe.Lock)
         {
-            if (!stripe.Dictionary.TryGetValue(id, out var value) || !ReferenceEquals(value, expected))
+            if (!stripe.Dictionary.TryGetValue(id, out var value)
+                || (typeof(TValue).IsValueType
+                    ? !EqualityComparer<TValue>.Default.Equals(value, expected)
+                    : !ReferenceEquals(value, expected)))
             {
                 return false;
             }

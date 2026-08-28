@@ -66,6 +66,20 @@ public class StripedCallbackDictionaryTests
     }
 
     [Fact]
+    public void ExactRemovalSupportsValueTypes()
+    {
+        var dictionary = new StripedCallbackDictionary<int>();
+        var id = new CorrelationId(42);
+
+        Assert.True(dictionary.TryAdd(id, 1));
+        Assert.False(dictionary.TryRemove(id, 2));
+        Assert.True(dictionary.TryGetValue(id, out var current));
+        Assert.Equal(1, current);
+        Assert.True(dictionary.TryRemove(id, 1));
+        Assert.Equal(0, dictionary.Count);
+    }
+
+    [Fact]
     public void EnumerationReturnsSnapshotValues()
     {
         var dictionary = new StripedCallbackDictionary<int>();
