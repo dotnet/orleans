@@ -50,7 +50,7 @@ internal sealed class ClientTlsMessageTransport : TlsMessageTransport
         {
             selector = (sender, targetHost, localCertificates, remoteCertificate, acceptableIssuers) =>
             {
-                var cert = _certificateSelector(sender, targetHost, localCertificates, remoteCertificate, acceptableIssuers);
+                X509Certificate2? cert = _certificateSelector(sender, targetHost, localCertificates, remoteCertificate, acceptableIssuers);
                 if (cert != null)
                 {
                     cert = ValidateCertificate(cert, Options.ClientCertificateMode);
