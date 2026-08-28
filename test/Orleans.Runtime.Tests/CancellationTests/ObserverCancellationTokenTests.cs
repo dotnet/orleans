@@ -82,31 +82,36 @@ public abstract class ObserverCancellationTokenTests(ObserverCancellationTokenTe
         var grain = fixture.GrainFactory.GetGrain<IObserverWithCancellationGrain>(Guid.NewGuid());
         var observer = new LongRunningObserver();
         var reference = fixture.GrainFactory.CreateObjectReference<ILongRunningObserver>(observer);
-        await grain.Subscribe(reference);
-
-        using var cts = new CancellationTokenSource();
-        var callId = Guid.NewGuid();
-        var grainTask = grain.NotifyLongWait(TimeSpan.FromSeconds(10), callId, cts.Token);
-
-        if (cancelImmediately)
+        try
         {
-            await cts.CancelAsync();
-        }
-        else
-        {
-            await observer.WaitForCallToStart(callId);
-            await cts.CancelAsync();
-        }
+            await grain.Subscribe(reference);
 
-        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => grainTask);
-        if (!cancelImmediately)
-        {
-            await observer.WaitForCancellation(callId);
-        }
+            using var cts = new CancellationTokenSource();
+            var callId = Guid.NewGuid();
+            var grainTask = grain.NotifyLongWait(TimeSpan.FromSeconds(10), callId, cts.Token);
 
-        await grain.Unsubscribe(reference);
-        fixture.GrainFactory.DeleteObjectReference<ILongRunningObserver>(reference);
-        GC.KeepAlive(observer);
+            if (cancelImmediately)
+            {
+                await cts.CancelAsync();
+            }
+            else
+            {
+                await observer.WaitForCallToStart(callId);
+                await cts.CancelAsync();
+            }
+
+            await Assert.ThrowsAnyAsync<OperationCanceledException>(() => grainTask);
+            if (!cancelImmediately)
+            {
+                await observer.WaitForCancellation(callId);
+            }
+        }
+        finally
+        {
+            await grain.Unsubscribe(reference);
+            fixture.GrainFactory.DeleteObjectReference<ILongRunningObserver>(reference);
+            GC.KeepAlive(observer);
+        }
     }
 
     /// <summary>
@@ -203,51 +208,55 @@ public abstract class ObserverCancellationTokenTests(ObserverCancellationTokenTe
         // Create multiple grains each with an observer
         using var cts = new CancellationTokenSource();
         var grains = new List<(IObserverWithCancellationGrain Grain, LongRunningObserver Observer, ILongRunningObserver Reference, Guid CallId)>();
-
-        for (int i = 0; i < 5; i++)
+        try
         {
-            var grain = fixture.GrainFactory.GetGrain<IObserverWithCancellationGrain>(Guid.NewGuid());
-            var observer = new LongRunningObserver();
-            var reference = fixture.GrainFactory.CreateObjectReference<ILongRunningObserver>(observer);
-            await grain.Subscribe(reference);
-            grains.Add((grain, observer, reference, Guid.NewGuid()));
-        }
-
-        var notifyTasks = grains
-            .Select(g => g.Grain.NotifyLongWait(TimeSpan.FromSeconds(10), g.CallId, cts.Token))
-            .ToList();
-
-        if (cancelImmediately)
-        {
-            await cts.CancelAsync();
-        }
-        else
-        {
-            await Task.WhenAll(grains.Select(g => g.Observer.WaitForCallToStart(g.CallId)));
-            await cts.CancelAsync();
-        }
-
-        foreach (var task in notifyTasks)
-        {
-            await Assert.ThrowsAnyAsync<OperationCanceledException>(() => task);
-        }
-
-        if (!cancelImmediately)
-        {
-            for (int i = 0; i < grains.Count; i++)
+            for (int i = 0; i < 5; i++)
             {
-                await grains[i].Observer.WaitForCancellation(grains[i].CallId);
+                var grain = fixture.GrainFactory.GetGrain<IObserverWithCancellationGrain>(Guid.NewGuid());
+                var observer = new LongRunningObserver();
+                var reference = fixture.GrainFactory.CreateObjectReference<ILongRunningObserver>(observer);
+                grains.Add((grain, observer, reference, Guid.NewGuid()));
+                await grain.Subscribe(reference);
+            }
+
+            var notifyTasks = grains
+                .Select(g => g.Grain.NotifyLongWait(TimeSpan.FromSeconds(10), g.CallId, cts.Token))
+                .ToList();
+
+            if (cancelImmediately)
+            {
+                await cts.CancelAsync();
+            }
+            else
+            {
+                await Task.WhenAll(grains.Select(g => g.Observer.WaitForCallToStart(g.CallId)));
+                await cts.CancelAsync();
+            }
+
+            foreach (var task in notifyTasks)
+            {
+                await Assert.ThrowsAnyAsync<OperationCanceledException>(() => task);
+            }
+
+            if (!cancelImmediately)
+            {
+                for (int i = 0; i < grains.Count; i++)
+                {
+                    await grains[i].Observer.WaitForCancellation(grains[i].CallId);
+                }
             }
         }
-
-        foreach (var g in grains)
+        finally
         {
-            await g.Grain.Unsubscribe(g.Reference);
-        }
-        foreach (var g in grains)
-        {
-            fixture.GrainFactory.DeleteObjectReference<ILongRunningObserver>(g.Reference);
-            GC.KeepAlive(g.Observer);
+            foreach (var g in grains)
+            {
+                await g.Grain.Unsubscribe(g.Reference);
+            }
+            foreach (var g in grains)
+            {
+                fixture.GrainFactory.DeleteObjectReference<ILongRunningObserver>(g.Reference);
+                GC.KeepAlive(g.Observer);
+            }
         }
     }
 
@@ -303,31 +312,36 @@ public abstract class ObserverCancellationTokenTests(ObserverCancellationTokenTe
         var grain = fixture.GrainFactory.GetGrain<IObserverWithCancellationGrain>(Guid.NewGuid());
         var observer = new LongRunningObserver();
         var reference = fixture.GrainFactory.CreateObjectReference<ILongRunningObserver>(observer);
-        await grain.Subscribe(reference);
-
-        using var cts = new CancellationTokenSource();
-        var callId = Guid.NewGuid();
-        var grainTask = grain.NotifyInterleavingLongWait(TimeSpan.FromSeconds(10), callId, cts.Token);
-
-        if (cancelImmediately)
+        try
         {
-            await cts.CancelAsync();
-        }
-        else
-        {
-            await observer.WaitForCallToStart(callId);
-            await cts.CancelAsync();
-        }
+            await grain.Subscribe(reference);
 
-        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => grainTask);
-        if (!cancelImmediately)
-        {
-            await observer.WaitForCancellation(callId);
-        }
+            using var cts = new CancellationTokenSource();
+            var callId = Guid.NewGuid();
+            var grainTask = grain.NotifyInterleavingLongWait(TimeSpan.FromSeconds(10), callId, cts.Token);
 
-        await grain.Unsubscribe(reference);
-        fixture.GrainFactory.DeleteObjectReference<ILongRunningObserver>(reference);
-        GC.KeepAlive(observer);
+            if (cancelImmediately)
+            {
+                await cts.CancelAsync();
+            }
+            else
+            {
+                await observer.WaitForCallToStart(callId);
+                await cts.CancelAsync();
+            }
+
+            await Assert.ThrowsAnyAsync<OperationCanceledException>(() => grainTask);
+            if (!cancelImmediately)
+            {
+                await observer.WaitForCancellation(callId);
+            }
+        }
+        finally
+        {
+            await grain.Unsubscribe(reference);
+            fixture.GrainFactory.DeleteObjectReference<ILongRunningObserver>(reference);
+            GC.KeepAlive(observer);
+        }
     }
 
     /// <summary>
