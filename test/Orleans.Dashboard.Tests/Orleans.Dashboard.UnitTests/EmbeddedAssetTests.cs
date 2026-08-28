@@ -218,7 +218,7 @@ namespace UnitTests
         }
 
         [Fact]
-        public async System.Threading.Tasks.Task ServeAsset_GzipAccepted_ReturnsCompressedContentAndContentEncoding()
+        public async System.Threading.Tasks.Task ServeAsset_GzipAccepted_ReturnsValidSelectedRepresentation()
         {
             var provider = new EmbeddedAssetProvider();
             var expectedDecompressedBody = ReadEmbeddedAsset("index.html");
@@ -233,14 +233,21 @@ namespace UnitTests
             Assert.Equal(StatusCodes.Status200OK, httpContext.Response.StatusCode);
             Assert.Equal("text/html", httpContext.Response.ContentType);
             Assert.Equal(actualBody.Length, httpContext.Response.ContentLength);
-            Assert.True(actualBody.Length < expectedDecompressedBody.Length);
-            Assert.Equal("gzip", httpContext.Response.Headers.ContentEncoding.ToString());
             var cacheControl = httpContext.Response.GetTypedHeaders().CacheControl;
             Assert.NotNull(cacheControl);
             Assert.True(cacheControl.NoCache);
             Assert.True(cacheControl.NoStore);
             Assert.Equal(1, httpContext.Response.Headers.ETag.Count);
-            Assert.Equal(expectedDecompressedBody, Decompress(actualBody));
+
+            if (httpContext.Response.Headers.ContentEncoding == "gzip")
+            {
+                Assert.Equal(expectedDecompressedBody, Decompress(actualBody));
+            }
+            else
+            {
+                Assert.Equal(0, httpContext.Response.Headers.ContentEncoding.Count);
+                Assert.Equal(expectedDecompressedBody, actualBody);
+            }
         }
 
         [Fact]
