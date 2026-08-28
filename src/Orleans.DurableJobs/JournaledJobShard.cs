@@ -169,7 +169,7 @@ internal sealed class JournaledJobShard : IJobShard
         var operation = new StartAttemptOperation(jobContext.Job.Id, cancellationToken);
         try
         {
-            EnqueueOperation(operation);
+            await EnqueueOperationAsync(operation).ConfigureAwait(false);
             return await operation.Task.ConfigureAwait(false);
         }
         finally
@@ -189,7 +189,7 @@ internal sealed class JournaledJobShard : IJobShard
         {
             await EnqueueOperationAsync(operation).ConfigureAwait(false);
             var removed = await operation.Task.ConfigureAwait(false);
-            if (removed)
+            if (removed == DurableJobMutationResult.Applied)
             {
                 ReleaseJobSlot();
             }
@@ -214,7 +214,7 @@ internal sealed class JournaledJobShard : IJobShard
         var operation = new RetryJobLaterOperation(jobContext, newDueTime, resetDequeueCount: false, cancellationToken);
         try
         {
-            EnqueueOperation(operation);
+            await EnqueueOperationAsync(operation).ConfigureAwait(false);
             return await operation.Task.ConfigureAwait(false);
         }
         finally
@@ -239,7 +239,7 @@ internal sealed class JournaledJobShard : IJobShard
             cancellationToken);
         try
         {
-            EnqueueOperation(operation);
+            await EnqueueOperationAsync(operation).ConfigureAwait(false);
             return await operation.Task.ConfigureAwait(false);
         }
         finally
@@ -483,10 +483,8 @@ internal sealed class JournaledJobShard : IJobShard
 
         try
         {
-            var startedCount = 0;
-            for (var index = 0; index < operations.Count; index++)
+            foreach (var operation in operations)
             {
-                var operation = operations[index];
                 if (!operation.TryStart())
                 {
                     continue;
@@ -497,15 +495,10 @@ internal sealed class JournaledJobShard : IJobShard
                     continue;
                 }
 
-                operations[startedCount++] = operation;
+                startedOperations.Add(operation);
             }
 
-            if (startedCount < operations.Count)
-            {
-                operations.RemoveRange(startedCount, operations.Count - startedCount);
-            }
-
-            if (operations.Count == 0)
+            if (startedOperations.Count == 0)
             {
                 return;
             }
@@ -523,7 +516,7 @@ internal sealed class JournaledJobShard : IJobShard
 
             if (!isOwned)
             {
-                foreach (var operation in operations)
+                foreach (var operation in startedOperations)
                 {
                     operation.CompleteNotOwned();
                 }
@@ -533,10 +526,8 @@ internal sealed class JournaledJobShard : IJobShard
 
             var pendingBytesBeforeApply = _stateManager.PendingWriteByteCount;
 
-            var appliedCount = 0;
-            for (var index = 0; index < operations.Count; index++)
+            foreach (var operation in startedOperations)
             {
-                var operation = operations[index];
                 try
                 {
                     var hasPendingWrite = appliedOperations.Count > 0;
@@ -556,18 +547,13 @@ internal sealed class JournaledJobShard : IJobShard
                 }
             }
 
-            if (appliedCount < operations.Count)
-            {
-                operations.RemoveRange(appliedCount, operations.Count - appliedCount);
-            }
-
-            if (operations.Count == 0)
+            if (appliedOperations.Count == 0)
             {
                 return;
             }
 
             var pendingBytesAfterApply = _stateManager.PendingWriteByteCount;
-            _durableJobsInstruments.OnShardBatch(operations.Count);
+            _durableJobsInstruments.OnShardBatch(appliedOperations.Count);
             if (pendingBytesBeforeApply >= 0 && pendingBytesAfterApply >= pendingBytesBeforeApply)
             {
                 _durableJobsInstruments.OnShardBatchBytes(pendingBytesAfterApply - pendingBytesBeforeApply);
@@ -575,7 +561,7 @@ internal sealed class JournaledJobShard : IJobShard
 
             try
             {
-                using var batchActivity = DurableJobsDiagnostics.StartPersistBatchActivity(operations, Id);
+                using var batchActivity = DurableJobsDiagnostics.StartPersistBatchActivity(appliedOperations, Id);
                 await _stateManager.WriteStateAsync(_shutdownToken).ConfigureAwait(false);
                 _durableJobsInstruments.OnStorageBatchWritten(appliedOperations.Count, operationCanceled: false, error: false);
                 batchActivity?.SetStatus(System.Diagnostics.ActivityStatusCode.Ok);
@@ -843,6 +829,8 @@ internal sealed class JournaledJobShard : IJobShard
     private sealed class StartAttemptOperation(string jobId, CancellationToken cancellationToken)
         : PendingMutationOperation<DurableJobMutationResult>(cancellationToken)
     {
+        public override int EstimatedSizeBytes { get; } = 128 + EstimateTextSize(jobId);
+
         protected override DurableJobMutationResult NotOwnedResult => DurableJobMutationResult.OwnershipLost;
 
         protected override bool Apply(JournaledJobShard shard, out DurableJobMutationResult result)

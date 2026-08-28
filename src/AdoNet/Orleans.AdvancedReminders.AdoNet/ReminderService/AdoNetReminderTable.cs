@@ -28,7 +28,7 @@ internal sealed class AdoNetReminderTable : IReminderTable
 
     public async Task StartAsync(CancellationToken cancellationToken)
     {
-        this.orleansQueries = await RelationalOrleansQueries.CreateInstance(
+        this.orleansQueries = await RelationalOrleansQueries.CreateInstanceAsync(
             this.options.Invariant,
             this.options.ConnectionString,
             cancellationToken);

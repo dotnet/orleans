@@ -473,7 +473,7 @@ internal sealed partial class ShardExecutor
                     // A terminal failure must leave the shard just like a successful completion.
                     // Otherwise the already-dequeued job remains in the persisted snapshot forever,
                     // cannot be yielded again, and prevents the shard from draining.
-                    await shard.RemoveJobAsync(jobContext.Job.Id, cancellationToken);
+                    await shard.RemoveJobAsync(jobContext.Job.Id, attemptCancellationToken);
                     LogJobFailedNoRetry(_logger, jobContext.Job.Id, jobContext.Job.Name, jobContext.DequeueCount);
                     _durableJobsInstruments.OnJobFailed(_timeProvider.GetElapsedTime(attemptStartTimestamp));
                     activity?.SetTag(ActivityTagKeys.DurableJobStatus, "failed");

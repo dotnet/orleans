@@ -276,13 +276,13 @@ public class JournaledJobShardManagerTests
             }, CancellationToken.None))
             .ToArray();
 
-        await storageProvider.AppendStarted.WaitAsync(TimeSpan.FromSeconds(5));
+        await storageProvider.AppendStarted.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
         Assert.Equal(
             JobCount - MaxJobsPerShard,
             schedules.Count(static task => task.IsCompletedSuccessfully && task.Result is null));
 
         storageProvider.AllowAppends();
-        var results = await Task.WhenAll(schedules).WaitAsync(TimeSpan.FromSeconds(5));
+        var results = await Task.WhenAll(schedules).WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
         Assert.Equal(MaxJobsPerShard, results.Count(static job => job is not null));
         Assert.Equal(JobCount - MaxJobsPerShard, results.Count(static job => job is null));
         Assert.Equal(MaxJobsPerShard, await shard.GetJobCountAsync());
@@ -320,9 +320,9 @@ public class JournaledJobShardManagerTests
             }, CancellationToken.None))
             .ToArray();
 
-        await storageProvider.AppendStarted.WaitAsync(TimeSpan.FromSeconds(5));
+        await storageProvider.AppendStarted.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
         storageProvider.AllowAppends();
-        Assert.All(await Task.WhenAll(tasks).WaitAsync(TimeSpan.FromSeconds(5)), Assert.NotNull);
+        Assert.All(await Task.WhenAll(tasks).WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken), Assert.NotNull);
         Assert.NotEmpty(observedBatchSizes);
         Assert.All(observedBatchSizes, size => Assert.InRange(size, 1, MaxBatchOperationCount));
 
@@ -359,9 +359,9 @@ public class JournaledJobShardManagerTests
             }, CancellationToken.None))
             .ToArray();
 
-        await storageProvider.AppendStarted.WaitAsync(TimeSpan.FromSeconds(5));
+        await storageProvider.AppendStarted.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
         storageProvider.AllowAppends();
-        Assert.All(await Task.WhenAll(tasks).WaitAsync(TimeSpan.FromSeconds(5)), Assert.NotNull);
+        Assert.All(await Task.WhenAll(tasks).WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken), Assert.NotNull);
         Assert.NotEmpty(observedBatchSizes);
         Assert.All(observedBatchSizes, size => Assert.Equal(1, size));
 
@@ -502,8 +502,8 @@ public class JournaledJobShardManagerTests
             }, CancellationToken.None))
             .ToArray();
 
-        await storageProvider.AppendStarted.WaitAsync(TimeSpan.FromSeconds(5));
-        await shard.DisposeAsync().AsTask().WaitAsync(TimeSpan.FromSeconds(5));
+        await storageProvider.AppendStarted.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+        await shard.DisposeAsync().AsTask().WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
 
         foreach (var schedule in schedules)
         {
@@ -767,7 +767,7 @@ public class JournaledJobShardManagerTests
                 start.AddHours(1),
                 new Dictionary<string, string> { ["Index"] = i.ToString() },
                 CancellationToken.None);
-            await ScheduleJobAsync(shard, $"catalog-job-{i}");
+            await ScheduleJobAsync(shard, $"catalog-job-{i}", TestContext.Current.CancellationToken);
             await manager1.UnregisterShardAsync(shard, CancellationToken.None);
         }
 
@@ -783,7 +783,7 @@ public class JournaledJobShardManagerTests
 
         foreach (var shard in secondPage)
         {
-            await DrainAndUnregisterAsync(manager2, shard);
+            await DrainAndUnregisterAsync(manager2, shard, TestContext.Current.CancellationToken);
         }
     }
 

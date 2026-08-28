@@ -482,7 +482,7 @@ internal sealed class AdvancedReminderService : IReminderService, IAttributeRemi
 
         try
         {
-            var canceled = await _jobManager.TryCancelDurableJobAsync(
+            var canceled = await _jobManager.CancelAsync(
                 new DurableJob
                 {
                     Id = entry.JobId,

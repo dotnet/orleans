@@ -231,7 +231,7 @@ public class InMemoryJobQueueTests
 
             previousDueTime = context.Job.DueTime;
             previousPriority = context.Job.Priority;
-            Assert.True(queue.CancelJob(context.Job.Id));
+            Assert.True(queue.RemoveJob(context.Job.Id));
         }
 
         Assert.Equal(jobCount, seen.Count);
@@ -259,7 +259,7 @@ public class InMemoryJobQueueTests
                 previousDueTime is null || context.Job.DueTime >= previousDueTime,
                 $"Due time moved backwards: {previousDueTime:O} -> {context.Job.DueTime:O}.");
             previousDueTime = context.Job.DueTime;
-            Assert.True(queue.CancelJob(context.Job.Id));
+            Assert.True(queue.RemoveJob(context.Job.Id));
 
             if (seen.Count == 100)
             {
@@ -768,8 +768,8 @@ public class InMemoryJobQueueTests
         var completion = enumerator.MoveNextAsync().AsTask();
         Assert.False(completion.IsCompleted);
 
-        Assert.True(queue.CancelJob(job.Id));
-        Assert.False(await completion.WaitAsync(TimeSpan.FromSeconds(5)));
+        Assert.True(queue.RemoveJob(job.Id));
+        Assert.False(await completion.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken));
     }
 
     [Fact]
@@ -789,22 +789,22 @@ public class InMemoryJobQueueTests
         await using var enumerator = queue.GetAsyncEnumerator(CancellationToken.None);
 
         // Taking the first item snapshots the stale version in the dequeued bucket.
-        Assert.True(await enumerator.MoveNextAsync().AsTask().WaitAsync(TimeSpan.FromSeconds(5)));
+        Assert.True(await enumerator.MoveNextAsync().AsTask().WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken));
         Assert.Equal(sentinel.Id, enumerator.Current.Job.Id);
-        Assert.True(queue.CancelJob(sentinel.Id));
+        Assert.True(queue.RemoveJob(sentinel.Id));
 
         // Moving the same ID to a new bucket must invalidate the stale snapshot item.
         queue.Enqueue(replacement, 7);
         queue.MarkAsComplete();
 
-        Assert.True(await enumerator.MoveNextAsync().AsTask().WaitAsync(TimeSpan.FromSeconds(5)));
+        Assert.True(await enumerator.MoveNextAsync().AsTask().WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken));
         Assert.Equal(replacement.Id, enumerator.Current.Job.Id);
         Assert.Equal(replacementDueTime, enumerator.Current.Job.DueTime);
         Assert.Equal(DurableJobPriority.High, enumerator.Current.Job.Priority);
         Assert.Equal(8, enumerator.Current.DequeueCount);
-        Assert.True(queue.CancelJob(replacement.Id));
+        Assert.True(queue.RemoveJob(replacement.Id));
 
-        Assert.False(await enumerator.MoveNextAsync().AsTask().WaitAsync(TimeSpan.FromSeconds(5)));
+        Assert.False(await enumerator.MoveNextAsync().AsTask().WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken));
     }
 
     [Fact]
@@ -824,7 +824,7 @@ public class InMemoryJobQueueTests
         while (await enumerator.MoveNextAsync())
         {
             observed++;
-            Assert.True(queue.CancelJob(enumerator.Current.Job.Id));
+            Assert.True(queue.RemoveJob(enumerator.Current.Job.Id));
         }
 
         Assert.Equal(InMemoryJobQueue.MaxDequeueBatchSize, observed);

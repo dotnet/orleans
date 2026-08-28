@@ -102,8 +102,13 @@ namespace Orleans.Tests.SqlUtils
         /// <param name="connectionString">The connection string this database should use for database operations.</param>
         internal static Task<RelationalOrleansQueries> CreateInstance(
             string invariantName,
+            string connectionString) =>
+            CreateInstance(RelationalStorage.CreateInstance(invariantName, connectionString), CancellationToken.None);
+
+        internal static Task<RelationalOrleansQueries> CreateInstanceAsync(
+            string invariantName,
             string connectionString,
-            CancellationToken cancellationToken = default) =>
+            CancellationToken cancellationToken) =>
             CreateInstance(RelationalStorage.CreateInstance(invariantName, connectionString), cancellationToken);
 
         /// <summary>
@@ -112,13 +117,15 @@ namespace Orleans.Tests.SqlUtils
         internal static Task<RelationalOrleansQueries> CreateInstance(
             string invariantName,
             string? connectionString,
-            DbDataSource? dataSource,
-            CancellationToken cancellationToken = default) =>
-            CreateInstance(RelationalStorage.CreateInstance(invariantName, connectionString, dataSource), cancellationToken);
+            DbDataSource? dataSource) =>
+            CreateInstance(RelationalStorage.CreateInstance(invariantName, connectionString, dataSource), CancellationToken.None);
 
-        internal static async Task<RelationalOrleansQueries> CreateInstance(
+        internal static Task<RelationalOrleansQueries> CreateInstance(IRelationalStorage storage)
+            => CreateInstance(storage, CancellationToken.None);
+
+        private static async Task<RelationalOrleansQueries> CreateInstance(
             IRelationalStorage storage,
-            CancellationToken cancellationToken = default)
+            CancellationToken cancellationToken)
         {
             var queries = await storage.ReadAsync(
                 DbStoredQueries.GetQueriesKey,

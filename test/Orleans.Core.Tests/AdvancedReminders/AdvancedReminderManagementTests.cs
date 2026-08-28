@@ -47,7 +47,7 @@ public class ReminderIteratorTests
 
         var iterator = new ReminderIterator(managementGrain);
         var names = new List<string>();
-        await foreach (var reminder in iterator.EnumerateAllAsync(pageSize: 2))
+        await foreach (var reminder in iterator.EnumerateAllAsync(pageSize: 2, cancellationToken: TestContext.Current.CancellationToken))
         {
             names.Add(reminder.ReminderName);
         }
@@ -80,7 +80,7 @@ public class ReminderIteratorTests
 
         var iterator = new ReminderIterator(managementGrain);
         var names = new List<string>();
-        await foreach (var reminder in iterator.EnumerateFilteredAsync(filter, pageSize: 2))
+        await foreach (var reminder in iterator.EnumerateFilteredAsync(filter, pageSize: 2, cancellationToken: TestContext.Current.CancellationToken))
         {
             names.Add(reminder.ReminderName);
         }
@@ -105,7 +105,10 @@ public class ReminderIteratorTests
 
         var iterator = new ReminderIterator(managementGrain);
         var names = new List<string>();
-        await foreach (var reminder in iterator.EnumerateOverdueAsync(TimeSpan.FromMinutes(3), pageSize: 2))
+        await foreach (var reminder in iterator.EnumerateOverdueAsync(
+            TimeSpan.FromMinutes(3),
+            pageSize: 2,
+            cancellationToken: TestContext.Current.CancellationToken))
         {
             names.Add(reminder.ReminderName);
         }
@@ -132,7 +135,11 @@ public class ReminderIteratorTests
 
         var iterator = new ReminderIterator(managementGrain);
         var names = new List<string>();
-        await foreach (var reminder in iterator.EnumerateDueInRangeAsync(from, to, pageSize: 2))
+        await foreach (var reminder in iterator.EnumerateDueInRangeAsync(
+            from,
+            to,
+            pageSize: 2,
+            cancellationToken: TestContext.Current.CancellationToken))
         {
             names.Add(reminder.ReminderName);
         }
@@ -191,7 +198,9 @@ public class ReminderManagementGrainExtensionsTests
         }));
 
         var names = new List<string>();
-        await foreach (var reminder in managementGrain.EnumerateAllAsync(pageSize: 2))
+        await foreach (var reminder in managementGrain.EnumerateAllAsync(
+            pageSize: 2,
+            cancellationToken: TestContext.Current.CancellationToken))
         {
             names.Add(reminder.ReminderName);
         }
@@ -228,7 +237,10 @@ public class ReminderManagementGrainExtensionsTests
         }));
 
         var names = new List<string>();
-        await foreach (var reminder in managementGrain.EnumerateOverdueAsync(TimeSpan.FromMinutes(2), pageSize: 2))
+        await foreach (var reminder in managementGrain.EnumerateOverdueAsync(
+            TimeSpan.FromMinutes(2),
+            pageSize: 2,
+            cancellationToken: TestContext.Current.CancellationToken))
         {
             names.Add(reminder.ReminderName);
         }
@@ -254,7 +266,11 @@ public class ReminderManagementGrainExtensionsTests
         }));
 
         var names = new List<string>();
-        await foreach (var reminder in managementGrain.EnumerateDueInRangeAsync(from, to, pageSize: 2))
+        await foreach (var reminder in managementGrain.EnumerateDueInRangeAsync(
+            from,
+            to,
+            pageSize: 2,
+            cancellationToken: TestContext.Current.CancellationToken))
         {
             names.Add(reminder.ReminderName);
         }
@@ -1040,7 +1056,7 @@ public class ReminderStressTests
         var iterator = new ReminderIterator(management);
 
         long observed = 0;
-        await foreach (var _ in iterator.EnumerateAllAsync(pageSize))
+        await foreach (var _ in iterator.EnumerateAllAsync(pageSize, TestContext.Current.CancellationToken))
         {
             observed++;
         }

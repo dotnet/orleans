@@ -67,7 +67,7 @@ public sealed class AdvancedReminderInMemoryTests(AdvancedReminderInMemoryTests.
         Assert.False(await grain.Exists(reminderName));
 
         var tickCount = await grain.GetTickCount();
-        await Task.Delay(TimeSpan.FromMilliseconds(300));
+        await Task.Delay(TimeSpan.FromMilliseconds(300), TestContext.Current.CancellationToken);
         Assert.Equal(tickCount, await grain.GetTickCount());
     }
 
@@ -90,7 +90,7 @@ public sealed class AdvancedReminderInMemoryTests(AdvancedReminderInMemoryTests.
             TimeSpan.FromSeconds(10));
 
         var tickCount = await grain.GetTickCount();
-        await Task.Delay(TimeSpan.FromMilliseconds(300));
+        await Task.Delay(TimeSpan.FromMilliseconds(300), TestContext.Current.CancellationToken);
         Assert.Equal(tickCount, await grain.GetTickCount());
     }
 

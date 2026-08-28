@@ -1621,9 +1621,9 @@ public class AdvancedReminderRecoveryGrainTests
             timeProvider: timeProvider);
 
         var reconcileTask = recovery.ReconcileAsync(force: false, CancellationToken.None);
-        await dispatchStarted.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        await dispatchStarted.Task.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
         timeProvider.Advance(AdvancedReminderRecoveryGrain.ReconciliationEntryTimeout);
-        await reconcileTask.WaitAsync(TimeSpan.FromSeconds(5));
+        await reconcileTask.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
 
         Assert.Equal(256, readCount);
     }
@@ -1906,7 +1906,7 @@ public class AdvancedReminderServiceTests
         Assert.Equal(firstRegistration.JobShardId, afterReactivation.JobShardId);
         Assert.Single(scheduledRequests);
         Assert.Equal(2, reminderTable.UpsertCount);
-        await jobManager.DidNotReceive().TryCancelDurableJobAsync(Arg.Any<DurableJob>(), Arg.Any<CancellationToken>());
+        await jobManager.DidNotReceive().CancelAsync(Arg.Any<DurableJob>(), Arg.Any<CancellationToken>());
 
         var remindable = Substitute.For<AdvancedRemindable>();
         remindable.ReceiveReminder(Arg.Any<string>(), Arg.Any<AdvancedTickStatus>()).Returns(Task.CompletedTask);
@@ -1961,7 +1961,7 @@ public class AdvancedReminderServiceTests
                 scheduledRequests.Add(request);
                 return Task.FromResult(CreateDurableJob(request));
             });
-        jobManager.TryCancelDurableJobAsync(Arg.Any<DurableJob>(), Arg.Any<CancellationToken>()).Returns(true);
+        jobManager.CancelAsync(Arg.Any<DurableJob>(), Arg.Any<CancellationToken>()).Returns(true);
         var service = CreateService(
             reminderTable,
             jobManager: jobManager,
@@ -2006,7 +2006,7 @@ public class AdvancedReminderServiceTests
         Assert.NotEqual(original.JobId, updated.JobId);
         Assert.Equal(2, scheduledRequests.Count);
         Assert.Equal(4, reminderTable.UpsertCount);
-        await jobManager.Received(1).TryCancelDurableJobAsync(
+        await jobManager.Received(1).CancelAsync(
             Arg.Is<DurableJob>(job => job.Id == original.JobId && job.ShardId == original.JobShardId),
             Arg.Any<CancellationToken>());
     }
@@ -2023,7 +2023,7 @@ public class AdvancedReminderServiceTests
         var jobManager = Substitute.For<ILocalDurableJobManager>();
         jobManager.ScheduleJobAsync(Arg.Any<ScheduleJobRequest>(), Arg.Any<CancellationToken>())
             .Returns(callInfo => Task.FromResult(CreateDurableJob(callInfo.Arg<ScheduleJobRequest>())));
-        jobManager.TryCancelDurableJobAsync(Arg.Any<DurableJob>(), Arg.Any<CancellationToken>())
+        jobManager.CancelAsync(Arg.Any<DurableJob>(), Arg.Any<CancellationToken>())
             .Returns(Task.FromException<bool>(new InvalidOperationException("Cancellation failed.")));
         var service = CreateService(
             reminderTable,
@@ -2519,7 +2519,7 @@ public class AdvancedReminderServiceTests
         var jobManager = Substitute.For<ILocalDurableJobManager>();
         jobManager.ScheduleJobAsync(Arg.Any<ScheduleJobRequest>(), Arg.Any<CancellationToken>())
             .Returns(callInfo => Task.FromResult(CreateDurableJob(callInfo.Arg<ScheduleJobRequest>())));
-        jobManager.TryCancelDurableJobAsync(Arg.Any<DurableJob>(), Arg.Any<CancellationToken>()).Returns(true);
+        jobManager.CancelAsync(Arg.Any<DurableJob>(), Arg.Any<CancellationToken>()).Returns(true);
         var service = CreateService(reminderTable, jobManager: jobManager, grainFactory: grainFactory);
         dispatcher.Service = service;
 
@@ -2532,7 +2532,7 @@ public class AdvancedReminderServiceTests
             Period = TimeSpan.FromMinutes(2),
         }, CancellationToken.None);
 
-        await jobManager.Received(1).TryCancelDurableJobAsync(
+        await jobManager.Received(1).CancelAsync(
             Arg.Is<DurableJob>(job => job.Id == "job-old" && job.ShardId == "shard-old"),
             CancellationToken.None);
     }
@@ -2559,14 +2559,14 @@ public class AdvancedReminderServiceTests
         var grainFactory = Substitute.For<IGrainFactory>();
         grainFactory.GetGrain<IAdvancedReminderDispatcherGrain>(grainId.ToString(), null).Returns(dispatcher);
         var jobManager = Substitute.For<ILocalDurableJobManager>();
-        jobManager.TryCancelDurableJobAsync(Arg.Any<DurableJob>(), Arg.Any<CancellationToken>()).Returns(true);
+        jobManager.CancelAsync(Arg.Any<DurableJob>(), Arg.Any<CancellationToken>()).Returns(true);
         var service = CreateService(reminderTable, jobManager: jobManager, grainFactory: grainFactory);
 
         await service.UnregisterCoreAsync(
             Assert.IsType<Orleans.AdvancedReminders.ReminderData>(current.ToIGrainReminder()),
             CancellationToken.None);
 
-        await jobManager.Received(1).TryCancelDurableJobAsync(
+        await jobManager.Received(1).CancelAsync(
             Arg.Is<DurableJob>(job => job.Id == "job-current" && job.ShardId == "shard-current"),
             CancellationToken.None);
     }
@@ -2613,7 +2613,7 @@ public class AdvancedReminderServiceTests
         var lifecycle = new SiloLifecycleSubject(NullLogger<SiloLifecycleSubject>.Instance);
         service.Participate(lifecycle);
 
-        var exception = await Assert.ThrowsAsync<TimeoutException>(() => lifecycle.OnStart());
+        var exception = await Assert.ThrowsAsync<TimeoutException>(() => lifecycle.OnStart(TestContext.Current.CancellationToken));
 
         Assert.Contains("00:00:00.025", exception.Message, StringComparison.Ordinal);
     }
@@ -2630,7 +2630,9 @@ public class AdvancedReminderServiceTests
         var lifecycle = new SiloLifecycleSubject(NullLogger<SiloLifecycleSubject>.Instance);
         service.Participate(lifecycle);
 
-        var exception = await Assert.ThrowsAsync<TimeoutException>(() => lifecycle.OnStart()).WaitAsync(TimeSpan.FromSeconds(1));
+        var exception = await Assert.ThrowsAsync<TimeoutException>(
+            () => lifecycle.OnStart(TestContext.Current.CancellationToken))
+            .WaitAsync(TimeSpan.FromSeconds(1), TestContext.Current.CancellationToken);
 
         Assert.Contains("00:00:00.025", exception.Message, StringComparison.Ordinal);
     }
@@ -2647,7 +2649,7 @@ public class AdvancedReminderServiceTests
         var lifecycle = new SiloLifecycleSubject(NullLogger<SiloLifecycleSubject>.Instance);
         service.Participate(lifecycle);
 
-        await lifecycle.OnStart();
+        await lifecycle.OnStart(TestContext.Current.CancellationToken);
         await recovery.Received(1).StartAsync(force: false, Arg.Any<CancellationToken>());
 
         timeProvider.Advance(AdvancedReminderService.RecoveryHeartbeatPeriod);
@@ -2659,7 +2661,7 @@ public class AdvancedReminderServiceTests
         }
 
         await recovery.Received(2).StartAsync(force: false, Arg.Any<CancellationToken>());
-        await lifecycle.OnStop();
+        await lifecycle.OnStop(TestContext.Current.CancellationToken);
     }
 
     [Fact]

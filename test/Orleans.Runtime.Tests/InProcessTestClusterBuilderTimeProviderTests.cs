@@ -27,7 +27,7 @@ public class InProcessTestClusterBuilderTimeProviderTests
         builder.ConfigureHost(hostBuilder => hostBuilder.Services.AddSingleton<TimeProvider>(fakeTimeProvider));
 
         await using var cluster = builder.Build();
-        await cluster.DeployAsync();
+        await cluster.DeployAsync(TestContext.Current.CancellationToken);
 
         Assert.Same(fakeTimeProvider, cluster.Client.ServiceProvider.GetRequiredService<TimeProvider>());
         Assert.Same(fakeTimeProvider, cluster.GetSiloServiceProvider().GetRequiredService<TimeProvider>());
@@ -42,7 +42,7 @@ public class InProcessTestClusterBuilderTimeProviderTests
         var builder = CreateBuilder(fakeTimeProvider);
 
         await using var cluster = builder.Build();
-        await cluster.DeployAsync();
+        await cluster.DeployAsync(TestContext.Current.CancellationToken);
 
         var grain = cluster.Client.GetGrain<IReminderTestGrain2>(Guid.NewGuid());
         const string reminderName = nameof(ConfigureHost_CanControlReminderDueTimeUsingFakeTimeProvider);
@@ -68,7 +68,7 @@ public class InProcessTestClusterBuilderTimeProviderTests
         var builder = CreateBuilder(fakeTimeProvider);
 
         await using var cluster = builder.Build();
-        await cluster.DeployAsync();
+        await cluster.DeployAsync(TestContext.Current.CancellationToken);
 
         var grain = cluster.Client.GetGrain<IReminderTestGrain2>(Guid.NewGuid());
         const string reminderName = nameof(ConfigureHost_CanAdvanceFakeTimeToTriggerSubsequentReminderTicks);

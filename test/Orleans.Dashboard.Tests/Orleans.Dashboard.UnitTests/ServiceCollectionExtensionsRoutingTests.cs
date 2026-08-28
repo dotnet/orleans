@@ -942,6 +942,12 @@ public class ServiceCollectionExtensionsRoutingTests
             Reminders = [],
         };
 
+        public AdvancedReminderResponse AdvancedReminderResult { get; set; } = new()
+        {
+            Count = 0,
+            Reminders = [],
+        };
+
         public string GrainStateResult { get; set; } = "{}";
 
         public Exception? ClusterStatsException { get; set; }
@@ -1030,6 +1036,15 @@ public class ServiceCollectionExtensionsRoutingTests
                 exception: ReminderException,
                 cancellationToken: cancellationToken);
         }
+
+        public Task<Immutable<AdvancedReminderResponse>> GetAdvancedReminders(
+            int pageNumber,
+            int pageSize,
+            CancellationToken cancellationToken = default) =>
+            Complete(
+                nameof(GetAdvancedReminders),
+                AdvancedReminderResult.AsImmutable(),
+                cancellationToken: cancellationToken);
 
         public Task<Immutable<SiloRuntimeStatistics?[]>> HistoricalStats(
             string siloAddress,

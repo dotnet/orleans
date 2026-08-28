@@ -1,7 +1,9 @@
 #nullable enable
-using Orleans.AdvancedReminders.Runtime.ReminderService;
+extern alias AdvancedRemindersAdoNet;
+
 using Xunit;
 using AdvancedReminderEntry = Orleans.AdvancedReminders.ReminderEntry;
+using AdoNetReminderTable = AdvancedRemindersAdoNet::Orleans.AdvancedReminders.Runtime.ReminderService.AdoNetReminderTable;
 
 namespace UnitTests.AdvancedRemindersTest;
 
