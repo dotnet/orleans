@@ -77,7 +77,6 @@ public abstract class RouteKeyHandler : IInboxHandler
     /// <exception cref="ArgumentException">Thrown when <paramref name="routeKey"/> is empty or whitespace.</exception>
     protected RouteKeyHandler(string routeKey)
     {
-        ArgumentNullException.ThrowIfNull(routeKey);
         ArgumentException.ThrowIfNullOrWhiteSpace(routeKey);
 
         _routeKey = routeKey;
