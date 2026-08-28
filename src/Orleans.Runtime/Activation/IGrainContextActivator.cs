@@ -177,9 +177,20 @@ namespace Orleans.Runtime
             {
                 return startup.Start();
             }
-            catch
+            catch (Exception startupException)
             {
-                startup.Abort();
+                try
+                {
+                    startup.Abort();
+                }
+                catch (Exception abortException)
+                {
+                    throw new AggregateException(
+                        "Grain context startup failed and aborting the startup also failed.",
+                        startupException,
+                        abortException);
+                }
+
                 throw;
             }
         }
