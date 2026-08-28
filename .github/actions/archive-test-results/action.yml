@@ -5,6 +5,10 @@ inputs:
   name:
     description: Artifact name.
     required: true
+  retention-days:
+    description: Number of days to retain the artifact.
+    required: false
+    default: '1'
 
 runs:
   using: composite
@@ -15,7 +19,7 @@ runs:
     with:
       name: ${{ inputs.name }}
       if-no-files-found: warn
-      retention-days: 1
+      retention-days: ${{ inputs.retention-days }}
       path: |
         **/TestResults/*
         !TestResults/*.cobertura.xml
@@ -31,7 +35,7 @@ runs:
     with:
       name: ${{ inputs.name }}
       if-no-files-found: warn
-      retention-days: 1
+      retention-days: ${{ inputs.retention-days }}
       overwrite: true
       path: |
         **/TestResults/*

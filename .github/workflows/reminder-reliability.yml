@@ -1,0 +1,225 @@
+name: Reminder reliability
+
+on:
+  schedule:
+    # Five repetitions weekly catch 23-83% of 5-30% flakes per run and 64-99.9% over four runs.
+    - cron: '17 5 * * 4'
+  workflow_dispatch:
+    inputs:
+      provider:
+        description: Reminder provider to exercise
+        required: true
+        default: all
+        type: choice
+        options:
+          - all
+          - in-memory
+          - azure-storage
+          - sql-server
+          - cosmos
+      framework:
+        description: Target framework to exercise
+        required: true
+        default: all
+        type: choice
+        options:
+          - all
+          - net8.0
+          - net10.0
+      iterations:
+        description: Sequential repetitions per provider/framework (1-20)
+        required: true
+        default: '5'
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: reminder-reliability-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  DOTNET_SKIP_FIRST_TIME_EXPERIENCE: 1
+  DOTNET_NOLOGO: true
+  BuildExternalAssets: 'false'
+  AZURITE_IMAGE: mcr.microsoft.com/azure-storage/azurite:3.35.0@sha256:647c63a91102a9d8e8000aab803436e1fc85fbb285e7ce830a82ee5d6661cf37
+  COSMOSDB_EMULATOR_IMAGE: mcr.microsoft.com/cosmosdb/linux/azure-cosmos-emulator:vnext-preview@sha256:bf3bd3cbe3fae2005a0745f77b01d1fc8cd04112193f3ee32289ee15ee9ae5fa
+  MSSQL_IMAGE: mcr.microsoft.com/mssql/server:2022-CU20-ubuntu-22.04@sha256:7c29dfbac885ad7519e219c7fe4aee0e67283e21a10e9c252d13b0fbde1866f8
+  TESTCONTAINERS_RYUK_IMAGE: testcontainers/ryuk:0.14.0@sha256:7c1a8a9a47c780ed0f983770a662f80deb115d95cce3e2daa3d12115b8cd28f0
+
+jobs:
+  prepare:
+    name: Prepare reliability matrix
+    runs-on: ubuntu-latest
+    outputs:
+      iterations: ${{ steps.matrix.outputs.iterations }}
+      matrix: ${{ steps.matrix.outputs.matrix }}
+    steps:
+    - name: Build requested matrix
+      id: matrix
+      shell: pwsh
+      env:
+        REQUESTED_FRAMEWORK: ${{ inputs.framework || 'all' }}
+        REQUESTED_ITERATIONS: ${{ inputs.iterations || '5' }}
+        REQUESTED_PROVIDER: ${{ inputs.provider || 'all' }}
+      run: |
+        $iterations = 0
+        if (-not [int]::TryParse($env:REQUESTED_ITERATIONS, [ref]$iterations) -or $iterations -lt 1 -or $iterations -gt 20) {
+          throw "iterations must be an integer from 1 through 20"
+        }
+
+        $providers = @(
+          [ordered]@{ input = 'in-memory'; id = 'None'; artifact = 'in-memory'; topology = 'in-process cluster; in-memory reminder table; suite-managed silo failover' }
+          [ordered]@{ input = 'azure-storage'; id = 'AzureStorage'; artifact = 'azure-storage'; topology = 'in-process cluster; Azurite table service; suite-managed silo failover' }
+          [ordered]@{ input = 'sql-server'; id = 'SqlServer'; artifact = 'sql-server'; topology = 'in-process cluster; SQL Server 2022 container; suite-managed silo failover' }
+          [ordered]@{ input = 'cosmos'; id = 'Cosmos'; artifact = 'cosmos'; topology = 'in-process cluster; Cosmos DB Linux emulator; suite-managed silo failover' }
+        )
+        if ($env:REQUESTED_PROVIDER -ne 'all') {
+          $providers = @($providers | Where-Object input -eq $env:REQUESTED_PROVIDER)
+        }
+
+        $frameworks = if ($env:REQUESTED_FRAMEWORK -eq 'all') { @('net8.0', 'net10.0') } else { @($env:REQUESTED_FRAMEWORK) }
+        $include = foreach ($provider in $providers) {
+          foreach ($framework in $frameworks) {
+            [ordered]@{
+              provider = $provider.id
+              artifact = $provider.artifact
+              topology = $provider.topology
+              framework = $framework
+              filter = $(if ($provider.id -eq 'None') {
+                '/[(Provider=None)&(Category=Reminders)&(Category!=Performance)]'
+              } else {
+                "/[(Provider=$($provider.id))&(Area=Reminders)&(Category!=Performance)]"
+              })
+            }
+          }
+        }
+
+        "iterations=$iterations" >> $env:GITHUB_OUTPUT
+        "matrix=$(@{ include = @($include) } | ConvertTo-Json -Compress -Depth 4)" >> $env:GITHUB_OUTPUT
+
+  test-reminders:
+    name: ${{ matrix.artifact }} / ${{ matrix.framework }}
+    needs: prepare
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    strategy:
+      fail-fast: false
+      max-parallel: 8
+      matrix: ${{ fromJSON(needs.prepare.outputs.matrix) }}
+    env:
+      ACCEPT_EULA: 'Y'
+      MSSQL_PID: Developer
+# [SuppressMessage("Microsoft.Security", "CS002:SecretInNextLine", Justification="Local emulator credential")]
+      SA_PASSWORD: 'yourWeak(!)Password'
+    steps:
+    - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
+    - uses: ./.github/actions/setup-test-environment
+    - name: Record run context
+      shell: pwsh
+      env:
+        ITERATIONS: ${{ needs.prepare.outputs.iterations }}
+        PROVIDER: ${{ matrix.provider }}
+        TARGET_FRAMEWORK: ${{ matrix.framework }}
+        TOPOLOGY: ${{ matrix.topology }}
+      run: |
+        New-Item -ItemType Directory -Force logs | Out-Null
+        [ordered]@{
+          iterations = $env:ITERATIONS
+          framework = $env:TARGET_FRAMEWORK
+          provider = $env:PROVIDER
+          commit = '${{ github.sha }}'
+          topology = $env:TOPOLOGY
+          workflowRun = '${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}'
+        } | ConvertTo-Json | Set-Content logs/run-context.json
+    - name: Start reminder provider
+      shell: bash
+      run: |
+        set -euo pipefail
+
+        case "${{ matrix.provider }}" in
+          None)
+            ;;
+          AzureStorage)
+            echo "REMINDER_CONTAINER=azurite" >> "$GITHUB_ENV"
+            bash .github/scripts/docker-pull-with-retry.sh "$AZURITE_IMAGE"
+            docker run -d --pull=never --name azurite \
+              -p 10000:10000 -p 10001:10001 -p 10002:10002 \
+              "$AZURITE_IMAGE" \
+              azurite --blobHost 0.0.0.0 --queueHost 0.0.0.0 --tableHost 0.0.0.0 --skipApiVersionCheck
+            timeout 60 bash -c 'until nc -z localhost 10000 && nc -z localhost 10001 && nc -z localhost 10002; do sleep 1; done'
+            # [SuppressMessage("Microsoft.Security", "CS002:SecretInNextLine", Justification="Well-known Azurite emulator credential")]
+            echo "ORLEANSDATACONNECTIONSTRING=DefaultEndpointsProtocol=http;AccountName=devstoreaccount1;AccountKey=Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw==;BlobEndpoint=http://127.0.0.1:10000/devstoreaccount1;QueueEndpoint=http://127.0.0.1:10001/devstoreaccount1;TableEndpoint=http://127.0.0.1:10002/devstoreaccount1;" >> "$GITHUB_ENV"
+            ;;
+          SqlServer)
+            echo "REMINDER_CONTAINER=mssql" >> "$GITHUB_ENV"
+            bash .github/scripts/docker-pull-with-retry.sh "$MSSQL_IMAGE"
+            docker run -d --pull=never --name mssql \
+              -p 1433:1433 \
+              -e ACCEPT_EULA="$ACCEPT_EULA" \
+              -e MSSQL_PID="$MSSQL_PID" \
+              -e MSSQL_SA_PASSWORD="$SA_PASSWORD" \
+              --health-cmd '/opt/mssql-tools18/bin/sqlcmd -C -S localhost -U sa -P "$MSSQL_SA_PASSWORD" -Q "SELECT 1" -b -o /dev/null' \
+              --health-interval 2s \
+              --health-timeout 5s \
+              --health-retries 60 \
+              "$MSSQL_IMAGE"
+            bash .github/scripts/docker-wait-for-health.sh mssql 120
+            echo "ORLEANSMSSQLCONNECTIONSTRING=Server=127.0.0.1,1433;User Id=SA;Password=$SA_PASSWORD;TrustServerCertificate=True;" >> "$GITHUB_ENV"
+            ;;
+          Cosmos)
+            echo "REMINDER_CONTAINER=cosmosdb-emulator" >> "$GITHUB_ENV"
+            bash .github/scripts/docker-pull-with-retry.sh "$COSMOSDB_EMULATOR_IMAGE"
+            docker run -d --pull=never --name cosmosdb-emulator \
+              -p 8081:8081 \
+              -e PROTOCOL=https \
+              -e ENABLE_EXPLORER=false \
+              -e ENABLE_TELEMETRY=false \
+              -e LOG_LEVEL=warn \
+              "$COSMOSDB_EMULATOR_IMAGE"
+            endpoint="https://localhost:8081/"
+            for attempt in {1..60}; do
+              if curl --silent --show-error --insecure "$endpoint" > /dev/null; then
+                echo "ORLEANSCOSMOSDBACCOUNTENDPOINT=$endpoint" >> "$GITHUB_ENV"
+                break
+              fi
+              if [[ "$attempt" -eq 60 ]]; then
+                echo "Azure Cosmos DB emulator did not become ready in time."
+                exit 1
+              fi
+              sleep 2
+            done
+            # [SuppressMessage("Microsoft.Security", "CS002:SecretInNextLine", Justification="Well-known Cosmos emulator credential")]
+            echo "ORLEANSCOSMOSDBACCOUNTKEY=C2y6yDjf5/R+ob0N8A7Cgv30VRDJIWEHLM+4QDU5DE2nQ9nDuVTqobD4b8mGGyPMbIZnqyMsEcaGQy67XIw/Jw==" >> "$GITHUB_ENV"
+            ;;
+        esac
+    - name: Run reminder reliability repetitions
+      shell: pwsh
+      run: >-
+        ./.github/scripts/run-reminder-reliability.ps1
+        -Provider '${{ matrix.provider }}'
+        -Framework '${{ matrix.framework }}'
+        -Iterations '${{ needs.prepare.outputs.iterations }}'
+        -FilterQuery '${{ matrix.filter }}'
+        -Topology '${{ matrix.topology }}'
+        -Commit '${{ github.sha }}'
+    - name: Capture provider diagnostics
+      if: always()
+      shell: bash
+      run: |
+        mkdir -p logs
+        if [[ -n "${REMINDER_CONTAINER:-}" ]]; then
+          docker inspect "$REMINDER_CONTAINER" > "logs/${REMINDER_CONTAINER}-inspect.json" 2>&1 || true
+          docker logs --timestamps "$REMINDER_CONTAINER" > "logs/${REMINDER_CONTAINER}.log" 2>&1 || true
+        fi
+    - name: Archive reliability diagnostics
+      if: always()
+      uses: ./.github/actions/archive-test-results
+      with:
+        name: reminder-reliability_${{ matrix.artifact }}_${{ matrix.framework }}_${{ github.run_attempt }}
+        retention-days: '14'
+    - name: Clean up reminder provider
+      if: always() && env.REMINDER_CONTAINER != ''
+      shell: bash
+      run: docker rm -f "$REMINDER_CONTAINER" || true
