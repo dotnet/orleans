@@ -1109,6 +1109,7 @@ internal sealed unsafe class LinuxIoUringCancelOperation : LinuxIoUringOperation
 
 internal sealed unsafe class LinuxIoUringSocketSender : LinuxIoUringOperation, ISocketSender
 {
+    private const int SynchronousSendThreshold = 16 * 1024;
     private const int ZeroCopyThreshold = 16 * 1024;
     private const int MaximumScatterBuffers = 64;
     private const ushort SendZeroCopyReportUsage = 1 << 3;
@@ -1160,6 +1161,12 @@ internal sealed unsafe class LinuxIoUringSocketSender : LinuxIoUringOperation, I
 
         if (buffers.Count == 1)
         {
+            if (!useZeroCopyOperation
+                && TrySendSynchronously(socket, buffers[0], buffersArePinned, out var synchronousResult))
+            {
+                return synchronousResult;
+            }
+
             return Submit(
                 socket,
                 buffers[0],
@@ -1232,12 +1239,65 @@ internal sealed unsafe class LinuxIoUringSocketSender : LinuxIoUringOperation, I
             && buffer.Count >= ZeroCopyThreshold
             ? LinuxIoUringEngine.SendZeroCopyOperation
             : LinuxIoUringEngine.SendOperation;
+        if (operation == LinuxIoUringEngine.SendOperation
+            && TrySendSynchronously(socket, buffer, bufferIsPinned, out var synchronousResult))
+        {
+            return synchronousResult;
+        }
+
         return Submit(
             socket,
             buffer,
             operation,
             bufferIsPinned,
             waitForNotification: operation == LinuxIoUringEngine.SendZeroCopyOperation);
+    }
+
+    private bool TrySendSynchronously(
+        Socket socket,
+        ArraySegment<byte> buffer,
+        bool bufferIsPinned,
+        out ValueTask result)
+    {
+        if (!bufferIsPinned || buffer.Count >= SynchronousSendThreshold)
+        {
+            result = default;
+            return false;
+        }
+
+        var address = Marshal.UnsafeAddrOfPinnedArrayElement(buffer.Array!, buffer.Offset);
+        nint sent;
+        do
+        {
+            sent = LinuxIoUringEngine.Native.Send(
+                checked((int)socket.Handle),
+                (void*)address,
+                checked((nuint)buffer.Count),
+                LinuxIoUringEngine.MessageDontWait | LinuxIoUringEngine.MessageNoSignal);
+        }
+        while (sent < 0 && Marshal.GetLastPInvokeError() == 4);
+
+        if (sent < 0)
+        {
+            var errorCode = Marshal.GetLastPInvokeError();
+            if (errorCode == 11)
+            {
+                result = default;
+                return false;
+            }
+
+            BytesTransferred = 0;
+            SocketError = LinuxIoUringEngine.MapSocketErrorCode(errorCode);
+            Error = new SocketException((int)SocketError);
+            result = ValueTask.FromException(Error);
+            return true;
+        }
+
+        BytesTransferred = checked((int)sent);
+        SocketError = SocketError.Success;
+        Error = null;
+        result = default;
+        return true;
     }
 
     public override void Dispose()
@@ -1659,6 +1719,8 @@ internal sealed unsafe partial class LinuxIoUringEngine
     internal const uint ReceiveMultishot = 1 << 1;
     internal const uint CompletionHasBuffer = 1;
     internal const uint CompletionBufferMore = 1 << 4;
+    internal const int MessageDontWait = 0x40;
+    internal const int MessageNoSignal = 0x4000;
 
     private const byte PollOperation = 6;
     private const uint PollIn = 1;
@@ -2529,6 +2591,9 @@ internal sealed unsafe partial class LinuxIoUringEngine
 
         [LibraryImport("libc", EntryPoint = "read", SetLastError = true)]
         internal static partial nint Read(int fileDescriptor, void* buffer, nuint count);
+
+        [LibraryImport("libc", EntryPoint = "send", SetLastError = true)]
+        internal static partial nint Send(int fileDescriptor, void* buffer, nuint count, int flags);
 
         [LibraryImport("libc", EntryPoint = "close")]
         internal static partial int Close(int fileDescriptor);
