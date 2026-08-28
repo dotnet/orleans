@@ -141,10 +141,11 @@ public sealed class MultiDimensionalArrayTests : IDisposable
     {
         var rankOne = Array.CreateInstance(typeof(MyValue), [1], [int.MaxValue]);
         rankOne.SetValue(new MyValue(65), int.MaxValue);
-        var rankTwoEmpty = Array.CreateInstance(typeof(MyValue), [1, 0], [int.MaxValue, int.MinValue]);
+        var rankTwo = Array.CreateInstance(typeof(MyValue), [1, 1], [int.MaxValue, int.MinValue]);
+        rankTwo.SetValue(new MyValue(66), int.MaxValue, int.MinValue);
 
         var rankOneResult = Copy(rankOne);
-        var rankTwoResult = Copy(rankTwoEmpty);
+        var rankTwoResult = Copy(rankTwo);
 
         Assert.Equal(int.MaxValue, rankOneResult.GetLowerBound(0));
         Assert.Equal(int.MaxValue, rankOneResult.GetUpperBound(0));
@@ -152,7 +153,8 @@ public sealed class MultiDimensionalArrayTests : IDisposable
         Assert.Equal(int.MaxValue, rankTwoResult.GetLowerBound(0));
         Assert.Equal(int.MaxValue, rankTwoResult.GetUpperBound(0));
         Assert.Equal(int.MinValue, rankTwoResult.GetLowerBound(1));
-        Assert.Empty(rankTwoResult);
+        Assert.Equal(int.MinValue, rankTwoResult.GetUpperBound(1));
+        Assert.Equal(66, Assert.IsType<MyValue>(rankTwoResult.GetValue(int.MaxValue, int.MinValue)).Value);
     }
 
     [Fact]

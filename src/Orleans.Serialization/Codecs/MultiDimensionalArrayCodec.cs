@@ -36,16 +36,12 @@ namespace Orleans.Serialization.Codecs
         /// <inheritdoc/>
         public void WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, [System.Diagnostics.CodeAnalysis.AllowNull] Type expectedType, [System.Diagnostics.CodeAnalysis.AllowNull] object? value) where TBufferWriter : IBufferWriter<byte>
         {
-            if (value is Array input)
-            {
-                EnsureZeroLowerBounds(input);
-            }
-
             if (ReferenceCodec.TryWriteReferenceField(ref writer, fieldIdDelta, expectedType, value!))
             {
                 return;
             }
 
+            EnsureZeroLowerBounds((Array)value);
             writer.WriteFieldHeader(fieldIdDelta, expectedType, value!.GetType(), WireType.TagDelimited);
 
             var array = (Array)value;
