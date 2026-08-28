@@ -32,10 +32,14 @@ public readonly struct TaskId : IEquatable<TaskId>, IParsable<TaskId>, ISpanPars
     /// <summary>Gets the parent identifier, or <see cref="None"/> for a root.</summary>
     public TaskId Parent() => _key?.Parent is { } parent ? new(parent) : None;
 
-    /// <summary>Returns whether this identifier is an ancestor of <paramref name="other"/>.</summary>
+    /// <summary>
+    /// Returns whether this identifier is an ancestor of or equal to <paramref name="other"/>.
+    /// </summary>
     public bool IsAncestorOf(TaskId other) => _key?.IsAncestorOf(other._key) is true;
 
-    /// <summary>Returns whether this identifier is a descendant of <paramref name="other"/>.</summary>
+    /// <summary>
+    /// Returns whether this identifier is a descendant of or equal to <paramref name="other"/>.
+    /// </summary>
     public bool IsDescendantOf(TaskId other) => other.IsAncestorOf(this);
 
     /// <summary>Returns whether this identifier is the parent of <paramref name="other"/>.</summary>
