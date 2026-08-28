@@ -32,6 +32,6 @@ See [Orleans contract compatibility analyzer](../grains/grain-versioning/contrac
 Prefer updating the reviewed manifest after accepting the contract removal. Suppress only for a manifest intentionally shared with another compilation.
 
 ```ini
-[*.cs]
+[*]
 dotnet_diagnostic.ORLEANS0027.severity = none
 ```
