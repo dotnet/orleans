@@ -155,7 +155,7 @@ public sealed class EventHubsAspireIntegrationTests
             .Single(endpoint => endpoint.Name == "emulator");
         emulatorEndpoint.AllocatedEndpoint = new AllocatedEndpoint(emulatorEndpoint, "localhost", 5672);
 
-        await using var app = await builder.BuildAsync();
+        await using var app = await builder.BuildAsync(TestContext.Current.CancellationToken);
         var configuration = await AspireResourceConfiguration.CreateAsync(
             silo.Resource,
             app.Services,
@@ -175,8 +175,8 @@ public sealed class EventHubsAspireIntegrationTests
 
         await using var connection = eventHubOptions.CreateConnection(new EventHubConnectionOptions());
         await using var producer = new EventHubProducerClient(connection);
-        Assert.NotEmpty(await producer.GetPartitionIdsAsync());
-        await checkpointerOptions.TableServiceClient!.GetPropertiesAsync();
+        Assert.NotEmpty(await producer.GetPartitionIdsAsync(TestContext.Current.CancellationToken));
+        await checkpointerOptions.TableServiceClient!.GetPropertiesAsync(TestContext.Current.CancellationToken);
     }
 
     private static bool IsRelevantEnvironmentVariable(string name)
