@@ -1377,22 +1377,19 @@ public class DurableTaskTests
             var registration = await registrationTask;
             await releaseTask;
             await callbackStarted.Task;
-            var joinedCancellation = !cancellation.IsCompleted;
 
             releaseCallback.SetResult();
-            if (joinedCancellation)
+            var cancellationException = await Record.ExceptionAsync(async () => await cancellation);
+            var disposalException = await Record.ExceptionAsync(async () => await registration.DisposeAsync());
+            if (cancellationException is AggregateException aggregateException)
             {
-                var exception = await Assert.ThrowsAsync<AggregateException>(async () => await cancellation);
-                Assert.Same(expected, Assert.Single(exception.InnerExceptions));
-                await registration.DisposeAsync();
+                Assert.Same(expected, Assert.Single(aggregateException.InnerExceptions));
+                Assert.Null(disposalException);
             }
             else
             {
-                Assert.True(cancellation.IsCompletedSuccessfully);
-                Assert.Same(
-                    expected,
-                    await Assert.ThrowsAsync<InvalidOperationException>(
-                        async () => await registration.DisposeAsync()));
+                Assert.Null(cancellationException);
+                Assert.Same(expected, Assert.IsType<InvalidOperationException>(disposalException));
             }
 
             Assert.Equal(1, calls);
