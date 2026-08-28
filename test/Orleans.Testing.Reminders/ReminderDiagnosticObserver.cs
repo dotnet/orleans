@@ -369,6 +369,12 @@ public sealed class ReminderDiagnosticObserver : IDisposable
                 cancellationRegistration.Dispose();
                 subscription.Dispose();
                 completion.TrySetException(error);
+            },
+            () =>
+            {
+                cancellationRegistration.Dispose();
+                subscription.Dispose();
+                completion.TrySetException(new InvalidOperationException("The diagnostic event stream completed before a matching event was observed."));
             });
         return completion.Task;
         return completion.Task;
