@@ -7,6 +7,32 @@ namespace Orleans.CodeGenerator;
 
 internal sealed class TypeSymbolResolver(Compilation compilation)
 {
+    private static readonly Dictionary<string, (string MetadataName, SpecialType SpecialType)> PrimitiveTypesByAlias =
+        new(StringComparer.Ordinal)
+        {
+            ["bool"] = ("System.Boolean", SpecialType.System_Boolean),
+            ["byte"] = ("System.Byte", SpecialType.System_Byte),
+            ["sbyte"] = ("System.SByte", SpecialType.System_SByte),
+            ["short"] = ("System.Int16", SpecialType.System_Int16),
+            ["ushort"] = ("System.UInt16", SpecialType.System_UInt16),
+            ["int"] = ("System.Int32", SpecialType.System_Int32),
+            ["uint"] = ("System.UInt32", SpecialType.System_UInt32),
+            ["long"] = ("System.Int64", SpecialType.System_Int64),
+            ["ulong"] = ("System.UInt64", SpecialType.System_UInt64),
+            ["float"] = ("System.Single", SpecialType.System_Single),
+            ["double"] = ("System.Double", SpecialType.System_Double),
+            ["decimal"] = ("System.Decimal", SpecialType.System_Decimal),
+            ["char"] = ("System.Char", SpecialType.System_Char),
+            ["string"] = ("System.String", SpecialType.System_String),
+            ["object"] = ("System.Object", SpecialType.System_Object),
+        };
+
+    private static readonly Dictionary<string, SpecialType> SpecialTypesByMetadataName =
+        PrimitiveTypesByAlias.Values.ToDictionary(
+            static value => value.MetadataName,
+            static value => value.SpecialType,
+            StringComparer.Ordinal);
+
     private readonly Compilation _compilation = compilation;
     private FallbackIndex? _fallbackIndex;
 
@@ -22,8 +48,21 @@ internal sealed class TypeSymbolResolver(Compilation compilation)
         }
 
         cancellationToken.ThrowIfCancellationRequested();
-        if (TryResolveMetadataIdentity(model.MetadataIdentity, cancellationToken, out symbol)
-            || TryResolveTypeSyntax(model.TypeSyntax.SyntaxString, cancellationToken, out symbol))
+        if (TryResolveMetadataIdentity(
+            model.MetadataIdentity,
+            cancellationToken,
+            out symbol,
+            out var assemblyNameIsAmbiguous))
+        {
+            return true;
+        }
+
+        if (assemblyNameIsAmbiguous)
+        {
+            return false;
+        }
+
+        if (TryResolveTypeSyntax(model.TypeSyntax.SyntaxString, cancellationToken, out symbol))
         {
             return true;
         }
@@ -56,10 +95,35 @@ internal sealed class TypeSymbolResolver(Compilation compilation)
         }
 
         cancellationToken.ThrowIfCancellationRequested();
-        if (TryResolveMetadataIdentity(model.MetadataIdentity, cancellationToken, out symbol)
-            || TryResolveTypeSyntax(model.InterfaceType.SyntaxString, cancellationToken, out symbol))
+        if (TryResolveMetadataIdentity(
+            model.MetadataIdentity,
+            cancellationToken,
+            out symbol,
+            out var assemblyNameIsAmbiguous))
         {
-            return symbol.TypeKind == TypeKind.Interface;
+            if (symbol.TypeKind == TypeKind.Interface)
+            {
+                return true;
+            }
+
+            symbol = null;
+            return false;
+        }
+
+        if (assemblyNameIsAmbiguous)
+        {
+            return false;
+        }
+
+        if (TryResolveTypeSyntax(model.InterfaceType.SyntaxString, cancellationToken, out symbol))
+        {
+            if (symbol.TypeKind == TypeKind.Interface)
+            {
+                return true;
+            }
+
+            symbol = null;
+            return false;
         }
 
         foreach (var candidate in GetFallbackIndex(cancellationToken).AllTypes)
@@ -80,26 +144,31 @@ internal sealed class TypeSymbolResolver(Compilation compilation)
 
     public bool TryResolveType(
         TypeRef type,
-        CancellationToken cancellationToken,
-        [NotNullWhen(true)] out INamedTypeSymbol? symbol)
-        => TryResolveType(type, TypeMetadataIdentity.Empty, cancellationToken, out symbol);
-
-    public bool TryResolveType(
-        TypeRef type,
         TypeMetadataIdentity metadataIdentity,
         CancellationToken cancellationToken,
         [NotNullWhen(true)] out INamedTypeSymbol? symbol)
     {
         cancellationToken.ThrowIfCancellationRequested();
-        return TryResolveMetadataIdentity(metadataIdentity, cancellationToken, out symbol)
-            || TryResolveTypeSyntax(type.SyntaxString, cancellationToken, out symbol);
+        if (TryResolveMetadataIdentity(
+            metadataIdentity,
+            cancellationToken,
+            out symbol,
+            out var assemblyNameIsAmbiguous))
+        {
+            return true;
+        }
+
+        return !assemblyNameIsAmbiguous
+            && TryResolveTypeSyntax(type.SyntaxString, cancellationToken, out symbol);
     }
 
     private bool TryResolveMetadataIdentity(
         TypeMetadataIdentity metadataIdentity,
         CancellationToken cancellationToken,
-        [NotNullWhen(true)] out INamedTypeSymbol? symbol)
+        [NotNullWhen(true)] out INamedTypeSymbol? symbol,
+        out bool assemblyNameIsAmbiguous)
     {
+        assemblyNameIsAmbiguous = false;
         if (metadataIdentity.IsEmpty)
         {
             symbol = null;
@@ -109,7 +178,11 @@ internal sealed class TypeSymbolResolver(Compilation compilation)
         if (!string.IsNullOrEmpty(metadataIdentity.AssemblyIdentity)
             || !string.IsNullOrEmpty(metadataIdentity.AssemblyName))
         {
-            if (TryGetAssembly(metadataIdentity, cancellationToken, out var assembly))
+            if (TryGetAssembly(
+                metadataIdentity,
+                cancellationToken,
+                out var assembly,
+                out assemblyNameIsAmbiguous))
             {
                 symbol = assembly.GetTypeByMetadataName(metadataIdentity.MetadataName);
                 return symbol is not null;
@@ -125,15 +198,46 @@ internal sealed class TypeSymbolResolver(Compilation compilation)
     private bool TryGetAssembly(
         TypeMetadataIdentity metadataIdentity,
         CancellationToken cancellationToken,
-        [NotNullWhen(true)] out IAssemblySymbol? assembly)
+        [NotNullWhen(true)] out IAssemblySymbol? assembly,
+        out bool assemblyNameIsAmbiguous)
     {
-        if (IsMatchingAssembly(_compilation.Assembly, metadataIdentity))
+        assemblyNameIsAmbiguous = false;
+        if (!string.IsNullOrEmpty(metadataIdentity.AssemblyIdentity))
         {
-            assembly = _compilation.Assembly;
-            return true;
+            if (string.Equals(
+                _compilation.Assembly.Identity.GetDisplayName(),
+                metadataIdentity.AssemblyIdentity,
+                StringComparison.Ordinal))
+            {
+                assembly = _compilation.Assembly;
+                return true;
+            }
+
+            foreach (var reference in _compilation.References)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                if (_compilation.GetAssemblyOrModuleSymbol(reference) is IAssemblySymbol candidate
+                    && string.Equals(
+                        candidate.Identity.GetDisplayName(),
+                        metadataIdentity.AssemblyIdentity,
+                        StringComparison.Ordinal))
+                {
+                    assembly = candidate;
+                    return true;
+                }
+            }
+
+            assembly = null;
+            return false;
         }
 
         IAssemblySymbol? assemblyByName = null;
+        if (!string.IsNullOrEmpty(metadataIdentity.AssemblyName)
+            && string.Equals(_compilation.Assembly.Identity.Name, metadataIdentity.AssemblyName, StringComparison.Ordinal))
+        {
+            assemblyByName = _compilation.Assembly;
+        }
+
         foreach (var reference in _compilation.References)
         {
             cancellationToken.ThrowIfCancellationRequested();
@@ -142,19 +246,13 @@ internal sealed class TypeSymbolResolver(Compilation compilation)
                 continue;
             }
 
-            if (IsMatchingAssembly(candidate, metadataIdentity))
-            {
-                assembly = candidate;
-                return true;
-            }
-
-            if (string.IsNullOrEmpty(metadataIdentity.AssemblyIdentity)
-                && !string.IsNullOrEmpty(metadataIdentity.AssemblyName)
+            if (!string.IsNullOrEmpty(metadataIdentity.AssemblyName)
                 && string.Equals(candidate.Identity.Name, metadataIdentity.AssemblyName, StringComparison.Ordinal))
             {
                 if (assemblyByName is not null)
                 {
                     assembly = null;
+                    assemblyNameIsAmbiguous = true;
                     return false;
                 }
 
@@ -170,17 +268,6 @@ internal sealed class TypeSymbolResolver(Compilation compilation)
 
         assembly = null;
         return false;
-    }
-
-    private static bool IsMatchingAssembly(IAssemblySymbol assembly, TypeMetadataIdentity metadataIdentity)
-    {
-        if (!string.IsNullOrEmpty(metadataIdentity.AssemblyIdentity))
-        {
-            return string.Equals(assembly.Identity.GetDisplayName(), metadataIdentity.AssemblyIdentity, StringComparison.Ordinal);
-        }
-
-        return !string.IsNullOrEmpty(metadataIdentity.AssemblyName)
-            && string.Equals(assembly.Identity.Name, metadataIdentity.AssemblyName, StringComparison.Ordinal);
     }
 
     private bool TryResolveTypeSyntax(
@@ -247,53 +334,16 @@ internal sealed class TypeSymbolResolver(Compilation compilation)
             metadataName = metadataName.Substring("global::".Length);
         }
 
-        metadataName = metadataName switch
+        if (PrimitiveTypesByAlias.TryGetValue(metadataName, out var primitiveType))
         {
-            "bool" => "System.Boolean",
-            "byte" => "System.Byte",
-            "sbyte" => "System.SByte",
-            "short" => "System.Int16",
-            "ushort" => "System.UInt16",
-            "int" => "System.Int32",
-            "uint" => "System.UInt32",
-            "long" => "System.Int64",
-            "ulong" => "System.UInt64",
-            "float" => "System.Single",
-            "double" => "System.Double",
-            "decimal" => "System.Decimal",
-            "char" => "System.Char",
-            "string" => "System.String",
-            "object" => "System.Object",
-            _ => metadataName,
-        };
+            metadataName = primitiveType.MetadataName;
+        }
 
         return !string.IsNullOrWhiteSpace(metadataName);
     }
 
     private static bool TryGetSpecialType(string metadataName, out SpecialType specialType)
-    {
-        specialType = metadataName switch
-        {
-            "System.Boolean" => SpecialType.System_Boolean,
-            "System.Byte" => SpecialType.System_Byte,
-            "System.SByte" => SpecialType.System_SByte,
-            "System.Int16" => SpecialType.System_Int16,
-            "System.UInt16" => SpecialType.System_UInt16,
-            "System.Int32" => SpecialType.System_Int32,
-            "System.UInt32" => SpecialType.System_UInt32,
-            "System.Int64" => SpecialType.System_Int64,
-            "System.UInt64" => SpecialType.System_UInt64,
-            "System.Single" => SpecialType.System_Single,
-            "System.Double" => SpecialType.System_Double,
-            "System.Decimal" => SpecialType.System_Decimal,
-            "System.Char" => SpecialType.System_Char,
-            "System.String" => SpecialType.System_String,
-            "System.Object" => SpecialType.System_Object,
-            _ => SpecialType.None,
-        };
-
-        return specialType != SpecialType.None;
-    }
+        => SpecialTypesByMetadataName.TryGetValue(metadataName, out specialType);
 
     private FallbackIndex GetFallbackIndex(CancellationToken cancellationToken)
     {

@@ -6,3 +6,6 @@ using Xunit;
 /// which is safe for analyzer tests as they don't share state or external resources.
 /// </summary>
 [assembly: CollectionBehavior(MaxParallelThreads = -1)]
+[assembly: TestArea("Analyzer")]
+[assembly: TestProvider("None")]
+[assembly: TestSuite("BVT")]
