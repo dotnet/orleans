@@ -39,10 +39,24 @@ internal sealed class DurableTaskMessageTransport(
             messageId: CreateStableMessageId(sender, target, taskId, CompletionRoute));
 
     public void SendCompletionAck(GrainId sender, GrainId target, TaskId taskId) =>
-        Send(sender, target, taskId, CompletionAckRoute, new DurableTaskCompletionAckMessage { TaskId = taskId }, replyTo: null);
+        Send(
+            sender,
+            target,
+            taskId,
+            CompletionAckRoute,
+            new DurableTaskCompletionAckMessage { TaskId = taskId },
+            replyTo: null,
+            messageId: CreateStableMessageId(sender, target, taskId, CompletionAckRoute));
 
     public void SendCancellation(GrainId sender, GrainId target, TaskId taskId) =>
-        Send(sender, target, taskId, CancellationRoute, new DurableTaskCancellationMessage { TaskId = taskId }, replyTo: null);
+        Send(
+            sender,
+            target,
+            taskId,
+            CancellationRoute,
+            new DurableTaskCancellationMessage { TaskId = taskId },
+            replyTo: null,
+            messageId: CreateStableMessageId(sender, target, taskId, CancellationRoute));
 
     public async ValueTask ScheduleResumeAsync(
         GrainId target,
