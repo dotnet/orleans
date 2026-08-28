@@ -75,6 +75,11 @@ namespace Orleans.Transactions.TestKit.Consistency
 
             var id = result[0].ExecutingTx;
 
+            foreach (var tuple in result)
+            {
+                tuple.ExecutingTx.Should().BeEquivalentTo(id);
+            }
+
             lock (succeeded)
             {
                 succeeded.Add(id);
@@ -82,7 +87,6 @@ namespace Orleans.Transactions.TestKit.Consistency
 
             foreach (var tuple in result)
             {
-                tuple.ExecutingTx.Should().BeEquivalentTo(id);
                 RecordObservation(tuple);
             }
         }
@@ -178,6 +182,9 @@ namespace Orleans.Transactions.TestKit.Consistency
 
         public void CheckConsistency(bool tolerateGenericTimeouts = false, bool tolerateUnknownExceptions = false)
         {
+            orderEdges.Clear();
+            marks.Clear();
+
             foreach (var grainKvp in tuples)
             {
                 CheckGrainConsistency(grainKvp.Key, grainKvp.Value);

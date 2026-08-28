@@ -30,6 +30,33 @@ public class ConsistencyTestHarnessTests
     }
 
     [Fact]
+    public void RecordSucceeded_WithMixedTransactionIds_DoesNotMutateHistory()
+    {
+        var harness = CreateHarness();
+
+        Assert.ThrowsAny<Exception>(() => harness.RecordSucceeded(
+            Observe(0, 1, "tx1", "tx1"),
+            Observe(0, 2, "tx1", "tx2")));
+
+        harness.CheckConsistency();
+    }
+
+    [Fact]
+    public void CheckConsistency_AfterRecordingMoreHistory_RebuildsDependencyGraph()
+    {
+        var harness = CreateHarness();
+        harness.RecordSucceeded(Observe(0, 0, ConsistencyTestHarness.InitialTx, "tx1"));
+        harness.RecordSucceeded(Observe(0, 1, "tx2", "tx2"));
+
+        harness.CheckConsistency();
+
+        harness.RecordSucceeded(Observe(1, 0, ConsistencyTestHarness.InitialTx, "tx2"));
+        harness.RecordSucceeded(Observe(1, 1, "tx1", "tx1"));
+
+        AssertInconsistent(harness, "found serializability violation");
+    }
+
+    [Fact]
     public void MissingVersion_IsRejected()
     {
         var harness = CreateHarness();
