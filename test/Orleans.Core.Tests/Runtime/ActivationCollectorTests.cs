@@ -1175,6 +1175,43 @@ namespace UnitTests.Runtime
             observer.DidNotReceive().OnActive(member);
         }
 
+        [Fact, TestCategory("Activation")]
+        public void WorkingSet_PublicMemberUsesDictionaryBackedClockState()
+        {
+            var timer = Substitute.For<IAsyncTimer>();
+            var timerFactory = Substitute.For<IAsyncTimerFactory>();
+            timerFactory.Create(Arg.Any<TimeSpan>(), Arg.Any<string>(), Arg.Any<TimeProvider>()).Returns(timer);
+            var observer = Substitute.For<IActivationWorkingSetObserver>();
+            var workingSet = new ActivationWorkingSet(
+                timerFactory,
+                NullLogger<ActivationWorkingSet>.Instance,
+                [observer],
+                CreateCatalogInstruments(),
+                TimeProvider.System);
+            var member = new PublicWorkingSetMember();
+            var visitMember = typeof(ActivationWorkingSet).GetMethod(
+                "VisitMember",
+                BindingFlags.Instance | BindingFlags.NonPublic,
+                [typeof(IActivationWorkingSetMember)])
+                ?? throw new InvalidOperationException("Could not find the working-set scan method.");
+
+            workingSet.OnActivated(member);
+            visitMember.Invoke(workingSet, [member]);
+            visitMember.Invoke(workingSet, [member]);
+
+            Assert.Equal([false, true], member.CandidateCalls);
+            Assert.Equal(0, workingSet.Count);
+            Assert.Empty(workingSet.Members);
+            observer.Received(1).OnIdle(member);
+            observer.Received(1).OnEvicted(member);
+
+            workingSet.OnActive(member);
+
+            Assert.Equal(1, workingSet.Count);
+            Assert.Equal([member], workingSet.Members);
+            observer.Received(1).OnActive(member);
+        }
+
         private IActivationWorkingSetMember PrepareActivation(int collectionAgeLimitMinutes, ActivationCollector collector)
             => PrepareActivation(TimeSpan.FromMinutes(collectionAgeLimitMinutes), collector);
 
@@ -1217,7 +1254,7 @@ namespace UnitTests.Runtime
             return (IActivationWorkingSetMember)activation;
         }
 
-        private sealed class TestWorkingSetMember(Func<bool, bool>? isCandidateForRemoval = null) : IActivationWorkingSetMember
+        private sealed class TestWorkingSetMember(Func<bool, bool>? isCandidateForRemoval = null) : IActivationWorkingSetMemberStatus
         {
             private bool _isIdle;
             private bool _isInWorkingSet;
@@ -1248,6 +1285,18 @@ namespace UnitTests.Runtime
                 return isCandidateForRemoval?.Invoke(wouldRemove) ?? false;
             }
 
+        }
+
+        private sealed class PublicWorkingSetMember : IActivationWorkingSetMember
+        {
+            public List<bool> CandidateCalls { get; } = [];
+
+            public bool IsCandidateForRemoval(bool wouldRemove)
+            {
+                Assert.True(Monitor.IsEntered(this));
+                CandidateCalls.Add(wouldRemove);
+                return true;
+            }
         }
 
         [Fact, TestCategory("Activation")]
@@ -1315,6 +1364,70 @@ namespace UnitTests.Runtime
             Assert.Equal(0, harness.Observer.Count("Evicted"));
             Assert.Equal(0, harness.Observer.Count("Deactivating"));
             Assert.Equal(0, harness.Observer.Count("Deactivated"));
+        }
+
+        [Fact, TestCategory("Activation")]
+        public async Task WorkingSet_BoundedConcurrentTransitionsPreserveMembershipCount()
+        {
+            const int workerCount = 8;
+            const int operationsPerWorker = 10_000;
+            await using var harness = await WorkingSetHarness.CreateAsync();
+            var visitMember = typeof(ActivationWorkingSet).GetMethod(
+                "VisitMember",
+                BindingFlags.Instance | BindingFlags.NonPublic,
+                [typeof(IActivationWorkingSetMember)])
+                ?? throw new InvalidOperationException("Could not find the working-set scan method.");
+            foreach (var member in harness.Members)
+            {
+                harness.WorkingSet.OnActivated(member);
+            }
+
+            var workers = Enumerable.Range(0, workerCount).Select(worker => Task.Run(() =>
+            {
+                var random = new Random(42 + worker);
+                for (var i = 0; i < operationsPerWorker; i++)
+                {
+                    var memberId = random.Next(harness.Members.Count);
+                    var member = harness.Members[memberId];
+                    switch (random.Next(4))
+                    {
+                        case 0:
+                            harness.WorkingSet.OnActive(member);
+                            break;
+                        case 1:
+                            harness.WorkingSet.OnEvicted(member);
+                            break;
+                        case 2:
+                            harness.MemberStates[memberId].CandidateEligible = random.Next(2) == 0;
+                            visitMember.Invoke(harness.WorkingSet, [member]);
+                            break;
+                        default:
+                            harness.WorkingSet.OnActive(member);
+                            visitMember.Invoke(harness.WorkingSet, [member]);
+                            break;
+                    }
+                }
+            })).ToArray();
+
+            await Task.WhenAll(workers);
+
+            foreach (var memberState in harness.MemberStates)
+            {
+                memberState.CandidateEligible = false;
+            }
+
+            foreach (var member in harness.Members)
+            {
+                harness.WorkingSet.OnActive(member);
+            }
+
+            Assert.Equal(harness.Members.Count, harness.WorkingSet.Count);
+            Assert.True(harness.Members.Cast<IActivationWorkingSetMember>().ToHashSet().SetEquals(harness.WorkingSet.Members));
+            Assert.All(harness.Members, member =>
+            {
+                Assert.True(member.IsInWorkingSet);
+                Assert.False(member.IsIdle);
+            });
         }
 
         [Fact, TestCategory("Activation")]
@@ -2195,7 +2308,7 @@ namespace UnitTests.Runtime
             }
 
             public ActivationData Activation { get; }
-            public IActivationWorkingSetMember Member { get; }
+            public IActivationWorkingSetMemberStatus Member { get; }
             public FakeTimeProvider TimeProvider { get; }
             public ActivationWorkingSet WorkingSet { get; }
             public RecordingWorkingSetObserver Observer { get; }
