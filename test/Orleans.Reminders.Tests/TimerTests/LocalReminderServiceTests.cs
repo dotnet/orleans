@@ -244,7 +244,10 @@ public class LocalReminderServiceCompatibilityTests : IClassFixture<LocalReminde
         using var cancellation = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
         cancellation.CancelAfter(TestConstants.InitTimeout);
 
-        var started = await fixture.ReminderHarness.WaitForServicesReadyAsync([silo], cancellation.Token);
+        var started = await fixture.ReminderHarness.WaitForServicesReadyAsync(
+            [silo],
+            TestConstants.InitTimeout,
+            cancellation.Token);
 
         Assert.Equal([silo.SiloAddress], started);
         var reminderTable = silo.ServiceProvider.GetRequiredService<NullReturningReminderTable>();
@@ -259,7 +262,10 @@ public class LocalReminderServiceCompatibilityTests : IClassFixture<LocalReminde
         var silo = Assert.Single(fixture.HostedCluster.Silos);
         using var cancellation = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
         cancellation.CancelAfter(TestConstants.InitTimeout);
-        _ = await fixture.ReminderHarness.WaitForServicesReadyAsync([silo], cancellation.Token);
+        _ = await fixture.ReminderHarness.WaitForServicesReadyAsync(
+            [silo],
+            TestConstants.InitTimeout,
+            cancellation.Token);
 
         var reminderTable = silo.ServiceProvider.GetRequiredService<NullReturningReminderTable>();
         var reminderService = silo.ServiceProvider.GetRequiredService<LocalReminderService>();
@@ -303,7 +309,10 @@ public class LocalReminderServiceCompatibilityTests : IClassFixture<LocalReminde
         var silo = Assert.Single(fixture.HostedCluster.Silos);
         using var cancellation = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
         cancellation.CancelAfter(TestConstants.InitTimeout);
-        _ = await fixture.ReminderHarness.WaitForServicesReadyAsync([silo], cancellation.Token);
+        _ = await fixture.ReminderHarness.WaitForServicesReadyAsync(
+            [silo],
+            TestConstants.InitTimeout,
+            cancellation.Token);
 
         var reminderTable = silo.ServiceProvider.GetRequiredService<NullReturningReminderTable>();
         var reminderService = silo.ServiceProvider.GetRequiredService<LocalReminderService>();
@@ -344,7 +353,10 @@ public class LocalReminderServiceCompatibilityTests : IClassFixture<LocalReminde
         var silo = Assert.Single(fixture.HostedCluster.Silos);
         using var cancellation = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
         cancellation.CancelAfter(TestConstants.InitTimeout);
-        _ = await fixture.ReminderHarness.WaitForServicesReadyAsync([silo], cancellation.Token);
+        _ = await fixture.ReminderHarness.WaitForServicesReadyAsync(
+            [silo],
+            TestConstants.InitTimeout,
+            cancellation.Token);
 
         var reminderTable = silo.ServiceProvider.GetRequiredService<NullReturningReminderTable>();
         var reminderService = silo.ServiceProvider.GetRequiredService<LocalReminderService>();
@@ -387,7 +399,10 @@ public class LocalReminderServiceCompatibilityTests : IClassFixture<LocalReminde
         var silo = Assert.Single(fixture.HostedCluster.Silos);
         using var cancellation = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
         cancellation.CancelAfter(TestConstants.InitTimeout);
-        _ = await fixture.ReminderHarness.WaitForServicesReadyAsync([silo], cancellation.Token);
+        _ = await fixture.ReminderHarness.WaitForServicesReadyAsync(
+            [silo],
+            TestConstants.InitTimeout,
+            cancellation.Token);
 
         var reminderTable = silo.ServiceProvider.GetRequiredService<NullReturningReminderTable>();
         var reminderService = silo.ServiceProvider.GetRequiredService<LocalReminderService>();
@@ -423,7 +438,10 @@ public class LocalReminderServiceCompatibilityTests : IClassFixture<LocalReminde
         var silo = Assert.Single(fixture.HostedCluster.Silos);
         using var cancellation = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
         cancellation.CancelAfter(TestConstants.InitTimeout);
-        _ = await fixture.ReminderHarness.WaitForServicesReadyAsync([silo], cancellation.Token);
+        _ = await fixture.ReminderHarness.WaitForServicesReadyAsync(
+            [silo],
+            TestConstants.InitTimeout,
+            cancellation.Token);
 
         var reminderService = silo.ServiceProvider.GetRequiredService<LocalReminderService>();
         await reminderService.TestOnlyWaitForRangeChangeReconciliation(cancellation.Token);

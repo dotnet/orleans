@@ -35,40 +35,57 @@ public sealed class ReminderLifecycleHarness : IDisposable
 
     public async Task<IReadOnlyList<SiloAddress>> WaitForServicesReadyAsync(
         IEnumerable<InProcessSiloHandle> silos,
+        TimeSpan timeout,
         CancellationToken cancellationToken)
     {
         var siloArray = silos.ToArray();
-        var startedTasks = siloArray
-            .Select(silo => _diagnostics.WaitForReminderServiceStartedAsync(cancellationToken, silo.SiloAddress))
-            .ToArray();
-        try
-        {
-            return (await Task.WhenAll(startedTasks)).Select(started => started.SiloAddress!).ToArray();
-        }
-        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
-        {
-            var missing = siloArray
-                .Where((_, index) => !startedTasks[index].IsCompletedSuccessfully)
-                .Select(silo => silo.SiloAddress);
-            throw new TimeoutException(
-                $"Reminder services did not become ready. Missing silos: {string.Join(", ", missing)}.");
-        }
+        Task<Orleans.Reminders.Diagnostics.ReminderEvents.ReminderServiceStarted>[]? startedTasks = null;
+        using var timeoutCancellation = new CancellationTokenSource(timeout);
+        return await WaitForPhaseAsync(
+            async phaseCancellation =>
+            {
+                startedTasks = siloArray
+                    .Select(silo => _diagnostics.WaitForReminderServiceStartedAsync(phaseCancellation, silo.SiloAddress))
+                    .ToArray();
+                return (await Task.WhenAll(startedTasks)).Select(started => started.SiloAddress!).ToArray();
+            },
+            timeoutCancellation.Token,
+            cancellationToken,
+            () =>
+            {
+                var missing = siloArray
+                    .Where((_, index) => startedTasks is null || !startedTasks[index].IsCompletedSuccessfully)
+                    .Select(silo => silo.SiloAddress);
+                return new TimeoutException(
+                    $"Reminder services did not become ready within {timeout}. Missing silos: {string.Join(", ", missing)}.");
+            });
     }
 
     public async Task WaitForTopologyReconciledAsync(
         Task topologyConverged,
         IEnumerable<InProcessSiloHandle> addedSilos,
+        TimeSpan timeout,
         CancellationToken cancellationToken)
     {
-        var serviceReady = WaitForServicesReadyAsync(addedSilos, cancellationToken);
-        await Task.WhenAll(topologyConverged.WaitAsync(cancellationToken), serviceReady);
+        var addedSiloArray = addedSilos.ToArray();
+        using var timeoutCancellation = new CancellationTokenSource(timeout);
+        await WaitForPhaseAsync(
+            async phaseCancellation =>
+            {
+                var serviceReady = WaitForServicesReadyCoreAsync(addedSiloArray, phaseCancellation);
+                await Task.WhenAll(topologyConverged.WaitAsync(phaseCancellation), serviceReady);
 
-        foreach (var silo in GetCluster().GetActiveSilos())
-        {
-            await silo.ServiceProvider
-                .GetRequiredService<LocalReminderService>()
-                .TestOnlyWaitForRangeChangeReconciliation(cancellationToken);
-        }
+                foreach (var silo in GetCluster().GetActiveSilos())
+                {
+                    await silo.ServiceProvider
+                        .GetRequiredService<LocalReminderService>()
+                        .TestOnlyWaitForRangeChangeReconciliation(phaseCancellation);
+                }
+            },
+            timeoutCancellation.Token,
+            cancellationToken,
+            () => new TimeoutException(
+                $"Reminder topology did not reconcile within {timeout}. Added silos: {string.Join(", ", addedSiloArray.Select(static silo => silo.SiloAddress))}."));
     }
 
     public async Task RefreshActiveServicesAsync(CancellationToken cancellationToken)
@@ -128,7 +145,9 @@ public sealed class ReminderLifecycleHarness : IDisposable
         => Task.WhenAll(phase.Entries.Select(entry => entry.Completion));
 
     public Task WaitForGlobalQuiescenceAsync(CancellationToken cancellationToken)
-        => _diagnostics.WaitForGlobalQuiescenceAsync(cancellationToken);
+        => _diagnostics.WaitForGlobalQuiescenceAsync(
+            GetCluster().GetActiveSilos().Select(static silo => silo.SiloAddress).ToHashSet(),
+            cancellationToken);
 
     public Task WaitForReminderQuiescenceAsync(
         IAddressable grain,
@@ -234,15 +253,16 @@ public sealed class ReminderLifecycleHarness : IDisposable
         Func<T, Task> stopResource,
         Func<Task> waitForTopology,
         ILogger logger,
-        CancellationToken startupWaitCancellationToken,
+        CancellationTokenSource startupCancellation,
         CancellationToken cleanupCancellationToken)
         where T : notnull
     {
+        await startupCancellation.CancelAsync();
         try
         {
-            await startupTask.WaitAsync(startupWaitCancellationToken);
+            await startupTask.WaitAsync(cleanupCancellationToken);
         }
-        catch (Exception exception)
+        catch (Exception exception) when (!cleanupCancellationToken.IsCancellationRequested)
         {
             logger.LogInformation(exception, "Additional resource startup did not complete successfully before cleanup.");
         }
@@ -260,6 +280,53 @@ public sealed class ReminderLifecycleHarness : IDisposable
     }
 
     public void Dispose() => _diagnostics.Dispose();
+
+    internal static async Task WaitForPhaseAsync(
+        Func<CancellationToken, Task> phase,
+        CancellationToken timeoutCancellationToken,
+        CancellationToken cancellationToken,
+        Func<TimeoutException> createTimeoutException)
+    {
+        await WaitForPhaseAsync(
+            async phaseCancellation =>
+            {
+                await phase(phaseCancellation);
+                return true;
+            },
+            timeoutCancellationToken,
+            cancellationToken,
+            createTimeoutException);
+    }
+
+    private async Task<IReadOnlyList<SiloAddress>> WaitForServicesReadyCoreAsync(
+        IEnumerable<InProcessSiloHandle> silos,
+        CancellationToken cancellationToken)
+    {
+        var startedTasks = silos
+            .Select(silo => _diagnostics.WaitForReminderServiceStartedAsync(cancellationToken, silo.SiloAddress));
+        return (await Task.WhenAll(startedTasks)).Select(started => started.SiloAddress!).ToArray();
+    }
+
+    private static async Task<T> WaitForPhaseAsync<T>(
+        Func<CancellationToken, Task<T>> phase,
+        CancellationToken timeoutCancellationToken,
+        CancellationToken cancellationToken,
+        Func<TimeoutException> createTimeoutException)
+    {
+        using var phaseCancellation = CancellationTokenSource.CreateLinkedTokenSource(
+            timeoutCancellationToken,
+            cancellationToken);
+        try
+        {
+            return await phase(phaseCancellation.Token);
+        }
+        catch (OperationCanceledException) when (
+            timeoutCancellationToken.IsCancellationRequested
+            && !cancellationToken.IsCancellationRequested)
+        {
+            throw createTimeoutException();
+        }
+    }
 
     private InProcessTestCluster GetCluster()
         => _cluster ?? throw new InvalidOperationException("This reminder harness is not attached to a test cluster.");

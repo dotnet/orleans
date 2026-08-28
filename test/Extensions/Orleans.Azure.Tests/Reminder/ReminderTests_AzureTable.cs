@@ -67,21 +67,10 @@ namespace Tester.AzureUtils.TimerTests
 
                 var silos = HostedCluster.Silos.ToArray();
                 _initialSilos = silos.Select(silo => silo.SiloAddress).ToArray();
-                using var cancellation = CancellationTokenSource.CreateLinkedTokenSource(
+                _startedReminderServices = await _startupHarness.WaitForServicesReadyAsync(
+                    silos,
+                    ReminderServiceStartupTimeout,
                     TestContext.Current.CancellationToken);
-                cancellation.CancelAfter(ReminderServiceStartupTimeout);
-                try
-                {
-                    _startedReminderServices = await _startupHarness.WaitForServicesReadyAsync(
-                        silos,
-                        cancellation.Token);
-                }
-                catch (TimeoutException exception)
-                {
-                    throw new TimeoutException(
-                        $"Azure reminder services did not start within {ReminderServiceStartupTimeout}. {exception.Message}",
-                        exception);
-                }
             }
 
             public override async ValueTask DisposeAsync()

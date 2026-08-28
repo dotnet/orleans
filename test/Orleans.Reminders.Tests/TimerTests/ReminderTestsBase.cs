@@ -41,7 +41,7 @@ public class ReminderTestsBase : OrleansTestingBase, IAsyncDisposable
     protected const long failAfter = 2;
     protected const long failCheckAfter = 6;
     protected ILogger log;
-    protected ReminderLifecycleHarness observer { get; }
+    protected readonly ReminderLifecycleHarness observer;
     private ReminderTestClock ReminderClock { get; }
 
     public ReminderTestsBase(ReminderTestClock reminderClock, InProcessTestCluster hostedCluster)
@@ -105,9 +105,11 @@ public class ReminderTestsBase : OrleansTestingBase, IAsyncDisposable
     {
         using var cleanupCancellation = new CancellationTokenSource(timeout);
         List<Exception>? exceptions = null;
-        await RunPhase(clearReminderTable);
-        await RunPhase(refreshReminderServices);
-        await RunPhase(waitForGlobalQuiescence);
+        if (await RunPhase(clearReminderTable)
+            && await RunPhase(refreshReminderServices))
+        {
+            await RunPhase(waitForGlobalQuiescence);
+        }
 
         if (exceptions is [var exception])
         {
@@ -119,7 +121,7 @@ public class ReminderTestsBase : OrleansTestingBase, IAsyncDisposable
             throw new AggregateException("Reminder test cleanup failed.", exceptions);
         }
 
-        async Task RunPhase(Func<CancellationToken, Task> phase)
+        async Task<bool> RunPhase(Func<CancellationToken, Task> phase)
         {
             try
             {
@@ -129,6 +131,8 @@ public class ReminderTestsBase : OrleansTestingBase, IAsyncDisposable
             {
                 (exceptions ??= []).Add(exception);
             }
+
+            return !cleanupCancellation.IsCancellationRequested;
         }
     }
 
@@ -226,6 +230,7 @@ public class ReminderTestsBase : OrleansTestingBase, IAsyncDisposable
         var initialSilos = HostedCluster.GetActiveSilos().ToHashSet();
         using var cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         cts.CancelAfter(CHURN_ENDWAIT);
+        using var startupCancellation = CancellationTokenSource.CreateLinkedTokenSource(cts.Token);
         Task<List<InProcessSiloHandle>>? startSilosTask = null;
         try
         {
@@ -235,7 +240,10 @@ public class ReminderTestsBase : OrleansTestingBase, IAsyncDisposable
                     await using (await PauseReminderTimeAsync(cancellationToken))
                     {
                         log.LogInformation("Starting another silo");
-                        startSilosTask = StartAdditionalSilosAsync(1, startAdditionalSiloOnNewPort: true);
+                        startSilosTask = StartAdditionalSilosAsync(
+                            1,
+                            startupCancellation.Token,
+                            startAdditionalSiloOnNewPort: true);
                         var additionalSilos = await WaitForAdditionalSilosAndReminderServicesAsync(startSilosTask, cancellationToken);
                         _ = Assert.Single(additionalSilos);
                     }
@@ -249,7 +257,7 @@ public class ReminderTestsBase : OrleansTestingBase, IAsyncDisposable
         }
         finally
         {
-            await CleanupAdditionalSilosAsync(initialSilos, startSilosTask);
+            await CleanupAdditionalSilosAsync(initialSilos, startSilosTask, startupCancellation);
         }
     }
 
@@ -266,6 +274,7 @@ public class ReminderTestsBase : OrleansTestingBase, IAsyncDisposable
         var initialSilos = HostedCluster.GetActiveSilos().ToHashSet();
         using var cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         cts.CancelAfter(CHURN_ENDWAIT);
+        using var startupCancellation = CancellationTokenSource.CreateLinkedTokenSource(cts.Token);
         Task<List<InProcessSiloHandle>>? startSilosTask = null;
         try
         {
@@ -275,7 +284,10 @@ public class ReminderTestsBase : OrleansTestingBase, IAsyncDisposable
                     await using (await PauseReminderTimeAsync(cancellationToken))
                     {
                         log.LogInformation("Starting 2 extra silos");
-                        startSilosTask = StartAdditionalSilosAsync(2, startAdditionalSiloOnNewPort: true);
+                        startSilosTask = StartAdditionalSilosAsync(
+                            2,
+                            startupCancellation.Token,
+                            startAdditionalSiloOnNewPort: true);
                         await WaitForAdditionalSilosAndReminderServicesAsync(startSilosTask, cancellationToken);
                     }
                 },
@@ -288,7 +300,7 @@ public class ReminderTestsBase : OrleansTestingBase, IAsyncDisposable
         }
         finally
         {
-            await CleanupAdditionalSilosAsync(initialSilos, startSilosTask);
+            await CleanupAdditionalSilosAsync(initialSilos, startSilosTask, startupCancellation);
         }
     }
 
@@ -337,9 +349,12 @@ public class ReminderTestsBase : OrleansTestingBase, IAsyncDisposable
         Assert.Equal(0, observer.GetActiveReminderCount(grainId, DR));
     }
 
-    protected Task<List<InProcessSiloHandle>> StartAdditionalSilosAsync(int silosToStart, bool startAdditionalSiloOnNewPort = false)
+    protected Task<List<InProcessSiloHandle>> StartAdditionalSilosAsync(
+        int silosToStart,
+        CancellationToken cancellationToken,
+        bool startAdditionalSiloOnNewPort = false)
     {
-        return HostedCluster.StartSilosAsync(silosToStart);
+        return HostedCluster.StartSilosAsync(silosToStart, cancellationToken);
     }
 
     protected Task WaitForLivenessToStabilizeAsync(bool didKill = false)
@@ -352,7 +367,10 @@ public class ReminderTestsBase : OrleansTestingBase, IAsyncDisposable
         CancellationToken cancellationToken,
         bool startAdditionalSiloOnNewPort = false)
     {
-        var startSilosTask = StartAdditionalSilosAsync(silosToStart, startAdditionalSiloOnNewPort);
+        var startSilosTask = StartAdditionalSilosAsync(
+            silosToStart,
+            cancellationToken,
+            startAdditionalSiloOnNewPort);
         return await WaitForAdditionalSilosAndReminderServicesAsync(startSilosTask, cancellationToken);
     }
 
@@ -364,29 +382,30 @@ public class ReminderTestsBase : OrleansTestingBase, IAsyncDisposable
         await observer.WaitForTopologyReconciledAsync(
             WaitForLivenessToStabilizeAsync(),
             result,
+            CHURN_ENDWAIT,
             cancellationToken);
         return result;
     }
 
     private async Task CleanupAdditionalSilosAsync(
         HashSet<InProcessSiloHandle> initialSilos,
-        Task<List<InProcessSiloHandle>>? startSilosTask)
+        Task<List<InProcessSiloHandle>>? startSilosTask,
+        CancellationTokenSource startupCancellation)
     {
         if (startSilosTask is null)
         {
             return;
         }
 
-        using var startupCompletionCts = new CancellationTokenSource(CHURN_ENDWAIT);
         using var cleanupCts = new CancellationTokenSource(CHURN_ENDWAIT);
         await ReminderLifecycleHarness.CleanupPartialStartupAsync(
             initialSilos,
             startSilosTask,
             () => HostedCluster.GetActiveSilos().ToArray(),
             StopSiloAsync,
-            () => WaitForLivenessToStabilizeAsync(),
+            () => WaitForLivenessToStabilizeAsync(didKill: true),
             log,
-            startupCompletionCts.Token,
+            startupCancellation,
             cleanupCts.Token);
     }
 
@@ -396,13 +415,17 @@ public class ReminderTestsBase : OrleansTestingBase, IAsyncDisposable
         bool startAdditionalSiloOnNewPort = false)
     {
         var stopTask = StopSiloAsync(siloToStop);
-        var startTask = StartAdditionalSilosAsync(1, startAdditionalSiloOnNewPort);
+        var startTask = StartAdditionalSilosAsync(
+            1,
+            cancellationToken,
+            startAdditionalSiloOnNewPort);
         await Task.WhenAll(stopTask, startTask).WaitAsync(cancellationToken);
 
         var silo = Assert.Single(await startTask);
         await observer.WaitForTopologyReconciledAsync(
             WaitForLivenessToStabilizeAsync(),
             [silo],
+            CHURN_ENDWAIT,
             cancellationToken);
         return silo;
     }

@@ -302,10 +302,13 @@ public sealed class ReminderDiagnosticObserver : IDisposable
     }
 
     /// <summary>
-    /// Waits until there are no active local reminders on any observed silo.
+    /// Waits until there are no active local reminders on the specified silos.
     /// </summary>
-    public Task WaitForGlobalQuiescenceAsync(CancellationToken cancellationToken)
+    public Task WaitForGlobalQuiescenceAsync(
+        IReadOnlySet<SiloAddress> siloAddresses,
+        CancellationToken cancellationToken)
     {
+        ArgumentNullException.ThrowIfNull(siloAddresses);
         if (cancellationToken.IsCancellationRequested)
         {
             return Task.FromCanceled(cancellationToken);
@@ -314,12 +317,12 @@ public sealed class ReminderDiagnosticObserver : IDisposable
         GlobalQuiescenceWaiter waiter;
         lock (_lock)
         {
-            if (_activeLocalReminders.Count == 0)
+            if (IsGloballyQuiescentCore(siloAddresses))
             {
                 return Task.CompletedTask;
             }
 
-            waiter = new();
+            waiter = new(siloAddresses);
             _globalQuiescenceWaiters.Add(waiter);
             RegisterCancellation(waiter, _globalQuiescenceWaiters, cancellationToken);
         }
@@ -522,13 +525,24 @@ public sealed class ReminderDiagnosticObserver : IDisposable
 
     private void ReleaseReadyGlobalQuiescenceWaiters(List<Waiter> ready)
     {
-        if (_activeLocalReminders.Count != 0)
+        for (var i = _globalQuiescenceWaiters.Count - 1; i >= 0; i--)
         {
-            return;
-        }
+            var waiter = _globalQuiescenceWaiters[i];
+            if (!IsGloballyQuiescentCore(waiter.SiloAddresses))
+            {
+                continue;
+            }
 
-        ready.AddRange(_globalQuiescenceWaiters);
-        _globalQuiescenceWaiters.Clear();
+            _globalQuiescenceWaiters.RemoveAt(i);
+            ready.Add(waiter);
+        }
+    }
+
+    private bool IsGloballyQuiescentCore(IReadOnlySet<SiloAddress> siloAddresses)
+    {
+        return !_activeLocalReminders.Values
+            .SelectMany(static instances => instances.Values)
+            .Any(instance => instance.SiloAddress is { } address && siloAddresses.Contains(address));
     }
 
     private readonly record struct ReminderTickKey(GrainId GrainId, string ReminderName);
@@ -580,7 +594,10 @@ public sealed class ReminderDiagnosticObserver : IDisposable
         public string ReminderName { get; } = reminderName;
     }
 
-    private sealed class GlobalQuiescenceWaiter : Waiter;
+    private sealed class GlobalQuiescenceWaiter(IReadOnlySet<SiloAddress> siloAddresses) : Waiter
+    {
+        public IReadOnlySet<SiloAddress> SiloAddresses { get; } = siloAddresses.ToHashSet();
+    }
 
     /// <inheritdoc/>
     public void Dispose()

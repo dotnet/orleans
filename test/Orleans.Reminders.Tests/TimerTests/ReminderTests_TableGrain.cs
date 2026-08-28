@@ -71,11 +71,10 @@ namespace UnitTests.TimerTests
                     return;
                 }
 
-                using var cancellation = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
-                cancellation.CancelAfter(TestConstants.InitTimeout);
                 _startedReminderServices = await _startupHarness.WaitForServicesReadyAsync(
                     HostedCluster.Silos,
-                    cancellation.Token);
+                    TestConstants.InitTimeout,
+                    TestContext.Current.CancellationToken);
             }
 
             public override async ValueTask DisposeAsync()
@@ -90,6 +89,7 @@ namespace UnitTests.TimerTests
                     _reminderClock?.Dispose();
                     _startupHarness.Dispose();
                 }
+
             }
         }
 
