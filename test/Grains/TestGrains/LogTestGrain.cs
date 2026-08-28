@@ -202,6 +202,11 @@ namespace TestGrains
             return this.RetrieveConfirmedEvents(0, Version);
         }
 
+        public Task<IReadOnlyList<object>> GetEventLogSegment(int fromVersion, int toVersion)
+        {
+            return RetrieveConfirmedEvents(fromVersion, toVersion);
+        }
+
     }
 
     internal sealed class UnsupportedLogEvent;
