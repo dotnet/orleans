@@ -36,7 +36,7 @@ namespace UnitTests.TimerTests
         public class Fixture : BaseInProcessTestClusterFixture
         {
             private ReminderTestClock? _reminderClock;
-            private readonly ReminderDiagnosticObserver _startupObserver = ReminderDiagnosticObserver.Create();
+            private readonly ReminderLifecycleHarness _startupHarness = new();
             private IReadOnlyList<SiloAddress>? _startedReminderServices;
             internal ReminderTestClock ReminderClock => _reminderClock ?? throw new InvalidOperationException($"{nameof(ReminderTestClock)} has not been configured.");
             internal ReminderTableReadController ReadController { get; } = new();
@@ -71,11 +71,10 @@ namespace UnitTests.TimerTests
                     return;
                 }
 
-                using var cancellation = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
-                cancellation.CancelAfter(TestConstants.InitTimeout);
-                var started = HostedCluster.Silos.Select(silo =>
-                    _startupObserver.WaitForReminderServiceStartedAsync(cancellation.Token, silo.SiloAddress));
-                _startedReminderServices = (await Task.WhenAll(started)).Select(e => e.SiloAddress!).ToArray();
+                _startedReminderServices = await _startupHarness.WaitForServicesReadyAsync(
+                    HostedCluster.Silos,
+                    TestConstants.InitTimeout,
+                    TestContext.Current.CancellationToken);
             }
 
             public override async ValueTask DisposeAsync()
@@ -88,8 +87,9 @@ namespace UnitTests.TimerTests
                 finally
                 {
                     _reminderClock?.Dispose();
-                    _startupObserver.Dispose();
+                    _startupHarness.Dispose();
                 }
+
             }
         }
 
@@ -104,13 +104,9 @@ namespace UnitTests.TimerTests
 
         public async ValueTask InitializeAsync()
         {
-            // ReminderTable.Clear() cannot be called from a non-Orleans thread,
-            // so we must proxy the call through a grain.
-            var controlProxy = GrainFactory.GetGrain<IReminderTestGrain2>(Guid.NewGuid());
-            await controlProxy.EraseReminderTable().WaitAsync(TestConstants.InitTimeout, TestContext.Current.CancellationToken);
+            await ClearReminderTableAsync(TestContext.Current.CancellationToken)
+                .WaitAsync(TestConstants.InitTimeout, TestContext.Current.CancellationToken);
         }
-
-        ValueTask IAsyncDisposable.DisposeAsync() => ValueTask.CompletedTask;
 
         // Basic tests
 
@@ -182,6 +178,32 @@ namespace UnitTests.TimerTests
             await AdvanceRemindersByTicksAsync(1, cts.Token, GetReminderIdentities(grains, DR));
             await AssertReminderCountersAsync(grains, cts.Token, (DR, 1));
             await StopRemindersAsync(grains, DR, cts.Token);
+        }
+
+        [Fact]
+        public async Task Rem_Grain_TickCompletionSurvivesActivationReplacement()
+        {
+            using var cancellation = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
+            cancellation.CancelAfter(TestConstants.InitTimeout);
+            var grain = GrainFactory.GetGrain<IReminderTestGrain2>(Guid.NewGuid());
+            var grainId = grain.GetGrainId();
+
+            await grain.StartReminder(DR).WaitAsync(cancellation.Token);
+            await observer.WaitForSchedulesArmedAsync(cancellation.Token, (grain, DR));
+            await Assert.ThrowsAsync<FileNotFoundException>(
+                () => grain.GetCounter(DR).WaitAsync(cancellation.Token));
+            var period = await grain.GetReminderPeriod(DR).WaitAsync(cancellation.Token);
+
+            var tickCompletion = observer.ArmTickCompletion(cancellation.Token, (grain, DR));
+            await HostedCluster.DeactivateAsync(grainId).WaitAsync(cancellation.Token);
+            Assert.False(HostedCluster.TryGetGrainContext(grainId, out _));
+
+            await AdvanceReminderTimeAsync(period, cancellation.Token);
+            await observer.WaitForTickCompletedAsync(tickCompletion).WaitAsync(cancellation.Token);
+
+            Assert.Equal(1, await grain.GetCounter(DR).WaitAsync(cancellation.Token));
+            Assert.Equal(1, observer.GetTickCount(grainId, DR));
+            await StopReminderAndWaitForQuiescenceAsync(grain, DR, grain.StopReminder, cancellation.Token);
         }
 
         [Fact]
@@ -277,8 +299,7 @@ namespace UnitTests.TimerTests
             Assert.Equal(firstTickTime, firstTick.Status.CurrentTickTime);
             Assert.Equal(1, observer.GetTickCount(grainId, reminderName));
 
-            var reminderService = HostedCluster.Silos.Single().ServiceProvider.GetRequiredService<LocalReminderService>();
-            await reminderService.TestOnlyRefresh().WaitAsync(cts.Token);
+            await observer.RefreshActiveServicesAsync(cts.Token);
 
             Assert.Equal(0, observer.GetActiveReminderCount(grainId, reminderName));
             Assert.Equal(1, observer.GetTickCount(grainId, reminderName));

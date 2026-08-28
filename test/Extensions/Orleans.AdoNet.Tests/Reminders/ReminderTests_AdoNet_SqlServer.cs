@@ -98,13 +98,9 @@ namespace Tester.AdoNet.Reminders
 
         public async ValueTask InitializeAsync()
         {
-            // ReminderTable.Clear() cannot be called from a non-Orleans thread,
-            // so we must proxy the call through a grain.
-            var controlProxy = GrainFactory.GetGrain<IReminderTestGrain2>(Guid.NewGuid());
-            await controlProxy.EraseReminderTable().WaitAsync(TestConstants.InitTimeout, TestContext.Current.CancellationToken);
+            await ClearReminderTableAsync(TestContext.Current.CancellationToken)
+                .WaitAsync(TestConstants.InitTimeout, TestContext.Current.CancellationToken);
         }
-
-        ValueTask IAsyncDisposable.DisposeAsync() => ValueTask.CompletedTask;
         
         // Basic tests
 

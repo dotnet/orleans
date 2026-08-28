@@ -198,6 +198,45 @@ public class ReminderEventsTests
     [TestSuite("BVT")]
     [TestProvider("None")]
     [Fact, TestCategory("BVT")]
+    public async Task ReminderDiagnosticObserver_GlobalQuiescenceIgnoresUnrelatedSilos()
+    {
+        using var observer = ReminderDiagnosticObserver.Create();
+        var grainId = GrainId.Create("test", "grain");
+        const string reminderName = "reminder";
+        var clusterIdentity = new object();
+        var unrelatedIdentity = new object();
+        var clusterSilo = SiloAddress.New(new IPEndPoint(IPAddress.Loopback, 14015), 16);
+        var unrelatedSilo = SiloAddress.New(new IPEndPoint(IPAddress.Loopback, 14016), 17);
+
+        ReminderEvents.EmitLocalReminderStarted(grainId, reminderName, clusterIdentity, clusterSilo);
+        ReminderEvents.EmitLocalReminderStarted(grainId, reminderName, unrelatedIdentity, unrelatedSilo);
+        var waitTask = observer.WaitForGlobalQuiescenceAsync(
+            new HashSet<SiloAddress> { clusterSilo },
+            TestContext.Current.CancellationToken);
+
+        Assert.False(waitTask.IsCompleted);
+        ReminderEvents.EmitLocalReminderStopped(
+            grainId,
+            reminderName,
+            clusterIdentity,
+            ReminderEvents.LocalReminderStopReason.RemovedFromTable,
+            clusterSilo);
+
+        Assert.True(waitTask.IsCompletedSuccessfully);
+        await waitTask;
+        Assert.Equal(1, observer.GetActiveReminderCount(grainId, reminderName));
+
+        ReminderEvents.EmitLocalReminderStopped(
+            grainId,
+            reminderName,
+            unrelatedIdentity,
+            ReminderEvents.LocalReminderStopReason.RemovedFromTable,
+            unrelatedSilo);
+    }
+
+    [TestSuite("BVT")]
+    [TestProvider("None")]
+    [Fact, TestCategory("BVT")]
     public async Task ReminderDiagnosticObserver_CanceledQuiescenceWait_RemainsCanceled()
     {
         using var observer = ReminderDiagnosticObserver.Create();
