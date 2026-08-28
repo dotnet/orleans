@@ -106,7 +106,7 @@ Explicit identities remain visible alongside their CLR names:
 # Contoso.Grains.ICartGrain
 interface [GrainInterfaceType("cart")] Contoso.Grains.ICartGrain [Version(1)]
   # Contoso.Grains.ICartGrain.AddAsync(Item item) -> Task
-[Alias("add")] add(Contoso.Grains.Item) -> Task
+  [Alias("add")] add(Contoso.Grains.Item) -> Task
 
 # Contoso.Grains.CartGrain
 class [GrainType("cart")] Contoso.Grains.CartGrain
