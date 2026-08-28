@@ -195,9 +195,10 @@ namespace Orleans.Runtime
                     return;
                 }
 
-                if (!callbacks.TryAdd(callbackData))
+                if (!callbacks.TryRegister(callbackData))
                 {
-                    throw new InvalidOperationException($"A callback with id '{message.Id}' is already registered.");
+                    callbackData.OnHostShutdown();
+                    return;
                 }
 
                 message.ResponseTarget = callbackData;
@@ -551,6 +552,7 @@ namespace Orleans.Runtime
         {
             Volatile.Write(ref _isStopping, 1);
             this.callbackTimer.Dispose();
+            callbacks.Close();
             // Once the silo is shutting down it can no longer receive responses, so any requests which
             // are still outstanding will never complete. Fault them now so that in-flight grain calls
             // observe a terminal result instead of hanging forever, which would otherwise deadlock grain
