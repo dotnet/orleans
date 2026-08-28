@@ -55,7 +55,14 @@ public static class DurableJobsExtensions
         services.TryAddScoped<DurableJobTurnIsolation>();
         services.TryAddScoped<IDurableTaskTurnIsolation>(
             static serviceProvider => serviceProvider.GetRequiredService<DurableJobTurnIsolation>());
-        services.TryAddScoped(sp => new DurableJobExecutionLifetime(sp.GetRequiredService<IGrainContextAccessor>().GrainContext));
+        services.TryAddScoped(sp =>
+        {
+            var context = sp.GetRequiredService<IGrainContextAccessor>().GrainContext;
+            return context.GetComponent<DurableJobExecutionLifetime>()
+                ?? new DurableJobExecutionLifetime(context);
+        });
+        services.TryAddEnumerable(
+            ServiceDescriptor.Singleton<IConfigureGrainContextProvider, DurableJobGrainContextConfigurator>());
         services.TryAddEnumerable(
             ServiceDescriptor.Singleton<IIncomingGrainCallFilter, DurableJobTurnIsolationFilter>());
         services.AddSingleton(sp => new DurableJobReceiverExtensionShared(

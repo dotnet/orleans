@@ -1,8 +1,10 @@
+using System.Collections.Immutable;
 using System.Diagnostics.CodeAnalysis;
 using Microsoft.Extensions.DependencyInjection;
 using NSubstitute;
 using Orleans.DurableJobs;
 using Orleans.Hosting;
+using Orleans.Metadata;
 using Orleans.Runtime;
 using Xunit;
 
@@ -14,6 +16,32 @@ namespace NonSilo.Tests.ScheduledJobs;
 [TestArea("DurableJobs")]
 public class DurableJobsExtensionsTests
 {
+    [Fact]
+    public void AddDurableJobs_RegistersEagerGrainContextConfiguration()
+    {
+        var services = new ServiceCollection();
+
+        services.AddDurableJobs();
+
+        var descriptor = Assert.Single(
+            services,
+            service => service.ServiceType == typeof(IConfigureGrainContextProvider)
+                && service.ImplementationType == typeof(DurableJobGrainContextConfigurator));
+        Assert.Equal(ServiceLifetime.Singleton, descriptor.Lifetime);
+
+        var configurator = new DurableJobGrainContextConfigurator();
+        Assert.True(configurator.TryGetConfigurator(
+            GrainType.Create("test"),
+            new GrainProperties(ImmutableDictionary.Create<string, string>(StringComparer.Ordinal)),
+            out var resolved));
+        Assert.Same(configurator, resolved);
+
+        var context = Substitute.For<IGrainContext>();
+        context.ObservableLifecycle.Returns(Substitute.For<IGrainLifecycle>());
+        configurator.Configure(context);
+        context.Received(1).SetComponent(Arg.Any<DurableJobExecutionLifetime>());
+    }
+
     [Fact]
     public async Task AddDurableJobs_RegistryAndReceiverShareScope_WhileSeparateScopesAreIsolated()
     {
