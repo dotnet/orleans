@@ -1291,23 +1291,20 @@ internal sealed unsafe class LinuxIoUringSocketSender : LinuxIoUringOperation, I
             var errorCode = Marshal.GetLastPInvokeError();
             if (errorCode == 11)
             {
-                CancelPreparation();
-                result = default;
-                return false;
+                result = SubmitPinnedFromPreparation(
+                    socket,
+                    buffer,
+                    LinuxIoUringEngine.SendOperation,
+                    waitForNotification: false);
+                return true;
             }
 
-            CancelPreparation();
-            BytesTransferred = 0;
-            SocketError = LinuxIoUringEngine.MapSocketErrorCode(errorCode);
-            Error = new SocketException((int)SocketError);
-            result = ValueTask.FromException(Error);
+            var error = CompleteSynchronousPreparation(-errorCode);
+            result = ValueTask.FromException(error!);
             return true;
         }
 
-        CancelPreparation();
-        BytesTransferred = checked((int)sent);
-        SocketError = SocketError.Success;
-        Error = null;
+        _ = CompleteSynchronousPreparation(checked((int)sent));
         result = default;
         return true;
     }
@@ -1488,6 +1485,29 @@ internal abstract class LinuxIoUringOperation : IValueTaskSource, IDisposable
         return SubmitPrepared(socket, _bufferAddress, _bufferLength, operationCode, waitForNotification);
     }
 
+    protected ValueTask SubmitPinnedFromPreparation(
+        Socket socket,
+        ArraySegment<byte> buffer,
+        byte operationCode,
+        bool waitForNotification)
+    {
+        Debug.Assert(Volatile.Read(ref _state) == StatePreparing);
+        try
+        {
+            _buffer = buffer.Array ?? throw new ArgumentException("The I/O buffer must be array-backed.", nameof(buffer));
+            _bufferOffset = buffer.Offset;
+            _bufferLength = buffer.Count;
+            _bufferAddress = Marshal.UnsafeAddrOfPinnedArrayElement(_buffer, _bufferOffset);
+        }
+        catch
+        {
+            CancelPreparation();
+            throw;
+        }
+
+        return SubmitPrepared(socket, _bufferAddress, _bufferLength, operationCode, waitForNotification);
+    }
+
     protected ValueTask SubmitPrepared(
         Socket socket,
         IntPtr bufferAddress,
@@ -1575,6 +1595,32 @@ internal abstract class LinuxIoUringOperation : IValueTaskSource, IDisposable
         }
 
         Volatile.Write(ref _state, StateIdle);
+    }
+
+    protected Exception? CompleteSynchronousPreparation(int result)
+    {
+        if (Volatile.Read(ref _state) != StatePreparing)
+        {
+            throw new InvalidOperationException("The io_uring operation left the preparation state unexpectedly.");
+        }
+
+        Exception? error;
+        ReleaseSubmission();
+        if (result >= 0)
+        {
+            BytesTransferred = result;
+            SocketError = SocketError.Success;
+            Error = error = null;
+        }
+        else
+        {
+            BytesTransferred = 0;
+            SocketError = MapSocketError(-result);
+            Error = error = new SocketException((int)SocketError);
+        }
+
+        Volatile.Write(ref _state, StateIdle);
+        return error;
     }
 
     internal void SetPrimaryResult(int result) => _primaryResult = result;
