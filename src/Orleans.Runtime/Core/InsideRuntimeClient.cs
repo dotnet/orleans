@@ -88,6 +88,7 @@ namespace Orleans.Runtime
 
             var callbackDataLogger = loggerFactory.CreateLogger<CallbackData>();
             this.sharedCallbackData = new SharedCallbackData(
+                this,
                 callbackDataLogger,
                 this.messagingOptions.ResponseTimeout,
                 this.messagingOptions.CancelRequestOnTimeout,
@@ -95,6 +96,7 @@ namespace Orleans.Runtime
                 cancellationManager: null!);
 
             this.systemSharedCallbackData = new SharedCallbackData(
+                this,
                 callbackDataLogger,
                 this.messagingOptions.SystemResponseTimeout,
                 cancelOnTimeout: false,
@@ -186,7 +188,7 @@ namespace Orleans.Runtime
                 Debug.Assert(context is not null);
 
                 // Register a callback for the request.
-                callbackData = new CallbackData(sharedData, this, context, message, _applicationRequestInstruments);
+                callbackData = new CallbackData(sharedData, context, message, _applicationRequestInstruments);
                 if (Volatile.Read(ref _isStopping) != 0)
                 {
                     callbackData.OnHostShutdown();

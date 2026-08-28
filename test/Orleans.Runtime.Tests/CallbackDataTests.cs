@@ -193,12 +193,13 @@ public class CallbackDataTests
         ApplicationRequestInstruments instruments)
     {
         var shared = new SharedCallbackData(
+            new DelegateCallbackTarget(unregister),
             logger: NullLogger<CallbackData>.Instance,
             responseTimeout: TimeSpan.FromMinutes(1),
             cancelOnTimeout: false,
             waitForCancellationAcknowledgement: false,
             cancellationManager: null);
-        return new CallbackData(shared, new DelegateCallbackTarget(unregister), completion, new Message(), instruments);
+        return new CallbackData(shared, completion, new Message(), instruments);
     }
 
     private static ServiceProvider CreateServiceProvider()
@@ -241,16 +242,24 @@ public class CallbackDataTests
         public void Unregister(CallbackData callback) => unregister(callback);
     }
 
-    private sealed class TestCallbackRegistry(ApplicationRequestInstruments instruments) : ICallbackDataTarget
+    private sealed class TestCallbackRegistry : ICallbackDataTarget
     {
         private readonly StripedCallbackDictionary<CallbackData> _callbacks = new();
+        private readonly ApplicationRequestInstruments _instruments;
+        private readonly SharedCallbackData _sharedData;
+
+        public TestCallbackRegistry(ApplicationRequestInstruments instruments)
+        {
+            _instruments = instruments;
+            _sharedData = CreateSharedData(this);
+        }
 
         public int Count => _callbacks.Count;
 
         public CallbackData Register(CorrelationId id, IResponseCompletionSource completion)
         {
             var message = new Message { Id = id };
-            var callback = new CallbackData(CreateSharedData(), this, completion, message, instruments);
+            var callback = new CallbackData(_sharedData, completion, message, _instruments);
             if (!_callbacks.TryAdd(id, callback))
             {
                 throw new InvalidOperationException($"A callback with correlation id {id} is already registered.");
@@ -280,7 +289,8 @@ public class CallbackDataTests
             _callbacks.TryRemove(callback.Message.Id, callback);
     }
 
-    private static SharedCallbackData CreateSharedData() => new(
+    private static SharedCallbackData CreateSharedData(ICallbackDataTarget target) => new(
+        target,
         logger: NullLogger<CallbackData>.Instance,
         responseTimeout: TimeSpan.FromMinutes(1),
         cancelOnTimeout: false,

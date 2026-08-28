@@ -17,9 +17,7 @@ namespace Orleans.Runtime
         private const int StateCompleted = 1;
         private const int StateCancellationRegistrationPending = 2;
         private const int StateCancellationRegistrationPublished = 4;
-
         private readonly SharedCallbackData shared;
-        private readonly ICallbackDataTarget target;
         private readonly IResponseCompletionSource context;
         private readonly ApplicationRequestInstruments _applicationRequestInstruments;
         private int _state;
@@ -29,13 +27,11 @@ namespace Orleans.Runtime
 
         public CallbackData(
             SharedCallbackData shared,
-            ICallbackDataTarget target,
             IResponseCompletionSource ctx,
             Message msg,
             ApplicationRequestInstruments applicationRequestInstruments)
         {
             this.shared = shared;
-            this.target = target;
             this.context = ctx;
             this.Message = msg;
             _applicationRequestInstruments = applicationRequestInstruments;
@@ -137,7 +133,7 @@ namespace Orleans.Runtime
 
             stopwatch.Stop();
             SignalCancellation();
-            target.Unregister(this);
+            shared.Unregister(this);
             _applicationRequestInstruments.OnAppRequestsEnd((long)stopwatch.Elapsed.TotalMilliseconds);
             _applicationRequestInstruments.OnAppRequestsCanceled(GetTargetGrainType());
             OrleansCallBackDataEvent.Instance.OnCanceled(Message);
@@ -158,7 +154,7 @@ namespace Orleans.Runtime
                 SignalCancellation();
             }
 
-            this.target.Unregister(this);
+            this.shared.Unregister(this);
             DisposeCancellationRegistration();
             _applicationRequestInstruments.OnAppRequestsEnd((long)this.stopwatch.Elapsed.TotalMilliseconds);
             _applicationRequestInstruments.OnAppRequestsTimedOut(GetTargetGrainType());
@@ -183,7 +179,7 @@ namespace Orleans.Runtime
             }
 
             this.stopwatch.Stop();
-            this.target.Unregister(this);
+            this.shared.Unregister(this);
             DisposeCancellationRegistration();
             _applicationRequestInstruments.OnAppRequestsEnd((long)this.stopwatch.Elapsed.TotalMilliseconds);
 
@@ -203,7 +199,7 @@ namespace Orleans.Runtime
             }
 
             this.stopwatch.Stop();
-            this.target.Unregister(this);
+            this.shared.Unregister(this);
             DisposeCancellationRegistration();
             _applicationRequestInstruments.OnAppRequestsEnd((long)this.stopwatch.Elapsed.TotalMilliseconds);
 

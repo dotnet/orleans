@@ -93,6 +93,7 @@ namespace Orleans
                     TimeSpan.FromSeconds(1)));
             this.callbackTimer = new PeriodicTimer(period, timeProvider);
             this.sharedCallbackData = new SharedCallbackData(
+                this,
                 this.loggerFactory.CreateLogger<CallbackData>(),
                 this.clientMessagingOptions.ResponseTimeout,
                 this.clientMessagingOptions.CancelRequestOnTimeout,
@@ -289,7 +290,7 @@ namespace Orleans
 
             if (!oneWay)
             {
-                var callbackData = new CallbackData(this.sharedCallbackData, this, context!, message, _applicationRequestInstruments);
+                var callbackData = new CallbackData(this.sharedCallbackData, context!, message, _applicationRequestInstruments);
                 if (Volatile.Read(ref _isStopping) != 0)
                 {
                     callbackData.OnHostShutdown();
