@@ -1,5 +1,6 @@
 #nullable enable
 using System;
+using System.Runtime.Serialization;
 
 namespace Orleans.Connections.Transport;
 
@@ -15,6 +16,11 @@ public class ConnectionAbortedException : Exception
     }
 
     public ConnectionAbortedException(string? message, Exception? innerException) : base(message, innerException)
+    {
+    }
+
+    [Obsolete]
+    protected ConnectionAbortedException(SerializationInfo info, StreamingContext context) : base(info, context)
     {
     }
 }
@@ -34,6 +40,11 @@ public class ConnectionClosedException : Exception
     }
 
     public ConnectionClosedException(string? message, Exception? innerException) : base(message, innerException)
+    {
+    }
+
+    [Obsolete]
+    protected ConnectionClosedException(SerializationInfo info, StreamingContext context) : base(info, context)
     {
     }
 }

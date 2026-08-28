@@ -30,7 +30,7 @@ public abstract class MessageTransportListener : IAsyncDisposable
     /// Binds to the configured endpoint and begins listening for incoming connections.
     /// </summary>
     /// <param name="cancellationToken">The cancellation token.</param>
-    /// <returns>The bound endpoint configuration.</returns>
+    /// <returns>A <see cref="ValueTask"/> which completes once the listener has been bound.</returns>
     public abstract ValueTask BindAsync(CancellationToken cancellationToken = default);
 
     /// <summary>
