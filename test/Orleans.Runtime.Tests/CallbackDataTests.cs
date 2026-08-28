@@ -259,7 +259,7 @@ public class CallbackDataTests
             return callback;
         }
 
-        public bool TryTake(CorrelationId id, out CallbackData callback) =>
+        public bool TryTake(CorrelationId id, out CallbackData? callback) =>
             _callbacks.TryRemove(id, out callback);
 
         public CallbackData Take(CorrelationId id)
