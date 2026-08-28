@@ -11,20 +11,17 @@ internal sealed class SqsAspireTestApp : IAsyncDisposable
 {
     private const string SiloResourceName = "silo";
     private const string ClientResourceName = "client";
-    private readonly IAsyncDisposable? _builder;
     private readonly DistributedApplication _application;
     private readonly IResource _silo;
     private readonly IResource _client;
 
     private SqsAspireTestApp(
-        IAsyncDisposable? builder,
         DistributedApplication application,
         IResource silo,
         IResource client,
         string providerName,
         string serviceId)
     {
-        _builder = builder;
         _application = application;
         _silo = silo;
         _client = client;
@@ -53,7 +50,6 @@ internal sealed class SqsAspireTestApp : IAsyncDisposable
                 Args = [],
                 DisableDashboard = true,
             });
-        IAsyncDisposable? builderLifetime = null;
         var connectionResources = new List<IResourceBuilder<IResourceWithConnectionString>>();
         var environmentValues = new List<(string Key, string? Value)>();
         foreach (var (key, value) in rootValues ?? [])
@@ -89,7 +85,6 @@ internal sealed class SqsAspireTestApp : IAsyncDisposable
         var application = builder.Build();
 
         return new SqsAspireTestApp(
-            builderLifetime,
             application,
             silo.Resource,
             client.Resource,
@@ -143,13 +138,7 @@ internal sealed class SqsAspireTestApp : IAsyncDisposable
     }
 
     public async ValueTask DisposeAsync()
-    {
-        await _application.DisposeAsync();
-        if (_builder is not null)
-        {
-            await _builder.DisposeAsync();
-        }
-    }
+        => await _application.DisposeAsync();
 
     public static IReadOnlyDictionary<string, string?> NormalizeConfiguration(
         IReadOnlyDictionary<string, string?> environment)
