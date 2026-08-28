@@ -192,9 +192,8 @@ namespace Orleans.Runtime.Messaging
                     return;
                 }
 
-                if (directoryCacheEntry is not null)
+                if (directoryCacheEntry is not null && msg.TargetSilo?.Matches(_siloAddress) == true)
                 {
-                    Debug.Assert(msg.TargetSilo?.Matches(_siloAddress) == true);
                     Debug.Assert(!msg.TargetGrain.IsClient());
                     Debug.Assert(msg.Direction is Message.Directions.Request or Message.Directions.OneWay);
                     MessagingEvents.EmitSent(msg);
@@ -229,8 +228,14 @@ namespace Orleans.Runtime.Messaging
                 }
                 else
                 {
-                    if (this.connectionManager.TryGetConnection(targetSilo, out var existingConnection))
+                    if (TryGetCachedConnection(directoryCacheEntry, targetSilo, out var cachedConnection))
                     {
+                        cachedConnection.Send(msg);
+                        return;
+                    }
+                    else if (this.connectionManager.TryGetConnection(targetSilo, out var existingConnection, out var connectionEntry))
+                    {
+                        directoryCacheEntry?.TrySetMessageTarget(connectionEntry, targetSilo);
                         existingConnection.Send(msg);
                         return;
                     }
@@ -251,20 +256,34 @@ namespace Orleans.Runtime.Messaging
                         if (connectionTask.IsCompletedSuccessfully)
                         {
                             var sender = connectionTask.Result;
+                            if (directoryCacheEntry is not null
+                                && connectionManager.TryGetConnectionEntry(targetSilo, out var completedConnectionEntry))
+                            {
+                                directoryCacheEntry.TrySetMessageTarget(completedConnectionEntry, targetSilo);
+                            }
+
                             sender.Send(msg);
                         }
                         else
                         {
-                            _ = SendAsync(this, connectionTask, msg);
+                            _ = SendAsync(this, connectionTask, msg, directoryCacheEntry, targetSilo);
 
                             static async Task SendAsync(
                                 MessageCenter messageCenter,
                                 ValueTask<Connection> connectionTask,
-                                Message msg)
+                                Message msg,
+                                GrainDirectoryCacheEntry? directoryCacheEntry,
+                                SiloAddress targetSilo)
                             {
                                 try
                                 {
                                     var sender = await connectionTask;
+                                    if (directoryCacheEntry is not null
+                                        && messageCenter.connectionManager.TryGetConnectionEntry(targetSilo, out var connectionEntry))
+                                    {
+                                        directoryCacheEntry.TrySetMessageTarget(connectionEntry, targetSilo);
+                                    }
+
                                     sender.Send(msg);
                                 }
                                 catch (Exception exception)
@@ -276,6 +295,29 @@ namespace Orleans.Runtime.Messaging
                     }
                 }
             }
+        }
+
+        private static bool TryGetCachedConnection(
+            GrainDirectoryCacheEntry? directoryCacheEntry,
+            SiloAddress targetSilo,
+            [NotNullWhen(true)] out Connection? connection)
+        {
+            if (directoryCacheEntry?.TryGetMessageTarget(out var target) == true
+                && target is { } messageTarget)
+            {
+                if (messageTarget is ConnectionManager.ConnectionEntry connectionEntry
+                    && connectionEntry.Endpoint.Equals(targetSilo)
+                    && connectionEntry.NextConnection() is { } result)
+                {
+                    connection = result;
+                    return true;
+                }
+
+                directoryCacheEntry.ClearMessageTarget(messageTarget);
+            }
+
+            connection = null;
+            return false;
         }
 
         public void DispatchLocalMessage(Message message) => ReceiveMessage(message);
@@ -507,7 +549,7 @@ namespace Orleans.Runtime.Messaging
                 {
                     var targetSilo = directoryCacheEntry.Address.SiloAddress!;
                     message.TargetSilo = targetSilo;
-                    SendMessage(message, targetSilo.Matches(_siloAddress) ? directoryCacheEntry : null);
+                    SendMessage(message, directoryCacheEntry);
                     return Task.CompletedTask;
                 }
 
@@ -594,7 +636,7 @@ namespace Orleans.Runtime.Messaging
             }
 
             target.MessageTargetCache = entry;
-            return targetSilo.Matches(_siloAddress) ? entry : null;
+            return entry;
         }
 
         internal void SendResponse(Message request, Response response)
@@ -664,7 +706,7 @@ namespace Orleans.Runtime.Messaging
                     && directoryCacheEntry is { } entry
                     && entry.Address.Matches(activation.Address))
                 {
-                    entry.TrySetMessageTarget(activation);
+                    entry.TrySetMessageTarget(activation, activation.Address);
                 }
             }
 
@@ -682,14 +724,14 @@ namespace Orleans.Runtime.Messaging
         private static ActivationData? GetCachedActivation(GrainDirectoryCacheEntry? directoryCacheEntry)
         {
             if (directoryCacheEntry?.TryGetMessageTarget(out var target) == true
-                && target is ActivationData activation)
+                && target is { } messageTarget)
             {
-                if (activation.IsValid)
+                if (messageTarget is ActivationData { IsValid: true } activation)
                 {
                     return activation;
                 }
 
-                directoryCacheEntry.ClearMessageTarget(activation);
+                directoryCacheEntry.ClearMessageTarget(messageTarget);
             }
 
             return null;

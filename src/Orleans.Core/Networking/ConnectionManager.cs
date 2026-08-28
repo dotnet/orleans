@@ -64,16 +64,27 @@ namespace Orleans.Runtime.Messaging
             return new(this.GetConnectionAsync(endpoint));
         }
         public bool TryGetConnection(SiloAddress endpoint, [NotNullWhen(true)] out Connection? connection)
+            => TryGetConnection(endpoint, out connection, out _);
+
+        internal bool TryGetConnection(
+            SiloAddress endpoint,
+            [NotNullWhen(true)] out Connection? connection,
+            [NotNullWhen(true)] out ConnectionEntry? connectionEntry)
         {
             if (this.connections.TryGetValue(endpoint, out var entry) && entry.NextConnection() is { } c)
             {
                 connection = c;
+                connectionEntry = entry;
                 return true;
             }
 
             connection = null;
+            connectionEntry = null;
             return false;
         }
+
+        internal bool TryGetConnectionEntry(SiloAddress endpoint, [NotNullWhen(true)] out ConnectionEntry? connectionEntry)
+            => connections.TryGetValue(endpoint, out connectionEntry);
 
         /// <summary>
         /// Gets the minimum elapsed time since any connection to the specified silo last received a message,
@@ -197,7 +208,7 @@ namespace Orleans.Runtime.Messaging
             }
         }
 
-        private ConnectionEntry GetOrCreateEntry(SiloAddress address) => connections.GetOrAdd(address, _ => new());
+        private ConnectionEntry GetOrCreateEntry(SiloAddress address) => connections.GetOrAdd(address, static address => new(address));
 
         private async Task<Connection> ConnectAsync(SiloAddress address, ConnectionEntry entry)
         {
@@ -256,7 +267,10 @@ namespace Orleans.Runtime.Messaging
                 connections = entry.Connections;
                 if (entry.PendingConnection is null)
                 {
-                    this.connections.TryRemove(endpoint, out _);
+                    if (this.connections.TryRemove(KeyValuePair.Create(endpoint, entry)))
+                    {
+                        connections = entry.Detach();
+                    }
                 }
             }
 
@@ -372,8 +386,13 @@ namespace Orleans.Runtime.Messaging
             return null;
         }
 
-        private sealed class ConnectionEntry
+        internal sealed class ConnectionEntry
         {
+            private int _detached;
+
+            public ConnectionEntry(SiloAddress endpoint) => Endpoint = endpoint;
+
+            public SiloAddress Endpoint { get; }
             public Task? PendingConnection { get; set; }
             public DateTime LastFailure { get; set; }
             public ImmutableArray<Connection> Connections { get; set; } = ImmutableArray<Connection>.Empty;
@@ -398,6 +417,11 @@ namespace Orleans.Runtime.Messaging
 
             public Connection? NextConnection()
             {
+                if (Volatile.Read(ref _detached) != 0)
+                {
+                    return null;
+                }
+
                 var connections = this.Connections;
                 if (connections.IsEmpty)
                 {
@@ -409,6 +433,14 @@ namespace Orleans.Runtime.Messaging
             }
 
             public void RemoveDefunct() => Connections = Connections.RemoveAll(c => !c.IsValid);
+
+            public ImmutableArray<Connection> Detach()
+            {
+                Volatile.Write(ref _detached, 1);
+                var result = Connections;
+                Connections = ImmutableArray<Connection>.Empty;
+                return result;
+            }
         }
 
         [LoggerMessage(

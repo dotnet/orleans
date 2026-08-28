@@ -1,6 +1,6 @@
 # Test Generation Research
 
-> Final scope update: cached handlers are limited to local `IGrainContext` instances. Remote grain references retain the same shared directory entry for address reuse, while remote connection and response-route caching remain separate experiments.
+> Final scope update: cached targets are limited to local `IGrainContext` instances and remote `ConnectionManager.ConnectionEntry` groups. Remote references retain the shared directory entry for address reuse; response-route caching remains a separate experiment.
 
 ## Project Overview
 - **Path**: `C:\dev\copilot-worktrees\orleans\rb-scaling-guacamole`

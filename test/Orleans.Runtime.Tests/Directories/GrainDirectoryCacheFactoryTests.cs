@@ -273,7 +273,7 @@ public class GrainDirectoryCacheFactoryTests
         {
             cache.AddOrUpdate(originalAddress, version: 1);
             var originalEntry = GetEntry(entrySource, grainId);
-            Assert.True(originalEntry.TrySetMessageTarget(originalTarget));
+            Assert.True(originalEntry.TrySetMessageTarget(originalTarget, originalEntry.Address));
 
             cache.AddOrUpdate(replacementAddress, version: 2);
             var replacementEntry = GetEntry(entrySource, grainId);
@@ -283,7 +283,7 @@ public class GrainDirectoryCacheFactoryTests
             Assert.Equal(replacementAddress, replacementEntry.Address);
             Assert.Equal(2, replacementEntry.Version);
             Assert.False(replacementEntry.TryGetMessageTarget(out _));
-            Assert.True(replacementEntry.TrySetMessageTarget(replacementTarget));
+            Assert.True(replacementEntry.TrySetMessageTarget(replacementTarget, replacementEntry.Address));
             AssertMessageTarget(replacementEntry, replacementTarget);
             Assert.True(cache.LookUp(grainId, out var result, out var version));
             Assert.Equal(replacementAddress, result);
@@ -307,7 +307,7 @@ public class GrainDirectoryCacheFactoryTests
         {
             cache.AddOrUpdate(address, version: 3);
             var entry = GetEntry(entrySource, address.GrainId);
-            Assert.True(entry.TrySetMessageTarget(target));
+            Assert.True(entry.TrySetMessageTarget(target, entry.Address));
 
             Assert.True(cache.Remove(address.GrainId));
 
@@ -340,8 +340,8 @@ public class GrainDirectoryCacheFactoryTests
             cache.AddOrUpdate(controlAddress, version: 5);
             var entry = GetEntry(entrySource, grainId);
             var controlEntry = GetEntry(entrySource, controlAddress.GrainId);
-            Assert.True(entry.TrySetMessageTarget(target));
-            Assert.True(controlEntry.TrySetMessageTarget(controlTarget));
+            Assert.True(entry.TrySetMessageTarget(target, entry.Address));
+            Assert.True(controlEntry.TrySetMessageTarget(controlTarget, controlEntry.Address));
 
             Assert.False(cache.Remove(mismatchedAddress));
             AssertMessageTarget(entry, target);
@@ -383,7 +383,7 @@ public class GrainDirectoryCacheFactoryTests
             {
                 cache.AddOrUpdate(addresses[i], version: i + 1);
                 entries[i] = GetEntry(entrySource, addresses[i].GrainId);
-                Assert.True(entries[i].TrySetMessageTarget(CreateMessageTarget()));
+                Assert.True(entries[i].TrySetMessageTarget(CreateMessageTarget(), entries[i].Address));
             }
 
             cache.Clear();
@@ -423,7 +423,7 @@ public class GrainDirectoryCacheFactoryTests
         {
             cache.AddOrUpdate(expiredAddress, version: 6);
             var expiredEntry = GetEntry(entrySource, expiredAddress.GrainId);
-            Assert.True(expiredEntry.TrySetMessageTarget(CreateMessageTarget()));
+            Assert.True(expiredEntry.TrySetMessageTarget(CreateMessageTarget(), expiredEntry.Address));
 
             timeProvider.Advance(timeToLive);
             Assert.Equal(0, await listener.WaitForCleanupAsync());
@@ -431,7 +431,7 @@ public class GrainDirectoryCacheFactoryTests
             cache.AddOrUpdate(freshAddress, version: 7);
             var freshEntry = GetEntry(entrySource, freshAddress.GrainId);
             var freshTarget = CreateMessageTarget();
-            Assert.True(freshEntry.TrySetMessageTarget(freshTarget));
+            Assert.True(freshEntry.TrySetMessageTarget(freshTarget, freshEntry.Address));
 
             timeProvider.Advance(timeToLive);
             Assert.Equal(1, await listener.WaitForCleanupAsync());
@@ -471,13 +471,13 @@ public class GrainDirectoryCacheFactoryTests
                 cache.AddOrUpdate(addresses[i], version: i + 1);
                 entries[i] = GetEntry(entrySource, addresses[i].GrainId);
                 targets[i] = CreateMessageTarget();
-                Assert.True(entries[i].TrySetMessageTarget(targets[i]));
+                Assert.True(entries[i].TrySetMessageTarget(targets[i], entries[i].Address));
             }
 
             cache.AddOrUpdate(addresses[3], version: 4);
             entries[3] = GetEntry(entrySource, addresses[3].GrainId);
             targets[3] = CreateMessageTarget();
-            Assert.True(entries[3].TrySetMessageTarget(targets[3]));
+            Assert.True(entries[3].TrySetMessageTarget(targets[3], entries[3].Address));
 
             AssertInvalidEntry(entries[0]);
             Assert.False(entrySource.TryGetEntry(addresses[0].GrainId, out _));
@@ -517,8 +517,8 @@ public class GrainDirectoryCacheFactoryTests
         var entry = new GrainDirectoryCacheEntry(CreateGrainAddress(CreateGrainId(), port: 11111), version: 9);
         var originalTarget = CreateMessageTarget();
 
-        Assert.True(entry.TrySetMessageTarget(originalTarget));
-        Assert.False(entry.TrySetMessageTarget(CreateMessageTarget()));
+        Assert.True(entry.TrySetMessageTarget(originalTarget, entry.Address));
+        Assert.False(entry.TrySetMessageTarget(CreateMessageTarget(), entry.Address));
         AssertMessageTarget(entry, originalTarget);
     }
 
@@ -528,15 +528,40 @@ public class GrainDirectoryCacheFactoryTests
         var entry = new GrainDirectoryCacheEntry(CreateGrainAddress(CreateGrainId(), port: 11111), version: 10);
         var originalTarget = CreateMessageTarget();
         var replacementTarget = CreateMessageTarget();
-        Assert.True(entry.TrySetMessageTarget(originalTarget));
+        Assert.True(entry.TrySetMessageTarget(originalTarget, entry.Address));
 
         entry.ClearMessageTarget(CreateMessageTarget());
         AssertMessageTarget(entry, originalTarget);
 
         entry.ClearMessageTarget(originalTarget);
         Assert.False(entry.TryGetMessageTarget(out _));
-        Assert.True(entry.TrySetMessageTarget(replacementTarget));
+        Assert.True(entry.TrySetMessageTarget(replacementTarget, entry.Address));
         AssertMessageTarget(entry, replacementTarget);
+    }
+
+    [Fact]
+    public async Task GrainDirectoryCacheEntry_StaleAddressCannotRebindAfterUpdate()
+    {
+        var (cache, entrySource) = CreateEntryCache();
+        var disposableCache = Assert.IsAssignableFrom<IAsyncDisposable>(cache);
+        var grainId = CreateGrainId();
+        var originalAddress = CreateGrainAddress(grainId, port: 11111);
+        var replacementAddress = CreateGrainAddress(grainId, port: 22222);
+
+        try
+        {
+            cache.AddOrUpdate(originalAddress, version: 1);
+            var entry = GetEntry(entrySource, grainId);
+            cache.AddOrUpdate(replacementAddress, version: 2);
+
+            Assert.False(entry.TrySetMessageTarget(CreateMessageTarget(), originalAddress));
+            Assert.False(entry.TryGetMessageTarget(out _));
+            Assert.Equal(replacementAddress, entry.Address);
+        }
+        finally
+        {
+            await disposableCache.DisposeAsync();
+        }
     }
 
     [Fact]
@@ -602,14 +627,14 @@ public class GrainDirectoryCacheFactoryTests
         Assert.False(entry.IsValid);
         Assert.False(entry.TryGetMessageTarget(out var actual));
         Assert.Null(actual);
-        Assert.False(entry.TrySetMessageTarget(CreateMessageTarget()));
+        Assert.False(entry.TrySetMessageTarget(CreateMessageTarget(), entry.Address));
     }
 
     [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.NoInlining)]
     private static WeakReference<IGrainContext> BindMessageTarget(GrainDirectoryCacheEntry entry)
     {
         var target = CreateMessageTarget();
-        Assert.True(entry.TrySetMessageTarget(target));
+        Assert.True(entry.TrySetMessageTarget(target, entry.Address));
         return new WeakReference<IGrainContext>(target);
     }
 

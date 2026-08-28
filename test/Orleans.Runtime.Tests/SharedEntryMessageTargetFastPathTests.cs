@@ -98,7 +98,7 @@ public sealed class SharedEntryMessageTargetFastPathTests : IClassFixture<Shared
     }
 
     [Fact]
-    public async Task RemoteDirectoryGrain_CachesAddressWithoutBindingLocalTarget()
+    public async Task RemoteDirectoryGrain_BindsConnectionGroupTarget()
     {
         var primary = (InProcessSiloHandle)_fixture.HostedCluster.Primary!;
         var secondary = _fixture.HostedCluster.Silos.Single(
@@ -123,7 +123,9 @@ public sealed class SharedEntryMessageTargetFastPathTests : IClassFixture<Shared
         Assert.True(entry.IsValid);
         Assert.Equal(grainReference.GrainId, entry.Address.GrainId);
         Assert.Equal(secondary.SiloAddress, entry.Address.SiloAddress);
-        Assert.False(entry.TryGetMessageTarget(out _));
+        Assert.True(entry.TryGetMessageTarget(out var messageTarget));
+        var connectionEntry = Assert.IsType<ConnectionManager.ConnectionEntry>(messageTarget);
+        Assert.Equal(secondary.SiloAddress, connectionEntry.Endpoint);
     }
 
     [Fact]

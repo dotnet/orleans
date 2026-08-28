@@ -29,7 +29,7 @@ internal sealed class GrainDirectoryCacheEntry
 
     public bool IsValid => !ReferenceEquals(Volatile.Read(ref _messageTarget), Invalidated);
 
-    public bool TryGetMessageTarget(out IGrainContext? messageTarget)
+    public bool TryGetMessageTarget(out object? messageTarget)
     {
         var target = Volatile.Read(ref _messageTarget);
         if (ReferenceEquals(target, Invalidated))
@@ -38,13 +38,48 @@ internal sealed class GrainDirectoryCacheEntry
             return false;
         }
 
-        messageTarget = target as IGrainContext;
+        messageTarget = target;
         return messageTarget is not null;
     }
 
-    public bool TrySetMessageTarget(IGrainContext messageTarget)
+    public bool TrySetMessageTarget(object messageTarget, GrainAddress expectedAddress)
     {
         ArgumentNullException.ThrowIfNull(messageTarget);
+        ArgumentNullException.ThrowIfNull(expectedAddress);
+        if (!Address.Matches(expectedAddress) || !TrySetMessageTargetCore(messageTarget))
+        {
+            return false;
+        }
+
+        if (Address.Matches(expectedAddress))
+        {
+            return true;
+        }
+
+        ClearMessageTarget(messageTarget);
+        return false;
+    }
+
+    public bool TrySetMessageTarget(object messageTarget, SiloAddress expectedSilo)
+    {
+        ArgumentNullException.ThrowIfNull(messageTarget);
+        ArgumentNullException.ThrowIfNull(expectedSilo);
+        if (Address.SiloAddress?.Equals(expectedSilo) != true || !TrySetMessageTargetCore(messageTarget))
+        {
+            return false;
+        }
+
+        if (Address.SiloAddress?.Equals(expectedSilo) == true)
+        {
+            return true;
+        }
+
+        ClearMessageTarget(messageTarget);
+        return false;
+    }
+
+    private bool TrySetMessageTargetCore(object messageTarget)
+    {
         var current = Volatile.Read(ref _messageTarget);
         if (ReferenceEquals(current, Invalidated))
         {
@@ -55,7 +90,7 @@ internal sealed class GrainDirectoryCacheEntry
             || current is null && Interlocked.CompareExchange(ref _messageTarget, messageTarget, null) is null;
     }
 
-    public void ClearMessageTarget(IGrainContext messageTarget)
+    public void ClearMessageTarget(object messageTarget)
     {
         ArgumentNullException.ThrowIfNull(messageTarget);
         Interlocked.CompareExchange(ref _messageTarget, null, messageTarget);

@@ -9,11 +9,11 @@ The shared directory-entry message target cache is covered by:
 
 ## Results
 
-- 28 focused tests pass on `net10.0`.
+- 29 focused tests pass on `net10.0`.
 - No generated test is assertion-free or relies only on presence/truthiness checks.
 - Assertions cover equality, identity, type, null, negative behavior, collection state, lifecycle state, and side effects.
 - Cache lifetime tests verify in-place replacement, conditional removal, clear, TTL expiration, eviction, tombstoning, target release, one-shot binding, and identity-checked clearing.
-- Integration tests verify local target binding, remote address-only caching, invalidation and recapture, compatible-interface casts, and explicit external-client and stateless-worker exclusion.
+- Integration tests verify local activation binding, remote connection-group binding, invalidation and recapture, compatible-interface casts, and explicit external-client and stateless-worker exclusion.
 
 ## Pseudo-Mutation Review
 
