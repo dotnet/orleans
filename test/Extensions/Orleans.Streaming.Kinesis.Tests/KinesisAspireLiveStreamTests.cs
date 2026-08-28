@@ -31,6 +31,7 @@ public sealed class KinesisAspireLiveStreamTests(ITestOutputHelper output)
     [Fact]
     public async Task AspireGeneratedConfiguration_PublishesConsumesAndCheckpointsKinesisStream()
     {
+        var cancellationToken = TestContext.Current.CancellationToken;
         if (!KinesisTestConstants.IsAvailable || !KinesisTestConstants.IsDynamoDbAvailable)
         {
             throw Xunit.Sdk.SkipException.ForSkip(
@@ -55,7 +56,7 @@ public sealed class KinesisAspireLiveStreamTests(ITestOutputHelper output)
             var topology = app.Topology;
 
             streamMayExist = true;
-            await KinesisStreamTestResource.Create(streamName);
+            await KinesisStreamTestResource.Create(streamName, cancellationToken);
             var streamArn = await VerifyStreamAsync(streamName, topology.Stream.ShardCount);
 
             dynamoDb = CreateDynamoDbClient(checkpointTableName);
@@ -92,13 +93,14 @@ public sealed class KinesisAspireLiveStreamTests(ITestOutputHelper output)
                 dynamoDb,
                 checkpointTableName,
                 topology.ServiceId,
-                topology.ProviderName);
+                topology.ProviderName,
+                cancellationToken);
             Assert.Empty(initialCheckpoints);
 
             var streamId = StreamId.Create("aspire", Guid.NewGuid());
             var firstPayload = $"first-{Guid.NewGuid():N}";
             cluster = BuildCluster(siloConfiguration, clientConfiguration);
-            await cluster.DeployAsync();
+            await cluster.DeployAsync(cancellationToken);
             var firstDelivery = await PublishAndConsumeAsync(
                 cluster,
                 topology.ProviderName,
@@ -123,7 +125,7 @@ public sealed class KinesisAspireLiveStreamTests(ITestOutputHelper output)
 
             var secondPayload = $"second-{Guid.NewGuid():N}";
             cluster = BuildCluster(siloConfiguration, clientConfiguration);
-            await cluster.DeployAsync();
+            await cluster.DeployAsync(cancellationToken);
             var secondDelivery = await PublishAndConsumeAsync(
                 cluster,
                 topology.ProviderName,
@@ -189,7 +191,7 @@ public sealed class KinesisAspireLiveStreamTests(ITestOutputHelper output)
             if (streamMayExist)
             {
                 await CaptureCleanupFailureAsync(
-                    () => KinesisStreamTestResource.Delete(streamName),
+                    () => KinesisStreamTestResource.Delete(streamName, cancellationToken),
                     $"delete Kinesis stream '{streamName}'",
                     cleanupFailures);
             }
