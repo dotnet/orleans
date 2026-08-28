@@ -855,7 +855,9 @@ internal sealed partial class DurableInboxExtension :
                 return true;
             }
 
-            var exponent = Math.Min(state.AttemptCount - 1, 6);
+            var exponent = Math.Min(
+                state.AttemptCount - 1,
+                DurableInboxOptions.MaximumBackoffExponent);
             state.NextAttemptAt = _timeProvider.GetUtcNow() + TimeSpan.FromTicks(_retryDelay.Ticks * (1L << exponent));
             _messageStates[key] = state;
             await _stateManager.WriteStateAsync(CancellationToken.None).ConfigureAwait(true);
