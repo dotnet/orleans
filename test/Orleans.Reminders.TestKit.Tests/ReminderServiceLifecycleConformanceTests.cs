@@ -258,7 +258,14 @@ public sealed class FaultyReminderServiceLifecycleTests
             {
                 await runner.RunReminderService_OneSiloJoinLeaveTransfersOwnership(token);
                 Assert.NotNull(recordingHarness);
-                Assert.Equal([TimeSpan.FromSeconds(3)], recordingHarness.Advances);
+                Assert.Equal(
+                    [
+                        recordingHarness.ReminderRefreshPeriod
+                            + recordingHarness.ReminderRefreshPeriod
+                            + recordingHarness.ReminderRefreshPeriod
+                            + TimeSpan.FromTicks(recordingHarness.ReminderRefreshPeriod.Ticks / 2)
+                    ],
+                    recordingHarness.Advances);
             });
     }
 
@@ -299,6 +306,7 @@ public sealed class FaultyReminderServiceLifecycleTests
         public virtual Task RefreshAsync(CancellationToken cancellationToken) => Inner.RefreshAsync(cancellationToken);
         public virtual Task WaitForOwnerCountAsync(GrainId grainId, string reminderName, int count, CancellationToken cancellationToken) => Inner.WaitForOwnerCountAsync(grainId, reminderName, count, cancellationToken);
         public virtual IReadOnlyList<SiloAddress> GetOwners(GrainId grainId, string reminderName) => Inner.GetOwners(grainId, reminderName);
+        public bool IsOwner(SiloAddress siloAddress, GrainId grainId) => Inner.IsOwner(siloAddress, grainId);
         public virtual Task WaitForScheduleAsync(GrainId grainId, string reminderName, CancellationToken cancellationToken) => Inner.WaitForScheduleAsync(grainId, reminderName, cancellationToken);
         public virtual int GetLocalStartCount(GrainId grainId, string reminderName) => Inner.GetLocalStartCount(grainId, reminderName);
         public int GetLocalStopCount(GrainId grainId, string reminderName) => Inner.GetLocalStopCount(grainId, reminderName);

@@ -4,6 +4,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Orleans.Reminders.Diagnostics;
 using Orleans.Reminders.TestKit;
 using Orleans.Runtime;
+using Orleans.Runtime.ConsistentRing;
 using Orleans.Runtime.ReminderService;
 using Orleans.TestingHost;
 
@@ -94,6 +95,17 @@ public sealed class ReminderServiceLifecycleHarness : IReminderServiceLifecycleH
     public IReadOnlyList<SiloAddress> GetOwners(GrainId grainId, string reminderName)
     {
         return _observer.GetActiveReminderOwnerSilos(grainId, reminderName, ActiveSilos);
+    }
+
+    /// <inheritdoc />
+    public bool IsOwner(SiloAddress siloAddress, GrainId grainId)
+    {
+        var silo = _cluster.GetSiloForAddress(siloAddress)
+            ?? throw new InvalidOperationException($"Silo {siloAddress} is not active.");
+        return silo.ServiceProvider
+            .GetRequiredService<IConsistentRingProvider>()
+            .GetMyRange()
+            .InRange(grainId);
     }
 
     /// <inheritdoc />

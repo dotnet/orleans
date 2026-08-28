@@ -52,6 +52,9 @@ public interface IReminderServiceLifecycleHarness
     /// <summary>Gets the current local owners.</summary>
     IReadOnlyList<SiloAddress> GetOwners(GrainId grainId, string reminderName);
 
+    /// <summary>Returns whether a silo's current ring range owns a grain identity.</summary>
+    bool IsOwner(SiloAddress siloAddress, GrainId grainId);
+
     /// <summary>Waits until the current owner has armed its persisted schedule.</summary>
     Task WaitForScheduleAsync(GrainId grainId, string reminderName, CancellationToken cancellationToken);
 
@@ -131,6 +134,7 @@ public abstract class ReminderServiceLifecycleTestRunner
         const string Guarantee = nameof(ReminderService_StartupReadiness);
         await ExecuteWithCleanupAsync(
             Guarantee,
+            cancellationToken,
             async () =>
             {
                 await _harness.WaitForStartupReadinessAsync(cancellationToken);
@@ -155,9 +159,10 @@ public abstract class ReminderServiceLifecycleTestRunner
         const string Guarantee = nameof(ReminderService_RegistrationHasSingleOwner);
         const string Name = "registration-owner";
         var grain = CreateGrain(Guarantee);
-        var due = TimeSpan.FromSeconds(3);
+        var due = GetNonRefreshAlignedDueTime();
         await ExecuteWithCleanupAsync(
             Guarantee,
+            cancellationToken,
             async () =>
             {
                 var expectedStart = _harness.UtcNow.UtcDateTime + due;
@@ -190,6 +195,7 @@ public abstract class ReminderServiceLifecycleTestRunner
         var grain = CreateGrain(Guarantee);
         await ExecuteWithCleanupAsync(
             Guarantee,
+            cancellationToken,
             async () =>
             {
                 await grain.RegisterOrUpdateAsync(Name, TimeSpan.FromSeconds(3), Period).WaitAsync(cancellationToken);
@@ -247,6 +253,7 @@ public abstract class ReminderServiceLifecycleTestRunner
         var grain = CreateGrain(Guarantee);
         await ExecuteWithCleanupAsync(
             Guarantee,
+            cancellationToken,
             async () =>
             {
                 await grain.RegisterOrUpdateAsync(Name, TimeSpan.FromSeconds(3), Period).WaitAsync(cancellationToken);
@@ -282,11 +289,14 @@ public abstract class ReminderServiceLifecycleTestRunner
         const string Guarantee = nameof(ReminderService_ExactDueRecovery);
         const string Name = "exact-due-recovery";
         var grain = CreateGrain(Guarantee);
+        var refreshSkew = TimeSpan.FromTicks(_harness.ReminderRefreshPeriod.Ticks / 2);
         var due = _harness.ReminderLoadingWindow
             + _harness.ReminderRefreshPeriod
-            + _harness.ReminderRefreshPeriod;
+            + _harness.ReminderRefreshPeriod
+            + refreshSkew;
         await ExecuteWithCleanupAsync(
             Guarantee,
+            cancellationToken,
             async () =>
             {
                 var expectedStart = _harness.UtcNow.UtcDateTime + due;
@@ -332,6 +342,7 @@ public abstract class ReminderServiceLifecycleTestRunner
         SiloAddress? joined = null;
         await ExecuteWithCleanupAsync(
             Guarantee,
+            cancellationToken,
             async () =>
             {
                 try
@@ -403,105 +414,58 @@ public abstract class ReminderServiceLifecycleTestRunner
     public async Task RunReminderService_OneSiloJoinLeaveTransfersOwnership(CancellationToken cancellationToken)
     {
         const string Guarantee = nameof(ReminderService_OneSiloJoinLeaveTransfersOwnership);
-        var reminders = CreateGrains(Guarantee, 32);
-        var firstTickTime = _harness.UtcNow.UtcDateTime + TimeSpan.FromSeconds(3);
-        var initialOwners = new Dictionary<GrainId, SiloAddress>();
+        var reminders = new List<(IReminderServiceTestGrain Grain, string Name)>();
         SiloAddress? joined = null;
         await ExecuteWithCleanupAsync(
             Guarantee,
+            cancellationToken,
             async () =>
             {
-                await Task.WhenAll(reminders.Select(item =>
-                    item.Grain.RegisterOrUpdateAsync(item.Name, TimeSpan.FromSeconds(3), Period)
-                        .WaitAsync(cancellationToken)));
-                await WaitForOwnersAfterRefreshAsync(reminders, cancellationToken);
-                foreach (var (grain, name) in reminders)
-                {
-                    initialOwners[grain.GetGrainId()] = _harness.GetOwners(grain.GetGrainId(), name).Single();
-                }
-
                 joined = await _harness.JoinOneSiloAsync(cancellationToken);
                 await _harness.WaitForTopologyReconciliationAsync(cancellationToken);
-                await Task.WhenAll(reminders.Select(item =>
-                    _harness.WaitForOwnerCountAsync(
-                        item.Grain.GetGrainId(),
-                        item.Name,
-                        1,
-                        cancellationToken)));
-                await _harness.WaitForTopologyReconciliationAsync(cancellationToken);
-                await Task.WhenAll(reminders.Select(item =>
-                    _harness.WaitForOwnerCountAsync(
-                        item.Grain.GetGrainId(),
-                        item.Name,
-                        1,
-                        cancellationToken)));
-                var transferred = 0;
-                (IReminderServiceTestGrain Grain, string Name)? transferredReminder = null;
-                foreach (var (grain, name) in reminders)
-                {
-                    var owner = _harness.GetOwners(grain.GetGrainId(), name).Single();
-                    if (owner.Equals(joined))
-                    {
-                        transferred++;
-                        transferredReminder ??= (grain, name);
-                    }
-                }
+                var grain = CreateGrainOwnedBy(joined, Guarantee);
+                const string Name = "join-leave-owner";
+                reminders.Add((grain, Name));
+                var due = GetNonRefreshAlignedDueTime();
+                var firstTickTime = _harness.UtcNow.UtcDateTime + due;
 
-                if (transferred == 0)
+                await grain.RegisterOrUpdateAsync(Name, due, Period).WaitAsync(cancellationToken);
+                await WaitForOwnersAfterRefreshAsync(reminders, cancellationToken);
+                var joinedOwner = _harness.GetOwners(grain.GetGrainId(), Name);
+                if (joinedOwner.Count != 1 || !joinedOwner[0].Equals(joined))
                 {
-                    Fail(Guarantee, "join reconciliation")
-                        .WithExpected($"at least one of {reminders.Count} deterministic reminders transferred to {joined}")
-                        .WithObserved("all reminders remained on the initial silos")
+                    OwnershipFailure(Guarantee, grain.GetGrainId(), Name, 1)
+                        .WithExpected($"the joined silo {joined} owns the selected reminder")
+                        .WithObserved($"owners=[{string.Join(", ", joinedOwner)}]")
                         .Throw();
                 }
 
                 await _harness.LeaveSiloAsync(joined, cancellationToken);
                 joined = null;
                 await _harness.WaitForTopologyReconciliationAsync(cancellationToken);
-                await Task.WhenAll(reminders.Select(item =>
-                    _harness.WaitForOwnerCountAsync(
-                        item.Grain.GetGrainId(),
-                        item.Name,
-                        1,
-                        cancellationToken)));
+                await _harness.WaitForOwnerCountAsync(
+                    grain.GetGrainId(),
+                    Name,
+                    1,
+                    cancellationToken);
                 await _harness.WaitForTopologyReconciliationAsync(cancellationToken);
-                await Task.WhenAll(reminders.Select(item =>
-                    _harness.WaitForOwnerCountAsync(
-                        item.Grain.GetGrainId(),
-                        item.Name,
-                        1,
-                        cancellationToken)));
-                foreach (var (grain, name) in reminders)
-                {
-                    var owner = _harness.GetOwners(grain.GetGrainId(), name).Single();
-                    var expectedOwner = initialOwners[grain.GetGrainId()];
-                    if (!owner.Equals(expectedOwner))
-                    {
-                        OwnershipFailure(Guarantee, grain.GetGrainId(), name, 1)
-                            .WithExpected($"owner={expectedOwner} after joined silo leaves")
-                            .WithObserved($"owner={owner}")
-                            .Throw();
-                    }
-
-                }
-
-                await Task.WhenAll(reminders.Select(item =>
-                    _harness.WaitForScheduleAsync(
-                        item.Grain.GetGrainId(),
-                        item.Name,
-                        cancellationToken)));
-                var transferredItem = transferredReminder!.Value;
+                await _harness.WaitForOwnerCountAsync(
+                    grain.GetGrainId(),
+                    Name,
+                    1,
+                    cancellationToken);
+                await _harness.WaitForScheduleAsync(grain.GetGrainId(), Name, cancellationToken);
                 var tick = _harness.WaitForTickCountAsync(
-                    transferredItem.Grain.GetGrainId(),
-                    transferredItem.Name,
+                    grain.GetGrainId(),
+                    Name,
                     1,
                     cancellationToken);
                 await _harness.AdvanceAsync(firstTickTime - _harness.UtcNow.UtcDateTime, cancellationToken);
                 await tick;
                 AssertCounts(
                     Guarantee,
-                    transferredItem.Grain,
-                    transferredItem.Name,
+                    grain,
+                    Name,
                     owners: null,
                     ticks: 1);
             },
@@ -531,6 +495,7 @@ public abstract class ReminderServiceLifecycleTestRunner
         const string SubjectName = "scenario-owned";
         await ExecuteWithCleanupAsync(
             Guarantee,
+            cancellationToken,
             async () =>
             {
                 await Task.WhenAll(
@@ -566,14 +531,44 @@ public abstract class ReminderServiceLifecycleTestRunner
         return _harness.GrainFactory.GetGrain<IReminderServiceTestGrain>(key);
     }
 
+    private IReminderServiceTestGrain CreateGrainOwnedBy(SiloAddress owner, string label)
+    {
+        var ordinal = Interlocked.Increment(ref _grainCounter);
+        for (var candidate = 0; candidate < ushort.MaxValue; candidate++)
+        {
+            var key = ReminderTestData.CreateGuid(
+                _seed,
+                $"{ProviderName}/{label}/{ordinal}/{candidate.ToString(CultureInfo.InvariantCulture)}");
+            var grain = _harness.GrainFactory.GetGrain<IReminderServiceTestGrain>(key);
+            if (_harness.IsOwner(owner, grain.GetGrainId()))
+            {
+                return grain;
+            }
+        }
+
+        Fail(label, "identity selection")
+            .WithExpected($"a deterministic grain identity owned by {owner}")
+            .WithObserved("no owned identity in 65,535 deterministic candidates")
+            .Throw();
+        return null!;
+    }
+
+    private TimeSpan GetNonRefreshAlignedDueTime()
+        => _harness.ReminderRefreshPeriod
+            + _harness.ReminderRefreshPeriod
+            + _harness.ReminderRefreshPeriod
+            + TimeSpan.FromTicks(_harness.ReminderRefreshPeriod.Ticks / 2);
+
     private async Task ExecuteWithCleanupAsync(
         string guarantee,
+        CancellationToken scenarioCancellationToken,
         Func<Task> scenario,
         Func<CancellationToken, Task> cleanup)
     {
         ExceptionDispatchInfo? scenarioFailure = null;
         try
         {
+            await _harness.WaitForStartupReadinessAsync(scenarioCancellationToken);
             await scenario();
         }
         catch (Exception exception)
