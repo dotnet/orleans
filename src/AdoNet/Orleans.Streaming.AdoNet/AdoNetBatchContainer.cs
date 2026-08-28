@@ -5,7 +5,7 @@ namespace Orleans.Streaming.AdoNet;
 /// </summary>
 /// <remarks>
 /// This class uses binary serialization to prioritize database storage performance and payload size.
-/// Its <see cref="SequenceToken"/> identifies a record position in the rewindable partition history.
+/// Its <see cref="SequenceToken"/> identifies a record position in the partition history.
 /// </remarks>
 [GenerateSerializer]
 [Alias("Orleans.Streaming.AdoNet.AdoNetBatchContainer")]
