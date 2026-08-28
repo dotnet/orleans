@@ -52,7 +52,6 @@ public sealed class AdoNetStreamSchemaTests
         Assert.Contains("UPDATE OrleansStreamPartition WITH (UPDLOCK, ROWLOCK)", script, StringComparison.Ordinal);
         Assert.Contains("OUTPUT Inserted.NextMessageId - 1", script, StringComparison.Ordinal);
         Assert.Contains("@LockOwner = 'Transaction'", script, StringComparison.Ordinal);
-        Assert.Contains("READPAST, READCOMMITTEDLOCK", script, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -75,6 +74,18 @@ public sealed class AdoNetStreamSchemaTests
         Assert.Contains("IN _ManageTransaction BOOLEAN", script, StringComparison.Ordinal);
         Assert.Contains("@Payload, TRUE)", script, StringComparison.Ordinal);
         Assert.DoesNotContain("@@session.in_transaction", script, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void MySqlSchemaUsesUnicodePartitionIdentifiers()
+    {
+        var script = ReadScript("MySQL");
+
+        Assert.Contains("ServiceId NVARCHAR(150) NOT NULL", script, StringComparison.Ordinal);
+        Assert.Contains("IN _ServiceId NVARCHAR(150)", script, StringComparison.Ordinal);
+        Assert.DoesNotContain("ServiceId VARCHAR(150)", script, StringComparison.Ordinal);
+        Assert.DoesNotContain("ProviderId VARCHAR(150)", script, StringComparison.Ordinal);
+        Assert.DoesNotContain("QueueId VARCHAR(150)", script, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -118,6 +129,32 @@ public sealed class AdoNetStreamSchemaTests
         AssertOrder(checkpointProcedure, lockMarker, timestampMarker, eligibilityMarker);
     }
 
+    [Theory]
+    [InlineData("SQLServer", "AND (@LockedCheckpoint IS NULL OR MessageId > @LockedCheckpoint)")]
+    [InlineData("PostgreSQL", "AND (_PreviousCheckpoint IS NULL OR M.MessageId > _PreviousCheckpoint)")]
+    [InlineData("MySQL", "AND (_CurrentCheckpoint IS NULL OR MessageId > _CurrentCheckpoint)")]
+    public void CheckpointEligibilityUpdateStartsAfterPreviousCheckpoint(string provider, string lowerBound)
+    {
+        var checkpointProcedure = GetProcedure(ReadScript(provider), "AdvanceStreamCheckpoint", "CleanupStreamMessages");
+
+        Assert.Contains(lowerBound, checkpointProcedure, StringComparison.Ordinal);
+    }
+
+    [Theory]
+    [InlineData("SQLServer", "READPAST")]
+    [InlineData("PostgreSQL", "SKIP LOCKED")]
+    [InlineData("MySQL", "SKIP LOCKED")]
+    public void CleanupWaitsForLeadingEligibleRows(string provider, string skipLockedMarker)
+    {
+        var script = ReadScript(provider);
+        var cleanupStart = script.IndexOf("CleanupStreamMessages", StringComparison.Ordinal);
+        Assert.True(cleanupStart >= 0);
+        var cleanupProcedure = script[cleanupStart..];
+
+        Assert.Contains("ORDER BY MessageId", cleanupProcedure, StringComparison.Ordinal);
+        Assert.DoesNotContain(skipLockedMarker, cleanupProcedure, StringComparison.Ordinal);
+    }
+
     private static string ReadScript(string provider) =>
         File.ReadAllText(Path.Combine(AppContext.BaseDirectory, $"{provider}-Streaming.sql"));
 
@@ -126,6 +163,15 @@ public sealed class AdoNetStreamSchemaTests
         var start = script.IndexOf($"('{queryKey}'", StringComparison.Ordinal);
         Assert.True(start >= 0);
         var end = script.IndexOfAny(['\r', '\n'], start);
+        return script[start..end];
+    }
+
+    private static string GetProcedure(string script, string startMarker, string endMarker)
+    {
+        var start = script.IndexOf(startMarker, StringComparison.Ordinal);
+        Assert.True(start >= 0);
+        var end = script.IndexOf(endMarker, start + startMarker.Length, StringComparison.Ordinal);
+        Assert.True(end > start);
         return script[start..end];
     }
 
