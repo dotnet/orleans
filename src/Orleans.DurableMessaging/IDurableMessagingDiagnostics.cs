@@ -56,7 +56,7 @@ internal sealed class DurableMessagingDiagnostics(
     public IReadOnlyList<DurableDeadLetter> InboxDeadLetters =>
         inbox.Values.Select(static entry => new DurableDeadLetter
         {
-            Message = entry.Envelope,
+            Message = entry.Envelope.Retain(),
             DeadLetteredAt = entry.DeadLetteredAt,
             Reason = entry.Reason,
             AttemptCount = entry.AttemptCount
@@ -65,7 +65,7 @@ internal sealed class DurableMessagingDiagnostics(
     public IReadOnlyList<DurableDeadLetter> OutboxDeadLetters =>
         outbox.Values.Select(static entry => new DurableDeadLetter
         {
-            Message = entry.Envelope,
+            Message = entry.Envelope.Retain(),
             DeadLetteredAt = entry.DeadLetteredAt,
             Reason = entry.Reason,
             AttemptCount = entry.AttemptCount

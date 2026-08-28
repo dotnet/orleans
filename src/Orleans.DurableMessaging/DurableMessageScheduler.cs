@@ -144,18 +144,6 @@ internal sealed class DurableMessageScheduler :
         try
         {
             var scheduleIds = _messages.Keys.ToList();
-            if (scheduleIds.Count > 0)
-            {
-                foreach (var scheduleId in scheduleIds)
-                {
-                    var state = _messages[scheduleId];
-                    state.JobId = null;
-                    _messages[scheduleId] = state;
-                }
-
-                await _stateManager.WriteStateAsync(cancellationToken).ConfigureAwait(true);
-            }
-
             foreach (var scheduleId in scheduleIds)
             {
                 await EnsureJobUnderGateAsync(scheduleId, cancellationToken).ConfigureAwait(true);
