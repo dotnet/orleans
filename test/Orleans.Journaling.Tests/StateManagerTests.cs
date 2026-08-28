@@ -53,7 +53,7 @@ public class StateManagerTests : JournalingTestBase
         queue.Enqueue(42);
 
         // Write state
-        await manager.WriteStateAsync(CancellationToken.None);
+        await manager.WriteStateAsync(TestContext.Current.CancellationToken);
 
         // Assert - Data is correctly stored
         Assert.Equal(1, dictionary["key1"]);
@@ -78,7 +78,7 @@ public class StateManagerTests : JournalingTestBase
         var storage = new VolatileJournalStorage();
         using (var data = CreateBuffer([1, 2, 3]))
         {
-            await storage.AppendAsync(data.AsReadOnlySequence(), CancellationToken.None);
+            await storage.AppendAsync(data.AsReadOnlySequence(), TestContext.Current.CancellationToken);
         }
 
         var sut = CreateTestSystem(storage: storage, journalFormat: new NonConsumingJournalFormat());
@@ -97,9 +97,9 @@ public class StateManagerTests : JournalingTestBase
         var sut = CreateTestSystem();
 
         var writeException = await Assert.ThrowsAsync<InvalidOperationException>(
-            () => sut.Manager.WriteStateAsync(CancellationToken.None).AsTask());
+            () => sut.Manager.WriteStateAsync(TestContext.Current.CancellationToken).AsTask());
         var deleteException = await Assert.ThrowsAsync<InvalidOperationException>(
-            () => sut.Manager.DeleteStateAsync(CancellationToken.None).AsTask());
+            () => sut.Manager.DeleteStateAsync(TestContext.Current.CancellationToken).AsTask());
 
         Assert.Contains("not been initialized", writeException.Message, StringComparison.Ordinal);
         Assert.Contains("not been initialized", deleteException.Message, StringComparison.Ordinal);
@@ -153,12 +153,12 @@ public class StateManagerTests : JournalingTestBase
 
         using var data = segment.GetBuffer();
         var originalBytes = data.ToArray();
-        await storage.AppendAsync(data.AsReadOnlySequence(), CancellationToken.None);
+        await storage.AppendAsync(data.AsReadOnlySequence(), TestContext.Current.CancellationToken);
         var sut = CreateTestSystem(storage: storage);
 
         await sut.Lifecycle.OnStart(TestContext.Current.CancellationToken)
             .WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
-        await sut.Manager.WriteStateAsync(CancellationToken.None);
+        await sut.Manager.WriteStateAsync(TestContext.Current.CancellationToken);
 
         var segmentBytes = Assert.Single(storage.Segments);
         Assert.Equal(originalBytes, segmentBytes);
@@ -172,7 +172,7 @@ public class StateManagerTests : JournalingTestBase
         var storage = new CapturingStorage { IsCompactionRequested = true };
         using (var data = CreateBuffer(physicalBytes))
         {
-            await storage.AppendAsync(data.AsReadOnlySequence(), CancellationToken.None);
+            await storage.AppendAsync(data.AsReadOnlySequence(), TestContext.Current.CancellationToken);
         }
 
         var format = new DecodedPayloadOnlyJournalFormat(new JournalStreamId(99), decodedPayload, SessionPool);
@@ -180,7 +180,7 @@ public class StateManagerTests : JournalingTestBase
 
         await sut.Lifecycle.OnStart(TestContext.Current.CancellationToken)
             .WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
-        await sut.Manager.WriteStateAsync(CancellationToken.None);
+        await sut.Manager.WriteStateAsync(TestContext.Current.CancellationToken);
 
         var replacement = Assert.Single(storage.Replaces);
         Assert.NotEqual(physicalBytes, replacement);
@@ -201,14 +201,14 @@ public class StateManagerTests : JournalingTestBase
 
         await initial.Lifecycle.OnStart(TestContext.Current.CancellationToken);
         dictionary.Add("key", 7);
-        await initial.Manager.WriteStateAsync(CancellationToken.None);
+        await initial.Manager.WriteStateAsync(TestContext.Current.CancellationToken);
 
         storage.IsCompactionRequested = true;
         var format = new TrackingJournalFormat(SessionPool);
         var compacting = CreateTestSystem(storage: storage, journalFormat: format);
 
         await compacting.Lifecycle.OnStart(TestContext.Current.CancellationToken);
-        await compacting.Manager.WriteStateAsync(CancellationToken.None);
+        await compacting.Manager.WriteStateAsync(TestContext.Current.CancellationToken);
 
         Assert.Contains(format.Writers, writer => writer.BeganEntryIds.Any(id => id >= 8));
         Assert.Single(storage.Replaces);
@@ -230,7 +230,7 @@ public class StateManagerTests : JournalingTestBase
 
         await sut.Lifecycle.OnStart(TestContext.Current.CancellationToken);
         dictionary.Add("key", 1);
-        await sut.Manager.WriteStateAsync(CancellationToken.None);
+        await sut.Manager.WriteStateAsync(TestContext.Current.CancellationToken);
 
         var writer = Assert.Single(format.Writers);
         Assert.Single(storage.Appends);
@@ -249,7 +249,7 @@ public class StateManagerTests : JournalingTestBase
 
         await sut.Lifecycle.OnStart(TestContext.Current.CancellationToken);
         value.Value = 42;
-        await sut.Manager.WriteStateAsync(CancellationToken.None);
+        await sut.Manager.WriteStateAsync(TestContext.Current.CancellationToken);
 
         var writer = Assert.Single(format.Writers);
         Assert.Single(storage.Appends);
@@ -266,7 +266,7 @@ public class StateManagerTests : JournalingTestBase
 
         await sut.Lifecycle.OnStart(TestContext.Current.CancellationToken);
         dictionary.Add("key", 1);
-        await sut.Manager.WriteStateAsync(CancellationToken.None);
+        await sut.Manager.WriteStateAsync(TestContext.Current.CancellationToken);
 
         var append = Assert.Single(storage.Appends);
         Assert.Empty(storage.Replaces);
@@ -282,7 +282,7 @@ public class StateManagerTests : JournalingTestBase
 
         await sut.Lifecycle.OnStart(TestContext.Current.CancellationToken);
         value.Value = 42;
-        await sut.Manager.WriteStateAsync(CancellationToken.None);
+        await sut.Manager.WriteStateAsync(TestContext.Current.CancellationToken);
 
         Assert.NotNull(storage.AppendBytesAfterYield);
         Assert.NotEmpty(storage.AppendBytesAfterYield);
@@ -297,7 +297,7 @@ public class StateManagerTests : JournalingTestBase
 
         await sut.Lifecycle.OnStart(TestContext.Current.CancellationToken);
         value.Value = 42;
-        await sut.Manager.WriteStateAsync(CancellationToken.None);
+        await sut.Manager.WriteStateAsync(TestContext.Current.CancellationToken);
 
         Assert.NotNull(storage.ReplaceBytesAfterYield);
         Assert.NotEmpty(storage.ReplaceBytesAfterYield);
@@ -310,22 +310,22 @@ public class StateManagerTests : JournalingTestBase
         var sut = CreateTestSystem(storage: storage);
         var value = new DurableValue<int>("value", sut.Manager, CreateValueCodec<int>());
 
-        await sut.Lifecycle.OnStart();
+        await sut.Lifecycle.OnStart(TestContext.Current.CancellationToken);
         value.Value = 1;
-        var firstWrite = sut.Manager.WriteStateAsync(CancellationToken.None).AsTask();
-        await storage.ReplaceStarted.Task.WaitAsync(TimeSpan.FromSeconds(10));
+        var firstWrite = sut.Manager.WriteStateAsync(TestContext.Current.CancellationToken).AsTask();
+        await storage.ReplaceStarted.Task.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
 
         value.Value = 2;
         storage.AllowReplace.SetResult();
-        await firstWrite.WaitAsync(TimeSpan.FromSeconds(10));
+        await firstWrite.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
 
         Assert.True(sut.Manager.HasPendingWrites);
         storage.IsCompactionRequested = false;
-        await sut.Manager.WriteStateAsync(CancellationToken.None);
+        await sut.Manager.WriteStateAsync(TestContext.Current.CancellationToken);
 
         var recovered = CreateTestSystem(storage: storage);
         var recoveredValue = new DurableValue<int>("value", recovered.Manager, CreateValueCodec<int>());
-        await recovered.Lifecycle.OnStart();
+        await recovered.Lifecycle.OnStart(TestContext.Current.CancellationToken);
         Assert.Equal(2, recoveredValue.Value);
     }
 
@@ -339,22 +339,22 @@ public class StateManagerTests : JournalingTestBase
             sut.Manager,
             new OrleansBinaryPersistentStateCommandCodec<string>(CodecProvider.GetCodec<string>(), SessionPool));
 
-        await sut.Lifecycle.OnStart();
+        await sut.Lifecycle.OnStart(TestContext.Current.CancellationToken);
         ((IStorage<string>)state).State = "value";
-        var firstWrite = sut.Manager.WriteStateAsync(CancellationToken.None).AsTask();
-        await storage.ReplaceStarted.Task.WaitAsync(TimeSpan.FromSeconds(10));
+        var firstWrite = sut.Manager.WriteStateAsync(TestContext.Current.CancellationToken).AsTask();
+        await storage.ReplaceStarted.Task.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
 
         storage.IsCompactionRequested = false;
-        var clear = ((IStorage)state).ClearStateAsync();
+        var clear = ((IStorage)state).ClearStateAsync(TestContext.Current.CancellationToken);
         storage.AllowReplace.SetResult();
-        await Task.WhenAll(firstWrite, clear).WaitAsync(TimeSpan.FromSeconds(10));
+        await Task.WhenAll(firstWrite, clear).WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
 
         var recovered = CreateTestSystem(storage: storage);
         var recoveredState = new DurableState<string>(
             "state",
             recovered.Manager,
             new OrleansBinaryPersistentStateCommandCodec<string>(CodecProvider.GetCodec<string>(), SessionPool));
-        await recovered.Lifecycle.OnStart();
+        await recovered.Lifecycle.OnStart(TestContext.Current.CancellationToken);
         Assert.False(((IStorage)recoveredState).RecordExists);
     }
 
@@ -373,15 +373,15 @@ public class StateManagerTests : JournalingTestBase
             ServiceProvider.GetRequiredService<DeepCopier<int>>(),
             ServiceProvider.GetRequiredService<DeepCopier<Exception>>());
 
-        await sut.Lifecycle.OnStart();
+        await sut.Lifecycle.OnStart(TestContext.Current.CancellationToken);
         Assert.True(completion.TrySetResult(42));
-        var write = sut.Manager.WriteStateAsync(CancellationToken.None).AsTask();
-        await storage.ReplaceStarted.Task.WaitAsync(TimeSpan.FromSeconds(10));
+        var write = sut.Manager.WriteStateAsync(TestContext.Current.CancellationToken).AsTask();
+        await storage.ReplaceStarted.Task.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
 
         Assert.False(completion.Task.IsCompleted);
 
         storage.AllowReplace.SetResult();
-        await write.WaitAsync(TimeSpan.FromSeconds(10));
+        await write.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
         Assert.Equal(42, await completion.Task);
     }
 
@@ -393,19 +393,19 @@ public class StateManagerTests : JournalingTestBase
         var sut = CreateTestSystem(storage: storage);
         var value = new DurableValue<int>("value", sut.Manager, CreateValueCodec<int>());
 
-        await sut.Lifecycle.OnStart();
+        await sut.Lifecycle.OnStart(TestContext.Current.CancellationToken);
         value.Value = 42;
 
-        var exception = await Assert.ThrowsAsync<IOException>(() => sut.Manager.WriteStateAsync(CancellationToken.None).AsTask());
+        var exception = await Assert.ThrowsAsync<IOException>(() => sut.Manager.WriteStateAsync(TestContext.Current.CancellationToken).AsTask());
         Assert.Same(expected, exception);
         Assert.True(sut.Manager.HasPendingWrites);
 
         storage.IsCompactionRequested = false;
-        await sut.Manager.WriteStateAsync(CancellationToken.None);
+        await sut.Manager.WriteStateAsync(TestContext.Current.CancellationToken);
 
         var recovered = CreateTestSystem(storage: storage);
         var recoveredValue = new DurableValue<int>("value", recovered.Manager, CreateValueCodec<int>());
-        await recovered.Lifecycle.OnStart();
+        await recovered.Lifecycle.OnStart(TestContext.Current.CancellationToken);
         Assert.Equal(42, recoveredValue.Value);
     }
 
@@ -418,7 +418,7 @@ public class StateManagerTests : JournalingTestBase
 
         await sut.Lifecycle.OnStart(TestContext.Current.CancellationToken);
         dictionary.Add("key", 1);
-        await sut.Manager.WriteStateAsync(CancellationToken.None);
+        await sut.Manager.WriteStateAsync(TestContext.Current.CancellationToken);
 
         var replacement = Assert.Single(storage.Replaces);
         Assert.Empty(storage.Appends);
@@ -436,7 +436,7 @@ public class StateManagerTests : JournalingTestBase
 
         await sut.Lifecycle.OnStart(TestContext.Current.CancellationToken);
         value.Value = 42;
-        await sut.Manager.WriteStateAsync(CancellationToken.None);
+        await sut.Manager.WriteStateAsync(TestContext.Current.CancellationToken);
 
         var replacement = Assert.Single(storage.Replaces);
         Assert.Empty(storage.Appends);
@@ -470,10 +470,10 @@ public class StateManagerTests : JournalingTestBase
         sut.Manager.RegisterState("state", state);
 
         await sut.Lifecycle.OnStart(TestContext.Current.CancellationToken);
-        var firstWrite = sut.Manager.WriteStateAsync(CancellationToken.None).AsTask();
+        var firstWrite = sut.Manager.WriteStateAsync(TestContext.Current.CancellationToken).AsTask();
         await storage.FirstAppendStarted.Task.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
 
-        var secondWrite = sut.Manager.WriteStateAsync(CancellationToken.None).AsTask();
+        var secondWrite = sut.Manager.WriteStateAsync(TestContext.Current.CancellationToken).AsTask();
         timeProvider.Advance(TimeSpan.FromMilliseconds(250));
         storage.AllowFirstAppend.SetResult();
 
@@ -492,11 +492,11 @@ public class StateManagerTests : JournalingTestBase
 
         await sut.Lifecycle.OnStart(TestContext.Current.CancellationToken);
         dictionary.Add("before", 1);
-        await sut.Manager.WriteStateAsync(CancellationToken.None);
+        await sut.Manager.WriteStateAsync(TestContext.Current.CancellationToken);
 
-        await sut.Manager.DeleteStateAsync(CancellationToken.None);
+        await sut.Manager.DeleteStateAsync(TestContext.Current.CancellationToken);
         dictionary.Add("after", 2);
-        await sut.Manager.WriteStateAsync(CancellationToken.None);
+        await sut.Manager.WriteStateAsync(TestContext.Current.CancellationToken);
 
         Assert.Equal(2, storage.Appends.Count);
         var entries = ReadBinaryEntries(storage.Appends[^1]);
@@ -520,11 +520,11 @@ public class StateManagerTests : JournalingTestBase
 
         await sut.Lifecycle.OnStart(TestContext.Current.CancellationToken);
         value.Value = 1;
-        await sut.Manager.WriteStateAsync(CancellationToken.None);
+        await sut.Manager.WriteStateAsync(TestContext.Current.CancellationToken);
         value.Value = 2;
 
-        await sut.Manager.DeleteStateAsync(CancellationToken.None);
-        await sut.Manager.WriteStateAsync(CancellationToken.None);
+        await sut.Manager.DeleteStateAsync(TestContext.Current.CancellationToken);
+        await sut.Manager.WriteStateAsync(TestContext.Current.CancellationToken);
 
         Assert.Equal(2, storage.Appends.Count);
         var postDeleteEntries = ReadBinaryEntries(storage.Appends[^1]);
@@ -542,7 +542,7 @@ public class StateManagerTests : JournalingTestBase
 
         await sut.Lifecycle.OnStart(TestContext.Current.CancellationToken);
         dictionary.Add("key", 1);
-        await sut.Manager.WriteStateAsync(CancellationToken.None);
+        await sut.Manager.WriteStateAsync(TestContext.Current.CancellationToken);
 
         Assert.Empty(storage.Appends);
         Assert.Single(storage.Replaces);
@@ -636,7 +636,7 @@ public class StateManagerTests : JournalingTestBase
         Assert.Empty(dictionary);
         Assert.Equal(lengthBefore, GetCommittedLength(writer));
 
-        await sut.Manager.WriteStateAsync(CancellationToken.None);
+        await sut.Manager.WriteStateAsync(TestContext.Current.CancellationToken);
     }
 
     [Fact]
@@ -654,7 +654,7 @@ public class StateManagerTests : JournalingTestBase
 
         codec.ThrowOnSet = false;
         dictionary.Add(1, 1);
-        await sut.Manager.WriteStateAsync(CancellationToken.None);
+        await sut.Manager.WriteStateAsync(TestContext.Current.CancellationToken);
 
         var recovered = CreateTestSystem(storage: storage, journalFormat: new TrackingJournalFormat(SessionPool));
         var recoveredDictionary = new DurableDictionary<int, int>("dict", recovered.Manager, CreateDictionaryCodec<int, int>());
@@ -673,14 +673,14 @@ public class StateManagerTests : JournalingTestBase
 
         await sut.Lifecycle.OnStart(TestContext.Current.CancellationToken);
         dictionary.Add("first", 1);
-        await sut.Manager.WriteStateAsync(CancellationToken.None);
+        await sut.Manager.WriteStateAsync(TestContext.Current.CancellationToken);
 
         var expected = new InconsistentStateException("Expected storage write conflict.");
         storage.NextAppendException = expected;
         storage.BlockNextRead = true;
         dictionary.Add("second", 2);
 
-        var failedWrite = sut.Manager.WriteStateAsync(CancellationToken.None).AsTask();
+        var failedWrite = sut.Manager.WriteStateAsync(TestContext.Current.CancellationToken).AsTask();
         await storage.BlockedReadStarted.Task.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
         Assert.False(failedWrite.IsCompleted);
 
@@ -712,7 +712,7 @@ public class StateManagerTests : JournalingTestBase
 
         await sut.Lifecycle.OnStart(TestContext.Current.CancellationToken);
         dictionary.Add("first", 1);
-        await sut.Manager.WriteStateAsync(CancellationToken.None);
+        await sut.Manager.WriteStateAsync(TestContext.Current.CancellationToken);
         storage.ResetReadConsumeCount();
 
         var expected = new IOException("Expected storage write failure.");
@@ -720,7 +720,7 @@ public class StateManagerTests : JournalingTestBase
         dictionary.Add("second", 2);
 
         var exception = await Assert.ThrowsAsync<IOException>(
-            () => sut.Manager.WriteStateAsync(CancellationToken.None).AsTask());
+            () => sut.Manager.WriteStateAsync(TestContext.Current.CancellationToken).AsTask());
         Assert.Same(expected, exception);
 
         await sut.Manager.WriteStateAsync(TestContext.Current.CancellationToken).AsTask()
@@ -746,7 +746,7 @@ public class StateManagerTests : JournalingTestBase
 
         await sut.Lifecycle.OnStart(TestContext.Current.CancellationToken);
         dictionary.Add("first", 1);
-        await sut.Manager.WriteStateAsync(CancellationToken.None);
+        await sut.Manager.WriteStateAsync(TestContext.Current.CancellationToken);
 
         var conflict = new InconsistentStateException("Expected storage write conflict.");
         var firstRecoveryFailure = new IOException("Expected first recovery failure.");
@@ -870,14 +870,14 @@ public class StateManagerTests : JournalingTestBase
         using var registration = cancellation.Token.Register(static state => ((TaskCompletionSource)state!).TrySetResult(), cancellationSignaled);
 
         var initialize = sut.Manager.InitializeAsync(cancellation.Token).AsTask();
-        await storage.BlockedReadStarted.Task.WaitAsync(TimeSpan.FromSeconds(10));
+        await storage.BlockedReadStarted.Task.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
 
         cancellation.Cancel();
-        await cancellationSignaled.Task.WaitAsync(TimeSpan.FromSeconds(10));
+        await cancellationSignaled.Task.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
         Assert.False(initialize.IsCompleted);
 
         storage.AllowBlockedRead.SetResult();
-        await initialize.WaitAsync(TimeSpan.FromSeconds(10));
+        await initialize.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
     }
 
     [Fact]
@@ -887,23 +887,23 @@ public class StateManagerTests : JournalingTestBase
         var sut = CreateTestSystem(storage: storage);
         var dictionary = new DurableDictionary<string, int>("dict", sut.Manager, CreateDictionaryCodec<string, int>());
 
-        await sut.Lifecycle.OnStart();
+        await sut.Lifecycle.OnStart(TestContext.Current.CancellationToken);
         dictionary.Add("persisted", 1);
-        await sut.Manager.WriteStateAsync(CancellationToken.None);
+        await sut.Manager.WriteStateAsync(TestContext.Current.CancellationToken);
         storage.BlockNextDelete = true;
 
         using var cancellation = new CancellationTokenSource();
         var cancellationSignaled = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         using var registration = cancellation.Token.Register(static state => ((TaskCompletionSource)state!).TrySetResult(), cancellationSignaled);
         var delete = sut.Manager.DeleteStateAsync(cancellation.Token).AsTask();
-        await storage.DeleteStarted.Task.WaitAsync(TimeSpan.FromSeconds(10));
+        await storage.DeleteStarted.Task.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
 
         cancellation.Cancel();
-        await cancellationSignaled.Task.WaitAsync(TimeSpan.FromSeconds(10));
+        await cancellationSignaled.Task.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
         Assert.False(delete.IsCompleted);
 
         storage.AllowDelete.SetResult();
-        await delete.WaitAsync(TimeSpan.FromSeconds(10));
+        await delete.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
         Assert.Equal(1, storage.DeleteCount);
         Assert.Empty(dictionary);
     }
@@ -1027,7 +1027,7 @@ public class StateManagerTests : JournalingTestBase
             try
             {
                 entry.Writer.Write(new byte[] { 1, 2, 3 });
-                writeTask = sut.Manager.WriteStateAsync(CancellationToken.None).AsTask();
+                writeTask = sut.Manager.WriteStateAsync(TestContext.Current.CancellationToken).AsTask();
                 Assert.True(SpinWait.SpinUntil(() => storage.ReplaceStarted.Task.IsCompleted, TimeSpan.FromSeconds(10)), writeTask.Exception?.ToString());
                 Assert.False(writeTask.IsCompleted);
 
@@ -1065,7 +1065,7 @@ public class StateManagerTests : JournalingTestBase
         list.Add("item1");
         list.Add("item2");
 
-        await sut.Manager.WriteStateAsync(CancellationToken.None);
+        await sut.Manager.WriteStateAsync(TestContext.Current.CancellationToken);
 
         // Act - Create new manager with same storage
         var sut2 = CreateTestSystem(storage: sut.Storage);
@@ -1092,7 +1092,7 @@ public class StateManagerTests : JournalingTestBase
 
         await initial.Lifecycle.OnStart(TestContext.Current.CancellationToken);
         value.Value = 42;
-        await initial.Manager.WriteStateAsync(CancellationToken.None);
+        await initial.Manager.WriteStateAsync(TestContext.Current.CancellationToken);
 
         var format = new TrackingJournalFormat(SessionPool);
         var recovered = CreateTestSystem(storage: storage, journalFormat: format);
@@ -1114,7 +1114,7 @@ public class StateManagerTests : JournalingTestBase
             AppendDirectorySet(segment, "existing", recoveredStreamId);
             CreateValueCodec<int>().WriteSet(42, segment.CreateJournalStreamWriter(recoveredStreamId));
             using var committed = segment.GetBuffer();
-            await storage.AppendAsync(committed.AsReadOnlySequence(), CancellationToken.None);
+            await storage.AppendAsync(committed.AsReadOnlySequence(), TestContext.Current.CancellationToken);
         }
 
         var sut = CreateTestSystem(storage: storage);
@@ -1123,7 +1123,7 @@ public class StateManagerTests : JournalingTestBase
 
         await sut.Lifecycle.OnStart(TestContext.Current.CancellationToken);
         next.Value = 99;
-        await sut.Manager.WriteStateAsync(CancellationToken.None);
+        await sut.Manager.WriteStateAsync(TestContext.Current.CancellationToken);
 
         Assert.Equal(42, existing.Value);
         var entries = ReadBinaryEntries(storage.Appends[^1]);
@@ -1139,9 +1139,9 @@ public class StateManagerTests : JournalingTestBase
 
         await initial.Lifecycle.OnStart(TestContext.Current.CancellationToken);
         value.Value = 1;
-        await initial.Manager.WriteStateAsync(CancellationToken.None);
+        await initial.Manager.WriteStateAsync(TestContext.Current.CancellationToken);
         value.Value = 2;
-        await initial.Manager.WriteStateAsync(CancellationToken.None);
+        await initial.Manager.WriteStateAsync(TestContext.Current.CancellationToken);
 
         storage.ConcatenateReads = true;
         var recovered = CreateTestSystem(storage: storage);
@@ -1162,9 +1162,9 @@ public class StateManagerTests : JournalingTestBase
 
         await initial.Lifecycle.OnStart(TestContext.Current.CancellationToken);
         value.Value = 1;
-        await initial.Manager.WriteStateAsync(CancellationToken.None);
+        await initial.Manager.WriteStateAsync(TestContext.Current.CancellationToken);
         value.Value = 2;
-        await initial.Manager.WriteStateAsync(CancellationToken.None);
+        await initial.Manager.WriteStateAsync(TestContext.Current.CancellationToken);
 
         var persistedBytes = storage.Appends.SelectMany(static segment => segment).ToArray();
         var splitStorage = new ChunkedReadStorage(persistedBytes, chunkSize: 1);
@@ -1205,7 +1205,7 @@ public class StateManagerTests : JournalingTestBase
         }
         finally
         {
-            await sut.Lifecycle.OnStop(CancellationToken.None);
+            await sut.Lifecycle.OnStop(TestContext.Current.CancellationToken);
         }
 
         Assert.Contains("journal format key 'orleans-binary'", exception.Message, StringComparison.Ordinal);
@@ -1293,7 +1293,7 @@ public class StateManagerTests : JournalingTestBase
         }
         finally
         {
-            await sut.Lifecycle.OnStop(CancellationToken.None);
+            await sut.Lifecycle.OnStop(TestContext.Current.CancellationToken);
         }
 
         Assert.Same(storage.Exception, exception);
@@ -1316,16 +1316,16 @@ public class StateManagerTests : JournalingTestBase
 
         // Act - Multiple operations with WriteState in between
         dictionary.Add("key1", 1);
-        await manager.WriteStateAsync(CancellationToken.None);
+        await manager.WriteStateAsync(TestContext.Current.CancellationToken);
 
         dictionary.Add("key2", 2);
-        await manager.WriteStateAsync(CancellationToken.None);
+        await manager.WriteStateAsync(TestContext.Current.CancellationToken);
 
         dictionary["key1"] = 10;
-        await manager.WriteStateAsync(CancellationToken.None);
+        await manager.WriteStateAsync(TestContext.Current.CancellationToken);
 
         dictionary.Remove("key2");
-        await manager.WriteStateAsync(CancellationToken.None);
+        await manager.WriteStateAsync(TestContext.Current.CancellationToken);
 
         // Assert - Final state is correct
         Assert.Single(dictionary);
@@ -1370,7 +1370,7 @@ public class StateManagerTests : JournalingTestBase
 
         personValue.Value = new TestPerson { Id = 100, Name = "Test Person", Age = 30 };
 
-        await manager.WriteStateAsync(CancellationToken.None);
+        await manager.WriteStateAsync(TestContext.Current.CancellationToken);
 
         // Assert - All should have correct values
         Assert.Equal(2, intDict.Count);
@@ -1423,7 +1423,7 @@ public class StateManagerTests : JournalingTestBase
         dict1.Add("key2", 2);
         dict2.Add("key2", 200);
 
-        await manager.WriteStateAsync(CancellationToken.None);
+        await manager.WriteStateAsync(TestContext.Current.CancellationToken);
 
         // Assert - Both states should have their correct values
         Assert.Equal(2, dict1.Count);
@@ -1456,7 +1456,7 @@ public class StateManagerTests : JournalingTestBase
             largeDict.Add(i, $"Value {i}");
         }
 
-        await sut.Manager.WriteStateAsync(CancellationToken.None);
+        await sut.Manager.WriteStateAsync(TestContext.Current.CancellationToken);
 
         // Create new manager for recovery
         var sut2 = CreateTestSystem(storage: sut.Storage);
@@ -1498,7 +1498,7 @@ public class StateManagerTests : JournalingTestBase
         dictToKeep1.Add("a", 1);
         dictToRetire2.Add("b", 1);
 
-        await sut1.Manager.WriteStateAsync(CancellationToken.None);
+        await sut1.Manager.WriteStateAsync(TestContext.Current.CancellationToken);
 
         // -------------- STEP 2 --------------
 
@@ -1593,7 +1593,7 @@ public class StateManagerTests : JournalingTestBase
             for (var i = 0; i < 11; i++)
             {
                 dict["a"] = i;
-                await manager.WriteStateAsync(CancellationToken.None);
+                await manager.WriteStateAsync(TestContext.Current.CancellationToken);
             }
         }
     }
@@ -1707,11 +1707,11 @@ public class StateManagerTests : JournalingTestBase
     {
         var storage = new CheckpointingJournalStorage();
         var sut = CreateMixedStateTestSystem(storage);
-        await sut.Lifecycle.OnStart().WaitAsync(TimeSpan.FromSeconds(10));
+        await sut.Lifecycle.OnStart(TestContext.Current.CancellationToken).WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
 
         sut.List.Add("baseline");
         sut.Value.Value = 10;
-        await sut.Manager.WriteStateAsync(CancellationToken.None).AsTask().WaitAsync(TimeSpan.FromSeconds(10));
+        await sut.Manager.WriteStateAsync(TestContext.Current.CancellationToken).AsTask().WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
         var baselineCheckpoint = storage.GetDurableCheckpoint();
         storage.ClearOperationHistory();
 
@@ -1722,7 +1722,7 @@ public class StateManagerTests : JournalingTestBase
         storage.NextReplaceException = expected;
 
         var exception = await Assert.ThrowsAsync<IOException>(
-            () => sut.Manager.WriteStateAsync(CancellationToken.None).AsTask().WaitAsync(TimeSpan.FromSeconds(10)));
+            () => sut.Manager.WriteStateAsync(TestContext.Current.CancellationToken).AsTask().WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken));
         var pendingAfterFailure = sut.Manager.HasPendingWrites;
         var pendingBytesAfterFailure = sut.Manager.PendingWriteByteCount;
         var failedCheckpoint = storage.GetDurableCheckpoint();
@@ -1732,7 +1732,7 @@ public class StateManagerTests : JournalingTestBase
         var committedReplacesAfterFailure = storage.CommittedReplaces.Count;
         var failedRecovery = await RecoverMixedStateAsync(new CheckpointingJournalStorage(failedCheckpoint));
 
-        await sut.Manager.WriteStateAsync(CancellationToken.None).AsTask().WaitAsync(TimeSpan.FromSeconds(10));
+        await sut.Manager.WriteStateAsync(TestContext.Current.CancellationToken).AsTask().WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
         var finalRecovery = await RecoverMixedStateAsync(storage.CreateRecoveryStorage());
 
         Assert.Same(expected, exception);
@@ -1758,11 +1758,11 @@ public class StateManagerTests : JournalingTestBase
     {
         var storage = new CheckpointingJournalStorage();
         var sut = CreateMixedStateTestSystem(storage);
-        await sut.Lifecycle.OnStart().WaitAsync(TimeSpan.FromSeconds(10));
+        await sut.Lifecycle.OnStart(TestContext.Current.CancellationToken).WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
 
         sut.List.Add("baseline");
         sut.Value.Value = 10;
-        await sut.Manager.WriteStateAsync(CancellationToken.None).AsTask().WaitAsync(TimeSpan.FromSeconds(10));
+        await sut.Manager.WriteStateAsync(TestContext.Current.CancellationToken).AsTask().WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
         var baselineCheckpoint = storage.GetDurableCheckpoint();
         storage.ClearOperationHistory();
 
@@ -1773,7 +1773,7 @@ public class StateManagerTests : JournalingTestBase
         storage.NextReplaceException = expected;
 
         var exception = await Assert.ThrowsAsync<InconsistentStateException>(
-            () => sut.Manager.WriteStateAsync(CancellationToken.None).AsTask().WaitAsync(TimeSpan.FromSeconds(10)));
+            () => sut.Manager.WriteStateAsync(TestContext.Current.CancellationToken).AsTask().WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken));
 
         Assert.Same(expected, exception);
         Assert.Single(storage.ReplaceAttempts);
@@ -1791,11 +1791,11 @@ public class StateManagerTests : JournalingTestBase
     {
         var storage = new CheckpointingJournalStorage();
         var sut = CreateMixedStateTestSystem(storage);
-        await sut.Lifecycle.OnStart().WaitAsync(TimeSpan.FromSeconds(10));
+        await sut.Lifecycle.OnStart(TestContext.Current.CancellationToken).WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
 
         sut.List.Add("baseline");
         sut.Value.Value = 10;
-        await sut.Manager.WriteStateAsync(CancellationToken.None).AsTask().WaitAsync(TimeSpan.FromSeconds(10));
+        await sut.Manager.WriteStateAsync(TestContext.Current.CancellationToken).AsTask().WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
         storage.ClearOperationHistory();
 
         sut.List.Add("losing");
@@ -1806,7 +1806,7 @@ public class StateManagerTests : JournalingTestBase
         storage.NextReplaceException = expected;
 
         var exception = await Assert.ThrowsAsync<InconsistentStateException>(
-            () => sut.Manager.WriteStateAsync(CancellationToken.None).AsTask().WaitAsync(TimeSpan.FromSeconds(10)));
+            () => sut.Manager.WriteStateAsync(TestContext.Current.CancellationToken).AsTask().WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken));
 
         Assert.Same(expected, exception);
         Assert.Empty(storage.GetDurableCheckpoint());
@@ -1823,34 +1823,34 @@ public class StateManagerTests : JournalingTestBase
     {
         var storage = new CheckpointingJournalStorage();
         var sut = CreateMixedStateTestSystem(storage);
-        await sut.Lifecycle.OnStart().WaitAsync(TimeSpan.FromSeconds(10));
+        await sut.Lifecycle.OnStart(TestContext.Current.CancellationToken).WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
 
         sut.List.Add("baseline");
         sut.Value.Value = 10;
-        await sut.Manager.WriteStateAsync(CancellationToken.None).AsTask().WaitAsync(TimeSpan.FromSeconds(10));
+        await sut.Manager.WriteStateAsync(TestContext.Current.CancellationToken).AsTask().WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
         storage.ClearOperationHistory();
 
         sut.List.Add("before-capture");
         sut.Value.Value = 20;
         storage.IsCompactionRequested = true;
         storage.DelayReplace = true;
-        var firstWrite = sut.Manager.WriteStateAsync(CancellationToken.None).AsTask();
-        await storage.ReplaceStarted.Task.WaitAsync(TimeSpan.FromSeconds(10));
+        var firstWrite = sut.Manager.WriteStateAsync(TestContext.Current.CancellationToken).AsTask();
+        await storage.ReplaceStarted.Task.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
 
         var capturedRecovery = await RecoverMixedStateAsync(storage.CreateCapturedReplacementStorage());
         sut.List.Add("during-replace");
         sut.Value.Value = 30;
 
         storage.AllowReplace.TrySetResult();
-        await firstWrite.WaitAsync(TimeSpan.FromSeconds(10));
-        await storage.ReplaceCompleted.Task.WaitAsync(TimeSpan.FromSeconds(10));
+        await firstWrite.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
+        await storage.ReplaceCompleted.Task.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
         var pendingAfterFirstWrite = sut.Manager.HasPendingWrites;
         var pendingBytesAfterFirstWrite = sut.Manager.PendingWriteByteCount;
         var replacementsAfterFirstWrite = storage.CommittedReplaces.Count;
 
         storage.DelayReplace = false;
         storage.IsCompactionRequested = false;
-        await sut.Manager.WriteStateAsync(CancellationToken.None).AsTask().WaitAsync(TimeSpan.FromSeconds(10));
+        await sut.Manager.WriteStateAsync(TestContext.Current.CancellationToken).AsTask().WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
         var finalRecovery = await RecoverMixedStateAsync(storage.CreateRecoveryStorage());
 
         Assert.Equal(["baseline", "before-capture"], capturedRecovery.List.ToArray());
@@ -1868,11 +1868,11 @@ public class StateManagerTests : JournalingTestBase
     {
         var storage = new CheckpointingJournalStorage();
         var sut = CreateMixedStateTestSystem(storage);
-        await sut.Lifecycle.OnStart().WaitAsync(TimeSpan.FromSeconds(10));
+        await sut.Lifecycle.OnStart(TestContext.Current.CancellationToken).WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
 
         sut.List.Add("baseline");
         sut.Value.Value = 10;
-        await sut.Manager.WriteStateAsync(CancellationToken.None).AsTask().WaitAsync(TimeSpan.FromSeconds(10));
+        await sut.Manager.WriteStateAsync(TestContext.Current.CancellationToken).AsTask().WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
         var baselineCheckpoint = storage.GetDurableCheckpoint();
         storage.ClearOperationHistory();
 
@@ -1883,7 +1883,7 @@ public class StateManagerTests : JournalingTestBase
         storage.NextReplaceException = expected;
 
         var exception = await Assert.ThrowsAsync<OperationCanceledException>(
-            () => sut.Manager.WriteStateAsync(CancellationToken.None).AsTask().WaitAsync(TimeSpan.FromSeconds(10)));
+            () => sut.Manager.WriteStateAsync(TestContext.Current.CancellationToken).AsTask().WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken));
         var pendingAfterFailure = sut.Manager.HasPendingWrites;
         var pendingBytesAfterFailure = sut.Manager.PendingWriteByteCount;
         var failedCheckpoint = storage.GetDurableCheckpoint();
@@ -1893,7 +1893,7 @@ public class StateManagerTests : JournalingTestBase
         var committedReplacesAfterFailure = storage.CommittedReplaces.Count;
         var failedRecovery = await RecoverMixedStateAsync(new CheckpointingJournalStorage(failedCheckpoint));
 
-        await sut.Manager.WriteStateAsync(CancellationToken.None).AsTask().WaitAsync(TimeSpan.FromSeconds(10));
+        await sut.Manager.WriteStateAsync(TestContext.Current.CancellationToken).AsTask().WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
         var finalRecovery = await RecoverMixedStateAsync(storage.CreateRecoveryStorage());
 
         Assert.Same(expected, exception);
@@ -1923,25 +1923,25 @@ public class StateManagerTests : JournalingTestBase
             DelayReplace = true
         };
         var sut = CreateMixedStateTestSystem(storage);
-        await sut.Lifecycle.OnStart().WaitAsync(TimeSpan.FromSeconds(10));
+        await sut.Lifecycle.OnStart(TestContext.Current.CancellationToken).WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
 
         sut.List.Add("direct");
         sut.Value.Value = 42;
         using var callerCancellation = new CancellationTokenSource();
         var callerWrite = sut.Manager.WriteStateAsync(callerCancellation.Token).AsTask();
-        await storage.ReplaceStarted.Task.WaitAsync(TimeSpan.FromSeconds(10));
+        await storage.ReplaceStarted.Task.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
 
         callerCancellation.Cancel();
         await Assert.ThrowsAnyAsync<OperationCanceledException>(
-            () => callerWrite.WaitAsync(TimeSpan.FromSeconds(10)));
+            () => callerWrite.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken));
         var storageTokenCanceledByCaller = storage.LastReplaceCancellationToken.IsCancellationRequested;
         var replacementCompletedBeforeRelease = storage.ReplaceCompleted.Task.IsCompleted;
         var committedReplacesBeforeRelease = storage.CommittedReplaces.Count;
 
         storage.AllowReplace.TrySetResult();
-        await storage.ReplaceCompleted.Task.WaitAsync(TimeSpan.FromSeconds(10));
+        await storage.ReplaceCompleted.Task.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
         storage.IsCompactionRequested = false;
-        await sut.Manager.WriteStateAsync(CancellationToken.None).AsTask().WaitAsync(TimeSpan.FromSeconds(10));
+        await sut.Manager.WriteStateAsync(TestContext.Current.CancellationToken).AsTask().WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
         var recovered = await RecoverMixedStateAsync(storage.CreateRecoveryStorage());
 
         Assert.False(storageTokenCanceledByCaller);
@@ -1959,11 +1959,11 @@ public class StateManagerTests : JournalingTestBase
     {
         var storage = new CheckpointingJournalStorage();
         var sut = CreateMixedStateTestSystem(storage);
-        await sut.Lifecycle.OnStart().WaitAsync(TimeSpan.FromSeconds(10));
+        await sut.Lifecycle.OnStart(TestContext.Current.CancellationToken).WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
 
         sut.List.Add("baseline");
         sut.Value.Value = 10;
-        await sut.Manager.WriteStateAsync(CancellationToken.None).AsTask().WaitAsync(TimeSpan.FromSeconds(10));
+        await sut.Manager.WriteStateAsync(TestContext.Current.CancellationToken).AsTask().WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
         var baselineCheckpoint = storage.GetDurableCheckpoint();
         storage.ClearOperationHistory();
 
@@ -1973,7 +1973,7 @@ public class StateManagerTests : JournalingTestBase
         storage.NextAppendException = expected;
 
         var exception = await Assert.ThrowsAsync<IOException>(
-            () => sut.Manager.WriteStateAsync(CancellationToken.None).AsTask().WaitAsync(TimeSpan.FromSeconds(10)));
+            () => sut.Manager.WriteStateAsync(TestContext.Current.CancellationToken).AsTask().WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken));
         var failedCheckpoint = storage.GetDurableCheckpoint();
         var failedRecovery = await RecoverMixedStateAsync(new CheckpointingJournalStorage(failedCheckpoint));
         var appendAttemptsAfterFailure = storage.AppendAttempts.Count;
@@ -1981,7 +1981,7 @@ public class StateManagerTests : JournalingTestBase
         var replaceAttemptsAfterFailure = storage.ReplaceAttempts.Count;
         var committedReplacesAfterFailure = storage.CommittedReplaces.Count;
 
-        await sut.Manager.WriteStateAsync(CancellationToken.None).AsTask().WaitAsync(TimeSpan.FromSeconds(10));
+        await sut.Manager.WriteStateAsync(TestContext.Current.CancellationToken).AsTask().WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
         var finalRecovery = await RecoverMixedStateAsync(storage.CreateRecoveryStorage());
 
         Assert.Same(expected, exception);
@@ -2020,7 +2020,7 @@ public class StateManagerTests : JournalingTestBase
         DurableValue<int> Value)> RecoverMixedStateAsync(IJournalStorage storage)
     {
         var recovered = CreateMixedStateTestSystem(storage);
-        await recovered.Lifecycle.OnStart().WaitAsync(TimeSpan.FromSeconds(10));
+        await recovered.Lifecycle.OnStart(TestContext.Current.CancellationToken).WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
         return recovered;
     }
 
