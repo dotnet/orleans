@@ -1,4 +1,5 @@
 using System.Collections.Concurrent;
+using System.Diagnostics.CodeAnalysis;
 using System.Runtime.CompilerServices;
 using Orleans.DurableTasks;
 using Xunit;
@@ -796,6 +797,7 @@ public class DurableTaskTests
     }
 
     [Fact]
+    [SuppressMessage("xUnit", "xUnit1051", Justification = "This test verifies that the default caller path returns the shared cancellation task.")]
     public async Task ExternalRequestAfterTokenCancellationStillAwaitsAndPropagatesErrors()
     {
         var host = new TestHost(DateTimeOffset.UnixEpoch);
@@ -813,12 +815,12 @@ public class DurableTaskTests
             throw expected;
         }, Xunit.TestContext.Current.CancellationToken);
 
-        var first = DurableTaskRuntimeHelper.RequestCancellationAsync(context, Xunit.TestContext.Current.CancellationToken);
+        var first = DurableTaskRuntimeHelper.RequestCancellationAsync(context);
         await callbackStarted.Task;
         Assert.True(tokenCallbackInvoked);
         Assert.Null(DurableExecutionContext.Current);
 
-        var second = DurableTaskRuntimeHelper.RequestCancellationAsync(context, Xunit.TestContext.Current.CancellationToken);
+        var second = DurableTaskRuntimeHelper.RequestCancellationAsync(context);
         Assert.Same(first, second);
         Assert.False(second.IsCompleted);
 
@@ -941,6 +943,7 @@ public class DurableTaskTests
     }
 
     [Fact]
+    [SuppressMessage("xUnit", "xUnit1051", Justification = "This test verifies that the default caller path returns the shared cancellation task.")]
     public async Task ConcurrentExternalCancellationObserversShareCompletionAndErrors()
     {
         var host = new TestHost(DateTimeOffset.UnixEpoch);
@@ -955,10 +958,10 @@ public class DurableTaskTests
             throw expected;
         }, Xunit.TestContext.Current.CancellationToken);
 
-        var first = DurableTaskRuntimeHelper.RequestCancellationAsync(context, Xunit.TestContext.Current.CancellationToken);
+        var first = DurableTaskRuntimeHelper.RequestCancellationAsync(context);
         await callbackStarted.Task;
-        var second = DurableTaskRuntimeHelper.RequestCancellationAsync(context, Xunit.TestContext.Current.CancellationToken);
-        var third = DurableTaskRuntimeHelper.RequestCancellationAsync(context, Xunit.TestContext.Current.CancellationToken);
+        var second = DurableTaskRuntimeHelper.RequestCancellationAsync(context);
+        var third = DurableTaskRuntimeHelper.RequestCancellationAsync(context);
 
         Assert.Same(first, second);
         Assert.Same(first, third);
@@ -972,6 +975,7 @@ public class DurableTaskTests
     }
 
     [Fact]
+    [SuppressMessage("xUnit", "xUnit1051", Justification = "This test verifies that the default caller path returns the shared cancellation task.")]
     public async Task LateRegistrationJoinsActiveCancellationCompletionAndErrors()
     {
         var host = new TestHost(DateTimeOffset.UnixEpoch);
@@ -988,7 +992,7 @@ public class DurableTaskTests
             await releaseBlocker.Task;
         }, Xunit.TestContext.Current.CancellationToken);
 
-        var first = DurableTaskRuntimeHelper.RequestCancellationAsync(context, Xunit.TestContext.Current.CancellationToken);
+        var first = DurableTaskRuntimeHelper.RequestCancellationAsync(context);
         await blockerStarted.Task;
         var registration = await context.RegisterCancellationCallbackAsync(async _ =>
         {
@@ -997,7 +1001,7 @@ public class DurableTaskTests
             throw firstFailure;
         }, Xunit.TestContext.Current.CancellationToken);
         var secondRegistration = await context.RegisterCancellationCallbackAsync(_ => throw secondFailure, Xunit.TestContext.Current.CancellationToken);
-        var second = DurableTaskRuntimeHelper.RequestCancellationAsync(context, Xunit.TestContext.Current.CancellationToken);
+        var second = DurableTaskRuntimeHelper.RequestCancellationAsync(context);
 
         Assert.Same(first, second);
         Assert.False(lateStarted.Task.IsCompleted);
@@ -1124,6 +1128,7 @@ public class DurableTaskTests
     }
 
     [Fact]
+    [SuppressMessage("xUnit", "xUnit1051", Justification = "This test verifies that the default caller path returns the shared cancellation task.")]
     public async Task OutsideCancellationCallerWaitsForActiveCallbackAndSharesCompletion()
     {
         var host = new TestHost(DateTimeOffset.UnixEpoch);
@@ -1138,9 +1143,9 @@ public class DurableTaskTests
             await releaseCallback.Task;
         }, Xunit.TestContext.Current.CancellationToken);
 
-        var first = DurableTaskRuntimeHelper.RequestCancellationAsync(context, Xunit.TestContext.Current.CancellationToken);
+        var first = DurableTaskRuntimeHelper.RequestCancellationAsync(context);
         await callbackStarted.Task;
-        var second = DurableTaskRuntimeHelper.RequestCancellationAsync(context, Xunit.TestContext.Current.CancellationToken);
+        var second = DurableTaskRuntimeHelper.RequestCancellationAsync(context);
 
         Assert.Same(first, second);
         Assert.False(second.IsCompleted);
