@@ -1,15 +1,15 @@
 using System.Data;
 using System.Data.Common;
 using System.Globalization;
-using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Data.SqlClient;
+using Microsoft.Extensions.Logging.Abstractions;
 using MySql.Data.MySqlClient;
 using Npgsql;
 using Orleans.Configuration;
 using Orleans.Runtime;
-using Orleans.Streams;
 using Orleans.Streaming.AdoNet;
 using Orleans.Streaming.AdoNet.Storage;
+using Orleans.Streams;
 using UnitTests.General;
 using static System.String;
 
@@ -91,7 +91,7 @@ public abstract class AdoNetStreamPartitionTests(string invariant) : IAsyncLifet
     private const string TestDatabaseName = "OrleansStreamTest";
 
     private IRelationalStorage _storage = null!;
-    private RelationalOrleansQueries _queries = null!;
+    private CancelableRelationalQueries _queries = null!;
 
     public async ValueTask InitializeAsync()
     {
@@ -99,7 +99,7 @@ public abstract class AdoNetStreamPartitionTests(string invariant) : IAsyncLifet
         Assert.SkipWhen(IsNullOrEmpty(testing.CurrentConnectionString), $"Database '{TestDatabaseName}' not initialized");
 
         _storage = RelationalStorage.CreateInstance(invariant, testing.CurrentConnectionString);
-        _queries = await RelationalOrleansQueries.CreateInstance(invariant, testing.CurrentConnectionString);
+        _queries = new(await RelationalOrleansQueries.CreateInstance(invariant, testing.CurrentConnectionString));
     }
 
     public ValueTask DisposeAsync() => ValueTask.CompletedTask;
@@ -553,7 +553,7 @@ public abstract class AdoNetStreamPartitionTests(string invariant) : IAsyncLifet
             providerId,
             queueId,
             new AdoNetStreamOptions(),
-            _queries,
+            _queries.Inner,
             NullLogger.Instance);
         var loaded = await store.Load(CancellationToken.None);
         Assert.Equal("0", loaded.Checkpoint);
@@ -584,14 +584,14 @@ public abstract class AdoNetStreamPartitionTests(string invariant) : IAsyncLifet
             providerId,
             queueId,
             new AdoNetStreamOptions(),
-            _queries,
+            _queries.Inner,
             NullLogger.Instance);
-        var loaded = await store.Load(CancellationToken.None);
+        var loaded = await store.Load(TestContext.Current.CancellationToken);
         var newOwner = await _queries.AcquireStreamPartitionAsync(serviceId, providerId, queueId, startFromNow: false);
         Assert.NotEqual(long.Parse(loaded.Version, CultureInfo.InvariantCulture), newOwner.OwnerEpoch);
 
         var exception = await Assert.ThrowsAsync<InvalidOperationException>(
-            () => store.Update("1", loaded.Version, CancellationToken.None).AsTask());
+            () => store.Update("1", loaded.Version, TestContext.Current.CancellationToken).AsTask());
 
         Assert.Contains("ownership was lost", exception.Message);
     }
@@ -906,7 +906,8 @@ public abstract class AdoNetStreamPartitionTests(string invariant) : IAsyncLifet
     {
         await _storage.ExecuteAsync(
             "DELETE FROM OrleansQuery WHERE QueryKey IN ('AppendStreamMessageKey', 'StreamSchemaVersionKey')",
-            command => { });
+            command => { },
+            cancellationToken: TestContext.Current.CancellationToken);
 
         var exception = await Assert.ThrowsAsync<InvalidOperationException>(() =>
             RelationalOrleansQueries.CreateInstance(invariant, _storage.ConnectionString));
@@ -920,7 +921,8 @@ public abstract class AdoNetStreamPartitionTests(string invariant) : IAsyncLifet
     {
         await _storage.ExecuteAsync(
             "INSERT INTO OrleansQuery (QueryKey, QueryText) VALUES ('QueueStreamMessageKey', 'legacy')",
-            command => { });
+            command => { },
+            cancellationToken: TestContext.Current.CancellationToken);
 
         var exception = await Assert.ThrowsAsync<InvalidOperationException>(() =>
             RelationalOrleansQueries.CreateInstance(invariant, _storage.ConnectionString));
@@ -948,8 +950,8 @@ public abstract class AdoNetStreamPartitionTests(string invariant) : IAsyncLifet
         var payload = RandomPayload();
 
         await using var firstConnection = new SqlConnection(_storage.ConnectionString);
-        await firstConnection.OpenAsync();
-        await using var firstTransaction = (SqlTransaction)await firstConnection.BeginTransactionAsync();
+        await firstConnection.OpenAsync(TestContext.Current.CancellationToken);
+        await using var firstTransaction = (SqlTransaction)await firstConnection.BeginTransactionAsync(TestContext.Current.CancellationToken);
         await using var firstCommand = CreateAppendCommand(firstConnection, firstTransaction, serviceId, providerId, queueId, streamIdBytes, nsLength, payload);
         var firstMessageId = await ReadMessageId(firstCommand);
         Assert.Equal(1, firstMessageId);
@@ -958,7 +960,7 @@ public abstract class AdoNetStreamPartitionTests(string invariant) : IAsyncLifet
         // transaction still holds the partition-row lock.
         await using (var secondConnection = new SqlConnection(_storage.ConnectionString))
         {
-            await secondConnection.OpenAsync();
+            await secondConnection.OpenAsync(TestContext.Current.CancellationToken);
             await using var secondCommand = secondConnection.CreateCommand();
             secondCommand.CommandType = CommandType.Text;
             secondCommand.CommandText = "SET LOCK_TIMEOUT 0; EXECUTE AppendStreamMessage @ServiceId, @ProviderId, @QueueId, @StreamIdBytes, @StreamNamespaceLength, @Payload;";
@@ -969,14 +971,15 @@ public abstract class AdoNetStreamPartitionTests(string invariant) : IAsyncLifet
             secondCommand.Parameters.AddWithValue("StreamNamespaceLength", nsLength);
             secondCommand.Parameters.AddWithValue("Payload", payload);
 
-            var exception = await Assert.ThrowsAsync<SqlException>(() => secondCommand.ExecuteReaderAsync());
+            var exception = await Assert.ThrowsAsync<SqlException>(
+                () => secondCommand.ExecuteReaderAsync(TestContext.Current.CancellationToken));
             Assert.Equal(51000, exception.Number);
             Assert.Contains("initialization lock", exception.Message, StringComparison.Ordinal);
         }
 
         // Rolling back must not burn the allocated identifier: it is reused by the next append,
         // and no message row for it was left behind.
-        await firstTransaction.RollbackAsync();
+        await firstTransaction.RollbackAsync(TestContext.Current.CancellationToken);
 
         var afterRollback = await _queries.AppendStreamMessageAsync(serviceId, providerId, queueId, streamIdBytes, nsLength, payload);
         Assert.Equal(1, afterRollback.MessageId);
@@ -1002,8 +1005,8 @@ public abstract class AdoNetStreamPartitionTests(string invariant) : IAsyncLifet
         var payload = RandomPayload();
 
         await using var connection = new SqlConnection(_storage.ConnectionString);
-        await connection.OpenAsync();
-        await using var transaction = (SqlTransaction)await connection.BeginTransactionAsync();
+        await connection.OpenAsync(TestContext.Current.CancellationToken);
+        await using var transaction = (SqlTransaction)await connection.BeginTransactionAsync(TestContext.Current.CancellationToken);
         await using var command = CreateAppendCommand(connection, transaction, serviceId, providerId, queueId, streamIdBytes, nsLength, payload);
         var inFlightMessageId = await ReadMessageId(command);
         Assert.Equal(committed.MessageId + 1, inFlightMessageId);
@@ -1011,7 +1014,7 @@ public abstract class AdoNetStreamPartitionTests(string invariant) : IAsyncLifet
         var duringAppend = await _queries.ReadStreamMessagesAsync(serviceId, providerId, queueId, afterMessageId: 0, maxCount: 100);
         Assert.Equal([committed.MessageId], duringAppend.Select(m => m.MessageId));
 
-        await transaction.CommitAsync();
+        await transaction.CommitAsync(TestContext.Current.CancellationToken);
 
         var afterCommit = await _queries.ReadStreamMessagesAsync(serviceId, providerId, queueId, afterMessageId: 0, maxCount: 100);
         Assert.Equal([committed.MessageId, inFlightMessageId], afterCommit.Select(m => m.MessageId));
@@ -1027,16 +1030,16 @@ public abstract class AdoNetStreamPartitionTests(string invariant) : IAsyncLifet
         var payload = RandomPayload();
 
         await using var connection = new SqlConnection(_storage.ConnectionString);
-        await connection.OpenAsync();
-        await using var transaction = (SqlTransaction)await connection.BeginTransactionAsync();
+        await connection.OpenAsync(TestContext.Current.CancellationToken);
+        await using var transaction = (SqlTransaction)await connection.BeginTransactionAsync(TestContext.Current.CancellationToken);
         await using var command = CreateAppendCommand(connection, transaction, serviceId, providerId, firstQueueId, streamIdBytes, nsLength, payload);
         Assert.Equal(1, await ReadMessageId(command));
 
         var independent = await _queries.AppendStreamMessageAsync(serviceId, providerId, secondQueueId, streamIdBytes, nsLength, payload)
-            .WaitAsync(TimeSpan.FromSeconds(5));
+            .WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
         Assert.Equal(1, independent.MessageId);
 
-        await transaction.RollbackAsync();
+        await transaction.RollbackAsync(TestContext.Current.CancellationToken);
     }
 
     protected async Task VerifyMySqlRollbackRestoresAllocation()
@@ -1048,8 +1051,8 @@ public abstract class AdoNetStreamPartitionTests(string invariant) : IAsyncLifet
         var payload = RandomPayload();
 
         await using var connection = new MySqlConnection(_storage.ConnectionString);
-        await connection.OpenAsync();
-        await using var transaction = await connection.BeginTransactionAsync();
+        await connection.OpenAsync(TestContext.Current.CancellationToken);
+        await using var transaction = await connection.BeginTransactionAsync(TestContext.Current.CancellationToken);
         await using (var command = connection.CreateCommand())
         {
             command.Transaction = transaction;
@@ -1063,7 +1066,7 @@ public abstract class AdoNetStreamPartitionTests(string invariant) : IAsyncLifet
             Assert.Equal(1, await ReadMessageId(command));
         }
 
-        await transaction.RollbackAsync();
+        await transaction.RollbackAsync(TestContext.Current.CancellationToken);
 
         var afterRollback = await _queries.AppendStreamMessageAsync(serviceId, providerId, queueId, streamIdBytes, nsLength, payload);
         Assert.Equal(1, afterRollback.MessageId);
@@ -1078,8 +1081,8 @@ public abstract class AdoNetStreamPartitionTests(string invariant) : IAsyncLifet
         var payload = RandomPayload();
 
         await using var connection = new NpgsqlConnection(_storage.ConnectionString);
-        await connection.OpenAsync();
-        await using var transaction = await connection.BeginTransactionAsync();
+        await connection.OpenAsync(TestContext.Current.CancellationToken);
+        await using var transaction = await connection.BeginTransactionAsync(TestContext.Current.CancellationToken);
         await using (var command = connection.CreateCommand())
         {
             command.Transaction = transaction;
@@ -1093,7 +1096,7 @@ public abstract class AdoNetStreamPartitionTests(string invariant) : IAsyncLifet
             Assert.Equal(1, await ReadMessageId(command));
         }
 
-        await transaction.RollbackAsync();
+        await transaction.RollbackAsync(TestContext.Current.CancellationToken);
 
         var afterRollback = await _queries.AppendStreamMessageAsync(serviceId, providerId, queueId, streamIdBytes, nsLength, payload);
         Assert.Equal(1, afterRollback.MessageId);
@@ -1124,9 +1127,93 @@ public abstract class AdoNetStreamPartitionTests(string invariant) : IAsyncLifet
 
     private static async Task<long> ReadMessageId(DbCommand command)
     {
-        await using var reader = await command.ExecuteReaderAsync();
-        Assert.True(await reader.ReadAsync());
+        await using var reader = await command.ExecuteReaderAsync(TestContext.Current.CancellationToken);
+        Assert.True(await reader.ReadAsync(TestContext.Current.CancellationToken));
         return reader.GetInt64(reader.GetOrdinal(nameof(AdoNetStreamMessage.MessageId)));
+    }
+
+    private sealed class CancelableRelationalQueries(RelationalOrleansQueries inner)
+    {
+        public RelationalOrleansQueries Inner { get; } = inner;
+
+        public Task<AdoNetStreamMessageAck> AppendStreamMessageAsync(
+            string serviceId,
+            string providerId,
+            string queueId,
+            byte[] streamIdBytes,
+            int streamNamespaceLength,
+            byte[] payload)
+            => Inner.AppendStreamMessageAsync(
+                serviceId,
+                providerId,
+                queueId,
+                streamIdBytes,
+                streamNamespaceLength,
+                payload);
+
+        public Task<AdoNetStreamPartitionState> AcquireStreamPartitionAsync(
+            string serviceId,
+            string providerId,
+            string queueId,
+            bool startFromNow)
+            => Inner.AcquireStreamPartitionAsync(
+                serviceId,
+                providerId,
+                queueId,
+                startFromNow,
+                TestContext.Current.CancellationToken);
+
+        public Task<IList<AdoNetStreamMessage>> ReadStreamMessagesAsync(
+            string serviceId,
+            string providerId,
+            string queueId,
+            long afterMessageId,
+            int maxCount)
+            => Inner.ReadStreamMessagesAsync(
+                serviceId,
+                providerId,
+                queueId,
+                afterMessageId,
+                maxCount,
+                TestContext.Current.CancellationToken);
+
+        public Task<AdoNetStreamCheckpointUpdate?> AdvanceStreamCheckpointAsync(
+            string serviceId,
+            string providerId,
+            string queueId,
+            long ownerEpoch,
+            long checkpoint)
+            => Inner.AdvanceStreamCheckpointAsync(
+                serviceId,
+                providerId,
+                queueId,
+                ownerEpoch,
+                checkpoint,
+                TestContext.Current.CancellationToken);
+
+        public Task<AdoNetStreamPartitionState?> GetStreamPartitionBoundsAsync(
+            string serviceId,
+            string providerId,
+            string queueId)
+            => Inner.GetStreamPartitionBoundsAsync(serviceId, providerId, queueId);
+
+        public Task<AdoNetStreamCleanupResult> CleanupStreamMessagesAsync(
+            string serviceId,
+            string providerId,
+            string queueId,
+            int retentionPeriodSeconds,
+            int? maximumRetentionPeriodSeconds,
+            int cleanupIntervalSeconds,
+            int cleanupBatchSize)
+            => Inner.CleanupStreamMessagesAsync(
+                serviceId,
+                providerId,
+                queueId,
+                retentionPeriodSeconds,
+                maximumRetentionPeriodSeconds,
+                cleanupIntervalSeconds,
+                cleanupBatchSize,
+                TestContext.Current.CancellationToken);
     }
 
     #endregion SQL Server
