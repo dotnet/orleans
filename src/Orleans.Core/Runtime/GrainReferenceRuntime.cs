@@ -6,6 +6,7 @@ using System.Threading.Tasks;
 using Orleans.CodeGeneration;
 using Orleans.GrainReferences;
 using Orleans.Metadata;
+using Orleans.Serialization;
 using Orleans.Serialization.Invocation;
 
 namespace Orleans.Runtime
@@ -17,20 +18,23 @@ namespace Orleans.Runtime
         private readonly IGrainCancellationTokenRuntime cancellationTokenRuntime;
         private readonly IOutgoingGrainCallFilter[] filters;
         private readonly Action<GrainReference, IResponseCompletionSource, IInvokable, InvokeMethodOptions> sendRequest;
+        private readonly DeepCopier requestCopier;
 
         public GrainReferenceRuntime(
             IRuntimeClient runtimeClient,
             IGrainCancellationTokenRuntime cancellationTokenRuntime,
             IEnumerable<IOutgoingGrainCallFilter> outgoingCallFilters,
             GrainReferenceActivator referenceActivator,
-            GrainInterfaceTypeResolver interfaceTypeResolver)
+            GrainInterfaceTypeResolver interfaceTypeResolver,
+            DeepCopier requestCopier)
         {
             this.RuntimeClient = runtimeClient;
             this.cancellationTokenRuntime = cancellationTokenRuntime;
             this.referenceActivator = referenceActivator;
             this.interfaceTypeResolver = interfaceTypeResolver;
             this.filters = outgoingCallFilters.ToArray();
-            this.sendRequest = (GrainReference reference, IResponseCompletionSource callback, IInvokable body, InvokeMethodOptions options) => RuntimeClient.SendRequest(reference, body, callback, options);
+            this.requestCopier = requestCopier;
+            this.sendRequest = SendFilteredRequest;
         }
 
         public IRuntimeClient RuntimeClient { get; private set; }
@@ -64,7 +68,7 @@ namespace Orleans.Runtime
         public void InvokeMethod(GrainReference reference, IInvokable request, InvokeMethodOptions options)
         {
             Debug.Assert((options & InvokeMethodOptions.OneWay) != 0);
-            var disposeRequest = true;
+            var requestTransferred = false;
 
             try
             {
@@ -72,17 +76,18 @@ namespace Orleans.Runtime
                 if (filters.Length == 0 && request is not IOutgoingGrainCallFilter)
                 {
                     SetGrainCancellationTokensTarget(reference, request);
+                    requestTransferred = true;
                     this.RuntimeClient.SendRequest(reference, request, context: null, options);
                 }
                 else
                 {
                     InvokeMethodWithFiltersAsync(reference, request, options).AsTask().Ignore();
-                    disposeRequest = false;
+                    requestTransferred = true;
                 }
             }
             finally
             {
-                if (disposeRequest)
+                if (!requestTransferred)
                 {
                     DisposeRequest(request);
                 }
@@ -121,60 +126,48 @@ namespace Orleans.Runtime
         private ValueTask<TResult?> InvokeMethodAsyncCore<TResult>(GrainReference reference, IInvokable request, InvokeMethodOptions options)
         {
             ResponseCompletionSource<TResult>? responseCompletionSource = null;
+            var requestTransferred = false;
             try
             {
                 SetGrainCancellationTokensTarget(reference, request);
                 responseCompletionSource = ResponseCompletionSourcePool.Get<TResult>();
+                requestTransferred = true;
                 this.RuntimeClient.SendRequest(reference, request, responseCompletionSource, options);
-                return CompleteInvokeAsync(responseCompletionSource, request, options);
+                return responseCompletionSource.AsValueTask();
             }
             catch
             {
                 responseCompletionSource?.Reset();
-                DisposeRequest(request);
-                throw;
-            }
-        }
+                if (!requestTransferred)
+                {
+                    DisposeRequest(request);
+                }
 
-        private static async ValueTask<TResult?> CompleteInvokeAsync<TResult>(ResponseCompletionSource<TResult> responseCompletionSource, IInvokable request, InvokeMethodOptions options)
-        {
-            try
-            {
-                return await responseCompletionSource.AsValueTask();
-            }
-            finally
-            {
-                DisposeRequest(request);
+                throw;
             }
         }
 
         private ValueTask InvokeMethodAsyncCore(GrainReference reference, IInvokable request, InvokeMethodOptions options)
         {
             ResponseCompletionSource? responseCompletionSource = null;
+            var requestTransferred = false;
             try
             {
                 SetGrainCancellationTokensTarget(reference, request);
                 responseCompletionSource = ResponseCompletionSourcePool.Get();
+                requestTransferred = true;
                 this.RuntimeClient.SendRequest(reference, request, responseCompletionSource, options);
-                return CompleteInvokeAsync(responseCompletionSource, request, options);
+                return responseCompletionSource.AsVoidValueTask();
             }
             catch
             {
                 responseCompletionSource?.Reset();
-                DisposeRequest(request);
-                throw;
-            }
-        }
+                if (!requestTransferred)
+                {
+                    DisposeRequest(request);
+                }
 
-        private static async ValueTask CompleteInvokeAsync(ResponseCompletionSource responseCompletionSource, IInvokable request, InvokeMethodOptions options)
-        {
-            try
-            {
-                await responseCompletionSource.AsVoidValueTask();
-            }
-            finally
-            {
-                DisposeRequest(request);
+                throw;
             }
         }
 
@@ -184,6 +177,18 @@ namespace Orleans.Runtime
             {
                 request.Dispose();
             }
+        }
+
+        private void SendFilteredRequest(
+            GrainReference reference,
+            IResponseCompletionSource callback,
+            IInvokable request,
+            InvokeMethodOptions options)
+        {
+            var messageRequest = request is RequestBase
+                ? (IInvokable)this.requestCopier.Copy(request)!
+                : request;
+            RuntimeClient.SendRequest(reference, messageRequest, callback, options);
         }
 
         public object Cast(IAddressable grain, Type grainInterface)

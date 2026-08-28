@@ -45,10 +45,25 @@ public class GrainReferenceRuntimeTests
         returned.Reset();
     }
 
-    private static GrainReferenceRuntime CreateRuntime(IRuntimeClient runtimeClient)
-        => new(runtimeClient, null!, [], null!, null!);
+    [Fact, TestCategory("BVT")]
+    public async Task RequestOwnershipTransfersWhenSendReturns()
+    {
+        var runtimeClient = new ThrowingRuntimeClient(throwOnSend: false);
+        var runtime = CreateRuntime(runtimeClient);
+        var request = new TestInvokableRequest();
 
-    private sealed class ThrowingRuntimeClient : IRuntimeClient
+        var resultTask = runtime.InvokeMethodAsync<int>(null!, request, InvokeMethodOptions.None);
+
+        Assert.Equal(1, request.DisposeCount);
+        using var response = Response.FromResult(42);
+        runtimeClient.Context!.Complete(response);
+        Assert.Equal(42, await resultTask);
+    }
+
+    private static GrainReferenceRuntime CreateRuntime(IRuntimeClient runtimeClient)
+        => new(runtimeClient, null!, [], null!, null!, null!);
+
+    private sealed class ThrowingRuntimeClient(bool throwOnSend = true) : IRuntimeClient
     {
         public IResponseCompletionSource? Context { get; private set; }
 
@@ -65,7 +80,11 @@ public class GrainReferenceRuntimeTests
         public void SendRequest(GrainReference target, IInvokable request, IResponseCompletionSource? context, InvokeMethodOptions options)
         {
             Context = context;
-            throw new InvalidOperationException("Send failed.");
+            request.Dispose();
+            if (throwOnSend)
+            {
+                throw new InvalidOperationException("Send failed.");
+            }
         }
 
         public void SendResponse(Message request, Response response) => throw new NotSupportedException();
@@ -87,4 +106,5 @@ public class GrainReferenceRuntimeTests
 
         public object? GetService(Type serviceType) => null;
     }
+
 }

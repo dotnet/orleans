@@ -944,6 +944,7 @@ internal class InvokableGenerator(ProxyGenerationContext generationContext)
                 constructor.MethodKind == MethodKind.Constructor
                 && constructor.HasAttribute(LibraryTypes.GeneratedActivatorConstructorAttribute));
         if (method.MethodTypeParameters.Count == 0
+            && method.Method.Parameters.Length >= 2
             && method.CustomInitializerMethods.Count == 0
             && !requiresDependencyInjection
             && IsPoolableBaseType(baseClassType))

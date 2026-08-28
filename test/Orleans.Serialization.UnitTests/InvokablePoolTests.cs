@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Concurrent;
 using System.Reflection;
 using System.Threading;
 using System.Threading.Tasks;
@@ -65,18 +66,17 @@ public class InvokablePoolTests
     }
 
     [Fact]
-    public void ConcurrentRentResetReturnKeepsThreadLocalInstancesIsolated()
+    public void ConcurrentRentResetReturnKeepsInstancesExclusive()
     {
         using var pool = new InvokablePool<TestInvokable>();
         using var ready = new CountdownEvent(2);
         using var start = new ManualResetEventSlim();
-        TestInvokable? first = null;
-        TestInvokable? second = null;
+        var active = new ConcurrentDictionary<TestInvokable, byte>();
         Exception? firstError = null;
         Exception? secondError = null;
 
-        var firstThread = new Thread(() => Run(ref first, ref firstError));
-        var secondThread = new Thread(() => Run(ref second, ref secondError));
+        var firstThread = new Thread(() => Run(ref firstError));
+        var secondThread = new Thread(() => Run(ref secondError));
         firstThread.Start();
         secondThread.Start();
         ready.Wait();
@@ -86,11 +86,8 @@ public class InvokablePoolTests
 
         Assert.Null(firstError);
         Assert.Null(secondError);
-        Assert.NotNull(first);
-        Assert.NotNull(second);
-        Assert.NotSame(first, second);
 
-        void Run(ref TestInvokable? firstItem, ref Exception? error)
+        void Run(ref Exception? error)
         {
             try
             {
@@ -99,13 +96,13 @@ public class InvokablePoolTests
                 for (var i = 0; i < 10_000; i++)
                 {
                     var item = pool.TryGet(out var pooled) ? pooled : new TestInvokable(pool);
-                    firstItem ??= item;
-                    Assert.Same(firstItem, item);
+                    Assert.True(active.TryAdd(item, 0));
                     Assert.Equal(0, item.Number);
                     Assert.Null(item.Text);
 
                     item.Number = i + 1;
                     item.Text = i.ToString();
+                    Assert.True(active.TryRemove(item, out _));
                     item.Dispose();
                 }
             }
@@ -114,6 +111,36 @@ public class InvokablePoolTests
                 error = exception;
             }
         }
+    }
+
+    [Fact]
+    public void CrossThreadReturnMakesItemAvailableToOtherThreads()
+    {
+        using var pool = new InvokablePool<TestInvokable>();
+        var item = new TestInvokable(pool);
+        Exception? error = null;
+        using var returned = new ManualResetEventSlim();
+
+        var returningThread = new Thread(() =>
+        {
+            try
+            {
+                item.Dispose();
+                returned.Set();
+            }
+            catch (Exception exception)
+            {
+                error = exception;
+            }
+        });
+
+        returningThread.Start();
+        returned.Wait();
+        Assert.True(pool.TryGet(out var rented));
+        returningThread.Join();
+
+        Assert.Null(error);
+        Assert.Same(item, rented);
     }
 
     private sealed class TestInvokable(InvokablePool<TestInvokable>? pool = null) : IInvokable

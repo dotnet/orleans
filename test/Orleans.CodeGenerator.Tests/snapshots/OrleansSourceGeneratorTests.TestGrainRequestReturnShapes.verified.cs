@@ -17,16 +17,6 @@ namespace OrleansCodeGen.TestProject
         public byte[] arg0;
         global::TestProject.IRequestShapeGrain _target;
         private static readonly global::System.Reflection.MethodInfo MethodBackingField = OrleansGeneratedCodeHelper.GetMethodInfoOrDefault(typeof(global::TestProject.IRequestShapeGrain), "TaskOfTMethod", null, new[] { typeof(byte[]) });
-        private readonly global::Orleans.Serialization.Invocation.InvokablePool<Invokable_IRequestShapeGrain_GrainReference_179DFF79> _pool;
-        public Invokable_IRequestShapeGrain_GrainReference_179DFF79() : this(null !)
-        {
-        }
-
-        public Invokable_IRequestShapeGrain_GrainReference_179DFF79(global::Orleans.Serialization.Invocation.InvokablePool<Invokable_IRequestShapeGrain_GrainReference_179DFF79> pool) : base()
-        {
-            _pool = pool;
-        }
-
         public override int GetArgumentCount() => 1;
         public override string GetMethodName() => "TaskOfTMethod";
         public override string GetInterfaceName() => "TestProject.IRequestShapeGrain";
@@ -39,7 +29,6 @@ namespace OrleansCodeGen.TestProject
         {
             arg0 = default;
             _target = default;
-            _pool?.Return(this);
         }
 
         public override object GetArgument(int index)
@@ -76,16 +65,6 @@ namespace OrleansCodeGen.TestProject
         public int arg0;
         global::TestProject.IRequestShapeGrain _target;
         private static readonly global::System.Reflection.MethodInfo MethodBackingField = OrleansGeneratedCodeHelper.GetMethodInfoOrDefault(typeof(global::TestProject.IRequestShapeGrain), "ValueTaskMethod", null, new[] { typeof(int) });
-        private readonly global::Orleans.Serialization.Invocation.InvokablePool<Invokable_IRequestShapeGrain_GrainReference_3637890A> _pool;
-        public Invokable_IRequestShapeGrain_GrainReference_3637890A() : this(null !)
-        {
-        }
-
-        public Invokable_IRequestShapeGrain_GrainReference_3637890A(global::Orleans.Serialization.Invocation.InvokablePool<Invokable_IRequestShapeGrain_GrainReference_3637890A> pool) : base()
-        {
-            _pool = pool;
-        }
-
         public override int GetArgumentCount() => 1;
         public override string GetMethodName() => "ValueTaskMethod";
         public override string GetInterfaceName() => "TestProject.IRequestShapeGrain";
@@ -98,7 +77,6 @@ namespace OrleansCodeGen.TestProject
         {
             arg0 = default;
             _target = default;
-            _pool?.Return(this);
         }
 
         public override object GetArgument(int index)
@@ -135,16 +113,6 @@ namespace OrleansCodeGen.TestProject
         public object arg0;
         global::TestProject.IRequestShapeGrain _target;
         private static readonly global::System.Reflection.MethodInfo MethodBackingField = OrleansGeneratedCodeHelper.GetMethodInfoOrDefault(typeof(global::TestProject.IRequestShapeGrain), "TaskMethod", null, new[] { typeof(object) });
-        private readonly global::Orleans.Serialization.Invocation.InvokablePool<Invokable_IRequestShapeGrain_GrainReference_547E1673> _pool;
-        public Invokable_IRequestShapeGrain_GrainReference_547E1673() : this(null !)
-        {
-        }
-
-        public Invokable_IRequestShapeGrain_GrainReference_547E1673(global::Orleans.Serialization.Invocation.InvokablePool<Invokable_IRequestShapeGrain_GrainReference_547E1673> pool) : base()
-        {
-            _pool = pool;
-        }
-
         public override int GetArgumentCount() => 1;
         public override string GetMethodName() => "TaskMethod";
         public override string GetInterfaceName() => "TestProject.IRequestShapeGrain";
@@ -157,7 +125,6 @@ namespace OrleansCodeGen.TestProject
         {
             arg0 = default;
             _target = default;
-            _pool?.Return(this);
         }
 
         public override object GetArgument(int index)
@@ -247,16 +214,6 @@ namespace OrleansCodeGen.TestProject
         public string arg0;
         global::TestProject.IRequestShapeGrain _target;
         private static readonly global::System.Reflection.MethodInfo MethodBackingField = OrleansGeneratedCodeHelper.GetMethodInfoOrDefault(typeof(global::TestProject.IRequestShapeGrain), "ValueTaskOfTMethod", null, new[] { typeof(string) });
-        private readonly global::Orleans.Serialization.Invocation.InvokablePool<Invokable_IRequestShapeGrain_GrainReference_D2239DF3> _pool;
-        public Invokable_IRequestShapeGrain_GrainReference_D2239DF3() : this(null !)
-        {
-        }
-
-        public Invokable_IRequestShapeGrain_GrainReference_D2239DF3(global::Orleans.Serialization.Invocation.InvokablePool<Invokable_IRequestShapeGrain_GrainReference_D2239DF3> pool) : base()
-        {
-            _pool = pool;
-        }
-
         public override int GetArgumentCount() => 1;
         public override string GetMethodName() => "ValueTaskOfTMethod";
         public override string GetInterfaceName() => "TestProject.IRequestShapeGrain";
@@ -269,7 +226,6 @@ namespace OrleansCodeGen.TestProject
         {
             arg0 = default;
             _target = default;
-            _pool?.Return(this);
         }
 
         public override object GetArgument(int index)
@@ -302,35 +258,27 @@ namespace OrleansCodeGen.TestProject
     [global::System.CodeDom.Compiler.GeneratedCodeAttribute("OrleansCodeGen", "10.0.0.0"), global::System.ComponentModel.EditorBrowsableAttribute(global::System.ComponentModel.EditorBrowsableState.Never), global::System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverageAttribute]
     internal sealed class Proxy_IRequestShapeGrain : global::Orleans.Runtime.GrainReference, global::TestProject.IRequestShapeGrain
     {
-        private readonly global::Orleans.Serialization.Activators.IActivator<OrleansCodeGen.TestProject.Invokable_IRequestShapeGrain_GrainReference_3637890A> _activator0;
-        private readonly global::Orleans.Serialization.Activators.IActivator<OrleansCodeGen.TestProject.Invokable_IRequestShapeGrain_GrainReference_D2239DF3> _activator1;
-        private readonly global::Orleans.Serialization.Activators.IActivator<OrleansCodeGen.TestProject.Invokable_IRequestShapeGrain_GrainReference_547E1673> _activator2;
-        private readonly global::Orleans.Serialization.Activators.IActivator<OrleansCodeGen.TestProject.Invokable_IRequestShapeGrain_GrainReference_179DFF79> _activator3;
         public Proxy_IRequestShapeGrain(global::Orleans.Runtime.GrainReferenceShared arg0, global::Orleans.Runtime.IdSpan arg1) : base(arg0, arg1)
         {
-            _activator0 = CodecProvider.GetActivator<OrleansCodeGen.TestProject.Invokable_IRequestShapeGrain_GrainReference_3637890A>();
-            _activator1 = CodecProvider.GetActivator<OrleansCodeGen.TestProject.Invokable_IRequestShapeGrain_GrainReference_D2239DF3>();
-            _activator2 = CodecProvider.GetActivator<OrleansCodeGen.TestProject.Invokable_IRequestShapeGrain_GrainReference_547E1673>();
-            _activator3 = CodecProvider.GetActivator<OrleansCodeGen.TestProject.Invokable_IRequestShapeGrain_GrainReference_179DFF79>();
         }
 
         global::System.Threading.Tasks.ValueTask global::TestProject.IRequestShapeGrain.ValueTaskMethod(int arg0)
         {
-            var request = _activator0.Create();
+            var request = new OrleansCodeGen.TestProject.Invokable_IRequestShapeGrain_GrainReference_3637890A();
             request.arg0 = arg0;
             return base.InvokeAsync(request);
         }
 
         global::System.Threading.Tasks.ValueTask<int> global::TestProject.IRequestShapeGrain.ValueTaskOfTMethod(string arg0)
         {
-            var request = _activator1.Create();
+            var request = new OrleansCodeGen.TestProject.Invokable_IRequestShapeGrain_GrainReference_D2239DF3();
             request.arg0 = arg0;
             return base.InvokeAsync<int>(request);
         }
 
         global::System.Threading.Tasks.Task global::TestProject.IRequestShapeGrain.TaskMethod(object arg0)
         {
-            var request = _activator2.Create();
+            var request = new OrleansCodeGen.TestProject.Invokable_IRequestShapeGrain_GrainReference_547E1673();
             using var copyContext = base.CopyContextPool.GetContext();
             request.arg0 = global::Orleans.Serialization.Codecs.ObjectCopier.DeepCopy(arg0, copyContext);
             return base.InvokeAsync(request).AsTask();
@@ -338,7 +286,7 @@ namespace OrleansCodeGen.TestProject
 
         global::System.Threading.Tasks.Task<int> global::TestProject.IRequestShapeGrain.TaskOfTMethod(byte[] arg0)
         {
-            var request = _activator3.Create();
+            var request = new OrleansCodeGen.TestProject.Invokable_IRequestShapeGrain_GrainReference_179DFF79();
             using var copyContext = base.CopyContextPool.GetContext();
             request.arg0 = global::Orleans.Serialization.Codecs.ByteArrayCopier.DeepCopy(arg0, copyContext);
             return base.InvokeAsync<int>(request).AsTask();
@@ -356,12 +304,6 @@ namespace OrleansCodeGen.TestProject
     public sealed class Codec_Invokable_IRequestShapeGrain_GrainReference_179DFF79 : global::Orleans.Serialization.Codecs.IFieldCodec<OrleansCodeGen.TestProject.Invokable_IRequestShapeGrain_GrainReference_179DFF79>
     {
         private readonly global::System.Type _codecFieldType = typeof(OrleansCodeGen.TestProject.Invokable_IRequestShapeGrain_GrainReference_179DFF79);
-        private readonly global::Orleans.Serialization.Activators.IActivator<OrleansCodeGen.TestProject.Invokable_IRequestShapeGrain_GrainReference_179DFF79> _activator;
-        public Codec_Invokable_IRequestShapeGrain_GrainReference_179DFF79(global::Orleans.Serialization.Activators.IActivator<OrleansCodeGen.TestProject.Invokable_IRequestShapeGrain_GrainReference_179DFF79> _activator)
-        {
-            this._activator = OrleansGeneratedCodeHelper.UnwrapService(this, _activator);
-        }
-
         [global::System.Runtime.CompilerServices.MethodImplAttribute(global::System.Runtime.CompilerServices.MethodImplOptions.AggressiveInlining)]
         public void Serialize<TBufferWriter>(ref global::Orleans.Serialization.Buffers.Writer<TBufferWriter> writer, OrleansCodeGen.TestProject.Invokable_IRequestShapeGrain_GrainReference_179DFF79 instance)
             where TBufferWriter : global::System.Buffers.IBufferWriter<byte>
@@ -413,7 +355,7 @@ namespace OrleansCodeGen.TestProject
             if (field.IsReference)
                 return ReferenceCodec.ReadReference<OrleansCodeGen.TestProject.Invokable_IRequestShapeGrain_GrainReference_179DFF79, TReaderInput>(ref reader, field);
             field.EnsureWireTypeTagDelimited();
-            var result = _activator.Create();
+            var result = new OrleansCodeGen.TestProject.Invokable_IRequestShapeGrain_GrainReference_179DFF79();
             ReferenceCodec.MarkValueField(reader.Session);
             Deserialize(ref reader, result);
             return result;
@@ -423,45 +365,21 @@ namespace OrleansCodeGen.TestProject
     [global::System.CodeDom.Compiler.GeneratedCodeAttribute("OrleansCodeGen", "10.0.0.0"), global::System.ComponentModel.EditorBrowsableAttribute(global::System.ComponentModel.EditorBrowsableState.Never), global::System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverageAttribute]
     public sealed class Copier_Invokable_IRequestShapeGrain_GrainReference_179DFF79 : global::Orleans.Serialization.Cloning.IDeepCopier<OrleansCodeGen.TestProject.Invokable_IRequestShapeGrain_GrainReference_179DFF79>
     {
-        private readonly global::Orleans.Serialization.Activators.IActivator<OrleansCodeGen.TestProject.Invokable_IRequestShapeGrain_GrainReference_179DFF79> _activator;
         [global::System.Runtime.CompilerServices.MethodImplAttribute(global::System.Runtime.CompilerServices.MethodImplOptions.AggressiveInlining)]
         public OrleansCodeGen.TestProject.Invokable_IRequestShapeGrain_GrainReference_179DFF79 DeepCopy(OrleansCodeGen.TestProject.Invokable_IRequestShapeGrain_GrainReference_179DFF79 original, global::Orleans.Serialization.Cloning.CopyContext context)
         {
             if (original is null)
                 return null;
-            var result = _activator.Create();
+            var result = new OrleansCodeGen.TestProject.Invokable_IRequestShapeGrain_GrainReference_179DFF79();
             result.arg0 = global::Orleans.Serialization.Codecs.ByteArrayCopier.DeepCopy(original.arg0, context);
             return result;
         }
-
-        public Copier_Invokable_IRequestShapeGrain_GrainReference_179DFF79(global::Orleans.Serialization.Activators.IActivator<OrleansCodeGen.TestProject.Invokable_IRequestShapeGrain_GrainReference_179DFF79> _activator)
-        {
-            this._activator = OrleansGeneratedCodeHelper.UnwrapService(this, _activator);
-        }
-    }
-
-    [global::System.CodeDom.Compiler.GeneratedCodeAttribute("OrleansCodeGen", "10.0.0.0"), global::System.ComponentModel.EditorBrowsableAttribute(global::System.ComponentModel.EditorBrowsableState.Never), global::System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverageAttribute]
-    internal sealed class Activator_Invokable_IRequestShapeGrain_GrainReference_179DFF79 : global::Orleans.Serialization.Activators.IActivator<OrleansCodeGen.TestProject.Invokable_IRequestShapeGrain_GrainReference_179DFF79>
-    {
-        private readonly global::Orleans.Serialization.Invocation.InvokablePool<Invokable_IRequestShapeGrain_GrainReference_179DFF79> _arg0;
-        public Activator_Invokable_IRequestShapeGrain_GrainReference_179DFF79(global::Orleans.Serialization.Invocation.InvokablePool<Invokable_IRequestShapeGrain_GrainReference_179DFF79> arg0)
-        {
-            _arg0 = arg0;
-        }
-
-        public OrleansCodeGen.TestProject.Invokable_IRequestShapeGrain_GrainReference_179DFF79 Create() => _arg0.TryGet(out var item) ? item : new OrleansCodeGen.TestProject.Invokable_IRequestShapeGrain_GrainReference_179DFF79(_arg0);
     }
 
     [global::System.CodeDom.Compiler.GeneratedCodeAttribute("OrleansCodeGen", "10.0.0.0"), global::System.ComponentModel.EditorBrowsableAttribute(global::System.ComponentModel.EditorBrowsableState.Never), global::System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverageAttribute]
     public sealed class Codec_Invokable_IRequestShapeGrain_GrainReference_3637890A : global::Orleans.Serialization.Codecs.IFieldCodec<OrleansCodeGen.TestProject.Invokable_IRequestShapeGrain_GrainReference_3637890A>
     {
         private readonly global::System.Type _codecFieldType = typeof(OrleansCodeGen.TestProject.Invokable_IRequestShapeGrain_GrainReference_3637890A);
-        private readonly global::Orleans.Serialization.Activators.IActivator<OrleansCodeGen.TestProject.Invokable_IRequestShapeGrain_GrainReference_3637890A> _activator;
-        public Codec_Invokable_IRequestShapeGrain_GrainReference_3637890A(global::Orleans.Serialization.Activators.IActivator<OrleansCodeGen.TestProject.Invokable_IRequestShapeGrain_GrainReference_3637890A> _activator)
-        {
-            this._activator = OrleansGeneratedCodeHelper.UnwrapService(this, _activator);
-        }
-
         [global::System.Runtime.CompilerServices.MethodImplAttribute(global::System.Runtime.CompilerServices.MethodImplOptions.AggressiveInlining)]
         public void Serialize<TBufferWriter>(ref global::Orleans.Serialization.Buffers.Writer<TBufferWriter> writer, OrleansCodeGen.TestProject.Invokable_IRequestShapeGrain_GrainReference_3637890A instance)
             where TBufferWriter : global::System.Buffers.IBufferWriter<byte>
@@ -513,7 +431,7 @@ namespace OrleansCodeGen.TestProject
             if (field.IsReference)
                 return ReferenceCodec.ReadReference<OrleansCodeGen.TestProject.Invokable_IRequestShapeGrain_GrainReference_3637890A, TReaderInput>(ref reader, field);
             field.EnsureWireTypeTagDelimited();
-            var result = _activator.Create();
+            var result = new OrleansCodeGen.TestProject.Invokable_IRequestShapeGrain_GrainReference_3637890A();
             ReferenceCodec.MarkValueField(reader.Session);
             Deserialize(ref reader, result);
             return result;
@@ -523,45 +441,21 @@ namespace OrleansCodeGen.TestProject
     [global::System.CodeDom.Compiler.GeneratedCodeAttribute("OrleansCodeGen", "10.0.0.0"), global::System.ComponentModel.EditorBrowsableAttribute(global::System.ComponentModel.EditorBrowsableState.Never), global::System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverageAttribute]
     public sealed class Copier_Invokable_IRequestShapeGrain_GrainReference_3637890A : global::Orleans.Serialization.Cloning.IDeepCopier<OrleansCodeGen.TestProject.Invokable_IRequestShapeGrain_GrainReference_3637890A>
     {
-        private readonly global::Orleans.Serialization.Activators.IActivator<OrleansCodeGen.TestProject.Invokable_IRequestShapeGrain_GrainReference_3637890A> _activator;
         [global::System.Runtime.CompilerServices.MethodImplAttribute(global::System.Runtime.CompilerServices.MethodImplOptions.AggressiveInlining)]
         public OrleansCodeGen.TestProject.Invokable_IRequestShapeGrain_GrainReference_3637890A DeepCopy(OrleansCodeGen.TestProject.Invokable_IRequestShapeGrain_GrainReference_3637890A original, global::Orleans.Serialization.Cloning.CopyContext context)
         {
             if (original is null)
                 return null;
-            var result = _activator.Create();
+            var result = new OrleansCodeGen.TestProject.Invokable_IRequestShapeGrain_GrainReference_3637890A();
             result.arg0 = original.arg0;
             return result;
         }
-
-        public Copier_Invokable_IRequestShapeGrain_GrainReference_3637890A(global::Orleans.Serialization.Activators.IActivator<OrleansCodeGen.TestProject.Invokable_IRequestShapeGrain_GrainReference_3637890A> _activator)
-        {
-            this._activator = OrleansGeneratedCodeHelper.UnwrapService(this, _activator);
-        }
-    }
-
-    [global::System.CodeDom.Compiler.GeneratedCodeAttribute("OrleansCodeGen", "10.0.0.0"), global::System.ComponentModel.EditorBrowsableAttribute(global::System.ComponentModel.EditorBrowsableState.Never), global::System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverageAttribute]
-    internal sealed class Activator_Invokable_IRequestShapeGrain_GrainReference_3637890A : global::Orleans.Serialization.Activators.IActivator<OrleansCodeGen.TestProject.Invokable_IRequestShapeGrain_GrainReference_3637890A>
-    {
-        private readonly global::Orleans.Serialization.Invocation.InvokablePool<Invokable_IRequestShapeGrain_GrainReference_3637890A> _arg0;
-        public Activator_Invokable_IRequestShapeGrain_GrainReference_3637890A(global::Orleans.Serialization.Invocation.InvokablePool<Invokable_IRequestShapeGrain_GrainReference_3637890A> arg0)
-        {
-            _arg0 = arg0;
-        }
-
-        public OrleansCodeGen.TestProject.Invokable_IRequestShapeGrain_GrainReference_3637890A Create() => _arg0.TryGet(out var item) ? item : new OrleansCodeGen.TestProject.Invokable_IRequestShapeGrain_GrainReference_3637890A(_arg0);
     }
 
     [global::System.CodeDom.Compiler.GeneratedCodeAttribute("OrleansCodeGen", "10.0.0.0"), global::System.ComponentModel.EditorBrowsableAttribute(global::System.ComponentModel.EditorBrowsableState.Never), global::System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverageAttribute]
     public sealed class Codec_Invokable_IRequestShapeGrain_GrainReference_547E1673 : global::Orleans.Serialization.Codecs.IFieldCodec<OrleansCodeGen.TestProject.Invokable_IRequestShapeGrain_GrainReference_547E1673>
     {
         private readonly global::System.Type _codecFieldType = typeof(OrleansCodeGen.TestProject.Invokable_IRequestShapeGrain_GrainReference_547E1673);
-        private readonly global::Orleans.Serialization.Activators.IActivator<OrleansCodeGen.TestProject.Invokable_IRequestShapeGrain_GrainReference_547E1673> _activator;
-        public Codec_Invokable_IRequestShapeGrain_GrainReference_547E1673(global::Orleans.Serialization.Activators.IActivator<OrleansCodeGen.TestProject.Invokable_IRequestShapeGrain_GrainReference_547E1673> _activator)
-        {
-            this._activator = OrleansGeneratedCodeHelper.UnwrapService(this, _activator);
-        }
-
         [global::System.Runtime.CompilerServices.MethodImplAttribute(global::System.Runtime.CompilerServices.MethodImplOptions.AggressiveInlining)]
         public void Serialize<TBufferWriter>(ref global::Orleans.Serialization.Buffers.Writer<TBufferWriter> writer, OrleansCodeGen.TestProject.Invokable_IRequestShapeGrain_GrainReference_547E1673 instance)
             where TBufferWriter : global::System.Buffers.IBufferWriter<byte>
@@ -613,7 +507,7 @@ namespace OrleansCodeGen.TestProject
             if (field.IsReference)
                 return ReferenceCodec.ReadReference<OrleansCodeGen.TestProject.Invokable_IRequestShapeGrain_GrainReference_547E1673, TReaderInput>(ref reader, field);
             field.EnsureWireTypeTagDelimited();
-            var result = _activator.Create();
+            var result = new OrleansCodeGen.TestProject.Invokable_IRequestShapeGrain_GrainReference_547E1673();
             ReferenceCodec.MarkValueField(reader.Session);
             Deserialize(ref reader, result);
             return result;
@@ -623,33 +517,15 @@ namespace OrleansCodeGen.TestProject
     [global::System.CodeDom.Compiler.GeneratedCodeAttribute("OrleansCodeGen", "10.0.0.0"), global::System.ComponentModel.EditorBrowsableAttribute(global::System.ComponentModel.EditorBrowsableState.Never), global::System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverageAttribute]
     public sealed class Copier_Invokable_IRequestShapeGrain_GrainReference_547E1673 : global::Orleans.Serialization.Cloning.IDeepCopier<OrleansCodeGen.TestProject.Invokable_IRequestShapeGrain_GrainReference_547E1673>
     {
-        private readonly global::Orleans.Serialization.Activators.IActivator<OrleansCodeGen.TestProject.Invokable_IRequestShapeGrain_GrainReference_547E1673> _activator;
         [global::System.Runtime.CompilerServices.MethodImplAttribute(global::System.Runtime.CompilerServices.MethodImplOptions.AggressiveInlining)]
         public OrleansCodeGen.TestProject.Invokable_IRequestShapeGrain_GrainReference_547E1673 DeepCopy(OrleansCodeGen.TestProject.Invokable_IRequestShapeGrain_GrainReference_547E1673 original, global::Orleans.Serialization.Cloning.CopyContext context)
         {
             if (original is null)
                 return null;
-            var result = _activator.Create();
+            var result = new OrleansCodeGen.TestProject.Invokable_IRequestShapeGrain_GrainReference_547E1673();
             result.arg0 = global::Orleans.Serialization.Codecs.ObjectCopier.DeepCopy(original.arg0, context);
             return result;
         }
-
-        public Copier_Invokable_IRequestShapeGrain_GrainReference_547E1673(global::Orleans.Serialization.Activators.IActivator<OrleansCodeGen.TestProject.Invokable_IRequestShapeGrain_GrainReference_547E1673> _activator)
-        {
-            this._activator = OrleansGeneratedCodeHelper.UnwrapService(this, _activator);
-        }
-    }
-
-    [global::System.CodeDom.Compiler.GeneratedCodeAttribute("OrleansCodeGen", "10.0.0.0"), global::System.ComponentModel.EditorBrowsableAttribute(global::System.ComponentModel.EditorBrowsableState.Never), global::System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverageAttribute]
-    internal sealed class Activator_Invokable_IRequestShapeGrain_GrainReference_547E1673 : global::Orleans.Serialization.Activators.IActivator<OrleansCodeGen.TestProject.Invokable_IRequestShapeGrain_GrainReference_547E1673>
-    {
-        private readonly global::Orleans.Serialization.Invocation.InvokablePool<Invokable_IRequestShapeGrain_GrainReference_547E1673> _arg0;
-        public Activator_Invokable_IRequestShapeGrain_GrainReference_547E1673(global::Orleans.Serialization.Invocation.InvokablePool<Invokable_IRequestShapeGrain_GrainReference_547E1673> arg0)
-        {
-            _arg0 = arg0;
-        }
-
-        public OrleansCodeGen.TestProject.Invokable_IRequestShapeGrain_GrainReference_547E1673 Create() => _arg0.TryGet(out var item) ? item : new OrleansCodeGen.TestProject.Invokable_IRequestShapeGrain_GrainReference_547E1673(_arg0);
     }
 
     [global::System.CodeDom.Compiler.GeneratedCodeAttribute("OrleansCodeGen", "10.0.0.0"), global::System.ComponentModel.EditorBrowsableAttribute(global::System.ComponentModel.EditorBrowsableState.Never), global::System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverageAttribute]
@@ -732,12 +608,6 @@ namespace OrleansCodeGen.TestProject
     public sealed class Codec_Invokable_IRequestShapeGrain_GrainReference_D2239DF3 : global::Orleans.Serialization.Codecs.IFieldCodec<OrleansCodeGen.TestProject.Invokable_IRequestShapeGrain_GrainReference_D2239DF3>
     {
         private readonly global::System.Type _codecFieldType = typeof(OrleansCodeGen.TestProject.Invokable_IRequestShapeGrain_GrainReference_D2239DF3);
-        private readonly global::Orleans.Serialization.Activators.IActivator<OrleansCodeGen.TestProject.Invokable_IRequestShapeGrain_GrainReference_D2239DF3> _activator;
-        public Codec_Invokable_IRequestShapeGrain_GrainReference_D2239DF3(global::Orleans.Serialization.Activators.IActivator<OrleansCodeGen.TestProject.Invokable_IRequestShapeGrain_GrainReference_D2239DF3> _activator)
-        {
-            this._activator = OrleansGeneratedCodeHelper.UnwrapService(this, _activator);
-        }
-
         [global::System.Runtime.CompilerServices.MethodImplAttribute(global::System.Runtime.CompilerServices.MethodImplOptions.AggressiveInlining)]
         public void Serialize<TBufferWriter>(ref global::Orleans.Serialization.Buffers.Writer<TBufferWriter> writer, OrleansCodeGen.TestProject.Invokable_IRequestShapeGrain_GrainReference_D2239DF3 instance)
             where TBufferWriter : global::System.Buffers.IBufferWriter<byte>
@@ -789,7 +659,7 @@ namespace OrleansCodeGen.TestProject
             if (field.IsReference)
                 return ReferenceCodec.ReadReference<OrleansCodeGen.TestProject.Invokable_IRequestShapeGrain_GrainReference_D2239DF3, TReaderInput>(ref reader, field);
             field.EnsureWireTypeTagDelimited();
-            var result = _activator.Create();
+            var result = new OrleansCodeGen.TestProject.Invokable_IRequestShapeGrain_GrainReference_D2239DF3();
             ReferenceCodec.MarkValueField(reader.Session);
             Deserialize(ref reader, result);
             return result;
@@ -799,33 +669,15 @@ namespace OrleansCodeGen.TestProject
     [global::System.CodeDom.Compiler.GeneratedCodeAttribute("OrleansCodeGen", "10.0.0.0"), global::System.ComponentModel.EditorBrowsableAttribute(global::System.ComponentModel.EditorBrowsableState.Never), global::System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverageAttribute]
     public sealed class Copier_Invokable_IRequestShapeGrain_GrainReference_D2239DF3 : global::Orleans.Serialization.Cloning.IDeepCopier<OrleansCodeGen.TestProject.Invokable_IRequestShapeGrain_GrainReference_D2239DF3>
     {
-        private readonly global::Orleans.Serialization.Activators.IActivator<OrleansCodeGen.TestProject.Invokable_IRequestShapeGrain_GrainReference_D2239DF3> _activator;
         [global::System.Runtime.CompilerServices.MethodImplAttribute(global::System.Runtime.CompilerServices.MethodImplOptions.AggressiveInlining)]
         public OrleansCodeGen.TestProject.Invokable_IRequestShapeGrain_GrainReference_D2239DF3 DeepCopy(OrleansCodeGen.TestProject.Invokable_IRequestShapeGrain_GrainReference_D2239DF3 original, global::Orleans.Serialization.Cloning.CopyContext context)
         {
             if (original is null)
                 return null;
-            var result = _activator.Create();
+            var result = new OrleansCodeGen.TestProject.Invokable_IRequestShapeGrain_GrainReference_D2239DF3();
             result.arg0 = original.arg0;
             return result;
         }
-
-        public Copier_Invokable_IRequestShapeGrain_GrainReference_D2239DF3(global::Orleans.Serialization.Activators.IActivator<OrleansCodeGen.TestProject.Invokable_IRequestShapeGrain_GrainReference_D2239DF3> _activator)
-        {
-            this._activator = OrleansGeneratedCodeHelper.UnwrapService(this, _activator);
-        }
-    }
-
-    [global::System.CodeDom.Compiler.GeneratedCodeAttribute("OrleansCodeGen", "10.0.0.0"), global::System.ComponentModel.EditorBrowsableAttribute(global::System.ComponentModel.EditorBrowsableState.Never), global::System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverageAttribute]
-    internal sealed class Activator_Invokable_IRequestShapeGrain_GrainReference_D2239DF3 : global::Orleans.Serialization.Activators.IActivator<OrleansCodeGen.TestProject.Invokable_IRequestShapeGrain_GrainReference_D2239DF3>
-    {
-        private readonly global::Orleans.Serialization.Invocation.InvokablePool<Invokable_IRequestShapeGrain_GrainReference_D2239DF3> _arg0;
-        public Activator_Invokable_IRequestShapeGrain_GrainReference_D2239DF3(global::Orleans.Serialization.Invocation.InvokablePool<Invokable_IRequestShapeGrain_GrainReference_D2239DF3> arg0)
-        {
-            _arg0 = arg0;
-        }
-
-        public OrleansCodeGen.TestProject.Invokable_IRequestShapeGrain_GrainReference_D2239DF3 Create() => _arg0.TryGet(out var item) ? item : new OrleansCodeGen.TestProject.Invokable_IRequestShapeGrain_GrainReference_D2239DF3(_arg0);
     }
 
     [global::System.CodeDom.Compiler.GeneratedCodeAttribute("OrleansCodeGen", "10.0.0.0"), global::System.ComponentModel.EditorBrowsableAttribute(global::System.ComponentModel.EditorBrowsableState.Never), global::System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverageAttribute]
@@ -845,10 +697,6 @@ namespace OrleansCodeGen.TestProject
             config.Copiers.Add(typeof(OrleansCodeGen.TestProject.Copier_Invokable_IRequestShapeGrain_GrainReference_D2239DF3));
             config.InterfaceProxies.Add(typeof(OrleansCodeGen.TestProject.Proxy_IRequestShapeGrain));
             config.Interfaces.Add(typeof(global::TestProject.IRequestShapeGrain));
-            config.Activators.Add(typeof(OrleansCodeGen.TestProject.Activator_Invokable_IRequestShapeGrain_GrainReference_179DFF79));
-            config.Activators.Add(typeof(OrleansCodeGen.TestProject.Activator_Invokable_IRequestShapeGrain_GrainReference_3637890A));
-            config.Activators.Add(typeof(OrleansCodeGen.TestProject.Activator_Invokable_IRequestShapeGrain_GrainReference_547E1673));
-            config.Activators.Add(typeof(OrleansCodeGen.TestProject.Activator_Invokable_IRequestShapeGrain_GrainReference_D2239DF3));
             var n1 = config.CompoundTypeAliases.Add("inv");
             var n2 = n1.Add(typeof(global::Orleans.Runtime.GrainReference));
             var n3 = n2.Add(typeof(global::TestProject.IRequestShapeGrain));
