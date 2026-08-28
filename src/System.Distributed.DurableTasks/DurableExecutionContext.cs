@@ -24,7 +24,7 @@ public abstract partial class DurableExecutionContext(TaskId id)
     {
         ArgumentNullException.ThrowIfNull(continuation);
         var context = Current.Value;
-        return () =>
+        Action wrapped = () =>
         {
             SetCurrentContext(context, out var previous);
             try
@@ -36,6 +36,7 @@ public abstract partial class DurableExecutionContext(TaskId id)
                 SetCurrentContext(previous);
             }
         };
+        return context?.WrapContinuationCore(wrapped) ?? wrapped;
     }
 
     public TaskId TaskId { get; } = id;
@@ -44,6 +45,7 @@ public abstract partial class DurableExecutionContext(TaskId id)
     protected internal abstract ValueTask<DurableTaskResponse> ScheduleDelayAsync(TaskId taskId, DateTimeOffset dueTime, CancellationToken cancellationToken);
     protected internal abstract IScheduledTaskHandle GetChildTaskHandle(TaskId taskId);
     protected internal abstract TaskId CreateChildTaskId(string? name);
+    internal virtual Action WrapContinuationCore(Action continuation) => continuation;
 
     // Note that blocking on cancellation of a task from within that task would result in a deadlock
     // Cancels the task if it is scheduled or running. If the task is not scheduled or running, this method does nothing.

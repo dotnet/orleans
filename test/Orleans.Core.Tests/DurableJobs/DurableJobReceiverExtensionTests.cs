@@ -498,7 +498,7 @@ public class DurableJobReceiverExtensionTests
         await handler.Received(1).ExecuteJobAsync(jobContext, Arg.Any<CancellationToken>());
 
         RequestContext.Remove(DurableJobTurnIsolation.RequestContextKey);
-        var ordinaryTurn = isolation.EnterOrdinaryAsync();
+        var ordinaryTurn = isolation.EnterOrdinaryAsync(TestContext.Current.CancellationToken);
         Assert.False(ordinaryTurn.IsCompleted);
         execution.SetResult();
         using var lease = await ordinaryTurn.AsTask()

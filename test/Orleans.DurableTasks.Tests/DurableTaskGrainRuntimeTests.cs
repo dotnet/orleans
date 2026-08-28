@@ -32,7 +32,96 @@ public class DurableTaskGrainRuntimeTests
         public required DurableTaskGrainRuntimeShared Shared { get; init; }
     }
 
-    private static Fixture CreateFixture(bool withTransport = false, VolatileDurableTaskGrainStorage? storage = null, FakeTimeProvider? timeProvider = null, GrainId grainId = default)
+    private sealed class BlockingTurnIsolation : IDurableTaskTurnIsolation
+    {
+        private TaskCompletionSource? _release;
+
+        public TaskCompletionSource WaiterEntered { get; } =
+            new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        public void Block() =>
+            _release = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        public void Release()
+        {
+            var release = Interlocked.Exchange(ref _release, null);
+            release?.TrySetResult();
+        }
+
+        public async ValueTask<IDurableTaskTurnIsolationLease> EnterAsync(CancellationToken cancellationToken)
+        {
+            if (_release is { } release)
+            {
+                WaiterEntered.TrySetResult();
+                await release.Task.WaitAsync(cancellationToken);
+            }
+
+            return Lease.Instance;
+        }
+
+        private sealed class Lease : IDurableTaskTurnIsolationLease
+        {
+            public static Lease Instance { get; } = new();
+            public void Activate() { }
+            public void Dispose() { }
+        }
+    }
+
+    private sealed class ReentrantTurnIsolation : IDurableTaskTurnIsolation
+    {
+        private static readonly AsyncLocal<ReentrantTurnIsolation?> Current = new();
+        private readonly SemaphoreSlim _gate = new(1, 1);
+
+        public ValueTask<IDurableTaskTurnIsolationLease> EnterAsync(CancellationToken cancellationToken)
+        {
+            if (ReferenceEquals(Current.Value, this))
+            {
+                return new(new Lease(this, Current.Value, ownsGate: false));
+            }
+
+            return EnterCoreAsync(cancellationToken);
+        }
+
+        private async ValueTask<IDurableTaskTurnIsolationLease> EnterCoreAsync(CancellationToken cancellationToken)
+        {
+            await _gate.WaitAsync(cancellationToken);
+            return new Lease(this, Current.Value, ownsGate: true);
+        }
+
+        private sealed class Lease(
+            ReentrantTurnIsolation owner,
+            ReentrantTurnIsolation? previous,
+            bool ownsGate) : IDurableTaskTurnIsolationLease
+        {
+            private bool _activated;
+
+            public void Activate()
+            {
+                Current.Value = owner;
+                _activated = true;
+            }
+
+            public void Dispose()
+            {
+                if (_activated)
+                {
+                    Current.Value = previous;
+                }
+
+                if (ownsGate)
+                {
+                    owner._gate.Release();
+                }
+            }
+        }
+    }
+
+    private static Fixture CreateFixture(
+        bool withTransport = false,
+        VolatileDurableTaskGrainStorage? storage = null,
+        FakeTimeProvider? timeProvider = null,
+        GrainId grainId = default,
+        IDurableTaskTurnIsolation? turnIsolation = null)
     {
         if (grainId.IsDefault)
         {
@@ -54,7 +143,7 @@ public class DurableTaskGrainRuntimeTests
             services.GetRequiredService<Serializer>());
         var transport = withTransport ? new RecordingDurableTaskMessageTransport() : null;
         IEnumerable<IDurableTaskMessageTransport> transports = transport is null ? [] : [transport];
-        var runtime = new DurableTaskGrainRuntime(storage, shared, transports);
+        var runtime = new DurableTaskGrainRuntime(storage, shared, transports, turnIsolation);
 
         return new Fixture
         {
@@ -238,6 +327,62 @@ public class DurableTaskGrainRuntimeTests
         Assert.Same(DurableTaskResponse.Pending, retryResponse);
         Assert.Equal(42, finalResponse.GetResult<int>());
         Assert.Equal(1, request.CreateTaskCallCount);
+    }
+
+    [Fact]
+    public async Task ScheduleAsync_AsynchronousContinuationWaitsForTurnIsolation()
+    {
+        var turnIsolation = new BlockingTurnIsolation();
+        var fixture = CreateFixture(turnIsolation: turnIsolation);
+        var taskId = TaskId.Create("isolated-continuation");
+        var resume = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var request = new RuntimeTestDurableTaskRequest(RunAsync)
+        {
+            Context = new DurableTaskRequestContext { TargetId = fixture.GrainId },
+        };
+
+        _ = await ((IDurableTaskServer)fixture.Runtime).ScheduleAsync(
+            taskId,
+            request,
+            TestContext.Current.CancellationToken);
+        turnIsolation.Block();
+        resume.SetResult();
+        await turnIsolation.WaiterEntered.Task.WaitAsync(
+            TimeSpan.FromSeconds(10),
+            TestContext.Current.CancellationToken);
+
+        Assert.True(fixture.Storage.TryGetTask(taskId, out var pending));
+        Assert.Null(pending.Result);
+
+        turnIsolation.Release();
+        var response = await fixture.Runtime.GetScheduledTaskHandle(taskId)
+            .WaitAsync(TestContext.Current.CancellationToken);
+        Assert.True(response.IsCompleted);
+
+        async DurableTask RunAsync()
+        {
+            await resume.Task.ConfigureAwait(false);
+        }
+    }
+
+    [Fact]
+    public async Task ScheduleAsync_CanceledTaskUsesReentrantTurnIsolation()
+    {
+        var fixture = CreateFixture(turnIsolation: new ReentrantTurnIsolation());
+        var taskId = TaskId.Create("reentrant-canceled");
+        var request = new RuntimeTestDurableTaskRequest(() => DurableTask.FromResult(0))
+        {
+            Context = new DurableTaskRequestContext { TargetId = fixture.GrainId },
+        };
+        var state = fixture.Storage.GetOrCreateTask(taskId, request);
+        fixture.Storage.RequestCancellation(taskId, state);
+
+        var response = await ((IDurableTaskServer)fixture.Runtime)
+            .ScheduleAsync(taskId, request, TestContext.Current.CancellationToken)
+            .AsTask()
+            .WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
+
+        Assert.Equal(DurableTaskStatus.Canceled, response.Status);
     }
 
     [Fact]

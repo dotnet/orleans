@@ -11,7 +11,10 @@ using Orleans.DurableTasks;
 
 namespace Orleans.Runtime.DurableTasks;
 
-internal sealed class GrainDurableExecutionContext(TaskId taskId, IDurableTaskGrainRuntime runtime) : DurableExecutionContext(taskId)
+internal sealed class GrainDurableExecutionContext(
+    TaskId taskId,
+    IDurableTaskGrainRuntime runtime,
+    IDurableTaskContinuationScheduler? continuationScheduler = null) : DurableExecutionContext(taskId)
 {
     // The sequence number for named children.
     private Dictionary<string, int>? _nextChildIds;
@@ -21,14 +24,14 @@ internal sealed class GrainDurableExecutionContext(TaskId taskId, IDurableTaskGr
 
     internal Task DeactivateForActivationAsync(CancellationToken cancellationToken) => DeactivateAsync(cancellationToken);
 
-    protected override ValueTask<IScheduledTaskHandle> ScheduleChildTaskAsync(TaskId taskId, DurableTask task, CancellationToken cancellationToken)
+    protected internal override ValueTask<IScheduledTaskHandle> ScheduleChildTaskAsync(TaskId taskId, DurableTask task, CancellationToken cancellationToken)
     {
         ArgumentOutOfRangeException.ThrowIfEqual(taskId, default);
         ThrowIfNotChildTaskId(taskId);
         return runtime.ScheduleChildAsync(taskId, task, cancellationToken);
     }
 
-    protected override ValueTask<DurableTaskResponse> ScheduleDelayAsync(
+    protected internal override ValueTask<DurableTaskResponse> ScheduleDelayAsync(
         TaskId taskId,
         DateTimeOffset dueTime,
         CancellationToken cancellationToken)
@@ -37,13 +40,13 @@ internal sealed class GrainDurableExecutionContext(TaskId taskId, IDurableTaskGr
         return runtime.ScheduleDelayAsync(taskId, dueTime, cancellationToken);
     }
 
-    protected override IScheduledTaskHandle GetChildTaskHandle(TaskId taskId)
+    protected internal override IScheduledTaskHandle GetChildTaskHandle(TaskId taskId)
     {
         ThrowIfNotChildTaskId(taskId);
         return runtime.GetScheduledTaskHandle(taskId);
     }
 
-    protected override TaskId CreateChildTaskId(string? name)
+    protected internal override TaskId CreateChildTaskId(string? name)
     {
         lock (SyncRoot)
         {
@@ -61,6 +64,9 @@ internal sealed class GrainDurableExecutionContext(TaskId taskId, IDurableTaskGr
             }
         }
     }
+
+    internal override Action WrapContinuationCore(Action continuation) =>
+        continuationScheduler?.WrapContinuation(continuation) ?? continuation;
 
     private void ThrowIfNotChildTaskId(TaskId taskId)
     {

@@ -131,13 +131,13 @@ public class DurableJobFeatureHandlerTests
     {
         var isolation = new DurableJobTurnIsolation();
         isolation.Enable();
-        var ordinary = await isolation.EnterOrdinaryAsync();
+        var ordinary = await isolation.EnterOrdinaryAsync(TestContext.Current.CancellationToken);
         ordinary.Activate();
         var durableWork = await isolation.EnterIsolatedAsync(CancellationToken.None);
         durableWork.Activate();
         ordinary.Dispose();
 
-        var concurrent = isolation.EnterOrdinaryAsync();
+        var concurrent = isolation.EnterOrdinaryAsync(TestContext.Current.CancellationToken);
         Assert.False(concurrent.IsCompleted);
 
         durableWork.Dispose();
@@ -150,7 +150,7 @@ public class DurableJobFeatureHandlerTests
     {
         var isolation = new DurableJobTurnIsolation();
         isolation.Enable();
-        var ordinary = await isolation.EnterOrdinaryAsync();
+        var ordinary = await isolation.EnterOrdinaryAsync(TestContext.Current.CancellationToken);
         ordinary.Activate();
         RequestContext.Remove(DurableJobTurnIsolation.RequestContextKey);
         using var cancellation = new CancellationTokenSource();
@@ -181,7 +181,7 @@ public class DurableJobFeatureHandlerTests
             }),
             requiresTurnIsolation: true);
         var extension = new DurableJobFeatureReceiverExtension(registry, CreateShared(), isolation);
-        using var active = await isolation.EnterOrdinaryAsync();
+        using var active = await isolation.EnterOrdinaryAsync(TestContext.Current.CancellationToken);
         active.Activate();
         RequestContext.Remove(DurableJobTurnIsolation.RequestContextKey);
         using var cancellation = new CancellationTokenSource();
@@ -199,14 +199,14 @@ public class DurableJobFeatureHandlerTests
         var isolation = new DurableJobTurnIsolation();
         isolation.Enable();
         object priorOwners;
-        using (var prior = await isolation.EnterOrdinaryAsync())
+        using (var prior = await isolation.EnterOrdinaryAsync(TestContext.Current.CancellationToken))
         {
             prior.Activate();
             priorOwners = Assert.IsAssignableFrom<IReadOnlyDictionary<string, string>>(
                 RequestContext.Get(DurableJobTurnIsolation.RequestContextKey));
         }
 
-        using var current = await isolation.EnterOrdinaryAsync();
+        using var current = await isolation.EnterOrdinaryAsync(TestContext.Current.CancellationToken);
         current.Activate();
         var currentOwners = Assert.IsAssignableFrom<IReadOnlyDictionary<string, string>>(
             RequestContext.Get(DurableJobTurnIsolation.RequestContextKey));
@@ -215,7 +215,7 @@ public class DurableJobFeatureHandlerTests
             Assert.Single(currentOwners).Value);
         RequestContext.Set(DurableJobTurnIsolation.RequestContextKey, priorOwners);
 
-        var staleEntry = isolation.EnterOrdinaryAsync();
+        var staleEntry = isolation.EnterOrdinaryAsync(TestContext.Current.CancellationToken);
         Assert.False(staleEntry.IsCompleted);
 
         RequestContext.Set(DurableJobTurnIsolation.RequestContextKey, currentOwners);
@@ -233,12 +233,12 @@ public class DurableJobFeatureHandlerTests
         first.Enable();
         second.Enable();
 
-        using var firstLease = await first.EnterOrdinaryAsync();
+        using var firstLease = await first.EnterOrdinaryAsync(TestContext.Current.CancellationToken);
         firstLease.Activate();
-        using var secondLease = await second.EnterOrdinaryAsync();
+        using var secondLease = await second.EnterOrdinaryAsync(TestContext.Current.CancellationToken);
         secondLease.Activate();
 
-        var reentrantFirst = first.EnterOrdinaryAsync();
+        var reentrantFirst = first.EnterOrdinaryAsync(TestContext.Current.CancellationToken);
         Assert.True(reentrantFirst.IsCompleted);
         using var nested = await reentrantFirst;
         Assert.True(nested.IsReentrant);

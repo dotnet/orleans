@@ -1,5 +1,6 @@
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.Runtime;
+using Orleans.Runtime.DurableTasks;
 
 namespace Orleans.DurableJobs;
 
@@ -8,7 +9,7 @@ internal interface IDurableJobTurnIsolationReentrantScope
     IDisposable JoinReentrantScope();
 }
 
-internal sealed class DurableJobTurnIsolation
+internal sealed class DurableJobTurnIsolation : IDurableTaskTurnIsolation
 {
     internal const string RequestContextKey = "Orleans.DurableJobs.TurnIsolation";
 
@@ -56,7 +57,7 @@ internal sealed class DurableJobTurnIsolation
         return new Lease(this, ownerId, RequestContext.Get(RequestContextKey), isReentrant: false);
     }
 
-    public async ValueTask<Lease> EnterOrdinaryAsync()
+    public async ValueTask<Lease> EnterOrdinaryAsync(CancellationToken cancellationToken = default)
     {
         if (!IsEnabled)
         {
@@ -72,7 +73,7 @@ internal sealed class DurableJobTurnIsolation
             }
         }
 
-        await _gate.WaitAsync().ConfigureAwait(true);
+        await _gate.WaitAsync(cancellationToken).ConfigureAwait(true);
         var ownerId = Guid.NewGuid().ToString("N");
         lock (_sync)
         {
@@ -108,7 +109,11 @@ internal sealed class DurableJobTurnIsolation
         }
     }
 
-    public sealed class Lease : IDisposable
+    async ValueTask<IDurableTaskTurnIsolationLease> IDurableTaskTurnIsolation.EnterAsync(
+        CancellationToken cancellationToken) =>
+        await EnterOrdinaryAsync(cancellationToken);
+
+    public sealed class Lease : IDurableTaskTurnIsolationLease
     {
         public static Lease None { get; } = new(null, null, null, isReentrant: false);
 
