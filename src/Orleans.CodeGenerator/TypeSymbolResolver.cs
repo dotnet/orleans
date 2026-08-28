@@ -48,8 +48,21 @@ internal sealed class TypeSymbolResolver(Compilation compilation)
         }
 
         cancellationToken.ThrowIfCancellationRequested();
-        if (TryResolveMetadataIdentity(model.MetadataIdentity, cancellationToken, out symbol)
-            || TryResolveTypeSyntax(model.TypeSyntax.SyntaxString, cancellationToken, out symbol))
+        if (TryResolveMetadataIdentity(
+            model.MetadataIdentity,
+            cancellationToken,
+            out symbol,
+            out var assemblyNameIsAmbiguous))
+        {
+            return true;
+        }
+
+        if (assemblyNameIsAmbiguous)
+        {
+            return false;
+        }
+
+        if (TryResolveTypeSyntax(model.TypeSyntax.SyntaxString, cancellationToken, out symbol))
         {
             return true;
         }
@@ -82,8 +95,27 @@ internal sealed class TypeSymbolResolver(Compilation compilation)
         }
 
         cancellationToken.ThrowIfCancellationRequested();
-        if (TryResolveMetadataIdentity(model.MetadataIdentity, cancellationToken, out symbol)
-            || TryResolveTypeSyntax(model.InterfaceType.SyntaxString, cancellationToken, out symbol))
+        if (TryResolveMetadataIdentity(
+            model.MetadataIdentity,
+            cancellationToken,
+            out symbol,
+            out var assemblyNameIsAmbiguous))
+        {
+            if (symbol.TypeKind == TypeKind.Interface)
+            {
+                return true;
+            }
+
+            symbol = null;
+            return false;
+        }
+
+        if (assemblyNameIsAmbiguous)
+        {
+            return false;
+        }
+
+        if (TryResolveTypeSyntax(model.InterfaceType.SyntaxString, cancellationToken, out symbol))
         {
             if (symbol.TypeKind == TypeKind.Interface)
             {
@@ -117,15 +149,26 @@ internal sealed class TypeSymbolResolver(Compilation compilation)
         [NotNullWhen(true)] out INamedTypeSymbol? symbol)
     {
         cancellationToken.ThrowIfCancellationRequested();
-        return TryResolveMetadataIdentity(metadataIdentity, cancellationToken, out symbol)
-            || TryResolveTypeSyntax(type.SyntaxString, cancellationToken, out symbol);
+        if (TryResolveMetadataIdentity(
+            metadataIdentity,
+            cancellationToken,
+            out symbol,
+            out var assemblyNameIsAmbiguous))
+        {
+            return true;
+        }
+
+        return !assemblyNameIsAmbiguous
+            && TryResolveTypeSyntax(type.SyntaxString, cancellationToken, out symbol);
     }
 
     private bool TryResolveMetadataIdentity(
         TypeMetadataIdentity metadataIdentity,
         CancellationToken cancellationToken,
-        [NotNullWhen(true)] out INamedTypeSymbol? symbol)
+        [NotNullWhen(true)] out INamedTypeSymbol? symbol,
+        out bool assemblyNameIsAmbiguous)
     {
+        assemblyNameIsAmbiguous = false;
         if (metadataIdentity.IsEmpty)
         {
             symbol = null;
@@ -135,7 +178,11 @@ internal sealed class TypeSymbolResolver(Compilation compilation)
         if (!string.IsNullOrEmpty(metadataIdentity.AssemblyIdentity)
             || !string.IsNullOrEmpty(metadataIdentity.AssemblyName))
         {
-            if (TryGetAssembly(metadataIdentity, cancellationToken, out var assembly))
+            if (TryGetAssembly(
+                metadataIdentity,
+                cancellationToken,
+                out var assembly,
+                out assemblyNameIsAmbiguous))
             {
                 symbol = assembly.GetTypeByMetadataName(metadataIdentity.MetadataName);
                 return symbol is not null;
@@ -151,8 +198,10 @@ internal sealed class TypeSymbolResolver(Compilation compilation)
     private bool TryGetAssembly(
         TypeMetadataIdentity metadataIdentity,
         CancellationToken cancellationToken,
-        [NotNullWhen(true)] out IAssemblySymbol? assembly)
+        [NotNullWhen(true)] out IAssemblySymbol? assembly,
+        out bool assemblyNameIsAmbiguous)
     {
+        assemblyNameIsAmbiguous = false;
         if (!string.IsNullOrEmpty(metadataIdentity.AssemblyIdentity))
         {
             if (string.Equals(
@@ -203,6 +252,7 @@ internal sealed class TypeSymbolResolver(Compilation compilation)
                 if (assemblyByName is not null)
                 {
                     assembly = null;
+                    assemblyNameIsAmbiguous = true;
                     return false;
                 }
 

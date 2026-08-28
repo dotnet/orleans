@@ -206,7 +206,7 @@ public class TypeSymbolResolverTests
             assemblyIdentity: string.Empty);
 
         var success = resolver.TryResolveType(
-            TypeRef.Empty,
+            new TypeRef("global::ResolverCases.Shadowed"),
             metadataIdentity,
             TestContext.Current.CancellationToken,
             out var actual);
