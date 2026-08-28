@@ -134,6 +134,7 @@ public static class DurableMessagingExtensions
             var abandonedRetentionPeriod = options.JobStatusPollInterval <= TimeSpan.MaxValue / 4
                 ? options.JobStatusPollInterval * 4
                 : TimeSpan.MaxValue;
+            var completedRetentionPeriod = DurableMessagingPumpResults.DefaultRetentionPeriod;
             return new DurableMessagingPumpResults(
                 sp.GetRequiredKeyedService<TimeProvider>(DurableJobTimeProviderNames.DurableJobs),
                 completedRetentionPeriod,

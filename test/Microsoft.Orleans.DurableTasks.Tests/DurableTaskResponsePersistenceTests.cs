@@ -47,9 +47,9 @@ public sealed class DurableTaskResponsePersistenceTests
         var state = storage.GetOrCreateTask(taskId, request: null);
 
         storage.SetResponse(taskId, state, CreateCanceledResponse());
-        await storage.WriteAsync(default);
+        await storage.WriteAsync(TestContext.Current.CancellationToken);
         storage.Clear();
-        await storage.ReadAsync(default);
+        await storage.ReadAsync(TestContext.Current.CancellationToken);
 
         Assert.True(storage.TryGetTask(taskId, out var recoveredState));
         AssertCancellation(Assert.IsType<CanceledDurableTaskResponse>(recoveredState.Result));
@@ -70,9 +70,9 @@ public sealed class DurableTaskResponsePersistenceTests
 
         storage.SetRemoteRequest(taskId, state, target, "fingerprint");
         storage.SetCallerId(taskId, state, caller);
-        await storage.WriteAsync(default);
+        await storage.WriteAsync(TestContext.Current.CancellationToken);
         storage.Clear();
-        await storage.ReadAsync(default);
+        await storage.ReadAsync(TestContext.Current.CancellationToken);
 
         Assert.True(storage.TryGetTask(taskId, out var recoveredState));
         Assert.Equal(target, recoveredState.RemoteTarget);
@@ -182,7 +182,7 @@ public sealed class DurableTaskResponsePersistenceTests
         public Task<DurableJob> ScheduleJobAsync(ScheduleJobRequest request, CancellationToken cancellationToken) =>
             throw new NotSupportedException();
 
-        public Task<bool> TryCancelDurableJobAsync(DurableJob job, CancellationToken cancellationToken) =>
+        public Task<bool> CancelAsync(DurableJob job, CancellationToken cancellationToken) =>
             throw new NotSupportedException();
     }
 }

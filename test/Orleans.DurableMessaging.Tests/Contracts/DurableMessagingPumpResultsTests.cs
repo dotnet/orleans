@@ -45,12 +45,12 @@ public sealed class DurableMessagingPumpResultsTests
         var clock = new FakeTimeProvider();
         var results = new PumpResults(clock, TimeSpan.FromMinutes(1), TimeSpan.FromMinutes(1), 16);
         var key = results.CreateKey("job", "id", "run");
-        Assert.True(results.TryStart(key, out var execution));
+        Assert.True(results.TryStart(key, out var execution, TestContext.Current.CancellationToken));
         Assert.True(results.TryBegin(execution));
         results.Complete(execution);
 
         clock.Advance(TimeSpan.FromMinutes(2));
-        _ = results.TryStart(results.CreateKey("job", "other", "run"), out _);
+        _ = results.TryStart(results.CreateKey("job", "other", "run"), out _, TestContext.Current.CancellationToken);
 
         Assert.False(results.TryTake(key, out _, out _));
     }
@@ -62,7 +62,10 @@ public sealed class DurableMessagingPumpResultsTests
 
         for (var index = 0; index < 100; index++)
         {
-            Assert.True(results.TryStart(results.CreateKey("job", index.ToString(), "run"), out _));
+            Assert.True(results.TryStart(
+                results.CreateKey("job", index.ToString(), "run"),
+                out _,
+                TestContext.Current.CancellationToken));
         }
 
         Assert.InRange(results.Count, 0, 4);
@@ -74,12 +77,12 @@ public sealed class DurableMessagingPumpResultsTests
         var clock = new FakeTimeProvider();
         var results = new PumpResults(clock, TimeSpan.FromMinutes(1), TimeSpan.FromMinutes(1), 4);
         var key = results.CreateKey("job", "id", "run");
-        Assert.True(results.TryStart(key, out var execution));
+        Assert.True(results.TryStart(key, out var execution, TestContext.Current.CancellationToken));
         Assert.True(results.TryBegin(execution));
 
         clock.Advance(TimeSpan.FromHours(1));
 
-        Assert.False(results.TryStart(key, out _));
+        Assert.False(results.TryStart(key, out _, TestContext.Current.CancellationToken));
         results.Complete(execution);
         Assert.True(results.TryTake(key, out var result, out var exception));
         Assert.Same(DurableJobRunResult.Completed, result);
@@ -109,11 +112,11 @@ public sealed class DurableMessagingPumpResultsTests
         var results = new PumpResults();
         var firstKey = results.CreateKey("job", "id", "run-1");
         var secondKey = results.CreateKey("job", "id", "run-2");
-        Assert.True(results.TryStart(firstKey, out var firstExecution));
+        Assert.True(results.TryStart(firstKey, out var firstExecution, TestContext.Current.CancellationToken));
         Assert.True(results.TryBegin(firstExecution));
         results.Complete(firstExecution);
 
-        Assert.True(results.TryStart(secondKey, out var secondExecution));
+        Assert.True(results.TryStart(secondKey, out var secondExecution, TestContext.Current.CancellationToken));
         Assert.False(results.TryTake(secondKey, out _, out _));
         Assert.True(results.TryTake(firstKey, out var firstResult, out _));
         Assert.Same(DurableJobRunResult.Completed, firstResult);

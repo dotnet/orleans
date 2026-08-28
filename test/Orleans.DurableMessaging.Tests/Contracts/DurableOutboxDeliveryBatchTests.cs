@@ -234,7 +234,7 @@ public sealed class DurableOutboxDeliveryBatchTests
 
         Assert.NotSame(fixture.Envelope.Data, duplicate.Data);
         Assert.Equal(0, fixture.PendingMessageCount);
-        await fixture.DeliverAsync();
+        await fixture.DeliverAsync(TestContext.Current.CancellationToken);
         Assert.Equal(1, fixture.DeliveryCount);
         Assert.False(fixture.Messages.ContainsKey(fixture.MessageId));
     }
@@ -263,7 +263,7 @@ public sealed class DurableOutboxDeliveryBatchTests
 
         Assert.Equal(0, fixture.Manager.WriteCompletedCount);
         Assert.Equal(0, fixture.PendingMessageCount);
-        await fixture.DeliverAsync();
+        await fixture.DeliverAsync(TestContext.Current.CancellationToken);
         Assert.Equal(1, fixture.DeliveryCount);
     }
 
@@ -277,13 +277,13 @@ public sealed class DurableOutboxDeliveryBatchTests
 
         Assert.Single(fixture.Messages);
         Assert.Equal(1, fixture.PendingMessageCount);
-        await fixture.DeliverAsync();
+        await fixture.DeliverAsync(TestContext.Current.CancellationToken);
         Assert.Equal(0, fixture.DeliveryCount);
 
         await fixture.CommitAsync();
 
         Assert.Equal(0, fixture.PendingMessageCount);
-        await fixture.DeliverAsync();
+        await fixture.DeliverAsync(TestContext.Current.CancellationToken);
         Assert.Equal(1, fixture.DeliveryCount);
     }
 
@@ -323,7 +323,7 @@ public sealed class DurableOutboxDeliveryBatchTests
 
         await fixture.CommitAsync();
         Assert.Equal(0, fixture.PendingMessageCount);
-        await fixture.DeliverAsync();
+        await fixture.DeliverAsync(TestContext.Current.CancellationToken);
         Assert.Equal(1, fixture.DeliveryCount);
     }
 
@@ -429,7 +429,7 @@ public sealed class DurableOutboxDeliveryBatchTests
             revertException: revertFailure);
 
         var exception = await Assert.ThrowsAsync<InvalidOperationException>(
-            () => fixture.DeliverAsync());
+            () => fixture.DeliverAsync(TestContext.Current.CancellationToken));
 
         Assert.Same(revertFailure, exception);
         Assert.Equal(1, fixture.Manager.WriteCount);
@@ -447,7 +447,7 @@ public sealed class DurableOutboxDeliveryBatchTests
         Assert.Equal(1, fixture.GetOutboxDepth());
 
         var exception = await Assert.ThrowsAsync<IOException>(
-            () => fixture.DeliverAsync());
+            () => fixture.DeliverAsync(TestContext.Current.CancellationToken));
 
         Assert.Same(writeFailure, exception);
         Assert.True(fixture.Messages.ContainsKey(fixture.MessageId));
@@ -474,7 +474,7 @@ public sealed class DurableOutboxDeliveryBatchTests
         var fixture = new OutboxFixture(
             _ => ValueTask.FromResult(DeliveryResult.Accepted()));
 
-        await fixture.DeliverAsync();
+        await fixture.DeliverAsync(TestContext.Current.CancellationToken);
 
         Assert.False(fixture.Messages.ContainsKey(fixture.MessageId));
         Assert.False(fixture.MessageStates.ContainsKey(fixture.MessageId));
@@ -840,7 +840,7 @@ public sealed class DurableOutboxDeliveryBatchTests
                 });
             }
 
-            public Task<bool> TryCancelDurableJobAsync(
+            public Task<bool> CancelAsync(
                 DurableJob job,
                 CancellationToken cancellationToken) => Task.FromResult(true);
         }

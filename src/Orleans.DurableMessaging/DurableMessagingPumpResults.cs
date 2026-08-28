@@ -10,7 +10,7 @@ internal readonly record struct DurableMessagingPumpExecution(DurableMessagingPu
 internal sealed class DurableMessagingPumpResults
 {
     private const int DefaultMaxRetainedEntries = 65_536;
-    private static readonly TimeSpan DefaultRetentionPeriod = TimeSpan.FromMinutes(10);
+    internal static readonly TimeSpan DefaultRetentionPeriod = TimeSpan.FromMinutes(10);
 
     private readonly object _lock = new();
     private readonly Dictionary<DurableMessagingPumpExecutionKey, Entry> _entries = [];

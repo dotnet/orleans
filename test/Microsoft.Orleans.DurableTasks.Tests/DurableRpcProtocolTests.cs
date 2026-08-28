@@ -134,7 +134,7 @@ public sealed class DurableRpcProtocolTests
         var taskId = TaskId.Parse("root/delay");
         var dueTime = DateTimeOffset.UtcNow.AddMinutes(1);
 
-        await transport.ScheduleResumeAsync(target, taskId, 7, dueTime, default);
+        await transport.ScheduleResumeAsync(target, taskId, 7, dueTime, TestContext.Current.CancellationToken);
 
         var request = Assert.Single(jobs.Requests);
         Assert.Equal(DurableTaskMessageTransport.ResumeJobName, request.JobName);
@@ -225,7 +225,7 @@ public sealed class DurableRpcProtocolTests
         cancellation.Cancel();
 
         await Assert.ThrowsAnyAsync<OperationCanceledException>(() => cancel);
-        Assert.False((await submitted.Task.WaitAsync(TimeSpan.FromSeconds(5))).CanBeCanceled);
+        Assert.False((await submitted.Task.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken)).CanBeCanceled);
         completion.TrySetResult();
     }
 
@@ -342,7 +342,7 @@ public sealed class DurableRpcProtocolTests
             });
         }
 
-        public Task<bool> TryCancelDurableJobAsync(DurableJob job, CancellationToken cancellationToken) =>
+        public Task<bool> CancelAsync(DurableJob job, CancellationToken cancellationToken) =>
             Task.FromResult(true);
     }
 

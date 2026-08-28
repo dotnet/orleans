@@ -15,7 +15,7 @@ internal sealed class DurableTaskGrainParticipant(
 {
     public void Initialize()
     {
-        jobHandlers.Register(DurableTaskMessageTransport.ResumeJobName, runtime);
+        jobHandlers.Register(runtime);
         try
         {
             stateManager.RegisterObserver(runtime);

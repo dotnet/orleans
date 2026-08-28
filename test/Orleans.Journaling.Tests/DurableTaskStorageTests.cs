@@ -16,7 +16,7 @@ public sealed class DurableTaskStorageTests : JournalingTestBase
     {
         var initial = CreateTestSystem();
         var storage = CreateTaskStorage(initial.Manager);
-        await initial.Lifecycle.OnStart();
+        await initial.Lifecycle.OnStart(TestContext.Current.CancellationToken);
         var taskId = TaskId.Parse("root/canceled");
         var exception = new OperationCanceledException(
             "Durable cancellation requested.",
@@ -24,11 +24,11 @@ public sealed class DurableTaskStorageTests : JournalingTestBase
         exception.Data["task"] = "root/canceled";
         var state = storage.GetOrCreateTask(taskId, request: null);
         storage.SetResponse(taskId, state, new CanceledDurableTaskResponse(exception));
-        await storage.WriteAsync(default);
+        await storage.WriteAsync(TestContext.Current.CancellationToken);
 
         var recovered = CreateTestSystem(storage: initial.Storage);
         var recoveredStorage = CreateTaskStorage(recovered.Manager);
-        await recovered.Lifecycle.OnStart();
+        await recovered.Lifecycle.OnStart(TestContext.Current.CancellationToken);
 
         Assert.True(recoveredStorage.TryGetTask(taskId, out var recoveredState));
         var response = Assert.IsType<CanceledDurableTaskResponse>(recoveredState.Result);

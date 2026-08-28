@@ -536,6 +536,8 @@ internal sealed partial class DurableInboxExtension :
         _recoveryCompleted = false;
     }
 
+    public bool CanHandle(string jobName) => string.Equals(jobName, JobName, StringComparison.Ordinal);
+
     public async ValueTask<DurableJobRunResult> ExecuteJobAsync(IJobRunContext context, CancellationToken cancellationToken)
     {
         var hasStableOwnership = DurableMessagingJobOwnership.TryGetOwnershipId(

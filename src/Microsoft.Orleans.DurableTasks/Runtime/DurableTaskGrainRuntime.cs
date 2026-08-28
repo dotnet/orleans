@@ -377,6 +377,9 @@ internal sealed partial class DurableTaskGrainRuntime(
         return DurableTaskResponse.Pending;
     }
 
+    public bool CanHandle(string jobName) =>
+        string.Equals(jobName, DurableTaskMessageTransport.ResumeJobName, StringComparison.Ordinal);
+
     public async ValueTask<DurableJobRunResult> ExecuteJobAsync(
         IJobRunContext context,
         CancellationToken cancellationToken)

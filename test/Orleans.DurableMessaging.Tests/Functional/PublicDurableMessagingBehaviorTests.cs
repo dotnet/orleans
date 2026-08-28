@@ -51,7 +51,7 @@ public sealed class PublicDurableMessagingBehaviorTests : IAsyncLifetime
         var barrier = fixture.Storage.BlockWrite(journalId);
         using var envelope = CreateEnvelope(receiver, NewMessage(1, "durability"));
 
-        var delivery = DeliverAsync(receiver, envelope.Value);
+        var delivery = DeliverAsync(receiver, envelope.Value, TestContext.Current.CancellationToken);
         await barrier.WaitUntilEnteredAsync();
 
         Assert.False(delivery.IsCompleted);
@@ -87,7 +87,7 @@ public sealed class PublicDurableMessagingBehaviorTests : IAsyncLifetime
         var barrier = fixture.Storage.BlockWrite(JournalId.FromGrainId(receiver.GetGrainId()));
         using var firstEnvelope = CreateEnvelope(receiver, NewMessage(72, "holds-gate"));
         using var secondEnvelope = CreateEnvelope(receiver, NewMessage(73, "canceled"));
-        var firstDelivery = DeliverAsync(receiver, firstEnvelope.Value);
+        var firstDelivery = DeliverAsync(receiver, firstEnvelope.Value, TestContext.Current.CancellationToken);
         await barrier.WaitUntilEnteredAsync();
         using var cancellation = new CancellationTokenSource();
 
@@ -157,7 +157,7 @@ public sealed class PublicDurableMessagingBehaviorTests : IAsyncLifetime
         using var envelope = CreateEnvelope(receiver, NewMessage(2, "failed-acceptance"));
 
         await Assert.ThrowsAnyAsync<Exception>(
-            () => DeliverAsync(receiver, envelope.Value));
+            () => DeliverAsync(receiver, envelope.Value, TestContext.Current.CancellationToken));
 
         var reverted = await receiver.GetSnapshotAsync();
         Assert.Equal(0, reverted.InboxCount);
@@ -170,7 +170,7 @@ public sealed class PublicDurableMessagingBehaviorTests : IAsyncLifetime
         Assert.Empty(recovered.Effects);
         Assert.Equal(depthBaseline, fixture.Metrics.GetDepth("orleans-durable-messaging-inbox-depth"));
 
-        Assert.Equal(DeliveryStatus.Accepted, (await DeliverAsync(receiver, envelope.Value)).Status);
+        Assert.Equal(DeliveryStatus.Accepted, (await DeliverAsync(receiver, envelope.Value, TestContext.Current.CancellationToken)).Status);
         await fixture.WaitForEffectCountAsync(receiver, 1);
         Assert.Equal(depthBaseline, fixture.Metrics.GetDepth("orleans-durable-messaging-inbox-depth"));
     }
@@ -205,11 +205,9 @@ public sealed class PublicDurableMessagingBehaviorTests : IAsyncLifetime
             jobName);
         using var envelope = CreateEnvelope(receiver, NewMessage(3, "inbox-orphan"));
 
-        var delivery = DeliverAsync(receiver, envelope.Value);
+        var delivery = DeliverAsync(receiver, envelope.Value, TestContext.Current.CancellationToken);
         await barrier.WaitUntilEnteredAsync();
-        await fixture.Metrics.WaitForCountAsync(
-            "orleans-durablejobs-job-attempts-started",
-            attemptBaseline + 1);
+        await fixture.Metrics.WaitForCountAsync("orleans-durablejobs-job-attempts-started", attemptBaseline + 1, cancellationToken: TestContext.Current.CancellationToken);
 
         Assert.Equal(
             orphanBaseline,
@@ -220,13 +218,8 @@ public sealed class PublicDurableMessagingBehaviorTests : IAsyncLifetime
         var recovered = await fixture.SnapshotProbe.WaitAsync(
             receiver.GetGrainId(),
             snapshot => snapshot.ActivationId != before.ActivationId);
-        await fixture.Metrics.WaitForCountAsync(
-            "orleans-durable-messaging-orphaned-jobs-reclaimed",
-            orphanBaseline + 1,
-            jobName);
-        await fixture.Metrics.WaitForCountAsync(
-            "orleans-durablejobs-jobs-completed",
-            completionBaseline + 1);
+        await fixture.Metrics.WaitForCountAsync("orleans-durable-messaging-orphaned-jobs-reclaimed", orphanBaseline + 1, jobName, TestContext.Current.CancellationToken);
+        await fixture.Metrics.WaitForCountAsync("orleans-durablejobs-jobs-completed", completionBaseline + 1, cancellationToken: TestContext.Current.CancellationToken);
 
         Assert.Equal(0, recovered.InboxCount);
         Assert.Null(recovered.InboxJobId);
@@ -246,7 +239,7 @@ public sealed class PublicDurableMessagingBehaviorTests : IAsyncLifetime
             receiver,
             new DurableTestMessage(logicalId, 7, "atomic", sink.GetGrainId()));
 
-        var result = await DeliverAsync(receiver, envelope.Value);
+        var result = await DeliverAsync(receiver, envelope.Value, TestContext.Current.CancellationToken);
         var receiverState = await fixture.WaitForEffectCountAsync(receiver, 1);
         var sinkState = await fixture.WaitForEffectCountAsync(sink, 1);
         receiverState = await fixture.WaitForOutboxCountAsync(receiver, 0);
@@ -258,7 +251,7 @@ public sealed class PublicDurableMessagingBehaviorTests : IAsyncLifetime
         Assert.Equal(0, receiverState.OutboxCount);
         Assert.Equal(effect, Assert.Single(sinkState.Effects));
 
-        var duplicate = await DeliverAsync(receiver, envelope.Value);
+        var duplicate = await DeliverAsync(receiver, envelope.Value, TestContext.Current.CancellationToken);
         Assert.Equal(DeliveryStatus.Duplicate, duplicate.Status);
         Assert.Equal(1, Assert.Single((await receiver.GetSnapshotAsync()).Effects).Count);
         Assert.Equal(1, Assert.Single((await sink.GetSnapshotAsync()).Effects).Count);
@@ -273,7 +266,7 @@ public sealed class PublicDurableMessagingBehaviorTests : IAsyncLifetime
             receiver,
             new DurableTestMessage(Guid.NewGuid(), 9, "rollback", sink.GetGrainId(), ThrowAfterStaging: true));
 
-        var accepted = await DeliverAsync(receiver, envelope.Value);
+        var accepted = await DeliverAsync(receiver, envelope.Value, TestContext.Current.CancellationToken);
         var state = await fixture.WaitForDeadLetterCountAsync(receiver, 1);
 
         Assert.Equal(DeliveryStatus.Accepted, accepted.Status);
@@ -409,9 +402,9 @@ public sealed class PublicDurableMessagingBehaviorTests : IAsyncLifetime
         using var barrier = fixture.HandlerProbe.Arm(receiver.GetGrainId(), "messages/blocked-duplicate");
         using var envelope = CreateEnvelope(receiver, NewMessage(11, "duplicate"), "messages/blocked-duplicate");
 
-        var first = await DeliverAsync(receiver, envelope.Value);
+        var first = await DeliverAsync(receiver, envelope.Value, TestContext.Current.CancellationToken);
         await barrier.WaitUntilEnteredAsync();
-        var second = DeliverAsync(receiver, envelope.Value);
+        var second = DeliverAsync(receiver, envelope.Value, TestContext.Current.CancellationToken);
 
         Assert.Equal(DeliveryStatus.Accepted, first.Status);
         Assert.False(second.IsCompleted);
@@ -430,13 +423,13 @@ public sealed class PublicDurableMessagingBehaviorTests : IAsyncLifetime
         var receiver = NewGrain();
         using var envelope = CreateEnvelope(receiver, NewMessage(13, "reactivation"));
 
-        Assert.Equal(DeliveryStatus.Accepted, (await DeliverAsync(receiver, envelope.Value)).Status);
+        Assert.Equal(DeliveryStatus.Accepted, (await DeliverAsync(receiver, envelope.Value, TestContext.Current.CancellationToken)).Status);
         var before = await fixture.WaitForEffectCountAsync(receiver, 1);
         await receiver.RequestDeactivationAsync();
         var after = await receiver.GetSnapshotAsync();
 
         Assert.NotEqual(before.ActivationId, after.ActivationId);
-        Assert.Equal(DeliveryStatus.Duplicate, (await DeliverAsync(receiver, envelope.Value)).Status);
+        Assert.Equal(DeliveryStatus.Duplicate, (await DeliverAsync(receiver, envelope.Value, TestContext.Current.CancellationToken)).Status);
         Assert.Equal(1, Assert.Single((await receiver.GetSnapshotAsync()).Effects).Count);
     }
 
@@ -454,8 +447,8 @@ public sealed class PublicDurableMessagingBehaviorTests : IAsyncLifetime
         foreach (var message in messages)
         {
             using var envelope = CreateEnvelope(receiver, message);
-            Assert.Equal(DeliveryStatus.Accepted, (await DeliverAsync(receiver, envelope.Value)).Status);
-            Assert.Equal(DeliveryStatus.Duplicate, (await DeliverAsync(receiver, envelope.Value)).Status);
+            Assert.Equal(DeliveryStatus.Accepted, (await DeliverAsync(receiver, envelope.Value, TestContext.Current.CancellationToken)).Status);
+            Assert.Equal(DeliveryStatus.Duplicate, (await DeliverAsync(receiver, envelope.Value, TestContext.Current.CancellationToken)).Status);
         }
 
         var state = await fixture.WaitForEffectCountAsync(receiver, 3);
@@ -471,9 +464,9 @@ public sealed class PublicDurableMessagingBehaviorTests : IAsyncLifetime
         using var first = CreateEnvelope(receiver, NewMessage(21, "first"), "messages/sequential");
         using var second = CreateEnvelope(receiver, NewMessage(22, "second"), "messages/sequential");
 
-        Assert.Equal(DeliveryStatus.Accepted, (await DeliverAsync(receiver, first.Value)).Status);
+        Assert.Equal(DeliveryStatus.Accepted, (await DeliverAsync(receiver, first.Value, TestContext.Current.CancellationToken)).Status);
         await WaitForBarrierAsync(receiver, barrier);
-        var secondDelivery = DeliverAsync(receiver, second.Value);
+        var secondDelivery = DeliverAsync(receiver, second.Value, TestContext.Current.CancellationToken);
         Assert.False(secondDelivery.IsCompleted);
 
         barrier.Release();
@@ -500,7 +493,7 @@ public sealed class PublicDurableMessagingBehaviorTests : IAsyncLifetime
         var receiver = NewGrain();
         using var malformed = CreateEnvelope(receiver, "wrong-body", "typed");
 
-        Assert.Equal(DeliveryStatus.Accepted, (await DeliverAsync(receiver, malformed.Value)).Status);
+        Assert.Equal(DeliveryStatus.Accepted, (await DeliverAsync(receiver, malformed.Value, TestContext.Current.CancellationToken)).Status);
         var poisoned = await fixture.WaitForDeadLetterCountAsync(receiver, 1);
         Assert.Empty(poisoned.Effects);
         var deadLetter = Assert.Single(poisoned.InboxDeadLetters);
@@ -508,7 +501,7 @@ public sealed class PublicDurableMessagingBehaviorTests : IAsyncLifetime
         Assert.Contains(nameof(DurableTestMessage), deadLetter.Reason, StringComparison.Ordinal);
 
         using var valid = CreateEnvelope(receiver, NewMessage(41, "valid-after-poison"), "typed");
-        Assert.Equal(DeliveryStatus.Accepted, (await DeliverAsync(receiver, valid.Value)).Status);
+        Assert.Equal(DeliveryStatus.Accepted, (await DeliverAsync(receiver, valid.Value, TestContext.Current.CancellationToken)).Status);
         var recovered = await fixture.WaitForEffectCountAsync(receiver, 1);
         Assert.Equal("valid-after-poison", Assert.Single(recovered.Effects).Value);
         Assert.Single(recovered.InboxDeadLetters);
@@ -693,9 +686,7 @@ public sealed class PublicDurableMessagingBehaviorTests : IAsyncLifetime
             "messages/outbox-orphan",
             NewMessage(54, "outbox-orphan"));
         await barrier.WaitUntilEnteredAsync();
-        await fixture.Metrics.WaitForCountAsync(
-            "orleans-durablejobs-job-attempts-started",
-            attemptBaseline + 1);
+        await fixture.Metrics.WaitForCountAsync("orleans-durablejobs-job-attempts-started", attemptBaseline + 1, cancellationToken: TestContext.Current.CancellationToken);
 
         Assert.Equal(
             orphanBaseline,
@@ -706,13 +697,8 @@ public sealed class PublicDurableMessagingBehaviorTests : IAsyncLifetime
         await sender.RequestDeactivationAsync();
         var recovered = await sender.GetSnapshotAsync();
         Assert.NotEqual(before.ActivationId, recovered.ActivationId);
-        await fixture.Metrics.WaitForCountAsync(
-            "orleans-durable-messaging-orphaned-jobs-reclaimed",
-            orphanBaseline + 1,
-            jobName);
-        await fixture.Metrics.WaitForCountAsync(
-            "orleans-durablejobs-jobs-completed",
-            completionBaseline + 1);
+        await fixture.Metrics.WaitForCountAsync("orleans-durable-messaging-orphaned-jobs-reclaimed", orphanBaseline + 1, jobName, TestContext.Current.CancellationToken);
+        await fixture.Metrics.WaitForCountAsync("orleans-durablejobs-jobs-completed", completionBaseline + 1, cancellationToken: TestContext.Current.CancellationToken);
 
         Assert.Equal(0, recovered.OutboxCount);
         Assert.Null(recovered.OutboxJobId);
@@ -736,7 +722,7 @@ public sealed class PublicDurableMessagingBehaviorTests : IAsyncLifetime
             "messages/outbox-clear-retry",
             NewMessage(56, "outbox-clear-retry"));
         _ = await fixture.WaitForEffectCountAsync(receiver, 1);
-        await fixture.Storage.WaitForSuccessfulWriteCountAsync(journalId, writeBaseline + 3);
+        await fixture.Storage.WaitForSuccessfulWriteCountAsync(journalId, writeBaseline + 3, TestContext.Current.CancellationToken);
         var cleaned = await sender.GetSnapshotAsync();
 
         Assert.Equal(0, cleaned.OutboxCount);
@@ -755,7 +741,7 @@ public sealed class PublicDurableMessagingBehaviorTests : IAsyncLifetime
         using var handler = fixture.HandlerProbe.Arm(receiver.GetGrainId(), "messages/inbox-clear-retry");
         using var envelope = CreateEnvelope(receiver, NewMessage(57, "inbox-clear-retry"), "messages/inbox-clear-retry");
 
-        Assert.Equal(DeliveryStatus.Accepted, (await DeliverAsync(receiver, envelope.Value)).Status);
+        Assert.Equal(DeliveryStatus.Accepted, (await DeliverAsync(receiver, envelope.Value, TestContext.Current.CancellationToken)).Status);
         await handler.WaitUntilEnteredAsync();
         fixture.Storage.FailWrite(JournalId.FromGrainId(receiver.GetGrainId()), matchingWrite: 2);
         fixture.DeactivateOnNextRecovery(receiver);
@@ -783,7 +769,7 @@ public sealed class PublicDurableMessagingBehaviorTests : IAsyncLifetime
         using var handler = fixture.HandlerProbe.Arm(receiver.GetGrainId(), "messages/stale-owner");
         using var envelope = CreateEnvelope(receiver, NewMessage(58, "stale-owner"), "messages/stale-owner");
 
-        Assert.Equal(DeliveryStatus.Accepted, (await DeliverAsync(receiver, envelope.Value)).Status);
+        Assert.Equal(DeliveryStatus.Accepted, (await DeliverAsync(receiver, envelope.Value, TestContext.Current.CancellationToken)).Status);
         await handler.WaitUntilEnteredAsync();
         var accepted = fixture.GetSnapshot(receiver);
 
@@ -803,7 +789,7 @@ public sealed class PublicDurableMessagingBehaviorTests : IAsyncLifetime
         using var handler = fixture.HandlerProbe.Arm(receiver.GetGrainId(), route);
         using var envelope = CreateEnvelope(receiver, NewMessage(60, "newer-inbox-owner"), route);
 
-        Assert.Equal(DeliveryStatus.Accepted, (await DeliverAsync(receiver, envelope.Value)).Status);
+        Assert.Equal(DeliveryStatus.Accepted, (await DeliverAsync(receiver, envelope.Value, TestContext.Current.CancellationToken)).Status);
         await handler.WaitUntilEnteredAsync();
         var owned = fixture.GetSnapshot(receiver);
         Assert.False(string.IsNullOrEmpty(owned.InboxJobId));
@@ -824,7 +810,8 @@ public sealed class PublicDurableMessagingBehaviorTests : IAsyncLifetime
             TestContext.Current.CancellationToken);
         await fixture.Metrics.WaitForCountAsync(
             "orleans-durablejobs-jobs-completed",
-            completionBaseline + 1);
+            completionBaseline + 1,
+            cancellationToken: TestContext.Current.CancellationToken);
 
         Assert.Equal(owned.InboxJobId, fixture.GetSnapshot(receiver).InboxJobId);
         handler.Release();
@@ -866,7 +853,8 @@ public sealed class PublicDurableMessagingBehaviorTests : IAsyncLifetime
                 TestContext.Current.CancellationToken);
             await fixture.Metrics.WaitForCountAsync(
                 "orleans-durablejobs-jobs-completed",
-                completionBaseline + 1);
+                completionBaseline + 1,
+                cancellationToken: TestContext.Current.CancellationToken);
 
             Assert.Equal(owned.OutboxJobId, fixture.GetSnapshot(sender).OutboxJobId);
         }
@@ -921,7 +909,8 @@ public sealed class PublicDurableMessagingBehaviorTests : IAsyncLifetime
                 TestContext.Current.CancellationToken);
             await fixture.Metrics.WaitForCountAsync(
                 "orleans-durablejobs-handler-executions-started",
-                handlerBaseline + 1);
+                handlerBaseline + 1,
+                cancellationToken: TestContext.Current.CancellationToken);
 
             Assert.Equal(
                 orphanBaseline,
@@ -948,10 +937,10 @@ public sealed class PublicDurableMessagingBehaviorTests : IAsyncLifetime
         fixture.JobManagerProbe.FailAfterNext("orleans.messaging.inbox-drain");
 
         await Assert.ThrowsAsync<IOException>(
-            () => DeliverAsync(receiver, envelope.Value));
+            () => DeliverAsync(receiver, envelope.Value, TestContext.Current.CancellationToken));
         Assert.Equal(0, (await receiver.GetSnapshotAsync()).InboxCount);
 
-        Assert.Equal(DeliveryStatus.Accepted, (await DeliverAsync(receiver, envelope.Value)).Status);
+        Assert.Equal(DeliveryStatus.Accepted, (await DeliverAsync(receiver, envelope.Value, TestContext.Current.CancellationToken)).Status);
         var completed = await fixture.WaitForEffectCountAsync(receiver, 1);
 
         var effect = Assert.Single(completed.Effects);
@@ -987,12 +976,12 @@ public sealed class PublicDurableMessagingBehaviorTests : IAsyncLifetime
         Assert.Null(referenceContext);
         Assert.True(referenceEnvelope.Value.Data.TryGetContextValue<int?>("null-value", out var valueContext));
         Assert.Null(valueContext);
-        Assert.Equal(DeliveryStatus.Accepted, (await DeliverAsync(receiver, referenceEnvelope.Value)).Status);
+        Assert.Equal(DeliveryStatus.Accepted, (await DeliverAsync(receiver, referenceEnvelope.Value, TestContext.Current.CancellationToken)).Status);
 
         using var valueEnvelope = CreateEnvelope<int?>(receiver, body: null, route: "nullable/value");
         Assert.True(valueEnvelope.Value.Data.TryGetBody<int?>(out var valueBody));
         Assert.Null(valueBody);
-        Assert.Equal(DeliveryStatus.Accepted, (await DeliverAsync(receiver, valueEnvelope.Value)).Status);
+        Assert.Equal(DeliveryStatus.Accepted, (await DeliverAsync(receiver, valueEnvelope.Value, TestContext.Current.CancellationToken)).Status);
 
         var completed = await fixture.SnapshotProbe.WaitAsync(
             receiver.GetGrainId(),
@@ -1011,7 +1000,7 @@ public sealed class PublicDurableMessagingBehaviorTests : IAsyncLifetime
         using var barrier = fixture.HandlerProbe.Arm(blocked.GetGrainId(), "messages/blocked-pump");
         using var blockedEnvelope = CreateEnvelope(blocked, NewMessage(61, "blocked"), "messages/blocked-pump");
 
-        Assert.Equal(DeliveryStatus.Accepted, (await DeliverAsync(blocked, blockedEnvelope.Value)).Status);
+        Assert.Equal(DeliveryStatus.Accepted, (await DeliverAsync(blocked, blockedEnvelope.Value, TestContext.Current.CancellationToken)).Status);
         await barrier.WaitUntilEnteredAsync();
         await independentSender.SendAsync(
             independentReceiver.GetGrainId(),
@@ -1039,7 +1028,7 @@ public sealed class PublicDurableMessagingBehaviorTests : IAsyncLifetime
         Assert.True(registration.LookupRetainedFirstHandler);
 
         using var envelope = CreateEnvelope(receiver, NewMessage(69, "first-handler"), route);
-        Assert.Equal(DeliveryStatus.Accepted, (await DeliverAsync(receiver, envelope.Value)).Status);
+        Assert.Equal(DeliveryStatus.Accepted, (await DeliverAsync(receiver, envelope.Value, TestContext.Current.CancellationToken)).Status);
         var state = await fixture.SnapshotProbe.WaitAsync(
             receiver.GetGrainId(),
             static snapshot => snapshot.FirstExactRouteHandlerCalls == 1);
@@ -1066,7 +1055,7 @@ public sealed class PublicDurableMessagingBehaviorTests : IAsyncLifetime
         var receiver = NewGrain();
         using var envelope = CreateEnvelope(receiver, NewMessage(71, "missing"), "unknown/route");
 
-        var result = await DeliverAsync(receiver, envelope.Value);
+        var result = await DeliverAsync(receiver, envelope.Value, TestContext.Current.CancellationToken);
 
         Assert.Equal(DeliveryStatus.RouteNotFound, result.Status);
         Assert.Equal("No handler for route 'unknown/route'", result.Message);

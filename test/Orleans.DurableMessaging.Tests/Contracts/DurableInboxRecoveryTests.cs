@@ -168,7 +168,7 @@ public sealed class DurableInboxRecoveryTests
             });
         }
 
-        public Task<bool> TryCancelDurableJobAsync(DurableJob job, CancellationToken cancellationToken) =>
+        public Task<bool> CancelAsync(DurableJob job, CancellationToken cancellationToken) =>
             Task.FromResult(true);
     }
 
