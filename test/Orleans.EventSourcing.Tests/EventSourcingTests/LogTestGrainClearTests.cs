@@ -136,7 +136,7 @@ public class LogTestGrainClearTests : IClassFixture<EventSourcingClusterFixture>
         this.fixture.FailNextJournalAppend(grain, new IOException("Expected transient append failure."));
 
         await Assert.ThrowsAsync<OrleansException>(() => grain.SetAuxiliaryValueAndAGlobal(23, 41));
-        await deactivated.WaitAsync(TimeSpan.FromSeconds(10));
+        await deactivated.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
 
         grain = this.fixture.GrainFactory.GetGrain<ILogTestGrainWithAuxiliaryState>(721007L, "TestGrains.LogTestGrainJournaledStateStorageWithAuxiliaryState");
         Assert.Equal(17, await grain.GetAuxiliaryValue());
@@ -155,7 +155,7 @@ public class LogTestGrainClearTests : IClassFixture<EventSourcingClusterFixture>
         this.fixture.FailNextJournalAppend(grain, new InconsistentStateException("Expected append conflict."));
 
         await Assert.ThrowsAsync<OrleansException>(() => grain.SetAuxiliaryValueAndAGlobal(23, 41));
-        await deactivated.WaitAsync(TimeSpan.FromSeconds(10));
+        await deactivated.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
 
         grain = this.fixture.GrainFactory.GetGrain<ILogTestGrainWithAuxiliaryState>(721008L, "TestGrains.LogTestGrainJournaledStateStorageWithAuxiliaryState");
         Assert.Equal(17, await grain.GetAuxiliaryValue());
@@ -213,7 +213,7 @@ public class LogTestGrainClearTests : IClassFixture<EventSourcingClusterFixture>
         this.fixture.FailNextJournalAppend(grain, new IOException("Expected transient clear failure."));
 
         await Assert.ThrowsAsync<IOException>(() => grain.Clear());
-        await deactivated.WaitAsync(TimeSpan.FromSeconds(10));
+        await deactivated.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
 
         grain = this.fixture.GrainFactory.GetGrain<ILogTestGrainWithAuxiliaryState>(721010L, "TestGrains.LogTestGrainJournaledStateStorageWithAuxiliaryState");
         Assert.Equal(17, await grain.GetAuxiliaryValue());
@@ -232,7 +232,7 @@ public class LogTestGrainClearTests : IClassFixture<EventSourcingClusterFixture>
         this.fixture.FailNextJournalAppend(grain, new InconsistentStateException("Expected clear conflict."));
 
         await Assert.ThrowsAsync<InconsistentStateException>(() => grain.Clear());
-        await deactivated.WaitAsync(TimeSpan.FromSeconds(10));
+        await deactivated.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
 
         grain = this.fixture.GrainFactory.GetGrain<ILogTestGrainWithAuxiliaryState>(721011L, "TestGrains.LogTestGrainJournaledStateStorageWithAuxiliaryState");
         Assert.Equal(17, await grain.GetAuxiliaryValue());
@@ -264,7 +264,7 @@ public class LogTestGrainClearTests : IClassFixture<EventSourcingClusterFixture>
         var deactivated = this.fixture.HostedCluster.WaitForDeactivationAsync(grain);
 
         await Assert.ThrowsAsync<OrleansException>(() => grain.RaiseEventsWithUnsupportedSecond());
-        await deactivated.WaitAsync(TimeSpan.FromSeconds(10));
+        await deactivated.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
 
         grain = this.fixture.GrainFactory.GetGrain<ILogTestGrain>(721014L, "TestGrains.LogTestGrainJournaledStateStorage");
         Assert.Equal(0, await grain.GetAGlobal());

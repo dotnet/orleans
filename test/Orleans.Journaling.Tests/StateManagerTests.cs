@@ -2675,8 +2675,6 @@ public class StateManagerTests : JournalingTestBase
 
         public TaskCompletionSource AllowBlockedRead { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
 
-        public Exception? NextReplaceException { get; set; }
-
         public int ReplaceAttemptCount { get; private set; }
 
         public TaskCompletionSource DeleteStarted { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
