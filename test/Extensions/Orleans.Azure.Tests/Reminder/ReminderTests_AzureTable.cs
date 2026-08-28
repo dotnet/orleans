@@ -14,6 +14,20 @@ using Orleans.Internal;
 
 namespace Tester.AzureUtils.TimerTests
 {
+    [TestSuite("Functional")]
+    [TestProvider("AzureStorage")]
+    [TestArea("Reminders")]
+    [TestCategory("Reminders"), TestCategory("AzureStorage")]
+    public sealed class ReminderServiceLifecycleTests_AzureTable
+        : ReminderServiceLifecycleTestsBase, IClassFixture<ReminderTests_AzureTable.Fixture>
+    {
+        public ReminderServiceLifecycleTests_AzureTable(ReminderTests_AzureTable.Fixture fixture)
+            : base(fixture.ReminderClock, fixture.HostedCluster, "AzureStorage")
+        {
+            fixture.EnsurePreconditionsMet();
+        }
+    }
+
     /// <summary>
     /// Tests for Azure Table Storage-based reminder service, including basic operations, failover, and multi-grain scenarios.
     /// </summary>

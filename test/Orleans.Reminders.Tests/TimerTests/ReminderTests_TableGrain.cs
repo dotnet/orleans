@@ -20,6 +20,19 @@ using ReminderEvents = Orleans.Reminders.Diagnostics.ReminderEvents;
 
 namespace UnitTests.TimerTests
 {
+    [TestSuite("Functional")]
+    [TestProvider("None")]
+    [TestArea("Reminders")]
+    [TestCategory("Functional"), TestCategory("Reminders")]
+    public sealed class ReminderServiceLifecycleTests_TableGrain
+        : ReminderServiceLifecycleTestsBase, IClassFixture<ReminderTests_TableGrain.Fixture>
+    {
+        public ReminderServiceLifecycleTests_TableGrain(ReminderTests_TableGrain.Fixture fixture)
+            : base(fixture.ReminderClock, fixture.HostedCluster, "InMemory")
+        {
+        }
+    }
+
     /// <summary>
     /// Tests for grain-based reminder functionality using in-memory reminder service as table storage.
     /// </summary>

@@ -17,6 +17,20 @@ using Xunit;
 
 namespace Tester.AdoNet.Reminders
 {
+    [TestSuite("Functional")]
+    [TestProvider("SqlServer")]
+    [TestArea("Reminders")]
+    [TestCategory("Reminders"), TestCategory("AdoNet"), TestCategory("SqlServer")]
+    public sealed class ReminderServiceLifecycleTests_AdoNet_SqlServer
+        : ReminderServiceLifecycleTestsBase, IClassFixture<ReminderTests_AdoNet_SqlServer.Fixture>
+    {
+        public ReminderServiceLifecycleTests_AdoNet_SqlServer(ReminderTests_AdoNet_SqlServer.Fixture fixture)
+            : base(fixture.ReminderClock, fixture.HostedCluster, "AdoNet.SqlServer")
+        {
+            fixture.EnsurePreconditionsMet();
+        }
+    }
+
     /// <summary>
     /// Integration tests for Orleans reminders functionality using SQL Server as the reminder service backend.
     /// </summary>
@@ -101,7 +115,7 @@ namespace Tester.AdoNet.Reminders
             await ClearReminderTableAsync(TestContext.Current.CancellationToken)
                 .WaitAsync(TestConstants.InitTimeout, TestContext.Current.CancellationToken);
         }
-        
+
         // Basic tests
 
         [Fact]

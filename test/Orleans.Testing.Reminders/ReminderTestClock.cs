@@ -28,12 +28,19 @@ public sealed class ReminderTestClock : IDisposable
         TimeSpan initializationTimeout)
     {
         TimeProvider = new FakeTimeProvider(initialTime);
+        DiagnosticObserver = ReminderDiagnosticObserver.Create();
         MinimumReminderPeriod = minimumReminderPeriod;
         RefreshReminderListPeriod = refreshReminderListPeriod;
         InitializationTimeout = initializationTimeout;
     }
 
     internal FakeTimeProvider TimeProvider { get; }
+
+    /// <summary>
+    /// Gets the diagnostic observer attached before the cluster is built, so reminder-service startup events are
+    /// available to deterministic lifecycle tests.
+    /// </summary>
+    public ReminderDiagnosticObserver DiagnosticObserver { get; }
 
     /// <summary>
     /// Gets the current reminder clock time.
@@ -146,6 +153,7 @@ public sealed class ReminderTestClock : IDisposable
         }
 
         _disposed = true;
+        DiagnosticObserver.Dispose();
         _advanceLock.Dispose();
     }
 

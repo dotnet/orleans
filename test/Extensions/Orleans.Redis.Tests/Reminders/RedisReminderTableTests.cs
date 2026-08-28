@@ -3,16 +3,75 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Newtonsoft.Json;
 using Orleans.Configuration;
+using Orleans.Hosting;
 using Orleans.Reminders.Redis;
 using Orleans.Runtime;
+using Orleans.Testing.Reminders;
+using Orleans.TestingHost;
 using StackExchange.Redis;
 using TestExtensions;
 using UnitTests;
 using UnitTests.RemindersTest;
+using UnitTests.TimerTests;
 using Xunit;
 
 namespace Tester.Redis.Reminders
 {
+    public sealed class RedisReminderServiceLifecycleFixture : BaseInProcessTestClusterFixture
+    {
+        private ReminderTestClock? _clock;
+
+        public ReminderTestClock Clock
+        {
+            get
+            {
+                EnsurePreconditionsMet();
+                return _clock ?? throw new InvalidOperationException("The reminder clock has not been configured.");
+            }
+        }
+
+        protected override void CheckPreconditionsOrThrow() => TestUtils.CheckForRedis();
+
+        protected override void ConfigureTestCluster(InProcessTestClusterBuilder builder)
+        {
+            _clock = builder.AddReminderTestClock();
+            builder.ConfigureSilo((_, siloBuilder) =>
+                siloBuilder.UseRedisReminderService(options =>
+                {
+                    options.ConfigurationOptions = ConfigurationOptions.Parse(
+                        TestDefaultConfiguration.RedisConnectionString!);
+                    options.EntryExpiry = TimeSpan.FromHours(1);
+                }));
+        }
+
+        public override async ValueTask DisposeAsync()
+        {
+            try
+            {
+                await base.DisposeAsync();
+            }
+            finally
+            {
+                _clock?.Dispose();
+            }
+        }
+    }
+
+    [TestCategory("Redis"), TestCategory("Reminders"), TestCategory("Functional")]
+    [Collection(TestEnvironmentFixture.DefaultCollection)]
+    [TestSuite("Functional")]
+    [TestProvider("Redis")]
+    [TestArea("Reminders")]
+    public sealed class RedisReminderServiceLifecycleTests
+        : ReminderServiceLifecycleTestsBase, IClassFixture<RedisReminderServiceLifecycleFixture>
+    {
+        public RedisReminderServiceLifecycleTests(RedisReminderServiceLifecycleFixture fixture)
+            : base(fixture.Clock, fixture.HostedCluster, "Redis")
+        {
+            fixture.EnsurePreconditionsMet();
+        }
+    }
+
     /// <summary>
     /// Tests for Redis reminder table implementation.
     /// </summary>
@@ -23,7 +82,7 @@ namespace Tester.Redis.Reminders
     [TestArea("Reminders")]
     public class RedisRemindersTableTests : ReminderTableTestsBase
     {
-        public RedisRemindersTableTests(ConnectionStringFixture fixture, CommonFixture clusterFixture) : base (fixture, clusterFixture, CreateFilters())
+        public RedisRemindersTableTests(ConnectionStringFixture fixture, CommonFixture clusterFixture) : base(fixture, clusterFixture, CreateFilters())
         {
             TestUtils.CheckForRedis();
         }
@@ -46,7 +105,7 @@ namespace Tester.Redis.Reminders
                 {
                     ConfigurationOptions = ConfigurationOptions.Parse(GetConnectionString().Result),
                     EntryExpiry = TimeSpan.FromHours(1)
-                })); 
+                }));
 
             if (reminderTable == null)
             {

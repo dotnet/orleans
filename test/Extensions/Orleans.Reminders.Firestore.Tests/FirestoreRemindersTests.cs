@@ -1,13 +1,70 @@
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
-using UnitTests;
-using TestExtensions;
-using UnitTests.RemindersTest;
+using Orleans.Hosting;
 using Orleans.Reminders.Firestore;
 using Orleans.Runtime;
-
+using Orleans.Testing.Reminders;
+using Orleans.TestingHost;
+using TestExtensions;
+using UnitTests;
+using UnitTests.RemindersTest;
+using UnitTests.TimerTests;
 
 namespace Orleans.Reminders.Firestore.Tests;
+
+public sealed class FirestoreReminderServiceLifecycleFixture : BaseInProcessTestClusterFixture
+{
+    private ReminderTestClock? _clock;
+
+    public ReminderTestClock Clock
+    {
+        get
+        {
+            EnsurePreconditionsMet();
+            return _clock ?? throw new InvalidOperationException("The reminder clock has not been configured.");
+        }
+    }
+
+    protected override void CheckPreconditionsOrThrow() => _ = GoogleEmulatorHost.FirestoreEndpoint;
+
+    protected override void ConfigureTestCluster(InProcessTestClusterBuilder builder)
+    {
+        _clock = builder.AddReminderTestClock();
+        builder.ConfigureSilo((_, siloBuilder) =>
+            siloBuilder.UseFirestoreReminderService(options =>
+            {
+                options.ProjectId = GoogleEmulatorHost.ProjectId;
+                options.EmulatorHost = GoogleEmulatorHost.FirestoreEndpoint;
+            }));
+    }
+
+    public override async ValueTask DisposeAsync()
+    {
+        try
+        {
+            await base.DisposeAsync();
+        }
+        finally
+        {
+            _clock?.Dispose();
+        }
+    }
+}
+
+[TestSuite("Functional")]
+[TestProvider("GoogleCloud")]
+[TestArea("Reminders")]
+[TestCategory("Reminders"), TestCategory("Firestore"), TestCategory("GoogleCloud"), TestCategory("Functional")]
+[Collection(TestEnvironmentFixture.DefaultCollection)]
+public sealed class FirestoreReminderServiceLifecycleTests
+    : ReminderServiceLifecycleTestsBase, IClassFixture<FirestoreReminderServiceLifecycleFixture>
+{
+    public FirestoreReminderServiceLifecycleTests(FirestoreReminderServiceLifecycleFixture fixture)
+        : base(fixture.Clock, fixture.HostedCluster, "Firestore")
+    {
+        fixture.EnsurePreconditionsMet();
+    }
+}
 
 [TestSuite("Functional")]
 [TestProvider("GoogleCloud")]
