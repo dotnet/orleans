@@ -6,6 +6,7 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration.Internal;
 using Orleans.Runtime;
+using Orleans.Runtime.DurableTasks;
 using Orleans.DurableJobs;
 using Orleans.Journaling;
 using Orleans.Journaling.Json;
@@ -52,6 +53,8 @@ public static class DurableJobsExtensions
         services.AddScoped<DurableJobHandlerRegistry>();
         services.AddScoped<IDurableJobHandlerRegistry>(sp => sp.GetRequiredService<DurableJobHandlerRegistry>());
         services.TryAddScoped<DurableJobTurnIsolation>();
+        services.TryAddScoped<IDurableTaskTurnIsolation>(
+            static serviceProvider => serviceProvider.GetRequiredService<DurableJobTurnIsolation>());
         services.TryAddScoped(sp => new DurableJobExecutionLifetime(sp.GetRequiredService<IGrainContextAccessor>().GrainContext));
         services.TryAddEnumerable(
             ServiceDescriptor.Singleton<IIncomingGrainCallFilter, DurableJobTurnIsolationFilter>());
