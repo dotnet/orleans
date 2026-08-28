@@ -110,7 +110,7 @@ namespace Orleans.Runtime
             var result = this.referenceActivator.CreateReference(grainId, interfaceType);
             if (grain is GrainReference source)
             {
-                result.DirectoryCacheEntry = source.DirectoryCacheEntry;
+                result.MessageTargetCache = source.MessageTargetCache;
             }
 
             return result;

@@ -554,7 +554,7 @@ namespace Orleans.Runtime.Messaging
             Message message,
             [NotNullWhen(true)] out GrainDirectoryCacheEntry? entry)
         {
-            if (target?.DirectoryCacheEntry is not GrainDirectoryCacheEntry candidate)
+            if (target?.MessageTargetCache is not GrainDirectoryCacheEntry candidate)
             {
                 entry = null;
                 return false;
@@ -575,7 +575,7 @@ namespace Orleans.Runtime.Messaging
                 || candidate.Address.SiloAddress is not { } candidateSilo
                 || siloStatusOracle.IsDeadSilo(candidateSilo))
             {
-                target.ClearDirectoryCacheEntry(candidate);
+                target.ClearMessageTargetCache(candidate);
             }
 
             entry = null;
@@ -593,7 +593,7 @@ namespace Orleans.Runtime.Messaging
                 return null;
             }
 
-            target.DirectoryCacheEntry = entry;
+            target.MessageTargetCache = entry;
             return targetSilo.Matches(_siloAddress) ? entry : null;
         }
 
