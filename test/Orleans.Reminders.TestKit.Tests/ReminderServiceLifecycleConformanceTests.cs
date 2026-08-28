@@ -258,14 +258,7 @@ public sealed class FaultyReminderServiceLifecycleTests
             {
                 await runner.RunReminderService_OneSiloJoinLeaveTransfersOwnership(token);
                 Assert.NotNull(recordingHarness);
-                Assert.Equal(
-                    [
-                        recordingHarness.ReminderRefreshPeriod
-                            + recordingHarness.ReminderRefreshPeriod
-                            + recordingHarness.ReminderRefreshPeriod
-                            + TimeSpan.FromTicks(recordingHarness.ReminderRefreshPeriod.Ticks / 2)
-                    ],
-                    recordingHarness.Advances);
+                Assert.Equal([TimeSpan.FromSeconds(3)], recordingHarness.Advances);
             });
     }
 

@@ -159,7 +159,7 @@ public abstract class ReminderServiceLifecycleTestRunner
         const string Guarantee = nameof(ReminderService_RegistrationHasSingleOwner);
         const string Name = "registration-owner";
         var grain = CreateGrain(Guarantee);
-        var due = GetNonRefreshAlignedDueTime();
+        var due = TimeSpan.FromSeconds(3);
         await ExecuteWithCleanupAsync(
             Guarantee,
             cancellationToken,
@@ -289,11 +289,9 @@ public abstract class ReminderServiceLifecycleTestRunner
         const string Guarantee = nameof(ReminderService_ExactDueRecovery);
         const string Name = "exact-due-recovery";
         var grain = CreateGrain(Guarantee);
-        var refreshSkew = TimeSpan.FromTicks(_harness.ReminderRefreshPeriod.Ticks / 2);
         var due = _harness.ReminderLoadingWindow
             + _harness.ReminderRefreshPeriod
-            + _harness.ReminderRefreshPeriod
-            + refreshSkew;
+            + _harness.ReminderRefreshPeriod;
         await ExecuteWithCleanupAsync(
             Guarantee,
             cancellationToken,
@@ -426,7 +424,7 @@ public abstract class ReminderServiceLifecycleTestRunner
                 var grain = CreateGrainOwnedBy(joined, Guarantee);
                 const string Name = "join-leave-owner";
                 reminders.Add((grain, Name));
-                var due = GetNonRefreshAlignedDueTime();
+                var due = TimeSpan.FromSeconds(3);
                 var firstTickTime = _harness.UtcNow.UtcDateTime + due;
 
                 await grain.RegisterOrUpdateAsync(Name, due, Period).WaitAsync(cancellationToken);
@@ -552,12 +550,6 @@ public abstract class ReminderServiceLifecycleTestRunner
             .Throw();
         return null!;
     }
-
-    private TimeSpan GetNonRefreshAlignedDueTime()
-        => _harness.ReminderRefreshPeriod
-            + _harness.ReminderRefreshPeriod
-            + _harness.ReminderRefreshPeriod
-            + TimeSpan.FromTicks(_harness.ReminderRefreshPeriod.Ticks / 2);
 
     private async Task ExecuteWithCleanupAsync(
         string guarantee,
