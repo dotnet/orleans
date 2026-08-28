@@ -477,6 +477,7 @@ BEGIN
             WHERE ServiceId = @ServiceId
                 AND ProviderId = @ProviderId
                 AND QueueId = @QueueId
+                AND (@LockedCheckpoint IS NULL OR MessageId > @LockedCheckpoint)
                 AND MessageId <= @Checkpoint
                 AND CheckpointedOn IS NULL;
         END;
@@ -585,7 +586,7 @@ BEGIN
         (
             SELECT TOP (@CleanupBatchSize)
                 MessageId
-            FROM OrleansStreamMessage WITH (UPDLOCK, READPAST, READCOMMITTEDLOCK, ROWLOCK)
+            FROM OrleansStreamMessage WITH (UPDLOCK, READCOMMITTEDLOCK, ROWLOCK)
             WHERE ServiceId = @ServiceId
                 AND ProviderId = @ProviderId
                 AND QueueId = @QueueId

@@ -49,6 +49,7 @@ namespace Orleans.Streams
         private Task _activePumpTask = Task.CompletedTask;
         private AdmissionGate _workAdmission = new();
         private Task? _shutdownTask;
+        private int _hasUnprocessedRead;
         private bool IsShutdown => timer is null;
         private string StatisticUniquePostfix => $"{streamProviderName}.{QueueId}";
 
@@ -187,6 +188,7 @@ namespace Orleans.Streams
             LogInfoInit(GetType().Name, GrainId, Silo, new(QueueId));
 
             _activePumpTask = Task.CompletedTask;
+            Volatile.Write(ref _hasUnprocessedRead, 0);
             lastTimeCleanedPubSubCache = _timeProvider.GetUtcNow().UtcDateTime;
 
             try
@@ -296,7 +298,7 @@ namespace Orleans.Streams
             await drainTask;
 
             // All accepted work has finished progress bookkeeping and released its batch/registration pins.
-            if (!hasPendingRegistrations)
+            if (!hasPendingRegistrations && Volatile.Read(ref _hasUnprocessedRead) == 0)
             {
                 NotifyDeliveryProgress();
             }
@@ -1021,6 +1023,16 @@ namespace Orleans.Streams
             // Retrieve one multiBatch from the queue. Every multiBatch has an IEnumerable of IBatchContainers, each IBatchContainer may have multiple events.
             IList<IBatchContainer>? multiBatch = await rcvr.GetQueueMessagesAsync(maxCacheAddCount, cancellationToken);
 
+            if (IsShutdown || cancellationToken.IsCancellationRequested)
+            {
+                if (multiBatch is { Count: > 0 })
+                {
+                    Volatile.Write(ref _hasUnprocessedRead, 1);
+                }
+                return false;
+            }
+            }
+
             // Receivers built against older Orleans versions can still return null.
             if (multiBatch is null || multiBatch.Count == 0) return false; // queue is empty. Exit the loop. Will attempt again in the next timer callback.
 
@@ -1048,6 +1060,12 @@ namespace Orleans.Streams
 
             foreach (var group in availableMessages.GroupBy(container => container.StreamId))
             {
+                if (IsShutdown || cancellationToken.IsCancellationRequested)
+                {
+                    Volatile.Write(ref _hasUnprocessedRead, 1);
+                    return false;
+                }
+
                 var streamId = new QualifiedStreamId(queueAdapter.Name, group.Key);
                 StreamSequenceToken startToken = group.First().SequenceToken;
                 if (pubSubCache.TryGetValue(streamId, out var streamData))

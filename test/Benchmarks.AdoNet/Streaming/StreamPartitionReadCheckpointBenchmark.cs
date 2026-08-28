@@ -108,18 +108,23 @@ public abstract class StreamPartitionReadCheckpointBenchmark(string invariant, s
     [BenchmarkCategory("Checkpoint")]
     public async Task AdvanceEpochFencedCheckpoints()
     {
-        await Parallel.ForAsync(0, OperationsPerInvoke, async (i, cancellationToken) =>
+        await Parallel.ForAsync(0, Math.Min(PartitionCount, OperationsPerInvoke), async (partition, cancellationToken) =>
         {
-            var partition = i % PartitionCount;
-            var checkpoint = (i / PartitionCount) + 1L;
-            var result = await _queries.AdvanceStreamCheckpointAsync(
-                "ServiceId-0",
-                "ProviderId-0",
-                _partitionIds[partition],
-                _ownerEpochs[partition],
-                checkpoint);
-            if (result is not null)
+            for (var i = partition; i < OperationsPerInvoke; i += PartitionCount)
             {
+                var checkpoint = (i / PartitionCount) + 1L;
+                var result = await _queries.AdvanceStreamCheckpointAsync(
+                    "ServiceId-0",
+                    "ProviderId-0",
+                    _partitionIds[partition],
+                    _ownerEpochs[partition],
+                    checkpoint,
+                    cancellationToken);
+                if (result is not { Updated: true })
+                {
+                    throw new InvalidOperationException($"Checkpoint {checkpoint} did not advance partition {partition}.");
+                }
+
                 _consumer.Consume(result);
             }
         });
@@ -226,7 +231,7 @@ public abstract class StreamPartitionCleanupBenchmark(string invariant, string d
                 FROM OrleansStreamMessage
             )
             UPDATE Message
-            SET CreatedOn = DATEADD(DAY, -2, SYSUTCDATETIME())
+            SET CheckpointedOn = DATEADD(DAY, -2, SYSUTCDATETIME())
             FROM OrleansStreamMessage AS Message
             INNER JOIN Ranked
                 ON Ranked.ServiceId = Message.ServiceId
