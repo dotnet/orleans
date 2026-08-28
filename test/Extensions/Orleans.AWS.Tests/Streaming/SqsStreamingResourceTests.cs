@@ -379,6 +379,34 @@ public sealed class SqsStreamingResourceTests
         Assert.Equal("SentTimestamp", Assert.Single(resource.Options.ReceiveMessageSystemAttributes));
     }
 
+    [Fact]
+    public void EnvironmentVariableScope_ClearsAndRestoresInheritedAwsConfiguration()
+    {
+        var originalDefaultRegion = Environment.GetEnvironmentVariable("AWS_DEFAULT_REGION");
+        var originalStructuredRegion = Environment.GetEnvironmentVariable("AWS__Region");
+        try
+        {
+            Environment.SetEnvironmentVariable("AWS_DEFAULT_REGION", "us-west-2");
+            Environment.SetEnvironmentVariable("AWS__Region", "us-west-2");
+
+            using (new EnvironmentVariableScope(
+                new Dictionary<string, string?> { ["AWS_REGION"] = "us-east-1" }))
+            {
+                Assert.Equal("us-east-1", Environment.GetEnvironmentVariable("AWS_REGION"));
+                Assert.Null(Environment.GetEnvironmentVariable("AWS_DEFAULT_REGION"));
+                Assert.Null(Environment.GetEnvironmentVariable("AWS__Region"));
+            }
+
+            Assert.Equal("us-west-2", Environment.GetEnvironmentVariable("AWS_DEFAULT_REGION"));
+            Assert.Equal("us-west-2", Environment.GetEnvironmentVariable("AWS__Region"));
+        }
+        finally
+        {
+            Environment.SetEnvironmentVariable("AWS_DEFAULT_REGION", originalDefaultRegion);
+            Environment.SetEnvironmentVariable("AWS__Region", originalStructuredRegion);
+        }
+    }
+
     private static async Task<TestApp> CreateAppAsync(SqsStreamingOptions options)
     {
         var builder = CreateBuilder();
@@ -533,10 +561,21 @@ public sealed class SqsStreamingResourceTests
 
         public EnvironmentVariableScope(IReadOnlyDictionary<string, string?> values)
         {
+            foreach (var key in new[]
+            {
+                "AWS_REGION",
+                "AWS_DEFAULT_REGION",
+                "AWS_PROFILE",
+                "AWS__Region",
+                "AWS__Profile",
+            })
+            {
+                SaveAndSet(key, null);
+            }
+
             foreach (var (key, value) in values)
             {
-                _previousValues[key] = Environment.GetEnvironmentVariable(key);
-                Environment.SetEnvironmentVariable(key, value);
+                SaveAndSet(key, value);
             }
         }
 
@@ -546,6 +585,12 @@ public sealed class SqsStreamingResourceTests
             {
                 Environment.SetEnvironmentVariable(key, value);
             }
+        }
+
+        private void SaveAndSet(string key, string? value)
+        {
+            _previousValues.TryAdd(key, Environment.GetEnvironmentVariable(key));
+            Environment.SetEnvironmentVariable(key, value);
         }
     }
 }
