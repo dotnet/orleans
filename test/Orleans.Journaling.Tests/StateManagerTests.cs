@@ -633,6 +633,8 @@ public class StateManagerTests : JournalingTestBase
         var storage = new CapturingStorage();
         var sut = CreateTestSystem(storage: storage);
         var dictionary = new DurableDictionary<string, int>("dict", sut.Manager, CreateDictionaryCodec<string, int>());
+        var observer = new RecordingStateObserver();
+        sut.Manager.RegisterObserver(observer);
 
         await sut.Lifecycle.OnStart(TestContext.Current.CancellationToken);
         dictionary.Add("first", 1);
@@ -665,6 +667,7 @@ public class StateManagerTests : JournalingTestBase
             .WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
         Assert.True(dictionary.ContainsKey("first"));
         Assert.False(dictionary.ContainsKey("second"));
+        Assert.Equal(2, observer.RecoveryCompletedCount);
     }
 
     [Fact]
@@ -690,6 +693,141 @@ public class StateManagerTests : JournalingTestBase
         Assert.Equal(1, dictionary["persisted"]);
         Assert.False(dictionary.ContainsKey("pending"));
         Assert.Equal(1, value.Value);
+    }
+
+    [Fact]
+    public async Task StateManager_RevertAgainstEmptyJournalResetsUncommittedState()
+    {
+        var storage = new CapturingStorage();
+        var sut = CreateTestSystem(storage: storage);
+        var value = new DurableValue<int>("value", sut.Manager, CreateValueCodec<int>());
+        await sut.Lifecycle.OnStart();
+        value.Value = 42;
+
+        await sut.Manager.RevertPendingChangesAsync(CancellationToken.None);
+
+        Assert.Equal(0, value.Value);
+        await sut.Manager.WriteStateAsync(CancellationToken.None);
+        var recovered = CreateTestSystem(storage: storage);
+        var recoveredValue = new DurableValue<int>("value", recovered.Manager, CreateValueCodec<int>());
+        await recovered.Lifecycle.OnStart();
+        Assert.Equal(0, recoveredValue.Value);
+    }
+
+    [Fact]
+    public async Task StateManager_ObserverPreparationParticipatesInAtomicCommit()
+    {
+        var storage = new CapturingStorage();
+        var sut = CreateTestSystem(storage: storage);
+        var value = new DurableValue<int>("value", sut.Manager, CreateValueCodec<int>());
+        var observer = new RecordingStateObserver(() => value.Value = 42);
+        sut.Manager.RegisterObserver(observer);
+
+        await sut.Lifecycle.OnStart();
+        await sut.Manager.WriteStateAsync(CancellationToken.None);
+
+        Assert.Equal(["Preparing", "Started", "Completed"], observer.WriteCalls);
+        var recovered = CreateTestSystem(storage: storage);
+        var recoveredValue = new DurableValue<int>("value", recovered.Manager, CreateValueCodec<int>());
+        await recovered.Lifecycle.OnStart();
+        Assert.Equal(42, recoveredValue.Value);
+    }
+
+    [Fact]
+    public async Task StateManager_FailedWriteOmitsObserverCompletionAndRecoveryRestoresState()
+    {
+        var storage = new CapturingStorage();
+        var sut = CreateTestSystem(storage: storage);
+        var value = new DurableValue<int>("value", sut.Manager, CreateValueCodec<int>());
+        var observer = new RecordingStateObserver();
+        sut.Manager.RegisterObserver(observer);
+        await sut.Lifecycle.OnStart();
+        value.Value = 1;
+        await sut.Manager.WriteStateAsync(CancellationToken.None);
+
+        storage.NextAppendException = new InconsistentStateException("Expected write conflict.");
+        value.Value = 2;
+        await Assert.ThrowsAsync<InconsistentStateException>(
+            () => sut.Manager.WriteStateAsync(CancellationToken.None).AsTask());
+
+        Assert.Equal(2, observer.WriteStartedCount);
+        Assert.Equal(1, observer.WriteCompletedCount);
+        Assert.Equal(2, observer.RecoveryCompletedCount);
+        Assert.Equal(1, value.Value);
+    }
+
+    [Fact]
+    public async Task StateManager_NoOpWritePairsObserverBoundary()
+    {
+        var sut = CreateTestSystem();
+        var observer = new RecordingStateObserver();
+        sut.Manager.RegisterObserver(observer);
+        await sut.Lifecycle.OnStart();
+
+        await sut.Manager.WriteStateAsync(CancellationToken.None);
+
+        Assert.Equal(["Preparing", "Started", "Completed"], observer.WriteCalls);
+    }
+
+    [Fact]
+    public async Task StateManager_FinalizationRunsAfterEveryPreparationAndBeforeCapture()
+    {
+        var storage = new CapturingStorage();
+        var sut = CreateTestSystem(storage: storage);
+        var value = new DurableValue<int>("value", sut.Manager, CreateValueCodec<int>());
+        var finalizer = new FinalizingStateObserver(() => Assert.Equal(42, value.Value));
+        sut.Manager.RegisterObserver(finalizer);
+        sut.Manager.RegisterObserver(new RecordingStateObserver(() => value.Value = 42));
+
+        await sut.Lifecycle.OnStart();
+        await sut.Manager.WriteStateAsync(CancellationToken.None);
+
+        Assert.True(finalizer.Finalized);
+        var recovered = CreateTestSystem(storage: storage);
+        var recoveredValue = new DurableValue<int>("value", recovered.Manager, CreateValueCodec<int>());
+        await recovered.Lifecycle.OnStart();
+        Assert.Equal(42, recoveredValue.Value);
+    }
+
+    [Fact]
+    public async Task StateManager_RecoveryObserverRunsOnceAfterAllStates()
+    {
+        var storage = new CapturingStorage();
+        var initial = CreateTestSystem(storage: storage);
+        var initialFirst = new DurableValue<int>("first", initial.Manager, CreateValueCodec<int>());
+        var initialSecond = new DurableValue<int>("second", initial.Manager, CreateValueCodec<int>());
+        await initial.Lifecycle.OnStart();
+        initialFirst.Value = 1;
+        initialSecond.Value = 2;
+        await initial.Manager.WriteStateAsync(CancellationToken.None);
+
+        var sut = CreateTestSystem(storage: storage);
+        var first = new DurableValue<int>("first", sut.Manager, CreateValueCodec<int>());
+        var second = new DurableValue<int>("second", sut.Manager, CreateValueCodec<int>());
+        var observer = new RecoveryStateObserver(() =>
+        {
+            Assert.Equal(1, first.Value);
+            Assert.Equal(2, second.Value);
+        });
+        sut.Manager.RegisterObserver(observer);
+
+        await sut.Lifecycle.OnStart();
+
+        Assert.Equal(1, observer.RecoveryStartedCount);
+        Assert.Equal(1, observer.RecoveryCompletedCount);
+    }
+
+    [Fact]
+    public async Task StateManager_DeleteNotifiesObserverAfterSuccessfulDeletion()
+    {
+        var sut = CreateTestSystem();
+        var observer = new RecordingStateObserver();
+        sut.Manager.RegisterObserver(observer);
+        await sut.Lifecycle.OnStart();
+
+        await sut.Manager.DeleteStateAsync(CancellationToken.None);
+
+        Assert.Equal(1, observer.DeleteCompletedCount);
     }
 
     [Fact]
@@ -1994,6 +2132,72 @@ public class StateManagerTests : JournalingTestBase
         public ValueTask AppendAsync(ReadOnlySequence<byte> value, CancellationToken cancellationToken) => default;
 
         public ValueTask DeleteAsync(CancellationToken cancellationToken) => default;
+    }
+
+    private sealed class RecordingStateObserver(Action? prepare = null) : IJournaledStateObserver
+    {
+        public List<string> WriteCalls { get; } = [];
+        public int WriteStartedCount { get; private set; }
+        public int WriteCompletedCount { get; private set; }
+        public int RecoveryCompletedCount { get; private set; }
+        public int DeleteCompletedCount { get; private set; }
+        public int RecoveryStartedCount { get; private set; }
+
+        public ValueTask OnWritePreparingAsync(CancellationToken cancellationToken)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            WriteCalls.Add("Preparing");
+            prepare?.Invoke();
+            return default;
+        }
+
+        public void OnWriteStarted()
+        {
+            WriteCalls.Add("Started");
+            WriteStartedCount++;
+        }
+
+        public void OnWriteCompleted()
+        {
+            WriteCalls.Add("Completed");
+            WriteCompletedCount++;
+        }
+
+        public void OnRecoveryCompleted() => RecoveryCompletedCount++;
+        public void OnRecoveryStarted() => RecoveryStartedCount++;
+        public void OnDeleteCompleted() => DeleteCompletedCount++;
+    }
+
+    private sealed class FinalizingStateObserver(Action finalize) : IJournaledStateObserver
+    {
+        public bool Finalized { get; private set; }
+
+        public ValueTask OnWriteFinalizingAsync(CancellationToken cancellationToken)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            finalize();
+            Finalized = true;
+            return default;
+        }
+
+        public void OnWriteStarted() { }
+        public void OnWriteCompleted() { }
+        public void OnRecoveryCompleted() { }
+    }
+
+    private sealed class RecoveryStateObserver(Action recovered) : IJournaledStateObserver
+    {
+        public int RecoveryStartedCount { get; private set; }
+        public int RecoveryCompletedCount { get; private set; }
+
+        public void OnWriteStarted() { }
+        public void OnWriteCompleted() { }
+        public void OnRecoveryStarted() => RecoveryStartedCount++;
+        public void OnRecoveryCompleted()
+        {
+            recovered();
+            RecoveryCompletedCount++;
+        }
     }
 
     private sealed class CapturingStorage : IJournalStorage

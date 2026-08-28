@@ -18,6 +18,9 @@ namespace Orleans.DurableMessaging.Configuration;
 /// </remarks>
 public class DurableInboxOptions
 {
+    private static readonly TimeSpan MaxSupportedRetryDelay =
+        TimeSpan.FromTicks(TimeSpan.FromMilliseconds(uint.MaxValue - 1).Ticks / 64);
+
     /// <summary>
     /// Gets or sets the maximum number of pending messages in the inbox.
     /// When this limit is reached, new message deliveries will return <c>DeliveryResult.Backpressured()</c>.
@@ -137,6 +140,13 @@ public class DurableInboxOptions
         if (BackpressureRetryDelay <= TimeSpan.Zero)
         {
             throw new ArgumentOutOfRangeException(nameof(BackpressureRetryDelay), BackpressureRetryDelay, "BackpressureRetryDelay must be greater than TimeSpan.Zero.");
+        }
+        if (BackpressureRetryDelay > MaxSupportedRetryDelay)
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(BackpressureRetryDelay),
+                BackpressureRetryDelay,
+                $"BackpressureRetryDelay must be less than or equal to {MaxSupportedRetryDelay}.");
         }
 
         if (MaxProcessingAttempts <= 0)
