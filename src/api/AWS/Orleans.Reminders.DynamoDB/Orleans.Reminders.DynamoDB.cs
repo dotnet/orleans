@@ -8,17 +8,32 @@
 //------------------------------------------------------------------------------
 namespace Orleans.Configuration
 {
+    public enum DynamoDBReminderTableMode
+    {
+        Legacy = 0,
+        Migrate = 1,
+        V2 = 2,
+        Rollback = 3,
+        V2Only = 4,
+    }
+
     public partial class DynamoDBReminderStorageOptions : Reminders.DynamoDB.DynamoDBClientOptions
     {
         public bool CreateIfNotExists { get { throw null; } set { } }
 
         public int ReadCapacityUnits { get { throw null; } set { } }
 
+        public int MigrationPageSize { get { throw null; } set { } }
+
         public string TableName { get { throw null; } set { } }
+
+        public DynamoDBReminderTableMode TableMode { get { throw null; } set { } }
 
         public bool UpdateIfExists { get { throw null; } set { } }
 
         public bool UseProvisionedThroughput { get { throw null; } set { } }
+
+        public string? V2TableName { get { throw null; } set { } }
 
         public int WriteCapacityUnits { get { throw null; } set { } }
     }

@@ -745,7 +745,13 @@ namespace Orleans.Transactions.DynamoDB
         /// <param name="lastEvaluatedKey">The primary key of the first item that this operation will evaluate. Use the value that was returned for LastEvaluatedKey in the previous operation</param>
         /// <param name="consistentRead">Determines the read consistency model. Note that if a GSI is used, this must be false.</param>
         /// <returns>The collection containing a list of objects translated by the resolver function and the LastEvaluatedKey for paged results</returns>
-        public async Task<(List<TResult> results, Dictionary<string, AttributeValue>? lastEvaluatedKey)> QueryAsync<TResult>(string tableName, Dictionary<string, AttributeValue> keys, string keyConditionExpression, Func<Dictionary<string, AttributeValue>, TResult> resolver, string indexName = "", bool scanIndexForward = true, Dictionary<string, AttributeValue>? lastEvaluatedKey = null, bool consistentRead = true) where TResult : class
+        public Task<(List<TResult> results, Dictionary<string, AttributeValue>? lastEvaluatedKey)> QueryAsync<TResult>(string tableName, Dictionary<string, AttributeValue> keys, string keyConditionExpression, Func<Dictionary<string, AttributeValue>, TResult> resolver, string indexName = "", bool scanIndexForward = true, Dictionary<string, AttributeValue>? lastEvaluatedKey = null, bool consistentRead = true) where TResult : class
+            => QueryPageAsync(tableName, keys, keyConditionExpression, resolver, indexName, scanIndexForward, lastEvaluatedKey, consistentRead, CancellationToken.None);
+
+        /// <summary>
+        /// Queries one page of entries with cancellation support.
+        /// </summary>
+        public async Task<(List<TResult> results, Dictionary<string, AttributeValue>? lastEvaluatedKey)> QueryPageAsync<TResult>(string tableName, Dictionary<string, AttributeValue> keys, string keyConditionExpression, Func<Dictionary<string, AttributeValue>, TResult> resolver, string indexName = "", bool scanIndexForward = true, Dictionary<string, AttributeValue>? lastEvaluatedKey = null, bool consistentRead = true, CancellationToken cancellationToken = default) where TResult : class
         {
             try
             {
@@ -769,7 +775,7 @@ namespace Orleans.Transactions.DynamoDB
                     request.IndexName = indexName;
                 }
 
-                var response = await _ddbClient.QueryAsync(request);
+                var response = await _ddbClient.QueryAsync(request, cancellationToken);
 
                 var resultList = new List<TResult>();
                 foreach (var item in response.Items)
@@ -881,6 +887,47 @@ namespace Orleans.Transactions.DynamoDB
                 }
 
                 return resultList;
+            }
+            catch (Exception exc)
+            {
+                LogWarningFailedToReadTable(_logger, exc, tableName);
+                throw new OrleansException($"Failed to read table {tableName}: {exc.Message}", exc);
+            }
+        }
+
+        /// <summary>
+        /// Strongly consistently scans one bounded page from a DynamoDB table.
+        /// </summary>
+        public async Task<(List<TResult> results, Dictionary<string, AttributeValue>? lastEvaluatedKey)> ScanPageAsync<TResult>(
+            string tableName,
+            Dictionary<string, AttributeValue> attributes,
+            string expression,
+            Func<Dictionary<string, AttributeValue>, TResult> resolver,
+            int limit,
+            Dictionary<string, AttributeValue>? exclusiveStartKey = null,
+            CancellationToken cancellationToken = default)
+            where TResult : class
+        {
+            try
+            {
+                var request = new ScanRequest
+                {
+                    TableName = tableName,
+                    ConsistentRead = true,
+                    FilterExpression = expression,
+                    ExpressionAttributeValues = attributes,
+                    Select = Select.ALL_ATTRIBUTES,
+                    Limit = limit,
+                    ExclusiveStartKey = exclusiveStartKey,
+                };
+
+                var response = await _ddbClient.ScanAsync(request, cancellationToken);
+                var results = response.Items?.Select(resolver).ToList() ?? [];
+                return (results, response.LastEvaluatedKey);
+            }
+            catch (OperationCanceledException)
+            {
+                throw;
             }
             catch (Exception exc)
             {
