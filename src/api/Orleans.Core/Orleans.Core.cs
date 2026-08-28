@@ -645,6 +645,9 @@ namespace Orleans.Connections.Transport
     {
         public ConnectionAbortedException() { }
 
+        [System.Obsolete]
+        protected ConnectionAbortedException(System.Runtime.Serialization.SerializationInfo info, System.Runtime.Serialization.StreamingContext context) { }
+
         public ConnectionAbortedException(string? message, System.Exception? innerException) { }
 
         public ConnectionAbortedException(string? message) { }
@@ -654,6 +657,9 @@ namespace Orleans.Connections.Transport
     {
         public ConnectionClosedException() { }
 
+        [System.Obsolete]
+        protected ConnectionClosedException(System.Runtime.Serialization.SerializationInfo info, System.Runtime.Serialization.StreamingContext context) { }
+
         public ConnectionClosedException(string? message, System.Exception? innerException) { }
 
         public ConnectionClosedException(string? message) { }
@@ -662,6 +668,9 @@ namespace Orleans.Connections.Transport
     public partial class ConnectionResetException : System.Exception
     {
         public ConnectionResetException() { }
+
+        [System.Obsolete]
+        protected ConnectionResetException(System.Runtime.Serialization.SerializationInfo info, System.Runtime.Serialization.StreamingContext context) { }
 
         public ConnectionResetException(string? message, System.Exception? innerException) { }
 
@@ -723,7 +732,6 @@ namespace Orleans.Connections.Transport
     public abstract partial class MessageTransport : System.IAsyncDisposable
     {
         public abstract System.Threading.CancellationToken Closed { get; }
-
         public abstract IFeatureCollection Features { get; }
 
         public abstract System.Threading.Tasks.ValueTask CloseAsync(System.Exception? closeException, System.Threading.CancellationToken cancellationToken = default);
@@ -836,7 +844,6 @@ namespace Orleans.Connections.Transport.Security
         public string? TargetHost { get { throw null; } set { } }
     }
 
-
     public partial class TlsOptions
     {
         public bool CheckCertificateRevocation { get { throw null; } set { } }
@@ -881,7 +888,6 @@ namespace Orleans.Connections.Transport.Security
         public object SslServerAuthenticationOptions { get { throw null; } }
     }
 }
-
 
 namespace Orleans.Core.Diagnostics
 {

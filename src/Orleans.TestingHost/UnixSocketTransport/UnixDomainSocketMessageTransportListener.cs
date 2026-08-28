@@ -2,6 +2,7 @@
 
 using System;
 using System.Diagnostics.CodeAnalysis;
+using System.IO;
 using System.Net.Sockets;
 using System.Threading;
 using System.Threading.Tasks;
@@ -24,6 +25,7 @@ internal class UnixDomainSocketMessageTransportListener : MessageTransportListen
 {
     private readonly CancellationTokenSource _closingCts = new();
     private Socket? _listenSocket;
+    private string? _boundPath;
     private readonly IOptionsMonitor<UnixDomainSocketMessageTransportListenerOptions> _listenerOptions;
 
     internal UnixDomainSocketMessageTransportListener(
@@ -65,29 +67,43 @@ internal class UnixDomainSocketMessageTransportListener : MessageTransportListen
 
         var options = _listenerOptions.Get(ListenerName);
         var path = options.Path;
+        var bound = false;
         try
         {
             listenSocket.Bind(new UnixDomainSocketEndPoint(path));
+            bound = true;
+            listenSocket.Listen(512);
         }
         catch (SocketException e) when (e.SocketErrorCode == SocketError.AddressAlreadyInUse)
         {
+            listenSocket.Dispose();
             throw new AddressInUseException(e.Message, e);
         }
+        catch
+        {
+            listenSocket.Dispose();
+            if (bound && !string.IsNullOrEmpty(path) && path[0] != '\0')
+            {
+                File.Delete(path);
+            }
 
-        listenSocket.Listen(512);
+            throw;
+        }
 
+        _boundPath = path;
         _listenSocket = listenSocket;
         return default;
     }
 
     public override async ValueTask<MessageTransport?> AcceptAsync(CancellationToken cancellationToken = default)
     {
+        var listenSocket = _listenSocket ?? throw new InvalidOperationException("Transport is not bound");
         using var ct = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, _closingCts.Token);
         while (!ct.IsCancellationRequested)
         {
             try
             {
-                var acceptSocket = await _listenSocket!.AcceptAsync(ct.Token).ConfigureAwait(false);
+                var acceptSocket = await listenSocket.AcceptAsync(ct.Token).ConfigureAwait(false);
                 var connection = new SocketMessageTransport(acceptSocket, Logger);
                 connection.Start();
 
@@ -122,6 +138,14 @@ internal class UnixDomainSocketMessageTransportListener : MessageTransportListen
     {
         _closingCts.Cancel();
         _listenSocket?.Dispose();
+        _listenSocket = null;
+
+        var path = _boundPath;
+        _boundPath = null;
+        if (!string.IsNullOrEmpty(path) && path[0] != '\0')
+        {
+            File.Delete(path);
+        }
     }
 
     public override ValueTask UnbindAsync(CancellationToken cancellationToken)
