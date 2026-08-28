@@ -616,7 +616,9 @@ namespace Orleans.Runtime
         }
 
         public int GetRunningRequestsCount(GrainInterfaceType grainInterfaceType)
-            => this.callbacks.CountWhere(c => c.Message.InterfaceType == grainInterfaceType);
+            => this.callbacks.CountWhere(
+                grainInterfaceType,
+                static (callback, grainInterfaceType) => callback.Message.InterfaceType == grainInterfaceType);
 
         private async Task MonitorCallbackExpiry()
         {

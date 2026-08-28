@@ -9,6 +9,7 @@ namespace Tester;
 public class StripedCallbackDictionaryTests
 {
     private static readonly Action<int, object?> EmptyVisitor = static (_, _) => { };
+    private static readonly Func<int, int, bool> MatchValue = static (value, expected) => value == expected;
 
     [Fact]
     public void CorrelationIdsDistributeAcrossStripesAtOverflowAndWithStride()
@@ -140,6 +141,21 @@ public class StripedCallbackDictionaryTests
         dictionary.ForEach((object?)null, EmptyVisitor);
         var allocated = GC.GetAllocatedBytesForCurrentThread() - allocatedBefore;
 
+        Assert.Equal(0, allocated);
+    }
+
+    [Fact]
+    public void StatefulCountDoesNotAllocate()
+    {
+        var dictionary = new StripedCallbackDictionary<int>();
+        Assert.True(dictionary.TryAdd(new CorrelationId(42), 42));
+        Assert.Equal(1, dictionary.CountWhere(42, MatchValue));
+
+        var allocatedBefore = GC.GetAllocatedBytesForCurrentThread();
+        var count = dictionary.CountWhere(42, MatchValue);
+        var allocated = GC.GetAllocatedBytesForCurrentThread() - allocatedBefore;
+
+        Assert.Equal(1, count);
         Assert.Equal(0, allocated);
     }
 }
