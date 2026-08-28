@@ -53,12 +53,16 @@ public class GrainInterfaceVersionCodeFix : CodeFixProvider
 
     public sealed override Task RegisterCodeFixesAsync(CodeFixContext context)
     {
-        context.RegisterCodeFix(
-            CodeAction.Create(
-                title: RegenerateCodeActionTitle,
-                createChangedSolution: cancellationToken => RegenerateOrleansContractsFileAsync(context.Document.Project, cancellationToken),
-                equivalenceKey: RegenerateCodeActionEquivalenceKey),
-            context.Diagnostics);
+        var validDiagnostics = context.Diagnostics.Where(HasRequiredProperties).ToImmutableArray();
+        if (!validDiagnostics.IsEmpty)
+        {
+            context.RegisterCodeFix(
+                CodeAction.Create(
+                    title: RegenerateCodeActionTitle,
+                    createChangedSolution: cancellationToken => RegenerateOrleansContractsFileAsync(context.Document.Project, cancellationToken),
+                    equivalenceKey: RegenerateCodeActionEquivalenceKey),
+                validDiagnostics);
+        }
 
         foreach (var diagnostic in context.Diagnostics)
         {
@@ -90,6 +94,31 @@ public class GrainInterfaceVersionCodeFix : CodeFixProvider
 
         return Task.CompletedTask;
     }
+
+    private static bool HasRequiredProperties(Diagnostic diagnostic)
+        => diagnostic.Id switch
+        {
+            GrainInterfaceVersionAnalyzer.RuleId0016
+                => HasProperty(diagnostic, GrainInterfaceVersionAnalyzer.InterfaceNamePropertyKey),
+            GrainInterfaceVersionAnalyzer.RuleId0017
+                => HasProperty(diagnostic, GrainInterfaceVersionAnalyzer.InterfaceNamePropertyKey)
+                    && HasProperty(diagnostic, GrainInterfaceVersionAnalyzer.ActualVersionPropertyKey),
+            GrainInterfaceVersionAnalyzer.RuleId0018
+                => HasProperty(diagnostic, GrainInterfaceVersionAnalyzer.InterfaceNamePropertyKey)
+                    && HasProperty(diagnostic, GrainInterfaceVersionAnalyzer.MemberNamePropertyKey),
+            GrainInterfaceVersionAnalyzer.RuleId0019
+                => HasProperty(diagnostic, GrainInterfaceVersionAnalyzer.InterfaceNamePropertyKey),
+            GrainInterfaceVersionAnalyzer.RuleId0020 => true,
+            GrainInterfaceVersionAnalyzer.RuleId0022
+                or GrainInterfaceVersionAnalyzer.RuleId0023
+                or GrainInterfaceVersionAnalyzer.RuleId0024
+                => HasProperty(diagnostic, GrainInterfaceVersionAnalyzer.ClassNamePropertyKey),
+            _ => false
+        };
+
+    private static bool HasProperty(Diagnostic diagnostic, string propertyName)
+        => diagnostic.Properties.TryGetValue(propertyName, out var value)
+            && !string.IsNullOrEmpty(value);
 
     private static async Task<Solution> RegenerateOrleansContractsFileAsync(
         Project project,
