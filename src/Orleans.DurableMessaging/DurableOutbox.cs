@@ -487,6 +487,7 @@ internal sealed partial class DurableOutbox : IDurableOutbox, IDurableJobFeature
                         {
                             case DeliveryStatus.Accepted:
                             case DeliveryStatus.Duplicate:
+                            case DeliveryStatus.DeadLettered:
                                 batchDirty = true;
                                 RemoveMessage(envelope.MessageId);
                                 deliveredCount++;
