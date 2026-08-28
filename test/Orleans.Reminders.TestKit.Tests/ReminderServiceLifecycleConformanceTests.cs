@@ -20,6 +20,15 @@ public sealed class ReminderServiceLifecycleFixture : IAsyncLifetime
     private InProcessTestCluster? _cluster;
     private ReminderTestClock? _clock;
 
+    public ReminderServiceLifecycleFixture()
+    {
+    }
+
+    internal ReminderServiceLifecycleFixture(ReminderTestClock clock)
+    {
+        _clock = clock;
+    }
+
     public ReminderServiceLifecycleHarness Harness { get; private set; } = null!;
 
     public async ValueTask InitializeAsync()
@@ -44,21 +53,33 @@ public sealed class ReminderServiceLifecycleFixture : IAsyncLifetime
 
     public async ValueTask DisposeAsync()
     {
-        if (_cluster is not { } cluster)
-        {
-            return;
-        }
+        var cluster = _cluster;
+        var clock = _clock;
+        _cluster = null;
+        _clock = null;
 
         try
         {
-            using var cancellation = new CancellationTokenSource(TimeSpan.FromMinutes(1));
-            await cluster.StopAllSilosAsync(cancellation.Token);
+            if (cluster is not null)
+            {
+                using var cancellation = new CancellationTokenSource(TimeSpan.FromMinutes(1));
+                await cluster.StopAllSilosAsync(cancellation.Token);
+            }
         }
         finally
         {
-            using var cancellation = new CancellationTokenSource(TimeSpan.FromMinutes(1));
-            await cluster.DisposeAsync().AsTask().WaitAsync(cancellation.Token);
-            _clock?.Dispose();
+            try
+            {
+                if (cluster is not null)
+                {
+                    using var cancellation = new CancellationTokenSource(TimeSpan.FromMinutes(1));
+                    await cluster.DisposeAsync().AsTask().WaitAsync(cancellation.Token);
+                }
+            }
+            finally
+            {
+                clock?.Dispose();
+            }
         }
     }
 }
@@ -133,6 +154,18 @@ public sealed class ReminderServiceLifecycleConformanceTests
 [Collection(ReminderServiceLifecycleCollection.Name)]
 public sealed class FaultyReminderServiceLifecycleTests
 {
+    [Fact]
+    public async Task PartiallyInitializedFixtureDisposesClock()
+    {
+        var clock = ReminderTestClock.Attach(new InProcessTestClusterBuilder(1));
+        var fixture = new ReminderServiceLifecycleFixture(clock);
+
+        await fixture.DisposeAsync();
+
+        await Assert.ThrowsAsync<ObjectDisposedException>(
+            () => clock.AdvanceAsync(TimeSpan.Zero, TestContext.Current.CancellationToken));
+    }
+
     [Fact]
     public Task DuplicateOwnerImplementationIsRejected()
         => RunFaultAsync(
@@ -209,13 +242,7 @@ public sealed class FaultyReminderServiceLifecycleTests
             {
                 await runner.RunReminderService_OneSiloJoinLeaveTransfersOwnership(token);
                 Assert.NotNull(recordingHarness);
-                Assert.Equal(
-                    [
-                        recordingHarness.ReminderRefreshPeriod,
-                        TimeSpan.FromSeconds(3) - recordingHarness.ReminderRefreshPeriod,
-                        recordingHarness.ReminderRefreshPeriod
-                    ],
-                    recordingHarness.Advances);
+                Assert.Equal([TimeSpan.FromSeconds(3)], recordingHarness.Advances);
             });
     }
 
@@ -253,6 +280,7 @@ public sealed class FaultyReminderServiceLifecycleTests
         public IReadOnlyList<SiloAddress> ActiveSilos => Inner.ActiveSilos;
         public Task WaitForStartupReadinessAsync(CancellationToken cancellationToken) => Inner.WaitForStartupReadinessAsync(cancellationToken);
         public virtual Task AdvanceAsync(TimeSpan amount, CancellationToken cancellationToken) => Inner.AdvanceAsync(amount, cancellationToken);
+        public virtual Task RefreshAsync(CancellationToken cancellationToken) => Inner.RefreshAsync(cancellationToken);
         public virtual Task WaitForOwnerCountAsync(GrainId grainId, string reminderName, int count, CancellationToken cancellationToken) => Inner.WaitForOwnerCountAsync(grainId, reminderName, count, cancellationToken);
         public virtual IReadOnlyList<SiloAddress> GetOwners(GrainId grainId, string reminderName) => Inner.GetOwners(grainId, reminderName);
         public virtual Task WaitForScheduleAsync(GrainId grainId, string reminderName, CancellationToken cancellationToken) => Inner.WaitForScheduleAsync(grainId, reminderName, cancellationToken);
@@ -342,9 +370,9 @@ public sealed class FaultyReminderServiceLifecycleTests
             ReleasedByRefresh = true;
         }
 
-        public override async Task AdvanceAsync(TimeSpan amount, CancellationToken cancellationToken)
+        public override async Task RefreshAsync(CancellationToken cancellationToken)
         {
-            await base.AdvanceAsync(amount, cancellationToken);
+            await base.RefreshAsync(cancellationToken);
             Interlocked.Exchange(ref _refreshGate, null)?.TrySetResult();
         }
     }

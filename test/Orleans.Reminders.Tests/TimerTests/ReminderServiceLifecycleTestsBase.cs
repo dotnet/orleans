@@ -1,5 +1,6 @@
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
+using Orleans.Configuration;
 using Orleans.Reminders.TestKit;
 using Orleans.Testing.Reminders;
 using Orleans.TestingHost;

@@ -39,6 +39,9 @@ public interface IReminderServiceLifecycleHarness
     /// <summary>Advances the one reminder clock driver.</summary>
     Task AdvanceAsync(TimeSpan amount, CancellationToken cancellationToken);
 
+    /// <summary>Refreshes every active reminder service without advancing time.</summary>
+    Task RefreshAsync(CancellationToken cancellationToken);
+
     /// <summary>Waits for exactly <paramref name="count"/> local owners.</summary>
     Task WaitForOwnerCountAsync(
         GrainId grainId,
@@ -206,7 +209,7 @@ public abstract class ReminderServiceLifecycleTestRunner
                     scheduleChanges + 1,
                     cancellationToken);
                 await grain.RegisterOrUpdateAsync(Name, due, Period + TimeSpan.FromMinutes(1)).WaitAsync(cancellationToken);
-                await _harness.AdvanceAsync(_harness.ReminderRefreshPeriod, cancellationToken);
+                await _harness.RefreshAsync(cancellationToken);
                 await changed;
                 await _harness.WaitForScheduleAsync(grain.GetGrainId(), Name, cancellationToken);
                 var updated = await ReadRequiredAsync(Guarantee, grain.GetGrainId(), Name, cancellationToken);
@@ -260,7 +263,7 @@ public abstract class ReminderServiceLifecycleTestRunner
                 }
 
                 var quiescence = _harness.WaitForOwnerCountAsync(grain.GetGrainId(), Name, 0, cancellationToken);
-                await _harness.AdvanceAsync(_harness.ReminderRefreshPeriod, cancellationToken);
+                await _harness.RefreshAsync(cancellationToken);
                 await quiescence;
                 await AssertAbsentAsync(Guarantee, grain.GetGrainId(), Name, cancellationToken);
                 await _harness.AdvanceAsync(Period, cancellationToken);
@@ -288,7 +291,8 @@ public abstract class ReminderServiceLifecycleTestRunner
             {
                 var expectedStart = _harness.UtcNow.UtcDateTime + due;
                 await grain.RegisterOrUpdateAsync(Name, due, Period).WaitAsync(cancellationToken);
-                var preWindowAdvance = due - _harness.ReminderLoadingWindow - _harness.ReminderRefreshPeriod;
+                var boundaryStep = TimeSpan.FromTicks(1);
+                var preWindowAdvance = due - _harness.ReminderLoadingWindow - boundaryStep;
                 await _harness.AdvanceAsync(preWindowAdvance, cancellationToken);
                 if (_harness.GetOwners(grain.GetGrainId(), Name).Count != 0)
                 {
@@ -300,7 +304,8 @@ public abstract class ReminderServiceLifecycleTestRunner
                 }
 
                 var owner = _harness.WaitForOwnerCountAsync(grain.GetGrainId(), Name, 1, cancellationToken);
-                await _harness.AdvanceAsync(_harness.ReminderRefreshPeriod, cancellationToken);
+                await _harness.AdvanceAsync(boundaryStep, cancellationToken);
+                await _harness.RefreshAsync(cancellationToken);
                 await owner;
                 await _harness.WaitForTopologyReconciliationAsync(cancellationToken);
                 await _harness.WaitForOwnerCountAsync(grain.GetGrainId(), Name, 1, cancellationToken);
@@ -347,7 +352,7 @@ public abstract class ReminderServiceLifecycleTestRunner
                             1,
                             cancellationToken))
                         .ToArray();
-                    await _harness.AdvanceAsync(_harness.ReminderRefreshPeriod, cancellationToken);
+                    await _harness.RefreshAsync(cancellationToken);
                     await Task.WhenAll(ownerWaits);
                     await _harness.WaitForTopologyReconciliationAsync(cancellationToken);
                     await Task.WhenAll(reminders.Select(item =>
@@ -619,7 +624,7 @@ public abstract class ReminderServiceLifecycleTestRunner
                 1,
                 cancellationToken))
             .ToArray();
-        await _harness.AdvanceAsync(_harness.ReminderRefreshPeriod, cancellationToken);
+        await _harness.RefreshAsync(cancellationToken);
         await Task.WhenAll(ownerWaits);
     }
 
@@ -637,7 +642,7 @@ public abstract class ReminderServiceLifecycleTestRunner
                 0,
                 cancellationToken))
             .ToArray();
-        await _harness.AdvanceAsync(_harness.ReminderRefreshPeriod, cancellationToken);
+        await _harness.RefreshAsync(cancellationToken);
         await Task.WhenAll(quiescence);
         await Task.WhenAll(reminders.Select(item =>
             AssertAbsentAsync(guarantee, item.Grain.GetGrainId(), item.Name, cancellationToken)));

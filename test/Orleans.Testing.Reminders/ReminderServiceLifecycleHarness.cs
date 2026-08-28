@@ -67,6 +67,17 @@ public sealed class ReminderServiceLifecycleHarness : IReminderServiceLifecycleH
         => _clock.AdvanceAsync(amount, cancellationToken);
 
     /// <inheritdoc />
+    public async Task RefreshAsync(CancellationToken cancellationToken)
+    {
+        foreach (var silo in _cluster.GetActiveSilos())
+        {
+            await silo.ServiceProvider.GetRequiredService<LocalReminderService>()
+                .TestOnlyRefresh()
+                .WaitAsync(cancellationToken);
+        }
+    }
+
+    /// <inheritdoc />
     public Task WaitForOwnerCountAsync(
         GrainId grainId,
         string reminderName,
@@ -127,7 +138,8 @@ public sealed class ReminderServiceLifecycleHarness : IReminderServiceLifecycleH
         var silo = AssertSingle(await _cluster.StartSilosAsync(1).WaitAsync(cancellationToken));
         await Task.WhenAll(
             _observer.WaitForReminderServiceStartedAsync(cancellationToken, silo.SiloAddress),
-            _cluster.WaitForLivenessToStabilizeAsync().WaitAsync(cancellationToken));
+            _cluster.WaitForLivenessToStabilizeAsync().WaitAsync(cancellationToken),
+            _cluster.WaitForClusterManifestToStabilizeAsync().WaitAsync(cancellationToken));
         return silo.SiloAddress;
     }
 
@@ -137,17 +149,22 @@ public sealed class ReminderServiceLifecycleHarness : IReminderServiceLifecycleH
         var silo = _cluster.GetSiloForAddress(siloAddress)
             ?? throw new InvalidOperationException($"Silo {siloAddress} is not active.");
         await _cluster.StopSiloAsync(silo, cancellationToken);
-        await _cluster.WaitForLivenessToStabilizeAsync().WaitAsync(cancellationToken);
+        await Task.WhenAll(
+            _cluster.WaitForLivenessToStabilizeAsync().WaitAsync(cancellationToken),
+            _cluster.WaitForClusterManifestToStabilizeAsync().WaitAsync(cancellationToken));
     }
 
     /// <inheritdoc />
     public async Task WaitForTopologyReconciliationAsync(CancellationToken cancellationToken)
     {
-        await _cluster.WaitForLivenessToStabilizeAsync().WaitAsync(cancellationToken);
+        await Task.WhenAll(
+            _cluster.WaitForLivenessToStabilizeAsync().WaitAsync(cancellationToken),
+            _cluster.WaitForClusterManifestToStabilizeAsync().WaitAsync(cancellationToken));
         var barriers = _cluster.GetActiveSilos().Select(silo =>
             silo.ServiceProvider.GetRequiredService<LocalReminderService>()
                 .TestOnlyWaitForRangeChangeReconciliation(cancellationToken));
         await Task.WhenAll(barriers);
+        await RefreshAsync(cancellationToken);
     }
 
     private static InProcessSiloHandle AssertSingle(IReadOnlyList<InProcessSiloHandle> silos)
