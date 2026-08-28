@@ -26,6 +26,17 @@ public sealed class PublicDurableMessagingBehaviorTests : IAsyncLifetime
     public ValueTask DisposeAsync() => fixture.DisposeAsync();
 
     [Fact]
+    public async Task ApplicationJournaledStateNamesDoNotCollideWithMessagingState()
+    {
+        var grain = NewGrain();
+
+        var snapshot = await grain.GetSnapshotAsync();
+
+        Assert.Equal(0, snapshot.InboxCount);
+        Assert.Equal(0, snapshot.OutboxCount);
+    }
+
+    [Fact]
     public async Task Deliver_AcceptedOnlyAfterInboxAndStableJobOwnershipAreDurable()
     {
         var receiver = NewGrain();
