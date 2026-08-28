@@ -114,7 +114,7 @@ public sealed class GeneratedWarningSuppressionTests
         var generatedTreePaths = result.GeneratedSources
             .Select(static source => source.HintName)
             .ToHashSet(StringComparer.Ordinal);
-        var obsoleteErrors = generatedCompilation.GetDiagnostics()
+        var obsoleteErrors = generatedCompilation.GetDiagnostics(TestContext.Current.CancellationToken)
             .Where(static diagnostic => (diagnostic.Id is ObsoleteWithoutMessageDiagnosticId or ObsoleteWithMessageDiagnosticId)
                 && diagnostic.Severity == DiagnosticSeverity.Error)
             .ToArray();
