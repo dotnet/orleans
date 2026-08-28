@@ -224,7 +224,7 @@ public sealed class DynamoDBAspireLiveTests
             Assert.Equal("DynamoDBReminderTable", reminders.GetType().Name);
             AssertProviderOptions(options.Service, options.TableName, options.UseProvisionedThroughput, endpoint, tableName);
 
-            await reminders.StartAsync();
+            await reminders.StartAsync(TestContext.Current.CancellationToken);
 
             var entry = new ReminderEntry
             {

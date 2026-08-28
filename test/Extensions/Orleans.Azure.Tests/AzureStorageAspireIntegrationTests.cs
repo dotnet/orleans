@@ -73,17 +73,17 @@ public sealed class AzureStorageAspireIntegrationTests
             .GetRequiredService<IOptions<AzureStorageClusteringOptions>>()
             .Value
             .TableServiceClient!
-            .GetPropertiesAsync();
+            .GetPropertiesAsync(TestContext.Current.CancellationToken);
         await host.Services
             .GetRequiredService<IOptionsMonitor<AzureBlobStorageOptions>>()
             .Get("blob-state")
             .BlobServiceClient!
-            .GetPropertiesAsync();
+            .GetPropertiesAsync(TestContext.Current.CancellationToken);
         await host.Services
             .GetRequiredService<IOptionsMonitor<AzureQueueOptions>>()
             .Get("queue-stream")
             .QueueServiceClient!
-            .GetPropertiesAsync();
+            .GetPropertiesAsync(TestContext.Current.CancellationToken);
     }
 
     private static IHost CreateHost(IConfiguration configuration)
