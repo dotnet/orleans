@@ -127,7 +127,7 @@ public sealed class AdoNetAspireIntegrationTests
             .WithDevelopmentClustering()
             .WithStreaming("streams", new MissingConnectionProviderConfiguration());
         var silo = builder.AddContainer("silo", "unused").WithReference(orleans);
-        await using var app = await builder.BuildAsync();
+        await using var app = await builder.BuildAsync(TestContext.Current.CancellationToken);
         var configuration = await AspireResourceConfiguration.CreateAsync(
             silo.Resource,
             app.Services,

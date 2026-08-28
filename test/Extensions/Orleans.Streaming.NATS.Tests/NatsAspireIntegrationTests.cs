@@ -77,7 +77,7 @@ public sealed class NatsAspireJetStreamTests
         await using var cluster = clusterBuilder.Build();
         try
         {
-            await cluster.DeployAsync();
+            await cluster.DeployAsync(TestContext.Current.CancellationToken);
             var received = new TaskCompletionSource<string>(TaskCreationOptions.RunContinuationsAsynchronously);
             var stream = cluster.Client
                 .GetStreamProvider("orders")
@@ -90,7 +90,11 @@ public sealed class NatsAspireJetStreamTests
 
             await stream.OnNextAsync("through-jetstream");
 
-            Assert.Equal("through-jetstream", await received.Task.WaitAsync(TimeSpan.FromSeconds(30)));
+            Assert.Equal(
+                "through-jetstream",
+                await received.Task.WaitAsync(
+                    TimeSpan.FromSeconds(30),
+                    TestContext.Current.CancellationToken));
         }
         finally
         {

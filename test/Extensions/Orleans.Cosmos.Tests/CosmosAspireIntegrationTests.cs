@@ -72,7 +72,7 @@ public sealed class CosmosAspireIntegrationTests
             .WithDevelopmentClustering()
             .WithReminders(new MissingConnectionCosmosProviderConfiguration());
         var silo = builder.AddContainer("silo", "unused").WithReference(orleans);
-        await using var app = await builder.BuildAsync();
+        await using var app = await builder.BuildAsync(TestContext.Current.CancellationToken);
         var configuration = await AspireResourceConfiguration.CreateAsync(
             silo.Resource,
             app.Services,
@@ -96,7 +96,7 @@ public sealed class CosmosAspireIntegrationTests
         await using var builder = DistributedApplicationTestingBuilder.Create();
         var resource = builder.AddContainer("app", "unused")
             .WithEnvironment("OPTIONAL_VALUE", (string?)null);
-        await using var app = await builder.BuildAsync();
+        await using var app = await builder.BuildAsync(TestContext.Current.CancellationToken);
 
         var configuration = await AspireResourceConfiguration.CreateAsync(
             resource.Resource,
