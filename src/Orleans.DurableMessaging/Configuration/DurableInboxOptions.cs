@@ -18,8 +18,15 @@ namespace Orleans.DurableMessaging.Configuration;
 /// </remarks>
 public class DurableInboxOptions
 {
+    internal const int MaximumBackoffExponent = 6;
+    internal const int MaximumBackoffMultiplier = 1 << MaximumBackoffExponent;
+
+    // The runtime multiplies this base delay by at most MaximumBackoffMultiplier.
+    // Keep the expanded delay within the timer implementation's uint-millisecond limit.
     private static readonly TimeSpan MaxSupportedRetryDelay =
-        TimeSpan.FromTicks(TimeSpan.FromMilliseconds(uint.MaxValue - 1).Ticks / 64);
+        TimeSpan.FromTicks(
+            TimeSpan.FromMilliseconds(uint.MaxValue - 1).Ticks
+            / MaximumBackoffMultiplier);
 
     /// <summary>
     /// Gets or sets the maximum number of pending messages in the inbox.
