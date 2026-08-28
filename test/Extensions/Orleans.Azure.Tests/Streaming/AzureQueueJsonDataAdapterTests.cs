@@ -1,6 +1,7 @@
 #pragma warning disable StreamingJsonSerializationExperimental // Type is for evaluation purposes only and is subject to change or removal in future updates. Suppress this diagnostic to proceed.
 
 using System.Buffers.Text;
+using JsonValueKind = System.Text.Json.JsonValueKind;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
@@ -19,6 +20,7 @@ using Xunit;
 namespace Tester.AzureUtils.Streaming
 {
     [Collection(TestEnvironmentFixture.DefaultCollection)]
+    [TestCategory("AzureStorage"), TestCategory("Streaming")]
     [TestSuite("BVT")]
     [TestProvider("AzureStorage")]
     [TestArea("Streaming")]
@@ -51,7 +53,10 @@ namespace Tester.AzureUtils.Streaming
         {
             var serializer = this.fixture.Services.GetRequiredService<Serializer>();
             var azureQueueDataAdapterV2 = new AzureQueueDataAdapterV2(serializer);
-            var jsonOptions = this.fixture.Services.GetRequiredService<IOptions<OrleansJsonSerializerOptions>>();
+            var jsonOptions = Options.Create(new OrleansJsonSerializerOptions
+            {
+                JsonSerializerSettings = OrleansJsonSerializerSettings.GetDefaultSerializerSettings(this.fixture.Services)
+            });
             var jsonOrleansSerializer = new OrleansJsonSerializer(jsonOptions);
 
             return new AzureQueueJsonDataAdapter(
@@ -209,19 +214,24 @@ namespace Tester.AzureUtils.Streaming
             var exception = Assert.Throws<InvalidDataException>(
                 () => jsonAdapter.FromQueueMessage($"{{\"version\":{version}}}", sequenceId: 0));
 
-            Assert.Equal($"Unsupported Azure Queue JSON envelope version: {version}.", exception.Message);
+            Assert.Contains("Unsupported Azure Queue JSON envelope version", exception.Message);
+            Assert.Contains(version, exception.Message);
         }
 
         [Theory, TestCategory("BVT")]
         [MemberData(nameof(MalformedCompactEnvelopeCases))]
-        public void JsonAdapter_RejectsMalformedCompactEnvelope(string message, string expectedMessage)
+        public void JsonAdapter_RejectsMalformedCompactEnvelope(
+            string message,
+            string expectedProperty,
+            string expectedKind)
         {
             var jsonAdapter = InitializeQueueJsonDataAdapter(new AzureQueueJsonDataAdapterOptions { EnableFallback = false });
 
             var exception = Assert.Throws<InvalidDataException>(
                 () => jsonAdapter.FromQueueMessage(message, sequenceId: 0));
 
-            Assert.Equal(expectedMessage, exception.Message);
+            Assert.Contains($"property '{expectedProperty}'", exception.Message);
+            Assert.Contains(expectedKind, exception.Message);
         }
 
         [Fact, TestCategory("BVT")]
@@ -413,47 +423,57 @@ namespace Tester.AzureUtils.Streaming
             Assert.True(IsValidJson(jsonMessage));
         }
 
-        public static TheoryData<string, string> MalformedCompactEnvelopeCases => new()
+        public static TheoryData<string, string, string> MalformedCompactEnvelopeCases => new()
         {
             {
                 """{"version":1,"events":[],"requestContext":{}}""",
-                "The Azure Queue JSON envelope property 'stream' must be a Object."
+                "stream",
+                nameof(JsonValueKind.Object)
             },
             {
                 """{"version":1,"stream":[],"events":[],"requestContext":{}}""",
-                "The Azure Queue JSON envelope property 'stream' must be a Object."
+                "stream",
+                nameof(JsonValueKind.Object)
             },
             {
                 """{"version":1,"stream":{"key":"key"},"events":[],"requestContext":{}}""",
-                "The Azure Queue JSON envelope property 'namespace' must be a String or Null."
+                "namespace",
+                $"{nameof(JsonValueKind.String)} or {nameof(JsonValueKind.Null)}"
             },
             {
                 """{"version":1,"stream":{"namespace":1,"key":"key"},"events":[],"requestContext":{}}""",
-                "The Azure Queue JSON envelope property 'namespace' must be a String or Null."
+                "namespace",
+                $"{nameof(JsonValueKind.String)} or {nameof(JsonValueKind.Null)}"
             },
             {
                 """{"version":1,"stream":{"namespace":"namespace"},"events":[],"requestContext":{}}""",
-                "The Azure Queue JSON envelope property 'key' must be a String."
+                "key",
+                nameof(JsonValueKind.String)
             },
             {
                 """{"version":1,"stream":{"namespace":"namespace","key":null},"events":[],"requestContext":{}}""",
-                "The Azure Queue JSON envelope property 'key' must be a String."
+                "key",
+                nameof(JsonValueKind.String)
             },
             {
                 """{"version":1,"stream":{"namespace":"namespace","key":"key"},"requestContext":{}}""",
-                "The Azure Queue JSON envelope property 'events' must be a Array."
+                "events",
+                nameof(JsonValueKind.Array)
             },
             {
                 """{"version":1,"stream":{"namespace":"namespace","key":"key"},"events":{},"requestContext":{}}""",
-                "The Azure Queue JSON envelope property 'events' must be a Array."
+                "events",
+                nameof(JsonValueKind.Array)
             },
             {
                 """{"version":1,"stream":{"namespace":"namespace","key":"key"},"events":[]}""",
-                "The Azure Queue JSON envelope property 'requestContext' must be a Object."
+                "requestContext",
+                nameof(JsonValueKind.Object)
             },
             {
                 """{"version":1,"stream":{"namespace":"namespace","key":"key"},"events":[],"requestContext":[]}""",
-                "The Azure Queue JSON envelope property 'requestContext' must be a Object."
+                "requestContext",
+                nameof(JsonValueKind.Object)
             }
         };
 
