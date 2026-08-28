@@ -1,5 +1,7 @@
 using System;
 using System.Collections.Concurrent;
+using System.Reflection;
+using System.Reflection.Emit;
 using System.Runtime.CompilerServices;
 using System.Threading;
 using Microsoft.Extensions.ObjectPool;
@@ -293,6 +295,16 @@ public sealed class ConcurrentObjectPoolTests
         Assert.All(references, reference => Assert.False(reference.IsAlive));
     }
 
+    [Fact]
+    public void CollectibleGenericTypesAreNotRootedByLiveThreadStorage()
+    {
+        var references = CreateWeakReferencesToCollectiblePoolState();
+
+        Collect();
+
+        Assert.All(references, reference => Assert.False(reference.IsAlive));
+    }
+
     [MethodImpl(MethodImplOptions.NoInlining)]
     private static WeakReference ReturnItemOnNewThread(ConcurrentObjectPool<PooledItem> pool)
     {
@@ -354,6 +366,23 @@ public sealed class ConcurrentObjectPoolTests
         }
 
         return references;
+    }
+
+    [MethodImpl(MethodImplOptions.NoInlining)]
+    private static WeakReference[] CreateWeakReferencesToCollectiblePoolState()
+    {
+        var assembly = AssemblyBuilder.DefineDynamicAssembly(
+            new AssemblyName($"CollectiblePoolTypes_{Guid.NewGuid():N}"),
+            AssemblyBuilderAccess.RunAndCollect);
+        var module = assembly.DefineDynamicModule("CollectiblePoolTypes");
+        var typeBuilder = module.DefineType("PooledItem", TypeAttributes.Public | TypeAttributes.Class);
+        typeBuilder.DefineDefaultConstructor(MethodAttributes.Public);
+        var itemType = typeBuilder.CreateType();
+        var poolType = typeof(ConcurrentObjectPool<>).MakeGenericType(itemType);
+        var pool = Activator.CreateInstance(poolType)!;
+        var item = poolType.GetMethod(nameof(Microsoft.Extensions.ObjectPool.ObjectPool<object>.Get))!.Invoke(pool, null)!;
+        poolType.GetMethod(nameof(Microsoft.Extensions.ObjectPool.ObjectPool<object>.Return))!.Invoke(pool, [item]);
+        return [new(itemType), new(pool), new(item)];
     }
 
     private static void Collect()
