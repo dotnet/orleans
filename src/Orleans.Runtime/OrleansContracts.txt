@@ -4,7 +4,9 @@
 # dotnet format PATH_TO_PROJECT_OR_SOLUTION analyzers --severity info --diagnostics ORLEANS0016 ORLEANS0017 ORLEANS0018 ORLEANS0019 ORLEANS0020 ORLEANS0022 ORLEANS0023 ORLEANS0024
 # Verify with: dotnet build PATH_TO_PROJECT_OR_SOLUTION
 # The regeneration command edits this manifest only; it does not change source attributes.
-# Methods without [Id] or [Alias] use the Orleans code generator's existing wire ID hash.
+# OrleansContracts format: 2
+# Method lines use: wire-identity: CLR-signature.
+# The identity is the identifier Orleans uses at runtime, whether generated or declared in source.
 # Review every diff: identity or signature changes can break wire compatibility during rolling upgrades.
 # Details: https://aka.ms/orleans/OrleansContracts.txt
 
@@ -19,8 +21,7 @@ class [GrainType("deploymentloadpublisher")] Orleans.Runtime.DeploymentLoadPubli
 class [GrainType("developmentleaseprovider")] Orleans.Runtime.Development.DevelopmentLeaseProviderGrain
 
 interface [GrainInterfaceType("Orleans.Runtime.Development.IDevelopmentLeaseProviderGrain")] Orleans.Runtime.Development.IDevelopmentLeaseProviderGrain [Version(0)]
-  # Orleans.Runtime.Development.IDevelopmentLeaseProviderGrain.Reset() -> Task
-  847FCE12() -> Task
+  847FCE12: Reset() -> Task
 
 class [GrainType("graincallcancellationmanager")] Orleans.Runtime.GrainCallCancellationManager
 
@@ -33,27 +34,25 @@ class [GrainType("distributedremotegraindirectory")] Orleans.Runtime.GrainDirect
 class [GrainType("graindirectorypartition")] Orleans.Runtime.GrainDirectory.GrainDirectoryPartition
 
 interface [GrainInterfaceType("Orleans.Runtime.GrainDirectory.IGrainDirectoryClient")] Orleans.Runtime.GrainDirectory.IGrainDirectoryClient [Version(0)]
-  [Alias("GetRegisteredActivations")] GetRegisteredActivations(Orleans.Runtime.MembershipVersion, RingRange, bool, System.Threading.CancellationToken) -> ValueTask<Orleans.Concurrency.Immutable<System.Collections.Generic.List<Orleans.Runtime.GrainAddress>>>
-  [Alias("RecoverRegisteredActivations")] RecoverRegisteredActivations(Orleans.Runtime.MembershipVersion, RingRange, Orleans.Runtime.SiloAddress, int, System.Threading.CancellationToken) -> ValueTask<Orleans.Concurrency.Immutable<System.Collections.Generic.List<Orleans.Runtime.GrainAddress>>>
+  GetRegisteredActivations: GetRegisteredActivations(Orleans.Runtime.MembershipVersion, RingRange, bool, System.Threading.CancellationToken) -> ValueTask<Orleans.Concurrency.Immutable<System.Collections.Generic.List<Orleans.Runtime.GrainAddress>>>
+  RecoverRegisteredActivations: RecoverRegisteredActivations(Orleans.Runtime.MembershipVersion, RingRange, Orleans.Runtime.SiloAddress, int, System.Threading.CancellationToken) -> ValueTask<Orleans.Concurrency.Immutable<System.Collections.Generic.List<Orleans.Runtime.GrainAddress>>>
 
 interface [GrainInterfaceType("Orleans.Runtime.GrainDirectory.IGrainDirectoryPartition")] Orleans.Runtime.GrainDirectory.IGrainDirectoryPartition [Version(0)]
-  [Alias("AcknowledgeSnapshotTransferAsync")] AcknowledgeSnapshotTransferAsync(Orleans.Runtime.SiloAddress, int, Orleans.Runtime.MembershipVersion, System.Threading.CancellationToken) -> ValueTask<bool>
-  [Alias("DeregisterAsync")] DeregisterAsync(Orleans.Runtime.MembershipVersion, Orleans.Runtime.GrainAddress, System.Threading.CancellationToken) -> ValueTask<DirectoryResult`1<bool>>
-  [Alias("GetSnapshotAsync")] GetSnapshotAsync(Orleans.Runtime.MembershipVersion, Orleans.Runtime.MembershipVersion, RingRange, System.Threading.CancellationToken) -> ValueTask<GrainDirectoryPartitionSnapshot>
-  [Alias("LookupAsync")] LookupAsync(Orleans.Runtime.MembershipVersion, Orleans.Runtime.GrainId, System.Threading.CancellationToken) -> ValueTask<DirectoryResult`1<Orleans.Runtime.GrainAddress?>>
-  [Alias("RegisterAsync")] RegisterAsync(Orleans.Runtime.MembershipVersion, Orleans.Runtime.GrainAddress, Orleans.Runtime.GrainAddress?, System.Threading.CancellationToken) -> ValueTask<DirectoryResult`1<Orleans.Runtime.GrainAddress>>
+  AcknowledgeSnapshotTransferAsync: AcknowledgeSnapshotTransferAsync(Orleans.Runtime.SiloAddress, int, Orleans.Runtime.MembershipVersion, System.Threading.CancellationToken) -> ValueTask<bool>
+  DeregisterAsync: DeregisterAsync(Orleans.Runtime.MembershipVersion, Orleans.Runtime.GrainAddress, System.Threading.CancellationToken) -> ValueTask<DirectoryResult`1<bool>>
+  GetSnapshotAsync: GetSnapshotAsync(Orleans.Runtime.MembershipVersion, Orleans.Runtime.MembershipVersion, RingRange, System.Threading.CancellationToken) -> ValueTask<GrainDirectoryPartitionSnapshot>
+  LookupAsync: LookupAsync(Orleans.Runtime.MembershipVersion, Orleans.Runtime.GrainId, System.Threading.CancellationToken) -> ValueTask<DirectoryResult`1<Orleans.Runtime.GrainAddress?>>
+  RegisterAsync: RegisterAsync(Orleans.Runtime.MembershipVersion, Orleans.Runtime.GrainAddress, Orleans.Runtime.GrainAddress?, System.Threading.CancellationToken) -> ValueTask<DirectoryResult`1<Orleans.Runtime.GrainAddress>>
 
 interface [GrainInterfaceType("Orleans.Runtime.GrainDirectory.IGrainDirectoryTestHooks")] Orleans.Runtime.GrainDirectory.IGrainDirectoryTestHooks [Version(0)]
-  [Alias("CheckActivationsAsync")] CheckActivationsAsync(Orleans.Concurrency.Immutable<System.Collections.Generic.List<Orleans.Runtime.GrainAddress>>) -> ValueTask<Orleans.Concurrency.Immutable<System.Collections.Generic.List<Orleans.Runtime.GrainId>>>
-  [Alias("CheckIntegrityAsync")] CheckIntegrityAsync() -> ValueTask
-  [Alias("RecoverAndCheckIntegrityAsync")] RecoverAndCheckIntegrityAsync() -> ValueTask
-  [Alias("WaitForMembershipVersionAsync")] WaitForMembershipVersionAsync(Orleans.Runtime.MembershipVersion) -> ValueTask
+  CheckActivationsAsync: CheckActivationsAsync(Orleans.Concurrency.Immutable<System.Collections.Generic.List<Orleans.Runtime.GrainAddress>>) -> ValueTask<Orleans.Concurrency.Immutable<System.Collections.Generic.List<Orleans.Runtime.GrainId>>>
+  CheckIntegrityAsync: CheckIntegrityAsync() -> ValueTask
+  RecoverAndCheckIntegrityAsync: RecoverAndCheckIntegrityAsync() -> ValueTask
+  WaitForMembershipVersionAsync: WaitForMembershipVersionAsync(Orleans.Runtime.MembershipVersion) -> ValueTask
 
 interface [GrainInterfaceType("Orleans.Runtime.GrainDirectory.IRemoteClientDirectory")] Orleans.Runtime.GrainDirectory.IRemoteClientDirectory [Version(0)]
-  # Orleans.Runtime.GrainDirectory.IRemoteClientDirectory.OnUpdateClientRoutes(ImmutableDictionary<SiloAddress, (ImmutableHashSet<GrainId> ConnectedClients, long Version)> update) -> Task
-  972F9953(System.Collections.Immutable.ImmutableDictionary<Orleans.Runtime.SiloAddress, (System.Collections.Immutable.ImmutableHashSet<Orleans.Runtime.GrainId>, long)>) -> Task
-  # Orleans.Runtime.GrainDirectory.IRemoteClientDirectory.GetClientRoutes(ImmutableDictionary<SiloAddress, long> knownRoutes) -> Task<ImmutableDictionary<SiloAddress, (ImmutableHashSet<GrainId> ConnectedClients, long Version)>>
-  A6E49CD1(System.Collections.Immutable.ImmutableDictionary<Orleans.Runtime.SiloAddress, long>) -> Task<System.Collections.Immutable.ImmutableDictionary<Orleans.Runtime.SiloAddress, (System.Collections.Immutable.ImmutableHashSet<Orleans.Runtime.GrainId>, long)>>
+  A6E49CD1: GetClientRoutes(System.Collections.Immutable.ImmutableDictionary<Orleans.Runtime.SiloAddress, long>) -> Task<System.Collections.Immutable.ImmutableDictionary<Orleans.Runtime.SiloAddress, (System.Collections.Immutable.ImmutableHashSet<Orleans.Runtime.GrainId>, long)>>
+  972F9953: OnUpdateClientRoutes(System.Collections.Immutable.ImmutableDictionary<Orleans.Runtime.SiloAddress, (System.Collections.Immutable.ImmutableHashSet<Orleans.Runtime.GrainId>, long)>) -> Task
 
 class [GrainType("localgraindirectoryclientcompatibility")] Orleans.Runtime.GrainDirectory.LocalGrainDirectoryClientCompatibility
 
@@ -62,32 +61,24 @@ class [GrainType("localgraindirectorypartitioncompatibility")] Orleans.Runtime.G
 class [GrainType("remotegraindirectory")] Orleans.Runtime.GrainDirectory.RemoteGrainDirectory
 
 interface [GrainInterfaceType("Orleans.Runtime.IActivationMigrationManagerSystemTarget")] Orleans.Runtime.IActivationMigrationManagerSystemTarget [Version(0)]
-  # Orleans.Runtime.IActivationMigrationManagerSystemTarget.AcceptMigratingGrains(List<GrainMigrationPackage> migratingGrains) -> ValueTask
-  29E9E63F(System.Collections.Generic.List<Orleans.Runtime.GrainMigrationPackage>) -> ValueTask
+  29E9E63F: AcceptMigratingGrains(System.Collections.Generic.List<Orleans.Runtime.GrainMigrationPackage>) -> ValueTask
 
 interface [GrainInterfaceType("Orleans.Runtime.ICatalog")] Orleans.Runtime.ICatalog [Version(0)]
-  # Orleans.Runtime.ICatalog.DeleteActivations(List<GrainAddress> activationAddresses, DeactivationReasonCode reasonCode, string reasonText) -> Task
-  C4A56D7C(System.Collections.Generic.List<Orleans.Runtime.GrainAddress>, Orleans.DeactivationReasonCode, string) -> Task
+  C4A56D7C: DeleteActivations(System.Collections.Generic.List<Orleans.Runtime.GrainAddress>, Orleans.DeactivationReasonCode, string) -> Task
 
 interface [GrainInterfaceType("Orleans.Runtime.IGrainCallCancellationManagerSystemTarget")] Orleans.Runtime.IGrainCallCancellationManagerSystemTarget [Version(0)]
-  # Orleans.Runtime.IGrainCallCancellationManagerSystemTarget.CancelCallsAsync(List<GrainCallCancellationRequest> cancellationRequests) -> ValueTask
-  AF79F3FA(System.Collections.Generic.List<Orleans.Runtime.GrainCallCancellationRequest>) -> ValueTask
+  AF79F3FA: CancelCallsAsync(System.Collections.Generic.List<Orleans.Runtime.GrainCallCancellationRequest>) -> ValueTask
 
 interface [GrainInterfaceType("Orleans.Runtime.IGrainTimerInvoker")] Orleans.Runtime.IGrainTimerInvoker [Version(0)]
-  # Orleans.Runtime.IGrainTimerInvoker.InvokeCallbackAsync() -> Task
-  3F6C2672() -> Task
+  3F6C2672: InvokeCallbackAsync() -> Task
 
 interface [GrainInterfaceType("Orleans.Runtime.IRemoteGrainDirectory")] Orleans.Runtime.IRemoteGrainDirectory [Version(0)]
-  # Orleans.Runtime.IRemoteGrainDirectory.LookUpMany(List<(GrainId GrainId, int Version)> grainAndETagList) -> Task<List<AddressAndTag>>
-  7DF50601(System.Collections.Generic.List<(Orleans.Runtime.GrainId, int)>) -> Task<System.Collections.Generic.List<Orleans.GrainDirectory.AddressAndTag>>
-  # Orleans.Runtime.IRemoteGrainDirectory.AcceptSplitPartition(List<GrainAddress> singleActivations) -> Task
-  9ABE3793(System.Collections.Generic.List<Orleans.Runtime.GrainAddress>) -> Task
-  # Orleans.Runtime.IRemoteGrainDirectory.RegisterMany(List<GrainAddress> addresses) -> Task
-  CD06EAEE(System.Collections.Generic.List<Orleans.Runtime.GrainAddress>) -> Task
+  9ABE3793: AcceptSplitPartition(System.Collections.Generic.List<Orleans.Runtime.GrainAddress>) -> Task
+  7DF50601: LookUpMany(System.Collections.Generic.List<(Orleans.Runtime.GrainId, int)>) -> Task<System.Collections.Generic.List<Orleans.GrainDirectory.AddressAndTag>>
+  CD06EAEE: RegisterMany(System.Collections.Generic.List<Orleans.Runtime.GrainAddress>) -> Task
 
 interface [GrainInterfaceType("Orleans.Runtime.ISiloManifestSystemTarget")] Orleans.Runtime.ISiloManifestSystemTarget [Version(0)]
-  # Orleans.Runtime.ISiloManifestSystemTarget.GetSiloManifest() -> ValueTask<GrainManifest>
-  1857A4C8() -> ValueTask<Orleans.Metadata.GrainManifest>
+  1857A4C8: GetSiloManifest() -> ValueTask<Orleans.Metadata.GrainManifest>
 
 class [GrainType("management")] Orleans.Runtime.Management.ManagementGrain
 
@@ -96,7 +87,7 @@ class [GrainType("membershipsystemtarget")] Orleans.Runtime.MembershipService.Me
 class [GrainType("membershiptablesystemtarget")] Orleans.Runtime.MembershipService.MembershipTableSystemTarget
 
 interface [GrainInterfaceType("Orleans.Runtime.MembershipService.SiloMetadata.ISiloMetadataSystemTarget")] Orleans.Runtime.MembershipService.SiloMetadata.ISiloMetadataSystemTarget [Version(0)]
-  [Alias("GetSiloMetadata")] GetSiloMetadata() -> Task<Orleans.Runtime.MembershipService.SiloMetadata.SiloMetadata>
+  GetSiloMetadata: GetSiloMetadata() -> Task<Orleans.Runtime.MembershipService.SiloMetadata.SiloMetadata>
 
 class [GrainType("silometadatasystemtarget")] Orleans.Runtime.MembershipService.SiloMetadata.SiloMetadataSystemTarget
 
@@ -113,21 +104,13 @@ interface [GrainInterfaceType("Orleans.Runtime.TestHooks.ITestHooksSystemTarget"
 class [GrainType("testhookssystemtarget")] Orleans.Runtime.TestHooks.TestHooksSystemTarget
 
 interface [GrainInterfaceType("Orleans.Runtime.Versions.IVersionStoreGrain")] Orleans.Runtime.Versions.IVersionStoreGrain [Version(0)]
-  # Orleans.Runtime.Versions.IVersionStoreGrain.SetCompatibilityStrategy(GrainInterfaceType interfaceType, CompatibilityStrategy strategy) -> Task
-  1B7F13C8(Orleans.Runtime.GrainInterfaceType, Orleans.Versions.Compatibility.CompatibilityStrategy) -> Task
-  # Orleans.Runtime.Versions.IVersionStoreGrain.SetSelectorStrategy(GrainInterfaceType interfaceType, VersionSelectorStrategy strategy) -> Task
-  3E6DDE3E(Orleans.Runtime.GrainInterfaceType, Orleans.Versions.Selector.VersionSelectorStrategy) -> Task
-  # Orleans.Runtime.Versions.IVersionStoreGrain.SetCompatibilityStrategy(CompatibilityStrategy strategy) -> Task
-  67A0B5AA(Orleans.Versions.Compatibility.CompatibilityStrategy) -> Task
-  # Orleans.Runtime.Versions.IVersionStoreGrain.GetCompatibilityStrategy() -> Task<CompatibilityStrategy?>
-  67EF9A39() -> Task<Orleans.Versions.Compatibility.CompatibilityStrategy?>
-  # Orleans.Runtime.Versions.IVersionStoreGrain.GetCompatibilityStrategies() -> Task<Dictionary<GrainInterfaceType, CompatibilityStrategy>>
-  7261373F() -> Task<System.Collections.Generic.Dictionary<Orleans.Runtime.GrainInterfaceType, Orleans.Versions.Compatibility.CompatibilityStrategy>>
-  # Orleans.Runtime.Versions.IVersionStoreGrain.GetSelectorStrategies() -> Task<Dictionary<GrainInterfaceType, VersionSelectorStrategy>>
-  743D88ED() -> Task<System.Collections.Generic.Dictionary<Orleans.Runtime.GrainInterfaceType, Orleans.Versions.Selector.VersionSelectorStrategy>>
-  # Orleans.Runtime.Versions.IVersionStoreGrain.GetSelectorStrategy() -> Task<VersionSelectorStrategy?>
-  8A72848A() -> Task<Orleans.Versions.Selector.VersionSelectorStrategy?>
-  # Orleans.Runtime.Versions.IVersionStoreGrain.SetSelectorStrategy(VersionSelectorStrategy strategy) -> Task
-  E7532DE3(Orleans.Versions.Selector.VersionSelectorStrategy) -> Task
+  7261373F: GetCompatibilityStrategies() -> Task<System.Collections.Generic.Dictionary<Orleans.Runtime.GrainInterfaceType, Orleans.Versions.Compatibility.CompatibilityStrategy>>
+  67EF9A39: GetCompatibilityStrategy() -> Task<Orleans.Versions.Compatibility.CompatibilityStrategy?>
+  743D88ED: GetSelectorStrategies() -> Task<System.Collections.Generic.Dictionary<Orleans.Runtime.GrainInterfaceType, Orleans.Versions.Selector.VersionSelectorStrategy>>
+  8A72848A: GetSelectorStrategy() -> Task<Orleans.Versions.Selector.VersionSelectorStrategy?>
+  1B7F13C8: SetCompatibilityStrategy(Orleans.Runtime.GrainInterfaceType, Orleans.Versions.Compatibility.CompatibilityStrategy) -> Task
+  67A0B5AA: SetCompatibilityStrategy(Orleans.Versions.Compatibility.CompatibilityStrategy) -> Task
+  3E6DDE3E: SetSelectorStrategy(Orleans.Runtime.GrainInterfaceType, Orleans.Versions.Selector.VersionSelectorStrategy) -> Task
+  E7532DE3: SetSelectorStrategy(Orleans.Versions.Selector.VersionSelectorStrategy) -> Task
 
 class [GrainType("versionstore")] Orleans.Runtime.Versions.VersionStoreGrain

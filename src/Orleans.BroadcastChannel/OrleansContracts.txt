@@ -4,12 +4,12 @@
 # dotnet format PATH_TO_PROJECT_OR_SOLUTION analyzers --severity info --diagnostics ORLEANS0016 ORLEANS0017 ORLEANS0018 ORLEANS0019 ORLEANS0020 ORLEANS0022 ORLEANS0023 ORLEANS0024
 # Verify with: dotnet build PATH_TO_PROJECT_OR_SOLUTION
 # The regeneration command edits this manifest only; it does not change source attributes.
-# Methods without [Id] or [Alias] use the Orleans code generator's existing wire ID hash.
+# OrleansContracts format: 2
+# Method lines use: wire-identity: CLR-signature.
+# The identity is the identifier Orleans uses at runtime, whether generated or declared in source.
 # Review every diff: identity or signature changes can break wire compatibility during rolling upgrades.
 # Details: https://aka.ms/orleans/OrleansContracts.txt
 
 interface [GrainInterfaceType("Orleans.BroadcastChannel.IBroadcastChannelConsumerExtension")] Orleans.BroadcastChannel.IBroadcastChannelConsumerExtension [Version(0)]
-  # Orleans.BroadcastChannel.IBroadcastChannelConsumerExtension.OnError(InternalChannelId streamId, Exception exception) -> Task
-  73F72B20(Orleans.BroadcastChannel.InternalChannelId, System.Exception) -> Task
-  # Orleans.BroadcastChannel.IBroadcastChannelConsumerExtension.OnPublished(InternalChannelId streamId, object item) -> Task
-  B1E55518(Orleans.BroadcastChannel.InternalChannelId, object) -> Task
+  73F72B20: OnError(Orleans.BroadcastChannel.InternalChannelId, System.Exception) -> Task
+  B1E55518: OnPublished(Orleans.BroadcastChannel.InternalChannelId, object) -> Task

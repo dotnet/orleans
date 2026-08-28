@@ -4,35 +4,37 @@
 # dotnet format PATH_TO_PROJECT_OR_SOLUTION analyzers --severity info --diagnostics ORLEANS0016 ORLEANS0017 ORLEANS0018 ORLEANS0019 ORLEANS0020 ORLEANS0022 ORLEANS0023 ORLEANS0024
 # Verify with: dotnet build PATH_TO_PROJECT_OR_SOLUTION
 # The regeneration command edits this manifest only; it does not change source attributes.
-# Methods without [Id] or [Alias] use the Orleans code generator's existing wire ID hash.
+# OrleansContracts format: 2
+# Method lines use: wire-identity: CLR-signature.
+# The identity is the identifier Orleans uses at runtime, whether generated or declared in source.
 # Review every diff: identity or signature changes can break wire compatibility during rolling upgrades.
 # Details: https://aka.ms/orleans/OrleansContracts.txt
 
 interface [GrainInterfaceType("Orleans.Dashboard.Core.IDashboardGrain")] Orleans.Dashboard.Core.IDashboardGrain [Version(0)]
-  [Alias("GetClusterTracing")] GetClusterTracing() -> Task<Orleans.Concurrency.Immutable<System.Collections.Generic.Dictionary<string, Orleans.Dashboard.Model.GrainTraceEntry>>>
-  [Alias("GetCounters")] GetCounters(string[]) -> Task<Orleans.Concurrency.Immutable<Orleans.Dashboard.Model.DashboardCounters>>
-  [Alias("GetGrainState")] GetGrainState(string?, string?) -> Task<Orleans.Concurrency.Immutable<string>>
-  [Alias("GetGrainTracing")] GetGrainTracing(string) -> Task<Orleans.Concurrency.Immutable<System.Collections.Generic.Dictionary<string, System.Collections.Generic.Dictionary<string, Orleans.Dashboard.Model.GrainTraceEntry>>>>
-  [Alias("GetGrainTypes")] GetGrainTypes(string[]) -> Task<Orleans.Concurrency.Immutable<string[]>>
-  [Alias("GetSiloTracing")] GetSiloTracing(string) -> Task<Orleans.Concurrency.Immutable<System.Collections.Generic.Dictionary<string, Orleans.Dashboard.Model.GrainTraceEntry>>>
-  [Alias("InitializeAsync")] InitializeAsync() -> Task
-  [Alias("SubmitTracing")] SubmitTracing(string, Orleans.Concurrency.Immutable<Orleans.Dashboard.Model.SiloGrainTraceEntry[]>) -> Task
-  [Alias("TopGrainMethods")] TopGrainMethods(int, string[]) -> Task<Orleans.Concurrency.Immutable<System.Collections.Generic.Dictionary<string, Orleans.Dashboard.Model.History.GrainMethodAggregate[]>>>
+  GetClusterTracing: GetClusterTracing() -> Task<Orleans.Concurrency.Immutable<System.Collections.Generic.Dictionary<string, Orleans.Dashboard.Model.GrainTraceEntry>>>
+  GetCounters: GetCounters(string[]) -> Task<Orleans.Concurrency.Immutable<Orleans.Dashboard.Model.DashboardCounters>>
+  GetGrainState: GetGrainState(string?, string?) -> Task<Orleans.Concurrency.Immutable<string>>
+  GetGrainTracing: GetGrainTracing(string) -> Task<Orleans.Concurrency.Immutable<System.Collections.Generic.Dictionary<string, System.Collections.Generic.Dictionary<string, Orleans.Dashboard.Model.GrainTraceEntry>>>>
+  GetGrainTypes: GetGrainTypes(string[]) -> Task<Orleans.Concurrency.Immutable<string[]>>
+  GetSiloTracing: GetSiloTracing(string) -> Task<Orleans.Concurrency.Immutable<System.Collections.Generic.Dictionary<string, Orleans.Dashboard.Model.GrainTraceEntry>>>
+  InitializeAsync: InitializeAsync() -> Task
+  SubmitTracing: SubmitTracing(string, Orleans.Concurrency.Immutable<Orleans.Dashboard.Model.SiloGrainTraceEntry[]>) -> Task
+  TopGrainMethods: TopGrainMethods(int, string[]) -> Task<Orleans.Concurrency.Immutable<System.Collections.Generic.Dictionary<string, Orleans.Dashboard.Model.History.GrainMethodAggregate[]>>>
 
 interface [GrainInterfaceType("Orleans.Dashboard.Core.IDashboardRemindersGrain")] Orleans.Dashboard.Core.IDashboardRemindersGrain [Version(0)]
-  [Alias("GetReminders")] GetReminders(int, int) -> Task<Orleans.Concurrency.Immutable<Orleans.Dashboard.Model.ReminderResponse>>
+  GetReminders: GetReminders(int, int) -> Task<Orleans.Concurrency.Immutable<Orleans.Dashboard.Model.ReminderResponse>>
 
 interface [GrainInterfaceType("Orleans.Dashboard.Core.ISiloGrainProxy")] Orleans.Dashboard.Core.ISiloGrainProxy [Version(0)]
-  [Alias("GetMetadata")] GetMetadata() -> Task<Orleans.Concurrency.Immutable<System.Collections.Generic.Dictionary<string, string>>>
+  GetMetadata: GetMetadata() -> Task<Orleans.Concurrency.Immutable<System.Collections.Generic.Dictionary<string, string>>>
 
 interface [GrainInterfaceType("Orleans.Dashboard.Core.ISiloGrainService")] Orleans.Dashboard.Core.ISiloGrainService [Version(0)]
-  [Alias("Enable")] Enable(bool) -> Task
-  [Alias("GetCounters")] GetCounters() -> Task<Orleans.Concurrency.Immutable<Orleans.Dashboard.Model.StatCounter[]>>
-  [Alias("GetExtendedProperties")] GetExtendedProperties() -> Task<Orleans.Concurrency.Immutable<System.Collections.Generic.Dictionary<string, string?>>>
-  [Alias("GetLifecycleStages")] GetLifecycleStages() -> Task<Orleans.Concurrency.Immutable<Orleans.Dashboard.Model.LifecycleStageInfo[]>>
-  [Alias("GetRuntimeStatistics")] GetRuntimeStatistics() -> Task<Orleans.Concurrency.Immutable<Orleans.Runtime.SiloRuntimeStatistics?[]>>
-  [Alias("ReportCounters")] ReportCounters(Orleans.Concurrency.Immutable<Orleans.Dashboard.Model.StatCounter[]>) -> Task
-  [Alias("SetVersion")] SetVersion(string, string) -> Task
+  Enable: Enable(bool) -> Task
+  GetCounters: GetCounters() -> Task<Orleans.Concurrency.Immutable<Orleans.Dashboard.Model.StatCounter[]>>
+  GetExtendedProperties: GetExtendedProperties() -> Task<Orleans.Concurrency.Immutable<System.Collections.Generic.Dictionary<string, string?>>>
+  GetLifecycleStages: GetLifecycleStages() -> Task<Orleans.Concurrency.Immutable<Orleans.Dashboard.Model.LifecycleStageInfo[]>>
+  GetRuntimeStatistics: GetRuntimeStatistics() -> Task<Orleans.Concurrency.Immutable<Orleans.Runtime.SiloRuntimeStatistics?[]>>
+  ReportCounters: ReportCounters(Orleans.Concurrency.Immutable<Orleans.Dashboard.Model.StatCounter[]>) -> Task
+  SetVersion: SetVersion(string, string) -> Task
 
 class [GrainType("dashboard")] Orleans.Dashboard.Implementation.Grains.DashboardGrain
 

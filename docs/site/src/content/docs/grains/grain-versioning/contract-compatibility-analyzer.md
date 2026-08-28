@@ -1,7 +1,7 @@
 ---
 title: Orleans contract compatibility analyzer
 description: Track grain RPC contracts during development to identify changes which can break rolling upgrades.
-ms.date: 08/27/2026
+ms.date: 08/28/2026
 ms.topic: concept-article
 ---
 
@@ -18,6 +18,15 @@ The analyzer is **disabled by default**. Enable it explicitly in a project file 
 ```
 
 Projects which use `Microsoft.Orleans.Sdk`, `Microsoft.Orleans.Client`, or `Microsoft.Orleans.Server` already receive the Orleans analyzers through those packages. A project which references `Microsoft.Orleans.Analyzers` directly can use the same property.
+
+To promote every contract diagnostic, configure the standard `Versioning` category:
+
+```ini
+[*.cs]
+dotnet_analyzer_diagnostic.category-Versioning.severity = error
+```
+
+This also promotes informational diagnostics such as `ORLEANS0020`. Configure `dotnet_diagnostic.ORLEANS####.severity` entries instead when only selected contract diagnostics should change severity.
 
 ## Configure the manifest path
 
@@ -54,9 +63,9 @@ dotnet format PATH_TO_PROJECT_OR_SOLUTION analyzers --severity info --diagnostic
 
 Run the command from the repository root. Replace `PATH_TO_PROJECT_OR_SOLUTION` with the path to the owning `.csproj` to regenerate one manifest, or a `.sln`/`.slnx` path to regenerate manifests in every affected project. The `--severity info` option includes `ORLEANS0020`, allowing the command to create a missing manifest.
 
-Regeneration edits `OrleansContracts.txt` files only. It does not add or change `[Alias]`, `[Id]`, `[GrainType]`, or `[GrainInterfaceType]` attributes in source. Attribute-like syntax in the manifest records the effective identity which Orleans already uses at runtime.
+Regeneration edits `OrleansContracts.txt` files only. Source `[Alias]`, `[Id]`, `[GrainType]`, and `[GrainInterfaceType]` attributes remain unchanged.
 
-For a method without `[Id]` or `[Alias]`, the manifest records the same generated xxHash32 method ID which the Orleans code generator already uses on the wire. The preceding comment records the CLR signature so reviewers can map the wire ID back to source. A one-time upgrade from an older manifest format can therefore replace a CLR method name with its existing generated ID; this records the current wire contract and does not change it.
+Every method line places the effective wire identity before a colon, followed by the CLR method name and signature. The identity is the source `[Id]` value, source `[Alias]` value, or the generated xxHash32 method ID already used by the Orleans code generator. The stable identity appears first so contract-breaking changes are prominent in diffs, while CLR-only renames keep the same leading value.
 
 After the command completes:
 
@@ -70,7 +79,7 @@ Add the generated file to source control and review its diff before committing. 
 - A removed source contract becomes `*RETIRED*`, preserving its identity history and preventing accidental reuse.
 - A removed RPC method remains in the manifest and reports `ORLEANS0027` until the method is restored or the wire break is explicitly accepted by removing the retained signature.
 - A `[Version]` change affects version-aware routing and must align with the rolling-upgrade design.
-- A CLR comment-only change records a refactor while the explicit Orleans identity remains stable.
+- A changed CLR method name with an unchanged identity records a refactor while the Orleans wire contract remains stable.
 
 Coding agents should regenerate the manifest instead of hand-editing active entries, retain retired history, and explain the compatibility impact of each contract diff in the change description.
 
@@ -85,15 +94,15 @@ Interface methods are indented beneath their interface:
 # dotnet format PATH_TO_PROJECT_OR_SOLUTION analyzers --severity info --diagnostics ORLEANS0016 ORLEANS0017 ORLEANS0018 ORLEANS0019 ORLEANS0020 ORLEANS0022 ORLEANS0023 ORLEANS0024
 # Verify with: dotnet build PATH_TO_PROJECT_OR_SOLUTION
 # The regeneration command edits this manifest only; it does not change source attributes.
-# Methods without [Id] or [Alias] use the Orleans code generator's existing wire ID hash.
+# OrleansContracts format: 2
+# Method lines use: wire-identity: CLR-signature.
+# The identity is the identifier Orleans uses at runtime, whether generated or declared in source.
 # Review every diff: identity or signature changes can break wire compatibility during rolling upgrades.
 # Details: https://aka.ms/orleans/OrleansContracts.txt
 
 interface [GrainInterfaceType("Contoso.Grains.ICartGrain")] Contoso.Grains.ICartGrain [Version(1)]
-  # Contoso.Grains.ICartGrain.AddAsync(Item item) -> Task
-  15793847(Contoso.Grains.Item) -> Task
-  # Contoso.Grains.ICartGrain.GetAsync() -> Task<Cart>
-  857AC6B2() -> Task<Contoso.Grains.Cart>
+  15793847: AddAsync(Contoso.Grains.Item) -> Task
+  857AC6B2: GetAsync() -> Task<Contoso.Grains.Cart>
 
 class [GrainType("cart")] Contoso.Grains.CartGrain
 ```
@@ -105,14 +114,13 @@ Explicit identities remain visible alongside their CLR names:
 ```text
 # Contoso.Grains.ICartGrain
 interface [GrainInterfaceType("cart")] Contoso.Grains.ICartGrain [Version(1)]
-  # Contoso.Grains.ICartGrain.AddAsync(Item item) -> Task
-  [Alias("add")] add(Contoso.Grains.Item) -> Task
+  add: AddAsync(Contoso.Grains.Item) -> Task
 
 # Contoso.Grains.CartGrain
 class [GrainType("cart")] Contoso.Grains.CartGrain
 ```
 
-`[Alias("...")]` on a manifest method records that the identity comes from a source `[Alias]` attribute. An unmarked eight-digit hexadecimal method identity is the generated wire ID. Comments record CLR names when they improve traceability; comments are informational and aren't part of contract matching.
+The value before the colon is the effective runtime identity. A source `[Id(42)]`, source `[Alias("42")]`, and generated method ID `42` describe the same wire identity. The manifest records that result as `42:` and keeps source provenance in source code. Syntax-sensitive characters in aliases are backslash-escaped.
 
 `*RETIRED*` marks an intentionally removed contract:
 

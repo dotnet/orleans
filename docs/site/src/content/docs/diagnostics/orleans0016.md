@@ -9,7 +9,7 @@ ms.topic: reference
 
 | Property | Value |
 | --- | --- |
-| Category | Orleans.Versioning |
+| Category | Versioning |
 | Severity | Warning |
 | Code fix | Available |
 

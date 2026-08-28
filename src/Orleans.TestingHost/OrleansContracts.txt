@@ -4,22 +4,18 @@
 # dotnet format PATH_TO_PROJECT_OR_SOLUTION analyzers --severity info --diagnostics ORLEANS0016 ORLEANS0017 ORLEANS0018 ORLEANS0019 ORLEANS0020 ORLEANS0022 ORLEANS0023 ORLEANS0024
 # Verify with: dotnet build PATH_TO_PROJECT_OR_SOLUTION
 # The regeneration command edits this manifest only; it does not change source attributes.
-# Methods without [Id] or [Alias] use the Orleans code generator's existing wire ID hash.
+# OrleansContracts format: 2
+# Method lines use: wire-identity: CLR-signature.
+# The identity is the identifier Orleans uses at runtime, whether generated or declared in source.
 # Review every diff: identity or signature changes can break wire compatibility during rolling upgrades.
 # Details: https://aka.ms/orleans/OrleansContracts.txt
 
 interface [GrainInterfaceType("Orleans.TestingHost.IStorageFaultGrain")] Orleans.TestingHost.IStorageFaultGrain [Version(0)]
-  # Orleans.TestingHost.IStorageFaultGrain.AddFaultOnRead(GrainId grainId, Exception exception) -> Task
-  1150D526(Orleans.Runtime.GrainId, System.Exception) -> Task
-  # Orleans.TestingHost.IStorageFaultGrain.AddFaultOnClear(GrainId grainId, Exception exception) -> Task
-  1A607A31(Orleans.Runtime.GrainId, System.Exception) -> Task
-  # Orleans.TestingHost.IStorageFaultGrain.OnRead(GrainId grainId) -> Task
-  5D91E1AF(Orleans.Runtime.GrainId) -> Task
-  # Orleans.TestingHost.IStorageFaultGrain.AddFaultOnWrite(GrainId grainId, Exception exception) -> Task
-  B9852E6E(Orleans.Runtime.GrainId, System.Exception) -> Task
-  # Orleans.TestingHost.IStorageFaultGrain.OnClear(GrainId grainId) -> Task
-  C94BA77C(Orleans.Runtime.GrainId) -> Task
-  # Orleans.TestingHost.IStorageFaultGrain.OnWrite(GrainId grainId) -> Task
-  E8594820(Orleans.Runtime.GrainId) -> Task
+  1A607A31: AddFaultOnClear(Orleans.Runtime.GrainId, System.Exception) -> Task
+  1150D526: AddFaultOnRead(Orleans.Runtime.GrainId, System.Exception) -> Task
+  B9852E6E: AddFaultOnWrite(Orleans.Runtime.GrainId, System.Exception) -> Task
+  C94BA77C: OnClear(Orleans.Runtime.GrainId) -> Task
+  5D91E1AF: OnRead(Orleans.Runtime.GrainId) -> Task
+  E8594820: OnWrite(Orleans.Runtime.GrainId) -> Task
 
 class [GrainType("storagefault")] Orleans.TestingHost.StorageFaultGrain

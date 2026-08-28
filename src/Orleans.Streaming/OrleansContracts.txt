@@ -4,15 +4,15 @@
 # dotnet format PATH_TO_PROJECT_OR_SOLUTION analyzers --severity info --diagnostics ORLEANS0016 ORLEANS0017 ORLEANS0018 ORLEANS0019 ORLEANS0020 ORLEANS0022 ORLEANS0023 ORLEANS0024
 # Verify with: dotnet build PATH_TO_PROJECT_OR_SOLUTION
 # The regeneration command edits this manifest only; it does not change source attributes.
-# Methods without [Id] or [Alias] use the Orleans code generator's existing wire ID hash.
+# OrleansContracts format: 2
+# Method lines use: wire-identity: CLR-signature.
+# The identity is the identifier Orleans uses at runtime, whether generated or declared in source.
 # Review every diff: identity or signature changes can break wire compatibility during rolling upgrades.
 # Details: https://aka.ms/orleans/OrleansContracts.txt
 
 interface [GrainInterfaceType("Orleans.Providers.IMemoryStreamQueueGrain")] Orleans.Providers.IMemoryStreamQueueGrain [Version(0)]
-  # Orleans.Providers.IMemoryStreamQueueGrain.Enqueue(MemoryMessageData data) -> Task
-  74D60341(Orleans.Providers.MemoryMessageData) -> Task
-  # Orleans.Providers.IMemoryStreamQueueGrain.Dequeue(int maxCount) -> Task<List<MemoryMessageData>>
-  7A8F8C1A(int) -> Task<System.Collections.Generic.List<Orleans.Providers.MemoryMessageData>>
+  7A8F8C1A: Dequeue(int) -> Task<System.Collections.Generic.List<Orleans.Providers.MemoryMessageData>>
+  74D60341: Enqueue(Orleans.Providers.MemoryMessageData) -> Task
 
 class [GrainType("memorystreamqueue")] Orleans.Providers.MemoryStreamQueueGrain
 
@@ -22,70 +22,43 @@ class [GrainType("stream.checkpoint.configured")] Orleans.Streams.ConfiguredStre
 interface [GrainInterfaceType("Orleans.Streams.IConfiguredStreamCheckpointerGrain")] Orleans.Streams.IConfiguredStreamCheckpointerGrain [Version(0)]
 
 interface [GrainInterfaceType("Orleans.Streams.IPersistentStreamPullingAgent")] Orleans.Streams.IPersistentStreamPullingAgent [Version(0)]
-  # Orleans.Streams.IPersistentStreamPullingAgent.Initialize() -> Task
-  06009D9C() -> Task
-  # Orleans.Streams.IPersistentStreamPullingAgent.Shutdown() -> Task
-  620FF905() -> Task
+  06009D9C: Initialize() -> Task
+  620FF905: Shutdown() -> Task
 
 interface [GrainInterfaceType("Orleans.Streams.IPersistentStreamPullingManager")] Orleans.Streams.IPersistentStreamPullingManager [Version(0)]
-  # Orleans.Streams.IPersistentStreamPullingManager.Initialize() -> Task
-  455AB850() -> Task
-  # Orleans.Streams.IPersistentStreamPullingManager.StartAgents() -> Task
-  54E9E970() -> Task
-  # Orleans.Streams.IPersistentStreamPullingManager.StopAgents() -> Task
-  BBD50CFF() -> Task
-  # Orleans.Streams.IPersistentStreamPullingManager.ExecuteCommand(PersistentStreamProviderCommand command, object? arg) -> Task<object?>
-  DE756D95(Orleans.Providers.Streams.Common.PersistentStreamProviderCommand, object?) -> Task<object?>
-  # Orleans.Streams.IPersistentStreamPullingManager.Stop() -> Task
-  F4B5B5AA() -> Task
+  DE756D95: ExecuteCommand(Orleans.Providers.Streams.Common.PersistentStreamProviderCommand, object?) -> Task<object?>
+  455AB850: Initialize() -> Task
+  54E9E970: StartAgents() -> Task
+  F4B5B5AA: Stop() -> Task
+  BBD50CFF: StopAgents() -> Task
 
 interface [GrainInterfaceType("Orleans.Streams.IPubSubRendezvousGrain")] Orleans.Streams.IPubSubRendezvousGrain [Version(0)]
-  # Orleans.Streams.IPubSubRendezvousGrain.Validate() -> Task
-  20AA72BF() -> Task
-  # Orleans.Streams.IPubSubRendezvousGrain.FaultSubscription(GuidId subscriptionId) -> Task
-  2821FCF5(Orleans.Runtime.GuidId) -> Task
-  # Orleans.Streams.IPubSubRendezvousGrain.ProducerCount(QualifiedStreamId streamId) -> Task<int>
-  29B61035(Orleans.Runtime.QualifiedStreamId) -> Task<int>
-  # Orleans.Streams.IPubSubRendezvousGrain.RegisterConsumer(GuidId subscriptionId, QualifiedStreamId streamId, GrainId streamConsumer, string? filterData) -> Task
-  5E7E20BC(Orleans.Runtime.GuidId, Orleans.Runtime.QualifiedStreamId, Orleans.Runtime.GrainId, string?) -> Task
-  # Orleans.Streams.IPubSubRendezvousGrain.ConsumerCount(QualifiedStreamId streamId) -> Task<int>
-  5F72C5CF(Orleans.Runtime.QualifiedStreamId) -> Task<int>
-  # Orleans.Streams.IPubSubRendezvousGrain.GetAllSubscriptions(QualifiedStreamId streamId, GrainId streamConsumer) -> Task<List<StreamSubscription>>
-  7DBE84FA(Orleans.Runtime.QualifiedStreamId, Orleans.Runtime.GrainId) -> Task<System.Collections.Generic.List<Orleans.Streams.Core.StreamSubscription>>
-  # Orleans.Streams.IPubSubRendezvousGrain.DiagGetConsumers(QualifiedStreamId streamId) -> Task<PubSubSubscriptionState[]>
-  8A033955(Orleans.Runtime.QualifiedStreamId) -> Task<Orleans.Streams.PubSubSubscriptionState[]>
-  # Orleans.Streams.IPubSubRendezvousGrain.UnregisterConsumer(GuidId subscriptionId, QualifiedStreamId streamId) -> Task
-  974334B6(Orleans.Runtime.GuidId, Orleans.Runtime.QualifiedStreamId) -> Task
-  # Orleans.Streams.IPubSubRendezvousGrain.RegisterProducer(QualifiedStreamId streamId, GrainId streamProducer) -> Task<ISet<PubSubSubscriptionState>>
-  B5FFB7F3(Orleans.Runtime.QualifiedStreamId, Orleans.Runtime.GrainId) -> Task<System.Collections.Generic.ISet<Orleans.Streams.PubSubSubscriptionState>>
-  # Orleans.Streams.IPubSubRendezvousGrain.UnregisterProducer(QualifiedStreamId streamId, GrainId streamProducer) -> Task
-  C017B47D(Orleans.Runtime.QualifiedStreamId, Orleans.Runtime.GrainId) -> Task
+  5F72C5CF: ConsumerCount(Orleans.Runtime.QualifiedStreamId) -> Task<int>
+  8A033955: DiagGetConsumers(Orleans.Runtime.QualifiedStreamId) -> Task<Orleans.Streams.PubSubSubscriptionState[]>
+  2821FCF5: FaultSubscription(Orleans.Runtime.GuidId) -> Task
+  7DBE84FA: GetAllSubscriptions(Orleans.Runtime.QualifiedStreamId, Orleans.Runtime.GrainId) -> Task<System.Collections.Generic.List<Orleans.Streams.Core.StreamSubscription>>
+  29B61035: ProducerCount(Orleans.Runtime.QualifiedStreamId) -> Task<int>
+  5E7E20BC: RegisterConsumer(Orleans.Runtime.GuidId, Orleans.Runtime.QualifiedStreamId, Orleans.Runtime.GrainId, string?) -> Task
+  B5FFB7F3: RegisterProducer(Orleans.Runtime.QualifiedStreamId, Orleans.Runtime.GrainId) -> Task<System.Collections.Generic.ISet<Orleans.Streams.PubSubSubscriptionState>>
+  974334B6: UnregisterConsumer(Orleans.Runtime.GuidId, Orleans.Runtime.QualifiedStreamId) -> Task
+  C017B47D: UnregisterProducer(Orleans.Runtime.QualifiedStreamId, Orleans.Runtime.GrainId) -> Task
+  20AA72BF: Validate() -> Task
 
 interface [GrainInterfaceType("Orleans.Streams.IStreamCheckpointerGrain")] Orleans.Streams.IStreamCheckpointerGrain [Version(0)]
-  # Orleans.Streams.IStreamCheckpointerGrain.Update(string offset, string expectedCheckpoint, CancellationToken cancellationToken) -> ValueTask<string>
-  7AB50A87(string, string, System.Threading.CancellationToken) -> ValueTask<string>
-  # Orleans.Streams.IStreamCheckpointerGrain.Load(CancellationToken cancellationToken) -> ValueTask<string>
-  DE3727A1(System.Threading.CancellationToken) -> ValueTask<string>
+  DE3727A1: Load(System.Threading.CancellationToken) -> ValueTask<string>
+  7AB50A87: Update(string, string, System.Threading.CancellationToken) -> ValueTask<string>
 
 interface [GrainInterfaceType("Orleans.Streams.IStreamConsumerExtension")] Orleans.Streams.IStreamConsumerExtension [Version(0)]
-  # Orleans.Streams.IStreamConsumerExtension.DeliverMutable(GuidId subscriptionId, QualifiedStreamId streamId, object item, StreamSequenceToken currentToken, StreamHandshakeToken? handshakeToken) -> Task<StreamHandshakeToken?>
-  31840DDE(Orleans.Runtime.GuidId, Orleans.Runtime.QualifiedStreamId, object, Orleans.Streams.StreamSequenceToken, Orleans.Streams.StreamHandshakeToken?) -> Task<Orleans.Streams.StreamHandshakeToken?>
-  # Orleans.Streams.IStreamConsumerExtension.CompleteStream(GuidId subscriptionId) -> Task
-  49F94A48(Orleans.Runtime.GuidId) -> Task
-  # Orleans.Streams.IStreamConsumerExtension.ErrorInStream(GuidId subscriptionId, Exception exc) -> Task
-  4C676CAF(Orleans.Runtime.GuidId, System.Exception) -> Task
-  # Orleans.Streams.IStreamConsumerExtension.DeliverImmutable(GuidId subscriptionId, QualifiedStreamId streamId, object item, StreamSequenceToken currentToken, StreamHandshakeToken? handshakeToken) -> Task<StreamHandshakeToken?>
-  6D8FAEB2(Orleans.Runtime.GuidId, Orleans.Runtime.QualifiedStreamId, object, Orleans.Streams.StreamSequenceToken, Orleans.Streams.StreamHandshakeToken?) -> Task<Orleans.Streams.StreamHandshakeToken?>
-  # Orleans.Streams.IStreamConsumerExtension.DeliverBatch(GuidId subscriptionId, QualifiedStreamId streamId, IBatchContainer item, StreamHandshakeToken? handshakeToken) -> Task<StreamHandshakeToken?>
-  B9CFF2C9(Orleans.Runtime.GuidId, Orleans.Runtime.QualifiedStreamId, Orleans.Streams.IBatchContainer, Orleans.Streams.StreamHandshakeToken?) -> Task<Orleans.Streams.StreamHandshakeToken?>
-  # Orleans.Streams.IStreamConsumerExtension.GetSequenceToken(GuidId subscriptionId) -> Task<StreamHandshakeToken?>
-  C265B3CB(Orleans.Runtime.GuidId) -> Task<Orleans.Streams.StreamHandshakeToken?>
+  49F94A48: CompleteStream(Orleans.Runtime.GuidId) -> Task
+  B9CFF2C9: DeliverBatch(Orleans.Runtime.GuidId, Orleans.Runtime.QualifiedStreamId, Orleans.Streams.IBatchContainer, Orleans.Streams.StreamHandshakeToken?) -> Task<Orleans.Streams.StreamHandshakeToken?>
+  6D8FAEB2: DeliverImmutable(Orleans.Runtime.GuidId, Orleans.Runtime.QualifiedStreamId, object, Orleans.Streams.StreamSequenceToken, Orleans.Streams.StreamHandshakeToken?) -> Task<Orleans.Streams.StreamHandshakeToken?>
+  31840DDE: DeliverMutable(Orleans.Runtime.GuidId, Orleans.Runtime.QualifiedStreamId, object, Orleans.Streams.StreamSequenceToken, Orleans.Streams.StreamHandshakeToken?) -> Task<Orleans.Streams.StreamHandshakeToken?>
+  4C676CAF: ErrorInStream(Orleans.Runtime.GuidId, System.Exception) -> Task
+  C265B3CB: GetSequenceToken(Orleans.Runtime.GuidId) -> Task<Orleans.Streams.StreamHandshakeToken?>
 
 interface [GrainInterfaceType("Orleans.Streams.IStreamProducerExtension")] Orleans.Streams.IStreamProducerExtension [Version(0)]
-  # Orleans.Streams.IStreamProducerExtension.AddSubscriber(GuidId subscriptionId, QualifiedStreamId streamId, GrainId streamConsumer, string? filterData) -> Task
-  1341E3D4(Orleans.Runtime.GuidId, Orleans.Runtime.QualifiedStreamId, Orleans.Runtime.GrainId, string?) -> Task
-  # Orleans.Streams.IStreamProducerExtension.RemoveSubscriber(GuidId subscriptionId, QualifiedStreamId streamId) -> Task
-  B98BA876(Orleans.Runtime.GuidId, Orleans.Runtime.QualifiedStreamId) -> Task
+  1341E3D4: AddSubscriber(Orleans.Runtime.GuidId, Orleans.Runtime.QualifiedStreamId, Orleans.Runtime.GrainId, string?) -> Task
+  B98BA876: RemoveSubscriber(Orleans.Runtime.GuidId, Orleans.Runtime.QualifiedStreamId) -> Task
 
 class [GrainType("persistentstreampullingagent")] Orleans.Streams.PersistentStreamPullingAgent
 
