@@ -1161,6 +1161,7 @@ public interface IMyGrain : IGrain
         var diagnostics = await GetDiagnosticsAsync(source, contractsFile);
 
         Assert.Contains(diagnostics, diagnostic => diagnostic.Id == GrainInterfaceVersionAnalyzer.RuleId0016);
+        Assert.Contains(diagnostics, diagnostic => diagnostic.Id == GrainInterfaceVersionAnalyzer.RuleId0019);
     }
 
     [Fact]
@@ -1177,6 +1178,247 @@ public class MyGrain : Grain, IGrainWithStringKey
         var diagnostics = await GetDiagnosticsAsync(source, contractsFile);
 
         Assert.Contains(diagnostics, diagnostic => diagnostic.Id == GrainInterfaceVersionAnalyzer.RuleId0023);
+    }
+
+    [Fact]
+    public async Task MethodRenameWithoutAlias_ReportsAddedAndRemovedSignatures()
+    {
+        const string oldSource = @"
+public interface IMyGrain : IGrain
+{
+    Task OldName();
+}
+";
+        const string newSource = @"
+public interface IMyGrain : IGrain
+{
+    Task NewName();
+}
+";
+        var contractsFile = await ApplyCodeFixAndGetContractsAsync(
+            oldSource,
+            "# OrleansContracts.txt\n",
+            GrainInterfaceVersionAnalyzer.RuleId0016);
+
+        var diagnostics = await GetDiagnosticsAsync(newSource, contractsFile);
+
+        AssertDiagnosticIds(
+            diagnostics,
+            GrainInterfaceVersionAnalyzer.RuleId0018,
+            GrainInterfaceVersionAnalyzer.RuleId0027);
+        Assert.Contains(diagnostics, diagnostic => diagnostic.GetMessage().Contains("NewName", StringComparison.Ordinal));
+        Assert.Contains("# IMyGrain.OldName() -> Task", contractsFile);
+    }
+
+    [Fact]
+    public async Task MethodReturnTypeChange_ReportsAddedAndRemovedSignatures()
+    {
+        const string oldSource = @"
+public interface IMyGrain : IGrain
+{
+    Task<int> Read();
+}
+";
+        const string newSource = @"
+public interface IMyGrain : IGrain
+{
+    Task<string> Read();
+}
+";
+        var contractsFile = await ApplyCodeFixAndGetContractsAsync(
+            oldSource,
+            "# OrleansContracts.txt\n",
+            GrainInterfaceVersionAnalyzer.RuleId0016);
+
+        var diagnostics = await GetDiagnosticsAsync(newSource, contractsFile);
+
+        AssertDiagnosticIds(
+            diagnostics,
+            GrainInterfaceVersionAnalyzer.RuleId0018,
+            GrainInterfaceVersionAnalyzer.RuleId0027);
+    }
+
+    [Fact]
+    public async Task MethodParameterTypeChange_ReportsAddedAndRemovedSignatures()
+    {
+        const string oldSource = @"
+public interface IMyGrain : IGrain
+{
+    Task Update(string value);
+}
+";
+        const string newSource = @"
+public interface IMyGrain : IGrain
+{
+    Task Update(int value);
+}
+";
+        var contractsFile = await ApplyCodeFixAndGetContractsAsync(
+            oldSource,
+            "# OrleansContracts.txt\n",
+            GrainInterfaceVersionAnalyzer.RuleId0016);
+
+        var diagnostics = await GetDiagnosticsAsync(newSource, contractsFile);
+
+        AssertDiagnosticIds(
+            diagnostics,
+            GrainInterfaceVersionAnalyzer.RuleId0018,
+            GrainInterfaceVersionAnalyzer.RuleId0027);
+    }
+
+    [Fact]
+    public async Task MethodParameterOrderChange_ReportsAddedAndRemovedSignatures()
+    {
+        const string oldSource = @"
+public interface IMyGrain : IGrain
+{
+    Task Update(string name, int count);
+}
+";
+        const string newSource = @"
+public interface IMyGrain : IGrain
+{
+    Task Update(int count, string name);
+}
+";
+        var contractsFile = await ApplyCodeFixAndGetContractsAsync(
+            oldSource,
+            "# OrleansContracts.txt\n",
+            GrainInterfaceVersionAnalyzer.RuleId0016);
+
+        var diagnostics = await GetDiagnosticsAsync(newSource, contractsFile);
+
+        AssertDiagnosticIds(
+            diagnostics,
+            GrainInterfaceVersionAnalyzer.RuleId0018,
+            GrainInterfaceVersionAnalyzer.RuleId0027);
+    }
+
+    [Fact]
+    public async Task MethodParameterRename_PreservesGeneratedIdentity()
+    {
+        const string oldSource = @"
+public interface IMyGrain : IGrain
+{
+    Task Update(string oldName);
+}
+";
+        const string newSource = @"
+public interface IMyGrain : IGrain
+{
+    Task Update(string newName);
+}
+";
+        var contractsFile = await ApplyCodeFixAndGetContractsAsync(
+            oldSource,
+            "# OrleansContracts.txt\n",
+            GrainInterfaceVersionAnalyzer.RuleId0016);
+
+        var diagnostics = await GetDiagnosticsAsync(newSource, contractsFile);
+
+        Assert.Empty(diagnostics);
+    }
+
+    [Fact]
+    public async Task MethodIdChange_ReportsAddedAndRemovedSignatures()
+    {
+        const string oldSource = @"
+public interface IMyGrain : IGrain
+{
+    [Id(1)]
+    Task Update();
+}
+";
+        const string newSource = @"
+public interface IMyGrain : IGrain
+{
+    [Id(2)]
+    Task Update();
+}
+";
+        var contractsFile = await ApplyCodeFixAndGetContractsAsync(
+            oldSource,
+            "# OrleansContracts.txt\n",
+            GrainInterfaceVersionAnalyzer.RuleId0016);
+
+        var diagnostics = await GetDiagnosticsAsync(newSource, contractsFile);
+
+        AssertDiagnosticIds(
+            diagnostics,
+            GrainInterfaceVersionAnalyzer.RuleId0018,
+            GrainInterfaceVersionAnalyzer.RuleId0027);
+    }
+
+    [Fact]
+    public async Task PayloadAliasChange_ReportsAddedAndRemovedSignatures()
+    {
+        const string oldSource = @"
+[Alias(""request"")]
+public sealed class Request { }
+
+public interface IMyGrain : IGrain
+{
+    [Alias(""update"")]
+    Task Update(Request request);
+}
+";
+        const string newSource = @"
+[Alias(""request-v2"")]
+public sealed class Request { }
+
+public interface IMyGrain : IGrain
+{
+    [Alias(""update"")]
+    Task Update(Request request);
+}
+";
+        var contractsFile = await ApplyCodeFixAndGetContractsAsync(
+            oldSource,
+            "# OrleansContracts.txt\n",
+            GrainInterfaceVersionAnalyzer.RuleId0016);
+
+        var diagnostics = await GetDiagnosticsAsync(newSource, contractsFile);
+
+        AssertDiagnosticIds(
+            diagnostics,
+            GrainInterfaceVersionAnalyzer.RuleId0018,
+            GrainInterfaceVersionAnalyzer.RuleId0027);
+    }
+
+    [Fact]
+    public async Task InterfaceRenameWithoutStableIdentity_ReportsAddedAndRemovedContracts()
+    {
+        const string oldSource = "public interface IOldGrain : IGrain { }";
+        const string newSource = "public interface INewGrain : IGrain { }";
+        var contractsFile = await ApplyCodeFixAndGetContractsAsync(
+            oldSource,
+            "# OrleansContracts.txt\n",
+            GrainInterfaceVersionAnalyzer.RuleId0016);
+
+        var diagnostics = await GetDiagnosticsAsync(newSource, contractsFile);
+
+        AssertDiagnosticIds(
+            diagnostics,
+            GrainInterfaceVersionAnalyzer.RuleId0016,
+            GrainInterfaceVersionAnalyzer.RuleId0019);
+    }
+
+    [Fact]
+    public async Task GrainClassRenameWithoutStableIdentity_ReportsAddedAndRemovedContracts()
+    {
+        const string oldSource = "public class OldGrain : Grain, IGrainWithStringKey { }";
+        const string newSource = "public class NewGrain : Grain, IGrainWithStringKey { }";
+        var contractsFile = await ApplyCodeFixAndGetContractsAsync(
+            oldSource,
+            "# OrleansContracts.txt\n",
+            GrainInterfaceVersionAnalyzer.RuleId0022);
+
+        var diagnostics = await GetDiagnosticsAsync(newSource, contractsFile);
+
+        AssertDiagnosticIds(
+            diagnostics,
+            GrainInterfaceVersionAnalyzer.RuleId0022,
+            GrainInterfaceVersionAnalyzer.RuleId0024);
     }
 
     #endregion
@@ -1270,6 +1512,11 @@ public class MyGrain : Grain, IGrainWithStringKey
             $"  [0-9A-F]{{8}}{Regex.Escape(contractSignatureSuffix)}\\r?$";
         Assert.Matches(pattern, content);
     }
+
+    private static void AssertDiagnosticIds(IEnumerable<Diagnostic> diagnostics, params string[] expected)
+        => Assert.Equal(
+            expected.OrderBy(id => id, StringComparer.Ordinal),
+            diagnostics.Select(diagnostic => diagnostic.Id).OrderBy(id => id, StringComparer.Ordinal));
 
     private static Project CreateProjectWithAdditionalFilesForCodeFix(
         string source,
