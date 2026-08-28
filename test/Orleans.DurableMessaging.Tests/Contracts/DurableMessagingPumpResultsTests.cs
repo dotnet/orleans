@@ -30,7 +30,7 @@ public sealed class DurableMessagingPumpResultsTests
         var key = results.CreateKey("job", "id", "run");
         using var cancellation = new CancellationTokenSource();
 
-        Assert.True(results.TryStart(key, out var execution, cancellation.Token));
+        Assert.True(results.TryStartWithCancellation(key, out var execution, cancellation.Token));
         cancellation.Cancel();
 
         Assert.False(results.TryBegin(execution));
@@ -149,7 +149,13 @@ public sealed class DurableMessagingPumpResultsTests
         public object CreateKey(string jobName, string jobId, string runId) =>
             Activator.CreateInstance(KeyType, [jobName, jobId, runId])!;
 
-        public bool TryStart(object key, out object execution, CancellationToken cancellationToken = default)
+        public bool TryStart(object key, out object execution) =>
+            TryStartWithCancellation(key, out execution, TestContext.Current.CancellationToken);
+
+        public bool TryStartWithCancellation(
+            object key,
+            out object execution,
+            CancellationToken cancellationToken)
         {
             object?[] arguments = [key, cancellationToken, null];
             var result = (bool)ResultsType.GetMethod("TryStart")!.Invoke(_instance, arguments)!;

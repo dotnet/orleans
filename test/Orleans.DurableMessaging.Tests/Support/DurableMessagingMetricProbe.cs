@@ -1,5 +1,6 @@
 using System.Collections.Concurrent;
 using System.Diagnostics.Metrics;
+using Xunit;
 
 namespace Orleans.DurableMessaging.Tests.Support;
 
@@ -42,11 +43,21 @@ public sealed class DurableMessagingMetricProbe : IDisposable
         return _gauges.TryGetValue(instrument, out var value) ? value : 0;
     }
 
-    public async Task WaitForCountAsync(
+    public Task WaitForCountAsync(
         string instrument,
         long expected,
-        string jobName = "",
-        CancellationToken cancellationToken = default)
+        string jobName = "") =>
+        WaitForCountWithCancellationAsync(
+            instrument,
+            expected,
+            jobName,
+            TestContext.Current.CancellationToken);
+
+    public async Task WaitForCountWithCancellationAsync(
+        string instrument,
+        long expected,
+        string jobName,
+        CancellationToken cancellationToken)
     {
         using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         timeout.CancelAfter(TimeSpan.FromSeconds(30));

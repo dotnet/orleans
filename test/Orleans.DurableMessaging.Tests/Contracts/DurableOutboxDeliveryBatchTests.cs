@@ -85,8 +85,8 @@ public sealed class DurableOutboxDeliveryBatchTests
             backpressureRetryDelay: TimeSpan.FromMilliseconds(1));
         fixture.Manager.FailNextWrite(new IOException("Injected ownership write failure."));
 
-        await fixture.EnsureJobScheduledAsync(replaceExisting: true, CancellationToken.None)
-            .WaitAsync(TimeSpan.FromSeconds(10));
+        await fixture.EnsureJobScheduledAsync(replaceExisting: true, TestContext.Current.CancellationToken)
+            .WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
 
         Assert.Equal(1, jobManager.AttemptCount);
         Assert.Equal(2, fixture.Manager.WriteCount);
@@ -131,7 +131,7 @@ public sealed class DurableOutboxDeliveryBatchTests
             maxDeliveryAttempts: 1);
 
         var delivery = fixture.DeliverAsync();
-        await entered.Task.WaitAsync(TimeSpan.FromSeconds(10));
+        await entered.Task.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
         fixture.SimulateRecoveryWithoutMessage();
         release.TrySetResult();
         await delivery;
@@ -219,7 +219,7 @@ public sealed class DurableOutboxDeliveryBatchTests
         var fixture = new OutboxFixture(hasDurableMessage: false);
         fixture.Send(fixture.Envelope);
 
-        await fixture.Manager.RevertPendingChangesAsync(CancellationToken.None);
+        await fixture.Manager.RevertPendingChangesAsync(TestContext.Current.CancellationToken);
 
         Assert.Empty(fixture.Messages);
         Assert.Equal(0, fixture.PendingMessageCount);
@@ -265,7 +265,7 @@ public sealed class DurableOutboxDeliveryBatchTests
             using var currentCancellation = new CancellationTokenSource();
             cancellation = currentCancellation;
             var exception = await Assert.ThrowsAnyAsync<OperationCanceledException>(
-                () => fixture.DeliverAsync(currentCancellation.Token));
+                () => fixture.DeliverWithCancellationAsync(currentCancellation.Token));
 
             Assert.Equal(currentCancellation.Token, exception.CancellationToken);
             Assert.True(fixture.Messages.ContainsKey(fixture.MessageId));
@@ -291,7 +291,7 @@ public sealed class DurableOutboxDeliveryBatchTests
             maxDeliveryAttempts: 1);
 
         await Assert.ThrowsAnyAsync<OperationCanceledException>(
-            () => fixture.DeliverAsync(cancellation.Token));
+            () => fixture.DeliverWithCancellationAsync(cancellation.Token));
 
         Assert.True(fixture.Messages.ContainsKey(fixture.MessageId));
         Assert.Equal(0, fixture.MessageStates.GetProperty<int>(fixture.MessageId, "AttemptCount"));
@@ -312,9 +312,9 @@ public sealed class DurableOutboxDeliveryBatchTests
             });
 
         await Assert.ThrowsAnyAsync<OperationCanceledException>(
-            () => fixture.DeliverAsync(cancellation.Token));
-        await fixture.Manager.WriteStateAsync(CancellationToken.None);
-        await fixture.Manager.RevertPendingChangesAsync(CancellationToken.None);
+            () => fixture.DeliverWithCancellationAsync(cancellation.Token));
+        await fixture.Manager.WriteStateAsync(TestContext.Current.CancellationToken);
+        await fixture.Manager.RevertPendingChangesAsync(TestContext.Current.CancellationToken);
 
         Assert.True(fixture.Messages.ContainsKey(fixture.MessageId));
         Assert.True(fixture.MessageStates.ContainsKey(fixture.MessageId));
@@ -397,7 +397,7 @@ public sealed class DurableOutboxDeliveryBatchTests
             });
 
         await Assert.ThrowsAnyAsync<OperationCanceledException>(
-            () => fixture.DeliverAsync(cancellation.Token));
+            () => fixture.DeliverWithCancellationAsync(cancellation.Token));
 
         Assert.True(fixture.Messages.ContainsKey(fixture.MessageId));
         Assert.Equal(0, fixture.Manager.WriteCount);
@@ -525,7 +525,10 @@ public sealed class DurableOutboxDeliveryBatchTests
         public ITimerRegistry TimerRegistry { get; }
         public int PendingMessageCount => GetPendingMessageIds().Count;
 
-        public Task DeliverAsync(CancellationToken cancellationToken = default) =>
+        public Task DeliverAsync() =>
+            DeliverWithCancellationAsync(TestContext.Current.CancellationToken);
+
+        public Task DeliverWithCancellationAsync(CancellationToken cancellationToken) =>
             (Task)_deliverMethod.Invoke(_outbox, [cancellationToken])!;
 
         public Task EnsureJobScheduledAsync(bool replaceExisting, CancellationToken cancellationToken) =>
@@ -533,7 +536,10 @@ public sealed class DurableOutboxDeliveryBatchTests
                 .GetMethod("EnsureJobScheduledAsync", BindingFlags.Instance | BindingFlags.NonPublic)!
                 .Invoke(_outbox, [replaceExisting, cancellationToken])!;
 
-        public Task StartAsync(CancellationToken cancellationToken = default) =>
+        public Task StartAsync() =>
+            StartWithCancellationAsync(TestContext.Current.CancellationToken);
+
+        public Task StartWithCancellationAsync(CancellationToken cancellationToken) =>
             ((ILifecycleObserver)_outbox).OnStart(cancellationToken);
 
         public void SimulateRecoveryWithoutMessage()
@@ -556,7 +562,7 @@ public sealed class DurableOutboxDeliveryBatchTests
                 static call => call.GetMethodInfo().Name == "RegisterGrainTimer");
             var arguments = call.GetArguments();
             var callback = (Delegate)arguments[1]!;
-            await (Task)callback.DynamicInvoke(arguments[2], CancellationToken.None)!;
+            await (Task)callback.DynamicInvoke(arguments[2], TestContext.Current.CancellationToken)!;
         }
 
         public void ActivateMetrics() =>
@@ -586,7 +592,7 @@ public sealed class DurableOutboxDeliveryBatchTests
 
         public void Send(DurableEnvelope envelope) => _outbox.Send(envelope);
 
-        public ValueTask CommitAsync() => Manager.WriteStateAsync(CancellationToken.None);
+        public ValueTask CommitAsync() => Manager.WriteStateAsync(TestContext.Current.CancellationToken);
 
         public bool IsPending(Guid messageId) => GetPendingMessageIds().Contains(messageId);
 
