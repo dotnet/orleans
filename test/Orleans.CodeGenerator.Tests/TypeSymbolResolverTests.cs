@@ -100,6 +100,40 @@ public class TypeSymbolResolverTests
         AssertSuccessfulResolution(success, actual, expected, expectedMetadataName, expectedTypeKind);
     }
 
+    [Theory]
+    [InlineData("bool", SpecialType.System_Boolean)]
+    [InlineData("byte", SpecialType.System_Byte)]
+    [InlineData("sbyte", SpecialType.System_SByte)]
+    [InlineData("short", SpecialType.System_Int16)]
+    [InlineData("ushort", SpecialType.System_UInt16)]
+    [InlineData("int", SpecialType.System_Int32)]
+    [InlineData("uint", SpecialType.System_UInt32)]
+    [InlineData("long", SpecialType.System_Int64)]
+    [InlineData("ulong", SpecialType.System_UInt64)]
+    [InlineData("float", SpecialType.System_Single)]
+    [InlineData("double", SpecialType.System_Double)]
+    [InlineData("decimal", SpecialType.System_Decimal)]
+    [InlineData("char", SpecialType.System_Char)]
+    [InlineData("string", SpecialType.System_String)]
+    [InlineData("object", SpecialType.System_Object)]
+    public void TryResolveType_FromPrimitiveAliasWithoutFrameworkReferences_ResolvesSpecialType(
+        string typeSyntax,
+        SpecialType expectedSpecialType)
+    {
+        var compilation = CSharpCompilation.Create("ResolverConsumer");
+        var resolver = new TypeSymbolResolver(compilation);
+
+        var success = resolver.TryResolveType(
+            new TypeRef(typeSyntax),
+            TypeMetadataIdentity.Empty,
+            TestContext.Current.CancellationToken,
+            out var actual);
+
+        Assert.True(success);
+        Assert.NotNull(actual);
+        Assert.Equal(expectedSpecialType, actual.SpecialType);
+    }
+
     [Fact]
     public async Task TryResolveType_FromMetadataIdentity_ResolvesTypeFromExactAssembly()
     {

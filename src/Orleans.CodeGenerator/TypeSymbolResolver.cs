@@ -7,6 +7,32 @@ namespace Orleans.CodeGenerator;
 
 internal sealed class TypeSymbolResolver(Compilation compilation)
 {
+    private static readonly Dictionary<string, (string MetadataName, SpecialType SpecialType)> PrimitiveTypesByAlias =
+        new(StringComparer.Ordinal)
+        {
+            ["bool"] = ("System.Boolean", SpecialType.System_Boolean),
+            ["byte"] = ("System.Byte", SpecialType.System_Byte),
+            ["sbyte"] = ("System.SByte", SpecialType.System_SByte),
+            ["short"] = ("System.Int16", SpecialType.System_Int16),
+            ["ushort"] = ("System.UInt16", SpecialType.System_UInt16),
+            ["int"] = ("System.Int32", SpecialType.System_Int32),
+            ["uint"] = ("System.UInt32", SpecialType.System_UInt32),
+            ["long"] = ("System.Int64", SpecialType.System_Int64),
+            ["ulong"] = ("System.UInt64", SpecialType.System_UInt64),
+            ["float"] = ("System.Single", SpecialType.System_Single),
+            ["double"] = ("System.Double", SpecialType.System_Double),
+            ["decimal"] = ("System.Decimal", SpecialType.System_Decimal),
+            ["char"] = ("System.Char", SpecialType.System_Char),
+            ["string"] = ("System.String", SpecialType.System_String),
+            ["object"] = ("System.Object", SpecialType.System_Object),
+        };
+
+    private static readonly Dictionary<string, SpecialType> SpecialTypesByMetadataName =
+        PrimitiveTypesByAlias.Values.ToDictionary(
+            static value => value.MetadataName,
+            static value => value.SpecialType,
+            StringComparer.Ordinal);
+
     private readonly Compilation _compilation = compilation;
     private FallbackIndex? _fallbackIndex;
 
@@ -258,53 +284,16 @@ internal sealed class TypeSymbolResolver(Compilation compilation)
             metadataName = metadataName.Substring("global::".Length);
         }
 
-        metadataName = metadataName switch
+        if (PrimitiveTypesByAlias.TryGetValue(metadataName, out var primitiveType))
         {
-            "bool" => "System.Boolean",
-            "byte" => "System.Byte",
-            "sbyte" => "System.SByte",
-            "short" => "System.Int16",
-            "ushort" => "System.UInt16",
-            "int" => "System.Int32",
-            "uint" => "System.UInt32",
-            "long" => "System.Int64",
-            "ulong" => "System.UInt64",
-            "float" => "System.Single",
-            "double" => "System.Double",
-            "decimal" => "System.Decimal",
-            "char" => "System.Char",
-            "string" => "System.String",
-            "object" => "System.Object",
-            _ => metadataName,
-        };
+            metadataName = primitiveType.MetadataName;
+        }
 
         return !string.IsNullOrWhiteSpace(metadataName);
     }
 
     private static bool TryGetSpecialType(string metadataName, out SpecialType specialType)
-    {
-        specialType = metadataName switch
-        {
-            "System.Boolean" => SpecialType.System_Boolean,
-            "System.Byte" => SpecialType.System_Byte,
-            "System.SByte" => SpecialType.System_SByte,
-            "System.Int16" => SpecialType.System_Int16,
-            "System.UInt16" => SpecialType.System_UInt16,
-            "System.Int32" => SpecialType.System_Int32,
-            "System.UInt32" => SpecialType.System_UInt32,
-            "System.Int64" => SpecialType.System_Int64,
-            "System.UInt64" => SpecialType.System_UInt64,
-            "System.Single" => SpecialType.System_Single,
-            "System.Double" => SpecialType.System_Double,
-            "System.Decimal" => SpecialType.System_Decimal,
-            "System.Char" => SpecialType.System_Char,
-            "System.String" => SpecialType.System_String,
-            "System.Object" => SpecialType.System_Object,
-            _ => SpecialType.None,
-        };
-
-        return specialType != SpecialType.None;
-    }
+        => SpecialTypesByMetadataName.TryGetValue(metadataName, out specialType);
 
     private FallbackIndex GetFallbackIndex(CancellationToken cancellationToken)
     {

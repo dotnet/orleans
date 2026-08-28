@@ -1554,6 +1554,32 @@ public class ConfigureAwaitAnalyzerTest : DiagnosticAnalyzerTestBase<ConfigureAw
     }
 
     [Fact]
+    public async Task BitwiseConfigureAwaitOptionsWithUnknownRightOperand_DoesNotReportDiagnostic()
+    {
+        var code = """
+                    public class MyGrain : Grain, IMyGrain
+                    {
+                        public async Task DoSomething(ConfigureAwaitOptions options, int value)
+                        {
+                            await Task.Delay(100).ConfigureAwait(
+                                (options & ConfigureAwaitOptions.ForceYielding) | GetOptions(value));
+                        }
+
+                        private static ConfigureAwaitOptions GetOptions(int value) => (ConfigureAwaitOptions)value;
+                    }
+
+                    public interface IMyGrain : IGrainWithGuidKey
+                    {
+                        Task DoSomething(ConfigureAwaitOptions options, int value);
+                    }
+                    """;
+
+        var (diagnostics, _) = await GetDiagnosticsAsync(code, Array.Empty<string>());
+
+        Assert.Empty(diagnostics);
+    }
+
+    [Fact]
     public Task ConstNonCapturingConfigureAwaitOptions_ReportsExactDiagnostic()
     {
         var code = """
