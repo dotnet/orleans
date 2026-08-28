@@ -260,7 +260,9 @@ public abstract class ReminderServiceLifecycleTestRunner
                 {
                     Fail(Guarantee, "RegisterOrUpdateReminder")
                         .WithIdentity(grain.GetGrainId(), Name)
-                        .WithExpected($"same single owner, starts={starts}, stops={stops}, rotated ETag, StartAt={expectedStart:O}")
+                        .WithExpected(
+                            $"same single owner, starts={starts}, stops={stops}, rotated ETag, "
+                            + $"StartAt={NormalizeStartAt(expectedStart):O} at whole-second precision")
                         .WithObserved(
                             $"owners=[{string.Join(", ", _harness.GetOwners(grain.GetGrainId(), Name))}], "
                             + $"starts={_harness.GetLocalStartCount(grain.GetGrainId(), Name)}, "
@@ -792,15 +794,18 @@ public abstract class ReminderServiceLifecycleTestRunner
             async () =>
             {
                 var row = await _harness.ReminderTable.ReadRow(grainId, name, cancellationToken).WaitAsync(cancellationToken);
-                return row is null
+                var removed = row is null
                     || await _harness.ReminderTable.RemoveRow(grainId, name, row.ETag!, cancellationToken).WaitAsync(cancellationToken);
+                return (Removed: removed, Row: row);
             },
-            static removed => removed,
+            static result => result.Removed,
             ProviderName,
             guarantee,
             "scenario cleanup remove",
             "scenario-owned row absent or removed using its current ETag",
-            static removed => removed ? "removed" : "ETag mismatch",
+            static result => result.Row is null
+                ? "row absent"
+                : $"{(result.Removed ? "removed" : "ETag mismatch")}: {Describe(result.Row)}",
             cancellationToken);
     }
 
