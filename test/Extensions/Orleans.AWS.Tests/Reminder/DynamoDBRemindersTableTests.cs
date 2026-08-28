@@ -131,6 +131,9 @@ namespace AWSUtils.Tests.RemindersTest
         [Fact]
         public async Task DynamoDBReminderTable_Init_CreatesExpectedCurrentSchema()
         {
+            if (!AWSTestConstants.IsDynamoDbAvailable)
+                throw Xunit.Sdk.SkipException.ForSkip("Unable to connect to AWS DynamoDB simulator");
+
             const string ServiceId = "phase-1-schema-service";
             var tableName = $"OrleansReminders-{Guid.NewGuid():N}";
             var reminderTable = CreateIsolatedReminderTable(tableName, ServiceId);
@@ -217,6 +220,9 @@ namespace AWSUtils.Tests.RemindersTest
         [Fact]
         public async Task DynamoDBReminderTable_UpsertRow_EncodesV1PrimaryKeyExactly()
         {
+            if (!AWSTestConstants.IsDynamoDbAvailable)
+                throw Xunit.Sdk.SkipException.ForSkip("Unable to connect to AWS DynamoDB simulator");
+
             const string ServiceId = "phase-1-key-service";
             const string ReminderName = "foo/bar\\#b_a_z?";
             var tableName = $"OrleansReminders-{Guid.NewGuid():N}";
@@ -284,6 +290,9 @@ namespace AWSUtils.Tests.RemindersTest
         [Fact]
         public async Task DynamoDBReminderTable_PointRead_IsImmediatelyConsistent_AfterWriteAndDelete()
         {
+            if (!AWSTestConstants.IsDynamoDbAvailable)
+                throw Xunit.Sdk.SkipException.ForSkip("Unable to connect to AWS DynamoDB simulator");
+
             const string ServiceId = "phase-2-consistency-service";
             const string ReminderName = "immediate-point-read";
             var tableName = $"OrleansReminders-{Guid.NewGuid():N}";
@@ -325,6 +334,9 @@ namespace AWSUtils.Tests.RemindersTest
         [Fact]
         public async Task DynamoDBReminderTable_TwoServicesSharingTable_AreFullyIsolated()
         {
+            if (!AWSTestConstants.IsDynamoDbAvailable)
+                throw Xunit.Sdk.SkipException.ForSkip("Unable to connect to AWS DynamoDB simulator");
+
             const string ServiceA = "phase-2-service-a";
             const string ServiceB = "phase-2-service-b";
             const string ReminderName = "shared-reminder";
