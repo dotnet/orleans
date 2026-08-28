@@ -377,7 +377,6 @@ public sealed class ReminderDiagnosticObserver : IDisposable
                 completion.TrySetException(new InvalidOperationException("The diagnostic event stream completed before a matching event was observed."));
             });
         return completion.Task;
-        return completion.Task;
     }
 
     private static bool MatchesReminder(ReminderEvents.ReminderEvent evt, GrainId grainId, string? reminderName)
