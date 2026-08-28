@@ -28,7 +28,7 @@ public sealed class DurableStateAndTcsRecoveryTests : JournalingTestBase
 
         ((IStorage<string>)state).State = "state-value";
         Assert.True(tcs.TrySetResult(17));
-        await sut.Manager.WriteStateAsync(CancellationToken.None);
+        await sut.Manager.WriteStateAsync(TestContext.Current.CancellationToken);
 
         var sut2 = CreateTestSystem(storage: sut.Storage);
         var state2 = new DurableState<string>("state", sut2.Manager, new OrleansBinaryPersistentStateCommandCodec<string>(ValueCodec<string>(), SessionPool));
@@ -60,8 +60,8 @@ public sealed class DurableStateAndTcsRecoveryTests : JournalingTestBase
         await sut.Lifecycle.OnStart(TestContext.Current.CancellationToken);
 
         grainState.State = "state-value";
-        await grainState.WriteStateAsync(CancellationToken.None);
-        await grainState.ClearStateAsync(CancellationToken.None);
+        await grainState.WriteStateAsync(TestContext.Current.CancellationToken);
+        await grainState.ClearStateAsync(TestContext.Current.CancellationToken);
 
         Assert.Equal(1, codec.WriteClearCount);
         Assert.False(grainState.RecordExists);
@@ -88,10 +88,10 @@ public sealed class DurableStateAndTcsRecoveryTests : JournalingTestBase
             Copier<Exception>());
         await sut.Lifecycle.OnStart(TestContext.Current.CancellationToken);
         Assert.True(tcs.TrySetResult(17));
-        await sut.Manager.WriteStateAsync(CancellationToken.None);
+        await sut.Manager.WriteStateAsync(TestContext.Current.CancellationToken);
         Assert.Equal(17, await tcs.Task);
 
-        await sut.Manager.DeleteStateAsync(CancellationToken.None);
+        await sut.Manager.DeleteStateAsync(TestContext.Current.CancellationToken);
 
         Assert.Equal(DurableTaskCompletionSourceStatus.Pending, tcs.State.Status);
         Assert.False(tcs.Task.IsCompleted);
@@ -106,14 +106,14 @@ public sealed class DurableStateAndTcsRecoveryTests : JournalingTestBase
         var sut = CreateTestSystem(storage: storage);
         var state = new DurableState<string>("state", sut.Manager, codec);
         var grainState = (IStorage<string>)state;
-        await sut.Lifecycle.OnStart();
+        await sut.Lifecycle.OnStart(TestContext.Current.CancellationToken);
 
         grainState.State = "state-value";
         storage.FailNextAppend();
-        await Assert.ThrowsAsync<IOException>(() => grainState.WriteStateAsync(CancellationToken.None));
+        await Assert.ThrowsAsync<IOException>(() => grainState.WriteStateAsync(TestContext.Current.CancellationToken));
         var firstAttempt = Assert.Single(storage.AppendAttempts);
 
-        await sut.Manager.WriteStateAsync(CancellationToken.None);
+        await sut.Manager.WriteStateAsync(TestContext.Current.CancellationToken);
 
         Assert.Equal(1, codec.WriteSetCount);
         Assert.Equal(2, storage.AppendAttempts.Count);
@@ -124,7 +124,7 @@ public sealed class DurableStateAndTcsRecoveryTests : JournalingTestBase
             "state",
             recovered.Manager,
             new OrleansBinaryPersistentStateCommandCodec<string>(ValueCodec<string>(), SessionPool));
-        await recovered.Lifecycle.OnStart();
+        await recovered.Lifecycle.OnStart(TestContext.Current.CancellationToken);
         Assert.Equal("state-value", ((IStorage<string>)recoveredState).State);
     }
 
@@ -136,16 +136,16 @@ public sealed class DurableStateAndTcsRecoveryTests : JournalingTestBase
         var sut = CreateTestSystem(storage: storage);
         var state = new DurableState<string>("state", sut.Manager, codec);
         var grainState = (IStorage<string>)state;
-        await sut.Lifecycle.OnStart();
+        await sut.Lifecycle.OnStart(TestContext.Current.CancellationToken);
         grainState.State = "state-value";
-        await grainState.WriteStateAsync(CancellationToken.None);
+        await grainState.WriteStateAsync(TestContext.Current.CancellationToken);
         storage.ClearAttempts();
 
         storage.FailNextAppend();
-        await Assert.ThrowsAsync<IOException>(() => grainState.ClearStateAsync(CancellationToken.None));
+        await Assert.ThrowsAsync<IOException>(() => grainState.ClearStateAsync(TestContext.Current.CancellationToken));
         var firstAttempt = Assert.Single(storage.AppendAttempts);
 
-        await sut.Manager.WriteStateAsync(CancellationToken.None);
+        await sut.Manager.WriteStateAsync(TestContext.Current.CancellationToken);
 
         Assert.Equal(1, codec.WriteClearCount);
         Assert.Equal(2, storage.AppendAttempts.Count);
@@ -156,7 +156,7 @@ public sealed class DurableStateAndTcsRecoveryTests : JournalingTestBase
             "state",
             recovered.Manager,
             new OrleansBinaryPersistentStateCommandCodec<string>(ValueCodec<string>(), SessionPool));
-        await recovered.Lifecycle.OnStart();
+        await recovered.Lifecycle.OnStart(TestContext.Current.CancellationToken);
         Assert.False(((IStorage)recoveredState).RecordExists);
     }
 
@@ -175,14 +175,14 @@ public sealed class DurableStateAndTcsRecoveryTests : JournalingTestBase
             codec,
             Copier<int>(),
             Copier<Exception>());
-        await sut.Lifecycle.OnStart();
+        await sut.Lifecycle.OnStart(TestContext.Current.CancellationToken);
 
         Assert.True(tcs.TrySetResult(17));
         storage.FailNextAppend();
-        await Assert.ThrowsAsync<IOException>(() => sut.Manager.WriteStateAsync(CancellationToken.None).AsTask());
+        await Assert.ThrowsAsync<IOException>(() => sut.Manager.WriteStateAsync(TestContext.Current.CancellationToken).AsTask());
         var firstAttempt = Assert.Single(storage.AppendAttempts);
 
-        await sut.Manager.WriteStateAsync(CancellationToken.None);
+        await sut.Manager.WriteStateAsync(TestContext.Current.CancellationToken);
 
         Assert.Equal(1, codec.WriteCompletedCount);
         Assert.Equal(2, storage.AppendAttempts.Count);
@@ -199,7 +199,7 @@ public sealed class DurableStateAndTcsRecoveryTests : JournalingTestBase
                 SessionPool),
             Copier<int>(),
             Copier<Exception>());
-        await recovered.Lifecycle.OnStart();
+        await recovered.Lifecycle.OnStart(TestContext.Current.CancellationToken);
         Assert.Equal(17, await recoveredTcs.Task);
     }
 
