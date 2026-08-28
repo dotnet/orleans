@@ -15,17 +15,55 @@ internal sealed class ConcurrentObjectPool<T> : ConcurrentObjectPool<T, DefaultC
 
 internal class ConcurrentObjectPool<T, TPoolPolicy> : ObjectPool<T>, IDisposable where T : class where TPoolPolicy : IPooledObjectPolicy<T>
 {
-    private readonly object _identity = new();
-    private readonly List<WeakReference<StackHolder>> _stacks = [];
+    private static readonly bool UseThreadLocalStorage = typeof(TPoolPolicy).IsGenericType
+        && typeof(TPoolPolicy).GetGenericTypeDefinition() == typeof(DefaultConcurrentObjectPoolPolicy<>)
+        && !IsCollectible(typeof(T))
+        && !IsCollectible(typeof(TPoolPolicy));
+    private readonly object? _identity;
+    private readonly List<WeakReference<StackHolder>>? _stacks;
+    private readonly ThreadLocal<Stack<T>>? _objects;
     private readonly TPoolPolicy _policy;
     private int _disposed;
 
-    public ConcurrentObjectPool(TPoolPolicy policy) => _policy = policy;
+    public ConcurrentObjectPool(TPoolPolicy policy)
+    {
+        _policy = policy;
+        if (UseThreadLocalStorage)
+        {
+            _objects = new(() => new());
+        }
+        else
+        {
+            _identity = new();
+            _stacks = [];
+        }
+    }
 
     public int MaxPoolSize { get; set; } = int.MaxValue;
 
+    private static bool IsCollectible(Type type)
+    {
+#if NETSTANDARD2_1
+        return type.GetType().GetProperty("IsCollectible")?.GetValue(type) is true;
+#else
+        return type.IsCollectible;
+#endif
+    }
+
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private Stack<T> GetStack()
+    {
+        if (_objects is { } objects)
+        {
+            ThrowIfDisposed();
+            return objects.Value!;
+        }
+
+        return GetWeakStack();
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private Stack<T> GetWeakStack()
     {
         ThrowIfDisposed();
 
@@ -35,7 +73,7 @@ internal class ConcurrentObjectPool<T, TPoolPolicy> : ObjectPool<T>, IDisposable
             || !ReferenceEquals(holder.Identity, _identity))
         {
             var stacks = PerThreadStack.Stacks ??= new();
-            holder = stacks.GetValue(this, static pool => new(pool._identity));
+            holder = stacks.GetValue(this, static pool => new(pool._identity!));
             if (!holder.IsRegistered)
             {
                 Register(holder);
@@ -103,7 +141,13 @@ internal class ConcurrentObjectPool<T, TPoolPolicy> : ObjectPool<T>, IDisposable
     {
         if (Interlocked.Exchange(ref _disposed, 1) == 0)
         {
-            lock (_stacks)
+            if (_objects is { } objects)
+            {
+                objects.Dispose();
+                return;
+            }
+
+            lock (_stacks!)
             {
                 foreach (var stackReference in _stacks)
                 {
@@ -120,7 +164,7 @@ internal class ConcurrentObjectPool<T, TPoolPolicy> : ObjectPool<T>, IDisposable
 
     private void Register(StackHolder holder)
     {
-        lock (_stacks)
+        lock (_stacks!)
         {
             for (var i = _stacks.Count - 1; i >= 0; i--)
             {
