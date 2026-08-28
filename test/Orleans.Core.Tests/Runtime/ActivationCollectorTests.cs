@@ -877,8 +877,8 @@ namespace UnitTests.Runtime
 
             var lifecycle = new SiloLifecycleSubject(NullLogger<SiloLifecycleSubject>.Instance);
             ((ILifecycleParticipant<ISiloLifecycle>)workingSet).Participate(lifecycle);
-            await lifecycle.OnStart();
-            await scanStarted.Task.WaitAsync(TimeSpan.FromSeconds(10));
+            await lifecycle.OnStart(TestContext.Current.CancellationToken);
+            await scanStarted.Task.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
 
             var mutationStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
             var mutationTask = Task.Run(() =>
@@ -886,11 +886,11 @@ namespace UnitTests.Runtime
                 mutationStarted.SetResult();
                 workingSet.OnEvicted(member);
                 workingSet.OnActivated(member);
-            });
-            await mutationStarted.Task.WaitAsync(TimeSpan.FromSeconds(10));
+            }, TestContext.Current.CancellationToken);
+            await mutationStarted.Task.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
             try
             {
-                var stopTask = lifecycle.OnStop();
+                var stopTask = lifecycle.OnStop(TestContext.Current.CancellationToken);
                 Assert.False(stopTask.IsCompleted);
                 Assert.False(mutationTask.IsCompleted);
                 resumeScan.Set();
@@ -940,8 +940,8 @@ namespace UnitTests.Runtime
 
             var lifecycle = new SiloLifecycleSubject(NullLogger<SiloLifecycleSubject>.Instance);
             ((ILifecycleParticipant<ISiloLifecycle>)workingSet).Participate(lifecycle);
-            await lifecycle.OnStart();
-            await removalScanStarted.Task.WaitAsync(TimeSpan.FromSeconds(10));
+            await lifecycle.OnStart(TestContext.Current.CancellationToken);
+            await removalScanStarted.Task.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
 
             var mutationStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
             var mutationTask = Task.Run(() =>
@@ -949,11 +949,11 @@ namespace UnitTests.Runtime
                 mutationStarted.SetResult();
                 workingSet.OnEvicted(member);
                 workingSet.OnActivated(member);
-            });
-            await mutationStarted.Task.WaitAsync(TimeSpan.FromSeconds(10));
+            }, TestContext.Current.CancellationToken);
+            await mutationStarted.Task.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
             try
             {
-                var stopTask = lifecycle.OnStop();
+                var stopTask = lifecycle.OnStop(TestContext.Current.CancellationToken);
                 Assert.False(stopTask.IsCompleted);
                 Assert.False(mutationTask.IsCompleted);
                 resumeScan.Set();
@@ -1000,8 +1000,8 @@ namespace UnitTests.Runtime
 
             var lifecycle = new SiloLifecycleSubject(NullLogger<SiloLifecycleSubject>.Instance);
             ((ILifecycleParticipant<ISiloLifecycle>)workingSet).Participate(lifecycle);
-            await lifecycle.OnStart();
-            await lifecycle.OnStop();
+            await lifecycle.OnStart(TestContext.Current.CancellationToken);
+            await lifecycle.OnStop(TestContext.Current.CancellationToken);
 
             Assert.Equal(0, workingSet.Count);
             Assert.DoesNotContain(member, workingSet.Members);
@@ -1053,8 +1053,8 @@ namespace UnitTests.Runtime
                     workingSet.OnEvicted(member);
                     workingSet.OnActivated(member);
                 }
-            });
-            await firstEviction.Task.WaitAsync(TimeSpan.FromSeconds(10));
+            }, TestContext.Current.CancellationToken);
+            await firstEviction.Task.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
 
             try
             {
@@ -1068,7 +1068,7 @@ namespace UnitTests.Runtime
                 resumeWriter.Set();
             }
 
-            await writer.WaitAsync(TimeSpan.FromSeconds(10));
+            await writer.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
 
             Assert.All(enumeratedMembers, member => Assert.Contains(member, members));
             Assert.Equal(members.Length, workingSet.Count);
@@ -1108,22 +1108,22 @@ namespace UnitTests.Runtime
 
             var lifecycle = new SiloLifecycleSubject(NullLogger<SiloLifecycleSubject>.Instance);
             ((ILifecycleParticipant<ISiloLifecycle>)workingSet).Participate(lifecycle);
-            await lifecycle.OnStart();
-            await removalScanStarted.Task.WaitAsync(TimeSpan.FromSeconds(10));
+            await lifecycle.OnStart(TestContext.Current.CancellationToken);
+            await removalScanStarted.Task.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
 
             var reactivationStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
             var reactivationTask = Task.Run(() =>
             {
                 reactivationStarted.SetResult();
                 workingSet.OnActive(member);
-            });
-            await reactivationStarted.Task.WaitAsync(TimeSpan.FromSeconds(10));
+            }, TestContext.Current.CancellationToken);
+            await reactivationStarted.Task.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
             try
             {
                 Assert.False(reactivationTask.IsCompleted);
                 resumeScan.Set();
                 await reactivationTask;
-                await lifecycle.OnStop();
+                await lifecycle.OnStop(TestContext.Current.CancellationToken);
             }
             finally
             {
@@ -1339,18 +1339,20 @@ namespace UnitTests.Runtime
                 ready.Signal();
                 await start.Task;
                 harness.WorkingSet.OnActive(member);
-            })).ToArray();
+            }, TestContext.Current.CancellationToken)).ToArray();
 
             try
             {
-                Assert.True(ready.Wait(TimeSpan.FromSeconds(10)), "Workers did not reach the OnActive start gate.");
+                Assert.True(
+                    ready.Wait(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken),
+                    "Workers did not reach the OnActive start gate.");
                 start.TrySetResult();
-                await Task.WhenAll(workers).WaitAsync(TimeSpan.FromSeconds(10));
+                await Task.WhenAll(workers).WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
             }
             finally
             {
                 start.TrySetResult();
-                await Task.WhenAll(workers).WaitAsync(TimeSpan.FromSeconds(10));
+                await Task.WhenAll(workers).WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
             }
 
             Assert.Equal(1, harness.WorkingSet.Count);
@@ -1407,7 +1409,7 @@ namespace UnitTests.Runtime
                             break;
                     }
                 }
-            })).ToArray();
+            }, TestContext.Current.CancellationToken)).ToArray();
 
             await Task.WhenAll(workers);
 
@@ -1438,13 +1440,17 @@ namespace UnitTests.Runtime
             harness.WorkingSet.OnActivated(member);
             harness.Observer.Clear();
             var gate = harness.Observer.ArmEvictionGate(0);
-            var eviction = Task.Run(() => harness.WorkingSet.OnEvicted(member));
+            var eviction = Task.Run(
+                () => harness.WorkingSet.OnEvicted(member),
+                TestContext.Current.CancellationToken);
             Task? reAdd = null;
             try
             {
-                await gate.Entered.Task.WaitAsync(TimeSpan.FromSeconds(10));
-                reAdd = Task.Run(() => harness.WorkingSet.OnActive(member));
-                await reAdd.WaitAsync(TimeSpan.FromSeconds(10));
+                await gate.Entered.Task.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
+                reAdd = Task.Run(
+                    () => harness.WorkingSet.OnActive(member),
+                    TestContext.Current.CancellationToken);
+                await reAdd.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
                 Assert.Equal(1, harness.WorkingSet.Count);
                 Assert.True(member.IsInWorkingSet);
                 Assert.False(member.IsIdle);
@@ -1456,10 +1462,10 @@ namespace UnitTests.Runtime
                 gate.Release.TrySetResult();
                 if (reAdd is not null)
                 {
-                    await reAdd.WaitAsync(TimeSpan.FromSeconds(10));
+                    await reAdd.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
                 }
 
-                await eviction.WaitAsync(TimeSpan.FromSeconds(10));
+                await eviction.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
             }
 
             Assert.Equal(["EvictedStarted", "Active", "EvictedCompleted"], harness.Observer.GetHistory(0));
@@ -1875,7 +1881,7 @@ namespace UnitTests.Runtime
                 var result = new WorkingSetHarness();
                 try
                 {
-                    await result._lifecycle.OnStart();
+                    await result._lifecycle.OnStart(TestContext.Current.CancellationToken);
                     await result._timer.WaitForGenerationAsync(1);
                     return result;
                 }
@@ -1897,7 +1903,8 @@ namespace UnitTests.Runtime
             {
                 try
                 {
-                    await _lifecycle.OnStop().WaitAsync(TimeSpan.FromSeconds(10));
+                    await _lifecycle.OnStop(TestContext.Current.CancellationToken)
+                        .WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
                 }
                 finally
                 {
@@ -1976,7 +1983,7 @@ namespace UnitTests.Runtime
                         generationChanged = _generationChanged.Task;
                     }
 
-                    await generationChanged.WaitAsync(TimeSpan.FromSeconds(10));
+                    await generationChanged.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
                 }
             }
 
