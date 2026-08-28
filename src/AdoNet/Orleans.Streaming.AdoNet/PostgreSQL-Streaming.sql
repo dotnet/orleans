@@ -297,6 +297,7 @@ DECLARE
     _Now TIMESTAMP(6) WITHOUT TIME ZONE;
     _CurrentOwnerEpoch BIGINT;
     _CurrentCheckpoint BIGINT;
+    _PreviousCheckpoint BIGINT;
     _Updated BOOLEAN := FALSE;
 BEGIN
     SELECT P.OwnerEpoch, P.Checkpoint
@@ -306,6 +307,7 @@ BEGIN
         AND P.ProviderId = _ProviderId
         AND P.QueueId = _QueueId
     FOR UPDATE;
+    _PreviousCheckpoint := _CurrentCheckpoint;
 
     _Now := clock_timestamp() AT TIME ZONE 'UTC';
 
@@ -329,6 +331,7 @@ BEGIN
         WHERE M.ServiceId = _ServiceId
             AND M.ProviderId = _ProviderId
             AND M.QueueId = _QueueId
+            AND (_PreviousCheckpoint IS NULL OR M.MessageId > _PreviousCheckpoint)
             AND M.MessageId <= _Checkpoint
             AND M.CheckpointedOn IS NULL;
     ELSE
@@ -449,7 +452,7 @@ BEGIN
                 )
             )
         ORDER BY M.MessageId
-        FOR UPDATE SKIP LOCKED
+        FOR UPDATE
         LIMIT _CleanupBatchSize
     ),
     Deleted AS
