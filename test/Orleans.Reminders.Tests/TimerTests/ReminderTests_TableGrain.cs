@@ -170,7 +170,7 @@ namespace UnitTests.TimerTests
         }
 
         [Fact]
-        public async Task Rem_Grain_ConcurrentCounterWaitersUseSingleClockDriver()
+        public async Task Rem_Grain_ConcurrentRemindersUseSingleClockDriver()
         {
             using var cts = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
             cts.CancelAfter(TestConstants.InitTimeout);
