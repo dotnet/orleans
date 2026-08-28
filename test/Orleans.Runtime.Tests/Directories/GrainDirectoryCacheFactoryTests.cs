@@ -565,6 +565,40 @@ public class GrainDirectoryCacheFactoryTests
     }
 
     [Fact]
+    public void GrainDirectoryCacheEntry_UpdateBlocksBindingUntilNewAddressIsPublished()
+    {
+        var grainId = CreateGrainId();
+        var originalAddress = CreateGrainAddress(grainId, port: 11111);
+        var replacementAddress = CreateGrainAddress(grainId, port: 22222);
+        var entry = new GrainDirectoryCacheEntry(originalAddress, version: 1);
+        var originalTarget = CreateMessageTarget();
+
+        Assert.True(entry.TrySetMessageTarget(originalTarget, originalAddress));
+
+        Assert.True(entry.TryBeginUpdate());
+        Assert.False(entry.IsValid);
+        Assert.False(entry.TryGetMessageTarget(out _));
+        Assert.False(entry.TrySetMessageTarget(CreateMessageTarget(), originalAddress));
+
+        entry.Value = (replacementAddress, 2);
+
+        Assert.False(entry.IsValid);
+        Assert.False(entry.TrySetMessageTarget(CreateMessageTarget(), replacementAddress));
+
+        entry.EndUpdate();
+
+        Assert.True(entry.IsValid);
+        Assert.Equal(replacementAddress, entry.Address);
+        Assert.Equal(2, entry.Version);
+        Assert.False(entry.TryGetMessageTarget(out _));
+        Assert.False(entry.TrySetMessageTarget(CreateMessageTarget(), originalAddress));
+
+        var replacementTarget = CreateMessageTarget();
+        Assert.True(entry.TrySetMessageTarget(replacementTarget, replacementAddress));
+        AssertMessageTarget(entry, replacementTarget);
+    }
+
+    [Fact]
     public async Task CreateGrainDirectoryCache_RemoveByGrainIdReleasesMessageTargetReference()
     {
         var (cache, entrySource) = CreateEntryCache();

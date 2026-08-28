@@ -8,6 +8,7 @@ internal sealed class GrainDirectoryCacheEntry
       IDisposable
 {
     private static readonly object Invalidated = new();
+    private static readonly object Updating = new();
     private object? _messageTarget;
 
     public GrainDirectoryCacheEntry(GrainAddress address, int version)
@@ -27,12 +28,19 @@ internal sealed class GrainDirectoryCacheEntry
 
     public int Version => Value.Version;
 
-    public bool IsValid => !ReferenceEquals(Volatile.Read(ref _messageTarget), Invalidated);
+    public bool IsValid
+    {
+        get
+        {
+            var target = Volatile.Read(ref _messageTarget);
+            return !ReferenceEquals(target, Invalidated) && !ReferenceEquals(target, Updating);
+        }
+    }
 
     public bool TryGetMessageTarget(out object? messageTarget)
     {
         var target = Volatile.Read(ref _messageTarget);
-        if (ReferenceEquals(target, Invalidated))
+        if (ReferenceEquals(target, Invalidated) || ReferenceEquals(target, Updating))
         {
             messageTarget = null;
             return false;
@@ -81,7 +89,7 @@ internal sealed class GrainDirectoryCacheEntry
     private bool TrySetMessageTargetCore(object messageTarget)
     {
         var current = Volatile.Read(ref _messageTarget);
-        if (ReferenceEquals(current, Invalidated))
+        if (ReferenceEquals(current, Invalidated) || ReferenceEquals(current, Updating))
         {
             return false;
         }
@@ -100,6 +108,22 @@ internal sealed class GrainDirectoryCacheEntry
 
     public void Dispose() => Invalidate();
 
+    internal void Update((GrainAddress ActivationAddress, int Version) value)
+    {
+        var updateStarted = TryBeginUpdate();
+        try
+        {
+            Value = value;
+        }
+        finally
+        {
+            if (updateStarted)
+            {
+                EndUpdate();
+            }
+        }
+    }
+
     public void ClearMessageTarget()
     {
         while (true)
@@ -116,4 +140,23 @@ internal sealed class GrainDirectoryCacheEntry
             }
         }
     }
+
+    internal bool TryBeginUpdate()
+    {
+        while (true)
+        {
+            var current = Volatile.Read(ref _messageTarget);
+            if (ReferenceEquals(current, Invalidated))
+            {
+                return false;
+            }
+
+            if (ReferenceEquals(Interlocked.CompareExchange(ref _messageTarget, Updating, current), current))
+            {
+                return true;
+            }
+        }
+    }
+
+    internal void EndUpdate() => Interlocked.CompareExchange(ref _messageTarget, null, Updating);
 }

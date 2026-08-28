@@ -64,9 +64,7 @@ internal class ConcurrentLruCache<K, V> : IEnumerable<KeyValuePair<K, V>>, ICach
     {
     }
 
-    protected virtual void OnItemUpdating(LruItem item)
-    {
-    }
+    protected virtual void UpdateItem(LruItem item, V value) => item.Value = value;
 
     protected virtual void OnItemRemoved(LruItem item)
     {
@@ -370,8 +368,7 @@ internal class ConcurrentLruCache<K, V> : IEnumerable<KeyValuePair<K, V>>, ICach
                 {
                     var oldValue = existing.Value;
 
-                    OnItemUpdating(existing);
-                    existing.Value = value;
+                    UpdateItem(existing, value);
                     UpdateTimestamp(existing);
 
                     _telemetryPolicy.IncrementUpdated();
