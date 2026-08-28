@@ -71,7 +71,11 @@ public sealed class SQSAspireLiveStreamTests : TestClusterPerTest
 
     [Fact]
     public Task AspireGeneratedConfiguration_PublishesConsumesAndAcknowledgesElasticMqStream()
-        => _runner.StreamTest_04_OneProducerClientOneConsumerClient();
+    {
+#pragma warning disable xUnit1051 // The shared stream runner does not expose a cancellation-token overload.
+        return _runner.StreamTest_04_OneProducerClientOneConsumerClient();
+#pragma warning restore xUnit1051
+    }
 
     public override async ValueTask DisposeAsync()
     {
