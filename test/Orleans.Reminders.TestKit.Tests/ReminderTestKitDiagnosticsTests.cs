@@ -1,4 +1,5 @@
 using Orleans.Reminders.TestKit;
+using TestExtensions;
 using Xunit;
 
 namespace Orleans.Reminders.TestKit.Tests;
