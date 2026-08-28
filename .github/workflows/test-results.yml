@@ -101,23 +101,30 @@ jobs:
           TESTED_SHA: ${{ steps.coverage-matrix.outputs.tested-sha }}
         run: |
           $commit = gh api "repos/$env:GITHUB_REPOSITORY/git/commits/$env:TESTED_SHA" | ConvertFrom-Json
-          $parents = @($commit.parents | ForEach-Object sha)
+          $parents = @($commit.parents | Select-Object -ExpandProperty sha)
           if ($commit.sha -ne $env:TESTED_SHA -or $parents.Count -ne 2 -or $parents -notcontains $env:HEAD_SHA) {
             throw "Coverage commit $env:TESTED_SHA is not the tested merge commit for head $env:HEAD_SHA"
           }
-      - name: Checkout covered source
-        uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
-        with:
-          path: coverage-source
-          persist-credentials: false
-          ref: ${{ steps.coverage-matrix.outputs.tested-sha }}
-          repository: ${{ github.repository }}
-          sparse-checkout: src
+      - name: Download covered source
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TESTED_SHA: ${{ steps.coverage-matrix.outputs.tested-sha }}
+        run: |
+          set -euo pipefail
+          mkdir coverage-source
+          gh api "repos/$GITHUB_REPOSITORY/tarball/$TESTED_SHA" > coverage-source.tar.gz
+          tar \
+            --extract \
+            --file coverage-source.tar.gz \
+            --gzip \
+            --directory coverage-source \
+            --strip-components 1
       - name: Merge coverage
         shell: pwsh
         run: |
           New-Item -ItemType Directory -Force coverage | Out-Null
-          $reports = @(Get-ChildItem -LiteralPath coverage-data -Recurse -File -Filter '*.cobertura.xml' | ForEach-Object FullName)
+          $reports = @(Get-ChildItem -LiteralPath coverage-data -Recurse -File -Filter '*.cobertura.xml' | Select-Object -ExpandProperty FullName)
           dotnet-coverage merge @reports --output coverage/coverage.cobertura.xml --output-format cobertura --nologo
       - name: Summarize coverage
         id: coverage

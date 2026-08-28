@@ -66,7 +66,7 @@ foreach ($artifact in Get-ChildItem -LiteralPath $resolvedReportDirectory -Force
     $coverageId = $expectedReport.Substring(0, $expectedReport.Length - '.cobertura.xml'.Length)
     $expectedMetadata = "$coverageId.coverage.json"
     $expectedContents = @($expectedMetadata, $expectedReport) | Sort-Object
-    $actualContents = @($contents | ForEach-Object Name | Sort-Object)
+    $actualContents = @($contents | Select-Object -ExpandProperty Name | Sort-Object)
     if ($contents.Where({ $_.PSIsContainer }, 'First').Count -gt 0 -or
         $actualContents.Count -ne $expectedContents.Count -or
         (Compare-Object $expectedContents $actualContents)) {

@@ -563,12 +563,13 @@ exit 0
             'Coverage validation must reject missing and unexpected reports.'
         Assert-Matches `
             $workflow `
-            'ref: \$\{\{ steps\.coverage-matrix\.outputs\.tested-sha \}\}' `
-            'Source validation must use the exact commit recorded by every coverage artifact.'
+            'gh api "repos/\$GITHUB_REPOSITORY/tarball/\$TESTED_SHA"' `
+            'Source validation must download the exact commit recorded by every coverage artifact.'
         Assert-Matches `
             $workflow `
-            '(?s)Verify tested commit.*?parents -notcontains \$env:HEAD_SHA.*?Checkout covered source' `
+            '(?s)Verify tested commit.*?parents -notcontains \$env:HEAD_SHA.*?Download covered source' `
             'The trusted reporter must bind the recorded merge commit to the triggering pull request head.'
+        Assert-Equal 0 ([regex]::Matches($workflow, 'name: Checkout covered source')).Count 'The privileged reporter must not check out untrusted pull request code.'
         Assert-Equal 60 $expectedArtifacts.Count 'Expected coverage artifact count differs.'
         Assert-Equal 60 (@($expectedArtifacts | Sort-Object -Unique)).Count 'Expected coverage artifact identities must be unique.'
     }
@@ -651,7 +652,7 @@ exit 0
         Assert-Equal 0 ([regex]::Matches($ciWorkflow, 'dotnet-coverage merge')).Count 'Pull request code must not merge its own coverage.'
         Assert-Matches `
             $reportingWorkflow `
-            '(?s)Checkout trusted reporter.*?Validate coverage matrix.*?Verify tested commit.*?Checkout covered source.*?Merge coverage.*?Summarize coverage' `
+            '(?s)Checkout trusted reporter.*?Validate coverage matrix.*?Verify tested commit.*?Download covered source.*?Merge coverage.*?Summarize coverage' `
             'Trusted reporting must validate raw reports against the covered source before summarizing.'
         Assert-Matches `
             $reportingWorkflow `
