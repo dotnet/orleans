@@ -1274,8 +1274,16 @@ public class MyGrain : Grain, IGrainWithStringKey
         // Add additional document if content is provided
         if (grainInterfacesFileContent is not null)
         {
-            var additionalDocumentId = DocumentId.CreateNewId(projectId, OrleansContractsFileName);
-            solution = solution.AddAdditionalDocument(additionalDocumentId, OrleansContractsFileName, SourceText.From(grainInterfacesFileContent));
+            var contractsDocumentPath = configuredContractsPath is null
+                ? OrleansContractsFileName
+                : configuredContractsPath.Replace('/', Path.DirectorySeparatorChar);
+            var contractsDocumentName = Path.GetFileName(contractsDocumentPath);
+            var additionalDocumentId = DocumentId.CreateNewId(projectId, contractsDocumentName);
+            solution = solution.AddAdditionalDocument(
+                additionalDocumentId,
+                contractsDocumentName,
+                SourceText.From(grainInterfacesFileContent),
+                filePath: contractsDocumentPath);
         }
 
         if (configuredContractsPath is not null)
@@ -1362,6 +1370,27 @@ public class CartGrain : Grain, IGrainWithStringKey
 
         Assert.NotNull(additionalDocumentId);
         Assert.Equal(configuredPath, changedSolution.GetAdditionalDocument(additionalDocumentId!)!.FilePath);
+    }
+
+    [Fact]
+    public async Task CodeFix_RegenerateExistingFile_UsesConfiguredCustomFilename()
+    {
+        var configuredPath = Path.Combine(Path.GetTempPath(), "contracts", "rpc-contracts.txt");
+        var (changedSolution, additionalDocumentId) = await ApplyCodeFixAsync(
+            "public interface IMyGrain : IGrain { Task Ping(); Task Pong(); }",
+            "interface IMyGrain [Version(0)]\n  Ping() -> Task\n",
+            GrainInterfaceVersionAnalyzer.RuleId0018,
+            RegenerateCodeActionTitle,
+            configuredPath);
+
+        Assert.NotNull(additionalDocumentId);
+        var project = changedSolution.GetProject(changedSolution.ProjectIds.Single())!;
+        var document = Assert.Single(project.AdditionalDocuments);
+        Assert.Equal(configuredPath, document.FilePath);
+        Assert.Equal("rpc-contracts.txt", document.Name);
+        Assert.Contains(
+            "Pong() -> Task",
+            (await document.GetTextAsync(TestContext.Current.CancellationToken)).ToString());
     }
 
     [Fact]

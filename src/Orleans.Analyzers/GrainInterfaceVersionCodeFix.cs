@@ -197,6 +197,14 @@ public class GrainInterfaceVersionCodeFix : CodeFixProvider
 
     private static TextDocument? FindContractsDocument(Project project)
     {
+        var configuredPath = GetConfiguredContractsPath(project);
+        var configuredDocument = project.AdditionalDocuments.FirstOrDefault(document =>
+            PathsEqual(document.FilePath ?? document.Name, configuredPath));
+        if (configuredDocument is not null)
+        {
+            return configuredDocument;
+        }
+
         foreach (var additionalFile in project.AnalyzerOptions.AdditionalFiles)
         {
             if (!Path.GetFileName(additionalFile.Path)
@@ -219,6 +227,19 @@ public class GrainInterfaceVersionCodeFix : CodeFixProvider
         return project.AdditionalDocuments.FirstOrDefault(document =>
             Path.GetFileName(document.FilePath ?? document.Name)
                 .Equals(Constants.OrleansContractsFileName, StringComparison.OrdinalIgnoreCase));
+    }
+
+    private static bool PathsEqual(string left, string right)
+    {
+        left = NormalizePathSeparators(left);
+        right = NormalizePathSeparators(right);
+        if (Path.IsPathRooted(left) && Path.IsPathRooted(right))
+        {
+            left = Path.GetFullPath(left);
+            right = Path.GetFullPath(right);
+        }
+
+        return string.Equals(left, right, StringComparison.OrdinalIgnoreCase);
     }
 
     private static string GetConfiguredContractsPath(Project project)
