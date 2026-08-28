@@ -268,8 +268,12 @@ public sealed class KinesisRuntimeTests
         var receiver = CreateReceiver(client, checkpointerFactory, timeProvider);
         await receiver.Initialize(TimeSpan.FromSeconds(5));
 
-        var firstBatch = (await receiver.GetQueueMessagesAsync(10)).Cast<KinesisBatchContainer>().ToArray();
-        var secondBatch = (await receiver.GetQueueMessagesAsync(10)).Cast<KinesisBatchContainer>().ToArray();
+        var firstBatch = (await receiver.GetQueueMessagesAsync(
+            10,
+            TestContext.Current.CancellationToken)).Cast<KinesisBatchContainer>().ToArray();
+        var secondBatch = (await receiver.GetQueueMessagesAsync(
+            10,
+            TestContext.Current.CancellationToken)).Cast<KinesisBatchContainer>().ToArray();
 
         Assert.Equal([0L, 1L], firstBatch.Select(container => container.Token.SequenceNumber));
         Assert.Equal([2L], secondBatch.Select(container => container.Token.SequenceNumber));
@@ -297,7 +301,9 @@ public sealed class KinesisRuntimeTests
             new Amazon.Kinesis.Model.Record { SequenceNumber = "42", Data = new MemoryStream() },
             sequenceId: 1);
 
-        await receiver.MessagesDeliveredAsync([hugeButReadFirst, smallButReadSecond]);
+        await receiver.MessagesDeliveredAsync(
+            [hugeButReadFirst, smallButReadSecond],
+            TestContext.Current.CancellationToken);
 
         checkpointer.Received(1).Update(
             "170141183460469231731687303715884105727",
@@ -319,7 +325,9 @@ public sealed class KinesisRuntimeTests
         var receiver = CreateReceiver(client, checkpointerFactory, new FakeTimeProvider());
         await receiver.Initialize(TimeSpan.FromSeconds(5));
 
-        await receiver.MessagesDeliveredAsync(Array.Empty<IBatchContainer>());
+        await receiver.MessagesDeliveredAsync(
+            Array.Empty<IBatchContainer>(),
+            TestContext.Current.CancellationToken);
 
         checkpointer.DidNotReceive().Update(Arg.Any<string>(), Arg.Any<DateTime>(), Arg.Any<CancellationToken>());
     }
