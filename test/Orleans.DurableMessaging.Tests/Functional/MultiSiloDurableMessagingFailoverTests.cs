@@ -32,7 +32,7 @@ public sealed class MultiSiloDurableMessagingFailoverTests(MultiSiloDurableMessa
         var owner = fixture.Cluster.Silos.Single(
             silo => silo.SiloAddress.ToParsableString() == before.SiloAddress);
 
-        await fixture.Cluster.KillSiloAsync(owner);
+        await fixture.Cluster.KillSiloAsync(owner, TestContext.Current.CancellationToken);
         await fixture.Cluster.WaitForLivenessToStabilizeAsync();
         var reactivated = await receiver.GetSnapshotAsync();
         Assert.NotEqual(before.ActivationId, reactivated.ActivationId);
