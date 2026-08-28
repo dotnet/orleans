@@ -7,6 +7,9 @@ namespace UnitTests.General
 {
     public class SqlServerStorageForTesting : RelationalStorageForTesting
     {
+        private const int DeadlockVictimError = 1205;
+        private const int DatabaseInUseError = 3702;
+
         protected override string ProviderMoniker => "SQLServer";
 
         public SqlServerStorageForTesting(string connectionString)
@@ -180,13 +183,20 @@ namespace UnitTests.General
                     await base.DropDatabaseAsync(databaseName, cancellationToken);
                     return;
                 }
-                catch (SqlException exception) when (exception.Number == 3702 && attempt < maxAttempts)
+                catch (SqlException exception) when (IsRetryableDatabaseResetError(exception.Number) && attempt < maxAttempts)
                 {
-                    Console.WriteLine("SQL Server database '{0}' remained in use after reset attempt {1}; retrying.", databaseName, attempt);
+                    Console.WriteLine(
+                        "SQL Server database '{0}' reset failed with transient error {1} on attempt {2}; retrying.",
+                        databaseName,
+                        exception.Number,
+                        attempt);
                     PrepareForDatabaseReset(databaseName);
                 }
             }
         }
+
+        internal static bool IsRetryableDatabaseResetError(int errorNumber) =>
+            errorNumber is DeadlockVictimError or DatabaseInUseError;
 
         protected override string ExistsDatabaseTemplate
         {
