@@ -76,7 +76,7 @@ internal sealed class LogViewAdaptor<TLogView, TLogEntry> : PrimaryBasedLogViewA
     /// <inheritdoc/>
     public override Task<IReadOnlyList<TLogEntry>> RetrieveLogSegment(int fromVersion, int toVersion)
     {
-        if (fromVersion < 0 || toVersion < fromVersion || toVersion > _eventLog.Count)
+        if (fromVersion < 0 || toVersion < fromVersion || toVersion > _confirmedVersion)
         {
             throw new ArgumentException("Invalid log segment range.");
         }
