@@ -19,6 +19,7 @@ runs:
       path: |
         **/TestResults/*
         !TestResults/*.cobertura.xml
+        !TestResults/*.coverage.json
         **/logs/*
   - name: Wait before retrying test result upload
     if: steps.archive-test-results.outcome == 'failure'
@@ -36,7 +37,21 @@ runs:
       path: |
         **/TestResults/*
         !TestResults/*.cobertura.xml
+        !TestResults/*.coverage.json
         **/logs/*
+  - name: Write coverage metadata
+    if: github.event_name == 'pull_request'
+    shell: pwsh
+    run: |
+      $metadata = [ordered]@{
+         artifact_name = 'coverage_${{ inputs.name }}'
+         commit_sha = $env:GITHUB_SHA
+         coverage_id = '${{ inputs.name }}'
+         format_version = 1
+      }
+      $metadata |
+         ConvertTo-Json |
+         Set-Content -LiteralPath 'TestResults/${{ inputs.name }}.coverage.json' -Encoding utf8NoBOM
   - name: Archive coverage
     id: archive-coverage
     if: github.event_name == 'pull_request'
@@ -46,7 +61,9 @@ runs:
       name: coverage_${{ inputs.name }}
       if-no-files-found: error
       retention-days: 1
-      path: TestResults/${{ inputs.name }}.cobertura.xml
+      path: |
+        TestResults/${{ inputs.name }}.cobertura.xml
+        TestResults/${{ inputs.name }}.coverage.json
   - name: Wait before retrying coverage upload
     if: github.event_name == 'pull_request' && steps.archive-coverage.outcome == 'failure'
     shell: pwsh
@@ -59,4 +76,6 @@ runs:
       if-no-files-found: error
       retention-days: 1
       overwrite: true
-      path: TestResults/${{ inputs.name }}.cobertura.xml
+      path: |
+        TestResults/${{ inputs.name }}.cobertura.xml
+        TestResults/${{ inputs.name }}.coverage.json
