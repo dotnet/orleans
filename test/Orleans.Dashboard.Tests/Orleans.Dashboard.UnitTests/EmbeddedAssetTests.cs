@@ -124,54 +124,47 @@ namespace UnitTests
         }
 
         [Fact]
-        public void EmbeddedAssetProvider_CanBeInstantiated()
+        public async System.Threading.Tasks.Task EmbeddedAssetProvider_CanBeInstantiated()
         {
-            // This tests that the EmbeddedAssetProvider can load all resources
-            // without throwing exceptions during construction
             var provider = new EmbeddedAssetProvider();
+            using var requestServices = CreateRequestServices();
+            var httpContext = CreateHttpContext(requestServices);
 
-            Assert.NotNull(provider);
+            var result = provider.ServeAsset("INDEX.HTML", httpContext);
+            await result.ExecuteAsync(httpContext);
+
+            Assert.Equal(StatusCodes.Status200OK, httpContext.Response.StatusCode);
+            Assert.Equal(ReadEmbeddedAsset("index.html"), ((System.IO.MemoryStream)httpContext.Response.Body).ToArray());
         }
 
         [Fact]
-        public void EmbeddedAssetProvider_ServesIndexHtml()
+        public async System.Threading.Tasks.Task EmbeddedAssetProvider_ServesIndexHtml()
         {
             var provider = new EmbeddedAssetProvider();
-            var httpContext = new DefaultHttpContext();
 
-            var result = provider.ServeAsset("index.html", httpContext);
-
-            // Result should not be NotFound - it should be a file result
-            Assert.IsNotType<NotFound>(result);
+            await AssertServesExactAsset(provider, "index.html");
         }
 
         [Fact]
-        public void EmbeddedAssetProvider_ServesIndexCss()
+        public async System.Threading.Tasks.Task EmbeddedAssetProvider_ServesIndexCss()
         {
             var provider = new EmbeddedAssetProvider();
-            var httpContext = new DefaultHttpContext();
 
-            var result = provider.ServeAsset("index.css", httpContext);
-
-            Assert.IsNotType<NotFound>(result);
+            await AssertServesExactAsset(provider, "index.css");
         }
 
         [Fact]
-        public void EmbeddedAssetProvider_ServesIndexJs()
+        public async System.Threading.Tasks.Task EmbeddedAssetProvider_ServesIndexJs()
         {
             var provider = new EmbeddedAssetProvider();
-            var httpContext = new DefaultHttpContext();
 
-            var result = provider.ServeAsset("index.min.js", httpContext);
-
-            Assert.IsNotType<NotFound>(result);
+            await AssertServesExactAsset(provider, "index.min.js");
         }
 
         [Fact]
-        public void EmbeddedAssetProvider_ServesFontFiles()
+        public async System.Threading.Tasks.Task EmbeddedAssetProvider_ServesFontFiles()
         {
             var provider = new EmbeddedAssetProvider();
-            var httpContext = new DefaultHttpContext();
             var fontResourceName = DashboardAssembly
                 .GetManifestResourceNames()
                 .FirstOrDefault(name =>
@@ -180,11 +173,9 @@ namespace UnitTests
                      name.EndsWith(".woff", StringComparison.Ordinal)));
 
             Assert.NotNull(fontResourceName);
-
             var assetName = fontResourceName.Substring(ResourcePrefix.Length);
 
-            var result = provider.ServeAsset(assetName, httpContext);
-            Assert.IsNotType<NotFound>(result);
+            await AssertServesExactAsset(provider, assetName);
         }
 
         [Fact]
@@ -196,6 +187,205 @@ namespace UnitTests
             var result = provider.ServeAsset("nonexistent.file", httpContext);
 
             Assert.IsType<NotFound>(result);
+        }
+
+        [Fact]
+        public async System.Threading.Tasks.Task ServeAsset_KnownAsset_ReturnsExactContentTypeCacheEtagAndBody()
+        {
+            var provider = new EmbeddedAssetProvider();
+            var expectedBody = ReadEmbeddedAsset("index.html");
+            using var requestServices = CreateRequestServices();
+            var httpContext = CreateHttpContext(requestServices);
+
+            var result = provider.ServeAsset("index.html", httpContext);
+            await result.ExecuteAsync(httpContext);
+
+            Assert.Equal(StatusCodes.Status200OK, httpContext.Response.StatusCode);
+            Assert.Equal("text/html", httpContext.Response.ContentType);
+            Assert.Equal(expectedBody.Length, httpContext.Response.ContentLength);
+            var cacheControl = httpContext.Response.GetTypedHeaders().CacheControl;
+            Assert.NotNull(cacheControl);
+            Assert.True(cacheControl.NoCache);
+            Assert.True(cacheControl.NoStore);
+            Assert.Equal(1, httpContext.Response.Headers.ETag.Count);
+            Assert.Equal(0, httpContext.Response.Headers.ContentEncoding.Count);
+            var actualBody = ((System.IO.MemoryStream)httpContext.Response.Body).ToArray();
+            Assert.Equal(expectedBody, actualBody);
+            Assert.Contains(
+                "<!DOCTYPE html>",
+                System.Text.Encoding.UTF8.GetString(actualBody),
+                StringComparison.OrdinalIgnoreCase);
+        }
+
+        [Fact]
+        public async System.Threading.Tasks.Task ServeAsset_GzipAccepted_ReturnsValidSelectedRepresentation()
+        {
+            var provider = new EmbeddedAssetProvider();
+            var expectedDecompressedBody = ReadEmbeddedAsset("index.html");
+            using var requestServices = CreateRequestServices();
+            var httpContext = CreateHttpContext(requestServices);
+            httpContext.Request.Headers.AcceptEncoding = "br, GZIP; q=0.8";
+
+            var result = provider.ServeAsset("index.html", httpContext);
+            await result.ExecuteAsync(httpContext);
+
+            var actualBody = ((System.IO.MemoryStream)httpContext.Response.Body).ToArray();
+            Assert.Equal(StatusCodes.Status200OK, httpContext.Response.StatusCode);
+            Assert.Equal("text/html", httpContext.Response.ContentType);
+            Assert.Equal(actualBody.Length, httpContext.Response.ContentLength);
+            var cacheControl = httpContext.Response.GetTypedHeaders().CacheControl;
+            Assert.NotNull(cacheControl);
+            Assert.True(cacheControl.NoCache);
+            Assert.True(cacheControl.NoStore);
+            Assert.Equal(1, httpContext.Response.Headers.ETag.Count);
+
+            if (httpContext.Response.Headers.ContentEncoding == "gzip")
+            {
+                Assert.Equal(expectedDecompressedBody, Decompress(actualBody));
+            }
+            else
+            {
+                Assert.Equal(0, httpContext.Response.Headers.ContentEncoding.Count);
+                Assert.Equal(expectedDecompressedBody, actualBody);
+            }
+        }
+
+        [Fact]
+        public async System.Threading.Tasks.Task ServeAsset_GzipQualityZero_ReturnsDecompressedRepresentationWithoutEncoding()
+        {
+            var provider = new EmbeddedAssetProvider();
+            var expectedBody = ReadEmbeddedAsset("index.html");
+            using var requestServices = CreateRequestServices();
+            var httpContext = CreateHttpContext(requestServices);
+            httpContext.Request.Headers.AcceptEncoding = "gzip; q=0, br";
+
+            var result = provider.ServeAsset("index.html", httpContext);
+            await result.ExecuteAsync(httpContext);
+
+            Assert.Equal(StatusCodes.Status200OK, httpContext.Response.StatusCode);
+            Assert.Equal(expectedBody.Length, httpContext.Response.ContentLength);
+            Assert.Equal(0, httpContext.Response.Headers.ContentEncoding.Count);
+            Assert.Equal(1, httpContext.Response.Headers.ETag.Count);
+            Assert.Equal(expectedBody, ((System.IO.MemoryStream)httpContext.Response.Body).ToArray());
+        }
+
+        [Fact]
+        public async System.Threading.Tasks.Task ServeAsset_SlashSeparatedNestedAsset_ReturnsExactBody()
+        {
+            var provider = new EmbeddedAssetProvider();
+            using var requestServices = CreateRequestServices();
+            var httpContext = CreateHttpContext(requestServices);
+            var expectedBody = ReadEmbeddedAsset("fonts.fa-solid-900.woff2");
+
+            var result = provider.ServeAsset("fonts/fa-solid-900.woff2", httpContext);
+            await result.ExecuteAsync(httpContext);
+
+            Assert.Equal(StatusCodes.Status200OK, httpContext.Response.StatusCode);
+            Assert.Equal("font/woff2", httpContext.Response.ContentType);
+            Assert.Equal(expectedBody, ((System.IO.MemoryStream)httpContext.Response.Body).ToArray());
+        }
+
+        [Fact]
+        public async System.Threading.Tasks.Task ServeAsset_MatchingIfNoneMatch_Returns304WithoutBodyOrRepresentationHeaders()
+        {
+            var provider = new EmbeddedAssetProvider();
+            using var requestServices = CreateRequestServices();
+            var initialContext = CreateHttpContext(requestServices);
+            var initialResult = provider.ServeAsset("index.html", initialContext);
+            await initialResult.ExecuteAsync(initialContext);
+            var entityTag = initialContext.Response.Headers.ETag;
+            Assert.Equal(1, entityTag.Count);
+
+            var httpContext = CreateHttpContext(requestServices);
+            httpContext.Request.Headers.IfNoneMatch = entityTag;
+
+            var result = provider.ServeAsset("index.html", httpContext);
+            await result.ExecuteAsync(httpContext);
+
+            Assert.Equal(StatusCodes.Status304NotModified, httpContext.Response.StatusCode);
+            Assert.Null(httpContext.Response.ContentType);
+            Assert.Null(httpContext.Response.ContentLength);
+            Assert.Equal(0, httpContext.Response.Headers.CacheControl.Count);
+            Assert.Equal(0, httpContext.Response.Headers.ETag.Count);
+            Assert.Equal(0, httpContext.Response.Headers.ContentEncoding.Count);
+            Assert.Empty(((System.IO.MemoryStream)httpContext.Response.Body).ToArray());
+        }
+
+        [Fact]
+        public async System.Threading.Tasks.Task ServeAsset_UnknownAsset_Returns404WithoutBodyOrCacheHeaders()
+        {
+            var provider = new EmbeddedAssetProvider();
+            using var requestServices = CreateRequestServices();
+            var httpContext = CreateHttpContext(requestServices);
+
+            var result = provider.ServeAsset("missing/asset.js", httpContext);
+            await result.ExecuteAsync(httpContext);
+
+            Assert.Equal(StatusCodes.Status404NotFound, httpContext.Response.StatusCode);
+            Assert.Null(httpContext.Response.ContentType);
+            Assert.Null(httpContext.Response.ContentLength);
+            Assert.Equal(0, httpContext.Response.Headers.CacheControl.Count);
+            Assert.Equal(0, httpContext.Response.Headers.ETag.Count);
+            Assert.Equal(0, httpContext.Response.Headers.ContentEncoding.Count);
+            Assert.Empty(((System.IO.MemoryStream)httpContext.Response.Body).ToArray());
+        }
+
+        private static DefaultHttpContext CreateHttpContext(System.IServiceProvider requestServices)
+        {
+            var context = new DefaultHttpContext
+            {
+                RequestServices = requestServices,
+            };
+            context.Response.Body = new System.IO.MemoryStream();
+            return context;
+        }
+
+        private static Microsoft.Extensions.DependencyInjection.ServiceProvider CreateRequestServices()
+        {
+            var services = new Microsoft.Extensions.DependencyInjection.ServiceCollection();
+            Microsoft.Extensions.DependencyInjection.LoggingServiceCollectionExtensions.AddLogging(services);
+            return Microsoft.Extensions.DependencyInjection.ServiceCollectionContainerBuilderExtensions.BuildServiceProvider(services);
+        }
+
+        private static async System.Threading.Tasks.Task AssertServesExactAsset(
+            EmbeddedAssetProvider provider,
+            string assetName)
+        {
+            var expectedBody = ReadEmbeddedAsset(assetName);
+            using var requestServices = CreateRequestServices();
+            var httpContext = CreateHttpContext(requestServices);
+
+            var result = provider.ServeAsset(assetName, httpContext);
+            await result.ExecuteAsync(httpContext);
+
+            Assert.Equal(StatusCodes.Status200OK, httpContext.Response.StatusCode);
+            Assert.Equal(expectedBody.Length, httpContext.Response.ContentLength);
+            var cacheControl = httpContext.Response.GetTypedHeaders().CacheControl;
+            Assert.NotNull(cacheControl);
+            Assert.True(cacheControl.NoCache);
+            Assert.True(cacheControl.NoStore);
+            Assert.Equal(1, httpContext.Response.Headers.ETag.Count);
+            Assert.Equal(expectedBody, ((System.IO.MemoryStream)httpContext.Response.Body).ToArray());
+        }
+
+        private static byte[] ReadEmbeddedAsset(string assetName)
+        {
+            using var stream = DashboardAssembly.GetManifestResourceStream($"{ResourcePrefix}{assetName}");
+            Assert.NotNull(stream);
+            using var output = new System.IO.MemoryStream();
+            stream.CopyTo(output);
+            return output.ToArray();
+        }
+
+        private static byte[] Decompress(byte[] body)
+        {
+            using var input = new System.IO.MemoryStream(body);
+            using var gzip = new System.IO.Compression.GZipStream(
+                input,
+                System.IO.Compression.CompressionMode.Decompress);
+            using var output = new System.IO.MemoryStream();
+            gzip.CopyTo(output);
+            return output.ToArray();
         }
     }
 }
