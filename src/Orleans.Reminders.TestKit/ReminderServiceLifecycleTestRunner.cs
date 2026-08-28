@@ -328,10 +328,9 @@ public abstract class ReminderServiceLifecycleTestRunner
                 {
                     joined = await _harness.JoinOneSiloAsync(cancellationToken);
                     phase = "registration";
-                    foreach (var (grain, name) in reminders)
-                    {
-                        await grain.RegisterOrUpdateAsync(name, TimeSpan.FromSeconds(3), Period).WaitAsync(cancellationToken);
-                    }
+                    await Task.WhenAll(reminders.Select(item =>
+                        item.Grain.RegisterOrUpdateAsync(item.Name, TimeSpan.FromSeconds(3), Period)
+                            .WaitAsync(cancellationToken)));
 
                     phase = "topology reconciliation";
                     await _harness.WaitForTopologyReconciliationAsync(cancellationToken);
@@ -394,19 +393,31 @@ public abstract class ReminderServiceLifecycleTestRunner
             Guarantee,
             async () =>
             {
+                await Task.WhenAll(reminders.Select(item =>
+                    item.Grain.RegisterOrUpdateAsync(item.Name, TimeSpan.FromSeconds(3), Period)
+                        .WaitAsync(cancellationToken)));
+                await Task.WhenAll(reminders.Select(item =>
+                    _harness.WaitForOwnerCountAsync(
+                        item.Grain.GetGrainId(),
+                        item.Name,
+                        1,
+                        cancellationToken)));
                 foreach (var (grain, name) in reminders)
                 {
-                    await grain.RegisterOrUpdateAsync(name, TimeSpan.FromSeconds(3), Period).WaitAsync(cancellationToken);
-                    await _harness.WaitForOwnerCountAsync(grain.GetGrainId(), name, 1, cancellationToken);
                     initialOwners[grain.GetGrainId()] = _harness.GetOwners(grain.GetGrainId(), name).Single();
                 }
 
                 joined = await _harness.JoinOneSiloAsync(cancellationToken);
                 await _harness.WaitForTopologyReconciliationAsync(cancellationToken);
+                await Task.WhenAll(reminders.Select(item =>
+                    _harness.WaitForOwnerCountAsync(
+                        item.Grain.GetGrainId(),
+                        item.Name,
+                        1,
+                        cancellationToken)));
                 var transferred = 0;
                 foreach (var (grain, name) in reminders)
                 {
-                    await _harness.WaitForOwnerCountAsync(grain.GetGrainId(), name, 1, cancellationToken);
                     var owner = _harness.GetOwners(grain.GetGrainId(), name).Single();
                     transferred += owner.Equals(joined) ? 1 : 0;
                 }
@@ -422,9 +433,14 @@ public abstract class ReminderServiceLifecycleTestRunner
                 await _harness.LeaveSiloAsync(joined, cancellationToken);
                 joined = null;
                 await _harness.WaitForTopologyReconciliationAsync(cancellationToken);
+                await Task.WhenAll(reminders.Select(item =>
+                    _harness.WaitForOwnerCountAsync(
+                        item.Grain.GetGrainId(),
+                        item.Name,
+                        1,
+                        cancellationToken)));
                 foreach (var (grain, name) in reminders)
                 {
-                    await _harness.WaitForOwnerCountAsync(grain.GetGrainId(), name, 1, cancellationToken);
                     var owner = _harness.GetOwners(grain.GetGrainId(), name).Single();
                     var expectedOwner = initialOwners[grain.GetGrainId()];
                     if (!owner.Equals(expectedOwner))
@@ -435,9 +451,13 @@ public abstract class ReminderServiceLifecycleTestRunner
                             .Throw();
                     }
 
-                    await _harness.WaitForScheduleAsync(grain.GetGrainId(), name, cancellationToken);
                 }
 
+                await Task.WhenAll(reminders.Select(item =>
+                    _harness.WaitForScheduleAsync(
+                        item.Grain.GetGrainId(),
+                        item.Name,
+                        cancellationToken)));
                 var tickWaits = reminders
                     .Select(item => _harness.WaitForTickCountAsync(
                         item.Grain.GetGrainId(),
@@ -480,8 +500,9 @@ public abstract class ReminderServiceLifecycleTestRunner
             Guarantee,
             async () =>
             {
-                await sentinel.RegisterOrUpdateAsync(SentinelName, TimeSpan.FromMinutes(1), Period).WaitAsync(cancellationToken);
-                await subject.RegisterOrUpdateAsync(SubjectName, TimeSpan.FromMinutes(1), Period).WaitAsync(cancellationToken);
+                await Task.WhenAll(
+                    sentinel.RegisterOrUpdateAsync(SentinelName, TimeSpan.FromMinutes(1), Period).WaitAsync(cancellationToken),
+                    subject.RegisterOrUpdateAsync(SubjectName, TimeSpan.FromMinutes(1), Period).WaitAsync(cancellationToken));
                 await CleanupAsync(Guarantee, subject, SubjectName, cancellationToken);
                 var sentinelRow = await _harness.ReminderTable.ReadRow(sentinel.GetGrainId(), SentinelName).WaitAsync(cancellationToken);
                 if (sentinelRow is null)
@@ -564,10 +585,8 @@ public abstract class ReminderServiceLifecycleTestRunner
         IReadOnlyList<(IReminderServiceTestGrain Grain, string Name)> reminders,
         CancellationToken cancellationToken)
     {
-        foreach (var (grain, name) in reminders)
-        {
-            await CleanupAsync(guarantee, grain, name, cancellationToken);
-        }
+        await Task.WhenAll(reminders.Select(item =>
+            CleanupAsync(guarantee, item.Grain, item.Name, cancellationToken)));
     }
 
     private async Task CleanupAsync(
