@@ -54,6 +54,10 @@ dotnet format PATH_TO_PROJECT_OR_SOLUTION analyzers --severity info --diagnostic
 
 Run the command from the repository root. Replace `PATH_TO_PROJECT_OR_SOLUTION` with the path to the owning `.csproj` to regenerate one manifest, or a `.sln`/`.slnx` path to regenerate manifests in every affected project. The `--severity info` option includes `ORLEANS0020`, allowing the command to create a missing manifest.
 
+Regeneration edits `OrleansContracts.txt` files only. It does not add or change `[Alias]`, `[Id]`, `[GrainType]`, or `[GrainInterfaceType]` attributes in source. Attribute-like syntax in the manifest records the effective identity which Orleans already uses at runtime.
+
+For a method without `[Id]` or `[Alias]`, the manifest records the same generated xxHash32 method ID which the Orleans code generator already uses on the wire. The preceding comment records the CLR signature so reviewers can map the wire ID back to source. A one-time upgrade from an older manifest format can therefore replace a CLR method name with its existing generated ID; this records the current wire contract and does not change it.
+
 After the command completes:
 
 1. Inspect `git diff -- "*OrleansContracts.txt"` and account for every changed identity, version, and method signature.
@@ -80,12 +84,16 @@ Interface methods are indented beneath their interface:
 # PATH_TO_PROJECT_OR_SOLUTION with the owning .csproj, .sln, or .slnx path:
 # dotnet format PATH_TO_PROJECT_OR_SOLUTION analyzers --severity info --diagnostics ORLEANS0016 ORLEANS0017 ORLEANS0018 ORLEANS0019 ORLEANS0020 ORLEANS0022 ORLEANS0023 ORLEANS0024
 # Verify with: dotnet build PATH_TO_PROJECT_OR_SOLUTION
+# The regeneration command edits this manifest only; it does not change source attributes.
+# Methods without [Id] or [Alias] use the Orleans code generator's existing wire ID hash.
 # Review every diff: identity or signature changes can break wire compatibility during rolling upgrades.
 # Details: https://aka.ms/orleans/OrleansContracts.txt
 
 interface [GrainInterfaceType("Contoso.Grains.ICartGrain")] Contoso.Grains.ICartGrain [Version(1)]
-  AddAsync(Contoso.Grains.Item) -> Task
-  GetAsync() -> Task<Contoso.Grains.Cart>
+  # Contoso.Grains.ICartGrain.AddAsync(Item item) -> Task
+  15793847(Contoso.Grains.Item) -> Task
+  # Contoso.Grains.ICartGrain.GetAsync() -> Task<Cart>
+  857AC6B2() -> Task<Contoso.Grains.Cart>
 
 class [GrainType("cart")] Contoso.Grains.CartGrain
 ```
@@ -98,13 +106,13 @@ Explicit identities remain visible alongside their CLR names:
 # Contoso.Grains.ICartGrain
 interface [GrainInterfaceType("cart")] Contoso.Grains.ICartGrain [Version(1)]
   # Contoso.Grains.ICartGrain.AddAsync(Item item) -> Task
-  add(Contoso.Grains.Item) -> Task
+[Alias("add")] add(Contoso.Grains.Item) -> Task
 
 # Contoso.Grains.CartGrain
 class [GrainType("cart")] Contoso.Grains.CartGrain
 ```
 
-Comments record CLR names only when they differ from the stable identity. Comments are informational and aren't part of contract matching.
+`[Alias("...")]` on a manifest method records that the identity comes from a source `[Alias]` attribute. An unmarked eight-digit hexadecimal method identity is the generated wire ID. Comments record CLR names when they improve traceability; comments are informational and aren't part of contract matching.
 
 `*RETIRED*` marks an intentionally removed contract:
 

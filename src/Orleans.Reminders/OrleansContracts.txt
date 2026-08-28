@@ -3,27 +3,42 @@
 # PATH_TO_PROJECT_OR_SOLUTION with the owning .csproj, .sln, or .slnx path:
 # dotnet format PATH_TO_PROJECT_OR_SOLUTION analyzers --severity info --diagnostics ORLEANS0016 ORLEANS0017 ORLEANS0018 ORLEANS0019 ORLEANS0020 ORLEANS0022 ORLEANS0023 ORLEANS0024
 # Verify with: dotnet build PATH_TO_PROJECT_OR_SOLUTION
+# The regeneration command edits this manifest only; it does not change source attributes.
+# Methods without [Id] or [Alias] use the Orleans code generator's existing wire ID hash.
 # Review every diff: identity or signature changes can break wire compatibility during rolling upgrades.
 # Details: https://aka.ms/orleans/OrleansContracts.txt
 
 interface [GrainInterfaceType("Orleans.IRemindable")] Orleans.IRemindable [Version(0)]
-  ReceiveReminder(string, Orleans.Runtime.TickStatus) -> Task
+  # Orleans.IRemindable.ReceiveReminder(string reminderName, TickStatus status) -> Task
+  6461BF2F(string, Orleans.Runtime.TickStatus) -> Task
 
 interface [GrainInterfaceType("Orleans.IReminderService")] Orleans.IReminderService [Version(0)]
-  GetReminder(Orleans.Runtime.GrainId, string) -> Task<Orleans.Runtime.IGrainReminder?>
-  GetReminders(Orleans.Runtime.GrainId) -> Task<System.Collections.Generic.List<Orleans.Runtime.IGrainReminder>>
-  RegisterOrUpdateReminder(Orleans.Runtime.GrainId, string, System.TimeSpan, System.TimeSpan) -> Task<Orleans.Runtime.IGrainReminder>
-  Start() -> Task
-  Stop() -> Task
-  UnregisterReminder(Orleans.Runtime.IGrainReminder) -> Task
+  # Orleans.IReminderService.RegisterOrUpdateReminder(GrainId grainId, string reminderName, TimeSpan dueTime, TimeSpan period) -> Task<IGrainReminder>
+  1281C86D(Orleans.Runtime.GrainId, string, System.TimeSpan, System.TimeSpan) -> Task<Orleans.Runtime.IGrainReminder>
+  # Orleans.IReminderService.GetReminders(GrainId grainId) -> Task<List<IGrainReminder>>
+  419EB51E(Orleans.Runtime.GrainId) -> Task<System.Collections.Generic.List<Orleans.Runtime.IGrainReminder>>
+  # Orleans.IReminderService.Start() -> Task
+  5CF78F8A() -> Task
+  # Orleans.IReminderService.UnregisterReminder(IGrainReminder reminder) -> Task
+  A7AF84A8(Orleans.Runtime.IGrainReminder) -> Task
+  # Orleans.IReminderService.GetReminder(GrainId grainId, string reminderName) -> Task<IGrainReminder?>
+  AC622EEB(Orleans.Runtime.GrainId, string) -> Task<Orleans.Runtime.IGrainReminder?>
+  # Orleans.IReminderService.Stop() -> Task
+  DCFCA00D() -> Task
 
 interface [GrainInterfaceType("Orleans.IReminderTableGrain")] Orleans.IReminderTableGrain [Version(0)]
-  ReadRow(Orleans.Runtime.GrainId, string) -> Task<Orleans.ReminderEntry?>
-  ReadRows(Orleans.Runtime.GrainId) -> Task<Orleans.ReminderTableData>
-  ReadRows(uint, uint) -> Task<Orleans.ReminderTableData>
-  RemoveRow(Orleans.Runtime.GrainId, string, string) -> Task<bool>
-  TestOnlyClearTable() -> Task
-  UpsertRow(Orleans.ReminderEntry) -> Task<string?>
+  # Orleans.IReminderTableGrain.ReadRows(uint begin, uint end) -> Task<ReminderTableData>
+  13558B55(uint, uint) -> Task<Orleans.ReminderTableData>
+  # Orleans.IReminderTableGrain.UpsertRow(ReminderEntry entry) -> Task<string?>
+  873299B5(Orleans.ReminderEntry) -> Task<string?>
+  # Orleans.IReminderTableGrain.TestOnlyClearTable() -> Task
+  8EBE0523() -> Task
+  # Orleans.IReminderTableGrain.ReadRow(GrainId grainId, string reminderName) -> Task<ReminderEntry?>
+  ECA791DE(Orleans.Runtime.GrainId, string) -> Task<Orleans.ReminderEntry?>
+  # Orleans.IReminderTableGrain.ReadRows(GrainId grainId) -> Task<ReminderTableData>
+  EEEF6FCA(Orleans.Runtime.GrainId) -> Task<Orleans.ReminderTableData>
+  # Orleans.IReminderTableGrain.RemoveRow(GrainId grainId, string reminderName, string eTag) -> Task<bool>
+  FF391E0B(Orleans.Runtime.GrainId, string, string) -> Task<bool>
 
 class [GrainType("localreminderservice")] Orleans.Runtime.ReminderService.LocalReminderService
 

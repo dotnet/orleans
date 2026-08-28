@@ -3,13 +3,17 @@
 # PATH_TO_PROJECT_OR_SOLUTION with the owning .csproj, .sln, or .slnx path:
 # dotnet format PATH_TO_PROJECT_OR_SOLUTION analyzers --severity info --diagnostics ORLEANS0016 ORLEANS0017 ORLEANS0018 ORLEANS0019 ORLEANS0020 ORLEANS0022 ORLEANS0023 ORLEANS0024
 # Verify with: dotnet build PATH_TO_PROJECT_OR_SOLUTION
+# The regeneration command edits this manifest only; it does not change source attributes.
+# Methods without [Id] or [Alias] use the Orleans code generator's existing wire ID hash.
 # Review every diff: identity or signature changes can break wire compatibility during rolling upgrades.
 # Details: https://aka.ms/orleans/OrleansContracts.txt
 
 interface [GrainInterfaceType("Orleans.DurableJobs.IDurableJobReceiverExtension")] Orleans.DurableJobs.IDurableJobReceiverExtension [Version(0)]
-  HandleDurableJobAsync(Orleans.DurableJobs.IJobRunContext, System.Threading.CancellationToken) -> ValueTask<Orleans.DurableJobs.DurableJobRunResult>
+  # Orleans.DurableJobs.IDurableJobReceiverExtension.HandleDurableJobAsync(IJobRunContext context, CancellationToken attemptCancellationToken) -> ValueTask<DurableJobRunResult>
+  703DB2D4(Orleans.DurableJobs.IJobRunContext, System.Threading.CancellationToken) -> ValueTask<Orleans.DurableJobs.DurableJobRunResult>
 
 interface [GrainInterfaceType("Orleans.DurableJobs.ILocalDurableJobManagerSystemTarget")] Orleans.DurableJobs.ILocalDurableJobManagerSystemTarget [Version(0)]
-  CancelAsync(Orleans.DurableJobs.DurableJob, System.Threading.CancellationToken) -> Task<bool>
+  # Orleans.DurableJobs.ILocalDurableJobManagerSystemTarget.CancelAsync(DurableJob job, CancellationToken requestCancellationToken) -> Task<bool>
+  4D559F22(Orleans.DurableJobs.DurableJob, System.Threading.CancellationToken) -> Task<bool>
 
 class [GrainType("localdurablejobmanager")] Orleans.DurableJobs.LocalDurableJobManager

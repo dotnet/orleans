@@ -3,13 +3,19 @@
 # PATH_TO_PROJECT_OR_SOLUTION with the owning .csproj, .sln, or .slnx path:
 # dotnet format PATH_TO_PROJECT_OR_SOLUTION analyzers --severity info --diagnostics ORLEANS0016 ORLEANS0017 ORLEANS0018 ORLEANS0019 ORLEANS0020 ORLEANS0022 ORLEANS0023 ORLEANS0024
 # Verify with: dotnet build PATH_TO_PROJECT_OR_SOLUTION
+# The regeneration command edits this manifest only; it does not change source attributes.
+# Methods without [Id] or [Alias] use the Orleans code generator's existing wire ID hash.
 # Review every diff: identity or signature changes can break wire compatibility during rolling upgrades.
 # Details: https://aka.ms/orleans/OrleansContracts.txt
 
 interface [GrainInterfaceType("Orleans.EventSourcing.ILogConsistencyProtocolParticipant")] Orleans.EventSourcing.ILogConsistencyProtocolParticipant [Version(0)]
-  DeactivateProtocolParticipant() -> Task
-  PostActivateProtocolParticipant() -> Task
-  PreActivateProtocolParticipant() -> Task
+  # Orleans.EventSourcing.ILogConsistencyProtocolParticipant.PreActivateProtocolParticipant() -> Task
+  0DB087C8() -> Task
+  # Orleans.EventSourcing.ILogConsistencyProtocolParticipant.PostActivateProtocolParticipant() -> Task
+  22FD7D72() -> Task
+  # Orleans.EventSourcing.ILogConsistencyProtocolParticipant.DeactivateProtocolParticipant() -> Task
+  A36FC884() -> Task
 
 interface [GrainInterfaceType("Orleans.SystemTargetInterfaces.ILogConsistencyProtocolGateway")] Orleans.SystemTargetInterfaces.ILogConsistencyProtocolGateway [Version(0)]
-  RelayMessage(Orleans.Runtime.GrainId, Orleans.EventSourcing.ILogConsistencyProtocolMessage) -> Task<Orleans.EventSourcing.ILogConsistencyProtocolMessage?>
+  # Orleans.SystemTargetInterfaces.ILogConsistencyProtocolGateway.RelayMessage(GrainId id, ILogConsistencyProtocolMessage payload) -> Task<ILogConsistencyProtocolMessage?>
+  C86A1066(Orleans.Runtime.GrainId, Orleans.EventSourcing.ILogConsistencyProtocolMessage) -> Task<Orleans.EventSourcing.ILogConsistencyProtocolMessage?>

@@ -15,7 +15,7 @@ ms.topic: reference
 
 ## Cause
 
-`OrleansContracts.txt` declares an RPC method signature which is absent from the matching source grain interface.
+`OrleansContracts.txt` declares an RPC method signature which is absent from the matching source grain interface. The manifest identity is an explicit `[Id]` or `[Alias]` value when present in source; otherwise, it is the generated method ID already used by Orleans on the wire.
 
 ## Impact
 

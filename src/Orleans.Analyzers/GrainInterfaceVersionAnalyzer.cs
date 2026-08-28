@@ -3,6 +3,7 @@
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.Diagnostics;
 using Microsoft.CodeAnalysis.Text;
+using Orleans.CodeGenerator;
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
@@ -402,7 +403,8 @@ public sealed partial class GrainInterfaceVersionAnalyzer : DiagnosticAnalyzer
                             location,
                             properties,
                             memberSignature,
-                            interfaceName));
+                            interfaceName,
+                            GetClrMethodSignature(member)));
                     }
                 }
             }
@@ -412,7 +414,7 @@ public sealed partial class GrainInterfaceVersionAnalyzer : DiagnosticAnalyzer
                 foreach (var declaredMember in declaredInterface.Members.Values)
                 {
                     if (sourceMembers.Any(member =>
-                        GrainInterfaceVersionAnalyzer.IsMatchingMember(
+                        GrainInterfaceVersionAnalyzer.IsMatchingHistoricalMember(
                             declaredInterface.Name,
                             declaredMember.Signature,
                             declaredMember.Alias,
@@ -807,10 +809,15 @@ public sealed partial class GrainInterfaceVersionAnalyzer : DiagnosticAnalyzer
 
     internal static string GetMethodSignature(IMethodSymbol method)
     {
-        var sb = new StringBuilder();
         var methodId = GetAttributeValue(method, Constants.IdAttributeFullyQualifiedName);
         var methodAlias = GetStringAttributeValue(method, Constants.AliasAttributeFullyQualifiedName);
-        sb.Append(methodId ?? methodAlias ?? method.Name);
+        return GetMethodSignature(method, methodId ?? methodAlias ?? MethodIdProvider.Create(method));
+    }
+
+    private static string GetMethodSignature(IMethodSymbol method, object methodId)
+    {
+        var sb = new StringBuilder();
+        sb.Append(methodId);
         if (method.Arity > 0)
         {
             sb.Append('`');
@@ -862,6 +869,11 @@ public sealed partial class GrainInterfaceVersionAnalyzer : DiagnosticAnalyzer
     {
         var methodId = GetAttributeValue(method, Constants.IdAttributeFullyQualifiedName)?.ToString();
         var methodAlias = GetStringAttributeValue(method, Constants.AliasAttributeFullyQualifiedName);
+        if (methodId is null && methodAlias is null)
+        {
+            return true;
+        }
+
         if (methodId is not null && !string.Equals(methodId, method.Name, StringComparison.Ordinal)
             || methodAlias is not null && !string.Equals(methodAlias, method.Name, StringComparison.Ordinal))
         {
@@ -907,11 +919,13 @@ public sealed partial class GrainInterfaceVersionAnalyzer : DiagnosticAnalyzer
         IMethodSymbol member)
     {
         var memberSignature = GetMethodSignature(member);
+        var sourceMethodId = GetAttributeValue(member, Constants.IdAttributeFullyQualifiedName);
+        var sourceMethodAlias = GetStringAttributeValue(member, Constants.AliasAttributeFullyQualifiedName);
         if (storedAlias is not null)
         {
             if (!string.Equals(
                 storedAlias,
-                GetStringAttributeValue(member, Constants.AliasAttributeFullyQualifiedName),
+                sourceMethodAlias,
                 StringComparison.Ordinal))
             {
                 return false;
@@ -945,9 +959,25 @@ public sealed partial class GrainInterfaceVersionAnalyzer : DiagnosticAnalyzer
                 StringComparison.Ordinal);
         }
 
+        var normalizedStoredSignature = NormalizeStoredMemberSignature(storedSignature, declaredInterfaceName);
+        if (sourceMethodAlias is not null)
+        {
+            return false;
+        }
+
+        if (sourceMethodId is not null)
+        {
+            return string.Equals(normalizedStoredSignature, memberSignature, StringComparison.Ordinal);
+        }
+
+        if (string.Equals(normalizedStoredSignature, memberSignature, StringComparison.Ordinal))
+        {
+            return true;
+        }
+
         if (string.Equals(
-            NormalizeStoredMemberSignature(storedSignature, declaredInterfaceName),
-            memberSignature,
+            normalizedStoredSignature,
+            GetMethodSignature(member, member.Name),
             StringComparison.Ordinal))
         {
             return true;
@@ -961,6 +991,26 @@ public sealed partial class GrainInterfaceVersionAnalyzer : DiagnosticAnalyzer
             || string.Equals(
                 normalized,
                 NormalizeLegacyMethodSignature(clrSignature.Substring(containingTypePrefix.Length)),
+                StringComparison.Ordinal);
+    }
+
+    internal static bool IsMatchingHistoricalMember(
+        string declaredInterfaceName,
+        string storedSignature,
+        string? storedAlias,
+        IMethodSymbol member)
+    {
+        if (IsMatchingMember(declaredInterfaceName, storedSignature, storedAlias, member))
+        {
+            return true;
+        }
+
+        var sourceMethodAlias = GetStringAttributeValue(member, Constants.AliasAttributeFullyQualifiedName);
+        return storedAlias is null
+            && sourceMethodAlias is not null
+            && string.Equals(
+                NormalizeStoredMemberSignature(storedSignature, declaredInterfaceName),
+                GetMethodSignature(member),
                 StringComparison.Ordinal);
     }
 

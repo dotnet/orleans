@@ -236,7 +236,7 @@
     <value>Grain interface member not declared in OrleansContracts.txt</value>
   </data>
   <data name="GrainInterfaceMemberNotDeclaredMessageFormat" xml:space="preserve">
-    <value>Grain interface member '{0}' is not declared in OrleansContracts.txt for interface '{1}'. Run the regeneration command in the file header for the owning project or solution, then review the diff for wire compatibility. See https://aka.ms/orleans/OrleansContracts.txt for details.</value>
+    <value>Grain interface source member '{2}' with wire signature '{0}' is not declared in OrleansContracts.txt for interface '{1}'. Run the regeneration command in the file header for the owning project or solution, then review the diff for wire compatibility. See https://aka.ms/orleans/OrleansContracts.txt for details.</value>
   </data>
   <data name="GrainInterfaceMemberNotDeclaredDescription" xml:space="preserve">
     <value>When adding or modifying grain interface members, update OrleansContracts.txt and increment the interface version.</value>

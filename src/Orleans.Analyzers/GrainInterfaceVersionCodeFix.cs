@@ -26,6 +26,7 @@ public class GrainInterfaceVersionCodeFix : CodeFixProvider
     private const string DefaultNewLine = "\n";
     private const string RegenerateCodeActionTitle = "Regenerate OrleansContracts.txt";
     private const string RegenerateCodeActionEquivalenceKey = nameof(RegenerateOrleansContractsFileAsync);
+    private static readonly Encoding Utf8NoBom = new UTF8Encoding(encoderShouldEmitUTF8Identifier: false);
     private const string RegenerationCommand =
         "dotnet format PATH_TO_PROJECT_OR_SOLUTION analyzers --severity info --diagnostics ORLEANS0016 ORLEANS0017 ORLEANS0018 ORLEANS0019 ORLEANS0020 ORLEANS0022 ORLEANS0023 ORLEANS0024";
     private static readonly string[] GeneratedHeader =
@@ -35,6 +36,8 @@ public class GrainInterfaceVersionCodeFix : CodeFixProvider
         "# PATH_TO_PROJECT_OR_SOLUTION with the owning .csproj, .sln, or .slnx path:",
         $"# {RegenerationCommand}",
         "# Verify with: dotnet build PATH_TO_PROJECT_OR_SOLUTION",
+        "# The regeneration command edits this manifest only; it does not change source attributes.",
+        "# Methods without [Id] or [Alias] use the Orleans code generator's existing wire ID hash.",
         "# Review every diff: identity or signature changes can break wire compatibility during rolling upgrades.",
         "# Details: https://aka.ms/orleans/OrleansContracts.txt"
     ];
@@ -144,8 +147,13 @@ public class GrainInterfaceVersionCodeFix : CodeFixProvider
         var activeConventionClassNames = new HashSet<string>(StringComparer.Ordinal);
         var iAddressableType = compilation.GetTypeByMetadataName(Constants.IAddressibleFullyQualifiedName);
         var generatedCodeTrees = new Dictionary<SyntaxTree, bool>();
+        var semanticModels = new Dictionary<SyntaxTree, SemanticModel>();
 
-        foreach (var type in GetAllSourceTypes(compilation.Assembly.GlobalNamespace, generatedCodeTrees)
+        foreach (var type in GetAllSourceTypes(
+            compilation.Assembly.GlobalNamespace,
+            compilation,
+            generatedCodeTrees,
+            semanticModels)
             .OrderBy(GetFullyQualifiedName, StringComparer.Ordinal))
         {
             if (type.TypeKind == TypeKind.Interface
@@ -181,7 +189,7 @@ public class GrainInterfaceVersionCodeFix : CodeFixProvider
         }
 
         var content = SortContractEntries(string.Join(newLine, lines), newLine);
-        var newText = SourceText.From(content, Encoding.UTF8);
+        var newText = SourceText.From(content, Utf8NoBom);
         if (contractsFile is not null)
         {
             return project.Solution.WithAdditionalDocumentText(contractsFile.Id, newText);
@@ -273,11 +281,17 @@ public class GrainInterfaceVersionCodeFix : CodeFixProvider
 
     private static IEnumerable<INamedTypeSymbol> GetAllSourceTypes(
         INamespaceSymbol @namespace,
-        Dictionary<SyntaxTree, bool> generatedCodeTrees)
+        Compilation compilation,
+        Dictionary<SyntaxTree, bool> generatedCodeTrees,
+        Dictionary<SyntaxTree, SemanticModel> semanticModels)
     {
         foreach (var type in @namespace.GetTypeMembers())
         {
-            foreach (var result in GetSourceTypeAndNestedTypes(type, generatedCodeTrees))
+            foreach (var result in GetSourceTypeAndNestedTypes(
+                type,
+                compilation,
+                generatedCodeTrees,
+                semanticModels))
             {
                 yield return result;
             }
@@ -285,7 +299,11 @@ public class GrainInterfaceVersionCodeFix : CodeFixProvider
 
         foreach (var childNamespace in @namespace.GetNamespaceMembers())
         {
-            foreach (var result in GetAllSourceTypes(childNamespace, generatedCodeTrees))
+            foreach (var result in GetAllSourceTypes(
+                childNamespace,
+                compilation,
+                generatedCodeTrees,
+                semanticModels))
             {
                 yield return result;
             }
@@ -294,10 +312,12 @@ public class GrainInterfaceVersionCodeFix : CodeFixProvider
 
     private static IEnumerable<INamedTypeSymbol> GetSourceTypeAndNestedTypes(
         INamedTypeSymbol type,
-        Dictionary<SyntaxTree, bool> generatedCodeTrees)
+        Compilation compilation,
+        Dictionary<SyntaxTree, bool> generatedCodeTrees,
+        Dictionary<SyntaxTree, SemanticModel> semanticModels)
     {
         if (!type.IsImplicitlyDeclared
-            && !IsGeneratedCode(type, generatedCodeTrees)
+            && !IsGeneratedCode(type, compilation, generatedCodeTrees, semanticModels)
             && type.Locations.Any(location => location.IsInSource))
         {
             yield return type;
@@ -305,7 +325,11 @@ public class GrainInterfaceVersionCodeFix : CodeFixProvider
 
         foreach (var nestedType in type.GetTypeMembers())
         {
-            foreach (var result in GetSourceTypeAndNestedTypes(nestedType, generatedCodeTrees))
+            foreach (var result in GetSourceTypeAndNestedTypes(
+                nestedType,
+                compilation,
+                generatedCodeTrees,
+                semanticModels))
             {
                 yield return result;
             }
@@ -314,22 +338,37 @@ public class GrainInterfaceVersionCodeFix : CodeFixProvider
 
     private static bool IsGeneratedCode(
         INamedTypeSymbol type,
-        Dictionary<SyntaxTree, bool> generatedCodeTrees)
+        Compilation compilation,
+        Dictionary<SyntaxTree, bool> generatedCodeTrees,
+        Dictionary<SyntaxTree, SemanticModel> semanticModels)
     {
-        for (ISymbol? symbol = type; symbol is not null; symbol = symbol.ContainingType)
+        var declarations = type.DeclaringSyntaxReferences;
+        return !declarations.IsEmpty
+            && declarations.All(declaration =>
+                IsGeneratedCode(declaration.SyntaxTree, generatedCodeTrees)
+                || HasGeneratedCodeAttribute(declaration.GetSyntax(), compilation, semanticModels));
+    }
+
+    private static bool HasGeneratedCodeAttribute(
+        SyntaxNode declaration,
+        Compilation compilation,
+        Dictionary<SyntaxTree, SemanticModel> semanticModels)
+    {
+        if (!semanticModels.TryGetValue(declaration.SyntaxTree, out var semanticModel))
         {
-            if (symbol.GetAttributes().Any(attribute =>
-                attribute.AttributeClass?.ToDisplayString() is
-                    "System.CodeDom.Compiler.GeneratedCodeAttribute"
-                    or "System.Runtime.CompilerServices.CompilerGeneratedAttribute"))
-            {
-                return true;
-            }
+            semanticModel = compilation.GetSemanticModel(declaration.SyntaxTree);
+            semanticModels[declaration.SyntaxTree] = semanticModel;
         }
 
-        return type.Locations
-            .Where(location => location.IsInSource && location.SourceTree is not null)
-            .Any(location => IsGeneratedCode(location.SourceTree!, generatedCodeTrees));
+        return declaration.AncestorsAndSelf()
+            .OfType<TypeDeclarationSyntax>()
+            .SelectMany(type => type.AttributeLists)
+            .SelectMany(list => list.Attributes)
+            .Select(attribute => semanticModel.GetSymbolInfo(attribute).Symbol as IMethodSymbol)
+            .Select(constructor => constructor?.ContainingType.ToDisplayString())
+            .Any(attributeType => attributeType is
+                "System.CodeDom.Compiler.GeneratedCodeAttribute"
+                or "System.Runtime.CompilerServices.CompilerGeneratedAttribute");
     }
 
     private static bool IsGeneratedCode(
@@ -397,7 +436,9 @@ public class GrainInterfaceVersionCodeFix : CodeFixProvider
                 lines.Add($"  # {GrainInterfaceVersionAnalyzer.GetClrMethodSignature(member)}");
             }
 
-            lines.Add($"  {GrainInterfaceVersionAnalyzer.GetMethodSignature(member)}");
+            lines.Add($"  {FormatStoredMember(
+                GrainInterfaceVersionAnalyzer.GetMethodSignature(member),
+                GetAliasFromAttributes(member))}");
         }
     }
 
@@ -606,7 +647,7 @@ public class GrainInterfaceVersionCodeFix : CodeFixProvider
                 .OfType<IMethodSymbol>()
                 .Any(member => member.MethodKind == MethodKind.Ordinary
                     && !member.IsStatic
-                    && GrainInterfaceVersionAnalyzer.IsMatchingMember(
+                    && GrainInterfaceVersionAnalyzer.IsMatchingHistoricalMember(
                         historicalInterfaceName,
                         memberSignature,
                         memberAlias,
@@ -627,7 +668,7 @@ public class GrainInterfaceVersionCodeFix : CodeFixProvider
                     result.Insert(generatedBlockEnd++, $"  {pendingComment}");
                 }
 
-                result.Insert(generatedBlockEnd++, $"  {historicalMemberKey}");
+                result.Insert(generatedBlockEnd++, $"  {FormatStoredMember(historicalMemberKey, memberAlias)}");
             }
 
             pendingComment = null;
@@ -766,12 +807,20 @@ public class GrainInterfaceVersionCodeFix : CodeFixProvider
         }
 
         diagnostic.Properties.TryGetValue(GrainInterfaceVersionAnalyzer.MemberClrSignaturePropertyKey, out var memberClrSignature);
+        diagnostic.Properties.TryGetValue(GrainInterfaceVersionAnalyzer.MemberAliasPropertyKey, out var memberAlias);
         diagnostic.Properties.TryGetValue(GrainInterfaceVersionAnalyzer.GrainInterfaceTypePropertyKey, out var grainInterfaceType);
 
         context.RegisterCodeFix(
             CodeAction.Create(
                 title: Resources.AddToOrleansContractsFileTitle,
-                createChangedSolution: ct => AddMemberToFileAsync(context.Document, interfaceName!, grainInterfaceType, memberSignature!, memberClrSignature, ct),
+                createChangedSolution: ct => AddMemberToFileAsync(
+                    context.Document,
+                    interfaceName!,
+                    grainInterfaceType,
+                    memberSignature!,
+                    memberAlias,
+                    memberClrSignature,
+                    ct),
                 equivalenceKey: GrainInterfaceVersionAnalyzer.RuleId0018),
             diagnostic);
     }
@@ -899,7 +948,7 @@ public class GrainInterfaceVersionCodeFix : CodeFixProvider
                 var reactivatedContent = SortContractEntries(string.Join(newLine, updatedLines), newLine);
                 return solution.WithAdditionalDocumentText(
                     contractsFile.Id,
-                    Microsoft.CodeAnalysis.Text.SourceText.From(reactivatedContent, Encoding.UTF8));
+                    Microsoft.CodeAnalysis.Text.SourceText.From(reactivatedContent, Utf8NoBom));
             }
         }
 
@@ -916,7 +965,7 @@ public class GrainInterfaceVersionCodeFix : CodeFixProvider
         content = SortContractEntries(content + classLine, newLine);
         return solution.WithAdditionalDocumentText(
             contractsFile.Id,
-            Microsoft.CodeAnalysis.Text.SourceText.From(content, Encoding.UTF8));
+            Microsoft.CodeAnalysis.Text.SourceText.From(content, Utf8NoBom));
     }
 
     private static async Task<Solution> UpdateGrainClassAliasInFileAsync(
@@ -958,7 +1007,7 @@ public class GrainInterfaceVersionCodeFix : CodeFixProvider
         var content = SortContractEntries(string.Join(newLine, lines), newLine);
         return project.Solution.WithAdditionalDocumentText(
             contractsFile.Id,
-            Microsoft.CodeAnalysis.Text.SourceText.From(content, Encoding.UTF8));
+            Microsoft.CodeAnalysis.Text.SourceText.From(content, Utf8NoBom));
     }
 
     private static async Task<Solution> RetireGrainClassInFileAsync(
@@ -996,7 +1045,7 @@ public class GrainInterfaceVersionCodeFix : CodeFixProvider
         var content = SortContractEntries(string.Join(newLine, lines), newLine);
         return project.Solution.WithAdditionalDocumentText(
             contractsFile.Id,
-            Microsoft.CodeAnalysis.Text.SourceText.From(content, Encoding.UTF8));
+            Microsoft.CodeAnalysis.Text.SourceText.From(content, Utf8NoBom));
     }
 
     private static async Task<Solution> AddInterfaceToFileAsync(
@@ -1057,7 +1106,7 @@ public class GrainInterfaceVersionCodeFix : CodeFixProvider
         var interfaceLine = sb.ToString();
 
         // Build member lines
-        var memberLines = new List<(string Signature, string? ClrSignature)>();
+        var memberLines = new List<(string Signature, string? Alias, string? ClrSignature)>();
         foreach (var member in symbol.GetMembers().OfType<IMethodSymbol>())
         {
             if (member.MethodKind != MethodKind.Ordinary || member.IsStatic)
@@ -1068,6 +1117,7 @@ public class GrainInterfaceVersionCodeFix : CodeFixProvider
             var memberSignature = GrainInterfaceVersionAnalyzer.GetMethodSignature(member);
             memberLines.Add((
                 memberSignature,
+                GetAliasFromAttributes(member),
                 GrainInterfaceVersionAnalyzer.RequiresClrComment(member)
                     ? GrainInterfaceVersionAnalyzer.GetClrMethodSignature(member)
                     : null));
@@ -1091,7 +1141,7 @@ public class GrainInterfaceVersionCodeFix : CodeFixProvider
                     i = SetClrCommentBefore(updatedLines, i, interfaceClrComment);
                     updatedLines[i] = interfaceLine;
                     var reactivatedContent = SortContractEntries(string.Join(newLine, updatedLines), newLine);
-                    var reactivatedText = Microsoft.CodeAnalysis.Text.SourceText.From(reactivatedContent, Encoding.UTF8);
+                    var reactivatedText = Microsoft.CodeAnalysis.Text.SourceText.From(reactivatedContent, Utf8NoBom);
                     return solution.WithAdditionalDocumentText(grainInterfacesFile.Id, reactivatedText);
                 }
             }
@@ -1112,11 +1162,11 @@ public class GrainInterfaceVersionCodeFix : CodeFixProvider
                 {
                     newContent += $"{newLine}  # {member.ClrSignature}";
                 }
-                newContent += $"{newLine}  {member.Signature}";
+                newContent += $"{newLine}  {FormatStoredMember(member.Signature, member.Alias)}";
             }
             newContent = SortContractEntries(newContent, newLine);
 
-            var newText = Microsoft.CodeAnalysis.Text.SourceText.From(newContent, Encoding.UTF8);
+            var newText = Microsoft.CodeAnalysis.Text.SourceText.From(newContent, Utf8NoBom);
             solution = solution.WithAdditionalDocumentText(grainInterfacesFile.Id, newText);
         }
         else
@@ -1133,10 +1183,10 @@ public class GrainInterfaceVersionCodeFix : CodeFixProvider
                 {
                     AppendLine(content, $"  # {member.ClrSignature}", DefaultNewLine);
                 }
-                AppendLine(content, $"  {member.Signature}", DefaultNewLine);
+                AppendLine(content, $"  {FormatStoredMember(member.Signature, member.Alias)}", DefaultNewLine);
             }
 
-            var newText = Microsoft.CodeAnalysis.Text.SourceText.From(SortContractEntries(content.ToString(), DefaultNewLine), Encoding.UTF8);
+            var newText = Microsoft.CodeAnalysis.Text.SourceText.From(SortContractEntries(content.ToString(), DefaultNewLine), Utf8NoBom);
             var filePath = GetConfiguredContractsPath(project);
 
             solution = solution.AddAdditionalDocument(
@@ -1207,7 +1257,7 @@ public class GrainInterfaceVersionCodeFix : CodeFixProvider
         }
         newContent = SortContractEntries(newContent, newLine);
 
-        var newText = Microsoft.CodeAnalysis.Text.SourceText.From(newContent, Encoding.UTF8);
+        var newText = Microsoft.CodeAnalysis.Text.SourceText.From(newContent, Utf8NoBom);
         return solution.WithAdditionalDocumentText(grainInterfacesFile.Id, newText);
     }
 
@@ -1216,6 +1266,7 @@ public class GrainInterfaceVersionCodeFix : CodeFixProvider
         string interfaceName,
         string? grainInterfaceType,
         string memberSignature,
+        string? memberAlias,
         string? memberClrSignature,
         CancellationToken cancellationToken)
     {
@@ -1252,7 +1303,7 @@ public class GrainInterfaceVersionCodeFix : CodeFixProvider
                     || trimmedLine.StartsWith("#", StringComparison.Ordinal)
                     || GrainInterfaceFileParser.TryGetContractName(trimmedLine, out _)))
             {
-                AppendMember(newLines, memberSignature, memberClrSignature, newLine);
+                AppendMember(newLines, memberSignature, memberAlias, memberClrSignature, newLine);
                 insertedMember = true;
             }
 
@@ -1268,7 +1319,7 @@ public class GrainInterfaceVersionCodeFix : CodeFixProvider
         // If we didn't insert the member yet, append it at the end
         if (foundInterface && !insertedMember)
         {
-            AppendMember(newLines, memberSignature, memberClrSignature, newLine);
+            AppendMember(newLines, memberSignature, memberAlias, memberClrSignature, newLine);
         }
 
         // Remove trailing newline added by AppendLine
@@ -1279,7 +1330,7 @@ public class GrainInterfaceVersionCodeFix : CodeFixProvider
         }
         newContent = SortContractEntries(newContent, newLine);
 
-        var newText = Microsoft.CodeAnalysis.Text.SourceText.From(newContent, Encoding.UTF8);
+        var newText = Microsoft.CodeAnalysis.Text.SourceText.From(newContent, Utf8NoBom);
         return solution.WithAdditionalDocumentText(grainInterfacesFile.Id, newText);
     }
 
@@ -1333,7 +1384,7 @@ public class GrainInterfaceVersionCodeFix : CodeFixProvider
         }
         newContent = SortContractEntries(newContent, newLine);
 
-        var newText = Microsoft.CodeAnalysis.Text.SourceText.From(newContent, Encoding.UTF8);
+        var newText = Microsoft.CodeAnalysis.Text.SourceText.From(newContent, Utf8NoBom);
         return solution.WithAdditionalDocumentText(grainInterfacesFile.Id, newText);
     }
 
@@ -1468,13 +1519,20 @@ public class GrainInterfaceVersionCodeFix : CodeFixProvider
                 }
                 preamble.Add(line);
             }
-            else if (GrainInterfaceFileParser.TryGetMemberSignature(line, out var memberSignature))
+            else if (GrainInterfaceFileParser.TryGetMemberDeclaration(
+                line,
+                out var storedMemberSignature,
+                out var memberAlias))
             {
+                var memberSignature = GrainInterfaceFileParser.GetCanonicalMemberSignature(
+                    storedMemberSignature,
+                    memberAlias);
                 var inlineComment = GrainInterfaceFileParser.GetClrComment(line);
                 var normalizedMemberLine = NormalizeMemberLine(memberSignature, currentBlock.Name);
                 currentBlock.Members.Add((
                     normalizedMemberLine,
                     normalizedMemberLine,
+                    memberAlias,
                     pendingComment ?? (inlineComment.Length > 0 ? NormalizeComment(inlineComment) : null)));
                 pendingComment = null;
             }
@@ -1527,7 +1585,7 @@ public class GrainInterfaceVersionCodeFix : CodeFixProvider
                 {
                     result.Add($"  {member.ClrComment}");
                 }
-                result.Add($"  {member.Line}");
+                result.Add($"  {FormatStoredMember(member.Line, member.Alias)}");
             }
             result.AddRange(block.OtherLines);
         }
@@ -1590,6 +1648,7 @@ public class GrainInterfaceVersionCodeFix : CodeFixProvider
     private static void AppendMember(
         StringBuilder builder,
         string memberSignature,
+        string? memberAlias,
         string? memberClrSignature,
         string newLine)
     {
@@ -1598,8 +1657,13 @@ public class GrainInterfaceVersionCodeFix : CodeFixProvider
             AppendLine(builder, $"  # {memberClrSignature}", newLine);
         }
 
-        AppendLine(builder, $"  {memberSignature}", newLine);
+        AppendLine(builder, $"  {FormatStoredMember(memberSignature, memberAlias)}", newLine);
     }
+
+    private static string FormatStoredMember(string memberSignature, string? memberAlias)
+        => memberAlias is null
+            ? memberSignature
+            : $"[Alias(\"{memberAlias}\")] {memberSignature}";
 
     private static ushort GetVersionFromAttributes(ISymbol symbol)
     {
@@ -1680,7 +1744,7 @@ public class GrainInterfaceVersionCodeFix : CodeFixProvider
 
         public string? ClrComment { get; }
 
-        public List<(string Signature, string Line, string? ClrComment)> Members { get; } = new();
+        public List<(string Signature, string Line, string? Alias, string? ClrComment)> Members { get; } = new();
 
         public List<string> OtherLines { get; } = new();
     }
