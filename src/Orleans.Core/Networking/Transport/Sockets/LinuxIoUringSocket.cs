@@ -1265,27 +1265,38 @@ internal sealed unsafe class LinuxIoUringSocketSender : LinuxIoUringOperation, I
             return false;
         }
 
-        var address = Marshal.UnsafeAddrOfPinnedArrayElement(buffer.Array!, buffer.Offset);
+        BeginPreparation();
         nint sent;
-        do
+        try
         {
-            sent = LinuxIoUringEngine.Native.Send(
-                checked((int)socket.Handle),
-                (void*)address,
-                checked((nuint)buffer.Count),
-                LinuxIoUringEngine.MessageDontWait | LinuxIoUringEngine.MessageNoSignal);
+            var address = Marshal.UnsafeAddrOfPinnedArrayElement(buffer.Array!, buffer.Offset);
+            do
+            {
+                sent = LinuxIoUringEngine.Native.Send(
+                    checked((int)socket.Handle),
+                    (void*)address,
+                    checked((nuint)buffer.Count),
+                    LinuxIoUringEngine.MessageDontWait | LinuxIoUringEngine.MessageNoSignal);
+            }
+            while (sent < 0 && Marshal.GetLastPInvokeError() == 4);
         }
-        while (sent < 0 && Marshal.GetLastPInvokeError() == 4);
+        catch
+        {
+            CancelPreparation();
+            throw;
+        }
 
         if (sent < 0)
         {
             var errorCode = Marshal.GetLastPInvokeError();
             if (errorCode == 11)
             {
+                CancelPreparation();
                 result = default;
                 return false;
             }
 
+            CancelPreparation();
             BytesTransferred = 0;
             SocketError = LinuxIoUringEngine.MapSocketErrorCode(errorCode);
             Error = new SocketException((int)SocketError);
@@ -1293,6 +1304,7 @@ internal sealed unsafe class LinuxIoUringSocketSender : LinuxIoUringOperation, I
             return true;
         }
 
+        CancelPreparation();
         BytesTransferred = checked((int)sent);
         SocketError = SocketError.Success;
         Error = null;

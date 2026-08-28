@@ -668,8 +668,8 @@ public class MessageTransportLifecycleTests
         using (listener)
         using (client)
         using (server)
-        using (var sender = new LinuxIoUringSocketSender())
         {
+            var sender = new LinuxIoUringSocketSender();
             var payload = GC.AllocateUninitializedArray<byte>(128, pinned: true);
             Random.Shared.NextBytes(payload);
 
@@ -687,6 +687,16 @@ public class MessageTransportLifecycleTests
                 TestContext.Current.CancellationToken);
             Assert.Equal(payload.Length, receivedLength);
             Assert.Equal(payload, received);
+
+            sender.Dispose();
+            Assert.Throws<InvalidOperationException>(() =>
+            {
+                _ = sender.SendAsync(
+                    client,
+                    payload,
+                    bufferIsPinned: true,
+                    useZeroCopy: false);
+            });
         }
     }
 
