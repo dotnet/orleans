@@ -379,7 +379,8 @@ namespace Orleans
         }
 
         void ICallbackDataTarget.Unregister(CallbackData callback) =>
-            callbacks.TryRemove(KeyValuePair.Create(callback.Message.Id, callback));
+            ((ICollection<KeyValuePair<CorrelationId, CallbackData>>)callbacks)
+                .Remove(KeyValuePair.Create(callback.Message.Id, callback));
 
         private void ConstructorReset()
         {
