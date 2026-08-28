@@ -42,7 +42,9 @@ The regeneration code fix rebuilds every active interface, method, and grain-cla
 
 ### Regenerate the manifest
 
-Apply **Regenerate OrleansContracts.txt** from any Orleans contract diagnostic. One application regenerates the entire project manifest. In an IDE, use **Fix all in project** or **Fix all in solution** to regenerate every affected project.
+Apply **Regenerate OrleansContracts.txt** from `ORLEANS0016`, `ORLEANS0017`, `ORLEANS0018`, `ORLEANS0019`, `ORLEANS0020`, `ORLEANS0022`, `ORLEANS0023`, or `ORLEANS0024`. One application regenerates the entire project manifest. In an IDE, use **Fix all in project** or **Fix all in solution** to regenerate every affected project.
+
+`ORLEANS0027` intentionally retains a removed method signature, so regeneration isn't offered for that diagnostic. If it is the only remaining diagnostic, restore the source method or explicitly delete the retained signature after reviewing and accepting the wire-compatibility break.
 
 Agents and command-line workflows can regenerate manifests without an IDE:
 
