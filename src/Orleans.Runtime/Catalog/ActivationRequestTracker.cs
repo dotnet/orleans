@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.Runtime.CompilerServices;
 using Microsoft.Extensions.ObjectPool;
 
 namespace Orleans.Runtime;
@@ -16,10 +17,29 @@ internal sealed class ActivationRequestTracker
     private Dictionary<Message, CoarseStopwatch>? _runningRequests;
     private bool _isRented;
 
-    internal int WaitingCount => _waitingRequests?.Count ?? 0;
-    internal int RunningCount => _runningRequests?.Count ?? 0;
-    internal int Count => WaitingCount + RunningCount;
-    internal bool IsEmpty => Count == 0;
+    internal int WaitingCount
+    {
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        get => _waitingRequests?.Count ?? 0;
+    }
+
+    internal int RunningCount
+    {
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        get => _runningRequests?.Count ?? 0;
+    }
+
+    internal int Count
+    {
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        get => WaitingCount + RunningCount;
+    }
+
+    internal bool IsEmpty
+    {
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        get => Count == 0;
+    }
     internal List<(Message Message, CoarseStopwatch QueuedTime)>? WaitingRequests => _waitingRequests;
     internal Dictionary<Message, CoarseStopwatch>? RunningRequests => _runningRequests;
 
@@ -36,24 +56,28 @@ internal sealed class ActivationRequestTracker
         Pool.Return(this);
     }
 
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     internal void AddWaiting(Message message)
     {
         Debug.Assert(_isRented);
         (_waitingRequests ??= new(capacity: 1)).Add((message, CoarseStopwatch.StartNew()));
     }
 
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     internal void RemoveWaitingAt(int index)
     {
         Debug.Assert(_isRented);
         _waitingRequests!.RemoveAt(index);
     }
 
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     internal void AddRunning(Message message, CoarseStopwatch stopwatch)
     {
         Debug.Assert(_isRented);
         (_runningRequests ??= new(capacity: 1)).Add(message, stopwatch);
     }
 
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     internal bool RemoveRunning(Message message)
     {
         Debug.Assert(_isRented);
