@@ -77,12 +77,12 @@ public sealed class ReminderServiceLifecycleHarness : IReminderServiceLifecycleH
             count,
             cancellationToken,
             reminderName,
-            IsActiveSilo);
+            ActiveSilos);
 
     /// <inheritdoc />
     public IReadOnlyList<SiloAddress> GetOwners(GrainId grainId, string reminderName)
     {
-        return _observer.GetActiveReminderOwnerSilos(grainId, reminderName, IsActiveSilo);
+        return _observer.GetActiveReminderOwnerSilos(grainId, reminderName, ActiveSilos);
     }
 
     /// <inheritdoc />
@@ -154,9 +154,6 @@ public sealed class ReminderServiceLifecycleHarness : IReminderServiceLifecycleH
         => silos.Count == 1
             ? silos[0]
             : throw new InvalidOperationException($"Expected one new silo, observed {silos.Count}.");
-
-    private bool IsActiveSilo(SiloAddress? siloAddress)
-        => siloAddress is not null && ActiveSilos.Contains(siloAddress);
 
     internal object AddDuplicateOwnerForTesting(GrainId grainId, string reminderName)
     {

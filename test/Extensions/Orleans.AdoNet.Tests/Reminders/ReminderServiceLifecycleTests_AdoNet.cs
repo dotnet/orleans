@@ -3,7 +3,6 @@ using Orleans.Tests.SqlUtils;
 using Orleans.Testing.Reminders;
 using Orleans.TestingHost;
 using TestExtensions;
-using UnitTests.General;
 using UnitTests.TimerTests;
 
 namespace Tester.AdoNet.Reminders;

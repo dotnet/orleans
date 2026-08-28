@@ -186,7 +186,6 @@ Use `ReminderTestClock` as the sole time driver and `ReminderDiagnosticObserver`
 reconciliation barriers:
 
 ```csharp
-var observer = ReminderDiagnosticObserver.Create(); // create before deployment
 var clock = builder.AddReminderTestClock();
 var cluster = builder.Build();
 await cluster.DeployAsync();
@@ -196,7 +195,7 @@ var options = cluster.Silos[0].ServiceProvider
 var harness = new ReminderServiceLifecycleHarness(
     cluster,
     clock,
-    observer,
+    clock.DiagnosticObserver,
     options.ReminderLoadingWindow);
 
 public sealed class MyLifecycleTests : ReminderServiceLifecycleTestRunner

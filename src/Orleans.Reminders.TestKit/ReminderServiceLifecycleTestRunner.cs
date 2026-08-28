@@ -52,13 +52,13 @@ public interface IReminderServiceLifecycleHarness
     /// <summary>Waits until the current owner has armed its persisted schedule.</summary>
     Task WaitForScheduleAsync(GrainId grainId, string reminderName, CancellationToken cancellationToken);
 
-    /// <summary>Gets the number of local reminder instances started for an identity.</summary>
+    /// <summary>Gets the number of local reminder instances started for a reminder.</summary>
     int GetLocalStartCount(GrainId grainId, string reminderName);
 
-    /// <summary>Gets the number of local reminder instances stopped for an identity.</summary>
+    /// <summary>Gets the number of local reminder instances stopped for a reminder.</summary>
     int GetLocalStopCount(GrainId grainId, string reminderName);
 
-    /// <summary>Gets the number of local schedule changes for an identity.</summary>
+    /// <summary>Gets the number of local schedule changes for a reminder.</summary>
     int GetScheduleChangeCount(GrainId grainId, string reminderName);
 
     /// <summary>Waits for the local schedule-change count.</summary>

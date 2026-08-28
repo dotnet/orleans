@@ -253,7 +253,7 @@ public sealed class ReminderDiagnosticObserver : IDisposable
         }
     }
 
-    /// <summary>Gets the number of local reminder instances started for an identity.</summary>
+    /// <summary>Gets the number of local reminder instances started for a reminder.</summary>
     public int GetLocalStartCount(GrainId grainId, string reminderName)
     {
         lock (_lock)
@@ -262,7 +262,7 @@ public sealed class ReminderDiagnosticObserver : IDisposable
         }
     }
 
-    /// <summary>Gets the number of local reminder instances stopped for an identity.</summary>
+    /// <summary>Gets the number of local reminder instances stopped for a reminder.</summary>
     public int GetLocalStopCount(GrainId grainId, string reminderName)
     {
         lock (_lock)
@@ -271,7 +271,7 @@ public sealed class ReminderDiagnosticObserver : IDisposable
         }
     }
 
-    /// <summary>Gets the number of local schedule changes for an identity.</summary>
+    /// <summary>Gets the number of local schedule changes for a reminder.</summary>
     public int GetScheduleChangeCount(GrainId grainId, string reminderName)
     {
         lock (_lock)
@@ -280,7 +280,7 @@ public sealed class ReminderDiagnosticObserver : IDisposable
         }
     }
 
-    /// <summary>Waits for the requested number of local schedule changes for an identity.</summary>
+    /// <summary>Waits for the requested number of local schedule changes for a reminder.</summary>
     public Task WaitForScheduleChangeCountAsync(
         GrainId grainId,
         string reminderName,
@@ -344,17 +344,18 @@ public sealed class ReminderDiagnosticObserver : IDisposable
     public SiloAddress[] GetActiveReminderOwnerSilos(
         GrainId grainId,
         string reminderName,
-        Predicate<SiloAddress?>? ownerFilter = null)
+        IEnumerable<SiloAddress>? activeSilos = null)
     {
         ArgumentException.ThrowIfNullOrEmpty(reminderName);
+        var activeSiloSet = activeSilos?.ToHashSet();
 
         lock (_lock)
         {
             return _activeLocalReminders.TryGetValue(new ReminderTickKey(grainId, reminderName), out var instances)
                 ? instances.Values
-                    .Where(instance => ownerFilter is null || ownerFilter(instance.SiloAddress))
                     .Select(instance => instance.SiloAddress)
                     .OfType<SiloAddress>()
+                    .Where(siloAddress => activeSiloSet is null || activeSiloSet.Contains(siloAddress))
                     .ToArray()
                 : [];
         }
@@ -367,27 +368,27 @@ public sealed class ReminderDiagnosticObserver : IDisposable
     {
         ArgumentOutOfRangeException.ThrowIfNegative(expectedCount);
         ArgumentException.ThrowIfNullOrEmpty(reminderName);
-        return WaitForActiveReminderCountCoreAsync(grainId, expectedCount, reminderName, ownerFilter: null, cancellationToken);
+        return WaitForActiveReminderCountCoreAsync(grainId, expectedCount, reminderName, activeSilos: null, cancellationToken);
     }
 
     /// <summary>
-    /// Waits for a specific number of active local reminder instances which match <paramref name="ownerFilter"/>.
+    /// Waits for a specific number of active local reminder instances on <paramref name="activeSilos"/>.
     /// </summary>
     public Task WaitForActiveReminderCountAsync(
         GrainId grainId,
         int expectedCount,
         CancellationToken cancellationToken,
         string reminderName,
-        Predicate<SiloAddress?> ownerFilter)
+        IEnumerable<SiloAddress> activeSilos)
     {
         ArgumentOutOfRangeException.ThrowIfNegative(expectedCount);
         ArgumentException.ThrowIfNullOrEmpty(reminderName);
-        ArgumentNullException.ThrowIfNull(ownerFilter);
+        ArgumentNullException.ThrowIfNull(activeSilos);
         return WaitForActiveReminderCountCoreAsync(
             grainId,
             expectedCount,
             reminderName,
-            ownerFilter,
+            activeSilos.ToHashSet(),
             cancellationToken);
     }
 
@@ -406,7 +407,7 @@ public sealed class ReminderDiagnosticObserver : IDisposable
     public Task WaitForReminderQuiescenceAsync(GrainId grainId, string reminderName, CancellationToken cancellationToken)
     {
         ArgumentException.ThrowIfNullOrEmpty(reminderName);
-        return WaitForActiveReminderCountCoreAsync(grainId, 0, reminderName, ownerFilter: null, cancellationToken);
+        return WaitForActiveReminderCountCoreAsync(grainId, 0, reminderName, activeSilos: null, cancellationToken);
     }
 
     /// <summary>
@@ -471,7 +472,7 @@ public sealed class ReminderDiagnosticObserver : IDisposable
         GrainId grainId,
         int targetCount,
         string reminderName,
-        Predicate<SiloAddress?>? ownerFilter,
+        HashSet<SiloAddress>? activeSilos,
         CancellationToken cancellationToken)
     {
         if (cancellationToken.IsCancellationRequested)
@@ -482,12 +483,12 @@ public sealed class ReminderDiagnosticObserver : IDisposable
         ActiveReminderCountWaiter? waiter;
         lock (_lock)
         {
-            if (GetActiveReminderCountCore(grainId, reminderName, ownerFilter) == targetCount)
+            if (GetActiveReminderCountCore(grainId, reminderName, activeSilos) == targetCount)
             {
                 return Task.CompletedTask;
             }
 
-            waiter = new ActiveReminderCountWaiter(grainId, reminderName, targetCount, ownerFilter);
+            waiter = new ActiveReminderCountWaiter(grainId, reminderName, targetCount, activeSilos);
             _activeReminderCountWaiters.Add(waiter);
             RegisterCancellation(waiter, _activeReminderCountWaiters, cancellationToken);
         }
@@ -553,10 +554,12 @@ public sealed class ReminderDiagnosticObserver : IDisposable
     private int GetActiveReminderCountCore(
         GrainId grainId,
         string reminderName,
-        Predicate<SiloAddress?>? ownerFilter = null)
+        HashSet<SiloAddress>? activeSilos = null)
     {
         return _activeLocalReminders.TryGetValue(new ReminderTickKey(grainId, reminderName), out var instances)
-            ? instances.Values.Count(instance => ownerFilter is null || ownerFilter(instance.SiloAddress))
+            ? instances.Values.Count(instance =>
+                instance.SiloAddress is { } siloAddress
+                && (activeSilos is null || activeSilos.Contains(siloAddress)))
             : 0;
     }
 
@@ -614,7 +617,7 @@ public sealed class ReminderDiagnosticObserver : IDisposable
         for (var i = _activeReminderCountWaiters.Count - 1; i >= 0; i--)
         {
             var waiter = _activeReminderCountWaiters[i];
-            if (GetActiveReminderCountCore(waiter.GrainId, waiter.ReminderName, waiter.OwnerFilter) != waiter.TargetCount)
+            if (GetActiveReminderCountCore(waiter.GrainId, waiter.ReminderName, waiter.ActiveSilos) != waiter.TargetCount)
             {
                 continue;
             }
@@ -718,12 +721,12 @@ public sealed class ReminderDiagnosticObserver : IDisposable
         GrainId grainId,
         string reminderName,
         int targetCount,
-        Predicate<SiloAddress?>? ownerFilter) : Waiter
+        HashSet<SiloAddress>? activeSilos) : Waiter
     {
         public GrainId GrainId { get; } = grainId;
         public string ReminderName { get; } = reminderName;
         public int TargetCount { get; } = targetCount;
-        public Predicate<SiloAddress?>? OwnerFilter { get; } = ownerFilter;
+        public HashSet<SiloAddress>? ActiveSilos { get; } = activeSilos;
     }
 
     private sealed class LocalReminderScheduleWaiter(GrainId grainId, string reminderName) : Waiter
