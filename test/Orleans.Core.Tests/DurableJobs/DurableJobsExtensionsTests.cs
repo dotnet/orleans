@@ -158,7 +158,9 @@ public class DurableJobsExtensionsTests
         {
         }
 
-        public Task<TResult> StartExecution<TResult>(Func<CancellationToken, Task<TResult>> factory) =>
+        public Task<TResult> StartExecution<TResult>(
+            Func<CancellationToken, Task<TResult>> factory,
+            bool holdTurnIsolation) =>
             factory(CancellationToken.None);
 
         public bool TryGetHandler(string jobName, [NotNullWhen(true)] out IDurableJobFeatureHandler? handler)
