@@ -25,6 +25,9 @@ namespace Orleans.Runtime
 
         public Dictionary<string, object>? _requestContextData;
 
+        [field: NonSerialized]
+        internal object? ResponseTarget { get; set; }
+
         public SiloAddress? _targetSilo;
         public GrainId _targetGrain;
 

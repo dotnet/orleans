@@ -65,6 +65,7 @@ namespace Orleans.Runtime
                 CacheInvalidationHeader = request.CacheInvalidationHeader,
                 TimeToLive = request.TimeToLive,
                 RequestContextData = RequestContextExtensions.Export(_deepCopier),
+                ResponseTarget = request.ResponseTarget,
             };
 
             return response;

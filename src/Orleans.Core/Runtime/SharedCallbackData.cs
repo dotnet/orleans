@@ -5,14 +5,14 @@ namespace Orleans.Runtime;
 
 internal sealed class SharedCallbackData
 {
-    public readonly Action<Message> Unregister;
+    public readonly Action<CallbackData> Unregister;
     public readonly ILogger Logger;
     public readonly TimeProvider TimeProvider;
     private TimeSpan _responseTimeout;
     public long ResponseTimeoutTimestampTicks;
 
     public SharedCallbackData(
-        Action<Message> unregister,
+        Action<CallbackData> unregister,
         ILogger logger,
         TimeProvider timeProvider,
         TimeSpan responseTimeout,
