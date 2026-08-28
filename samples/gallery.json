@@ -99,6 +99,17 @@
     "featured": false
   },
   {
+    "slug": "durable-workflows",
+    "title": "Durable Workflows",
+    "description": "An Aspire-hosted application demonstrating durable RPC, fan-out, approval, cancellation, sagas, and replica recovery.",
+    "path": "DurableWorkflows",
+    "sourceRepository": "https://github.com/dotnet/orleans",
+    "image": null,
+    "languages": ["C#"],
+    "tags": ["durable-tasks", "workflows", "aspire", "redis", "azure-storage"],
+    "featured": true
+  },
+  {
     "slug": "fsharp-hello-world",
     "title": "F# Hello World",
     "description": "A minimal Orleans application with grains implemented in F#.",

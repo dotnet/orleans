@@ -17,6 +17,12 @@ public abstract class DurableGrain : Grain, IGrainBase
         {
             participant.Participate(((IGrainBase)this).GrainContext.ObservableLifecycle);
         }
+
+        var features = ServiceProvider.GetServices<IJournaledGrainParticipant>().ToArray();
+        foreach (var feature in features)
+        {
+            feature.Initialize();
+        }
     }
 
     /// <summary>

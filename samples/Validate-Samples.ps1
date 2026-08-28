@@ -108,13 +108,15 @@ foreach ($sourceProjectPath in $sourceProjectFiles) {
 
 foreach ($projectPath in $projectFiles) {
     [xml] $project = Get-Content -LiteralPath (Join-Path $samplesRoot $projectPath)
+    $publicationException = $project.SelectSingleNode('//OrleansDocumentationVersionException').'#text'
     foreach ($reference in $project.SelectNodes('//PackageReference')) {
         if ($reference.Version -or $reference.VersionOverride) {
             throw "$projectPath contains a non-central package version for '$($reference.Include)'."
         }
 
         if ($reference.Include.StartsWith('Microsoft.Orleans.', [System.StringComparison]::OrdinalIgnoreCase) -and
-            -not $sourcePackageIds.Contains($reference.Include)) {
+            -not $sourcePackageIds.Contains($reference.Include) -and
+            [string]::IsNullOrWhiteSpace($publicationException)) {
             throw "$projectPath references '$($reference.Include)', which is not produced by Orleans.slnx."
         }
     }

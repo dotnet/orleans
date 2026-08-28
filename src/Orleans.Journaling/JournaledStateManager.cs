@@ -19,6 +19,7 @@ internal sealed partial class JournaledStateManager : IJournaledStateManager, IJ
 #endif
     private readonly Dictionary<string, IJournaledState> _states = new(StringComparer.Ordinal);
     private readonly Dictionary<uint, IJournaledState> _statesMap = [];
+    private readonly HashSet<IJournaledStateObserver> _observers = [];
     private readonly JournaledStateManagerShared _shared;
     private readonly IJournalStorage _storage;
     private readonly JournalBufferWriter _journalWriter;
@@ -130,6 +131,19 @@ internal sealed partial class JournaledStateManager : IJournaledStateManager, IJ
         _workSignal.Signal();
     }
 
+    public void RegisterObserver(IJournaledStateObserver observer)
+    {
+        ArgumentNullException.ThrowIfNull(observer);
+        lock (_lock)
+        {
+            _shutdownCancellation.Token.ThrowIfCancellationRequested();
+            if (!_observers.Add(observer))
+            {
+                throw new InvalidOperationException("The journaled state observer is already registered.");
+            }
+        }
+    }
+
     public async ValueTask InitializeAsync(CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
@@ -207,10 +221,9 @@ internal sealed partial class JournaledStateManager : IJournaledStateManager, IJ
                             {
                                 if (fenceOnFailure)
                                 {
-                                    _state = ManagerState.Ready;
+                                    _state = ManagerState.Fenced;
                                 }
                             }
-
                             throw;
                         }
                     }
@@ -280,6 +293,29 @@ internal sealed partial class JournaledStateManager : IJournaledStateManager, IJ
                                     var hasCommittedBuffer = false;
                                     var hasBufferToConsume = false;
                                     var bufferToConsumeIsCommittedBuffer = false;
+
+                                    IJournaledStateObserver[] observers;
+                                    lock (_lock)
+                                    {
+                                        observers = [.. _observers];
+                                    }
+
+                                    foreach (var observer in observers)
+                                    {
+                                        await observer.OnWritePreparingAsync(_shutdownCancellation.Token).ConfigureAwait(true);
+                                    }
+
+                                    foreach (var observer in observers)
+                                    {
+                                        try
+                                        {
+                                            observer.OnWriteStarted();
+                                        }
+                                        catch (Exception exception)
+                                        {
+                                            LogObserverError(_shared.Logger, exception, nameof(IJournaledStateObserver.OnWriteStarted));
+                                        }
+                                    }
 
                                     lock (_lock)
                                     {
@@ -434,13 +470,32 @@ internal sealed partial class JournaledStateManager : IJournaledStateManager, IJ
                                         {
                                             foreach (var state in _states.Values)
                                             {
-                                                state.OnWriteCompleted();
+                                                try
+                                                {
+                                                    state.OnWriteCompleted();
+                                                }
+                                                catch (Exception exception)
+                                                {
+                                                    LogStateCallbackError(_shared.Logger, exception, state.GetType().FullName ?? state.GetType().Name);
+                                                }
                                             }
 
                                             if (isSnapshot)
                                             {
                                                 _migrationSnapshotRequired = false;
                                             }
+                                        }
+                                    }
+
+                                    foreach (var observer in observers)
+                                    {
+                                        try
+                                        {
+                                            observer.OnWriteCompleted();
+                                        }
+                                        catch (Exception exception)
+                                        {
+                                            LogObserverError(_shared.Logger, exception, nameof(IJournaledStateObserver.OnWriteCompleted));
                                         }
                                     }
 
@@ -543,6 +598,11 @@ internal sealed partial class JournaledStateManager : IJournaledStateManager, IJ
 
                         if (IsRecoverySignal(exception))
                         {
+                            lock (_lock)
+                            {
+                                _state = ManagerState.Recovering;
+                            }
+
                             Debug.Assert(recoveryTrigger is null);
                             recoveryTrigger = workItem;
                             recoveryTriggerException = exception;
@@ -724,8 +784,10 @@ internal sealed partial class JournaledStateManager : IJournaledStateManager, IJ
     private async Task RecoverAsync(CancellationToken cancellationToken)
     {
         var startTimestamp = _shared.TimeProvider.GetTimestamp();
+        IJournaledStateObserver[] observers;
         lock (_lock)
         {
+            observers = [.. _observers];
             ResetForRecovery();
         }
 
@@ -754,6 +816,19 @@ internal sealed partial class JournaledStateManager : IJournaledStateManager, IJ
                         LogRetiredStateDetected(_shared.Logger, name);
                     }
                 }
+            }
+
+        }
+
+        foreach (var observer in observers)
+        {
+            try
+            {
+                observer.OnRecoveryCompleted();
+            }
+            catch (Exception exception)
+            {
+                LogObserverError(_shared.Logger, exception, nameof(IJournaledStateObserver.OnRecoveryCompleted));
             }
         }
     }
@@ -1347,6 +1422,16 @@ internal sealed partial class JournaledStateManager : IJournaledStateManager, IJ
         Level = LogLevel.Error,
         Message = "Error processing work items.")]
     private static partial void LogErrorProcessingWorkItems(ILogger logger, Exception exception);
+
+    [LoggerMessage(
+        Level = LogLevel.Error,
+        Message = "Journaled state observer callback {Callback} failed.")]
+    private static partial void LogObserverError(ILogger logger, Exception exception, string callback);
+
+    [LoggerMessage(
+        Level = LogLevel.Error,
+        Message = "Journaled state {StateType} failed its write-completion callback.")]
+    private static partial void LogStateCallbackError(ILogger logger, Exception exception, string stateType);
 
     [LoggerMessage(
         Level = LogLevel.Information,
