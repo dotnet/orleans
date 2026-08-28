@@ -7,6 +7,7 @@ using Orleans.Configuration;
 using Orleans.Hosting;
 using Orleans.Providers;
 using Orleans.Streaming.NATS;
+using TestExtensions;
 using Xunit;
 
 namespace NATS.Tests;
