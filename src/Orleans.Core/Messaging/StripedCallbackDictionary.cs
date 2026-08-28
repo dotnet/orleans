@@ -113,6 +113,12 @@ internal sealed class StripedCallbackDictionary<TValue>
     /// Counts items matching a predicate across all stripes.
     /// </summary>
     public int CountWhere(Func<TValue, bool> predicate)
+        => CountWhere(predicate, static (value, predicate) => predicate(value));
+
+    /// <summary>
+    /// Counts items matching a predicate across all stripes.
+    /// </summary>
+    public int CountWhere<TState>(TState state, Func<TValue, TState, bool> predicate)
     {
         int count = 0;
         foreach (var stripe in _stripes)
@@ -121,7 +127,7 @@ internal sealed class StripedCallbackDictionary<TValue>
             {
                 foreach (var value in stripe.Dictionary.Values)
                 {
-                    if (predicate(value))
+                    if (predicate(value, state))
                     {
                         count++;
                     }
