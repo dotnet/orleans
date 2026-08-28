@@ -70,9 +70,9 @@ public sealed class DurableDeadLetter
 }
 
 internal sealed class DurableMessagingDiagnostics(
-    [Microsoft.Extensions.DependencyInjection.FromKeyedServices("inbox-dead-letters")]
+    [Microsoft.Extensions.DependencyInjection.FromKeyedServices(DurableMessagingStateNames.InboxDeadLetters)]
     IDurableDictionary<(Orleans.Runtime.GrainId, Guid), InboxDeadLetter> inbox,
-    [Microsoft.Extensions.DependencyInjection.FromKeyedServices("outbox-dead-letters")]
+    [Microsoft.Extensions.DependencyInjection.FromKeyedServices(DurableMessagingStateNames.OutboxDeadLetters)]
     IDurableDictionary<Guid, OutboxDeadLetter> outbox) : IDurableMessagingDiagnostics
 {
     public IReadOnlyList<DurableDeadLetter> InboxDeadLetters =>
