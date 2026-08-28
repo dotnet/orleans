@@ -93,6 +93,46 @@ public class CallbackDataTests
     [TestSuite("BVT")]
     [TestProvider("None")]
     [Fact, TestCategory("BVT")]
+    public void WrongCorrelationStatusUpdateDoesNotAffectReusedCallback()
+    {
+        using var serviceProvider = CreateServiceProvider();
+        var instruments = CreateInstruments(serviceProvider);
+        var staleOwner = CallbackDataPool.Rent(
+            CreateSharedData(),
+            new TestResponseCompletionSource(),
+            new Message { Id = new CorrelationId(1) },
+            instruments);
+        using (var lease = staleOwner.Acquire())
+        {
+            Assert.Equal(new CorrelationId(1), lease.Value.Message.Id);
+        }
+        CallbackDataPool.Return(staleOwner);
+
+        var completion = new TestResponseCompletionSource();
+        CallbackDataOwner currentOwner = default;
+        currentOwner = CallbackDataPool.Rent(
+            CreateSharedData(_ => CallbackDataPool.Return(currentOwner)),
+            completion,
+            new Message { Id = new CorrelationId(2) },
+            instruments);
+        using var currentLease = currentOwner.Acquire();
+        Assert.Equal(new CorrelationId(2), currentLease.Value.Message.Id);
+
+        using var staleLease = staleOwner.Acquire();
+        if (staleLease.TryGetValue(out var staleCallback))
+        {
+            staleCallback.OnStatusUpdate(new StatusResponse(isExecuting: true, isWaiting: false, diagnostics: ["stale"]));
+        }
+
+        currentLease.Value.OnTimeout();
+
+        var exception = Assert.IsType<TimeoutException>(completion.Response!.Exception);
+        Assert.DoesNotContain("stale", exception.Message);
+    }
+
+    [TestSuite("BVT")]
+    [TestProvider("None")]
+    [Fact, TestCategory("BVT")]
     public void ActiveLeaseDelaysCallbackReuse()
     {
         using var serviceProvider = CreateServiceProvider();
@@ -118,7 +158,148 @@ public class CallbackDataTests
     [TestSuite("BVT")]
     [TestProvider("None")]
     [Fact, TestCategory("BVT")]
-    public void CancellationAfterCompletionDoesNotAffectReusedCallback()
+    public void CopiedLeaseDoubleReleaseThrows()
+    {
+        using var serviceProvider = CreateServiceProvider();
+        var owner = CallbackDataPool.Rent(
+            CreateSharedData(),
+            new TestResponseCompletionSource(),
+            new Message(),
+            CreateInstruments(serviceProvider));
+        var lease = owner.Acquire();
+        var callback = lease.Value;
+        var copiedLease = lease;
+        lease.Dispose();
+
+        var threw = false;
+        try
+        {
+            copiedLease.Dispose();
+        }
+        catch (InvalidOperationException)
+        {
+            threw = true;
+        }
+
+        Assert.True(threw);
+        CallbackDataPool.Return(owner);
+
+        var reusedOwner = CallbackDataPool.Rent(
+            CreateSharedData(),
+            new TestResponseCompletionSource(),
+            new Message(),
+            CreateInstruments(serviceProvider));
+        using var reusedLease = reusedOwner.Acquire();
+        Assert.Same(callback, reusedLease.Value);
+
+        var concurrentOwner = CallbackDataPool.Rent(
+            CreateSharedData(),
+            new TestResponseCompletionSource(),
+            new Message(),
+            CreateInstruments(serviceProvider));
+        using var concurrentLease = concurrentOwner.Acquire();
+        Assert.NotSame(callback, concurrentLease.Value);
+
+        CallbackDataPool.Return(concurrentOwner);
+        CallbackDataPool.Return(reusedOwner);
+    }
+
+    [TestSuite("BVT")]
+    [TestProvider("None")]
+    [Fact, TestCategory("BVT")]
+    public void StatusLeaseDelaysReuseAfterResponseTransfer()
+    {
+        using var serviceProvider = CreateServiceProvider();
+        var instruments = CreateInstruments(serviceProvider);
+        var owner = CallbackDataPool.Rent(CreateSharedData(), new TestResponseCompletionSource(), new Message(), instruments);
+        var senderLease = owner.Acquire();
+        var callback = senderLease.Value;
+        senderLease.Dispose();
+        var statusLease = owner.Acquire();
+
+        using (var responseLease = owner.TransferToLease())
+        {
+            responseLease.Value.DoCallback(new Message { BodyObject = Response.Completed });
+        }
+
+        var concurrentOwner = CallbackDataPool.Rent(CreateSharedData(), new TestResponseCompletionSource(), new Message(), instruments);
+        using (var concurrentLease = concurrentOwner.Acquire())
+        {
+            Assert.NotSame(callback, concurrentLease.Value);
+        }
+        CallbackDataPool.Return(concurrentOwner);
+
+        var localOwner = CallbackDataPool.Rent(CreateSharedData(), new TestResponseCompletionSource(), new Message(), instruments);
+        using var localLease = localOwner.Acquire();
+        statusLease.Value.OnStatusUpdate(new StatusResponse(isExecuting: true, isWaiting: false, diagnostics: []));
+        statusLease.Dispose();
+
+        var reusedOwner = CallbackDataPool.Rent(CreateSharedData(), new TestResponseCompletionSource(), new Message(), instruments);
+        using var reusedLease = reusedOwner.Acquire();
+        Assert.Same(callback, reusedLease.Value);
+        CallbackDataPool.Return(reusedOwner);
+        CallbackDataPool.Return(localOwner);
+    }
+
+    [TestSuite("BVT")]
+    [TestProvider("None")]
+    [Fact, TestCategory("BVT")]
+    public async Task InFlightCancellationDelaysReuseUntilCallbackReturns()
+    {
+        using var serviceProvider = CreateServiceProvider();
+        using var cancellation = new CancellationTokenSource();
+        var instruments = CreateInstruments(serviceProvider);
+        using var completion = new BlockingResponseCompletionSource();
+        CallbackDataOwner owner = default;
+        owner = CallbackDataPool.Rent(
+            CreateSharedData(_ => CallbackDataPool.Return(owner)),
+            completion,
+            new Message(),
+            instruments);
+        var senderLease = owner.Acquire();
+        var callback = senderLease.Value;
+        callback.SubscribeForCancellation(cancellation.Token);
+        senderLease.Dispose();
+
+        var prematurelyReused = false;
+        completion.SetProbe(() =>
+        {
+            var probeOwner = CallbackDataPool.Rent(CreateSharedData(), new TestResponseCompletionSource(), new Message(), instruments);
+            using var probeLease = probeOwner.Acquire();
+            prematurelyReused = ReferenceEquals(callback, probeLease.Value);
+            CallbackDataPool.Return(probeOwner);
+        });
+
+        var cancellationTask = Task.Run(() =>
+        {
+            var localOwner = CallbackDataPool.Rent(CreateSharedData(), new TestResponseCompletionSource(), new Message(), instruments);
+            using var localLease = localOwner.Acquire();
+            cancellation.Cancel();
+            var reusedOwner = CallbackDataPool.Rent(CreateSharedData(), new TestResponseCompletionSource(), new Message(), instruments);
+            using var reusedLease = reusedOwner.Acquire();
+            var reusedCallback = reusedLease.Value;
+            CallbackDataPool.Return(reusedOwner);
+            CallbackDataPool.Return(localOwner);
+            return reusedCallback;
+        });
+
+        completion.WaitUntilProbed();
+        try
+        {
+            Assert.False(prematurelyReused);
+        }
+        finally
+        {
+            completion.Release();
+        }
+
+        Assert.Same(callback, await cancellationTask.WaitAsync(TimeSpan.FromSeconds(10)));
+    }
+
+    [TestSuite("BVT")]
+    [TestProvider("None")]
+    [Fact, TestCategory("BVT")]
+    public void StaleCancellationCallbackDoesNotAffectReusedCallback()
     {
         using var serviceProvider = CreateServiceProvider();
         using var cancellation = new CancellationTokenSource();
@@ -367,5 +548,46 @@ public class CallbackDataTests
         public void Complete(Response value) => throw new InvalidOperationException("Test completion failure.");
 
         public void Complete() => throw new InvalidOperationException("Test completion failure.");
+    }
+
+    private sealed class BlockingResponseCompletionSource : IResponseCompletionSource, IDisposable
+    {
+        private readonly ManualResetEventSlim _probed = new();
+        private readonly ManualResetEventSlim _release = new();
+        private Action? _probe;
+
+        public void Complete(Response value)
+        {
+            try
+            {
+                _probe!();
+            }
+            finally
+            {
+                _probed.Set();
+            }
+
+            _release.Wait();
+        }
+
+        public void Complete() => Complete(Response.Completed);
+
+        public void SetProbe(Action probe) => _probe = probe;
+
+        public void WaitUntilProbed()
+        {
+            if (!_probed.Wait(TimeSpan.FromSeconds(10)))
+            {
+                throw new TimeoutException("Cancellation callback did not probe the callback pool.");
+            }
+        }
+
+        public void Release() => _release.Set();
+
+        public void Dispose()
+        {
+            _probed.Dispose();
+            _release.Dispose();
+        }
     }
 }
