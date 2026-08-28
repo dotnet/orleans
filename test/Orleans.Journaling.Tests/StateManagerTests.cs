@@ -1044,6 +1044,33 @@ public class StateManagerTests : JournalingTestBase
         }
     }
 
+    [Fact]
+    public async Task StateManager_DirectWritingState_DefaultPendingFlagUsesJournalBuffer()
+    {
+        var storage = new CapturingStorage();
+        var sut = CreateTestSystem(storage: storage);
+        var state = new ManualDirectWriteState();
+        sut.Manager.RegisterState("manual", state);
+        await sut.Lifecycle.OnStart(TestContext.Current.CancellationToken);
+        await sut.Manager.WriteStateAsync(TestContext.Current.CancellationToken);
+
+        Assert.False(sut.Manager.HasPendingWrites);
+
+        using (var entry = state.BeginEntry())
+        {
+            entry.Writer.Write(new byte[] { 1, 2, 3 });
+            entry.Commit();
+        }
+        state.MarkEntryClosing();
+
+        Assert.True(sut.Manager.HasPendingWrites);
+
+        await sut.Manager.WriteStateAsync(TestContext.Current.CancellationToken);
+
+        Assert.False(sut.Manager.HasPendingWrites);
+        Assert.Equal(2, storage.Appends.Count);
+    }
+
     /// <summary>
     /// Tests that all registered states are correctly recovered together.
     /// Verifies that the manager maintains consistency across multiple collections
