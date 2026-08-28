@@ -65,6 +65,7 @@ public sealed class DeliveryAndOptionsContractTests
             (nameof(DurableInboxOptions.MaxCapacity), options => options.MaxCapacity = 0),
             (nameof(DurableInboxOptions.DeduplicationWindow), options => options.DeduplicationWindow = TimeSpan.Zero),
             (nameof(DurableInboxOptions.BackpressureRetryDelay), options => options.BackpressureRetryDelay = TimeSpan.Zero),
+            (nameof(DurableInboxOptions.BackpressureRetryDelay), options => options.BackpressureRetryDelay = TimeSpan.MaxValue),
             (nameof(DurableInboxOptions.MaxProcessingAttempts), options => options.MaxProcessingAttempts = 0),
             (nameof(DurableInboxOptions.MaxDeliveryAttempts), options => options.MaxDeliveryAttempts = 0),
             (nameof(DurableInboxOptions.MaxOutboxRetryAge), options => options.MaxOutboxRetryAge = TimeSpan.Zero),
@@ -130,5 +131,25 @@ public sealed class DeliveryAndOptionsContractTests
         cancellation.Cancel();
 
         await Assert.ThrowsAnyAsync<OperationCanceledException>(() => start);
+    }
+
+    [Fact]
+    public void PhysicalJobId_EncodesGrainTypeAndKeyBoundaries()
+    {
+        var ownershipType = typeof(IDurableInbox).Assembly.GetType(
+            "Orleans.DurableMessaging.DurableMessagingJobOwnership",
+            throwOnError: true)!;
+        var createJobId = ownershipType.GetMethod(
+            "CreateJobId",
+            BindingFlags.Static | BindingFlags.Public)!;
+
+        var first = (string)createJobId.Invoke(
+            null,
+            ["job", GrainId.Create("a/b", "c"), "epoch:1"])!;
+        var second = (string)createJobId.Invoke(
+            null,
+            ["job", GrainId.Create("a", "b/c"), "epoch:1"])!;
+
+        Assert.NotEqual(first, second);
     }
 }

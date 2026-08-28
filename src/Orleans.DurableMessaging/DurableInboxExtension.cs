@@ -30,6 +30,8 @@ internal sealed partial class DurableInboxExtension :
 {
     internal const string JobName = "orleans.messaging.inbox-drain";
 
+    public bool CanHandle(string jobName) => string.Equals(jobName, JobName, StringComparison.Ordinal);
+
     private readonly IGrainContext _grainContext;
     private readonly IGrainFactory _grainFactory;
     private readonly ITimerRegistry _timerRegistry;
@@ -61,6 +63,11 @@ internal sealed partial class DurableInboxExtension :
     private readonly CancellationTokenSource _shutdownCts = new();
     private int _metricsActive;
     private int _reportedDepth;
+    private int _handlerExecutionDepth;
+    private DateTimeOffset? _pendingJobDueTime;
+    private bool _provisionalScheduleConfirmed;
+    private string _ownershipEpoch = Guid.NewGuid().ToString("N");
+    private long _stateGeneration;
     private bool _recoveryCompleted;
 
     /// <summary>
@@ -148,7 +155,7 @@ internal sealed partial class DurableInboxExtension :
         _batchSize = options.InboxBatchSize;
         _retryDelay = options.BackpressureRetryDelay;
         DurableMessagingStateManagerCapabilities.RegisterObserver(stateManager, this);
-        jobHandlers.Register(JobName, this);
+        jobHandlers.Register(this);
         grainContext.ObservableLifecycle.Subscribe(
             RuntimeTypeNameFormatter.Format(GetType()),
             GrainLifecycleStage.Activate,
@@ -285,6 +292,8 @@ internal sealed partial class DurableInboxExtension :
                 _inboxDict[key] = envelope;
                 _messageStates[key] = new InboxMessageState();
                 _provisionalAcceptances.Add(key);
+                _provisionalScheduleConfirmed = false;
+                var stateGeneration = Volatile.Read(ref _stateGeneration);
                 UpdateInboxDepth(1);
                 var committed = false;
                 try
@@ -294,19 +303,24 @@ internal sealed partial class DurableInboxExtension :
                         persistState: false,
                         replaceExisting: wasDurablyEmpty,
                         includeProvisional: true).ConfigureAwait(true);
+                    _provisionalScheduleConfirmed = true;
+                    ValidateAcceptanceState(key, stateGeneration);
                     await _stateManager.WriteStateAsync(CancellationToken.None).ConfigureAwait(true);
+                    ValidateAcceptanceState(key, stateGeneration);
                     committed = true;
                 }
                 catch
                 {
                     await _stateManager.RevertPendingChangesAsync(CancellationToken.None).ConfigureAwait(true);
-                    RemoveMessage(key);
-                    _messageStates.Remove(key);
                     throw;
                 }
                 finally
                 {
                     _provisionalAcceptances.Remove(key);
+                    if (_provisionalAcceptances.Count == 0)
+                    {
+                        _provisionalScheduleConfirmed = false;
+                    }
                 }
 
                 if (committed && string.IsNullOrEmpty(_jobId.Value))
@@ -348,15 +362,16 @@ internal sealed partial class DurableInboxExtension :
 
         var previousJobId = _jobId.Value;
         var jobId = replaceExisting || string.IsNullOrEmpty(previousJobId)
-            ? DurableMessagingJobOwnership.NextId(_jobSequence)
+            ? DurableMessagingJobOwnership.NextId(_ownershipEpoch, _jobSequence)
             : previousJobId;
-        var dueTime = _jobTimeProvider.GetUtcNow();
+        var dueTime = _pendingJobDueTime ??= _jobTimeProvider.GetUtcNow();
         _jobId.Value = jobId;
         try
         {
             await _jobManager.ScheduleJobAsync(
                 new ScheduleJobRequest
                 {
+                    JobId = DurableMessagingJobOwnership.CreateJobId(JobName, _grainContext.GrainId, jobId),
                     Target = _grainContext.GrainId,
                     JobName = JobName,
                     DueTime = dueTime,
@@ -380,15 +395,80 @@ internal sealed partial class DurableInboxExtension :
     {
     }
 
+    public ValueTask OnWritePreparingAsync(CancellationToken cancellationToken)
+    {
+        return ValidatePersistenceBoundary(cancellationToken);
+    }
+
+    public void OnWriteRequested() => ValidatePersistenceRequest();
+
+    public void OnDeleteRequested() => ValidatePersistenceRequest();
+
+    public ValueTask OnDeletePreparingAsync(CancellationToken cancellationToken)
+    {
+        return ValidatePersistenceBoundary(cancellationToken);
+    }
+
+    public void OnDeleteCompleted()
+    {
+        Interlocked.Increment(ref _stateGeneration);
+        _ownershipEpoch = Guid.NewGuid().ToString("N");
+        _provisionalAcceptances.Clear();
+        _provisionalScheduleConfirmed = false;
+        _pendingJobDueTime = null;
+        ReconcileInboxDepth();
+    }
+
+    public ValueTask OnWriteFinalizingAsync(CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        if (_provisionalAcceptances.Count > 0 && !_provisionalScheduleConfirmed)
+        {
+            return ValueTask.FromException(
+                new InvalidOperationException(
+                    "Journaled state cannot be captured while durable inbox acceptance is waiting for job scheduling."));
+        }
+
+        return default;
+    }
+
+    private ValueTask ValidatePersistenceBoundary(CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        return Volatile.Read(ref _handlerExecutionDepth) != 0
+            ? ValueTask.FromException(
+                new InvalidOperationException(
+                    "Journaled state cannot be committed or deleted from inside a durable inbox handler. "
+                    + "Handler effects, outgoing messages, and inbox completion are committed atomically after the handler returns."))
+            : default;
+    }
+
+    private void ValidatePersistenceRequest()
+    {
+        if (Volatile.Read(ref _handlerExecutionDepth) != 0)
+        {
+            throw new InvalidOperationException(
+                "Journaled state cannot be committed or deleted from inside a durable inbox handler. "
+                + "Handler effects, outgoing messages, and inbox completion are committed atomically after the handler returns.");
+        }
+    }
+
     public void OnWriteCompleted()
     {
+        _pendingJobDueTime = null;
     }
 
     public void OnRecoveryCompleted()
     {
+        Interlocked.Increment(ref _stateGeneration);
+        _ownershipEpoch = Guid.NewGuid().ToString("N");
         _recoveryCompleted = true;
+        _provisionalAcceptances.Clear();
+        _provisionalScheduleConfirmed = false;
         ReconcileInboxDepth();
     }
+
+    public void OnRecoveryStarted() => _recoveryCompleted = false;
 
     public async ValueTask<DurableJobRunResult> ExecuteJobAsync(IJobRunContext context, CancellationToken cancellationToken)
     {
@@ -668,12 +748,21 @@ internal sealed partial class DurableInboxExtension :
         }
 
         var context = new InboxHandlerContext(envelope, _grainContext.GrainId, _outbox, _sessionPool);
+        var stateGeneration = Volatile.Read(ref _stateGeneration);
         try
         {
             if (_durableInbox.TryFindHandler(context, out var handler))
             {
-                await handler.HandleAsync(context, cancellationToken).ConfigureAwait(true);
-                cancellationToken.ThrowIfCancellationRequested();
+                Interlocked.Increment(ref _handlerExecutionDepth);
+                try
+                {
+                    await handler.HandleAsync(context, cancellationToken).ConfigureAwait(true);
+                    cancellationToken.ThrowIfCancellationRequested();
+                }
+                finally
+                {
+                    Interlocked.Decrement(ref _handlerExecutionDepth);
+                }
             }
             else
             {
@@ -681,6 +770,12 @@ internal sealed partial class DurableInboxExtension :
                 stopwatch.Stop();
                 _instruments.OnInboxMessageProcessed(grainTypeName, envelope.RouteKey, "dead_lettered");
                 _instruments.OnInboxProcessingDuration(stopwatch.Elapsed, grainTypeName, envelope.RouteKey);
+                return;
+            }
+
+            if (Volatile.Read(ref _stateGeneration) != stateGeneration)
+            {
+                await _stateManager.RevertPendingChangesAsync(CancellationToken.None).ConfigureAwait(true);
                 return;
             }
 
@@ -694,6 +789,7 @@ internal sealed partial class DurableInboxExtension :
                     _processed[key] = _timeProvider.GetUtcNow();
                     await _stateManager.WriteStateAsync(CancellationToken.None).ConfigureAwait(true);
                 }
+
             }
             finally
             {
@@ -717,6 +813,19 @@ internal sealed partial class DurableInboxExtension :
             stopwatch.Stop();
             _instruments.OnInboxMessageProcessed(grainTypeName, envelope.RouteKey, deadLettered ? "dead_lettered" : "retry");
             _instruments.OnInboxProcessingDuration(stopwatch.Elapsed, grainTypeName, envelope.RouteKey);
+        }
+    }
+
+    private void ValidateAcceptanceState(
+        (GrainId SenderId, Guid MessageId) key,
+        long expectedGeneration)
+    {
+        if (Volatile.Read(ref _stateGeneration) != expectedGeneration
+            || !_inboxDict.ContainsKey(key)
+            || string.IsNullOrEmpty(_jobId.Value))
+        {
+            throw new InvalidOperationException(
+                "Durable inbox acceptance was interrupted by state recovery or deletion.");
         }
     }
 

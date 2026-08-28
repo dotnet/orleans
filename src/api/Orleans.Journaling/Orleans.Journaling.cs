@@ -219,16 +219,18 @@ namespace Orleans.Journaling
         void Reset(JournalStreamWriter writer);
     }
 
+    public partial interface IJournaledGrainParticipant
+    {
+        void Initialize();
+    }
+
     public partial interface IJournaledStateManager : System.IAsyncDisposable
     {
         long PendingWriteByteCount { get; }
 
-        bool SupportsRollback { get; }
-
-        bool SupportsObservers { get; }
-
         System.Threading.Tasks.ValueTask DeleteStateAsync(System.Threading.CancellationToken cancellationToken);
         System.Threading.Tasks.ValueTask InitializeAsync(System.Threading.CancellationToken cancellationToken);
+        void RegisterObserver(IJournaledStateObserver observer);
         void RegisterState(string name, IJournaledState state);
         System.Threading.Tasks.ValueTask RevertPendingChangesAsync(System.Threading.CancellationToken cancellationToken);
         System.Threading.Tasks.ValueTask System.IAsyncDisposable.DisposeAsync();
@@ -239,6 +241,20 @@ namespace Orleans.Journaling
     public partial interface IJournaledStateManagerFactory
     {
         IJournaledStateManager Create(JournalId journalId);
+    }
+
+    public partial interface IJournaledStateObserver
+    {
+        void OnDeleteCompleted() { }
+        System.Threading.Tasks.ValueTask OnDeletePreparingAsync(System.Threading.CancellationToken cancellationToken);
+        void OnDeleteRequested() { }
+        void OnRecoveryCompleted();
+        void OnRecoveryStarted() { }
+        void OnWriteCompleted();
+        System.Threading.Tasks.ValueTask OnWriteFinalizingAsync(System.Threading.CancellationToken cancellationToken);
+        System.Threading.Tasks.ValueTask OnWritePreparingAsync(System.Threading.CancellationToken cancellationToken);
+        void OnWriteRequested() { }
+        void OnWriteStarted();
     }
 
     public partial interface IJournalFormat

@@ -91,6 +91,43 @@ public sealed class PublicDurableMessagingBehaviorTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task ConcurrentWriteCannotCaptureInboxAcceptanceBeforeScheduling()
+    {
+        var receiver = NewGrain();
+        using var schedule = fixture.JobManagerProbe.BlockNext("orleans.messaging.inbox-drain");
+        using var envelope = CreateEnvelope(receiver, NewMessage(74, "schedule-barrier"));
+
+        var delivery = DeliverAsync(receiver, envelope.Value);
+        await schedule.WaitUntilEnteredAsync();
+
+        var exception = await Assert.ThrowsAsync<InvalidOperationException>(
+            () => receiver.RetryWriteStateAsync());
+        Assert.Contains("waiting for job scheduling", exception.Message, StringComparison.Ordinal);
+
+        schedule.Continue();
+        Assert.Equal(DeliveryStatus.Accepted, (await delivery).Status);
+        var completed = await fixture.WaitForEffectCountAsync(receiver, 1);
+        Assert.Equal("schedule-barrier", Assert.Single(completed.Effects).Value);
+    }
+
+    [Fact]
+    public async Task RecoveryDuringInboxScheduling_PreventsFalseAcceptance()
+    {
+        var receiver = NewGrain();
+        using var schedule = fixture.JobManagerProbe.BlockNext("orleans.messaging.inbox-drain");
+        using var envelope = CreateEnvelope(receiver, NewMessage(77, "recovered-during-schedule"));
+
+        var delivery = DeliverAsync(receiver, envelope.Value);
+        await schedule.WaitUntilEnteredAsync();
+        await receiver.RevertStateAsync();
+        schedule.Continue();
+
+        var exception = await Assert.ThrowsAsync<InvalidOperationException>(() => delivery);
+        Assert.Contains("interrupted by state recovery", exception.Message, StringComparison.Ordinal);
+        Assert.Equal(0, (await receiver.GetSnapshotAsync()).InboxCount);
+    }
+
+    [Fact]
     public async Task FailedInboxAcceptance_RevertsEnvelopeAndOrphanedJobCannotProcess()
     {
         var receiver = NewGrain();
@@ -116,6 +153,21 @@ public sealed class PublicDurableMessagingBehaviorTests : IAsyncLifetime
         Assert.Equal(DeliveryStatus.Accepted, (await DeliverAsync(receiver, envelope.Value)).Status);
         await fixture.WaitForEffectCountAsync(receiver, 1);
         Assert.Equal(depthBaseline, fixture.Metrics.GetDepth("orleans-durable-messaging-inbox-depth"));
+    }
+
+    [Fact]
+    public async Task AmbiguousInboxAcceptanceCommit_PreservesAndProcessesRecoveredEnvelope()
+    {
+        var receiver = NewGrain();
+        var journalId = JournalId.FromGrainId(receiver.GetGrainId());
+        fixture.Storage.FailAfterWrite(journalId);
+        using var envelope = CreateEnvelope(receiver, NewMessage(76, "ambiguous-acceptance"));
+
+        await Assert.ThrowsAsync<IOException>(() => DeliverAsync(receiver, envelope.Value));
+
+        var completed = await fixture.WaitForEffectCountAsync(receiver, 1);
+        Assert.Equal("ambiguous-acceptance", Assert.Single(completed.Effects).Value);
+        Assert.Equal(0, completed.InboxCount);
     }
 
     [Fact]
@@ -213,6 +265,64 @@ public sealed class PublicDurableMessagingBehaviorTests : IAsyncLifetime
         Assert.Equal(1, deadLetter.AttemptCount);
         Assert.Contains("Injected handler failure", deadLetter.Reason, StringComparison.Ordinal);
         Assert.Empty((await sink.GetSnapshotAsync()).Effects);
+    }
+
+    [Fact]
+    public async Task HandlerCannotCommitBeforeInboxCompletion()
+    {
+        var receiver = NewGrain();
+        var message = new DurableTestMessage(
+            Guid.NewGuid(),
+            10,
+            "premature-commit",
+            CommitDuringHandling: true);
+        using var envelope = CreateEnvelope(receiver, message);
+
+        Assert.Equal(DeliveryStatus.Accepted, (await DeliverAsync(receiver, envelope.Value)).Status);
+        var state = await fixture.WaitForDeadLetterCountAsync(receiver, 1);
+
+        Assert.Empty(state.Effects);
+        var deadLetter = Assert.Single(state.InboxDeadLetters);
+        Assert.Contains("cannot be committed", deadLetter.Reason, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task HandlerCannotDeleteStateBeforeInboxCompletion()
+    {
+        var receiver = NewGrain();
+        var message = new DurableTestMessage(
+            Guid.NewGuid(),
+            11,
+            "premature-delete",
+            DeleteDuringHandling: true);
+        using var envelope = CreateEnvelope(receiver, message);
+
+        Assert.Equal(DeliveryStatus.Accepted, (await DeliverAsync(receiver, envelope.Value)).Status);
+        var state = await fixture.WaitForDeadLetterCountAsync(receiver, 1);
+
+        Assert.Empty(state.Effects);
+        var deadLetter = Assert.Single(state.InboxDeadLetters);
+        Assert.Contains("cannot be committed or deleted", deadLetter.Reason, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task RecoveryDuringHandler_LeavesMessageRetryable()
+    {
+        var receiver = NewGrain();
+        using var handler = fixture.HandlerProbe.Arm(receiver.GetGrainId(), "messages/recover-handler");
+        using var envelope = CreateEnvelope(
+            receiver,
+            NewMessage(78, "recover-handler"),
+            "messages/recover-handler");
+
+        Assert.Equal(DeliveryStatus.Accepted, (await DeliverAsync(receiver, envelope.Value)).Status);
+        await handler.WaitUntilEnteredAsync();
+        await receiver.RevertStateAsync();
+        handler.Release();
+
+        var completed = await fixture.WaitForEffectCountAsync(receiver, 1);
+        Assert.Equal(1, Assert.Single(completed.Effects).Count);
+        Assert.Equal(0, completed.InboxCount);
     }
 
     [Fact]
@@ -467,6 +577,22 @@ public sealed class PublicDurableMessagingBehaviorTests : IAsyncLifetime
             fixture.JobManagerProbe.GetSuccessCount(
                 "orleans.messaging.outbox-flush",
                 sender.GetGrainId()));
+    }
+
+    [Fact]
+    public async Task DeleteThenWrite_DiscardsPendingOutboxWithoutPoisoningNextWrite()
+    {
+        var sender = NewGrain();
+        var receiver = NewGrain();
+        await sender.StageWithoutCommitAsync(
+            receiver.GetGrainId(),
+            "messages/delete-then-write",
+            NewMessage(75, "delete-then-write"));
+
+        await sender.DeleteThenWriteStateAsync();
+
+        Assert.Equal(0, (await sender.GetSnapshotAsync()).OutboxCount);
+        Assert.Empty((await receiver.GetSnapshotAsync()).Effects);
     }
 
     [Fact]
