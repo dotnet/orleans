@@ -55,12 +55,12 @@ internal sealed class StripedCallbackDictionary<TValue>
     /// Attempts to add the specified key and value to the dictionary.
     /// </summary>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public bool TryAdd(GrainId owner, CorrelationId id, TValue value)
+    public bool TryAdd(CorrelationId id, TValue value)
     {
         var stripe = GetStripe(id);
         lock (stripe.Lock)
         {
-            return stripe.Dictionary.TryAdd(new(owner, id), value);
+            return stripe.Dictionary.TryAdd(id, value);
         }
     }
 
@@ -68,12 +68,12 @@ internal sealed class StripedCallbackDictionary<TValue>
     /// Attempts to get the value associated with the specified key.
     /// </summary>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public bool TryGetValue(GrainId owner, CorrelationId id, [NotNullWhen(true)] out TValue? value)
+    public bool TryGetValue(CorrelationId id, [NotNullWhen(true)] out TValue? value)
     {
         var stripe = GetStripe(id);
         lock (stripe.Lock)
         {
-            return stripe.Dictionary.TryGetValue(new(owner, id), out value);
+            return stripe.Dictionary.TryGetValue(id, out value);
         }
     }
 
@@ -81,12 +81,12 @@ internal sealed class StripedCallbackDictionary<TValue>
     /// Attempts to remove the value with the specified key.
     /// </summary>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public bool TryRemove(GrainId owner, CorrelationId id, [NotNullWhen(true)] out TValue? value)
+    public bool TryRemove(CorrelationId id, [NotNullWhen(true)] out TValue? value)
     {
         var stripe = GetStripe(id);
         lock (stripe.Lock)
         {
-            return stripe.Dictionary.Remove(new(owner, id), out value);
+            return stripe.Dictionary.Remove(id, out value);
         }
     }
 
@@ -180,8 +180,6 @@ internal sealed class StripedCallbackDictionary<TValue>
 #else
         public readonly object Lock = new();
 #endif
-        public readonly Dictionary<CallbackKey, TValue> Dictionary = new();
+        public readonly Dictionary<CorrelationId, TValue> Dictionary = new();
     }
-
-    private readonly record struct CallbackKey(GrainId Owner, CorrelationId Id);
 }
