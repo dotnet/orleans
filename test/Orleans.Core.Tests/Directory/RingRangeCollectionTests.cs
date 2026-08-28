@@ -39,12 +39,12 @@ public sealed class RingRangeCollectionTests
         Assert.True(empty.IsEmpty);
         Assert.False(empty.IsFull);
         Assert.Equal(0u, empty.Size);
-        Assert.Equal(0, empty.SizePercent);
+        Assert.Equal(0f, empty.SizePercent);
 
         Assert.False(full.IsEmpty);
         Assert.True(full.IsFull);
         Assert.Equal(uint.MaxValue, full.Size);
-        Assert.Equal(100, full.SizePercent);
+        Assert.Equal(100f, full.SizePercent);
 
         Assert.False(partial.IsEmpty);
         Assert.False(partial.IsFull);
@@ -69,8 +69,9 @@ public sealed class RingRangeCollectionTests
     public void Contains_UsesTheGrainUniformHashCode()
     {
         var grainId = GrainId.Create("test", "grain");
+        var collection = Create(RingRange.FromPoint(grainId.GetUniformHashCode()));
 
-        Assert.True(Create(RingRange.Full).Contains(grainId));
+        Assert.True(collection.Contains(grainId));
         Assert.False(RingRangeCollection.Empty.Contains(grainId));
     }
 
