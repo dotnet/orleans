@@ -11,6 +11,15 @@ public class SqlServerStorageForTestingTests
 {
     private const string TestDatabaseName = "OrleansSqlServerSetupTest";
 
+    [Theory]
+    [InlineData(1205, true)]
+    [InlineData(3702, true)]
+    [InlineData(18456, false)]
+    public void ClassifiesRetryableDatabaseResetErrors(int errorNumber, bool expected)
+    {
+        Assert.Equal(expected, SqlServerStorageForTesting.IsRetryableDatabaseResetError(errorNumber));
+    }
+
     [Fact]
     public async Task RecreatesDatabaseWithActivePooledConnection()
     {
