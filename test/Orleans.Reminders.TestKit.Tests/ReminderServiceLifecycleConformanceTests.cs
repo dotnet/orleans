@@ -33,22 +33,38 @@ public sealed class ReminderServiceLifecycleFixture : IAsyncLifetime
 
     public async ValueTask InitializeAsync()
     {
-        var builder = new InProcessTestClusterBuilder(1);
-        builder.ConfigureSilo((_, siloBuilder) =>
-            siloBuilder.Configure<ConsistentRingOptions>(options => options.UseVirtualBucketsConsistentRing = false));
-        builder.UseIdealizedReminderTable(
-            configureReminderOptions: options => options.ReminderLoadingWindow = LoadingWindow);
-        _clock = ReminderTestClock.Attach(
-            builder,
-            minimumReminderPeriod: TimeSpan.FromSeconds(1),
-            refreshReminderListPeriod: TimeSpan.FromSeconds(1));
-        _cluster = builder.Build();
-        await _cluster.DeployAsync(TestContext.Current.CancellationToken);
-        Harness = new ReminderServiceLifecycleHarness(
-            _cluster,
-            _clock,
-            _clock.DiagnosticObserver,
-            LoadingWindow);
+        try
+        {
+            var builder = new InProcessTestClusterBuilder(1);
+            builder.ConfigureSilo((_, siloBuilder) =>
+                siloBuilder.Configure<ConsistentRingOptions>(options => options.UseVirtualBucketsConsistentRing = false));
+            builder.UseIdealizedReminderTable(
+                configureReminderOptions: options => options.ReminderLoadingWindow = LoadingWindow);
+            _clock = ReminderTestClock.Attach(
+                builder,
+                minimumReminderPeriod: TimeSpan.FromSeconds(1),
+                refreshReminderListPeriod: TimeSpan.FromSeconds(1));
+            _cluster = builder.Build();
+            await _cluster.DeployAsync(TestContext.Current.CancellationToken);
+            Harness = new ReminderServiceLifecycleHarness(
+                _cluster,
+                _clock,
+                _clock.DiagnosticObserver,
+                LoadingWindow);
+        }
+        catch (Exception initializationException)
+        {
+            try
+            {
+                await DisposeAsync();
+            }
+            catch (Exception cleanupException)
+            {
+                initializationException.Data["ReminderServiceLifecycleFixture.CleanupException"] = cleanupException;
+            }
+
+            throw;
+        }
     }
 
     public async ValueTask DisposeAsync()
