@@ -353,7 +353,7 @@ public class ReminderTestsBase : OrleansTestingBase, IAsyncDisposable
     {
         var initialSilos = HostedCluster.GetActiveSilos().ToHashSet();
         using var cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-        cts.CancelAfter(ENDWAIT);
+        cts.CancelAfter(CHURN_ENDWAIT);
         using var startupCancellation = CancellationTokenSource.CreateLinkedTokenSource(cts.Token);
         Task<List<InProcessSiloHandle>>? setupJoinTask = null;
         Task<List<InProcessSiloHandle>>? failoverJoinTask = null;
