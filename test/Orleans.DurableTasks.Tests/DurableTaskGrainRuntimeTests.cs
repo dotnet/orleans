@@ -191,7 +191,9 @@ public class DurableTaskGrainRuntimeTests
         };
 
         var firstSchedule = ((IDurableTaskServer)runtime).ScheduleAsync(taskId, firstRequest, CancellationToken.None).AsTask();
-        await storage.WriteStarted.Task.WaitAsync(TimeSpan.FromSeconds(10));
+        await storage.WriteStarted.Task.WaitAsync(
+            TimeSpan.FromSeconds(10),
+            TestContext.Current.CancellationToken);
 
         var duplicateResponse = await ((IDurableTaskServer)runtime).ScheduleAsync(
             taskId,
@@ -199,7 +201,9 @@ public class DurableTaskGrainRuntimeTests
             CancellationToken.None);
 
         storage.AllowWrite.SetResult();
-        var firstResponse = await firstSchedule.WaitAsync(TimeSpan.FromSeconds(10));
+        var firstResponse = await firstSchedule.WaitAsync(
+            TimeSpan.FromSeconds(10),
+            TestContext.Current.CancellationToken);
         completion.SetResult(42);
         var finalResponse = await runtime.GetScheduledTaskHandle(taskId).WaitAsync(BoundedWait());
 
@@ -513,7 +517,9 @@ public class DurableTaskGrainRuntimeTests
         var restarted = CreateSecondRuntime(fixture);
 
         await restarted.ResumePendingTasksAsync(CancellationToken.None);
-        await childStarted.Task.WaitAsync(TimeSpan.FromSeconds(10));
+        await childStarted.Task.WaitAsync(
+            TimeSpan.FromSeconds(10),
+            TestContext.Current.CancellationToken);
 
         Assert.Equal(1, Volatile.Read(ref childInvocationCount));
         childCompletion.SetResult(17);
@@ -769,7 +775,9 @@ public class DurableTaskGrainRuntimeTests
         });
 
         var handle = await fixture.Runtime.ScheduleChildAsync(taskId, task, CancellationToken.None);
-        await started.Task.WaitAsync(TimeSpan.FromSeconds(10));
+        await started.Task.WaitAsync(
+            TimeSpan.FromSeconds(10),
+            TestContext.Current.CancellationToken);
 
         await handle.CancelAsync(CancellationToken.None);
         var response = await handle.WaitAsync(BoundedWait());
@@ -1961,7 +1969,7 @@ public class DurableTaskGrainRuntimeTests
         Assert.False(timedStop.IsCompleted);
 
         var runningAfterTimeout = await ((IDurableTaskGrainExtension)fixture.Runtime)
-            .GetRunningTasksAsync()
+            .GetRunningTasksAsync(TestContext.Current.CancellationToken)
             .ToListAsync();
         Assert.Contains(taskId, runningAfterTimeout);
         Assert.True(fixture.Storage.TryGetTask(taskId, out var pendingAfterTimeout));
@@ -1973,7 +1981,7 @@ public class DurableTaskGrainRuntimeTests
 
         await timedStop.WaitAsync(BoundedWait());
         var runningAfterTerminalStop = await ((IDurableTaskGrainExtension)fixture.Runtime)
-            .GetRunningTasksAsync()
+            .GetRunningTasksAsync(TestContext.Current.CancellationToken)
             .ToListAsync();
         Assert.Empty(runningAfterTerminalStop);
     }

@@ -199,9 +199,15 @@ public class DurableInboxExtensionTests : IClassFixture<DefaultClusterFixture>
                 CancellationToken.None);
 
             Assert.Equal(DeliveryStatus.Processed, result.Status);
-            Assert.Equal("contoso", await handler.ObservedTenant.Task.WaitAsync(TimeSpan.FromSeconds(10)));
+            Assert.Equal(
+                "contoso",
+                await handler.ObservedTenant.Task.WaitAsync(
+                    TimeSpan.FromSeconds(10),
+                    TestContext.Current.CancellationToken));
             var observedOwners = Assert.IsAssignableFrom<IReadOnlyDictionary<string, string>>(
-                await handler.ObservedTurnIsolation.Task.WaitAsync(TimeSpan.FromSeconds(10)));
+                await handler.ObservedTurnIsolation.Task.WaitAsync(
+                    TimeSpan.FromSeconds(10),
+                    TestContext.Current.CancellationToken));
             Assert.NotEmpty(observedOwners);
             Assert.DoesNotContain("sender-owner", observedOwners.Values);
             Assert.Equal("outer", RequestContext.Get("tenant"));
@@ -485,11 +491,12 @@ public class DurableInboxExtensionTests : IClassFixture<DefaultClusterFixture>
         var options = new DeliveryOptions { PollTimeout = TimeSpan.FromSeconds(10) };
 
         var first = extension.DeliverAsync(envelope, options, CancellationToken.None).AsTask();
-        await handler.Started.Task.WaitAsync(TimeSpan.FromSeconds(10));
+        await handler.Started.Task.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
         var second = extension.DeliverAsync(envelope, options, CancellationToken.None).AsTask();
         handler.Release.TrySetResult();
 
-        var results = await Task.WhenAll(first, second).WaitAsync(TimeSpan.FromSeconds(10));
+        var results = await Task.WhenAll(first, second)
+            .WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
         Assert.All(results, result => Assert.Equal(DeliveryStatus.Processed, result.Status));
         Assert.Equal(1, handler.Count);
     }
@@ -510,11 +517,11 @@ public class DurableInboxExtensionTests : IClassFixture<DefaultClusterFixture>
             envelope,
             new DeliveryOptions { PollTimeout = TimeSpan.Zero },
             CancellationToken.None);
-        await handler.Started.Task.WaitAsync(TimeSpan.FromSeconds(10));
+        await handler.Started.Task.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
 
         extension.StopProcessing();
 
-        await handler.Canceled.Task.WaitAsync(TimeSpan.FromSeconds(10));
+        await handler.Canceled.Task.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
     }
 
     [Fact]
@@ -532,14 +539,14 @@ public class DurableInboxExtensionTests : IClassFixture<DefaultClusterFixture>
             envelope,
             new DeliveryOptions { PollTimeout = TimeSpan.Zero },
             CancellationToken.None);
-        await handler.Started.Task.WaitAsync(TimeSpan.FromSeconds(10));
+        await handler.Started.Task.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
 
-        var stop = extension.OnStop();
+        var stop = extension.OnStop(TestContext.Current.CancellationToken);
         await Task.Yield();
         Assert.False(stop.IsCompleted);
 
         handler.Release.SetResult();
-        await stop.WaitAsync(TimeSpan.FromSeconds(10));
+        await stop.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
     }
 
     [Fact]
@@ -567,7 +574,7 @@ public class DurableInboxExtensionTests : IClassFixture<DefaultClusterFixture>
             envelope,
             new DeliveryOptions { PollTimeout = TimeSpan.Zero },
             CancellationToken.None);
-        await handler.Started.Task.WaitAsync(TimeSpan.FromSeconds(10));
+        await handler.Started.Task.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
 
         var stop = grainContext.StopAsync();
         await Task.Yield();
@@ -575,7 +582,7 @@ public class DurableInboxExtensionTests : IClassFixture<DefaultClusterFixture>
 
         handler.Release.SetResult();
         await delivery;
-        await stop.WaitAsync(TimeSpan.FromSeconds(10));
+        await stop.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
     }
 
     [Fact]
@@ -595,11 +602,13 @@ public class DurableInboxExtensionTests : IClassFixture<DefaultClusterFixture>
             envelope,
             new DeliveryOptions { PollTimeout = TimeSpan.Zero },
             CancellationToken.None).AsTask();
-        await stateManager.WriteStarted.Task.WaitAsync(TimeSpan.FromSeconds(10));
-        var stop = extension.OnStop();
+        await stateManager.WriteStarted.Task.WaitAsync(
+            TimeSpan.FromSeconds(10),
+            TestContext.Current.CancellationToken);
+        var stop = extension.OnStop(TestContext.Current.CancellationToken);
         stateManager.AllowWrite.SetResult();
-        await delivery.WaitAsync(TimeSpan.FromSeconds(10));
-        await stop.WaitAsync(TimeSpan.FromSeconds(10));
+        await delivery.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
+        await stop.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
         Assert.False(handler.Started.Task.IsCompleted);
         Assert.Equal(1, extension.Count);
     }
@@ -772,7 +781,9 @@ public class DurableInboxExtensionTests : IClassFixture<DefaultClusterFixture>
         Task unrelated;
         using (ExecutionContext.SuppressFlow())
         {
-            unrelated = Task.Run(coordinator.ThrowIfMutationBlocked);
+            unrelated = Task.Run(
+                coordinator.ThrowIfMutationBlocked,
+                TestContext.Current.CancellationToken);
         }
         await Assert.ThrowsAsync<InvalidOperationException>(() => unrelated);
 
@@ -794,13 +805,13 @@ public class DurableInboxExtensionTests : IClassFixture<DefaultClusterFixture>
             var write = manager.WriteStateAsync(CancellationToken.None);
             waiting.SetResult();
             await write;
-        });
+        }, TestContext.Current.CancellationToken);
 
         using var scope = await coordinator.BeginHandlerAsync(CancellationToken.None);
         scope.Activate();
         await manager.WriteStateAsync(CancellationToken.None);
         release.SetResult();
-        await waiting.Task.WaitAsync(TimeSpan.FromSeconds(10));
+        await waiting.Task.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
         Assert.False(unrelatedWrite.IsCompleted);
 
         scope.Complete();
@@ -821,13 +832,13 @@ public class DurableInboxExtensionTests : IClassFixture<DefaultClusterFixture>
             var write = manager.WriteStateAsync(CancellationToken.None);
             waiting.SetResult();
             await write;
-        });
+        }, TestContext.Current.CancellationToken);
 
         using (var scope = await coordinator.BeginHandlerAsync(CancellationToken.None))
         {
             scope.Activate();
             release.SetResult();
-            await waiting.Task.WaitAsync(TimeSpan.FromSeconds(10));
+            await waiting.Task.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
             Assert.False(unrelatedWrite.IsCompleted);
         }
 
@@ -846,7 +857,7 @@ public class DurableInboxExtensionTests : IClassFixture<DefaultClusterFixture>
             await release.Task;
             using var joined = coordinator.JoinReentrantScope();
             await manager.WriteStateAsync(CancellationToken.None);
-        });
+        }, TestContext.Current.CancellationToken);
 
         using (var scope = await coordinator.BeginHandlerAsync(CancellationToken.None))
         {

@@ -19,9 +19,15 @@ public class DurableTaskMethodBuilderTests
         Assert.Null(DurableExecutionContext.CurrentContext);
 
         resume.SetResult();
-        (await execution.WaitAsync(TimeSpan.FromSeconds(10))).ThrowIfExceptionResponse();
+        (await execution.WaitAsync(
+            TimeSpan.FromSeconds(10),
+            TestContext.Current.CancellationToken)).ThrowIfExceptionResponse();
 
-        Assert.Same(context, await observed.Task.WaitAsync(TimeSpan.FromSeconds(10)));
+        Assert.Same(
+            context,
+            await observed.Task.WaitAsync(
+                TimeSpan.FromSeconds(10),
+                TestContext.Current.CancellationToken));
 
         async DurableTask RunAsync()
         {
@@ -41,10 +47,16 @@ public class DurableTaskMethodBuilderTests
         Assert.Null(DurableExecutionContext.CurrentContext);
 
         resume.SetResult();
-        var response = await execution.WaitAsync(TimeSpan.FromSeconds(10));
+        var response = await execution.WaitAsync(
+            TimeSpan.FromSeconds(10),
+            TestContext.Current.CancellationToken);
 
         Assert.Equal(42, response.GetResult<int>());
-        Assert.Same(context, await observed.Task.WaitAsync(TimeSpan.FromSeconds(10)));
+        Assert.Same(
+            context,
+            await observed.Task.WaitAsync(
+                TimeSpan.FromSeconds(10),
+                TestContext.Current.CancellationToken));
 
         async DurableTask<int> RunAsync()
         {

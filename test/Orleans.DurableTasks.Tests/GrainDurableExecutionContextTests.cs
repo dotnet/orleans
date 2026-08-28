@@ -104,7 +104,7 @@ public class GrainDurableExecutionContextTests
             var registration = context.RegisterCancellationCallback(static _ => Task.CompletedTask);
 
             await Task.WhenAll(
-                Task.Run(registration.Dispose),
+                Task.Run(registration.Dispose, TestContext.Current.CancellationToken),
                 context.CancelAsync(CancellationToken.None));
         }
     }

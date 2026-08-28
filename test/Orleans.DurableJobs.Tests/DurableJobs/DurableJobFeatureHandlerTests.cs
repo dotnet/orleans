@@ -141,7 +141,8 @@ public class DurableJobFeatureHandlerTests
         Assert.False(concurrent.IsCompleted);
 
         durableWork.Dispose();
-        using var concurrentLease = await concurrent.AsTask().WaitAsync(TimeSpan.FromSeconds(10));
+        using var concurrentLease = await concurrent.AsTask()
+            .WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
     }
 
     [Fact]
@@ -219,7 +220,8 @@ public class DurableJobFeatureHandlerTests
 
         RequestContext.Set(DurableJobTurnIsolation.RequestContextKey, currentOwners);
         current.Dispose();
-        using var admitted = await staleEntry.AsTask().WaitAsync(TimeSpan.FromSeconds(10));
+        using var admitted = await staleEntry.AsTask()
+            .WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
         admitted.Activate();
     }
 
@@ -250,7 +252,7 @@ public class DurableJobFeatureHandlerTests
             TaskCreationOptions.RunContinuationsAsynchronously);
         var execution = lifetime.Start(_ => release.Task);
 
-        var stop = lifetime.OnStop();
+        var stop = lifetime.OnStop(TestContext.Current.CancellationToken);
         await Task.Yield();
         Assert.False(stop.IsCompleted);
         Assert.Throws<OperationCanceledException>(
@@ -258,7 +260,7 @@ public class DurableJobFeatureHandlerTests
 
         release.SetResult(DurableJobRunResult.Completed);
         Assert.Same(DurableJobRunResult.Completed, await execution);
-        await stop.WaitAsync(TimeSpan.FromSeconds(10));
+        await stop.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
     }
 
     [Theory]

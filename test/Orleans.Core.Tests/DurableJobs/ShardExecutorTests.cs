@@ -988,13 +988,15 @@ public class ShardExecutorTests
         var runTask = executor.RunShardAsync(shard, CancellationToken.None);
         try
         {
-            var completedTask = await Task.WhenAny(reachedFullConcurrency.Task, Task.Delay(TimeSpan.FromSeconds(10)));
+            var completedTask = await Task.WhenAny(
+                reachedFullConcurrency.Task,
+                Task.Delay(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken));
             Assert.Same(reachedFullConcurrency.Task, completedTask);
         }
         finally
         {
             holdGate.TrySetResult();
-            await runTask.WaitAsync(TimeSpan.FromSeconds(10));
+            await runTask.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
         }
 
         // Despite the initial concurrency being capped at 2, the failed ramp-up must have released the
