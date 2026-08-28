@@ -53,7 +53,9 @@ await host.WaitForShutdownAsync();
 
 ## Strongly consistent schema migration
 
-The provider defaults to the legacy schema. V2 migration is an explicit two-stage rollout:
+The provider defaults to the legacy schema. Legacy reads now strongly point-validate GSI candidates and omissions, strongly scan once for initial/range ownership, and reconcile completed mutations on the current owner. This prevents stale resurrection and removal but cannot make a GSI omission discoverable for arbitrary set reads.
+
+V2 migration supplies the complete guarantee and is an explicit two-stage rollout:
 
 1. Deploy every silo with `TableMode=Migrate` to create/backfill `${TableName}-v2` while retaining V1 reads and transactional dual writes.
 2. After all silos are upgraded and migration reports `Ready`, deploy `TableMode=V2`. Cutover verifies the copies and fails if any active silo lacks a V2 compatibility marker.

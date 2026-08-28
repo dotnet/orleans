@@ -90,6 +90,10 @@ namespace Orleans
         System.Threading.Tasks.Task<ReminderTableData> ReadRows(uint begin, uint end, System.Threading.CancellationToken cancellationToken);
         System.Threading.Tasks.Task<ReminderTableData> ReadRows(uint begin, uint end);
         System.Threading.Tasks.Task<bool> RemoveRow(Runtime.GrainId grainId, string reminderName, string eTag, System.Threading.CancellationToken cancellationToken);
+        System.Threading.Tasks.Task<ReminderTableData> ReadRows(uint begin, uint end, bool requireStrongConsistency);
+        System.Threading.Tasks.Task<ReminderTableData> ReadRows(uint begin, uint end, bool requireStrongConsistency, System.Threading.CancellationToken cancellationToken);
+        System.Threading.Tasks.Task<ReminderTableData> ReadRows(System.Collections.Generic.IReadOnlyList<(uint Begin, uint End)> ranges, bool requireStrongConsistency);
+        System.Threading.Tasks.Task<ReminderTableData> ReadRows(System.Collections.Generic.IReadOnlyList<(uint Begin, uint End)> ranges, bool requireStrongConsistency, System.Threading.CancellationToken cancellationToken);
         System.Threading.Tasks.Task<bool> RemoveRow(Runtime.GrainId grainId, string reminderName, string eTag);
         System.Threading.Tasks.Task StartAsync(System.Threading.CancellationToken cancellationToken = default);
         System.Threading.Tasks.Task StopAsync(System.Threading.CancellationToken cancellationToken = default);

@@ -6,7 +6,6 @@ using Orleans.Configuration;
 using Orleans.Runtime;
 using System;
 using System.Collections.Generic;
-using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -49,6 +48,8 @@ namespace Orleans.Reminders.DynamoDB
         private string? leaseToken;
         private CancellationTokenSource? leaseRenewalCancellation;
         private Task? leaseRenewalTask;
+        private readonly SemaphoreSlim legacyStrongScanRateLimiter = new(1, 1);
+        private DateTimeOffset lastLegacyStrongScanStarted;
 
         /// <summary>Initializes a new instance of the <see cref="DynamoDBReminderTable"/> class.</summary>
         /// <param name="loggerFactory">logger factory to use</param>
@@ -115,8 +116,16 @@ namespace Orleans.Reminders.DynamoDB
                 if ((await ReadMigrationState())?.Status == MigrationStatus.Retired)
                 {
                     await StartCompatibilityHeartbeat();
-                    await InitializeMigration(cancellationToken);
-                    return;
+                    try
+                    {
+                        await InitializeMigration(cancellationToken);
+                        return;
+                    }
+                    catch
+                    {
+                        await StopAsync();
+                        throw;
+                    }
                 }
             }
 
@@ -233,6 +242,7 @@ namespace Orleans.Reminders.DynamoDB
             {
                 var expression = $"{SERVICE_ID_PROPERTY_NAME} = :{SERVICE_ID_PROPERTY_NAME} AND {GRAIN_REFERENCE_PROPERTY_NAME} = :{GRAIN_REFERENCE_PROPERTY_NAME}";
                 var records = await this.storage.QueryAllAsync(this.options.TableName, expressionValues, expression, this.Resolve, SERVICE_ID_GRAIN_REFERENCE_INDEX, consistentRead: false).ConfigureAwait(false);
+                records = await ConfirmLegacyDiscoveryCandidates(records);
 
                 return new ReminderTableData(records);
             }
@@ -249,12 +259,52 @@ namespace Orleans.Reminders.DynamoDB
         /// <param name="begin"></param>
         /// <param name="end"></param>
         /// <returns> Return the RemiderTableData if the rows were read successfully </returns>
-        public async Task<ReminderTableData> ReadRows(uint begin, uint end)
+        public Task<ReminderTableData> ReadRows(uint begin, uint end)
+            => ReadRows(begin, end, requireStrongConsistency: false);
+
+        /// <inheritdoc/>
+        public async Task<ReminderTableData> ReadRows(
+            IReadOnlyList<(uint Begin, uint End)> ranges,
+            bool requireStrongConsistency)
+        {
+            await RefreshReadMode();
+            if (useV2Reads)
+            {
+                var result = new List<ReminderEntry>();
+                foreach (var range in ranges)
+                {
+                    result.AddRange((await ReadV2Rows(range.Begin, range.End)).Reminders);
+                }
+
+                return new(result);
+            }
+
+            if (requireStrongConsistency)
+            {
+                return await ReadLegacyRowsStrongly(ranges);
+            }
+
+            var legacyResult = new List<ReminderEntry>();
+            foreach (var range in ranges)
+            {
+                legacyResult.AddRange((await ReadRows(range.Begin, range.End)).Reminders);
+            }
+
+            return new(legacyResult);
+        }
+
+        /// <inheritdoc/>
+        public async Task<ReminderTableData> ReadRows(uint begin, uint end, bool requireStrongConsistency)
         {
             await RefreshReadMode();
             if (useV2Reads)
             {
                 return await ReadV2Rows(begin, end);
+            }
+
+            if (requireStrongConsistency)
+            {
+                return await ReadLegacyRowsStrongly(begin, end);
             }
 
             Dictionary<string, AttributeValue>? expressionValues = null;
@@ -295,6 +345,7 @@ namespace Orleans.Reminders.DynamoDB
 
                 }
 
+                records = await ConfirmLegacyDiscoveryCandidates(records);
                 return new ReminderTableData(records);
             }
             catch (Exception exc)

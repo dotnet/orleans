@@ -13,6 +13,8 @@ internal sealed class DynamoDBReminderMigrationTestHooks
     public Func<Task>? BeforeVerification { get; init; }
 
     public Func<Task>? AfterPageCheckpoint { get; init; }
+
+    public Func<IReadOnlyList<ReminderEntry>, IReadOnlyList<ReminderEntry>>? LegacyDiscoveryResults { get; init; }
 }
 
 internal sealed partial class DynamoDBReminderTable
