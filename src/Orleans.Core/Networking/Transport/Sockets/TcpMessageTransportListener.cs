@@ -44,7 +44,14 @@ internal sealed class TcpMessageTransportListener : MessageTransportListener
     public override FeatureCollection Features { get; } = new FeatureCollection();
 
     /// <inheritdoc/>
-    public override bool IsValid => _listenerOptions.Get(ListenerName).Enabled;
+    public override bool IsValid
+    {
+        get
+        {
+            var options = _listenerOptions.Get(ListenerName);
+            return options.Enabled && options.Endpoint is not null;
+        }
+    }
 
     /// <inheritdoc/>
     public override string ListenerName { get; }
