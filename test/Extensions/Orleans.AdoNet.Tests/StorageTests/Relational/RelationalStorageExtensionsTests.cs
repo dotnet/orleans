@@ -25,7 +25,8 @@ public sealed class RelationalStorageExtensionsTests
                 "@tenant",
                 "north",
                 size: 32,
-                dbType: DbType.AnsiString));
+                dbType: DbType.AnsiString),
+            TestContext.Current.CancellationToken);
 
         Assert.Equal([84], results);
         var call = Assert.Single(storage.Calls);
@@ -48,7 +49,11 @@ public sealed class RelationalStorageExtensionsTests
             CreateTable(("Value", typeof(int), 10), ("Value", typeof(int), 20)),
             CreateTable(("Value", typeof(int), 30)));
 
-        var results = await storage.ReadAsync(Sql, record => record.GetInt32(0), parameterProvider: null);
+        var results = await storage.ReadAsync(
+            Sql,
+            record => record.GetInt32(0),
+            parameterProvider: null,
+            TestContext.Current.CancellationToken);
 
         Assert.Equal([10, 20, 30], results);
         Assert.Single(storage.Calls);
@@ -111,7 +116,11 @@ public sealed class RelationalStorageExtensionsTests
         var storage = new ScriptedRelationalStorage();
 
         var exception = await Assert.ThrowsAsync<ArgumentNullException>(
-            () => storage.ReadAsync(Sql, (Func<IDataRecord, int>)null!, parameterProvider: null));
+            () => storage.ReadAsync(
+                Sql,
+                (Func<IDataRecord, int>)null!,
+                parameterProvider: null,
+                TestContext.Current.CancellationToken));
 
         Assert.Equal("selector", exception.ParamName);
         Assert.Empty(storage.Calls);

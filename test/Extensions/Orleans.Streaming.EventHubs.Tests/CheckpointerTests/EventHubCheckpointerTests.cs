@@ -386,7 +386,10 @@ public class EventHubCheckpointerTests
         var checkpointer = CreateUninitializedCheckpointer();
         SetPersistedOffset(checkpointer, "20");
 
-        checkpointer.Update(candidate, new DateTime(2026, 1, 2, 3, 4, 5, DateTimeKind.Utc));
+        checkpointer.Update(
+            candidate,
+            new DateTime(2026, 1, 2, 3, 4, 5, DateTimeKind.Utc),
+            TestContext.Current.CancellationToken);
         await checkpointer.FlushAsync(TestContext.Current.CancellationToken);
 
         Assert.True(checkpointer.CheckpointExists);
@@ -401,7 +404,10 @@ public class EventHubCheckpointerTests
         var checkpointer = CreateUninitializedCheckpointer();
         SetPersistedOffset(checkpointer, "20");
 
-        checkpointer.Update("21", new DateTime(2026, 1, 2, 3, 4, 5, DateTimeKind.Utc));
+        checkpointer.Update(
+            "21",
+            new DateTime(2026, 1, 2, 3, 4, 5, DateTimeKind.Utc),
+            TestContext.Current.CancellationToken);
 
         Assert.True(checkpointer.CheckpointExists);
         Assert.Equal("21", GetLatestOffset(checkpointer));
@@ -414,7 +420,10 @@ public class EventHubCheckpointerTests
         var checkpointer = CreateUninitializedCheckpointer(useNumericComparer: false);
         ThrottleSaves(checkpointer);
 
-        checkpointer.Update("opaque-checkpoint", new DateTime(2026, 1, 2, 3, 4, 5, DateTimeKind.Utc));
+        checkpointer.Update(
+            "opaque-checkpoint",
+            new DateTime(2026, 1, 2, 3, 4, 5, DateTimeKind.Utc),
+            TestContext.Current.CancellationToken);
 
         Assert.True(checkpointer.CheckpointExists);
         Assert.Equal("opaque-checkpoint", GetLatestOffset(checkpointer));
