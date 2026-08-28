@@ -26,6 +26,19 @@ public class DurableTaskStateTests
         Assert.Null(state.CompletedAt);
         Assert.Null(state.CancellationRequestedAt);
         Assert.Equal(default, state.CreatedAt);
+        Assert.Equal(DurableTaskKind.Unspecified, state.Kind);
+    }
+
+    [Fact]
+    public void PendingAndSubscribedGenericResultsThrowInvalidOperationException()
+    {
+        var pending = Assert.Throws<InvalidOperationException>(
+            () => PendingDurableTaskResponse.Instance.GetResult<int>());
+        var subscribed = Assert.Throws<InvalidOperationException>(
+            () => SubscribedDurableTaskResponse.Instance.GetResult<string>());
+
+        Assert.Equal("The task has not completed yet.", pending.Message);
+        Assert.Equal("The task has not completed yet.", subscribed.Message);
     }
 
     [Fact]

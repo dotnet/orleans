@@ -451,6 +451,7 @@ public class VolatileDurableTaskGrainStorageTests
 
     private sealed class NotDurableTaskState : IDurableTaskState
     {
+        public DurableTaskKind Kind => DurableTaskKind.Unspecified;
         public DurableTaskResponse? Result => null;
         public IReadOnlySet<GrainId> CompletionDestinations => new HashSet<GrainId>();
         public IDurableTaskRequest? Request => null;

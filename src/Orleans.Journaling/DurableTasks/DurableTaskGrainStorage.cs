@@ -139,6 +139,13 @@ internal sealed class DurableTaskGrainStorage : IDurableTaskGrainStorage
         _items[taskId] = typedState;
     }
 
+    public void SetTaskKind(TaskId taskId, IDurableTaskState state, DurableTaskKind kind)
+    {
+        var typedState = CopyState(taskId, state);
+        typedState.Kind = kind;
+        _items[taskId] = typedState;
+    }
+
     public bool TryGetTask(TaskId taskId, [NotNullWhen(true)] out IDurableTaskState? state)
     {
         ArgumentOutOfRangeException.ThrowIfEqual(taskId, default);

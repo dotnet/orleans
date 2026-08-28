@@ -844,7 +844,7 @@ public sealed class PendingDurableTaskResponse : DurableTaskResponse
     public override DurableTaskResponseKind ResponseKind => DurableTaskResponseKind.Pending;
 
     /// <inheritdoc/>
-    public override T GetResult<T>() => default!;
+    public override T GetResult<T>() => throw new InvalidOperationException("The task has not completed yet.");
 
     /// <inheritdoc/>
     public override string ToString() => "[Pending]";
@@ -870,7 +870,7 @@ public sealed class SubscribedDurableTaskResponse : DurableTaskResponse
     public override DurableTaskResponseKind ResponseKind => DurableTaskResponseKind.Subscribed;
 
     /// <inheritdoc/>
-    public override T GetResult<T>() => default!;
+    public override T GetResult<T>() => throw new InvalidOperationException("The task has not completed yet.");
 
     /// <inheritdoc/>
     public override string ToString() => "[Subscribed]";

@@ -171,7 +171,8 @@ internal sealed class DurableJobTurnIsolationFilter : IIncomingGrainCallFilter
     public async Task Invoke(IIncomingGrainCallContext context)
     {
         if (context.TargetId.IsSystemTarget()
-            || context.InterfaceMethod.DeclaringType == typeof(IDurableJobFeatureReceiverExtension))
+            || context.InterfaceMethod.DeclaringType == typeof(IDurableJobFeatureReceiverExtension)
+            || context.InterfaceMethod.DeclaringType == typeof(IDurableJobReceiverExtension))
         {
             await context.Invoke();
             return;

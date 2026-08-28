@@ -107,6 +107,7 @@ internal sealed partial class DurableTaskGrainRuntime(
         }
 
         _storage.SetRemoteTarget(taskId, state, context.TargetId);
+        _storage.SetTaskKind(taskId, state, DurableTaskKind.Remote);
         transport.SendInvocation(GrainId, context.TargetId, taskId, request);
         await _storage.WriteAsync(cancellationToken);
         return DurableTaskResponse.Pending;
@@ -122,6 +123,7 @@ internal sealed partial class DurableTaskGrainRuntime(
             _storage.SetRemoteTarget(taskId, state, target);
             _storage.SetPendingCancellationDestination(taskId, state, target);
             _storage.RequestCancellation(taskId, state);
+            _storage.SetTaskKind(taskId, state, DurableTaskKind.Remote);
         }
 
         transport.SendCancellation(GrainId, target, taskId);
@@ -209,34 +211,56 @@ internal sealed partial class DurableTaskGrainRuntime(
             await _storage.WriteAsync(cancellationToken);
         }
 
-        foreach (var (taskId, state) in _storage.Tasks.ToList())
+        var canceledLocalTasks = _storage.Tasks
+            .Where(static task =>
+                task.State.Result is not { IsCompleted: true }
+                && task.State.CancellationRequestedAt.HasValue
+                && task.State.PendingCancellationDestination.IsDefault
+                && GetRecoveryKind(task.State) is not DurableTaskKind.Remote)
+            .Select(static task => task.Id)
+            .ToList();
+        foreach (var taskId in canceledLocalTasks)
+        {
+            await SetResponseAsync(
+                taskId,
+                DurableTaskResponse.FromException(new OperationCanceledException()),
+                cancellationToken);
+        }
+
+        var tasks = _storage.Tasks.ToList();
+        foreach (var (taskId, state) in tasks)
+        {
+            if (state.Result is { IsCompleted: true })
+            {
+                continue;
+            }
+
+            var kind = GetRecoveryKind(state);
+            switch (kind)
+            {
+                case DurableTaskKind.Remote:
+                    _taskHandles.TryAdd(
+                        taskId,
+                        new TaskHandle(taskId, this, state.RemoteTarget) { IsRunning = true });
+                    break;
+                case DurableTaskKind.Scheduled:
+                    _taskHandles.TryAdd(taskId, new TaskHandle(taskId, this) { IsRunning = true });
+                    break;
+                case DurableTaskKind.Local:
+                    _taskHandles.TryAdd(
+                        taskId,
+                        new TaskHandle(taskId, this) { IsRunning = state.Request is not null });
+                    break;
+            }
+        }
+
+        foreach (var (taskId, state) in tasks)
         {
             if (state.Result is { IsCompleted: true }
-                || _runningRequests.ContainsKey(taskId))
+                || _runningRequests.ContainsKey(taskId)
+                || GetRecoveryKind(state) is not DurableTaskKind.Local
+                || state.Request is null)
             {
-                continue;
-            }
-
-            if (!state.RemoteTarget.IsDefault)
-            {
-                _taskHandles.TryAdd(taskId, new TaskHandle(taskId, this, state.RemoteTarget));
-                continue;
-            }
-
-            if (state.Request is null)
-            {
-                _taskHandles.TryAdd(taskId, new TaskHandle(taskId, this) { IsRunning = true });
-                continue;
-            }
-
-            if (state.CancellationRequestedAt.HasValue)
-            {
-                if (!state.PendingCancellationDestination.IsDefault)
-                {
-                    continue;
-                }
-
-                await SetResponseAsync(taskId, DurableTaskResponse.FromException(new OperationCanceledException()), cancellationToken);
                 continue;
             }
 
@@ -249,6 +273,21 @@ internal sealed partial class DurableTaskGrainRuntime(
                 state.Request,
                 executionContext,
                 restorePersistedRequestContext: true);
+        }
+
+        static DurableTaskKind GetRecoveryKind(IDurableTaskState state)
+        {
+            if (state.Kind is not DurableTaskKind.Unspecified)
+            {
+                return state.Kind;
+            }
+
+            if (!state.RemoteTarget.IsDefault)
+            {
+                return DurableTaskKind.Remote;
+            }
+
+            return state.Request is null ? DurableTaskKind.Scheduled : DurableTaskKind.Local;
         }
     }
 
@@ -291,6 +330,7 @@ internal sealed partial class DurableTaskGrainRuntime(
             {
                 _storage.SetRequest(taskId, existingState, request);
             }
+            _storage.SetTaskKind(taskId, existingState, DurableTaskKind.Local);
 
             TryRegisterCompletionDestination(taskId, existingState, requestContext.CallerId);
             var canceled = DurableTaskResponse.FromException(new OperationCanceledException());
@@ -327,6 +367,7 @@ internal sealed partial class DurableTaskGrainRuntime(
             {
                 _storage.SetRequest(taskId, state, request);
             }
+            _storage.SetTaskKind(taskId, state, DurableTaskKind.Local);
 
             var subscribed = TryRegisterCompletionDestination(taskId, state, requestContext.CallerId);
 
@@ -419,6 +460,10 @@ internal sealed partial class DurableTaskGrainRuntime(
                 }
                 _taskHandles[taskId] = handle;
             }
+            _storage.SetTaskKind(
+                taskId,
+                state,
+                durableTask is IDurableTaskRequest ? DurableTaskKind.Remote : DurableTaskKind.Scheduled);
 
             using var schedulerEnlistment = schedulableTask.CommitsDurableState
                 && !_storage.IsCommitIntegratedWithActivationJournal
@@ -519,6 +564,7 @@ internal sealed partial class DurableTaskGrainRuntime(
         }
 
         // Otherwise, the task must be a local method invocation, so create an execution context for it and execute it.
+        _storage.SetTaskKind(taskId, state, DurableTaskKind.Local);
         var executionContext = CreateExecutionContext(taskId);
         handle =  new TaskHandle(taskId, this) { IsRunning = true };
         _taskHandles[taskId] = handle;

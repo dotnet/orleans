@@ -456,6 +456,54 @@ public class DurableJobReceiverExtensionTests
         }
     }
 
+    [Fact]
+    public async Task TurnIsolationFilter_ReceiverPollProgressesWhileHandlerLeasePreventsDuplicateExecution()
+    {
+        var isolation = new DurableJobTurnIsolation();
+        isolation.Enable();
+        var execution = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var handler = Substitute.For<IDurableJobHandler>();
+        handler.ExecuteJobAsync(Arg.Any<IJobRunContext>(), Arg.Any<CancellationToken>())
+            .Returns(execution.Task);
+        var timeProvider = new FakeTimeProvider();
+        var registry = new DurableJobHandlerRegistry(isolation);
+        var extension = CreateExtension(
+            handler,
+            jobStatusPollInterval: TimeSpan.FromSeconds(1),
+            timeProvider: timeProvider,
+            registry: registry);
+        var jobContext = CreateJobContext("poll-under-isolation");
+
+        var initialDelivery = extension.HandleDurableJobAsync(jobContext, CancellationToken.None).AsTask();
+        await Task.Yield();
+        timeProvider.Advance(TimeSpan.FromSeconds(1));
+        Assert.True((await initialDelivery).IsInProgress);
+
+        var callContext = Substitute.For<IIncomingGrainCallContext>();
+        callContext.TargetId.Returns(GrainId.Create("test", "grain-1"));
+        callContext.InterfaceMethod.Returns(
+            typeof(IDurableJobReceiverExtension).GetMethod(
+                nameof(IDurableJobReceiverExtension.HandleDurableJobAsync))!);
+        DurableJobRunResult? pollResult = null;
+        callContext.Invoke().Returns(async _ =>
+        {
+            pollResult = await extension.HandleDurableJobAsync(jobContext, CancellationToken.None);
+        });
+
+        await new DurableJobTurnIsolationFilter().Invoke(callContext).WaitAsync(TimeSpan.FromSeconds(10));
+
+        Assert.NotNull(pollResult);
+        Assert.True(pollResult.IsInProgress);
+        await handler.Received(1).ExecuteJobAsync(jobContext, Arg.Any<CancellationToken>());
+
+        RequestContext.Remove(DurableJobTurnIsolation.RequestContextKey);
+        var ordinaryTurn = isolation.EnterOrdinaryAsync();
+        Assert.False(ordinaryTurn.IsCompleted);
+        execution.SetResult();
+        using var lease = await ordinaryTurn.AsTask().WaitAsync(TimeSpan.FromSeconds(10));
+        await handler.Received(1).ExecuteJobAsync(jobContext, Arg.Any<CancellationToken>());
+    }
+
     private static void RegisterFeatureHandler(
         DurableJobHandlerRegistry registry,
         IDurableJobFeatureHandler handler,

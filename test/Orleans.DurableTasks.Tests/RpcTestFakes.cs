@@ -84,6 +84,7 @@ internal sealed class RpcTestDurableTaskState : IDurableTaskState
     public DateTimeOffset? CancellationRequestedAt { get; set; }
     public DateTimeOffset CreatedAt { get; set; }
     public GrainId RemoteTarget { get; set; }
+    public DurableTaskKind Kind { get; set; }
     public bool IsCancellationTombstone { get; set; }
     public GrainId PendingCancellationDestination { get; set; }
 
@@ -150,6 +151,9 @@ internal sealed class RpcTestDurableTaskGrainStorage : IDurableTaskGrainStorage
 
     public void SetCancellationTombstone(TaskId taskId, IDurableTaskState state, bool value) =>
         ((RpcTestDurableTaskState)state).IsCancellationTombstone = value;
+
+    public void SetTaskKind(TaskId taskId, IDurableTaskState state, DurableTaskKind kind) =>
+        ((RpcTestDurableTaskState)state).Kind = kind;
 
     public bool TryGetTask(TaskId taskId, [NotNullWhen(true)] out IDurableTaskState? state)
     {
