@@ -660,6 +660,8 @@ public class ServiceCollectionExtensionsRoutingTests
         return
         [
             P("/"),
+            P("/AdvancedReminders"),
+            P("/AdvancedReminders/{page:int}"),
             P("/ClusterStats"),
             P("/DashboardCounters"),
             P("/GrainState"),
