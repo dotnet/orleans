@@ -71,7 +71,13 @@ internal sealed class TestContainerManager<TContainer>
     {
         try
         {
-            using var dockerClient = TestcontainersSettings.OS.DockerEndpointAuthConfig
+            var endpointAuthConfig = TestcontainersSettings.OS.DockerEndpointAuthConfig;
+            if (endpointAuthConfig is null)
+            {
+                return "Docker endpoint configuration is unavailable.";
+            }
+
+            using var dockerClient = endpointAuthConfig
                 .GetDockerClientConfiguration(Guid.NewGuid())
                 .CreateClient();
             var dockerInfo = await dockerClient.System.GetSystemInfoAsync().ConfigureAwait(false);
