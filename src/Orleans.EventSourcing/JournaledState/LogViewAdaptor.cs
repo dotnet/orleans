@@ -81,7 +81,19 @@ internal sealed class LogViewAdaptor<TLogView, TLogEntry> : PrimaryBasedLogViewA
             throw new ArgumentException("Invalid log segment range.");
         }
 
-        return Task.FromResult<IReadOnlyList<TLogEntry>>(_eventLog.Skip(fromVersion).Take(toVersion - fromVersion).ToArray());
+        var length = toVersion - fromVersion;
+        if (length == 0)
+        {
+            return Task.FromResult<IReadOnlyList<TLogEntry>>(Array.Empty<TLogEntry>());
+        }
+
+        var result = new TLogEntry[length];
+        for (var index = 0; index < length; index++)
+        {
+            result[index] = _eventLog[fromVersion + index];
+        }
+
+        return Task.FromResult<IReadOnlyList<TLogEntry>>(result);
     }
 
     /// <inheritdoc/>
