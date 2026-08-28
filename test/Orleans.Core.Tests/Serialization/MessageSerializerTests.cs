@@ -179,12 +179,16 @@ namespace UnitTests.Serialization
                 isExecuting: true,
                 isWaiting: false,
                 diagnostics: []);
+            var deserializedRequest = RoundTripMessage(request);
             var deserializedResponse = RoundTripMessage(response);
+            var responseToDeserializedRequest = messageFactory.CreateResponseMessage(deserializedRequest);
 
             Assert.Same(target, response.ResponseTarget);
             Assert.Same(target, rejection.ResponseTarget);
             Assert.Same(target, status.ResponseTarget);
+            Assert.Null(deserializedRequest.ResponseTarget);
             Assert.Null(deserializedResponse.ResponseTarget);
+            Assert.Null(responseToDeserializedRequest.ResponseTarget);
         }
 
         [TestSuite("Functional")]
