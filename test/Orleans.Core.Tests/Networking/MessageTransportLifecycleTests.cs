@@ -657,6 +657,40 @@ public class MessageTransportLifecycleTests
     }
 
     [Fact]
+    public async Task LinuxIoUringSocketSender_PinnedSendCompletesSynchronously()
+    {
+        if (!IsIoUringTestEnabled())
+        {
+            return;
+        }
+
+        var (listener, client, server) = await CreateSocketPair();
+        using (listener)
+        using (client)
+        using (server)
+        using (var sender = new LinuxIoUringSocketSender())
+        {
+            var payload = GC.AllocateUninitializedArray<byte>(128, pinned: true);
+            Random.Shared.NextBytes(payload);
+
+            var send = sender.SendAsync(
+                client,
+                payload,
+                bufferIsPinned: true,
+                useZeroCopy: false);
+
+            Assert.True(send.IsCompletedSuccessfully);
+            await send;
+            var received = new byte[payload.Length];
+            var receivedLength = await server.ReceiveAsync(
+                received,
+                TestContext.Current.CancellationToken);
+            Assert.Equal(payload.Length, receivedLength);
+            Assert.Equal(payload, received);
+        }
+    }
+
+    [Fact]
     public async Task SocketMessageTransport_LinuxIoUringAdaptive_SmallFramesNeverArmMultishot()
     {
         if (!IsIoUringTestEnabled())
@@ -685,6 +719,81 @@ public class MessageTransportLifecycleTests
             Assert.Null(transport.MultishotReceiveStatistics);
             Assert.Equal(0, transport.AdaptivePromotionCount);
             Assert.False(transport.IsAdaptiveMultishot);
+            await transport.CloseAsync(null, TestContext.Current.CancellationToken);
+        }
+    }
+
+    [Fact]
+    public async Task SocketMessageTransport_LinuxIoUringTinyAdaptive_TinyFramesPromoteAndLargeFramesDemote()
+    {
+        if (!IsIoUringTestEnabled())
+        {
+            return;
+        }
+
+        var (listener, client, server) = await CreateSocketPair();
+        using (listener)
+        using (client)
+        using (server)
+        await using (var transport = new SocketMessageTransport(
+            client,
+            NullLogger.Instance,
+            useLinuxIoUring: true,
+            linuxIoUringReceiveMode: LinuxIoUringReceiveMode.TinyAdaptive))
+        {
+            var promotionCompleted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            var demotionCompleted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            transport.AdaptiveModeChangedForTesting = useMultishot =>
+            {
+                (useMultishot ? promotionCompleted : demotionCompleted).TrySetResult();
+            };
+
+            transport.Start();
+            for (var i = 0; i < 8; i++)
+            {
+                var payload = Enumerable.Repeat((byte)i, 128).ToArray();
+                Assert.Equal(payload, await SendFramedAsync(transport, server, payload));
+            }
+
+            await promotionCompleted.Task.WaitAsync(
+                TimeSpan.FromSeconds(10),
+                TestContext.Current.CancellationToken);
+            Assert.True(transport.IsAdaptiveMultishot);
+            Assert.Equal(1, transport.AdaptivePromotionCount);
+
+            var largePayload = Enumerable.Repeat((byte)42, 16 * 1024).ToArray();
+            var queuedTinyPayload = Enumerable.Repeat((byte)43, 128).ToArray();
+            using var largeRequest = new FramedReadRequest(largePayload.Length);
+            using var queuedTinyRequest = new FramedReadRequest(queuedTinyPayload.Length);
+            Assert.True(transport.EnqueueRead(largeRequest));
+            Assert.True(transport.EnqueueRead(queuedTinyRequest));
+            await SendExactly(server, CreateFrame(largePayload).Concat(CreateFrame(queuedTinyPayload)).ToArray());
+            Assert.Equal(
+                largePayload,
+                await largeRequest.Completion.WaitAsync(
+                    TimeSpan.FromSeconds(10),
+                    TestContext.Current.CancellationToken));
+            Assert.Equal(
+                queuedTinyPayload,
+                await queuedTinyRequest.Completion.WaitAsync(
+                    TimeSpan.FromSeconds(10),
+                    TestContext.Current.CancellationToken));
+            await demotionCompleted.Task.WaitAsync(
+                TimeSpan.FromSeconds(10),
+                TestContext.Current.CancellationToken);
+            Assert.False(transport.IsAdaptiveMultishot);
+            Assert.Equal(1, transport.AdaptiveDemotionCount);
+
+            for (var i = 0; i < 12; i++)
+            {
+                var payload = Enumerable.Repeat((byte)i, 1024).ToArray();
+                Assert.Equal(payload, await SendFramedAsync(transport, server, payload));
+            }
+
+            largePayload[0] = 43;
+            Assert.Equal(largePayload, await SendFramedAsync(transport, server, largePayload));
+            Assert.False(transport.IsAdaptiveMultishot);
+            Assert.Equal(1, transport.AdaptivePromotionCount);
             await transport.CloseAsync(null, TestContext.Current.CancellationToken);
         }
     }

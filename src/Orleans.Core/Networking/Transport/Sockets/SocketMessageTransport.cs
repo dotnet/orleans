@@ -24,6 +24,7 @@ namespace Orleans.Connections.Transport.Sockets;
 internal enum LinuxIoUringReceiveMode
 {
     OneShot,
+    TinyAdaptive,
     Adaptive,
     Multishot,
 }
@@ -32,15 +33,18 @@ internal sealed partial class SocketMessageTransport : MessageTransportBase
 {
     private const int AdaptivePromotionThreshold = 16 * 1024;
     private const int AdaptivePromotionFrameCount = 2;
+    private const int AdaptiveTinyPromotionThreshold = 1024;
+    private const int AdaptiveTinyPromotionFrameCount = 8;
     private const int AdaptiveDemotionThreshold = 4 * 1024;
     private const int AdaptiveDemotionFrameCount = 8;
     private static readonly bool IsWindows = RuntimeInformation.IsOSPlatform(OSPlatform.Windows);
     private static readonly bool IsMacOS = RuntimeInformation.IsOSPlatform(OSPlatform.OSX);
 
     private readonly ISocketSender _socketSender;
-    private readonly ISocketSender _largeSocketSender;
+    private ISocketSender? _largeSocketSender;
     private readonly ISocketReceiver _socketReceiver;
     private readonly IOwnedPageSocketReceiver? _ownedPageReceiver;
+    private readonly LinuxIoUringEngine? _ioUringReceiveEngine;
     private readonly Socket _socket;
     private readonly Queue<ReadRequest> _readRequests = new();
     private readonly SingleWaiterAutoResetEvent _readSignal = new() { RunContinuationsAsynchronously = false };
@@ -53,6 +57,7 @@ internal sealed partial class SocketMessageTransport : MessageTransportBase
     private readonly object _receiveLifecycleLock = new();
     private readonly bool _useLinuxIoUring;
     private readonly bool _useAdaptiveReads;
+    private readonly bool _promoteTinyFrames;
     private readonly bool _useZeroCopy;
     private readonly string _remoteEndpointString; // For diagnostics only
     private readonly string _localEndpointString; // For diagnostics only
@@ -92,20 +97,23 @@ internal sealed partial class SocketMessageTransport : MessageTransportBase
         _ownedPageReceiver = null;
         _multishotReceiver = null;
         _useAdaptiveReads = false;
+        _promoteTinyFrames = false;
         if (useLinuxIoUring)
         {
             var receiveMode = linuxIoUringReceiveMode
-                ?? (string.Equals(
-                    Environment.GetEnvironmentVariable("ORLEANS_IO_URING_MULTISHOT"),
-                    "1",
-                    StringComparison.Ordinal)
-                    ? LinuxIoUringReceiveMode.Adaptive
-                    : LinuxIoUringReceiveMode.OneShot);
+                ?? Environment.GetEnvironmentVariable("ORLEANS_IO_URING_MULTISHOT") switch
+                {
+                    "1" => LinuxIoUringReceiveMode.Adaptive,
+                    "force" => LinuxIoUringReceiveMode.Multishot,
+                    "0" => LinuxIoUringReceiveMode.OneShot,
+                    null or "" when OperatingSystem.IsOSPlatformVersionAtLeast("LINUX", 6, 12)
+                        => LinuxIoUringReceiveMode.TinyAdaptive,
+                    _ => LinuxIoUringReceiveMode.OneShot,
+                };
             LinuxIoUringSocketReceiver? oneShotReceiver = null;
             LinuxIoUringSocketMultishotReceiver? multishotReceiver = null;
             ISocketReceiver? receiver = null;
             LinuxIoUringSocketSender? sender = null;
-            LinuxIoUringSocketSender? largeSender = null;
             try
             {
                 LinuxIoUringEngine receiveEngine;
@@ -117,10 +125,12 @@ internal sealed partial class SocketMessageTransport : MessageTransportBase
                         receiveEngine = oneShotReceiver.Engine;
                         break;
                     case LinuxIoUringReceiveMode.Adaptive:
+                    case LinuxIoUringReceiveMode.TinyAdaptive:
                         oneShotReceiver = new LinuxIoUringSocketReceiver();
                         receiver = oneShotReceiver;
                         receiveEngine = oneShotReceiver.Engine;
                         _useAdaptiveReads = true;
+                        _promoteTinyFrames = receiveMode == LinuxIoUringReceiveMode.TinyAdaptive;
                         break;
                     case LinuxIoUringReceiveMode.Multishot:
                         multishotReceiver = new LinuxIoUringSocketMultishotReceiver();
@@ -134,14 +144,12 @@ internal sealed partial class SocketMessageTransport : MessageTransportBase
                 }
 
                 sender = new LinuxIoUringSocketSender(receiveEngine);
-                largeSender = new LinuxIoUringSocketSender(LinuxIoUringEngine.GetOther(receiveEngine));
                 _socketSender = sender;
-                _largeSocketSender = largeSender;
+                _ioUringReceiveEngine = receiveEngine;
                 _socketReceiver = receiver;
             }
             catch
             {
-                largeSender?.Dispose();
                 sender?.Dispose();
                 multishotReceiver?.Dispose();
                 oneShotReceiver?.Dispose();
@@ -153,6 +161,7 @@ internal sealed partial class SocketMessageTransport : MessageTransportBase
             _socketReceiver = new SocketReceiver();
             _socketSender = new SocketSender();
             _largeSocketSender = _socketSender;
+            _ioUringReceiveEngine = null;
         }
 
         try
@@ -541,15 +550,17 @@ internal sealed partial class SocketMessageTransport : MessageTransportBase
             }
             finally
             {
+                var largeSocketSender = _largeSocketSender;
                 try
                 {
                     _socketSender.Dispose();
                 }
                 finally
                 {
-                    if (!ReferenceEquals(_largeSocketSender, _socketSender))
+                    if (largeSocketSender is not null
+                        && !ReferenceEquals(largeSocketSender, _socketSender))
                     {
-                        _largeSocketSender.Dispose();
+                        largeSocketSender.Dispose();
                     }
                 }
             }
@@ -648,6 +659,7 @@ internal sealed partial class SocketMessageTransport : MessageTransportBase
         var isGracefulTermination = false;
         var useMultishot = false;
         var consecutiveLargeFrames = 0;
+        var consecutiveTinyFrames = 0;
         var consecutiveSmallFrames = 0;
         var demotionRequested = false;
         Exception? error = null;
@@ -656,6 +668,23 @@ internal sealed partial class SocketMessageTransport : MessageTransportBase
         using ArcBufferWriter bufferWriter = new();
         var reader = new ArcBufferReader(bufferWriter);
         List<ArraySegment<byte>> networkBuffers = new(capacity: 8);
+
+        async ValueTask DemoteAsync()
+        {
+            var receiver = multishotReceiver
+                ?? throw new InvalidOperationException("Adaptive multishot receive was not initialized.");
+            AdaptiveDemotionStartingForTesting?.Invoke();
+            await receiver.StopAsync().ConfigureAwait(false);
+            receiver.TransitionToOneShot(bufferWriter);
+            useMultishot = false;
+            demotionRequested = false;
+            consecutiveLargeFrames = 0;
+            consecutiveTinyFrames = 0;
+            consecutiveSmallFrames = 0;
+            Volatile.Write(ref _adaptiveMultishot, 0);
+            Interlocked.Increment(ref _adaptiveDemotionCount);
+            AdaptiveModeChangedForTesting?.Invoke(false);
+        }
 
         try
         {
@@ -668,6 +697,7 @@ internal sealed partial class SocketMessageTransport : MessageTransportBase
                     if (framedRequest is null)
                     {
                         consecutiveLargeFrames = 0;
+                        consecutiveTinyFrames = 0;
                         consecutiveSmallFrames = 0;
                     }
 
@@ -684,20 +714,45 @@ internal sealed partial class SocketMessageTransport : MessageTransportBase
                             observedFrame = true;
                             if (framedLength >= AdaptivePromotionThreshold)
                             {
+                                consecutiveTinyFrames = 0;
                                 consecutiveSmallFrames = 0;
-                                consecutiveLargeFrames++;
-                                if (!useMultishot && consecutiveLargeFrames >= AdaptivePromotionFrameCount)
+                                if (_promoteTinyFrames)
+                                {
+                                    consecutiveLargeFrames = 0;
+                                    demotionRequested = useMultishot;
+                                }
+                                else
+                                {
+                                    consecutiveLargeFrames++;
+                                    if (!useMultishot && consecutiveLargeFrames >= AdaptivePromotionFrameCount)
+                                    {
+                                        networkBuffers.Clear();
+                                        multishotReceiver = PromoteAdaptiveReceiver(bufferWriter);
+                                        useMultishot = true;
+                                        demotionRequested = false;
+                                        AdaptiveModeChangedForTesting?.Invoke(true);
+                                    }
+                                }
+                            }
+                            else if (_promoteTinyFrames && framedLength < AdaptiveTinyPromotionThreshold)
+                            {
+                                consecutiveLargeFrames = 0;
+                                consecutiveSmallFrames = 0;
+                                consecutiveTinyFrames++;
+                                demotionRequested = false;
+                                if (!useMultishot
+                                    && consecutiveTinyFrames >= AdaptiveTinyPromotionFrameCount)
                                 {
                                     networkBuffers.Clear();
                                     multishotReceiver = PromoteAdaptiveReceiver(bufferWriter);
                                     useMultishot = true;
-                                    demotionRequested = false;
                                     AdaptiveModeChangedForTesting?.Invoke(true);
                                 }
                             }
                             else if (useMultishot && framedLength < AdaptiveDemotionThreshold)
                             {
                                 consecutiveLargeFrames = 0;
+                                consecutiveTinyFrames = 0;
                                 consecutiveSmallFrames++;
                                 if (consecutiveSmallFrames >= AdaptiveDemotionFrameCount)
                                 {
@@ -707,6 +762,7 @@ internal sealed partial class SocketMessageTransport : MessageTransportBase
                             else
                             {
                                 consecutiveLargeFrames = 0;
+                                consecutiveTinyFrames = 0;
                                 consecutiveSmallFrames = 0;
                             }
                         }
@@ -754,28 +810,25 @@ internal sealed partial class SocketMessageTransport : MessageTransportBase
                     if (!observedFrame)
                     {
                         consecutiveLargeFrames = 0;
+                        consecutiveTinyFrames = 0;
                         consecutiveSmallFrames = 0;
                     }
 
                     request = null;
+                    if (_promoteTinyFrames
+                        && useMultishot
+                        && demotionRequested
+                        && !_connectionClosingCts.IsCancellationRequested)
+                    {
+                        await DemoteAsync();
+                    }
                 }
 
                 if (useMultishot
                     && demotionRequested
                     && !_connectionClosingCts.IsCancellationRequested)
                 {
-                    var receiver = multishotReceiver
-                        ?? throw new InvalidOperationException("Adaptive multishot receive was not initialized.");
-                    AdaptiveDemotionStartingForTesting?.Invoke();
-                    await receiver.StopAsync().ConfigureAwait(false);
-                    receiver.TransitionToOneShot(bufferWriter);
-                    useMultishot = false;
-                    demotionRequested = false;
-                    consecutiveLargeFrames = 0;
-                    consecutiveSmallFrames = 0;
-                    Volatile.Write(ref _adaptiveMultishot, 0);
-                    Interlocked.Increment(ref _adaptiveDemotionCount);
-                    AdaptiveModeChangedForTesting?.Invoke(false);
+                    await DemoteAsync();
                 }
 
                 await _readSignal.WaitAsync().ConfigureAwait(false);
@@ -1192,6 +1245,7 @@ exit:
             : ArrayPool<byte>.Shared.Rent(CoalescingBufferSize);
         ArcBuffer.ArraySegmentEnumerator enumerator = default;
         var bufferLimit = SmallRequestBufferLimit;
+        var hasLargeMessages = false;
 
         try
         {
@@ -1221,6 +1275,7 @@ DequeueRequest:
                             if (request.HasLargeMessages)
                             {
                                 bufferLimit = LargeRequestBufferLimit;
+                                hasLargeMessages = true;
                             }
 
                             // Start enumerating the next request.
@@ -1269,7 +1324,7 @@ RefreshRequestQueue:
                     totalBytes += buffer.Count;
                 }
 
-                var socketSender = totalBytes >= 4 * 1024 ? _largeSocketSender : _socketSender;
+                var socketSender = GetSocketSender(hasLargeMessages);
                 if (buffers.Count == 1
                     && processingRequests.Count == 1
                     && requests.Count == 0
@@ -1396,10 +1451,12 @@ RefreshRequestQueue:
                     var (request, slice) = last;
                     request.SetResult();
                     slice.Dispose();
+                    hasLargeMessages = false;
                 }
                 else
                 {
                     processingRequests.Add(last);
+                    hasLargeMessages = last.Item1.HasLargeMessages;
                 }
             }
         }
@@ -1481,6 +1538,18 @@ RefreshRequestQueue:
                 bytesTransferred = 0;
             }
         }
+
+    }
+
+    private ISocketSender GetSocketSender(bool hasLargeMessages)
+    {
+        if (!hasLargeMessages || _ioUringReceiveEngine is null)
+        {
+            return _socketSender;
+        }
+
+        return _largeSocketSender ??= new LinuxIoUringSocketSender(
+            LinuxIoUringEngine.GetOther(_ioUringReceiveEngine));
     }
 
     private Exception GetSendAsyncError(ISocketSender socketSender)
