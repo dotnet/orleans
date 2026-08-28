@@ -1615,6 +1615,8 @@ public class DurableTaskTests
         var root = TaskId.CreateRoot("root");
         var child = root.Child("child");
 
+        Assert.False(TaskId.None.IsAncestorOf(TaskId.None));
+        Assert.False(TaskId.None.IsDescendantOf(TaskId.None));
         Assert.True(root.IsAncestorOf(root));
         Assert.True(root.IsDescendantOf(root));
         Assert.False(root.IsParentOf(root));
