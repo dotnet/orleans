@@ -50,7 +50,9 @@ public sealed class StatelessWorkerActivationStartupTests(
                 payload: "synchronous",
                 requestContextValue: "sync-request");
 
-            admissionTask = Task.Run(() => wrapper.ReceiveMessage(message));
+            admissionTask = Task.Run(
+                () => wrapper.ReceiveMessage(message),
+                TestContext.Current.CancellationToken);
             worker = Assert.IsType<ActivationData>(
                 await gate.Entered.WaitAsync(Timeout, TestContext.Current.CancellationToken));
 
@@ -207,7 +209,9 @@ public sealed class StatelessWorkerActivationStartupTests(
 
             if (gate is not null)
             {
-                admissionTask = Task.Run(() => wrapper.ReceiveMessage(message));
+                admissionTask = Task.Run(
+                    () => wrapper.ReceiveMessage(message),
+                    TestContext.Current.CancellationToken);
                 worker = Assert.IsType<ActivationData>(
                     await gate.Entered.WaitAsync(Timeout, TestContext.Current.CancellationToken));
                 Assert.Same(worker, Assert.Single(GetWorkers(wrapper)));

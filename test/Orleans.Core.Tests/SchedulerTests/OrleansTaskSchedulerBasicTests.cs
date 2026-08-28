@@ -150,7 +150,7 @@ namespace UnitTests.SchedulerTests
                 Assert.Throws<InvalidOperationException>(startup.Abort);
             }
 
-            await queuedTask.WaitAsync(TimeSpan.FromSeconds(5));
+            await queuedTask.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
             Assert.Equal(1, queuedTaskObservedStartCompletion);
         }
 
@@ -194,16 +194,20 @@ namespace UnitTests.SchedulerTests
                 Assert.True(startTask.IsCompletedSuccessfully, startTask.Exception?.ToString());
                 Assert.Equal(3, initialObservation);
             }
-            await loopStarted.Task.WaitAsync(TimeSpan.FromSeconds(5));
+            await loopStarted.Task.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
             Assert.Equal(3, asyncInitialObservation);
 
             for (var i = 0; i < observations.Length; i++)
             {
                 signal.Signal();
-                Assert.Equal(3, await observations[i].Task.WaitAsync(TimeSpan.FromSeconds(5)));
+                Assert.Equal(
+                    3,
+                    await observations[i].Task.WaitAsync(
+                        TimeSpan.FromSeconds(5),
+                        TestContext.Current.CancellationToken));
             }
 
-            await observationLoop!.WaitAsync(TimeSpan.FromSeconds(5));
+            await observationLoop!.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
 
             async Task ObserveSignals()
             {
@@ -246,7 +250,7 @@ namespace UnitTests.SchedulerTests
             queuedTask.Start(_rootContext.WorkItemGroup.TaskScheduler);
 
             startup.Dispose();
-            await queuedTask.WaitAsync(TimeSpan.FromSeconds(5));
+            await queuedTask.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
             Assert.Equal(1, Volatile.Read(ref queuedWorkCount));
             Assert.Equal(0, _rootContext.WorkItemGroup.ExternalWorkItemCount);
 
@@ -256,7 +260,7 @@ namespace UnitTests.SchedulerTests
 
             var subsequentTask = new Task(() => Interlocked.Increment(ref subsequentWorkCount));
             subsequentTask.Start(_rootContext.WorkItemGroup.TaskScheduler);
-            await subsequentTask.WaitAsync(TimeSpan.FromSeconds(5));
+            await subsequentTask.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
 
             Assert.Equal(1, Volatile.Read(ref queuedWorkCount));
             Assert.Equal(1, Volatile.Read(ref subsequentWorkCount));
@@ -280,7 +284,7 @@ namespace UnitTests.SchedulerTests
 
             var subsequentTask = new Task(() => Interlocked.Increment(ref subsequentWorkCount));
             subsequentTask.Start(_rootContext.WorkItemGroup.TaskScheduler);
-            await subsequentTask.WaitAsync(TimeSpan.FromSeconds(5));
+            await subsequentTask.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
 
             Assert.Equal(0, Volatile.Read(ref discardedWorkCount));
             Assert.Equal(1, Volatile.Read(ref subsequentWorkCount));
@@ -631,35 +635,39 @@ namespace UnitTests.SchedulerTests
             for (var i = 0; i < ParticipantCount; i++)
             {
                 var participant = participantReady[i] = new(TaskCreationOptions.RunContinuationsAsynchronously);
-                releaseParticipants[i] = Task.Run(async () =>
-                {
-                    participant.SetResult();
-                    await releaseParticipantsBarrier.Task;
-                    startup.Dispose();
-                });
+                releaseParticipants[i] = Task.Run(
+                    async () =>
+                    {
+                        participant.SetResult();
+                        await releaseParticipantsBarrier.Task;
+                        startup.Dispose();
+                    },
+                    TestContext.Current.CancellationToken);
             }
 
             try
             {
                 await Task.WhenAll(Array.ConvertAll(participantReady, static participant => participant.Task))
-                    .WaitAsync(TimeSpan.FromSeconds(5));
+                    .WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
                 Assert.False(queuedWork.IsCompleted);
 
                 releaseParticipantsBarrier.SetResult();
-                await Task.WhenAll(releaseParticipants).WaitAsync(TimeSpan.FromSeconds(5));
-                await queuedWork.WaitAsync(TimeSpan.FromSeconds(5));
+                await Task.WhenAll(releaseParticipants)
+                    .WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+                await queuedWork.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
                 Assert.Equal(1, Volatile.Read(ref queuedWorkCount));
 
                 var subsequentWork = new Task(() => Interlocked.Increment(ref subsequentWorkCount));
                 subsequentWork.Start(_rootContext.WorkItemGroup.TaskScheduler);
-                await subsequentWork.WaitAsync(TimeSpan.FromSeconds(5));
+                await subsequentWork.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
                 Assert.Equal(1, Volatile.Read(ref subsequentWorkCount));
             }
             finally
             {
                 releaseParticipantsBarrier.TrySetResult();
                 startup.Dispose();
-                await Task.WhenAll(releaseParticipants).WaitAsync(TimeSpan.FromSeconds(5));
+                await Task.WhenAll(releaseParticipants)
+                    .WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
             }
         }
     }

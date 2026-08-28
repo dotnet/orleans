@@ -221,7 +221,10 @@ public class ActivationDataMigrationTests(ActivationDataMigrationTests.Fixture f
                 TestContext.Current.CancellationToken);
 
             Assert.Equal(ActivationState.Activating, context.State);
-            Assert.False(context.TryStartMigration(requestContext: null));
+            Assert.False(
+                context.TryStartMigration(
+                    requestContext: null,
+                    TestContext.Current.CancellationToken));
             Assert.Equal(ActivationState.Activating, context.State);
             Assert.Same(context, startupFixture.ActivationDirectory.FindTarget(grainId));
             Assert.DoesNotContain(
@@ -241,7 +244,10 @@ public class ActivationDataMigrationTests(ActivationDataMigrationTests.Fixture f
 
             var deactivating = scenario.WaitForEvent("Deactivating");
             var deactivated = scenario.WaitForEvent("Deactivated");
-            Assert.True(context.TryStartMigration(requestContext: null));
+            Assert.True(
+                context.TryStartMigration(
+                    requestContext: null,
+                    TestContext.Current.CancellationToken));
             await deactivating.WaitAsync(
                 TimeSpan.FromSeconds(30),
                 TestContext.Current.CancellationToken);

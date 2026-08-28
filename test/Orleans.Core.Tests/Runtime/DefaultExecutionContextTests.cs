@@ -24,19 +24,21 @@ public class DefaultExecutionContextTests
         for (var i = 0; i < tasks.Length; i++)
         {
             var expected = new object();
-            tasks[i] = Task.Run(() =>
-            {
-                var ambientState = new AsyncLocal<object?> { Value = expected };
-                object? observed = expected;
+            tasks[i] = Task.Run(
+                () =>
+                {
+                    var ambientState = new AsyncLocal<object?> { Value = expected };
+                    object? observed = expected;
 
-                ExecutionContext.Run(
-                    DefaultExecutionContext.Instance,
-                    _ => observed = ambientState.Value,
-                    null);
+                    ExecutionContext.Run(
+                        DefaultExecutionContext.Instance,
+                        _ => observed = ambientState.Value,
+                        null);
 
-                Assert.Null(observed);
-                Assert.Same(expected, ambientState.Value);
-            });
+                    Assert.Null(observed);
+                    Assert.Same(expected, ambientState.Value);
+                },
+                TestContext.Current.CancellationToken);
         }
 
         await Task.WhenAll(tasks);

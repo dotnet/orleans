@@ -149,8 +149,12 @@ namespace UnitTests.General
                 state.ClearAmbientState();
                 if (context is not null)
                 {
-                    context.Deactivate(new(DeactivationReasonCode.ApplicationRequested, "Test completed."));
-                    await context.Deactivated.WaitAsync(TimeSpan.FromSeconds(10));
+                    context.Deactivate(
+                        new(DeactivationReasonCode.ApplicationRequested, "Test completed."),
+                        TestContext.Current.CancellationToken);
+                    await context.Deactivated.WaitAsync(
+                        TimeSpan.FromSeconds(10),
+                        TestContext.Current.CancellationToken);
                 }
             }
         }
@@ -181,8 +185,12 @@ namespace UnitTests.General
             }
             finally
             {
-                context.Deactivate(new(DeactivationReasonCode.ApplicationRequested, "Test completed."));
-                await context.Deactivated.WaitAsync(TimeSpan.FromSeconds(10));
+                context.Deactivate(
+                    new(DeactivationReasonCode.ApplicationRequested, "Test completed."),
+                    TestContext.Current.CancellationToken);
+                await context.Deactivated.WaitAsync(
+                    TimeSpan.FromSeconds(10),
+                    TestContext.Current.CancellationToken);
             }
         }
 
