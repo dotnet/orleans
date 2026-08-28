@@ -73,13 +73,13 @@ public static class DurableMessagingExtensions
                 sp.GetRequiredService<ILogger<DurableInboxExtension>>(),
                 sp.GetRequiredService<DurableMessagingInstruments>(),
                 sp.GetRequiredService<DurableInbox>(),
-                sp.GetRequiredKeyedService<IDurableDictionary<(GrainId, Guid), DurableEnvelope>>("inbox"),
-                sp.GetRequiredKeyedService<IDurableDictionary<(GrainId, Guid), DateTimeOffset>>("inbox-processed"),
-                sp.GetRequiredKeyedService<IDurableDictionary<(GrainId, Guid), InboxMessageState>>("inbox-message-state"),
-                sp.GetRequiredKeyedService<IDurableDictionary<(GrainId, Guid), InboxDeadLetter>>("inbox-dead-letters"),
-                sp.GetRequiredKeyedService<IDurableValue<string>>("inbox-job-id"),
-                sp.GetRequiredKeyedService<IDurableValue<string>>("inbox-completed-job-id"),
-                sp.GetRequiredKeyedService<IDurableValue<long>>("inbox-job-sequence"),
+                sp.GetRequiredKeyedService<IDurableDictionary<(GrainId, Guid), DurableEnvelope>>(DurableMessagingStateNames.Inbox),
+                sp.GetRequiredKeyedService<IDurableDictionary<(GrainId, Guid), DateTimeOffset>>(DurableMessagingStateNames.InboxProcessed),
+                sp.GetRequiredKeyedService<IDurableDictionary<(GrainId, Guid), InboxMessageState>>(DurableMessagingStateNames.InboxMessageState),
+                sp.GetRequiredKeyedService<IDurableDictionary<(GrainId, Guid), InboxDeadLetter>>(DurableMessagingStateNames.InboxDeadLetters),
+                sp.GetRequiredKeyedService<IDurableValue<string>>(DurableMessagingStateNames.InboxJobId),
+                sp.GetRequiredKeyedService<IDurableValue<string>>(DurableMessagingStateNames.InboxCompletedJobId),
+                sp.GetRequiredKeyedService<IDurableValue<long>>(DurableMessagingStateNames.InboxJobSequence),
                 sp.GetRequiredService<IDurableOutbox>(),
                 sp.GetRequiredService<ILocalDurableJobManager>(),
                 sp.GetRequiredService<IDurableJobHandlerRegistry>(),
@@ -95,21 +95,21 @@ public static class DurableMessagingExtensions
         services.TryAddScoped<DurableInbox>(sp =>
         {
             var options = sp.GetRequiredService<IOptions<DurableInboxOptions>>().Value;
-            _ = sp.GetRequiredKeyedService<IDurableDictionary<(GrainId, Guid), InboxMessageState>>("inbox-message-state");
-            _ = sp.GetRequiredKeyedService<IDurableDictionary<(GrainId, Guid), InboxDeadLetter>>("inbox-dead-letters");
-            _ = sp.GetRequiredKeyedService<IDurableValue<string>>("inbox-job-id");
-            _ = sp.GetRequiredKeyedService<IDurableValue<string>>("inbox-completed-job-id");
-            _ = sp.GetRequiredKeyedService<IDurableValue<long>>("inbox-job-sequence");
+            _ = sp.GetRequiredKeyedService<IDurableDictionary<(GrainId, Guid), InboxMessageState>>(DurableMessagingStateNames.InboxMessageState);
+            _ = sp.GetRequiredKeyedService<IDurableDictionary<(GrainId, Guid), InboxDeadLetter>>(DurableMessagingStateNames.InboxDeadLetters);
+            _ = sp.GetRequiredKeyedService<IDurableValue<string>>(DurableMessagingStateNames.InboxJobId);
+            _ = sp.GetRequiredKeyedService<IDurableValue<string>>(DurableMessagingStateNames.InboxCompletedJobId);
+            _ = sp.GetRequiredKeyedService<IDurableValue<long>>(DurableMessagingStateNames.InboxJobSequence);
             _ = sp.GetRequiredService<IDurableOutbox>();
             return new DurableInbox(
-                sp.GetRequiredKeyedService<IDurableDictionary<(GrainId, Guid), DurableEnvelope>>("inbox"),
+                sp.GetRequiredKeyedService<IDurableDictionary<(GrainId, Guid), DurableEnvelope>>(DurableMessagingStateNames.Inbox),
                 sp.GetServices<IInboxHandler>(),
                 options.MaxCapacity);
         });
         services.TryAddScoped<IDurableInbox>(sp => sp.GetRequiredService<DurableInbox>());
 
-        services.TryAddKeyedScoped<IDurableOutbox, DurableOutbox>("outbox");
-        services.TryAddScoped<IDurableOutbox>(sp => sp.GetRequiredKeyedService<IDurableOutbox>("outbox"));
+        services.TryAddKeyedScoped<IDurableOutbox, DurableOutbox>(DurableMessagingStateNames.Outbox);
+        services.TryAddScoped<IDurableOutbox>(sp => sp.GetRequiredKeyedService<IDurableOutbox>(DurableMessagingStateNames.Outbox));
         services.TryAddScoped<IDurableMessagingDiagnostics, DurableMessagingDiagnostics>();
         services.TryAddScoped(sp =>
         {
