@@ -361,7 +361,19 @@ public sealed class ReminderDiagnosticObserver : IDisposable
         subscription.Disposable = events.Subscribe(
             value =>
             {
-                if (!predicate(value))
+                bool matches;
+                try
+                {
+                    matches = predicate(value);
+                }
+                catch (Exception exception)
+                {
+                    subscription.Dispose();
+                    completion.TrySetException(exception);
+                    return;
+                }
+
+                if (!matches)
                 {
                     return;
                 }
