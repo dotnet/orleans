@@ -20,11 +20,10 @@ handlers in registration order. Handlers can select envelopes by exact route, ro
 prefix, correlation hierarchy, or arbitrary metadata, and typed handlers deserialize
 the body only when selected.
 
-The preview correlation key type now belongs to this package as
-<xref:Orleans.DurableMessaging.HierarchicalKey>. Draft consumers of
-`Orleans.HierarchicalKey` should update their namespace import. Its serialized alias
-and member identifiers remain unchanged, so envelopes written by the earlier draft
-remain readable.
+<xref:Orleans.DurableMessaging.HierarchicalKey> is the public correlation key type.
+Its `Orleans.HierarchicalKey` serialization alias and member identifiers preserve
+compatibility with envelopes written by the earlier preview. Source code from that
+preview should update its namespace import to `Orleans.DurableMessaging`.
 
 `ReplyTo` is general message metadata. Applications decide which route and body to use
 for a follow-up message.
