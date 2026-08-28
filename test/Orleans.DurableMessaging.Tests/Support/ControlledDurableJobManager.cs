@@ -11,6 +11,7 @@ public sealed class DurableJobManagerProbe
     private readonly ConcurrentDictionary<(string JobName, GrainId Target), int> _successes = [];
     private readonly ConcurrentDictionary<string, int> _failures = new(StringComparer.Ordinal);
     private readonly ConcurrentDictionary<string, int> _postScheduleFailures = new(StringComparer.Ordinal);
+    private readonly ConcurrentDictionary<string, ScheduleBarrier> _scheduleBarriers = new(StringComparer.Ordinal);
 
     public void FailNext(string jobName) =>
         _failures.AddOrUpdate(jobName, 1, static (_, count) => count + 1);
@@ -24,6 +25,17 @@ public sealed class DurableJobManagerProbe
     public int GetSuccessCount(string jobName, GrainId target) =>
         _successes.TryGetValue((jobName, target), out var count) ? count : 0;
 
+    public ScheduleBarrier BlockNext(string jobName)
+    {
+        var barrier = new ScheduleBarrier();
+        if (!_scheduleBarriers.TryAdd(jobName, barrier))
+        {
+            throw new InvalidOperationException($"A scheduling barrier is already armed for '{jobName}'.");
+        }
+
+        return barrier;
+    }
+
     internal void OnAttempt(ScheduleJobRequest request) =>
         _attempts.AddOrUpdate((request.JobName, request.Target), 1, static (_, count) => count + 1);
 
@@ -35,6 +47,17 @@ public sealed class DurableJobManagerProbe
 
     internal bool ShouldFailAfterSchedule(string jobName)
         => TryConsumeFailure(_postScheduleFailures, jobName);
+
+    internal async Task WaitIfBlockedAsync(string jobName, CancellationToken cancellationToken)
+    {
+        if (!_scheduleBarriers.TryRemove(jobName, out var barrier))
+        {
+            return;
+        }
+
+        barrier.Entered.TrySetResult();
+        await barrier.Release.Task.WaitAsync(cancellationToken);
+    }
 
     private static bool TryConsumeFailure(
         ConcurrentDictionary<string, int> failures,
@@ -49,6 +72,18 @@ public sealed class DurableJobManagerProbe
         }
 
         return false;
+    }
+
+    public sealed class ScheduleBarrier : IDisposable
+    {
+        internal TaskCompletionSource Entered { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        internal TaskCompletionSource Release { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        public Task WaitUntilEnteredAsync() => Entered.Task.WaitAsync(TimeSpan.FromSeconds(30));
+
+        public void Continue() => Release.TrySetResult();
+
+        public void Dispose() => Continue();
     }
 }
 
@@ -66,6 +101,7 @@ internal sealed class ControlledDurableJobManager(
             throw new IOException($"Injected durable job scheduling failure for '{request.JobName}'.");
         }
 
+        await probe.WaitIfBlockedAsync(request.JobName, cancellationToken);
         var result = await inner.ScheduleJobAsync(request, cancellationToken);
         probe.OnSuccess(request);
         if (probe.ShouldFailAfterSchedule(request.JobName))
@@ -77,8 +113,8 @@ internal sealed class ControlledDurableJobManager(
         return result;
     }
 
-    public Task<bool> TryCancelDurableJobAsync(DurableJob job, CancellationToken cancellationToken) =>
-        inner.TryCancelDurableJobAsync(job, cancellationToken);
+    public Task<bool> CancelAsync(DurableJob job, CancellationToken cancellationToken) =>
+        inner.CancelAsync(job, cancellationToken);
 
     public static void Decorate(IServiceCollection services, DurableJobManagerProbe probe)
     {
