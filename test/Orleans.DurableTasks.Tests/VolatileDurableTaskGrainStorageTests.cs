@@ -133,6 +133,38 @@ public class VolatileDurableTaskGrainStorageTests
     }
 
     [Fact]
+    public async Task NextCommitEnlistment_CapturesMutationsAtCommitTime()
+    {
+        var services = new ServiceCollection().AddSerializer().BuildServiceProvider();
+        var transport = new RecordingDurableTaskMessageTransport();
+        var storage = new VolatileDurableTaskGrainStorage(
+            services.GetRequiredService<DeepCopier<Dictionary<TaskId, DurableTaskState>>>(),
+            services.GetRequiredService<DeepCopier<DurableTaskState>>(),
+            TimeProvider.System,
+            transport);
+        var taskId = TaskId.Create("commit-time-snapshot");
+        var state = storage.GetOrCreateTask(taskId, request: null);
+        storage.SetResponse(taskId, state, DurableTaskResponse.FromResult(1));
+        await storage.WriteAsync(CancellationToken.None);
+
+        using (storage.EnlistWithNextMessageCommit())
+        {
+            Assert.True(storage.TryGetTask(taskId, out state));
+            storage.SetResponse(taskId, state, DurableTaskResponse.FromResult(2));
+            await storage.WriteAsync(CancellationToken.None);
+        }
+
+        await transport.ScheduleResumeAsync(
+            GrainId.Create("test", "target"),
+            taskId,
+            DateTimeOffset.UtcNow,
+            CancellationToken.None);
+        await storage.ReadAsync(CancellationToken.None);
+        Assert.True(storage.TryGetTask(taskId, out var committed));
+        Assert.Equal(2, committed.Result!.GetResult<int>());
+    }
+
+    [Fact]
     public void AddOrUpdateTask_TryGetTask_RoundTrip_DeepCopyIsolation()
     {
         var (storage, time) = CreateStorage();

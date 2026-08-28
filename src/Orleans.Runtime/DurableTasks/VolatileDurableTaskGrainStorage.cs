@@ -56,7 +56,6 @@ public class VolatileDurableTaskGrainStorage : IDurableTaskGrainStorage
             return _nextCommitEnlistment.Value;
         }
 
-        var persistedCopy = CopyStorage(_workingCopy);
         var rollbackCopy = CopyStorage(_persistedCopy);
         var enlistment = new NextCommitEnlistment();
         _nextCommitEnlistment.Value = enlistment;
@@ -65,7 +64,7 @@ public class VolatileDurableTaskGrainStorage : IDurableTaskGrainStorage
             {
                 if (enlistment.TryComplete())
                 {
-                    _persistedCopy = persistedCopy;
+                    _persistedCopy = CopyStorage(_workingCopy);
                 }
             },
             rollback: () =>
