@@ -155,8 +155,7 @@ internal sealed unsafe class LinuxIoUringSocketMultishotReceiver : LinuxIoUringO
             bufferGroupAllocated = true;
             for (var i = 0; i < BufferCount; i++)
             {
-                _buffers[i] = new BufferState();
-                AssignFreshPage(_buffers[i], BufferOwnership.ReceiverOwned);
+                AssignFreshPage(ref _buffers[i], BufferOwnership.ReceiverOwned);
             }
         }
         catch
@@ -344,7 +343,7 @@ internal sealed unsafe class LinuxIoUringSocketMultishotReceiver : LinuxIoUringO
                     return;
                 }
 
-                var state = _buffers[bufferId];
+                ref var state = ref _buffers[bufferId];
                 if (state.Page is not { } page
                     || state.Ownership is not (BufferOwnership.Published or BufferOwnership.PartiallyConsumed))
                 {
@@ -381,10 +380,10 @@ internal sealed unsafe class LinuxIoUringSocketMultishotReceiver : LinuxIoUringO
                 state.Ownership = bufferHasMore
                     ? BufferOwnership.PartiallyConsumed
                     : BufferOwnership.FinalQueued;
-                Interlocked.Increment(ref _completedSegmentCount);
+                _completedSegmentCount++;
                 if (!bufferHasMore)
                 {
-                    Interlocked.Increment(ref _finalBufferCount);
+                    _finalBufferCount++;
                 }
 
                 if (!receiveHasMore)
@@ -423,7 +422,7 @@ internal sealed unsafe class LinuxIoUringSocketMultishotReceiver : LinuxIoUringO
 
             if (socketError == SocketError.NoBufferSpaceAvailable)
             {
-                Interlocked.Increment(ref _noBufferCompletionCount);
+                _noBufferCompletionCount++;
                 if (_stopping)
                 {
                     var hasWaitingReceive = _receiveWaiting;
@@ -569,12 +568,13 @@ internal sealed unsafe class LinuxIoUringSocketMultishotReceiver : LinuxIoUringO
             AppendReceivedPages(writer);
             _pendingRefillMask = 0;
             Volatile.Write(ref _refillQueued, 0);
-            foreach (var state in _buffers)
+            for (var i = 0; i < BufferCount; i++)
             {
+                ref var state = ref _buffers[i];
                 switch (state.Ownership)
                 {
                     case BufferOwnership.Free:
-                        AssignFreshPage(state, BufferOwnership.ReceiverOwned);
+                        AssignFreshPage(ref state, BufferOwnership.ReceiverOwned);
                         break;
                     case BufferOwnership.ReceiverOwned:
                     case BufferOwnership.PendingPublication:
@@ -591,9 +591,9 @@ internal sealed unsafe class LinuxIoUringSocketMultishotReceiver : LinuxIoUringO
                         var page = state.Page
                             ?? throw new InvalidOperationException("A partially consumed provided buffer has no page.");
                         var pageVersion = state.PageVersion;
-                        ClearState(state);
+                        ClearState(ref state);
                         page.Unpin(pageVersion);
-                        AssignFreshPage(state, BufferOwnership.ReceiverOwned);
+                        AssignFreshPage(ref state, BufferOwnership.ReceiverOwned);
                         break;
                     case BufferOwnership.FinalQueued:
                         throw new InvalidOperationException("A final provided-buffer segment remained queued after draining.");
@@ -673,7 +673,7 @@ internal sealed unsafe class LinuxIoUringSocketMultishotReceiver : LinuxIoUringO
         var appended = 0;
         while (_receivedSegments.TryPeek(out var received))
         {
-            var state = _buffers[received.BufferId];
+            ref var state = ref _buffers[received.BufferId];
             if (state.Generation != received.Generation
                 || !ReferenceEquals(state.Page, received.Page)
                 || state.PageVersion != received.PageVersion)
@@ -691,7 +691,7 @@ internal sealed unsafe class LinuxIoUringSocketMultishotReceiver : LinuxIoUringO
                 writer.AppendReceivedPage(received.Page, received.Length);
                 state.Adopted = true;
                 _firstAdoptedPage ??= received.Page;
-                Interlocked.Increment(ref _adoptedPageCount);
+                _adoptedPageCount++;
             }
             else
             {
@@ -730,12 +730,12 @@ internal sealed unsafe class LinuxIoUringSocketMultishotReceiver : LinuxIoUringO
         ulong addedBufferMask = 0;
         for (var i = 0; i < BufferCount; i++)
         {
-            var state = _buffers[i];
+            ref var state = ref _buffers[i];
             if (state.Ownership == BufferOwnership.Free)
             {
-                AssignFreshPage(state, BufferOwnership.PendingPublication);
+                AssignFreshPage(ref state, BufferOwnership.PendingPublication);
                 addedBufferMask |= 1UL << i;
-                Interlocked.Increment(ref _replacementPageCount);
+                _replacementPageCount++;
             }
         }
 
@@ -763,10 +763,10 @@ internal sealed unsafe class LinuxIoUringSocketMultishotReceiver : LinuxIoUringO
                     continue;
                 }
 
-                var state = _buffers[bufferId];
+                ref var state = ref _buffers[bufferId];
                 var page = state.Page!;
                 var pageVersion = state.PageVersion;
-                ClearState(state);
+                ClearState(ref state);
                 page.Unpin(pageVersion);
             }
 
@@ -875,7 +875,7 @@ internal sealed unsafe class LinuxIoUringSocketMultishotReceiver : LinuxIoUringO
         return page;
     }
 
-    private static void AssignFreshPage(BufferState state, BufferOwnership ownership)
+    private static void AssignFreshPage(ref BufferState state, BufferOwnership ownership)
     {
         var page = RentPage();
         var pageVersion = page.Version;
@@ -898,20 +898,21 @@ internal sealed unsafe class LinuxIoUringSocketMultishotReceiver : LinuxIoUringO
         _pendingRefillMask = 0;
         Volatile.Write(ref _refillQueued, 0);
         _receivedSegments.Clear();
-        foreach (var state in _buffers)
+        for (var i = 0; i < BufferCount; i++)
         {
-            if (state?.Page is not { } page)
+            ref var state = ref _buffers[i];
+            if (state.Page is not { } page)
             {
                 continue;
             }
 
             var pageVersion = state.PageVersion;
-            ClearState(state);
+            ClearState(ref state);
             page.Unpin(pageVersion);
         }
     }
 
-    private static void ClearState(BufferState state)
+    private static void ClearState(ref BufferState state)
     {
         state.Page = null;
         state.PageVersion = 0;
@@ -964,7 +965,7 @@ internal sealed unsafe class LinuxIoUringSocketMultishotReceiver : LinuxIoUringO
         _terminalError = null;
         _stopping = false;
         _stopCompletion = null;
-        Interlocked.Increment(ref _receiveStartCount);
+        _receiveStartCount++;
         BeginPreparation();
         try
         {
@@ -992,7 +993,7 @@ internal sealed unsafe class LinuxIoUringSocketMultishotReceiver : LinuxIoUringO
         FinalQueued,
     }
 
-    private sealed class BufferState
+    private struct BufferState
     {
         internal ArcBufferPage? Page;
         internal int PageVersion;
@@ -1272,7 +1273,7 @@ internal sealed unsafe class LinuxIoUringSocketSender : LinuxIoUringOperation, I
         {
             Volatile.Write(ref _consecutiveCopiedZeroCopySends, 0);
         }
-        else if (Interlocked.Increment(ref _consecutiveCopiedZeroCopySends) >= 4)
+        else if (++_consecutiveCopiedZeroCopySends >= 4)
         {
             Volatile.Write(ref _zeroCopyDisabled, 1);
         }
@@ -2203,11 +2204,11 @@ internal sealed unsafe partial class LinuxIoUringEngine
             {
                 if ((flags & CompletionIsNotification) != 0)
                 {
-                    Interlocked.Increment(ref _zeroCopyNotificationCompletions);
+                    _zeroCopyNotificationCompletions++;
                     operation.SetZeroCopyUsage(result);
                     if (((uint)result & (1U << 31)) != 0)
                     {
-                        Interlocked.Increment(ref _zeroCopyCopiedCompletions);
+                        _zeroCopyCopiedCompletions++;
                     }
 
                     operation.Complete(
@@ -2218,7 +2219,7 @@ internal sealed unsafe partial class LinuxIoUringEngine
                 {
                     if (result >= 0)
                     {
-                        Interlocked.Increment(ref _zeroCopyFallbackCompletions);
+                        _zeroCopyFallbackCompletions++;
                         operation.SetZeroCopyUsage(unchecked((int)(1U << 31)));
                     }
 
@@ -2226,7 +2227,7 @@ internal sealed unsafe partial class LinuxIoUringEngine
                 }
                 else
                 {
-                    Interlocked.Increment(ref _zeroCopyPrimaryCompletions);
+                    _zeroCopyPrimaryCompletions++;
                     operation.SetPrimaryResult(result);
                 }
             }
