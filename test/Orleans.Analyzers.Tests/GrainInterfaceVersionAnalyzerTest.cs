@@ -1277,13 +1277,17 @@ public class MyGrain : Grain, IGrainWithStringKey
 
         if (configuredContractsPath is not null)
         {
+            var analyzerConfigDirectory = Path.GetDirectoryName(configuredContractsPath);
+            var analyzerConfigPath = string.IsNullOrEmpty(analyzerConfigDirectory)
+                ? Path.Combine(Path.GetTempPath(), ".globalconfig")
+                : Path.Combine(analyzerConfigDirectory, ".globalconfig");
             solution = solution.AddAnalyzerConfigDocument(
                 DocumentId.CreateNewId(projectId, ".globalconfig"),
                 ".globalconfig",
                 SourceText.From(
                     $"is_global = true{Environment.NewLine}" +
                     $"build_property.OrleansContractsPath = {configuredContractsPath}{Environment.NewLine}"),
-                filePath: Path.Combine(Path.GetDirectoryName(configuredContractsPath)!, ".globalconfig"));
+                filePath: analyzerConfigPath);
         }
 
         return solution.GetProject(projectId)!
@@ -1337,6 +1341,21 @@ public class CartGrain : Grain, IGrainWithStringKey
             GrainInterfaceVersionAnalyzer.RuleId0020,
             RegenerateCodeActionTitle,
             configuredPathWithAlternateSeparators);
+
+        Assert.NotNull(additionalDocumentId);
+        Assert.Equal(configuredPath, changedSolution.GetAdditionalDocument(additionalDocumentId!)!.FilePath);
+    }
+
+    [Fact]
+    public async Task CodeFix_RegenerateMissingFile_UsesFilenameOnlyConfiguredManifestPath()
+    {
+        const string configuredPath = "rpc-contracts.txt";
+        var (changedSolution, additionalDocumentId) = await ApplyCodeFixAsync(
+            "public interface IMyGrain : IGrain { Task Ping(); }",
+            grainInterfacesFileContent: null,
+            GrainInterfaceVersionAnalyzer.RuleId0020,
+            RegenerateCodeActionTitle,
+            configuredPath);
 
         Assert.NotNull(additionalDocumentId);
         Assert.Equal(configuredPath, changedSolution.GetAdditionalDocument(additionalDocumentId!)!.FilePath);

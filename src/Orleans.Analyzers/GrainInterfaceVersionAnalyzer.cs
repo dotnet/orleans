@@ -204,18 +204,19 @@ public sealed partial class GrainInterfaceVersionAnalyzer : DiagnosticAnalyzer
                     && string.Equals(value, "true", StringComparison.OrdinalIgnoreCase));
 
         GrainInterfaceData? data = null;
+        SourceText? sourceText = null;
         List<Diagnostic>? fileParseErrors = null;
 
         if (grainInterfacesFile is not null)
         {
-            var sourceText = grainInterfacesFile.GetText(context.CancellationToken);
+            sourceText = grainInterfacesFile.GetText(context.CancellationToken);
             if (sourceText is not null)
             {
                 (data, fileParseErrors) = GrainInterfaceFileParser.Parse(sourceText, grainInterfacesFile.Path);
             }
         }
 
-        var impl = new Impl(context.Compilation, data, grainInterfacesFile, fileParseErrors);
+        var impl = new Impl(context.Compilation, data, grainInterfacesFile, sourceText, fileParseErrors);
 
         context.RegisterSymbolAction(impl.AnalyzeNamedType, SymbolKind.NamedType);
         context.RegisterCompilationEndAction(impl.OnCompilationEnd);
@@ -225,6 +226,7 @@ public sealed partial class GrainInterfaceVersionAnalyzer : DiagnosticAnalyzer
     {
         private readonly GrainInterfaceData? _data;
         private readonly AdditionalText? _grainInterfacesFile;
+        private readonly SourceText? _grainInterfacesFileText;
         private readonly List<Diagnostic>? _fileParseErrors;
         private readonly ConcurrentDictionary<string, bool> _visitedInterfaces = new(StringComparer.Ordinal);
         private readonly ConcurrentDictionary<string, bool> _visitedClasses = new(StringComparer.Ordinal);
@@ -238,10 +240,12 @@ public sealed partial class GrainInterfaceVersionAnalyzer : DiagnosticAnalyzer
             Compilation compilation,
             GrainInterfaceData? data,
             AdditionalText? grainInterfacesFile,
+            SourceText? grainInterfacesFileText,
             List<Diagnostic>? fileParseErrors)
         {
             _data = data;
             _grainInterfacesFile = grainInterfacesFile;
+            _grainInterfacesFileText = grainInterfacesFileText;
             _fileParseErrors = fileParseErrors;
 
             _iAddressableType = compilation.GetTypeByMetadataName(Constants.IAddressibleFullyQualifiedName);
@@ -403,7 +407,7 @@ public sealed partial class GrainInterfaceVersionAnalyzer : DiagnosticAnalyzer
                 }
             }
 
-            if (_grainInterfacesFile?.GetText(context.CancellationToken) is { } sourceText)
+            if (_grainInterfacesFile is not null && _grainInterfacesFileText is { } sourceText)
             {
                 foreach (var declaredMember in declaredInterface.Members.Values)
                 {
@@ -459,8 +463,7 @@ public sealed partial class GrainInterfaceVersionAnalyzer : DiagnosticAnalyzer
             // Check for removed interfaces (in file but not in code)
             if (_data is not null && _grainInterfacesFile is not null)
             {
-                var sourceText = _grainInterfacesFile.GetText(context.CancellationToken);
-                if (sourceText is not null)
+                if (_grainInterfacesFileText is { } sourceText)
                 {
                     foreach (var declaredInterface in _data.Interfaces)
                     {
