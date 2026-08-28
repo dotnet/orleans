@@ -27,9 +27,9 @@ The `Service` connection value accepts an AWS region such as `us-east-1` or an S
 
 ## Configure SQS streams with Aspire
 
-Install [`Microsoft.Orleans.Streaming.SQS.Aspire`](https://www.nuget.org/packages/Microsoft.Orleans.Streaming.SQS.Aspire) in the AppHost. Its <xref:Aspire.Hosting.OrleansSqsStreamingExtensions.WithSqsStreaming*> extension uses the AWS-supported [`Aspire.Hosting.AWS`](https://www.nuget.org/packages/Aspire.Hosting.AWS) integration to configure AWS SDK for .NET v4 and provision the complete Orleans queue topology through AWS CDK.
+Install [`Microsoft.Orleans.Streaming.SQS.Aspire`](https://www.nuget.org/packages/Microsoft.Orleans.Streaming.SQS.Aspire) in the AppHost. Its `WithSqsStreaming` extension uses the AWS-supported [`Aspire.Hosting.AWS`](https://www.nuget.org/packages/Aspire.Hosting.AWS) integration to configure AWS SDK for .NET v4 and provision the complete Orleans queue topology through AWS CDK.
 
-Configure the AWS SDK region and one <xref:Aspire.Hosting.SqsStreamingOptions> object:
+Configure the AWS SDK region and one `SqsStreamingOptions` object:
 
 :::code language="csharp" source="../host/snippets/aspire/AppHost/AppHostExamples.cs" id="sqs_streaming_apphost":::
 
