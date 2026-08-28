@@ -1,4 +1,6 @@
+using System.Diagnostics.CodeAnalysis;
 using Microsoft.Extensions.DependencyInjection;
+using Orleans.Metadata;
 using Orleans.Runtime;
 using Orleans.Runtime.DurableTasks;
 
@@ -288,5 +290,29 @@ internal sealed class DurableJobExecutionLifetime : ILifecycleObserver
         }
 
         await Task.WhenAll(executions).ConfigureAwait(ConfigureAwaitOptions.SuppressThrowing);
+    }
+}
+
+internal sealed class DurableJobGrainContextConfigurator :
+    IConfigureGrainContextProvider,
+    IConfigureGrainContextPerActivation
+{
+    public bool TryGetConfigurator(
+        GrainType grainType,
+        GrainProperties properties,
+        [NotNullWhen(true)] out IConfigureGrainContext? configurator)
+    {
+        configurator = this;
+        return true;
+    }
+
+    public void Configure(IGrainContext context)
+    {
+        if (context is StatelessWorkerGrainContext)
+        {
+            return;
+        }
+
+        context.SetComponent(new DurableJobExecutionLifetime(context));
     }
 }

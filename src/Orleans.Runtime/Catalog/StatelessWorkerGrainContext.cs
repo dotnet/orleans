@@ -18,6 +18,7 @@ internal partial class StatelessWorkerGrainContext : IGrainContext, IAsyncDispos
     private static readonly object CollectIdleWorkersSentinel = new();
     private readonly StatelessWorkerGrainTypeSharedContext _shared;
     private readonly IGrainContextActivator _innerActivator;
+    private readonly IConfigureGrainContext[] _workerConfigureActions;
     private readonly List<ActivationData> _workers = [];
     private readonly ConcurrentQueue<(WorkItemType Type, object State)> _workItems = new();
     private readonly SingleWaiterAutoResetEvent _workSignal = new() { RunContinuationsAsynchronously = false };
@@ -50,6 +51,9 @@ internal partial class StatelessWorkerGrainContext : IGrainContext, IAsyncDispos
         Address = address;
         _shared = sharedContext;
         _innerActivator = innerActivator;
+        _workerConfigureActions = configureActions
+            .Where(static action => action is IConfigureGrainContextPerActivation)
+            .ToArray();
 
         foreach (var configure in configureActions)
         {
@@ -335,7 +339,7 @@ internal partial class StatelessWorkerGrainContext : IGrainContext, IAsyncDispos
     {
         Debug.Assert(!_terminated, "CreateWorker must not be called on a terminated stateless worker context.");
         var address = GrainAddress.GetAddress(Address.SiloAddress, Address.GrainId, ActivationId.NewId());
-        var newWorker = (ActivationData)_innerActivator.CreateContext(address, []);
+        var newWorker = (ActivationData)_innerActivator.CreateContext(address, _workerConfigureActions);
 
         // Observe the create/destroy lifecycle of the activation
         newWorker.SetComponent<IActivationLifecycleObserver>(this);

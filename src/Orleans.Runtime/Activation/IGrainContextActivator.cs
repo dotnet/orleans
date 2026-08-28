@@ -161,6 +161,10 @@ namespace Orleans.Runtime
         void Configure(IGrainContext context);
     }
 
+    internal interface IConfigureGrainContextPerActivation : IConfigureGrainContext
+    {
+    }
+
     /// <summary>
     /// Resolves components which are common to all instances of a given grain type.
     /// </summary>
