@@ -1,7 +1,7 @@
 ---
 title: "ORLEANS0025: Duplicate grain class declaration"
 description: Understand and resolve ORLEANS0025 when OrleansContracts.txt declares a grain identity more than once.
-ms.date: 08/25/2026
+ms.date: 08/27/2026
 ms.topic: reference
 ---
 
@@ -15,7 +15,7 @@ ms.topic: reference
 
 ## Cause
 
-`OrleansContracts.txt` repeats a grain class CLR name or a non-empty `GrainType`, including active and retired declarations with the same identity.
+`OrleansContracts.txt` repeats an effective grain class identity. The effective identity is `GrainType` when present and the identity derived from the recorded CLR name using Orleans conventions for a legacy declaration.
 
 ## Impact
 
@@ -23,7 +23,7 @@ The grain identity history becomes ambiguous, and the parser accepts only the fi
 
 ## How to fix
 
-Merge or remove duplicates, retaining one canonical active or retired declaration.
+Merge declarations which have the same effective identity into one canonical entry. Active and retired declarations can share a CLR name when they record different explicit `GrainType` values across an identity migration.
 
 ## Suppress the diagnostic
 

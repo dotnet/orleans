@@ -16,3 +16,4 @@ ORLEANS0022 | Orleans.Versioning | Warning | GrainInterfaceVersionAnalyzer, Grai
 ORLEANS0023 | Orleans.Versioning | Warning | GrainInterfaceVersionAnalyzer, Grain class alias mismatch
 ORLEANS0024 | Orleans.Versioning | Warning | GrainInterfaceVersionAnalyzer, Removed grain class not marked as *RETIRED*
 ORLEANS0025 | Orleans.Versioning | Warning | GrainInterfaceVersionAnalyzer, Duplicate grain class declaration in file
+ORLEANS0027 | Orleans.Versioning | Warning | GrainInterfaceVersionAnalyzer, Removed grain interface member remains in OrleansContracts.txt

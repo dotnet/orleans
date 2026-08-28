@@ -1,7 +1,7 @@
 ---
 title: "ORLEANS0016: Grain interface is not active in OrleansContracts.txt"
 description: Understand and resolve ORLEANS0016 when a grain interface is missing or retired in the contract manifest.
-ms.date: 08/25/2026
+ms.date: 08/27/2026
 ms.topic: reference
 ---
 
@@ -26,6 +26,8 @@ The interface identity, version, and methods are absent from contract review. A 
 Verify the interface identity and version, then apply **Add to OrleansContracts.txt**. The code fix adds or reactivates the interface and records its ordinary instance methods.
 
 If the interface was restored accidentally, remove it from source or introduce a separately named replacement instead of reusing a retired identity.
+
+Apply **Regenerate OrleansContracts.txt** to rebuild the complete project manifest, or use **Fix all in solution** to update every affected project. Review the generated diff using the [contract compatibility guidance](../grains/grain-versioning/contract-compatibility-analyzer.md#regenerate-the-manifest).
 
 ## Suppress the diagnostic
 

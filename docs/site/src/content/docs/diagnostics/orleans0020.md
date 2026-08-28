@@ -1,7 +1,7 @@
 ---
 title: "ORLEANS0020: OrleansContracts.txt is missing"
 description: Understand and resolve ORLEANS0020 when contract compatibility analysis is enabled without a manifest.
-ms.date: 08/25/2026
+ms.date: 08/27/2026
 ms.topic: reference
 ---
 
@@ -11,7 +11,7 @@ ms.topic: reference
 | --- | --- |
 | Category | Orleans.Versioning |
 | Severity | Info |
-| Code fix | Not available |
+| Code fix | Available |
 
 ## Cause
 
@@ -23,7 +23,7 @@ The analyzer has no baseline, so it cannot detect RPC identity, signature, versi
 
 ## How to fix
 
-Create `OrleansContracts.txt` at `OrleansContractsPath`, add it to source control, and rebuild. Apply the resulting diagnostics' code fixes to populate interface, method, and class declarations.
+Apply **Regenerate OrleansContracts.txt** to create and populate the complete project manifest. Use **Fix all in solution** to create manifests for every affected project, then add the generated files to source control and review the baseline using the [contract compatibility guidance](../grains/grain-versioning/contract-compatibility-analyzer.md#regenerate-the-manifest).
 
 ## Suppress the diagnostic
 

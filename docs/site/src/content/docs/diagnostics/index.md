@@ -110,3 +110,7 @@ Analyzer help links use `https://aka.ms/orleans/diagnostics` with the diagnostic
 ## ORLEANS0026
 
 [Invalid invokable base type mapping](orleans0026.md) — Error. A custom grain-call return type mapping cannot generate a valid invokable request.
+
+## ORLEANS0027
+
+[Grain interface member removed from source](orleans0027.md) — Warning. The manifest retains an RPC signature which is absent from source.

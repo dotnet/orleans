@@ -1,7 +1,7 @@
 ---
 title: Orleans contract compatibility analyzer
 description: Track grain RPC contracts during development to identify changes which can break rolling upgrades.
-ms.date: 08/25/2026
+ms.date: 08/27/2026
 ms.topic: concept-article
 ---
 
@@ -36,40 +36,69 @@ The path can also be set in `Directory.Build.props` to apply a repository conven
 
 ## Create and update the manifest
 
-After opting in, build the project. If no manifest exists, diagnostic `ORLEANS0020` identifies the missing file. Create the file, include it in source control, and apply the Orleans code fixes to add missing interface and class entries. Apply the code fixes again after adding RPC methods.
+After opting in, build the project. If no manifest exists, diagnostic `ORLEANS0020` identifies the missing file at the first contract declaration. Apply **Regenerate OrleansContracts.txt** to create and populate the manifest for the project.
 
-Code fixes add the generated-file header, preserve the file's line endings, and write entries in stable ordinal order. The resulting file is deterministic regardless of the order in which fixes are applied.
+The regeneration code fix rebuilds every active interface, method, and grain-class entry from the project compilation. It preserves existing `*RETIRED*` entries and marks declarations which are no longer in source as retired. The generated header, line endings, and ordinal entry order are deterministic.
 
 ### Regenerate the manifest
 
-Use the analyzer code fixes to regenerate the active contracts:
+Apply **Regenerate OrleansContracts.txt** from `ORLEANS0016`, `ORLEANS0017`, `ORLEANS0018`, `ORLEANS0019`, `ORLEANS0020`, `ORLEANS0022`, `ORLEANS0023`, or `ORLEANS0024`. One application regenerates the entire project manifest. In an IDE, use **Fix all in project** or **Fix all in solution** to regenerate every affected project.
 
-1. Preserve every `*RETIRED*` declaration from the existing manifest. Retired identities are historical data and cannot be reconstructed from current source.
-2. Create an empty `OrleansContracts.txt`, then restore the retired declarations.
-3. Build the project.
-4. Apply each `ORLEANS0016` and `ORLEANS0022` code fix to add active interfaces and grain classes.
-5. Build again and apply each `ORLEANS0018` code fix to add interface methods.
-6. Review the resulting identity, version, and signature diff before committing it.
+`ORLEANS0027` intentionally retains a removed method signature, so regeneration isn't offered for that diagnostic. If it is the only remaining diagnostic, restore the source method or explicitly delete the retained signature after reviewing and accepting the wire-compatibility break.
 
-For routine contract changes, keep the existing manifest and apply the reported update or retirement code fix instead of rebuilding it from scratch.
+Agents and command-line workflows can regenerate manifests without an IDE:
+
+```dotnetcli
+dotnet format PATH_TO_PROJECT_OR_SOLUTION analyzers --severity info --diagnostics ORLEANS0016 ORLEANS0017 ORLEANS0018 ORLEANS0019 ORLEANS0020 ORLEANS0022 ORLEANS0023 ORLEANS0024
+```
+
+Run the command from the repository root. Replace `PATH_TO_PROJECT_OR_SOLUTION` with the path to the owning `.csproj` to regenerate one manifest, or a `.sln`/`.slnx` path to regenerate manifests in every affected project. The `--severity info` option includes `ORLEANS0020`, allowing the command to create a missing manifest.
+
+Regeneration edits `OrleansContracts.txt` files only. It does not add or change `[Alias]`, `[Id]`, `[GrainType]`, or `[GrainInterfaceType]` attributes in source. Attribute-like syntax in the manifest records the effective identity which Orleans already uses at runtime.
+
+For a method without `[Id]` or `[Alias]`, the manifest records the same generated xxHash32 method ID which the Orleans code generator already uses on the wire. The preceding comment records the CLR signature so reviewers can map the wire ID back to source. A one-time upgrade from an older manifest format can therefore replace a CLR method name with its existing generated ID; this records the current wire contract and does not change it.
+
+After the command completes:
+
+1. Inspect `git diff -- "*OrleansContracts.txt"` and account for every changed identity, version, and method signature.
+2. Preserve all `*RETIRED*` declarations and retained removed-method signatures unless the compatibility break is intentional.
+3. Run `dotnet build PATH_TO_PROJECT_OR_SOLUTION` and resolve all Orleans contract diagnostics. `ORLEANS0027` remains until a removed method is restored or its retained signature is explicitly deleted after compatibility review.
+
+Add the generated file to source control and review its diff before committing. Treat every changed contract line as a potential wire-compatibility change:
+
+- A changed `GrainInterfaceType`, `GrainType`, method identity, parameter type, or return type changes a wire identity or signature.
+- A removed source contract becomes `*RETIRED*`, preserving its identity history and preventing accidental reuse.
+- A removed RPC method remains in the manifest and reports `ORLEANS0027` until the method is restored or the wire break is explicitly accepted by removing the retained signature.
+- A `[Version]` change affects version-aware routing and must align with the rolling-upgrade design.
+- A CLR comment-only change records a refactor while the explicit Orleans identity remains stable.
+
+Coding agents should regenerate the manifest instead of hand-editing active entries, retain retired history, and explain the compatibility impact of each contract diff in the change description.
 
 ## Manifest format
 
 Interface methods are indented beneath their interface:
 
 ```text
-# This file is auto-generated by the Orleans contract analyzer.
-# Update source contracts, then regenerate this file by following:
-# https://aka.ms/orleans/OrleansContracts.txt
+# This file is generated by the Orleans contract analyzer.
+# To regenerate, run this command from the repository root after replacing
+# PATH_TO_PROJECT_OR_SOLUTION with the owning .csproj, .sln, or .slnx path:
+# dotnet format PATH_TO_PROJECT_OR_SOLUTION analyzers --severity info --diagnostics ORLEANS0016 ORLEANS0017 ORLEANS0018 ORLEANS0019 ORLEANS0020 ORLEANS0022 ORLEANS0023 ORLEANS0024
+# Verify with: dotnet build PATH_TO_PROJECT_OR_SOLUTION
+# The regeneration command edits this manifest only; it does not change source attributes.
+# Methods without [Id] or [Alias] use the Orleans code generator's existing wire ID hash.
+# Review every diff: identity or signature changes can break wire compatibility during rolling upgrades.
+# Details: https://aka.ms/orleans/OrleansContracts.txt
 
 interface [GrainInterfaceType("Contoso.Grains.ICartGrain")] Contoso.Grains.ICartGrain [Version(1)]
-  AddAsync(Contoso.Grains.Item) -> Task
-  GetAsync() -> Task<Contoso.Grains.Cart>
+  # Contoso.Grains.ICartGrain.AddAsync(Item item) -> Task
+  15793847(Contoso.Grains.Item) -> Task
+  # Contoso.Grains.ICartGrain.GetAsync() -> Task<Cart>
+  857AC6B2() -> Task<Contoso.Grains.Cart>
 
 class [GrainType("cart")] Contoso.Grains.CartGrain
 ```
 
-Each declaration includes both its Orleans identity and CLR type name. A diff which changes both values is a breaking identity change. A diff which changes only the CLR type name preserves the Orleans identity.
+Each declaration includes both its Orleans identity and CLR type name. A diff which changes the Orleans identity changes the wire contract. A diff which changes only the CLR type name preserves an explicit Orleans identity.
 
 Explicit identities remain visible alongside their CLR names:
 
@@ -77,13 +106,13 @@ Explicit identities remain visible alongside their CLR names:
 # Contoso.Grains.ICartGrain
 interface [GrainInterfaceType("cart")] Contoso.Grains.ICartGrain [Version(1)]
   # Contoso.Grains.ICartGrain.AddAsync(Item item) -> Task
-  add(Contoso.Grains.Item) -> Task
+  [Alias("add")] add(Contoso.Grains.Item) -> Task
 
 # Contoso.Grains.CartGrain
 class [GrainType("cart")] Contoso.Grains.CartGrain
 ```
 
-Comments record CLR names only when they differ from the stable identity. Comments are informational and aren't part of contract matching.
+`[Alias("...")]` on a manifest method records that the identity comes from a source `[Alias]` attribute. An unmarked eight-digit hexadecimal method identity is the generated wire ID. Comments record CLR names when they improve traceability; comments are informational and aren't part of contract matching.
 
 `*RETIRED*` marks an intentionally removed contract:
 
@@ -93,7 +122,7 @@ Comments record CLR names only when they differ from the stable identity. Commen
 *RETIRED* class [GrainType("legacy")] Contoso.Grains.LegacyGrain
 ```
 
-Don't delete retired entries. They preserve the contract history and prevent a removed identity from being unintentionally reused.
+Retired entries preserve contract history and prevent a removed identity from being unintentionally reused.
 
 ## Refactor-safe identities
 
@@ -104,7 +133,7 @@ The analyzer uses Orleans identities before CLR names:
 - <xref:Orleans.IdAttribute> or <xref:Orleans.AliasAttribute> identifies grain methods.
 - <xref:Orleans.AliasAttribute> identifies serialized parameter and return types.
 
-When these identities remain unchanged, renaming a CLR class, interface, method, parameter, or aliased data type doesn't require a manifest update. Changing an Orleans identity remains a contract change and produces a diagnostic.
+When these identities remain unchanged, a CLR class, interface, method, parameter, or aliased data type can be renamed while preserving the wire identity. Changing an Orleans identity produces a contract diff and diagnostic.
 
 Without an explicit stable identity, Orleans derives the identity from the CLR type name. Renaming the CLR type therefore changes the derived identity and the contract.
 
@@ -122,9 +151,10 @@ Without an explicit stable identity, Orleans derives the identity from the CLR t
 | [`ORLEANS0023`](../../diagnostics/orleans0023.md) | Warning | A grain class identity differs from the manifest. |
 | [`ORLEANS0024`](../../diagnostics/orleans0024.md) | Warning | A removed grain class isn't marked `*RETIRED*`. |
 | [`ORLEANS0025`](../../diagnostics/orleans0025.md) | Warning | A grain class is declared more than once. |
+| [`ORLEANS0027`](../../diagnostics/orleans0027.md) | Warning | An RPC method remains in the manifest after it is removed from source. |
 
 Standard `.editorconfig` diagnostic configuration can change these severities. Prefer fixing contract drift instead of suppressing diagnostics.
 
 ## Scope
 
-The analyzer tracks RPC interface signatures, numeric interface versions, and concrete grain class identities. It doesn't prove behavioral compatibility or validate persisted state schemas. Continue to follow the [backward compatibility guidelines](backward-compatibility-guidelines.md) and test mixed-version deployments before production rollout.
+The analyzer tracks RPC interface signatures, numeric interface versions, and concrete grain class identities. Behavioral compatibility and persisted state schemas require separate review using the [backward compatibility guidelines](backward-compatibility-guidelines.md) and mixed-version deployment tests.

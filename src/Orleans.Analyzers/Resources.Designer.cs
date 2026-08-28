@@ -409,6 +409,24 @@ namespace Orleans.Analyzers {
                 return ResourceManager.GetString("GrainInterfaceMemberNotDeclaredTitle", resourceCulture);
             }
         }
+
+        internal static string GrainInterfaceMemberRemovedDescription {
+            get {
+                return ResourceManager.GetString("GrainInterfaceMemberRemovedDescription", resourceCulture);
+            }
+        }
+
+        internal static string GrainInterfaceMemberRemovedMessageFormat {
+            get {
+                return ResourceManager.GetString("GrainInterfaceMemberRemovedMessageFormat", resourceCulture);
+            }
+        }
+
+        internal static string GrainInterfaceMemberRemovedTitle {
+            get {
+                return ResourceManager.GetString("GrainInterfaceMemberRemovedTitle", resourceCulture);
+            }
+        }
         
         /// <summary>
         ///   Looks up a localized string similar to All grain interfaces should have an active declaration in OrleansContracts.txt to ensure version compatibility during rolling upgrades..
