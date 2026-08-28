@@ -79,6 +79,10 @@ try
             '--max-parallel-test-modules'
             '1'
         )
+        if ($iteration -gt 1)
+        {
+            $arguments += '--no-build'
+        }
 
         & dotnet @arguments 2>&1 | Tee-Object -FilePath $consoleLogPath
         $exitCode = $LASTEXITCODE

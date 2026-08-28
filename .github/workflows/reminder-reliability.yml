@@ -88,7 +88,7 @@ jobs:
               topology = $provider.topology
               framework = $framework
               filter = $(if ($provider.id -eq 'None') {
-                '/[(Provider=None)&(Category=Reminders)&(Category!=Performance)]'
+                '/[(Provider=None)&((Area=Reminders)|(Category=Reminders))&(Category!=Performance)]'
               } else {
                 "/[(Provider=$($provider.id))&(Area=Reminders)&(Category!=Performance)]"
               })
@@ -195,6 +195,7 @@ jobs:
             ;;
         esac
     - name: Run reminder reliability repetitions
+      timeout-minutes: 90
       shell: pwsh
       run: >-
         ./.github/scripts/run-reminder-reliability.ps1
@@ -219,6 +220,7 @@ jobs:
       with:
         name: reminder-reliability_${{ matrix.artifact }}_${{ matrix.framework }}_${{ github.run_attempt }}
         retention-days: '14'
+        fail-on-upload-error: 'true'
     - name: Clean up reminder provider
       if: always() && env.REMINDER_CONTAINER != ''
       shell: bash

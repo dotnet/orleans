@@ -9,6 +9,10 @@ inputs:
     description: Number of days to retain the artifact.
     required: false
     default: '1'
+  fail-on-upload-error:
+    description: Fail if both test result upload attempts fail.
+    required: false
+    default: 'false'
 
 runs:
   using: composite
@@ -30,7 +34,7 @@ runs:
     run: Start-Sleep -Seconds 30
   - name: Retry test result upload
     if: steps.archive-test-results.outcome == 'failure'
-    continue-on-error: true
+    continue-on-error: ${{ inputs.fail-on-upload-error != 'true' }}
     uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
     with:
       name: ${{ inputs.name }}
