@@ -68,17 +68,16 @@ public class CallbackDataTests
 
     private static CallbackData CreateCallback(
         IResponseCompletionSource completion,
-        Action<Message> unregister,
+        Action<CallbackData> unregister,
         ApplicationRequestInstruments instruments)
     {
         var shared = new SharedCallbackData(
-            unregister,
             logger: NullLogger<CallbackData>.Instance,
             responseTimeout: TimeSpan.FromMinutes(1),
             cancelOnTimeout: false,
             waitForCancellationAcknowledgement: false,
             cancellationManager: null);
-        return new CallbackData(shared, completion, new Message(), instruments);
+        return new CallbackData(shared, new DelegateCallbackTarget(unregister), completion, new Message(), instruments);
     }
 
     private static ServiceProvider CreateServiceProvider()
@@ -98,5 +97,10 @@ public class CallbackDataTests
         public void Complete(Response value) => Response = value;
 
         public void Complete() => Response = Orleans.Serialization.Invocation.Response.Completed;
+    }
+
+    private sealed class DelegateCallbackTarget(Action<CallbackData> unregister) : ICallbackDataTarget
+    {
+        public void Unregister(CallbackData callback) => unregister(callback);
     }
 }

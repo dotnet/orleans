@@ -18,7 +18,7 @@ using static Orleans.Internal.StandardExtensions;
 
 namespace Orleans
 {
-    internal partial class OutsideRuntimeClient : IRuntimeClient, IDisposable, IClusterConnectionStatusListener
+    internal partial class OutsideRuntimeClient : IRuntimeClient, IDisposable, IClusterConnectionStatusListener, ICallbackDataTarget
     {
         internal static bool TestOnlyThrowExceptionDuringInit { get; set; }
 
@@ -93,7 +93,6 @@ namespace Orleans
                     TimeSpan.FromSeconds(1)));
             this.callbackTimer = new PeriodicTimer(period, timeProvider);
             this.sharedCallbackData = new SharedCallbackData(
-                msg => this.UnregisterCallback(msg.Id),
                 this.loggerFactory.CreateLogger<CallbackData>(),
                 this.clientMessagingOptions.ResponseTimeout,
                 this.clientMessagingOptions.CancelRequestOnTimeout,
@@ -290,14 +289,18 @@ namespace Orleans
 
             if (!oneWay)
             {
-                var callbackData = new CallbackData(this.sharedCallbackData, context!, message, _applicationRequestInstruments);
+                var callbackData = new CallbackData(this.sharedCallbackData, this, context!, message, _applicationRequestInstruments);
                 if (Volatile.Read(ref _isStopping) != 0)
                 {
                     callbackData.OnHostShutdown();
                     return;
                 }
 
-                callbacks.TryAdd(message.Id, callbackData);
+                if (!callbacks.TryAdd(message.Id, callbackData))
+                {
+                    throw new InvalidOperationException($"A callback with correlation id {message.Id} is already registered.");
+                }
+
                 callbackData.SubscribeForCancellation(cancellationToken);
 
                 if (Volatile.Read(ref _isStopping) != 0)
@@ -375,10 +378,8 @@ namespace Orleans
             }
         }
 
-        private void UnregisterCallback(CorrelationId id)
-        {
-            callbacks.TryRemove(id, out _);
-        }
+        void ICallbackDataTarget.Unregister(CallbackData callback) =>
+            callbacks.TryRemove(KeyValuePair.Create(callback.Message.Id, callback));
 
         private void ConstructorReset()
         {

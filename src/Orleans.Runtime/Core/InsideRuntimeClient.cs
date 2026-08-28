@@ -24,7 +24,7 @@ namespace Orleans.Runtime
     /// <summary>
     /// Internal class for system grains to get access to runtime object
     /// </summary>
-    internal sealed partial class InsideRuntimeClient : IRuntimeClient, ILifecycleParticipant<ISiloLifecycle>
+    internal sealed partial class InsideRuntimeClient : IRuntimeClient, ILifecycleParticipant<ISiloLifecycle>, ICallbackDataTarget
     {
         private readonly ILogger logger;
         private readonly ILogger invokeExceptionLogger;
@@ -88,7 +88,6 @@ namespace Orleans.Runtime
 
             var callbackDataLogger = loggerFactory.CreateLogger<CallbackData>();
             this.sharedCallbackData = new SharedCallbackData(
-                msg => this.UnregisterCallback(msg.Id),
                 callbackDataLogger,
                 this.messagingOptions.ResponseTimeout,
                 this.messagingOptions.CancelRequestOnTimeout,
@@ -96,7 +95,6 @@ namespace Orleans.Runtime
                 cancellationManager: null!);
 
             this.systemSharedCallbackData = new SharedCallbackData(
-                msg => this.UnregisterCallback(msg.Id),
                 callbackDataLogger,
                 this.messagingOptions.SystemResponseTimeout,
                 cancelOnTimeout: false,
@@ -188,14 +186,18 @@ namespace Orleans.Runtime
                 Debug.Assert(context is not null);
 
                 // Register a callback for the request.
-                callbackData = new CallbackData(sharedData, context, message, _applicationRequestInstruments);
+                callbackData = new CallbackData(sharedData, this, context, message, _applicationRequestInstruments);
                 if (Volatile.Read(ref _isStopping) != 0)
                 {
                     callbackData.OnHostShutdown();
                     return;
                 }
 
-                callbacks.TryAdd(message.Id, callbackData);
+                if (!callbacks.TryAdd(message.Id, callbackData))
+                {
+                    throw new InvalidOperationException($"A callback with correlation id {message.Id} is already registered.");
+                }
+
                 callbackData.SubscribeForCancellation(cancellationToken);
             }
             else
@@ -233,13 +235,8 @@ namespace Orleans.Runtime
             this.MessageCenter.SendResponse(request, response);
         }
 
-        /// <summary>
-        /// UnRegister a callback.
-        /// </summary>
-        private void UnregisterCallback(CorrelationId correlationId)
-        {
-            callbacks.TryRemove(correlationId, out _);
-        }
+        void ICallbackDataTarget.Unregister(CallbackData callback) =>
+            callbacks.TryRemove(callback.Message.Id, callback);
 
         public void SniffIncomingMessage(Message message)
         {
