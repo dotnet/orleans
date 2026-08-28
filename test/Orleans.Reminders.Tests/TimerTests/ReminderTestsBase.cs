@@ -707,15 +707,6 @@ public class ReminderTestsBase : OrleansTestingBase, IAsyncDisposable
             $"Could not select a {typeof(TGrainInterface).Name} reminder grain owned by {owner.SiloAddress} after {maximumAttempts} attempts.");
     }
 
-    private async Task WaitForReminderRangeReconciliationAsync(CancellationToken cancellationToken)
-    {
-        // Membership convergence does not await the reminder services' queued range-change reconciliation.
-        var rangeChangeReconciliations = HostedCluster.GetActiveSilos().Select(silo =>
-            silo.ServiceProvider.GetRequiredService<LocalReminderService>()
-                .TestOnlyWaitForRangeChangeReconciliation(cancellationToken));
-        await Task.WhenAll(rangeChangeReconciliations);
-    }
-
     protected async Task InvokeGrainCallsAfterTopologyConvergenceAsync(
         CancellationToken cancellationToken,
         params Func<Task>[] grainCalls)
@@ -738,7 +729,11 @@ public class ReminderTestsBase : OrleansTestingBase, IAsyncDisposable
     private async Task WaitForTopologyConvergenceAsync(CancellationToken cancellationToken)
     {
         await HostedCluster.WaitForTopologyToConvergeAsync(cancellationToken);
-        await WaitForReminderRangeReconciliationAsync(cancellationToken);
+        await observer.WaitForTopologyReconciledAsync(
+            Task.CompletedTask,
+            [],
+            CHURN_ENDWAIT,
+            cancellationToken);
     }
 
     private async Task WaitForGrainsReachableAsync(CancellationToken cancellationToken, params IAddressable[] grains)
