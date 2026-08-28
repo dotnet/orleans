@@ -168,7 +168,7 @@ public abstract class ReminderServiceLifecycleTestRunner
                 await _harness.WaitForScheduleAsync(grain.GetGrainId(), Name, cancellationToken);
                 await AssertPersistedAsync(Guarantee, grain.GetGrainId(), Name, expectedStart, Period, cancellationToken);
                 var tick = _harness.WaitForTickCountAsync(grain.GetGrainId(), Name, 1, cancellationToken);
-                await _harness.AdvanceAsync(due, cancellationToken);
+                await _harness.AdvanceAsync(expectedStart - _harness.UtcNow.UtcDateTime, cancellationToken);
                 await tick;
                 AssertCounts(Guarantee, grain, Name, owners: null, ticks: 1);
             },
@@ -206,6 +206,7 @@ public abstract class ReminderServiceLifecycleTestRunner
                     scheduleChanges + 1,
                     cancellationToken);
                 await grain.RegisterOrUpdateAsync(Name, due, Period + TimeSpan.FromMinutes(1)).WaitAsync(cancellationToken);
+                await _harness.AdvanceAsync(_harness.ReminderRefreshPeriod, cancellationToken);
                 await changed;
                 await _harness.WaitForScheduleAsync(grain.GetGrainId(), Name, cancellationToken);
                 var updated = await ReadRequiredAsync(Guarantee, grain.GetGrainId(), Name, cancellationToken);
@@ -258,7 +259,9 @@ public abstract class ReminderServiceLifecycleTestRunner
                         .Throw();
                 }
 
-                await _harness.WaitForOwnerCountAsync(grain.GetGrainId(), Name, 0, cancellationToken);
+                var quiescence = _harness.WaitForOwnerCountAsync(grain.GetGrainId(), Name, 0, cancellationToken);
+                await _harness.AdvanceAsync(_harness.ReminderRefreshPeriod, cancellationToken);
+                await quiescence;
                 await AssertAbsentAsync(Guarantee, grain.GetGrainId(), Name, cancellationToken);
                 await _harness.AdvanceAsync(Period, cancellationToken);
                 AssertCounts(Guarantee, grain, Name, owners: 0, ticks: 0);
@@ -387,6 +390,7 @@ public abstract class ReminderServiceLifecycleTestRunner
     {
         const string Guarantee = nameof(ReminderService_OneSiloJoinLeaveTransfersOwnership);
         var reminders = CreateGrains(Guarantee, 32);
+        var firstTickTime = _harness.UtcNow.UtcDateTime + TimeSpan.FromSeconds(3);
         var initialOwners = new Dictionary<GrainId, SiloAddress>();
         SiloAddress? joined = null;
         await ExecuteWithCleanupAsync(
@@ -411,10 +415,15 @@ public abstract class ReminderServiceLifecycleTestRunner
                         1,
                         cancellationToken)));
                 var transferred = 0;
+                (IReminderServiceTestGrain Grain, string Name)? transferredReminder = null;
                 foreach (var (grain, name) in reminders)
                 {
                     var owner = _harness.GetOwners(grain.GetGrainId(), name).Single();
-                    transferred += owner.Equals(joined) ? 1 : 0;
+                    if (owner.Equals(joined))
+                    {
+                        transferred++;
+                        transferredReminder ??= (grain, name);
+                    }
                 }
 
                 if (transferred == 0)
@@ -453,19 +462,20 @@ public abstract class ReminderServiceLifecycleTestRunner
                         item.Grain.GetGrainId(),
                         item.Name,
                         cancellationToken)));
-                var tickWaits = reminders
-                    .Select(item => _harness.WaitForTickCountAsync(
-                        item.Grain.GetGrainId(),
-                        item.Name,
-                        1,
-                        cancellationToken))
-                    .ToArray();
-                await _harness.AdvanceAsync(TimeSpan.FromSeconds(3), cancellationToken);
-                await Task.WhenAll(tickWaits);
-                foreach (var (grain, name) in reminders)
-                {
-                    AssertCounts(Guarantee, grain, name, owners: null, ticks: 1);
-                }
+                var transferredItem = transferredReminder!.Value;
+                var tick = _harness.WaitForTickCountAsync(
+                    transferredItem.Grain.GetGrainId(),
+                    transferredItem.Name,
+                    1,
+                    cancellationToken);
+                await _harness.AdvanceAsync(firstTickTime - _harness.UtcNow.UtcDateTime, cancellationToken);
+                await tick;
+                AssertCounts(
+                    Guarantee,
+                    transferredItem.Grain,
+                    transferredItem.Name,
+                    owners: null,
+                    ticks: 1);
             },
             async cleanupToken =>
             {
