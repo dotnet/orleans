@@ -150,11 +150,8 @@ namespace UnitTests.Runtime
             await lookupStarted.Task;
             timeProvider.Advance(messagingOptions.PlacementTimeout);
 
-            var completedTask = await Task.WhenAny(
-                placementTask,
-                Task.Delay(TimeSpan.FromSeconds(1), TestContext.Current.CancellationToken));
-            Assert.Same(placementTask, completedTask);
-            var exception = await Assert.ThrowsAsync<TimeoutException>(() => placementTask);
+            var exception = await Assert.ThrowsAsync<TimeoutException>(
+                () => placementTask.WaitAsync(TestContext.Current.CancellationToken));
             Assert.IsType<Polly.Timeout.TimeoutRejectedException>(exception.InnerException);
 
             lookupCompletion.TrySetResult(default);
