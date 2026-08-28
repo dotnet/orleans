@@ -8,7 +8,6 @@ namespace Tester;
 [TestCategory("BVT")]
 public class StripedCallbackDictionaryTests
 {
-    private static readonly GrainId Owner = GrainId.Create("test", "owner");
     private static readonly Action<int, object?> EmptyVisitor = static (_, _) => { };
 
     [Fact]
@@ -36,27 +35,13 @@ public class StripedCallbackDictionaryTests
         var dictionary = new StripedCallbackDictionary<string>();
         var id = new CorrelationId(42);
 
-        Assert.True(dictionary.TryAdd(Owner, id, "value"));
-        Assert.False(dictionary.TryAdd(Owner, id, "duplicate"));
-        Assert.True(dictionary.TryGetValue(Owner, id, out var value));
+        Assert.True(dictionary.TryAdd(id, "value"));
+        Assert.False(dictionary.TryAdd(id, "duplicate"));
+        Assert.True(dictionary.TryGetValue(id, out var value));
         Assert.Equal("value", value);
-        Assert.True(dictionary.TryRemove(Owner, id, out value));
+        Assert.True(dictionary.TryRemove(id, out value));
         Assert.Equal("value", value);
-        Assert.False(dictionary.TryGetValue(Owner, id, out _));
-    }
-
-    [Fact]
-    public void CallbackOwnerIsPartOfTheKey()
-    {
-        var dictionary = new StripedCallbackDictionary<string>();
-        var otherOwner = GrainId.Create("test", "other-owner");
-        var id = new CorrelationId(42);
-
-        Assert.True(dictionary.TryAdd(Owner, id, "value"));
-        Assert.False(dictionary.TryGetValue(otherOwner, id, out _));
-        Assert.False(dictionary.TryRemove(otherOwner, id, out _));
-        Assert.True(dictionary.TryGetValue(Owner, id, out var value));
-        Assert.Equal("value", value);
+        Assert.False(dictionary.TryGetValue(id, out _));
     }
 
     [Fact]
@@ -66,7 +51,7 @@ public class StripedCallbackDictionaryTests
         for (var i = 0; i < 32; i++)
         {
             var id = new CorrelationId(i);
-            Assert.True(dictionary.TryAdd(Owner, id, i));
+            Assert.True(dictionary.TryAdd(id, i));
         }
 
         var values = new List<int>();
@@ -83,8 +68,8 @@ public class StripedCallbackDictionaryTests
         Parallel.For(0, 10_000, i =>
         {
             var id = new CorrelationId(i);
-            Assert.True(dictionary.TryAdd(Owner, id, i));
-            Assert.True(dictionary.TryGetValue(Owner, id, out var value));
+            Assert.True(dictionary.TryAdd(id, i));
+            Assert.True(dictionary.TryGetValue(id, out var value));
             Assert.Equal(i, value);
         });
 
@@ -93,7 +78,7 @@ public class StripedCallbackDictionaryTests
 
         Parallel.For(0, 10_000, i =>
         {
-            Assert.True(dictionary.TryRemove(Owner, new CorrelationId(i), out var value));
+            Assert.True(dictionary.TryRemove(new CorrelationId(i), out var value));
             Assert.Equal(i, value);
         });
 
@@ -107,20 +92,20 @@ public class StripedCallbackDictionaryTests
         var dictionary = new StripedCallbackDictionary<int>();
         for (var i = 0; i < count; i++)
         {
-            Assert.True(dictionary.TryAdd(Owner, new CorrelationId(i), i));
+            Assert.True(dictionary.TryAdd(new CorrelationId(i), i));
         }
 
         Parallel.Invoke(
             () => Parallel.For(0, count, i =>
             {
-                if (dictionary.TryGetValue(Owner, new CorrelationId(i), out var value))
+                if (dictionary.TryGetValue(new CorrelationId(i), out var value))
                 {
                     Assert.Equal(i, value);
                 }
             }),
             () => Parallel.For(0, count, i =>
             {
-                Assert.True(dictionary.TryRemove(Owner, new CorrelationId(i), out var value));
+                Assert.True(dictionary.TryRemove(new CorrelationId(i), out var value));
                 Assert.Equal(i, value);
             }));
 
@@ -133,12 +118,12 @@ public class StripedCallbackDictionaryTests
         var dictionary = new StripedCallbackDictionary<int>();
         for (var i = 0; i < 32; i++)
         {
-            Assert.True(dictionary.TryAdd(Owner, new CorrelationId(i), i));
+            Assert.True(dictionary.TryAdd(new CorrelationId(i), i));
         }
 
-        dictionary.ForEach((Dictionary: dictionary, Owner), static (value, state) =>
+        dictionary.ForEach(dictionary, static (value, dictionary) =>
         {
-            Assert.True(state.Dictionary.TryRemove(state.Owner, new CorrelationId(value), out var removed));
+            Assert.True(dictionary.TryRemove(new CorrelationId(value), out var removed));
             Assert.Equal(value, removed);
         });
 
