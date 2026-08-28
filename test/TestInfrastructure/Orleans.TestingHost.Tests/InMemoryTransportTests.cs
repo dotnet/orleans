@@ -41,7 +41,7 @@ public class InMemoryTransportTests
         var endpoint = new IPEndPoint(IPAddress.Loopback, 12346);
         var connector = new InMemoryTransportConnector(hub, NullLoggerFactory.Instance);
         await using var listener = new InMemoryTransportListener("test", endpoint.ToString(), hub);
-        await listener.BindAsync();
+        await listener.BindAsync(TestContext.Current.CancellationToken);
         using var connectCancellation = new CancellationTokenSource();
 
         var connectTask = connector.CreateAsync(endpoint, connectCancellation.Token).AsTask();
@@ -57,7 +57,7 @@ public class InMemoryTransportTests
     {
         var input = new Pipe();
         var unusedOutput = new Pipe();
-        await input.Writer.WriteAsync(new byte[] { 1, 2, 3 });
+        await input.Writer.WriteAsync(new byte[] { 1, 2, 3 }, TestContext.Current.CancellationToken);
         await input.Writer.CompleteAsync();
         await using var transport = new InMemoryMessageTransport(
             new TestDuplexPipe(input.Reader, unusedOutput.Writer),
@@ -67,7 +67,9 @@ public class InMemoryTransportTests
 
         Assert.True(transport.EnqueueRead(request));
 
-        Assert.Equal([1, 2, 3], await request.Completion.WaitAsync(TimeSpan.FromSeconds(10)));
+        Assert.Equal(
+            [1, 2, 3],
+            await request.Completion.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken));
     }
 
     [Fact]
@@ -77,7 +79,7 @@ public class InMemoryTransportTests
         await using var listener = new InMemoryTransportListener("gateway", endpointValue: null, hub);
 
         Assert.False(listener.IsValid);
-        await listener.BindAsync();
+        await listener.BindAsync(TestContext.Current.CancellationToken);
 
         using var cancellation = new CancellationTokenSource(TimeSpan.FromMilliseconds(100));
         await Assert.ThrowsAnyAsync<OperationCanceledException>(
