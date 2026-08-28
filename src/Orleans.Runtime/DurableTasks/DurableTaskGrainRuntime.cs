@@ -225,6 +225,7 @@ internal sealed partial class DurableTaskGrainRuntime(
 
             if (state.Request is null)
             {
+                _taskHandles.TryAdd(taskId, new TaskHandle(taskId, this) { IsRunning = true });
                 continue;
             }
 
@@ -596,8 +597,18 @@ internal sealed partial class DurableTaskGrainRuntime(
             {
                 _shared.Logger.LogWarning(
                     "Durable task deactivation exceeded the {DrainTimeout} cooperative drain period. "
-                    + "Activation teardown will wait until all activation-owned executions are terminal.",
+                    + "Activation-local waiters will be released before teardown continues.",
                     _shared.DeactivationDrainTimeout);
+                var deactivationResponse = DurableTaskResponse.FromException(
+                    new OperationCanceledException("The durable task activation is deactivating."));
+                foreach (var handle in _taskHandles.Values)
+                {
+                    if (handle is TaskHandle { RemoteTarget.IsDefault: true } localHandle)
+                    {
+                        localHandle.TrySetResponse(deactivationResponse);
+                    }
+                }
+
                 await terminal.ConfigureAwait(true);
             }
             catch (Exception exception) when (terminal.IsCompleted)
@@ -732,31 +743,27 @@ internal sealed partial class DurableTaskGrainRuntime(
         {
             foreach (var taskId in completedTaskIds)
             {
-                // Prune all otherwise-completed children.
-                if (waitingOnParent is not null && waitingOnParent.TryGetValue(taskId, out var childTaskIds))
+                var pending = new Stack<TaskId>();
+                pending.Push(taskId);
+                while (pending.TryPop(out var currentTaskId))
                 {
-                    foreach (var childTaskId in childTaskIds)
+                    if (waitingOnParent is not null && waitingOnParent.TryGetValue(currentTaskId, out var childTaskIds))
                     {
-                        if (_shared.Logger.IsEnabled(LogLevel.Trace))
+                        foreach (var childTaskId in childTaskIds)
                         {
-                            _shared.Logger.LogTrace("{Id} pruning completed child task {TaskId}", GrainId, childTaskId);
+                            pending.Push(childTaskId);
                         }
-
-                        _storage.RemoveTask(childTaskId);
-                        _executionContexts.Remove(childTaskId);
-                        _taskHandles.Remove(childTaskId);
                     }
-                }
 
-                // Prune the task.
-                if (_shared.Logger.IsEnabled(LogLevel.Trace))
-                {
-                    _shared.Logger.LogTrace("{Id} pruning completed task {TaskId}", GrainId, taskId);
-                }
+                    if (_shared.Logger.IsEnabled(LogLevel.Trace))
+                    {
+                        _shared.Logger.LogTrace("{Id} pruning completed task {TaskId}", GrainId, currentTaskId);
+                    }
 
-                _storage.RemoveTask(taskId);
-                _executionContexts.Remove(taskId);
-                _taskHandles.Remove(taskId);
+                    _storage.RemoveTask(currentTaskId);
+                    _executionContexts.Remove(currentTaskId);
+                    _taskHandles.Remove(currentTaskId);
+                }
             }
         }
 
