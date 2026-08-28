@@ -271,7 +271,7 @@ public class AdaptivePingBenchmark : IDisposable
     }
 
     public static async Task RunDeterministicMatrixAsync(
-        int repetitions = 3,
+        int repetitions = 5,
         TimeSpan? warmupDuration = null,
         TimeSpan? measurementInterval = null)
     {
@@ -298,7 +298,7 @@ public class AdaptivePingBenchmark : IDisposable
     public static async Task RunDeterministicScenarioAsync(
         BenchmarkMode mode,
         int numSilos,
-        int repetitions = 3,
+        int repetitions = 5,
         TimeSpan? warmupDuration = null,
         TimeSpan? measurementInterval = null)
     {
@@ -313,7 +313,7 @@ public class AdaptivePingBenchmark : IDisposable
         TimeSpan? warmupDuration,
         TimeSpan? measurementInterval)
     {
-        int[] concurrencyLevels = [100, 250, 500];
+        int[] concurrencyLevels = [1, 16, 100, 250, 500];
         var results = new List<DeterministicResult>(concurrencyLevels.Length);
         using var benchmark = new AdaptivePingBenchmark(mode, numSilos);
         try
@@ -333,13 +333,26 @@ public class AdaptivePingBenchmark : IDisposable
                     initialStepSize: 1,
                     sampleInterval: DefaultSampleInterval,
                     minimumRelativeImprovement: 0);
-                var samples = await loadGenerator.RunFixedConcurrencyAsync(repetitions);
-                Array.Sort(samples);
-                var median = samples.Length % 2 == 0
-                    ? (samples[(samples.Length / 2) - 1] + samples[samples.Length / 2]) / 2
-                    : samples[samples.Length / 2];
-                results.Add(new(benchmark.Description, concurrency, median, samples[^1]));
-                Console.WriteLine($"{benchmark.Description}, concurrency {concurrency}: median {median:N0}/s, max {samples[^1]:N0}/s");
+                var measurements = await loadGenerator.RunFixedConcurrencyAsync(repetitions);
+                var throughput = measurements.Select(static measurement => measurement.Throughput).Order().ToArray();
+                var result = new DeterministicResult(
+                    benchmark.Description,
+                    concurrency,
+                    GetPercentile(throughput, 0.50),
+                    GetPercentile(throughput, 0.95),
+                    GetPercentile(throughput, 0.99),
+                    GetMedian(measurements, static measurement => measurement.LatencyP50Microseconds),
+                    GetMedian(measurements, static measurement => measurement.LatencyP95Microseconds),
+                    GetMedian(measurements, static measurement => measurement.LatencyP99Microseconds),
+                    GetMedian(measurements, static measurement => measurement.AllocatedBytesPerRequest),
+                    GetMedian(measurements, static measurement => measurement.Gen0CollectionsPerMillionRequests),
+                    GetMedian(measurements, static measurement => measurement.CpuUtilization),
+                    GetMedian(measurements, static measurement => measurement.LockContentionsPerMillionRequests));
+                results.Add(result);
+                Console.WriteLine(
+                    $"{benchmark.Description}, concurrency {concurrency}: "
+                    + $"P50 {result.P50Throughput:N0}/s, P95 {result.P95Throughput:N0}/s, "
+                    + $"latency {result.LatencyP50Microseconds:N1}/{result.LatencyP95Microseconds:N1}/{result.LatencyP99Microseconds:N1} us");
             }
         }
         finally
@@ -355,19 +368,47 @@ public class AdaptivePingBenchmark : IDisposable
         Console.WriteLine();
         Console.WriteLine("## Deterministic Ping Benchmark Results");
         Console.WriteLine();
-        Console.WriteLine("| Scenario | Concurrency | Median Throughput | Maximum Throughput |");
-        Console.WriteLine("|----------|------------:|------------------:|-------------------:|");
+        Console.WriteLine("| Scenario | Concurrency | P50 throughput | P95 throughput | P99 throughput | Latency P50/P95/P99 (us) | B/request | Gen0/M requests | CPU | Contentions/M requests |");
+        Console.WriteLine("|----------|------------:|---------------:|---------------:|---------------:|-------------------------:|----------:|----------------:|----:|-----------------------:|");
         foreach (var result in results)
         {
-            Console.WriteLine($"| {result.Description} | {result.Concurrency} | {result.MedianThroughput:N0}/s | {result.MaximumThroughput:N0}/s |");
+            Console.WriteLine(
+                $"| {result.Description} | {result.Concurrency} | {result.P50Throughput:N0}/s | "
+                + $"{result.P95Throughput:N0}/s | {result.P99Throughput:N0}/s | "
+                + $"{result.LatencyP50Microseconds:N1}/{result.LatencyP95Microseconds:N1}/{result.LatencyP99Microseconds:N1} | "
+                + $"{result.AllocatedBytesPerRequest:N1} | {result.Gen0CollectionsPerMillionRequests:N2} | "
+                + $"{result.CpuUtilization:N1}% | {result.LockContentionsPerMillionRequests:N2} |");
         }
 
         Console.WriteLine();
     }
 
+    private static double GetPercentile(double[] sortedSamples, double percentile)
+    {
+        var index = (int)Math.Ceiling(percentile * sortedSamples.Length) - 1;
+        return sortedSamples[Math.Clamp(index, 0, sortedSamples.Length - 1)];
+    }
+
+    private static double GetMedian(
+        AdaptiveConcurrencyLoadGenerator<IPingGrain>.FixedConcurrencyMeasurement[] measurements,
+        Func<AdaptiveConcurrencyLoadGenerator<IPingGrain>.FixedConcurrencyMeasurement, double> selector)
+    {
+        var values = measurements.Select(selector).Order().ToArray();
+        var midpoint = values.Length / 2;
+        return values.Length % 2 == 0 ? (values[midpoint - 1] + values[midpoint]) / 2 : values[midpoint];
+    }
+
     private readonly record struct DeterministicResult(
         string Description,
         int Concurrency,
-        double MedianThroughput,
-        double MaximumThroughput);
+        double P50Throughput,
+        double P95Throughput,
+        double P99Throughput,
+        double LatencyP50Microseconds,
+        double LatencyP95Microseconds,
+        double LatencyP99Microseconds,
+        double AllocatedBytesPerRequest,
+        double Gen0CollectionsPerMillionRequests,
+        double CpuUtilization,
+        double LockContentionsPerMillionRequests);
 }
