@@ -1,4 +1,6 @@
 using System.Reflection;
+using System.Runtime.CompilerServices;
+using System.Threading.Tasks.Sources;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -69,7 +71,7 @@ public class WorkItemGroupWaiterTests
         using var services = CreateServices();
         var waiter = new WorkItemGroupWaiter(CreateWorkItemGroup(services));
 
-        await RunSignalRace().WaitAsync(TimeSpan.FromSeconds(10));
+        await RunSignalRace().WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
 
         async Task RunSignalRace()
         {
@@ -96,7 +98,9 @@ public class WorkItemGroupWaiterTests
         Assert.False(wait.IsCompleted);
         workItemGroup.Execute();
 
-        Assert.Same(workItemGroup.TaskScheduler, await wait.WaitAsync(TimeSpan.FromSeconds(10)));
+        Assert.Same(
+            workItemGroup.TaskScheduler,
+            await wait.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken));
 
         static async Task<TaskScheduler> ObserveScheduler(ValueTask wait)
         {
@@ -118,6 +122,128 @@ public class WorkItemGroupWaiterTests
 
         waiter.Signal();
         await secondWait;
+    }
+
+    [Fact]
+    public async Task DuplicateSignalsAreCoalesced()
+    {
+        var waiter = new WorkItemGroupWaiter(null!);
+        var firstWait = waiter.WaitAsync();
+
+        Parallel.For(0, Environment.ProcessorCount * 4, _ => waiter.Signal());
+        await firstWait;
+
+        var secondWait = waiter.WaitAsync();
+        Assert.False(secondWait.IsCompleted);
+
+        waiter.Signal();
+        await secondWait;
+    }
+
+    [Fact]
+    public async Task ReuseRemainsOperationalAcrossTokenRollover()
+    {
+        var waiter = new WorkItemGroupWaiter(null!);
+        ValueTask previousWait = default;
+
+        for (var i = 0; i <= ushort.MaxValue; i++)
+        {
+            previousWait = waiter.WaitAsync();
+            waiter.Signal();
+            Assert.True(previousWait.IsCompletedSuccessfully);
+            await previousWait;
+        }
+
+        var currentWait = waiter.WaitAsync();
+        await Assert.ThrowsAsync<InvalidOperationException>(async () => await previousWait);
+
+        waiter.Signal();
+        await currentWait;
+    }
+
+    [Fact]
+    public async Task SignalAndContinuationRegistrationRaceCompletesExactlyOnce()
+    {
+        const int IterationCount = 2_000;
+        using var services = CreateServices();
+        var workItemGroup = CreateWorkItemGroup(
+            services,
+            new SchedulingOptions { ActivationSchedulingQuantum = TimeSpan.Zero });
+        var waiter = new WorkItemGroupWaiter(workItemGroup);
+        var callbackCount = 0;
+
+        for (var i = 0; i < IterationCount; i++)
+        {
+            SetRunning(workItemGroup);
+            var wait = waiter.WaitAsync();
+            var awaiter = wait.GetAwaiter();
+            var register = Task.Run(
+                () => awaiter.UnsafeOnCompleted(() => Interlocked.Increment(ref callbackCount)),
+                TestContext.Current.CancellationToken);
+            var signal = Task.Run(waiter.Signal, TestContext.Current.CancellationToken);
+
+            await Task.WhenAll(register, signal);
+            workItemGroup.Execute();
+            await wait;
+        }
+
+        Assert.Equal(IterationCount, callbackCount);
+    }
+
+    [Fact]
+    public async Task ContinuationRegisteredAfterSignalIsQueued()
+    {
+        using var services = CreateServices();
+        var workItemGroup = CreateWorkItemGroup(services);
+        SetRunning(workItemGroup);
+        var waiter = new WorkItemGroupWaiter(workItemGroup);
+        var wait = waiter.WaitAsync();
+        var awaiter = wait.GetAwaiter();
+        TaskScheduler? observedScheduler = null;
+
+        waiter.Signal();
+        Assert.True(awaiter.IsCompleted);
+        awaiter.UnsafeOnCompleted(() => observedScheduler = TaskScheduler.Current);
+
+        Assert.Null(observedScheduler);
+        workItemGroup.Execute();
+
+        Assert.Same(workItemGroup.TaskScheduler, observedScheduler);
+        await wait;
+    }
+
+    [Fact]
+    public void CompletedWaitDoesNotRetainContinuationState()
+    {
+        var weakReference = CompleteWaitWithState();
+
+        GC.Collect();
+        GC.WaitForPendingFinalizers();
+        GC.Collect();
+
+        Assert.False(weakReference.IsAlive);
+
+        [MethodImpl(MethodImplOptions.NoInlining)]
+        static WeakReference CompleteWaitWithState()
+        {
+            using var services = CreateServices();
+            var workItemGroup = CreateWorkItemGroup(services);
+            SetRunning(workItemGroup);
+            var waiter = new WorkItemGroupWaiter(workItemGroup);
+            var source = (IValueTaskSource)waiter;
+            var state = new object();
+            var weakReference = new WeakReference(state);
+
+            _ = waiter.WaitAsync();
+            source.OnCompleted(static _ => { }, state, token: 0, ValueTaskSourceOnCompletedFlags.None);
+            waiter.Signal();
+            workItemGroup.Execute();
+#pragma warning disable xUnit1031 // The custom value-task source is known to be complete.
+            source.GetResult(token: 0);
+#pragma warning restore xUnit1031
+
+            return weakReference;
+        }
     }
 
     [Fact]
@@ -143,7 +269,7 @@ public class WorkItemGroupWaiterTests
         workItemGroup.QueueAction(() => asyncLocal.Value = new object());
         workItemGroup.QueueAction(() => observedValue.SetResult(asyncLocal.Value));
 
-        Assert.Null(await observedValue.Task.WaitAsync(TimeSpan.FromSeconds(10)));
+        Assert.Null(await observedValue.Task.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken));
     }
 
     [Fact]
@@ -287,6 +413,20 @@ public class WorkItemGroupWaiterTests
         Assert.Throws<ArgumentNullException>("action", () => workItemGroup.QueueAction((Action)null!));
         Assert.Throws<ArgumentNullException>("action", () => workItemGroup.QueueAction((Action<object>)null!, new object()));
         Assert.Equal(0, workItemGroup.ExternalWorkItemCount);
+    }
+
+    [Fact]
+    public void QueueNullableActionPreservesNullState()
+    {
+        using var services = CreateServices();
+        var workItemGroup = CreateWorkItemGroup(services);
+        SetRunning(workItemGroup);
+        object? observedState = new object();
+
+        workItemGroup.QueueNullableAction(state => observedState = state, null);
+        workItemGroup.Execute();
+
+        Assert.Null(observedState);
     }
 
     [Fact]
