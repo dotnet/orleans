@@ -103,7 +103,9 @@ namespace Orleans.Providers.Streams.Common
             var positions = new List<StreamPosition>(messages.Count);
             var cachedMessages = new List<CachedMessage>(messages.Count);
             var allocatedBuffers = new List<FixedSizeBuffer>();
-            FixedSizeBuffer? batchBuffer = null;
+            var initialBuffer = _currentBuffer;
+            var initialBufferPosition = initialBuffer?.Position ?? 0;
+            var batchBuffer = initialBuffer;
             try
             {
                 foreach (var message in messages)
@@ -115,6 +117,7 @@ namespace Orleans.Providers.Streams.Common
             }
             catch
             {
+                initialBuffer?.ResetTo(initialBufferPosition);
                 foreach (var buffer in allocatedBuffers)
                 {
                     buffer.Dispose();
@@ -164,7 +167,11 @@ namespace Orleans.Providers.Streams.Common
 
             if (_flowController is not null)
             {
-                result = Math.Min(result, _flowController.GetMaxAddCount());
+                var flowControlLimit = _flowController.GetMaxAddCount();
+                if (flowControlLimit >= 0)
+                {
+                    result = Math.Min(result, flowControlLimit);
+                }
             }
 
             return result;
