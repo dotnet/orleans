@@ -410,6 +410,49 @@ public sealed class InProcessTestCluster : IDisposable, IAsyncDisposable
         }
     }
 
+    internal async Task WaitForTopologyToConvergeAsync(
+        CancellationToken cancellationToken,
+        bool didKill = false)
+    {
+        var clusterMembershipOptions = Client!.ServiceProvider
+            .GetRequiredService<IOptions<ClusterMembershipOptions>>().Value;
+        var timeout = GetLivenessStabilizationTime(clusterMembershipOptions, didKill);
+        var activeSilos = GetActiveSilos().ToArray();
+        var expectedSilos = string.Join(", ", activeSilos.Select(static silo => silo.SiloAddress));
+        var testHooks = activeSilos
+            .Select(static silo => (ITestHooks)silo.ServiceProvider.GetRequiredService<TestHooksSystemTarget>())
+            .ToArray();
+        var gatewayManager = Client.ServiceProvider.GetRequiredService<GatewayManager>();
+        if (!GrainDirectoryObserver.CanObserve(activeSilos))
+        {
+            throw new InvalidOperationException(
+                $"The grain directory cannot report convergence for the expected topology: {expectedSilos}.");
+        }
+
+        var topologyConverged = await LivenessStabilizationHelper
+            .WaitForExpectedActiveSilosAndGatewaysAsync(
+                activeSilos,
+                testHooks,
+                gatewayManager,
+                timeout,
+                remaining => _grainDirectoryObserver.WaitForConvergenceAsync(activeSilos, remaining))
+            .WaitAsync(cancellationToken);
+        if (!topologyConverged)
+        {
+            throw new TimeoutException(
+                $"Membership, gateway, and grain-directory views did not converge within {timeout}. Expected active silos: {expectedSilos}.");
+        }
+
+        var manifestConverged = await ClusterManifestStabilizationHelper
+            .WaitForExpectedClusterManifestAsync(activeSilos, testHooks, timeout)
+            .WaitAsync(cancellationToken);
+        if (!manifestConverged)
+        {
+            throw new TimeoutException(
+                $"Cluster manifests did not converge within {timeout}. Expected active silos: {expectedSilos}.");
+        }
+    }
+
     /// <summary>
     /// Get the timeout value to use to wait for the silo liveness sub-system to detect and act on any recent cluster membership changes.
     /// <seealso cref="WaitForLivenessToStabilizeAsync"/>

@@ -719,8 +719,17 @@ public class ReminderTestsBase : OrleansTestingBase, IAsyncDisposable
     protected async Task InvokeGrainCallsAfterTopologyConvergenceAsync(
         CancellationToken cancellationToken,
         params Func<Task>[] grainCalls)
+        => await InvokeGrainCallsAfterTopologyConvergenceAsync(
+            WaitForTopologyConvergenceAsync,
+            cancellationToken,
+            grainCalls);
+
+    protected static async Task InvokeGrainCallsAfterTopologyConvergenceAsync(
+        Func<CancellationToken, Task> topologyConvergence,
+        CancellationToken cancellationToken,
+        params Func<Task>[] grainCalls)
     {
-        await WaitForTopologyConvergenceAsync(cancellationToken);
+        await topologyConvergence(cancellationToken);
 
         var callTasks = grainCalls.Select(static grainCall => grainCall()).ToArray();
         await Task.WhenAll(callTasks).WaitAsync(cancellationToken);
@@ -728,9 +737,7 @@ public class ReminderTestsBase : OrleansTestingBase, IAsyncDisposable
 
     private async Task WaitForTopologyConvergenceAsync(CancellationToken cancellationToken)
     {
-        // Liveness stabilization covers membership, client gateways, and the in-process grain directory.
-        await WaitForLivenessToStabilizeAsync().WaitAsync(cancellationToken);
-        await HostedCluster.WaitForClusterManifestToStabilizeAsync().WaitAsync(cancellationToken);
+        await HostedCluster.WaitForTopologyToConvergeAsync(cancellationToken);
         await WaitForReminderRangeReconciliationAsync(cancellationToken);
     }
 

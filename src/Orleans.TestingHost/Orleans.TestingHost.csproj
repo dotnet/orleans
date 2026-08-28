@@ -26,6 +26,7 @@
     <InternalsVisibleTo Include="Orleans.Placement.Tests" />
     <InternalsVisibleTo Include="Orleans.Runtime.Internal.Tests" />
     <InternalsVisibleTo Include="Orleans.Persistence.Firestore.Tests" />
+    <InternalsVisibleTo Include="Orleans.Reminders.Tests" />
     <InternalsVisibleTo Include="Orleans.Streaming.Tests" />
     <InternalsVisibleTo Include="Orleans.Streaming.Kinesis.Tests" />
     <InternalsVisibleTo Include="Orleans.TestingHost.Tests" />

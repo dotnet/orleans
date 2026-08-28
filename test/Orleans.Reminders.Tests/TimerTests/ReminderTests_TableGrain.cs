@@ -241,6 +241,28 @@ namespace UnitTests.TimerTests
         }
 
         [Fact]
+        public async Task Rem_Grain_TopologyConvergenceTimeout_PreventsGrainCalls()
+        {
+            using var cts = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
+            cts.CancelAfter(TestConstants.InitTimeout);
+            var timeout = new TimeoutException("Controlled topology convergence timeout.");
+            var callCount = 0;
+
+            var actual = await Assert.ThrowsAsync<TimeoutException>(() =>
+                InvokeGrainCallsAfterTopologyConvergenceAsync(
+                    _ => Task.FromException(timeout),
+                    cts.Token,
+                    () =>
+                    {
+                        callCount++;
+                        return Task.CompletedTask;
+                    }));
+
+            Assert.Same(timeout, actual);
+            Assert.Equal(0, callCount);
+        }
+
+        [Fact]
         public async Task Rem_Grain_CanRestartBeforeRemovedReminderIsPurged()
         {
             using var cts = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
