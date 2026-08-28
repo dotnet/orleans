@@ -112,6 +112,76 @@ public sealed class DynamoDBReminderMigrationTests
     }
 
     [Fact]
+    public async Task LegacyDiscovery_StrongPointValidationReturnsCurrentRowsAndDropsDeletes()
+    {
+        EnsureDynamoDb();
+        var tableName = NewTableName();
+        const string serviceId = "legacy-candidates";
+        using var client = CreateClient();
+        IReadOnlyList<ReminderEntry> discovery = [];
+        var table = CreateTable(
+            tableName,
+            serviceId,
+            DynamoDBReminderTableMode.Legacy,
+            hooks: new() { LegacyDiscoveryResults = _ => discovery });
+        try
+        {
+            await table.StartAsync(TestContext.Current.CancellationToken);
+            var entry = Entry(1);
+            var firstEtag = await table.UpsertRow(entry);
+            discovery = [Clone(entry)];
+
+            entry.StartAt = entry.StartAt.AddHours(3);
+            entry.Period = TimeSpan.FromHours(2);
+            var secondEtag = await table.UpsertRow(entry);
+            var rangeResult = Assert.Single((await table.ReadRows(0, 0)).Reminders);
+            var grainResult = Assert.Single((await table.ReadRows(entry.GrainId)).Reminders);
+            Assert.Equal(secondEtag, rangeResult.ETag);
+            Assert.Equal(entry.StartAt, rangeResult.StartAt);
+            Assert.Equal(entry.Period, rangeResult.Period);
+            Assert.Equal(secondEtag, grainResult.ETag);
+
+            Assert.True(await table.RemoveRow(entry.GrainId, entry.ReminderName, secondEtag!));
+            Assert.Empty((await table.ReadRows(0, 0)).Reminders);
+            Assert.Empty((await table.ReadRows(entry.GrainId)).Reminders);
+            Assert.NotEqual(firstEtag, secondEtag);
+        }
+        finally
+        {
+            await StopAndDelete(client, tableName, table);
+        }
+    }
+
+    [Fact]
+    public async Task LegacyStrongOwnershipReadFindsRowsMissingFromDiscoveryIndex()
+    {
+        EnsureDynamoDb();
+        var tableName = NewTableName();
+        using var client = CreateClient();
+        var table = CreateTable(
+            tableName,
+            "legacy-missing",
+            DynamoDBReminderTableMode.Legacy,
+            hooks: new() { LegacyDiscoveryResults = _ => [] });
+        try
+        {
+            await table.StartAsync(TestContext.Current.CancellationToken);
+            var entry = Entry(1);
+            await table.UpsertRow(entry);
+
+            Assert.Empty((await table.ReadRows(0, 0)).Reminders);
+            var stronglyDiscovered = Assert.Single((await table.ReadRows(0, 0, requireStrongConsistency: true)).Reminders);
+            Assert.Equal(entry.GrainId, stronglyDiscovered.GrainId);
+            Assert.Equal(entry.ReminderName, stronglyDiscovered.ReminderName);
+            Assert.Equal(entry.ETag, stronglyDiscovered.ETag);
+        }
+        finally
+        {
+            await StopAndDelete(client, tableName, table);
+        }
+    }
+
+    [Fact]
     public async Task Migration_BackfillsPagesResumesAndPreservesLegacyETags()
     {
         EnsureDynamoDb();
@@ -676,6 +746,16 @@ public sealed class DynamoDBReminderMigrationTests
             ReminderName = $"reminder/#_{index:D4}",
             StartAt = new DateTime(2026, 8, 28, 1, 2, 3, DateTimeKind.Utc).AddMinutes(index),
             Period = TimeSpan.FromMinutes(index + 1),
+        };
+
+    private static ReminderEntry Clone(ReminderEntry entry)
+        => new()
+        {
+            GrainId = entry.GrainId,
+            ReminderName = entry.ReminderName,
+            StartAt = entry.StartAt,
+            Period = entry.Period,
+            ETag = entry.ETag,
         };
 
     private static Dictionary<string, AttributeValue> V2Key(string serviceId, ReminderEntry entry)
