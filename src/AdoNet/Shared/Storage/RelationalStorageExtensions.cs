@@ -3,7 +3,6 @@ using System.Collections.Generic;
 using System.Data;
 using System.Data.Common;
 using System.IO;
-using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -29,126 +28,6 @@ namespace Orleans.Tests.SqlUtils
     internal static class RelationalStorageExtensions
     {
         /// <summary>
-        /// Used to format .NET objects suitable to relational database format.
-        /// </summary>
-        private static readonly AdoNetFormatProvider adoNetFormatProvider = new AdoNetFormatProvider();
-
-        /// <summary>
-        /// This is a template to produce query parameters that are indexed.
-        /// </summary>
-        private const string indexedParameterTemplate = "@p{0}";
-
-        /// <summary>
-        /// Executes a multi-record insert query clause with <em>SELECT UNION ALL</em>.
-        /// </summary>
-        /// <typeparam name="T"></typeparam>
-        /// <param name="storage">The storage to use.</param>
-        /// <param name="tableName">The table name to against which to execute the query.</param>
-        /// <param name="parameters">The parameters to insert.</param>
-        /// <param name="nameMap">If provided, maps property names from <typeparamref name="T"/> to ones provided in the map.</param>
-        /// <param name="onlyOnceColumns">If given, SQL parameter values for the given <typeparamref name="T"/> property types are generated only once. Effective only when <paramref name="useSqlParams"/> is <em>TRUE</em>.</param>
-        /// <param name="useSqlParams"><em>TRUE</em> if the query should be in parameterized form. <em>FALSE</em> otherwise.</param>
-        /// <param name="cancellationToken">The cancellation token. Defaults to <see cref="CancellationToken.None"/>.</param>
-        /// <returns>The rows affected.</returns>
-        public static Task<int> ExecuteMultipleInsertIntoAsync<T>(this IRelationalStorage storage, string tableName, IEnumerable<T> parameters, IReadOnlyDictionary<string, string>? nameMap = null, IEnumerable<string>? onlyOnceColumns = null, bool useSqlParams = true, CancellationToken cancellationToken = default)
-        {
-            if(string.IsNullOrWhiteSpace(tableName))
-            {
-                throw new ArgumentException("The name must be a legal SQL table name", nameof(tableName));
-            }
-
-            if(parameters == null)
-            {
-                throw new ArgumentNullException(nameof(parameters));
-            }
-
-            var storageConsts = DbConstantsStore.GetDbConstants(storage.InvariantName);
-
-            var startEscapeIndicator = storageConsts.StartEscapeIndicator;
-            var endEscapeIndicator = storageConsts.EndEscapeIndicator;
-
-            //SqlParameters map is needed in case the query needs to be parameterized in order to avoid two
-            //reflection passes as first a query needs to be constructed and after that when a database
-            //command object has been created, parameters need to be provided to them.
-            var sqlParameters = new Dictionary<string, object?>();
-            const string insertIntoValuesTemplate = "INSERT INTO {0} ({1}) SELECT {2};";
-            var columns = string.Empty;
-            var values = new List<string>();
-            if(parameters.Any())
-            {
-                //Type and property information are the same for all of the objects.
-                //The following assumes the property names will be retrieved in the same
-                //order as is the index iteration done.
-                var onlyOnceRow = new List<string>();
-                var properties = parameters.First()!.GetType().GetProperties();
-                columns = string.Join(",", nameMap == null ? properties.Select(pn => string.Format("{0}{1}{2}", startEscapeIndicator, pn.Name, endEscapeIndicator)) : properties.Select(pn => string.Format("{0}{1}{2}", startEscapeIndicator, (nameMap.TryGetValue(pn.Name, out var pnName) ? pnName : pn.Name), endEscapeIndicator)));
-                if (onlyOnceColumns != null && onlyOnceColumns.Any())
-                {
-                    var onlyOnceProperties = properties.Where(pn => onlyOnceColumns.Contains(pn.Name)).Select(pn => pn).ToArray();
-                    var onlyOnceData = parameters.First();
-                    for(int i = 0; i < onlyOnceProperties.Length; ++i)
-                    {
-                        var currentProperty = onlyOnceProperties[i];
-                        var parameterValue = currentProperty.GetValue(onlyOnceData, null);
-                        if(useSqlParams)
-                        {
-                            var parameterName = string.Format("@{0}", (nameMap!.TryGetValue(onlyOnceProperties[i].Name, out var parameter) ? parameter : onlyOnceProperties[i].Name));
-                            onlyOnceRow.Add(parameterName);
-                            sqlParameters.Add(parameterName, parameterValue);
-                        }
-                        else
-                        {
-                            onlyOnceRow.Add(string.Format(adoNetFormatProvider, "{0}", parameterValue));
-                        }
-                    }
-                }
-
-                var dataRows = new List<string>();
-                var multiProperties = onlyOnceColumns == null ? properties : properties.Where(pn => !onlyOnceColumns.Contains(pn.Name)).Select(pn => pn).ToArray();
-                int parameterCount = 0;
-                foreach(var row in parameters)
-                {
-                    for(int i = 0; i < multiProperties.Length; ++i)
-                    {
-                        var currentProperty = multiProperties[i];
-                        var parameterValue = currentProperty.GetValue(row, null);
-                        if(useSqlParams)
-                        {
-                            var parameterName = string.Format(indexedParameterTemplate, parameterCount);
-                            dataRows.Add(parameterName);
-                            sqlParameters.Add(parameterName, parameterValue);
-                            ++parameterCount;
-                        }
-                        else
-                        {
-                            dataRows.Add(string.Format(adoNetFormatProvider, "{0}", parameterValue));
-                        }
-                    }
-
-                    values.Add(string.Format("{0}", string.Join(",", onlyOnceRow.Concat(dataRows))));
-                    dataRows.Clear();
-                }
-            }
-
-            var query = string.Format(insertIntoValuesTemplate, tableName, columns, string.Join(storageConsts.UnionAllSelectTemplate, values));
-            return storage.ExecuteAsync(query, command =>
-            {
-                if (useSqlParams)
-                {
-                    foreach (var sp in sqlParameters)
-                    {
-                        var p = command.CreateParameter();
-                        p.ParameterName = sp.Key;
-                        p.Value = sp.Value ?? DBNull.Value;
-                        p.Direction = ParameterDirection.Input;
-                        command.Parameters.Add(p);
-                    }
-                }
-            }, cancellationToken: cancellationToken);
-        }
-
-
-        /// <summary>
         /// A simplified version of <see cref="IRelationalStorage.ReadAsync{TResult}"/>
         /// </summary>
         /// <param name="storage"></param>
@@ -159,6 +38,7 @@ namespace Orleans.Tests.SqlUtils
         /// <returns></returns>
         public static Task<IEnumerable<TResult>> ReadAsync<TResult>(this IRelationalStorage storage, string query, Func<IDataRecord, TResult> selector, Action<IDbCommand>? parameterProvider)
         {
+            ArgumentNullException.ThrowIfNull(selector);
             return storage.ReadAsync(query, parameterProvider, (record, i, cancellationToken) => Task.FromResult(selector(record)));
         }
 
