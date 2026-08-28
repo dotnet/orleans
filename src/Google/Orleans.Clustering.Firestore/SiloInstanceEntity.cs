@@ -1,6 +1,7 @@
 using System;
 using System.Net;
 using System.Collections.Generic;
+using System.Collections.Immutable;
 using Google.Cloud.Firestore;
 using Orleans.Runtime;
 
@@ -54,6 +55,9 @@ internal class SiloInstanceEntity : FirestoreEntity
     [FirestoreProperty("IAmAliveTime")]
     public DateTimeOffset IAmAliveTime { get; set; } = default!;
 
+    [FirestoreProperty("Metadata")]
+    public Dictionary<string, string>? Metadata { get; set; }
+
     public override IDictionary<string, object?> GetFields()
     {
         return new Dictionary<string, object?>
@@ -73,6 +77,7 @@ internal class SiloInstanceEntity : FirestoreEntity
             ["MembershipVersion"] = this.MembershipVersion,
             ["StartTime"] = this.StartTime,
             ["IAmAliveTime"] = this.IAmAliveTime,
+            ["Metadata"] = this.Metadata,
         };
     }
 
@@ -90,6 +95,7 @@ internal class SiloInstanceEntity : FirestoreEntity
             FaultZone = this.FaultZone,
             StartTime = this.StartTime.UtcDateTime,
             IAmAliveTime = this.IAmAliveTime.UtcDateTime,
+            Metadata = this.Metadata?.ToImmutableDictionary(),
         };
 
         if (this.SuspectingSilos is not null || this.SuspectingTimes is not null)
@@ -130,6 +136,7 @@ internal class SiloInstanceEntity : FirestoreEntity
             MembershipVersion = membershipVersion,
             StartTime = DateTime.SpecifyKind(entry.StartTime, DateTimeKind.Utc),
             IAmAliveTime = DateTime.SpecifyKind(entry.IAmAliveTime, DateTimeKind.Utc),
+            Metadata = entry.Metadata?.ToDictionary(item => item.Key, item => item.Value),
         };
 
         if (entry.SuspectTimes is not null)

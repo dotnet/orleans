@@ -6,6 +6,7 @@ using System.Linq;
 using System.Net;
 using System.Text;
 using System.Text.Json;
+using System.Threading;
 using System.Threading.Tasks;
 using Azure;
 using Microsoft.Extensions.Logging;
@@ -25,6 +26,9 @@ namespace Orleans.Runtime.MembershipService
         private OrleansSiloInstanceManager tableManager = null!;
         private readonly AzureStorageClusteringOptions options;
         private readonly string clusterId;
+        private int metadataRepairCheckCountdown;
+
+        private const int MetadataRepairCheckInterval = 10;
 
         public AzureBasedMembershipTable(
             ILoggerFactory loggerFactory,
@@ -151,13 +155,22 @@ namespace Orleans.Runtime.MembershipService
             try
             {
                 LogDebugMergeEntry(entry);
-                var rowKey = SiloInstanceTableEntry.ConstructRowKey(entry.SiloAddress);
-                var existing = await tableManager.ReadSingleTableEntryAsync(tableManager.DeploymentId, rowKey);
-                var siloEntry = ConvertPartial(
-                    entry,
-                    tableManager.DeploymentId,
-                    includeMetadata: existing.Entity?.Metadata is null);
+                var includeMetadata = false;
+                var checkedMetadata = false;
+                if (ShouldCheckMetadata())
+                {
+                    var rowKey = SiloInstanceTableEntry.ConstructRowKey(entry.SiloAddress);
+                    var existing = await tableManager.ReadSingleTableEntryAsync(tableManager.DeploymentId, rowKey);
+                    includeMetadata = existing.Entity?.Metadata is null;
+                    checkedMetadata = true;
+                }
+
+                var siloEntry = ConvertPartial(entry, tableManager.DeploymentId, includeMetadata);
                 await tableManager.MergeTableEntryAsync(siloEntry);
+                if (checkedMetadata)
+                {
+                    MetadataChecked();
+                }
             }
             catch (Exception exc)
             {
@@ -167,6 +180,10 @@ namespace Orleans.Runtime.MembershipService
                 throw;
             }
         }
+
+        private bool ShouldCheckMetadata() => Interlocked.Decrement(ref metadataRepairCheckCountdown) < 0;
+
+        private void MetadataChecked() => Volatile.Write(ref metadataRepairCheckCountdown, MetadataRepairCheckInterval);
 
         private MembershipTableData Convert(List<(SiloInstanceTableEntry Entity, string ETag)> entries)
         {

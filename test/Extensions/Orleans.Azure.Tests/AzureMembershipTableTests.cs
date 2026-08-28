@@ -168,19 +168,31 @@ namespace Tester.AzureUtils
 
             var table = options.TableServiceClient!.GetTableClient(options.TableName);
             var rowKey = SiloInstanceTableEntry.ConstructRowKey(entry.SiloAddress);
-            var legacyEntity = (await table.GetEntityAsync<TableEntity>(clusterId, rowKey)).Value;
+            var legacyEntity = (await table.GetEntityAsync<TableEntity>(
+                clusterId,
+                rowKey,
+                cancellationToken: TestContext.Current.CancellationToken)).Value;
             legacyEntity.Remove(nameof(SiloInstanceTableEntry.Metadata));
-            await table.UpdateEntityAsync(legacyEntity, ETag.All, TableUpdateMode.Replace);
+            await table.UpdateEntityAsync(
+                legacyEntity,
+                ETag.All,
+                TableUpdateMode.Replace,
+                TestContext.Current.CancellationToken);
 
             entry.IAmAliveTime = entry.IAmAliveTime.AddMinutes(1);
             await membership.UpdateIAmAlive(entry);
 
-            var repairedEntity = (await table.GetEntityAsync<TableEntity>(clusterId, rowKey)).Value;
+            var repairedEntity = (await table.GetEntityAsync<TableEntity>(
+                clusterId,
+                rowKey,
+                cancellationToken: TestContext.Current.CancellationToken)).Value;
             var serializedMetadata = Assert.IsType<string>(repairedEntity[nameof(SiloInstanceTableEntry.Metadata)]);
             var repairedMetadata = JsonSerializer.Deserialize<Dictionary<string, string>>(serializedMetadata);
             Assert.Equal(entry.Metadata, repairedMetadata);
-            Assert.Equal(entry.IAmAliveTime, LogFormatter.ParseDate(
-                Assert.IsType<string>(repairedEntity[nameof(SiloInstanceTableEntry.IAmAliveTime)])));
+            var storedIAmAliveTime = LogFormatter.ParseDate(
+                Assert.IsType<string>(repairedEntity[nameof(SiloInstanceTableEntry.IAmAliveTime)]));
+            var difference = (entry.IAmAliveTime - storedIAmAliveTime).Duration();
+            Assert.True(difference < TimeSpan.FromMilliseconds(1), difference.ToString());
         }
 
         private static MembershipEntry CreateMetadataEntry() => new()

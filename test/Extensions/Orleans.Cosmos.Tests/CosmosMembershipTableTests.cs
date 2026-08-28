@@ -172,14 +172,24 @@ public class CosmosMembershipTableTests : MembershipTableTestsBase
         var container = client.GetContainer(options.DatabaseName, options.ContainerName);
         var partitionKey = new PartitionKey(clusterId);
         var id = $"{entry.SiloAddress.Endpoint.Address}-{entry.SiloAddress.Endpoint.Port}-{entry.SiloAddress.Generation}";
-        var legacyEntity = (await container.ReadItemAsync<SiloEntity>(id, partitionKey)).Resource;
+        var legacyEntity = (await container.ReadItemAsync<SiloEntity>(
+            id,
+            partitionKey,
+            cancellationToken: TestContext.Current.CancellationToken)).Resource;
         legacyEntity.Metadata = null;
-        await container.ReplaceItemAsync(legacyEntity, id, partitionKey);
+        await container.ReplaceItemAsync(
+            legacyEntity,
+            id,
+            partitionKey,
+            cancellationToken: TestContext.Current.CancellationToken);
 
         entry.IAmAliveTime = entry.IAmAliveTime.AddMinutes(1);
         await membership.UpdateIAmAlive(entry);
 
-        var repaired = (await container.ReadItemAsync<SiloEntity>(id, partitionKey)).Resource;
+        var repaired = (await container.ReadItemAsync<SiloEntity>(
+            id,
+            partitionKey,
+            cancellationToken: TestContext.Current.CancellationToken)).Resource;
         Assert.Equal(entry.Metadata, repaired.Metadata);
         Assert.Equal(entry.IAmAliveTime, repaired.IAmAliveTime.UtcDateTime);
     }

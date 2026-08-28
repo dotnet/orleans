@@ -1,4 +1,5 @@
 using Orleans.Runtime;
+using System.Collections.Immutable;
 using TestExtensions;
 
 namespace Orleans.Clustering.Firestore.Tests;
@@ -30,6 +31,7 @@ public class SiloInstanceEntityTests
             Status = status,
             StartTime = startTime,
             IAmAliveTime = iAmAliveTime,
+            Metadata = ImmutableDictionary<string, string>.Empty.Add("region", "west"),
         };
         var suspectingSilo = SiloAddressUtils.NewLocalSiloAddress(2);
         membershipEntry.AddSuspector(suspectingSilo, suspectTime);
@@ -51,5 +53,8 @@ public class SiloInstanceEntityTests
         Assert.Equal(membershipEntry.StartTime, result.StartTime);
         Assert.Equal(membershipEntry.IAmAliveTime, result.IAmAliveTime);
         Assert.Equal(membershipEntry.SuspectTimes, result.SuspectTimes);
+        Assert.Equal(membershipEntry.Metadata, result.Metadata);
+        Assert.Equal(membershipEntry.Metadata, entity.Metadata);
+        Assert.Equal(membershipEntry.Metadata, entity.GetFields()["Metadata"]);
     }
 }
