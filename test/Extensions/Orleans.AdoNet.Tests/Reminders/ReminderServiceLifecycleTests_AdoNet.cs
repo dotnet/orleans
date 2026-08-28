@@ -26,7 +26,7 @@ public abstract class AdoNetReminderServiceLifecycleFixture : BaseInProcessTestC
     }
 
     protected override void CheckPreconditionsOrThrow()
-        => RelationalStorageForTesting.CheckPreconditionsOrThrow(Invariant);
+        => UnitTests.General.RelationalStorageForTesting.CheckPreconditionsOrThrow(Invariant);
 
     public override async ValueTask InitializeAsync()
     {
@@ -35,7 +35,7 @@ public abstract class AdoNetReminderServiceLifecycleFixture : BaseInProcessTestC
             return;
         }
 
-        var relationalStorage = await RelationalStorageForTesting.SetupInstance(
+        var relationalStorage = await UnitTests.General.RelationalStorageForTesting.SetupInstance(
             Invariant,
             DatabaseName,
             cancellationToken: TestContext.Current.CancellationToken);
