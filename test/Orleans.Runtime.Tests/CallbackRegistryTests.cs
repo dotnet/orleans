@@ -19,7 +19,7 @@ public class CallbackRegistryTests
         var registry = new CallbackRegistry();
         var completion = new TestResponseCompletionSource();
         var callback = CreateCallback(registry, completion, CreateRequest(1), serviceProvider);
-        Assert.True(registry.TryAdd(callback));
+        Assert.True(registry.TryRegister(callback));
         var response = CreateResponse(callback.Message, callback);
 
         Assert.True(registry.TryCompleteResponse(response));
@@ -36,7 +36,7 @@ public class CallbackRegistryTests
         var registry = new CallbackRegistry();
         var completion = new TestResponseCompletionSource();
         var callback = CreateCallback(registry, completion, CreateRequest(2), serviceProvider);
-        Assert.True(registry.TryAdd(callback));
+        Assert.True(registry.TryRegister(callback));
         var response = CreateResponse(callback.Message, responseTarget: null);
 
         Assert.True(registry.TryCompleteResponse(response));
@@ -53,7 +53,7 @@ public class CallbackRegistryTests
         var registry = new CallbackRegistry();
         var completion = new TestResponseCompletionSource();
         var callback = CreateCallback(registry, completion, CreateRequest(7), serviceProvider);
-        Assert.True(registry.TryAdd(callback));
+        Assert.True(registry.TryRegister(callback));
         var response = CreateResponse(callback.Message, callback);
         response.Result = Message.ResponseTypes.Rejection;
         response.BodyObject = new RejectionResponse
@@ -79,7 +79,7 @@ public class CallbackRegistryTests
             new TestResponseCompletionSource(),
             CreateRequest(3),
             serviceProvider);
-        Assert.True(registry.TryAdd(callback));
+        Assert.True(registry.TryRegister(callback));
         var status = CreateResponse(callback.Message, callback);
         status.Result = Message.ResponseTypes.Status;
         status.BodyObject = new StatusResponse(true, false, []);
@@ -97,12 +97,12 @@ public class CallbackRegistryTests
         var registry = new CallbackRegistry();
         var firstCompletion = new TestResponseCompletionSource();
         var first = CreateCallback(registry, firstCompletion, CreateRequest(4), serviceProvider);
-        Assert.True(registry.TryAdd(first));
+        Assert.True(registry.TryRegister(first));
         first.OnTimeout();
 
         var replacementCompletion = new TestResponseCompletionSource();
         var replacement = CreateCallback(registry, replacementCompletion, CreateRequest(4), serviceProvider);
-        Assert.True(registry.TryAdd(replacement));
+        Assert.True(registry.TryRegister(replacement));
         var staleResponse = CreateResponse(first.Message, first);
 
         Assert.False(registry.TryCompleteResponse(staleResponse));
@@ -126,7 +126,7 @@ public class CallbackRegistryTests
         var registry = new CallbackRegistry();
         var completion = new TestResponseCompletionSource();
         var callback = CreateCallback(registry, completion, CreateRequest(5), serviceProvider);
-        Assert.True(registry.TryAdd(callback));
+        Assert.True(registry.TryRegister(callback));
         var response = CreateResponse(callback.Message, callback);
 
         Parallel.Invoke(
@@ -145,7 +145,7 @@ public class CallbackRegistryTests
         var registry = new CallbackRegistry();
         var completion = new TestResponseCompletionSource();
         var callback = CreateCallback(registry, completion, CreateRequest(6), serviceProvider);
-        Assert.True(registry.TryAdd(callback));
+        Assert.True(registry.TryRegister(callback));
         callback.SubscribeForCancellation(cancellation.Token);
         var response = CreateResponse(callback.Message, callback);
 
@@ -154,6 +154,44 @@ public class CallbackRegistryTests
             () => registry.TryCompleteResponse(response));
 
         Assert.Equal(1, completion.CompletionCount);
+        Assert.Equal(0, registry.Count);
+    }
+
+    [Fact]
+    public void TryRegister_DuplicateCorrelationIdAcrossSenders_Throws()
+    {
+        using var serviceProvider = CreateServiceProvider();
+        var registry = new CallbackRegistry();
+        var first = CreateCallback(registry, new TestResponseCompletionSource(), CreateRequest(8), serviceProvider);
+        Assert.True(registry.TryRegister(first));
+        var duplicateRequest = CreateRequest(8);
+        duplicateRequest.SendingGrain = GrainId.Create("callback-caller", "2");
+        var duplicate = CreateCallback(
+            registry,
+            new TestResponseCompletionSource(),
+            duplicateRequest,
+            serviceProvider);
+
+        Assert.Throws<InvalidOperationException>(() => registry.TryRegister(duplicate));
+
+        first.OnHostShutdown();
+        Assert.Equal(0, registry.Count);
+    }
+
+    [Fact]
+    public void TryRegister_AfterClose_DoesNotPublishCallback()
+    {
+        using var serviceProvider = CreateServiceProvider();
+        var registry = new CallbackRegistry();
+        registry.Close();
+        var callback = CreateCallback(
+            registry,
+            new TestResponseCompletionSource(),
+            CreateRequest(9),
+            serviceProvider);
+
+        Assert.False(registry.TryRegister(callback));
+
         Assert.Equal(0, registry.Count);
     }
 
