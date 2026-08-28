@@ -109,7 +109,7 @@ namespace Orleans.Tests.SqlUtils
         /// <param name="dbType">the <see cref="DbType"/> of the parameter.</param>
         public static void AddParameter<T>(this IDbCommand command, string parameterName, T? value, ParameterDirection direction = ParameterDirection.Input, int? size = null, DbType? dbType = null)
         {
-            command.Parameters.Add(command.CreateParameter(direction, parameterName, value, size));
+            command.Parameters.Add(command.CreateParameter(direction, parameterName, value, size, dbType));
         }
 
         /// <summary>

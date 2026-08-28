@@ -76,7 +76,7 @@ namespace Orleans.Tests.SqlUtils
         internal static Task<RelationalOrleansQueries> CreateInstance(string invariantName, string? connectionString, DbDataSource? dataSource) =>
             CreateInstance(RelationalStorage.CreateInstance(invariantName, connectionString, dataSource));
 
-        private static async Task<RelationalOrleansQueries> CreateInstance(IRelationalStorage storage)
+        internal static async Task<RelationalOrleansQueries> CreateInstance(IRelationalStorage storage)
         {
             var queries = await storage.ReadAsync(DbStoredQueries.GetQueriesKey, DbStoredQueries.Converters.GetQueryKeyAndValue, null);
 
