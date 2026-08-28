@@ -88,6 +88,29 @@ public class GrainContextActivatorTests
     }
 
     [Fact]
+    public void PreparedContext_StartAndAbortFailureReportsBothExceptions()
+    {
+        var events = new List<string>();
+        var context = Substitute.For<IGrainContext>();
+        var startupException = new InvalidOperationException("start-fault");
+        var abortException = new InvalidOperationException("abort-fault");
+        var preparedContext = new PreparedGrainContext(
+            context,
+            new ThrowingStartAndAbortGrainContextStartup(
+                events,
+                startupException,
+                abortException));
+
+        var actual = Assert.Throws<AggregateException>(preparedContext.Start);
+
+        Assert.Equal(
+            "Grain context startup failed and aborting the startup also failed.",
+            actual.Message.Split(" (")[0]);
+        Assert.Equal([startupException, abortException], actual.InnerExceptions);
+        Assert.Equal(["start", "abort"], events);
+    }
+
+    [Fact]
     public void CatalogStartPreparedContext_StartFailureRemovesRecordedTarget()
     {
         var events = new List<string>();
@@ -255,5 +278,23 @@ public class GrainContextActivatorTests
         }
 
         public void Abort() => events.Add("abort");
+    }
+
+    private sealed class ThrowingStartAndAbortGrainContextStartup(
+        List<string> events,
+        Exception startupException,
+        Exception abortException) : IGrainContextStartup
+    {
+        public IDisposable Start()
+        {
+            events.Add("start");
+            throw startupException;
+        }
+
+        public void Abort()
+        {
+            events.Add("abort");
+            throw abortException;
+        }
     }
 }
