@@ -54,9 +54,9 @@ DROP PROCEDURE ValidateOrleansStreamingSchemaUpgrade;
 
 CREATE TABLE OrleansStreamPartition
 (
-    ServiceId VARCHAR(150) NOT NULL,
-    ProviderId VARCHAR(150) NOT NULL,
-    QueueId VARCHAR(150) NOT NULL,
+    ServiceId NVARCHAR(150) NOT NULL,
+    ProviderId NVARCHAR(150) NOT NULL,
+    QueueId NVARCHAR(150) NOT NULL,
     NextMessageId BIGINT NOT NULL,
     Checkpoint BIGINT NULL,
     OwnerEpoch BIGINT NOT NULL,
@@ -69,9 +69,9 @@ CREATE TABLE OrleansStreamPartition
 
 CREATE TABLE OrleansStreamMessage
 (
-    ServiceId VARCHAR(150) NOT NULL,
-    ProviderId VARCHAR(150) NOT NULL,
-    QueueId VARCHAR(150) NOT NULL,
+    ServiceId NVARCHAR(150) NOT NULL,
+    ProviderId NVARCHAR(150) NOT NULL,
+    QueueId NVARCHAR(150) NOT NULL,
     MessageId BIGINT NOT NULL,
     StreamIdBytes LONGBLOB NOT NULL,
     StreamNamespaceLength INT NOT NULL,
@@ -86,9 +86,9 @@ DELIMITER $$
 
 CREATE PROCEDURE AppendStreamMessage
 (
-    IN _ServiceId VARCHAR(150),
-    IN _ProviderId VARCHAR(150),
-    IN _QueueId VARCHAR(150),
+    IN _ServiceId NVARCHAR(150),
+    IN _ProviderId NVARCHAR(150),
+    IN _QueueId NVARCHAR(150),
     IN _StreamIdBytes LONGBLOB,
     IN _StreamNamespaceLength INT,
     IN _Payload LONGBLOB,
@@ -190,9 +190,9 @@ END$$
 
 CREATE PROCEDURE AcquireStreamPartition
 (
-    IN _ServiceId VARCHAR(150),
-    IN _ProviderId VARCHAR(150),
-    IN _QueueId VARCHAR(150),
+    IN _ServiceId NVARCHAR(150),
+    IN _ProviderId NVARCHAR(150),
+    IN _QueueId NVARCHAR(150),
     IN _StartFromNow BOOLEAN,
     IN _ManageTransaction BOOLEAN
 )
@@ -307,9 +307,9 @@ END$$
 
 CREATE PROCEDURE AdvanceStreamCheckpoint
 (
-    IN _ServiceId VARCHAR(150),
-    IN _ProviderId VARCHAR(150),
-    IN _QueueId VARCHAR(150),
+    IN _ServiceId NVARCHAR(150),
+    IN _ProviderId NVARCHAR(150),
+    IN _QueueId NVARCHAR(150),
     IN _OwnerEpoch BIGINT,
     IN _Checkpoint BIGINT,
     IN _ManageTransaction BOOLEAN
@@ -361,6 +361,7 @@ BEGIN
         WHERE ServiceId = _ServiceId
             AND ProviderId = _ProviderId
             AND QueueId = _QueueId
+            AND (_CurrentCheckpoint IS NULL OR MessageId > _CurrentCheckpoint)
             AND MessageId <= _Checkpoint
             AND CheckpointedOn IS NULL;
     END IF;
@@ -390,9 +391,9 @@ END$$
 
 CREATE PROCEDURE CleanupStreamMessages
 (
-    IN _ServiceId VARCHAR(150),
-    IN _ProviderId VARCHAR(150),
-    IN _QueueId VARCHAR(150),
+    IN _ServiceId NVARCHAR(150),
+    IN _ProviderId NVARCHAR(150),
+    IN _QueueId NVARCHAR(150),
     IN _RetentionPeriodSeconds INT,
     IN _MaximumRetentionPeriodSeconds INT,
     IN _CleanupIntervalSeconds INT,
@@ -491,7 +492,7 @@ BEGIN
             )
         ORDER BY MessageId
         LIMIT _CleanupBatchSize
-        FOR UPDATE SKIP LOCKED;
+        FOR UPDATE;
 
         SELECT
             COUNT(*),
