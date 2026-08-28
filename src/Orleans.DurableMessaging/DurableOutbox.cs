@@ -598,7 +598,9 @@ internal sealed partial class DurableOutbox : IDurableOutbox, IDurableJobFeature
             return;
         }
 
-        var exponent = Math.Min(state.AttemptCount - 1, 6);
+        var exponent = Math.Min(
+            state.AttemptCount - 1,
+            DurableInboxOptions.MaximumBackoffExponent);
         var delay = TimeSpan.FromTicks(_backpressureRetryDelay.Ticks * (1L << exponent));
         state.NextAttemptAt = now + delay;
         _messageStates[envelope.MessageId] = state;
