@@ -71,6 +71,7 @@ public class InvokablePoolTests
         using var pool = new InvokablePool<TestInvokable>();
         using var ready = new CountdownEvent(2);
         using var start = new ManualResetEventSlim();
+        var cancellationToken = TestContext.Current.CancellationToken;
         var active = new ConcurrentDictionary<TestInvokable, byte>();
         Exception? firstError = null;
         Exception? secondError = null;
@@ -79,7 +80,7 @@ public class InvokablePoolTests
         var secondThread = new Thread(() => Run(ref secondError));
         firstThread.Start();
         secondThread.Start();
-        ready.Wait();
+        ready.Wait(cancellationToken);
         start.Set();
         firstThread.Join();
         secondThread.Join();
@@ -92,7 +93,7 @@ public class InvokablePoolTests
             try
             {
                 ready.Signal();
-                start.Wait();
+                start.Wait(cancellationToken);
                 for (var i = 0; i < 10_000; i++)
                 {
                     var item = pool.TryGet(out var pooled) ? pooled : new TestInvokable(pool);
@@ -118,6 +119,7 @@ public class InvokablePoolTests
     {
         using var pool = new InvokablePool<TestInvokable>();
         var item = new TestInvokable(pool);
+        var cancellationToken = TestContext.Current.CancellationToken;
         Exception? error = null;
         using var returned = new ManualResetEventSlim();
 
@@ -135,7 +137,7 @@ public class InvokablePoolTests
         });
 
         returningThread.Start();
-        returned.Wait();
+        returned.Wait(cancellationToken);
         Assert.True(pool.TryGet(out var rented));
         returningThread.Join();
 
