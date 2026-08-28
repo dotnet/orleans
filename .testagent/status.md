@@ -12,8 +12,8 @@ The shared directory-entry message target cache is covered by:
 - 28 focused tests pass on `net10.0`.
 - No generated test is assertion-free or relies only on presence/truthiness checks.
 - Assertions cover equality, identity, type, null, negative behavior, collection state, lifecycle state, and side effects.
-- Cache lifetime tests verify replacement, conditional removal, clear, TTL expiration, eviction, tombstoning, target release, one-shot binding, and identity-checked clearing.
-- Integration tests verify local target binding, invalidation and recapture, compatible-interface casts, and explicit remote, external-client, and stateless-worker exclusion.
+- Cache lifetime tests verify in-place replacement, conditional removal, clear, TTL expiration, eviction, tombstoning, target release, one-shot binding, and identity-checked clearing.
+- Integration tests verify local target binding, remote address-only caching, invalidation and recapture, compatible-interface casts, and explicit external-client and stateless-worker exclusion.
 
 ## Pseudo-Mutation Review
 
@@ -27,4 +27,4 @@ Every mutation was reverted immediately. The focused suites were rerun green aft
 
 ## Remaining Risk
 
-The tests intentionally allow the same stale local-dispatch race as the existing activation-directory lookup path: invalidation can race after a valid target is read. Activation state and address validation preserve the existing recovery semantics. Remote connections and response routing remain on the established path.
+The tests intentionally allow the same stale routing race as the existing directory and activation lookups: invalidation can race after a valid entry is read. Entry invalidation, activation state checks, membership validation, and existing forwarding semantics preserve recovery. Remote connections and response routing remain on the established path.

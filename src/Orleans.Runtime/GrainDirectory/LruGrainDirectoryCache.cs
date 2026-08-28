@@ -6,9 +6,9 @@ using Orleans.Caching;
 
 namespace Orleans.Runtime.GrainDirectory;
 
-internal sealed class LruGrainDirectoryCache : ConcurrentLruCache<GrainId, GrainDirectoryCacheEntry>, IGrainDirectoryCache, IGrainDirectoryCacheEntrySource, IAsyncDisposable
+internal sealed class LruGrainDirectoryCache : ConcurrentLruCache<GrainId, (GrainAddress ActivationAddress, int Version)>, IGrainDirectoryCache, IGrainDirectoryCacheEntrySource, IAsyncDisposable
 {
-    private static readonly Func<GrainDirectoryCacheEntry, GrainAddress, bool> ActivationAddressesMatch = (value, state) => GrainAddress.MatchesGrainIdAndSilo(state, value.Address);
+    private static readonly Func<(GrainAddress Address, int Version), GrainAddress, bool> ActivationAddressesMatch = (value, state) => GrainAddress.MatchesGrainIdAndSilo(state, value.Address);
     private readonly IDisposable _cacheSizeRegistration;
 
     public LruGrainDirectoryCache(
@@ -27,7 +27,7 @@ internal sealed class LruGrainDirectoryCache : ConcurrentLruCache<GrainId, Grain
             : directoryInstruments.RegisterCacheSizeObserve(() => Count);
     }
 
-    public void AddOrUpdate(GrainAddress activationAddress, int version) => AddOrUpdate(activationAddress.GrainId, new GrainDirectoryCacheEntry(activationAddress, version));
+    public void AddOrUpdate(GrainAddress activationAddress, int version) => AddOrUpdate(activationAddress.GrainId, (activationAddress, version));
 
     public bool Remove(GrainId key) => TryRemove(key);
 
@@ -35,10 +35,10 @@ internal sealed class LruGrainDirectoryCache : ConcurrentLruCache<GrainId, Grain
 
     public bool LookUp(GrainId key, [NotNullWhen(true)] out GrainAddress? result, out int version)
     {
-        if (TryGetEntry(key, out var entry))
+        if (TryGet(key, out var entry))
         {
             version = entry.Version;
-            result = entry.Address;
+            result = entry.ActivationAddress;
             return true;
         }
 
@@ -53,24 +53,33 @@ internal sealed class LruGrainDirectoryCache : ConcurrentLruCache<GrainId, Grain
         {
             foreach (var entry in this)
             {
-                if (entry.Value.IsValid)
-                {
-                    yield return (entry.Value.Address, entry.Value.Version);
-                }
+                yield return (entry.Value.ActivationAddress, entry.Value.Version);
             }
         }
     }
 
     public bool TryGetEntry(GrainId key, [NotNullWhen(true)] out GrainDirectoryCacheEntry? entry)
     {
-        if (TryGet(key, out entry) && entry.IsValid)
+        if (TryGetItem(key, out var item)
+            && item is GrainDirectoryCacheEntry result
+            && result.IsValid)
         {
+            entry = result;
             return true;
         }
 
         entry = null;
         return false;
     }
+
+    protected override LruItem CreateItem(GrainId key, (GrainAddress ActivationAddress, int Version) value)
+        => new GrainDirectoryCacheEntry(key, value, GetCurrentTimestamp());
+
+    protected override void OnItemUpdating(LruItem item)
+        => ((GrainDirectoryCacheEntry)item).ClearMessageTarget();
+
+    protected override void OnItemRemoved(LruItem item)
+        => ((GrainDirectoryCacheEntry)item).Invalidate();
 
     public new async ValueTask DisposeAsync()
     {

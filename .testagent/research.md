@@ -1,6 +1,6 @@
 # Test Generation Research
 
-> Final scope update: benchmarking showed material benefit only for in-process activation dispatch. The implemented cache target is therefore limited to `IGrainContext`; remote connection and response-route caching are deferred to separate experiments.
+> Final scope update: cached handlers are limited to local `IGrainContext` instances. Remote grain references retain the same shared directory entry for address reuse, while remote connection and response-route caching remain separate experiments.
 
 ## Project Overview
 - **Path**: `C:\dev\copilot-worktrees\orleans\rb-scaling-guacamole`

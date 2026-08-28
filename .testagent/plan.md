@@ -1,6 +1,6 @@
 # Test Implementation Plan
 
-> Final scope update: the implementation was narrowed to local `IGrainContext` targets. Remote connection and response-route cases below were superseded by explicit remote/client/stateless fallback tests.
+> Final scope update: handler caching is narrowed to local `IGrainContext` targets. Remote references cache only the shared directory address and continue through the normal connection path; connection and response-route cases below remain deferred.
 
 ## Overview
 

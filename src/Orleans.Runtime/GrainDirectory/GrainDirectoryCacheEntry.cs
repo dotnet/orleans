@@ -1,21 +1,31 @@
 using System.Threading;
+using Orleans.Caching;
 
 namespace Orleans.Runtime.GrainDirectory;
 
-internal sealed class GrainDirectoryCacheEntry : IDisposable
+internal sealed class GrainDirectoryCacheEntry
+    : ConcurrentLruCache<GrainId, (GrainAddress ActivationAddress, int Version)>.LruItem,
+      IDisposable
 {
     private static readonly object Invalidated = new();
     private object? _messageTarget;
 
     public GrainDirectoryCacheEntry(GrainAddress address, int version)
+        : this(address.GrainId, (address, version), timestamp: 0)
     {
-        Address = address;
-        Version = version;
     }
 
-    public GrainAddress Address { get; }
+    public GrainDirectoryCacheEntry(
+        GrainId grainId,
+        (GrainAddress ActivationAddress, int Version) value,
+        long timestamp)
+        : base(grainId, value, timestamp)
+    {
+    }
 
-    public int Version { get; }
+    public GrainAddress Address => Value.ActivationAddress;
+
+    public int Version => Value.Version;
 
     public bool IsValid => !ReferenceEquals(Volatile.Read(ref _messageTarget), Invalidated);
 
@@ -51,5 +61,24 @@ internal sealed class GrainDirectoryCacheEntry : IDisposable
         Interlocked.CompareExchange(ref _messageTarget, null, messageTarget);
     }
 
-    public void Dispose() => Interlocked.Exchange(ref _messageTarget, Invalidated);
+    public void Invalidate() => Interlocked.Exchange(ref _messageTarget, Invalidated);
+
+    public void Dispose() => Invalidate();
+
+    public void ClearMessageTarget()
+    {
+        while (true)
+        {
+            var current = Volatile.Read(ref _messageTarget);
+            if (current is null || ReferenceEquals(current, Invalidated))
+            {
+                return;
+            }
+
+            if (ReferenceEquals(Interlocked.CompareExchange(ref _messageTarget, null, current), current))
+            {
+                return;
+            }
+        }
+    }
 }

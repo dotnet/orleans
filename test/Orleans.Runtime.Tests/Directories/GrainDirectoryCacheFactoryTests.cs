@@ -259,7 +259,7 @@ public class GrainDirectoryCacheFactoryTests
     }
 
     [Fact]
-    public async Task CreateGrainDirectoryCache_AddOrUpdateInvalidatesReplacedRouteHandle()
+    public async Task CreateGrainDirectoryCache_AddOrUpdateUpdatesSharedRouteHandle()
     {
         var (cache, entrySource) = CreateEntryCache();
         var disposableCache = Assert.IsAssignableFrom<IAsyncDisposable>(cache);
@@ -277,10 +277,13 @@ public class GrainDirectoryCacheFactoryTests
 
             cache.AddOrUpdate(replacementAddress, version: 2);
             var replacementEntry = GetEntry(entrySource, grainId);
-            Assert.True(replacementEntry.TrySetMessageTarget(replacementTarget));
 
-            Assert.NotSame(originalEntry, replacementEntry);
-            AssertInvalidEntry(originalEntry);
+            Assert.Same(originalEntry, replacementEntry);
+            Assert.True(replacementEntry.IsValid);
+            Assert.Equal(replacementAddress, replacementEntry.Address);
+            Assert.Equal(2, replacementEntry.Version);
+            Assert.False(replacementEntry.TryGetMessageTarget(out _));
+            Assert.True(replacementEntry.TrySetMessageTarget(replacementTarget));
             AssertMessageTarget(replacementEntry, replacementTarget);
             Assert.True(cache.LookUp(grainId, out var result, out var version));
             Assert.Equal(replacementAddress, result);
@@ -451,7 +454,6 @@ public class GrainDirectoryCacheFactoryTests
     {
         var (cache, entrySource) = CreateEntryCache(cacheSize: 3);
         var disposableCache = Assert.IsAssignableFrom<IAsyncDisposable>(cache);
-        var lruCache = Assert.IsType<LruGrainDirectoryCache>(cache);
         var addresses = new[]
         {
             CreateGrainAddress(CreateGrainId(), port: 11111),
@@ -464,19 +466,18 @@ public class GrainDirectoryCacheFactoryTests
 
         try
         {
-            for (var i = 0; i < entries.Length; i++)
+            for (var i = 0; i < 3; i++)
             {
-                entries[i] = new GrainDirectoryCacheEntry(addresses[i], version: i + 1);
+                cache.AddOrUpdate(addresses[i], version: i + 1);
+                entries[i] = GetEntry(entrySource, addresses[i].GrainId);
                 targets[i] = CreateMessageTarget();
                 Assert.True(entries[i].TrySetMessageTarget(targets[i]));
             }
 
-            for (var i = 0; i < 3; i++)
-            {
-                lruCache.AddOrUpdate(addresses[i].GrainId, entries[i]);
-            }
-
-            lruCache.AddOrUpdate(addresses[3].GrainId, entries[3]);
+            cache.AddOrUpdate(addresses[3], version: 4);
+            entries[3] = GetEntry(entrySource, addresses[3].GrainId);
+            targets[3] = CreateMessageTarget();
+            Assert.True(entries[3].TrySetMessageTarget(targets[3]));
 
             AssertInvalidEntry(entries[0]);
             Assert.False(entrySource.TryGetEntry(addresses[0].GrainId, out _));

@@ -505,8 +505,9 @@ namespace Orleans.Runtime.Messaging
             {
                 if (TryGetDirectoryCacheEntry(target, message, out var directoryCacheEntry))
                 {
-                    message.TargetSilo = _siloAddress;
-                    SendMessage(message, directoryCacheEntry);
+                    var targetSilo = directoryCacheEntry.Address.SiloAddress!;
+                    message.TargetSilo = targetSilo;
+                    SendMessage(message, targetSilo.Matches(_siloAddress) ? directoryCacheEntry : null);
                     return Task.CompletedTask;
                 }
 
@@ -562,12 +563,17 @@ namespace Orleans.Runtime.Messaging
             if (message.CacheInvalidationHeader is null && candidate.IsValid)
             {
                 Debug.Assert(candidate.Address.GrainId.Equals(message.TargetGrain));
-                Debug.Assert(candidate.Address.SiloAddress?.Matches(_siloAddress) == true);
-                entry = candidate;
-                return true;
+                if (candidate.Address.SiloAddress is { } targetSilo
+                    && (targetSilo.Matches(_siloAddress) || !siloStatusOracle.IsDeadSilo(targetSilo)))
+                {
+                    entry = candidate;
+                    return true;
+                }
             }
 
-            if (!candidate.IsValid)
+            if (!candidate.IsValid
+                || candidate.Address.SiloAddress is not { } candidateSilo
+                || siloStatusOracle.IsDeadSilo(candidateSilo))
             {
                 target.ClearDirectoryCacheEntry(candidate);
             }
@@ -581,7 +587,6 @@ namespace Orleans.Runtime.Messaging
             if (target is null
                 || message.CacheInvalidationHeader is not null
                 || message.TargetSilo is not { } targetSilo
-                || !targetSilo.Matches(_siloAddress)
                 || !placementService.IsUsingGrainDirectory(message.TargetGrain)
                 || !_grainLocator.TryGetCacheEntry(message.TargetGrain, targetSilo, out var entry))
             {
@@ -589,7 +594,7 @@ namespace Orleans.Runtime.Messaging
             }
 
             target.DirectoryCacheEntry = entry;
-            return entry;
+            return targetSilo.Matches(_siloAddress) ? entry : null;
         }
 
         internal void SendResponse(Message request, Response response)
