@@ -1833,6 +1833,7 @@ internal sealed unsafe partial class LinuxIoUringEngine
         {
             Interlocked.Decrement(ref _actionEnqueuers);
         }
+
         completion.Task.GetAwaiter().GetResult();
     }
 
@@ -1945,8 +1946,8 @@ internal sealed unsafe partial class LinuxIoUringEngine
             var engineId = i;
             result[i] = new(() => new LinuxIoUringEngine(engineId));
         }
+
         return result;
-    }
     }
 
     public void Enqueue(LinuxIoUringOperation operation)
