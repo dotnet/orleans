@@ -394,17 +394,17 @@ public class MessageTransportLifecycleTests
         var listener = new TcpListener(IPAddress.Loopback, 0);
         listener.Start();
         using var clientSocket = new Socket(SocketType.Stream, ProtocolType.Tcp);
-        var connect = clientSocket.ConnectAsync(listener.LocalEndpoint);
-        using var serverSocket = await listener.AcceptSocketAsync();
+        var connect = clientSocket.ConnectAsync(listener.LocalEndpoint, TestContext.Current.CancellationToken);
+        using var serverSocket = await listener.AcceptSocketAsync(TestContext.Current.CancellationToken);
         await connect;
         await using var transport = new SocketMessageTransport(clientSocket, NullLogger.Instance);
         transport.Start();
         using var request = new EmptyWriteRequest();
 
         Assert.True(transport.EnqueueWrite(request));
-        await request.Completion.WaitAsync(TimeSpan.FromSeconds(10));
+        await request.Completion.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
 
-        await transport.CloseAsync(null);
+        await transport.CloseAsync(null, TestContext.Current.CancellationToken);
         listener.Stop();
     }
 
@@ -419,7 +419,7 @@ public class MessageTransportLifecycleTests
 
         Assert.True(transport.EnqueueWrite(request));
         await Assert.ThrowsAsync<IOException>(() => request.Completion);
-        await closed.Task.WaitAsync(TimeSpan.FromSeconds(10));
+        await closed.Task.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
     }
 
     [Fact]
@@ -431,7 +431,9 @@ public class MessageTransportLifecycleTests
         await using var connector = new TlsMessageTransportConnector(new TestConnector(inner), options, NullLoggerFactory.Instance);
 
         await Assert.ThrowsAsync<InvalidOperationException>(
-            () => connector.CreateAsync(new IPEndPoint(IPAddress.Loopback, 1)).AsTask());
+            () => connector.CreateAsync(
+                new IPEndPoint(IPAddress.Loopback, 1),
+                TestContext.Current.CancellationToken).AsTask());
 
         Assert.True(inner.Disposed);
     }
@@ -444,7 +446,7 @@ public class MessageTransportLifecycleTests
         options.Get(Arg.Any<string>()).Returns(new TlsOptions());
         await using var listener = new TlsMessageTransportListener(new TestListener(inner), options, NullLoggerFactory.Instance);
 
-        Assert.Null(await listener.AcceptAsync());
+        Assert.Null(await listener.AcceptAsync(TestContext.Current.CancellationToken));
         Assert.True(inner.Disposed);
     }
 
