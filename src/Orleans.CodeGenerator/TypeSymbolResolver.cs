@@ -59,7 +59,13 @@ internal sealed class TypeSymbolResolver(Compilation compilation)
         if (TryResolveMetadataIdentity(model.MetadataIdentity, cancellationToken, out symbol)
             || TryResolveTypeSyntax(model.InterfaceType.SyntaxString, cancellationToken, out symbol))
         {
-            return symbol.TypeKind == TypeKind.Interface;
+            if (symbol.TypeKind == TypeKind.Interface)
+            {
+                return true;
+            }
+
+            symbol = null;
+            return false;
         }
 
         foreach (var candidate in GetFallbackIndex(cancellationToken).AllTypes)
@@ -77,12 +83,6 @@ internal sealed class TypeSymbolResolver(Compilation compilation)
         symbol = null;
         return false;
     }
-
-    public bool TryResolveType(
-        TypeRef type,
-        CancellationToken cancellationToken,
-        [NotNullWhen(true)] out INamedTypeSymbol? symbol)
-        => TryResolveType(type, TypeMetadataIdentity.Empty, cancellationToken, out symbol);
 
     public bool TryResolveType(
         TypeRef type,
@@ -127,13 +127,42 @@ internal sealed class TypeSymbolResolver(Compilation compilation)
         CancellationToken cancellationToken,
         [NotNullWhen(true)] out IAssemblySymbol? assembly)
     {
-        if (IsMatchingAssembly(_compilation.Assembly, metadataIdentity))
+        if (!string.IsNullOrEmpty(metadataIdentity.AssemblyIdentity))
         {
-            assembly = _compilation.Assembly;
-            return true;
+            if (string.Equals(
+                _compilation.Assembly.Identity.GetDisplayName(),
+                metadataIdentity.AssemblyIdentity,
+                StringComparison.Ordinal))
+            {
+                assembly = _compilation.Assembly;
+                return true;
+            }
+
+            foreach (var reference in _compilation.References)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                if (_compilation.GetAssemblyOrModuleSymbol(reference) is IAssemblySymbol candidate
+                    && string.Equals(
+                        candidate.Identity.GetDisplayName(),
+                        metadataIdentity.AssemblyIdentity,
+                        StringComparison.Ordinal))
+                {
+                    assembly = candidate;
+                    return true;
+                }
+            }
+
+            assembly = null;
+            return false;
         }
 
         IAssemblySymbol? assemblyByName = null;
+        if (!string.IsNullOrEmpty(metadataIdentity.AssemblyName)
+            && string.Equals(_compilation.Assembly.Identity.Name, metadataIdentity.AssemblyName, StringComparison.Ordinal))
+        {
+            assemblyByName = _compilation.Assembly;
+        }
+
         foreach (var reference in _compilation.References)
         {
             cancellationToken.ThrowIfCancellationRequested();
@@ -142,14 +171,7 @@ internal sealed class TypeSymbolResolver(Compilation compilation)
                 continue;
             }
 
-            if (IsMatchingAssembly(candidate, metadataIdentity))
-            {
-                assembly = candidate;
-                return true;
-            }
-
-            if (string.IsNullOrEmpty(metadataIdentity.AssemblyIdentity)
-                && !string.IsNullOrEmpty(metadataIdentity.AssemblyName)
+            if (!string.IsNullOrEmpty(metadataIdentity.AssemblyName)
                 && string.Equals(candidate.Identity.Name, metadataIdentity.AssemblyName, StringComparison.Ordinal))
             {
                 if (assemblyByName is not null)
@@ -170,17 +192,6 @@ internal sealed class TypeSymbolResolver(Compilation compilation)
 
         assembly = null;
         return false;
-    }
-
-    private static bool IsMatchingAssembly(IAssemblySymbol assembly, TypeMetadataIdentity metadataIdentity)
-    {
-        if (!string.IsNullOrEmpty(metadataIdentity.AssemblyIdentity))
-        {
-            return string.Equals(assembly.Identity.GetDisplayName(), metadataIdentity.AssemblyIdentity, StringComparison.Ordinal);
-        }
-
-        return !string.IsNullOrEmpty(metadataIdentity.AssemblyName)
-            && string.Equals(assembly.Identity.Name, metadataIdentity.AssemblyName, StringComparison.Ordinal);
     }
 
     private bool TryResolveTypeSyntax(

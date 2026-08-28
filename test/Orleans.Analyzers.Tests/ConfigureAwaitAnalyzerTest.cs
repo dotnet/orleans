@@ -1,3 +1,6 @@
+using System.Collections.Immutable;
+using System.Reflection;
+using System.Text;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CodeActions;
 using Microsoft.CodeAnalysis.CodeFixes;
@@ -5,9 +8,6 @@ using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.Diagnostics;
 using Microsoft.CodeAnalysis.Text;
 using Orleans.Analyzers;
-using System.Collections.Immutable;
-using System.Reflection;
-using System.Text;
 using Xunit;
 
 namespace Analyzers.Tests;
@@ -1434,4 +1434,254 @@ public class ConfigureAwaitAnalyzerTest : DiagnosticAnalyzerTestBase<ConfigureAw
     }
 
     #endregion
+
+    [Fact]
+    public async Task NonConstantConfigureAwaitOptionsVariable_DoesNotReportDiagnostic()
+    {
+        var code = """
+                    public class MyGrain : Grain, IMyGrain
+                    {
+                        public async Task DoSomething(ConfigureAwaitOptions suppliedOptions)
+                        {
+                            var options = suppliedOptions;
+                            await Task.Delay(100).ConfigureAwait(options);
+                        }
+                    }
+
+                    public interface IMyGrain : IGrainWithGuidKey
+                    {
+                        Task DoSomething(ConfigureAwaitOptions suppliedOptions);
+                    }
+                    """;
+
+        var (diagnostics, _) = await GetDiagnosticsAsync(code, Array.Empty<string>());
+
+        Assert.Empty(diagnostics);
+    }
+
+    [Fact]
+    public async Task ConfigureAwaitOptionsInvocationWithUnknownResult_DoesNotReportDiagnostic()
+    {
+        var code = """
+                    public class MyGrain : Grain, IMyGrain
+                    {
+                        public async Task DoSomething(int value)
+                        {
+                            await Task.Delay(100).ConfigureAwait(GetOptions(value));
+                        }
+
+                        private static ConfigureAwaitOptions GetOptions(int value) => (ConfigureAwaitOptions)value;
+                    }
+
+                    public interface IMyGrain : IGrainWithGuidKey
+                    {
+                        Task DoSomething(int value);
+                    }
+                    """;
+
+        var (diagnostics, _) = await GetDiagnosticsAsync(code, Array.Empty<string>());
+
+        Assert.Empty(diagnostics);
+    }
+
+    [Fact]
+    public async Task CastOfUnknownConfigureAwaitOptions_DoesNotReportDiagnostic()
+    {
+        var code = """
+                    public class MyGrain : Grain, IMyGrain
+                    {
+                        public async Task DoSomething(int value)
+                        {
+                            await Task.Delay(100).ConfigureAwait((ConfigureAwaitOptions)value);
+                        }
+                    }
+
+                    public interface IMyGrain : IGrainWithGuidKey
+                    {
+                        Task DoSomething(int value);
+                    }
+                    """;
+
+        var (diagnostics, _) = await GetDiagnosticsAsync(code, Array.Empty<string>());
+
+        Assert.Empty(diagnostics);
+    }
+
+    [Fact]
+    public async Task ParenthesizedUnknownConfigureAwaitOptions_DoesNotReportDiagnostic()
+    {
+        var code = """
+                    public class MyGrain : Grain, IMyGrain
+                    {
+                        public async Task DoSomething(ConfigureAwaitOptions options)
+                        {
+                            await Task.Delay(100).ConfigureAwait((options));
+                        }
+                    }
+
+                    public interface IMyGrain : IGrainWithGuidKey
+                    {
+                        Task DoSomething(ConfigureAwaitOptions options);
+                    }
+                    """;
+
+        var (diagnostics, _) = await GetDiagnosticsAsync(code, Array.Empty<string>());
+
+        Assert.Empty(diagnostics);
+    }
+
+    [Fact]
+    public async Task BitwiseConfigureAwaitOptionsWithUnknownOperand_DoesNotReportDiagnostic()
+    {
+        var code = """
+                    public class MyGrain : Grain, IMyGrain
+                    {
+                        public async Task DoSomething(ConfigureAwaitOptions options)
+                        {
+                            await Task.Delay(100).ConfigureAwait(options | ConfigureAwaitOptions.ForceYielding);
+                        }
+                    }
+
+                    public interface IMyGrain : IGrainWithGuidKey
+                    {
+                        Task DoSomething(ConfigureAwaitOptions options);
+                    }
+                    """;
+
+        var (diagnostics, _) = await GetDiagnosticsAsync(code, Array.Empty<string>());
+
+        Assert.Empty(diagnostics);
+    }
+
+    [Fact]
+    public Task ConstNonCapturingConfigureAwaitOptions_ReportsExactDiagnostic()
+    {
+        var code = """
+                    public class MyGrain : Grain, IMyGrain
+                    {
+                        public async Task DoSomething()
+                        {
+                            const ConfigureAwaitOptions options = ConfigureAwaitOptions.SuppressThrowing;
+                            await Task.Delay(100).ConfigureAwait(options);
+                        }
+                    }
+
+                    public interface IMyGrain : IGrainWithGuidKey
+                    {
+                        Task DoSomething();
+                    }
+                    """;
+
+        return VerifySingleConfigureAwaitDiagnostic(code);
+    }
+
+    [Fact]
+    public Task CastNonCapturingConfigureAwaitOptions_ReportsExactDiagnostic()
+    {
+        var code = """
+                    public class MyGrain : Grain, IMyGrain
+                    {
+                        public async Task DoSomething()
+                        {
+                            await Task.Delay(100).ConfigureAwait((ConfigureAwaitOptions)6);
+                        }
+                    }
+
+                    public interface IMyGrain : IGrainWithGuidKey
+                    {
+                        Task DoSomething();
+                    }
+                    """;
+
+        return VerifySingleConfigureAwaitDiagnostic(code);
+    }
+
+    [Fact]
+    public Task ParenthesizedNonCapturingConfigureAwaitOptions_ReportsExactDiagnostic()
+    {
+        var code = """
+                    public class MyGrain : Grain, IMyGrain
+                    {
+                        public async Task DoSomething()
+                        {
+                            await Task.Delay(100).ConfigureAwait(((ConfigureAwaitOptions.ForceYielding)));
+                        }
+                    }
+
+                    public interface IMyGrain : IGrainWithGuidKey
+                    {
+                        Task DoSomething();
+                    }
+                    """;
+
+        return VerifySingleConfigureAwaitDiagnostic(code);
+    }
+
+    [Fact]
+    public Task BitwiseNonCapturingConfigureAwaitOptionsExpression_ReportsExactDiagnostic()
+    {
+        var code = """
+                    public class MyGrain : Grain, IMyGrain
+                    {
+                        public async Task DoSomething()
+                        {
+                            await Task.Delay(100).ConfigureAwait(
+                                ((ConfigureAwaitOptions)4) | (ConfigureAwaitOptions)(1 << 1));
+                        }
+                    }
+
+                    public interface IMyGrain : IGrainWithGuidKey
+                    {
+                        Task DoSomething();
+                    }
+                    """;
+
+        return VerifySingleConfigureAwaitDiagnostic(code);
+    }
+
+    [Fact]
+    public Task NonConstantBitwiseAndNonCapturingConfigureAwaitOptionsExpression_ReportsExactDiagnostic()
+    {
+        var code = """
+                    public class MyGrain : Grain, IMyGrain
+                    {
+                        public async Task DoSomething(ConfigureAwaitOptions options)
+                        {
+                            await Task.Delay(100).ConfigureAwait(options & ConfigureAwaitOptions.ForceYielding);
+                        }
+                    }
+
+                    public interface IMyGrain : IGrainWithGuidKey
+                    {
+                        Task DoSomething(ConfigureAwaitOptions options);
+                    }
+                    """;
+
+        return VerifySingleConfigureAwaitDiagnostic(code);
+    }
+
+    private async Task VerifySingleConfigureAwaitDiagnostic(string code)
+    {
+        var (diagnostics, completeSource) = await GetDiagnosticsAsync(code, Array.Empty<string>());
+
+        var diagnostic = Assert.Single(diagnostics);
+        Assert.Equal("ORLEANS0014", diagnostic.Id);
+        Assert.Equal(DiagnosticSeverity.Warning, diagnostic.Severity);
+        Assert.True(diagnostic.Location.IsInSource);
+        Assert.NotNull(diagnostic.Location.SourceTree);
+        Assert.Equal(completeSource, diagnostic.Location.SourceTree.GetText().ToString());
+
+        var syntaxTree = CSharpSyntaxTree.ParseText(completeSource);
+        var invocation = syntaxTree.GetRoot()
+            .DescendantNodes()
+            .OfType<Microsoft.CodeAnalysis.CSharp.Syntax.InvocationExpressionSyntax>()
+            .Single(candidate =>
+                candidate.Expression is Microsoft.CodeAnalysis.CSharp.Syntax.MemberAccessExpressionSyntax memberAccess
+                && memberAccess.Name.Identifier.ValueText == "ConfigureAwait");
+
+        Assert.Equal(invocation.Span, diagnostic.Location.SourceSpan);
+        Assert.Equal(
+            invocation.ToString(),
+            diagnostic.Location.SourceTree.GetText().ToString(diagnostic.Location.SourceSpan));
+    }
 }
