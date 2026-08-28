@@ -2,14 +2,75 @@ using AWSUtils.Tests.StorageTests;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration;
+using Orleans.Hosting;
 using Orleans.Reminders.DynamoDB;
+using Orleans.Testing.Reminders;
+using Orleans.TestingHost;
 using TestExtensions;
 using UnitTests;
 using UnitTests.RemindersTest;
+using UnitTests.TimerTests;
 using Xunit;
 
 namespace AWSUtils.Tests.RemindersTest
 {
+    public sealed class DynamoDBReminderServiceLifecycleFixture : BaseInProcessTestClusterFixture
+    {
+        private ReminderTestClock? _clock;
+
+        public ReminderTestClock Clock
+        {
+            get
+            {
+                EnsurePreconditionsMet();
+                return _clock ?? throw new InvalidOperationException("The reminder clock has not been configured.");
+            }
+        }
+
+        protected override void CheckPreconditionsOrThrow()
+        {
+            if (!AWSTestConstants.IsDynamoDbAvailable)
+            {
+                throw Xunit.Sdk.SkipException.ForSkip("Unable to connect to AWS DynamoDB simulator");
+            }
+        }
+
+        protected override void ConfigureTestCluster(InProcessTestClusterBuilder builder)
+        {
+            _clock = builder.AddReminderTestClock();
+            builder.ConfigureSilo((_, siloBuilder) =>
+                siloBuilder.UseDynamoDBReminderService(options =>
+                    options.ParseConnectionString($"Service={AWSTestConstants.DynamoDbService}")));
+        }
+
+        public override async ValueTask DisposeAsync()
+        {
+            try
+            {
+                await base.DisposeAsync();
+            }
+            finally
+            {
+                _clock?.Dispose();
+            }
+        }
+    }
+
+    [TestCategory("Reminders"), TestCategory("AWS"), TestCategory("DynamoDb")]
+    [Collection(TestEnvironmentFixture.DefaultCollection)]
+    [TestSuite("Functional")]
+    [TestProvider("DynamoDB")]
+    [TestArea("Reminders")]
+    public sealed class DynamoDBReminderServiceLifecycleTests
+        : ReminderServiceLifecycleTestsBase, IClassFixture<DynamoDBReminderServiceLifecycleFixture>
+    {
+        public DynamoDBReminderServiceLifecycleTests(DynamoDBReminderServiceLifecycleFixture fixture)
+            : base(fixture.Clock, fixture.HostedCluster, "DynamoDB")
+        {
+            fixture.EnsurePreconditionsMet();
+        }
+    }
+
     /// <summary>
     /// Tests DynamoDB implementation of the Orleans reminders table for storing and retrieving grain reminders.
     /// </summary>

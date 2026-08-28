@@ -237,6 +237,47 @@ public class ReminderEventsTests
     [TestSuite("BVT")]
     [TestProvider("None")]
     [Fact, TestCategory("BVT")]
+    public async Task ReminderDiagnosticObserver_CountsDuplicateInstancesOnOneSilo()
+    {
+        using var observer = ReminderDiagnosticObserver.Create();
+        var grainId = GrainId.Create("test", "duplicate-owner");
+        const string reminderName = "reminder";
+        var siloAddress = SiloAddress.New(new IPEndPoint(IPAddress.Loopback, 14010), 11);
+        var firstIdentity = new object();
+        var secondIdentity = new object();
+
+        var twoOwners = observer.WaitForActiveReminderCountAsync(
+            grainId,
+            2,
+            TestContext.Current.CancellationToken,
+            reminderName,
+            [siloAddress]);
+        ReminderEvents.EmitLocalReminderStarted(grainId, reminderName, firstIdentity, siloAddress);
+        ReminderEvents.EmitLocalReminderStarted(grainId, reminderName, secondIdentity, siloAddress);
+
+        await twoOwners;
+        Assert.Equal(
+            [siloAddress, siloAddress],
+            observer.GetActiveReminderOwnerSilos(grainId, reminderName));
+        Assert.Single(observer.GetActiveReminderSilos(grainId, reminderName));
+
+        ReminderEvents.EmitLocalReminderStopped(
+            grainId,
+            reminderName,
+            firstIdentity,
+            ReminderEvents.LocalReminderStopReason.Unregistered,
+            siloAddress);
+        ReminderEvents.EmitLocalReminderStopped(
+            grainId,
+            reminderName,
+            secondIdentity,
+            ReminderEvents.LocalReminderStopReason.Unregistered,
+            siloAddress);
+    }
+
+    [TestSuite("BVT")]
+    [TestProvider("None")]
+    [Fact, TestCategory("BVT")]
     public async Task ReminderDiagnosticObserver_CanceledQuiescenceWait_RemainsCanceled()
     {
         using var observer = ReminderDiagnosticObserver.Create();

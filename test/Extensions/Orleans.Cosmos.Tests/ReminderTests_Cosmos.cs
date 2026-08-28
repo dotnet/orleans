@@ -11,6 +11,20 @@ using UnitTests.GrainInterfaces;
 
 namespace Tester.Cosmos.Reminders;
 
+[TestSuite("Functional")]
+[TestProvider("Cosmos")]
+[TestArea("Reminders")]
+[TestCategory("Reminders"), TestCategory("Cosmos")]
+public sealed class ReminderServiceLifecycleTests_Cosmos
+    : ReminderServiceLifecycleTestsBase, IClassFixture<ReminderTests_Cosmos.Fixture>
+{
+    public ReminderServiceLifecycleTests_Cosmos(ReminderTests_Cosmos.Fixture fixture)
+        : base(fixture.ReminderClock, fixture.HostedCluster, "Cosmos")
+    {
+        fixture.EnsurePreconditionsMet();
+    }
+}
+
 /// <summary>
 /// Tests for Orleans reminders functionality using Azure Cosmos DB as the reminder service backing store.
 /// </summary>

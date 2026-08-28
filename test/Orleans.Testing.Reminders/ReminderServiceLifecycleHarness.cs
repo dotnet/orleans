@@ -1,6 +1,7 @@
 #nullable enable
 
 using Microsoft.Extensions.DependencyInjection;
+using Orleans.Reminders.Diagnostics;
 using Orleans.Reminders.TestKit;
 using Orleans.Runtime;
 using Orleans.Runtime.ReminderService;
@@ -52,8 +53,14 @@ public sealed class ReminderServiceLifecycleHarness : IReminderServiceLifecycleH
         => _cluster.GetActiveSilos().Select(silo => silo.SiloAddress).Order().ToArray();
 
     /// <inheritdoc />
-    public Task WaitForStartupReadinessAsync(CancellationToken cancellationToken)
-        => WaitForTopologyReconciliationAsync(cancellationToken);
+    public async Task WaitForStartupReadinessAsync(CancellationToken cancellationToken)
+    {
+        var startupEvents = ActiveSilos
+            .Select(silo => _observer.WaitForReminderServiceStartedAsync(cancellationToken, silo))
+            .ToArray();
+        await Task.WhenAll(startupEvents);
+        await WaitForTopologyReconciliationAsync(cancellationToken);
+    }
 
     /// <inheritdoc />
     public Task AdvanceAsync(TimeSpan amount, CancellationToken cancellationToken)
@@ -65,17 +72,17 @@ public sealed class ReminderServiceLifecycleHarness : IReminderServiceLifecycleH
         string reminderName,
         int count,
         CancellationToken cancellationToken)
-        => GetOwners(grainId, reminderName).Count == count
-            ? Task.CompletedTask
-            : _observer.WaitForActiveReminderCountAsync(grainId, count, cancellationToken, reminderName);
+        => _observer.WaitForActiveReminderCountAsync(
+            grainId,
+            count,
+            cancellationToken,
+            reminderName,
+            IsActiveSilo);
 
     /// <inheritdoc />
     public IReadOnlyList<SiloAddress> GetOwners(GrainId grainId, string reminderName)
     {
-        var active = ActiveSilos.ToHashSet();
-        return _observer.GetActiveReminderSilos(grainId, reminderName)
-            .Where(active.Contains)
-            .ToArray();
+        return _observer.GetActiveReminderOwnerSilos(grainId, reminderName, IsActiveSilo);
     }
 
     /// <inheritdoc />
@@ -147,4 +154,29 @@ public sealed class ReminderServiceLifecycleHarness : IReminderServiceLifecycleH
         => silos.Count == 1
             ? silos[0]
             : throw new InvalidOperationException($"Expected one new silo, observed {silos.Count}.");
+
+    private bool IsActiveSilo(SiloAddress? siloAddress)
+        => siloAddress is not null && ActiveSilos.Contains(siloAddress);
+
+    internal object AddDuplicateOwnerForTesting(GrainId grainId, string reminderName)
+    {
+        var identity = new object();
+        ReminderEvents.EmitLocalReminderStarted(
+            grainId,
+            reminderName,
+            identity,
+            ActiveSilos.First());
+        return identity;
+    }
+
+    internal void RemoveDuplicateOwnerForTesting(
+        GrainId grainId,
+        string reminderName,
+        object identity)
+        => ReminderEvents.EmitLocalReminderStopped(
+            grainId,
+            reminderName,
+            identity,
+            ReminderEvents.LocalReminderStopReason.Unregistered,
+            ActiveSilos.First());
 }

@@ -213,7 +213,15 @@ public sealed class MyLifecycleTests : ReminderServiceLifecycleTestRunner
 ```
 
 Do not replace harness barriers with delays, retry loops, longer timeouts, or provider-specific skips. Scenario cleanup
-unregisters only deterministic scenario identities and verifies their absence; it never clears unrelated provider rows.
+uses its own bounded token, unregisters only deterministic scenario identities, and verifies their absence; it never
+clears unrelated provider rows or replaces the original scenario failure. Ownership assertions count local reminder
+instance identities, including duplicate instances on one silo, rather than counting distinct silo addresses.
+
+The built-in in-memory, Azure Table, Cosmos DB, ADO.NET SQL Server, PostgreSQL, MySQL, Redis, DynamoDB, and Firestore
+providers all expose these same inherited facts. Their adapters contain only backend precondition/setup and provider
+registration. External-service availability can skip fixture construction, but no provider disables individual
+lifecycle guarantees. Add a documented capability boundary here before omitting a future provider which cannot host
+the Orleans reminder service or participate in in-process silo churn.
 
 ## Deterministic oracle and cluster testing
 
@@ -242,7 +250,9 @@ The oracle exposes:
 - `FreezeReads` for stale-read convergence scenarios; and
 - lifecycle cancellation and invariant checks.
 
-The TestKit cluster integration suite uses these controls to cover exact-due delivery, exact-due storage recovery,
+`ReminderTestClock` creates its lifecycle observer before the cluster is built, allowing startup conformance to await
+one `ReminderServiceStarted` event for every silo before liveness and range-reconciliation barriers. The TestKit
+cluster integration suite uses these controls to cover exact-due delivery, exact-due storage recovery,
 due times beyond the platform timer limit, stale-refresh suppression after unregister, and single-owner delivery in a
 multi-silo cluster.
 
