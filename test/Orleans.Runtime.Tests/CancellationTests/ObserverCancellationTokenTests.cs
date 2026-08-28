@@ -106,6 +106,7 @@ public abstract class ObserverCancellationTokenTests(ObserverCancellationTokenTe
 
         await grain.Unsubscribe(reference);
         fixture.GrainFactory.DeleteObjectReference<ILongRunningObserver>(reference);
+        GC.KeepAlive(observer);
     }
 
     /// <summary>
@@ -128,6 +129,7 @@ public abstract class ObserverCancellationTokenTests(ObserverCancellationTokenTe
 
         await grain.Unsubscribe(reference);
         fixture.GrainFactory.DeleteObjectReference<ILongRunningObserver>(reference);
+        GC.KeepAlive(observer);
     }
 
     /// <summary>
@@ -153,6 +155,7 @@ public abstract class ObserverCancellationTokenTests(ObserverCancellationTokenTe
 
         await grain.Unsubscribe(reference);
         fixture.GrainFactory.DeleteObjectReference<ILongRunningObserver>(reference);
+        GC.KeepAlive(observer);
     }
 
     /// <summary>
@@ -186,6 +189,7 @@ public abstract class ObserverCancellationTokenTests(ObserverCancellationTokenTe
         await observer.WaitForCancellation(callId);
         await grain.Unsubscribe(reference);
         fixture.GrainFactory.DeleteObjectReference<ILongRunningObserver>(reference);
+        GC.KeepAlive(observer);
     }
 
     /// <summary>
@@ -243,6 +247,7 @@ public abstract class ObserverCancellationTokenTests(ObserverCancellationTokenTe
         foreach (var g in grains)
         {
             fixture.GrainFactory.DeleteObjectReference<ILongRunningObserver>(g.Reference);
+            GC.KeepAlive(g.Observer);
         }
     }
 
@@ -283,6 +288,7 @@ public abstract class ObserverCancellationTokenTests(ObserverCancellationTokenTe
 
         await grain.Unsubscribe(reference);
         fixture.GrainFactory.DeleteObjectReference<ILongRunningObserver>(reference);
+        GC.KeepAlive(observer);
     }
 
     /// <summary>
@@ -321,6 +327,7 @@ public abstract class ObserverCancellationTokenTests(ObserverCancellationTokenTe
 
         await grain.Unsubscribe(reference);
         fixture.GrainFactory.DeleteObjectReference<ILongRunningObserver>(reference);
+        GC.KeepAlive(observer);
     }
 
     /// <summary>
@@ -370,6 +377,7 @@ public abstract class ObserverCancellationTokenTests(ObserverCancellationTokenTe
 
         await grain.Unsubscribe(reference);
         fixture.GrainFactory.DeleteObjectReference<ILongRunningObserver>(reference);
+        GC.KeepAlive(observer);
     }
 
     /// <summary>
@@ -411,6 +419,7 @@ public abstract class ObserverCancellationTokenTests(ObserverCancellationTokenTe
 
         await grain.Unsubscribe(reference);
         fixture.GrainFactory.DeleteObjectReference<ILongRunningObserver>(reference);
+        GC.KeepAlive(observer);
     }
 
     /// <summary>
