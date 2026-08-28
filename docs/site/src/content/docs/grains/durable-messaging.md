@@ -43,6 +43,11 @@ Durable Messaging has the following boundaries:
   correlation, body, or request-context content throws without changing the outbox.
 - A failed turn restores the last durable journal version. Its staged effects and
   outgoing envelopes are discarded before the inbox records a retry or dead letter.
+- Inbox handlers stage journaled effects and outgoing envelopes. Durable Messaging
+  commits those changes together with inbox completion after the handler returns;
+  handlers cannot create an earlier journal commit or delete boundary.
+- Deleting the grain journal discards staged inbox and outbox work and clears the
+  corresponding volatile pump bookkeeping before a later write begins.
 - A receiver allocates a stable ownership token and places it in a scheduled inbox job
   before committing both the envelope and ownership, and returns `Accepted` only after
   both are durable.
@@ -59,8 +64,9 @@ Durable Messaging has the following boundaries:
 
 The inbox and outbox use independent Durable Jobs. A blocked inbox handler on one grain
 doesn't stop another grain's outbox. Monotonic ownership generations fence job
-callbacks; if an ambiguous scheduling response creates more than one job, callbacks
-with that generation poll the same durable queue safely. Completed-generation
+callbacks. Scheduling uses an internal stable physical job ID for each grain, pump, and
+ownership generation, so retrying an ambiguous response while the original schedule is
+active returns that job instead of creating another one. Completed-generation
 tombstones let delayed duplicates terminate. A job which wakes before its ownership
 commit or activation recovery is visible polls the same attempt instead of completing.
 After recovery, a scheduled generation with no committed owner and no work is a

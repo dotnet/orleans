@@ -113,6 +113,23 @@ internal sealed class InMemoryJobQueue : IAsyncEnumerable<IJobRunContext>
         }
     }
 
+    public bool TryGetJob(string jobId, out DurableJob? job)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(jobId);
+        lock (_syncLock)
+        {
+            if (_jobsIdToBucket.TryGetValue(jobId, out var bucket)
+                && bucket.TryGetJob(jobId, out var entry))
+            {
+                job = entry.Job;
+                return true;
+            }
+
+            job = null;
+            return false;
+        }
+    }
+
     /// <summary>
     /// Returns whether the queue still contains the supplied durable job.
     /// </summary>

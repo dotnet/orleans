@@ -43,6 +43,8 @@ internal sealed partial class DurableOutbox : IDurableOutbox, IDurableJobFeature
 {
     internal const string JobName = "orleans.messaging.outbox-flush";
 
+    public bool CanHandle(string jobName) => string.Equals(jobName, JobName, StringComparison.Ordinal);
+
     private readonly IJournaledStateManager _stateManager;
     private readonly IDurableDictionary<Guid, DurableEnvelope> _messages;
     private readonly IGrainFactory _grainFactory;
@@ -78,6 +80,9 @@ internal sealed partial class DurableOutbox : IDurableOutbox, IDurableJobFeature
     private bool _jobScheduleConfirmed;
     private bool _recoveryCompleted;
     private int _ensureJobScheduledQueued;
+    private string _ownershipEpoch = Guid.NewGuid().ToString("N");
+    private long _stateGeneration;
+    private long? _activeDeliveryGeneration;
 
     private int _metricsActive;
     private int _reportedDepth;
@@ -147,7 +152,7 @@ internal sealed partial class DurableOutbox : IDurableOutbox, IDurableJobFeature
         _maxRetryAge = options.Value.MaxOutboxRetryAge;
         _maxDeliveryAttempts = options.Value.MaxDeliveryAttempts;
         _batchSize = options.Value.OutboxBatchSize;
-        jobHandlers.Register(JobName, this);
+        jobHandlers.Register(this);
         DurableMessagingStateManagerCapabilities.RegisterObserver(manager, this);
 
         // Subscribe to the grain lifecycle to start pumping on activation
@@ -195,7 +200,7 @@ internal sealed partial class DurableOutbox : IDurableOutbox, IDurableJobFeature
         _messages.Add(envelope.MessageId, envelope);
         if (startsNewBatch)
         {
-            _jobId.Value = DurableMessagingJobOwnership.NextId(_jobSequence);
+            _jobId.Value = DurableMessagingJobOwnership.NextId(_ownershipEpoch, _jobSequence);
             _pendingJobDueTime = _jobTimeProvider.GetUtcNow();
             _jobScheduleConfirmed = false;
         }
@@ -280,8 +285,15 @@ internal sealed partial class DurableOutbox : IDurableOutbox, IDurableJobFeature
         _committingMessageIds.UnionWith(_pendingMessageIds);
     }
 
-    public async ValueTask OnWritePreparingAsync(CancellationToken cancellationToken)
+    public async ValueTask OnWriteFinalizingAsync(CancellationToken cancellationToken)
     {
+        if (_activeDeliveryGeneration is { } deliveryGeneration
+            && deliveryGeneration != Volatile.Read(ref _stateGeneration))
+        {
+            throw new InvalidOperationException(
+                "Outbox delivery was interrupted by state recovery or deletion.");
+        }
+
         if (_pendingMessageIds.Count == 0 || _pendingJobDueTime is not { } dueTime || _jobScheduleConfirmed)
         {
             return;
@@ -296,6 +308,7 @@ internal sealed partial class DurableOutbox : IDurableOutbox, IDurableJobFeature
         await _jobManager.ScheduleJobAsync(
             new ScheduleJobRequest
             {
+                JobId = DurableMessagingJobOwnership.CreateJobId(JobName, _grainContext.GrainId, jobId),
                 Target = _grainContext.GrainId,
                 JobName = JobName,
                 DueTime = dueTime,
@@ -323,8 +336,22 @@ internal sealed partial class DurableOutbox : IDurableOutbox, IDurableJobFeature
         }
     }
 
+    public void OnDeleteCompleted()
+    {
+        Interlocked.Increment(ref _stateGeneration);
+        _ownershipEpoch = Guid.NewGuid().ToString("N");
+        _pendingMessageIds.Clear();
+        _committingMessageIds.Clear();
+        _pendingJobDueTime = null;
+        _scheduledOwnershipDueTime = null;
+        _scheduledOwnershipId = null;
+        _jobScheduleConfirmed = false;
+        ReconcileOutboxDepth();
+    }
+
     public void OnRecoveryCompleted()
     {
+        _ownershipEpoch = Guid.NewGuid().ToString("N");
         _recoveryCompleted = true;
         _pendingMessageIds.Clear();
         _committingMessageIds.Clear();
@@ -347,6 +374,12 @@ internal sealed partial class DurableOutbox : IDurableOutbox, IDurableJobFeature
         {
             QueueEnsureJobScheduled(replaceExisting: true);
         }
+    }
+
+    public void OnRecoveryStarted()
+    {
+        Interlocked.Increment(ref _stateGeneration);
+        _recoveryCompleted = false;
     }
 
     /// <summary>
@@ -391,6 +424,8 @@ internal sealed partial class DurableOutbox : IDurableOutbox, IDurableJobFeature
     public async Task DeliverPendingMessagesAsync(CancellationToken cancellationToken = default)
     {
         await _deliveryGate.WaitAsync(cancellationToken).ConfigureAwait(true);
+        var stateGeneration = Volatile.Read(ref _stateGeneration);
+        _activeDeliveryGeneration = stateGeneration;
         try
         {
             if (Count == 0)
@@ -442,6 +477,10 @@ internal sealed partial class DurableOutbox : IDurableOutbox, IDurableJobFeature
                         var result = await targetGrain.DeliverAsync(
                             envelope,
                             cancellationToken).ConfigureAwait(true);
+                        if (Volatile.Read(ref _stateGeneration) != stateGeneration)
+                        {
+                            return;
+                        }
 
                         stopwatch.Stop();
                         switch (result.Status)
@@ -494,6 +533,11 @@ internal sealed partial class DurableOutbox : IDurableOutbox, IDurableJobFeature
                     }
                     catch (Exception ex) when (ex is not OperationCanceledException)
                     {
+                        if (Volatile.Read(ref _stateGeneration) != stateGeneration)
+                        {
+                            return;
+                        }
+
                         stopwatch.Stop();
                         batchDirty = true;
                         RecordDeliveryFailure(envelope, ex.ToString());
@@ -525,6 +569,7 @@ internal sealed partial class DurableOutbox : IDurableOutbox, IDurableJobFeature
         }
         finally
         {
+            _activeDeliveryGeneration = null;
             _deliveryGate.Release();
         }
     }
@@ -702,6 +747,10 @@ internal sealed partial class DurableOutbox : IDurableOutbox, IDurableJobFeature
                         await _jobManager.ScheduleJobAsync(
                             new ScheduleJobRequest
                             {
+                                JobId = DurableMessagingJobOwnership.CreateJobId(
+                                    JobName,
+                                    _grainContext.GrainId,
+                                    ownershipId),
                                 Target = _grainContext.GrainId,
                                 JobName = JobName,
                                 DueTime = dueTime,
@@ -747,7 +796,7 @@ internal sealed partial class DurableOutbox : IDurableOutbox, IDurableJobFeature
         if (string.IsNullOrEmpty(_jobId.Value)
             || (replaceExisting && _pendingJobDueTime is null))
         {
-            _jobId.Value = DurableMessagingJobOwnership.NextId(_jobSequence);
+            _jobId.Value = DurableMessagingJobOwnership.NextId(_ownershipEpoch, _jobSequence);
             _pendingJobDueTime = _jobTimeProvider.GetUtcNow();
             _jobScheduleConfirmed = false;
         }

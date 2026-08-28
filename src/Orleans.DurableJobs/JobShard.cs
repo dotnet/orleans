@@ -231,18 +231,19 @@ public abstract class JobShard : IJobShard
                 throw new ArgumentOutOfRangeException(nameof(request), "Scheduled time is out of shard bounds.");
             }
 
-            var jobId = Guid.NewGuid().ToString();
-            var job = new DurableJob
+            if (request.JobId is { } requestedJobId
+                && _jobQueue.TryGetJob(requestedJobId, out var existingJob))
             {
-                Id = jobId,
-                TargetGrainId = request.Target,
-                Name = request.JobName,
-                DueTime = request.DueTime,
-                ShardId = Id,
-                Metadata = request.Metadata,
-                TraceParent = request.TraceParent,
-                TraceState = request.TraceState,
-            };
+                if (!request.Matches(existingJob!))
+                {
+                    throw new InvalidOperationException(
+                        $"Durable job ID '{requestedJobId}' is already scheduled with different properties.");
+                }
+
+                return existingJob;
+            }
+
+            var job = request.CreateJob(Id);
 
             await PersistAddJobAsync(job, cancellationToken);
             _jobQueue.Enqueue(job, 0);
