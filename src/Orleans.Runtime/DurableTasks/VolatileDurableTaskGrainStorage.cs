@@ -241,6 +241,13 @@ public class VolatileDurableTaskGrainStorage : IDurableTaskGrainStorage
         AddOrUpdateTask(taskId, typedState);
     }
 
+    public void SetTaskKind(TaskId taskId, IDurableTaskState state, DurableTaskKind kind)
+    {
+        var typedState = GetState(state);
+        typedState.Kind = kind;
+        AddOrUpdateTask(taskId, typedState);
+    }
+
     private static DurableTaskState GetState(IDurableTaskState state)
     {
         if (state is not DurableTaskState result)

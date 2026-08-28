@@ -23,6 +23,7 @@ public interface IDurableTaskGrainStorage
     void SetRemoteTarget(TaskId taskId, IDurableTaskState state, GrainId target);
     void SetPendingCancellationDestination(TaskId taskId, IDurableTaskState state, GrainId target);
     void SetCancellationTombstone(TaskId taskId, IDurableTaskState state, bool value);
+    void SetTaskKind(TaskId taskId, IDurableTaskState state, DurableTaskKind kind);
 
     bool TryGetTask(TaskId taskId, [NotNullWhen(true)] out IDurableTaskState? state);
 

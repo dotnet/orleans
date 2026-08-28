@@ -5,6 +5,32 @@ using Orleans.Runtime;
 
 namespace Orleans.DurableTasks;
 
+/// <summary>
+/// Identifies how an incomplete durable task is resumed after activation recovery.
+/// </summary>
+public enum DurableTaskKind
+{
+    /// <summary>
+    /// The task predates explicit task-kind persistence.
+    /// </summary>
+    Unspecified,
+
+    /// <summary>
+    /// The task is executable within the local durable execution context.
+    /// </summary>
+    Local,
+
+    /// <summary>
+    /// The task is owned by an external durable scheduler, such as a durable delay.
+    /// </summary>
+    Scheduled,
+
+    /// <summary>
+    /// The task is an outbound request owned by another grain.
+    /// </summary>
+    Remote,
+}
+
 /*
  * Grain activates
  * Grain enumerates stored pending tasks and re-invokes any which are not completed.
@@ -14,6 +40,11 @@ namespace Orleans.DurableTasks;
 
 public interface IDurableTaskState
 {
+    /// <summary>
+    /// Gets the persisted task kind used to recover incomplete work.
+    /// </summary>
+    public DurableTaskKind Kind { get; }
+
     /// <summary>
     /// The result of the task, which will be <see langword="null"/> if the task has not yet completed.
     /// </summary>

@@ -53,6 +53,10 @@ public class DurableTaskState : IDurableTaskState
     [Id(9)]
     internal bool IsCancellationTombstone { get; set; }
 
+    /// <inheritdoc cref="IDurableTaskState.Kind"/>
+    [Id(10)]
+    public DurableTaskKind Kind { get; set; }
+
     IReadOnlySet<GrainId> IDurableTaskState.CompletionDestinations => CompletionDestinations;
     IDurableTaskRequest? IDurableTaskState.Request => Request;
     DateTimeOffset? IDurableTaskState.CompletedAt => CompletedAt;

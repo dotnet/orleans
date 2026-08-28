@@ -27,6 +27,7 @@ public class JobScheduler(IJobStorage storage, ILogger<JobScheduler> logger)
 {
     private readonly Dictionary<string, object> _handlers = [];
     private readonly Dictionary<TaskId, JobDurableExecutionContext> _tasks = [];
+    private readonly Dictionary<TaskId, JobTaskHandle> _taskHandles = [];
     private readonly Dictionary<TaskId, Task> _runningTasks = [];
     private readonly IJobStorage _storage = storage;
     private readonly ILogger<JobScheduler> _logger = logger;
@@ -40,12 +41,18 @@ public class JobScheduler(IJobStorage storage, ILogger<JobScheduler> logger)
     private async ValueTask RecoverAsync(CancellationToken cancellationToken)
     {
         await _storage.ReadAsync(cancellationToken);
-        foreach (var (taskId, taskState) in _storage.Tasks)
+        var tasks = _storage.Tasks.ToList();
+        foreach (var (taskId, taskState) in tasks)
         {
-            if (taskState.Result is null)
+            _ = RehydrateTaskFromStorage(taskId, taskState);
+        }
+
+        foreach (var (taskId, taskState) in tasks)
+        {
+            if (taskState.Result is null && taskState.Type is not null)
             {
-                var job = new JobTask(taskState.Type!, taskState.Arguments, this);
-                var executionContext = RehydrateTaskFromStorage(taskId, taskState);
+                var job = new JobTask(taskState.Type, taskState.Arguments, this);
+                var executionContext = _tasks[taskId];
                 InvokeRequestMethod(job, taskId, executionContext, cancellationToken);
             }
         }
@@ -57,7 +64,12 @@ public class JobScheduler(IJobStorage storage, ILogger<JobScheduler> logger)
     /// <param name="taskId">The task id.</param>
     /// <param name="state">The task state.</param>
     /// <returns>The new execution context.</returns>
-    private JobDurableExecutionContext CreateExecutionContext(TaskId taskId, JobTaskState state) => _tasks[taskId] = new JobDurableExecutionContext(taskId, this, state);
+    private JobDurableExecutionContext CreateExecutionContext(TaskId taskId, JobTaskState state)
+    {
+        var context = _tasks[taskId] = new JobDurableExecutionContext(taskId, this, state);
+        _taskHandles[taskId] = new JobTaskHandle(taskId, state.Result);
+        return context;
+    }
 
     /// <summary>
     /// Gets the execution context corresponding to the provided task, if it exists, and returns it.
@@ -84,19 +96,7 @@ public class JobScheduler(IJobStorage storage, ILogger<JobScheduler> logger)
 
     private JobDurableExecutionContext RehydrateTaskFromStorage(TaskId taskId, JobTaskState state)
     {
-        // Rehydrate the execution context from its persisted state.
-        var executionContext = new JobDurableExecutionContext(taskId, this, state);
-
-        // If the task has completed, set the result now.
-        if (state.Result is { } response)
-        {
-            //DurableTaskRuntimeHelper.SetResult(executionContext, response);
-            throw new NotImplementedException();
-        }
-
-        // Move the task into the list of active tasks.
-        _tasks[taskId] = executionContext;
-        return executionContext;
+        return CreateExecutionContext(taskId, state);
     }
 
     private async Task<JobDurableExecutionContext> CreateExecutionContextAsync(TaskId taskId, string? type, string[]? arguments, CancellationToken cancellationToken)
@@ -157,10 +157,9 @@ public class JobScheduler(IJobStorage storage, ILogger<JobScheduler> logger)
 
     internal async ValueTask<DurableTaskResponse> ScheduleAsync(JobTask job, TaskId taskId, CancellationToken cancellationToken)
     {
+        await _asyncLock.WaitAsync(cancellationToken);
         try
         {
-            await _asyncLock.WaitAsync();
-
             if (TryGetExecutionContext(taskId, out var executionContext))
             {
                 if (!string.Equals(executionContext.State.Type, job.Type, StringComparison.Ordinal))
@@ -169,8 +168,9 @@ public class JobScheduler(IJobStorage storage, ILogger<JobScheduler> logger)
                 }
 
                 // and similarly for the job arguments...
-                //return DurableTaskRuntimeHelper.Poll(executionContext);
-                throw new NotImplementedException();
+                return await _taskHandles[taskId].PollAsync(
+                    new PollingOptions { PollTimeout = TimeSpan.Zero },
+                    cancellationToken);
             }
 
             executionContext = await CreateExecutionContextAsync(taskId, job.Type, job.Arguments, cancellationToken);
@@ -178,8 +178,7 @@ public class JobScheduler(IJobStorage storage, ILogger<JobScheduler> logger)
             // Start invoking the newly defined task.
             InvokeRequestMethod(job, taskId, executionContext, cancellationToken);
 
-            //return DurableTaskRuntimeHelper.Poll(executionContext);
-            throw new NotImplementedException();
+            return DurableTaskResponse.Pending;
         }
         finally
         {
@@ -189,38 +188,52 @@ public class JobScheduler(IJobStorage storage, ILogger<JobScheduler> logger)
 
     public async ValueTask<IScheduledTaskHandle> InvokeAsync(TaskId taskId, DurableTask taskDefinition, CancellationToken cancellationToken)
     {
-        var ctx = await EvaluateStepAsync(taskId, taskDefinition, cancellationToken);
-
-        //return await DurableTaskRuntimeHelper.WaitAsync(ctx, cancellationToken);
-        throw new NotImplementedException();
-    }
-
-    private async ValueTask<DurableExecutionContext> EvaluateStepAsync(TaskId taskId, DurableTask taskDefinition, CancellationToken cancellationToken)
-    {
+        await _asyncLock.WaitAsync(cancellationToken);
         try
         {
-            await _asyncLock.WaitAsync(cancellationToken);
-
             if (!TryGetExecutionContext(taskId, out var executionContext))
             {
                 executionContext = await CreateExecutionContextAsync(taskId, type: null, arguments: null, cancellationToken);
             }
-
-            try
+            else if (executionContext.State.Result is not null || _runningTasks.ContainsKey(taskId))
             {
-                var response = await DurableTaskRuntimeHelper.RunAsync(taskDefinition, executionContext);
-                await CompleteRequestWithResponse(taskId, response, executionContext, cancellationToken);
-            }
-            catch (Exception exception)
-            {
-                await CompleteRequestWithResponse(taskId, DurableTaskResponse.FromException(exception), executionContext, cancellationToken);
+                return _taskHandles[taskId];
             }
 
-            return executionContext;
+            _runningTasks.Add(
+                taskId,
+                InvokeTaskDefinitionCore(taskId, taskDefinition, executionContext, cancellationToken));
+            return _taskHandles[taskId];
         }
         finally
         {
             _asyncLock.Release();
+        }
+    }
+
+    private async Task InvokeTaskDefinitionCore(
+        TaskId taskId,
+        DurableTask taskDefinition,
+        JobDurableExecutionContext executionContext,
+        CancellationToken cancellationToken)
+    {
+        await Task.Yield();
+        try
+        {
+            var response = await DurableTaskRuntimeHelper.RunAsync(taskDefinition, executionContext);
+            await CompleteRequestWithResponse(taskId, response, executionContext, cancellationToken);
+        }
+        catch (Exception exception)
+        {
+            await CompleteRequestWithResponse(
+                taskId,
+                DurableTaskResponse.FromException(exception),
+                executionContext,
+                cancellationToken);
+        }
+        finally
+        {
+            _runningTasks.Remove(taskId);
         }
     }
 
@@ -245,6 +258,10 @@ public class JobScheduler(IJobStorage storage, ILogger<JobScheduler> logger)
             var argString = arguments switch { { Length: 1 } arg => arg[0], { Length: > 1 } => string.Join(", ", arguments), _ => "" };
             _logger.LogError(exception, "Error invoking durable task request {Type}({Arguments})", job.Type, argString);
             await CompleteRequestWithResponse(taskId, DurableTaskResponse.FromException(exception), executionContext, cancellationToken);
+        }
+        finally
+        {
+            _runningTasks.Remove(taskId);
         }
     }
 
@@ -273,8 +290,7 @@ public class JobScheduler(IJobStorage storage, ILogger<JobScheduler> logger)
             await _storage.WriteAsync(cancellationToken);
 
             // TODO: visibility of results must only happen once all child tasks have completed.
-            //DurableTaskRuntimeHelper.SetResult(executionContext, response);
-            throw new NotImplementedException();
+            _taskHandles[taskId].TrySetResponse(response);
         }
     }
 
@@ -375,7 +391,18 @@ public class JobScheduler(IJobStorage storage, ILogger<JobScheduler> logger)
 
     internal IScheduledTaskHandle GetScheduledTaskHandle(TaskId taskId)
     {
-        throw new NotImplementedException();
+        if (_taskHandles.TryGetValue(taskId, out var handle))
+        {
+            return handle;
+        }
+
+        if (_storage.TryGetTask(taskId, out var state))
+        {
+            _ = RehydrateTaskFromStorage(taskId, state);
+            return _taskHandles[taskId];
+        }
+
+        throw new KeyNotFoundException($"A task with the identifier '{taskId}' was not found.");
     }
 
     internal class JobTask(string type, string[]? args, JobScheduler jobScheduler) : DurableTask<string>, ISchedulableTask
@@ -386,7 +413,7 @@ public class JobScheduler(IJobStorage storage, ILogger<JobScheduler> logger)
 
         public IScheduledTaskHandle GetHandle(TaskId taskId)
         {
-            throw new NotImplementedException();
+            return _jobScheduler.GetScheduledTaskHandle(taskId);
         }
 
         public ValueTask<DurableTaskResponse> ScheduleAsync(TaskId taskId, CancellationToken cancellationToken)
@@ -416,6 +443,54 @@ public class JobScheduler(IJobStorage storage, ILogger<JobScheduler> logger)
             }
 
             return response;
+        }
+    }
+
+    private sealed class JobTaskHandle(
+        TaskId taskId,
+        DurableTaskResponse? response) : IScheduledTaskHandle
+    {
+        private readonly TaskCompletionSource<DurableTaskResponse> _completion =
+            response is null
+                ? new(TaskCreationOptions.RunContinuationsAsynchronously)
+                : CreateCompleted(response);
+
+        public TaskId TaskId { get; } = taskId;
+
+        public ValueTask CancelAsync(CancellationToken cancellationToken) =>
+            ValueTask.FromException(new NotSupportedException("Job cancellation is not implemented by this playground."));
+
+        public async ValueTask<DurableTaskResponse> PollAsync(
+            PollingOptions options,
+            CancellationToken cancellationToken)
+        {
+            if (options.PollTimeout > TimeSpan.Zero && !_completion.Task.IsCompleted)
+            {
+                try
+                {
+                    await _completion.Task.WaitAsync(options.PollTimeout, cancellationToken);
+                }
+                catch (TimeoutException)
+                {
+                }
+            }
+
+            return _completion.Task.IsCompleted
+                ? await _completion.Task
+                : DurableTaskResponse.Pending;
+        }
+
+        public async ValueTask<DurableTaskResponse> WaitAsync(CancellationToken cancellationToken) =>
+            await _completion.Task.WaitAsync(cancellationToken);
+
+        public bool TrySetResponse(DurableTaskResponse result) => _completion.TrySetResult(result);
+
+        private static TaskCompletionSource<DurableTaskResponse> CreateCompleted(DurableTaskResponse result)
+        {
+            var completion = new TaskCompletionSource<DurableTaskResponse>(
+                TaskCreationOptions.RunContinuationsAsynchronously);
+            completion.SetResult(result);
+            return completion;
         }
     }
 }

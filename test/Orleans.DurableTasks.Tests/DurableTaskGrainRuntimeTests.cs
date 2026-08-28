@@ -99,6 +99,7 @@ public class DurableTaskGrainRuntimeTests
         Assert.True(fixture.Storage.TryGetTask(taskId, out var state));
         Assert.Same(request, state.Request);
         Assert.Empty(state.CompletionDestinations);
+        Assert.Equal(DurableTaskKind.Local, state.Kind);
 
         // Allow the fire-and-forget invocation to complete, then verify the final response.
         var finalResponse = await fixture.Runtime.GetScheduledTaskHandle(taskId).WaitAsync(BoundedWait());
@@ -480,6 +481,70 @@ public class DurableTaskGrainRuntimeTests
         Assert.Equal(1, stateAfterRestart.Result.GetResult<int>());
     }
 
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task ResumePendingTasksAsync_ReplaysLocalChildRegardlessOfStorageOrder(bool childFirst)
+    {
+        var fixture = CreateFixture();
+        var parentId = TaskId.Create($"local-recovery-{childFirst}");
+        var childId = parentId.Child("named:5:child:0");
+        var childStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var childCompletion = new TaskCompletionSource<int>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var childInvocationCount = 0;
+        var request = new RuntimeTestDurableTaskRequest(Parent)
+        {
+            Context = new DurableTaskRequestContext { TargetId = fixture.GrainId },
+        };
+
+        if (childFirst)
+        {
+            AddChild();
+            AddParent();
+        }
+        else
+        {
+            AddParent();
+            AddChild();
+        }
+
+        await fixture.Storage.WriteAsync(CancellationToken.None);
+        await fixture.Storage.ReadAsync(CancellationToken.None);
+        var restarted = CreateSecondRuntime(fixture);
+
+        await restarted.ResumePendingTasksAsync(CancellationToken.None);
+        await childStarted.Task.WaitAsync(TimeSpan.FromSeconds(10));
+
+        Assert.Equal(1, Volatile.Read(ref childInvocationCount));
+        childCompletion.SetResult(17);
+        var response = await restarted.GetScheduledTaskHandle(parentId).WaitAsync(BoundedWait());
+        Assert.Equal(17, response.GetResult<int>());
+        Assert.Equal(1, request.CreateTaskCallCount);
+        Assert.Equal(1, Volatile.Read(ref childInvocationCount));
+
+        void AddParent()
+        {
+            var state = fixture.Storage.GetOrCreateTask(parentId, request);
+            fixture.Storage.SetTaskKind(parentId, state, DurableTaskKind.Local);
+        }
+
+        void AddChild()
+        {
+            var state = fixture.Storage.GetOrCreateTask(childId, request: null);
+            fixture.Storage.SetTaskKind(childId, state, DurableTaskKind.Local);
+        }
+
+        async DurableTask<int> Parent()
+        {
+            return await DurableTask.Run<int>(_ =>
+            {
+                Interlocked.Increment(ref childInvocationCount);
+                childStarted.TrySetResult();
+                return childCompletion.Task;
+            }).WithId("child");
+        }
+    }
+
     [Fact]
     public async Task Completion_NotifiesAllRegisteredCompletionDestinations_ThenClearsThem()
     {
@@ -804,6 +869,7 @@ public class DurableTaskGrainRuntimeTests
         Assert.True(fixture.Storage.TryGetTask(taskId, out var state));
         Assert.NotNull(state.Result);
         Assert.Equal(321, state.Result!.GetResult<int>());
+        Assert.Equal(DurableTaskKind.Scheduled, state.Kind);
     }
 
     [Fact]
@@ -905,6 +971,62 @@ public class DurableTaskGrainRuntimeTests
 
         Assert.True(fixture.Storage.TryGetTask(taskId, out var state));
         Assert.Null(state.Result);
+        Assert.Equal(DurableTaskKind.Scheduled, state.Kind);
+    }
+
+    [Fact]
+    public async Task ResumePendingTasksAsync_RehydratesScheduledDelayWithoutSchedulingDuplicate()
+    {
+        var fixture = CreateFixture(withTransport: true);
+        var parentId = TaskId.Create("scheduled-delay-recovery");
+        var taskId = parentId.Child("delay");
+        DurableExecutionContext.SetCurrentContext(new GrainDurableExecutionContext(parentId, fixture.Runtime));
+        try
+        {
+            _ = await fixture.Runtime.ScheduleChildAsync(
+                taskId,
+                DurableTask.Delay(TimeSpan.FromHours(1)),
+                CancellationToken.None);
+        }
+        finally
+        {
+            DurableExecutionContext.SetCurrentContext(null);
+        }
+
+        Assert.Single(fixture.Transport!.ScheduledResumes);
+        await fixture.Storage.ReadAsync(CancellationToken.None);
+        var restarted = CreateSecondRuntime(fixture);
+        await restarted.ResumePendingTasksAsync(CancellationToken.None);
+
+        var recovered = await restarted.ScheduleChildAsync(
+            taskId,
+            DurableTask.Delay(TimeSpan.FromHours(2)),
+            CancellationToken.None);
+        var response = await recovered.PollAsync(
+            new PollingOptions { PollTimeout = TimeSpan.Zero },
+            CancellationToken.None);
+
+        Assert.False(response.IsCompleted);
+        Assert.Single(fixture.Transport.ScheduledResumes);
+    }
+
+    [Fact]
+    public async Task ResumePendingTasksAsync_CompletesCanceledScheduledTaskWithoutReusingSchedulerMessage()
+    {
+        var fixture = CreateFixture(withTransport: true);
+        var taskId = TaskId.Create("canceled-scheduled-recovery");
+        var state = fixture.Storage.GetOrCreateTask(taskId, request: null);
+        fixture.Storage.SetTaskKind(taskId, state, DurableTaskKind.Scheduled);
+        fixture.Storage.RequestCancellation(taskId, state);
+        await fixture.Storage.WriteAsync(CancellationToken.None);
+        await fixture.Storage.ReadAsync(CancellationToken.None);
+        var restarted = CreateSecondRuntime(fixture);
+
+        await restarted.ResumePendingTasksAsync(CancellationToken.None);
+        var response = await restarted.GetScheduledTaskHandle(taskId).WaitAsync(BoundedWait());
+
+        Assert.Equal(DurableTaskStatus.Canceled, response.Status);
+        Assert.Empty(fixture.Transport!.ScheduledResumes);
     }
 
     [Fact]
@@ -961,6 +1083,7 @@ public class DurableTaskGrainRuntimeTests
         Assert.True(fixture.Storage.TryGetTask(taskId, out var state));
         Assert.Same(request, state.Request);
         Assert.Equal(target, state.RemoteTarget);
+        Assert.Equal(DurableTaskKind.Remote, state.Kind);
         await fixture.Runtime.AcceptResponseAsync(
             taskId,
             target,

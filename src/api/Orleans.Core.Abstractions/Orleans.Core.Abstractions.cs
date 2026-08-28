@@ -1809,6 +1809,7 @@ namespace Orleans.DurableTasks
         void SetRemoteTarget(System.Distributed.DurableTasks.TaskId taskId, IDurableTaskState state, Runtime.GrainId target);
         void SetRequest(System.Distributed.DurableTasks.TaskId taskId, IDurableTaskState state, IDurableTaskRequest request);
         void SetResponse(System.Distributed.DurableTasks.TaskId taskId, IDurableTaskState state, System.Distributed.DurableTasks.DurableTaskResponse response);
+        void SetTaskKind(System.Distributed.DurableTasks.TaskId taskId, IDurableTaskState state, DurableTaskKind kind);
         bool TryGetTask(System.Distributed.DurableTasks.TaskId taskId, out IDurableTaskState? state);
         System.Threading.Tasks.ValueTask WriteAsync(System.Threading.CancellationToken cancellationToken);
     }
@@ -1855,6 +1856,8 @@ namespace Orleans.DurableTasks
 
         bool IsCancellationTombstone { get; set; }
 
+        DurableTaskKind Kind { get; }
+
         Runtime.GrainId PendingCancellationDestination { get; set; }
 
         Runtime.GrainId RemoteTarget { get; }
@@ -1862,6 +1865,14 @@ namespace Orleans.DurableTasks
         IDurableTaskRequest? Request { get; }
 
         System.Distributed.DurableTasks.DurableTaskResponse? Result { get; }
+    }
+
+    public enum DurableTaskKind
+    {
+        Unspecified = 0,
+        Local = 1,
+        Scheduled = 2,
+        Remote = 3,
     }
 
     [GenerateSerializer]
