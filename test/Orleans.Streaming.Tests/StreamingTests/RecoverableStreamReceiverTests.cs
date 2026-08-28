@@ -352,6 +352,21 @@ public sealed class RecoverableStreamReceiverTests
     }
 
     [Fact]
+    public void Cache_UnlimitedFlowControlUsesConfiguredReadLimit()
+    {
+        var cache = new RecoverableStreamQueueCache<TestQueueMessage>(
+            100,
+            new ObjectPool<FixedSizeBuffer>(() => new FixedSizeBuffer(4 * 1024)),
+            new TestDataAdapter(),
+            new NoOpEvictionStrategy(),
+            NullLogger.Instance,
+            flowController: new FixedFlowController(QueueAdapterConstants.UNLIMITED_GET_QUEUE_MSG));
+
+        Assert.Equal(100, cache.GetMaxAddCount());
+        Assert.False(cache.IsUnderPressure());
+    }
+
+    [Fact]
     public void Cache_DisposeDrainsMessagesReturnsBuffersAndAllocatesFreshBufferIfReused()
     {
         var streamId = StreamId.Create("namespace", Guid.NewGuid());
@@ -405,6 +420,38 @@ public sealed class RecoverableStreamReceiverTests
         Assert.Equal(0, cache.ItemCount);
         Assert.Equal(2, bufferPool.AllocateCount);
         Assert.Equal(2, bufferPool.FreeCount);
+    }
+
+    [Fact]
+    public void Cache_ReusesCurrentBufferAcrossAddsAndRollsBackFailedPacking()
+    {
+        var streamId = StreamId.Create("namespace", Guid.NewGuid());
+        var first = new TestQueueMessage(streamId, 1, "a");
+        var failed = new TestQueueMessage(streamId, 2, new string('b', 10));
+        var final = new TestQueueMessage(streamId, 3, new string('c', 10));
+        var bufferPool = new TrackingBufferPool(
+            GetPackedSize(first) + GetPackedSize(failed) + GetPackedSize(final) - 1);
+        var adapter = new TestDataAdapter();
+        var cache = new RecoverableStreamQueueCache<TestQueueMessage>(
+            100,
+            bufferPool,
+            adapter,
+            new NoOpEvictionStrategy(),
+            NullLogger.Instance);
+        _ = cache.Add([first], DateTime.UnixEpoch);
+        adapter.ThrowAfterPackingSequenceNumber = 2;
+
+        Assert.Throws<InvalidOperationException>(() => cache.Add([failed], DateTime.UnixEpoch));
+
+        adapter.ThrowAfterPackingSequenceNumber = null;
+        _ = cache.Add([final], DateTime.UnixEpoch);
+
+        Assert.Equal(2, cache.ItemCount);
+        Assert.Equal(1, bufferPool.AllocateCount);
+
+        static int GetPackedSize(TestQueueMessage message) =>
+            SegmentBuilder.CalculateAppendSize(message.SequenceNumber.ToString(CultureInfo.InvariantCulture))
+            + SegmentBuilder.CalculateAppendSize(message.Payload);
     }
 
     [Fact]
@@ -780,6 +827,7 @@ public sealed class RecoverableStreamReceiverTests
         public int PositionCallCount { get; private set; }
         public int FromQueueMessageCallCount { get; private set; }
         public int GetBatchContainerCallCount { get; private set; }
+        public long? ThrowAfterPackingSequenceNumber { get; set; }
 
         public StreamPosition GetStreamPosition(TestQueueMessage queueMessage)
         {
@@ -800,6 +848,11 @@ public sealed class RecoverableStreamReceiverTests
             var offset = 0;
             SegmentBuilder.Append(segment, ref offset, queueMessage.SequenceNumber.ToString(CultureInfo.InvariantCulture));
             SegmentBuilder.Append(segment, ref offset, queueMessage.Payload);
+            if (queueMessage.SequenceNumber == ThrowAfterPackingSequenceNumber)
+            {
+                throw new InvalidOperationException("packing failed");
+            }
+
             return new CachedMessage
             {
                 StreamId = streamPosition.StreamId,
@@ -1059,7 +1112,7 @@ public sealed class RecoverableStreamReceiverTests
         public int GetMaxAddCount() => maxAddCount;
     }
 
-    private sealed class TrackingBufferPool : IObjectPool<FixedSizeBuffer>
+    private sealed class TrackingBufferPool(int bufferSize = 4 * 1024) : IObjectPool<FixedSizeBuffer>
     {
         public int AllocateCount { get; private set; }
 
@@ -1068,7 +1121,7 @@ public sealed class RecoverableStreamReceiverTests
         public FixedSizeBuffer Allocate()
         {
             AllocateCount++;
-            return new(4 * 1024) { Pool = this };
+            return new(bufferSize) { Pool = this };
         }
 
         public void Free(FixedSizeBuffer resource)

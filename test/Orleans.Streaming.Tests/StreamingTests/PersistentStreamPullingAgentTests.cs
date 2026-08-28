@@ -2235,6 +2235,49 @@ namespace UnitTests.StreamingTests
         [TestProvider("None")]
         [TestArea("Streaming")]
         [Fact, TestCategory("BVT"), TestCategory("Streaming")]
+        public async Task Shutdown_DoesNotCheckpointBatchReturnedAfterShutdownStarts()
+        {
+            var queueReadStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            var queueReadReleased = new TaskCompletionSource<IList<IBatchContainer>>(TaskCreationOptions.RunContinuationsAsynchronously);
+            var queueId = QueueId.GetQueueId("queue", 0u, 0u);
+            var streamId = StreamId.Create("namespace", Guid.NewGuid());
+            var receiver = Substitute.For<IQueueAdapterReceiver>();
+            receiver.GetQueueMessagesAsync(Arg.Any<int>(), Arg.Any<CancellationToken>())
+                .Returns(async _ =>
+                {
+                    queueReadStarted.TrySetResult();
+                    return await queueReadReleased.Task;
+                });
+            receiver.Shutdown(Arg.Any<TimeSpan>()).Returns(Task.CompletedTask);
+            var queueCache = Substitute.For<IQueueCache>();
+            queueCache.GetMaxAddCount().Returns(1);
+            var queueAdapterCache = Substitute.For<IQueueAdapterCache>();
+            queueAdapterCache.CreateQueueCache(queueId).Returns(queueCache);
+            var agent = CreateAgent(pubSub: null, queueId, receiver, queueAdapterCache);
+            var testAccessor = (PersistentStreamPullingAgent.ITestAccessor)agent;
+            await InitializeAgent(agent);
+
+            var pumpTask = testAccessor.RunQueuePump(queueId, TestContext.Current.CancellationToken);
+            await queueReadStarted.Task.WaitAsync(TestContext.Current.CancellationToken);
+            var shutdownTask = testAccessor.Shutdown();
+            queueReadReleased.SetResult(
+            [
+                new GeneratedBatchContainer(streamId, 1, new EventSequenceTokenV2(1)),
+            ]);
+
+            await shutdownTask;
+            await pumpTask;
+
+            queueCache.DidNotReceive().AddToCache(Arg.Any<IList<IBatchContainer>>());
+            queueCache.DidNotReceive().UpdateDeliveryProgress(
+                Arg.Any<StreamSequenceToken?>(),
+                Arg.Any<DateTime>());
+        }
+
+        [TestSuite("BVT")]
+        [TestProvider("None")]
+        [TestArea("Streaming")]
+        [Fact, TestCategory("BVT"), TestCategory("Streaming")]
         public async Task Shutdown_IsIdempotent()
         {
             var queueId = QueueId.GetQueueId("queue", 0u, 0u);
