@@ -7,6 +7,7 @@ using System.Reactive.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.Internal;
 using Orleans.Reminders;
+using Orleans.Runtime;
 using Orleans.Runtime.ReminderService;
 using Orleans.Testing.Reminders;
 using Orleans.TestingHost;
@@ -217,6 +218,65 @@ namespace UnitTests.TimerTests
             Assert.Equal(1, await grain.GetCounter(DR).WaitAsync(cancellation.Token));
             Assert.Equal(1, observer.GetTickCount(grainId, DR));
             await StopReminderAndWaitForQuiescenceAsync(grain, DR, grain.StopReminder, cancellation.Token);
+        }
+
+        [Fact]
+        public async Task Rem_Grain_GT_1F1J_MultiGrain()
+        {
+            await Test_Reminders_GT_1F1J_MultiGrain(TestContext.Current.CancellationToken);
+        }
+
+        [Fact]
+        public async Task Rem_Grain_PostTopologyConvergence_DoesNotSuppressMessageRejection()
+        {
+            using var cts = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
+            cts.CancelAfter(TestConstants.InitTimeout);
+            var rejection = (OrleansMessageRejectionException)Activator.CreateInstance(
+                typeof(OrleansMessageRejectionException),
+                System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic,
+                binder: null,
+                args: ["Controlled post-convergence rejection."],
+                culture: null)!;
+            var callCounts = new int[4];
+
+            var actual = await Assert.ThrowsAsync<OrleansMessageRejectionException>(() =>
+                InvokeGrainCallsAfterTopologyConvergenceAsync(
+                    cts.Token,
+                    CreateCall(0),
+                    CreateCall(1),
+                    CreateCall(2, rejection),
+                    CreateCall(3)));
+
+            Assert.Same(rejection, actual);
+            Assert.All(callCounts, count => Assert.Equal(1, count));
+
+            Func<Task> CreateCall(int index, Exception? exception = null) => () =>
+            {
+                callCounts[index]++;
+                return exception is null ? Task.CompletedTask : Task.FromException(exception);
+            };
+        }
+
+        [Fact]
+        public async Task Rem_Grain_TopologyConvergenceTimeout_PreventsGrainCalls()
+        {
+            using var cts = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
+            cts.CancelAfter(TestConstants.InitTimeout);
+            var timeout = new TimeoutException("Controlled topology convergence timeout.");
+            var callCount = 0;
+
+            var actual = await Assert.ThrowsAsync<TimeoutException>(() =>
+                InvokeGrainCallsAfterTopologyConvergenceAsync(
+                    _ => Task.FromException(timeout),
+                    cts.Token,
+                    () =>
+                    {
+                        callCount++;
+                        return Task.CompletedTask;
+                    }));
+
+            Assert.Same(timeout, actual);
+            Assert.Equal(0, callCount);
         }
 
         [Fact]
