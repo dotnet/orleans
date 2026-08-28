@@ -7,6 +7,7 @@ using System.Reactive.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.Internal;
 using Orleans.Reminders;
+using Orleans.Runtime;
 using Orleans.Runtime.ReminderService;
 using Orleans.Testing.Reminders;
 using Orleans.TestingHost;
@@ -210,6 +211,33 @@ namespace UnitTests.TimerTests
         public async Task Rem_Grain_GT_1F1J_MultiGrain()
         {
             await Test_Reminders_GT_1F1J_MultiGrain(TestContext.Current.CancellationToken);
+        }
+
+        [Fact]
+        public async Task Rem_Grain_PostTopologyConvergence_DoesNotSuppressMessageRejection()
+        {
+            using var cts = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
+            cts.CancelAfter(TestConstants.InitTimeout);
+            var rejection = (OrleansMessageRejectionException)System.Runtime.CompilerServices.RuntimeHelpers
+                .GetUninitializedObject(typeof(OrleansMessageRejectionException));
+            var callCounts = new int[4];
+
+            var actual = await Assert.ThrowsAsync<OrleansMessageRejectionException>(() =>
+                InvokeGrainCallsAfterTopologyConvergenceAsync(
+                    cts.Token,
+                    CreateCall(0),
+                    CreateCall(1),
+                    CreateCall(2, rejection),
+                    CreateCall(3)));
+
+            Assert.Same(rejection, actual);
+            Assert.All(callCounts, count => Assert.Equal(1, count));
+
+            Func<Task> CreateCall(int index, Exception? exception = null) => () =>
+            {
+                callCounts[index]++;
+                return exception is null ? Task.CompletedTask : Task.FromException(exception);
+            };
         }
 
         [Fact]
