@@ -4064,7 +4064,9 @@ namespace UnitTests.StreamingTests
             Assert.Empty(queueCache.DeliveryProgressTokens);
 
             timeProvider.Advance(TimeSpan.FromTicks(1));
-            await queueCache.DeliveryProgressUpdated.WaitAsync(TimeSpan.FromSeconds(5));
+            await queueCache.DeliveryProgressUpdated.WaitAsync(
+                TimeSpan.FromSeconds(5),
+                TestContext.Current.CancellationToken);
 
             Assert.Equal(providerEarliest, Assert.Single(queueCache.DeliveryProgressTokens));
             Assert.Equal(timeProvider.GetUtcNow().UtcDateTime, Assert.Single(queueCache.DeliveryProgressUtcTimes));
@@ -4262,7 +4264,9 @@ namespace UnitTests.StreamingTests
             queueCache.ClearDeliveryProgress();
 
             timeProvider.Advance(options.DeliveryProgressUpdateInterval);
-            await queueCache.DeliveryProgressUpdated.WaitAsync(TimeSpan.FromSeconds(5));
+            await queueCache.DeliveryProgressUpdated.WaitAsync(
+                TimeSpan.FromSeconds(5),
+                TestContext.Current.CancellationToken);
 
             Assert.Equal(deliveredToken, Assert.Single(queueCache.DeliveryProgressTokens));
             await testAccessor.Shutdown();
@@ -4323,7 +4327,9 @@ namespace UnitTests.StreamingTests
             await testAccessor.RunConsumerCursor(consumerData);
             Assert.Equal(10, consumerData.LastSafePartitionToken?.SequenceNumber);
             timeProvider.Advance(options.DeliveryProgressUpdateInterval);
-            await queueCache.DeliveryProgressUpdated.WaitAsync(TimeSpan.FromSeconds(5));
+            await queueCache.DeliveryProgressUpdated.WaitAsync(
+                TimeSpan.FromSeconds(5),
+                TestContext.Current.CancellationToken);
             Assert.Equal(10, Assert.Single(queueCache.DeliveryProgressTokens)?.SequenceNumber);
             await testAccessor.Shutdown();
         }
@@ -4412,7 +4418,9 @@ namespace UnitTests.StreamingTests
                 Assert.True(await testAccessor.ReadFromQueue(queueId, receiver, 2));
                 await testAccessor.GetPubSubCache();
                 timeProvider.Advance(options.DeliveryProgressUpdateInterval);
-                await queueCache.DeliveryProgressUpdated.WaitAsync(TimeSpan.FromSeconds(5));
+                await queueCache.DeliveryProgressUpdated.WaitAsync(
+                    TimeSpan.FromSeconds(5),
+                    TestContext.Current.CancellationToken);
 
                 var checkpoint = Assert.Single(queueCache.DeliveryProgressTokens);
                 Assert.NotNull(checkpoint);
@@ -4517,7 +4525,9 @@ namespace UnitTests.StreamingTests
             Assert.Equal(filteredToken, consumerData.LastProcessedToken);
 
             timeProvider.Advance(options.DeliveryProgressUpdateInterval);
-            await queueCache.DeliveryProgressUpdated.WaitAsync(TimeSpan.FromSeconds(5));
+            await queueCache.DeliveryProgressUpdated.WaitAsync(
+                TimeSpan.FromSeconds(5),
+                TestContext.Current.CancellationToken);
             Assert.Equal(filteredToken, Assert.Single(queueCache.DeliveryProgressTokens));
 
             await testAccessor.Shutdown();
@@ -4578,14 +4588,20 @@ namespace UnitTests.StreamingTests
             queueCache.ClearDeliveryProgress();
 
             Assert.True(await testAccessor.ReadFromQueue(queueId, receiver, 1));
-            await slowConsumer.Delivered.Task.WaitAsync(TimeSpan.FromSeconds(5));
-            await fastConsumer.Delivered.Task.WaitAsync(TimeSpan.FromSeconds(5));
+            await slowConsumer.Delivered.Task.WaitAsync(
+                TimeSpan.FromSeconds(5),
+                TestContext.Current.CancellationToken);
+            await fastConsumer.Delivered.Task.WaitAsync(
+                TimeSpan.FromSeconds(5),
+                TestContext.Current.CancellationToken);
             await testAccessor.GetPubSubCache();
             Assert.Equal(previousToken, slowConsumerData.LastProcessedToken);
             Assert.Equal(currentToken, fastConsumerData.LastProcessedToken);
 
             timeProvider.Advance(options.DeliveryProgressUpdateInterval);
-            await queueCache.DeliveryProgressUpdated.WaitAsync(TimeSpan.FromSeconds(5));
+            await queueCache.DeliveryProgressUpdated.WaitAsync(
+                TimeSpan.FromSeconds(5),
+                TestContext.Current.CancellationToken);
             Assert.Equal(previousToken, Assert.Single(queueCache.DeliveryProgressTokens));
 
             slowConsumer.ReleaseDelivery();
