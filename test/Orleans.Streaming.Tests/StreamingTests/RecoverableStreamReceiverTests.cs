@@ -720,6 +720,30 @@ public sealed class RecoverableStreamReceiverTests
     }
 
     [Fact]
+    public void Registry_FactoryFailureAllowsLaterCreationRetry()
+    {
+        var queue = QueueId.GetQueueId("queue", 0, 0);
+        var attempts = 0;
+        var registry = new QueueAdapterReceiverRegistry<TestCombinedReceiver>(_ =>
+        {
+            if (Interlocked.Increment(ref attempts) == 1)
+            {
+                throw new InvalidOperationException("creation failed");
+            }
+
+            return new TestCombinedReceiver();
+        });
+
+        Assert.Throws<InvalidOperationException>(() => registry.GetOrCreate(queue));
+        Assert.Empty(registry.Receivers);
+
+        var receiver = registry.GetOrCreate(queue);
+
+        Assert.Equal(2, attempts);
+        Assert.Same(receiver, Assert.Single(registry.Receivers).Value);
+    }
+
+    [Fact]
     public void Registry_RemoveAllowsFreshReceiverForReassignedQueue()
     {
         var queue = QueueId.GetQueueId("queue", 0, 0);
