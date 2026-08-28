@@ -293,7 +293,7 @@ public class CallbackDataTests
             completion.Release();
         }
 
-        Assert.Same(callback, await cancellationTask.WaitAsync(TimeSpan.FromSeconds(10)));
+        Assert.Same(callback, await cancellationTask.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken));
     }
 
     [TestSuite("BVT")]
