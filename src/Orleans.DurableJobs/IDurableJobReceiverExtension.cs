@@ -97,7 +97,8 @@ internal sealed partial class DurableJobReceiverExtension : IDurableJobReceiverE
         if (_featureHandlers.TryGetHandler(context.Job.Name, out var featureHandler))
         {
             return _featureHandlers.StartExecution(
-                token => ExecuteFeatureHandlerAsync(featureHandler, context, token));
+                token => ExecuteFeatureHandlerAsync(featureHandler, context, token),
+                holdTurnIsolation: false);
         }
 
         if (_grain.GrainInstance is not IDurableJobHandler handler)
@@ -107,7 +108,8 @@ internal sealed partial class DurableJobReceiverExtension : IDurableJobReceiverE
         }
 
         return _featureHandlers.StartExecution(
-            token => ExecuteHandlerAsync(handler, context, token));
+            token => ExecuteHandlerAsync(handler, context, token),
+            holdTurnIsolation: true);
     }
 
     private Task<DurableJobRunResult> ExecuteFeatureHandlerAsync(

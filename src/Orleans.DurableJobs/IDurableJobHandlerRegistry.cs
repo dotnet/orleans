@@ -74,7 +74,9 @@ internal interface IDurableJobHandlerLookup
 {
     CancellationToken ExecutionToken { get; }
 
-    Task<TResult> StartExecution<TResult>(Func<CancellationToken, Task<TResult>> factory);
+    Task<TResult> StartExecution<TResult>(
+        Func<CancellationToken, Task<TResult>> factory,
+        bool holdTurnIsolation);
 
     bool TryGetHandler(string jobName, [NotNullWhen(true)] out IDurableJobFeatureHandler? handler);
 
@@ -97,15 +99,18 @@ internal sealed class DurableJobHandlerRegistry : IDurableJobHandlerRegistry, ID
 
     public CancellationToken ExecutionToken => _lifetime?.Token ?? CancellationToken.None;
 
-    public Task<TResult> StartExecution<TResult>(Func<CancellationToken, Task<TResult>> factory) =>
-        _lifetime?.Start(token => StartUnderOrdinaryLease(factory, token))
-        ?? StartUnderOrdinaryLease(factory, CancellationToken.None);
-
-    private async Task<TResult> StartUnderOrdinaryLease<TResult>(
+    public Task<TResult> StartExecution<TResult>(
         Func<CancellationToken, Task<TResult>> factory,
-        CancellationToken cancellationToken)
+        bool holdTurnIsolation) =>
+        _lifetime?.Start(token => StartExecutionCore(factory, token, holdTurnIsolation))
+        ?? StartExecutionCore(factory, CancellationToken.None, holdTurnIsolation);
+
+    private async Task<TResult> StartExecutionCore<TResult>(
+        Func<CancellationToken, Task<TResult>> factory,
+        CancellationToken cancellationToken,
+        bool holdTurnIsolation)
     {
-        if (_turnIsolation is null)
+        if (!holdTurnIsolation || _turnIsolation is null)
         {
             return await factory(cancellationToken);
         }
@@ -246,7 +251,8 @@ internal sealed partial class DurableJobFeatureReceiverExtension : IDurableJobFe
         try
         {
             var result = await _handlers.StartExecution(
-                token => handler.ExecuteJobAsync(context, token).AsTask())
+                token => handler.ExecuteJobAsync(context, token).AsTask(),
+                holdTurnIsolation: false)
                 ?? throw new InvalidOperationException(
                     $"Durable job feature handler for '{context.Job.Name}' returned a null result.");
             CacheResult(key, result);
