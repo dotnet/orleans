@@ -30,7 +30,7 @@ internal sealed partial class ActivationData :
     IGrainContext,
     ICollectibleGrainContext,
     IGrainExtensionBinder,
-    IActivationWorkingSetMember,
+    IActivationWorkingSetMemberStatus,
     IGrainTimerRegistry,
     IGrainManagementExtension,
     IGrainCallCancellationExtension,
@@ -1134,7 +1134,7 @@ internal sealed partial class ActivationData :
         }
     }
 
-    bool IActivationWorkingSetMember.IsInWorkingSet
+    bool IActivationWorkingSetMemberStatus.IsInWorkingSet
     {
         get => IsInWorkingSet;
         set
@@ -1147,7 +1147,7 @@ internal sealed partial class ActivationData :
         }
     }
 
-    bool IActivationWorkingSetMember.IsIdle
+    bool IActivationWorkingSetMemberStatus.IsIdle
     {
         get => IsIdleInWorkingSet;
         set => IsIdleInWorkingSet = value;

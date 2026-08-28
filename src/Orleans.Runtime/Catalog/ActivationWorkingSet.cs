@@ -17,6 +17,7 @@ namespace Orleans.Runtime;
 /// </summary>
 internal sealed partial class ActivationWorkingSet : IActivationWorkingSet, ILifecycleParticipant<ISiloLifecycle>
 {
+    private const byte IsIdleMask = 0b0000_0001;
     private readonly ConcurrentDictionary<IActivationWorkingSetMember, byte> _members = new();
     private readonly ILogger _logger;
     private readonly IAsyncTimer _scanPeriodTimer;
@@ -46,7 +47,9 @@ internal sealed partial class ActivationWorkingSet : IActivationWorkingSet, ILif
     {
         foreach (var pair in _members)
         {
-            if (!pair.Key.IsIdle)
+            if (pair.Key is IActivationWorkingSetMemberStatus status
+                ? !status.IsIdle
+                : (pair.Value & IsIdleMask) == 0)
             {
                 yield return pair.Key;
             }
@@ -61,8 +64,12 @@ internal sealed partial class ActivationWorkingSet : IActivationWorkingSet, ILif
             throw new InvalidOperationException($"Member {member} is already a member of the working set");
         }
 
-        member.IsInWorkingSet = true;
-        member.IsIdle = false;
+        if (member is IActivationWorkingSetMemberStatus status)
+        {
+            status.IsInWorkingSet = true;
+            status.IsIdle = false;
+        }
+
         Interlocked.Increment(ref _activeCount);
         foreach (var observer in _observers)
         {
@@ -72,9 +79,18 @@ internal sealed partial class ActivationWorkingSet : IActivationWorkingSet, ILif
 
     public void OnActive(IActivationWorkingSetMember member)
     {
-        member.IsInWorkingSet = true;
-        member.IsIdle = false;
-        if (_members.TryAdd(member, 0))
+        var added = _members.TryAdd(member, 0);
+        if (member is IActivationWorkingSetMemberStatus status)
+        {
+            status.IsInWorkingSet = true;
+            status.IsIdle = false;
+        }
+        else if (!added)
+        {
+            _members[member] = 0;
+        }
+
+        if (added)
         {
             Interlocked.Increment(ref _activeCount);
         }
@@ -87,10 +103,15 @@ internal sealed partial class ActivationWorkingSet : IActivationWorkingSet, ILif
 
     public void OnEvicted(IActivationWorkingSetMember member)
     {
-        if (_members.TryRemove(member, out _))
+        var removed = _members.TryRemove(member, out _);
+        if (removed && member is IActivationWorkingSetMemberStatus status)
         {
-            member.IsInWorkingSet = false;
-            member.IsIdle = false;
+            status.IsInWorkingSet = false;
+            status.IsIdle = false;
+        }
+
+        if (removed)
+        {
             OnEvictedCore(member);
         }
     }
@@ -145,21 +166,30 @@ internal sealed partial class ActivationWorkingSet : IActivationWorkingSet, ILif
         MemberVisitResult result;
         // Enumeration can retain a member across removal and re-addition. CLOCK state is advisory, so visit the
         // member's current state instead of adding a dictionary validation to every scan.
-        if (!member.IsInWorkingSet)
+        var status = member as IActivationWorkingSetMemberStatus;
+        byte dictionaryState = 0;
+        if ((status is null && !_members.TryGetValue(member, out dictionaryState))
+            || (status is not null && !status.IsInWorkingSet))
         {
             result = MemberVisitResult.None;
         }
         else
         {
-            var wouldRemove = member.IsIdle;
+            var wouldRemove = status is not null
+                ? status.IsIdle
+                : (dictionaryState & IsIdleMask) != 0;
             if (member.IsCandidateForRemoval(wouldRemove))
             {
                 if (wouldRemove)
                 {
                     if (_members.TryRemove(member, out _))
                     {
-                        member.IsInWorkingSet = false;
-                        member.IsIdle = false;
+                        if (status is not null)
+                        {
+                            status.IsInWorkingSet = false;
+                            status.IsIdle = false;
+                        }
+
                         Interlocked.Decrement(ref _activeCount);
                         result = MemberVisitResult.Evicted;
                     }
@@ -170,13 +200,29 @@ internal sealed partial class ActivationWorkingSet : IActivationWorkingSet, ILif
                 }
                 else
                 {
-                    member.IsIdle = true;
+                    if (status is not null)
+                    {
+                        status.IsIdle = true;
+                    }
+                    else
+                    {
+                        _members[member] = IsIdleMask;
+                    }
+
                     result = MemberVisitResult.Idle;
                 }
             }
             else
             {
-                member.IsIdle = false;
+                if (wouldRemove && status is not null)
+                {
+                    status.IsIdle = false;
+                }
+                else if (wouldRemove)
+                {
+                    _members[member] = 0;
+                }
+
                 result = MemberVisitResult.Active;
             }
         }
@@ -276,16 +322,6 @@ public interface IActivationWorkingSet
 public interface IActivationWorkingSetMember
 {
     /// <summary>
-    /// Gets or sets whether this member is registered in the working set.
-    /// </summary>
-    bool IsInWorkingSet { get; set; }
-
-    /// <summary>
-    /// Gets or sets whether this member was idle during the previous working-set scan.
-    /// </summary>
-    bool IsIdle { get; set; }
-
-    /// <summary>
     /// Returns <see langword="true"/> if the member is eligible for removal, <see langword="false"/> otherwise.
     /// </summary>
     /// <returns><see langword="true"/> if the member is eligible for removal, <see langword="false"/> otherwise.</returns>
@@ -293,6 +329,13 @@ public interface IActivationWorkingSetMember
     /// If this method returns <see langword="true"/> and <paramref name="wouldRemove"/> is <see langword="true"/>, the member must be removed from the working set and is eligible to be added again via a call to <see cref="IActivationWorkingSet.OnActivated(IActivationWorkingSetMember)"/>.
     /// </remarks>
     bool IsCandidateForRemoval(bool wouldRemove);
+}
+
+internal interface IActivationWorkingSetMemberStatus : IActivationWorkingSetMember
+{
+    bool IsInWorkingSet { get; set; }
+
+    bool IsIdle { get; set; }
 }
 
 /// <summary>
