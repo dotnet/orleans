@@ -1,7 +1,7 @@
 ---
 title: "ORLEANS0027: Grain interface member removed from source"
 description: Understand and resolve ORLEANS0027 when OrleansContracts.txt retains an RPC method which is absent from source.
-ms.date: 08/27/2026
+ms.date: 08/28/2026
 ms.topic: reference
 ---
 
@@ -9,13 +9,13 @@ ms.topic: reference
 
 | Property | Value |
 | --- | --- |
-| Category | Orleans.Versioning |
+| Category | Versioning |
 | Severity | Warning |
 | Code fix | Not available |
 
 ## Cause
 
-`OrleansContracts.txt` declares an RPC method signature which is absent from the matching source grain interface. The manifest identity is an explicit `[Id]` or `[Alias]` value when present in source; otherwise, it is the generated method ID already used by Orleans on the wire.
+`OrleansContracts.txt` declares an RPC method signature which is absent from the matching source grain interface. The value before the colon is the effective method identity Orleans uses on the wire.
 
 ## Impact
 

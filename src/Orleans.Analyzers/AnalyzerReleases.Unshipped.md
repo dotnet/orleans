@@ -6,14 +6,14 @@ Rule ID | Category | Severity | Notes
 --------|----------|----------|-------
 ORLEANS0026 | Usage | Error | Invalid invokable base type mapping
 ORLEANS0014 | Usage | Warning | ConfigureAwaitAnalyzer, Grain code should not use ConfigureAwait(false) or ConfigureAwait without ContinueOnCapturedContext
-ORLEANS0016 | Orleans.Versioning | Warning | GrainInterfaceVersionAnalyzer, Grain interface not declared in OrleansContracts.txt
-ORLEANS0017 | Orleans.Versioning | Warning | GrainInterfaceVersionAnalyzer, Grain interface version mismatch between code and file
-ORLEANS0018 | Orleans.Versioning | Warning | GrainInterfaceVersionAnalyzer, Grain interface member not declared in OrleansContracts.txt
-ORLEANS0019 | Orleans.Versioning | Warning | GrainInterfaceVersionAnalyzer, Removed interface not marked as *RETIRED*
-ORLEANS0020 | Orleans.Versioning | Info | GrainInterfaceVersionAnalyzer, OrleansContracts.txt file is missing
-ORLEANS0021 | Orleans.Versioning | Warning | GrainInterfaceVersionAnalyzer, Duplicate interface declaration in file
-ORLEANS0022 | Orleans.Versioning | Warning | GrainInterfaceVersionAnalyzer, Grain class not declared in OrleansContracts.txt
-ORLEANS0023 | Orleans.Versioning | Warning | GrainInterfaceVersionAnalyzer, Grain class alias mismatch
-ORLEANS0024 | Orleans.Versioning | Warning | GrainInterfaceVersionAnalyzer, Removed grain class not marked as *RETIRED*
-ORLEANS0025 | Orleans.Versioning | Warning | GrainInterfaceVersionAnalyzer, Duplicate grain class declaration in file
-ORLEANS0027 | Orleans.Versioning | Warning | GrainInterfaceVersionAnalyzer, Removed grain interface member remains in OrleansContracts.txt
+ORLEANS0016 | Versioning | Warning | GrainInterfaceVersionAnalyzer, Grain interface not declared in OrleansContracts.txt
+ORLEANS0017 | Versioning | Warning | GrainInterfaceVersionAnalyzer, Grain interface version mismatch between code and file
+ORLEANS0018 | Versioning | Warning | GrainInterfaceVersionAnalyzer, Grain interface member not declared in OrleansContracts.txt
+ORLEANS0019 | Versioning | Warning | GrainInterfaceVersionAnalyzer, Removed interface not marked as *RETIRED*
+ORLEANS0020 | Versioning | Info | GrainInterfaceVersionAnalyzer, OrleansContracts.txt file is missing
+ORLEANS0021 | Versioning | Warning | GrainInterfaceVersionAnalyzer, Duplicate interface declaration in file
+ORLEANS0022 | Versioning | Warning | GrainInterfaceVersionAnalyzer, Grain class not declared in OrleansContracts.txt
+ORLEANS0023 | Versioning | Warning | GrainInterfaceVersionAnalyzer, Grain class alias mismatch
+ORLEANS0024 | Versioning | Warning | GrainInterfaceVersionAnalyzer, Removed grain class not marked as *RETIRED*
+ORLEANS0025 | Versioning | Warning | GrainInterfaceVersionAnalyzer, Duplicate grain class declaration in file
+ORLEANS0027 | Versioning | Warning | GrainInterfaceVersionAnalyzer, Removed grain interface member remains in OrleansContracts.txt

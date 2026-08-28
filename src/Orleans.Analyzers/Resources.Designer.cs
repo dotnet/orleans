@@ -481,7 +481,7 @@ namespace Orleans.Analyzers {
                 return ResourceManager.GetString("GrainInterfaceRemovedNotRetiredTitle", resourceCulture);
             }
         }
-        
+
         /// <summary>
         ///   Looks up a localized string similar to Add an OrleansContracts.txt file to track Orleans contracts for compatibility during rolling upgrades..
         /// </summary>

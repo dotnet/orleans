@@ -4,15 +4,15 @@
 # dotnet format PATH_TO_PROJECT_OR_SOLUTION analyzers --severity info --diagnostics ORLEANS0016 ORLEANS0017 ORLEANS0018 ORLEANS0019 ORLEANS0020 ORLEANS0022 ORLEANS0023 ORLEANS0024
 # Verify with: dotnet build PATH_TO_PROJECT_OR_SOLUTION
 # The regeneration command edits this manifest only; it does not change source attributes.
-# Methods without [Id] or [Alias] use the Orleans code generator's existing wire ID hash.
+# OrleansContracts format: 2
+# Method lines use: wire-identity: CLR-signature.
+# The identity is the identifier Orleans uses at runtime, whether generated or declared in source.
 # Review every diff: identity or signature changes can break wire compatibility during rolling upgrades.
 # Details: https://aka.ms/orleans/OrleansContracts.txt
 
 interface [GrainInterfaceType("Orleans.Core.Internal.IGrainManagementExtension")] Orleans.Core.Internal.IGrainManagementExtension [Version(0)]
-  # Orleans.Core.Internal.IGrainManagementExtension.DeactivateOnIdle() -> ValueTask
-  1B9614D1() -> ValueTask
-  # Orleans.Core.Internal.IGrainManagementExtension.MigrateOnIdle() -> ValueTask
-  4CC93B45() -> ValueTask
+  1B9614D1: DeactivateOnIdle() -> ValueTask
+  4CC93B45: MigrateOnIdle() -> ValueTask
 
 interface [GrainInterfaceType("Orleans.IGrain")] Orleans.IGrain [Version(0)]
 
@@ -31,20 +31,14 @@ interface [GrainInterfaceType("Orleans.IGrainWithStringKey")] Orleans.IGrainWith
 interface [GrainInterfaceType("Orleans.ISystemTarget")] Orleans.ISystemTarget [Version(0)]
 
 interface [GrainInterfaceType("Orleans.Runtime.IAsyncEnumerableGrainExtension")] Orleans.Runtime.IAsyncEnumerableGrainExtension [Version(0)]
-  # Orleans.Runtime.IAsyncEnumerableGrainExtension.StartEnumeration<T>(Guid requestId, IAsyncEnumerableRequest<T> request) -> ValueTask<(EnumerationResult Status, object? Value)>
-  370CD5AB`1(System.Guid, Orleans.Runtime.IAsyncEnumerableRequest<T>) -> ValueTask<(Orleans.Runtime.EnumerationResult, object?)>
-  # Orleans.Runtime.IAsyncEnumerableGrainExtension.DisposeAsync(Guid requestId) -> ValueTask
-  3C6D7209(System.Guid) -> ValueTask
-  # Orleans.Runtime.IAsyncEnumerableGrainExtension.StartEnumeration<T>(Guid requestId, IAsyncEnumerableRequest<T> request, CancellationToken cancellationToken) -> ValueTask<(EnumerationResult Status, object? Value)>
-  8678B466`1(System.Guid, Orleans.Runtime.IAsyncEnumerableRequest<T>, System.Threading.CancellationToken) -> ValueTask<(Orleans.Runtime.EnumerationResult, object?)>
-  # Orleans.Runtime.IAsyncEnumerableGrainExtension.MoveNext<T>(Guid requestId) -> ValueTask<(EnumerationResult Status, object? Value)>
-  A7FA7E30`1(System.Guid) -> ValueTask<(Orleans.Runtime.EnumerationResult, object?)>
-  # Orleans.Runtime.IAsyncEnumerableGrainExtension.MoveNext<T>(Guid requestId, CancellationToken cancellationToken) -> ValueTask<(EnumerationResult Status, object? Value)>
-  E60EA75B`1(System.Guid, System.Threading.CancellationToken) -> ValueTask<(Orleans.Runtime.EnumerationResult, object?)>
+  3C6D7209: DisposeAsync(System.Guid) -> ValueTask
+  A7FA7E30: MoveNext`1(System.Guid) -> ValueTask<(Orleans.Runtime.EnumerationResult, object?)>
+  E60EA75B: MoveNext`1(System.Guid, System.Threading.CancellationToken) -> ValueTask<(Orleans.Runtime.EnumerationResult, object?)>
+  370CD5AB: StartEnumeration`1(System.Guid, Orleans.Runtime.IAsyncEnumerableRequest<T>) -> ValueTask<(Orleans.Runtime.EnumerationResult, object?)>
+  8678B466: StartEnumeration`1(System.Guid, Orleans.Runtime.IAsyncEnumerableRequest<T>, System.Threading.CancellationToken) -> ValueTask<(Orleans.Runtime.EnumerationResult, object?)>
 
 interface [GrainInterfaceType("Orleans.Runtime.ICancellationSourcesExtension")] Orleans.Runtime.ICancellationSourcesExtension [Version(0)]
-  # Orleans.Runtime.ICancellationSourcesExtension.CancelRemoteToken(Guid tokenId) -> Task
-  50F75C16(System.Guid) -> Task
+  50F75C16: CancelRemoteToken(System.Guid) -> Task
 
 interface [GrainInterfaceType("Orleans.Runtime.IGrainExtension")] Orleans.Runtime.IGrainExtension [Version(0)]
 

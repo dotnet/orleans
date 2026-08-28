@@ -8,6 +8,7 @@ using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Collections.Immutable;
+using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Text;
@@ -23,6 +24,7 @@ namespace Orleans.Analyzers;
 [DiagnosticAnalyzer(LanguageNames.CSharp)]
 public sealed partial class GrainInterfaceVersionAnalyzer : DiagnosticAnalyzer
 {
+    private const string DiagnosticCategory = "Versioning";
     public const string EnableAnalyzerPropertyName = "EnableOrleansContractsAnalyzer";
     public const string RuleId0016 = "ORLEANS0016";
     public const string RuleId0017 = "ORLEANS0017";
@@ -39,8 +41,7 @@ public sealed partial class GrainInterfaceVersionAnalyzer : DiagnosticAnalyzer
     // Property bag keys for code fixes
     internal const string InterfaceNamePropertyKey = "InterfaceName";
     internal const string MemberNamePropertyKey = "MemberName";
-    internal const string MemberAliasPropertyKey = "MemberAlias";
-    internal const string MemberClrSignaturePropertyKey = "MemberClrSignature";
+    internal const string MemberWireIdentityPropertyKey = "MemberWireIdentity";
     internal const string ExpectedVersionPropertyKey = "ExpectedVersion";
     internal const string ActualVersionPropertyKey = "ActualVersion";
     internal const string ExpectedSignaturePropertyKey = "ExpectedSignature";
@@ -55,7 +56,7 @@ public sealed partial class GrainInterfaceVersionAnalyzer : DiagnosticAnalyzer
         id: RuleId0016,
         title: new LocalizableResourceString(nameof(Resources.GrainInterfaceNotDeclaredTitle), Resources.ResourceManager, typeof(Resources)),
         messageFormat: new LocalizableResourceString(nameof(Resources.GrainInterfaceNotDeclaredMessageFormat), Resources.ResourceManager, typeof(Resources)),
-        category: "Orleans.Versioning",
+        category: DiagnosticCategory,
         defaultSeverity: DiagnosticSeverity.Warning,
         isEnabledByDefault: true,
         description: new LocalizableResourceString(nameof(Resources.GrainInterfaceNotDeclaredDescription), Resources.ResourceManager, typeof(Resources)),
@@ -65,7 +66,7 @@ public sealed partial class GrainInterfaceVersionAnalyzer : DiagnosticAnalyzer
         id: RuleId0017,
         title: new LocalizableResourceString(nameof(Resources.GrainInterfaceVersionMismatchTitle), Resources.ResourceManager, typeof(Resources)),
         messageFormat: new LocalizableResourceString(nameof(Resources.GrainInterfaceVersionMismatchMessageFormat), Resources.ResourceManager, typeof(Resources)),
-        category: "Orleans.Versioning",
+        category: DiagnosticCategory,
         defaultSeverity: DiagnosticSeverity.Warning,
         isEnabledByDefault: true,
         description: new LocalizableResourceString(nameof(Resources.GrainInterfaceVersionMismatchDescription), Resources.ResourceManager, typeof(Resources)),
@@ -75,7 +76,7 @@ public sealed partial class GrainInterfaceVersionAnalyzer : DiagnosticAnalyzer
         id: RuleId0018,
         title: new LocalizableResourceString(nameof(Resources.GrainInterfaceMemberNotDeclaredTitle), Resources.ResourceManager, typeof(Resources)),
         messageFormat: new LocalizableResourceString(nameof(Resources.GrainInterfaceMemberNotDeclaredMessageFormat), Resources.ResourceManager, typeof(Resources)),
-        category: "Orleans.Versioning",
+        category: DiagnosticCategory,
         defaultSeverity: DiagnosticSeverity.Warning,
         isEnabledByDefault: true,
         description: new LocalizableResourceString(nameof(Resources.GrainInterfaceMemberNotDeclaredDescription), Resources.ResourceManager, typeof(Resources)),
@@ -85,7 +86,7 @@ public sealed partial class GrainInterfaceVersionAnalyzer : DiagnosticAnalyzer
         id: RuleId0027,
         title: new LocalizableResourceString(nameof(Resources.GrainInterfaceMemberRemovedTitle), Resources.ResourceManager, typeof(Resources)),
         messageFormat: new LocalizableResourceString(nameof(Resources.GrainInterfaceMemberRemovedMessageFormat), Resources.ResourceManager, typeof(Resources)),
-        category: "Orleans.Versioning",
+        category: DiagnosticCategory,
         defaultSeverity: DiagnosticSeverity.Warning,
         isEnabledByDefault: true,
         description: new LocalizableResourceString(nameof(Resources.GrainInterfaceMemberRemovedDescription), Resources.ResourceManager, typeof(Resources)),
@@ -96,7 +97,7 @@ public sealed partial class GrainInterfaceVersionAnalyzer : DiagnosticAnalyzer
         id: RuleId0019,
         title: new LocalizableResourceString(nameof(Resources.GrainInterfaceRemovedNotRetiredTitle), Resources.ResourceManager, typeof(Resources)),
         messageFormat: new LocalizableResourceString(nameof(Resources.GrainInterfaceRemovedNotRetiredMessageFormat), Resources.ResourceManager, typeof(Resources)),
-        category: "Orleans.Versioning",
+        category: DiagnosticCategory,
         defaultSeverity: DiagnosticSeverity.Warning,
         isEnabledByDefault: true,
         description: new LocalizableResourceString(nameof(Resources.GrainInterfaceRemovedNotRetiredDescription), Resources.ResourceManager, typeof(Resources)),
@@ -107,7 +108,7 @@ public sealed partial class GrainInterfaceVersionAnalyzer : DiagnosticAnalyzer
         id: RuleId0020,
         title: new LocalizableResourceString(nameof(Resources.OrleansContractsFileMissingTitle), Resources.ResourceManager, typeof(Resources)),
         messageFormat: new LocalizableResourceString(nameof(Resources.OrleansContractsFileMissingMessageFormat), Resources.ResourceManager, typeof(Resources)),
-        category: "Orleans.Versioning",
+        category: DiagnosticCategory,
         defaultSeverity: DiagnosticSeverity.Info,
         isEnabledByDefault: true,
         description: new LocalizableResourceString(nameof(Resources.OrleansContractsFileMissingDescription), Resources.ResourceManager, typeof(Resources)),
@@ -118,7 +119,7 @@ public sealed partial class GrainInterfaceVersionAnalyzer : DiagnosticAnalyzer
         id: RuleId0021,
         title: new LocalizableResourceString(nameof(Resources.GrainInterfaceDuplicateDeclarationTitle), Resources.ResourceManager, typeof(Resources)),
         messageFormat: new LocalizableResourceString(nameof(Resources.GrainInterfaceDuplicateDeclarationMessageFormat), Resources.ResourceManager, typeof(Resources)),
-        category: "Orleans.Versioning",
+        category: DiagnosticCategory,
         defaultSeverity: DiagnosticSeverity.Warning,
         isEnabledByDefault: true,
         description: new LocalizableResourceString(nameof(Resources.GrainInterfaceDuplicateDeclarationDescription), Resources.ResourceManager, typeof(Resources)),
@@ -128,7 +129,7 @@ public sealed partial class GrainInterfaceVersionAnalyzer : DiagnosticAnalyzer
         id: RuleId0022,
         title: new LocalizableResourceString(nameof(Resources.GrainClassNotDeclaredTitle), Resources.ResourceManager, typeof(Resources)),
         messageFormat: new LocalizableResourceString(nameof(Resources.GrainClassNotDeclaredMessageFormat), Resources.ResourceManager, typeof(Resources)),
-        category: "Orleans.Versioning",
+        category: DiagnosticCategory,
         defaultSeverity: DiagnosticSeverity.Warning,
         isEnabledByDefault: true,
         description: new LocalizableResourceString(nameof(Resources.GrainClassNotDeclaredDescription), Resources.ResourceManager, typeof(Resources)),
@@ -138,7 +139,7 @@ public sealed partial class GrainInterfaceVersionAnalyzer : DiagnosticAnalyzer
         id: RuleId0023,
         title: new LocalizableResourceString(nameof(Resources.GrainClassAliasMismatchTitle), Resources.ResourceManager, typeof(Resources)),
         messageFormat: new LocalizableResourceString(nameof(Resources.GrainClassAliasMismatchMessageFormat), Resources.ResourceManager, typeof(Resources)),
-        category: "Orleans.Versioning",
+        category: DiagnosticCategory,
         defaultSeverity: DiagnosticSeverity.Warning,
         isEnabledByDefault: true,
         description: new LocalizableResourceString(nameof(Resources.GrainClassAliasMismatchDescription), Resources.ResourceManager, typeof(Resources)),
@@ -148,7 +149,7 @@ public sealed partial class GrainInterfaceVersionAnalyzer : DiagnosticAnalyzer
         id: RuleId0024,
         title: new LocalizableResourceString(nameof(Resources.GrainClassRemovedNotRetiredTitle), Resources.ResourceManager, typeof(Resources)),
         messageFormat: new LocalizableResourceString(nameof(Resources.GrainClassRemovedNotRetiredMessageFormat), Resources.ResourceManager, typeof(Resources)),
-        category: "Orleans.Versioning",
+        category: DiagnosticCategory,
         defaultSeverity: DiagnosticSeverity.Warning,
         isEnabledByDefault: true,
         description: new LocalizableResourceString(nameof(Resources.GrainClassRemovedNotRetiredDescription), Resources.ResourceManager, typeof(Resources)),
@@ -159,7 +160,7 @@ public sealed partial class GrainInterfaceVersionAnalyzer : DiagnosticAnalyzer
         id: RuleId0025,
         title: new LocalizableResourceString(nameof(Resources.GrainClassDuplicateDeclarationTitle), Resources.ResourceManager, typeof(Resources)),
         messageFormat: new LocalizableResourceString(nameof(Resources.GrainClassDuplicateDeclarationMessageFormat), Resources.ResourceManager, typeof(Resources)),
-        category: "Orleans.Versioning",
+        category: DiagnosticCategory,
         defaultSeverity: DiagnosticSeverity.Warning,
         isEnabledByDefault: true,
         description: new LocalizableResourceString(nameof(Resources.GrainClassDuplicateDeclarationDescription), Resources.ResourceManager, typeof(Resources)),
@@ -379,22 +380,22 @@ public sealed partial class GrainInterfaceVersionAnalyzer : DiagnosticAnalyzer
             foreach (var member in sourceMembers)
             {
                 var memberSignature = GetMethodSignature(member);
-                var memberAlias = GetAliasFromAttribute(member);
-
-                if (!declaredInterface.Members.Values.Any(declaredMember =>
-                    GrainInterfaceVersionAnalyzer.IsMatchingMember(
+                var declaredMember = declaredInterface.Members.Values
+                    .Where(candidate => GrainInterfaceVersionAnalyzer.IsMatchingMember(
                         declaredInterface.Name,
-                        declaredMember.Signature,
-                        declaredMember.Alias,
-                        member)))
+                        candidate.Signature,
+                        candidate.WireIdentity,
+                        member))
+                    .FirstOrDefault();
+
+                if (declaredMember is null)
                 {
                     // Member not found - interface has changed
                     var properties = ImmutableDictionary<string, string?>.Empty
                         .Add(InterfaceNamePropertyKey, interfaceName)
                         .Add(GrainInterfaceTypePropertyKey, grainInterfaceType)
-                        .Add(MemberNamePropertyKey, memberSignature)
-                        .Add(MemberAliasPropertyKey, memberAlias)
-                        .Add(MemberClrSignaturePropertyKey, RequiresClrComment(member) ? GetClrMethodSignature(member) : null);
+                        .Add(MemberNamePropertyKey, GetManifestMethodSignature(member))
+                        .Add(MemberWireIdentityPropertyKey, GetMethodWireIdentity(member).ToManifestMetadata());
 
                     foreach (var location in member.Locations.Where(l => l.IsInSource))
                     {
@@ -402,9 +403,9 @@ public sealed partial class GrainInterfaceVersionAnalyzer : DiagnosticAnalyzer
                             MemberNotDeclaredRule,
                             location,
                             properties,
-                            memberSignature,
-                            interfaceName,
-                            GetClrMethodSignature(member)));
+                            GetClrMethodSignature(member),
+                            GetMethodWireIdentity(member).Value,
+                            interfaceName));
                     }
                 }
             }
@@ -417,7 +418,7 @@ public sealed partial class GrainInterfaceVersionAnalyzer : DiagnosticAnalyzer
                         GrainInterfaceVersionAnalyzer.IsMatchingHistoricalMember(
                             declaredInterface.Name,
                             declaredMember.Signature,
-                            declaredMember.Alias,
+                            declaredMember.WireIdentity,
                             member)))
                     {
                         continue;
@@ -427,11 +428,14 @@ public sealed partial class GrainInterfaceVersionAnalyzer : DiagnosticAnalyzer
                         .Add(InterfaceNamePropertyKey, interfaceName)
                         .Add(GrainInterfaceTypePropertyKey, grainInterfaceType)
                         .Add(MemberNamePropertyKey, declaredMember.Signature);
+                    var declaredMemberLine = GrainInterfaceFileParser.FormatMemberDeclaration(
+                        declaredMember.Signature,
+                        declaredMember.WireIdentity);
                     _removedMemberDiagnostics.Add(Diagnostic.Create(
                         RemovedMemberRule,
                         declaredMember.GetLocation(sourceText, _grainInterfacesFile.Path),
                         properties,
-                        declaredMember.Signature,
+                        declaredMemberLine,
                         interfaceName));
                 }
             }
@@ -809,9 +813,8 @@ public sealed partial class GrainInterfaceVersionAnalyzer : DiagnosticAnalyzer
 
     internal static string GetMethodSignature(IMethodSymbol method)
     {
-        var methodId = GetAttributeValue(method, Constants.IdAttributeFullyQualifiedName);
-        var methodAlias = GetStringAttributeValue(method, Constants.AliasAttributeFullyQualifiedName);
-        return GetMethodSignature(method, methodId ?? methodAlias ?? MethodIdProvider.Create(method));
+        var identity = GetMethodWireIdentity(method);
+        return GetMethodSignature(method, identity.Value);
     }
 
     private static string GetMethodSignature(IMethodSymbol method, object methodId)
@@ -836,6 +839,24 @@ public sealed partial class GrainInterfaceVersionAnalyzer : DiagnosticAnalyzer
         sb.Append(GetContractTypeName(method.ReturnType));
 
         return sb.ToString();
+    }
+
+    internal static string GetManifestMethodSignature(IMethodSymbol method)
+        => GetMethodSignature(method, method.Name);
+
+    internal static MethodWireIdentity GetMethodWireIdentity(IMethodSymbol method)
+    {
+        if (GetAttributeValue(method, Constants.IdAttributeFullyQualifiedName) is { } methodId)
+        {
+            return new MethodWireIdentity(methodId.ToString());
+        }
+
+        if (GetStringAttributeValue(method, Constants.AliasAttributeFullyQualifiedName) is { } methodAlias)
+        {
+            return new MethodWireIdentity(methodAlias);
+        }
+
+        return new MethodWireIdentity(MethodIdProvider.Create(method));
     }
 
     internal static string GetClrMethodSignature(IMethodSymbol method)
@@ -865,25 +886,6 @@ public sealed partial class GrainInterfaceVersionAnalyzer : DiagnosticAnalyzer
         return sb.ToString();
     }
 
-    internal static bool RequiresClrComment(IMethodSymbol method)
-    {
-        var methodId = GetAttributeValue(method, Constants.IdAttributeFullyQualifiedName)?.ToString();
-        var methodAlias = GetStringAttributeValue(method, Constants.AliasAttributeFullyQualifiedName);
-        if (methodId is null && methodAlias is null)
-        {
-            return true;
-        }
-
-        if (methodId is not null && !string.Equals(methodId, method.Name, StringComparison.Ordinal)
-            || methodAlias is not null && !string.Equals(methodAlias, method.Name, StringComparison.Ordinal))
-        {
-            return true;
-        }
-
-        return method.Parameters.Any(parameter => HasMeaningfulTypeAlias(parameter.Type))
-            || HasMeaningfulTypeAlias(method.ReturnType);
-    }
-
     internal static bool IdentityDiffersFromClrName(string? identity, INamedTypeSymbol type)
     {
         if (identity is null)
@@ -896,9 +898,6 @@ public sealed partial class GrainInterfaceVersionAnalyzer : DiagnosticAnalyzer
             && !string.Equals(identity, type.MetadataName, StringComparison.Ordinal)
             && !string.Equals(identity, fullName, StringComparison.Ordinal);
     }
-
-    internal static string NormalizeLegacyMethodSignature(string signature)
-        => Regex.Replace(signature, @"\s+[A-Za-z_]\w*(?=\s*[,)\]])", "");
 
     internal static string NormalizeStoredMemberSignature(string signature, string interfaceName)
     {
@@ -915,111 +914,37 @@ public sealed partial class GrainInterfaceVersionAnalyzer : DiagnosticAnalyzer
     internal static bool IsMatchingMember(
         string declaredInterfaceName,
         string storedSignature,
-        string? storedAlias,
+        MethodWireIdentity storedWireIdentity,
         IMethodSymbol member)
     {
-        var memberSignature = GetMethodSignature(member);
-        var sourceMethodId = GetAttributeValue(member, Constants.IdAttributeFullyQualifiedName);
-        var sourceMethodAlias = GetStringAttributeValue(member, Constants.AliasAttributeFullyQualifiedName);
-        if (storedAlias is not null)
-        {
-            if (!string.Equals(
-                storedAlias,
-                sourceMethodAlias,
-                StringComparison.Ordinal))
-            {
-                return false;
-            }
-
-            var storedIdentity = storedAlias + GrainInterfaceFileParser.GetMethodAritySuffix(storedSignature);
-            var parameterListStart = memberSignature.IndexOf('(');
-            if (parameterListStart < 0
-                || !string.Equals(
-                    storedIdentity,
-                    memberSignature.Substring(0, parameterListStart),
-                    StringComparison.Ordinal))
-            {
-                return false;
-            }
-
-            var canonicalStoredSignature = GrainInterfaceFileParser.GetCanonicalMemberSignature(
-                storedSignature,
-                storedAlias);
-            if (string.Equals(
-                NormalizeStoredMemberSignature(canonicalStoredSignature, declaredInterfaceName),
-                memberSignature,
-                StringComparison.Ordinal))
-            {
-                return true;
-            }
-
-            return string.Equals(
-                GetNormalizedSignatureSuffix(storedSignature),
-                GetNormalizedSignatureSuffix(GetClrMethodSignature(member)),
-                StringComparison.Ordinal);
-        }
-
-        var normalizedStoredSignature = NormalizeStoredMemberSignature(storedSignature, declaredInterfaceName);
-        if (sourceMethodAlias is not null)
-        {
-            return false;
-        }
-
-        if (sourceMethodId is not null)
-        {
-            return string.Equals(normalizedStoredSignature, memberSignature, StringComparison.Ordinal);
-        }
-
-        if (string.Equals(normalizedStoredSignature, memberSignature, StringComparison.Ordinal))
-        {
-            return true;
-        }
-
-        if (string.Equals(
-            normalizedStoredSignature,
-            GetMethodSignature(member, member.Name),
-            StringComparison.Ordinal))
-        {
-            return true;
-        }
-
-        var normalized = NormalizeLegacyMethodSignature(storedSignature);
-        var clrSignature = GetClrMethodSignature(member);
-        var containingTypePrefix =
-            $"{member.ContainingType.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat).Replace("global::", "")}.";
-        return string.Equals(normalized, NormalizeLegacyMethodSignature(clrSignature), StringComparison.Ordinal)
-            || string.Equals(
-                normalized,
-                NormalizeLegacyMethodSignature(clrSignature.Substring(containingTypePrefix.Length)),
+        var sourceWireIdentity = GetMethodWireIdentity(member);
+        return string.Equals(
+                storedWireIdentity.Value,
+                sourceWireIdentity.Value,
+                StringComparison.Ordinal)
+            && string.Equals(
+                GrainInterfaceFileParser.GetMethodAritySuffix(storedSignature),
+                GrainInterfaceFileParser.GetMethodAritySuffix(GetManifestMethodSignature(member)),
+                StringComparison.Ordinal)
+            && string.Equals(
+                GetSignatureSuffix(storedSignature),
+                GetSignatureSuffix(GetManifestMethodSignature(member)),
                 StringComparison.Ordinal);
     }
 
     internal static bool IsMatchingHistoricalMember(
         string declaredInterfaceName,
         string storedSignature,
-        string? storedAlias,
+        MethodWireIdentity storedWireIdentity,
         IMethodSymbol member)
     {
-        if (IsMatchingMember(declaredInterfaceName, storedSignature, storedAlias, member))
-        {
-            return true;
-        }
-
-        var sourceMethodAlias = GetStringAttributeValue(member, Constants.AliasAttributeFullyQualifiedName);
-        return storedAlias is null
-            && sourceMethodAlias is not null
-            && string.Equals(
-                NormalizeStoredMemberSignature(storedSignature, declaredInterfaceName),
-                GetMethodSignature(member),
-                StringComparison.Ordinal);
+        return IsMatchingMember(declaredInterfaceName, storedSignature, storedWireIdentity, member);
     }
 
-    private static string GetNormalizedSignatureSuffix(string signature)
+    private static string GetSignatureSuffix(string signature)
     {
         var parameterListStart = signature.IndexOf('(');
-        return parameterListStart < 0
-            ? NormalizeLegacyMethodSignature(signature)
-            : NormalizeLegacyMethodSignature(signature.Substring(parameterListStart));
+        return parameterListStart < 0 ? signature : signature.Substring(parameterListStart);
     }
 
     private static string GetContractTypeName(ITypeSymbol type)
@@ -1087,27 +1012,6 @@ public sealed partial class GrainInterfaceVersionAnalyzer : DiagnosticAnalyzer
         return $"{genericName}<{string.Join(", ", namedType.TypeArguments.Select(GetContractTypeName))}>";
     }
 
-    private static bool HasMeaningfulTypeAlias(ITypeSymbol type)
-    {
-        if (type is IArrayTypeSymbol array)
-        {
-            return HasMeaningfulTypeAlias(array.ElementType);
-        }
-
-        if (type is not INamedTypeSymbol namedType)
-        {
-            return false;
-        }
-
-        var alias = GetStringAttributeValue(namedType.OriginalDefinition, Constants.AliasAttributeFullyQualifiedName);
-        if (IdentityDiffersFromClrName(alias, namedType.OriginalDefinition))
-        {
-            return true;
-        }
-
-        return namedType.TypeArguments.Any(HasMeaningfulTypeAlias);
-    }
-
     private static object? GetAttributeValue(ISymbol symbol, string attributeName)
         => symbol.GetAttributes()
             .FirstOrDefault(attribute => string.Equals(attribute.AttributeClass?.ToDisplayString(), attributeName, StringComparison.Ordinal))
@@ -1125,6 +1029,7 @@ internal sealed class GrainInterfaceData
     public List<DeclaredGrainInterface> Interfaces { get; } = new();
 
     public List<DeclaredGrainClass> Classes { get; } = new();
+
 }
 
 /// <summary>
@@ -1158,13 +1063,14 @@ internal sealed class DeclaredGrainInterface
 /// </summary>
 internal sealed class DeclaredGrainMember
 {
-    public DeclaredGrainMember(string signature)
+    public DeclaredGrainMember(string signature, MethodWireIdentity wireIdentity)
     {
         Signature = signature;
+        WireIdentity = wireIdentity;
     }
 
     public string Signature { get; }
-    public string? Alias { get; set; }
+    public MethodWireIdentity WireIdentity { get; }
     public TextSpan Span { get; set; }
 
     public Location GetLocation(SourceText sourceText, string filePath)
@@ -1172,6 +1078,40 @@ internal sealed class DeclaredGrainMember
         var lineSpan = sourceText.Lines.GetLinePositionSpan(Span);
         return Location.Create(filePath, Span, lineSpan);
     }
+}
+
+internal readonly struct MethodWireIdentity
+{
+    public MethodWireIdentity(string value)
+    {
+        Value = value;
+    }
+
+    public string Value { get; }
+
+    public string ToManifestMetadata()
+    {
+        var result = new StringBuilder(Value.Length);
+        foreach (var character in Value)
+        {
+            result.Append(character switch
+            {
+                '\\' => @"\\",
+                ':' => @"\:",
+                '#' => @"\#",
+                ' ' => @"\s",
+                '\r' => @"\r",
+                '\n' => @"\n",
+                '\t' => @"\t",
+                _ when char.IsControl(character) || char.IsWhiteSpace(character)
+                    => $"\\u{((int)character).ToString("X4", CultureInfo.InvariantCulture)}",
+                _ => character.ToString()
+            });
+        }
+
+        return result.ToString();
+    }
+
 }
 
 /// <summary>
@@ -1218,10 +1158,10 @@ internal static class GrainInterfaceFileParser
         @"^(?<retired>\*RETIRED\*\s*)?class\s+(\[(?:GrainType|Alias)\(""(?<alias>[^""]+)""\)\]\s*)?(?<name>[\w]+(?:<[\w,\s]+>)?(?:\.[\w]+(?:<[\w,\s]+>)?)*)$",
         RegexOptions.Compiled);
 
-    // Member line: [Alias("x")] Namespace.IInterface<T>.Method(params) -> ReturnType
-    // The signature includes the full interface name (possibly generic) and method
+    // Member line: 0123ABCD: Method(params) -> ReturnType
+    // The value is the effective wire identity, independent of how source declares it.
     private static readonly Regex MemberPattern = new(
-        @"^(\[Alias\(""(?<alias>[^""]+)""\)\]\s*)?(?<signature>.+\(.*\)\s*->\s*.+)$",
+        @"^(?<signature>.+\(.*\)\s*->\s*.+)$",
         RegexOptions.Compiled);
 
     internal static bool TryGetInterfaceName(string line, out string name)
@@ -1281,9 +1221,9 @@ internal static class GrainInterfaceFileParser
 
     internal static bool TryGetMemberSignature(string line, out string signature)
     {
-        if (TryGetMemberDeclaration(line, out signature, out var alias))
+        if (TryGetMemberDeclaration(line, out signature, out var wireIdentity))
         {
-            signature = GetCanonicalMemberSignature(signature, alias);
+            signature = GetCanonicalMemberSignature(signature, wireIdentity);
             return true;
         }
 
@@ -1291,32 +1231,52 @@ internal static class GrainInterfaceFileParser
         return false;
     }
 
-    internal static bool TryGetMemberDeclaration(string line, out string signature, out string? alias)
+    internal static bool TryGetMemberDeclaration(
+        string line,
+        out string signature,
+        out MethodWireIdentity wireIdentity)
     {
-        var match = MemberPattern.Match(StripClrComment(line));
+        var declaration = StripClrComment(line);
+        var identityDelimiter = FindIdentityDelimiter(declaration);
+        if (identityDelimiter < 0)
+        {
+            signature = string.Empty;
+            wireIdentity = default;
+            return false;
+        }
+
+        wireIdentity = new MethodWireIdentity(
+            UnescapeWireIdentity(declaration.Substring(0, identityDelimiter)));
+        declaration = declaration.Substring(identityDelimiter + 2);
+        var match = MemberPattern.Match(declaration);
         if (match.Success)
         {
             signature = match.Groups["signature"].Value;
-            alias = match.Groups["alias"].Success ? match.Groups["alias"].Value : null;
             return true;
         }
 
         signature = string.Empty;
-        alias = null;
+        wireIdentity = default;
         return false;
     }
 
-    internal static string GetCanonicalMemberSignature(string signature, string? alias)
+    internal static string GetCanonicalMemberSignature(
+        string signature,
+        MethodWireIdentity wireIdentity)
     {
-        if (alias is null)
-        {
-            return signature;
-        }
-
         var parameterListStart = signature.IndexOf('(');
         return parameterListStart < 0
             ? signature
-            : alias + GetMethodAritySuffix(signature) + signature.Substring(parameterListStart);
+            : $"{wireIdentity.Value.Length}:{wireIdentity.Value}"
+                + GetMethodAritySuffix(signature)
+                + signature.Substring(parameterListStart);
+    }
+
+    internal static string FormatMemberDeclaration(
+        string signature,
+        MethodWireIdentity wireIdentity)
+    {
+        return $"{wireIdentity.ToManifestMetadata()}: {signature}";
     }
 
     internal static string GetMethodAritySuffix(string signature)
@@ -1366,6 +1326,70 @@ internal static class GrainInterfaceFileParser
         const string Prefix = " # CLR: ";
         var index = line.IndexOf(Prefix, StringComparison.Ordinal);
         return (index < 0 ? line : line.Substring(0, index)).Trim();
+    }
+
+    private static int FindIdentityDelimiter(string declaration)
+    {
+        var escaped = false;
+        for (var index = 0; index < declaration.Length - 1; index++)
+        {
+            if (escaped)
+            {
+                escaped = false;
+                continue;
+            }
+
+            if (declaration[index] == '\\')
+            {
+                escaped = true;
+                continue;
+            }
+
+            if (declaration[index] == ':' && declaration[index + 1] == ' ')
+            {
+                return index;
+            }
+        }
+
+        return -1;
+    }
+
+    private static string UnescapeWireIdentity(string value)
+    {
+        var result = new StringBuilder(value.Length);
+        for (var index = 0; index < value.Length; index++)
+        {
+            if (value[index] == '\\' && index + 1 < value.Length)
+            {
+                if (value[index + 1] == 'u'
+                    && index + 5 < value.Length
+                    && ushort.TryParse(
+                        value.Substring(index + 2, 4),
+                        NumberStyles.HexNumber,
+                        CultureInfo.InvariantCulture,
+                        out var codePoint))
+                {
+                    result.Append((char)codePoint);
+                    index += 5;
+                    continue;
+                }
+
+                index++;
+                result.Append(value[index] switch
+                {
+                    'r' => '\r',
+                    'n' => '\n',
+                    't' => '\t',
+                    's' => ' ',
+                    _ => value[index]
+                });
+                continue;
+            }
+
+            result.Append(value[index]);
+        }
+
+        return result.ToString();
     }
 
     public static (GrainInterfaceData Data, List<Diagnostic>? Errors) Parse(SourceText sourceText, string filePath)
@@ -1464,15 +1488,12 @@ internal static class GrainInterfaceFileParser
             }
 
             // Try to match member declaration
-            var memberMatch = MemberPattern.Match(lineText);
-            if (memberMatch.Success && currentInterface is not null)
+            if (currentInterface is not null
+                && TryGetMemberDeclaration(lineText, out var signature, out var wireIdentity))
             {
-                var signature = memberMatch.Groups["signature"].Value;
-                var alias = memberMatch.Groups["alias"].Success ? memberMatch.Groups["alias"].Value : null;
-
-                currentInterface.Members[signature] = new DeclaredGrainMember(signature)
+                var key = GetCanonicalMemberSignature(signature, wireIdentity);
+                currentInterface.Members[key] = new DeclaredGrainMember(signature, wireIdentity)
                 {
-                    Alias = alias,
                     Span = textLine.Span
                 };
             }

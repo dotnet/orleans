@@ -33,7 +33,9 @@ public class GrainInterfaceVersionAnalyzerTest
         "# dotnet format PATH_TO_PROJECT_OR_SOLUTION analyzers --severity info --diagnostics ORLEANS0016 ORLEANS0017 ORLEANS0018 ORLEANS0019 ORLEANS0020 ORLEANS0022 ORLEANS0023 ORLEANS0024\n" +
         "# Verify with: dotnet build PATH_TO_PROJECT_OR_SOLUTION\n" +
         "# The regeneration command edits this manifest only; it does not change source attributes.\n" +
-        "# Methods without [Id] or [Alias] use the Orleans code generator's existing wire ID hash.\n" +
+        "# OrleansContracts format: 2\n" +
+        "# Method lines use: wire-identity: CLR-signature.\n" +
+        "# The identity is the identifier Orleans uses at runtime, whether generated or declared in source.\n" +
         "# Review every diff: identity or signature changes can break wire compatibility during rolling upgrades.\n" +
         "# Details: https://aka.ms/orleans/OrleansContracts.txt\n\n";
 
@@ -179,6 +181,7 @@ public class GrainInterfaceVersionAnalyzerTest
     public async Task AnalyzerDisabled_NoDiagnostic()
     {
         const string source = @"
+[Version(1)]
 public interface IMyGrain : IGrain
 {
     Task DoSomething();
@@ -224,7 +227,7 @@ public interface IMyGrain : IGrain
         const string grainInterfacesFile = @"
 # OrleansContracts.txt
 IMyGrain [Version(1)]
-IMyGrain.DoSomething() -> Task
+41F3F487: DoSomething() -> Task
 ";
         var diagnostics = await GetDiagnosticsAsync(source, grainInterfacesFile);
 
@@ -288,7 +291,7 @@ public interface IMyGrain : IGrain
         const string grainInterfacesFile = @"
 # OrleansContracts.txt
 IMyGrain [Version(1)]
-IMyGrain.DoSomething() -> Task
+41F3F487: DoSomething() -> Task
 ";
         var diagnostics = await GetDiagnosticsAsync(source, grainInterfacesFile);
 
@@ -312,7 +315,7 @@ public interface IMyGrain : IGrain
         const string grainInterfacesFile = @"
 # OrleansContracts.txt
 IMyGrain [Version(1)]
-IMyGrain.DoSomething() -> Task
+41F3F487: DoSomething() -> Task
 ";
         var diagnostics = await GetDiagnosticsAsync(source, grainInterfacesFile);
 
@@ -356,14 +359,14 @@ public interface IMyGrain : IGrain
         const string grainInterfacesFile = @"
 # OrleansContracts.txt
 IMyGrain [Version(1)]
-IMyGrain.DoSomething() -> Task
+41F3F487: DoSomething() -> Task
 ";
         var diagnostics = await GetDiagnosticsAsync(source, grainInterfacesFile);
 
         Assert.Contains(diagnostics, d => d.Id == GrainInterfaceVersionAnalyzer.RuleId0018);
         var diagnostic = diagnostics.First(d => d.Id == GrainInterfaceVersionAnalyzer.RuleId0018);
         Assert.Contains("NewMethod", diagnostic.GetMessage());
-        Assert.Contains("8E43BF4F() -> Task", diagnostic.GetMessage());
+        Assert.Contains("8E43BF4F", diagnostic.GetMessage());
     }
 
     [Fact]
@@ -379,11 +382,159 @@ public interface IMyGrain : IGrain
         const string grainInterfacesFile = @"
 # OrleansContracts.txt
 IMyGrain [Version(1)]
-IMyGrain.DoSomething() -> Task
+41F3F487: DoSomething() -> Task
 ";
         var diagnostics = await GetDiagnosticsAsync(source, grainInterfacesFile);
 
         Assert.DoesNotContain(diagnostics, d => d.Id == GrainInterfaceVersionAnalyzer.RuleId0018);
+    }
+
+    [Fact]
+    public async Task CanonicalGeneratedIdentity_InFile_NoDiagnostic()
+    {
+        const string source = @"
+[Version(1)]
+public interface IMyGrain : IGrain
+{
+    Task NewMethod();
+}
+";
+        const string contractsFile = @"
+interface IMyGrain [Version(1)]
+  8E43BF4F: NewMethod() -> Task
+";
+
+        var diagnostics = await GetDiagnosticsAsync(source, contractsFile);
+
+        Assert.Empty(diagnostics);
+    }
+
+    [Fact]
+    public async Task CanonicalIdIdentity_InFile_NoDiagnostic()
+    {
+        const string source = @"
+[Version(1)]
+public interface IMyGrain : IGrain
+{
+    [Id(42)]
+    Task Ping();
+}
+";
+        const string contractsFile = @"
+interface IMyGrain [Version(1)]
+  42: Ping() -> Task
+";
+
+        var diagnostics = await GetDiagnosticsAsync(source, contractsFile);
+
+        Assert.Empty(diagnostics);
+    }
+
+    [Fact]
+    public async Task CanonicalAliasIdentity_InFile_NoDiagnostic()
+    {
+        const string source = @"
+[Version(1)]
+public interface IMyGrain : IGrain
+{
+    [Alias(""stable-ping"")]
+    Task Ping();
+}
+";
+        const string contractsFile = @"
+interface IMyGrain [Version(1)]
+  stable-ping: Ping() -> Task
+";
+
+        var diagnostics = await GetDiagnosticsAsync(source, contractsFile);
+
+        Assert.Empty(diagnostics);
+    }
+
+    [Fact]
+    public async Task CanonicalAliasIdentity_WithEscapedDelimiter_NoDiagnostic()
+    {
+        const string source = @"
+[Version(1)]
+public interface IMyGrain : IGrain
+{
+    [Alias("" # CLR: stable:ping\\v2\u0085next "")]
+    Task Ping();
+}
+";
+        const string contractsFile = @"
+interface IMyGrain [Version(1)]
+  \s\#\sCLR\:\sstable\:ping\\v2\u0085next\s: Ping() -> Task
+";
+
+        var diagnostics = await GetDiagnosticsAsync(source, contractsFile);
+
+        Assert.Empty(diagnostics);
+    }
+
+    [Fact]
+    public async Task CanonicalMemberKeys_SeparateIdentityFromGenericArity()
+    {
+        const string source = @"
+[Version(1)]
+public interface IMyGrain : IGrain
+{
+    [Alias(""a"")]
+    Task First<T>();
+
+    [Alias(""a`1"")]
+    Task Second();
+}
+";
+        const string contractsFile = @"
+interface IMyGrain [Version(1)]
+  a: First`1() -> Task
+  a`1: Second() -> Task
+";
+
+        var diagnostics = await GetDiagnosticsAsync(source, contractsFile);
+
+        Assert.Empty(diagnostics);
+    }
+
+    [Fact]
+    public async Task EquivalentGeneratedAndAliasIdentity_NoDiagnostic()
+    {
+        const string source = @"
+[Version(1)]
+public interface IMyGrain : IGrain
+{
+    [Alias(""8E43BF4F"")]
+    Task NewMethod();
+}
+";
+        const string contractsFile =
+            "interface IMyGrain [Version(1)]\n  8E43BF4F: NewMethod() -> Task\n";
+
+        var diagnostics = await GetDiagnosticsAsync(source, contractsFile);
+
+        Assert.Empty(diagnostics);
+    }
+
+    [Theory]
+    [InlineData("[Id(46529181)]")]
+    [InlineData("")]
+    public async Task EquivalentGeneratedAndIdIdentity_NoDiagnostic(string sourceAttribute)
+    {
+        var source = $@"
+[Version(1)]
+public interface IMyGrain : IGrain
+{{
+    {sourceAttribute}
+    Task Method26();
+}}
+";
+        const string contractsFile =
+            "interface IMyGrain [Version(1)]\n  46529181: Method26() -> Task\n";
+
+        var diagnostics = await GetDiagnosticsAsync(source, contractsFile);
+
+        Assert.Empty(diagnostics);
     }
 
     [Fact]
@@ -399,7 +550,7 @@ public interface IMyGrain : IGrain
         const string grainInterfacesFile = @"
 # OrleansContracts.txt
 IMyGrain [Version(1)]
-IMyGrain.DoSomething(string name, int count) -> Task
+2DB8A137: DoSomething(string, int) -> Task
 ";
         var diagnostics = await GetDiagnosticsAsync(source, grainInterfacesFile);
 
@@ -407,18 +558,19 @@ IMyGrain.DoSomething(string name, int count) -> Task
     }
 
     [Fact]
-    public async Task LegacyMemberParameterRename_NoDiagnostic()
+    public async Task AliasedMemberParameterRename_NoDiagnostic()
     {
         const string source = @"
 [Version(1)]
 public interface IMyGrain : IGrain
 {
+    [Alias(""stable-method"")]
     Task DoSomething(string renamed, int newCount);
 }
 ";
         const string contractsFile = @"
 IMyGrain [Version(1)]
-IMyGrain.DoSomething(string original, int oldCount) -> Task
+stable-method: DoSomething(string, int) -> Task
 ";
 
         var diagnostics = await GetDiagnosticsAsync(source, contractsFile);
@@ -433,13 +585,14 @@ IMyGrain.DoSomething(string original, int oldCount) -> Task
 [Version(1)]
 public interface IMyGrain : IGrain
 {
+    [Alias(""tuple-method"")]
     Task DoSomething((int X, int Y) value);
 }
 ";
         const string grainInterfacesFile = @"
 # OrleansContracts.txt
 IMyGrain [Version(1)]
-IMyGrain.DoSomething((int X, int Y) value) -> Task
+tuple-method: DoSomething((int, int)) -> Task
 ";
         var diagnostics = await GetDiagnosticsAsync(source, grainInterfacesFile);
 
@@ -458,13 +611,14 @@ namespace NamespaceA
 [Version(1)]
 public interface IMyGrain : IGrain
 {
+    [Alias(""stable-method"")]
     Task DoSomething(NamespaceA.Request request);
 }
 ";
         const string grainInterfacesFile = @"
 # OrleansContracts.txt
 IMyGrain [Version(1)]
-IMyGrain.DoSomething(NamespaceB.Request request) -> Task
+stable-method: DoSomething(NamespaceB.Request) -> Task
 ";
         var diagnostics = await GetDiagnosticsAsync(source, grainInterfacesFile);
 
@@ -502,7 +656,7 @@ public interface IMyGrain : IGrain
 ";
         const string contractsFile = @"
 interface IMyGrain [Version(1)]
-  ReadStateAsync`1(T) -> Task<T>
+  0105B5F1: ReadStateAsync`1(T) -> Task<T>
 ";
 
         var diagnostics = await GetDiagnosticsAsync(source, contractsFile);
@@ -517,12 +671,13 @@ interface IMyGrain [Version(1)]
 [Version(1)]
 public interface IMyGrain : IGrain
 {
+    [Alias(""read-state"")]
     Task<T1> ReadStateAsync<T1, T2>(T1 first, T2 second);
 }
 ";
         const string contractsFile = @"
 interface IMyGrain [Version(1)]
-  ReadStateAsync`1(T) -> Task<T>
+  read-state: ReadStateAsync`1(T) -> Task<T>
 ";
 
         var diagnostics = await GetDiagnosticsAsync(source, contractsFile);
@@ -542,8 +697,8 @@ public interface IMyGrain : IGrain
 ";
         const string contractsFile = @"
 interface IMyGrain [Version(1)]
-  ExistingAsync() -> Task
-  RemovedAsync() -> Task
+  629F4AD1: ExistingAsync() -> Task
+  C1BEB0D0: RemovedAsync() -> Task
 ";
 
         var diagnostics = await GetDiagnosticsAsync(source, contractsFile);
@@ -556,7 +711,7 @@ interface IMyGrain [Version(1)]
     }
 
     [Fact]
-    public async Task LegacyAliasedMemberRename_NoDiagnostic()
+    public async Task AliasedMemberRename_NoDiagnostic()
     {
         const string source = @"
 [Version(1)]
@@ -568,7 +723,7 @@ public interface IMyGrain : IGrain
 ";
         const string contractsFile = @"
 interface IMyGrain [Version(1)]
-  [Alias(""stable-method"")] IMyGrain.OldName(string original) -> Task
+  stable-method: OldName(string) -> Task
 ";
 
         var diagnostics = await GetDiagnosticsAsync(source, contractsFile);
@@ -578,7 +733,7 @@ interface IMyGrain [Version(1)]
     }
 
     [Fact]
-    public async Task UnmarkedSameNameAlias_ReportsManifestUpgrade()
+    public async Task AliasIdentityMismatch_ReportsAddedAndRemovedSignatures()
     {
         const string source = @"
 [Version(1)]
@@ -590,13 +745,13 @@ public interface IMyGrain : IGrain
 ";
         const string contractsFile = @"
 interface IMyGrain [Version(1)]
-  Method() -> Task
+  old-method: Method() -> Task
 ";
 
         var diagnostics = await GetDiagnosticsAsync(source, contractsFile);
 
         Assert.Contains(diagnostics, diagnostic => diagnostic.Id == GrainInterfaceVersionAnalyzer.RuleId0018);
-        Assert.DoesNotContain(diagnostics, diagnostic => diagnostic.Id == GrainInterfaceVersionAnalyzer.RuleId0027);
+        Assert.Contains(diagnostics, diagnostic => diagnostic.Id == GrainInterfaceVersionAnalyzer.RuleId0027);
     }
 
     [Fact]
@@ -612,7 +767,7 @@ public interface IMyGrain : IGrain
 ";
         const string contractsFile = @"
 interface IMyGrain [Version(1)]
-  [Alias(""old-method"")] IMyGrain.Method() -> Task
+  old-method: Method() -> Task
 ";
 
         var diagnostics = await GetDiagnosticsAsync(source, contractsFile);
@@ -622,7 +777,7 @@ interface IMyGrain [Version(1)]
     }
 
     [Fact]
-    public async Task ExplicitId_DoesNotMatchLegacyMethodName()
+    public async Task ExplicitId_DoesNotMatchDifferentWireIdentity()
     {
         const string source = @"
 [Version(1)]
@@ -634,7 +789,7 @@ public interface IMyGrain : IGrain
 ";
         const string contractsFile = @"
 interface IMyGrain [Version(1)]
-  Ping() -> Task
+  Ping: Ping() -> Task
 ";
 
         var diagnostics = await GetDiagnosticsAsync(source, contractsFile);
@@ -655,7 +810,7 @@ public interface IMyGrain : IGrain
 ";
         const string contractsFile = @"
 interface IMyGrain [Version(1)]
-  [Alias(""old-method"")] IMyGrain.Method() -> Task
+  old-method: Method() -> Task
 ";
 
         var diagnostics = await GetDiagnosticsAsync(source, contractsFile);
@@ -677,7 +832,7 @@ public interface IMyGrain : IGrain
 ";
         const string contractsFile = @"
 interface IMyGrain [Version(1)]
-  [Alias(""stable-method"")] IMyGrain.Method() -> Task
+  stable-method: Method() -> Task
 ";
 
         var diagnostics = await GetDiagnosticsAsync(source, contractsFile);
@@ -818,7 +973,7 @@ public interface IMyObserver : IGrainObserver
         const string grainInterfacesFile = @"
 # OrleansContracts.txt
 IMyObserver [Version(0)]
-IMyObserver.OnEvent(string value) -> void
+3DCBC519: OnEvent(string) -> void
 ";
         var diagnostics = await GetDiagnosticsAsync(source, grainInterfacesFile);
 
@@ -866,7 +1021,7 @@ namespace MyApp.Grains
         const string grainInterfacesFile = @"
 # OrleansContracts.txt
 MyApp.Grains.IMyGrain [Version(1)]
-MyApp.Grains.IMyGrain.DoSomething() -> Task
+4057D20A: DoSomething() -> Task
 ";
         var diagnostics = await GetDiagnosticsAsync(source, grainInterfacesFile);
 
@@ -894,7 +1049,7 @@ public interface IMyGrain : IGrain
 # Another comment
 IMyGrain [Version(1)]
 # Comment between entries
-IMyGrain.DoSomething() -> Task
+41F3F487: DoSomething() -> Task
 # Final comment
 ";
         var diagnostics = await GetDiagnosticsAsync(source, grainInterfacesFile);
@@ -1139,10 +1294,9 @@ public interface INewGrain : IGrain
         Assert.Empty(diagnostics);
         Assert.Contains("# IOldGrain\ninterface [GrainInterfaceType(\"stable-interface\")] IOldGrain [Version(0)]", contractsFile);
         Assert.Contains(
-            "  [Alias(\"stable-method\")] stable-method(request) -> Task<response>",
+            "  stable-method: OldMethod(request) -> Task<response>",
             contractsFile);
         Assert.Contains("# IOldGrain", contractsFile);
-        Assert.Contains("# IOldGrain.OldMethod", contractsFile);
     }
 
     [Fact]
@@ -1207,7 +1361,8 @@ public interface IMyGrain : IGrain
             GrainInterfaceVersionAnalyzer.RuleId0018,
             GrainInterfaceVersionAnalyzer.RuleId0027);
         Assert.Contains(diagnostics, diagnostic => diagnostic.GetMessage().Contains("NewName", StringComparison.Ordinal));
-        Assert.Contains("# IMyGrain.OldName() -> Task", contractsFile);
+        Assert.Contains(": OldName() -> Task", contractsFile);
+        Assert.Contains("OldName() -> Task", contractsFile);
     }
 
     [Fact]
@@ -1507,9 +1662,33 @@ public interface IMyGrain : IGrain
         string clrSignature,
         string contractSignatureSuffix)
     {
+        var parameterListStart = clrSignature.IndexOf('(');
+        var methodStart = clrSignature.LastIndexOf('.', parameterListStart - 1) + 1;
+        var methodName = clrSignature.Substring(methodStart, parameterListStart - methodStart);
+        var genericStart = methodName.IndexOf('<');
+        if (genericStart >= 0)
+        {
+            var genericEnd = methodName.LastIndexOf('>');
+            var arity = 1;
+            for (var index = genericStart + 1; index < genericEnd; index++)
+            {
+                if (methodName[index] == ',')
+                {
+                    arity++;
+                }
+            }
+
+            methodName = $"{methodName.Substring(0, genericStart)}`{arity}";
+            var suffixArityEnd = contractSignatureSuffix.IndexOf('(');
+            if (contractSignatureSuffix.StartsWith("`", StringComparison.Ordinal)
+                && suffixArityEnd >= 0)
+            {
+                contractSignatureSuffix = contractSignatureSuffix.Substring(suffixArityEnd);
+            }
+        }
+
         var pattern =
-            $"(?m)^  # {Regex.Escape(clrSignature)}\\r?$\\n" +
-            $"  [0-9A-F]{{8}}{Regex.Escape(contractSignatureSuffix)}\\r?$";
+            $"(?m)^  [0-9A-F]{{8}}: {Regex.Escape(methodName + contractSignatureSuffix)}\\r?$";
         Assert.Matches(pattern, content);
     }
 
@@ -1643,7 +1822,7 @@ public class CartGrain : Grain, IGrainWithStringKey
         var content = (await changedSolution.GetAdditionalDocument(additionalDocumentId!)!
             .GetTextAsync(TestContext.Current.CancellationToken)).ToString();
         Assert.Contains("interface [GrainInterfaceType(\"cart\")] ICartGrain [Version(2)]", content);
-        Assert.Contains("  [Alias(\"read\")] read(int) -> Task<string>", content);
+        Assert.Contains("  read: GetAsync(int) -> Task<string>", content);
         Assert.Contains("class [GrainType(\"cart\")] CartGrain", content);
     }
 
@@ -1698,6 +1877,96 @@ public class CartGrain : Grain, IGrainWithStringKey
             (await document.GetTextAsync(TestContext.Current.CancellationToken)).ToString(),
             "IMyGrain.Pong() -> Task",
             "() -> Task");
+    }
+
+    [Fact]
+    public async Task CodeFix_RegenerateProject_MigratesHashFirstManifest()
+    {
+        const string source = @"
+[Version(1)]
+public interface IMyGrain : IGrain
+{
+    Task NewMethod();
+}
+";
+        const string contractsFile = @"
+interface IMyGrain [Version(0)]
+  # IMyGrain.NewMethod() -> Task
+  8E43BF4F() -> Task
+";
+
+        var (changedSolution, additionalDocumentId) = await ApplyCodeFixAsync(
+            source,
+            contractsFile,
+            GrainInterfaceVersionAnalyzer.RuleId0017,
+            RegenerateCodeActionTitle);
+        var content = (await changedSolution.GetAdditionalDocument(additionalDocumentId!)!
+            .GetTextAsync(TestContext.Current.CancellationToken)).ToString();
+
+        Assert.Contains("  8E43BF4F: NewMethod() -> Task", content);
+        Assert.DoesNotContain("# IMyGrain.NewMethod", content);
+        Assert.Empty(await GetDiagnosticsAsync(source, content));
+    }
+
+    [Fact]
+    public async Task CodeFix_RegenerateProject_MigratesNameBasedManifest()
+    {
+        const string source = @"
+[Version(1)]
+public interface IMyGrain : IGrain
+{
+    Task NewMethod();
+}
+";
+        const string contractsFile = @"
+interface IMyGrain [Version(0)]
+  IMyGrain.NewMethod() -> Task
+";
+
+        var (changedSolution, additionalDocumentId) = await ApplyCodeFixAsync(
+            source,
+            contractsFile,
+            GrainInterfaceVersionAnalyzer.RuleId0017,
+            RegenerateCodeActionTitle);
+        var content = (await changedSolution.GetAdditionalDocument(additionalDocumentId!)!
+            .GetTextAsync(TestContext.Current.CancellationToken)).ToString();
+
+        Assert.Contains("  8E43BF4F: NewMethod() -> Task", content);
+        Assert.DoesNotContain("IMyGrain.NewMethod", content);
+        Assert.Empty(await GetDiagnosticsAsync(source, content));
+    }
+
+    [Fact]
+    public async Task CodeFix_RegenerateProject_EmitsSourceIdentityMetadataWithoutEditingSource()
+    {
+        const string source = @"
+public interface IMyGrain : IGrain
+{
+    [Id(42)]
+    Task Ping();
+
+    [Alias(""stable-pong"")]
+    Task Pong();
+}
+";
+
+        var (changedSolution, additionalDocumentId) = await ApplyCodeFixAsync(
+            source,
+            grainInterfacesFileContent: null,
+            GrainInterfaceVersionAnalyzer.RuleId0020,
+            RegenerateCodeActionTitle);
+
+        var content = (await changedSolution.GetAdditionalDocument(additionalDocumentId!)!
+            .GetTextAsync(TestContext.Current.CancellationToken)).ToString();
+        Assert.Contains("  42: Ping() -> Task", content);
+        Assert.Contains("  stable-pong: Pong() -> Task", content);
+
+        var sourceText = (await changedSolution.Projects.Single().Documents
+            .Single(document => document.Name == "Test.cs")
+            .GetTextAsync(TestContext.Current.CancellationToken)).ToString();
+        Assert.Contains("[Id(42)]", sourceText);
+        Assert.Contains("[Alias(\"stable-pong\")]", sourceText);
+        Assert.DoesNotContain("stable-pong: Pong", sourceText);
     }
 
     [Fact]
@@ -2001,8 +2270,8 @@ public interface IMyGrain : IGrain
 ";
         const string contractsFile = @"
 interface IMyGrain [Version(1)]
-  ExistingAsync() -> Task
-  RemovedAsync() -> Task
+  629F4AD1: ExistingAsync() -> Task
+  C1BEB0D0: RemovedAsync() -> Task
 ";
 
         var (changedSolution, additionalDocumentId) = await ApplyCodeFixAsync(
@@ -2015,7 +2284,7 @@ interface IMyGrain [Version(1)]
             .GetTextAsync(TestContext.Current.CancellationToken)).ToString();
         AssertContainsGeneratedMethod(content, "IMyGrain.ExistingAsync() -> Task", "() -> Task");
         AssertContainsGeneratedMethod(content, "IMyGrain.NewAsync() -> Task", "() -> Task");
-        Assert.Contains("  RemovedAsync() -> Task", content);
+        Assert.Contains("  C1BEB0D0: RemovedAsync() -> Task", content);
 
         var diagnostics = await GetDiagnosticsAsync(source, content);
         Assert.DoesNotContain(diagnostics, diagnostic => diagnostic.Id == GrainInterfaceVersionAnalyzer.RuleId0018);
@@ -2023,7 +2292,7 @@ interface IMyGrain [Version(1)]
     }
 
     [Fact]
-    public async Task CodeFix_RegenerateProject_PreservesAliasesAndDeduplicatesLegacyMembers()
+    public async Task CodeFix_RegenerateProject_PreservesAliasesAndDeduplicatesMembers()
     {
         const string source = @"
 [Version(1)]
@@ -2035,9 +2304,9 @@ public interface IMyGrain : IGrain
 ";
         const string contractsFile = @"
 interface IMyGrain [Version(1)]
-  ExistingAsync() -> Task
-  [Alias(""removed"")] IMyGrain.RemovedAsync(string value) -> Task
-  removed(string) -> Task
+  629F4AD1: ExistingAsync() -> Task
+  removed: RemovedAsync(string) -> Task
+  removed: RemovedAsync(string) -> Task
 ";
 
         var (changedSolution, additionalDocumentId) = await ApplyCodeFixAsync(
@@ -2048,15 +2317,15 @@ interface IMyGrain [Version(1)]
 
         var content = (await changedSolution.GetAdditionalDocument(additionalDocumentId!)!
             .GetTextAsync(TestContext.Current.CancellationToken)).ToString();
-        Assert.Equal(1, content.Split(new[] { "removed(string) -> Task" }, StringSplitOptions.None).Length - 1);
-        Assert.Contains("[Alias(\"removed\")] removed(string) -> Task", content);
+        Assert.Equal(1, content.Split(new[] { "removed:" }, StringSplitOptions.None).Length - 1);
+        Assert.Contains("removed: RemovedAsync(string) -> Task", content);
 
         var diagnostics = await GetDiagnosticsAsync(source, content);
         Assert.Single(diagnostics, diagnostic => diagnostic.Id == GrainInterfaceVersionAnalyzer.RuleId0027);
     }
 
     [Fact]
-    public async Task CodeFix_RegenerateProject_DeduplicatesSemanticallyEquivalentLegacyMembers()
+    public async Task CodeFix_RegenerateProject_DropsUnrecognizedPreReleaseMemberSyntax()
     {
         const string source = @"
 namespace Models
@@ -2095,7 +2364,7 @@ interface IMyGrain [Version(1)]
     }
 
     [Fact]
-    public async Task CodeFix_RegenerateProject_PreservesRemovedMembersOnNestedLegacyInterfaces()
+    public async Task CodeFix_RegenerateProject_PreservesRemovedMembersOnNestedInterfaces()
     {
         const string source = @"
 public class Outer
@@ -2110,8 +2379,8 @@ public class Outer
 ";
         const string contractsFile = @"
 interface Outer.IInnerGrain [Version(1)]
-  ExistingAsync() -> Task
-  RemovedAsync() -> Task
+  D4692090: ExistingAsync() -> Task
+  5F9C2FBA: RemovedAsync() -> Task
 ";
 
         var (changedSolution, additionalDocumentId) = await ApplyCodeFixAsync(
@@ -2122,7 +2391,7 @@ interface Outer.IInnerGrain [Version(1)]
 
         var content = (await changedSolution.GetAdditionalDocument(additionalDocumentId!)!
             .GetTextAsync(TestContext.Current.CancellationToken)).ToString();
-        Assert.Contains("  RemovedAsync() -> Task", content);
+        Assert.Contains("  5F9C2FBA: RemovedAsync() -> Task", content);
         Assert.Contains(
             await GetDiagnosticsAsync(source, content),
             diagnostic => diagnostic.Id == GrainInterfaceVersionAnalyzer.RuleId0027);
@@ -2184,7 +2453,7 @@ interface Outer.IInnerGrain [Version(1)]
                 GrainInterfaceVersionAnalyzer.RuleId0016,
                 "Contract missing",
                 "Contract missing",
-                "Orleans.Versioning",
+                "Versioning",
                 DiagnosticSeverity.Warning,
                 isEnabledByDefault: true),
             Location.None);
@@ -2486,9 +2755,9 @@ public interface IMiddle : IGrain
 ";
         const string grainInterfacesFile = "# OrleansContracts.txt\n" +
             "IZulu [Version(1)]\n" +
-            "IZulu.Method() -> Task\n\n" +
+            "zulu: Method() -> Task\n\n" +
             "interface IAlpha [Version(1)]\n" +
-            "IAlpha.Method() -> Task";
+            "alpha: Method() -> Task";
 
         var (changedSolution, additionalDocumentId) = await ApplyCodeFixAsync(source, grainInterfacesFile, GrainInterfaceVersionAnalyzer.RuleId0016);
 
@@ -2506,8 +2775,43 @@ public interface IMiddle : IGrain
         Assert.True(middleInterface < zuluInterface);
         AssertContainsGeneratedMethod(content, "IMiddle.Alpha() -> Task", "() -> Task");
         AssertContainsGeneratedMethod(content, "IMiddle.Zeta() -> Task", "() -> Task");
-        Assert.Contains("interface IAlpha [Version(1)]\n  Method() -> Task", content);
-        Assert.Contains("interface IZulu [Version(1)]\n  Method() -> Task", content);
+        Assert.Contains("interface IAlpha [Version(1)]\n  alpha: Method() -> Task", content);
+        Assert.Contains("interface IZulu [Version(1)]\n  zulu: Method() -> Task", content);
+    }
+
+    [Fact]
+    public async Task CodeFix_SortsDuplicateClrSignaturesByWireIdentity()
+    {
+        const string source = @"
+public interface IMyGrain : IGrain
+{
+    Task NewAsync();
+}
+";
+        const string alphaFirst = @"
+interface IMyGrain [Version(0)]
+  alpha: RemovedAsync() -> Task
+  zeta: RemovedAsync() -> Task
+";
+        const string zetaFirst = @"
+interface IMyGrain [Version(0)]
+  zeta: RemovedAsync() -> Task
+  alpha: RemovedAsync() -> Task
+";
+
+        var first = await ApplyCodeFixAndGetContractsAsync(
+            source,
+            alphaFirst,
+            GrainInterfaceVersionAnalyzer.RuleId0018);
+        var second = await ApplyCodeFixAndGetContractsAsync(
+            source,
+            zetaFirst,
+            GrainInterfaceVersionAnalyzer.RuleId0018);
+
+        Assert.Equal(first, second);
+        Assert.True(
+            first.IndexOf("alpha: RemovedAsync()", StringComparison.Ordinal)
+                < first.IndexOf("zeta: RemovedAsync()", StringComparison.Ordinal));
     }
 
     [Fact]
@@ -2636,7 +2940,7 @@ public interface IMyGrain : IGrain
 ";
         const string grainInterfacesFile = @"# OrleansContracts.txt
 IMyGrain [Version(1)]
-IMyGrain.DoSomething() -> Task";
+41F3F487: DoSomething() -> Task";
 
         var (changedSolution, additionalDocumentId) = await ApplyCodeFixAsync(source, grainInterfacesFile, GrainInterfaceVersionAnalyzer.RuleId0017);
 
@@ -2670,10 +2974,10 @@ public interface IFooBar : IGrain
 ";
         const string grainInterfacesFile = @"# OrleansContracts.txt
 IFooBar [Version(1)]
-IFooBar.DoSomething() -> Task
+E0A3D19A: DoSomething() -> Task
 
 IFoo [Version(1)]
-IFoo.DoSomething() -> Task";
+4BC6AD4C: DoSomething() -> Task";
 
         var (changedSolution, additionalDocumentId) = await ApplyCodeFixAsync(source, grainInterfacesFile, GrainInterfaceVersionAnalyzer.RuleId0017);
 
@@ -2698,7 +3002,7 @@ public interface IMyGrain : IGrain
     Task DoSomething();
 }
 ";
-        const string grainInterfacesFile = "# OrleansContracts.txt\nIMyGrain [Version(1)]\nIMyGrain.DoSomething() -> Task\n";
+        const string grainInterfacesFile = "# OrleansContracts.txt\nIMyGrain [Version(1)]\n41F3F487: DoSomething() -> Task\n";
 
         var (changedSolution, additionalDocumentId) = await ApplyCodeFixAsync(source, grainInterfacesFile, GrainInterfaceVersionAnalyzer.RuleId0017);
 
@@ -2710,7 +3014,7 @@ public interface IMyGrain : IGrain
         var content = changedText.ToString();
 
         Assert.DoesNotContain("\r", content);
-        Assert.Equal(GeneratedHeader + "interface IMyGrain [Version(2)]\n  DoSomething() -> Task\n", content);
+        Assert.Equal(GeneratedHeader + "interface IMyGrain [Version(2)]\n  41F3F487: DoSomething() -> Task\n", content);
     }
 
     #endregion
@@ -2730,7 +3034,7 @@ public interface IMyGrain : IGrain
 ";
         const string grainInterfacesFile = @"# OrleansContracts.txt
 IMyGrain [Version(1)]
-IMyGrain.DoSomething() -> Task";
+41F3F487: DoSomething() -> Task";
 
         var (changedSolution, additionalDocumentId) = await ApplyCodeFixAsync(source, grainInterfacesFile, GrainInterfaceVersionAnalyzer.RuleId0018);
 
@@ -2763,7 +3067,7 @@ public interface IMyGrain : IGrain
 ";
         const string grainInterfacesFile = @"# OrleansContracts.txt
 IMyGrain [Version(1)]
-IMyGrain.DoSomething() -> Task";
+41F3F487: DoSomething() -> Task";
 
         var (changedSolution, additionalDocumentId) = await ApplyCodeFixAsync(source, grainInterfacesFile, GrainInterfaceVersionAnalyzer.RuleId0018);
 
@@ -2774,8 +3078,7 @@ IMyGrain.DoSomething() -> Task";
         var changedText = await changedDocument!.GetTextAsync(TestContext.Current.CancellationToken);
         var content = changedText.ToString();
 
-        Assert.Contains("\n  [Alias(\"new-method\")] new-method(int) -> Task", content);
-        Assert.Contains("  # IMyGrain.NewMethod(int value) -> Task", content);
+        Assert.Contains("\n  new-method: NewMethod(int) -> Task", content);
     }
 
     [Fact]
@@ -2797,7 +3100,7 @@ public interface IMyGrain : IGrain
             GrainInterfaceVersionAnalyzer.RuleId0018);
 
         Assert.Equal(
-            GeneratedHeader + "interface IMyGrain [Version(1)]\n  [Alias(\"NewMethod\")] NewMethod() -> Task\n",
+            GeneratedHeader + "interface IMyGrain [Version(1)]\n  NewMethod: NewMethod() -> Task\n",
             content);
     }
 
@@ -2844,7 +3147,7 @@ public interface IFooBar : IGrain
         const string grainInterfacesFile = @"# OrleansContracts.txt
 IFoo [Version(1)]
 IFooBar [Version(1)]
-IFooBar.ExistingMethod() -> Task";
+037556D9: ExistingMethod() -> Task";
 
         var (changedSolution, additionalDocumentId) = await ApplyCodeFixAsync(source, grainInterfacesFile, GrainInterfaceVersionAnalyzer.RuleId0018);
 
@@ -2901,7 +3204,7 @@ public interface IMyGrain<T> : IGrain
         const string grainInterfacesFile = @"
 # OrleansContracts.txt
 IMyGrain<T> [Version(1)]
-IMyGrain<T>.DoSomething(T value) -> Task
+7DDCD155: DoSomething(T) -> Task
 ";
         var diagnostics = await GetDiagnosticsAsync(source, grainInterfacesFile);
 
@@ -2923,7 +3226,7 @@ public interface IMyGrain<T> : IGrain where T : class
         const string grainInterfacesFile = @"
 # OrleansContracts.txt
 IMyGrain<T> [Version(1)]
-IMyGrain<T>.DoSomething(T value) -> Task
+7DDCD155: DoSomething(T) -> Task
 ";
         var diagnostics = await GetDiagnosticsAsync(source, grainInterfacesFile);
 
@@ -2943,7 +3246,7 @@ public interface IMyGrain<TKey, TValue> : IGrain
         const string grainInterfacesFile = @"
 # OrleansContracts.txt
 IMyGrain<TKey, TValue> [Version(1)]
-IMyGrain<TKey, TValue>.DoSomething(TKey key, TValue value) -> Task
+96A32DB8: DoSomething(TKey, TValue) -> Task
 ";
         var diagnostics = await GetDiagnosticsAsync(source, grainInterfacesFile);
 
@@ -3051,10 +3354,10 @@ public interface IDerivedGrain : IBaseGrain
         const string grainInterfacesFile = @"
 # OrleansContracts.txt
 IBaseGrain [Version(1)]
-IBaseGrain.DoBase() -> Task
+E1000F29: DoBase() -> Task
 
 IDerivedGrain [Version(1)]
-IDerivedGrain.DoDerived() -> Task
+BDD4EFFA: DoDerived() -> Task
 ";
         var diagnostics = await GetDiagnosticsAsync(source, grainInterfacesFile);
 
@@ -3083,7 +3386,7 @@ public interface IDerivedGrain : IBaseGrain
         const string grainInterfacesFile = @"
 # OrleansContracts.txt
 IBaseGrain [Version(1)]
-IBaseGrain.DoBase() -> Task
+E1000F29: DoBase() -> Task
 ";
         var diagnostics = await GetDiagnosticsAsync(source, grainInterfacesFile);
 
@@ -3106,7 +3409,7 @@ public interface IMyGrain : IGrainWithStringKey
         const string grainInterfacesFile = @"
 # OrleansContracts.txt
 IMyGrain [Version(1)]
-IMyGrain.DoSomething() -> Task
+41F3F487: DoSomething() -> Task
 ";
         var diagnostics = await GetDiagnosticsAsync(source, grainInterfacesFile);
 
@@ -3168,11 +3471,11 @@ public interface IMyGrain : IGrain
     Task DoSomething();
 }
 ";
-        const string contractsFile = "# OrleansContracts.txt\r\nIMyGrain [Version(1)]\r\nIMyGrain.DoSomething() -> Task\r\n";
+        const string contractsFile = "# OrleansContracts.txt\r\nIMyGrain [Version(1)]\r\n41F3F487: DoSomething() -> Task\r\n";
         var expectedContractsFile =
             GeneratedHeader.Replace("\n", "\r\n", StringComparison.Ordinal) +
             "interface IMyGrain [Version(2)]\r\n" +
-            "  DoSomething() -> Task\r\n";
+            "  41F3F487: DoSomething() -> Task\r\n";
         var properties = ImmutableDictionary<string, string?>.Empty
             .Add("InterfaceName", "IMyGrain")
             .Add("ActualVersion", "2");
