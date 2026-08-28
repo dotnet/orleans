@@ -379,7 +379,6 @@ public sealed partial class GrainInterfaceVersionAnalyzer : DiagnosticAnalyzer
             // Check members
             foreach (var member in sourceMembers)
             {
-                var memberSignature = GetMethodSignature(member);
                 var declaredMember = declaredInterface.Members.Values
                     .Where(candidate => GrainInterfaceVersionAnalyzer.IsMatchingMember(
                         declaredInterface.Name,
@@ -848,7 +847,7 @@ public sealed partial class GrainInterfaceVersionAnalyzer : DiagnosticAnalyzer
     {
         if (GetAttributeValue(method, Constants.IdAttributeFullyQualifiedName) is { } methodId)
         {
-            return new MethodWireIdentity(methodId.ToString());
+            return new MethodWireIdentity(Convert.ToString(methodId, CultureInfo.InvariantCulture)!);
         }
 
         if (GetStringAttributeValue(method, Constants.AliasAttributeFullyQualifiedName) is { } methodAlias)

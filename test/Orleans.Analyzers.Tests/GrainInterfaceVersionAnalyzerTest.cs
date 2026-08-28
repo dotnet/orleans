@@ -1,6 +1,7 @@
 #nullable enable
 
 using System.Collections.Immutable;
+using System.Globalization;
 using System.Reflection;
 using System.Text;
 using System.Text.RegularExpressions;
@@ -428,6 +429,36 @@ interface IMyGrain [Version(1)]
         var diagnostics = await GetDiagnosticsAsync(source, contractsFile);
 
         Assert.Empty(diagnostics);
+    }
+
+    [Fact]
+    public async Task CanonicalIdIdentity_UsesInvariantFormatting()
+    {
+        const string source = @"
+[Version(1)]
+public interface IMyGrain : IGrain
+{
+    [Id(42)]
+    Task Ping();
+}
+";
+        const string contractsFile = @"
+interface IMyGrain [Version(1)]
+  42: Ping() -> Task
+";
+        var originalCulture = CultureInfo.CurrentCulture;
+        try
+        {
+            CultureInfo.CurrentCulture = CultureInfo.GetCultureInfo("ar-SA");
+
+            var diagnostics = await GetDiagnosticsAsync(source, contractsFile);
+
+            Assert.Empty(diagnostics);
+        }
+        finally
+        {
+            CultureInfo.CurrentCulture = originalCulture;
+        }
     }
 
     [Fact]
