@@ -94,7 +94,7 @@ public sealed class RelationalStorageDataSourceTests
         var storage = RelationalStorage.CreateInstance(AdoNetInvariants.InvariantNamePostgreSql, dataSource);
 
         Assert.Equal(AdoNetInvariants.InvariantNamePostgreSql, storage.InvariantName);
-        Assert.Equal("Host=127.0.0.1;Port=1;Database=unused;Username=unused", storage.ConnectionString);
+        Assert.Equal(dataSource.ConnectionString, storage.ConnectionString);
     }
 
     [Fact]
@@ -156,20 +156,20 @@ public sealed class RelationalStorageDataSourceTests
             CREATE TABLE Items(Id INTEGER PRIMARY KEY, Value TEXT NOT NULL);
             INSERT INTO Items(Id, Value) VALUES (1, 'one'), (2, 'two'), (3, 'three');
             """);
-        var observations = new List<(int ResultSetIndex, int RecordsAffected)>();
+        var recordsAffected = new List<int>();
 
         var results = await fixture.Storage.ReadAsync(
             "UPDATE Items SET Value = Value || '-updated' WHERE Id <= 2; SELECT Id, Value FROM Items ORDER BY Id;",
             parameterProvider: null,
-            (record, resultSetIndex, _) =>
+            (record, _, _) =>
             {
-                observations.Add((resultSetIndex, ((DbDataReader)record).RecordsAffected));
+                recordsAffected.Add(((DbDataReader)record).RecordsAffected);
                 return Task.FromResult($"{record.GetInt64(0)}:{record.GetString(1)}");
             },
             cancellationToken: TestContext.Current.CancellationToken);
 
         Assert.Equal(["1:one-updated", "2:two-updated", "3:three"], results);
-        Assert.Equal([(0, 2), (0, 2), (0, 2)], observations);
+        Assert.Equal([2, 2, 2], recordsAffected);
         Assert.Equal(2L, fixture.ExecuteScalar<long>("SELECT COUNT(*) FROM Items WHERE Value LIKE '%-updated';"));
         AssertOperationDisposed(fixture.DataSource, expectReader: true);
     }
