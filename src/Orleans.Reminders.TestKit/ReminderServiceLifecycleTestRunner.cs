@@ -159,7 +159,7 @@ public abstract class ReminderServiceLifecycleTestRunner
             {
                 var expectedStart = _harness.UtcNow.UtcDateTime + due;
                 await grain.RegisterOrUpdateAsync(Name, due, Period).WaitAsync(cancellationToken);
-                await _harness.WaitForOwnerCountAsync(grain.GetGrainId(), Name, 1, cancellationToken);
+                await WaitForOwnersAfterRefreshAsync([(grain, Name)], cancellationToken);
                 if (_harness.GetOwners(grain.GetGrainId(), Name).Count != 1)
                 {
                     OwnershipFailure(Guarantee, grain.GetGrainId(), Name, 1).Throw();
@@ -190,7 +190,7 @@ public abstract class ReminderServiceLifecycleTestRunner
             async () =>
             {
                 await grain.RegisterOrUpdateAsync(Name, TimeSpan.FromSeconds(3), Period).WaitAsync(cancellationToken);
-                await _harness.WaitForOwnerCountAsync(grain.GetGrainId(), Name, 1, cancellationToken);
+                await WaitForOwnersAfterRefreshAsync([(grain, Name)], cancellationToken);
                 await _harness.WaitForScheduleAsync(grain.GetGrainId(), Name, cancellationToken);
                 var original = await ReadRequiredAsync(Guarantee, grain.GetGrainId(), Name, cancellationToken);
                 var owners = _harness.GetOwners(grain.GetGrainId(), Name).ToArray();
@@ -246,7 +246,7 @@ public abstract class ReminderServiceLifecycleTestRunner
             async () =>
             {
                 await grain.RegisterOrUpdateAsync(Name, TimeSpan.FromSeconds(3), Period).WaitAsync(cancellationToken);
-                await _harness.WaitForOwnerCountAsync(grain.GetGrainId(), Name, 1, cancellationToken);
+                await WaitForOwnersAfterRefreshAsync([(grain, Name)], cancellationToken);
                 await _harness.WaitForScheduleAsync(grain.GetGrainId(), Name, cancellationToken);
 
                 if (!await grain.UnregisterAsync(Name).WaitAsync(cancellationToken))
@@ -396,12 +396,7 @@ public abstract class ReminderServiceLifecycleTestRunner
                 await Task.WhenAll(reminders.Select(item =>
                     item.Grain.RegisterOrUpdateAsync(item.Name, TimeSpan.FromSeconds(3), Period)
                         .WaitAsync(cancellationToken)));
-                await Task.WhenAll(reminders.Select(item =>
-                    _harness.WaitForOwnerCountAsync(
-                        item.Grain.GetGrainId(),
-                        item.Name,
-                        1,
-                        cancellationToken)));
+                await WaitForOwnersAfterRefreshAsync(reminders, cancellationToken);
                 foreach (var (grain, name) in reminders)
                 {
                     initialOwners[grain.GetGrainId()] = _harness.GetOwners(grain.GetGrainId(), name).Single();
@@ -578,6 +573,21 @@ public abstract class ReminderServiceLifecycleTestRunner
                 .WithObserved($"{cleanupFailure.GetType().FullName}: {cleanupFailure.Message}")
                 .Throw(cleanupFailure);
         }
+    }
+
+    private async Task WaitForOwnersAfterRefreshAsync(
+        IReadOnlyList<(IReminderServiceTestGrain Grain, string Name)> reminders,
+        CancellationToken cancellationToken)
+    {
+        var ownerWaits = reminders
+            .Select(item => _harness.WaitForOwnerCountAsync(
+                item.Grain.GetGrainId(),
+                item.Name,
+                1,
+                cancellationToken))
+            .ToArray();
+        await _harness.AdvanceAsync(_harness.ReminderRefreshPeriod, cancellationToken);
+        await Task.WhenAll(ownerWaits);
     }
 
     private async Task CleanupAsync(
