@@ -218,8 +218,12 @@ namespace UnitTests.TimerTests
         {
             using var cts = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
             cts.CancelAfter(TestConstants.InitTimeout);
-            var rejection = (OrleansMessageRejectionException)System.Runtime.CompilerServices.RuntimeHelpers
-                .GetUninitializedObject(typeof(OrleansMessageRejectionException));
+            var rejection = (OrleansMessageRejectionException)Activator.CreateInstance(
+                typeof(OrleansMessageRejectionException),
+                System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic,
+                binder: null,
+                args: ["Controlled post-convergence rejection."],
+                culture: null)!;
             var callCounts = new int[4];
 
             var actual = await Assert.ThrowsAsync<OrleansMessageRejectionException>(() =>
