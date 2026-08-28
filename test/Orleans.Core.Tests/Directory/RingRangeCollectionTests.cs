@@ -1,6 +1,6 @@
+using System.Collections;
 using System.Collections.Immutable;
 using Orleans.Runtime.GrainDirectory;
-using CsCheck;
 using Xunit;
 
 namespace NonSilo.Tests.Directory;
@@ -14,135 +14,222 @@ namespace NonSilo.Tests.Directory;
 [TestArea("GrainDirectory")]
 public sealed class RingRangeCollectionTests
 {
-    private static readonly Gen<RingRangeCollection> GenRingRangeCollection = Gen.Int[0, 100].SelectMany(count => Gen.Select(Gen.UInt, Gen.Bool, static (boundary, included) => (boundary, included)).Array[count].Select(elements =>
-    {
-        var arr = ImmutableArray.CreateBuilder<RingRange>(elements.Length);
-        for (var i = 1; i < arr.Count;)
-        {
-            var prev = elements[i - 1];
-            var (boundary, included) = elements[i];
-            if (!included)
-            {
-                continue;
-            }
-
-            arr.Add(RingRange.Create(prev.boundary, boundary));
-        }
-
-        return RingRangeCollection.Create(arr);
-    }));
-
     [Fact]
-    public void Contains()
+    public void Create_SortsRangesAndOmitsEmptyRanges()
     {
-        Gen.Select(GenRingRangeCollection, Gen.UInt).Sample((ranges, point) =>
-        {
-            var doesContain = ranges.Ranges.Any(r => r.Contains(point));
-            Assert.Equal(doesContain, ranges.Contains(point));
-        });
+        var low = RingRange.Create(10, 20);
+        var high = RingRange.Create(30, 40);
+
+        var collection = RingRangeCollection.Create(new[] { high, RingRange.Empty, low });
+
+        Assert.Equal(new[] { low, high }, collection.Ranges);
     }
 
     [Fact]
-    public void Intersects()
+    public void Properties_ReportEmptyFullAndPartialCollections()
     {
-        GenRingRangeCollection.Sample(ranges =>
-        {
-            foreach (var range in ranges.Ranges)
-            {
-                Assert.True(ranges.Intersects(range));
-            }
-        });
+        var defaultCollection = default(RingRangeCollection);
+        var empty = RingRangeCollection.Empty;
+        var full = Create(RingRange.Full);
+        var partial = Create(RingRange.Create(10, 20), RingRange.Create(30, 40));
+
+        Assert.True(defaultCollection.IsDefault);
+
+        Assert.False(empty.IsDefault);
+        Assert.True(empty.IsEmpty);
+        Assert.False(empty.IsFull);
+        Assert.Equal(0u, empty.Size);
+        Assert.Equal(0f, empty.SizePercent);
+
+        Assert.False(full.IsEmpty);
+        Assert.True(full.IsFull);
+        Assert.Equal(uint.MaxValue, full.Size);
+        Assert.Equal(100f, full.SizePercent);
+
+        Assert.False(partial.IsEmpty);
+        Assert.False(partial.IsFull);
+        Assert.Equal(20u, partial.Size);
     }
 
     [Fact]
-    public void Difference()
+    public void Contains_UsesExclusiveStartsAndInclusiveEnds()
     {
-        var ringWithUpdates = GenRingRangeCollection.SelectMany(original => Gen.Float[0f, 1f].Array[original.Ranges.Length].Select(diffs =>
-        {
-            // Increase or decrease the end of each range by some amount.
-            var arr = ImmutableArray.CreateBuilder<RingRange>(original.Ranges.Length);
-            for (var i = 0; i < diffs.Length; i++)
-            {
-                var orig = original.Ranges[i];
-                var next = original.Ranges[(i + 1) % original.Ranges.Length];
-                var maxPossibleLength = RingRange.Create(orig.Start, next.Start).Size;
-                var newEnd = orig.Start + maxPossibleLength * diffs[i];
-                arr.Add(RingRange.Create(orig.Start, (uint)Math.Clamp(orig.End + diffs[i], orig.Start + 1, next.Start)));
-            }
+        var collection = Create(RingRange.Create(10, 20), RingRange.Create(30, 40));
 
-            return (original, RingRangeCollection.Create(arr));
-        }));
-
-        ringWithUpdates.Sample((original, updated) =>
-        {
-            var additions = updated.Difference(original);
-            
-            foreach (var addition in additions)
-            {
-                Assert.True(updated.Intersects(addition));
-                Assert.False(original.Intersects(addition));
-            }
-
-            var removals = updated.Difference(original);
-            
-            foreach (var removal in removals)
-            {
-                Assert.False(updated.Intersects(removal));
-                Assert.True(original.Intersects(removal));
-            }
-        });
+        Assert.False(collection.Contains(10));
+        Assert.True(collection.Contains(11));
+        Assert.True(collection.Contains(20));
+        Assert.False(collection.Contains(21));
+        Assert.False(collection.Contains(30));
+        Assert.True(collection.Contains(40));
+        Assert.False(collection.Contains(41));
     }
 
     [Fact]
-    public void ContainsTest()
+    public void Contains_UsesTheGrainUniformHashCode()
     {
-        Gen.Select(GenRingRangeCollection, Gen.UInt).Sample((collection, point) =>
-        {
-            var allRanges = collection.Ranges.ToList();
-            var expectedContains = allRanges.Any(r => r.Contains(point));
-            Assert.Equal(expectedContains, collection.Contains(point));
-            var numContains = collection.Count(r => r.Contains(point));
-            Assert.Equal(expectedContains ? 1 : 0, numContains);
-        });
+        var grainId = GrainId.Create("test", "grain");
+        var collection = Create(RingRange.FromPoint(grainId.GetUniformHashCode()));
+
+        Assert.True(collection.Contains(grainId));
+        Assert.False(RingRangeCollection.Empty.Contains(grainId));
     }
 
     [Fact]
-    public void ContainsWrappedTest()
+    public void Contains_HandlesWrappedRangeBoundaries()
     {
-        var ranges = new RingRange[]
-        {
-            RingRange.Create(0x10930012, 0x179C5AD4),
-            RingRange.Create(0x287844C7, 0x2B5DCCCB),
-            RingRange.Create(0x32AC80C2, 0x36F72978),
-            RingRange.Create(0x6F5C3AAC, 0x7776E202),
-            RingRange.Create(0x7D2B02F3, 0x7DF52810),
-            RingRange.Create(0xA18205D1, 0xA3A44031),
-            RingRange.Create(0xA847CD39, 0xAD6C28D0),
-            RingRange.Create(0xAF60D42F, 0xB278D2BE),
-            RingRange.Create(0xBB8EA837, 0xC61DA5E1),
-            RingRange.Create(0xF08C2237, 0xF3030A5A)
-        }.ToImmutableArray();
-        var collection = new RingRangeCollection(ranges);
-        uint point = 0x16F4037C;
-        Assert.True(ranges[0].Contains(point));
-        Assert.True(collection.Contains(point));
+        var collection = Create(RingRange.Create(100, 10));
 
-        // Just outside the last range.
-        point = 0xF3030A5A + 1;
-        Assert.False(ranges[^1].Contains(point));
-        Assert.False(collection.Contains(point));
-
-        // Just inside the last range.
-        point = 0xF3030A5A;
-        Assert.True(ranges[^1].Contains(point));
-        Assert.True(collection.Contains(point));
-
-        // Between ranges.
-        point = 0xF08C2237 - 1;
-        Assert.False(collection.Contains(point));
-
-        // In an interior range.
-        point = 0x7D2B02F3 + 1;
-        Assert.True(collection.Contains(point));
+        Assert.False(collection.Contains(100));
+        Assert.True(collection.Contains(101));
+        Assert.True(collection.Contains(uint.MaxValue));
+        Assert.True(collection.Contains(0));
+        Assert.True(collection.Contains(10));
+        Assert.False(collection.Contains(11));
+        Assert.False(collection.Contains(50));
     }
+
+    [Fact]
+    public void IntersectsRange_HandlesEmptyContainedContainingAndDisjointRanges()
+    {
+        var collection = Create(RingRange.Create(10, 20), RingRange.Create(30, 40));
+
+        Assert.False(RingRangeCollection.Empty.Intersects(RingRange.Create(10, 20)));
+        Assert.False(collection.Intersects(RingRange.Empty));
+        Assert.True(collection.Intersects(RingRange.Create(12, 18)));
+        Assert.True(collection.Intersects(RingRange.Create(15, 25)));
+        Assert.False(collection.Intersects(RingRange.Create(20, 30)));
+        Assert.False(collection.Intersects(RingRange.Create(40, 50)));
+    }
+
+    [Fact]
+    public void IntersectsRange_HandlesWrappedRangesAndBoundaryTouches()
+    {
+        var collection = Create(RingRange.Create(100, 10));
+
+        Assert.True(collection.Intersects(RingRange.Create(0, 5)));
+        Assert.True(collection.Intersects(RingRange.Create(150, 200)));
+        Assert.False(collection.Intersects(RingRange.Create(10, 20)));
+        Assert.False(collection.Intersects(RingRange.Create(90, 100)));
+        Assert.False(collection.Intersects(RingRange.Create(20, 30)));
+    }
+
+    [Fact]
+    public void IntersectsCollection_HandlesEitherContainmentDirectionAndEmptyCollections()
+    {
+        var inner = Create(RingRange.Create(15, 20));
+        var overlapping = Create(RingRange.Create(10, 18));
+        var outer = Create(RingRange.Create(10, 30));
+        var disjoint = Create(RingRange.Create(30, 40));
+
+        Assert.False(RingRangeCollection.Empty.Intersects(inner));
+        Assert.False(inner.Intersects(RingRangeCollection.Empty));
+        Assert.True(inner.Intersects(overlapping));
+        Assert.True(outer.Intersects(inner));
+        Assert.True(inner.Intersects(outer));
+        Assert.False(inner.Intersects(disjoint));
+        Assert.False(disjoint.Intersects(inner));
+    }
+
+    [Fact]
+    public void Difference_ReturnsOnlyRangeGrowth()
+    {
+        var previous = Create(RingRange.Create(10, 20), RingRange.Create(30, 40));
+        var current = Create(RingRange.Create(10, 25), RingRange.Create(30, 40));
+
+        var result = current.Difference(previous);
+
+        Assert.Equal(new[] { RingRange.Create(20, 25) }, result.Ranges);
+        Assert.True(current.Intersects(result));
+        Assert.False(previous.Intersects(result));
+    }
+
+    [Fact]
+    public void Difference_PreservesSortOrderWhenWrappedRangeGrowthMovesToTheFront()
+    {
+        var previous = Create(RingRange.Create(10, 20), RingRange.Create(100, 5));
+        var current = Create(RingRange.Create(10, 25), RingRange.Create(100, 8));
+
+        var result = current.Difference(previous);
+
+        Assert.Equal(
+            new[] { RingRange.Create(5, 8), RingRange.Create(20, 25) },
+            result.Ranges);
+        Assert.All(result, addition => Assert.True(current.Intersects(addition)));
+        Assert.All(result, addition => Assert.False(previous.Intersects(addition)));
+    }
+
+    [Fact]
+    public void Difference_HandlesUnchangedAndEmptyCollections()
+    {
+        var collection = Create(RingRange.Create(10, 20), RingRange.Create(30, 40));
+
+        Assert.True(collection.Difference(collection).IsEmpty);
+        Assert.Equal(collection, collection.Difference(RingRangeCollection.Empty));
+        Assert.True(RingRangeCollection.Empty.Difference(collection).IsEmpty);
+        Assert.True(RingRangeCollection.Empty.Difference(RingRangeCollection.Empty).IsEmpty);
+    }
+
+    [Fact]
+    public void Equality_UsesTheOrderedRangeSequenceAndTreatsEmptyCollectionsAsEqual()
+    {
+        var range = RingRange.Create(10, 20);
+        var first = Create(range);
+        var equal = Create(range);
+        var different = Create(RingRange.Create(10, 21));
+        var emptyWithExplicitRange = new RingRangeCollection(ImmutableArray.Create(RingRange.Empty));
+
+        Assert.Equal(first, equal);
+        Assert.True(first.Equals(equal));
+        Assert.True(first == equal);
+        Assert.False(first != equal);
+        Assert.Equal(first.GetHashCode(), equal.GetHashCode());
+
+        Assert.NotEqual(first, different);
+        Assert.False(first.Equals(different));
+        Assert.True(first != different);
+        Assert.False(first.Equals(null));
+        Assert.False(first.Equals("not a range collection"));
+
+        Assert.Equal(RingRangeCollection.Empty, emptyWithExplicitRange);
+        Assert.NotEqual(first, RingRangeCollection.Empty);
+    }
+
+    [Fact]
+    public void Enumeration_ProducesEveryRangeForGenericAndNonGenericConsumers()
+    {
+        var expected = new[] { RingRange.Create(10, 20), RingRange.Create(30, 40) };
+        var collection = Create(expected);
+
+        Assert.Equal(expected, collection.ToArray());
+        Assert.Equal(expected, ((IEnumerable)collection).Cast<RingRange>().ToArray());
+
+        var enumerator = collection.GetEnumerator();
+        Assert.True(enumerator.MoveNext());
+        Assert.Equal(expected[0], enumerator.Current);
+
+        var nonGenericEnumerator = ((IEnumerable)collection).GetEnumerator();
+        Assert.True(nonGenericEnumerator.MoveNext());
+        Assert.Equal(expected[0], nonGenericEnumerator.Current);
+    }
+
+    [Fact]
+    public void Formatting_ReportsSubrangeCountAndSize()
+    {
+        var collection = Create(RingRange.Create(0, uint.MaxValue));
+        Span<char> buffer = stackalloc char[64];
+
+        Assert.True(((ISpanFormattable)collection).TryFormat(buffer, out var charsWritten, default, null));
+        var formatted = buffer[..charsWritten].ToString();
+        Assert.StartsWith("(1 subranges), ", formatted);
+        Assert.EndsWith("%", formatted);
+        Assert.Equal(formatted, collection.ToString());
+        Assert.Equal(formatted, ((IFormattable)collection).ToString(null, null));
+
+        Span<char> shortBuffer = stackalloc char[1];
+        Assert.False(((ISpanFormattable)collection).TryFormat(shortBuffer, out charsWritten, default, null));
+        Assert.Equal(0, charsWritten);
+    }
+
+    private static RingRangeCollection Create(params RingRange[] ranges) => RingRangeCollection.Create(ranges);
 }
