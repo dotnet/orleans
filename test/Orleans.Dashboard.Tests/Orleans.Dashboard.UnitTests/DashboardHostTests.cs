@@ -151,16 +151,14 @@ public class DashboardHostTests
             AssertDashboardActivation(fixture);
             AssertSiloActivation(fixture);
             Assert.Equal(0, trackingProvider.DisposeCalls);
-
-            host.Dispose();
-
-            Assert.Equal(1, trackingProvider.DisposeCalls);
         }
         finally
         {
             originalProvider.Dispose();
             host.Dispose();
         }
+
+        Assert.Equal(1, trackingProvider.DisposeCalls);
     }
 
     [Fact]

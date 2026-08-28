@@ -115,7 +115,9 @@ public class ServiceCollectionExtensionsRoutingTests
         Assert.Equal(StatusCodes.Status200OK, response.StatusCode);
         Assert.Equal("text/css", response.ContentType);
         Assert.Equal(expectedBody.Length, response.ContentLength);
-        Assert.Equal("no-store, no-cache", response.Headers.CacheControl.ToString());
+        var cacheControl = CacheControlHeaderValue.Parse(response.Headers.CacheControl.ToString());
+        Assert.True(cacheControl.NoCache);
+        Assert.True(cacheControl.NoStore);
         Assert.True(EntityTagHeaderValue.TryParse(response.Headers.ETag.ToString(), out var entityTag));
         Assert.Equal(expectedBody, response.Body);
 
