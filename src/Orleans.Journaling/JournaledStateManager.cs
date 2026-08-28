@@ -86,10 +86,6 @@ internal sealed partial class JournaledStateManager : IJournaledStateManager, IJ
 
     internal IServiceProvider ServiceProvider => _shared.ServiceProvider;
 
-    public bool SupportsRollback => true;
-
-    public bool SupportsObservers => true;
-
     public void RegisterState(string name, IJournaledState state)
     {
         ArgumentNullException.ThrowIfNullOrEmpty(name);
