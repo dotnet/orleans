@@ -381,8 +381,8 @@ namespace Orleans.Serialization.Cloning
         public CopyContextPool(CodecProvider codecProvider)
         {
             var returner = new WeakPoolReturner<CopyContext>();
-            var sessionPoolPolicy = new PoolPolicy(codecProvider, returner.Return);
-            _pool = new ConcurrentObjectPool<CopyContext, PoolPolicy>(sessionPoolPolicy);
+            var poolPolicy = new PoolPolicy(codecProvider, returner.Return);
+            _pool = new ConcurrentObjectPool<CopyContext, PoolPolicy>(poolPolicy);
             returner.SetPool(_pool);
         }
 
