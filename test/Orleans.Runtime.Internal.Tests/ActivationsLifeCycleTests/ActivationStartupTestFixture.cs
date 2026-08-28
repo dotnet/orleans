@@ -1,5 +1,6 @@
 using System.Reflection;
 using Microsoft.Extensions.DependencyInjection;
+using Orleans.CodeGeneration;
 using Orleans.Metadata;
 using Orleans.Runtime;
 using Orleans.Runtime.Diagnostics;
