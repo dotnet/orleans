@@ -94,6 +94,26 @@ public class LogTestGrainClearTests : IClassFixture<EventSourcingClusterFixture>
     }
 
     [Fact, TestCategory("EventSourcing"), TestCategory("Functional")]
+    public async Task JournaledStateLogStorage_RetrievesIndexedLogSegments()
+    {
+        var grain = this.fixture.GrainFactory.GetGrain<ILogTestGrain>(721017L, "TestGrains.LogTestGrainJournaledStateStorage");
+
+        await grain.Clear();
+        await grain.SetAGlobal(10);
+        await grain.SetBGlobal(20);
+        await grain.IncrementAGlobal();
+
+        var segment = await grain.GetEventLogSegment(1, 3);
+        Assert.Collection(
+            segment,
+            entry => Assert.Equal(20, Assert.IsType<TestGrains.UpdateB>(entry).Val),
+            entry => Assert.IsType<TestGrains.IncrementA>(entry));
+        Assert.Empty(await grain.GetEventLogSegment(2, 2));
+        await Assert.ThrowsAsync<ArgumentException>(() => grain.GetEventLogSegment(-1, 1));
+        await Assert.ThrowsAsync<ArgumentException>(() => grain.GetEventLogSegment(2, 4));
+    }
+
+    [Fact, TestCategory("EventSourcing"), TestCategory("Functional")]
     public async Task JournaledStateLogStorage_ClearPreservesOtherJournaledState()
     {
         var grain = this.fixture.GrainFactory.GetGrain<ILogTestGrainWithAuxiliaryState>(721006L, "TestGrains.LogTestGrainJournaledStateStorageWithAuxiliaryState");
