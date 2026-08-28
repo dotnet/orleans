@@ -25,6 +25,7 @@ internal sealed class SocketReceiver : SocketAwaitableEventArgs
             return new ValueTask(this, 0);
         }
 
-        return Error is not null ? ValueTask.FromException(Error) : default;
+        var error = Error;
+        return error is not null ? ValueTask.FromException(error) : default;
     }
 }
