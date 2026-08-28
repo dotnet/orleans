@@ -322,19 +322,17 @@ public class WorkItemGroupWaiterTests
     public void SchedulerTaskDoesNotCaptureExecutionContext()
     {
         using var services = CreateServices();
-        var asyncLocal = new AsyncLocal<object?> { Value = new object() };
-        var workItemGroup = CreateWorkItemGroup(services);
-        var schedulerTask = GetSchedulerTask(workItemGroup);
-        var contingentPropertiesField = typeof(Task).GetField("m_contingentProperties", BindingFlags.Instance | BindingFlags.NonPublic);
-        var contingentProperties = contingentPropertiesField!.GetValue(schedulerTask);
+        var (workItemGroup, ambientValue) = CreateWorkItemGroupWithAmbientValue(services);
 
-        if (contingentProperties is not null)
+        for (var i = 0; ambientValue.IsAlive && i < 3; i++)
         {
-            var capturedContextField = contingentProperties.GetType().GetField("m_capturedContext", BindingFlags.Instance | BindingFlags.NonPublic);
-            Assert.Null(capturedContextField!.GetValue(contingentProperties));
+            GC.Collect();
+            GC.WaitForPendingFinalizers();
+            GC.Collect();
         }
 
-        GC.KeepAlive(asyncLocal);
+        Assert.False(ambientValue.IsAlive);
+        GC.KeepAlive(workItemGroup);
     }
 
     [Fact]
@@ -464,6 +462,16 @@ public class WorkItemGroupWaiterTests
             context,
             Options.Create(schedulingOptions ?? new SchedulingOptions()),
             services.GetRequiredService<SchedulerInstruments>());
+    }
+
+    [MethodImpl(MethodImplOptions.NoInlining)]
+    private static (WorkItemGroup WorkItemGroup, WeakReference AmbientValue) CreateWorkItemGroupWithAmbientValue(ServiceProvider services)
+    {
+        var asyncLocal = new AsyncLocal<object?> { Value = new object() };
+        var ambientValue = new WeakReference(asyncLocal.Value);
+        var workItemGroup = CreateWorkItemGroup(services);
+        asyncLocal.Value = null;
+        return (workItemGroup, ambientValue);
     }
 
     private static void SetRunning(WorkItemGroup workItemGroup)
