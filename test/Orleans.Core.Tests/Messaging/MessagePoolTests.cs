@@ -1,3 +1,5 @@
+using System.Collections.Concurrent;
+using System.Net;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.CodeGeneration;
 using Orleans.Runtime;
@@ -7,10 +9,16 @@ using Xunit;
 
 namespace UnitTests.Messaging;
 
+[CollectionDefinition(MessagePoolTestCollection.Name, DisableParallelization = true)]
+public sealed class MessagePoolTestCollection : ICollectionFixture<TestEnvironmentFixture>
+{
+    public const string Name = "MessagePoolTests";
+}
+
 /// <summary>
 /// Tests for Message pooling and ownership tracking.
 /// </summary>
-[Collection(TestEnvironmentFixture.DefaultCollection)]
+[Collection(MessagePoolTestCollection.Name)]
 public class MessagePoolTests
 {
     private readonly MessageFactory _messageFactory;
@@ -167,20 +175,58 @@ public class MessagePoolTests
     [Fact, TestCategory("BVT"), TestCategory("Messaging")]
     public void Message_Reset_ClearsAllFields()
     {
+        MessagePool.ClearCurrentThreadPool();
         var message = MessagePool.Get();
+        var state = message.StateIdentity;
         message.Direction = Message.Directions.Request;
+        message.Result = Message.ResponseTypes.Error;
+        message.RetryCount = 3;
+        message.ForwardCount = 4;
+        message.Id = CorrelationId.GetNext();
+        message.IsSystemMessage = true;
+        message.IsReadOnly = true;
+        message.IsAlwaysInterleave = true;
+        message.IsUnordered = true;
+        message.IsLocalOnly = true;
+        message.IsKeepAlive = false;
+        message.TimeToLive = TimeSpan.FromSeconds(30);
+        message.TargetSilo = SiloAddress.New(new IPEndPoint(IPAddress.Loopback, 11111), 1);
         message.TargetGrain = GrainId.Create("test", "key");
+        message.SendingSilo = SiloAddress.New(new IPEndPoint(IPAddress.Loopback, 11112), 2);
         message.SendingGrain = GrainId.Create("sender", "key");
+        message.InterfaceType = GrainInterfaceType.Create("test.interface");
+        message.InterfaceVersion = 7;
         message.BodyObject = "test body";
+        message.RequestContextData = new Dictionary<string, object> { ["key"] = "value" };
+        var invalidAddress = GrainAddress.NewActivationAddress(message.TargetSilo, message.TargetGrain);
+        message.CacheInvalidationHeader = [new GrainAddressCacheUpdate(invalidAddress, validAddress: null)];
 
         message.Release();
 
         var newMessage = MessagePool.Get();
 
+        Assert.Same(state, newMessage.StateIdentity);
         Assert.Equal(Message.Directions.None, newMessage.Direction);
+        Assert.Equal(Message.ResponseTypes.None, newMessage.Result);
+        Assert.Equal(0, newMessage.RetryCount);
+        Assert.Equal(0, newMessage.ForwardCount);
+        Assert.Equal(default, newMessage.Id);
+        Assert.False(newMessage.IsSystemMessage);
+        Assert.False(newMessage.IsReadOnly);
+        Assert.False(newMessage.IsAlwaysInterleave);
+        Assert.False(newMessage.IsUnordered);
+        Assert.False(newMessage.IsLocalOnly);
+        Assert.True(newMessage.IsKeepAlive);
+        Assert.Null(newMessage.TimeToLive);
+        Assert.Null(newMessage.TargetSilo);
         Assert.True(newMessage.TargetGrain.IsDefault);
+        Assert.Null(newMessage.SendingSilo);
         Assert.True(newMessage.SendingGrain.IsDefault);
+        Assert.True(newMessage.InterfaceType.IsDefault);
+        Assert.Equal(0, newMessage.InterfaceVersion);
         Assert.Null(newMessage.BodyObject);
+        Assert.Null(newMessage.RequestContextData);
+        Assert.Null(newMessage.CacheInvalidationHeader);
 
         newMessage.Release();
     }
@@ -216,6 +262,81 @@ public class MessagePoolTests
     }
 
     [Fact, TestCategory("BVT"), TestCategory("Messaging")]
+    public async Task Message_StaleHandleCannotAffectStateReusedOnAnotherThread()
+    {
+        var stale = MessagePool.Get();
+        var state = stale.StateIdentity;
+        var cancellationToken = TestContext.Current.CancellationToken;
+        using var releaseCurrent = new ManualResetEventSlim();
+        var currentSource = new TaskCompletionSource<Message>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var consumer = new Thread(() =>
+        {
+            stale.Release();
+            var current = MessagePool.Get();
+            current.BodyObject = "current";
+            currentSource.SetResult(current);
+            releaseCurrent.Wait(cancellationToken);
+            current.Release();
+        });
+        consumer.Start();
+
+        var current = await currentSource.Task.WaitAsync(TimeSpan.FromSeconds(5), cancellationToken);
+        try
+        {
+            Assert.Same(state, current.StateIdentity);
+            Assert.Throws<InvalidOperationException>(() => stale.BodyObject = "corrupt");
+            Assert.Throws<InvalidOperationException>(() => stale.Release());
+            Assert.Equal("current", current.BodyObject);
+        }
+        finally
+        {
+            releaseCurrent.Set();
+            consumer.Join();
+        }
+    }
+
+#if DEBUG
+    [Fact, TestCategory("BVT"), TestCategory("Messaging")]
+    public void MessagePool_CrossThreadReleaseLeavesNoOutstandingOwnership()
+    {
+        MessagePool.ClearLeakTracking();
+        MessagePool.EnableLeakTracking = true;
+        using var queue = new BlockingCollection<Message>(boundedCapacity: 32);
+        var consumer = new Thread(() =>
+        {
+            foreach (var message in queue.GetConsumingEnumerable())
+            {
+                message.Release();
+            }
+        });
+
+        try
+        {
+            consumer.Start();
+            for (var i = 0; i < 256; i++)
+            {
+                queue.Add(MessagePool.Get(), TestContext.Current.CancellationToken);
+            }
+
+            queue.CompleteAdding();
+            consumer.Join();
+            Assert.Empty(MessagePool.GetOutstandingMessages());
+        }
+        finally
+        {
+            queue.CompleteAdding();
+            if (consumer.IsAlive)
+            {
+                consumer.Join();
+            }
+
+            MessagePool.EnableLeakTracking = false;
+            MessagePool.ClearLeakTracking();
+        }
+    }
+#endif
+
+    [Fact, TestCategory("BVT"), TestCategory("Messaging")]
     public void Message_ConcurrentOwnersReturnStateOnce()
     {
         MessagePool.ClearCurrentThreadPool();
@@ -244,11 +365,11 @@ public class MessagePoolTests
         {
             releaseStarted.SetResult();
             stale.Release();
-        });
+        }, TestContext.Current.CancellationToken);
 
         try
         {
-            await releaseStarted.Task;
+            await releaseStarted.Task.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
             Assert.True(SpinWait.SpinUntil(() => state.RefCountForTesting == 0, TimeSpan.FromSeconds(5)));
             Assert.False(releaseTask.IsCompleted);
         }
@@ -257,7 +378,7 @@ public class MessagePoolTests
             state.ExitMutation();
         }
 
-        await releaseTask.WaitAsync(TimeSpan.FromSeconds(5));
+        await releaseTask.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
         var current = MessagePool.Get();
         Assert.Same(state, current.StateIdentity);
         current.BodyObject = "current";

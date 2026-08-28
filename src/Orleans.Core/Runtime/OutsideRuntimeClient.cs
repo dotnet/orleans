@@ -327,68 +327,73 @@ namespace Orleans
 
         public void ReceiveResponse(Message response)
         {
-            OrleansOutsideRuntimeClientEvent.Instance.ReceiveResponse(response);
-
-            LogReceivedMessage(logger, response);
-
-            if (response.Result is Message.ResponseTypes.Status)
+            try
             {
-                var status = (StatusResponse)response.BodyObject!;
-                callbacks.TryGetValue(response.Id, out var callback);
-                if (callback is not null && callback.TryAcquireMessage(out var requestMessage))
+                OrleansOutsideRuntimeClientEvent.Instance.ReceiveResponse(response);
+                LogReceivedMessage(logger, response);
+
+                if (response.Result is Message.ResponseTypes.Status)
                 {
-                    try
+                    var status = (StatusResponse)response.BodyObject!;
+                    callbacks.TryGetValue(response.Id, out var callback);
+                    if (callback is not null && callback.TryAcquireMessage(out var requestMessage))
                     {
-                        callback.OnStatusUpdate(status);
-                        if (status.Diagnostics != null && status.Diagnostics.Count > 0)
+                        try
                         {
-                            LogReceivedStatusUpdateForPendingRequest(logger, requestMessage, new(status.Diagnostics));
+                            callback.OnStatusUpdate(status);
+                            if (status.Diagnostics != null && status.Diagnostics.Count > 0)
+                            {
+                                LogReceivedStatusUpdateForPendingRequest(logger, requestMessage, new(status.Diagnostics));
+                            }
+                        }
+                        finally
+                        {
+                            requestMessage.Release();
                         }
                     }
-                    finally
+                    else
                     {
-                        requestMessage.Release();
+                        if (clientMessagingOptions.CancelUnknownRequestOnStatusUpdate)
+                        {
+                            // Cancel the call since the caller has abandoned it.
+                            // Note that the target and sender arguments are swapped because this is a response to the original request.
+                            _cancellationManager?.SignalCancellation(
+                                response.SendingSilo,
+                                targetGrainId: response.SendingGrain,
+                                sendingGrainId: response.TargetGrain,
+                                messageId: response.Id);
+                        }
+
+                        if (status.Diagnostics != null && status.Diagnostics.Count > 0)
+                        {
+                            LogReceivedStatusUpdateForUnknownRequest(logger, response, new(status.Diagnostics));
+                        }
                     }
+
+                    return;
+                }
+
+                CallbackData? callbackData;
+                var found = callbacks.TryRemove(response.Id, out callbackData);
+                if (found)
+                {
+                    // We need to import the RequestContext here as well.
+                    // Unfortunately, it is not enough, since CallContext.LogicalGetData will not flow "up" from task completion source into the resolved task.
+                    // RequestContextExtensions.Import(response.RequestContextData);
+                    callbackData!.DoCallback(response);
                 }
                 else
                 {
-                    if (clientMessagingOptions.CancelUnknownRequestOnStatusUpdate)
-                    {
-                        // Cancel the call since the caller has abandoned it.
-                        // Note that the target and sender arguments are swapped because this is a response to the original request.
-                        _cancellationManager?.SignalCancellation(
-                            response.SendingSilo,
-                            targetGrainId: response.SendingGrain,
-                            sendingGrainId: response.TargetGrain,
-                            messageId: response.Id);
-                    }
-
-                    if (status.Diagnostics != null && status.Diagnostics.Count > 0)
-                    {
-                        LogReceivedStatusUpdateForUnknownRequest(logger, response, new(status.Diagnostics));
-                    }
+                    LogDebugNoCallbackForResponseMessage(logger, response);
                 }
-
-                // Release the status response message - it's been fully processed
-                response.ReleaseDropped("StatusResponseHandled");
-                return;
             }
-
-            CallbackData? callbackData;
-            var found = callbacks.TryRemove(response.Id, out callbackData);
-            if (found)
+            catch (Exception exception)
             {
-                // We need to import the RequestContext here as well.
-                // Unfortunately, it is not enough, since CallContext.LogicalGetData will not flow "up" from task completion source into the resolved task.
-                // RequestContextExtensions.Import(response.RequestContextData);
-                callbackData!.DoCallback(response);
-                response.MarkTransferred("OutsideRuntimeClient.ReceiveResponse:AfterDoCallback");
-                response.Release();
+                LogErrorProcessingResponse(logger, exception, response);
             }
-            else
+            finally
             {
-                LogDebugNoCallbackForResponseMessage(logger, response);
-                response.ReleaseDropped("NoCallbackNotFound");
+                response.ReleaseDropped("ResponseHandled");
             }
         }
 
@@ -636,6 +641,12 @@ namespace Orleans
             Message = "Message not supported: '{Message}'."
         )]
         private static partial void LogMessageNotSupported(ILogger logger, Message message);
+
+        [LoggerMessage(
+            Level = LogLevel.Error,
+            Message = "Error processing response message '{Message}'."
+        )]
+        private static partial void LogErrorProcessingResponse(ILogger logger, Exception exception, Message message);
 
         [LoggerMessage(
             Level = LogLevel.Warning,

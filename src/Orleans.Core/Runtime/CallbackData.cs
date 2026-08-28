@@ -255,8 +255,14 @@ namespace Orleans.Runtime
             _applicationRequestInstruments.OnAppRequestsEnd((long)this.stopwatch.Elapsed.TotalMilliseconds);
 
             // do callback outside the CallbackData lock. Just not a good practice to hold a lock for this unrelated operation.
-            ResponseCallback(response, this.context);
-            ReleaseRequest("CallbackData.DoCallback");
+            try
+            {
+                ResponseCallback(response, this.context);
+            }
+            finally
+            {
+                ReleaseRequest("CallbackData.DoCallback");
+            }
         }
 
         private bool TryComplete() => (Interlocked.Or(ref _state, StateCompleted) & StateCompleted) == 0;
