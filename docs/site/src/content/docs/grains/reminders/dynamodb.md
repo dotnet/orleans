@@ -27,6 +27,19 @@ The example uses on-demand capacity and an infrastructure-managed table. Set <xr
 
 <xref:Orleans.Configuration.DynamoDBReminderStorageOptions.CreateIfNotExists> and <xref:Orleans.Configuration.DynamoDBReminderStorageOptions.UpdateIfExists> allow the provider to create the reminder table and update its provisioned capacity. Infrastructure-managed provisioning keeps table lifecycle and capacity changes in the deployment workflow.
 
+## Legacy-schema consistency hardening
+
+`TableMode=Legacy` retains the existing table and indexes while hardening reminder scheduling against GSI lag:
+
+- GSI range and grain results are discovery candidates. The provider strongly point-reads every candidate from the base table before returning it, so an obsolete index row cannot resurrect a deleted reminder or restore an old schedule.
+- Before a silo removes a known local reminder which a range query omitted, it strongly point-reads that identity. A still-present or newer row is reconciled instead of removed.
+- Reminder registration, update, and removal strongly point-read and reconcile before returning when the handling silo is still the owner. During a topology disagreement the handler does not schedule outside its current ownership; the mandatory strong range-acquisition scan is applied even when concurrent mutations occur. If that scan preceded the mutation, discovery still depends on GSI convergence.
+- Initial startup and newly acquired ring ranges request one strongly consistent service-wide scan. Each silo serializes its own scans and starts them at least five seconds apart; different silos can scan concurrently. Ordinary periodic refreshes continue to query the GSI and never scan the table.
+
+This path materially hardens runtime scheduling without changing the key schema, but it cannot provide a complete strong set read. A GSI can omit a row, and a point read can validate only identities already known to the caller. In particular, an arbitrary `GetReminders` or range-table call can omit an identity which is absent from the GSI and was not learned during startup, ownership acquisition, or a completed local mutation. DynamoDB also does not provide snapshot isolation for a multi-page strongly consistent scan. The owner-reconciliation protocol covers operations which return successfully through Orleans, but it cannot fence a pre-protocol binary or an external direct table writer. V2 remains required for the full point, grain, and range completed-write visibility guarantee.
+
+Legacy periodic refresh cost is one eventual GSI query for each contiguous owned ring subrange, plus one strongly consistent base-table `GetItem` for each candidate and for each locally known identity omitted by the GSI. A wrap-around range uses two GSI queries. Startup and range acquisition consume strongly consistent scan capacity for every item in the shared physical table, including items filtered out by `ServiceId`; they are deliberately excluded from periodic refresh. The five-second scan limit is per silo, not cluster-wide. Monitor scan throttling and topology churn before enabling large shared-table deployments.
+
 ## Migrate to the strongly consistent schema
 
 The default <xref:Orleans.Configuration.DynamoDBReminderStorageOptions.TableMode> is `Legacy`, so upgrading Orleans does not change an existing table. The V2 schema stores reminders in a separate table named by <xref:Orleans.Configuration.DynamoDBReminderStorageOptions.V2TableName>, or `${TableName}-v2` when that option is unset. Both names continue to support custom <xref:Orleans.Configuration.DynamoDBReminderStorageOptions.TableName> values.
