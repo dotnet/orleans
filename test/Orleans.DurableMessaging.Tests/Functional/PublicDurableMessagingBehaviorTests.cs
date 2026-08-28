@@ -74,7 +74,10 @@ public sealed class PublicDurableMessagingBehaviorTests : IAsyncLifetime
         await barrier.WaitUntilEnteredAsync();
         using var cancellation = new CancellationTokenSource();
 
-        var canceledDelivery = DeliverAsync(receiver, secondEnvelope.Value, cancellation.Token);
+        var canceledDelivery = DeliverWithCancellationAsync(
+            receiver,
+            secondEnvelope.Value,
+            cancellation.Token);
         Assert.False(canceledDelivery.IsCompleted);
         cancellation.Cancel();
 
@@ -743,7 +746,7 @@ public sealed class PublicDurableMessagingBehaviorTests : IAsyncLifetime
                     ["orleans.messaging.ownership-id"] = "0"
                 }
             },
-            CancellationToken.None);
+            TestContext.Current.CancellationToken);
         await fixture.Metrics.WaitForCountAsync(
             "orleans-durablejobs-jobs-completed",
             completionBaseline + 1);
@@ -785,7 +788,7 @@ public sealed class PublicDurableMessagingBehaviorTests : IAsyncLifetime
                         ["orleans.messaging.ownership-id"] = "0"
                     }
                 },
-                CancellationToken.None);
+                TestContext.Current.CancellationToken);
             await fixture.Metrics.WaitForCountAsync(
                 "orleans-durablejobs-jobs-completed",
                 completionBaseline + 1);
@@ -840,7 +843,7 @@ public sealed class PublicDurableMessagingBehaviorTests : IAsyncLifetime
                         ["orleans.messaging.ownership-id"] = ownershipId
                     }
                 },
-                CancellationToken.None);
+                TestContext.Current.CancellationToken);
             await fixture.Metrics.WaitForCountAsync(
                 "orleans-durablejobs-handler-executions-started",
                 handlerBaseline + 1);
@@ -1044,10 +1047,15 @@ public sealed class PublicDurableMessagingBehaviorTests : IAsyncLifetime
     private static DurableTestMessage NewMessage(int sequence, string value) =>
         new(Guid.NewGuid(), sequence, value);
 
-    private static async Task<DeliveryResult> DeliverAsync(
+    private static Task<DeliveryResult> DeliverAsync(
+        IDurableMessagingTestGrain receiver,
+        DurableEnvelope envelope) =>
+        DeliverWithCancellationAsync(receiver, envelope, TestContext.Current.CancellationToken);
+
+    private static async Task<DeliveryResult> DeliverWithCancellationAsync(
         IDurableMessagingTestGrain receiver,
         DurableEnvelope envelope,
-        CancellationToken cancellationToken = default) =>
+        CancellationToken cancellationToken) =>
         await receiver.AsReference<IDurableInboxExtension>().DeliverAsync(envelope, cancellationToken);
 
     private static async Task WaitForBarrierAsync(
