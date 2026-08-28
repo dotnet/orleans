@@ -114,6 +114,31 @@ public class LogTestGrainClearTests : IClassFixture<EventSourcingClusterFixture>
     }
 
     [Fact, TestCategory("EventSourcing"), TestCategory("Functional")]
+    public async Task JournaledStateLogStorage_DoesNotRetrieveTentativeLogEntries()
+    {
+        var grain = this.fixture.GrainFactory.GetGrain<ILogTestGrain>(721018L, "TestGrains.LogTestGrainJournaledStateStorage");
+
+        await grain.Clear();
+        var appendStarted = this.fixture.BlockNextJournalAppend(grain);
+        try
+        {
+            await grain.SetALocal(41);
+            await appendStarted.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
+
+            Assert.Equal(0, await grain.GetConfirmedVersion());
+            await Assert.ThrowsAsync<ArgumentException>(() => grain.GetEventLogSegment(0, 1));
+        }
+        finally
+        {
+            this.fixture.ReleaseBlockedJournalAppend(grain);
+        }
+
+        await grain.SynchronizeGlobalState();
+        var segment = await grain.GetEventLogSegment(0, 1);
+        Assert.Equal(41, Assert.IsType<TestGrains.UpdateA>(Assert.Single(segment)).Val);
+    }
+
+    [Fact, TestCategory("EventSourcing"), TestCategory("Functional")]
     public async Task JournaledStateLogStorage_ClearPreservesOtherJournaledState()
     {
         var grain = this.fixture.GrainFactory.GetGrain<ILogTestGrainWithAuxiliaryState>(721006L, "TestGrains.LogTestGrainJournaledStateStorageWithAuxiliaryState");
