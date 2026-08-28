@@ -108,9 +108,10 @@ public sealed class DurableMessagingTestGrain : DurableGrain, IDurableMessagingT
         IDurableOutbox outbox,
         IDurableMessagingDiagnostics diagnostics,
         [FromKeyedServices("test-effects")] IDurableDictionary<Guid, DurableEffect> effects,
-        [FromKeyedServices("inbox-processed")] IDurableDictionary<(GrainId SenderId, Guid MessageId), DateTimeOffset> processedMessages,
-        [FromKeyedServices("inbox-job-id")] IDurableValue<string> inboxJobId,
-        [FromKeyedServices("outbox-job-id")] IDurableValue<string> outboxJobId,
+        [FromKeyedServices("inbox")] IDurableValue<string> applicationInboxState,
+        [FromKeyedServices("__orleans.durable-messaging.inbox-processed")] IDurableDictionary<(GrainId SenderId, Guid MessageId), DateTimeOffset> processedMessages,
+        [FromKeyedServices("__orleans.durable-messaging.inbox-job-id")] IDurableValue<string> inboxJobId,
+        [FromKeyedServices("__orleans.durable-messaging.outbox-job-id")] IDurableValue<string> outboxJobId,
         SerializerSessionPool sessions,
         ILocalSiloDetails siloDetails,
         HandlerProbe handlerProbe,
@@ -120,6 +121,7 @@ public sealed class DurableMessagingTestGrain : DurableGrain, IDurableMessagingT
         _outbox = outbox;
         _diagnostics = diagnostics;
         _effects = effects;
+        ArgumentNullException.ThrowIfNull(applicationInboxState);
         _processedMessages = processedMessages;
         _inboxJobId = inboxJobId;
         _outboxJobId = outboxJobId;
