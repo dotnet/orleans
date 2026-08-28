@@ -1323,6 +1323,7 @@ public class DurableTaskTests
             await releaseCallback.Task;
             throw expected;
         }, Xunit.TestContext.Current.CancellationToken);
+        Assert.True(callbackStarted.Task.IsCompletedSuccessfully);
         await callbackStarted.Task;
 
         var disposal = registration.DisposeAsync().AsTask();
