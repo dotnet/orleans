@@ -181,6 +181,44 @@ public sealed class FaultyReminderServiceLifecycleTests
         }
     }
 
+    [Fact]
+    public Task UpdateWaitsForRefreshBeforeExpectingScheduleReconciliation()
+    {
+        RefreshGatedScheduleHarness? gatedHarness = null;
+        return RunFaultAsync(
+            harness => new LifecycleRunner(
+                gatedHarness = new RefreshGatedScheduleHarness(harness),
+                "RefreshGatedUpdate"),
+            async (runner, token) =>
+            {
+                await runner.RunReminderService_UpdateDoesNotRestartLocalOwner(token);
+                Assert.NotNull(gatedHarness);
+                Assert.True(gatedHarness.ReleasedByRefresh);
+            });
+    }
+
+    [Fact]
+    public Task JoinLeaveAdvancesToTheExactRemainingDueTime()
+    {
+        RecordingAdvanceHarness? recordingHarness = null;
+        return RunFaultAsync(
+            harness => new LifecycleRunner(
+                recordingHarness = new RecordingAdvanceHarness(harness),
+                "ExactJoinLeaveDue"),
+            async (runner, token) =>
+            {
+                await runner.RunReminderService_OneSiloJoinLeaveTransfersOwnership(token);
+                Assert.NotNull(recordingHarness);
+                Assert.Equal(
+                    [
+                        recordingHarness.ReminderRefreshPeriod,
+                        TimeSpan.FromSeconds(3) - recordingHarness.ReminderRefreshPeriod,
+                        recordingHarness.ReminderRefreshPeriod
+                    ],
+                    recordingHarness.Advances);
+            });
+    }
+
     private static async Task RunFaultAsync(
         Func<IReminderServiceLifecycleHarness, LifecycleRunner> createRunner,
         Func<LifecycleRunner, CancellationToken, Task> scenario)
@@ -214,7 +252,7 @@ public sealed class FaultyReminderServiceLifecycleTests
         public TimeSpan ReminderRefreshPeriod => Inner.ReminderRefreshPeriod;
         public IReadOnlyList<SiloAddress> ActiveSilos => Inner.ActiveSilos;
         public Task WaitForStartupReadinessAsync(CancellationToken cancellationToken) => Inner.WaitForStartupReadinessAsync(cancellationToken);
-        public Task AdvanceAsync(TimeSpan amount, CancellationToken cancellationToken) => Inner.AdvanceAsync(amount, cancellationToken);
+        public virtual Task AdvanceAsync(TimeSpan amount, CancellationToken cancellationToken) => Inner.AdvanceAsync(amount, cancellationToken);
         public virtual Task WaitForOwnerCountAsync(GrainId grainId, string reminderName, int count, CancellationToken cancellationToken) => Inner.WaitForOwnerCountAsync(grainId, reminderName, count, cancellationToken);
         public virtual IReadOnlyList<SiloAddress> GetOwners(GrainId grainId, string reminderName) => Inner.GetOwners(grainId, reminderName);
         public virtual Task WaitForScheduleAsync(GrainId grainId, string reminderName, CancellationToken cancellationToken) => Inner.WaitForScheduleAsync(grainId, reminderName, cancellationToken);
@@ -279,5 +317,46 @@ public sealed class FaultyReminderServiceLifecycleTests
             string reminderName,
             CancellationToken cancellationToken)
             => Task.Delay(Timeout.InfiniteTimeSpan, cancellationToken);
+    }
+
+    private sealed class RefreshGatedScheduleHarness(IReminderServiceLifecycleHarness inner) : DelegatingHarness(inner)
+    {
+        private TaskCompletionSource? _refreshGate;
+
+        public bool ReleasedByRefresh { get; private set; }
+
+        public override async Task WaitForScheduleChangeCountAsync(
+            GrainId grainId,
+            string reminderName,
+            int count,
+            CancellationToken cancellationToken)
+        {
+            var innerWait = base.WaitForScheduleChangeCountAsync(
+                grainId,
+                reminderName,
+                count,
+                cancellationToken);
+            var refreshGate = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            _refreshGate = refreshGate;
+            await Task.WhenAll(innerWait, refreshGate.Task.WaitAsync(cancellationToken));
+            ReleasedByRefresh = true;
+        }
+
+        public override async Task AdvanceAsync(TimeSpan amount, CancellationToken cancellationToken)
+        {
+            await base.AdvanceAsync(amount, cancellationToken);
+            Interlocked.Exchange(ref _refreshGate, null)?.TrySetResult();
+        }
+    }
+
+    private sealed class RecordingAdvanceHarness(IReminderServiceLifecycleHarness inner) : DelegatingHarness(inner)
+    {
+        public List<TimeSpan> Advances { get; } = [];
+
+        public override async Task AdvanceAsync(TimeSpan amount, CancellationToken cancellationToken)
+        {
+            Advances.Add(amount);
+            await base.AdvanceAsync(amount, cancellationToken);
+        }
     }
 }
