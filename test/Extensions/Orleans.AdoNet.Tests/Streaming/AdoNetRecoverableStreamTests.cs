@@ -109,7 +109,7 @@ public class AdoNetRecoverableStreamTests
         await Assert.ThrowsAnyAsync<OperationCanceledException>(() => loadTask);
         Assert.True(source.AcquisitionCompletion.IsCompletedSuccessfully);
         await Assert.ThrowsAsync<InvalidOperationException>(
-            () => source.Update("1", "1", CancellationToken.None).AsTask());
+            () => source.Update("1", "1", TestContext.Current.CancellationToken).AsTask());
     }
 
     [Theory]
@@ -137,7 +137,7 @@ public class AdoNetRecoverableStreamTests
                 acquisition.SetException(new InvalidOperationException("late failure"));
                 break;
             case AcquisitionCompletionKind.Canceled:
-                acquisition.SetCanceled();
+                acquisition.SetCanceled(TestContext.Current.CancellationToken);
                 break;
         }
 
@@ -198,7 +198,7 @@ public class AdoNetRecoverableStreamTests
             CreateQueries(storage),
             NullLogger.Instance);
 
-        Assert.Empty(await source.Read(10, CancellationToken.None));
+        Assert.Empty(await source.Read(10, TestContext.Current.CancellationToken));
 
         var parameters = storage.Parameters[nameof(DbStoredQueries.CleanupStreamMessagesKey)];
         Assert.Equal(3, parameters[nameof(DbStoredQueries.Columns.RetentionPeriodSeconds)]);
