@@ -18,8 +18,9 @@ public class InsideRuntimeClientDisposalTests
     [Fact]
     public async Task Dispose_RacingWithNewRequests_StopsTimerAndCompletesAllCallbacks()
     {
+        var cancellationToken = TestContext.Current.CancellationToken;
         await using var cluster = new InProcessTestClusterBuilder(1).Build();
-        await cluster.DeployAsync();
+        await cluster.DeployAsync(cancellationToken);
 
         var services = cluster.Silos[0].ServiceProvider;
         var runtimeClient = services.GetRequiredService<InsideRuntimeClient>();
@@ -32,42 +33,43 @@ public class InsideRuntimeClientDisposalTests
 
         await WaitUntilAsync(
             () => runtimeClient.GetRunningRequestsCount(interfaceType) == 1,
-            TimeSpan.FromSeconds(10));
+            TimeSpan.FromSeconds(10),
+            cancellationToken);
 
         using var start = new ManualResetEventSlim();
         var disposeTask = Task.Run(() =>
         {
             start.Wait();
             runtimeClient.Dispose();
-        });
+        }, cancellationToken);
         var racingCall = Task.Run(async () =>
         {
             start.Wait();
             await grain.LongRunningTask(2, TimeSpan.Zero);
-        });
+        }, cancellationToken);
 
         start.Set();
-        await disposeTask.WaitAsync(TimeSpan.FromSeconds(10));
+        await disposeTask.WaitAsync(TimeSpan.FromSeconds(10), cancellationToken);
 
         await Assert.ThrowsAsync<SiloUnavailableException>(() => pendingCall);
         try
         {
-            await racingCall.WaitAsync(TimeSpan.FromSeconds(10));
+            await racingCall.WaitAsync(TimeSpan.FromSeconds(10), cancellationToken);
         }
         catch (SiloUnavailableException)
         {
             // The call lost the admission race and was rejected by the stopping runtime.
         }
-        await runtimeClient.CallbackTimerTask.WaitAsync(TimeSpan.FromSeconds(10));
+        await runtimeClient.CallbackTimerTask.WaitAsync(TimeSpan.FromSeconds(10), cancellationToken);
         Assert.Equal(0, runtimeClient.GetRunningRequestsCount(interfaceType));
         await Assert.ThrowsAsync<SiloUnavailableException>(() => grain.LongRunningTask(3, TimeSpan.Zero));
 
-        await Task.Delay(TimeSpan.FromSeconds(2));
+        await Task.Delay(TimeSpan.FromSeconds(2), cancellationToken);
         var externalGrain = cluster.Client.GetGrain<ILongRunningTaskGrain<int>>(grainId);
         Assert.NotEqual(3, await externalGrain.GetLastValue());
     }
 
-    private static async Task WaitUntilAsync(Func<bool> condition, TimeSpan timeout)
+    private static async Task WaitUntilAsync(Func<bool> condition, TimeSpan timeout, CancellationToken cancellationToken)
     {
         var deadline = DateTime.UtcNow + timeout;
         while (!condition())
@@ -77,7 +79,7 @@ public class InsideRuntimeClientDisposalTests
                 throw new TimeoutException("The expected runtime-client state was not reached.");
             }
 
-            await Task.Delay(10);
+            await Task.Delay(10, cancellationToken);
         }
     }
 }

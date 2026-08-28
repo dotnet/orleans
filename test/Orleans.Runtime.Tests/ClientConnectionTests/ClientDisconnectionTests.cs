@@ -44,6 +44,7 @@ public class ClientDisconnectionTests(ClientDisconnectionTests.Fixture fixture) 
     [Fact]
     public async Task ResponseAcrossMultipleGateways_ClearsOwningGatewayBeforeClientDrop()
     {
+        var cancellationToken = TestContext.Current.CancellationToken;
         var clientA = await _cluster.GetClientAsync("OwnerClientA");
         var clientB = await _cluster.GetClientAsync("OwnerClientB");
         var observerB = new EchoGrainObserver();
@@ -55,7 +56,7 @@ public class ClientDisconnectionTests(ClientDisconnectionTests.Fixture fixture) 
             GrainInterfaceType.Create("IEchoGrainObserver"));
         var responseTask = aToB.EchoAsync("owner-routed response");
 
-        await observerB.WaitForCallAsync().WaitAsync(TimeSpan.FromSeconds(10));
+        await observerB.WaitForCallAsync().WaitAsync(TimeSpan.FromSeconds(10), cancellationToken);
         Assert.True(ClientGrainId.TryParse(observerBId, out var clientBId));
         var gateways = _cluster.Silos
             .Select(static silo => silo.ServiceProvider.GetRequiredService<MessageCenter>().Gateway!)
@@ -103,6 +104,7 @@ public class ClientDisconnectionTests(ClientDisconnectionTests.Fixture fixture) 
     [InlineData(false)]
     public async Task ClientReceivesRejectionWhenTargetClientDisconnected(bool hostedClient)
     {
+        var cancellationToken = TestContext.Current.CancellationToken;
         var clientA = hostedClient ? _cluster.Silos[0].ServiceProvider.GetRequiredService<IClusterClient>() : await _cluster.GetClientAsync("ClientA");
         var clientB = await _cluster.GetClientAsync("ClientB");
 
@@ -128,7 +130,7 @@ public class ClientDisconnectionTests(ClientDisconnectionTests.Fixture fixture) 
 
         observerB.UnblockResponse();
         var responseTask = aToB.EchoAsync(message);
-        await Assert.ThrowsAsync<TimeoutException>(async () => await responseTask.WaitAsync(TimeSpan.FromMilliseconds(200)));
+        await Assert.ThrowsAsync<TimeoutException>(async () => await responseTask.WaitAsync(TimeSpan.FromMilliseconds(200), cancellationToken));
         Assert.False(responseTask.IsCompleted, "The task should not complete before the client has been dropped.");
 
         // Use IManagementGrain to force all Gateways to drop defunct clients.
