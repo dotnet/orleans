@@ -28,7 +28,7 @@ Idle workers are removed by default. The two-argument attribute constructor can 
 
 ## State and concurrency
 
-"Stateless" means activations aren't individually addressable and no single activation owns authoritative state for the key. A worker can keep caches or other local state; each activation manages its own copy for its lifetime.
+"Stateless" means activations aren't individually addressable and no single activation owns authoritative state for the key. A worker can keep caches or other local state. Each activation manages an independent copy, updates remain local to that activation, and the copy is discarded when Orleans removes or replaces the activation.
 
 Stateless workers are non-reentrant by default. Add <xref:Orleans.Concurrency.ReentrantAttribute> only if their implementation is safe for request interleaving.
 
