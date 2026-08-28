@@ -32,6 +32,16 @@ public class EventSourcingClusterFixture : BaseTestClusterFixture
         JournalStorageProvider.FailNextAppend(JournalId.FromGrainId(grain.GetGrainId()), exception, afterWrite);
     }
 
+    public Task BlockNextJournalAppend(IAddressable grain)
+    {
+        return JournalStorageProvider.BlockNextAppend(JournalId.FromGrainId(grain.GetGrainId()));
+    }
+
+    public void ReleaseBlockedJournalAppend(IAddressable grain)
+    {
+        JournalStorageProvider.ReleaseBlockedAppend(JournalId.FromGrainId(grain.GetGrainId()));
+    }
+
     private static readonly FaultInjectingJournalStorageProvider JournalStorageProvider = new();
 
     private class TestSiloConfigurator : ISiloConfigurator
@@ -128,6 +138,7 @@ public class EventSourcingClusterFixture : BaseTestClusterFixture
     private sealed class FaultInjectingJournalStorageProvider : IJournalStorageProvider
     {
         private readonly ConcurrentDictionary<JournalId, AppendFailure> _appendFailures = new();
+        private readonly ConcurrentDictionary<JournalId, AppendBlock> _appendBlocks = new();
         private readonly VolatileJournalStorageProvider _inner = new();
 
         public IJournalStorage CreateStorage(JournalId journalId) => new FaultInjectingJournalStorage(this, journalId, _inner.CreateStorage(journalId));
@@ -141,9 +152,37 @@ public class EventSourcingClusterFixture : BaseTestClusterFixture
             }
         }
 
+        public Task BlockNextAppend(JournalId journalId)
+        {
+            var block = new AppendBlock();
+            if (!_appendBlocks.TryAdd(journalId, block))
+            {
+                throw new InvalidOperationException($"An append block is already configured for journal '{journalId}'.");
+            }
+
+            return block.Started.Task;
+        }
+
+        public void ReleaseBlockedAppend(JournalId journalId)
+        {
+            if (!_appendBlocks.TryGetValue(journalId, out var block))
+            {
+                throw new InvalidOperationException($"No append block is configured for journal '{journalId}'.");
+            }
+
+            block.Allow.TrySetResult();
+        }
+
         private bool TryTakeAppendFailure(JournalId journalId, out AppendFailure failure) => _appendFailures.TryRemove(journalId, out failure);
 
         private readonly record struct AppendFailure(Exception Exception, bool AfterWrite);
+
+        private sealed class AppendBlock
+        {
+            public TaskCompletionSource Started { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+            public TaskCompletionSource Allow { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        }
 
         private sealed class FaultInjectingJournalStorage(
             FaultInjectingJournalStorageProvider provider,
@@ -175,6 +214,13 @@ public class EventSourcingClusterFixture : BaseTestClusterFixture
 
             public async ValueTask AppendAsync(ReadOnlySequence<byte> value, CancellationToken cancellationToken)
             {
+                if (provider._appendBlocks.TryGetValue(journalId, out var block))
+                {
+                    block.Started.TrySetResult();
+                    await block.Allow.Task.WaitAsync(cancellationToken);
+                    provider._appendBlocks.TryRemove(new KeyValuePair<JournalId, AppendBlock>(journalId, block));
+                }
+
                 var hasFailure = provider.TryTakeAppendFailure(journalId, out var failure);
                 if (hasFailure && !failure.AfterWrite)
                 {
