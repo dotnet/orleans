@@ -108,17 +108,13 @@ public sealed class RelationalStorageExtensionsTests
     public async Task ReadAsync_RejectsNullSelector()
     {
         const string Sql = "SELECT Value FROM Sample";
-        var storage = new ScriptedRelationalStorage().ExpectRead(
-            Sql,
-            CreateTable(("Value", typeof(int), 42)));
+        var storage = new ScriptedRelationalStorage();
 
-        var exception = await Assert.ThrowsAsync<NullReferenceException>(
+        var exception = await Assert.ThrowsAsync<ArgumentNullException>(
             () => storage.ReadAsync(Sql, (Func<IDataRecord, int>)null!, parameterProvider: null));
 
-        var call = Assert.Single(storage.Calls);
-        Assert.Equal(Sql, call.Query);
-        Assert.Null(exception.InnerException);
-        storage.VerifyComplete();
+        Assert.Equal("selector", exception.ParamName);
+        Assert.Empty(storage.Calls);
     }
 
     [Fact]
