@@ -1,4 +1,3 @@
-using Microsoft.Extensions.DependencyInjection;
 using Orleans.CodeGeneration;
 using Orleans.Runtime;
 using Orleans.Serialization.Invocation;
