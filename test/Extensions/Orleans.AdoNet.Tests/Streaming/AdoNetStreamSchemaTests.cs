@@ -81,11 +81,11 @@ public sealed class AdoNetStreamSchemaTests
     {
         var script = ReadScript("MySQL");
 
-        Assert.Contains("ServiceId NVARCHAR(150) NOT NULL", script, StringComparison.Ordinal);
-        Assert.Contains("IN _ServiceId NVARCHAR(150)", script, StringComparison.Ordinal);
-        Assert.DoesNotContain("ServiceId VARCHAR(150)", script, StringComparison.Ordinal);
-        Assert.DoesNotContain("ProviderId VARCHAR(150)", script, StringComparison.Ordinal);
-        Assert.DoesNotContain("QueueId VARCHAR(150)", script, StringComparison.Ordinal);
+        Assert.Contains("ServiceId VARCHAR(150) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin NOT NULL", script, StringComparison.Ordinal);
+        Assert.Contains("IN _ServiceId VARCHAR(150) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin", script, StringComparison.Ordinal);
+        Assert.DoesNotContain("ServiceId NVARCHAR(150)", script, StringComparison.Ordinal);
+        Assert.DoesNotContain("ProviderId NVARCHAR(150)", script, StringComparison.Ordinal);
+        Assert.DoesNotContain("QueueId NVARCHAR(150)", script, StringComparison.Ordinal);
     }
 
     [Fact]
