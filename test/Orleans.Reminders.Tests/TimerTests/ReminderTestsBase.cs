@@ -257,7 +257,7 @@ public class ReminderTestsBase : OrleansTestingBase, IAsyncDisposable
         }
         finally
         {
-            await CleanupAdditionalSilosAsync(initialSilos, startSilosTask, startupCancellation);
+            await CleanupAdditionalSilosAsync(initialSilos, startupCancellation, startSilosTask);
         }
     }
 
@@ -300,7 +300,7 @@ public class ReminderTestsBase : OrleansTestingBase, IAsyncDisposable
         }
         finally
         {
-            await CleanupAdditionalSilosAsync(initialSilos, startSilosTask, startupCancellation);
+            await CleanupAdditionalSilosAsync(initialSilos, startupCancellation, startSilosTask);
         }
     }
 
@@ -349,6 +349,64 @@ public class ReminderTestsBase : OrleansTestingBase, IAsyncDisposable
         Assert.Equal(0, observer.GetActiveReminderCount(grainId, DR));
     }
 
+    public async Task Test_Reminders_GT_1F1J_MultiGrain(CancellationToken cancellationToken)
+    {
+        var initialSilos = HostedCluster.GetActiveSilos().ToHashSet();
+        using var cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        cts.CancelAfter(ENDWAIT);
+        using var startupCancellation = CancellationTokenSource.CreateLinkedTokenSource(cts.Token);
+        Task<List<InProcessSiloHandle>>? setupJoinTask = null;
+        Task<List<InProcessSiloHandle>>? failoverJoinTask = null;
+
+        try
+        {
+            setupJoinTask = StartAdditionalSilosAsync(1, startupCancellation.Token);
+            var failedSilo = Assert.Single(
+                await WaitForAdditionalSilosAndReminderServicesAsync(setupJoinTask, cts.Token));
+
+            var g1 = await GetGrainOwnedBySiloAsync<IReminderTestGrain2>(failedSilo, cts.Token);
+            var g2 = GrainFactory.GetGrain<IReminderTestGrain2>(Guid.NewGuid());
+            var g3 = GrainFactory.GetGrain<IReminderTestCopyGrain>(Guid.NewGuid());
+            var g4 = GrainFactory.GetGrain<IReminderTestCopyGrain>(Guid.NewGuid());
+            IAddressable[] grains = [g1, g2, g3, g4];
+            var reminders = GetReminderIdentities(grains, DR);
+
+            await PrepareForGrainFailureAsync(cts.Token, grains);
+            await AssertReminderOwnershipAndSchedulesAsync(reminders, failAfter, cts.Token);
+            Assert.Equal(failedSilo.SiloAddress, GetReminderOwner(g1, DR).SiloAddress);
+
+            await using (await PauseReminderTimeAsync(cts.Token))
+            {
+                log.LogInformation(
+                    "Stopping reminder owner {SiloAddress} while joining a replacement silo",
+                    failedSilo.SiloAddress);
+                var stopTask = StopSiloAsync(failedSilo);
+                failoverJoinTask = StartAdditionalSilosAsync(1, startupCancellation.Token);
+                await Task.WhenAll(stopTask, failoverJoinTask).WaitAsync(cts.Token);
+                _ = Assert.Single(
+                    await WaitForAdditionalSilosAndReminderServicesAsync(failoverJoinTask, cts.Token));
+                await WaitForGrainsReachableAsync(cts.Token, grains);
+                await AssertReminderOwnershipAndSchedulesAsync(reminders, failAfter, cts.Token);
+                await AssertReminderCountersAsync(grains, cts.Token, (DR, failAfter));
+                Assert.DoesNotContain(
+                    failedSilo.SiloAddress,
+                    reminders.SelectMany(reminder =>
+                        observer.GetActiveReminderSilos(reminder.Grain.GetGrainId(), reminder.ReminderName)));
+            }
+
+            await CompleteGrainFailureTestAsync(cts.Token, grains);
+            AssertRemindersStopped(reminders, failCheckAfter);
+        }
+        finally
+        {
+            await CleanupAdditionalSilosAsync(
+                initialSilos,
+                startupCancellation,
+                setupJoinTask,
+                failoverJoinTask);
+        }
+    }
+
     protected Task<List<InProcessSiloHandle>> StartAdditionalSilosAsync(
         int silosToStart,
         CancellationToken cancellationToken,
@@ -389,10 +447,10 @@ public class ReminderTestsBase : OrleansTestingBase, IAsyncDisposable
 
     private async Task CleanupAdditionalSilosAsync(
         HashSet<InProcessSiloHandle> initialSilos,
-        Task<List<InProcessSiloHandle>>? startSilosTask,
-        CancellationTokenSource startupCancellation)
+        CancellationTokenSource startupCancellation,
+        params Task<List<InProcessSiloHandle>>?[] startSilosTasks)
     {
-        if (startSilosTask is null)
+        if (startSilosTasks.All(static task => task is null))
         {
             return;
         }
@@ -400,13 +458,22 @@ public class ReminderTestsBase : OrleansTestingBase, IAsyncDisposable
         using var cleanupCts = new CancellationTokenSource(CHURN_ENDWAIT);
         await ReminderLifecycleHarness.CleanupPartialStartupAsync(
             initialSilos,
-            startSilosTask,
+            Task.WhenAll(startSilosTasks.OfType<Task<List<InProcessSiloHandle>>>()),
             () => HostedCluster.GetActiveSilos().ToArray(),
             StopSiloAsync,
-            () => WaitForLivenessToStabilizeAsync(didKill: true),
+            () => observer.WaitForTopologyReconciledAsync(
+                WaitForLivenessToStabilizeAsync(didKill: true),
+                [],
+                CHURN_ENDWAIT,
+                cleanupCts.Token),
             log,
             startupCancellation,
             cleanupCts.Token);
+
+        var activeSilos = HostedCluster.GetActiveSilos().ToHashSet();
+        Assert.True(
+            initialSilos.SetEquals(activeSilos),
+            $"Reminder test did not restore its baseline topology. Expected: {string.Join(", ", initialSilos.Select(static silo => silo.SiloAddress))}; actual: {string.Join(", ", activeSilos.Select(static silo => silo.SiloAddress))}.");
     }
 
     protected async Task<InProcessSiloHandle> StopSiloAndStartAdditionalSiloAsync(
@@ -531,6 +598,73 @@ public class ReminderTestsBase : OrleansTestingBase, IAsyncDisposable
             await GetReminderPeriodAsync(grains[0], DR).WaitAsync(cancellationToken),
             cancellationToken);
         await AssertReminderCountersAsync(grains, cancellationToken, (DR, failCheckAfter));
+    }
+
+    private async Task AssertReminderOwnershipAndSchedulesAsync(
+        (IAddressable Grain, string ReminderName)[] reminders,
+        long expectedTickCount,
+        CancellationToken cancellationToken)
+    {
+        await SynchronizeReminderSchedulesAsync(cancellationToken, reminders);
+        var activeSilos = HostedCluster.GetActiveSilos();
+
+        foreach (var reminder in reminders)
+        {
+            var grainId = reminder.Grain.GetGrainId();
+            var actualOwner = Assert.Single(observer.GetActiveReminderSilos(grainId, reminder.ReminderName));
+
+            Assert.Equal(1, observer.GetActiveReminderCount(grainId, reminder.ReminderName));
+            Assert.Contains(activeSilos, silo => silo.SiloAddress == actualOwner);
+            Assert.Equal(expectedTickCount, (long)observer.GetTickCount(grainId, reminder.ReminderName));
+        }
+    }
+
+    private void AssertRemindersStopped(
+        (IAddressable Grain, string ReminderName)[] reminders,
+        long expectedTickCount)
+    {
+        foreach (var reminder in reminders)
+        {
+            var grainId = reminder.Grain.GetGrainId();
+            Assert.Equal(0, observer.GetActiveReminderCount(grainId, reminder.ReminderName));
+            Assert.Empty(observer.GetActiveReminderSilos(grainId, reminder.ReminderName));
+            Assert.Equal(expectedTickCount, (long)observer.GetTickCount(grainId, reminder.ReminderName));
+        }
+    }
+
+    private async Task<TGrainInterface> GetGrainOwnedBySiloAsync<TGrainInterface>(
+        InProcessSiloHandle owner,
+        CancellationToken cancellationToken)
+        where TGrainInterface : IGrainWithGuidKey
+    {
+        const int maximumAttempts = 1_000;
+
+        // Select a key in the joined silo's range so the test always removes a real reminder owner
+        // while leaving every baseline silo available for subsequent shared-fixture tests.
+        for (var attempt = 0; attempt < maximumAttempts; attempt++)
+        {
+            var grain = GrainFactory.GetGrain<TGrainInterface>(Guid.NewGuid());
+            await StartReminderAsync(grain, DR).WaitAsync(cancellationToken);
+            await SynchronizeReminderSchedulesAsync(cancellationToken, (grain, DR));
+            if (GetReminderOwner(grain, DR).SiloAddress == owner.SiloAddress)
+            {
+                return grain;
+            }
+
+            await StopRemindersAsync([grain], DR, cancellationToken);
+        }
+
+        throw new InvalidOperationException(
+            $"Could not select a {typeof(TGrainInterface).Name} reminder grain owned by {owner.SiloAddress} after {maximumAttempts} attempts.");
+    }
+
+    private async Task WaitForReminderRangeReconciliationAsync(CancellationToken cancellationToken)
+    {
+        // Membership convergence does not await the reminder services' queued range-change reconciliation.
+        var rangeChangeReconciliations = HostedCluster.GetActiveSilos().Select(silo =>
+            silo.ServiceProvider.GetRequiredService<LocalReminderService>()
+                .TestOnlyWaitForRangeChangeReconciliation(cancellationToken));
+        await Task.WhenAll(rangeChangeReconciliations);
     }
 
     private async Task WaitForGrainsReachableAsync(CancellationToken cancellationToken, params IAddressable[] grains)

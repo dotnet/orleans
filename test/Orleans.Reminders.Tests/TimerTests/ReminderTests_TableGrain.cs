@@ -207,6 +207,12 @@ namespace UnitTests.TimerTests
         }
 
         [Fact]
+        public async Task Rem_Grain_GT_1F1J_MultiGrain()
+        {
+            await Test_Reminders_GT_1F1J_MultiGrain(TestContext.Current.CancellationToken);
+        }
+
+        [Fact]
         public async Task Rem_Grain_CanRestartBeforeRemovedReminderIsPurged()
         {
             using var cts = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);

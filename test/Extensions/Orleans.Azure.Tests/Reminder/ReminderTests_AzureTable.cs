@@ -339,31 +339,10 @@ namespace Tester.AzureUtils.TimerTests
             await StopReminderAndWaitForQuiescenceAsync(g2, DR, g2.StopReminder, cts.Token);
         }
 
-        [Fact(Skip = "https://github.com/dotnet/orleans/issues/4319"), TestCategory("Functional")]
+        [Fact, TestCategory("Functional")]
         public async Task Rem_Azure_GT_1F1J_MultiGrain()
         {
-            using var cts = CancellationTokenSource.CreateLinkedTokenSource(
-                TestContext.Current.CancellationToken);
-            cts.CancelAfter(ENDWAIT);
-            _ = await this.StartAdditionalSilosAndWaitForReminderServicesAsync(1, cts.Token);
-
-            IReminderTestGrain2 g1 = this.GrainFactory.GetGrain<IReminderTestGrain2>(Guid.NewGuid());
-            IReminderTestGrain2 g2 = this.GrainFactory.GetGrain<IReminderTestGrain2>(Guid.NewGuid());
-            IReminderTestCopyGrain g3 = this.GrainFactory.GetGrain<IReminderTestCopyGrain>(Guid.NewGuid());
-            IReminderTestCopyGrain g4 = this.GrainFactory.GetGrain<IReminderTestCopyGrain>(Guid.NewGuid());
-
-            IAddressable[] grains = [g1, g2, g3, g4];
-            await PrepareForGrainFailureAsync(cts.Token, grains);
-
-            var siloToKill = this.GetReminderOwner(g1, DR);
-            // stop a silo and join a new one in parallel
-            await using (await PauseReminderTimeAsync(cts.Token))
-            {
-                log.LogInformation("Stopping a silo and joining a silo");
-                await this.StopSiloAndStartAdditionalSiloAsync(siloToKill, cts.Token);
-            }
-
-            await CompleteGrainFailureTestAsync(cts.Token, grains);
+            await Test_Reminders_GT_1F1J_MultiGrain(TestContext.Current.CancellationToken);
         }
 
         [Fact, TestCategory("Functional")]

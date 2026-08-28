@@ -21,7 +21,9 @@ public class ReminderTests_Cosmos : ReminderTestsBase, IClassFixture<ReminderTes
 {
     public class Fixture : BaseInProcessTestClusterFixture
     {
+        private static readonly TimeSpan ReminderServiceStartupTimeout = TimeSpan.FromMinutes(5);
         private ReminderTestClock? _reminderClock;
+        private readonly ReminderDiagnosticObserver _startupObserver = ReminderDiagnosticObserver.Create();
         internal ReminderTestClock ReminderClock
         {
             get
@@ -45,6 +47,38 @@ public class ReminderTests_Cosmos : ReminderTestsBase, IClassFixture<ReminderTes
             });
         }
 
+        public override async ValueTask InitializeAsync()
+        {
+            await base.InitializeAsync();
+            if (!PreconditionsMet)
+            {
+                return;
+            }
+
+            var silos = HostedCluster.Silos.ToArray();
+            using var cancellation = CancellationTokenSource.CreateLinkedTokenSource(
+                TestContext.Current.CancellationToken);
+            cancellation.CancelAfter(ReminderServiceStartupTimeout);
+            var startedTasks = silos
+                .Select(silo => _startupObserver.WaitForReminderServiceStartedAsync(cancellation.Token, silo.SiloAddress))
+                .ToArray();
+
+            try
+            {
+                await Task.WhenAll(startedTasks);
+            }
+            catch (OperationCanceledException) when (
+                cancellation.IsCancellationRequested
+                && !TestContext.Current.CancellationToken.IsCancellationRequested)
+            {
+                var missing = silos
+                    .Where((_, index) => !startedTasks[index].IsCompletedSuccessfully)
+                    .Select(silo => silo.SiloAddress);
+                throw new TimeoutException(
+                    $"Cosmos reminder services did not start within {ReminderServiceStartupTimeout}. Missing silos: {string.Join(", ", missing)}.");
+            }
+        }
+
         public override async ValueTask DisposeAsync()
         {
             try
@@ -54,6 +88,7 @@ public class ReminderTests_Cosmos : ReminderTestsBase, IClassFixture<ReminderTes
             finally
             {
                 _reminderClock?.Dispose();
+                _startupObserver.Dispose();
             }
         }
     }
@@ -316,30 +351,10 @@ public class ReminderTests_Cosmos : ReminderTestsBase, IClassFixture<ReminderTes
     }
 
     [TestSuite("Functional")]
-    [Fact(Skip = "https://github.com/dotnet/orleans/issues/4319"), TestCategory("Functional")]
+    [Fact, TestCategory("Functional")]
     public async Task Rem_Azure_GT_1F1J_MultiGrain()
     {
-        using var cts = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
-        cts.CancelAfter(ENDWAIT);
-        _ = await StartAdditionalSilosAndWaitForReminderServicesAsync(1, cts.Token);
-
-        IReminderTestGrain2 g1 = GrainFactory.GetGrain<IReminderTestGrain2>(Guid.NewGuid());
-        IReminderTestGrain2 g2 = GrainFactory.GetGrain<IReminderTestGrain2>(Guid.NewGuid());
-        IReminderTestCopyGrain g3 = GrainFactory.GetGrain<IReminderTestCopyGrain>(Guid.NewGuid());
-        IReminderTestCopyGrain g4 = GrainFactory.GetGrain<IReminderTestCopyGrain>(Guid.NewGuid());
-
-        IAddressable[] grains = [g1, g2, g3, g4];
-        await PrepareForGrainFailureAsync(cts.Token, grains);
-
-        var siloToKill = GetReminderOwner(g1, DR);
-        // stop a silo and join a new one in parallel
-        await using (await PauseReminderTimeAsync(cts.Token))
-        {
-            log.LogInformation("Stopping a silo and joining a silo");
-            await StopSiloAndStartAdditionalSiloAsync(siloToKill, cts.Token);
-        }
-
-        await CompleteGrainFailureTestAsync(cts.Token, grains);
+        await Test_Reminders_GT_1F1J_MultiGrain(TestContext.Current.CancellationToken);
     }
 
     [TestSuite("Functional")]
