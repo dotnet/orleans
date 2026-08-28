@@ -764,9 +764,13 @@ public sealed class DynamoDBReminderMigrationTests
             return new(new BasicAWSCredentials("dummy", "dummyKey"), new AmazonDynamoDBConfig { ServiceURL = service });
         }
 
-        return new(
-            new BasicAWSCredentials(AWSTestConstants.DynamoDbAccessKey, AWSTestConstants.DynamoDbSecretKey),
-            new AmazonDynamoDBConfig { RegionEndpoint = Amazon.RegionEndpoint.GetBySystemName(service) });
+        var config = new AmazonDynamoDBConfig { RegionEndpoint = Amazon.RegionEndpoint.GetBySystemName(service) };
+        return string.IsNullOrEmpty(AWSTestConstants.DynamoDbAccessKey)
+            || string.IsNullOrEmpty(AWSTestConstants.DynamoDbSecretKey)
+                ? new(config)
+                : new(
+                    new BasicAWSCredentials(AWSTestConstants.DynamoDbAccessKey, AWSTestConstants.DynamoDbSecretKey),
+                    config);
     }
 
     private static async Task StopAndDelete(AmazonDynamoDBClient client, string tableName, params DynamoDBReminderTable?[] tables)
