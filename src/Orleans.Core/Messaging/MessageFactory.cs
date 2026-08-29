@@ -94,7 +94,6 @@ namespace Orleans.Runtime
                 SendingGrain = request.TargetGrain,
                 CacheInvalidationHeader = request.CacheInvalidationHeader,
                 RequestContextData = RequestContextExtensions.Export(_deepCopier),
-                ResponseTarget = request.ResponseTarget,
             };
 
             response.SetTimeToLive(request);
