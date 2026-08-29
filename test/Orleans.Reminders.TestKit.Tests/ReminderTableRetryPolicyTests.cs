@@ -153,7 +153,34 @@ public class ReminderTableRetryPolicyTests
     }
 
     [Fact]
-    public async Task UniformPolicy_EnforcesDeadlineAfterStartingFirstAttempt()
+    public async Task UniformPolicy_ObservesCompletedFirstAttemptAfterDeadline()
+    {
+        var invocations = 0;
+
+        var result = await ReminderTableRetryPolicy.ExecuteUntilAsync(
+            () =>
+            {
+                invocations++;
+                Thread.Sleep(TimeSpan.FromMilliseconds(20));
+                return Task.FromResult("late-success");
+            },
+            _ => true,
+            "DelayedStart",
+            "ReadGuarantee",
+            "ReadRow",
+            "a completed result",
+            value => value,
+            "read convergence",
+            TimeSpan.FromMilliseconds(1),
+            TimeSpan.FromMilliseconds(5),
+            TestContext.Current.CancellationToken);
+
+        Assert.Equal("late-success", result);
+        Assert.Equal(1, invocations);
+    }
+
+    [Fact]
+    public async Task UniformPolicy_ObservesCompletedFaultAfterDeadline()
     {
         var invocations = 0;
 
@@ -163,15 +190,15 @@ public class ReminderTableRetryPolicyTests
                 {
                     invocations++;
                     Thread.Sleep(TimeSpan.FromMilliseconds(20));
-                    return Task.FromResult("late-success");
+                    return Task.FromException<string>(new InvalidOperationException("late-contention"));
                 },
                 _ => true,
                 "DelayedStart",
-                "ReadGuarantee",
-                "ReadRow",
-                "a result within the deadline",
+                "MutationGuarantee",
+                "UpsertRow",
+                "a completed mutation",
                 value => value,
-                "read convergence",
+                "mutation retry",
                 TimeSpan.FromMilliseconds(1),
                 TimeSpan.FromMilliseconds(5),
                 TestContext.Current.CancellationToken));
@@ -179,7 +206,7 @@ public class ReminderTableRetryPolicyTests
         Assert.Equal(1, invocations);
         Assert.Contains("attempts=1", exception.Message, StringComparison.Ordinal);
         Assert.Contains("Last observation: <no completed attempt>", exception.Message, StringComparison.Ordinal);
-        Assert.Contains("Last exception: System.TimeoutException", exception.Message, StringComparison.Ordinal);
+        Assert.Contains("Last exception: System.InvalidOperationException: late-contention", exception.Message, StringComparison.Ordinal);
     }
 
     private sealed class TestRunner(IReminderTable table, string providerName)
