@@ -90,3 +90,35 @@ public class DurableTaskState : IDurableTaskState
         return changed;
     }
 }
+
+[GenerateSerializer]
+[Alias("Orleans.DurableTasks.Runtime.DurableTaskTerminalFailureCode")]
+internal enum DurableTaskTerminalFailureCode : byte
+{
+    ExpiredOrTombstoned = 1,
+}
+
+[GenerateSerializer]
+[Alias("Orleans.DurableTasks.Runtime.DurableTaskTerminalFailure")]
+internal sealed class DurableTaskTerminalFailure : Exception
+{
+    private DurableTaskTerminalFailure()
+    {
+    }
+
+    public DurableTaskTerminalFailure(TaskId taskId)
+        : base($"Durable task '{taskId}' has expired and its result is no longer available.")
+    {
+        Code = DurableTaskTerminalFailureCode.ExpiredOrTombstoned;
+        TaskId = taskId;
+    }
+
+    [Id(0)]
+    public DurableTaskTerminalFailureCode Code { get; private set; }
+
+    [Id(1)]
+    public TaskId TaskId { get; private set; }
+
+    public static DurableTaskResponse CreateResponse(TaskId taskId) =>
+        DurableTaskResponse.FromException(new DurableTaskTerminalFailure(taskId));
+}

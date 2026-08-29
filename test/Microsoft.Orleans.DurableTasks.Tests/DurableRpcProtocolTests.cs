@@ -1,11 +1,13 @@
 using System.Buffers;
 using System.Diagnostics.CodeAnalysis;
+using System.Reflection;
 using Orleans.DurableTasks;
 using Orleans.DurableTasks.Protocol;
 using Orleans.DurableTasks.Runtime;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using NSubstitute;
+using Orleans.Concurrency;
 using Orleans.Configuration;
 using Orleans.DurableJobs;
 using Orleans.DurableMessaging;
@@ -24,6 +26,17 @@ namespace Microsoft.Orleans.DurableTasks.Tests;
 [TestArea("DurableTasks")]
 public sealed class DurableRpcProtocolTests
 {
+    [Fact]
+    public void DurableTaskExtensionOperationsDoNotAlwaysInterleaveWithGrainTurns()
+    {
+        var methods = typeof(IDurableTaskServer).GetMethods()
+            .Concat(typeof(IDurableTaskObserver).GetMethods());
+
+        Assert.All(
+            methods,
+            method => Assert.Null(method.GetCustomAttribute<AlwaysInterleaveAttribute>()));
+    }
+
     [Fact]
     public void OrleansSerializationFingerprintIncludesPrivateStateAndIsStableForEquivalentGraphs()
     {
@@ -348,6 +361,66 @@ public sealed class DurableRpcProtocolTests
             .ToArray();
 
         Assert.NotEmpty(generated);
+    }
+
+    [Fact]
+    public async Task PollAsync_TombstonedTask_ReturnsExpiredTerminalFailure()
+    {
+        var taskId = TaskId.Parse("root/expired-client-poll");
+        var grain = new TombstoneResponseDurableTaskServer(taskId);
+        var handle = new GrainScheduledTaskHandle(
+            taskId,
+            new RuntimeTestDurableTaskRequest(),
+            grain,
+            lastResponse: null);
+
+        var response = await handle.PollAsync(
+            new PollingOptions { PollTimeout = TimeSpan.Zero },
+            TestContext.Current.CancellationToken);
+
+        var failedResponse = Assert.IsType<ExceptionDurableTaskResponse>(response);
+        var failure = Assert.IsType<DurableTaskTerminalFailure>(failedResponse.Exception);
+        Assert.True(failedResponse.IsCompleted);
+        Assert.Equal(DurableTaskResponseKind.Failed, failedResponse.ResponseKind);
+        Assert.Equal(DurableTaskStatus.Failed, failedResponse.Status);
+        Assert.Equal(DurableTaskTerminalFailureCode.ExpiredOrTombstoned, failure.Code);
+        Assert.Equal(taskId, failure.TaskId);
+        Assert.Equal(
+            $"Durable task '{taskId}' has expired and its result is no longer available.",
+            failure.Message);
+        Assert.Same(response, handle.LastResponse);
+        Assert.Equal(1, grain.SubscribeOrPollCallCount);
+        Assert.Equal(taskId, grain.LastRequestedTaskId);
+        Assert.Equal(TimeSpan.Zero, grain.LastPollTimeout);
+    }
+
+    [Fact]
+    public async Task WaitAsync_TombstonedTask_ReturnsExpiredTerminalFailureWithoutRepolling()
+    {
+        var taskId = TaskId.Parse("root/expired-client-wait");
+        var grain = new TombstoneResponseDurableTaskServer(taskId);
+        var handle = new GrainScheduledTaskHandle(
+            taskId,
+            new RuntimeTestDurableTaskRequest(),
+            grain,
+            lastResponse: null);
+
+        var response = await handle.WaitAsync(TestContext.Current.CancellationToken);
+
+        var failedResponse = Assert.IsType<ExceptionDurableTaskResponse>(response);
+        var failure = Assert.IsType<DurableTaskTerminalFailure>(failedResponse.Exception);
+        Assert.True(failedResponse.IsCompleted);
+        Assert.Equal(DurableTaskResponseKind.Failed, failedResponse.ResponseKind);
+        Assert.Equal(DurableTaskStatus.Failed, failedResponse.Status);
+        Assert.Equal(DurableTaskTerminalFailureCode.ExpiredOrTombstoned, failure.Code);
+        Assert.Equal(taskId, failure.TaskId);
+        Assert.Equal(
+            $"Durable task '{taskId}' has expired and its result is no longer available.",
+            failure.Message);
+        Assert.Same(response, handle.LastResponse);
+        Assert.Equal(1, grain.SubscribeOrPollCallCount);
+        Assert.Equal(taskId, grain.LastRequestedTaskId);
+        Assert.Equal(TimeSpan.FromSeconds(5), grain.LastPollTimeout);
     }
 
     private sealed class RecordingOutbox : IDurableOutbox

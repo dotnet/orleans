@@ -3,7 +3,6 @@ using System;
 using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
-using Orleans.Concurrency;
 using Orleans.DurableTasks;
 using Orleans.Runtime;
 
@@ -12,7 +11,6 @@ namespace Orleans.DurableTasks.Protocol;
 [Alias("IDurableTaskObserverGrainExtension")]
 public interface IDurableTaskObserver : IGrainExtension
 {
-    [AlwaysInterleave]
     [Alias("OnResponse")]
     ValueTask OnResponseAsync(TaskId taskId, DurableTaskResponse response, CancellationToken cancellationToken = default);
 }
@@ -21,15 +19,14 @@ public interface IDurableTaskObserver : IGrainExtension
 public interface IDurableTaskServer : IGrainExtension
 {
     // Called by DurableTaskRequest.Invoke to ensure that a task is scheduled
-    [Alias("ScheduleAsync"), AlwaysInterleave]
+    [Alias("ScheduleAsync")]
     ValueTask<DurableTaskResponse> ScheduleAsync(TaskId taskId, IDurableTaskRequest request, CancellationToken cancellationToken = default);
 
     // API used by ScheduledTask/<T> to check for a result for a task.
     // The ScheduledTask does not have access to the original request, so it cannot submit a sensible IDurableTaskRequest.
-    [Alias("SubscribeOrPollAsync"), AlwaysInterleave]
+    [Alias("SubscribeOrPollAsync")]
     ValueTask<DurableTaskResponse> SubscribeOrPollAsync(TaskId taskId, SubscribeOrPollOptions options, CancellationToken cancellationToken = default);
 
-    [AlwaysInterleave]
     [Alias("CancelAsync")]
     ValueTask CancelAsync(TaskId taskId, CancellationToken cancellationToken = default);
 }

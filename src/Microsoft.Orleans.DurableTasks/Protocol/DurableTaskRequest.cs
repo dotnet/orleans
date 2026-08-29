@@ -10,6 +10,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Orleans.CodeGeneration;
 using Orleans.DurableTasks;
+using Orleans.DurableTasks.Runtime;
 using Orleans.Invocation;
 using Orleans.Runtime;
 using Orleans.Serialization;
@@ -439,7 +440,7 @@ internal sealed class GrainScheduledTaskHandle(TaskId taskId, IDurableTaskReques
 
         // TODO: Add resilience via Polly
         var pollOptions = new SubscribeOrPollOptions { PollTimeout = options.PollTimeout };
-        return LastResponse = await grain.SubscribeOrPollAsync(TaskId, pollOptions, cancellationToken);
+        return DecodeResponse(await grain.SubscribeOrPollAsync(TaskId, pollOptions, cancellationToken));
     }
 
     public async ValueTask<DurableTaskResponse> ScheduleAsync(CancellationToken cancellationToken)
@@ -460,7 +461,7 @@ internal sealed class GrainScheduledTaskHandle(TaskId taskId, IDurableTaskReques
             // TODO: Add resilience via Polly
 
             var options = new SubscribeOrPollOptions { PollTimeout = TimeSpan.FromSeconds(5) };
-            response = LastResponse = await grain.SubscribeOrPollAsync(TaskId, options, cancellationToken);
+            response = DecodeResponse(await grain.SubscribeOrPollAsync(TaskId, options, cancellationToken));
             if (response.IsCompleted)
             {
                 return response;
@@ -468,5 +469,17 @@ internal sealed class GrainScheduledTaskHandle(TaskId taskId, IDurableTaskReques
 
             // TODO: Add exponential backoff via Polly/etc?
         }
+    }
+
+    private DurableTaskResponse DecodeResponse(DurableTaskResponse response)
+    {
+        if (response is ExceptionDurableTaskResponse { Exception: DurableTaskTerminalFailure failure }
+            && failure.TaskId != TaskId)
+        {
+            throw new InvalidOperationException(
+                $"Received terminal failure for durable task '{failure.TaskId}' while observing '{TaskId}'.");
+        }
+
+        return LastResponse = response;
     }
 }

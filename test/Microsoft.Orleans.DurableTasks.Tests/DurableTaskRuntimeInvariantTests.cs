@@ -522,19 +522,39 @@ public sealed class DurableTaskRuntimeInvariantTests
     [Fact]
     public async Task InboxCompletionPersistsEligiblePruningAfterOuterWrite()
     {
-        var (runtime, storage, manager, _) = CreateRuntime(TimeSpan.Zero);
+        var (runtime, storage, manager, transport) = CreateRuntime(TimeSpan.Zero);
         var taskId = TaskId.Parse("root/remote");
         var target = GrainId.Create("target", "one");
         var state = storage.GetOrCreate(taskId);
         storage.SetRemoteRequest(taskId, state, target, "fingerprint");
+        var pruningWriteCompleted = new TaskCompletionSource<int>(TaskCreationOptions.RunContinuationsAsynchronously);
+        manager.AfterWriteCompleted = writeCount =>
+        {
+            if (writeCount == 2)
+            {
+                pruningWriteCompleted.TrySetResult(writeCount);
+            }
+        };
 
         await runtime.AcceptResponseAsync(taskId, DurableTaskResponse.FromResult(42), target, TestContext.Current.CancellationToken, persist: false);
         Assert.True(storage.Contains(taskId));
 
         await manager.WriteStateAsync(TestContext.Current.CancellationToken);
-        await WaitUntilAsync(() => !storage.Contains(taskId) && manager.WriteCount >= 2);
+        Assert.Equal(
+            2,
+            await pruningWriteCompleted.Task.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken));
 
-        Assert.True(manager.WriteCount >= 2);
+        var tombstone = storage.Get(taskId);
+        Assert.Same(state, tombstone);
+        Assert.Null(tombstone.RequestFingerprint);
+        Assert.Equal("fingerprint", tombstone.RemoteRequestFingerprint);
+        Assert.Equal(target, tombstone.RemoteTarget);
+        Assert.NotNull(tombstone.TombstonedAt);
+        Assert.Null(tombstone.Request);
+        Assert.Null(tombstone.Result);
+        Assert.Empty(tombstone.CompletionDestinations);
+        Assert.Empty(transport.Invocations);
+        Assert.Equal(2, manager.WriteCount);
     }
 
     [Fact]
@@ -549,6 +569,14 @@ public sealed class DurableTaskRuntimeInvariantTests
         var second = storage.GetOrCreate(secondId);
         storage.SetRemoteRequest(secondId, second, target, "second");
         var secondHandle = runtime.GetScheduledTaskHandle(secondId);
+        var pruningWriteCompleted = new TaskCompletionSource<int>(TaskCreationOptions.RunContinuationsAsynchronously);
+        manager.AfterWriteCompleted = writeCount =>
+        {
+            if (writeCount == 2)
+            {
+                pruningWriteCompleted.TrySetResult(writeCount);
+            }
+        };
         await runtime.AcceptResponseAsync(firstId, DurableTaskResponse.FromResult(1), target, TestContext.Current.CancellationToken, persist: false);
         manager.AfterWriteStarted = () => runtime.AcceptResponseAsync(
             secondId,
@@ -563,7 +591,17 @@ public sealed class DurableTaskRuntimeInvariantTests
         Assert.Equal(
             2,
             (await secondHandle.WaitAsync(TestContext.Current.CancellationToken).AsTask().WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken)).GetResult<int>());
-        await WaitUntilAsync(() => manager.WriteCount >= 2 && !storage.Contains(secondId));
+        Assert.Equal(
+            2,
+            await pruningWriteCompleted.Task.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken));
+        Assert.NotNull(second.TombstonedAt);
+        Assert.Same(second, storage.Get(secondId));
+        Assert.Null(second.RequestFingerprint);
+        Assert.Equal("second", second.RemoteRequestFingerprint);
+        Assert.Equal(target, second.RemoteTarget);
+        Assert.Null(second.Request);
+        Assert.Null(second.Result);
+        Assert.Empty(second.CompletionDestinations);
     }
 
     [Fact]
@@ -1462,6 +1500,318 @@ public sealed class DurableTaskRuntimeInvariantTests
         Assert.False(storage.Contains(taskId));
     }
 
+    [Fact]
+    public async Task ScheduleChildAsync_ConcurrentAncestorCancellation_DoesNotPersistOrStartChild()
+    {
+        var (runtime, storage, manager, transport) = CreateRuntime();
+        var rootId = TaskId.Parse("root");
+        var childId = TaskId.Parse("root/remote-child");
+        storage.GetOrCreate(rootId);
+        var rootHandle = runtime.GetScheduledTaskHandle(rootId);
+        var receiver = GrainId.Create("test", "one");
+        var caller = GrainId.Create("caller", "one");
+        var handler = (IInboxHandler)new DurableTaskMessageHandler(runtime);
+        var cancellationWriteEntered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var releaseCancellationWrite = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        manager.AfterWriteStarted = async () =>
+        {
+            manager.AfterWriteStarted = null;
+            cancellationWriteEntered.TrySetResult();
+            await releaseCancellationWrite.Task.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+        };
+
+        await handler.HandleAsync(
+            CreateHandlerContext(
+                receiver,
+                CreateEnvelope(
+                    caller,
+                    receiver,
+                    DurableTaskMessageTransport.CancellationRoute,
+                    new DurableTaskCancellationMessage { TaskId = rootId })),
+            TestContext.Current.CancellationToken);
+        var cancellationWrite = manager.WriteStateAsync(TestContext.Current.CancellationToken).AsTask();
+        await cancellationWriteEntered.Task.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+        var remoteRequest = CreateRemoteRequest(17);
+        var childTask = new TestStateManager.TestRemoteDurableTask(remoteRequest);
+
+        var scheduling = runtime.ScheduleChildAsync(
+            childId,
+            childTask,
+            TestContext.Current.CancellationToken).AsTask();
+
+        try
+        {
+            Assert.False(scheduling.IsCompleted);
+            Assert.False(storage.Contains(childId));
+            Assert.Equal(0, childTask.ScheduleAsyncCallCount);
+            Assert.Empty(transport.Invocations);
+            Assert.Equal(0, manager.WriteCount);
+        }
+        finally
+        {
+            releaseCancellationWrite.TrySetResult();
+        }
+
+        await cancellationWrite;
+        var handle = await scheduling;
+        var rootResponse = Assert.IsType<CanceledDurableTaskResponse>(
+            await rootHandle.WaitAsync(TestContext.Current.CancellationToken)
+                .AsTask()
+                .WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken));
+        var response = Assert.IsType<CanceledDurableTaskResponse>(
+            await handle.WaitAsync(TestContext.Current.CancellationToken)
+                .AsTask()
+                .WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken));
+
+        Assert.Equal(childId, handle.TaskId);
+        Assert.Equal(DurableTaskStatus.Canceled, rootResponse.Status);
+        Assert.Same(DurableTaskResponse.Canceled, response);
+        Assert.Equal(DurableTaskResponseKind.Canceled, response.ResponseKind);
+        Assert.Equal(DurableTaskStatus.Canceled, response.Status);
+        Assert.Equal("The operation was canceled.", response.Exception.Message);
+        Assert.NotNull(storage.Get(rootId).CancellationRequestedAt);
+        Assert.False(storage.Contains(childId));
+        Assert.Equal(0, childTask.ScheduleAsyncCallCount);
+        Assert.Empty(transport.Invocations);
+        Assert.Equal(2, manager.WriteCount);
+    }
+
+    [Fact]
+    public async Task ScheduleChildAsync_CanceledAncestorPreservesCompletedChildResult()
+    {
+        var (runtime, storage, _, transport) = CreateRuntime();
+        var rootId = TaskId.Parse("root");
+        var childId = TaskId.Parse("root/completed-child");
+        var request = CreateRemoteRequest(17);
+        var childTask = new TestStateManager.TestRemoteDurableTask(request);
+        var child = storage.GetOrCreate(childId);
+        storage.SetRemoteRequest(
+            childId,
+            child,
+            request.Context!.TargetId,
+            IDurableTaskRequest.GetFingerprint(childTask, CreateSerializer()));
+        child.Result = DurableTaskResponse.FromResult(42);
+        child.CompletedAt = DateTimeOffset.UtcNow;
+        storage.RequestCancellation(rootId, storage.GetOrCreate(rootId));
+
+        var handle = await runtime.ScheduleChildAsync(
+            childId,
+            childTask,
+            TestContext.Current.CancellationToken);
+
+        Assert.Equal(42, (await handle.WaitAsync(TestContext.Current.CancellationToken)).GetResult<int>());
+        Assert.Empty(transport.Invocations);
+    }
+
+    [Fact]
+    public async Task ScheduleChildAsync_CanceledAncestorPreservesTombstonedChildFailure()
+    {
+        var (runtime, storage, _, transport) = CreateRuntime();
+        var rootId = TaskId.Parse("root");
+        var childId = TaskId.Parse("root/tombstoned-child");
+        var request = CreateRemoteRequest(17);
+        var childTask = new TestStateManager.TestRemoteDurableTask(request);
+        var child = storage.GetOrCreate(childId);
+        storage.SetRemoteRequest(
+            childId,
+            child,
+            request.Context!.TargetId,
+            IDurableTaskRequest.GetFingerprint(childTask, CreateSerializer()));
+        storage.CreateTombstone(childId, child);
+        storage.RequestCancellation(rootId, storage.GetOrCreate(rootId));
+
+        var handle = await runtime.ScheduleChildAsync(
+            childId,
+            childTask,
+            TestContext.Current.CancellationToken);
+        var response = Assert.IsType<ExceptionDurableTaskResponse>(
+            await handle.WaitAsync(TestContext.Current.CancellationToken));
+
+        var failure = Assert.IsType<DurableTaskTerminalFailure>(response.Exception);
+        Assert.Equal(childId, failure.TaskId);
+        Assert.Empty(transport.Invocations);
+    }
+
+    [Fact]
+    public async Task ScheduleChildAsync_CanceledAncestorStillRejectsConflictingChildIdentity()
+    {
+        var (runtime, storage, _, transport) = CreateRuntime();
+        var rootId = TaskId.Parse("root");
+        var childId = TaskId.Parse("root/conflicting-child");
+        var originalRequest = CreateRemoteRequest(17);
+        var originalTask = new TestStateManager.TestRemoteDurableTask(originalRequest);
+        var child = storage.GetOrCreate(childId);
+        storage.SetRemoteRequest(
+            childId,
+            child,
+            originalRequest.Context!.TargetId,
+            IDurableTaskRequest.GetFingerprint(originalTask, CreateSerializer()));
+        storage.RequestCancellation(rootId, storage.GetOrCreate(rootId));
+
+        var exception = await Assert.ThrowsAsync<InvalidOperationException>(
+            () => runtime.ScheduleChildAsync(
+                childId,
+                new TestStateManager.TestRemoteDurableTask(CreateRemoteRequest(18)),
+                TestContext.Current.CancellationToken).AsTask());
+
+        Assert.Equal(
+            $"Durable child task '{childId}' is already associated with a different request.",
+            exception.Message);
+        Assert.Empty(transport.Invocations);
+    }
+
+    [Fact]
+    public async Task ScheduleChildAsync_SpawnedRuntimeWriteWaitsForJournalGate()
+    {
+        var (runtime, _, manager, transport) = CreateRuntime();
+        var childId = TaskId.Parse("root/custom-child");
+        var nestedId = TaskId.Parse("nested/remote");
+        var nestedRequest = CreateRemoteRequest(17);
+        Task<DurableTaskResponse>? nestedScheduling = null;
+        var writeEntered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var releaseWrite = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        manager.AfterWriteStarted = async () =>
+        {
+            manager.AfterWriteStarted = null;
+            writeEntered.TrySetResult();
+            await releaseWrite.Task.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+        };
+        var task = new TestSchedulableTask((_, _) =>
+        {
+            nestedScheduling = Task.Run(
+                () => runtime.ScheduleRemoteAsync(
+                    nestedId,
+                    nestedRequest,
+                    TestContext.Current.CancellationToken).AsTask(),
+                TestContext.Current.CancellationToken);
+            return new(DurableTaskResponse.Pending);
+        });
+
+        var scheduling = runtime.ScheduleChildAsync(
+            childId,
+            task,
+            TestContext.Current.CancellationToken).AsTask();
+        await writeEntered.Task.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+
+        try
+        {
+            Assert.NotNull(nestedScheduling);
+            Assert.False(nestedScheduling.IsCompleted);
+            Assert.Empty(transport.Invocations);
+        }
+        finally
+        {
+            releaseWrite.TrySetResult();
+        }
+
+        await scheduling.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+        await nestedScheduling.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+        Assert.Single(transport.Invocations);
+    }
+
+    [Fact]
+    public async Task RemoteTaskIdReuseAfterPruning_IsRejectedWithoutSendingInvocation()
+    {
+        var (runtime, storage, manager, transport) = CreateRuntime(TimeSpan.Zero);
+        var taskId = TaskId.Parse("root/remote-reuse");
+        var originalRequest = CreateRemoteRequest(17);
+        var target = originalRequest.Context!.TargetId;
+        var originalFingerprint = IDurableTaskRequest.GetFingerprint(originalRequest, CreateSerializer());
+        var pruningWriteCompleted = new TaskCompletionSource<int>(TaskCreationOptions.RunContinuationsAsynchronously);
+        manager.AfterWriteCompleted = writeCount =>
+        {
+            if (writeCount == 3)
+            {
+                pruningWriteCompleted.TrySetResult(writeCount);
+            }
+        };
+
+        await runtime.ScheduleRemoteAsync(taskId, originalRequest, TestContext.Current.CancellationToken);
+        await runtime.AcceptResponseAsync(
+            taskId,
+            DurableTaskResponse.FromResult(42),
+            target,
+            TestContext.Current.CancellationToken,
+            persist: false);
+        await manager.WriteStateAsync(TestContext.Current.CancellationToken);
+        Assert.Equal(
+            3,
+            await pruningWriteCompleted.Task.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken));
+
+        var tombstone = storage.Get(taskId);
+        var tombstonedAt = Assert.IsType<DateTimeOffset>(tombstone.TombstonedAt);
+        Assert.Null(tombstone.RequestFingerprint);
+        Assert.Equal(originalFingerprint, tombstone.RemoteRequestFingerprint);
+        Assert.Equal(target, tombstone.RemoteTarget);
+        Assert.Null(tombstone.Request);
+        Assert.Null(tombstone.Result);
+        Assert.Empty(tombstone.CompletionDestinations);
+        var originalInvocation = Assert.Single(transport.Invocations);
+        Assert.Equal(taskId, originalInvocation.TaskId);
+        Assert.Equal(target, originalInvocation.Target);
+        Assert.Same(originalRequest, originalInvocation.Request);
+        Assert.Equal(3, manager.WriteCount);
+
+        var incompatibleRequest = CreateRemoteRequest(18);
+        var exception = await Assert.ThrowsAsync<InvalidOperationException>(
+            () => runtime.ScheduleRemoteAsync(
+                taskId,
+                incompatibleRequest,
+                TestContext.Current.CancellationToken).AsTask());
+
+        Assert.Equal(
+            $"Durable task '{taskId}' is already associated with a different request.",
+            exception.Message);
+        Assert.Same(tombstone, storage.Get(taskId));
+        Assert.Null(tombstone.RequestFingerprint);
+        Assert.Equal(originalFingerprint, tombstone.RemoteRequestFingerprint);
+        Assert.Equal(target, tombstone.RemoteTarget);
+        Assert.Equal(tombstonedAt, tombstone.TombstonedAt);
+        Assert.Null(tombstone.Request);
+        Assert.Null(tombstone.Result);
+        Assert.Empty(tombstone.CompletionDestinations);
+        var currentInvocation = Assert.Single(transport.Invocations);
+        Assert.Equal(originalInvocation.Sender, currentInvocation.Sender);
+        Assert.Equal(originalInvocation.Target, currentInvocation.Target);
+        Assert.Equal(originalInvocation.TaskId, currentInvocation.TaskId);
+        Assert.Same(originalInvocation.Request, currentInvocation.Request);
+        Assert.Equal(3, manager.WriteCount);
+    }
+
+    [Fact]
+    public async Task SubscribeOrPollAsync_TombstonedTask_ReturnsExpiredTerminalFailure()
+    {
+        var (runtime, storage, manager, transport) = CreateRuntime();
+        var taskId = TaskId.Parse("root/expired-poll");
+        var tombstone = storage.GetOrCreate(taskId);
+        tombstone.RemoteRequestFingerprint = "stable-remote-fingerprint";
+        storage.CreateTombstone(taskId, tombstone);
+
+        var response = await ((IDurableTaskServer)runtime).SubscribeOrPollAsync(
+            taskId,
+            new SubscribeOrPollOptions { PollTimeout = TimeSpan.Zero },
+            TestContext.Current.CancellationToken);
+        var serializer = EnvelopeServiceProvider.GetRequiredService<Serializer>();
+        var wireResponse = serializer.Deserialize<DurableTaskResponse>(
+            serializer.SerializeToArray<DurableTaskResponse>(response));
+
+        var failedResponse = Assert.IsType<ExceptionDurableTaskResponse>(wireResponse);
+        var failure = Assert.IsType<DurableTaskTerminalFailure>(failedResponse.Exception);
+        Assert.True(failedResponse.IsCompleted);
+        Assert.Equal(DurableTaskResponseKind.Failed, failedResponse.ResponseKind);
+        Assert.Equal(DurableTaskStatus.Failed, failedResponse.Status);
+        Assert.Equal(DurableTaskTerminalFailureCode.ExpiredOrTombstoned, failure.Code);
+        Assert.Equal(taskId, failure.TaskId);
+        Assert.Equal(
+            $"Durable task '{taskId}' has expired and its result is no longer available.",
+            failure.Message);
+        Assert.Same(tombstone, storage.Get(taskId));
+        Assert.NotNull(tombstone.TombstonedAt);
+        Assert.Null(tombstone.Result);
+        Assert.Equal(0, manager.WriteCount);
+        Assert.Empty(transport.Invocations);
+    }
+
     private static RuntimeTestDurableTaskRequest CreateRequest(
         int argument,
         Func<DurableTask>? createTask = null) =>
@@ -1836,6 +2186,7 @@ public sealed class DurableTaskRuntimeInvariantTests
         public long PendingWriteByteCount { get; set; }
         public Action? BeforeWrite { get; set; }
         public Func<ValueTask>? AfterWriteStarted { get; set; }
+        public Action<int>? AfterWriteCompleted { get; set; }
         public bool SupportsRollback => true;
         public void RegisterObserver(IJournaledStateObserver observer) => _observers.Add(observer);
         public ValueTask InitializeAsync(CancellationToken cancellationToken) => default;
@@ -1866,6 +2217,8 @@ public sealed class DurableTaskRuntimeInvariantTests
             {
                 observer.OnWriteCompleted();
             }
+
+            AfterWriteCompleted?.Invoke(WriteCount);
         }
 
         internal sealed class PendingDurableTask : DurableTask

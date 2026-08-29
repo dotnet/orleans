@@ -102,3 +102,38 @@ internal sealed class FakeGrainReferenceObserver(GrainReferenceShared shared, Id
         return new FakeGrainReferenceObserver(shared, IdSpan.Create(key));
     }
 }
+
+internal sealed class TombstoneResponseDurableTaskServer(TaskId expectedTaskId) : IDurableTaskServer
+{
+    private int _subscribeOrPollCallCount;
+
+    public int SubscribeOrPollCallCount => Volatile.Read(ref _subscribeOrPollCallCount);
+    public TaskId LastRequestedTaskId { get; private set; }
+    public TimeSpan LastPollTimeout { get; private set; }
+
+    public ValueTask<DurableTaskResponse> ScheduleAsync(
+        TaskId taskId,
+        IDurableTaskRequest request,
+        CancellationToken cancellationToken = default) =>
+        throw new NotSupportedException();
+
+    public ValueTask<DurableTaskResponse> SubscribeOrPollAsync(
+        TaskId taskId,
+        SubscribeOrPollOptions options,
+        CancellationToken cancellationToken = default)
+    {
+        if (taskId != expectedTaskId)
+        {
+            throw new InvalidOperationException(
+                $"Expected a request for durable task '{expectedTaskId}', but received '{taskId}'.");
+        }
+
+        LastRequestedTaskId = taskId;
+        LastPollTimeout = options.PollTimeout;
+        Interlocked.Increment(ref _subscribeOrPollCallCount);
+        return new(DurableTaskTerminalFailure.CreateResponse(taskId));
+    }
+
+    public ValueTask CancelAsync(TaskId taskId, CancellationToken cancellationToken = default) =>
+        throw new NotSupportedException();
+}

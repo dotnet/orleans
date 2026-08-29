@@ -130,7 +130,6 @@ public static class DurableMessagingExtensions
         services.TryAddScoped(sp =>
         {
             var options = sp.GetRequiredService<IOptions<DurableJobsOptions>>().Value;
-            var completedRetentionPeriod = TimeSpan.FromMinutes(10);
             var abandonedRetentionPeriod = options.JobStatusPollInterval <= TimeSpan.MaxValue / 4
                 ? options.JobStatusPollInterval * 4
                 : TimeSpan.MaxValue;

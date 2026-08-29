@@ -1206,4 +1206,84 @@ public sealed class PublicDurableMessagingBehaviorTests : IAsyncLifetime
         {
         }
     }
+
+    [Fact]
+    public async Task DefaultConfiguration_RecoversInboxAndOutboxAcrossActivation()
+    {
+        var sender = NewGrain();
+        var receiver = NewGrain();
+        var senderBefore = await sender.GetSnapshotAsync();
+        var receiverBefore = await receiver.GetSnapshotAsync();
+        var receiverWrite = fixture.Storage.BlockWrite(JournalId.FromGrainId(receiver.GetGrainId()));
+        var message = NewMessage(81, "default-binary-round-trip");
+        Guid messageId;
+
+        try
+        {
+            messageId = await sender.SendAndDeactivateAsync(
+                receiver.GetGrainId(),
+                "messages/default-binary-round-trip",
+                message);
+            await receiverWrite.WaitUntilEnteredAsync();
+
+            var committedSender = await sender.GetSnapshotAsync();
+            Assert.NotEqual(senderBefore.ActivationId, committedSender.ActivationId);
+            Assert.Equal(1, committedSender.OutboxCount);
+            Assert.False(string.IsNullOrEmpty(committedSender.OutboxJobId));
+        }
+        finally
+        {
+            receiverWrite.Release();
+        }
+
+        var delivered = await fixture.WaitForEffectCountAsync(receiver, 1);
+        var recoveredSender = await fixture.SnapshotProbe.WaitAsync(
+            sender.GetGrainId(),
+            snapshot => snapshot.ActivationId != senderBefore.ActivationId
+                && snapshot.OutboxCount == 0
+                && snapshot.OutboxJobId is null);
+        var expectedEffect = new DurableEffect(message.LogicalId, 1, message.Sequence, message.Value);
+
+        Assert.Equal(expectedEffect, Assert.Single(delivered.Effects));
+        Assert.Equal(0, delivered.InboxCount);
+        Assert.Equal(1, delivered.ProcessedMessageCount);
+        Assert.NotEqual(senderBefore.ActivationId, recoveredSender.ActivationId);
+        Assert.Equal(0, recoveredSender.OutboxCount);
+        Assert.Null(recoveredSender.OutboxJobId);
+
+        await receiver.RequestDeactivationAsync();
+        var recoveredReceiver = await receiver.GetSnapshotAsync();
+
+        Assert.NotEqual(receiverBefore.ActivationId, recoveredReceiver.ActivationId);
+        Assert.Equal(0, recoveredReceiver.InboxCount);
+        Assert.Equal(1, recoveredReceiver.ProcessedMessageCount);
+        Assert.Equal(expectedEffect, Assert.Single(recoveredReceiver.Effects));
+        Assert.Empty(recoveredReceiver.InboxDeadLetters);
+        Assert.Empty(recoveredReceiver.OutboxDeadLetters);
+
+        var sessions = fixture.Client.ServiceProvider.GetRequiredService<SerializerSessionPool>();
+        var replayTemplate = new DurableEnvelopeBuilder(sessions, sender.GetGrainId())
+            .To(receiver.GetGrainId(), "messages/default-binary-round-trip")
+            .WithBody(message)
+            .Build();
+        var replay = new DurableEnvelope
+        {
+            MessageId = messageId,
+            SenderId = replayTemplate.SenderId,
+            ReceiverId = replayTemplate.ReceiverId,
+            RouteKey = replayTemplate.RouteKey,
+            CorrelationKey = replayTemplate.CorrelationKey,
+            ReplyTo = replayTemplate.ReplyTo,
+            Data = replayTemplate.Data,
+            CreatedAt = replayTemplate.CreatedAt,
+        };
+
+        var duplicate = await DeliverAsync(receiver, replay, TestContext.Current.CancellationToken);
+        var afterDuplicate = await receiver.GetSnapshotAsync();
+        Assert.Equal(DeliveryStatus.Duplicate, duplicate.Status);
+        Assert.Equal(expectedEffect, Assert.Single(afterDuplicate.Effects));
+        Assert.Equal(0, afterDuplicate.InboxCount);
+        Assert.Equal(1, afterDuplicate.ProcessedMessageCount);
+    }
+
 }

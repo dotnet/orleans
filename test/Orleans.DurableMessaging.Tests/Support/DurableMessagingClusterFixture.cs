@@ -26,15 +26,19 @@ public class DurableMessagingClusterFixture : IAsyncLifetime
         JobManagerProbe = new DurableJobManagerProbe();
         HandlerProbe = new HandlerProbe();
         SnapshotProbe = new SnapshotProbe();
+        DurableTaskExecutionProbe = new DurableTaskExecutionProbe();
         var clusterId = $"durable-messaging-{Guid.NewGuid():N}";
         var serviceId = $"durable-messaging-service-{Guid.NewGuid():N}";
         var builder = new InProcessTestClusterBuilder((short)initialSilos);
         builder.ConfigureClient(clientBuilder =>
+        {
+            clientBuilder.AddDurableTasks();
             clientBuilder.Configure<ClusterOptions>(options =>
             {
                 options.ClusterId = clusterId;
                 options.ServiceId = serviceId;
-            }));
+            });
+        });
         builder.ConfigureSilo((_, siloBuilder) =>
         {
             siloBuilder.Configure<ClusterOptions>(options =>
@@ -46,8 +50,10 @@ public class DurableMessagingClusterFixture : IAsyncLifetime
             siloBuilder.Services.UseTimeProviderForBackgroundAreas(TimeProvider.System);
             siloBuilder.Services.AddSingleton(HandlerProbe);
             siloBuilder.Services.AddSingleton(SnapshotProbe);
+            siloBuilder.Services.AddSingleton(DurableTaskExecutionProbe);
             siloBuilder.UseInMemoryDurableJobs();
-            siloBuilder.AddDurableMessaging(ConfigureOptions);
+            siloBuilder.AddDurableTasks();
+            siloBuilder.Services.Configure<DurableInboxOptions>(ConfigureOptions);
             siloBuilder.ConfigureServices(services =>
                 ControlledDurableJobManager.Decorate(services, JobManagerProbe));
             siloBuilder.Services.RemoveAll<IJournalStorageProvider>();
@@ -72,6 +78,7 @@ public class DurableMessagingClusterFixture : IAsyncLifetime
     public DurableJobManagerProbe JobManagerProbe { get; }
     public HandlerProbe HandlerProbe { get; }
     public SnapshotProbe SnapshotProbe { get; }
+    public DurableTaskExecutionProbe DurableTaskExecutionProbe { get; }
 
     public Task<DurableEndpointSnapshot> WaitForEffectCountAsync(IDurableMessagingTestGrain grain, int expected) =>
         SnapshotProbe.WaitAsync(
