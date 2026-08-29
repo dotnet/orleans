@@ -13,14 +13,14 @@ namespace Tester;
 public class CallbackRegistryTests
 {
     [Fact]
-    public void TryCompleteResponse_DirectTarget_CompletesExactCallbackAndCleansFallback()
+    public void TryCompleteResponse_CompletesCallbackAndRemovesRegistration()
     {
         using var serviceProvider = CreateServiceProvider();
         var registry = new CallbackRegistry();
         var completion = new TestResponseCompletionSource();
         var callback = CreateCallback(registry, completion, CreateRequest(1), serviceProvider);
         Assert.True(registry.TryRegister(callback));
-        var response = CreateResponse(callback.Message, callback);
+        var response = CreateResponse(callback.Message);
 
         Assert.True(registry.TryCompleteResponse(response));
 
@@ -30,31 +30,14 @@ public class CallbackRegistryTests
     }
 
     [Fact]
-    public void TryCompleteResponse_SerializedResponse_UsesFallbackLookup()
-    {
-        using var serviceProvider = CreateServiceProvider();
-        var registry = new CallbackRegistry();
-        var completion = new TestResponseCompletionSource();
-        var callback = CreateCallback(registry, completion, CreateRequest(2), serviceProvider);
-        Assert.True(registry.TryRegister(callback));
-        var response = CreateResponse(callback.Message, responseTarget: null);
-
-        Assert.True(registry.TryCompleteResponse(response));
-
-        Assert.Same(Response.Completed, completion.Response);
-        Assert.Equal(1, completion.CompletionCount);
-        Assert.Equal(0, registry.Count);
-    }
-
-    [Fact]
-    public void TryCompleteResponse_DirectRejection_CompletesExactCallback()
+    public void TryCompleteResponse_RejectionCompletesExactCallback()
     {
         using var serviceProvider = CreateServiceProvider();
         var registry = new CallbackRegistry();
         var completion = new TestResponseCompletionSource();
         var callback = CreateCallback(registry, completion, CreateRequest(7), serviceProvider);
         Assert.True(registry.TryRegister(callback));
-        var response = CreateResponse(callback.Message, callback);
+        var response = CreateResponse(callback.Message);
         response.Result = Message.ResponseTypes.Rejection;
         response.BodyObject = new RejectionResponse
         {
@@ -70,7 +53,7 @@ public class CallbackRegistryTests
     }
 
     [Fact]
-    public void TryGetResponseCallback_DirectStatus_UsesExactCallback()
+    public void TryGetResponseCallback_StatusUsesRegisteredCallback()
     {
         using var serviceProvider = CreateServiceProvider();
         var registry = new CallbackRegistry();
@@ -80,7 +63,7 @@ public class CallbackRegistryTests
             CreateRequest(3),
             serviceProvider);
         Assert.True(registry.TryRegister(callback));
-        var status = CreateResponse(callback.Message, callback);
+        var status = CreateResponse(callback.Message);
         status.Result = Message.ResponseTypes.Status;
         status.BodyObject = new StatusResponse(true, false, []);
 
@@ -91,23 +74,22 @@ public class CallbackRegistryTests
     }
 
     [Fact]
-    public void TryCompleteResponse_StaleDirectTarget_DoesNotRemoveReplacement()
+    public void TryRemove_StaleCallbackDoesNotRemoveReplacement()
     {
         using var serviceProvider = CreateServiceProvider();
         var registry = new CallbackRegistry();
         var firstCompletion = new TestResponseCompletionSource();
         var first = CreateCallback(registry, firstCompletion, CreateRequest(4), serviceProvider);
         Assert.True(registry.TryRegister(first));
-        first.OnTimeout();
+        Assert.True(registry.TryRemove(first));
 
         var replacementCompletion = new TestResponseCompletionSource();
         var replacement = CreateCallback(registry, replacementCompletion, CreateRequest(4), serviceProvider);
         Assert.True(registry.TryRegister(replacement));
-        var staleResponse = CreateResponse(first.Message, first);
+        first.OnTimeout();
 
-        Assert.False(registry.TryCompleteResponse(staleResponse));
         Assert.Equal(1, registry.Count);
-        Assert.True(registry.TryCompleteResponse(CreateResponse(replacement.Message, responseTarget: null)));
+        Assert.True(registry.TryCompleteResponse(CreateResponse(replacement.Message)));
 
         Assert.IsType<TimeoutException>(firstCompletion.Response.Exception);
         Assert.Same(Response.Completed, replacementCompletion.Response);
@@ -127,7 +109,7 @@ public class CallbackRegistryTests
         var completion = new TestResponseCompletionSource();
         var callback = CreateCallback(registry, completion, CreateRequest(5), serviceProvider);
         Assert.True(registry.TryRegister(callback));
-        var response = CreateResponse(callback.Message, callback);
+        var response = CreateResponse(callback.Message);
 
         Parallel.Invoke(
             () => CompleteTerminal(callback, race),
@@ -147,7 +129,7 @@ public class CallbackRegistryTests
         var callback = CreateCallback(registry, completion, CreateRequest(6), serviceProvider);
         Assert.True(registry.TryRegister(callback));
         callback.SubscribeForCancellation(cancellation.Token);
-        var response = CreateResponse(callback.Message, callback);
+        var response = CreateResponse(callback.Message);
 
         Parallel.Invoke(
             cancellation.Cancel,
@@ -155,6 +137,97 @@ public class CallbackRegistryTests
 
         Assert.Equal(1, completion.CompletionCount);
         Assert.Equal(0, registry.Count);
+    }
+
+    [Theory]
+    [InlineData(TerminalRace.Timeout)]
+    [InlineData(TerminalRace.TargetFailure)]
+    [InlineData(TerminalRace.Shutdown)]
+    public void TryCompleteResponse_TerminalRaceStress_CompletesEveryCallbackExactlyOnce(TerminalRace race)
+    {
+        const int count = 1_000;
+        using var serviceProvider = CreateServiceProvider();
+        using var barrier = new Barrier(2);
+        var registry = new CallbackRegistry();
+        var completions = new TestResponseCompletionSource[count];
+        var callbacks = new CallbackData[count];
+        var responses = new Message[count];
+        for (var index = 0; index < count; index++)
+        {
+            completions[index] = new TestResponseCompletionSource();
+            callbacks[index] = CreateCallback(registry, completions[index], CreateRequest(1_000 + index), serviceProvider);
+            Assert.True(registry.TryRegister(callbacks[index]));
+            responses[index] = CreateResponse(callbacks[index].Message);
+        }
+
+        Parallel.Invoke(
+            () =>
+            {
+                for (var index = 0; index < count; index++)
+                {
+                    barrier.SignalAndWait();
+                    CompleteTerminal(callbacks[index], race);
+                }
+            },
+            () =>
+            {
+                for (var index = 0; index < count; index++)
+                {
+                    barrier.SignalAndWait();
+                    registry.TryCompleteResponse(responses[index]);
+                }
+            });
+
+        Assert.All(completions, completion => Assert.Equal(1, completion.CompletionCount));
+        Assert.Equal(0, registry.Count);
+    }
+
+    [Fact]
+    public void TryCompleteResponse_CancellationRaceStress_CompletesEveryCallbackExactlyOnce()
+    {
+        const int count = 1_000;
+        using var serviceProvider = CreateServiceProvider();
+        using var barrier = new Barrier(2);
+        var registry = new CallbackRegistry();
+        var cancellations = new CancellationTokenSource[count];
+        var completions = new TestResponseCompletionSource[count];
+        var callbacks = new CallbackData[count];
+        var responses = new Message[count];
+        for (var index = 0; index < count; index++)
+        {
+            cancellations[index] = new CancellationTokenSource();
+            completions[index] = new TestResponseCompletionSource();
+            callbacks[index] = CreateCallback(registry, completions[index], CreateRequest(10_000 + index), serviceProvider);
+            Assert.True(registry.TryRegister(callbacks[index]));
+            callbacks[index].SubscribeForCancellation(cancellations[index].Token);
+            responses[index] = CreateResponse(callbacks[index].Message);
+        }
+
+        Parallel.Invoke(
+            () =>
+            {
+                for (var index = 0; index < count; index++)
+                {
+                    barrier.SignalAndWait();
+                    cancellations[index].Cancel();
+                }
+            },
+            () =>
+            {
+                for (var index = 0; index < count; index++)
+                {
+                    barrier.SignalAndWait();
+                    registry.TryCompleteResponse(responses[index]);
+                }
+            });
+
+        Assert.All(completions, completion => Assert.Equal(1, completion.CompletionCount));
+        Assert.Equal(0, registry.Count);
+
+        foreach (var cancellation in cancellations)
+        {
+            cancellation.Dispose();
+        }
     }
 
     [Fact]
@@ -238,7 +311,7 @@ public class CallbackRegistryTests
         TargetGrain = GrainId.Create("callback-target", "1"),
     };
 
-    private static Message CreateResponse(Message request, CallbackData? responseTarget) => new()
+    private static Message CreateResponse(Message request) => new()
     {
         Direction = Message.Directions.Response,
         Result = Message.ResponseTypes.Success,
@@ -246,7 +319,6 @@ public class CallbackRegistryTests
         TargetGrain = request.SendingGrain,
         SendingGrain = request.TargetGrain,
         BodyObject = Response.Completed,
-        ResponseTarget = responseTarget,
     };
 
     private static ServiceProvider CreateServiceProvider()

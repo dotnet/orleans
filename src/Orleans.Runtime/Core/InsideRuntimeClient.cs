@@ -203,7 +203,6 @@ namespace Orleans.Runtime
                     return;
                 }
 
-                message.ResponseTarget = callbackData;
                 callbackData.SubscribeForCancellation(cancellationToken);
             }
             else
