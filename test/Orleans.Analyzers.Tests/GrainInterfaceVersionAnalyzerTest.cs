@@ -2776,8 +2776,15 @@ interface Outer.IInnerGrain [Version(1)]
         => VerifyDotNetFormatCreatesMissingContractsFileAsync(
             Path.Combine("contracts", "CustomContracts.txt"));
 
+    [Fact]
+    public Task DotNetFormat_CreatesMissingContractsFileUsingRepositoryBuildTargets()
+        => VerifyDotNetFormatCreatesMissingContractsFileAsync(
+            configuredContractsPath: null,
+            useRepositoryBuildTargets: true);
+
     private static async Task VerifyDotNetFormatCreatesMissingContractsFileAsync(
-        string? configuredContractsPath)
+        string? configuredContractsPath,
+        bool useRepositoryBuildTargets = false)
     {
         var repositoryRoot = GetRepositoryRoot();
         var tempDirectory = Path.Combine(
@@ -2799,12 +2806,14 @@ interface Outer.IInnerGrain [Version(1)]
                 "Orleans.Analyzers",
                 "build",
                 "Microsoft.Orleans.Analyzers.props");
-            var targetsPath = Path.Combine(
-                repositoryRoot,
-                "src",
-                "Orleans.Analyzers",
-                "build",
-                "Microsoft.Orleans.Analyzers.targets");
+            var targetsPath = useRepositoryBuildTargets
+                ? Path.Combine(repositoryRoot, "src", "Directory.Build.targets")
+                : Path.Combine(
+                    repositoryRoot,
+                    "src",
+                    "Orleans.Analyzers",
+                    "build",
+                    "Microsoft.Orleans.Analyzers.targets");
             var configuredPathProperty = configuredContractsPath is null
                 ? string.Empty
                 : $"    <OrleansContractsPath>$(MSBuildProjectDirectory)\\{configuredContractsPath}</OrleansContractsPath>{Environment.NewLine}";
@@ -2838,12 +2847,21 @@ interface Outer.IInnerGrain [Version(1)]
                 """,
                 TestContext.Current.CancellationToken);
 
-            var restore = await RunDotNetAsync(tempDirectory, "restore", projectPath, "--nologo");
+            var restore = await RunDotNetAsync(repositoryRoot, "restore", projectPath, "--nologo");
             Assert.True(restore.ExitCode == 0, restore.Output);
             Assert.False(File.Exists(contractsPath));
 
+            var missingManifestBuild = await RunDotNetAsync(
+                repositoryRoot,
+                "build",
+                projectPath,
+                "--no-restore",
+                "--nologo");
+            Assert.True(missingManifestBuild.ExitCode == 0, missingManifestBuild.Output);
+            Assert.False(File.Exists(contractsPath));
+
             var format = await RunDotNetAsync(
-                tempDirectory,
+                repositoryRoot,
                 "format",
                 projectPath,
                 "analyzers",
@@ -2870,7 +2888,7 @@ interface Outer.IInnerGrain [Version(1)]
                 content);
 
             var build = await RunDotNetAsync(
-                tempDirectory,
+                repositoryRoot,
                 "build",
                 projectPath,
                 "--no-restore",

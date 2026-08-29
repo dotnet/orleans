@@ -2,7 +2,8 @@
   <ItemGroup Condition="'$(EnableOrleansContractsAnalyzer)' == 'true'">
     <AdditionalFiles Include="$(OrleansContractsPath)"
                      OrleansContractsFile="true"
-                     OrleansContractsFileExists="false" />
+                     OrleansContractsFileExists="false"
+                     Condition="'$(DesignTimeBuild)' == 'true' or Exists('$(OrleansContractsPath)')" />
     <AdditionalFiles Update="$(OrleansContractsPath)"
                      OrleansContractsFileExists="true"
                      Condition="Exists('$(OrleansContractsPath)')" />

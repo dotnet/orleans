@@ -10,9 +10,16 @@
     <CompilerVisibleProperty Include="OrleansContractsPath" />
   </ItemGroup>
 
-  <ItemGroup Condition="'$(EnableOrleansContractsAnalyzer)' == 'true' and Exists('$(OrleansContractsPath)')">
-    <AdditionalFiles Include="$(OrleansContractsPath)" OrleansContractsFile="true" />
+  <ItemGroup Condition="'$(EnableOrleansContractsAnalyzer)' == 'true'">
+    <AdditionalFiles Include="$(OrleansContractsPath)"
+                     OrleansContractsFile="true"
+                     OrleansContractsFileExists="false"
+                     Condition="'$(DesignTimeBuild)' == 'true' or Exists('$(OrleansContractsPath)')" />
+    <AdditionalFiles Update="$(OrleansContractsPath)"
+                     OrleansContractsFileExists="true"
+                     Condition="Exists('$(OrleansContractsPath)')" />
     <CompilerVisibleItemMetadata Include="AdditionalFiles" MetadataName="OrleansContractsFile" />
+    <CompilerVisibleItemMetadata Include="AdditionalFiles" MetadataName="OrleansContractsFileExists" />
   </ItemGroup>
 
   <ItemGroup Condition="'$(IsPackable)'=='true' and '$(SourceLinkCreate)'=='true' and '$(IncludeBuildOutput)'=='true'">
