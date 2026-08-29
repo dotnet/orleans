@@ -85,7 +85,8 @@ public class GrainDirectoryCacheBenchmark
     public GrainAddress SharedHandle()
     {
         _entryHandle.TryGetTarget(out var entry);
-        return entry!.Address;
+        entry!.TryTouch();
+        return entry.Address;
     }
 
     [GlobalCleanup]
