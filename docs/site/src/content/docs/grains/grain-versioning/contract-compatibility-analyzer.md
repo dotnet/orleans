@@ -30,7 +30,7 @@ This also promotes informational diagnostics such as `ORLEANS0020`. Configure `d
 
 ## Configure the manifest path
 
-By default, the analyzer tracks `OrleansContracts.txt` beside the project file. The analyzer package registers the configured path as a compiler `AdditionalFile`, including before the file exists, so no explicit `AdditionalFiles` item or seed file is required.
+By default, the analyzer tracks `OrleansContracts.txt` beside the project file. During design-time builds used by IDEs and `dotnet format`, the analyzer package registers the configured path as a compiler `AdditionalFile` before the file exists, allowing regeneration to create it. Regular builds register an existing manifest and report `ORLEANS0020` when the configured manifest is absent. No explicit `AdditionalFiles` item or seed file is required.
 
 Set `OrleansContractsPath` to use another location or filename:
 
