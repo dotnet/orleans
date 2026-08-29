@@ -212,8 +212,7 @@ internal sealed partial class ActivationData :
         }
     }
 
-    // Running requests are only added, removed, and observed by the activation scheduler.
-    public bool IsCurrentlyExecuting => _requestTracker is { RunningCount: > 0 };
+    public bool IsCurrentlyExecuting => GetRunningCount(Volatile.Read(ref _requestStatus)) > 0;
 
     internal (int WaitingCount, bool IsInactive) GetRequestStatus()
     {
@@ -585,6 +584,8 @@ internal sealed partial class ActivationData :
         => Volatile.Write(ref _requestStatus, ((long)requestTracker.RunningCount << 32) | (uint)requestTracker.WaitingCount);
 
     private static int GetWaitingCount(long status) => (int)(uint)status;
+
+    private static int GetRunningCount(long status) => (int)(status >> 32);
 
     /// <summary>
     /// Returns how long this activation has been idle.
