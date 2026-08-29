@@ -788,9 +788,7 @@ public class GrainInterfaceVersionCodeFix : CodeFixProvider
                     cancellationToken).ConfigureAwait(false);
             }
 
-            var projects = GetProjectsToRegenerate(solution)
-                .Where(project => project.Language == LanguageNames.CSharp
-                    && IsContractsAnalyzerEnabled(project))
+            var projects = (await GetProjectsToRegenerateAsync(solution, cancellationToken).ConfigureAwait(false))
                 .OrderBy(project => project.FilePath ?? project.Name, StringComparer.Ordinal)
                 .ToArray();
             if (projects.Length == 0)
@@ -844,7 +842,9 @@ public class GrainInterfaceVersionCodeFix : CodeFixProvider
             out var value)
             && string.Equals(value, "true", StringComparison.OrdinalIgnoreCase);
 
-    private static IEnumerable<Project> GetProjectsToRegenerate(Solution solution)
+    private static async Task<ImmutableArray<Project>> GetProjectsToRegenerateAsync(
+        Solution solution,
+        CancellationToken cancellationToken)
     {
         var projects = solution.Projects.ToArray();
         var dependents = new Dictionary<ProjectId, List<ProjectId>>();
@@ -890,38 +890,41 @@ public class GrainInterfaceVersionCodeFix : CodeFixProvider
             }
         }
 
+        var result = ImmutableArray.CreateBuilder<Project>();
         foreach (var project in projects)
         {
-            if (orleansReachableProjects.Contains(project.Id)
-                || HasExistingContractsManifest(project))
+            if (project.Language != LanguageNames.CSharp || !IsContractsAnalyzerEnabled(project))
             {
-                yield return project;
+                continue;
+            }
+
+            if (orleansReachableProjects.Contains(project.Id)
+                || await HasExistingContractsManifestAsync(project, cancellationToken).ConfigureAwait(false))
+            {
+                result.Add(project);
             }
         }
+
+        return result.ToImmutable();
     }
 
-    private static bool HasExistingContractsManifest(Project project)
+    private static async Task<bool> HasExistingContractsManifestAsync(
+        Project project,
+        CancellationToken cancellationToken)
     {
-        if (FindContractsDocument(project) is { } document
-            && document.TryGetText(out var text)
-            && text.Length > 0)
-        {
-            return true;
-        }
-
         var configuredPath = GetConfiguredContractsPath(project);
         foreach (var additionalFile in project.AnalyzerOptions.AdditionalFiles)
         {
             if (PathsEqual(additionalFile.Path, configuredPath)
                 && project.AnalyzerOptions.AnalyzerConfigOptionsProvider.GetOptions(additionalFile)
-                    .TryGetValue(OrleansContractsFileExistsMetadata, out var value)
-                && string.Equals(value, "true", StringComparison.OrdinalIgnoreCase))
+                    .TryGetValue(OrleansContractsFileExistsMetadata, out var value))
             {
-                return true;
+                return string.Equals(value, "true", StringComparison.OrdinalIgnoreCase);
             }
         }
 
-        return false;
+        return FindContractsDocument(project) is { } document
+            && (await document.GetTextAsync(cancellationToken).ConfigureAwait(false)).Length > 0;
     }
 
     private static bool IsOrleansCoreAbstractionsReference(MetadataReference reference)

@@ -2669,13 +2669,7 @@ interface Outer.IInnerGrain [Version(1)]
                 OrleansContractsFileName,
                 SourceText.From("interface OldGrain [Version(1)]\n"),
                 filePath: contractsPath);
-        solution = AddContractsAnalyzerConfig(
-            solution,
-            projectId,
-            contractsPath,
-            contractsFileExists: true);
-        _ = await solution.GetAdditionalDocument(contractsDocumentId)!
-            .GetTextAsync(TestContext.Current.CancellationToken);
+        solution = AddContractsAnalyzerConfig(solution, projectId, contractsPath);
 
         var changedSolution = await ApplySolutionFixAllAsync(
             solution.GetProject(projectId)!,
