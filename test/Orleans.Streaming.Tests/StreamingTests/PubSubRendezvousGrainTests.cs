@@ -111,6 +111,7 @@ namespace UnitTests.StreamingTests
         [Fact, TestCategory("BVT"), TestCategory("Streaming"), TestCategory("PubSub")]
         public async Task RegisterProducer_RemovesPersistedPullingAgentFromDefunctSilo()
         {
+            var cancellationToken = TestContext.Current.CancellationToken;
             var streamId = new QualifiedStreamId("ProviderName", StreamId.Create("StreamNamespace", Guid.NewGuid()));
             var pubSubGrain = this.fixture.GrainFactory.GetGrain<IPubSubRendezvousGrain>(streamId.ToString());
             var primarySilo = this.fixture.HostedCluster.Primary!;
@@ -133,7 +134,7 @@ namespace UnitTests.StreamingTests
                 restartedSilo.SiloAddress,
                 "ProviderName_1_test-queue").GrainId;
 
-            await pubSubGrain.RegisterProducer(streamId, staleProducer, new MembershipVersion(1));
+            await pubSubGrain.RegisterProducer(streamId, staleProducer, new MembershipVersion(1), cancellationToken);
             Assert.Equal(1, await pubSubGrain.ProducerCount(streamId));
 
             var replacementSilo = await this.fixture.HostedCluster.RestartSiloAsync(restartedSilo);
@@ -144,7 +145,7 @@ namespace UnitTests.StreamingTests
                 replacementSilo.SiloAddress,
                 "ProviderName_1_test-queue").GrainId;
 
-            await pubSubGrain.RegisterProducer(streamId, replacementProducer, new MembershipVersion(1));
+            await pubSubGrain.RegisterProducer(streamId, replacementProducer, new MembershipVersion(1), cancellationToken);
 
             Assert.Equal(1, await pubSubGrain.ProducerCount(streamId));
             await managementGrain.ForceActivationCollection(TimeSpan.Zero);
@@ -156,6 +157,7 @@ namespace UnitTests.StreamingTests
         [Fact, TestCategory("BVT"), TestCategory("Streaming"), TestCategory("PubSub")]
         public async Task RegisterProducer_DoesNotRestorePullingAgentFromDefunctSilo()
         {
+            var cancellationToken = TestContext.Current.CancellationToken;
             var streamId = new QualifiedStreamId("ProviderName", StreamId.Create("StreamNamespace", Guid.NewGuid()));
             var pubSubGrain = this.fixture.GrainFactory.GetGrain<IPubSubRendezvousGrain>(streamId.ToString());
             Assert.Equal(0, await pubSubGrain.ProducerCount(streamId));
@@ -172,8 +174,9 @@ namespace UnitTests.StreamingTests
                 activeSilo,
                 "ProviderName_1_test-queue").GrainId;
 
-            await pubSubGrain.RegisterProducer(streamId, replacementProducer);
-            await Assert.ThrowsAsync<OrleansException>(() => pubSubGrain.RegisterProducer(streamId, defunctProducer));
+            await pubSubGrain.RegisterProducer(streamId, replacementProducer, cancellationToken: cancellationToken);
+            await Assert.ThrowsAsync<OrleansException>(
+                () => pubSubGrain.RegisterProducer(streamId, defunctProducer, cancellationToken: cancellationToken));
 
             Assert.Equal(1, await pubSubGrain.ProducerCount(streamId));
             await managementGrain.ForceActivationCollection(TimeSpan.Zero);
@@ -203,6 +206,7 @@ namespace UnitTests.StreamingTests
         [Fact, TestCategory("BVT"), TestCategory("Streaming"), TestCategory("PubSub")]
         public async Task UnversionedReplacementRecomputesVersionedPublisherFromPostRefreshSnapshot()
         {
+            var cancellationToken = TestContext.Current.CancellationToken;
             var staleSilo = SiloAddress.New(new IPEndPoint(IPAddress.Loopback, 11111), 1);
             var replacementSilo = SiloAddress.New(new IPEndPoint(IPAddress.Loopback, 11111), 2);
             var staleSnapshot = new ClusterMembershipSnapshot(
@@ -231,7 +235,7 @@ namespace UnitTests.StreamingTests
                 {
                     Assert.Same(staleSnapshot, snapshot);
                     Assert.Equal([replacementSilo], unversionedSilos);
-                    Assert.Equal(CancellationToken.None, cancellationToken);
+                    Assert.Equal(TestContext.Current.CancellationToken, cancellationToken);
                     return ValueTask.FromResult(
                         new UnknownSiloStatusCache.SiloStatusValidationResult(
                             new Dictionary<SiloAddress, SiloStatus>
@@ -240,7 +244,7 @@ namespace UnitTests.StreamingTests
                             },
                             freshSnapshot));
                 },
-                CancellationToken.None);
+                cancellationToken);
 
             Assert.Equal(SiloStatus.Dead, statuses[staleSilo]);
             Assert.Equal(SiloStatus.Active, statuses[replacementSilo]);
@@ -254,14 +258,15 @@ namespace UnitTests.StreamingTests
         [Fact(Skip = "This test fails because the producer must be grain reference which is not implied by the IStreamProducerExtension"), TestCategory("BVT"), TestCategory("Streaming"), TestCategory("PubSub")]
         public async Task RegisterProducerFaultTest()
         {
+            var cancellationToken = TestContext.Current.CancellationToken;
             this.fixture.Logger.LogInformation("************************ RegisterProducerFaultTest *********************************");
             var streamId = new QualifiedStreamId("ProviderName", StreamId.Create("StreamNamespace", Guid.NewGuid()));
             var pubSubGrain = this.fixture.GrainFactory.GetGrain<IPubSubRendezvousGrain>(streamId.ToString());
             var faultGrain = this.fixture.GrainFactory.GetGrain<IStorageFaultGrain>(nameof(PubSubRendezvousGrain));
 
             // clean call, to make sure everything is happy and pubsub has state.
-            await pubSubGrain.RegisterProducer(streamId, default, TestContext.Current.CancellationToken);
-            int producers = await pubSubGrain.ProducerCount(streamId, TestContext.Current.CancellationToken);
+            await pubSubGrain.RegisterProducer(streamId, default, cancellationToken: cancellationToken);
+            int producers = await pubSubGrain.ProducerCount(streamId, cancellationToken);
             Assert.Equal(1, producers);
 
             // inject fault
@@ -269,11 +274,11 @@ namespace UnitTests.StreamingTests
 
             // expect exception when registering a new producer
             await Assert.ThrowsAsync<OrleansException>(
-                    () => pubSubGrain.RegisterProducer(streamId, default, TestContext.Current.CancellationToken));
+                    () => pubSubGrain.RegisterProducer(streamId, default, cancellationToken: cancellationToken));
 
             // pubsub grain should recover and still function
-            await pubSubGrain.RegisterProducer(streamId, default, TestContext.Current.CancellationToken);
-            producers = await pubSubGrain.ProducerCount(streamId, TestContext.Current.CancellationToken);
+            await pubSubGrain.RegisterProducer(streamId, default, cancellationToken: cancellationToken);
+            producers = await pubSubGrain.ProducerCount(streamId, cancellationToken);
             Assert.Equal(2, producers);
         }
 
@@ -284,6 +289,7 @@ namespace UnitTests.StreamingTests
         [Fact(Skip = "This test fails because the producer must be grain reference which is not implied by the IStreamProducerExtension"), TestCategory("BVT"), TestCategory("Streaming"), TestCategory("PubSub")]
         public async Task UnregisterProducerFaultTest()
         {
+            var cancellationToken = TestContext.Current.CancellationToken;
             this.fixture.Logger.LogInformation("************************ UnregisterProducerFaultTest *********************************");
             var streamId = new QualifiedStreamId("ProviderName", StreamId.Create("StreamNamespace", Guid.NewGuid()));
             var pubSubGrain = this.fixture.GrainFactory.GetGrain<IPubSubRendezvousGrain>(streamId.ToString());
@@ -292,9 +298,15 @@ namespace UnitTests.StreamingTests
             IStreamProducerExtension firstProducer = new DummyStreamProducerExtension();
             IStreamProducerExtension secondProducer = new DummyStreamProducerExtension();
             // Add two producers so when we remove the first it does a storage write, not a storage clear.
-            await pubSubGrain.RegisterProducer(streamId, firstProducer.GetGrainId(), TestContext.Current.CancellationToken);
-            await pubSubGrain.RegisterProducer(streamId, secondProducer.GetGrainId(), TestContext.Current.CancellationToken);
-            int producers = await pubSubGrain.ProducerCount(streamId, TestContext.Current.CancellationToken);
+            await pubSubGrain.RegisterProducer(
+                streamId,
+                firstProducer.GetGrainId(),
+                cancellationToken: cancellationToken);
+            await pubSubGrain.RegisterProducer(
+                streamId,
+                secondProducer.GetGrainId(),
+                cancellationToken: cancellationToken);
+            int producers = await pubSubGrain.ProducerCount(streamId, cancellationToken);
             Assert.Equal(2, producers);
 
             // inject fault

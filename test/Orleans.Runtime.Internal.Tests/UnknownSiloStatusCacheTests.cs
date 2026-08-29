@@ -36,6 +36,7 @@ public class UnknownSiloStatusCacheTests
     [Fact]
     public async Task ConcurrentValidationsShareOneQualifyingFreshRead()
     {
+        var cancellationToken = TestContext.Current.CancellationToken;
         var membershipManager = new TestMembershipManager(CreateMembershipTableSnapshot(1))
         {
             AutoCompleteRefreshes = false,
@@ -64,7 +65,7 @@ public class UnknownSiloStatusCacheTests
         Assert.Equal(2, membershipManager.SourceRefreshCount);
         sharedRefresh.Completion.TrySetResult();
 
-        var results = await Task.WhenAll(concurrentValidations).WaitAsync(TimeSpan.FromSeconds(30));
+        var results = await Task.WhenAll(concurrentValidations).WaitAsync(TimeSpan.FromSeconds(30), cancellationToken);
         Assert.All(results, statuses => Assert.Equal(SiloStatus.Dead, statuses[sharedSilo]));
         Assert.Equal(SiloStatus.Dead, (await olderValidation)[firstSilo]);
         Assert.Equal(2, membershipManager.SourceRefreshCount);

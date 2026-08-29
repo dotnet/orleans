@@ -1483,6 +1483,7 @@ namespace NonSilo.Tests.Membership
         [Fact]
         public async Task MembershipTableManager_RequireFreshStartsNewReadWhileRefreshInFlight()
         {
+            var cancellationToken = TestContext.Current.CancellationToken;
             var membershipTable = new InMemoryMembershipTable();
             var manager = CreateMembershipTableManager(membershipTable);
             var firstReadStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -1500,8 +1501,10 @@ namespace NonSilo.Tests.Membership
                 }
             };
 
-            var inFlightRefresh = Task.Run(() => manager.Refresh());
-            await firstReadStarted.Task.WaitAsync(TimeSpan.FromSeconds(30));
+            var inFlightRefresh = Task.Run(
+                () => manager.Refresh(cancellationToken: cancellationToken),
+                cancellationToken);
+            await firstReadStarted.Task.WaitAsync(TimeSpan.FromSeconds(30), cancellationToken);
             var causalRefresh = ((IMembershipManager)manager).Refresh(
                 targetVersion: null,
                 cancellationToken: CancellationToken.None,
@@ -1509,7 +1512,7 @@ namespace NonSilo.Tests.Membership
 
             try
             {
-                await causalRefresh.WaitAsync(TimeSpan.FromSeconds(30));
+                await causalRefresh.WaitAsync(TimeSpan.FromSeconds(30), cancellationToken);
                 Assert.Equal(2, readCount);
             }
             finally
@@ -1541,12 +1544,13 @@ namespace NonSilo.Tests.Membership
         [Fact]
         public async Task MembershipTableManager_ShutdownFreshRefreshDoesNotRead()
         {
+            var cancellationToken = TestContext.Current.CancellationToken;
             var membershipTable = new InMemoryMembershipTable();
             var lifecycle = new SiloLifecycleSubject(this.loggerFactory.CreateLogger<SiloLifecycleSubject>());
             using var manager = CreateMembershipTableManager(membershipTable, lifecycle);
             ((ILifecycleParticipant<ISiloLifecycle>)manager).Participate(lifecycle);
-            await lifecycle.OnStart();
-            await lifecycle.OnStop();
+            await lifecycle.OnStart(cancellationToken);
+            await lifecycle.OnStop(cancellationToken);
             var readCount = 0;
             membershipTable.OnReadAll = () => Interlocked.Increment(ref readCount);
 
