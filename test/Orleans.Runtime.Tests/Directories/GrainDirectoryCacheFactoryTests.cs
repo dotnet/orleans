@@ -831,11 +831,9 @@ public class GrainDirectoryCacheFactoryTests
     [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.NoInlining)]
     private static void AssertEventuallyCollected(WeakReference<IGrainContext> targetReference)
     {
-        for (var attempt = 0; attempt < 3; attempt++)
+        for (var attempt = 0; attempt < 5; attempt++)
         {
-            GC.Collect();
-            GC.WaitForPendingFinalizers();
-            GC.Collect();
+            ForceFullCollection();
 
             if (!targetReference.TryGetTarget(out _))
             {
@@ -849,11 +847,9 @@ public class GrainDirectoryCacheFactoryTests
     [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.NoInlining)]
     private static void AssertEventuallyCollected(WeakReference<GrainDirectoryCacheEntry> entryReference)
     {
-        for (var attempt = 0; attempt < 3; attempt++)
+        for (var attempt = 0; attempt < 5; attempt++)
         {
-            GC.Collect();
-            GC.WaitForPendingFinalizers();
-            GC.Collect();
+            ForceFullCollection();
 
             if (!entryReference.TryGetTarget(out _))
             {
@@ -880,12 +876,17 @@ public class GrainDirectoryCacheFactoryTests
 
     private static void CollectGarbage()
     {
-        for (var attempt = 0; attempt < 3; attempt++)
+        for (var attempt = 0; attempt < 5; attempt++)
         {
-            GC.Collect();
-            GC.WaitForPendingFinalizers();
-            GC.Collect();
+            ForceFullCollection();
         }
+    }
+
+    private static void ForceFullCollection()
+    {
+        GC.Collect(GC.MaxGeneration, GCCollectionMode.Forced, blocking: true, compacting: true);
+        GC.WaitForPendingFinalizers();
+        GC.Collect(GC.MaxGeneration, GCCollectionMode.Forced, blocking: true, compacting: true);
     }
 
     private static GrainId CreateGrainId() => GrainId.Parse($"user/{Guid.NewGuid():N}");

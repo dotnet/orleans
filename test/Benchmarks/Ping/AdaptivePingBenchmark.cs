@@ -353,7 +353,7 @@ public class AdaptivePingBenchmark : IDisposable
                 Console.WriteLine(
                     $"{benchmark.Description}, concurrency {concurrency}: "
                     + $"P50 {result.P50Throughput:N0}/s, P95 {result.P95Throughput:N0}/s, "
-                    + $"latency {result.LatencyP50Microseconds:N1}/{result.LatencyP95Microseconds:N1}/{result.LatencyP99Microseconds:N1} us");
+                    + $"first-completion sample {result.LatencyP50Microseconds:N1}/{result.LatencyP95Microseconds:N1}/{result.LatencyP99Microseconds:N1} us");
             }
         }
         finally
@@ -369,7 +369,7 @@ public class AdaptivePingBenchmark : IDisposable
         Console.WriteLine();
         Console.WriteLine("## Deterministic Ping Benchmark Results");
         Console.WriteLine();
-        Console.WriteLine("| Scenario | Concurrency | P50 throughput | P95 throughput | P99 throughput | Latency P50/P95/P99 (us) | B/request | Gen0/M requests | CPU | Contentions/M requests |");
+        Console.WriteLine("| Scenario | Concurrency | P50 throughput | P95 throughput | P99 throughput | First-completion sample P50/P95/P99 (us) | B/request | Gen0/M requests | CPU | Contentions/M requests |");
         Console.WriteLine("|----------|------------:|---------------:|---------------:|---------------:|-------------------------:|----------:|----------------:|----:|-----------------------:|");
         foreach (var result in results)
         {
