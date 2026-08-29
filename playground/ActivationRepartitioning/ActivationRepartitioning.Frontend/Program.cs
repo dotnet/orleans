@@ -97,7 +97,7 @@ public class LoaderGrain : Grain, ILoaderGrain
     {
         ++_resetCount;
         _numForests = 0;
-        await ServiceProvider.GetRequiredService<ClusterDiagnosticsService>().ResetAsync();
+        await ServiceProvider!.GetRequiredService<ClusterDiagnosticsService>().ResetAsync();
         await GrainFactory.GetGrain<IManagementGrain>(0).ResetGrainCallFrequencies();
     }
 

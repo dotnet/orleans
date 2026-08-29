@@ -59,8 +59,9 @@ namespace UnitTests.Grains
             IMessageSerializationGrain otherGrain;
             var id = this.GetPrimaryKeyLong();
             var currentSiloIdentity = await this.GetSiloIdentity();
-            var silos = ServiceProvider.GetRequiredService<IClusterMembershipService>().CurrentSnapshot.Members.Where(kv => kv.Value.Status == SiloStatus.Active).Select(kv => kv.Key).ToHashSet();
-            silos.Remove(ServiceProvider.GetRequiredService<ILocalSiloDetails>().SiloAddress);
+            var serviceProvider = ServiceProvider!;
+            var silos = serviceProvider.GetRequiredService<IClusterMembershipService>().CurrentSnapshot.Members.Where(kv => kv.Value.Status == SiloStatus.Active).Select(kv => kv.Key).ToHashSet();
+            silos.Remove(serviceProvider.GetRequiredService<ILocalSiloDetails>().SiloAddress);
             while (true)
             {
                 RequestContext.Set(IPlacementDirector.PlacementHintKey, silos.First());

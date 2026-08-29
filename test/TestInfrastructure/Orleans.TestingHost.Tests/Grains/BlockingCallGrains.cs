@@ -48,7 +48,7 @@ namespace Orleans.TestingHost.Tests.Grains
             => GetState(key).Entered.WaitAsync(timeout, cancellationToken);
 
         public Task<string> GetSiloIdentity() =>
-            Task.FromResult(this.ServiceProvider.GetRequiredService<ILocalSiloDetails>().SiloAddress.ToString());
+            Task.FromResult(ServiceProvider!.GetRequiredService<ILocalSiloDetails>().SiloAddress.ToString());
 
         public Task BlockUntilReleased()
         {
@@ -87,7 +87,7 @@ namespace Orleans.TestingHost.Tests.Grains
     public class LauncherGrain : Grain, ILauncherGrain
     {
         public Task<string> GetSiloIdentity() =>
-            Task.FromResult(this.ServiceProvider.GetRequiredService<ILocalSiloDetails>().SiloAddress.ToString());
+            Task.FromResult(ServiceProvider!.GetRequiredService<ILocalSiloDetails>().SiloAddress.ToString());
 
         public Task StartBlockingCall(ILocalWorkerGrain worker, IRemoteBlockerGrain remote)
         {

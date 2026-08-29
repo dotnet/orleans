@@ -252,7 +252,7 @@ namespace UnitTests.Grains
     {
         public Task<PlacementStrategy> GetDefaultPlacement()
         {
-            var defaultStrategy = this.ServiceProvider.GetRequiredService<PlacementStrategy>();
+            var defaultStrategy = ServiceProvider!.GetRequiredService<PlacementStrategy>();
             return Task.FromResult(defaultStrategy);
         }
     }

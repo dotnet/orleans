@@ -204,7 +204,7 @@ namespace UnitTests.Grains
             return Task.FromResult(_id);
         }
 
-        public Task<SiloAddress> GetSiloAddress() => Task.FromResult(ServiceProvider.GetRequiredService<ILocalSiloDetails>().SiloAddress);
+        public Task<SiloAddress> GetSiloAddress() => Task.FromResult(ServiceProvider!.GetRequiredService<ILocalSiloDetails>().SiloAddress);
     }
 
     internal class OneWayGrain : Grain, IOneWayGrain, ISimpleGrainObserver
@@ -219,8 +219,8 @@ namespace UnitTests.Grains
 
         public OneWayGrain(GrainLocator grainLocator) => this.grainLocator = grainLocator;
 
-        private ILocalGrainDirectory LocalGrainDirectory => this.ServiceProvider.GetRequiredService<ILocalGrainDirectory>();
-        private ILocalSiloDetails LocalSiloDetails => this.ServiceProvider.GetRequiredService<ILocalSiloDetails>();
+        private ILocalGrainDirectory LocalGrainDirectory => ServiceProvider!.GetRequiredService<ILocalGrainDirectory>();
+        private ILocalSiloDetails LocalSiloDetails => ServiceProvider!.GetRequiredService<ILocalSiloDetails>();
 
         public Task Notify()
         {
@@ -264,7 +264,7 @@ namespace UnitTests.Grains
 
             async Task<IOneWayGrain> GetGrainOnOtherSilo()
             {
-                var silos = ServiceProvider.GetRequiredService<IClusterMembershipService>().CurrentSnapshot.Members.Where(kv => kv.Value.Status == SiloStatus.Active).Select(kv => kv.Key).ToHashSet();
+                var silos = ServiceProvider!.GetRequiredService<IClusterMembershipService>().CurrentSnapshot.Members.Where(kv => kv.Value.Status == SiloStatus.Active).Select(kv => kv.Key).ToHashSet();
                 var thisSilo = await this.GetSiloAddress();
                 silos.Remove(thisSilo);
                 while (true)

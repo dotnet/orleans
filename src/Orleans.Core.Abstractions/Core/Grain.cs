@@ -49,7 +49,7 @@ public abstract partial class Grain : IGrainBase, IAddressable
     /// <summary>
     /// Gets the IServiceProvider managed by the runtime. Null if this grain is not associated with a Runtime, such as when created directly for unit testing.
     /// </summary>
-    protected internal IServiceProvider ServiceProvider => GrainContext?.ActivationServices ?? RuntimeOrDefault?.ServiceProvider!;
+    protected internal IServiceProvider? ServiceProvider => GrainContext?.ActivationServices ?? RuntimeOrDefault?.ServiceProvider;
 
     internal GrainId GrainId => GrainContext.GrainId;
 

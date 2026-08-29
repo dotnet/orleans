@@ -1071,7 +1071,7 @@ namespace Orleans
 
         public string RuntimeIdentity { get { throw null; } }
 
-        protected internal System.IServiceProvider ServiceProvider { get { throw null; } }
+        protected internal System.IServiceProvider? ServiceProvider { get { throw null; } }
 
         protected void DeactivateOnIdle() { }
 

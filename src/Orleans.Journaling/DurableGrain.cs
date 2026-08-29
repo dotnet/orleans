@@ -12,7 +12,7 @@ public abstract class DurableGrain : Grain, IGrainBase
     /// </summary>
     protected DurableGrain()
     {
-        StateManager = ServiceProvider.GetRequiredService<IJournaledStateManager>();
+        StateManager = ServiceProvider!.GetRequiredService<IJournaledStateManager>();
         if (StateManager is ILifecycleParticipant<IGrainLifecycle> participant)
         {
             participant.Participate(((IGrainBase)this).GrainContext.ObservableLifecycle);
@@ -31,7 +31,7 @@ public abstract class DurableGrain : Grain, IGrainBase
     /// <param name="name">The name used to register the state.</param>
     /// <returns>The existing or newly created state.</returns>
     protected TState GetOrCreateState<TState>(string name) where TState : class, IJournaledState
-        => GetOrCreateState(name, static sp => sp.GetRequiredService<TState>(), ServiceProvider);
+        => GetOrCreateState(name, static sp => sp.GetRequiredService<TState>(), ServiceProvider!);
 
     /// <summary>
     /// Gets the registered state with the specified name or creates it using the supplied factory and argument.

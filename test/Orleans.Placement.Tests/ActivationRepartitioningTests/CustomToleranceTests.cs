@@ -185,13 +185,13 @@ public class CustomToleranceTests(CustomToleranceTests.Fixture fixture, ITestOut
         public Task<SiloAddress> GetAddress() => Task.FromResult(GrainContext.Address.SiloAddress!);
         public override Task OnActivateAsync(CancellationToken cancellationToken)
         {
-            ServiceProvider.GetRequiredService<ILogger<E>>().LogInformation("Activating {GrainId} on silo {SiloAddress}", this.GrainId, this.Runtime.SiloAddress);
+            ServiceProvider!.GetRequiredService<ILogger<E>>().LogInformation("Activating {GrainId} on silo {SiloAddress}", this.GrainId, this.Runtime.SiloAddress);
             return base.OnActivateAsync(cancellationToken);
         }
 
         public override Task OnDeactivateAsync(DeactivationReason reason, CancellationToken cancellationToken)
         {
-            ServiceProvider.GetRequiredService<ILogger<E>>().LogInformation("Deactivating {GrainId} on silo {SiloAddress}. Reason: {Reason}", this.GrainId, this.Runtime.SiloAddress, reason);
+            ServiceProvider!.GetRequiredService<ILogger<E>>().LogInformation("Deactivating {GrainId} on silo {SiloAddress}. Reason: {Reason}", this.GrainId, this.Runtime.SiloAddress, reason);
             return base.OnDeactivateAsync(reason, cancellationToken);
         }
     }
@@ -204,13 +204,13 @@ public class CustomToleranceTests(CustomToleranceTests.Fixture fixture, ITestOut
 
         public override Task OnActivateAsync(CancellationToken cancellationToken)
         {
-            ServiceProvider.GetRequiredService<ILogger<F>>().LogInformation("Activating {GrainId} on silo {SiloAddress}", this.GrainId, this.Runtime.SiloAddress);
+            ServiceProvider!.GetRequiredService<ILogger<F>>().LogInformation("Activating {GrainId} on silo {SiloAddress}", this.GrainId, this.Runtime.SiloAddress);
             return base.OnActivateAsync(cancellationToken);
         }
 
         public override Task OnDeactivateAsync(DeactivationReason reason, CancellationToken cancellationToken)
         {
-            ServiceProvider.GetRequiredService<ILogger<F>>().LogInformation("Deactivating {GrainId} on silo {SiloAddress}. Reason: {Reason}", this.GrainId, this.Runtime.SiloAddress, reason);
+            ServiceProvider!.GetRequiredService<ILogger<F>>().LogInformation("Deactivating {GrainId} on silo {SiloAddress}. Reason: {Reason}", this.GrainId, this.Runtime.SiloAddress, reason);
             return base.OnDeactivateAsync(reason, cancellationToken);
         }
     }
@@ -227,13 +227,13 @@ public class CustomToleranceTests(CustomToleranceTests.Fixture fixture, ITestOut
 
         public override Task OnActivateAsync(CancellationToken cancellationToken)
         {
-            ServiceProvider.GetRequiredService<ILogger<X>>().LogInformation("Activating {GrainId} on silo {SiloAddress}", this.GrainId, this.Runtime.SiloAddress);
+            ServiceProvider!.GetRequiredService<ILogger<X>>().LogInformation("Activating {GrainId} on silo {SiloAddress}", this.GrainId, this.Runtime.SiloAddress);
             return base.OnActivateAsync(cancellationToken);
         }
 
         public override Task OnDeactivateAsync(DeactivationReason reason, CancellationToken cancellationToken)
         {
-            ServiceProvider.GetRequiredService<ILogger<X>>().LogInformation("Deactivating {GrainId} on silo {SiloAddress}. Reason: {Reason}", this.GrainId, this.Runtime.SiloAddress, reason);
+            ServiceProvider!.GetRequiredService<ILogger<X>>().LogInformation("Deactivating {GrainId} on silo {SiloAddress}. Reason: {Reason}", this.GrainId, this.Runtime.SiloAddress, reason);
             return base.OnDeactivateAsync(reason, cancellationToken);
         }
     }

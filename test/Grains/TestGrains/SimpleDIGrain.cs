@@ -65,9 +65,10 @@ namespace UnitTests.Grains
 
         public Task AssertCanResolveSameServiceInstances()
         {
-            if (!ReferenceEquals(this.ServiceProvider.GetRequiredService<IInjectedService>(), this.injectedService)) throw new Exception("singleton not equal");
-            if (!ReferenceEquals(this.ServiceProvider.GetRequiredService<IInjectedScopedService>(), this.injectedScopedService)) throw new Exception("scoped not equal");
-            if (!ReferenceEquals(this.ServiceProvider.GetRequiredService<IGrainContextAccessor>().GrainContext, this.originalGrainContext)) throw new Exception("scoped grain activation context not equal");
+            var serviceProvider = ServiceProvider!;
+            if (!ReferenceEquals(serviceProvider.GetRequiredService<IInjectedService>(), this.injectedService)) throw new Exception("singleton not equal");
+            if (!ReferenceEquals(serviceProvider.GetRequiredService<IInjectedScopedService>(), this.injectedScopedService)) throw new Exception("scoped not equal");
+            if (!ReferenceEquals(serviceProvider.GetRequiredService<IGrainContextAccessor>().GrainContext, this.originalGrainContext)) throw new Exception("scoped grain activation context not equal");
 
             return Task.CompletedTask;
         }
