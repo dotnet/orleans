@@ -16,13 +16,10 @@ internal sealed class ControllableReminderTable(
 
     public Task<ReminderTableData> ReadRows(GrainId grainId) => inner.ReadRows(grainId);
 
-    public Task<ReminderTableData> ReadRows(uint begin, uint end)
-        => ReadRows(begin, end, requireStrongConsistency: false);
-
-    public async Task<ReminderTableData> ReadRows(uint begin, uint end, bool requireStrongConsistency)
+    public async Task<ReminderTableData> ReadRows(uint begin, uint end)
     {
         var result = await inner.ReadRows(begin, end);
-        result = readController.TransformRangeRead(begin, end, result, requireStrongConsistency);
+        result = readController.TransformRangeRead(begin, end, result);
         await readController.OnRangeReadAsync(begin, end);
         return result;
     }
@@ -50,13 +47,6 @@ internal sealed class ReminderTableReadController
     private readonly List<ReminderTableReadGate> _gates = [];
     private readonly List<ReminderPointReadGate> _pointReadGates = [];
     private readonly List<(GrainId GrainId, string ReminderName)> _omissions = [];
-    private int strongRangeReadCount;
-    private int eventualRangeReadCount;
-
-    public int StrongRangeReadCount => Volatile.Read(ref strongRangeReadCount);
-
-    public int EventualRangeReadCount => Volatile.Read(ref eventualRangeReadCount);
-
     public void OmitFromNextRangeRead(GrainId grainId, string reminderName)
     {
         lock (_lock)
@@ -117,18 +107,8 @@ internal sealed class ReminderTableReadController
     internal ReminderTableData TransformRangeRead(
         uint begin,
         uint end,
-        ReminderTableData result,
-        bool requireStrongConsistency)
+        ReminderTableData result)
     {
-        if (requireStrongConsistency)
-        {
-            Interlocked.Increment(ref strongRangeReadCount);
-        }
-        else
-        {
-            Interlocked.Increment(ref eventualRangeReadCount);
-        }
-
         lock (_lock)
         {
             for (var i = 0; i < _omissions.Count; i++)

@@ -495,26 +495,6 @@ namespace UnitTests.TimerTests
         }
 
         [Fact]
-        public async Task ReminderOwnershipReadsUseStrongDiscoveryOnlyForInitialAndAcquiredRanges()
-        {
-            var silo = Assert.Single(HostedCluster.Silos);
-            var reminderService = silo.ServiceProvider.GetRequiredService<LocalReminderService>();
-            var initialStrongReads = _readController.StrongRangeReadCount;
-            var initialEventualReads = _readController.EventualRangeReadCount;
-
-            Assert.True(initialStrongReads > 0);
-            await reminderService.TestOnlyRefresh().WaitAsync(TestContext.Current.CancellationToken);
-            Assert.Equal(initialStrongReads, _readController.StrongRangeReadCount);
-            Assert.True(_readController.EventualRangeReadCount > initialEventualReads);
-
-            var oldRange = RangeFactory.CreateRange(0, uint.MaxValue / 2);
-            var newRange = RangeFactory.CreateRange(0, uint.MaxValue);
-            await reminderService.TestOnlyChangeRange(oldRange, newRange, increased: true)
-                .WaitAsync(TestContext.Current.CancellationToken);
-            Assert.True(_readController.StrongRangeReadCount > initialStrongReads);
-        }
-
-        [Fact]
         public async Task RegisterAndUnregisterReconcileThroughPointReadsBeforeReturning()
         {
             const string reminderName = "immediate_point_reconciliation";

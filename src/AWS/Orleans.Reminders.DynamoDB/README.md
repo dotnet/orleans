@@ -53,7 +53,7 @@ await host.WaitForShutdownAsync();
 
 ## Strongly consistent schema migration
 
-The provider defaults to the legacy schema. Legacy reads now strongly point-validate GSI candidates and omissions, strongly scan once for initial/range ownership, and reconcile completed mutations on the current owner. This prevents stale resurrection and removal but cannot make a GSI omission discoverable for arbitrary set reads.
+The provider defaults to the legacy schema. Legacy reads strongly point-validate GSI candidates and locally known omissions, and completed mutations send a bounded owner notification followed by a point read. This prevents stale resurrection and removal but cannot make a GSI omission discoverable for cold startup, newly acquired ranges, exhausted notifications, or arbitrary set reads. Legacy startup and refresh never use full-table scans.
 
 V2 migration supplies the complete guarantee and is an explicit two-stage rollout:
 
