@@ -121,9 +121,12 @@ public class CosmosHostingExtensionsTests
             new FirstPartitionKeyProvider());
 
         var identifiers = await provider.GetDocumentIdentifiers("grain-type", GrainId.Create("type", "key"));
+        var documentKey = await ((IDocumentIdProvider)provider).GetDocumentKey("grain-type", GrainId.Create("type", "key"));
 
         Assert.Equal("first", identifiers.PartitionKey);
         Assert.Equal("service__type_key", identifiers.DocumentId);
+        Assert.Equal("service__type_key", documentKey.DocumentId);
+        Assert.Equal(["first"], documentKey.PartitionKeyValues);
     }
 
 #pragma warning restore CS0618 // Type or member is obsolete

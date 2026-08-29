@@ -37,6 +37,48 @@ var builder = Host.CreateApplicationBuilder(args)
 await builder.RunAsync();
 ```
 
+## Hierarchical partition keys
+
+Single-string partitioning remains the default and continues to use `PartitionKeyPath`, which defaults to `/PartitionKey`. Existing applications do not need code or configuration changes.
+
+To opt into a two-level or three-level hierarchical partition key, set `PartitionKeyLevelCount` and register an `IDocumentIdProvider` that returns the same number of ordered values from `GetDocumentKey`:
+
+```csharp
+public sealed class TenantDocumentIdProvider(
+    IOptions<ClusterOptions> clusterOptions) : IDocumentIdProvider
+{
+    private readonly DefaultDocumentIdProvider _defaultProvider = new(clusterOptions);
+
+    public ValueTask<(string DocumentId, string PartitionKey)> GetDocumentIdentifiers(
+        string grainType,
+        GrainId grainId)
+    {
+        var tenantId = grainId.Key.ToString()!;
+        return new((_defaultProvider.GetId(grainType, grainId), tenantId));
+    }
+
+    public ValueTask<CosmosDocumentKey> GetDocumentKey(string grainType, GrainId grainId)
+    {
+        var tenantId = grainId.Key.ToString()!;
+        return new(new CosmosDocumentKey(
+            _defaultProvider.GetId(grainType, grainId),
+            [tenantId, grainType]));
+    }
+}
+
+siloBuilder.AddCosmosGrainStorage<TenantDocumentIdProvider>(
+    "cosmosStore",
+    options =>
+    {
+        options.ConfigureCosmosClient(connectionString);
+        options.PartitionKeyLevelCount = 2;
+    });
+```
+
+Two levels use `/PartitionKey` and `/PartitionKey2`. Three levels also use `/PartitionKey3`. The values returned by `GetDocumentKey` must follow that order.
+
+During startup, Orleans verifies that the actual container has the configured path count, names, and order. The check runs even when resource creation is disabled. Cosmos DB cannot convert an existing single-key container to HPK in place. Create a new container and copy the data when migrating; Orleans does not perform that migration.
+
 ## Example - Using Grain Storage in a Grain
 ```csharp
 // Define grain state class

@@ -79,6 +79,38 @@ namespace Orleans.Persistence.Cosmos
         public override void GetObjectData(System.Runtime.Serialization.SerializationInfo info, System.Runtime.Serialization.StreamingContext context) { }
     }
 
+    public readonly partial struct CosmosDocumentKey : System.IEquatable<CosmosDocumentKey>
+    {
+        private readonly object _dummy;
+        private readonly int _dummyPrimitive;
+        public CosmosDocumentKey(string DocumentId, System.Collections.Generic.IReadOnlyList<string> PartitionKeyValues) { }
+
+        public string DocumentId { get { throw null; } init { } }
+
+        public System.Collections.Generic.IReadOnlyList<string> PartitionKeyValues { get { throw null; } init { } }
+
+        [System.Runtime.CompilerServices.CompilerGenerated]
+        public readonly void Deconstruct(out string DocumentId, out System.Collections.Generic.IReadOnlyList<string> PartitionKeyValues) { throw null; }
+
+        [System.Runtime.CompilerServices.CompilerGenerated]
+        public readonly bool Equals(CosmosDocumentKey other) { throw null; }
+
+        [System.Runtime.CompilerServices.CompilerGenerated]
+        public override readonly bool Equals(object obj) { throw null; }
+
+        [System.Runtime.CompilerServices.CompilerGenerated]
+        public override readonly int GetHashCode() { throw null; }
+
+        [System.Runtime.CompilerServices.CompilerGenerated]
+        public static bool operator ==(CosmosDocumentKey left, CosmosDocumentKey right) { throw null; }
+
+        [System.Runtime.CompilerServices.CompilerGenerated]
+        public static bool operator !=(CosmosDocumentKey left, CosmosDocumentKey right) { throw null; }
+
+        [System.Runtime.CompilerServices.CompilerGenerated]
+        public override readonly string ToString() { throw null; }
+    }
+
     public sealed partial class CosmosGrainStorage : Storage.IGrainStorage, ILifecycleParticipant<Runtime.ISiloLifecycle>
     {
         public CosmosGrainStorage(string name, CosmosGrainStorageOptions options, Microsoft.Extensions.Logging.ILoggerFactory loggerFactory, System.IServiceProvider serviceProvider, Microsoft.Extensions.Options.IOptions<Configuration.ClusterOptions> clusterOptions, IDocumentIdProvider documentIdProvider, Serialization.Serializers.IActivatorProvider activatorProvider) { }
@@ -98,6 +130,8 @@ namespace Orleans.Persistence.Cosmos
         public bool DeleteStateOnClear { get { throw null; } set { } }
 
         public int InitStage { get { throw null; } set { } }
+
+        public int PartitionKeyLevelCount { get { throw null; } set { } }
 
         public string PartitionKeyPath { get { throw null; } set { } }
 
@@ -164,6 +198,8 @@ namespace Orleans.Persistence.Cosmos
     public partial interface IDocumentIdProvider
     {
         System.Threading.Tasks.ValueTask<(string DocumentId, string PartitionKey)> GetDocumentIdentifiers(string grainType, Runtime.GrainId grainId);
+        [System.Diagnostics.DebuggerStepThrough]
+        System.Threading.Tasks.ValueTask<CosmosDocumentKey> GetDocumentKey(string grainType, Runtime.GrainId grainId);
     }
 
     [System.Obsolete("Use IDocumentIdProvider instead.")]
