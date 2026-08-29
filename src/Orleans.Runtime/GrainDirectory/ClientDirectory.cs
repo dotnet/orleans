@@ -548,6 +548,7 @@ internal sealed partial class ClientDirectory : SystemTarget, ILocalClientDirect
         }
         catch (OperationCanceledException) when (_shutdownCts.IsCancellationRequested)
         {
+            // Publication is intentionally canceled while the silo is quiescing.
         }
         catch (Exception exception)
         {
