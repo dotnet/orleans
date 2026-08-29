@@ -1078,6 +1078,29 @@ namespace UnitTests.Runtime
         }
 
         [Fact, TestCategory("Activation")]
+        public void WorkingSetMembers_ExcludesUnregisteredMember()
+        {
+            var timer = Substitute.For<IAsyncTimer>();
+            timer.NextTick().Returns(Task.FromResult(false));
+            var timerFactory = Substitute.For<IAsyncTimerFactory>();
+            timerFactory.Create(Arg.Any<TimeSpan>(), Arg.Any<string>(), Arg.Any<TimeProvider>()).Returns(timer);
+            var workingSet = new ActivationWorkingSet(
+                timerFactory,
+                NullLogger<ActivationWorkingSet>.Instance,
+                Array.Empty<IActivationWorkingSetObserver>(),
+                CreateCatalogInstruments(),
+                TimeProvider.System);
+            var member = new TestWorkingSetMember();
+            workingSet.OnActivated(member);
+            lock (member)
+            {
+                member.IsInWorkingSet = false;
+            }
+
+            Assert.Empty(workingSet.Members);
+        }
+
+        [Fact, TestCategory("Activation")]
         public async Task WorkingSetScan_SerializesRemovalWithReactivation()
         {
             var timer = Substitute.For<IAsyncTimer>();

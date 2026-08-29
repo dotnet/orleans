@@ -48,7 +48,7 @@ internal sealed partial class ActivationWorkingSet : IActivationWorkingSet, ILif
         foreach (var pair in _members)
         {
             if (pair.Key is IActivationWorkingSetMemberStatus status
-                ? !status.IsIdle
+                ? status.IsInWorkingSet && !status.IsIdle
                 : (pair.Value & IsIdleMask) == 0)
             {
                 yield return pair.Key;
