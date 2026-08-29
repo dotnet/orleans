@@ -30,6 +30,10 @@ namespace Orleans.Runtime
         private readonly IServiceProvider _serviceProvider;
         private readonly object _statisticsUpdateLock = new();
         private readonly ConcurrentDictionary<SiloAddress, SiloRuntimeStatistics> _periodicStats;
+        private readonly Queue<SiloAddress> _pendingStatisticsNotificationOrder = [];
+        private readonly Dictionary<SiloAddress, SiloRuntimeStatistics?> _pendingStatisticsNotifications = [];
+        private readonly HashSet<SiloAddress> _terminatedSilos = [];
+        private bool _processingStatisticsNotifications;
         private readonly TimeSpan _statisticsRefreshTime;
         private readonly List<ISiloStatisticsChangeListener> _siloStatisticsChangeListeners;
         private readonly ILogger _logger;
@@ -151,7 +155,8 @@ namespace Orleans.Runtime
         {
             lock (_statisticsUpdateLock)
             {
-                if (_siloStatusOracle.GetApproximateSiloStatus(siloAddress) != SiloStatus.Active)
+                if (_terminatedSilos.Contains(siloAddress)
+                    || _siloStatusOracle.GetApproximateSiloStatus(siloAddress) != SiloStatus.Active)
                 {
                     return true;
                 }
@@ -214,9 +219,11 @@ namespace Orleans.Runtime
         private DisseminationApplyResult UpdateRuntimeStatisticsInternal(SiloAddress siloAddress, SiloRuntimeStatistics siloStats, bool rejectEqualTimestamp = false)
         {
             LogTraceUpdateRuntimeStatistics(_logger, siloAddress);
+            bool processNotifications;
             lock (_statisticsUpdateLock)
             {
-                if (_siloStatusOracle.GetApproximateSiloStatus(siloAddress) != SiloStatus.Active)
+                if (_terminatedSilos.Contains(siloAddress)
+                    || _siloStatusOracle.GetApproximateSiloStatus(siloAddress) != SiloStatus.Active)
                 {
                     return DisseminationApplyResult.Rejected;
                 }
@@ -234,10 +241,15 @@ namespace Orleans.Runtime
                 }
 
                 _periodicStats[siloAddress] = siloStats;
-                NotifyAllStatisticsChangeEventsSubscribers(siloAddress, siloStats);
-                DeploymentLoadPublisherEvents.EmitReceived(siloAddress, _siloDetails.SiloAddress, siloStats);
-                return DisseminationApplyResult.Applied;
+                processNotifications = EnqueueStatisticsNotificationUnsafe(siloAddress, siloStats);
             }
+
+            if (processNotifications)
+            {
+                ProcessStatisticsNotifications();
+            }
+
+            return DisseminationApplyResult.Applied;
         }
 
         internal async Task RefreshClusterStatistics()
@@ -290,18 +302,81 @@ namespace Orleans.Runtime
 
         private void NotifyAllStatisticsChangeEventsSubscribers(SiloAddress silo, SiloRuntimeStatistics? stats)
         {
+            ISiloStatisticsChangeListener[] subscribers;
             lock (_siloStatisticsChangeListeners)
             {
-                foreach (var subscriber in _siloStatisticsChangeListeners)
+                subscribers = [.. _siloStatisticsChangeListeners];
+            }
+
+            foreach (var subscriber in subscribers)
+            {
+                if (stats == null)
                 {
-                    if (stats == null)
+                    subscriber.RemoveSilo(silo);
+                }
+                else
+                {
+                    subscriber.SiloStatisticsChangeNotification(silo, stats);
+                }
+            }
+        }
+
+        private bool EnqueueStatisticsNotificationUnsafe(SiloAddress siloAddress, SiloRuntimeStatistics? statistics)
+        {
+            if (!_pendingStatisticsNotifications.ContainsKey(siloAddress))
+            {
+                _pendingStatisticsNotificationOrder.Enqueue(siloAddress);
+            }
+
+            _pendingStatisticsNotifications[siloAddress] = statistics;
+            if (_processingStatisticsNotifications)
+            {
+                return false;
+            }
+
+            _processingStatisticsNotifications = true;
+            return true;
+        }
+
+        private void ProcessStatisticsNotifications()
+        {
+            while (true)
+            {
+                SiloAddress siloAddress;
+                SiloRuntimeStatistics? statistics;
+                lock (_statisticsUpdateLock)
+                {
+                    if (_pendingStatisticsNotificationOrder.Count == 0)
                     {
-                        subscriber.RemoveSilo(silo);
+                        _processingStatisticsNotifications = false;
+                        return;
+                    }
+
+                    siloAddress = _pendingStatisticsNotificationOrder.Dequeue();
+                    statistics = _pendingStatisticsNotifications[siloAddress];
+                    _pendingStatisticsNotifications.Remove(siloAddress);
+                }
+
+                try
+                {
+                    NotifyAllStatisticsChangeEventsSubscribers(siloAddress, statistics);
+                    if (statistics is null)
+                    {
+                        DeploymentLoadPublisherEvents.EmitRemoved(siloAddress, _siloDetails.SiloAddress);
                     }
                     else
                     {
-                        subscriber.SiloStatisticsChangeNotification(silo, stats);
+                        DeploymentLoadPublisherEvents.EmitReceived(siloAddress, _siloDetails.SiloAddress, statistics);
                     }
+                }
+                catch
+                {
+                    lock (_statisticsUpdateLock)
+                    {
+                        _processingStatisticsNotifications = false;
+                    }
+
+                    throw;
                 }
             }
         }
@@ -318,11 +393,17 @@ namespace Orleans.Runtime
         {
             if (!status.IsTerminating()) return;
 
+            bool processNotifications;
             lock (_statisticsUpdateLock)
             {
+                _terminatedSilos.Add(updatedSilo);
                 _periodicStats.TryRemove(updatedSilo, out _);
-                NotifyAllStatisticsChangeEventsSubscribers(updatedSilo, null);
-                DeploymentLoadPublisherEvents.EmitRemoved(updatedSilo, _siloDetails.SiloAddress);
+                processNotifications = EnqueueStatisticsNotificationUnsafe(updatedSilo, statistics: null);
+            }
+
+            if (processNotifications)
+            {
+                ProcessStatisticsNotifications();
             }
         }
 

@@ -35,7 +35,7 @@ Scope: this design covers Orleans internal runtime replication for bounded, mono
 
 The key distinguishing factors are value cardinality, update rate, payload size, diffability, and correctness authority. Load has many small latest-wins values. Membership has one correctness-sensitive stream which can potentially be represented as diffs. Manifests are large, mostly identical across hosts, and better handled by content-addressed pull with direct fallback.
 
-Deployment load mutations use one status-and-version boundary shared by direct publication, refresh, dissemination, and terminal membership removal. Active status is checked before version comparison, newer timestamps supersede older timestamps, and terminal removal is ordered with updates so a late value cannot resurrect a removed silo.
+Deployment load mutations use one status-and-version boundary shared by direct publication, refresh, dissemination, and terminal membership removal. Active status is checked before version comparison, newer timestamps supersede older timestamps, and terminal removal records a tombstone and removes cached state atomically so a late value cannot resurrect a removed silo. Subscriber callbacks and diagnostic events run after the committed mutation releases that boundary.
 
 ## Value model
 

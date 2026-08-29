@@ -2422,6 +2422,87 @@ public class DisseminationProtocolTests
     }
 
     [Fact]
+    public async Task RuntimeStatisticsUpdateCallbackDoesNotHoldMutationLock()
+    {
+        var local = CreateSilo(21025);
+        var peer = CreateSilo(21026);
+        var statusOracle = new FakeSiloStatusOracle();
+        statusOracle.SetStatus(peer, SiloStatus.Active);
+        var publisher = CreateDeploymentLoadPublisher(local, statusOracle);
+        var callbackEntered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var releaseCallback = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var callbackCount = 0;
+        publisher.SubscribeToStatisticsChangeEvents(new DelegateStatisticsListener(
+            onUpdate: (_, _) =>
+            {
+                if (Interlocked.Increment(ref callbackCount) == 1)
+                {
+                    callbackEntered.TrySetResult();
+                    releaseCallback.Task.GetAwaiter().GetResult();
+                }
+            }));
+        var first = CreateStatistics(new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc));
+        var second = CreateStatistics(first.DateTime.AddSeconds(1));
+
+        var firstUpdate = Task.Run(
+            () => publisher.ApplyDisseminatedRuntimeStatistics(peer, first),
+            TestContext.Current.CancellationToken);
+        await callbackEntered.Task.WaitAsync(TimeSpan.FromSeconds(2), TestContext.Current.CancellationToken);
+
+        var secondResult = await Task.Run(
+            () => publisher.ApplyDisseminatedRuntimeStatistics(peer, second),
+            TestContext.Current.CancellationToken).WaitAsync(
+                TimeSpan.FromSeconds(2),
+                TestContext.Current.CancellationToken);
+
+        Assert.Equal(DisseminationApplyResult.Applied, secondResult);
+        Assert.Equal(second.DateTime, publisher.PeriodicStatistics[peer].DateTime);
+        Assert.Equal(1, Volatile.Read(ref callbackCount));
+        releaseCallback.TrySetResult();
+        await firstUpdate;
+        Assert.Equal(2, callbackCount);
+    }
+
+    [Fact]
+    public async Task RuntimeStatisticsRemovalCallbackDoesNotHoldMutationLockOrPermitResurrection()
+    {
+        var local = CreateSilo(21027);
+        var peer = CreateSilo(21028);
+        var statusOracle = new FakeSiloStatusOracle();
+        statusOracle.SetStatus(peer, SiloStatus.Active);
+        var publisher = CreateDeploymentLoadPublisher(local, statusOracle);
+        var baseline = CreateStatistics(new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc));
+        Assert.Equal(DisseminationApplyResult.Applied, publisher.ApplyDisseminatedRuntimeStatistics(peer, baseline));
+        var callbackEntered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var releaseCallback = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        publisher.SubscribeToStatisticsChangeEvents(new DelegateStatisticsListener(
+            onRemove: _ =>
+            {
+                callbackEntered.TrySetResult();
+                releaseCallback.Task.GetAwaiter().GetResult();
+            }));
+        statusOracle.SetStatus(peer, SiloStatus.Dead);
+
+        var removal = Task.Run(
+            () => publisher.OnSiloStatusChange(peer, SiloStatus.Dead),
+            TestContext.Current.CancellationToken);
+        await callbackEntered.Task.WaitAsync(TimeSpan.FromSeconds(2), TestContext.Current.CancellationToken);
+
+        var lateResult = await Task.Run(
+            () => publisher.ApplyDisseminatedRuntimeStatistics(
+                peer,
+                CreateStatistics(baseline.DateTime.AddSeconds(1))),
+            TestContext.Current.CancellationToken).WaitAsync(
+                TimeSpan.FromSeconds(2),
+                TestContext.Current.CancellationToken);
+
+        Assert.Equal(DisseminationApplyResult.Rejected, lateResult);
+        Assert.False(publisher.PeriodicStatistics.ContainsKey(peer));
+        releaseCallback.TrySetResult();
+        await removal;
+    }
+
+    [Fact]
     public void IsRuntimeStatisticsObsolete_ReflectsSiloActivityAndStatisticsRecency()
     {
         var local = CreateSilo(21003);
@@ -4349,6 +4430,16 @@ public class DisseminationProtocolTests
     private sealed class FakeEnvironmentStatisticsProvider : Orleans.Statistics.IEnvironmentStatisticsProvider
     {
         public Orleans.Statistics.EnvironmentStatistics GetEnvironmentStatistics() => default;
+    }
+
+    private sealed class DelegateStatisticsListener(
+        Action<SiloAddress, SiloRuntimeStatistics>? onUpdate = null,
+        Action<SiloAddress>? onRemove = null) : ISiloStatisticsChangeListener
+    {
+        public void SiloStatisticsChangeNotification(SiloAddress updatedSilo, SiloRuntimeStatistics newStats) =>
+            onUpdate?.Invoke(updatedSilo, newStats);
+
+        public void RemoveSilo(SiloAddress removedSilo) => onRemove?.Invoke(removedSilo);
     }
 
     private sealed class ActionObserver<T>(Action<T> onNext) : IObserver<T>
