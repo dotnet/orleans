@@ -12,6 +12,7 @@ public class GrainDirectoryCacheBenchmark
     private ConcurrentLruCache<GrainId, (GrainAddress Address, int Version)> _tupleCache = null!;
     private LruGrainDirectoryCache _entryCache = null!;
     private IGrainDirectoryCacheEntrySource _entrySource = null!;
+    private WeakReference<GrainDirectoryCacheEntry> _entryHandle = null!;
     private GrainId _target;
 
     [GlobalSetup]
@@ -43,6 +44,13 @@ public class GrainDirectoryCacheBenchmark
                 _target = grainId;
             }
         }
+
+        if (!_entrySource.TryGetEntry(_target, out var entry))
+        {
+            throw new InvalidOperationException("Benchmark entry was not added.");
+        }
+
+        _entryHandle = entry.ReferenceHandle;
     }
 
     [Benchmark(Baseline = true)]
@@ -67,9 +75,16 @@ public class GrainDirectoryCacheBenchmark
     }
 
     [Benchmark]
-    public GrainAddress SharedHandle()
+    public GrainAddress SharedEntrySource()
     {
         _entrySource.TryGetEntry(_target, out var entry);
+        return entry!.Address;
+    }
+
+    [Benchmark]
+    public GrainAddress SharedHandle()
+    {
+        _entryHandle.TryGetTarget(out var entry);
         return entry!.Address;
     }
 
