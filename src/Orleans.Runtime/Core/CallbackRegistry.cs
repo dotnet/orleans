@@ -29,13 +29,6 @@ internal sealed class CallbackRegistry
 
     public bool TryCompleteResponse(Message response)
     {
-        if (response.ResponseTarget is CallbackData directCallback)
-        {
-            var completed = directCallback.TryDoCallback(response);
-            TryRemove(directCallback);
-            return completed;
-        }
-
         if (_callbacks.TryRemove(response.Id, out var callback))
         {
             return callback.TryDoCallback(response);
@@ -45,21 +38,7 @@ internal sealed class CallbackRegistry
     }
 
     public bool TryGetResponseCallback(Message response, [NotNullWhen(true)] out CallbackData? callback)
-    {
-        if (response.ResponseTarget is CallbackData directCallback)
-        {
-            if (!directCallback.IsCompleted)
-            {
-                callback = directCallback;
-                return true;
-            }
-
-            callback = null;
-            return false;
-        }
-
-        return _callbacks.TryGetValue(response.Id, out callback);
-    }
+        => _callbacks.TryGetValue(response.Id, out callback);
 
     public bool TryRemove(CallbackData callback)
         => _callbacks.TryRemove(callback.Message.Id, callback);

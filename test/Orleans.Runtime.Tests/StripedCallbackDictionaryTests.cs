@@ -131,4 +131,45 @@ public class StripedCallbackDictionaryTests
         Assert.True(dictionary.TryRemove(new CorrelationId(1), out var value));
         Assert.Equal(1, value);
     }
+
+    [Fact]
+    public async Task Close_ConcurrentPublication_ClassifiesEveryAttempt()
+    {
+        const int publisherCount = 32;
+        const int entriesPerPublisher = 1_024;
+        var cancellationToken = TestContext.Current.CancellationToken;
+        using var start = new Barrier(publisherCount + 1);
+        var dictionary = new StripedCallbackDictionary<int>();
+        var accepted = new bool[publisherCount * entriesPerPublisher];
+        var tasks = Enumerable.Range(0, publisherCount)
+            .Select(publisher => Task.Run(() =>
+            {
+                start.SignalAndWait(cancellationToken);
+                var offset = publisher * entriesPerPublisher;
+                for (var index = 0; index < entriesPerPublisher; index++)
+                {
+                    var value = offset + index;
+                    accepted[value] = dictionary.TryAdd(new CorrelationId(value), value, out var isClosed);
+                    Assert.Equal(!accepted[value], isClosed);
+                }
+            }, cancellationToken))
+            .ToArray();
+
+        start.SignalAndWait(cancellationToken);
+        dictionary.Close();
+        await Task.WhenAll(tasks);
+
+        Assert.Equal(accepted.Count(static value => value), dictionary.Count);
+        for (var value = 0; value < accepted.Length; value++)
+        {
+            Assert.Equal(accepted[value], dictionary.TryGetValue(new CorrelationId(value), out var found));
+            if (accepted[value])
+            {
+                Assert.Equal(value, found);
+            }
+        }
+
+        Assert.False(dictionary.TryAdd(new CorrelationId(accepted.Length), accepted.Length, out var isClosed));
+        Assert.True(isClosed);
+    }
 }
