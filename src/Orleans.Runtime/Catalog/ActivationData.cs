@@ -146,7 +146,7 @@ internal sealed partial class ActivationData :
     {
         get
         {
-            var extras = _extras;
+            var extras = Volatile.Read(ref _extras);
             return extras is null ? _shared.Runtime : Volatile.Read(ref extras.GrainRuntime) ?? _shared.Runtime;
         }
     }
@@ -412,17 +412,20 @@ internal sealed partial class ActivationData :
         {
             if (componentType == typeof(IGrainRuntime))
             {
-                if (_extras is null)
+                var extras = Volatile.Read(ref _extras);
+                if (extras is null)
                 {
                     if (instance is null)
                     {
                         return;
                     }
 
-                    _extras = new();
+                    extras = new() { GrainRuntime = (IGrainRuntime)instance };
+                    Volatile.Write(ref _extras, extras);
+                    return;
                 }
 
-                Volatile.Write(ref _extras.GrainRuntime, (IGrainRuntime?)instance);
+                Volatile.Write(ref extras.GrainRuntime, (IGrainRuntime?)instance);
                 return;
             }
 
