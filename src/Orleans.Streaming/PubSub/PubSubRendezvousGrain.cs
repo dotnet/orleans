@@ -137,7 +137,8 @@ namespace Orleans.Streams
                 };
                 var (shouldRegister, stateChanged) = await RemoveDefunctSystemTargetProducers(
                     streamProducer,
-                    membershipVersion);
+                    membershipVersion,
+                    cancellationToken);
                 if (!shouldRegister)
                 {
                     LogWarningProducerRegistrationIgnored(publisherState, streamId);
@@ -177,6 +178,10 @@ namespace Orleans.Streams
                     }
                 }
             }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                throw;
+            }
             catch (Exception exc)
             {
                 LogErrorRegisterProducer(streamId, streamProducer, exc);
@@ -198,7 +203,8 @@ namespace Orleans.Streams
 
         private async Task<(bool ShouldRegister, bool StateChanged)> RemoveDefunctSystemTargetProducers(
             GrainId streamProducer,
-            MembershipVersion membershipVersion)
+            MembershipVersion membershipVersion,
+            CancellationToken cancellationToken)
         {
             var membershipSnapshot = _clusterMembershipService.CurrentSnapshot;
             List<(PubSubPublisherState Producer, SiloAddress SiloAddress)>? systemTargetProducers = null;
@@ -239,7 +245,7 @@ namespace Orleans.Streams
 
             if (HasMembershipVersion(targetVersion))
             {
-                await _clusterMembershipService.Refresh(targetVersion, CancellationToken.None);
+                await _clusterMembershipService.Refresh(targetVersion, cancellationToken);
                 membershipSnapshot = _clusterMembershipService.CurrentSnapshot;
             }
 
