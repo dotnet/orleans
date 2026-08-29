@@ -20,6 +20,7 @@ public sealed class ActivationRequestTrackerTests
         lock (activation)
         {
             tracker.AddWaiting(message);
+            UpdateRequestStatus(activation, tracker);
         }
 
         Assert.Equal(1, activation.WaitingCount);
@@ -31,6 +32,7 @@ public sealed class ActivationRequestTrackerTests
         {
             tracker.RemoveWaitingAt(0);
             tracker.AddRunning(message, CoarseStopwatch.StartNew());
+            UpdateRequestStatus(activation, tracker);
         }
 
         Assert.Equal(0, activation.WaitingCount);
@@ -65,6 +67,7 @@ public sealed class ActivationRequestTrackerTests
                 tracker.AddWaiting(message);
                 tracker.RemoveWaitingAt(0);
                 tracker.AddRunning(message, CoarseStopwatch.StartNew());
+                UpdateRequestStatus(activation, tracker);
             }
 
             using var start = new Barrier(3);
@@ -110,6 +113,7 @@ public sealed class ActivationRequestTrackerTests
         {
             tracker.AddWaiting(first);
             tracker.AddWaiting(second);
+            UpdateRequestStatus(activation, tracker);
         }
 
         Assert.Equal(2, activation.GetRequestCount());
@@ -118,6 +122,7 @@ public sealed class ActivationRequestTrackerTests
         {
             tracker.RemoveWaitingAt(0);
             tracker.AddRunning(first, CoarseStopwatch.StartNew());
+            UpdateRequestStatus(activation, tracker);
         }
 
         Assert.Equal(2, activation.GetRequestCount());
@@ -127,6 +132,7 @@ public sealed class ActivationRequestTrackerTests
         lock (activation)
         {
             Assert.True(tracker.RemoveRunning(first));
+            UpdateRequestStatus(activation, tracker);
         }
 
         Assert.Equal(1, activation.GetRequestCount());
@@ -157,6 +163,7 @@ public sealed class ActivationRequestTrackerTests
             tracker.AddRunning(running, CoarseStopwatch.StartNew());
             tracker.AddWaiting(queued);
             tracker.AddWaiting(local);
+            UpdateRequestStatus(activation, tracker);
         }
 
         var drained = activation.DequeueAllWaitingRequests();
@@ -234,44 +241,66 @@ public sealed class ActivationRequestTrackerTests
         activation.SetState(ActivationState.Valid);
         var message = CreateMessage(1);
 
-        var firstTracker = GetRequestTracker(activation) = ActivationRequestTracker.Rent();
-        firstTracker.AddWaiting(message);
-        OnWaitingRequestAdded(activation);
-        firstTracker.RemoveWaitingAt(0);
-        ReturnRequestTrackerIfEmpty(activation);
+        ActivationRequestTracker firstTracker;
+        lock (activation)
+        {
+            firstTracker = GetRequestTracker(activation) = ActivationRequestTracker.Rent();
+            firstTracker.AddWaiting(message);
+            UpdateRequestStatus(activation, firstTracker);
+            OnWaitingRequestAdded(activation);
+            firstTracker.RemoveWaitingAt(0);
+            ReturnRequestTrackerIfEmpty(activation);
+        }
 
         Assert.Null(GetRequestTracker(activation));
         Assert.True(activation.IsInactive);
 
-        var recurringTracker = GetRequestTracker(activation) = ActivationRequestTracker.Rent();
-        recurringTracker.AddWaiting(message);
-        OnWaitingRequestAdded(activation);
-        recurringTracker.RemoveWaitingAt(0);
-        ReturnRequestTrackerIfEmpty(activation);
+        ActivationRequestTracker recurringTracker;
+        lock (activation)
+        {
+            recurringTracker = GetRequestTracker(activation) = ActivationRequestTracker.Rent();
+            recurringTracker.AddWaiting(message);
+            UpdateRequestStatus(activation, recurringTracker);
+            OnWaitingRequestAdded(activation);
+            recurringTracker.RemoveWaitingAt(0);
+            ReturnRequestTrackerIfEmpty(activation);
+        }
 
         Assert.Null(GetRequestTracker(activation));
         Assert.True(activation.IsInactive);
 
-        recurringTracker = GetRequestTracker(activation) = ActivationRequestTracker.Rent();
-        recurringTracker.AddWaiting(message);
-        OnWaitingRequestAdded(activation);
-        recurringTracker.RemoveWaitingAt(0);
-        ReturnRequestTrackerIfEmpty(activation);
+        lock (activation)
+        {
+            recurringTracker = GetRequestTracker(activation) = ActivationRequestTracker.Rent();
+            recurringTracker.AddWaiting(message);
+            UpdateRequestStatus(activation, recurringTracker);
+            OnWaitingRequestAdded(activation);
+            recurringTracker.RemoveWaitingAt(0);
+            ReturnRequestTrackerIfEmpty(activation);
+        }
 
         Assert.Same(recurringTracker, GetRequestTracker(activation));
         Assert.True(recurringTracker.IsEmpty);
         Assert.True(activation.IsInactive);
 
-        recurringTracker.AddWaiting(message);
-        OnWaitingRequestAdded(activation);
-        recurringTracker.RemoveWaitingAt(0);
-        recurringTracker.AddRunning(message, CoarseStopwatch.StartNew());
-        activation.SetState(ActivationState.Deactivating);
-        ReturnRequestTrackerIfEmpty(activation);
+        lock (activation)
+        {
+            recurringTracker.AddWaiting(message);
+            UpdateRequestStatus(activation, recurringTracker);
+            OnWaitingRequestAdded(activation);
+            recurringTracker.RemoveWaitingAt(0);
+            recurringTracker.AddRunning(message, CoarseStopwatch.StartNew());
+            UpdateRequestStatus(activation, recurringTracker);
+            activation.SetState(ActivationState.Deactivating);
+            ReturnRequestTrackerIfEmpty(activation);
+        }
 
         Assert.Same(recurringTracker, GetRequestTracker(activation));
-        Assert.True(recurringTracker.RemoveRunning(message));
-        ReturnRequestTrackerIfEmpty(activation);
+        lock (activation)
+        {
+            Assert.True(recurringTracker.RemoveRunning(message));
+            ReturnRequestTrackerIfEmpty(activation);
+        }
 
         Assert.Null(GetRequestTracker(activation));
     }
@@ -284,21 +313,26 @@ public sealed class ActivationRequestTrackerTests
         var activation = CreateActivation();
         var messages = Enumerable.Range(0, ProducerCount).Select(id => CreateMessage(id)).ToArray();
         var observedTrackers = new ActivationRequestTracker[ProducerCount];
-        using var start = new Barrier(ProducerCount);
+        var start = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
 
         var producers = Enumerable.Range(0, ProducerCount).Select(index =>
-            Task.Factory.StartNew(() =>
-            {
-                SignalAndWait(start, cancellationToken);
-                lock (activation)
-                {
-                    var tracker = GetRequestTracker(activation) ??= ActivationRequestTracker.Rent();
-                    observedTrackers[index] = tracker;
-                    tracker.AddWaiting(messages[index]);
-                }
-            }, cancellationToken, TaskCreationOptions.LongRunning, TaskScheduler.Default)).ToArray();
+            RunProducer(index)).ToArray();
 
+        start.SetResult();
         await Task.WhenAll(producers);
+
+        async Task RunProducer(int index)
+        {
+            await start.Task;
+            lock (activation)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                var tracker = GetRequestTracker(activation) ??= ActivationRequestTracker.Rent();
+                observedTrackers[index] = tracker;
+                tracker.AddWaiting(messages[index]);
+                UpdateRequestStatus(activation, tracker);
+            }
+        }
 
         var tracker = Assert.IsType<ActivationRequestTracker>(GetRequestTracker(activation));
         Assert.All(observedTrackers, observed => Assert.Same(tracker, observed));
@@ -345,6 +379,7 @@ public sealed class ActivationRequestTrackerTests
                             tracker ??= GetRequestTracker(activation) = ActivationRequestTracker.Rent();
                             var message = CreateMessage(nextMessageId++, isLocalOnly: nextMessageId % 7 == 0);
                             tracker.AddWaiting(message);
+                            UpdateRequestStatus(activation, tracker);
                             model.Waiting.Add(message);
                             break;
                         }
@@ -354,6 +389,7 @@ public sealed class ActivationRequestTrackerTests
                             var message = model.Waiting[index];
                             tracker!.RemoveWaitingAt(index);
                             tracker.AddRunning(message, CoarseStopwatch.StartNew());
+                            UpdateRequestStatus(activation, tracker);
                             model.Waiting.RemoveAt(index);
                             model.Running.Add(message);
                             break;
@@ -486,6 +522,7 @@ public sealed class ActivationRequestTrackerTests
                     lock (activation)
                     {
                         tracker.AddWaiting(message);
+                        UpdateRequestStatus(activation, tracker);
                     }
 
                     SignalAndWait(phase, cancellation.Token);
@@ -495,6 +532,7 @@ public sealed class ActivationRequestTrackerTests
                     {
                         tracker.RemoveWaitingAt(0);
                         tracker.AddRunning(message, CoarseStopwatch.StartNew());
+                        UpdateRequestStatus(activation, tracker);
                     }
 
                     SignalAndWait(phase, cancellation.Token);
@@ -503,6 +541,7 @@ public sealed class ActivationRequestTrackerTests
                     lock (activation)
                     {
                         Assert.True(tracker.RemoveRunning(message));
+                        UpdateRequestStatus(activation, tracker);
                     }
 
                     SignalAndWait(phase, cancellation.Token);
@@ -531,10 +570,13 @@ public sealed class ActivationRequestTrackerTests
 
     private static ActivationRequestTracker LeaseTracker(ActivationData activation)
     {
-        var tracker = new ActivationRequestTracker();
-        tracker.OnRent();
-        GetRequestTracker(activation) = tracker;
-        return tracker;
+        lock (activation)
+        {
+            var tracker = new ActivationRequestTracker();
+            tracker.OnRent();
+            GetRequestTracker(activation) = tracker;
+            return tracker;
+        }
     }
 
     private static void AssertTrackerMatchesModel(ActivationData activation, ActivationRequestTracker? tracker, RequestModel model)
@@ -601,6 +643,9 @@ public sealed class ActivationRequestTrackerTests
 
     [UnsafeAccessor(UnsafeAccessorKind.Method, Name = "OnWaitingRequestAdded")]
     private static extern void OnWaitingRequestAdded(ActivationData activation);
+
+    [UnsafeAccessor(UnsafeAccessorKind.Method, Name = "UpdateRequestStatus")]
+    private static extern void UpdateRequestStatus(ActivationData activation, ActivationRequestTracker requestTracker);
 
     private sealed class RequestModel
     {
