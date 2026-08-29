@@ -2816,7 +2816,7 @@ interface Outer.IInnerGrain [Version(1)]
                     "Microsoft.Orleans.Analyzers.targets");
             var configuredPathProperty = configuredContractsPath is null
                 ? string.Empty
-                : $"    <OrleansContractsPath>$(MSBuildProjectDirectory)\\{configuredContractsPath}</OrleansContractsPath>{Environment.NewLine}";
+                : $"    <OrleansContractsPath>$(MSBuildProjectDirectory)/{configuredContractsPath.Replace('\\', '/')}</OrleansContractsPath>{Environment.NewLine}";
             await File.WriteAllTextAsync(
                 projectPath,
                 $"""
