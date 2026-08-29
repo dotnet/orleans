@@ -486,12 +486,14 @@ namespace NonSilo.Tests.Membership
             var version = manager.MembershipTableSnapshot.Version;
             await manager.RefreshFromSnapshot(Snapshot(
                 new MembershipVersion(version.Value - 1),
-                Entry(this.localSilo, SiloStatus.Dead, DateTimeOffset.UtcNow)));
+                Entry(this.localSilo, SiloStatus.Dead, DateTimeOffset.UtcNow)),
+                cancellationToken);
             this.fatalErrorHandler.DidNotReceiveWithAnyArgs().OnFatalException(default, default, default);
 
             await manager.RefreshFromSnapshot(Snapshot(
                 new MembershipVersion(version.Value + 1),
-                Entry(this.localSilo, SiloStatus.Dead, DateTimeOffset.UtcNow)));
+                Entry(this.localSilo, SiloStatus.Dead, DateTimeOffset.UtcNow)),
+                cancellationToken);
             this.fatalErrorHandler.ReceivedWithAnyArgs().OnFatalException(default, default, default);
             await this.lifecycle.OnStop(cancellationToken);
         }
@@ -562,17 +564,18 @@ namespace NonSilo.Tests.Membership
             var manager = this.CreateMembershipTableManager(membershipTable);
             ((ILifecycleParticipant<ISiloLifecycle>)manager).Participate(this.lifecycle);
 
-            await manager.RefreshFromSnapshot(Snapshot(new MembershipVersion(1)));
+            await manager.RefreshFromSnapshot(Snapshot(new MembershipVersion(1)), cancellationToken);
             this.fatalErrorHandler.DidNotReceiveWithAnyArgs().OnFatalException(default, default, default);
 
             await this.lifecycle.OnStart(cancellationToken);
             await manager.UpdateStatus(SiloStatus.Joining);
             var currentVersion = manager.MembershipTableSnapshot.Version;
 
-            await manager.RefreshFromSnapshot(Snapshot(new MembershipVersion(currentVersion.Value - 1)));
+            await manager.RefreshFromSnapshot(Snapshot(new MembershipVersion(currentVersion.Value - 1)), cancellationToken);
             await manager.RefreshFromSnapshot(Snapshot(
                 currentVersion,
-                Entry(otherSilo, SiloStatus.Active, now.AddMinutes(1))));
+                Entry(otherSilo, SiloStatus.Active, now.AddMinutes(1))),
+                cancellationToken);
             Assert.Equal(SiloStatus.Joining, manager.MembershipTableSnapshot.Entries[this.localSilo].Status);
             this.fatalErrorHandler.DidNotReceiveWithAnyArgs().OnFatalException(default, default, default);
 
@@ -581,7 +584,8 @@ namespace NonSilo.Tests.Membership
 
             await manager.RefreshFromSnapshot(Snapshot(
                 new MembershipVersion(currentVersion.Value + 1),
-                Entry(otherSilo, SiloStatus.Active, now.AddMinutes(1))));
+                Entry(otherSilo, SiloStatus.Active, now.AddMinutes(1))),
+                cancellationToken);
             Assert.True(await membershipUpdates.MoveNextAsync());
             Assert.Equal(SiloStatus.Dead, membershipUpdates.Current.Entries[this.localSilo].Status);
             Assert.Equal(SiloStatus.Dead, manager.MembershipTableSnapshot.Entries[this.localSilo].Status);
@@ -599,12 +603,12 @@ namespace NonSilo.Tests.Membership
             ((ILifecycleParticipant<ISiloLifecycle>)manager).Participate(this.lifecycle);
             await this.lifecycle.OnStart(cancellationToken);
 
-            await manager.RefreshFromSnapshot(Snapshot(new MembershipVersion(125)));
+            await manager.RefreshFromSnapshot(Snapshot(new MembershipVersion(125)), cancellationToken);
             await manager.UpdateStatus(SiloStatus.Joining);
             Assert.Equal(SiloStatus.Created, manager.CurrentStatus);
             Assert.DoesNotContain(this.localSilo, manager.MembershipTableSnapshot.Entries.Keys);
 
-            await manager.RefreshFromSnapshot(Snapshot(new MembershipVersion(126)));
+            await manager.RefreshFromSnapshot(Snapshot(new MembershipVersion(126)), cancellationToken);
             this.fatalErrorHandler.DidNotReceiveWithAnyArgs().OnFatalException(default, default, default);
 
             await this.lifecycle.OnStop(cancellationToken);

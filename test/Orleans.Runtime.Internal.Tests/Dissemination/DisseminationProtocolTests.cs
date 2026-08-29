@@ -523,7 +523,7 @@ public class DisseminationProtocolTests
         try
         {
             Assert.True(await protocol.Publish(topic.Name, topic.CreateItem(local, "in-flight", sequence: 1), [peer], CancellationToken.None));
-            await firstSendStarted.Task.WaitAsync(TimeSpan.FromSeconds(2));
+            await firstSendStarted.Task.WaitAsync(TimeSpan.FromSeconds(2), TestContext.Current.CancellationToken);
             Assert.True(await protocol.Publish(topic.Name, topic.CreateItem(local, "queued", sequence: 1), [peer], CancellationToken.None));
 
             await protocol.ReceiveGossip(
@@ -620,10 +620,10 @@ public class DisseminationProtocolTests
         var protocol = CreateProtocol(transport, topic, options => options.MaxBatchItems = 2);
 
         var first = await protocol.Publish(topic.Name, topic.CreateItem(local, "first", sequence: 1), [peer], CancellationToken.None);
-        await Task.Delay(TimeSpan.FromMilliseconds(50));
+        await Task.Delay(TimeSpan.FromMilliseconds(50), TestContext.Current.CancellationToken);
         var second = await protocol.Publish(topic.Name, topic.CreateItem(local, "second", sequence: 1), [peer], CancellationToken.None);
 
-        await sent.Task.WaitAsync(TimeSpan.FromSeconds(2));
+        await sent.Task.WaitAsync(TimeSpan.FromSeconds(2), TestContext.Current.CancellationToken);
         Assert.True(first);
         Assert.True(second);
         var batch = Assert.Single(transport.GossipBatches);
@@ -654,7 +654,7 @@ public class DisseminationProtocolTests
         var protocol = CreateProtocol(transport, topic);
 
         var first = await protocol.Publish(topic.Name, topic.CreateItem(local, "first", sequence: 1), [peer], CancellationToken.None);
-        await firstSendStarted.Task.WaitAsync(TimeSpan.FromSeconds(2));
+        await firstSendStarted.Task.WaitAsync(TimeSpan.FromSeconds(2), TestContext.Current.CancellationToken);
         var second = await protocol.Publish(topic.Name, topic.CreateItem(local, "second", sequence: 1), [peer], CancellationToken.None);
         var third = await protocol.Publish(topic.Name, topic.CreateItem(local, "third", sequence: 1), [peer], CancellationToken.None);
 
@@ -741,7 +741,7 @@ public class DisseminationProtocolTests
             CancellationToken.None));
         var flushTask = protocol.FlushPendingGossip(CancellationToken.None);
 
-        await concurrencyReached.Task.WaitAsync(TimeSpan.FromSeconds(2));
+        await concurrencyReached.Task.WaitAsync(TimeSpan.FromSeconds(2), TestContext.Current.CancellationToken);
         Assert.Equal(2, Volatile.Read(ref started));
         Assert.Equal(2, Volatile.Read(ref maxInFlight));
 
@@ -791,14 +791,14 @@ public class DisseminationProtocolTests
         });
 
         Assert.True(await protocol.Publish(topic.Name, topic.CreateItem(local, "first", sequence: 1), [firstPeer], CancellationToken.None));
-        await firstSendStarted.Task.WaitAsync(TimeSpan.FromSeconds(2));
+        await firstSendStarted.Task.WaitAsync(TimeSpan.FromSeconds(2), TestContext.Current.CancellationToken);
         Assert.True(await protocol.Publish(topic.Name, topic.CreateItem(local, "second", sequence: 1), [secondPeer], CancellationToken.None));
         var explicitFlush = protocol.FlushPendingGossip(CancellationToken.None);
 
         Assert.Equal(1, Volatile.Read(ref maxInFlight));
         releaseFirstSend.SetResult(true);
         await explicitFlush;
-        await allSendsCompleted.Task.WaitAsync(TimeSpan.FromSeconds(2));
+        await allSendsCompleted.Task.WaitAsync(TimeSpan.FromSeconds(2), TestContext.Current.CancellationToken);
         Assert.Equal(1, maxInFlight);
     }
 
@@ -2326,11 +2326,17 @@ public class DisseminationProtocolTests
         var older = CreateStatistics(new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc));
         var newer = CreateStatistics(older.DateTime.AddSeconds(1));
 
-        var newerUpdate = Task.Run(() => publisher.ApplyDisseminatedRuntimeStatistics(peer, newer));
-        Assert.True(statusCheckEntered.Wait(TimeSpan.FromSeconds(2)), "The newer update did not enter the status/version boundary.");
-        var olderUpdate = Task.Run(() => publisher.UpdateRuntimeStatistics(peer, older));
+        var newerUpdate = Task.Run(
+            () => publisher.ApplyDisseminatedRuntimeStatistics(peer, newer),
+            TestContext.Current.CancellationToken);
+        Assert.True(
+            statusCheckEntered.Wait(TimeSpan.FromSeconds(2), TestContext.Current.CancellationToken),
+            "The newer update did not enter the status/version boundary.");
+        var olderUpdate = Task.Run(
+            () => publisher.UpdateRuntimeStatistics(peer, older),
+            TestContext.Current.CancellationToken);
         Assert.False(
-            olderStatusCheckEntered.Wait(TimeSpan.FromMilliseconds(100)),
+            olderStatusCheckEntered.Wait(TimeSpan.FromMilliseconds(100), TestContext.Current.CancellationToken),
             "The older update entered the status/version boundary while the newer update still owned it.");
         releaseStatusCheck.Set();
 
@@ -2366,10 +2372,16 @@ public class DisseminationProtocolTests
         blockStatusCheck = true;
         var lateStatistics = CreateStatistics(baseline.DateTime.AddSeconds(1));
 
-        var lateUpdate = Task.Run(() => publisher.ApplyDisseminatedRuntimeStatistics(peer, lateStatistics));
-        Assert.True(statusCheckEntered.Wait(TimeSpan.FromSeconds(2)), "The late update did not enter the status/version boundary.");
+        var lateUpdate = Task.Run(
+            () => publisher.ApplyDisseminatedRuntimeStatistics(peer, lateStatistics),
+            TestContext.Current.CancellationToken);
+        Assert.True(
+            statusCheckEntered.Wait(TimeSpan.FromSeconds(2), TestContext.Current.CancellationToken),
+            "The late update did not enter the status/version boundary.");
         statusOracle.SetStatus(peer, SiloStatus.Dead);
-        var termination = Task.Run(() => publisher.OnSiloStatusChange(peer, SiloStatus.Dead));
+        var termination = Task.Run(
+            () => publisher.OnSiloStatusChange(peer, SiloStatus.Dead),
+            TestContext.Current.CancellationToken);
         releaseStatusCheck.Set();
 
         await lateUpdate;
@@ -3256,7 +3268,7 @@ public class DisseminationProtocolTests
             topic.CreateItem(local, FakeTopic.DefaultKey, sequence: 1),
             [peer],
             CancellationToken.None));
-        await sendStarted.Task.WaitAsync(TimeSpan.FromSeconds(2));
+        await sendStarted.Task.WaitAsync(TimeSpan.FromSeconds(2), TestContext.Current.CancellationToken);
 
         var stopTask = service.StopAsync(CancellationToken.None);
         Assert.False(stopTask.IsCompleted);
@@ -3295,7 +3307,7 @@ public class DisseminationProtocolTests
             topic,
             options => options.Overlay.AntiEntropyInterval = TimeSpan.FromMilliseconds(1));
         await service.StartAsync(CancellationToken.None);
-        await exchangeStarted.Task.WaitAsync(TimeSpan.FromSeconds(2));
+        await exchangeStarted.Task.WaitAsync(TimeSpan.FromSeconds(2), TestContext.Current.CancellationToken);
         using var cts = new CancellationTokenSource();
         cts.Cancel();
 
@@ -3308,7 +3320,7 @@ public class DisseminationProtocolTests
             Sender = peer,
             SupportedTopics = [topic.Name],
         });
-        await exchangeCompleted.Task.WaitAsync(TimeSpan.FromSeconds(2));
+        await exchangeCompleted.Task.WaitAsync(TimeSpan.FromSeconds(2), TestContext.Current.CancellationToken);
         await WaitUntil(() => !service.HasOutstandingAntiEntropyTask);
         await WaitUntil(() => service.IsProtocolDisposed);
         Assert.Equal(new[] { peer }, service.GetUnconfirmedPeers(topic.Name, topic.MembershipScope));

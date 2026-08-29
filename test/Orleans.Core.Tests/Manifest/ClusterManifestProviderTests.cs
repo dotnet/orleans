@@ -334,7 +334,7 @@ public class ClusterManifestProviderTests
         }
         finally
         {
-            await lifecycle.OnStop();
+            await lifecycle.OnStop(TestContext.Current.CancellationToken);
             membership.Dispose();
         }
     }
@@ -392,7 +392,7 @@ public class ClusterManifestProviderTests
         }
         finally
         {
-            await lifecycle.OnStop();
+            await lifecycle.OnStop(TestContext.Current.CancellationToken);
             membership.Dispose();
         }
     }
@@ -452,7 +452,7 @@ public class ClusterManifestProviderTests
         }
         finally
         {
-            await lifecycle.OnStop();
+            await lifecycle.OnStop(TestContext.Current.CancellationToken);
             membership.Dispose();
         }
     }
@@ -509,7 +509,7 @@ public class ClusterManifestProviderTests
                 (localSilo, SiloStatus.Active),
                 (peer1, SiloStatus.Active),
                 (peer2, SiloStatus.Active)));
-            await updateRequested.Task.WaitAsync(TimeSpan.FromSeconds(10));
+            await updateRequested.Task.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
 
             membership.Update(CreateMembershipSnapshot(
                 3,
@@ -527,7 +527,7 @@ public class ClusterManifestProviderTests
         }
         finally
         {
-            await lifecycle.OnStop();
+            await lifecycle.OnStop(TestContext.Current.CancellationToken);
             membership.Dispose();
         }
     }
@@ -574,7 +574,7 @@ public class ClusterManifestProviderTests
                 2,
                 (localSilo, SiloStatus.Active),
                 (remoteSilo, SiloStatus.Active)));
-            await manifestRequested.Task.WaitAsync(TimeSpan.FromSeconds(10));
+            await manifestRequested.Task.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
 
             membership.Update(CreateMembershipSnapshot(
                 3,
@@ -590,7 +590,7 @@ public class ClusterManifestProviderTests
         }
         finally
         {
-            await lifecycle.OnStop();
+            await lifecycle.OnStop(TestContext.Current.CancellationToken);
             membership.Dispose();
         }
     }
@@ -642,7 +642,7 @@ public class ClusterManifestProviderTests
         }
         finally
         {
-            await lifecycle.OnStop();
+            await lifecycle.OnStop(TestContext.Current.CancellationToken);
             membership.Dispose();
         }
     }
