@@ -136,9 +136,12 @@ namespace Orleans.Runtime.MembershipService
             }
         }
 
-        public async Task RefreshFromSnapshot(
+        public Task RefreshFromSnapshot(MembershipTableSnapshot snapshot) =>
+            RefreshFromSnapshot(snapshot, CancellationToken.None);
+
+        private async Task RefreshFromSnapshot(
             MembershipTableSnapshot snapshot,
-            CancellationToken cancellationToken = default)
+            CancellationToken cancellationToken)
         {
             if (snapshot.Version == MembershipVersion.MinValue)
                 throw new ArgumentException("Cannot call RefreshFromSnapshot with Version == MembershipVersion.MinValue");

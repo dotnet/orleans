@@ -715,7 +715,7 @@ public class ClusterManifestProviderTests
         }
         finally
         {
-            await lifecycle.OnStop();
+            await lifecycle.OnStop(TestContext.Current.CancellationToken);
             provider.Dispose();
             membership.Dispose();
         }
@@ -753,7 +753,7 @@ public class ClusterManifestProviderTests
         {
             await Task.WhenAll(requestLog.WaitForProbeCountAsync(3), requestLog.WaitForLegacyFetchCountAsync(peers.Length));
 
-            await lifecycle.OnStop();
+            await lifecycle.OnStop(TestContext.Current.CancellationToken);
             stopped = true;
 
             Assert.Equal(GetExpectedProbePeers(localSilo, peers, round: 1), requestLog.ProbeAddresses);
@@ -764,7 +764,7 @@ public class ClusterManifestProviderTests
         {
             if (!stopped)
             {
-                await lifecycle.OnStop();
+                await lifecycle.OnStop(TestContext.Current.CancellationToken);
             }
 
             provider.Dispose();
@@ -811,7 +811,7 @@ public class ClusterManifestProviderTests
         }
         finally
         {
-            await lifecycle.OnStop();
+            await lifecycle.OnStop(TestContext.Current.CancellationToken);
             provider.Dispose();
             membership.Dispose();
         }
@@ -883,7 +883,7 @@ public class ClusterManifestProviderTests
         }
         finally
         {
-            await lifecycle.OnStop();
+            await lifecycle.OnStop(TestContext.Current.CancellationToken);
             provider.Dispose();
             membership.Dispose();
         }
@@ -933,7 +933,7 @@ public class ClusterManifestProviderTests
         }
         finally
         {
-            await lifecycle.OnStop();
+            await lifecycle.OnStop(TestContext.Current.CancellationToken);
             provider.Dispose();
             membership.Dispose();
         }

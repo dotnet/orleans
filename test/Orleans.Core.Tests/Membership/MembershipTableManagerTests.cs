@@ -508,8 +508,8 @@ namespace NonSilo.Tests.Membership
                 return readCompletion.Task;
             });
             var manager = this.CreateMembershipTableManager(membershipTable);
-            var refreshTask = manager.Refresh();
-            await readStarted.Task.WaitAsync(TimeSpan.FromSeconds(5));
+            var refreshTask = manager.Refresh(cancellationToken: TestContext.Current.CancellationToken);
+            await readStarted.Task.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
             using var cancellation = new CancellationTokenSource();
             var gossipTask = ((IMembershipManager)manager).ProcessGossipSnapshot(
                 Snapshot(new MembershipVersion(1)),
@@ -518,11 +518,11 @@ namespace NonSilo.Tests.Membership
             cancellation.Cancel();
 
             await Assert.ThrowsAnyAsync<OperationCanceledException>(
-                () => gossipTask.WaitAsync(TimeSpan.FromSeconds(5)));
+                () => gossipTask.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken));
 
             var completedTable = await new InMemoryMembershipTable(new TableVersion(1, "1")).ReadAll();
             readCompletion.TrySetResult(completedTable);
-            await refreshTask.WaitAsync(TimeSpan.FromSeconds(5));
+            await refreshTask.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
         }
 
         [Fact]
@@ -1156,8 +1156,8 @@ namespace NonSilo.Tests.Membership
                     return deadStatusUpdate;
                 });
 
-            await this.lifecycle.OnStart();
-            var stopTask = this.lifecycle.OnStop();
+            await this.lifecycle.OnStart(TestContext.Current.CancellationToken);
+            var stopTask = this.lifecycle.OnStop(TestContext.Current.CancellationToken);
             await gossipStarted.Task;
 
             Assert.NotNull(deadStatusUpdate);
@@ -1288,8 +1288,8 @@ namespace NonSilo.Tests.Membership
                     return deadStatusUpdate;
                 });
 
-            await this.lifecycle.OnStart();
-            var stopTask = this.lifecycle.OnStop();
+            await this.lifecycle.OnStart(TestContext.Current.CancellationToken);
+            var stopTask = this.lifecycle.OnStop(TestContext.Current.CancellationToken);
             var membershipUpdate = await membershipUpdateStarted.Task;
 
             Assert.Equal(SiloStatus.Dead, membershipUpdate.Status);

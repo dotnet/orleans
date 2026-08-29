@@ -38,7 +38,7 @@ public sealed class DisseminationClusterTests
         });
 
         await using var cluster = builder.Build();
-        await cluster.DeployAsync();
+        await cluster.DeployAsync(TestContext.Current.CancellationToken);
         await cluster.WaitForLivenessToStabilizeAsync();
 
         var existingSilos = cluster.GetActiveSilos().Select(static silo => silo.SiloAddress).ToHashSet();

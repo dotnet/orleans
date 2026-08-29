@@ -14,7 +14,7 @@ public class WakeTimerTests
     {
         var timeProvider = new FakeTimeProvider();
         using var timer = new WakeTimer(timeProvider);
-        var wait = timer.WaitAsync(CancellationToken.None).AsTask();
+        var wait = timer.WaitAsync(TestContext.Current.CancellationToken).AsTask();
 
         timer.Change(TimeSpan.FromSeconds(1));
         timeProvider.Advance(TimeSpan.FromMilliseconds(999));
@@ -31,7 +31,7 @@ public class WakeTimerTests
 
         timer.Wake();
 
-        Assert.True(await timer.WaitAsync(CancellationToken.None));
+        Assert.True(await timer.WaitAsync(TestContext.Current.CancellationToken));
     }
 
     [Fact]
@@ -39,7 +39,7 @@ public class WakeTimerTests
     {
         var timeProvider = new FakeTimeProvider();
         using var timer = new WakeTimer(timeProvider);
-        var wait = timer.WaitAsync(CancellationToken.None).AsTask();
+        var wait = timer.WaitAsync(TestContext.Current.CancellationToken).AsTask();
 
         timer.Change(TimeSpan.FromSeconds(1));
         timeProvider.Advance(TimeSpan.FromMilliseconds(500));
@@ -56,7 +56,7 @@ public class WakeTimerTests
     {
         var timeProvider = new ControllableTimeProvider();
         using var timer = new WakeTimer(timeProvider);
-        var wait = timer.WaitAsync(CancellationToken.None).AsTask();
+        var wait = timer.WaitAsync(TestContext.Current.CancellationToken).AsTask();
 
         timer.Change(TimeSpan.FromSeconds(1));
         timeProvider.Advance(TimeSpan.FromMilliseconds(500));
@@ -83,7 +83,7 @@ public class WakeTimerTests
         cancellation.Cancel();
         await Assert.ThrowsAnyAsync<OperationCanceledException>(() => canceledWait);
 
-        var nextWait = timer.WaitAsync(CancellationToken.None).AsTask();
+        var nextWait = timer.WaitAsync(TestContext.Current.CancellationToken).AsTask();
         timeProvider.Advance(TimeSpan.FromSeconds(1));
 
         Assert.True(await nextWait);
@@ -112,7 +112,7 @@ public class WakeTimerTests
         synchronizationContext.RunAll();
 
         await Assert.ThrowsAnyAsync<OperationCanceledException>(() => canceledWait);
-        var nextWait = timer.WaitAsync();
+        var nextWait = timer.WaitAsync(TestContext.Current.CancellationToken);
         Assert.True(nextWait.IsCompletedSuccessfully);
         Assert.True(await nextWait);
     }
@@ -121,12 +121,12 @@ public class WakeTimerTests
     public async Task DisposeCompletesCurrentAndFutureWaitsWithFalse()
     {
         var timer = new WakeTimer(TimeProvider.System);
-        var wait = timer.WaitAsync(CancellationToken.None).AsTask();
+        var wait = timer.WaitAsync(TestContext.Current.CancellationToken).AsTask();
 
         timer.Dispose();
 
         Assert.False(await wait);
-        Assert.False(await timer.WaitAsync(CancellationToken.None));
+        Assert.False(await timer.WaitAsync(TestContext.Current.CancellationToken));
     }
 
     private sealed class QueuedSynchronizationContext : SynchronizationContext
