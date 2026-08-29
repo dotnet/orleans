@@ -512,17 +512,12 @@ internal sealed partial class ClientDirectory : SystemTarget, ILocalClientDirect
             LogDebugPublishingRoutes(successor);
 
             var remote = _grainFactory.GetSystemTarget<IRemoteClientDirectory>(Constants.ClientDirectoryType, successor);
-            Task publishTask;
-            lock (_lockObj)
+            if (_stoppingCts.IsCancellationRequested)
             {
-                if (_stoppingCts.IsCancellationRequested)
-                {
-                    return;
-                }
-
-                publishTask = remote.OnUpdateClientRoutes(update);
+                return;
             }
 
+            var publishTask = remote.OnUpdateClientRoutes(update);
             await publishTask.WaitAsync(_stoppingCts.Token);
 
             // Record the current lower bound of what the successor knows, so that it can be used to minimize
