@@ -684,6 +684,22 @@ public class GrainDirectoryCacheFactoryTests
     }
 
     [Fact]
+    public async Task CreateGrainDirectoryCache_DisposeInvalidatesHandleAndReleasesTarget()
+    {
+        var (cache, entrySource) = CreateEntryCache();
+        var disposableCache = Assert.IsAssignableFrom<IAsyncDisposable>(cache);
+        var address = CreateGrainAddress(CreateGrainId(), port: 11111);
+        cache.AddOrUpdate(address, version: 1);
+        var entry = GetEntry(entrySource, address.GrainId);
+        var targetReference = BindMessageTarget(entry);
+
+        await disposableCache.DisposeAsync();
+
+        AssertInvalidEntry(entry);
+        AssertEventuallyCollected(targetReference);
+    }
+
+    [Fact]
     public void CreateGrainDirectoryCache_HighCardinalityHandlesRemainBoundedAndReleaseObjectGraphs()
     {
         const int cacheSize = 64;

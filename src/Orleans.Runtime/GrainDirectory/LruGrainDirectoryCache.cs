@@ -86,6 +86,7 @@ internal sealed class LruGrainDirectoryCache : ConcurrentLruCache<GrainId, (Grai
     public new async ValueTask DisposeAsync()
     {
         _cacheSizeRegistration.Dispose();
+        Clear();
         await base.DisposeAsync();
     }
 
