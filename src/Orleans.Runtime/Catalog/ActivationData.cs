@@ -48,6 +48,9 @@ internal sealed partial class ActivationData :
     private readonly IServiceScope _serviceScope;
     private readonly WorkItemGroup _workItemGroup;
     private ActivationRequestTracker? _requestTracker;
+    // Low 32 bits store waiting requests and high 32 bits store running requests.
+    // Writers hold the activation lock; readers use one volatile snapshot without observing pooled tracker state.
+    private long _requestStatus;
     // 0-2 count completed request cycles. 3 indicates that a recurring activation retains its empty tracker.
     private byte _requestTrackerReuseState;
     private readonly SingleWaiterAutoResetEvent _workSignal = new() { RunContinuationsAsynchronously = true };
@@ -214,11 +217,8 @@ internal sealed partial class ActivationData :
 
     internal (int WaitingCount, bool IsInactive) GetRequestStatus()
     {
-        lock (this)
-        {
-            var requestTracker = _requestTracker;
-            return (requestTracker?.WaitingCount ?? 0, requestTracker is null or { IsEmpty: true });
-        }
+        var status = Volatile.Read(ref _requestStatus);
+        return (GetWaitingCount(status), status == 0);
     }
     internal ValueTask WaitForActivationReadyAsync(CancellationToken cancellationToken)
     {
@@ -540,18 +540,24 @@ internal sealed partial class ActivationData :
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private void ReturnRequestTrackerIfEmpty()
     {
+        if (_requestTracker is not { } requestTracker)
+        {
+            return;
+        }
+
+        UpdateRequestStatus(requestTracker);
         if (_requestTrackerReuseState >= 3 && State == ActivationState.Valid)
         {
             return;
         }
 
-        ReturnRequestTrackerIfEmptySlow();
+        ReturnRequestTrackerIfEmptySlow(requestTracker);
     }
 
     [MethodImpl(MethodImplOptions.NoInlining)]
-    private void ReturnRequestTrackerIfEmptySlow()
+    private void ReturnRequestTrackerIfEmptySlow(ActivationRequestTracker requestTracker)
     {
-        if (_requestTracker is not { IsEmpty: true } requestTracker)
+        if (!requestTracker.IsEmpty)
         {
             return;
         }
@@ -573,6 +579,12 @@ internal sealed partial class ActivationData :
             _requestTrackerReuseState = 3;
         }
     }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private void UpdateRequestStatus(ActivationRequestTracker requestTracker)
+        => Volatile.Write(ref _requestStatus, ((long)requestTracker.RunningCount << 32) | (uint)requestTracker.WaitingCount);
+
+    private static int GetWaitingCount(long status) => (int)(uint)status;
 
     /// <summary>
     /// Returns how long this activation has been idle.
@@ -1274,6 +1286,7 @@ internal sealed partial class ActivationData :
         {
             var stopwatch = CoarseStopwatch.StartNew();
             _requestTracker!.AddRunning(message, stopwatch);
+            UpdateRequestStatus(_requestTracker);
 
             if (_blockingRequest != null || isInterleavable) return;
 
@@ -1635,10 +1648,8 @@ internal sealed partial class ActivationData :
     {
         lock (_lock)
         {
-            if (!_requestTracker!.RemoveRunning(message))
-            {
-                throw new InvalidOperationException($"Completed request {message} was not tracked by activation {this}.");
-            }
+            var removed = _requestTracker!.RemoveRunning(message);
+            Debug.Assert(removed, $"Completed request {message} was not tracked by activation {this}.");
 
             ReturnRequestTrackerIfEmpty();
 
@@ -1720,6 +1731,7 @@ internal sealed partial class ActivationData :
         {
             var requestTracker = _requestTracker ??= ActivationRequestTracker.Rent();
             requestTracker.AddWaiting(message);
+            UpdateRequestStatus(requestTracker);
             OnWaitingRequestAdded();
         }
 
