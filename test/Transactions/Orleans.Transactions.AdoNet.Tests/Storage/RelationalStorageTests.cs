@@ -21,7 +21,10 @@ public sealed class RelationalStorageTests
         var storage = (RelationalStorage)RuntimeHelpers.GetUninitializedObject(typeof(RelationalStorage));
 
         var exception = await Assert.ThrowsAsync<ArgumentNullException>(
-            () => storage.ExecuteTransactionAsync(null!, currentETag: null));
+            () => storage.ExecuteTransactionAsync(
+                null!,
+                currentETag: null,
+                TestContext.Current.CancellationToken));
 
         Assert.Equal("multipleQuery", exception.ParamName);
     }
@@ -100,7 +103,7 @@ public sealed class RelationalStorageTests
         await RelationalStorage.RollbackPreservingOriginalExceptionAsync(
             transaction,
             originalException,
-            CancellationToken.None);
+            TestContext.Current.CancellationToken);
 
         Assert.Same(
             rollbackException,
