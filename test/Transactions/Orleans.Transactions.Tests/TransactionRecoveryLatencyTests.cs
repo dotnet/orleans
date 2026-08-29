@@ -123,6 +123,7 @@ public class TransactionRecoveryLatencyTests
         await queue.RWLock.EnterLock(
             transactionId,
             timeStamp,
+            TimeSpan.FromMinutes(1),
             default,
             isRead: false,
             exclusiveLock: false,
