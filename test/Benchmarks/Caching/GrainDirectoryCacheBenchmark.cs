@@ -95,3 +95,32 @@ public class GrainDirectoryCacheBenchmark
         await _entryCache.DisposeAsync();
     }
 }
+
+[MemoryDiagnoser]
+[BenchmarkCategory("Caching")]
+public class GrainDirectoryCacheAllocationBenchmark
+{
+    private GrainId _grainId;
+    private GrainAddress _address = null!;
+
+    [GlobalSetup]
+    public void Setup()
+    {
+        _grainId = GrainId.Create("benchmark", "allocation");
+        _address = new GrainAddress
+        {
+            GrainId = _grainId,
+            ActivationId = ActivationId.NewId(),
+            SiloAddress = SiloAddress.FromParsableString("127.0.0.1:11111@1"),
+        };
+    }
+
+    [Benchmark(Baseline = true)]
+    public object TupleEntry()
+        => new ConcurrentLruCache<GrainId, (GrainAddress Address, int Version)>.LruItem(
+            _grainId,
+            (_address, 1));
+
+    [Benchmark]
+    public object SharedEntry() => new GrainDirectoryCacheEntry(_address, version: 1);
+}
