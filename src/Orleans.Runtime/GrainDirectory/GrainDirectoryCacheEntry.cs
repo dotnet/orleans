@@ -9,6 +9,7 @@ internal sealed class GrainDirectoryCacheEntry
 {
     private static readonly object Invalidated = new();
     private static readonly object Updating = new();
+    private readonly WeakReference<GrainDirectoryCacheEntry> _referenceHandle;
     private object? _messageTarget;
 
     public GrainDirectoryCacheEntry(GrainAddress address, int version)
@@ -22,11 +23,14 @@ internal sealed class GrainDirectoryCacheEntry
         long timestamp)
         : base(grainId, value, timestamp)
     {
+        _referenceHandle = new(this);
     }
 
     public GrainAddress Address => Value.ActivationAddress;
 
     public int Version => Value.Version;
+
+    public WeakReference<GrainDirectoryCacheEntry> ReferenceHandle => _referenceHandle;
 
     public bool IsValid
     {

@@ -599,6 +599,25 @@ public class GrainDirectoryCacheFactoryTests
     }
 
     [Fact]
+    public void GrainDirectoryCacheEntry_InvalidationDuringUpdateCannotReopenBinding()
+    {
+        var grainId = CreateGrainId();
+        var originalAddress = CreateGrainAddress(grainId, port: 11111);
+        var replacementAddress = CreateGrainAddress(grainId, port: 22222);
+        var entry = new GrainDirectoryCacheEntry(originalAddress, version: 1);
+
+        Assert.True(entry.TryBeginUpdate());
+
+        entry.Invalidate();
+        entry.Value = (replacementAddress, 2);
+        entry.EndUpdate();
+
+        AssertInvalidEntry(entry);
+        Assert.Equal(replacementAddress, entry.Address);
+        Assert.Equal(2, entry.Version);
+    }
+
+    [Fact]
     public async Task CreateGrainDirectoryCache_RemoveByGrainIdReleasesMessageTargetReference()
     {
         var (cache, entrySource) = CreateEntryCache();
@@ -619,6 +638,30 @@ public class GrainDirectoryCacheFactoryTests
         {
             await disposableCache.DisposeAsync();
         }
+    }
+
+    [Fact]
+    public void CreateGrainDirectoryCache_LongLivedHandleDoesNotRetainRemovedEntry()
+    {
+        var handle = CreateRemovedEntryHandle();
+
+        AssertEventuallyCollected(handle);
+        GC.KeepAlive(handle);
+    }
+
+    [Fact]
+    public void CreateGrainDirectoryCache_HighCardinalityHandlesRemainBoundedAndReleaseObjectGraphs()
+    {
+        const int cacheSize = 64;
+        const int entryCount = 5_000;
+        var (handles, targets) = CreateHighCardinalityHandles(cacheSize, entryCount);
+
+        Assert.Equal(entryCount, handles.Length);
+        Assert.Equal(entryCount, targets.Length);
+        AssertEventuallyCollected(handles);
+        AssertEventuallyCollected(targets);
+        GC.KeepAlive(handles);
+        GC.KeepAlive(targets);
     }
 
     private static (IGrainDirectoryCache Cache, IGrainDirectoryCacheEntrySource EntrySource) CreateEntryCache(
@@ -673,6 +716,69 @@ public class GrainDirectoryCacheFactoryTests
     }
 
     [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.NoInlining)]
+    private static WeakReference<GrainDirectoryCacheEntry> AddRemoveAndGetEntryHandle(
+        IGrainDirectoryCache cache,
+        IGrainDirectoryCacheEntrySource entrySource,
+        GrainAddress address)
+    {
+        cache.AddOrUpdate(address, version: 1);
+        var entry = GetEntry(entrySource, address.GrainId);
+        var handle = entry.ReferenceHandle;
+        Assert.True(cache.Remove(address.GrainId));
+        Assert.False(handle.TryGetTarget(out var retained) && retained.IsValid);
+        return handle;
+    }
+
+    [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.NoInlining)]
+    private static WeakReference<GrainDirectoryCacheEntry> CreateRemovedEntryHandle()
+    {
+        var (cache, entrySource) = CreateEntryCache();
+        var disposableCache = Assert.IsAssignableFrom<IAsyncDisposable>(cache);
+        try
+        {
+            return AddRemoveAndGetEntryHandle(
+                cache,
+                entrySource,
+                CreateGrainAddress(CreateGrainId(), port: 11111));
+        }
+        finally
+        {
+            disposableCache.DisposeAsync().AsTask().GetAwaiter().GetResult();
+        }
+    }
+
+    [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.NoInlining)]
+    private static (
+        WeakReference<GrainDirectoryCacheEntry>[] Handles,
+        WeakReference<object>[] Targets) CreateHighCardinalityHandles(int cacheSize, int entryCount)
+    {
+        var (cache, entrySource) = CreateEntryCache(cacheSize);
+        var disposableCache = Assert.IsAssignableFrom<IAsyncDisposable>(cache);
+        var handles = new WeakReference<GrainDirectoryCacheEntry>[entryCount];
+        var targets = new WeakReference<object>[entryCount];
+        try
+        {
+            for (var i = 0; i < entryCount; i++)
+            {
+                var address = CreateGrainAddress(CreateGrainId(), port: 11111 + (i % 100));
+                cache.AddOrUpdate(address, version: i);
+                var entry = GetEntry(entrySource, address.GrainId);
+                var target = new object();
+                Assert.True(entry.TrySetMessageTarget(target, address));
+                handles[i] = entry.ReferenceHandle;
+                targets[i] = new(target);
+            }
+
+            Assert.InRange(cache.KeyValues.Count(), 0, cacheSize);
+            return (handles, targets);
+        }
+        finally
+        {
+            disposableCache.DisposeAsync().AsTask().GetAwaiter().GetResult();
+        }
+    }
+
+    [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.NoInlining)]
     private static void AssertEventuallyCollected(WeakReference<IGrainContext> targetReference)
     {
         for (var attempt = 0; attempt < 3; attempt++)
@@ -688,6 +794,48 @@ public class GrainDirectoryCacheFactoryTests
         }
 
         Assert.False(targetReference.TryGetTarget(out _));
+    }
+
+    [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.NoInlining)]
+    private static void AssertEventuallyCollected(WeakReference<GrainDirectoryCacheEntry> entryReference)
+    {
+        for (var attempt = 0; attempt < 3; attempt++)
+        {
+            GC.Collect();
+            GC.WaitForPendingFinalizers();
+            GC.Collect();
+
+            if (!entryReference.TryGetTarget(out _))
+            {
+                return;
+            }
+        }
+
+        Assert.False(entryReference.TryGetTarget(out _));
+    }
+
+    [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.NoInlining)]
+    private static void AssertEventuallyCollected(WeakReference<GrainDirectoryCacheEntry>[] entryReferences)
+    {
+        CollectGarbage();
+        Assert.All(entryReferences, entryReference => Assert.False(entryReference.TryGetTarget(out _)));
+    }
+
+    [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.NoInlining)]
+    private static void AssertEventuallyCollected(WeakReference<object>[] targetReferences)
+    {
+        CollectGarbage();
+        Assert.All(targetReferences, targetReference => Assert.False(targetReference.TryGetTarget(out _)));
+    }
+
+    private static void CollectGarbage()
+    {
+        for (var attempt = 0; attempt < 3; attempt++)
+        {
+            GC.Collect();
+            GC.WaitForPendingFinalizers();
+            GC.Collect();
+        }
     }
 
     private static GrainId CreateGrainId() => GrainId.Parse($"user/{Guid.NewGuid():N}");

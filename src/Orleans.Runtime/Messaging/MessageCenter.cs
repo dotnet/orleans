@@ -27,6 +27,7 @@ namespace Orleans.Runtime.Messaging
         private readonly SiloMessagingOptions messagingOptions;
         private readonly PlacementService placementService;
         private readonly GrainLocator _grainLocator;
+        private readonly IClusterMembershipService _clusterMembershipService;
         private readonly Action<Message>? _messageObserver;
         private readonly ILogger log;
         private readonly Catalog catalog;
@@ -48,6 +49,7 @@ namespace Orleans.Runtime.Messaging
             IOptions<SiloMessagingOptions> messagingOptions,
             PlacementService placementService,
             GrainLocator grainLocator,
+            IClusterMembershipService clusterMembershipService,
             IMessageStatisticsSink messageStatisticsSink)
         {
             this.catalog = catalog;
@@ -59,6 +61,7 @@ namespace Orleans.Runtime.Messaging
             _messagingProcessingInstruments = messagingProcessingInstruments;
             this.placementService = placementService;
             _grainLocator = grainLocator;
+            _clusterMembershipService = clusterMembershipService;
             _messageObserver = messageStatisticsSink.GetMessageObserver();
             this.log = logger;
             this.messageFactory = messageFactory;
@@ -596,33 +599,51 @@ namespace Orleans.Runtime.Messaging
             Message message,
             [NotNullWhen(true)] out GrainDirectoryCacheEntry? entry)
         {
-            if (target?.MessageTargetCache is not GrainDirectoryCacheEntry candidate)
+            var cache = target?.MessageTargetCache;
+            if (cache is not WeakReference<GrainDirectoryCacheEntry> handle
+                || !handle.TryGetTarget(out var candidate))
             {
+                if (target is not null && cache is not null)
+                {
+                    target.ClearMessageTargetCache(cache);
+                }
+
                 entry = null;
                 return false;
             }
 
             if (message.CacheInvalidationHeader is null && candidate.IsValid)
             {
-                Debug.Assert(candidate.Address.GrainId.Equals(message.TargetGrain));
-                if (candidate.Address.SiloAddress is { } targetSilo
-                    && (targetSilo.Matches(_siloAddress) || !siloStatusOracle.IsDeadSilo(targetSilo)))
+                var candidateAddress = candidate.Address;
+                Debug.Assert(candidateAddress.GrainId.Equals(message.TargetGrain));
+                if (candidateAddress.SiloAddress is { } targetSilo
+                    && (targetSilo.Matches(_siloAddress) || !IsKnownDeadSilo(candidateAddress)))
                 {
                     entry = candidate;
                     return true;
                 }
             }
 
-            if (!candidate.IsValid
-                || candidate.Address.SiloAddress is not { } candidateSilo
-                || siloStatusOracle.IsDeadSilo(candidateSilo))
+            var clearHandle = !candidate.IsValid;
+            if (!clearHandle)
             {
-                target.ClearMessageTargetCache(candidate);
+                var candidateAddress = candidate.Address;
+                clearHandle = candidateAddress.SiloAddress is not { } candidateSilo
+                    || !candidateSilo.Matches(_siloAddress) && IsKnownDeadSilo(candidateAddress);
+            }
+
+            if (clearHandle)
+            {
+                target!.ClearMessageTargetCache(handle);
             }
 
             entry = null;
             return false;
         }
+
+        private bool IsKnownDeadSilo(GrainAddress address)
+            => address.SiloAddress is not { } siloAddress
+                || _clusterMembershipService.CurrentSnapshot.GetSiloStatus(siloAddress, address.MembershipVersion) == SiloStatus.Dead;
 
         private GrainDirectoryCacheEntry? CaptureDirectoryCacheEntry(GrainReference? target, Message message)
         {
@@ -635,7 +656,7 @@ namespace Orleans.Runtime.Messaging
                 return null;
             }
 
-            target.MessageTargetCache = entry;
+            target.MessageTargetCache = entry.ReferenceHandle;
             return entry;
         }
 
