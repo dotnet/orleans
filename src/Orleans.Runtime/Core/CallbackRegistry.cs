@@ -31,7 +31,8 @@ internal sealed class CallbackRegistry
     {
         if (_callbacks.TryRemove(response.Id, out var callback))
         {
-            return callback.TryDoCallback(response);
+            _ = callback.TryDoCallback(response);
+            return true;
         }
 
         return false;
