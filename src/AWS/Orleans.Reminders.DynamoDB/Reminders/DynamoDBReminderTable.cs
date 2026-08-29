@@ -48,8 +48,6 @@ namespace Orleans.Reminders.DynamoDB
         private string? leaseToken;
         private CancellationTokenSource? leaseRenewalCancellation;
         private Task? leaseRenewalTask;
-        private readonly SemaphoreSlim legacyStrongScanRateLimiter = new(1, 1);
-        private DateTimeOffset lastLegacyStrongScanStarted;
 
         /// <summary>Initializes a new instance of the <see cref="DynamoDBReminderTable"/> class.</summary>
         /// <param name="loggerFactory">logger factory to use</param>
@@ -259,52 +257,12 @@ namespace Orleans.Reminders.DynamoDB
         /// <param name="begin"></param>
         /// <param name="end"></param>
         /// <returns> Return the RemiderTableData if the rows were read successfully </returns>
-        public Task<ReminderTableData> ReadRows(uint begin, uint end)
-            => ReadRows(begin, end, requireStrongConsistency: false);
-
-        /// <inheritdoc/>
-        public async Task<ReminderTableData> ReadRows(
-            IReadOnlyList<(uint Begin, uint End)> ranges,
-            bool requireStrongConsistency)
-        {
-            await RefreshReadMode();
-            if (useV2Reads)
-            {
-                var result = new List<ReminderEntry>();
-                foreach (var range in ranges)
-                {
-                    result.AddRange((await ReadV2Rows(range.Begin, range.End)).Reminders);
-                }
-
-                return new(result);
-            }
-
-            if (requireStrongConsistency)
-            {
-                return await ReadLegacyRowsStrongly(ranges);
-            }
-
-            var legacyResult = new List<ReminderEntry>();
-            foreach (var range in ranges)
-            {
-                legacyResult.AddRange((await ReadRows(range.Begin, range.End)).Reminders);
-            }
-
-            return new(legacyResult);
-        }
-
-        /// <inheritdoc/>
-        public async Task<ReminderTableData> ReadRows(uint begin, uint end, bool requireStrongConsistency)
+        public async Task<ReminderTableData> ReadRows(uint begin, uint end)
         {
             await RefreshReadMode();
             if (useV2Reads)
             {
                 return await ReadV2Rows(begin, end);
-            }
-
-            if (requireStrongConsistency)
-            {
-                return await ReadLegacyRowsStrongly(begin, end);
             }
 
             Dictionary<string, AttributeValue>? expressionValues = null;
