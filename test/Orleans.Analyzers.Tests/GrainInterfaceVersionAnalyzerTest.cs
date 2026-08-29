@@ -1,6 +1,7 @@
 #nullable enable
 
 using System.Collections.Immutable;
+using System.Diagnostics;
 using System.Globalization;
 using System.Reflection;
 using System.Text;
@@ -1802,23 +1803,45 @@ public interface IMyGrain : IGrain
                 filePath: contractsDocumentPath);
         }
 
-        if (configuredContractsPath is not null)
-        {
-            var analyzerConfigDirectory = Path.GetDirectoryName(configuredContractsPath);
-            var analyzerConfigPath = string.IsNullOrEmpty(analyzerConfigDirectory)
-                ? Path.Combine(Path.GetTempPath(), ".globalconfig")
-                : Path.Combine(analyzerConfigDirectory, ".globalconfig");
-            solution = solution.AddAnalyzerConfigDocument(
-                DocumentId.CreateNewId(projectId, ".globalconfig"),
-                ".globalconfig",
-                SourceText.From(
-                    $"is_global = true{Environment.NewLine}" +
-                    $"build_property.OrleansContractsPath = {configuredContractsPath}{Environment.NewLine}"),
-                filePath: analyzerConfigPath);
-        }
+        solution = AddContractsAnalyzerConfig(solution, projectId, configuredContractsPath);
 
         return solution.GetProject(projectId)!
             .WithCompilationOptions(new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+    }
+
+    private static Solution AddContractsAnalyzerConfig(
+        Solution solution,
+        ProjectId projectId,
+        string? configuredContractsPath = null,
+        bool contractsFileExists = false)
+    {
+        var analyzerConfigDirectory = configuredContractsPath is null
+            ? Path.GetTempPath()
+            : Path.GetDirectoryName(configuredContractsPath);
+        var analyzerConfigPath = Path.Combine(
+            string.IsNullOrEmpty(analyzerConfigDirectory) ? Path.GetTempPath() : analyzerConfigDirectory,
+            projectId.Id.ToString("N"),
+            ".globalconfig");
+        var content =
+            $"is_global = true{Environment.NewLine}" +
+            $"build_property.{GrainInterfaceVersionAnalyzer.EnableAnalyzerPropertyName} = true{Environment.NewLine}";
+        if (configuredContractsPath is not null)
+        {
+            content += $"build_property.OrleansContractsPath = {configuredContractsPath}{Environment.NewLine}";
+        }
+
+        if (contractsFileExists)
+        {
+            content +=
+                $"{Environment.NewLine}[*.txt]{Environment.NewLine}" +
+                $"build_metadata.AdditionalFiles.OrleansContractsFileExists = true{Environment.NewLine}";
+        }
+
+        return solution.AddAnalyzerConfigDocument(
+            DocumentId.CreateNewId(projectId, ".globalconfig"),
+            ".globalconfig",
+            SourceText.From(content),
+            filePath: analyzerConfigPath);
     }
 
     #endregion
@@ -2429,7 +2452,7 @@ interface Outer.IInnerGrain [Version(1)]
     }
 
     [Fact]
-    public async Task FixAll_RegenerateSolution_UpdatesEveryProjectWithDiagnostics()
+    public async Task FixAll_RegenerateSolution_DoesNotRequestDiagnosticsAgain()
     {
         var firstProject = CreateProjectWithAdditionalFilesForCodeFix(
             "public interface IFirstGrain : IGrain { Task Ping(); }",
@@ -2448,13 +2471,9 @@ interface Outer.IInnerGrain [Version(1)]
             .WithProjectCompilationOptions(secondProjectId, new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary))
             .AddDocument(secondDocumentId, "Second.cs", SourceText.From(secondSource))
             .AddAdditionalDocument(secondContractsId, OrleansContractsFileName, SourceText.From("# OrleansContracts.txt\n"));
+        solution = AddContractsAnalyzerConfig(solution, secondProjectId);
 
         firstProject = solution.GetProject(firstProject.Id)!;
-        var diagnostics = new Dictionary<ProjectId, IEnumerable<Diagnostic>>
-        {
-            [firstProject.Id] = new[] { CreateFixAllDiagnostic() },
-            [secondProjectId] = new[] { CreateFixAllDiagnostic() }
-        };
         var codeFixer = new GrainInterfaceVersionCodeFix();
         var context = new FixAllContext(
             firstProject.Documents.First(),
@@ -2462,7 +2481,7 @@ interface Outer.IInnerGrain [Version(1)]
             FixAllScope.Solution,
             RegenerateCodeActionEquivalenceKey,
             codeFixer.FixableDiagnosticIds,
-            new TestFixAllDiagnosticProvider(diagnostics),
+            ThrowingFixAllDiagnosticProvider.Instance,
             TestContext.Current.CancellationToken);
 
         var action = await codeFixer.GetFixAllProvider().GetFixAsync(context);
@@ -2478,10 +2497,480 @@ interface Outer.IInnerGrain [Version(1)]
         Assert.Contains("interface [GrainInterfaceType(\"ISecondGrain\")] ISecondGrain [Version(0)]", secondContent);
     }
 
-    private static Diagnostic CreateFixAllDiagnostic()
+    [Fact]
+    public async Task FixAll_RegenerateSolution_SkipsEnabledProjectsWithoutOrleansReferenceOrManifest()
+    {
+        var relevantProject = CreateProjectWithAdditionalFilesForCodeFix(
+            "public interface IRelevantGrain : IGrain { Task Ping(); }",
+            "# OrleansContracts.txt\n");
+        var unrelatedProjectId = ProjectId.CreateNewId("UnrelatedProject");
+        var unrelatedDocumentId = DocumentId.CreateNewId(unrelatedProjectId, "Unrelated.cs");
+        var nonOrleansReferences = relevantProject.MetadataReferences
+            .Where(reference => !string.Equals(
+                Path.GetFileNameWithoutExtension(reference.Display),
+                "Orleans.Core.Abstractions",
+                StringComparison.OrdinalIgnoreCase));
+        var solution = relevantProject.Solution
+            .AddProject(unrelatedProjectId, "UnrelatedProject", "UnrelatedProject", LanguageNames.CSharp)
+            .AddMetadataReferences(unrelatedProjectId, nonOrleansReferences)
+            .WithProjectCompilationOptions(unrelatedProjectId, new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary))
+            .AddDocument(unrelatedDocumentId, "Unrelated.cs", SourceText.From("public sealed class Unrelated;"));
+        solution = AddContractsAnalyzerConfig(solution, unrelatedProjectId);
+
+        var changedSolution = await ApplySolutionFixAllAsync(
+            solution.GetProject(relevantProject.Id)!,
+            ThrowingFixAllDiagnosticProvider.Instance);
+
+        Assert.Empty(changedSolution.GetProject(unrelatedProjectId)!.AdditionalDocuments);
+        var content = await GetOnlyContractsDocumentTextAsync(changedSolution, relevantProject.Id);
+        Assert.Contains("interface [GrainInterfaceType(\"IRelevantGrain\")] IRelevantGrain [Version(0)]", content);
+    }
+
+    [Fact]
+    public async Task FixAll_RegenerateSolution_SkipsDisabledProjectsBeforeCompilation()
+    {
+        var relevantProject = CreateProjectWithAdditionalFilesForCodeFix(
+            "public interface IRelevantGrain : IGrain { Task Ping(); }",
+            "# OrleansContracts.txt\n");
+        var disabledProjectId = ProjectId.CreateNewId("DisabledProject");
+        var disabledDocumentId = DocumentId.CreateNewId(disabledProjectId, "Disabled.cs");
+        var solution = relevantProject.Solution
+            .AddProject(disabledProjectId, "DisabledProject", "DisabledProject", LanguageNames.CSharp)
+            .AddMetadataReferences(disabledProjectId, relevantProject.MetadataReferences)
+            .WithProjectCompilationOptions(disabledProjectId, new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary))
+            .AddDocument(disabledDocumentId, "Disabled.cs", SourceText.From(
+                "using Orleans; public interface IDisabledGrain : IGrain { }"));
+
+        var changedSolution = await ApplySolutionFixAllAsync(
+            solution.GetProject(relevantProject.Id)!,
+            ThrowingFixAllDiagnosticProvider.Instance);
+
+        Assert.Empty(changedSolution.GetProject(disabledProjectId)!.AdditionalDocuments);
+        var content = await GetOnlyContractsDocumentTextAsync(changedSolution, relevantProject.Id);
+        Assert.Contains("interface [GrainInterfaceType(\"IRelevantGrain\")] IRelevantGrain [Version(0)]", content);
+    }
+
+    [Fact]
+    public async Task FixAll_RegenerateSolution_DoesNotCreateManifestForProjectWithoutContracts()
+    {
+        var relevantProject = CreateProjectWithAdditionalFilesForCodeFix(
+            "public interface IRelevantGrain : IGrain { Task Ping(); }",
+            "# OrleansContracts.txt\n");
+        var emptyProjectId = ProjectId.CreateNewId("EmptyProject");
+        var emptyDocumentId = DocumentId.CreateNewId(emptyProjectId, "Empty.cs");
+        var solution = relevantProject.Solution
+            .AddProject(emptyProjectId, "EmptyProject", "EmptyProject", LanguageNames.CSharp)
+            .AddMetadataReferences(emptyProjectId, relevantProject.MetadataReferences)
+            .WithProjectCompilationOptions(emptyProjectId, new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary))
+            .AddDocument(emptyDocumentId, "Empty.cs", SourceText.From("public sealed class Empty;"));
+        solution = AddContractsAnalyzerConfig(solution, emptyProjectId);
+
+        var changedSolution = await ApplySolutionFixAllAsync(
+            solution.GetProject(relevantProject.Id)!,
+            ThrowingFixAllDiagnosticProvider.Instance);
+
+        Assert.Empty(changedSolution.GetProject(emptyProjectId)!.AdditionalDocuments);
+        var content = await GetOnlyContractsDocumentTextAsync(changedSolution, relevantProject.Id);
+        Assert.Contains("interface [GrainInterfaceType(\"IRelevantGrain\")] IRelevantGrain [Version(0)]", content);
+    }
+
+    [Fact]
+    public async Task FixAll_RegenerateSolution_ProcessesTransitiveOrleansProjectReferences()
+    {
+        var templateProject = CreateProjectWithAdditionalFilesForCodeFix(
+            "public sealed class ReferenceTemplate;",
+            grainInterfacesFileContent: null);
+        var nonOrleansReferences = templateProject.MetadataReferences
+            .Where(reference => !string.Equals(
+                Path.GetFileNameWithoutExtension(reference.Display),
+                "Orleans.Core.Abstractions",
+                StringComparison.OrdinalIgnoreCase))
+            .ToArray();
+        var orleansReference = Assert.Single(templateProject.MetadataReferences, reference => string.Equals(
+            Path.GetFileNameWithoutExtension(reference.Display),
+            "Orleans.Core.Abstractions",
+            StringComparison.OrdinalIgnoreCase));
+        var hiddenOrleansReference = MetadataReference.CreateFromImage(
+            ImmutableArray.Create(File.ReadAllBytes(orleansReference.Display!)),
+            filePath: "TransitiveDependency.dll");
+        var baseProjectId = ProjectId.CreateNewId("BaseProject");
+        var middleProjectId = ProjectId.CreateNewId("MiddleProject");
+        var contractProjectId = ProjectId.CreateNewId("ContractProject");
+        var solution = new AdhocWorkspace().CurrentSolution
+            .AddProject(baseProjectId, "BaseProject", "BaseProject", LanguageNames.CSharp)
+            .WithProjectCompilationOptions(baseProjectId, new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary))
+            .AddMetadataReferences(baseProjectId, nonOrleansReferences.Append(orleansReference))
+            .AddDocument(
+                DocumentId.CreateNewId(baseProjectId, "Base.cs"),
+                "Base.cs",
+                SourceText.From(
+                    "public sealed class BaseType;"))
+            .AddProject(middleProjectId, "MiddleProject", "MiddleProject", LanguageNames.CSharp)
+            .WithProjectCompilationOptions(middleProjectId, new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary))
+            .AddMetadataReferences(middleProjectId, nonOrleansReferences)
+            .AddProjectReference(middleProjectId, new ProjectReference(baseProjectId))
+            .AddDocument(
+                DocumentId.CreateNewId(middleProjectId, "Middle.cs"),
+                "Middle.cs",
+                SourceText.From(
+                    "public sealed class MiddleType;"))
+            .AddProject(contractProjectId, "ContractProject", "ContractProject", LanguageNames.CSharp)
+            .WithProjectCompilationOptions(contractProjectId, new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary))
+            .AddMetadataReferences(contractProjectId, nonOrleansReferences.Append(hiddenOrleansReference))
+            .AddProjectReference(contractProjectId, new ProjectReference(middleProjectId))
+            .AddDocument(
+                DocumentId.CreateNewId(contractProjectId, "Contract.cs"),
+                "Contract.cs",
+                SourceText.From(
+                    "using Orleans; using System.Threading.Tasks; public interface ITransitiveGrain : IGrain { Task Ping(); }"))
+            .AddAdditionalDocument(
+                DocumentId.CreateNewId(contractProjectId, OrleansContractsFileName),
+                OrleansContractsFileName,
+                SourceText.From("# OrleansContracts.txt\n"));
+        solution = AddContractsAnalyzerConfig(solution, contractProjectId);
+
+        var changedSolution = await ApplySolutionFixAllAsync(
+            solution.GetProject(contractProjectId)!,
+            ThrowingFixAllDiagnosticProvider.Instance);
+
+        var content = await GetOnlyContractsDocumentTextAsync(changedSolution, contractProjectId);
+        Assert.Contains(
+            "interface [GrainInterfaceType(\"ITransitiveGrain\")] ITransitiveGrain [Version(0)]",
+            content);
+    }
+
+    [Fact]
+    public async Task FixAll_RegenerateSolution_ProcessesExistingManifestWithoutCurrentOrleansReference()
+    {
+        var templateProject = CreateProjectWithAdditionalFilesForCodeFix(
+            "public sealed class ReferenceTemplate;",
+            grainInterfacesFileContent: null);
+        var projectId = ProjectId.CreateNewId("HistoricalProject");
+        var contractsPath = Path.Combine(
+            Path.GetTempPath(),
+            projectId.Id.ToString("N"),
+            OrleansContractsFileName);
+        var contractsDocumentId = DocumentId.CreateNewId(projectId, OrleansContractsFileName);
+        var solution = new AdhocWorkspace().CurrentSolution
+            .AddProject(projectId, "HistoricalProject", "HistoricalProject", LanguageNames.CSharp)
+            .WithProjectCompilationOptions(projectId, new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary))
+            .AddMetadataReferences(
+                projectId,
+                templateProject.MetadataReferences.Where(reference => !string.Equals(
+                    Path.GetFileNameWithoutExtension(reference.Display),
+                    "Orleans.Core.Abstractions",
+                    StringComparison.OrdinalIgnoreCase)))
+            .AddDocument(
+                DocumentId.CreateNewId(projectId, "Historical.cs"),
+                "Historical.cs",
+                SourceText.From("public sealed class Historical;"))
+            .AddAdditionalDocument(
+                contractsDocumentId,
+                OrleansContractsFileName,
+                SourceText.From("interface OldGrain [Version(1)]\n"),
+                filePath: contractsPath);
+        solution = AddContractsAnalyzerConfig(
+            solution,
+            projectId,
+            contractsPath,
+            contractsFileExists: true);
+        _ = await solution.GetAdditionalDocument(contractsDocumentId)!
+            .GetTextAsync(TestContext.Current.CancellationToken);
+
+        var changedSolution = await ApplySolutionFixAllAsync(
+            solution.GetProject(projectId)!,
+            ThrowingFixAllDiagnosticProvider.Instance);
+
+        var content = await GetOnlyContractsDocumentTextAsync(changedSolution, projectId);
+        Assert.Contains("*RETIRED* interface OldGrain [Version(1)]", content);
+    }
+
+    [Fact]
+    public async Task FixAll_RegenerateSolution_IsDeterministicAcrossProjectOrder()
+    {
+        var forward = await RegenerateSolutionAsync(["Alpha", "Beta"]);
+        var reverse = await RegenerateSolutionAsync(["Beta", "Alpha"]);
+
+        Assert.Equal(forward.Keys.Order(StringComparer.Ordinal), reverse.Keys.Order(StringComparer.Ordinal));
+        foreach (var projectName in forward.Keys)
+        {
+            Assert.Equal(forward[projectName], reverse[projectName]);
+        }
+
+        static async Task<Dictionary<string, string>> RegenerateSolutionAsync(string[] projectNames)
+        {
+            var templateProject = CreateProjectWithAdditionalFilesForCodeFix(
+                "public sealed class ReferenceTemplate;",
+                grainInterfacesFileContent: null);
+            var solution = new AdhocWorkspace().CurrentSolution;
+            foreach (var projectName in projectNames)
+            {
+                var projectId = ProjectId.CreateNewId(projectName);
+                solution = solution
+                    .AddProject(projectId, projectName, projectName, LanguageNames.CSharp)
+                    .WithProjectCompilationOptions(
+                        projectId,
+                        new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary))
+                    .AddMetadataReferences(projectId, templateProject.MetadataReferences)
+                    .AddDocument(
+                        DocumentId.CreateNewId(projectId, $"{projectName}.cs"),
+                        $"{projectName}.cs",
+                        SourceText.From(
+                            string.Join(
+                                Environment.NewLine,
+                                Usings.Select(@using => $"using {@using};").Append(
+                                    $"public interface I{projectName}Grain : IGrain {{ Task Ping(); }}"))))
+                    .AddAdditionalDocument(
+                        DocumentId.CreateNewId(projectId, OrleansContractsFileName),
+                        OrleansContractsFileName,
+                        SourceText.From("# OrleansContracts.txt\n"));
+                solution = AddContractsAnalyzerConfig(solution, projectId);
+            }
+
+            var changedSolution = await ApplySolutionFixAllAsync(
+                solution.Projects.First(),
+                ThrowingFixAllDiagnosticProvider.Instance);
+            var result = new Dictionary<string, string>(StringComparer.Ordinal);
+            foreach (var project in changedSolution.Projects)
+            {
+                result.Add(project.Name, await GetOnlyContractsDocumentTextAsync(changedSolution, project.Id));
+            }
+
+            return result;
+        }
+    }
+
+    [Fact]
+    public async Task CodeFix_RegenerateMissingWorkspaceDocument_UpdatesExistingDocumentId()
+    {
+        var project = CreateProjectWithAdditionalFilesForCodeFix(
+            "public interface IMyGrain : IGrain { Task Ping(); }",
+            string.Empty);
+        var originalDocument = Assert.Single(project.AdditionalDocuments);
+        var codeFixer = new GrainInterfaceVersionCodeFix();
+        var actions = new List<CodeAction>();
+        var context = new CodeFixContext(
+            project.Documents.Single(),
+            CreateFixAllDiagnostic(GrainInterfaceVersionAnalyzer.RuleId0020),
+            (action, _) => actions.Add(action),
+            TestContext.Current.CancellationToken);
+
+        await codeFixer.RegisterCodeFixesAsync(context);
+        var action = Assert.Single(actions, candidate => candidate.Title == RegenerateCodeActionTitle);
+        var operations = await action.GetOperationsAsync(TestContext.Current.CancellationToken);
+        var changedSolution = Assert.Single(operations.OfType<ApplyChangesOperation>()).ChangedSolution;
+        var changedProject = changedSolution.GetProject(project.Id)!;
+        var changedDocument = Assert.Single(changedProject.AdditionalDocuments);
+        var content = (await changedDocument.GetTextAsync(TestContext.Current.CancellationToken)).ToString();
+
+        Assert.Equal(originalDocument.Id, changedDocument.Id);
+        Assert.Contains("interface [GrainInterfaceType(\"IMyGrain\")] IMyGrain [Version(0)]", content);
+    }
+
+    [Fact]
+    public Task DotNetFormat_CreatesMissingDefaultContractsFile()
+        => VerifyDotNetFormatCreatesMissingContractsFileAsync(configuredContractsPath: null);
+
+    [Fact]
+    public Task DotNetFormat_CreatesMissingCustomContractsFileAndParentDirectory()
+        => VerifyDotNetFormatCreatesMissingContractsFileAsync(
+            Path.Combine("contracts", "CustomContracts.txt"));
+
+    private static async Task VerifyDotNetFormatCreatesMissingContractsFileAsync(
+        string? configuredContractsPath)
+    {
+        var repositoryRoot = GetRepositoryRoot();
+        var tempDirectory = Path.Combine(
+            Path.GetTempPath(),
+            "OrleansContractsTests",
+            Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(tempDirectory);
+        try
+        {
+            var projectPath = Path.Combine(tempDirectory, "ContractsCliTest.csproj");
+            var contractsPath = Path.Combine(
+                tempDirectory,
+                configuredContractsPath ?? OrleansContractsFileName);
+            var analyzerPath = typeof(GrainInterfaceVersionAnalyzer).Assembly.Location;
+            var abstractionsPath = typeof(IGrain).Assembly.Location;
+            var propsPath = Path.Combine(
+                repositoryRoot,
+                "src",
+                "Orleans.Analyzers",
+                "build",
+                "Microsoft.Orleans.Analyzers.props");
+            var targetsPath = Path.Combine(
+                repositoryRoot,
+                "src",
+                "Orleans.Analyzers",
+                "build",
+                "Microsoft.Orleans.Analyzers.targets");
+            var configuredPathProperty = configuredContractsPath is null
+                ? string.Empty
+                : $"    <OrleansContractsPath>$(MSBuildProjectDirectory)\\{configuredContractsPath}</OrleansContractsPath>{Environment.NewLine}";
+            await File.WriteAllTextAsync(
+                projectPath,
+                $"""
+                <Project Sdk="Microsoft.NET.Sdk">
+                  <Import Project="{EscapeXml(propsPath)}" />
+                  <PropertyGroup>
+                    <TargetFramework>net10.0</TargetFramework>
+                    <EnableOrleansContractsAnalyzer>true</EnableOrleansContractsAnalyzer>
+                {configuredPathProperty}  </PropertyGroup>
+                  <ItemGroup>
+                    <Reference Include="Orleans.Core.Abstractions" HintPath="{EscapeXml(abstractionsPath)}" />
+                    <Analyzer Include="{EscapeXml(analyzerPath)}" />
+                  </ItemGroup>
+                  <Import Project="{EscapeXml(targetsPath)}" />
+                </Project>
+                """,
+                TestContext.Current.CancellationToken);
+            await File.WriteAllTextAsync(
+                Path.Combine(tempDirectory, "MyGrain.cs"),
+                """
+                using System.Threading.Tasks;
+                using Orleans;
+
+                public interface IMyGrain : IGrain
+                {
+                    Task Ping();
+                }
+                """,
+                TestContext.Current.CancellationToken);
+
+            var restore = await RunDotNetAsync(tempDirectory, "restore", projectPath, "--nologo");
+            Assert.True(restore.ExitCode == 0, restore.Output);
+            Assert.False(File.Exists(contractsPath));
+
+            var format = await RunDotNetAsync(
+                tempDirectory,
+                "format",
+                projectPath,
+                "analyzers",
+                "--no-restore",
+                "--severity",
+                "info",
+                "--diagnostics",
+                GrainInterfaceVersionAnalyzer.RuleId0016,
+                GrainInterfaceVersionAnalyzer.RuleId0017,
+                GrainInterfaceVersionAnalyzer.RuleId0018,
+                GrainInterfaceVersionAnalyzer.RuleId0019,
+                GrainInterfaceVersionAnalyzer.RuleId0020,
+                GrainInterfaceVersionAnalyzer.RuleId0022,
+                GrainInterfaceVersionAnalyzer.RuleId0023,
+                GrainInterfaceVersionAnalyzer.RuleId0024);
+            Assert.True(format.ExitCode == 0, format.Output);
+            Assert.True(File.Exists(contractsPath), format.Output);
+            var content = await File.ReadAllTextAsync(
+                contractsPath,
+                TestContext.Current.CancellationToken);
+            Assert.StartsWith(GeneratedHeader, content);
+            Assert.Contains(
+                "interface [GrainInterfaceType(\"IMyGrain\")] IMyGrain [Version(0)]",
+                content);
+
+            var build = await RunDotNetAsync(
+                tempDirectory,
+                "build",
+                projectPath,
+                "--no-restore",
+                "--nologo");
+            Assert.True(build.ExitCode == 0, build.Output);
+        }
+        finally
+        {
+            Directory.Delete(tempDirectory, recursive: true);
+        }
+    }
+
+    private static async Task<(int ExitCode, string Output)> RunDotNetAsync(
+        string workingDirectory,
+        params string[] arguments)
+    {
+        var startInfo = new ProcessStartInfo("dotnet")
+        {
+            WorkingDirectory = workingDirectory,
+            RedirectStandardError = true,
+            RedirectStandardOutput = true,
+            UseShellExecute = false,
+        };
+        foreach (var argument in arguments)
+        {
+            startInfo.ArgumentList.Add(argument);
+        }
+
+        using var process = Process.Start(startInfo);
+        Assert.NotNull(process);
+        var standardOutput = process!.StandardOutput.ReadToEndAsync();
+        var standardError = process.StandardError.ReadToEndAsync();
+        using var timeout = CancellationTokenSource.CreateLinkedTokenSource(
+            TestContext.Current.CancellationToken);
+        timeout.CancelAfter(TimeSpan.FromMinutes(2));
+        try
+        {
+            await process.WaitForExitAsync(timeout.Token);
+        }
+        catch (OperationCanceledException) when (!TestContext.Current.CancellationToken.IsCancellationRequested)
+        {
+            process.Kill(entireProcessTree: true);
+            throw new TimeoutException(
+                $"dotnet {string.Join(' ', arguments)} exceeded the two-minute test timeout.");
+        }
+
+        var output = string.Concat(
+            await standardOutput,
+            Environment.NewLine,
+            await standardError);
+        return (process.ExitCode, output);
+    }
+
+    private static string EscapeXml(string value)
+        => System.Security.SecurityElement.Escape(value)!;
+
+    private static string GetRepositoryRoot()
+    {
+        for (var directory = new DirectoryInfo(AppContext.BaseDirectory);
+            directory is not null;
+            directory = directory.Parent)
+        {
+            if (File.Exists(Path.Combine(directory.FullName, "Orleans.slnx")))
+            {
+                return directory.FullName;
+            }
+        }
+
+        throw new DirectoryNotFoundException("Could not locate the Orleans repository root.");
+    }
+
+    private static async Task<Solution> ApplySolutionFixAllAsync(
+        Project project,
+        FixAllContext.DiagnosticProvider diagnosticProvider)
+    {
+        var codeFixer = new GrainInterfaceVersionCodeFix();
+        var context = new FixAllContext(
+            project.Documents.First(),
+            codeFixer,
+            FixAllScope.Solution,
+            RegenerateCodeActionEquivalenceKey,
+            codeFixer.FixableDiagnosticIds,
+            diagnosticProvider,
+            TestContext.Current.CancellationToken);
+        var action = await codeFixer.GetFixAllProvider().GetFixAsync(context);
+        Assert.NotNull(action);
+        var operations = await action!.GetOperationsAsync(TestContext.Current.CancellationToken);
+        return Assert.Single(operations.OfType<ApplyChangesOperation>()).ChangedSolution;
+    }
+
+    private static async Task<string> GetOnlyContractsDocumentTextAsync(Solution solution, ProjectId projectId)
+    {
+        var document = Assert.Single(solution.GetProject(projectId)!.AdditionalDocuments);
+        return (await document.GetTextAsync(TestContext.Current.CancellationToken)).ToString();
+    }
+
+    private static Diagnostic CreateFixAllDiagnostic(string diagnosticId)
         => Diagnostic.Create(
             new DiagnosticDescriptor(
-                GrainInterfaceVersionAnalyzer.RuleId0016,
+                diagnosticId,
                 "Contract missing",
                 "Contract missing",
                 "Versioning",
@@ -2489,26 +2978,24 @@ interface Outer.IInnerGrain [Version(1)]
                 isEnabledByDefault: true),
             Location.None);
 
-    private sealed class TestFixAllDiagnosticProvider(
-        IReadOnlyDictionary<ProjectId, IEnumerable<Diagnostic>> diagnostics) : FixAllContext.DiagnosticProvider
+    private sealed class ThrowingFixAllDiagnosticProvider : FixAllContext.DiagnosticProvider
     {
+        public static ThrowingFixAllDiagnosticProvider Instance { get; } = new();
+
         public override Task<IEnumerable<Diagnostic>> GetDocumentDiagnosticsAsync(
             Document document,
             CancellationToken cancellationToken)
-            => Task.FromResult(Enumerable.Empty<Diagnostic>());
+            => throw new InvalidOperationException("Solution regeneration must not request diagnostics.");
 
         public override Task<IEnumerable<Diagnostic>> GetProjectDiagnosticsAsync(
             Project project,
             CancellationToken cancellationToken)
-            => Task.FromResult(Enumerable.Empty<Diagnostic>());
+            => throw new InvalidOperationException("Solution regeneration must not request diagnostics.");
 
         public override Task<IEnumerable<Diagnostic>> GetAllDiagnosticsAsync(
             Project project,
             CancellationToken cancellationToken)
-            => Task.FromResult(
-                diagnostics.TryGetValue(project.Id, out var result)
-                    ? result
-                    : Enumerable.Empty<Diagnostic>());
+            => throw new InvalidOperationException("Solution regeneration must not request diagnostics.");
     }
 
     #endregion

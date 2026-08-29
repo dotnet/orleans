@@ -30,7 +30,7 @@ This also promotes informational diagnostics such as `ORLEANS0020`. Configure `d
 
 ## Configure the manifest path
 
-By default, the analyzer looks for `OrleansContracts.txt` beside the project file. The analyzer package automatically adds an existing file at that location as a compiler `AdditionalFile`; no explicit `AdditionalFiles` item is required.
+By default, the analyzer tracks `OrleansContracts.txt` beside the project file. The analyzer package registers the configured path as a compiler `AdditionalFile`, including before the file exists, so no explicit `AdditionalFiles` item or seed file is required.
 
 Set `OrleansContractsPath` to use another location or filename:
 
@@ -61,7 +61,7 @@ Agents and command-line workflows can regenerate manifests without an IDE:
 dotnet format PATH_TO_PROJECT_OR_SOLUTION analyzers --severity info --diagnostics ORLEANS0016 ORLEANS0017 ORLEANS0018 ORLEANS0019 ORLEANS0020 ORLEANS0022 ORLEANS0023 ORLEANS0024
 ```
 
-Run the command from the repository root. Replace `PATH_TO_PROJECT_OR_SOLUTION` with the path to the owning `.csproj` to regenerate one manifest, or a `.sln`/`.slnx` path to regenerate manifests in every affected project. The `--severity info` option includes `ORLEANS0020`, allowing the command to create a missing manifest.
+Run the command from the repository root. Replace `PATH_TO_PROJECT_OR_SOLUTION` with the path to the owning `.csproj` to regenerate one manifest, or a `.sln`/`.slnx` path to regenerate manifests in every affected project. The `--severity info` option includes `ORLEANS0020`, allowing the command to create the default manifest or a configured `OrleansContractsPath`, including its parent directory. Solution regeneration selects analyzer-enabled projects which reference Orleans or already contain a manifest and processes a bounded number of projects concurrently. For repositories where loading the complete solution is expensive, run the project form for each analyzer-enabled contract project.
 
 Regeneration edits `OrleansContracts.txt` files only. Source `[Alias]`, `[Id]`, `[GrainType]`, and `[GrainInterfaceType]` attributes remain unchanged.
 
