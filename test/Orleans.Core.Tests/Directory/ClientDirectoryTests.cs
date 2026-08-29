@@ -405,6 +405,72 @@ namespace NonSilo.Tests.Directory
             Assert.Equal(1, totalUpdateCalls[0]);
         }
 
+        [Fact]
+        public async Task PublishingStopsBeforeMembershipShutdownBegins()
+        {
+            var cancellationToken = TestContext.Current.CancellationToken;
+            var remoteSilo = Silo("127.0.0.1:222@100");
+            var remoteDirectory = _remoteDirectories.GetOrAdd(remoteSilo, Substitute.For<IRemoteClientDirectory>());
+            var publicationStarted = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+            var publicationRelease = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+            remoteDirectory.OnUpdateClientRoutes(default!).ReturnsForAnyArgs(_ =>
+            {
+                publicationStarted.TrySetResult(true);
+                return publicationRelease.Task;
+            });
+
+            _clusterMembershipService.UpdateSiloStatus(remoteSilo, SiloStatus.Active, "remoteSilo");
+            ((ILifecycleParticipant<ISiloLifecycle>)_directory).Participate(_lifecycle);
+
+            var publicationStoppedBeforeMembershipShutdown = false;
+            _lifecycle.Subscribe(
+                "MembershipShutdownObserver",
+                ServiceLifecycleStage.BecomeActive,
+                static _ => Task.CompletedTask,
+                _ =>
+                {
+                    publicationStoppedBeforeMembershipShutdown = _testAccessor.NextPublishTask?.IsCompleted == true;
+                    return Task.CompletedTask;
+                });
+
+            await _lifecycle.OnStart(cancellationToken);
+            var lifecycleStopped = false;
+            try
+            {
+                var localClient = Client("local");
+                SetLocalClients([localClient]);
+                Assert.True(_directory.TryLocalLookup(localClient, out _));
+
+                _testAccessor.SchedulePublishUpdates();
+                await publicationStarted.Task.WaitAsync(cancellationToken);
+
+                await _lifecycle.OnStop(cancellationToken);
+                lifecycleStopped = true;
+
+                Assert.True(
+                    publicationStoppedBeforeMembershipShutdown,
+                    "Client route publication remained active when the membership shutdown stage began.");
+                Assert.True(_testAccessor.NextPublishTask?.IsCompletedSuccessfully);
+
+                var update = ImmutableDictionary<SiloAddress, (ImmutableHashSet<GrainId>, long)>.Empty.Add(
+                    remoteSilo,
+                    (ImmutableHashSet.Create(Client("remote")), 2));
+                await _directory.OnUpdateClientRoutes(update);
+                _testAccessor.SchedulePublishUpdates();
+
+                _ = remoteDirectory.Received(1).OnUpdateClientRoutes(
+                    Arg.Any<ImmutableDictionary<SiloAddress, (ImmutableHashSet<GrainId>, long)>>());
+            }
+            finally
+            {
+                publicationRelease.TrySetResult(true);
+                if (!lifecycleStopped)
+                {
+                    await _lifecycle.OnStop(CancellationToken.None);
+                }
+            }
+        }
+
         private static SiloAddress Silo(string value) => SiloAddress.FromParsableString(value);
 
         private static GrainId Client(string id) => ClientGrainId.Create(id).GrainId;
