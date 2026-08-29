@@ -114,7 +114,7 @@ public sealed class KinesisRuntimeTests
     }
 
     [Fact]
-    public async Task PooledReceiver_ReadsAfterSuccessfulInitialization()
+    public async Task PooledReceiver_ReadsAndDisposesLifecycleCancellationOnShutdown()
     {
         var client = Substitute.For<IAmazonKinesis>();
         client.GetShardIteratorAsync(
@@ -152,6 +152,7 @@ public sealed class KinesisRuntimeTests
             topologyMonitor,
             TimeSpan.Zero,
             timeProvider);
+        var lifecycleCancellationToken = receiver.LifecycleCancellationToken;
         await receiver.Initialize(TimeSpan.FromSeconds(5));
 
         Assert.Empty(await receiver.GetQueueMessagesAsync(10, CancellationToken.None));
@@ -160,6 +161,9 @@ public sealed class KinesisRuntimeTests
             Arg.Any<GetRecordsRequest>(),
             Arg.Any<CancellationToken>());
         await receiver.Shutdown(TimeSpan.FromSeconds(5));
+
+        Assert.True(lifecycleCancellationToken.IsCancellationRequested);
+        Assert.Throws<ObjectDisposedException>(() => _ = receiver.LifecycleCancellationToken);
     }
 
     [Fact]

@@ -28,6 +28,8 @@ internal sealed class KinesisPooledAdapterReceiver : IQueueAdapterReceiver, IQue
     private int _initialized;
     private int _shutdown;
 
+    internal CancellationToken LifecycleCancellationToken => _lifecycleCancellation.Token;
+
     public KinesisPooledAdapterReceiver(
         IAmazonKinesis client,
         string streamName,
@@ -171,6 +173,7 @@ internal sealed class KinesisPooledAdapterReceiver : IQueueAdapterReceiver, IQue
         }
         finally
         {
+            _lifecycleCancellation.Dispose();
             _onShutdown?.Invoke(this);
         }
     }
