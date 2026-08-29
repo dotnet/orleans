@@ -170,12 +170,15 @@ public sealed class AdaptiveConcurrencyLoadGenerator<TState>
         try
         {
             await RunPhaseAsync(_warmupDuration, isWarmup: true, states);
+            cancellationToken.ThrowIfCancellationRequested();
             GC.Collect();
 
             var results = new FixedConcurrencyMeasurement[repetitions];
             for (var i = 0; i < results.Length; i++)
             {
+                cancellationToken.ThrowIfCancellationRequested();
                 var measurement = await RunPhaseAsync(_measurementInterval, isWarmup: false, states);
+                cancellationToken.ThrowIfCancellationRequested();
                 if (measurement.Failures > 0)
                 {
                     throw new InvalidOperationException($"Measurement completed with {measurement.Failures:N0} failed requests.");

@@ -320,6 +320,7 @@ public class AdaptivePingBenchmark : IDisposable
         {
             foreach (var concurrency in concurrencyLevels)
             {
+                benchmark._cts.Token.ThrowIfCancellationRequested();
                 var loadGenerator = new AdaptiveConcurrencyLoadGenerator<IPingGrain>(
                     issueRequest: grain => grain.Run(),
                     getStateForWorker: workerId => benchmark.GetGrainFactory().GetGrain<IPingGrain>(workerId),
@@ -333,7 +334,7 @@ public class AdaptivePingBenchmark : IDisposable
                     initialStepSize: 1,
                     sampleInterval: DefaultSampleInterval,
                     minimumRelativeImprovement: 0);
-                var measurements = await loadGenerator.RunFixedConcurrencyAsync(repetitions);
+                var measurements = await loadGenerator.RunFixedConcurrencyAsync(repetitions, benchmark._cts.Token);
                 var throughput = measurements.Select(static measurement => measurement.Throughput).Order().ToArray();
                 var result = new DeterministicResult(
                     benchmark.Description,
