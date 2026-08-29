@@ -502,16 +502,14 @@ namespace Orleans.Runtime.Messaging
                             return;
                         }
 
-                        var pendingCount = _pendingToSend.Count;
-                        while (pendingCount-- > 0 && _pendingToSend.TryDequeue(out var message))
+                        var connection = Volatile.Read(ref _connection);
+                        if (connection is null)
                         {
-                            var connection = Volatile.Read(ref _connection);
-                            if (connection is null)
-                            {
-                                _pendingToSend.Enqueue(message);
-                                continue;
-                            }
+                            continue;
+                        }
 
+                        while (_pendingToSend.TryDequeue(out var message))
+                        {
                             var isRequest = message.Direction == Message.Directions.Request;
                             if (isRequest)
                             {
@@ -531,6 +529,7 @@ namespace Orleans.Runtime.Messaging
                                 }
 
                                 _pendingToSend.Enqueue(message);
+                                break;
                             }
                         }
                     }
