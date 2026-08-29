@@ -429,11 +429,10 @@ namespace NonSilo.Tests.Directory
                 static _ => Task.CompletedTask,
                 _ =>
                 {
-                    publicationStoppedBeforeMembershipShutdown = _testAccessor.NextPublishTask?.IsCompleted == true;
+                    publicationStoppedBeforeMembershipShutdown = _testAccessor.PublishTasksCompleted;
                     return Task.CompletedTask;
                 });
 
-            await _lifecycle.OnStart(cancellationToken);
             var lifecycleStopped = false;
             try
             {
@@ -441,7 +440,7 @@ namespace NonSilo.Tests.Directory
                 SetLocalClients([localClient]);
                 Assert.True(_directory.TryLocalLookup(localClient, out _));
 
-                _testAccessor.SchedulePublishUpdates();
+                await _lifecycle.OnStart(cancellationToken);
                 await publicationStarted.Task.WaitAsync(cancellationToken);
 
                 await _lifecycle.OnStop(cancellationToken);
@@ -450,7 +449,7 @@ namespace NonSilo.Tests.Directory
                 Assert.True(
                     publicationStoppedBeforeMembershipShutdown,
                     "Client route publication remained active when the membership shutdown stage began.");
-                Assert.True(_testAccessor.NextPublishTask?.IsCompletedSuccessfully);
+                Assert.True(_testAccessor.PublishTasksCompleted);
 
                 var update = ImmutableDictionary<SiloAddress, (ImmutableHashSet<GrainId>, long)>.Empty.Add(
                     remoteSilo,

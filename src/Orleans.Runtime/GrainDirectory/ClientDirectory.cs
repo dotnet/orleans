@@ -502,6 +502,7 @@ internal sealed partial class ClientDirectory : SystemTarget, ILocalClientDirect
             }
         }
 
+        var update = builder.ToImmutable();
         try
         {
             LogDebugPublishingRoutes(successor);
@@ -515,7 +516,7 @@ internal sealed partial class ClientDirectory : SystemTarget, ILocalClientDirect
                     return;
                 }
 
-                publishTask = remote.OnUpdateClientRoutes(_table);
+                publishTask = remote.OnUpdateClientRoutes(update);
             }
 
             await publishTask.WaitAsync(_shutdownCts.Token);
@@ -602,7 +603,9 @@ internal sealed partial class ClientDirectory : SystemTarget, ILocalClientDirect
     {
         public Action SchedulePublishUpdate { get => instance._schedulePublishUpdate; set => instance._schedulePublishUpdate = value; }
         public long ObservedConnectedClientsVersion { get => instance._observedConnectedClientsVersion; set => instance._observedConnectedClientsVersion = value; }
-        public Task? NextPublishTask => instance._nextPublishTask;
+        public bool PublishTasksCompleted =>
+            instance._runTask is not { IsCompleted: false }
+            && instance._nextPublishTask is not { IsCompleted: false };
         public void SchedulePublishUpdates() => instance.SchedulePublishUpdates();
         public Task PublishUpdates() => instance.PublishUpdates();
     }
