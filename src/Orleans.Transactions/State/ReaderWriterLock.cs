@@ -379,7 +379,7 @@ namespace Orleans.Transactions.State
                             // discard expired waiters that have no chance to succeed
                             // because they have been waiting for the lock for a longer timespan than the
                             // total transaction timeout
-                            foreach (var kvp in currentGroup.ToArray())
+                            foreach (var kvp in currentGroup)
                             {
                                 if (now > kvp.Value.Deadline)
                                 {
