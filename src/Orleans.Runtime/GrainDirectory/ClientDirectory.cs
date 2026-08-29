@@ -38,7 +38,7 @@ internal sealed partial class ClientDirectory : SystemTarget, ILocalClientDirect
     private readonly SiloAddress _localSilo;
     private readonly IClusterMembershipService _clusterMembershipService;
     private readonly SiloMessagingOptions _messagingOptions;
-    private readonly CancellationTokenSource _shutdownCts = new();
+    private readonly CancellationTokenSource _stoppingCts = new();
 #if NET9_0_OR_GREATER
     private readonly Lock _lockObj = new();
 #else
@@ -48,7 +48,6 @@ internal sealed partial class ClientDirectory : SystemTarget, ILocalClientDirect
     private readonly IConnectedClientCollection _connectedClients;
     private Action _schedulePublishUpdate;
     private Task? _runTask;
-    private int _isStopping;
     private MembershipVersion _observedMembershipVersion = MembershipVersion.MinValue;
     private long _observedConnectedClientsVersion = -1;
     private long _localVersion = 1;
@@ -350,12 +349,12 @@ internal sealed partial class ClientDirectory : SystemTarget, ILocalClientDirect
 
     private async Task Run()
     {
-        var membershipUpdates = _clusterMembershipService.MembershipUpdates.GetAsyncEnumerator(_shutdownCts.Token);
+        var membershipUpdates = _clusterMembershipService.MembershipUpdates.GetAsyncEnumerator(_stoppingCts.Token);
 
         Task<bool>? membershipTask = null;
         Task<bool>? timerTask = _refreshTimer.NextTick(RandomTimeSpan.Next(_messagingOptions.ClientRegistrationRefresh));
 
-        while (!_shutdownCts.IsCancellationRequested)
+        while (!_stoppingCts.IsCancellationRequested)
         {
             try
             {
@@ -390,7 +389,7 @@ internal sealed partial class ClientDirectory : SystemTarget, ILocalClientDirect
                     await PublishUpdates();
                 }
             }
-            catch (OperationCanceledException) when (_shutdownCts.IsCancellationRequested)
+            catch (OperationCanceledException) when (_stoppingCts.IsCancellationRequested)
             {
                 // Ignore during shutdown.
                 break;
@@ -404,7 +403,7 @@ internal sealed partial class ClientDirectory : SystemTarget, ILocalClientDirect
 
     private bool ShouldPublish()
     {
-        if (Volatile.Read(ref _isStopping) != 0)
+        if (_stoppingCts.IsCancellationRequested)
         {
             return false;
         }
@@ -412,7 +411,7 @@ internal sealed partial class ClientDirectory : SystemTarget, ILocalClientDirect
         EnsureRefreshed();
         lock (_lockObj)
         {
-            if (_isStopping != 0)
+            if (_stoppingCts.IsCancellationRequested)
             {
                 return false;
             }
@@ -443,7 +442,7 @@ internal sealed partial class ClientDirectory : SystemTarget, ILocalClientDirect
     {
         lock (_lockObj)
         {
-            if (_isStopping != 0 || _nextPublishTask is Task task && !task.IsCompleted)
+            if (_stoppingCts.IsCancellationRequested || _nextPublishTask is Task task && !task.IsCompleted)
             {
                 return;
             }
@@ -459,7 +458,7 @@ internal sealed partial class ClientDirectory : SystemTarget, ILocalClientDirect
         ImmutableDictionary<SiloAddress, (ImmutableHashSet<GrainId> ConnectedClients, long Version)>? previousRoutes;
         lock (_lockObj)
         {
-            if (_isStopping != 0)
+            if (_stoppingCts.IsCancellationRequested)
             {
                 return;
             }
@@ -516,7 +515,7 @@ internal sealed partial class ClientDirectory : SystemTarget, ILocalClientDirect
             Task publishTask;
             lock (_lockObj)
             {
-                if (_isStopping != 0)
+                if (_stoppingCts.IsCancellationRequested)
                 {
                     return;
                 }
@@ -524,7 +523,7 @@ internal sealed partial class ClientDirectory : SystemTarget, ILocalClientDirect
                 publishTask = remote.OnUpdateClientRoutes(update);
             }
 
-            await publishTask.WaitAsync(_shutdownCts.Token);
+            await publishTask.WaitAsync(_stoppingCts.Token);
 
             // Record the current lower bound of what the successor knows, so that it can be used to minimize
             // data transfer next time an update is performed.
@@ -546,7 +545,7 @@ internal sealed partial class ClientDirectory : SystemTarget, ILocalClientDirect
                 _schedulePublishUpdate();
             }
         }
-        catch (OperationCanceledException) when (_shutdownCts.IsCancellationRequested)
+        catch (OperationCanceledException) when (_stoppingCts.IsCancellationRequested)
         {
             // Publication is intentionally canceled while the silo is quiescing.
         }
@@ -586,19 +585,16 @@ internal sealed partial class ClientDirectory : SystemTarget, ILocalClientDirect
         {
             Task? runTask;
             Task? publishTask;
-            bool beginStopping;
-            lock (_lockObj)
+            if (!_stoppingCts.IsCancellationRequested)
             {
-                beginStopping = _isStopping == 0;
-                Volatile.Write(ref _isStopping, 1);
-                runTask = _runTask;
-                publishTask = _nextPublishTask;
+                _stoppingCts.Cancel();
+                _refreshTimer.Dispose();
             }
 
-            if (beginStopping)
+            lock (_lockObj)
             {
-                _shutdownCts.Cancel();
-                _refreshTimer.Dispose();
+                runTask = _runTask;
+                publishTask = _nextPublishTask;
             }
 
             if (runTask is not null)
