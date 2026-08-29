@@ -231,14 +231,8 @@ namespace Orleans.Runtime.Messaging
                 }
                 else
                 {
-                    if (TryGetCachedConnection(directoryCacheEntry, targetSilo, out var cachedConnection))
+                    if (this.connectionManager.TryGetConnection(targetSilo, out var existingConnection))
                     {
-                        cachedConnection.Send(msg);
-                        return;
-                    }
-                    else if (this.connectionManager.TryGetConnection(targetSilo, out var existingConnection, out var connectionEntry))
-                    {
-                        directoryCacheEntry?.TrySetMessageTarget(connectionEntry, targetSilo);
                         existingConnection.Send(msg);
                         return;
                     }
@@ -259,34 +253,17 @@ namespace Orleans.Runtime.Messaging
                         if (connectionTask.IsCompletedSuccessfully)
                         {
                             var sender = connectionTask.Result;
-                            if (directoryCacheEntry is not null
-                                && connectionManager.TryGetConnectionEntry(targetSilo, out var completedConnectionEntry))
-                            {
-                                directoryCacheEntry.TrySetMessageTarget(completedConnectionEntry, targetSilo);
-                            }
-
                             sender.Send(msg);
                         }
                         else
                         {
-                            _ = SendAsync(this, connectionTask, msg, directoryCacheEntry, targetSilo);
+                            _ = SendAsync(this, connectionTask, msg);
 
-                            static async Task SendAsync(
-                                MessageCenter messageCenter,
-                                ValueTask<Connection> connectionTask,
-                                Message msg,
-                                GrainDirectoryCacheEntry? directoryCacheEntry,
-                                SiloAddress targetSilo)
+                            static async Task SendAsync(MessageCenter messageCenter, ValueTask<Connection> connectionTask, Message msg)
                             {
                                 try
                                 {
                                     var sender = await connectionTask;
-                                    if (directoryCacheEntry is not null
-                                        && messageCenter.connectionManager.TryGetConnectionEntry(targetSilo, out var connectionEntry))
-                                    {
-                                        directoryCacheEntry.TrySetMessageTarget(connectionEntry, targetSilo);
-                                    }
-
                                     sender.Send(msg);
                                 }
                                 catch (Exception exception)
@@ -298,29 +275,6 @@ namespace Orleans.Runtime.Messaging
                     }
                 }
             }
-        }
-
-        private static bool TryGetCachedConnection(
-            GrainDirectoryCacheEntry? directoryCacheEntry,
-            SiloAddress targetSilo,
-            [NotNullWhen(true)] out Connection? connection)
-        {
-            if (directoryCacheEntry?.TryGetMessageTarget(out var target) == true
-                && target is { } messageTarget)
-            {
-                if (messageTarget is ConnectionManager.ConnectionEntry connectionEntry
-                    && connectionEntry.Endpoint.Equals(targetSilo)
-                    && connectionEntry.NextConnection() is { } result)
-                {
-                    connection = result;
-                    return true;
-                }
-
-                directoryCacheEntry.ClearMessageTarget(messageTarget);
-            }
-
-            connection = null;
-            return false;
         }
 
         public void DispatchLocalMessage(Message message) => ReceiveMessage(message);

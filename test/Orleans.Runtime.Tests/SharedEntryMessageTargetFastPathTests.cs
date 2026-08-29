@@ -98,7 +98,7 @@ public sealed class SharedEntryMessageTargetFastPathTests : IClassFixture<Shared
     }
 
     [Fact]
-    public async Task RemoteDirectoryGrain_BindsConnectionGroupTarget()
+    public async Task RemoteDirectoryGrain_DoesNotBindConnectionTarget()
     {
         var primary = (InProcessSiloHandle)_fixture.HostedCluster.Primary!;
         var secondary = _fixture.HostedCluster.Silos.Single(
@@ -123,49 +123,7 @@ public sealed class SharedEntryMessageTargetFastPathTests : IClassFixture<Shared
         Assert.True(entry.IsValid);
         Assert.Equal(grainReference.GrainId, entry.Address.GrainId);
         Assert.Equal(secondary.SiloAddress, entry.Address.SiloAddress);
-        Assert.True(entry.TryGetMessageTarget(out var messageTarget));
-        var connectionEntry = Assert.IsType<ConnectionManager.ConnectionEntry>(messageTarget);
-        Assert.Equal(secondary.SiloAddress, connectionEntry.Endpoint);
-    }
-
-    [Fact]
-    public async Task RemoteDirectoryGrain_ConnectionCloseRebindsToNewConnectionGroup()
-    {
-        var primary = (InProcessSiloHandle)_fixture.HostedCluster.Primary!;
-        var secondary = _fixture.HostedCluster.Silos.Single(
-            silo => !silo.SiloAddress.Equals(primary.SiloAddress));
-        var grainFactory = GetPrimarySiloGrainFactory(primary);
-        var grain = grainFactory.GetGrain<ITestGrain>(Interlocked.Increment(ref _nextGrainKey));
-        var grainReference = Assert.IsAssignableFrom<GrainReference>(grain);
-        const string label = "remote-reconnect";
-
-        RequestContext.Set(IPlacementDirector.PlacementHintKey, secondary.SiloAddress);
-        try
-        {
-            await grain.SetLabel(label);
-            Assert.Equal(label, await grain.GetLabel());
-        }
-        finally
-        {
-            RequestContext.Remove(IPlacementDirector.PlacementHintKey);
-        }
-
-        var entry = GetEntry(grainReference);
-        Assert.True(entry.TryGetMessageTarget(out var originalTarget));
-        var originalConnectionEntry = Assert.IsType<ConnectionManager.ConnectionEntry>(originalTarget);
-        var connectionManager = primary.ServiceProvider.GetRequiredService<ConnectionManager>();
-
-        await connectionManager.CloseAsync(secondary.SiloAddress);
-
-        Assert.Null(originalConnectionEntry.NextConnection());
-        Assert.Equal(label, await grain.GetLabel());
-
-        var reboundEntry = GetEntry(grainReference);
-        Assert.True(reboundEntry.TryGetMessageTarget(out var reboundTarget));
-        var reboundConnectionEntry = Assert.IsType<ConnectionManager.ConnectionEntry>(reboundTarget);
-        Assert.NotSame(originalConnectionEntry, reboundConnectionEntry);
-        Assert.Equal(secondary.SiloAddress, reboundConnectionEntry.Endpoint);
-        Assert.NotNull(reboundConnectionEntry.NextConnection());
+        Assert.False(entry.TryGetMessageTarget(out _));
     }
 
     [Fact]
@@ -198,6 +156,9 @@ public sealed class SharedEntryMessageTargetFastPathTests : IClassFixture<Shared
 
         Assert.NotEqual(originalActivationId, reboundActivationId);
         Assert.False(originalActivation.IsValid);
+        primary.ServiceProvider.GetRequiredService<GrainLocator>().InvalidateCache(grainReference.GrainId);
+        Assert.Equal(reboundActivationId, await grain.GetActivationId());
+        Assert.Equal(reboundActivationId, await grain.GetActivationId());
         var reboundEntry = GetEntry(grainReference);
         Assert.True(reboundEntry.TryGetMessageTarget(out var reboundTarget));
         var reboundActivation = Assert.IsType<ActivationData>(reboundTarget);
