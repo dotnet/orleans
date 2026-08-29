@@ -450,6 +450,40 @@ public class GrainDirectoryCacheFactoryTests
     }
 
     [Fact]
+    public async Task CreateGrainDirectoryCache_RetainedHandleTouchRefreshesExpiration()
+    {
+        var timeProvider = new FakeTimeProvider();
+        var timeToLive = TimeSpan.FromMinutes(1);
+        var (cache, entrySource) = CreateEntryCache(cacheSize: 10, timeToLive, timeProvider);
+        var disposableCache = Assert.IsAssignableFrom<IAsyncDisposable>(cache);
+        using var listener = new ConcurrentLruCacheExpirationCleanupListener(cache);
+        var address = CreateGrainAddress(CreateGrainId(), port: 11111);
+
+        try
+        {
+            cache.AddOrUpdate(address, version: 1);
+            var entry = GetEntry(entrySource, address.GrainId);
+
+            timeProvider.Advance(timeToLive);
+            Assert.Equal(0, await listener.WaitForCleanupAsync());
+            Assert.True(entry.TryTouch());
+
+            timeProvider.Advance(timeToLive);
+            Assert.Equal(0, await listener.WaitForCleanupAsync());
+            Assert.True(entry.IsValid);
+            Assert.Single(cache.KeyValues);
+
+            timeProvider.Advance(timeToLive);
+            Assert.Equal(1, await listener.WaitForCleanupAsync());
+            AssertInvalidEntry(entry);
+        }
+        finally
+        {
+            await disposableCache.DisposeAsync();
+        }
+    }
+
+    [Fact]
     public async Task CreateGrainDirectoryCache_EvictionInvalidatesRouteHandle()
     {
         var (cache, entrySource) = CreateEntryCache(cacheSize: 3);

@@ -73,7 +73,9 @@ internal sealed class LruGrainDirectoryCache : ConcurrentLruCache<GrainId, (Grai
     }
 
     protected override LruItem CreateItem(GrainId key, (GrainAddress ActivationAddress, int Version) value)
-        => new GrainDirectoryCacheEntry(key, value, GetCurrentTimestamp());
+        => new GrainDirectoryCacheEntry(this, key, value, GetCurrentTimestamp());
+
+    internal void Touch(GrainDirectoryCacheEntry entry) => TouchItem(entry);
 
     protected override void UpdateItem(LruItem item, (GrainAddress ActivationAddress, int Version) value)
         => ((GrainDirectoryCacheEntry)item).Update(value);

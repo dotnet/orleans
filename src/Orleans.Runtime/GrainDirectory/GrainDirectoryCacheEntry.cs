@@ -9,20 +9,23 @@ internal sealed class GrainDirectoryCacheEntry
 {
     private static readonly object Invalidated = new();
     private static readonly object Updating = new();
+    private readonly LruGrainDirectoryCache? _owner;
     private readonly WeakReference<GrainDirectoryCacheEntry> _referenceHandle;
     private object? _messageTarget;
 
     public GrainDirectoryCacheEntry(GrainAddress address, int version)
-        : this(address.GrainId, (address, version), timestamp: 0)
+        : this(owner: null, address.GrainId, (address, version), timestamp: 0)
     {
     }
 
     public GrainDirectoryCacheEntry(
+        LruGrainDirectoryCache? owner,
         GrainId grainId,
         (GrainAddress ActivationAddress, int Version) value,
         long timestamp)
         : base(grainId, value, timestamp)
     {
+        _owner = owner;
         _referenceHandle = new(this);
     }
 
@@ -31,6 +34,17 @@ internal sealed class GrainDirectoryCacheEntry
     public int Version => Value.Version;
 
     public WeakReference<GrainDirectoryCacheEntry> ReferenceHandle => _referenceHandle;
+
+    public bool TryTouch()
+    {
+        if (!IsValid)
+        {
+            return false;
+        }
+
+        _owner?.Touch(this);
+        return IsValid;
+    }
 
     public bool IsValid
     {

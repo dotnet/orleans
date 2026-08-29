@@ -571,7 +571,8 @@ namespace Orleans.Runtime.Messaging
                 var candidateAddress = candidate.Address;
                 Debug.Assert(candidateAddress.GrainId.Equals(message.TargetGrain));
                 if (candidateAddress.SiloAddress is { } targetSilo
-                    && (targetSilo.Matches(_siloAddress) || !IsKnownDeadSilo(candidateAddress)))
+                    && (targetSilo.Matches(_siloAddress) || !IsKnownDeadSilo(candidateAddress))
+                    && candidate.TryTouch())
                 {
                     entry = candidate;
                     return true;

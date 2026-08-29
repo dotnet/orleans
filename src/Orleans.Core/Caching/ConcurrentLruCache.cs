@@ -181,7 +181,7 @@ internal class ConcurrentLruCache<K, V> : IEnumerable<KeyValuePair<K, V>>, ICach
     {
         if (_dictionary.TryGetValue(key, out item))
         {
-            Touch(item);
+            TouchItem(item);
             _telemetryPolicy.IncrementHit();
             return true;
         }
@@ -1080,7 +1080,7 @@ internal class ConcurrentLruCache<K, V> : IEnumerable<KeyValuePair<K, V>>, ICach
     protected long GetCurrentTimestamp() => _expiresAfterAccess ? _timeProvider.GetTimestamp() : 0;
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private void Touch(LruItem item)
+    protected void TouchItem(LruItem item)
     {
         if (_expiresAfterAccess)
         {
