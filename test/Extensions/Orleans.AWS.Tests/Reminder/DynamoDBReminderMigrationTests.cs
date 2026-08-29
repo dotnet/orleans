@@ -153,7 +153,7 @@ public sealed class DynamoDBReminderMigrationTests
     }
 
     [Fact]
-    public async Task LegacyStrongOwnershipReadFindsRowsMissingFromDiscoveryIndex()
+    public async Task LegacyMissingDiscoveryCandidateRemainsUndiscoverableWithoutSchemaChange()
     {
         EnsureDynamoDb();
         var tableName = NewTableName();
@@ -170,10 +170,11 @@ public sealed class DynamoDBReminderMigrationTests
             await table.UpsertRow(entry);
 
             Assert.Empty((await table.ReadRows(0, 0)).Reminders);
-            var stronglyDiscovered = Assert.Single((await table.ReadRows(0, 0, requireStrongConsistency: true)).Reminders);
-            Assert.Equal(entry.GrainId, stronglyDiscovered.GrainId);
-            Assert.Equal(entry.ReminderName, stronglyDiscovered.ReminderName);
-            Assert.Equal(entry.ETag, stronglyDiscovered.ETag);
+            Assert.Empty((await table.ReadRows(entry.GrainId)).Reminders);
+            var pointRead = Assert.IsType<ReminderEntry>(await table.ReadRow(entry.GrainId, entry.ReminderName));
+            Assert.Equal(entry.GrainId, pointRead.GrainId);
+            Assert.Equal(entry.ReminderName, pointRead.ReminderName);
+            Assert.Equal(entry.ETag, pointRead.ETag);
         }
         finally
         {

@@ -61,6 +61,7 @@ namespace Orleans
         System.Threading.Tasks.Task<System.Collections.Generic.List<Runtime.IGrainReminder>> GetReminders(Runtime.GrainId grainId, System.Threading.CancellationToken cancellationToken);
         [Alias("GetReminders")]
         System.Threading.Tasks.Task<System.Collections.Generic.List<Runtime.IGrainReminder>> GetReminders(Runtime.GrainId grainId);
+        System.Threading.Tasks.Task<bool> ReconcileReminder(Runtime.GrainId grainId, string reminderName, int remainingHops);
         [Alias("1281C86D")]
         System.Threading.Tasks.Task<Runtime.IGrainReminder> RegisterOrUpdateReminder(Runtime.GrainId grainId, string reminderName, System.TimeSpan dueTime, System.TimeSpan period, System.Threading.CancellationToken cancellationToken);
         [Alias("RegisterOrUpdateReminder")]
@@ -90,10 +91,6 @@ namespace Orleans
         System.Threading.Tasks.Task<ReminderTableData> ReadRows(uint begin, uint end, System.Threading.CancellationToken cancellationToken);
         System.Threading.Tasks.Task<ReminderTableData> ReadRows(uint begin, uint end);
         System.Threading.Tasks.Task<bool> RemoveRow(Runtime.GrainId grainId, string reminderName, string eTag, System.Threading.CancellationToken cancellationToken);
-        System.Threading.Tasks.Task<ReminderTableData> ReadRows(uint begin, uint end, bool requireStrongConsistency);
-        System.Threading.Tasks.Task<ReminderTableData> ReadRows(uint begin, uint end, bool requireStrongConsistency, System.Threading.CancellationToken cancellationToken);
-        System.Threading.Tasks.Task<ReminderTableData> ReadRows(System.Collections.Generic.IReadOnlyList<(uint Begin, uint End)> ranges, bool requireStrongConsistency);
-        System.Threading.Tasks.Task<ReminderTableData> ReadRows(System.Collections.Generic.IReadOnlyList<(uint Begin, uint End)> ranges, bool requireStrongConsistency, System.Threading.CancellationToken cancellationToken);
         System.Threading.Tasks.Task<bool> RemoveRow(Runtime.GrainId grainId, string reminderName, string eTag);
         System.Threading.Tasks.Task StartAsync(System.Threading.CancellationToken cancellationToken = default);
         System.Threading.Tasks.Task StopAsync(System.Threading.CancellationToken cancellationToken = default);
