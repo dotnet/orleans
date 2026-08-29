@@ -127,16 +127,19 @@ public sealed class SqsStreamingResourceTests
         var client = builder.AddContainer("client", "unused").WithReference(orleans.AsClient());
         await using var application = builder.Build();
 
-        using var siloEnvironment = new EnvironmentVariableScope(
-            await GetEnvironmentAsync(application.Services, silo.Resource));
-        using var siloHost = Host.CreateApplicationBuilder().UseOrleans().Build();
-        AssertActivatedProvider(siloHost.Services, partitionCount: 2, fifoQueue: true);
+        using (new EnvironmentVariableScope(
+            await GetEnvironmentAsync(application.Services, silo.Resource)))
+        {
+            using var siloHost = Host.CreateApplicationBuilder().UseOrleans().Build();
+            AssertActivatedProvider(siloHost.Services, partitionCount: 2, fifoQueue: true);
+        }
 
-        siloEnvironment.Dispose();
-        using var clientEnvironment = new EnvironmentVariableScope(
-            await GetEnvironmentAsync(application.Services, client.Resource));
-        using var clientHost = Host.CreateApplicationBuilder().UseOrleansClient().Build();
-        AssertActivatedProvider(clientHost.Services, partitionCount: 2, fifoQueue: true);
+        using (new EnvironmentVariableScope(
+            await GetEnvironmentAsync(application.Services, client.Resource)))
+        {
+            using var clientHost = Host.CreateApplicationBuilder().UseOrleansClient().Build();
+            AssertActivatedProvider(clientHost.Services, partitionCount: 2, fifoQueue: true);
+        }
     }
 
     [Theory]
