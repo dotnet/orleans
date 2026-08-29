@@ -123,7 +123,7 @@ public sealed class SharedEntryMessageTargetFastPathTests : IClassFixture<Shared
     }
 
     [Fact]
-    public async Task LocalDirectoryGrain_DeactivationRebindsToNewActivation()
+    public async Task LocalDirectoryGrain_DeactivationDoesNotReuseInvalidActivation()
     {
         var primary = (InProcessSiloHandle)_fixture.HostedCluster.Primary!;
         var grainFactory = GetPrimarySiloGrainFactory(primary);
@@ -147,20 +147,24 @@ public sealed class SharedEntryMessageTargetFastPathTests : IClassFixture<Shared
         var originalActivationId = await grain.GetActivationId();
 
         await grain.Deactivate();
-        var reboundActivationId = await grain.GetActivationId();
-        Assert.Equal(reboundActivationId, await grain.GetActivationId());
+        RequestContext.Set(IPlacementDirector.PlacementHintKey, primary.SiloAddress);
+        try
+        {
+            var reboundActivationId = await grain.GetActivationId();
+            Assert.Equal(reboundActivationId, await grain.GetActivationId());
 
-        Assert.NotEqual(originalActivationId, reboundActivationId);
-        Assert.False(originalActivation.IsValid);
-        primary.ServiceProvider.GetRequiredService<GrainLocator>().InvalidateCache(grainReference.GrainId);
-        Assert.Equal(reboundActivationId, await grain.GetActivationId());
-        Assert.Equal(reboundActivationId, await grain.GetActivationId());
-        var reboundEntry = GetEntry(grainReference);
-        Assert.True(reboundEntry.TryGetMessageTarget(out var reboundTarget));
-        var reboundActivation = Assert.IsType<ActivationData>(reboundTarget);
-        Assert.NotSame(originalActivation, reboundActivation);
-        Assert.True(reboundActivation.IsValid);
-        Assert.Equal(reboundEntry.Address, reboundActivation.Address);
+            Assert.NotEqual(originalActivationId, reboundActivationId);
+            Assert.False(originalActivation.IsValid);
+            Assert.True(_fixture.HostedCluster.TryGetGrainContext(grainReference.GrainId, out var reboundContext));
+            var reboundActivation = Assert.IsType<ActivationData>(reboundContext);
+            Assert.NotSame(originalActivation, reboundActivation);
+            Assert.True(reboundActivation.IsValid);
+            Assert.Equal(primary.SiloAddress, reboundActivation.Address.SiloAddress);
+        }
+        finally
+        {
+            RequestContext.Remove(IPlacementDirector.PlacementHintKey);
+        }
     }
 
     [Fact]
