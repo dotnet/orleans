@@ -278,7 +278,6 @@ internal sealed partial class DynamoDBReminderTable
     private async Task<bool> CopyLegacyRecord(LegacyReminderRecord record)
     {
         var entry = Resolve(record.Item);
-        var etag = GetAttributeString(record.Item[ETAG_PROPERTY_NAME]);
         var values = new Dictionary<string, AttributeValue> { [":sourceETag"] = Clone(record.Item[ETAG_PROPERTY_NAME]) };
         try
         {

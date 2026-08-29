@@ -647,7 +647,7 @@ namespace Orleans.Runtime.ReminderService
         }
 
         private async Task ReadAndReconcileRange(
-            IRingRange range,
+            ISingleRange range,
             int rangeSerialNumberCopy,
             long cachedSequence)
         {
@@ -659,10 +659,9 @@ namespace Orleans.Runtime.ReminderService
             {
                 // The read sequence was captured before any range read yielded. Local mutations which run while
                 // storage is reading receive a later sequence and therefore win when this snapshot returns.
-                var singleRange = (ISingleRange)range;
                 ReminderTableData? table = await reminderTable.ReadRows(
-                    singleRange.Begin,
-                    singleRange.End,
+                    range.Begin,
+                    range.End,
                     StoppedCancellationTokenSource.Token);
 
                 if (cachedSequence < localTableSequence)
