@@ -27,7 +27,6 @@ namespace Orleans.Runtime.Messaging
         private readonly SiloMessagingOptions messagingOptions;
         private readonly PlacementService placementService;
         private readonly GrainLocator _grainLocator;
-        private readonly IClusterMembershipService _clusterMembershipService;
         private readonly Action<Message>? _messageObserver;
         private readonly ILogger log;
         private readonly Catalog catalog;
@@ -49,7 +48,6 @@ namespace Orleans.Runtime.Messaging
             IOptions<SiloMessagingOptions> messagingOptions,
             PlacementService placementService,
             GrainLocator grainLocator,
-            IClusterMembershipService clusterMembershipService,
             IMessageStatisticsSink messageStatisticsSink)
         {
             this.catalog = catalog;
@@ -61,7 +59,6 @@ namespace Orleans.Runtime.Messaging
             _messagingProcessingInstruments = messagingProcessingInstruments;
             this.placementService = placementService;
             _grainLocator = grainLocator;
-            _clusterMembershipService = clusterMembershipService;
             _messageObserver = messageStatisticsSink.GetMessageObserver();
             this.log = logger;
             this.messageFactory = messageFactory;
@@ -571,7 +568,7 @@ namespace Orleans.Runtime.Messaging
                 var candidateAddress = candidate.Address;
                 Debug.Assert(candidateAddress.GrainId.Equals(message.TargetGrain));
                 if (candidateAddress.SiloAddress is { } targetSilo
-                    && (targetSilo.Matches(_siloAddress) || !IsKnownDeadSilo(candidateAddress))
+                    && targetSilo.Matches(_siloAddress)
                     && candidate.TryTouch())
                 {
                     entry = candidate;
@@ -584,7 +581,7 @@ namespace Orleans.Runtime.Messaging
             {
                 var candidateAddress = candidate.Address;
                 clearHandle = candidateAddress.SiloAddress is not { } candidateSilo
-                    || !candidateSilo.Matches(_siloAddress) && IsKnownDeadSilo(candidateAddress);
+                    || !candidateSilo.Matches(_siloAddress);
             }
 
             if (clearHandle)
@@ -596,15 +593,12 @@ namespace Orleans.Runtime.Messaging
             return false;
         }
 
-        private bool IsKnownDeadSilo(GrainAddress address)
-            => address.SiloAddress is not { } siloAddress
-                || _clusterMembershipService.CurrentSnapshot.GetSiloStatus(siloAddress, address.MembershipVersion) == SiloStatus.Dead;
-
         private GrainDirectoryCacheEntry? CaptureDirectoryCacheEntry(GrainReference? target, Message message)
         {
             if (target is null
                 || message.CacheInvalidationHeader is not null
                 || message.TargetSilo is not { } targetSilo
+                || !targetSilo.Matches(_siloAddress)
                 || !placementService.IsUsingGrainDirectory(message.TargetGrain)
                 || !_grainLocator.TryGetCacheEntry(message.TargetGrain, targetSilo, out var entry))
             {

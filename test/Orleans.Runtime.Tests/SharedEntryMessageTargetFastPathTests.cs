@@ -119,11 +119,7 @@ public sealed class SharedEntryMessageTargetFastPathTests : IClassFixture<Shared
             RequestContext.Remove(IPlacementDirector.PlacementHintKey);
         }
 
-        var entry = GetEntry(grainReference);
-        Assert.True(entry.IsValid);
-        Assert.Equal(grainReference.GrainId, entry.Address.GrainId);
-        Assert.Equal(secondary.SiloAddress, entry.Address.SiloAddress);
-        Assert.False(entry.TryGetMessageTarget(out _));
+        Assert.Null(grainReference.MessageTargetCache);
     }
 
     [Fact]
@@ -262,7 +258,7 @@ public sealed class SharedEntryMessageTargetFastPathTests : IClassFixture<Shared
     }
 
     [Fact]
-    public void PurgedSiloEntry_IsRejectedAndClearedFromGrainReference()
+    public void RemoteSiloEntry_IsRejectedAndClearedFromGrainReference()
     {
         var primary = (InProcessSiloHandle)_fixture.HostedCluster.Primary!;
         var grainFactory = GetPrimarySiloGrainFactory(primary);
