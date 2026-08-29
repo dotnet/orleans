@@ -531,7 +531,11 @@ internal sealed partial class ClientDirectory : SystemTarget, ILocalClientDirect
 
             LogDebugSuccessfullyPublishedRoutes(successor);
 
-            _nextPublishTask = null;
+            lock (_lockObj)
+            {
+                _nextPublishTask = null;
+            }
+
             if (ShouldPublish())
             {
                 _schedulePublishUpdate();
@@ -562,7 +566,13 @@ internal sealed partial class ClientDirectory : SystemTarget, ILocalClientDirect
 
         Task StartPublishingRoutingTable(CancellationToken ct)
         {
-            this.RunOrQueueTask(() => _runTask = this.Run()).Ignore();
+            var runTask = this.RunOrQueueTask(Run);
+            lock (_lockObj)
+            {
+                _runTask = runTask;
+            }
+
+            runTask.Ignore();
             return Task.CompletedTask;
         }
 
@@ -574,7 +584,7 @@ internal sealed partial class ClientDirectory : SystemTarget, ILocalClientDirect
             lock (_lockObj)
             {
                 beginStopping = _isStopping == 0;
-                _isStopping = 1;
+                Volatile.Write(ref _isStopping, 1);
                 runTask = _runTask;
                 publishTask = _nextPublishTask;
             }
@@ -603,9 +613,17 @@ internal sealed partial class ClientDirectory : SystemTarget, ILocalClientDirect
     {
         public Action SchedulePublishUpdate { get => instance._schedulePublishUpdate; set => instance._schedulePublishUpdate = value; }
         public long ObservedConnectedClientsVersion { get => instance._observedConnectedClientsVersion; set => instance._observedConnectedClientsVersion = value; }
-        public bool PublishTasksCompleted =>
-            instance._runTask is not { IsCompleted: false }
-            && instance._nextPublishTask is not { IsCompleted: false };
+        public bool PublishTasksCompleted
+        {
+            get
+            {
+                lock (instance._lockObj)
+                {
+                    return instance._runTask is not { IsCompleted: false }
+                        && instance._nextPublishTask is not { IsCompleted: false };
+                }
+            }
+        }
         public void SchedulePublishUpdates() => instance.SchedulePublishUpdates();
         public Task PublishUpdates() => instance.PublishUpdates();
     }
