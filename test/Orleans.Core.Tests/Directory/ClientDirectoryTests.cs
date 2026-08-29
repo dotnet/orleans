@@ -359,6 +359,7 @@ namespace NonSilo.Tests.Directory
 
                     if (callNumber == 1)
                     {
+                        Assert.DoesNotContain(silo, update);
                         Assert.True(update.TryGetValue(otherRemoteSilo, out var siloUpdate));
                         Assert.Contains(remoteClientId2, siloUpdate.ConnectedClients);
                     }
@@ -392,17 +393,13 @@ namespace NonSilo.Tests.Directory
             await _directory.OnUpdateClientRoutes(builder.ToImmutable());
             Assert.Equal(1, totalUpdateCalls[0]);
 
-            var oldSuccessor = calledSilos.Last();
-            _clusterMembershipService.UpdateSiloStatus(oldSuccessor, SiloStatus.Dead, "blah");
-            var newSuccessor = GetOtherRemoteSilo(oldSuccessor);
-            totalUpdateCalls[0] = 0;
-
-            // Add clients locally and see that they are propagated to the new successor.
+            var successor = Assert.Single(calledSilos);
             SetLocalClients(new List<GrainId> { remoteClientId, remoteClientId2 });
-            builder = ImmutableDictionary.CreateBuilder<SiloAddress, (ImmutableHashSet<GrainId>, long)>();
-            builder[oldSuccessor] = (ImmutableHashSet.CreateRange(new[] { remoteClientId2 }), 4);
-            await _directory.OnUpdateClientRoutes(builder.ToImmutable());
-            Assert.Equal(1, totalUpdateCalls[0]);
+            await _directory.OnUpdateClientRoutes(
+                ImmutableDictionary<SiloAddress, (ImmutableHashSet<GrainId>, long)>.Empty);
+
+            Assert.Equal(2, totalUpdateCalls[0]);
+            Assert.All(calledSilos, calledSilo => Assert.Equal(successor, calledSilo));
         }
 
         [Fact]

@@ -454,20 +454,30 @@ internal sealed partial class ClientDirectory : SystemTarget, ILocalClientDirect
 
     private async Task PublishUpdates()
     {
-        // Publish clients to the next two silos in the ring
-        var successor = _consistentRing.Successor;
-        if (successor is null)
+        SiloAddress? successor;
+        ImmutableDictionary<SiloAddress, (ImmutableHashSet<GrainId> ConnectedClients, long Version)> newRoutes;
+        ImmutableDictionary<SiloAddress, (ImmutableHashSet<GrainId> ConnectedClients, long Version)>? previousRoutes;
+        lock (_lockObj)
         {
-            return;
-        }
+            if (_isStopping != 0)
+            {
+                return;
+            }
 
-        if (successor.Equals(_previousSuccessor))
-        {
-            _publishedTable = null;
-        }
+            successor = _consistentRing.Successor;
+            if (successor is null)
+            {
+                return;
+            }
 
-        var newRoutes = _table;
-        var previousRoutes = _publishedTable;
+            if (!successor.Equals(_previousSuccessor))
+            {
+                _publishedTable = null;
+            }
+
+            newRoutes = _table;
+            previousRoutes = _publishedTable;
+        }
 
         if (ReferenceEquals(previousRoutes, newRoutes))
         {
@@ -477,18 +487,13 @@ internal sealed partial class ClientDirectory : SystemTarget, ILocalClientDirect
 
         // Try to find the minimum amount of information required to update the successor.
         var builder = newRoutes.ToBuilder();
+        builder.Remove(successor);
         if (previousRoutes is not null)
         {
             foreach (var pair in previousRoutes)
             {
                 var silo = pair.Key;
                 var (_, version) = pair.Value;
-                if (silo.Equals(successor))
-                {
-                    // No need to publish updates to the silo which originated them.
-                    continue;
-                }
-
                 if (!builder.TryGetValue(silo, out var published))
                 {
                     continue;
@@ -523,16 +528,16 @@ internal sealed partial class ClientDirectory : SystemTarget, ILocalClientDirect
 
             // Record the current lower bound of what the successor knows, so that it can be used to minimize
             // data transfer next time an update is performed.
-            if (ReferenceEquals(_publishedTable, previousRoutes))
-            {
-                _publishedTable = newRoutes;
-                _previousSuccessor = successor;
-            }
-
             LogDebugSuccessfullyPublishedRoutes(successor);
 
             lock (_lockObj)
             {
+                if (ReferenceEquals(_publishedTable, previousRoutes))
+                {
+                    _publishedTable = newRoutes;
+                    _previousSuccessor = successor;
+                }
+
                 _nextPublishTask = null;
             }
 
