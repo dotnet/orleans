@@ -1,6 +1,7 @@
 <Project>
   <ItemGroup Condition="'$(EnableOrleansContractsAnalyzer)' == 'true'">
-    <Analyzer Include="$(OrleansContractsAnalyzerPath)" />
+    <Analyzer Include="$(OrleansContractsAnalyzerPath)"
+              Condition="'$(OrleansContractsAnalyzerPath)' != ''" />
     <AdditionalFiles Include="$(OrleansContractsPath)"
                      OrleansContractsFile="true"
                      OrleansContractsFileExists="false"
