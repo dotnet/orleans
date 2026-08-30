@@ -35,7 +35,7 @@ public sealed class InProcessTestClusterLifecycleTests
             {
                 Assert.Empty(cluster.GetActiveSilos());
             }
-        }));
+        })).ToArray();
         var readers = Enumerable.Range(0, ConcurrentLogReaderCount).Select(_ => Task.Run(async () =>
         {
             await start.Task;
@@ -44,7 +44,7 @@ public sealed class InProcessTestClusterLifecycleTests
                 cluster.GetLog();
                 await Task.Yield();
             }
-        }));
+        })).ToArray();
 
         start.TrySetResult();
         await Task.WhenAll(writers.Concat(readers));
