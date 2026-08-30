@@ -1,3 +1,5 @@
+using Orleans.Placement.Rebalancing;
+using TestExtensions;
 using Xunit;
 
 namespace UnitTests.ActivationRebalancingTests;
@@ -17,6 +19,9 @@ public class DynamicRebalancingTests(RebalancerFixture fixture, ITestOutputHelpe
     {
         var cancellationToken = TestContext.Current.CancellationToken;
         var tasks = new List<Task>();
+        using var rebalancerEvents = RebalancerDiagnosticObserver.Create();
+        var rebalancer = Cluster.Client!.GetGrain<IActivationRebalancerWorker>(0);
+        var rebalancerHost = (await rebalancer.GetReport()).Host;
 
         AddTestActivations(tasks, Silo1, 300);
         AddTestActivations(tasks, Silo2, 30);
@@ -24,6 +29,7 @@ public class DynamicRebalancingTests(RebalancerFixture fixture, ITestOutputHelpe
         AddTestActivations(tasks, Silo4, 100);
 
         await Task.WhenAll(tasks);
+        rebalancerEvents.Clear();
 
         var stats = await MgmtGrain.GetDetailedGrainStatistics();
 
@@ -54,7 +60,10 @@ public class DynamicRebalancingTests(RebalancerFixture fixture, ITestOutputHelpe
 
         while (index < 5)
         {
-            await Task.Delay(RebalancerFixture.SessionCyclePeriod, cancellationToken);
+            var completedCycles = rebalancerEvents.GetCycleCount(rebalancerHost);
+            await rebalancerEvents
+                .WaitForCycleCountAsync(rebalancerHost, completedCycles + 1)
+                .WaitAsync(cancellationToken);
 
             if (index % 2 == 0)
             {
