@@ -101,6 +101,68 @@ public sealed class DurableTaskResponsePersistenceTests
     }
 
     [Fact]
+    public void VolatileCancellationKeepsStoredStateOwnedByTask()
+    {
+        using var services = CreateSerializationServices();
+        var storage = new VolatileDurableTaskGrainStorage(
+            services.GetRequiredService<DeepCopier<Dictionary<TaskId, DurableTaskState>>>(),
+            services.GetRequiredService<DeepCopier<DurableTaskState>>(),
+            TimeProvider.System);
+        var taskId = TaskId.Parse("root/cancel-owned");
+        var state = storage.GetOrCreateTask(taskId, request: null);
+
+        storage.RequestCancellation(taskId, state);
+        var storedState = Assert.Single(storage.Tasks).State;
+        storage.SetResponse(taskId, storedState, DurableTaskResponse.Completed);
+
+        Assert.True(storage.TryGetTask(taskId, out var completed));
+        Assert.Equal(DurableTaskStatus.CompletedSuccessfully, completed.Result!.Status);
+    }
+
+    [Fact]
+    public void VolatileStorageRejectsStateFromAnotherStorageInstance()
+    {
+        using var services = CreateSerializationServices();
+        var storageCopier = services.GetRequiredService<DeepCopier<Dictionary<TaskId, DurableTaskState>>>();
+        var stateCopier = services.GetRequiredService<DeepCopier<DurableTaskState>>();
+        var first = new VolatileDurableTaskGrainStorage(storageCopier, stateCopier, TimeProvider.System);
+        var second = new VolatileDurableTaskGrainStorage(storageCopier, stateCopier, TimeProvider.System);
+        var taskId = TaskId.Parse("root/owned");
+        var state = first.GetOrCreateTask(taskId, request: null);
+        second.GetOrCreateTask(taskId, request: null);
+
+        var exception = Assert.Throws<ArgumentException>(
+            () => second.SetResponse(taskId, state, DurableTaskResponse.Completed));
+
+        Assert.Equal("state", exception.ParamName);
+        Assert.True(second.TryGetTask(taskId, out var secondState));
+        Assert.Null(secondState.Result);
+    }
+
+    [Fact]
+    public void VolatileStorageRejectsStateForDifferentTaskId()
+    {
+        using var services = CreateSerializationServices();
+        var storage = new VolatileDurableTaskGrainStorage(
+            services.GetRequiredService<DeepCopier<Dictionary<TaskId, DurableTaskState>>>(),
+            services.GetRequiredService<DeepCopier<DurableTaskState>>(),
+            TimeProvider.System);
+        var ownerTaskId = TaskId.Parse("root/owned");
+        var otherTaskId = TaskId.Parse("root/other");
+        var state = storage.GetOrCreateTask(ownerTaskId, request: null);
+        storage.GetOrCreateTask(otherTaskId, request: null);
+
+        var exception = Assert.Throws<ArgumentException>(
+            () => storage.CreateTombstone(otherTaskId, state));
+
+        Assert.Equal("state", exception.ParamName);
+        Assert.True(storage.TryGetTask(otherTaskId, out var otherState));
+        Assert.Null(otherState.TombstonedAt);
+        Assert.True(storage.TryGetTask(ownerTaskId, out var ownerState));
+        Assert.Null(ownerState.TombstonedAt);
+    }
+
+    [Fact]
     public void CanceledResponseRoundTripsThroughCompletionDelivery()
     {
         using var services = CreateSerializationServices();

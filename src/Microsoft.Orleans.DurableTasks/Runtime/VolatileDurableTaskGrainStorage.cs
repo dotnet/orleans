@@ -2,6 +2,7 @@
 using System;
 using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
+using System.Runtime.CompilerServices;
 using Orleans.DurableTasks.Protocol;
 using Orleans.DurableTasks;
 using System.Linq;
@@ -20,18 +21,32 @@ public class VolatileDurableTaskGrainStorage(
     private readonly DeepCopier<Dictionary<TaskId, DurableTaskState>> _storageCopier = storageCopier;
     private readonly DeepCopier<DurableTaskState> _stateCopier = stateCopier;
     private readonly TimeProvider _timeProvider = timeProvider;
+    private readonly ConditionalWeakTable<DurableTaskState, StateOwnership> _stateOwnership = new();
     private Dictionary<TaskId, DurableTaskState> _workingCopy = [];
     private Dictionary<TaskId, DurableTaskState> _persistedCopy = [];
 
     public IEnumerable<(TaskId Id, IDurableTaskState State)> Tasks => _workingCopy.Select(static pair => (pair.Key, (IDurableTaskState)pair.Value));
 
-    public void AddOrUpdateTask(TaskId taskId, DurableTaskState state) => _workingCopy[taskId] = CopyState(state);
-    public bool RemoveTask(TaskId taskId) => _workingCopy.Remove(taskId);
+    public void AddOrUpdateTask(TaskId taskId, DurableTaskState state)
+    {
+        ArgumentOutOfRangeException.ThrowIfEqual(taskId, default);
+        ArgumentNullException.ThrowIfNull(state);
+        TrackState(taskId, state);
+        _workingCopy[taskId] = TrackState(taskId, CopyState(state));
+    }
+
+    public bool RemoveTask(TaskId taskId)
+    {
+        ArgumentOutOfRangeException.ThrowIfEqual(taskId, default);
+        return _workingCopy.Remove(taskId);
+    }
+
     public bool TryGetTask(TaskId taskId, [NotNullWhen(true)] out IDurableTaskState? state)
     {
+        ArgumentOutOfRangeException.ThrowIfEqual(taskId, default);
         if (_workingCopy.TryGetValue(taskId, out var internalState))
         {
-            state = CopyState(internalState);
+            state = TrackState(taskId, CopyState(internalState));
             return true;
         }
 
@@ -42,6 +57,11 @@ public class VolatileDurableTaskGrainStorage(
     public ValueTask ReadAsync(CancellationToken cancellationToken)
     {
         _workingCopy = CopyStorage(_persistedCopy);
+        foreach (var (taskId, state) in _workingCopy)
+        {
+            TrackState(taskId, state);
+        }
+
         return default;
     }
 
@@ -53,6 +73,7 @@ public class VolatileDurableTaskGrainStorage(
 
     public IDurableTaskState GetOrCreateTask(TaskId taskId, IDurableTaskRequest? request)
     {
+        ArgumentOutOfRangeException.ThrowIfEqual(taskId, default);
         if (!TryGetTask(taskId, out var result))
         {
             if (request is not null && request.Context is null)
@@ -80,21 +101,21 @@ public class VolatileDurableTaskGrainStorage(
 
     public void SetRequest(TaskId taskId, IDurableTaskState state, IDurableTaskRequest request)
     {
-        var typedState = GetState(state);
+        var typedState = GetState(taskId, state);
         typedState.Request = request;
         AddOrUpdateTask(taskId, typedState);
     }
 
     public void SetRequestFingerprint(TaskId taskId, IDurableTaskState state, string fingerprint)
     {
-        var typedState = GetState(state);
+        var typedState = GetState(taskId, state);
         typedState.RequestFingerprint = fingerprint;
         AddOrUpdateTask(taskId, typedState);
     }
 
     public void SetRemoteRequest(TaskId taskId, IDurableTaskState state, GrainId target, string fingerprint)
     {
-        var typedState = GetState(state);
+        var typedState = GetState(taskId, state);
         typedState.RemoteTarget = target;
         typedState.RemoteRequestFingerprint = fingerprint;
         AddOrUpdateTask(taskId, typedState);
@@ -103,14 +124,14 @@ public class VolatileDurableTaskGrainStorage(
     public void SetCallerId(TaskId taskId, IDurableTaskState state, GrainId callerId)
     {
         ArgumentOutOfRangeException.ThrowIfEqual(callerId, default);
-        var typedState = GetState(state);
+        var typedState = GetState(taskId, state);
         typedState.CallerId = callerId;
         AddOrUpdateTask(taskId, typedState);
     }
 
     public void SetResponse(TaskId taskId, IDurableTaskState state, DurableTaskResponse response)
     {
-        var typedState = GetState(state);
+        var typedState = GetState(taskId, state);
         typedState.Result = response;
         typedState.CompletedAt = _timeProvider.GetUtcNow();
         typedState.DueTime = null;
@@ -124,32 +145,38 @@ public class VolatileDurableTaskGrainStorage(
 
     public void AddCompletionDestination(TaskId taskId, IDurableTaskState state, GrainId destination)
     {
-        var typedState = GetState(state);
+        var typedState = GetState(taskId, state);
         typedState.CompletionDestinations.Add(destination);
         AddOrUpdateTask(taskId, typedState);
     }
 
     public void RemoveCompletionDestination(TaskId taskId, IDurableTaskState state, GrainId destination)
     {
-        var typedState = GetState(state);
+        var typedState = GetState(taskId, state);
         typedState.CompletionDestinations.Remove(destination);
         AddOrUpdateTask(taskId, typedState);
     }
 
     public void CreateTombstone(TaskId taskId, IDurableTaskState state)
     {
-        var typedState = GetState(state);
+        var typedState = GetState(taskId, state);
         typedState.Request = null;
         typedState.Result = null;
         typedState.TombstonedAt = _timeProvider.GetUtcNow();
         AddOrUpdateTask(taskId, typedState);
     }
 
-    private static DurableTaskState GetState(IDurableTaskState state)
+    private DurableTaskState GetState(TaskId taskId, IDurableTaskState state)
     {
-        if (state is not DurableTaskState result)
+        ArgumentOutOfRangeException.ThrowIfEqual(taskId, default);
+        ArgumentNullException.ThrowIfNull(state);
+
+        if (state is not DurableTaskState result
+            || !_stateOwnership.TryGetValue(result, out var ownership)
+            || ownership.TaskId != taskId
+            || !_workingCopy.ContainsKey(taskId))
         {
-            throw new ArgumentException("The provided value does not belong to this storage provider", nameof(state));
+            throw new ArgumentException("The provided value does not belong to this storage provider.", nameof(state));
         }
 
         return result;
@@ -163,6 +190,26 @@ public class VolatileDurableTaskGrainStorage(
         _storageCopier.Copy(storage)
         ?? throw new InvalidOperationException("The durable task storage copier returned null.");
 
+    private DurableTaskState TrackState(TaskId taskId, DurableTaskState state)
+    {
+        if (_stateOwnership.TryGetValue(state, out var ownership))
+        {
+            if (ownership.TaskId != taskId)
+            {
+                throw new ArgumentException("The provided value is associated with a different durable task.", nameof(state));
+            }
+
+            return state;
+        }
+
+        _stateOwnership.Add(state, new StateOwnership(taskId));
+        return state;
+    }
+
+    private sealed class StateOwnership(TaskId taskId)
+    {
+        public TaskId TaskId { get; } = taskId;
+    }
 
     public void Clear()
     {
@@ -171,7 +218,7 @@ public class VolatileDurableTaskGrainStorage(
 
     public void RequestCancellation(TaskId taskId, IDurableTaskState state)
     {
-        _ = GetState(state);
+        _ = GetState(taskId, state);
         if (!_workingCopy.TryGetValue(taskId, out var current)
             || current.CompletedAt.HasValue
             || current.CancellationRequestedAt.HasValue)
@@ -181,12 +228,12 @@ public class VolatileDurableTaskGrainStorage(
 
         var updated = CopyState(current);
         updated.CancellationRequestedAt = _timeProvider.GetUtcNow();
-        _workingCopy[taskId] = updated;
+        _workingCopy[taskId] = TrackState(taskId, updated);
     }
 
     public void SetDelay(TaskId taskId, IDurableTaskState state, DateTimeOffset dueTime, TimeSpan duration, long generation)
     {
-        var typedState = GetState(state);
+        var typedState = GetState(taskId, state);
         typedState.DueTime = dueTime;
         typedState.DelayDuration = duration;
         typedState.ResumeGeneration = generation;

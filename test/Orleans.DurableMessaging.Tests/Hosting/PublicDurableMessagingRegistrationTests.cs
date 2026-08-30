@@ -143,16 +143,19 @@ public sealed class PublicDurableMessagingRegistrationTests
     }
 
     [Fact]
-    public void AddDurableMessaging_InvalidOptionsFailThroughOptionsContract()
+    public void AddDurableMessaging_InvalidOptionsPreserveValidationDetailsAtStartup()
     {
         var services = new ServiceCollection();
         services.AddDurableMessaging(options => options.MaxCapacity = 0);
         using var provider = services.BuildServiceProvider();
 
         var exception = Assert.Throws<OptionsValidationException>(
-            () => provider.GetRequiredService<IOptions<DurableInboxOptions>>().Value);
+            () => provider.GetRequiredService<IStartupValidator>().Validate());
 
-        Assert.Contains("DurableInboxOptions validation failed", exception.Message, StringComparison.Ordinal);
+        Assert.Equal(typeof(DurableInboxOptions), exception.OptionsType);
+        Assert.Contains(nameof(DurableInboxOptions.MaxCapacity), exception.Message, StringComparison.Ordinal);
+        Assert.Contains("must be greater than zero", exception.Message, StringComparison.Ordinal);
+        Assert.Contains("Actual value was 0", exception.Message, StringComparison.Ordinal);
     }
 
     [Fact]

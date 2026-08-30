@@ -29,6 +29,13 @@ Transport is at-least-once and unordered. The receiver deduplicates by
 deduplication record is retained. Applications which require ordering must include and
 enforce their own sequence numbers.
 
-Durable Messaging requires a Journaling state manager with rollback support and Durable
-Jobs storage appropriate for the deployment. In-memory storage is for development and
-tests only.
+Durable Messaging requires a Journaling state manager with rollback support and the
+`orleans-binary` journal format. Its inbox, outbox, ownership, and durable RPC records
+contain Orleans-polymorphic values whose recovery contract is currently validated with
+the Orleans serializer. `AddDurableMessaging` selects this format for the host and startup
+validation reports an incompatible override before any activation can process messages.
+Run workloads which require Journaling's JSON migration path in a separate silo host
+which does not call `AddDurableMessaging`.
+
+Configure Durable Jobs storage appropriate for the deployment. In-memory storage is for
+development and tests only.

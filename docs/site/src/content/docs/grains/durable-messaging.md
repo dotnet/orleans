@@ -1,7 +1,7 @@
 ---
 title: Durable messaging
 description: Understand the durable inbox and outbox guarantees, recovery model, and operating limits.
-ms.date: 08/20/2026
+ms.date: 08/29/2026
 ms.topic: conceptual
 ---
 
@@ -135,6 +135,14 @@ activation throws an <xref:System.InvalidOperationException> identifying
 <xref:Orleans.Journaling.IJournaledStateManager.RegisterObserver*> as a requirement. Use
 shared, production-grade storage for multi-silo deployments. In-memory Durable Jobs and
 journal storage are suitable only for development and tests.
+
+Durable Messaging uses the `orleans-binary` journal format. Inbox, outbox, ownership,
+and durable RPC state contain Orleans-polymorphic values whose recovery contract is
+validated with the Orleans serializer. `AddDurableMessaging` selects this format, and
+startup validation reports an incompatible format override before activations process
+messages. `JournaledStateManagerOptions` applies to the host, so workloads which require
+Journaling's JSON migration workflow run in a separate silo host which does not call
+`AddDurableMessaging`.
 
 Capacity and retention settings bound storage growth and define the effectively-once
 window. Monitor inbox depth, outbox depth, retry failures, dead letters, and oldest

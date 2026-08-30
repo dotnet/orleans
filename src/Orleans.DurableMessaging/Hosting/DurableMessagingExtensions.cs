@@ -51,6 +51,10 @@ public static class DurableMessagingExtensions
                         $"Durable messaging requires journal format '{DurableMessagingJournalFormatKey}', but '{options.JournalFormatKey}' is configured.");
                 }
             });
+        services.TryAddEnumerable(
+            ServiceDescriptor.Singleton<
+                IValidateOptions<DurableInboxOptions>,
+                DurableInboxOptionsValidator>());
 
         var optionsBuilder = services.AddOptions<DurableInboxOptions>();
         if (configureOptions is not null)
@@ -58,20 +62,7 @@ public static class DurableMessagingExtensions
             optionsBuilder.Configure(configureOptions);
         }
 
-        optionsBuilder.Validate(
-            options =>
-            {
-                try
-                {
-                    options.Validate();
-                    return true;
-                }
-                catch (ArgumentOutOfRangeException)
-                {
-                    return false;
-                }
-            },
-            "DurableInboxOptions validation failed.");
+        optionsBuilder.ValidateOnStart();
 
         services.ConfigureNamedOptionForLogging<DurableInboxOptions>(Options.DefaultName);
         services.TryAddSingleton<DurableMessagingInstruments>();
@@ -144,5 +135,21 @@ public static class DurableMessagingExtensions
         services.TryAddEnumerable(
             ServiceDescriptor.Scoped<IJournaledGrainParticipant, DurableMessagingGrainParticipant>());
         return services;
+    }
+
+    private sealed class DurableInboxOptionsValidator : IValidateOptions<DurableInboxOptions>
+    {
+        public ValidateOptionsResult Validate(string? name, DurableInboxOptions options)
+        {
+            try
+            {
+                options.Validate();
+                return ValidateOptionsResult.Success;
+            }
+            catch (ArgumentOutOfRangeException exception)
+            {
+                return ValidateOptionsResult.Fail(exception.Message);
+            }
+        }
     }
 }
