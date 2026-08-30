@@ -191,11 +191,13 @@ public class TransactionRecoveryLatencyTests
         var abortedTransactionId = Guid.NewGuid();
         var nextTransactionId = Guid.NewGuid();
         var priority = DateTime.UtcNow;
+        var transactionTimeout = TimeSpan.FromMinutes(1);
         var abortedOperationCount = 0;
 
         await queue.RWLock.EnterLock(
             currentTransactionId,
             priority,
+            transactionTimeout,
             new AccessCounter(),
             isRead: false,
             exclusiveLock: false,
@@ -203,6 +205,7 @@ public class TransactionRecoveryLatencyTests
         var firstAbortedOperation = queue.RWLock.EnterLock(
             abortedTransactionId,
             priority,
+            transactionTimeout,
             new AccessCounter(),
             isRead: false,
             exclusiveLock: false,
@@ -210,6 +213,7 @@ public class TransactionRecoveryLatencyTests
         var secondAbortedOperation = queue.RWLock.EnterLock(
             abortedTransactionId,
             priority,
+            transactionTimeout,
             new AccessCounter { Writes = 1 },
             isRead: false,
             exclusiveLock: false,
@@ -229,6 +233,7 @@ public class TransactionRecoveryLatencyTests
         var nextOperation = queue.RWLock.EnterLock(
             nextTransactionId,
             priority,
+            transactionTimeout,
             new AccessCounter(),
             isRead: false,
             exclusiveLock: false,
@@ -253,11 +258,13 @@ public class TransactionRecoveryLatencyTests
         var upgradingTransactionId = Guid.NewGuid();
         var conflictingTransactionId = Guid.NewGuid();
         var priority = new DateTime(2026, 8, 21, 12, 0, 0, DateTimeKind.Utc);
+        var transactionTimeout = TimeSpan.FromMinutes(1);
         var conflictingOperationCount = 0;
 
         await queue.RWLock.EnterLock(
             currentTransactionId,
             priority,
+            transactionTimeout,
             new AccessCounter(),
             isRead: false,
             exclusiveLock: false,
@@ -265,6 +272,7 @@ public class TransactionRecoveryLatencyTests
         var queuedRead = queue.RWLock.EnterLock(
             upgradingTransactionId,
             priority,
+            transactionTimeout,
             new AccessCounter(),
             isRead: true,
             exclusiveLock: false,
@@ -272,6 +280,7 @@ public class TransactionRecoveryLatencyTests
         var conflictingRead = queue.RWLock.EnterLock(
             conflictingTransactionId,
             priority,
+            transactionTimeout,
             new AccessCounter(),
             isRead: true,
             exclusiveLock: false,
@@ -279,6 +288,7 @@ public class TransactionRecoveryLatencyTests
         var queuedWrite = queue.RWLock.EnterLock(
             upgradingTransactionId,
             priority,
+            transactionTimeout,
             new AccessCounter { Reads = 1 },
             isRead: false,
             exclusiveLock: false,
