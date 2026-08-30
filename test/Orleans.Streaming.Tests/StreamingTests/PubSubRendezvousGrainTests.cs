@@ -104,6 +104,27 @@ namespace UnitTests.StreamingTests
             Assert.Equal(0, consumers);
         }
 
+        [Fact, TestCategory("BVT"), TestCategory("Streaming"), TestCategory("PubSub")]
+        public async Task UnregisterLastConsumerEmitsDiagnosticAfterClearingState()
+        {
+            var streamId = new QualifiedStreamId("ProviderName", StreamId.Create("StreamNamespace", Guid.NewGuid()));
+            var subscriptionId = GuidId.GetGuidId(Guid.NewGuid());
+            var pubSubGrain = this.fixture.GrainFactory.GetGrain<IPubSubRendezvousGrain>(streamId.ToString());
+            using var observer = StreamingDiagnosticObserver.Create();
+
+            await pubSubGrain.RegisterConsumer(subscriptionId, streamId, default, null!);
+            await pubSubGrain.UnregisterConsumer(subscriptionId, streamId);
+
+            var unregistered = await observer.WaitForSubscriptionUnregisteredAsync(
+                streamId.StreamId,
+                subscriptionId.Guid,
+                streamId.ProviderName,
+                TestContext.Current.CancellationToken);
+            Assert.Equal(streamId.StreamId, unregistered.StreamId);
+            Assert.Equal(subscriptionId.Guid, unregistered.SubscriptionId);
+            Assert.Equal(0, await pubSubGrain.ConsumerCount(streamId));
+        }
+
         /// <summary>
         /// This test fails because the producer must be grain reference which is not implied by the IStreamProducerExtension in the producer management calls.
         /// TODO: Fix rendezvous implementation.
