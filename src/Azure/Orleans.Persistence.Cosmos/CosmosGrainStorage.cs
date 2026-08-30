@@ -259,6 +259,8 @@ public sealed partial class CosmosGrainStorage : IGrainStorage, ILifecyclePartic
             }
 
             await InitializeCosmosClient().ConfigureAwait(false);
+            _container = _client.GetContainer(_options.DatabaseName, _options.ContainerName);
+            var containerValidated = false;
 
             if (_options.IsResourceCreationEnabled)
             {
@@ -266,12 +268,21 @@ public sealed partial class CosmosGrainStorage : IGrainStorage, ILifecyclePartic
                 {
                     await TryDeleteDatabase().ConfigureAwait(false);
                 }
+                else
+                {
+                    containerValidated = await ValidateContainerPartitionKeyDefinitionIfExists(ct).ConfigureAwait(false);
+                }
 
-                await TryCreateResources().ConfigureAwait(false);
+                if (!containerValidated)
+                {
+                    await TryCreateResources().ConfigureAwait(false);
+                }
             }
 
-            _container = _client.GetContainer(_options.DatabaseName, _options.ContainerName);
-            await ValidateContainerPartitionKeyDefinition(ct).ConfigureAwait(false);
+            if (!containerValidated)
+            {
+                await ValidateContainerPartitionKeyDefinition(ct).ConfigureAwait(false);
+            }
 
             stopWatch.Stop();
             LogDebugInitializingProvider(_name, GetType().Name, _options.InitStage, stopWatch.ElapsedMilliseconds);
@@ -329,15 +340,6 @@ public sealed partial class CosmosGrainStorage : IGrainStorage, ILifecyclePartic
         {
             var containerResponse = await db.CreateContainerIfNotExistsAsync(stateContainer, _options.ContainerThroughputProperties);
 
-            if (containerResponse.StatusCode == HttpStatusCode.OK || containerResponse.StatusCode == HttpStatusCode.Created)
-            {
-                var container = containerResponse.Resource;
-                if (_partitionKeyPaths.Length == 1 &&
-                    container.PartitionKeyPaths is [GRAINTYPE_PARTITION_KEY_PATH] &&
-                    (_documentIdProvider is not DefaultDocumentIdProvider defaultProvider || defaultProvider.HasCustomPartitionKeyProvider))
-                    throw new OrleansConfigurationException("Custom document id or partition key providers are not compatible with partition key path set to /GrainType");
-            }
-
             if (retry == maxRetries || dbResponse.StatusCode != HttpStatusCode.Created || containerResponse.StatusCode == HttpStatusCode.Created)
             {
                 break;  // Apparently some throttling logic returns HttpStatusCode.OK (not 429) when the collection wasn't created in a new DB.
@@ -350,6 +352,29 @@ public sealed partial class CosmosGrainStorage : IGrainStorage, ILifecyclePartic
     {
         var response = await _container.ReadContainerAsync(cancellationToken: cancellationToken).ConfigureAwait(false);
         ValidateContainerPartitionKeyPaths(_partitionKeyPaths, response.Resource.PartitionKeyPaths, _name, _options.ContainerName);
+
+        if (_partitionKeyPaths.Length == 1 &&
+            response.Resource.PartitionKeyPaths is [GRAINTYPE_PARTITION_KEY_PATH] &&
+            (_documentIdProvider is not DefaultDocumentIdProvider defaultProvider || defaultProvider.HasCustomPartitionKeyProvider))
+        {
+            throw new OrleansConfigurationException("Custom document id or partition key providers are not compatible with partition key path set to /GrainType");
+        }
+    }
+
+    /// <summary>
+    /// Validates the existing container, returning <see langword="false"/> when the database or container does not exist.
+    /// </summary>
+    private async Task<bool> ValidateContainerPartitionKeyDefinitionIfExists(CancellationToken cancellationToken)
+    {
+        try
+        {
+            await ValidateContainerPartitionKeyDefinition(cancellationToken).ConfigureAwait(false);
+            return true;
+        }
+        catch (CosmosException exception) when (exception.StatusCode == HttpStatusCode.NotFound)
+        {
+            return false;
+        }
     }
 
     internal static void ValidateContainerPartitionKeyPaths(

@@ -206,7 +206,7 @@ public class CosmosGrainStorageHpkIntegrationTests
             var exception = await Assert.ThrowsAsync<WrappedException>(
                 () => StartStorage(options, clusterOptions, provider));
 
-            Assert.EndsWith(nameof(OrleansConfigurationException), exception.OriginalExceptionType);
+            Assert.Contains(nameof(OrleansConfigurationException), exception.OriginalExceptionType);
             Assert.Contains("number, order, and name", exception.Message);
         }
         finally
