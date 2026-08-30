@@ -22,7 +22,7 @@ Configure a named provider with <xref:Orleans.Hosting.HostingExtensions.AddCosmo
 
 The <xref:Orleans.Persistence.Cosmos.DefaultDocumentIdProvider> derives the document ID and partition key for each grain record. To customize either value, implement <xref:Orleans.Persistence.Cosmos.IDocumentIdProvider> and register it using the generic <xref:Orleans.Hosting.HostingExtensions.AddCosmosGrainStorage*?displayProperty=nameWithType> overload.
 
-Single-string partitioning remains the default. It uses <xref:Orleans.Persistence.Cosmos.CosmosGrainStorageOptions.PartitionKeyPath>, which defaults to `/PartitionKey`. Existing providers, containers, and documents continue to use this behavior without configuration changes.
+Single-string partitioning remains the default. It uses <xref:Orleans.Persistence.Cosmos.CosmosGrainStorageOptions.PartitionKeyPath>, which defaults to `/PartitionKey`. Existing containers partitioned by `/GrainType` remain compatible with the default document ID provider when the partition-key options are omitted.
 
 Set <xref:Orleans.Persistence.Cosmos.CosmosGrainStorageOptions.PartitionKeyLevelCount> to `2` or `3` to opt into hierarchical partition keys. Orleans uses these ordered paths:
 
@@ -32,47 +32,13 @@ Set <xref:Orleans.Persistence.Cosmos.CosmosGrainStorageOptions.PartitionKeyLevel
 
 The configured level count selects the first two or all three paths. An HPK-aware <xref:Orleans.Persistence.Cosmos.IDocumentIdProvider> returns the same number of values, in the same order, using <xref:Orleans.Persistence.Cosmos.IDocumentIdProvider.GetDocumentKey*>:
 
-```csharp
-using Microsoft.Extensions.Options;
-using Orleans.Configuration;
-using Orleans.Persistence.Cosmos;
-using Orleans.Runtime;
-
-public sealed class TenantDocumentIdProvider(IOptions<ClusterOptions> clusterOptions) : IDocumentIdProvider
-{
-    private readonly DefaultDocumentIdProvider _defaultProvider = new(clusterOptions);
-
-    public ValueTask<(string DocumentId, string PartitionKey)> GetDocumentIdentifiers(
-        string grainType,
-        GrainId grainId)
-    {
-        var tenantId = grainId.Key.ToString()!;
-        return new((_defaultProvider.GetId(grainType, grainId), tenantId));
-    }
-
-    public ValueTask<CosmosDocumentKey> GetDocumentKey(string grainType, GrainId grainId)
-    {
-        var tenantId = grainId.Key.ToString()!;
-        return new(new CosmosDocumentKey(
-            _defaultProvider.GetId(grainType, grainId),
-            [tenantId, grainType]));
-    }
-}
-```
+:::code language="csharp" source="../../snippets/compiled/Grains/PersistenceSnippets.cs" id="cosmos_hpk_document_id_provider":::
 
 Register the provider and select the matching depth:
 
-```csharp
-siloBuilder.AddCosmosGrainStorage<TenantDocumentIdProvider>(
-    "cosmosStore",
-    options =>
-    {
-        options.ConfigureCosmosClient(connectionString);
-        options.PartitionKeyLevelCount = 2;
-    });
-```
+:::code language="csharp" source="../../snippets/compiled/Grains/PersistenceSnippets.cs" id="configure_cosmos_hpk_storage":::
 
-At startup, Orleans reads the container definition and compares its partition-key paths with the provider configuration. Startup fails if the mode, path count, path names, or ordering differ. This check also runs when resource creation is disabled. A provider that returns the wrong number of values fails with an <xref:OrleansConfigurationException> before the grain operation reaches Cosmos DB.
+At startup, Orleans reads the container definition and compares its partition-key paths with the provider configuration. Except for the default provider's legacy `/GrainType` compatibility, startup fails if the mode, path count, path names, or ordering differ. This check also runs when resource creation is disabled. A provider that returns the wrong number of values fails with an <xref:Orleans.Runtime.OrleansConfigurationException> before the grain operation reaches Cosmos DB.
 
 Cosmos DB cannot change an existing container's partition-key definition in place. Moving from single-string partitioning to HPK requires a new container and a data copy or [container copy job](https://learn.microsoft.com/azure/cosmos-db/hierarchical-partition-keys-faq#can-i-add-hierarchical-partition-keys-to-existing-containers). Orleans does not migrate the data automatically. All silos using the same provider name must agree on the database, container, partition-key configuration, and provider implementation.
 

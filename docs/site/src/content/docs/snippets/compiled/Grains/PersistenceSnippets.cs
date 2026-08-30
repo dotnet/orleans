@@ -12,6 +12,9 @@ namespace Documentation.Grains.Persistence.Cosmos
     // <azure_identity_using_cosmos>
 using Azure.Identity;
     // </azure_identity_using_cosmos>
+using Microsoft.Extensions.Options;
+using Orleans.Configuration;
+using Orleans.Persistence.Cosmos;
 
     internal static class CosmosStorage
     {
@@ -30,6 +33,50 @@ siloBuilder.AddCosmosGrainStorage(
         options.IsResourceCreationEnabled = false;
     });
             // </configure_cosmos_storage>
+        }
+    }
+
+    // <cosmos_hpk_document_id_provider>
+    /// <summary>
+    /// Derives a document ID and two ordered partition-key values for each grain record.
+    /// </summary>
+    public sealed class TenantDocumentIdProvider(IOptions<ClusterOptions> clusterOptions) : IDocumentIdProvider
+    {
+        private readonly DefaultDocumentIdProvider _defaultProvider = new(clusterOptions);
+
+        /// <inheritdoc />
+        public ValueTask<(string DocumentId, string PartitionKey)> GetDocumentIdentifiers(
+            string grainType,
+            GrainId grainId)
+        {
+            var tenantId = grainId.Key.ToString()!;
+            return new((_defaultProvider.GetId(grainType, grainId), tenantId));
+        }
+
+        /// <inheritdoc />
+        public ValueTask<CosmosDocumentKey> GetDocumentKey(string grainType, GrainId grainId)
+        {
+            var tenantId = grainId.Key.ToString()!;
+            return new(new CosmosDocumentKey(
+                _defaultProvider.GetId(grainType, grainId),
+                [tenantId, grainType]));
+        }
+    }
+    // </cosmos_hpk_document_id_provider>
+
+    internal static class CosmosHierarchicalPartitionKeys
+    {
+        internal static void Configure(ISiloBuilder siloBuilder, string connectionString)
+        {
+            // <configure_cosmos_hpk_storage>
+siloBuilder.AddCosmosGrainStorage<TenantDocumentIdProvider>(
+    "cosmosStore",
+    options =>
+    {
+        options.ConfigureCosmosClient(connectionString);
+        options.PartitionKeyLevelCount = 2;
+    });
+            // </configure_cosmos_hpk_storage>
         }
     }
 }

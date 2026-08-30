@@ -185,6 +185,46 @@ public class CosmosGrainStorageHpkIntegrationTests
     }
 
     [Theory, TestCategory("Functional")]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task ExistingGrainTypeContainer_RemainsSupportedWithDefaultOptions(bool resourceCreationEnabled)
+    {
+        var databaseName = $"OrleansLegacyGrainType{Guid.NewGuid():N}";
+        const string containerName = "GrainState";
+        var clusterOptions = Options.Create(new ClusterOptions { ClusterId = "cluster", ServiceId = "service" });
+        var options = new CosmosGrainStorageOptions
+        {
+            DatabaseName = databaseName,
+            ContainerName = containerName,
+            DeleteStateOnClear = false,
+            IsResourceCreationEnabled = resourceCreationEnabled
+        };
+        options.ConfigureTestDefaults();
+        var client = await options.CreateClient(_services);
+
+        try
+        {
+            await CreateContainer(client, databaseName, containerName, ["/GrainType"]);
+            var storage = await StartStorage(options, clusterOptions, new DefaultDocumentIdProvider(clusterOptions));
+            var grainId = GrainId.Create("test-grain", Guid.NewGuid().ToString("N"));
+            const string grainType = "grain-type";
+            var state = new GrainState<TestState> { State = new TestState { Value = 7 } };
+
+            await storage.WriteStateAsync(grainType, grainId, state);
+            var readState = new GrainState<TestState> { State = new TestState() };
+            await storage.ReadStateAsync(grainType, grainId, readState);
+
+            Assert.True(readState.RecordExists);
+            Assert.Equal(7, readState.State.Value);
+        }
+        finally
+        {
+            await DeleteDatabase(client, databaseName);
+            client.Dispose();
+        }
+    }
+
+    [Theory, TestCategory("Functional")]
     [MemberData(nameof(MismatchedContainerDefinitions))]
     public async Task Startup_RejectsMismatchedContainerPartitionKeyDefinition(
         int configuredLevelCount,

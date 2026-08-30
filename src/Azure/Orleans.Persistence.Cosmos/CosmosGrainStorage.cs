@@ -351,13 +351,20 @@ public sealed partial class CosmosGrainStorage : IGrainStorage, ILifecyclePartic
     private async Task ValidateContainerPartitionKeyDefinition(CancellationToken cancellationToken)
     {
         var response = await _container.ReadContainerAsync(cancellationToken: cancellationToken).ConfigureAwait(false);
-        ValidateContainerPartitionKeyPaths(_partitionKeyPaths, response.Resource.PartitionKeyPaths, _name, _options.ContainerName);
+        var containerPaths = response.Resource.PartitionKeyPaths;
+        var usesSingleGrainTypePartitioning = _partitionKeyPaths.Length == 1 && containerPaths is [GRAINTYPE_PARTITION_KEY_PATH];
 
-        if (_partitionKeyPaths.Length == 1 &&
-            response.Resource.PartitionKeyPaths is [GRAINTYPE_PARTITION_KEY_PATH] &&
+        if (usesSingleGrainTypePartitioning &&
             (_documentIdProvider is not DefaultDocumentIdProvider defaultProvider || defaultProvider.HasCustomPartitionKeyProvider))
         {
             throw new OrleansConfigurationException("Custom document id or partition key providers are not compatible with partition key path set to /GrainType");
+        }
+
+        var usesLegacyDefaultPartitioning = usesSingleGrainTypePartitioning &&
+            string.Equals(_partitionKeyPaths[0], CosmosGrainStorageOptions.DEFAULT_PARTITION_KEY_PATH, StringComparison.Ordinal);
+        if (!usesLegacyDefaultPartitioning)
+        {
+            ValidateContainerPartitionKeyPaths(_partitionKeyPaths, containerPaths, _name, _options.ContainerName);
         }
     }
 
