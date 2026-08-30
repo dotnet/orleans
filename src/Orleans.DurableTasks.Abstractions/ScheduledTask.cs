@@ -38,14 +38,14 @@ public abstract class ScheduledTask
     public static async Task WhenAll(IReadOnlyList<ScheduledTask> tasks, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(tasks);
-        await Task.WhenAll(tasks.Select(task => task.WaitAsync(cancellationToken).AsTask())).ConfigureAwait(false);
+        await WaitForAllAsync(tasks, cancellationToken).ConfigureAwait(false);
     }
 
     /// <summary>Waits for every scheduled task to complete successfully.</summary>
     public static async Task WhenAll<TResult>(IReadOnlyList<ScheduledTask<TResult>> tasks, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(tasks);
-        await Task.WhenAll(tasks.Select(task => WaitForSuccessAsync(task, cancellationToken))).ConfigureAwait(false);
+        await WaitForAllAsync(tasks, cancellationToken).ConfigureAwait(false);
     }
 
     /// <summary>
@@ -89,6 +89,7 @@ public abstract class ScheduledTask
             {
                 waits.Add(task.WaitAsyncCore(waitCancellation.Token).AsTask());
             }
+
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
@@ -115,6 +116,49 @@ public abstract class ScheduledTask
         finally
         {
             await CancelAndDrainWaitsAsync(waitCancellation, waits, winnerIndex).ConfigureAwait(false);
+        }
+    }
+
+    private static async Task WaitForAllAsync<TTask>(
+        IReadOnlyList<TTask> tasks,
+        CancellationToken cancellationToken)
+        where TTask : ScheduledTask
+    {
+        using var waitCancellation = cancellationToken.CanBeCanceled
+            ? CancellationTokenSource.CreateLinkedTokenSource(cancellationToken)
+            : new CancellationTokenSource();
+        var waits = new List<Task<DurableTaskResponse>>(tasks.Count);
+        try
+        {
+            foreach (var task in tasks)
+            {
+                waits.Add(task.WaitAsyncCore(waitCancellation.Token).AsTask());
+            }
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            await CancelAndDrainWaitsPreservingFailureAsync(waitCancellation, waits).ConfigureAwait(false);
+            throw new OperationCanceledException(cancellationToken);
+        }
+        catch
+        {
+            await CancelAndDrainWaitsPreservingFailureAsync(waitCancellation, waits).ConfigureAwait(false);
+            throw;
+        }
+
+        DurableTaskResponse[] responses;
+        try
+        {
+            responses = await Task.WhenAll(waits).ConfigureAwait(false);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw new OperationCanceledException(cancellationToken);
+        }
+
+        foreach (var response in responses)
+        {
+            response.EnsureSuccessfulCompletion();
         }
     }
 
@@ -171,8 +215,6 @@ public abstract class ScheduledTask
         }
     }
 
-    private static async Task WaitForSuccessAsync(ScheduledTask task, CancellationToken cancellationToken)
-        => (await task.WaitAsyncCore(cancellationToken).ConfigureAwait(false)).EnsureSuccessfulCompletion();
 }
 
 /// <summary>Represents a host-scheduled durable task with a result.</summary>

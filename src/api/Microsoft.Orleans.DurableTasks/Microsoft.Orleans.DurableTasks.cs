@@ -196,7 +196,7 @@ namespace Orleans.DurableTasks.Protocol
         bool RemoveTask(TaskId taskId);
         void RequestCancellation(TaskId taskId, IDurableTaskState state);
         void SetCallerId(TaskId taskId, IDurableTaskState state, Orleans.Runtime.GrainId callerId);
-        void SetDelay(TaskId taskId, IDurableTaskState state, System.DateTimeOffset dueTime, long generation);
+        void SetDelay(TaskId taskId, IDurableTaskState state, System.DateTimeOffset dueTime, System.TimeSpan duration, long generation);
         void SetRemoteRequest(TaskId taskId, IDurableTaskState state, Orleans.Runtime.GrainId target, string fingerprint);
         void SetRequest(TaskId taskId, IDurableTaskState state, IDurableTaskRequest request);
         void SetRequestFingerprint(TaskId taskId, IDurableTaskState state, string fingerprint);
@@ -208,7 +208,6 @@ namespace Orleans.DurableTasks.Protocol
     [Alias("IDurableTaskObserverGrainExtension")]
     public partial interface IDurableTaskObserver : Orleans.Runtime.IGrainExtension, Orleans.Runtime.IAddressable
     {
-        [Concurrency.AlwaysInterleave]
         [Alias("OnResponse")]
         System.Threading.Tasks.ValueTask OnResponseAsync(TaskId taskId, DurableTaskResponse response, System.Threading.CancellationToken cancellationToken = default);
     }
@@ -224,14 +223,11 @@ namespace Orleans.DurableTasks.Protocol
     [Alias("IDurableTaskServerGrainExtension")]
     public partial interface IDurableTaskServer : Orleans.Runtime.IGrainExtension, Orleans.Runtime.IAddressable
     {
-        [Concurrency.AlwaysInterleave]
         [Alias("CancelAsync")]
         System.Threading.Tasks.ValueTask CancelAsync(TaskId taskId, System.Threading.CancellationToken cancellationToken = default);
         [Alias("ScheduleAsync")]
-        [Concurrency.AlwaysInterleave]
         System.Threading.Tasks.ValueTask<DurableTaskResponse> ScheduleAsync(TaskId taskId, IDurableTaskRequest request, System.Threading.CancellationToken cancellationToken = default);
         [Alias("SubscribeOrPollAsync")]
-        [Concurrency.AlwaysInterleave]
         System.Threading.Tasks.ValueTask<DurableTaskResponse> SubscribeOrPollAsync(TaskId taskId, SubscribeOrPollOptions options, System.Threading.CancellationToken cancellationToken = default);
     }
 
@@ -246,6 +242,8 @@ namespace Orleans.DurableTasks.Protocol
         System.Collections.Generic.IReadOnlySet<Orleans.Runtime.GrainId> CompletionDestinations { get; }
 
         System.DateTimeOffset CreatedAt { get; }
+
+        System.TimeSpan? DelayDuration { get; }
 
         System.DateTimeOffset? DueTime { get; }
 
@@ -296,6 +294,9 @@ namespace Orleans.DurableTasks.Runtime
 
         [Id(4)]
         public System.DateTimeOffset CreatedAt { get { throw null; } set { } }
+
+        [Id(14)]
+        public System.TimeSpan? DelayDuration { get { throw null; } set { } }
 
         [Id(7)]
         public System.DateTimeOffset? DueTime { get { throw null; } set { } }
@@ -361,7 +362,7 @@ namespace Orleans.DurableTasks.Runtime
 
         public void SetCallerId(TaskId taskId, Protocol.IDurableTaskState state, Orleans.Runtime.GrainId callerId) { }
 
-        public void SetDelay(TaskId taskId, Protocol.IDurableTaskState state, System.DateTimeOffset dueTime, long generation) { }
+        public void SetDelay(TaskId taskId, Protocol.IDurableTaskState state, System.DateTimeOffset dueTime, System.TimeSpan duration, long generation) { }
 
         public void SetRemoteRequest(TaskId taskId, Protocol.IDurableTaskState state, Orleans.Runtime.GrainId target, string fingerprint) { }
 

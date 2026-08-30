@@ -34,8 +34,11 @@ internal sealed class DurableTaskGrainParticipant(
         runtime.InitializeForActivation();
     }
 
-    public Task OnStart(CancellationToken cancellationToken = default) =>
-        runtime.ResumePendingTasksAsync(cancellationToken);
+    public Task OnStart(CancellationToken cancellationToken = default)
+    {
+        runtime.MarkActivated();
+        return runtime.ResumePendingTasksAsync(cancellationToken);
+    }
 
     public Task OnStop(CancellationToken cancellationToken = default) => runtime.StopAsync(cancellationToken);
 }

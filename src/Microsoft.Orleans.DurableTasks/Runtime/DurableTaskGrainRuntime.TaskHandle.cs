@@ -34,21 +34,34 @@ internal sealed partial class DurableTaskGrainRuntime
 
         public async ValueTask CancelAsync(CancellationToken cancellationToken)
         {
+            ValueTask cancellation;
             if (RemoteTarget.IsDefault)
             {
-                await runtime.CancelScheduledTaskAsync(TaskId, cancellationToken);
+                cancellation = runtime.CancelScheduledTaskAsync(TaskId, CancellationToken.None);
             }
             else
             {
-                await runtime.CancelRemoteAsync(TaskId, RemoteTarget, cancellationToken);
+                cancellation = runtime.CancelRemoteAsync(TaskId, RemoteTarget, CancellationToken.None);
             }
+
+            await cancellation.AsTask().WaitAsync(cancellationToken);
         }
 
         public async ValueTask<DurableTaskResponse> PollAsync(PollingOptions options, CancellationToken cancellationToken)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             if (options.PollTimeout > TimeSpan.Zero)
             {
-                await ((Task)ResponseTask).WaitAsync(options.PollTimeout, runtime._shared.TimeProvider, cancellationToken).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext | ConfigureAwaitOptions.SuppressThrowing);
+                try
+                {
+                    await ((Task)ResponseTask)
+                        .WaitAsync(options.PollTimeout, runtime._shared.TimeProvider, cancellationToken)
+                        .ConfigureAwait(true);
+                }
+                catch (TimeoutException)
+                {
+                    return DurableTaskResponse.Pending;
+                }
             }
 
             if (ResponseTask.IsCompleted)

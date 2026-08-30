@@ -105,6 +105,7 @@ internal sealed class DurableTaskGrainStorage : IDurableTaskGrainStorage
         typedState.Result = response;
         typedState.CompletedAt = _timeProvider.GetUtcNow();
         typedState.DueTime = null;
+        typedState.DelayDuration = null;
         if (typedState.ResumeGeneration > 0)
         {
             typedState.ResumeGeneration = checked(typedState.ResumeGeneration + 1);
@@ -124,10 +125,11 @@ internal sealed class DurableTaskGrainStorage : IDurableTaskGrainStorage
         _items[taskId] = typedState;
     }
 
-    public void SetDelay(TaskId taskId, IDurableTaskState state, DateTimeOffset dueTime, long generation)
+    public void SetDelay(TaskId taskId, IDurableTaskState state, DateTimeOffset dueTime, TimeSpan duration, long generation)
     {
         var typedState = GetState(taskId, state);
         typedState.DueTime = dueTime;
+        typedState.DelayDuration = duration;
         typedState.ResumeGeneration = generation;
         _items[taskId] = typedState;
     }

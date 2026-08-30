@@ -201,6 +201,75 @@ public sealed class DurableEnvelopeContractTests : IDisposable
 
     public void Dispose() => _services.Dispose();
 
+    [Fact]
+    public void TypedReadsRejectWireCompatibleDeclaredTypeMismatches()
+    {
+        var envelope = new DurableEnvelopeBuilder(
+                _sessions,
+                GrainId.Create("sender", "typed-mismatch"))
+            .To(GrainId.Create("receiver", "typed-mismatch"), "typed/mismatch")
+            .WithBody(42)
+            .WithContextValue("attempt", 7)
+            .Build();
+
+        Assert.True(envelope.Data.TryGetBody<int>(out var body));
+        Assert.Equal(42, body);
+        Assert.False(envelope.Data.TryGetBody<uint>(out _));
+        Assert.True(envelope.Data.TryGetContextValue<int>("attempt", out var attempt));
+        Assert.Equal(7, attempt);
+        Assert.False(envelope.Data.TryGetContextValue<uint>("attempt", out _));
+    }
+
+    [Fact]
+    public void DeclaredTypeMetadataRoundTripsWithEnvelope()
+    {
+        var envelope = new DurableEnvelopeBuilder(
+                _sessions,
+                GrainId.Create("sender", "typed-roundtrip"))
+            .To(GrainId.Create("receiver", "typed-roundtrip"), "typed/roundtrip")
+            .WithBody(42)
+            .WithContextValue("attempt", 7)
+            .Build();
+        var serializer = _services.GetRequiredService<Serializer<DurableEnvelope>>();
+
+        var copy = serializer.Deserialize(serializer.SerializeToArray(envelope));
+
+        Assert.True(copy.Data.TryGetBody<int>(out var body));
+        Assert.Equal(42, body);
+        Assert.False(copy.Data.TryGetBody<uint>(out _));
+        Assert.True(copy.Data.TryGetContextValue<int>("attempt", out var attempt));
+        Assert.Equal(7, attempt);
+        Assert.False(copy.Data.TryGetContextValue<uint>("attempt", out _));
+    }
+
+    [Fact]
+    public void OutboxEquivalenceIncludesDeclaredTypeMetadata()
+    {
+        var sender = GrainId.Create("sender", "typed-equivalence");
+        var receiver = GrainId.Create("receiver", "typed-equivalence");
+        var first = new DurableEnvelopeBuilder(_sessions, sender)
+            .To(receiver, "typed/equivalence")
+            .WithBody(0)
+            .Build();
+        var secondTemplate = new DurableEnvelopeBuilder(_sessions, sender)
+            .To(receiver, "typed/equivalence")
+            .WithBody(0U)
+            .Build();
+        var second = new DurableEnvelope
+        {
+            MessageId = first.MessageId,
+            SenderId = secondTemplate.SenderId,
+            ReceiverId = secondTemplate.ReceiverId,
+            RouteKey = secondTemplate.RouteKey,
+            CorrelationKey = secondTemplate.CorrelationKey,
+            ReplyTo = secondTemplate.ReplyTo,
+            Data = secondTemplate.Data,
+            CreatedAt = first.CreatedAt,
+        };
+
+        Assert.False(DurableOutbox.AreEquivalent(first, second));
+    }
+
     [GenerateSerializer, Immutable]
     public sealed record TestMessage([property: Id(0)] int Id, [property: Id(1)] string Action);
 }

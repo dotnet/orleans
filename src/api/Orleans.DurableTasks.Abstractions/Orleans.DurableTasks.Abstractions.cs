@@ -79,7 +79,7 @@ namespace Orleans.DurableTasks
         public Threading.Tasks.ValueTask<IAsyncDisposable> RegisterCancellationCallbackAsync(Func<Threading.CancellationToken, Threading.Tasks.ValueTask> callback, Threading.CancellationToken cancellationToken = default) { throw null; }
 
         protected internal abstract Threading.Tasks.ValueTask<IScheduledTaskHandle> ScheduleChildTaskAsync(TaskId taskId, DurableTask taskDefinition, Threading.CancellationToken cancellationToken);
-        protected internal abstract Threading.Tasks.ValueTask<DurableTaskResponse> ScheduleDelayAsync(TaskId taskId, DateTimeOffset dueTime, Threading.CancellationToken cancellationToken);
+        protected internal abstract Threading.Tasks.ValueTask<DurableTaskResponse> ScheduleDelayAsync(TaskId taskId, TimeSpan duration, Threading.CancellationToken cancellationToken);
         protected internal abstract Threading.Tasks.ValueTask<TaskId> SelectCompletionAsync(TaskId decisionId, Collections.Generic.IReadOnlyList<TaskId> candidates, Threading.CancellationToken cancellationToken);
     }
 

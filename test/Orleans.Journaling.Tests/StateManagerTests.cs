@@ -704,6 +704,40 @@ public class StateManagerTests : JournalingTestBase
     }
 
     [Fact]
+    public async Task StateManager_RecoveryRejectsWritesQueuedBeforeMutationsWereDiscarded()
+    {
+        var storage = new BlockingAppendStorage
+        {
+            FirstAppendException = new InconsistentStateException("Expected write conflict.")
+        };
+        var sut = CreateTestSystem(storage: storage);
+        var value = new DurableValue<int>("value", sut.Manager, CreateValueCodec<int>());
+        await sut.Lifecycle.OnStart(TestContext.Current.CancellationToken);
+        value.Value = 1;
+
+        var conflictingWrite = sut.Manager.WriteStateAsync(TestContext.Current.CancellationToken).AsTask();
+        await storage.FirstAppendStarted.Task.WaitAsync(
+            TimeSpan.FromSeconds(10),
+            TestContext.Current.CancellationToken);
+        value.Value = 2;
+        var queuedWrite = sut.Manager.WriteStateAsync(TestContext.Current.CancellationToken).AsTask();
+
+        storage.AllowFirstAppend.TrySetResult();
+
+        await Assert.ThrowsAsync<InconsistentStateException>(
+            () => conflictingWrite.WaitAsync(
+                TimeSpan.FromSeconds(10),
+                TestContext.Current.CancellationToken));
+        var exception = await Assert.ThrowsAsync<InvalidOperationException>(
+            () => queuedWrite.WaitAsync(
+                TimeSpan.FromSeconds(10),
+                TestContext.Current.CancellationToken));
+
+        Assert.Contains("queued before recovery discarded its mutations", exception.Message, StringComparison.Ordinal);
+        Assert.Empty(storage.Appends);
+    }
+
+    [Fact]
     public async Task StateManager_RevertPendingChanges_RestoresLastDurableState()
     {
         var storage = new CapturingStorage();
@@ -1018,6 +1052,20 @@ public class StateManagerTests : JournalingTestBase
             .WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
 
         Assert.Equal(2, storage.DeleteCount);
+    }
+
+    [Fact]
+    public async Task StateManager_DeleteStateAsync_NotifiesRecoveryObservers()
+    {
+        var sut = CreateTestSystem();
+        var observer = new RecordingStateObserver();
+        sut.Manager.RegisterObserver(observer);
+        await sut.Lifecycle.OnStart(TestContext.Current.CancellationToken);
+        var recoveryCount = observer.RecoveryCompletedCount;
+
+        await sut.Manager.DeleteStateAsync(TestContext.Current.CancellationToken);
+
+        Assert.Equal(recoveryCount + 1, observer.RecoveryCompletedCount);
     }
 
     [Fact]
@@ -2134,6 +2182,8 @@ public class StateManagerTests : JournalingTestBase
 
         public TaskCompletionSource AllowFirstAppend { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
 
+        public Exception? FirstAppendException { get; init; }
+
         public List<byte[]> Appends { get; } = [];
 
         public bool IsCompactionRequested => false;
@@ -2153,6 +2203,10 @@ public class StateManagerTests : JournalingTestBase
             {
                 FirstAppendStarted.SetResult();
                 await AllowFirstAppend.Task.WaitAsync(cancellationToken);
+                if (FirstAppendException is { } exception)
+                {
+                    throw exception;
+                }
             }
 
             Appends.Add(value.ToArray());

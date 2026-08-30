@@ -20,7 +20,7 @@ public interface IDurableTaskGrainStorage
     void SetCallerId(TaskId taskId, IDurableTaskState state, GrainId callerId);
     void SetResponse(TaskId taskId, IDurableTaskState state, DurableTaskResponse response);
     void RequestCancellation(TaskId taskId, IDurableTaskState state);
-    void SetDelay(TaskId taskId, IDurableTaskState state, DateTimeOffset dueTime, long generation);
+    void SetDelay(TaskId taskId, IDurableTaskState state, DateTimeOffset dueTime, TimeSpan duration, long generation);
 
     void AddCompletionDestination(TaskId taskId, IDurableTaskState state, GrainId destination);
     void RemoveCompletionDestination(TaskId taskId, IDurableTaskState state, GrainId destination);

@@ -72,10 +72,10 @@ public abstract class DurableExecutionContext
         DurableTask taskDefinition,
         CancellationToken cancellationToken);
 
-    /// <summary>Schedules a durable delay at <paramref name="dueTime"/>.</summary>
+    /// <summary>Schedules a durable delay for <paramref name="duration"/>.</summary>
     protected internal abstract ValueTask<DurableTaskResponse> ScheduleDelayAsync(
         TaskId taskId,
-        DateTimeOffset dueTime,
+        TimeSpan duration,
         CancellationToken cancellationToken);
 
     /// <summary>Gets the host handle for an existing child identifier.</summary>

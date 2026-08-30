@@ -91,6 +91,11 @@ public abstract class DurableTaskResponse
 
         if (Exception is { } exception)
         {
+            if (ReferenceEquals(this, Canceled))
+            {
+                throw new OperationCanceledException();
+            }
+
             ExceptionDispatchInfo.Capture(exception).Throw();
         }
     }
@@ -188,6 +193,11 @@ public sealed class CanceledDurableTaskResponse : DurableTaskResponse
     /// <inheritdoc />
     public override T GetResult<T>()
     {
+        if (ReferenceEquals(this, Instance))
+        {
+            throw new OperationCanceledException();
+        }
+
         ExceptionDispatchInfo.Capture(Exception).Throw();
         return default!;
     }

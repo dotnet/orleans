@@ -50,6 +50,8 @@ public interface IDurableTaskState
 
     public DateTimeOffset? DueTime { get; }
 
+    TimeSpan? DelayDuration { get; }
+
     public long ResumeGeneration { get; }
 
     public string? RequestFingerprint { get; }

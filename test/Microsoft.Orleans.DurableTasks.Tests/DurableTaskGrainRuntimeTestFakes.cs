@@ -1,6 +1,7 @@
 #nullable enable
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using Orleans.DurableTasks;
 using Orleans.DurableTasks.Protocol;
 using Orleans.DurableTasks.Runtime;
@@ -162,7 +163,23 @@ internal sealed class TestSchedulableTask(
 
     public IScheduledTaskHandle GetHandle(TaskId taskId) => getHandle is not null
         ? getHandle(taskId)
-        : throw new NotSupportedException("This test task was not configured with a GetHandle callback.");
+        : new PendingScheduledTaskHandle(taskId);
 
     protected override ValueTask<DurableTaskResponse> RunAsync(DurableExecutionContext context) => throw new NotSupportedException("This test task is not directly runnable.");
+
+    private sealed class PendingScheduledTaskHandle(TaskId taskId) : IScheduledTaskHandle
+    {
+        public TaskId TaskId { get; } = taskId;
+
+        public async ValueTask<DurableTaskResponse> WaitAsync(CancellationToken cancellationToken)
+        {
+            await Task.Delay(Timeout.InfiniteTimeSpan, cancellationToken);
+            throw new UnreachableException();
+        }
+
+        public ValueTask<DurableTaskResponse> PollAsync(PollingOptions options, CancellationToken cancellationToken) =>
+            new(DurableTaskResponse.Pending);
+
+        public ValueTask CancelAsync(CancellationToken cancellationToken) => default;
+    }
 }

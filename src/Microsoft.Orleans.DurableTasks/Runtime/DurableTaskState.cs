@@ -65,6 +65,9 @@ public class DurableTaskState : IDurableTaskState
     [Id(13)]
     public GrainId CallerId { get; set; }
 
+    [Id(14)]
+    public TimeSpan? DelayDuration { get; set; }
+
     IReadOnlySet<GrainId> IDurableTaskState.CompletionDestinations => CompletionDestinations;
     IDurableTaskRequest? IDurableTaskState.Request => Request;
     DateTimeOffset? IDurableTaskState.CompletedAt => CompletedAt;

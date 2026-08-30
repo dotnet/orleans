@@ -22,6 +22,20 @@ namespace Orleans.DurableMessaging.Tests.Contracts;
 public sealed class DurableOutboxDeliveryBatchTests
 {
     [Fact]
+    public async Task MessageCapturedAfterPreparationStillSchedulesPumpAfterCommit()
+    {
+        var fixture = new OutboxFixture(hasDurableMessage: false, runTimersImmediately: true);
+        var envelope = fixture.CreateEnvelope(Guid.NewGuid());
+
+        fixture.Send(envelope);
+        fixture.CommitWithoutPreparation();
+        await fixture.WaitForEnsureJobTimersAsync();
+
+        Assert.Equal(1, fixture.ScheduledJobCount);
+        Assert.Single(fixture.Messages);
+    }
+
+    [Fact]
     public async Task RecoveryAndLifecycleStart_CoalesceReplacementScheduling()
     {
         var timerRegistry = Substitute.For<ITimerRegistry>();
@@ -781,6 +795,12 @@ public sealed class DurableOutboxDeliveryBatchTests
         public void Send(DurableEnvelope envelope) => _outbox.Send(envelope);
 
         public ValueTask CommitAsync() => Manager.WriteStateAsync(TestContext.Current.CancellationToken);
+
+        public void CommitWithoutPreparation()
+        {
+            ((IJournaledStateObserver)_outbox).OnWriteStarted();
+            ((IJournaledStateObserver)_outbox).OnWriteCompleted();
+        }
 
         public Task WaitForEnsureJobTimersAsync() =>
             _immediateTimerRegistry?.WaitForCallbacksAsync() ?? Task.CompletedTask;

@@ -85,7 +85,7 @@ internal interface IDurableTaskGrainRuntime
     DateTimeOffset UtcNow { get; }
     ValueTask<IScheduledTaskHandle> ScheduleChildAsync(TaskId taskId, DurableTask taskDefinition, CancellationToken cancellationToken);
     ValueTask<DurableTaskResponse> ScheduleRemoteAsync(TaskId taskId, IDurableTaskRequest request, CancellationToken cancellationToken);
-    ValueTask<DurableTaskResponse> ScheduleDelayAsync(TaskId taskId, DateTimeOffset dueTime, CancellationToken cancellationToken);
+    ValueTask<DurableTaskResponse> ScheduleDelayAsync(TaskId taskId, TimeSpan duration, CancellationToken cancellationToken);
     ValueTask CancelRemoteAsync(TaskId taskId, GrainId target, CancellationToken cancellationToken);
     ValueTask<TaskId> SelectCompletionAsync(TaskId decisionId, IReadOnlyList<TaskId> candidates, CancellationToken cancellationToken);
     IScheduledTaskHandle GetScheduledTaskHandle(TaskId taskId);

@@ -114,6 +114,7 @@ public class VolatileDurableTaskGrainStorage(
         typedState.Result = response;
         typedState.CompletedAt = _timeProvider.GetUtcNow();
         typedState.DueTime = null;
+        typedState.DelayDuration = null;
         if (typedState.ResumeGeneration > 0)
         {
             typedState.ResumeGeneration = checked(typedState.ResumeGeneration + 1);
@@ -183,10 +184,11 @@ public class VolatileDurableTaskGrainStorage(
         _workingCopy[taskId] = updated;
     }
 
-    public void SetDelay(TaskId taskId, IDurableTaskState state, DateTimeOffset dueTime, long generation)
+    public void SetDelay(TaskId taskId, IDurableTaskState state, DateTimeOffset dueTime, TimeSpan duration, long generation)
     {
         var typedState = GetState(state);
         typedState.DueTime = dueTime;
+        typedState.DelayDuration = duration;
         typedState.ResumeGeneration = generation;
         AddOrUpdateTask(taskId, typedState);
     }

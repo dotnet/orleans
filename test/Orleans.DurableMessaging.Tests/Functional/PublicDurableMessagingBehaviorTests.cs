@@ -1015,6 +1015,33 @@ public sealed class PublicDurableMessagingBehaviorTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task ReciprocalOutboxPumps_DeliverWithoutBlockingEachOther()
+    {
+        var first = NewGrain();
+        var second = NewGrain();
+
+        await Task.WhenAll(
+            first.SendAsync(
+                second.GetGrainId(),
+                "messages/reciprocal",
+                NewMessage(71, "first-to-second")),
+            second.SendAsync(
+                first.GetGrainId(),
+                "messages/reciprocal",
+                NewMessage(72, "second-to-first")));
+
+        var firstResult = await fixture.WaitForEffectCountAsync(first, 1);
+        var secondResult = await fixture.WaitForEffectCountAsync(second, 1);
+        firstResult = await fixture.WaitForOutboxCountAsync(first, 0);
+        secondResult = await fixture.WaitForOutboxCountAsync(second, 0);
+
+        Assert.Equal("second-to-first", Assert.Single(firstResult.Effects).Value);
+        Assert.Equal("first-to-second", Assert.Single(secondResult.Effects).Value);
+        Assert.Equal(0, firstResult.OutboxCount);
+        Assert.Equal(0, secondResult.OutboxCount);
+    }
+
+    [Fact]
     public async Task DuplicateExactRouteRegistration_ThrowsAndPreservesLookupAndDispatch()
     {
         var receiver = NewGrain();

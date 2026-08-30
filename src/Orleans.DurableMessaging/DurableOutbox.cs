@@ -67,6 +67,7 @@ internal sealed partial class DurableOutbox : IDurableOutbox, IDurableJobFeature
     private readonly SemaphoreSlim _gate = new(1, 1);
     private readonly SemaphoreSlim _deliveryGate = new(1, 1);
     private readonly CancellationTokenSource _shutdown = new();
+    private static readonly TimeSpan DeliveryAttemptTimeout = TimeSpan.FromSeconds(5);
 
     /// <summary>
     /// Set of message IDs that have been added to the outbox but not yet durably persisted.
@@ -190,6 +191,12 @@ internal sealed partial class DurableOutbox : IDurableOutbox, IDurableJobFeature
                 $"Durable outbox sender '{envelope.SenderId}' does not match the owning grain '{_grainContext.GrainId}'.");
         }
 
+        if (envelope.ReceiverId == _grainContext.GrainId)
+        {
+            throw new InvalidOperationException(
+                $"Durable outbox delivery cannot target the owning grain '{_grainContext.GrainId}'.");
+        }
+
         if (_messages.TryGetValue(envelope.MessageId, out var existingEnvelope))
         {
             if (!AreEquivalent(existingEnvelope, envelope))
@@ -229,7 +236,7 @@ internal sealed partial class DurableOutbox : IDurableOutbox, IDurableJobFeature
         // Delivery remains fenced by _pendingMessageIds until the commit completes.
     }
 
-    private static bool AreEquivalent(DurableEnvelope left, DurableEnvelope right)
+    internal static bool AreEquivalent(DurableEnvelope left, DurableEnvelope right)
     {
         if (left.MessageId != right.MessageId
             || left.SenderId != right.SenderId
@@ -248,6 +255,7 @@ internal sealed partial class DurableOutbox : IDurableOutbox, IDurableJobFeature
         }
 
         if (left.Data is null || right.Data is null
+            || !left.Data.HasEquivalentDeclaredTypes(right.Data)
             || !SequenceEqual(left.Data.GetBodyBytes(), right.Data.GetBodyBytes()))
         {
             return false;
@@ -349,7 +357,7 @@ internal sealed partial class DurableOutbox : IDurableOutbox, IDurableJobFeature
             _scheduledOwnershipDueTime = null;
         }
 
-        if (_pendingMessageIds.Count > 0 && !_jobScheduleConfirmed)
+        if (Count > 0 && !_jobScheduleConfirmed)
         {
             QueueEnsureJobScheduled(replaceExisting: false);
         }
@@ -506,9 +514,11 @@ internal sealed partial class DurableOutbox : IDurableOutbox, IDurableJobFeature
                     try
                     {
                         var targetGrain = _grainFactory.GetGrain<IDurableInboxExtension>(envelope.ReceiverId);
+                        using var attemptCancellation = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+                        attemptCancellation.CancelAfter(DeliveryAttemptTimeout);
                         var result = await targetGrain.DeliverAsync(
                             envelope,
-                            cancellationToken).ConfigureAwait(true);
+                            attemptCancellation.Token).ConfigureAwait(true);
                         if (Volatile.Read(ref _stateGeneration) != stateGeneration)
                         {
                             return;
@@ -567,6 +577,21 @@ internal sealed partial class DurableOutbox : IDurableOutbox, IDurableJobFeature
                     catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
                     {
                         throw;
+                    }
+                    catch (OperationCanceledException exception)
+                    {
+                        if (Volatile.Read(ref _stateGeneration) != stateGeneration)
+                        {
+                            return;
+                        }
+
+                        stopwatch.Stop();
+                        batchDirty = true;
+                        RecordDeliveryFailure(envelope, exception.ToString());
+                        failedCount++;
+                        LogDeliveryError(_logger, exception, envelope.MessageId, envelope.SenderId, envelope.ReceiverId, envelope.RouteKey, envelope.CorrelationKey?.ToString());
+                        _instruments.OnOutboxMessageDelivered(grainTypeName, envelope.RouteKey, "timeout");
+                        _instruments.OnOutboxDeliveryDuration(stopwatch.Elapsed, grainTypeName, envelope.RouteKey);
                     }
                     catch (Exception ex)
                     {
@@ -640,6 +665,13 @@ internal sealed partial class DurableOutbox : IDurableOutbox, IDurableJobFeature
             state.AttemptCount - 1,
             DurableInboxOptions.MaximumBackoffExponent);
         var delay = TimeSpan.FromTicks(_backpressureRetryDelay.Ticks * (1L << exponent));
+        if (string.CompareOrdinal(
+                _grainContext.GrainId.ToString(),
+                envelope.ReceiverId.ToString()) > 0)
+        {
+            delay += TimeSpan.FromTicks(Math.Max(1, delay.Ticks / 2));
+        }
+
         state.NextAttemptAt = DurableMessagingTime.AddClamped(now, delay);
         _messageStates[envelope.MessageId] = state;
     }

@@ -45,15 +45,15 @@ internal sealed class GrainDurableExecutionContext(
 
     protected override ValueTask<DurableTaskResponse> ScheduleDelayAsync(
         TaskId taskId,
-        DateTimeOffset dueTime,
+        TimeSpan duration,
         CancellationToken cancellationToken) =>
         RunOnScheduler(
             _scheduler,
-            () => ScheduleDelayCoreAsync(taskId, dueTime, cancellationToken));
+            () => ScheduleDelayCoreAsync(taskId, duration, cancellationToken));
 
     private async ValueTask<DurableTaskResponse> ScheduleDelayCoreAsync(
         TaskId taskId,
-        DateTimeOffset dueTime,
+        TimeSpan duration,
         CancellationToken cancellationToken)
     {
         if (taskId != TaskId)
@@ -62,7 +62,7 @@ internal sealed class GrainDurableExecutionContext(
         }
 
         using var executionCts = CreateExecutionCancellationSource(cancellationToken);
-        return await runtime.ScheduleDelayAsync(taskId, dueTime, executionCts.Token);
+        return await runtime.ScheduleDelayAsync(taskId, duration, executionCts.Token);
     }
 
     protected override IScheduledTaskHandle GetChildTaskHandle(TaskId taskId)

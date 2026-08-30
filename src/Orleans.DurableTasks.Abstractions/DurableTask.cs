@@ -111,7 +111,7 @@ public abstract class DurableTask
         for (var index = 0; index < tasks.Count; index++)
         {
             scheduled[index] = await new ConfiguredDurableTask(tasks[index], CreateCombinatorChildId(operationId, index))
-                .ScheduleAsync(cancellationToken).ConfigureAwait(false);
+                .ScheduleCombinatorChildAsync(cancellationToken).ConfigureAwait(false);
         }
 
         await ScheduledTask.WhenAll(scheduled, cancellationToken).ConfigureAwait(false);
@@ -129,7 +129,7 @@ public abstract class DurableTask
         {
             scheduled[index] = await new ConfiguredDurableTask<TResult>(
                 tasks[index],
-                CreateCombinatorChildId(operationId, index)).ScheduleAsync(cancellationToken).ConfigureAwait(false);
+                CreateCombinatorChildId(operationId, index)).ScheduleCombinatorChildAsync(cancellationToken).ConfigureAwait(false);
         }
 
         await ScheduledTask.WhenAll(scheduled, cancellationToken).ConfigureAwait(false);
@@ -146,13 +146,22 @@ public abstract class DurableTask
         for (var index = 0; index < tasks.Count; index++)
         {
             scheduled[index] = await new ConfiguredDurableTask(tasks[index], CreateCombinatorChildId(operationId, index))
-                .ScheduleAsync(cancellationToken).ConfigureAwait(false);
+                .ScheduleCombinatorChildAsync(cancellationToken).ConfigureAwait(false);
         }
 
-        return await context.SelectCompletionAsync(
+        var winner = await context.SelectCompletionAsync(
             operationId.Child("$winner"),
             scheduled.Select(task => task.Id).ToArray(),
             cancellationToken).ConfigureAwait(false);
+        for (var index = 0; index < scheduled.Length; index++)
+        {
+            if (scheduled[index].Id != winner && tasks[index] is not ISchedulableTask)
+            {
+                await scheduled[index].CancelAsync(cancellationToken).ConfigureAwait(false);
+            }
+        }
+
+        return winner;
     }
 
     private static async Task<TaskId> WhenAnyCore<TResult>(
@@ -166,13 +175,22 @@ public abstract class DurableTask
         {
             scheduled[index] = await new ConfiguredDurableTask<TResult>(
                 tasks[index],
-                CreateCombinatorChildId(operationId, index)).ScheduleAsync(cancellationToken).ConfigureAwait(false);
+                CreateCombinatorChildId(operationId, index)).ScheduleCombinatorChildAsync(cancellationToken).ConfigureAwait(false);
         }
 
-        return await context.SelectCompletionAsync(
+        var winner = await context.SelectCompletionAsync(
             operationId.Child("$winner"),
             scheduled.Select(task => task.Id).ToArray(),
             cancellationToken).ConfigureAwait(false);
+        for (var index = 0; index < scheduled.Length; index++)
+        {
+            if (scheduled[index].Id != winner && tasks[index] is not ISchedulableTask)
+            {
+                await scheduled[index].CancelAsync(cancellationToken).ConfigureAwait(false);
+            }
+        }
+
+        return winner;
     }
 
     private static DurableExecutionContext GetCurrentContext(string operation)
@@ -206,7 +224,7 @@ internal sealed class CompletedDurableTask<TResult>(TResult value) : DurableTask
 internal sealed class DelayDurableTask(TimeSpan duration) : DurableTask
 {
     protected internal override ValueTask<DurableTaskResponse> RunAsync(DurableExecutionContext context)
-        => context.ScheduleDelayAsync(context.TaskId, context.UtcNow + duration, context.CancellationToken);
+        => context.ScheduleDelayAsync(context.TaskId, duration, context.CancellationToken);
 }
 
 internal abstract class DelegateDurableTaskBase : DurableTask
@@ -350,16 +368,25 @@ internal struct ConfiguredDurableTaskCore<TTask> where TTask : DurableTask
             return await Task.RunAsync(parent).ConfigureAwait(false);
         }
 
-        var scheduled = await ScheduleCoreAsync(cancellationToken).ConfigureAwait(false);
+        var scheduled = await ScheduleCoreAsync(
+            cancellationToken,
+            allowLocalChild: true).ConfigureAwait(false);
         return scheduled.Response ?? await scheduled.Handle!.WaitAsync(cancellationToken).ConfigureAwait(false);
     }
 
     internal async Task<(DurableTaskResponse? Response, IScheduledTaskHandle? Handle)> ScheduleCoreAsync(
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        bool allowLocalChild = false)
     {
         EnsureId();
         if (ParentContext is { } parent)
         {
+            if (!allowLocalChild && Task is not ISchedulableTask)
+            {
+                throw new NotSupportedException(
+                    "Detached scheduling of local durable tasks is not recoverable. Await the task directly or schedule a host-backed durable task.");
+            }
+
             return (null, await parent.ScheduleChildTaskAsync(_taskId, Task, cancellationToken).ConfigureAwait(false));
         }
 
@@ -421,6 +448,14 @@ public struct ConfiguredDurableTask
             : new ScheduledTaskHandle(scheduled.Handle!);
     }
 
+    internal async Task<ScheduledTask> ScheduleCombinatorChildAsync(CancellationToken cancellationToken)
+    {
+        var scheduled = await _core.ScheduleCoreAsync(cancellationToken, allowLocalChild: true).ConfigureAwait(false);
+        return scheduled.Response is { } response
+            ? new CompletedScheduledTask(_core.TaskId, response)
+            : new ScheduledTaskHandle(scheduled.Handle!);
+    }
+
     /// <summary>Requests durable cancellation.</summary>
     public ValueTask CancelAsync(CancellationToken cancellationToken = default)
         => _core.GetHandle().CancelAsync(cancellationToken);
@@ -460,6 +495,14 @@ public struct ConfiguredDurableTask<TResult>
     public async Task<ScheduledTask<TResult>> ScheduleAsync(CancellationToken cancellationToken = default)
     {
         var scheduled = await _core.ScheduleCoreAsync(cancellationToken).ConfigureAwait(false);
+        return scheduled.Response is { } response
+            ? new CompletedScheduledTask<TResult>(_core.TaskId, response)
+            : new ScheduledTaskHandle<TResult>(scheduled.Handle!);
+    }
+
+    internal async Task<ScheduledTask<TResult>> ScheduleCombinatorChildAsync(CancellationToken cancellationToken)
+    {
+        var scheduled = await _core.ScheduleCoreAsync(cancellationToken, allowLocalChild: true).ConfigureAwait(false);
         return scheduled.Response is { } response
             ? new CompletedScheduledTask<TResult>(_core.TaskId, response)
             : new ScheduledTaskHandle<TResult>(scheduled.Handle!);
