@@ -23,7 +23,7 @@ public class TransactionRecoveryLatencyTests
     {
         var timeout = TimeSpan.FromSeconds(30);
 
-        var transaction = await CreateTransactionAgent(protocol: null!).StartTransaction(readOnly: false, timeout);
+        var transaction = await CreateTransactionAgent(TransactionAgentProtocol.Instance).StartTransaction(readOnly: false, timeout);
         var fork = transaction.Fork();
 
         Assert.Equal(timeout, transaction.Timeout);
