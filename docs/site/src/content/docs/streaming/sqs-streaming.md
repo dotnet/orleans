@@ -82,7 +82,7 @@ List every application-defined attribute required by the decoder in <xref:Orlean
 | <xref:Orleans.Configuration.SqsOptions.ReceiveMessageAttributes> | Requests the application-defined attributes consumed by a custom data adapter. |
 | <xref:Orleans.Configuration.SqsOptions.ReceiveMessageSystemAttributes> | Requests SQS system attributes consumed by the provider or application adapter. |
 
-The CDK stack owns queue creation and updates for AWS deployments. Manage retention, visibility, encryption, access policy, and dead-letter redrive policy in the queue constructs so CloudFormation applies the declared configuration consistently.
+With the Aspire integration, the CDK stack owns queue creation and updates. Define retention, visibility, encryption, access policy, and dead-letter redrive policy in the queue constructs so CloudFormation applies the declared configuration consistently. In non-Aspire hosts, Orleans creates a missing mapped queue when its partition is first used; operators manage subsequent queue-property changes through SQS administration.
 
 Serialized Orleans batches must fit within the [SQS message quotas](https://docs.aws.amazon.com/AWSSimpleQueueService/latest/SQSDeveloperGuide/quotas-messages.html). Bound batch size before messages approach the service limit, and include custom envelope and message-attribute overhead in that calculation.
 
