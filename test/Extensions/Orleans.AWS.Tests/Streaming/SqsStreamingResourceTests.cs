@@ -315,6 +315,27 @@ public sealed class SqsStreamingResourceTests
     }
 
     [Fact]
+    public void AddSqsStreaming_NonalphanumericProviderName_UsesStableConstructIds()
+    {
+        var builder = CreateBuilder();
+        var aws = builder.AddAWSSDKConfig().WithRegion(RegionEndpoint.USEast1);
+        var orleans = builder.AddOrleans("cluster").WithDevelopmentClustering();
+        var resource = orleans.AddSqsStreaming(
+            "-",
+            aws,
+            new SqsStreamingOptions
+            {
+                ServiceId = ServiceId,
+                PartitionCount = 2,
+            });
+
+        Assert.Equal(["sqs-0", "sqs-1"], resource.Queues.Select(queue => queue.Resource.Name));
+        Assert.Equal(
+            ["orders-service---0", "orders-service---1"],
+            GetQueues(resource).Select(queue => queue.QueueName));
+    }
+
+    [Fact]
     public void AddSqsStreaming_ConflictingServiceIdsAcrossProviders_ThrowsActionableError()
     {
         var builder = CreateBuilder();
