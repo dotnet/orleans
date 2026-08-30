@@ -15,4 +15,4 @@ Regenerate one project or every enabled project in a solution:
 dotnet tool run orleans-contracts PATH_TO_PROJECT_OR_SOLUTION
 ```
 
-For solution input, the tool evaluates the project graph, selects projects where `EnableOrleansContractsAnalyzer` is `true`, and runs the analyzer fixes against a temporary filtered solution.
+For solution input, the tool evaluates the project graph, selects enabled C# projects which contain a manifest or Orleans contract declarations, and runs the analyzer fixes against a temporary filtered solution.

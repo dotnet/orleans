@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using System.Text;
+using System.Text.RegularExpressions;
 
 const string ProjectMarker = "ORLEANS_CONTRACT_PROJECT=";
 string[] diagnosticIds =
@@ -17,6 +18,9 @@ string[] diagnosticIds =
 var dryRun = args.Contains("--dry-run", StringComparer.Ordinal);
 var paths = args.Where(arg => !string.Equals(arg, "--dry-run", StringComparison.Ordinal)).ToArray();
 var pathComparer = OperatingSystem.IsWindows() ? StringComparer.OrdinalIgnoreCase : StringComparer.Ordinal;
+var contractDeclarationPattern = new Regex(
+    @"(?:\[\s*(?:global::)?(?:Orleans\.)?(?:GrainType|GrainInterfaceType)\b)|(?:\b(?:interface|class|record)\s+[\w@][^{;]*:\s*[^{;]*(?:\bIGrain\w*\b|\bIAddressable\b|\bGrain(?:<|\b)))",
+    RegexOptions.Compiled | RegexOptions.CultureInvariant);
 if (paths.Length != 1)
 {
     Console.Error.WriteLine("Usage: orleans-contracts [--dry-run] <project-or-solution>");
@@ -61,7 +65,7 @@ try
           <Target Name="_CollectOrleansContractProjects">
             <Message Condition="'$(EnableOrleansContractsAnalyzer)' == 'true'"
                      Importance="high"
-                     Text="ORLEANS_CONTRACT_PROJECT=$(MSBuildProjectFullPath)" />
+                     Text="ORLEANS_CONTRACT_PROJECT=$(MSBuildProjectFullPath)::$(OrleansContractsPath)" />
           </Target>
         </Project>
         """);
@@ -92,11 +96,19 @@ try
         .Select(line => line.Trim())
         .Where(line => line.Contains(ProjectMarker, StringComparison.Ordinal))
         .Select(line => line[(line.IndexOf(ProjectMarker, StringComparison.Ordinal) + ProjectMarker.Length)..].Trim())
-        .Where(path =>
-            File.Exists(path)
-            && string.Equals(Path.GetExtension(path), ".csproj", StringComparison.OrdinalIgnoreCase))
-        .Distinct(pathComparer)
-        .OrderBy(path => path, pathComparer)
+        .Select(value =>
+        {
+            var separatorIndex = value.IndexOf("::", StringComparison.Ordinal);
+            return separatorIndex < 0
+                ? new ContractProject(value, string.Empty)
+                : new ContractProject(value[..separatorIndex], value[(separatorIndex + 2)..]);
+        })
+        .Where(project =>
+            File.Exists(project.ProjectPath)
+            && string.Equals(Path.GetExtension(project.ProjectPath), ".csproj", StringComparison.OrdinalIgnoreCase)
+            && (File.Exists(project.ContractsPath) || ContainsContractDeclarations(project.ProjectPath)))
+        .DistinctBy(project => project.ProjectPath, pathComparer)
+        .OrderBy(project => project.ProjectPath, pathComparer)
         .ToArray();
     if (projects.Length == 0)
     {
@@ -108,7 +120,7 @@ try
     {
         foreach (var project in projects)
         {
-            Console.WriteLine(project);
+            Console.WriteLine(project.ProjectPath);
         }
 
         return 0;
@@ -122,7 +134,7 @@ try
         content.AppendLine("<Solution>");
         foreach (var project in projects)
         {
-            var relativePath = Path.GetRelativePath(temporaryDirectory, project).Replace('\\', '/');
+            var relativePath = Path.GetRelativePath(temporaryDirectory, project.ProjectPath).Replace('\\', '/');
             content.Append("  <Project Path=\"")
                 .Append(System.Security.SecurityElement.Escape(relativePath))
                 .AppendLine("\" />");
@@ -142,6 +154,27 @@ try
 finally
 {
     Directory.Delete(temporaryDirectory, recursive: true);
+}
+
+bool ContainsContractDeclarations(string projectPath)
+{
+    var projectDirectory = Path.GetDirectoryName(projectPath)!;
+    foreach (var sourcePath in Directory.EnumerateFiles(projectDirectory, "*.cs", SearchOption.AllDirectories))
+    {
+        var relativePath = Path.GetRelativePath(projectDirectory, sourcePath);
+        if (relativePath.Split(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar)
+            .Any(segment => segment is "bin" or "obj"))
+        {
+            continue;
+        }
+
+        if (contractDeclarationPattern.IsMatch(File.ReadAllText(sourcePath)))
+        {
+            return true;
+        }
+    }
+
+    return false;
 }
 
 static async Task<int> RunDotNetFormatAsync(
@@ -198,3 +231,5 @@ static async Task<ProcessResult> RunProcessAsync(
 }
 
 readonly record struct ProcessResult(int ExitCode, string StandardOutput, string StandardError);
+
+readonly record struct ContractProject(string ProjectPath, string ContractsPath);

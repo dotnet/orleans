@@ -71,7 +71,7 @@ dotnet tool install Microsoft.Orleans.ContractTool
 dotnet tool run orleans-contracts PATH_TO_SOLUTION.slnx
 ```
 
-The tool evaluates the solution to identify projects where `EnableOrleansContractsAnalyzer` is `true`, creates a temporary filtered solution, and runs regeneration against that smaller workspace. Commit the tool manifest so every developer and build agent uses the same tool version.
+The tool evaluates the solution to identify enabled C# projects which contain a manifest or Orleans contract declarations, creates a temporary filtered solution, and runs regeneration against that smaller workspace. Commit the tool manifest so every developer and build agent uses the same tool version.
 
 Regeneration edits `OrleansContracts.txt` files only. Source `[Alias]`, `[Id]`, `[GrainType]`, and `[GrainInterfaceType]` attributes remain unchanged.
 
