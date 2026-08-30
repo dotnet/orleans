@@ -1,7 +1,7 @@
 ---
 title: Write a custom persistent-stream queue adapter
 description: Implement and register an Orleans persistent-stream queue adapter for an external queue technology.
-ms.date: 08/18/2026
+ms.date: 08/30/2026
 ms.topic: how-to
 ---
 
@@ -49,7 +49,9 @@ The factory composes the adapter with queue mapping, caching, and failure handli
 
 :::code language="csharp" source="snippets/streaming/CustomQueueAdapter.cs" id="custom_queue_factory":::
 
-`SimpleQueueAdapterCache` is suitable for a non-rewindable adapter whose queue remains the durability boundary. A rewindable adapter usually needs a cache and sequence-token implementation which can position cursors at retained historical messages.
+`SimpleQueueAdapterCache` is suitable for an adapter whose subscription tokens only address its live in-memory cache. The pulling agent passes a requested subscription token to <xref:Orleans.Streams.IQueueCache.GetCacheCursor*>; <xref:Orleans.Streams.IQueueAdapterReceiver.GetQueueMessagesAsync*> advances the owned queue partition from the receiver's current position.
+
+An adapter which serves tokens older than the live cache composes its cache and receiver through the factory. On a cache miss, that implementation can open a bounded historical reader at the requested provider token, feed a temporary cursor in order, and hand the cursor to the live cache after catch-up. The adapter defines retention-expiry errors, concurrent replay limits, partition ownership transfer, and shutdown for those readers.
 
 `AddPersistentStreams` leaves checkpointing to the adapter. The non-rewindable example acknowledges completed messages through its receiver and therefore has no independent checkpoint. For a retained-log transport, implement an <xref:Orleans.Streams.IStreamQueueCheckpointerFactory>, have the receiver or cache load and update the per-partition position, and register it as a named component with `ConfigureComponent`. Persist a checkpoint only after all consumers have advanced beyond the corresponding cached messages. A no-op checkpointer is suitable only when replay position is deliberately disposable.
 

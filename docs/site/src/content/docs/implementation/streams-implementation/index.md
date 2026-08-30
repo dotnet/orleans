@@ -101,7 +101,9 @@ Cache capacity is not durability. The queue remains the durable boundary, subjec
 
 The agent registers as a producer for each stream and obtains subscription records from stream pub-sub. It holds a pin cursor while subscription handshakes complete so cache cleanup cannot pass the requested start token. New subscription notifications update the agent's local pub-sub cache.
 
-Sequence tokens allow a rewindable adapter to start from a supported historical position. An adapter whose <xref:Orleans.Streams.IQueueAdapter.IsRewindable?displayProperty=nameWithType> property is `false` must reject unsupported tokens rather than pretending to honor them.
+Sequence tokens allow a rewindable adapter to start from a historical position supported by its queue cache. The pulling agent passes the token to <xref:Orleans.Streams.IQueueCache.GetCacheCursor*> and continues polling the partition receiver from its existing position. Retained-history replay therefore belongs in an adapter-specific cache and receiver composition which can create historical readers and hand their cursors back to the live cache.
+
+An adapter whose <xref:Orleans.Streams.IQueueAdapter.IsRewindable?displayProperty=nameWithType> property is `false` rejects subscription tokens. A `true` value means the adapter accepts tokens within its documented range; it does not define that range as the external transport's full retention window.
 
 ## Delivery and failure semantics
 

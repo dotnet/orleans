@@ -1,7 +1,7 @@
 ---
 title: Stream delivery, ordering, replay, and recovery
 description: Design Orleans streaming consumers for provider-specific delivery, ordering, replay, and failure behavior.
-ms.date: 08/24/2026
+ms.date: 08/30/2026
 ms.topic: concept-article
 ---
 
@@ -45,13 +45,16 @@ Use event version numbers or domain sequence numbers when business logic require
 
 ## Replay and rewindability
 
-A rewindable provider can start or resume a subscription from a provider sequence token while the corresponding event remains in that provider's retention window. Rewindability isn't the same as durability:
+A rewindable provider can start or resume a subscription from a provider sequence token within the historical range supported by its queue cache. Rewindability and external event retention are separate capabilities:
 
-- Memory streams are rewindable only over their transient in-memory cache.
-- Event Hubs and Redis Streams are rewindable over retained external data.
-- Azure Queue, Amazon SQS, ADO.NET, and NATS JetStream providers aren't rewindable.
+- Memory streams, Event Hubs, and Redis Streams position subscription cursors within the live Orleans queue cache.
+- Event Hubs and Redis Streams also retain events externally and restore their queue receiver from a provider checkpoint after restart or ownership transfer.
+- Kinesis restores its queue receiver from a durable checkpoint and currently reports its subscription API as non-rewindable.
+- Azure Queue, Amazon SQS, ADO.NET, and NATS JetStream providers use forward-only subscription cursors.
 
-Explicit subscriptions can resume from retained positions according to the provider's token semantics. An implicit subscription accepts a recovery token when an activation attaches its observer, then advances monotonically for that attachment. Once a delivery call completes successfully, resuming the active implicit handle with a sequence token throws <xref:System.InvalidOperationException>; passing `null` replaces the observer at its current position.
+The built-in persistent providers resolve a subscription token through <xref:Orleans.Streams.IQueueCache.GetCacheCursor*>. A token older than that live cache produces a <xref:Orleans.Streams.QueueCacheMissException>; the pulling agent does not open an independent historical reader for that subscription. A custom retained-log adapter can provide a wider range by coupling its cache to bounded historical readers.
+
+Explicit subscriptions can resume from positions supported by the provider's cache and token semantics. An implicit subscription accepts a recovery token when an activation attaches its observer, then advances monotonically for that attachment. Once a delivery call completes successfully, resuming the active implicit handle with a sequence token throws <xref:System.InvalidOperationException>; passing `null` replaces the observer at its current position.
 
 See the [provider matrix](stream-providers.md#provider-matrix) for provider capabilities.
 
@@ -61,7 +64,7 @@ See the [provider matrix](stream-providers.md#provider-matrix) for provider capa
 1. Use a durable [`PubSubStore`](pubsub-storage.md) when explicit subscription records must survive cluster loss.
 1. Resume existing explicit handles after grain activation; don't call <xref:Orleans.Streams.IAsyncObservable`1.SubscribeAsync*> unconditionally.
 1. Persist the last applied domain position when the application needs deterministic recovery.
-1. For a rewindable provider, restart from a checkpointed token and tolerate replay of the checkpoint boundary.
+1. For a rewindable provider, resume from a token that remains in its supported cache range and tolerate replay of the token boundary.
 1. Make effects idempotent and alert on poison events, repeated retries, and growing lag.
 
 Provider retention and subscription storage solve different problems. Durable events without durable subscription metadata can wait with no consumer binding; durable subscriptions with a transient provider can't recover events that disappeared.

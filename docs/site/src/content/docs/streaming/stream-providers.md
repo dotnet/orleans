@@ -1,7 +1,7 @@
 ---
 title: Orleans stream providers
 description: Compare built-in Orleans stream providers by durability, rewindability, status, and prerequisites.
-ms.date: 08/18/2026
+ms.date: 08/30/2026
 ms.topic: concept-article
 ---
 
@@ -15,12 +15,12 @@ A stream provider connects the Orleans streaming API to a transport and defines 
 |---|---|---|---|---|---|
 | Memory | [`Microsoft.Orleans.Streaming`](https://www.nuget.org/packages/Microsoft.Orleans.Streaming) | Stable | No; silo memory only | Yes, within the transient in-memory cache | None |
 | Azure Queue Storage | [`Microsoft.Orleans.Streaming.AzureStorage`](https://www.nuget.org/packages/Microsoft.Orleans.Streaming.AzureStorage) | Stable | Yes, in Azure Storage queues | No | Azure Storage account or Azurite; credentials and a stable Orleans service ID |
-| Azure Event Hubs | [`Microsoft.Orleans.Streaming.EventHubs`](https://www.nuget.org/packages/Microsoft.Orleans.Streaming.EventHubs) | Stable | Yes, within Event Hubs retention | Yes | Event Hubs namespace, hub, consumer group, and checkpoint storage |
-| Amazon Kinesis | [`Microsoft.Orleans.Streaming.Kinesis`](https://www.nuget.org/packages/Microsoft.Orleans.Streaming.Kinesis) | Stable | Yes, within Kinesis retention | Yes | Kinesis data stream, AWS credentials, region, and durable checkpoint storage |
+| Azure Event Hubs | [`Microsoft.Orleans.Streaming.EventHubs`](https://www.nuget.org/packages/Microsoft.Orleans.Streaming.EventHubs) | Stable | Yes, within Event Hubs retention | Yes, within the live Orleans cache | Event Hubs namespace, hub, consumer group, and checkpoint storage |
+| Amazon Kinesis | [`Microsoft.Orleans.Streaming.Kinesis`](https://www.nuget.org/packages/Microsoft.Orleans.Streaming.Kinesis) | Stable | Yes, within Kinesis retention | No; receiver recovery uses checkpoints | Kinesis data stream, AWS credentials, region, and durable checkpoint storage |
 | Amazon SQS | [`Microsoft.Orleans.Streaming.SQS`](https://www.nuget.org/packages/Microsoft.Orleans.Streaming.SQS) | Stable | Yes, within SQS retention | No | AWS account, queue permissions, region/endpoint configuration |
 | ADO.NET | [`Microsoft.Orleans.Streaming.AdoNet`](https://www.nuget.org/packages/Microsoft.Orleans.Streaming.AdoNet) | **Alpha** | Yes, in relational tables until expiry/dead-letter eviction | No | Supported database, ADO.NET driver, and Orleans streaming SQL schema |
 | NATS JetStream | [`Microsoft.Orleans.Streaming.NATS`](https://www.nuget.org/packages/Microsoft.Orleans.Streaming.NATS) | **Alpha** | Configurable; file storage is the default | No | NATS server with JetStream and sufficient storage; subject/stream administration |
-| Redis Streams | [`Microsoft.Orleans.Streaming.Redis`](https://www.nuget.org/packages/Microsoft.Orleans.Streaming.Redis) | **Alpha** | Configurable through Redis persistence and stream retention | Yes, while entries remain | Redis deployment, persistence/HA policy, and retention sizing |
+| Redis Streams | [`Microsoft.Orleans.Streaming.Redis`](https://www.nuget.org/packages/Microsoft.Orleans.Streaming.Redis) | **Alpha** | Configurable through Redis persistence and stream retention | Yes, within the live Orleans cache | Redis deployment, persistence/HA policy, and retention sizing |
 
 Alpha packages have an `alpha.1` version suffix. Treat their APIs and operational behavior as prerelease, validate failure modes under load, and pin versions deliberately.
 
@@ -52,13 +52,13 @@ The examples use durable Azure Table Storage for `PubSubStore`; queue durability
 
 <a id="azure-event-hub-stream-provider"></a>
 
-Register [Azure Event Hubs](https://learn.microsoft.com/azure/event-hubs/event-hubs-about) with <xref:Orleans.Hosting.SiloBuilderExtensions.AddEventHubStreams*>. Event Hubs retention and partition positions make this provider rewindable. Configure a consumer group dedicated to the Orleans application and durable checkpoint storage. Partition count bounds physical read parallelism, and retention bounds how far recovery can rewind.
+Register [Azure Event Hubs](https://learn.microsoft.com/azure/event-hubs/event-hubs-about) with <xref:Orleans.Hosting.SiloBuilderExtensions.AddEventHubStreams*>. The provider accepts subscription tokens that remain in its live Orleans cache. Event Hubs retention and durable checkpoints let a queue receiver resume partition reading after restart or ownership transfer. Configure a consumer group dedicated to the Orleans application and durable checkpoint storage. Partition count bounds physical read parallelism, and cache retention bounds per-subscription rewind.
 
 The Event Hubs provider supports a custom data adapter for provider-specific wire formats. See [Integrate external stream producers and consumers](external-streams.md) when a non-Orleans application must publish to or consume from the same Event Hub.
 
 ## Amazon Kinesis
 
-Register [Amazon Kinesis Data Streams](https://docs.aws.amazon.com/streams/latest/dev/introduction.html) with <xref:Orleans.Hosting.SiloBuilderExtensions.AddKinesisStreams*>. Kinesis retains events independently of Orleans, and the provider persists each shard's last delivered sequence number so that delivery can resume after shutdown or queue reassignment. See [Stream with Amazon Kinesis](kinesis-streaming.md) for configuration, checkpoint choices, and operational constraints.
+Register [Amazon Kinesis Data Streams](https://docs.aws.amazon.com/streams/latest/dev/introduction.html) with <xref:Orleans.Hosting.SiloBuilderExtensions.AddKinesisStreams*>. Kinesis retains events independently of Orleans, and the provider persists each shard's last delivered sequence number so that queue reading can resume after shutdown or reassignment. Subscription cursors advance from the receiver's current position. See [Stream with Amazon Kinesis](kinesis-streaming.md) for configuration, checkpoint choices, and operational constraints.
 
 ## Amazon SQS
 
@@ -74,7 +74,7 @@ Register [NATS JetStream](https://docs.nats.io/nats-concepts/jetstream) with `Ad
 
 ## Redis Streams streaming (alpha)
 
-Register [Redis Streams](https://redis.io/docs/latest/develop/data-types/streams/) with `AddRedisStreams`. The provider stores events and checkpoints in Redis and is rewindable while entries remain. Redis durability depends on its [persistence](https://redis.io/docs/latest/operate/oss_and_stack/management/persistence/) and replication configuration. `RedisStreamingOptions.MaxStreamLength` can bound retention; without it, stream length is unbounded, so capacity planning is required.
+Register [Redis Streams](https://redis.io/docs/latest/develop/data-types/streams/) with `AddRedisStreams`. The provider stores events and checkpoints in Redis and accepts subscription tokens that remain in its live Orleans cache. A queue receiver resumes from its Redis checkpoint after restart or ownership transfer. Redis durability depends on its [persistence](https://redis.io/docs/latest/operate/oss_and_stack/management/persistence/) and replication configuration. `RedisStreamingOptions.MaxStreamLength` can bound external retention; `SimpleQueueCacheOptions.CacheSize` bounds the subscription rewind range.
 
 ## Custom adapters
 
