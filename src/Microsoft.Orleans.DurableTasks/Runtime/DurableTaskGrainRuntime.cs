@@ -292,8 +292,15 @@ internal sealed partial class DurableTaskGrainRuntime(
         var transport = _messageTransport ?? throw new InvalidOperationException(
             "Durable messaging is not configured. Call AddDurableTasks on the silo builder.");
         var context = request.Context ?? throw new InvalidOperationException("The durable task request has no context.");
+        if (context.TargetId == GrainId)
+        {
+            throw new InvalidOperationException(
+                $"Durable task '{taskId}' cannot invoke its owning grain '{GrainId}' through durable messaging.");
+        }
+
         var fingerprint = IDurableTaskRequest.GetFingerprint(request, _shared.Serializer);
-        var state = _storage.GetOrCreateTask(taskId, request: null);
+        var stateExisted = _storage.TryGetTask(taskId, out var state);
+        state ??= _storage.GetOrCreateTask(taskId, request: null);
         if (state.Request is not null
             || state.RequestFingerprint is not null
             || !state.CallerId.IsDefault
@@ -317,20 +324,25 @@ internal sealed partial class DurableTaskGrainRuntime(
             return completed;
         }
 
-        if (state.RemoteTarget.IsDefault || state.RemoteRequestFingerprint is null)
-        {
-            _storage.SetRemoteRequest(taskId, state, context.TargetId, fingerprint);
-        }
-
-        context.CallerId = GrainId;
-        context.SupportsDurableCompletion = true;
-        transport.SendInvocation(GrainId, context.TargetId, taskId, request);
         try
         {
+            if (state.RemoteTarget.IsDefault || state.RemoteRequestFingerprint is null)
+            {
+                _storage.SetRemoteRequest(taskId, state, context.TargetId, fingerprint);
+            }
+
+            context.CallerId = GrainId;
+            context.SupportsDurableCompletion = true;
+            transport.SendInvocation(GrainId, context.TargetId, taskId, request);
             await WriteStateUnderJournalWriteGateAsync(cancellationToken);
         }
         catch
         {
+            if (!stateExisted)
+            {
+                _storage.RemoveTask(taskId);
+            }
+
             await _stateManager.RevertPendingChangesAsync(CancellationToken.None);
             throw;
         }
@@ -397,7 +409,8 @@ internal sealed partial class DurableTaskGrainRuntime(
         var transport = _messageTransport ?? throw new InvalidOperationException(
             "Durable messaging is not configured. Call AddDurableTasks on the silo builder.");
         var dueTime = UtcNow + duration;
-        var state = _storage.GetOrCreateTask(taskId, request: null);
+        var stateExisted = _storage.TryGetTask(taskId, out var state);
+        state ??= _storage.GetOrCreateTask(taskId, request: null);
         if (state.Result is { IsCompleted: true } completed)
         {
             return completed;
@@ -426,9 +439,23 @@ internal sealed partial class DurableTaskGrainRuntime(
         }
 
         var generation = checked(state.ResumeGeneration + 1);
-        _storage.SetDelay(taskId, state, dueTime, duration, generation);
-        await transport.ScheduleResumeAsync(GrainId, taskId, generation, dueTime, cancellationToken);
-        await WriteStateAsync(cancellationToken);
+        try
+        {
+            _storage.SetDelay(taskId, state, dueTime, duration, generation);
+            await transport.ScheduleResumeAsync(GrainId, taskId, generation, dueTime, cancellationToken);
+            await WriteStateAsync(cancellationToken);
+        }
+        catch
+        {
+            if (!stateExisted)
+            {
+                _storage.RemoveTask(taskId);
+            }
+
+            await _stateManager.RevertPendingChangesAsync(CancellationToken.None);
+            throw;
+        }
+
         return DurableTaskResponse.Pending;
     }
 

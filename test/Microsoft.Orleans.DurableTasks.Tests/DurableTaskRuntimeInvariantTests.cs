@@ -383,7 +383,7 @@ public sealed class DurableTaskRuntimeInvariantTests
     {
         var (runtime, storage, _, transport) = CreateRuntime();
         var receiver = GrainId.Create("test", "one");
-        var request = CreateRequest(1);
+        var request = CreateRemoteRequest(1);
         var expectedTarget = request.Context!.TargetId;
         var taskId = TaskId.Parse("root/remote");
         await runtime.ScheduleChildAsync(taskId, new TestStateManager.TestRemoteDurableTask(request), TestContext.Current.CancellationToken);
@@ -458,6 +458,22 @@ public sealed class DurableTaskRuntimeInvariantTests
 
         Assert.Equal(1, manager.WriteCount);
         Assert.True(request.Context.SupportsDurableCompletion);
+    }
+
+    [Fact]
+    public async Task RootRemoteScheduleRejectsSelfTargetBeforeCreatingState()
+    {
+        var (runtime, storage, manager, transport) = CreateRuntime();
+        var taskId = TaskId.Parse("root/self");
+        var request = CreateRequest(1);
+
+        var exception = await Assert.ThrowsAsync<InvalidOperationException>(
+            () => runtime.ScheduleRemoteAsync(taskId, request, TestContext.Current.CancellationToken).AsTask());
+
+        Assert.Contains("owning grain", exception.Message, StringComparison.Ordinal);
+        Assert.False(storage.Contains(taskId));
+        Assert.Empty(transport.Invocations);
+        Assert.Equal(0, manager.WriteCount);
     }
 
     [Fact]
@@ -774,6 +790,26 @@ public sealed class DurableTaskRuntimeInvariantTests
                 TimeSpan.FromMinutes(6),
                 TestContext.Current.CancellationToken).AsTask());
         Assert.Contains("duration", exception.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task FailedDelaySchedulingDoesNotLeavePendingState()
+    {
+        var (runtime, storage, manager, transport) = CreateRuntime();
+        var taskId = TaskId.Parse("root/failed-delay");
+        transport.BeforeScheduleResumeAsync = static (_, _, _, _, _) =>
+            ValueTask.FromException(new InvalidOperationException("Expected scheduling failure."));
+
+        var exception = await Assert.ThrowsAsync<InvalidOperationException>(
+            () => runtime.ScheduleDelayAsync(
+                taskId,
+                TimeSpan.FromMinutes(1),
+                TestContext.Current.CancellationToken).AsTask());
+
+        Assert.Equal("Expected scheduling failure.", exception.Message);
+        Assert.False(storage.Contains(taskId));
+        Assert.Empty(transport.ScheduledResumes);
+        Assert.Equal(0, manager.WriteCount);
     }
 
     [Fact]

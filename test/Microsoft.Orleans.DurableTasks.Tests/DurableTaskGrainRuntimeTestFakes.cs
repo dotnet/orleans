@@ -38,6 +38,7 @@ internal sealed class RecordingDurableTaskMessageTransport : IDurableTaskMessage
     public Task ScheduledResume => _scheduledResume.Task;
     public Action<GrainId, GrainId, TaskId, IDurableTaskRequest>? BeforeSendInvocation { get; set; }
     public Action<GrainId, GrainId, TaskId>? BeforeSendCancellation { get; set; }
+    public Func<GrainId, TaskId, long, DateTimeOffset, CancellationToken, ValueTask>? BeforeScheduleResumeAsync { get; set; }
 
     public void SendInvocation(GrainId sender, GrainId target, TaskId taskId, IDurableTaskRequest request)
     {
@@ -55,11 +56,15 @@ internal sealed class RecordingDurableTaskMessageTransport : IDurableTaskMessage
         Cancellations.Add((sender, target, taskId));
     }
 
-    public ValueTask ScheduleResumeAsync(GrainId target, TaskId taskId, long generation, DateTimeOffset dueTime, CancellationToken cancellationToken)
+    public async ValueTask ScheduleResumeAsync(GrainId target, TaskId taskId, long generation, DateTimeOffset dueTime, CancellationToken cancellationToken)
     {
+        if (BeforeScheduleResumeAsync is { } beforeScheduleResume)
+        {
+            await beforeScheduleResume(target, taskId, generation, dueTime, cancellationToken);
+        }
+
         ScheduledResumes.Add((target, taskId, dueTime));
         _scheduledResume.TrySetResult();
-        return default;
     }
 
     public ValueTask CommitAsync(CancellationToken cancellationToken)
