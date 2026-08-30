@@ -263,7 +263,7 @@
     <value>OrleansContracts.txt file is missing</value>
   </data>
   <data name="OrleansContractsFileMissingMessageFormat" xml:space="preserve">
-    <value>The project contains Orleans contracts but no {0} file. From the repository root, replace PATH_TO_PROJECT_OR_SOLUTION with the owning .csproj, .sln, or .slnx path and run 'dotnet format PATH_TO_PROJECT_OR_SOLUTION analyzers --severity info --diagnostics ORLEANS0016 ORLEANS0017 ORLEANS0018 ORLEANS0019 ORLEANS0020 ORLEANS0022 ORLEANS0023 ORLEANS0024'. Review the generated baseline. See https://aka.ms/orleans/OrleansContracts.txt for details.</value>
+    <value>The project contains Orleans contracts but no {0} file. From the repository root, run 'dotnet format PATH_TO_PROJECT.csproj analyzers --severity info --diagnostics ORLEANS0016 ORLEANS0017 ORLEANS0018 ORLEANS0019 ORLEANS0020 ORLEANS0022 ORLEANS0023 ORLEANS0024'. For a solution, run 'dotnet tool run orleans-contracts PATH_TO_SOLUTION'. Review the generated baseline. See https://aka.ms/orleans/OrleansContracts.txt for details.</value>
   </data>
   <data name="OrleansContractsFileMissingDescription" xml:space="preserve">
     <value>Add an OrleansContracts.txt file to track Orleans contracts for compatibility during rolling upgrades.</value>

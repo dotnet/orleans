@@ -1,7 +1,7 @@
 ---
 title: Orleans NuGet packages
 description: Choose Orleans packages for hosts, providers, serialization, observability, and testing.
-ms.date: 08/21/2026
+ms.date: 08/29/2026
 ms.topic: reference
 ---
 
@@ -20,6 +20,12 @@ All official packages use the `Microsoft.Orleans` prefix and are published on [N
 Most applications should begin with one of these packages and then add only the provider and feature packages they use.
 
 For installation guidance, see [`dotnet package add`](https://learn.microsoft.com/dotnet/core/tools/dotnet-package-add) and [NuGet package installation workflows](https://learn.microsoft.com/nuget/consume-packages/overview-and-workflow).
+
+## Development tools
+
+| Package | Purpose |
+| --- | --- |
+| `Microsoft.Orleans.ContractTool` | .NET tool which regenerates `OrleansContracts.txt` manifests for every analyzer-enabled project in a project or solution. |
 
 ## Hosting and observability
 

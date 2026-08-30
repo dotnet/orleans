@@ -1,15 +1,10 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-    <PackageId>Microsoft.Orleans.Analyzers</PackageId>
-    <Title>Microsoft Orleans Analyzers</Title>
-    <Description>C# Analyzers for Microsoft Orleans.</Description>
     <TargetFramework>netstandard2.0</TargetFramework>
-    <NoPackageAnalysis>true</NoPackageAnalysis>
-    <IncludeBuildOutput>false</IncludeBuildOutput>
-    <DevelopmentDependency>true</DevelopmentDependency>
+    <IsPackable>false</IsPackable>
     <IsOrleansFrameworkPart>false</IsOrleansFrameworkPart>
     <EnforceExtendedAnalyzerRules>true</EnforceExtendedAnalyzerRules>
-    <NoWarn>$(NoWarn);RS1038</NoWarn>
+    <NoWarn>$(NoWarn);RS1001;RS1038</NoWarn>
   </PropertyGroup>
 
   <ItemGroup>
@@ -27,32 +22,8 @@
   </ItemGroup>
 
   <ItemGroup>
-    <None Include="$(OutputPath)\$(AssemblyName).dll" Pack="true" PackagePath="analyzers/dotnet/cs" Visible="false" />
     <AdditionalFiles Include="AnalyzerReleases.Shipped.md" />
     <AdditionalFiles Include="AnalyzerReleases.Unshipped.md" />
-  </ItemGroup>
-
-  <ItemGroup>
-    <Content Include="build\Microsoft.Orleans.Analyzers.props">
-      <Pack>true</Pack>
-      <PackagePath>%(Identity)</PackagePath>
-      <Visible>true</Visible>
-    </Content>
-    <Content Include="build\Microsoft.Orleans.Analyzers.targets">
-      <Pack>true</Pack>
-      <PackagePath>%(Identity)</PackagePath>
-      <Visible>true</Visible>
-    </Content>
-    <Content Include="buildTransitive\Microsoft.Orleans.Analyzers.props">
-      <Pack>true</Pack>
-      <PackagePath>%(Identity)</PackagePath>
-      <Visible>true</Visible>
-    </Content>
-    <Content Include="buildTransitive\Microsoft.Orleans.Analyzers.targets">
-      <Pack>true</Pack>
-      <PackagePath>%(Identity)</PackagePath>
-      <Visible>true</Visible>
-    </Content>
   </ItemGroup>
 
   <ItemGroup>

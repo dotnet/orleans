@@ -23,7 +23,7 @@ The analyzer has no baseline, so it cannot detect RPC identity, signature, versi
 
 ## How to fix
 
-Apply **Regenerate OrleansContracts.txt** to create and populate the complete project manifest. The configured path can be absent; the code fix creates the file and its parent directory. Use **Fix all in solution** to create manifests for every affected project, then add the generated files to source control and review the baseline using the [contract compatibility guidance](../grains/grain-versioning/contract-compatibility-analyzer.md#regenerate-the-manifest).
+Apply **Regenerate OrleansContracts.txt** to create and populate the complete project manifest. The configured path can be absent; the code fix creates the file and its parent directory. For a large solution, use the `Microsoft.Orleans.ContractTool` tool to regenerate every enabled project through a filtered workspace. Add the generated files to source control and review the baseline using the [contract compatibility guidance](../grains/grain-versioning/contract-compatibility-analyzer.md#regenerate-the-manifest).
 
 ## Suppress the diagnostic
 
