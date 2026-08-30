@@ -221,9 +221,9 @@ public class TransactionRecoveryLatencyTests
         queue.RWLock.Rollback(abortedTransactionId);
 
         await Assert.ThrowsAsync<OrleansCascadingAbortException>(
-            () => firstAbortedOperation.WaitAsync(TimeSpan.FromSeconds(1)));
+            () => firstAbortedOperation.WaitAsync(TestContext.Current.CancellationToken));
         await Assert.ThrowsAsync<OrleansCascadingAbortException>(
-            () => secondAbortedOperation.WaitAsync(TimeSpan.FromSeconds(1)));
+            () => secondAbortedOperation.WaitAsync(TestContext.Current.CancellationToken));
         Assert.Equal(0, abortedOperationCount);
 
         var nextOperation = queue.RWLock.EnterLock(
@@ -239,7 +239,7 @@ public class TransactionRecoveryLatencyTests
         queue.RWLock.Rollback(currentTransactionId);
         queue.RWLock.Notify();
 
-        Assert.Equal(42, await nextOperation.WaitAsync(TimeSpan.FromSeconds(1)));
+        Assert.Equal(42, await nextOperation.WaitAsync(TestContext.Current.CancellationToken));
         Assert.Equal(0, abortedOperationCount);
     }
 
@@ -285,7 +285,7 @@ public class TransactionRecoveryLatencyTests
             static () => 2);
 
         await Assert.ThrowsAsync<OrleansCascadingAbortException>(
-            () => conflictingRead.WaitAsync(TimeSpan.FromSeconds(1)));
+            () => conflictingRead.WaitAsync(TestContext.Current.CancellationToken));
         Assert.Equal(0, conflictingOperationCount);
         Assert.False(queuedRead.IsCompleted);
         Assert.False(queuedWrite.IsCompleted);
@@ -293,8 +293,8 @@ public class TransactionRecoveryLatencyTests
         queue.RWLock.Rollback(currentTransactionId);
         queue.RWLock.Notify();
 
-        Assert.Equal(1, await queuedRead.WaitAsync(TimeSpan.FromSeconds(1)));
-        Assert.Equal(2, await queuedWrite.WaitAsync(TimeSpan.FromSeconds(1)));
+        Assert.Equal(1, await queuedRead.WaitAsync(TestContext.Current.CancellationToken));
+        Assert.Equal(2, await queuedWrite.WaitAsync(TestContext.Current.CancellationToken));
         Assert.Equal(0, conflictingOperationCount);
     }
 
