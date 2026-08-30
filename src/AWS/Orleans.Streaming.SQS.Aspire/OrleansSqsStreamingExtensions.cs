@@ -215,7 +215,8 @@ public static partial class OrleansSqsStreamingExtensions
             }
         }
 
-        return result.ToString().Trim('-');
+        var normalized = result.ToString().Trim('-');
+        return normalized.Length == 0 ? "sqs" : normalized;
     }
 
     internal static void ValidateServiceId(
