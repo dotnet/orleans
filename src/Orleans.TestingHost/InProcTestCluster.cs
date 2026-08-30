@@ -36,6 +36,7 @@ public sealed class InProcessTestCluster : IDisposable, IAsyncDisposable
 {
     private readonly List<InProcessSiloHandle> _silos = [];
     private readonly StringBuilder _log = new();
+    private readonly object _logLock = new();
     private readonly InMemoryTransportConnectionHub _transportHub = new();
     private readonly GrainDirectoryObserver _grainDirectoryObserver = new();
     private readonly InProcessGrainDirectory _grainDirectory;
@@ -1073,7 +1074,10 @@ public sealed class InProcessTestCluster : IDisposable, IAsyncDisposable
     /// <returns>The log contents.</returns>
     public string GetLog()
     {
-        return _log.ToString();
+        lock (_logLock)
+        {
+            return _log.ToString();
+        }
     }
 
     private void ReportUnobservedException(object? sender, UnhandledExceptionEventArgs eventArgs)
@@ -1084,7 +1088,10 @@ public sealed class InProcessTestCluster : IDisposable, IAsyncDisposable
 
     private void WriteLog(string format, params object?[] args)
     {
-        _log.AppendFormat(format + Environment.NewLine, args);
+        lock (_logLock)
+        {
+            _log.AppendFormat(format + Environment.NewLine, args);
+        }
     }
 
     private void FlushLogToConsole()

@@ -15,9 +15,44 @@ namespace Orleans.TestingHost.Tests;
 public sealed class InProcessTestClusterLifecycleTests
 {
     private const string DiagnosticCategory = "Orleans.TestingHost.Tests.LifecycleFailureProbe";
+    private const int ConcurrentLogReaderCount = 4;
+    private const int ConcurrentLogReadsPerWorker = 100;
+    private const int ConcurrentLogWriterCount = 8;
+    private const int ConcurrentLogWritesPerWorker = 2_500;
     private static readonly EventId SiloStartupFailureEvent = new(7101, "SiloStartupFailed");
     private static readonly EventId ClientStartupFailureEvent = new(7102, "ClientStartupFailed");
     private static readonly EventId SiloStopFailureEvent = new(7103, "SiloStopFailed");
+
+    [Fact]
+    public async Task Log_RemainsConsistentDuringConcurrentWritesAndReads()
+    {
+        await using var cluster = new InProcessTestCluster(new InProcessTestClusterOptions(), new FixedPortAllocator());
+        var start = CreateCompletionSource();
+        var writers = Enumerable.Range(0, ConcurrentLogWriterCount).Select(_ => Task.Run(async () =>
+        {
+            await start.Task;
+            for (var i = 0; i < ConcurrentLogWritesPerWorker; i++)
+            {
+                Assert.Empty(cluster.GetActiveSilos());
+            }
+        }));
+        var readers = Enumerable.Range(0, ConcurrentLogReaderCount).Select(_ => Task.Run(async () =>
+        {
+            await start.Task;
+            for (var i = 0; i < ConcurrentLogReadsPerWorker; i++)
+            {
+                cluster.GetLog();
+                await Task.Yield();
+            }
+        }));
+
+        start.TrySetResult();
+        await Task.WhenAll(writers.Concat(readers));
+
+        var entries = cluster.GetLog().Split(Environment.NewLine, StringSplitOptions.RemoveEmptyEntries);
+        Assert.Equal(ConcurrentLogWriterCount * ConcurrentLogWritesPerWorker, entries.Length);
+        Assert.All(entries, entry => Assert.StartsWith("GetActiveSilos: 0 Silos=", entry, StringComparison.Ordinal));
+    }
 
     [Fact]
     public async Task DeployAsync_WhenOneSiloStartupFails_DisposesEveryBuiltHostAndReportsRootFailure()
