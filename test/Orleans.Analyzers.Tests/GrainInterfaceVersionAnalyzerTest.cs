@@ -1850,12 +1850,11 @@ public interface IMyGrain : IGrain
     #region Code Fix Tests - Regenerate
 
     [Fact]
-    public void ContractAnalyzerRegistration_IsolatedFromStandardAnalyzers()
+    public void ContractAnalyzer_IsolatedFromStandardAnalyzers()
     {
-        Assert.Empty(typeof(GrainInterfaceVersionAnalyzer).GetCustomAttributes(typeof(DiagnosticAnalyzerAttribute), inherit: false));
-        Assert.Single(typeof(GrainInterfaceVersionAnalyzerRegistration).GetCustomAttributes(typeof(DiagnosticAnalyzerAttribute), inherit: false));
-        Assert.Empty(typeof(GrainInterfaceVersionCodeFix).GetCustomAttributes(typeof(ExportCodeFixProviderAttribute), inherit: false));
-        Assert.Single(typeof(GrainInterfaceVersionCodeFixRegistration).GetCustomAttributes(typeof(ExportCodeFixProviderAttribute), inherit: false));
+        Assert.NotEqual(typeof(AlwaysInterleaveDiagnosticAnalyzer).Assembly, typeof(GrainInterfaceVersionAnalyzer).Assembly);
+        Assert.Single(typeof(GrainInterfaceVersionAnalyzer).GetCustomAttributes(typeof(DiagnosticAnalyzerAttribute), inherit: false));
+        Assert.Single(typeof(GrainInterfaceVersionCodeFix).GetCustomAttributes(typeof(ExportCodeFixProviderAttribute), inherit: false));
     }
 
     [Fact]
@@ -2802,8 +2801,8 @@ interface Outer.IInnerGrain [Version(1)]
             var contractsPath = Path.Combine(
                 tempDirectory,
                 configuredContractsPath ?? OrleansContractsFileName);
-            var analyzerPath = typeof(GrainInterfaceVersionAnalyzer).Assembly.Location;
-            var contractsAnalyzerPath = typeof(GrainInterfaceVersionAnalyzerRegistration).Assembly.Location;
+            var analyzerPath = typeof(AlwaysInterleaveDiagnosticAnalyzer).Assembly.Location;
+            var contractsAnalyzerPath = typeof(GrainInterfaceVersionAnalyzer).Assembly.Location;
             var abstractionsPath = typeof(IGrain).Assembly.Location;
             var propsPath = Path.Combine(
                 repositoryRoot,

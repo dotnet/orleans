@@ -21,6 +21,7 @@ namespace Orleans.Analyzers;
 /// An analyzer that tracks grain interface definitions and their versions.
 /// It ensures that interface changes are accompanied by version increments.
 /// </summary>
+[DiagnosticAnalyzer(LanguageNames.CSharp)]
 public sealed partial class GrainInterfaceVersionAnalyzer : DiagnosticAnalyzer
 {
     private const string DiagnosticCategory = "Versioning";

@@ -10,14 +10,30 @@
     <IncludeBuildOutput>false</IncludeBuildOutput>
     <DevelopmentDependency>true</DevelopmentDependency>
     <IsOrleansFrameworkPart>false</IsOrleansFrameworkPart>
-    <EnforceExtendedAnalyzerRules>false</EnforceExtendedAnalyzerRules>
-    <NoWarn>$(NoWarn);RS1025;RS1026;RS1038</NoWarn>
+    <EnforceExtendedAnalyzerRules>true</EnforceExtendedAnalyzerRules>
+    <NoWarn>$(NoWarn);RS1038</NoWarn>
   </PropertyGroup>
 
   <ItemGroup>
     <PackageReference Include="Microsoft.CodeAnalysis.CSharp.Workspaces" PrivateAssets="all" />
     <PackageReference Update="NETStandard.Library" PrivateAssets="all" />
-    <ProjectReference Include="..\Orleans.Analyzers\Orleans.Analyzers.csproj" PrivateAssets="all" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Compile Include="..\Orleans.Analyzers\Constants.cs" Link="Constants.cs" />
+    <Compile Include="..\Orleans.Analyzers\GrainInterfaceVersionAnalyzer.cs" Link="GrainInterfaceVersionAnalyzer.cs" />
+    <Compile Include="..\Orleans.Analyzers\GrainInterfaceVersionCodeFix.cs" Link="GrainInterfaceVersionCodeFix.cs" />
+    <Compile Include="..\Orleans.Analyzers\NullableAttributes.cs" Link="NullableAttributes.cs" />
+    <Compile Include="..\Orleans.Analyzers\Properties\IsExternalInit.cs" Link="Properties\IsExternalInit.cs" />
+    <Compile Include="..\Orleans.Analyzers\Resources.Designer.cs" Link="Resources.Designer.cs" />
+    <Compile Include="..\Orleans.Analyzers\SymbolHelpers.cs" Link="SymbolHelpers.cs" />
+    <Compile Include="..\Orleans.Analyzers\SyntaxHelpers.cs" Link="SyntaxHelpers.cs" />
+    <Compile Include="..\Orleans.CodeGenerator.Shared\InvokableBaseTypeResolver.cs" Link="InvokableBaseTypeResolver.cs" />
+    <Compile Include="..\Orleans.CodeGenerator.Shared\MethodIdProvider.cs" Link="MethodIdProvider.cs" />
+    <Compile Include="..\Orleans.CodeGenerator\Hashing\BitOperations.cs" Link="Hashing\BitOperations.cs" />
+    <Compile Include="..\Orleans.CodeGenerator\Hashing\NonCryptographicHashAlgorithm.cs" Link="Hashing\NonCryptographicHashAlgorithm.cs" />
+    <Compile Include="..\Orleans.CodeGenerator\Hashing\XxHash32.cs" Link="Hashing\XxHash32.cs" />
+    <Compile Include="..\Orleans.CodeGenerator\Hashing\XxHash32.State.cs" Link="Hashing\XxHash32.State.cs" />
   </ItemGroup>
 
   <ItemGroup>
@@ -29,6 +45,21 @@
           Pack="true"
           PackagePath="tools/analyzers"
           Visible="false" />
+    <AdditionalFiles Include="AnalyzerReleases.Shipped.md" />
+    <AdditionalFiles Include="AnalyzerReleases.Unshipped.md" />
+    <EmbeddedResource Include="..\Orleans.Analyzers\Resources.resx" Link="Resources.resx" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Compile Update="Resources.Designer.cs">
+      <DesignTime>True</DesignTime>
+      <AutoGen>True</AutoGen>
+      <DependentUpon>Resources.resx</DependentUpon>
+    </Compile>
+    <EmbeddedResource Update="Resources.resx">
+      <Generator>ResXFileCodeGenerator</Generator>
+      <LastGenOutput>Resources.Designer.cs</LastGenOutput>
+    </EmbeddedResource>
   </ItemGroup>
 
   <ItemGroup>

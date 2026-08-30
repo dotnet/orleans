@@ -8,6 +8,7 @@ using Microsoft.CodeAnalysis.Text;
 using System;
 using System.Collections.Generic;
 using System.Collections.Immutable;
+using System.Composition;
 using System.IO;
 using System.Linq;
 using System.Text;
@@ -19,6 +20,7 @@ namespace Orleans.Analyzers;
 /// <summary>
 /// A code fix provider that adds grain interfaces to OrleansContracts.txt or updates their version.
 /// </summary>
+[ExportCodeFixProvider(LanguageNames.CSharp, Name = nameof(GrainInterfaceVersionCodeFix)), Shared]
 public class GrainInterfaceVersionCodeFix : CodeFixProvider
 {
     private const string DefaultNewLine = "\n";
