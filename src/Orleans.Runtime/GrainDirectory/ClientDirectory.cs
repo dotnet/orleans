@@ -38,7 +38,7 @@ internal sealed partial class ClientDirectory : SystemTarget, ILocalClientDirect
     private readonly SiloAddress _localSilo;
     private readonly IClusterMembershipService _clusterMembershipService;
     private readonly SiloMessagingOptions _messagingOptions;
-    private readonly CancellationTokenSource _shutdownCts = new();
+    private readonly CancellationTokenSource _stoppingCts = new();
 #if NET9_0_OR_GREATER
     private readonly Lock _lockObj = new();
 #else
@@ -46,6 +46,7 @@ internal sealed partial class ClientDirectory : SystemTarget, ILocalClientDirect
 #endif
     private readonly GrainId _localHostedClientId;
     private readonly IConnectedClientCollection _connectedClients;
+    private Func<Task> _onPublishRegistered = static () => Task.CompletedTask;
     private Action _schedulePublishUpdate;
     private Task? _runTask;
     private MembershipVersion _observedMembershipVersion = MembershipVersion.MinValue;
@@ -58,6 +59,10 @@ internal sealed partial class ClientDirectory : SystemTarget, ILocalClientDirect
 
     // For synchronization with remote silos.
     private Task? _nextPublishTask;
+    private Task? _inflightPublishTask;
+    private long _publishRequestVersion;
+    private SiloAddress? _requestedSuccessor;
+    private ImmutableDictionary<SiloAddress, (ImmutableHashSet<GrainId> ConnectedClients, long Version)>? _requestedTable;
     private SiloAddress? _previousSuccessor;
     private ImmutableDictionary<SiloAddress, (ImmutableHashSet<GrainId> ConnectedClients, long Version)>? _publishedTable;
 
@@ -349,12 +354,12 @@ internal sealed partial class ClientDirectory : SystemTarget, ILocalClientDirect
 
     private async Task Run()
     {
-        var membershipUpdates = _clusterMembershipService.MembershipUpdates.GetAsyncEnumerator(_shutdownCts.Token);
+        await using var membershipUpdates = _clusterMembershipService.MembershipUpdates.GetAsyncEnumerator(_stoppingCts.Token);
 
         Task<bool>? membershipTask = null;
         Task<bool>? timerTask = _refreshTimer.NextTick(RandomTimeSpan.Next(_messagingOptions.ClientRegistrationRefresh));
 
-        while (!_shutdownCts.IsCancellationRequested)
+        while (!_stoppingCts.IsCancellationRequested)
         {
             try
             {
@@ -386,10 +391,10 @@ internal sealed partial class ClientDirectory : SystemTarget, ILocalClientDirect
 
                 if (ShouldPublish())
                 {
-                    await PublishUpdates();
+                    _schedulePublishUpdate();
                 }
             }
-            catch (OperationCanceledException) when (_shutdownCts.IsCancellationRequested)
+            catch (OperationCanceledException) when (_stoppingCts.IsCancellationRequested)
             {
                 // Ignore during shutdown.
                 break;
@@ -403,10 +408,21 @@ internal sealed partial class ClientDirectory : SystemTarget, ILocalClientDirect
 
     private bool ShouldPublish()
     {
+        if (_stoppingCts.IsCancellationRequested)
+        {
+            return false;
+        }
+
         EnsureRefreshed();
         lock (_lockObj)
         {
-            if (_nextPublishTask is Task task && !task.IsCompleted)
+            if (_stoppingCts.IsCancellationRequested)
+            {
+                return false;
+            }
+
+            var successor = _consistentRing.Successor;
+            if (successor is null)
             {
                 return false;
             }
@@ -416,15 +432,7 @@ internal sealed partial class ClientDirectory : SystemTarget, ILocalClientDirect
                 return true;
             }
 
-            // If there is no successor, or the successor is equal to the successor the last time the table was published,
-            // then there is no need to publish.
-            var successor = _consistentRing.Successor;
-            if (successor is null || successor.Equals(_previousSuccessor))
-            {
-                return false;
-            }
-
-            return true;
+            return !successor.Equals(_previousSuccessor);
         }
     }
 
@@ -432,52 +440,103 @@ internal sealed partial class ClientDirectory : SystemTarget, ILocalClientDirect
     {
         lock (_lockObj)
         {
-            if (_nextPublishTask is Task task && !task.IsCompleted)
+            if (_stoppingCts.IsCancellationRequested)
             {
                 return;
             }
 
-            _nextPublishTask = this.RunOrQueueTask(PublishUpdates);
+            var successor = _consistentRing.Successor;
+            if (successor is null)
+            {
+                return;
+            }
+
+            var table = _table;
+            if (_nextPublishTask is Task task && !task.IsCompleted)
+            {
+                if (ReferenceEquals(table, _requestedTable) && successor.Equals(_requestedSuccessor))
+                {
+                    return;
+                }
+
+                _requestedTable = table;
+                _requestedSuccessor = successor;
+                ++_publishRequestVersion;
+                return;
+            }
+
+            _requestedTable = table;
+            _requestedSuccessor = successor;
+            var requestVersion = ++_publishRequestVersion;
+            _nextPublishTask = this.QueueTask(() => RunScheduledPublish(requestVersion));
         }
     }
 
-    private async Task PublishUpdates()
+    private async Task RunScheduledPublish(long requestVersion)
     {
-        // Publish clients to the next two silos in the ring
-        var successor = _consistentRing.Successor;
-        if (successor is null)
+        bool published;
+        bool newerRequest;
+        try
         {
-            return;
+            published = await PublishUpdates();
+        }
+        finally
+        {
+            lock (_lockObj)
+            {
+                _nextPublishTask = null;
+                newerRequest = _publishRequestVersion > requestVersion;
+            }
         }
 
-        if (successor.Equals(_previousSuccessor))
+        if (newerRequest || published && ShouldPublish())
         {
-            _publishedTable = null;
+            _schedulePublishUpdate();
         }
+    }
 
-        var newRoutes = _table;
-        var previousRoutes = _publishedTable;
+    private async Task<bool> PublishUpdates()
+    {
+        SiloAddress? successor;
+        ImmutableDictionary<SiloAddress, (ImmutableHashSet<GrainId> ConnectedClients, long Version)> newRoutes;
+        ImmutableDictionary<SiloAddress, (ImmutableHashSet<GrainId> ConnectedClients, long Version)>? previousRoutes;
+        lock (_lockObj)
+        {
+            if (_stoppingCts.IsCancellationRequested)
+            {
+                return false;
+            }
+
+            successor = _consistentRing.Successor;
+            if (successor is null)
+            {
+                return false;
+            }
+
+            if (!successor.Equals(_previousSuccessor))
+            {
+                _publishedTable = null;
+            }
+
+            newRoutes = _table;
+            previousRoutes = _publishedTable;
+        }
 
         if (ReferenceEquals(previousRoutes, newRoutes))
         {
             LogDebugSkippingPublishingRoutes();
-            return;
+            return false;
         }
 
         // Try to find the minimum amount of information required to update the successor.
         var builder = newRoutes.ToBuilder();
+        builder.Remove(successor);
         if (previousRoutes is not null)
         {
             foreach (var pair in previousRoutes)
             {
                 var silo = pair.Key;
                 var (_, version) = pair.Value;
-                if (silo.Equals(successor))
-                {
-                    // No need to publish updates to the silo which originated them.
-                    continue;
-                }
-
                 if (!builder.TryGetValue(silo, out var published))
                 {
                     continue;
@@ -491,37 +550,127 @@ internal sealed partial class ClientDirectory : SystemTarget, ILocalClientDirect
             }
         }
 
+        var update = builder.ToImmutable();
         try
         {
             LogDebugPublishingRoutes(successor);
 
             var remote = _grainFactory.GetSystemTarget<IRemoteClientDirectory>(Constants.ClientDirectoryType, successor);
-            await remote.OnUpdateClientRoutes(_table).WaitAsync(_shutdownCts.Token);
+            if (_stoppingCts.IsCancellationRequested)
+            {
+                return false;
+            }
+
+            var publicationCompletion = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+            publicationCompletion.Task.Ignore();
+            Volatile.Write(ref _inflightPublishTask, publicationCompletion.Task);
+            await _onPublishRegistered();
+
+            if (_stoppingCts.IsCancellationRequested)
+            {
+                publicationCompletion.TrySetResult(false);
+                return false;
+            }
+
+            Task publishTask;
+            try
+            {
+                publishTask = remote.OnUpdateClientRoutes(update);
+            }
+            catch (Exception exception)
+            {
+                publicationCompletion.TrySetException(exception);
+                throw;
+            }
+
+            ObservePublication(publishTask, publicationCompletion).Ignore();
+            await publishTask.WaitAsync(_stoppingCts.Token);
 
             // Record the current lower bound of what the successor knows, so that it can be used to minimize
             // data transfer next time an update is performed.
-            if (ReferenceEquals(_publishedTable, previousRoutes))
-            {
-                _publishedTable = newRoutes;
-                _previousSuccessor = successor;
-            }
-
             LogDebugSuccessfullyPublishedRoutes(successor);
 
-            _nextPublishTask = null;
-            if (ShouldPublish())
+            lock (_lockObj)
             {
-                _schedulePublishUpdate();
+                if (ReferenceEquals(_publishedTable, previousRoutes))
+                {
+                    _publishedTable = newRoutes;
+                    _previousSuccessor = successor;
+                }
             }
+
+            return true;
+        }
+        catch (OperationCanceledException) when (_stoppingCts.IsCancellationRequested)
+        {
+            // Publication is intentionally canceled while the silo is quiescing.
+            return false;
         }
         catch (Exception exception)
         {
             LogErrorPublishingClientRoutingTableToSilo(exception, successor);
+            return false;
+        }
+
+        static async Task ObservePublication(Task publishTask, TaskCompletionSource<bool> publicationCompletion)
+        {
+            try
+            {
+                await publishTask;
+                publicationCompletion.TrySetResult(true);
+            }
+            catch (OperationCanceledException exception)
+            {
+                publicationCompletion.TrySetCanceled(exception.CancellationToken);
+            }
+            catch (Exception exception)
+            {
+                publicationCompletion.TrySetException(exception);
+            }
+        }
+    }
+
+    private async Task QuiescePublishingRoutingTable(CancellationToken cancellationToken)
+    {
+        Task? runTask;
+        Task? publishTask;
+        if (!_stoppingCts.IsCancellationRequested)
+        {
+            _stoppingCts.Cancel();
+            _refreshTimer.Dispose();
+        }
+
+        lock (_lockObj)
+        {
+            runTask = _runTask;
+            publishTask = _nextPublishTask;
+        }
+
+        if (runTask is not null)
+        {
+            await runTask.WaitAsync(cancellationToken).SuppressThrowing();
+        }
+
+        if (publishTask is not null)
+        {
+            await publishTask.WaitAsync(cancellationToken).SuppressThrowing();
+        }
+
+        var inflightPublishTask = Volatile.Read(ref _inflightPublishTask);
+        if (inflightPublishTask is not null)
+        {
+            await inflightPublishTask.WaitAsync(cancellationToken).SuppressThrowing();
         }
     }
 
     void ILifecycleParticipant<ISiloLifecycle>.Participate(ISiloLifecycle lifecycle)
     {
+        lifecycle.Subscribe(
+            $"{nameof(ClientDirectory)}.Quiesce",
+            ServiceLifecycleStage.Active,
+            static _ => Task.CompletedTask,
+            QuiescePublishingRoutingTable);
+
         lifecycle.Subscribe(
             nameof(ClientDirectory),
             ServiceLifecycleStage.RuntimeGrainServices,
@@ -530,31 +679,40 @@ internal sealed partial class ClientDirectory : SystemTarget, ILocalClientDirect
 
         Task StartPublishingRoutingTable(CancellationToken ct)
         {
-            this.RunOrQueueTask(() => _runTask = this.Run()).Ignore();
+            var runTask = this.RunOrQueueTask(Run);
+            lock (_lockObj)
+            {
+                _runTask = runTask;
+            }
+
+            runTask.Ignore();
             return Task.CompletedTask;
         }
 
-        async Task StopPublishingRoutingTable(CancellationToken ct)
-        {
-            _shutdownCts.Cancel();
-            _refreshTimer?.Dispose();
-
-            if (_runTask is Task task)
-            {
-                await task.WaitAsync(ct).SuppressThrowing();
-            }
-
-            if (_nextPublishTask is Task publishTask)
-            {
-                await publishTask.WaitAsync(ct).SuppressThrowing();
-            }
-        }
+        Task StopPublishingRoutingTable(CancellationToken ct) => QuiescePublishingRoutingTable(ct);
     }
 
     internal class TestAccessor(ClientDirectory instance)
     {
         public Action SchedulePublishUpdate { get => instance._schedulePublishUpdate; set => instance._schedulePublishUpdate = value; }
+        public Func<Task> OnPublishRegistered { set => instance._onPublishRegistered = value; }
         public long ObservedConnectedClientsVersion { get => instance._observedConnectedClientsVersion; set => instance._observedConnectedClientsVersion = value; }
+        public CancellationToken StoppingToken => instance._stoppingCts.Token;
+        public Task DrainScheduler() => instance.RunOrQueueTask(static () => Task.CompletedTask);
+        public Task Quiesce(CancellationToken cancellationToken) => instance.QuiescePublishingRoutingTable(cancellationToken);
+        public bool PublishTasksCompleted
+        {
+            get
+            {
+                lock (instance._lockObj)
+                {
+                    return instance._runTask is not { IsCompleted: false }
+                        && instance._nextPublishTask is not { IsCompleted: false }
+                        && Volatile.Read(ref instance._inflightPublishTask) is not { IsCompleted: false };
+                }
+            }
+        }
+        public void SchedulePublishUpdates() => instance.SchedulePublishUpdates();
         public Task PublishUpdates() => instance.PublishUpdates();
     }
 
