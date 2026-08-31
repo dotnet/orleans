@@ -172,11 +172,11 @@ public sealed class ReminderServiceLifecycleHarness : IReminderServiceLifecycleH
         await Task.WhenAll(
             _cluster.WaitForLivenessToStabilizeAsync().WaitAsync(cancellationToken),
             _cluster.WaitForClusterManifestToStabilizeAsync().WaitAsync(cancellationToken));
+        await RefreshAsync(cancellationToken);
         var barriers = _cluster.GetActiveSilos().Select(silo =>
             silo.ServiceProvider.GetRequiredService<LocalReminderService>()
                 .TestOnlyWaitForRangeChangeReconciliation(cancellationToken));
         await Task.WhenAll(barriers);
-        await RefreshAsync(cancellationToken);
     }
 
     private static InProcessSiloHandle AssertSingle(IReadOnlyList<InProcessSiloHandle> silos)

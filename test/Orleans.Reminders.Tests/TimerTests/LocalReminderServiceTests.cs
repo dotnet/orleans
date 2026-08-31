@@ -304,6 +304,50 @@ public class LocalReminderServiceCompatibilityTests : IClassFixture<LocalReminde
     [TestSuite("BVT")]
     [TestProvider("None")]
     [Fact, TestCategory("BVT")]
+    public async Task RangeChangeBarrier_FollowsLatestRefresh()
+    {
+        var silo = Assert.Single(fixture.HostedCluster.Silos);
+        using var cancellation = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
+        cancellation.CancelAfter(TestConstants.InitTimeout);
+        _ = await fixture.ReminderHarness.WaitForServicesReadyAsync(
+            [silo],
+            TestConstants.InitTimeout,
+            cancellation.Token);
+
+        var reminderTable = silo.ServiceProvider.GetRequiredService<NullReturningReminderTable>();
+        var reminderService = silo.ServiceProvider.GetRequiredService<LocalReminderService>();
+        var oldRange = RangeFactory.CreateRange(0, uint.MaxValue / 2);
+        var newRange = RangeFactory.CreateRange(0, uint.MaxValue / 4);
+        var obsoleteRead = reminderTable.BlockNextRangeRead(cancellation.Token);
+        RangeReadGate? currentRead = null;
+        try
+        {
+            var obsoleteRangeChange = reminderService.TestOnlyChangeRange(oldRange, newRange, increased: false);
+            await obsoleteRead.WaitUntilBlockedAsync(cancellation.Token);
+            var reconciliationTask = reminderService.TestOnlyWaitForRangeChangeReconciliation(cancellation.Token);
+
+            currentRead = reminderTable.BlockNextRangeRead(cancellation.Token);
+            var currentRefresh = reminderService.TestOnlyRefresh();
+            await currentRead.WaitUntilBlockedAsync(cancellation.Token);
+            Assert.False(reconciliationTask.IsCompleted);
+
+            currentRead.Release();
+            await Task.WhenAll(currentRefresh, reconciliationTask).WaitAsync(cancellation.Token);
+            Assert.False(obsoleteRangeChange.IsCompleted);
+
+            obsoleteRead.Release();
+            await obsoleteRangeChange.WaitAsync(cancellation.Token);
+        }
+        finally
+        {
+            obsoleteRead.Release();
+            currentRead?.Release();
+        }
+    }
+
+    [TestSuite("BVT")]
+    [TestProvider("None")]
+    [Fact, TestCategory("BVT")]
     public async Task RangeChangeBarrier_PropagatesCurrentProviderReadFailure()
     {
         var silo = Assert.Single(fixture.HostedCluster.Silos);
