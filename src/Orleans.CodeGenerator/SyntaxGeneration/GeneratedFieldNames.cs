@@ -3,8 +3,9 @@ using Microsoft.CodeAnalysis;
 namespace Orleans.CodeGenerator.SyntaxGeneration;
 
 /// <summary>
-/// Produces names for generated private fields which stay stable when members are added to a type, so that
-/// .NET Hot Reload sees additions rather than retyped or renamed fields.
+/// Produces names for generated private fields which are stable under member reordering and most member additions,
+/// so that .NET Hot Reload sees additions rather than retyped or renamed fields. Adding a member whose type causes
+/// a previously unseen name collision may still force existing names to switch to a hash-suffixed form.
 /// </summary>
 internal static class GeneratedFieldNames
 {
