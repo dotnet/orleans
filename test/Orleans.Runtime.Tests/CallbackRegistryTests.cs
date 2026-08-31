@@ -139,6 +139,47 @@ public class CallbackRegistryTests
         Assert.Equal(0, registry.Count);
     }
 
+    [Fact]
+    public async Task TryCompleteResponse_ConcurrentTerminalCompletionReportsMatchingRegistration()
+    {
+        using var serviceProvider = CreateServiceProvider();
+        using var unregisterEntered = new ManualResetEventSlim();
+        using var releaseUnregister = new ManualResetEventSlim();
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var registry = new CallbackRegistry();
+        var completion = new TestResponseCompletionSource();
+        var request = CreateRequest(10);
+        var callback = CreateCallback(
+            completion,
+            request,
+            serviceProvider,
+            callback =>
+            {
+                unregisterEntered.Set();
+                releaseUnregister.Wait(cancellationToken);
+                registry.TryRemove(callback);
+            });
+        Assert.True(registry.TryRegister(callback));
+        var terminalTask = Task.Run(callback.OnTimeout, cancellationToken);
+        bool found;
+
+        try
+        {
+            unregisterEntered.Wait(cancellationToken);
+            found = registry.TryCompleteResponse(CreateResponse(request));
+        }
+        finally
+        {
+            releaseUnregister.Set();
+            await terminalTask;
+        }
+
+        Assert.True(found);
+        Assert.IsType<TimeoutException>(completion.Response.Exception);
+        Assert.Equal(1, completion.CompletionCount);
+        Assert.Equal(0, registry.Count);
+    }
+
     [Theory]
     [InlineData(TerminalRace.Timeout)]
     [InlineData(TerminalRace.TargetFailure)]
@@ -291,9 +332,20 @@ public class CallbackRegistryTests
         IResponseCompletionSource completion,
         Message request,
         IServiceProvider serviceProvider)
+        => CreateCallback(
+            completion,
+            request,
+            serviceProvider,
+            callback => registry.TryRemove(callback));
+
+    private static CallbackData CreateCallback(
+        IResponseCompletionSource completion,
+        Message request,
+        IServiceProvider serviceProvider,
+        Action<CallbackData> unregister)
     {
         var shared = new SharedCallbackData(
-            callback => registry.TryRemove(callback),
+            unregister,
             NullLogger<CallbackData>.Instance,
             responseTimeout: TimeSpan.FromMinutes(1),
             cancelOnTimeout: false,
