@@ -58,6 +58,7 @@ internal sealed partial class ClientDirectory : SystemTarget, ILocalClientDirect
 
     // For synchronization with remote silos.
     private Task? _nextPublishTask;
+    private long _publishRequestVersion;
     private SiloAddress? _previousSuccessor;
     private ImmutableDictionary<SiloAddress, (ImmutableHashSet<GrainId> ConnectedClients, long Version)>? _publishedTable;
 
@@ -386,7 +387,7 @@ internal sealed partial class ClientDirectory : SystemTarget, ILocalClientDirect
 
                 if (ShouldPublish())
                 {
-                    await PublishUpdates();
+                    _schedulePublishUpdate();
                 }
             }
             catch (OperationCanceledException) when (_stoppingCts.IsCancellationRequested)
@@ -416,7 +417,8 @@ internal sealed partial class ClientDirectory : SystemTarget, ILocalClientDirect
                 return false;
             }
 
-            if (_nextPublishTask is Task task && !task.IsCompleted)
+            var successor = _consistentRing.Successor;
+            if (successor is null)
             {
                 return false;
             }
@@ -426,15 +428,7 @@ internal sealed partial class ClientDirectory : SystemTarget, ILocalClientDirect
                 return true;
             }
 
-            // If there is no successor, or the successor is equal to the successor the last time the table was published,
-            // then there is no need to publish.
-            var successor = _consistentRing.Successor;
-            if (successor is null || successor.Equals(_previousSuccessor))
-            {
-                return false;
-            }
-
-            return true;
+            return !successor.Equals(_previousSuccessor);
         }
     }
 
@@ -442,16 +436,45 @@ internal sealed partial class ClientDirectory : SystemTarget, ILocalClientDirect
     {
         lock (_lockObj)
         {
-            if (_stoppingCts.IsCancellationRequested || _nextPublishTask is Task task && !task.IsCompleted)
+            if (_stoppingCts.IsCancellationRequested)
             {
                 return;
             }
 
-            _nextPublishTask = this.RunOrQueueTask(PublishUpdates);
+            var requestVersion = ++_publishRequestVersion;
+            if (_nextPublishTask is Task task && !task.IsCompleted)
+            {
+                return;
+            }
+
+            _nextPublishTask = this.QueueTask(() => RunScheduledPublish(requestVersion));
         }
     }
 
-    private async Task PublishUpdates()
+    private async Task RunScheduledPublish(long requestVersion)
+    {
+        bool published;
+        bool newerRequest;
+        try
+        {
+            published = await PublishUpdates();
+        }
+        finally
+        {
+            lock (_lockObj)
+            {
+                _nextPublishTask = null;
+                newerRequest = _publishRequestVersion > requestVersion;
+            }
+        }
+
+        if (newerRequest || published && ShouldPublish())
+        {
+            _schedulePublishUpdate();
+        }
+    }
+
+    private async Task<bool> PublishUpdates()
     {
         SiloAddress? successor;
         ImmutableDictionary<SiloAddress, (ImmutableHashSet<GrainId> ConnectedClients, long Version)> newRoutes;
@@ -460,13 +483,13 @@ internal sealed partial class ClientDirectory : SystemTarget, ILocalClientDirect
         {
             if (_stoppingCts.IsCancellationRequested)
             {
-                return;
+                return false;
             }
 
             successor = _consistentRing.Successor;
             if (successor is null)
             {
-                return;
+                return false;
             }
 
             if (!successor.Equals(_previousSuccessor))
@@ -481,7 +504,7 @@ internal sealed partial class ClientDirectory : SystemTarget, ILocalClientDirect
         if (ReferenceEquals(previousRoutes, newRoutes))
         {
             LogDebugSkippingPublishingRoutes();
-            return;
+            return false;
         }
 
         // Try to find the minimum amount of information required to update the successor.
@@ -514,11 +537,11 @@ internal sealed partial class ClientDirectory : SystemTarget, ILocalClientDirect
             var remote = _grainFactory.GetSystemTarget<IRemoteClientDirectory>(Constants.ClientDirectoryType, successor);
             if (_stoppingCts.IsCancellationRequested)
             {
-                return;
+                return false;
             }
 
             var publishTask = remote.OnUpdateClientRoutes(update);
-            await publishTask.WaitAsync(_stoppingCts.Token);
+            await publishTask;
 
             // Record the current lower bound of what the successor knows, so that it can be used to minimize
             // data transfer next time an update is performed.
@@ -531,22 +554,19 @@ internal sealed partial class ClientDirectory : SystemTarget, ILocalClientDirect
                     _publishedTable = newRoutes;
                     _previousSuccessor = successor;
                 }
-
-                _nextPublishTask = null;
             }
 
-            if (ShouldPublish())
-            {
-                _schedulePublishUpdate();
-            }
+            return true;
         }
         catch (OperationCanceledException) when (_stoppingCts.IsCancellationRequested)
         {
             // Publication is intentionally canceled while the silo is quiescing.
+            return false;
         }
         catch (Exception exception)
         {
             LogErrorPublishingClientRoutingTableToSilo(exception, successor);
+            return false;
         }
     }
 
@@ -610,6 +630,8 @@ internal sealed partial class ClientDirectory : SystemTarget, ILocalClientDirect
     {
         public Action SchedulePublishUpdate { get => instance._schedulePublishUpdate; set => instance._schedulePublishUpdate = value; }
         public long ObservedConnectedClientsVersion { get => instance._observedConnectedClientsVersion; set => instance._observedConnectedClientsVersion = value; }
+        public CancellationToken StoppingToken => instance._stoppingCts.Token;
+        public Task DrainScheduler() => instance.RunOrQueueTask(static () => Task.CompletedTask);
         public bool PublishTasksCompleted
         {
             get
