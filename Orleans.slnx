@@ -39,7 +39,6 @@
     <Project Path="src/Orleans.BroadcastChannel/Orleans.BroadcastChannel.csproj" />
     <Project Path="src/Orleans.Client/Orleans.Client.csproj" />
     <Project Path="src/Orleans.CodeGenerator/Orleans.CodeGenerator.csproj" />
-    <Project Path="src/Orleans.ContractTool/Orleans.ContractTool.csproj" />
     <Project Path="src/Orleans.Core.Abstractions/Orleans.Core.Abstractions.csproj" />
     <Project Path="src/Orleans.Core/Orleans.Core.csproj" />
     <Project Path="src/Orleans.EventSourcing/Orleans.EventSourcing.csproj" />

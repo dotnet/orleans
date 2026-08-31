@@ -25,7 +25,7 @@ The deletion or identity-changing rename is not recorded as intentional, and the
 
 Restore the interface if its removal was accidental. Otherwise apply **Mark as *RETIRED* in OrleansContracts.txt**. Preserve retired declarations as contract history.
 
-Apply **Regenerate OrleansContracts.txt** to rebuild the complete project manifest and retire every declaration absent from source, or use **Fix all in solution** to update every affected project. Review the generated diff using the [contract compatibility guidance](../grains/grain-versioning/contract-compatibility-analyzer.md#regenerate-the-manifest).
+Apply **Regenerate OrleansContracts.txt** to rebuild the complete project manifest and retire every declaration absent from source. Run regeneration separately for each contract project and review the generated diff using the [contract compatibility guidance](../grains/grain-versioning/contract-compatibility-analyzer.md#regenerate-the-manifest).
 
 ## Suppress the diagnostic
 

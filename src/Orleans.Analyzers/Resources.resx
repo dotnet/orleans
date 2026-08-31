@@ -218,7 +218,7 @@
     <value>Grain interface is not active in OrleansContracts.txt</value>
   </data>
   <data name="GrainInterfaceNotDeclaredMessageFormat" xml:space="preserve">
-    <value>Grain interface '{0}' does not have an active declaration in OrleansContracts.txt. Run the regeneration command in the file header for the owning project or solution, then review the diff for wire compatibility. See https://aka.ms/orleans/OrleansContracts.txt for details.</value>
+    <value>Grain interface '{0}' does not have an active declaration in OrleansContracts.txt. Run the regeneration command in the file header for the owning project, then review the diff for wire compatibility. See https://aka.ms/orleans/OrleansContracts.txt for details.</value>
   </data>
   <data name="GrainInterfaceNotDeclaredDescription" xml:space="preserve">
     <value>All grain interfaces should have an active declaration in OrleansContracts.txt to ensure version compatibility during rolling upgrades.</value>
@@ -227,7 +227,7 @@
     <value>Grain interface version mismatch</value>
   </data>
   <data name="GrainInterfaceVersionMismatchMessageFormat" xml:space="preserve">
-    <value>Grain interface '{0}' has [Version({1})] in OrleansContracts.txt but [Version({2})] in code. Run the regeneration command in the file header for the owning project or solution, then review the diff for wire compatibility. See https://aka.ms/orleans/OrleansContracts.txt for details.</value>
+    <value>Grain interface '{0}' has [Version({1})] in OrleansContracts.txt but [Version({2})] in code. Run the regeneration command in the file header for the owning project, then review the diff for wire compatibility. See https://aka.ms/orleans/OrleansContracts.txt for details.</value>
   </data>
   <data name="GrainInterfaceVersionMismatchDescription" xml:space="preserve">
     <value>The [Version] attribute on the grain interface must match the version declared in OrleansContracts.txt.</value>
@@ -236,7 +236,7 @@
     <value>Grain interface member not declared in OrleansContracts.txt</value>
   </data>
   <data name="GrainInterfaceMemberNotDeclaredMessageFormat" xml:space="preserve">
-    <value>Grain interface source member '{0}' with effective wire identity '{1}' is not declared in OrleansContracts.txt for interface '{2}'. Run the regeneration command in the file header for the owning project or solution, then review the diff for wire compatibility. See https://aka.ms/orleans/OrleansContracts.txt for details.</value>
+    <value>Grain interface source member '{0}' with effective wire identity '{1}' is not declared in OrleansContracts.txt for interface '{2}'. Run the regeneration command in the file header for the owning project, then review the diff for wire compatibility. See https://aka.ms/orleans/OrleansContracts.txt for details.</value>
   </data>
   <data name="GrainInterfaceMemberNotDeclaredDescription" xml:space="preserve">
     <value>When adding or modifying grain interface members, update OrleansContracts.txt and increment the interface version.</value>
@@ -254,7 +254,7 @@
     <value>Removed grain interface not marked as retired</value>
   </data>
   <data name="GrainInterfaceRemovedNotRetiredMessageFormat" xml:space="preserve">
-    <value>Grain interface '{0}' is declared in OrleansContracts.txt but no longer exists in code. Run the regeneration command in the file header for the owning project or solution to preserve it as *RETIRED*, then review the diff for wire compatibility. See https://aka.ms/orleans/OrleansContracts.txt for details.</value>
+    <value>Grain interface '{0}' is declared in OrleansContracts.txt but no longer exists in code. Run the regeneration command in the file header for the owning project to preserve it as *RETIRED*, then review the diff for wire compatibility. See https://aka.ms/orleans/OrleansContracts.txt for details.</value>
   </data>
   <data name="GrainInterfaceRemovedNotRetiredDescription" xml:space="preserve">
     <value>When removing a grain interface, mark it as *RETIRED* in OrleansContracts.txt to document that it has been intentionally removed.</value>
@@ -263,7 +263,7 @@
     <value>OrleansContracts.txt file is missing</value>
   </data>
   <data name="OrleansContractsFileMissingMessageFormat" xml:space="preserve">
-    <value>The project contains Orleans contracts but no {0} file. From the repository root, run 'dotnet format PATH_TO_PROJECT.csproj analyzers --severity info --diagnostics ORLEANS0016 ORLEANS0017 ORLEANS0018 ORLEANS0019 ORLEANS0020 ORLEANS0022 ORLEANS0023 ORLEANS0024'. For a solution, run 'dotnet tool run orleans-contracts PATH_TO_SOLUTION'. Review the generated baseline. See https://aka.ms/orleans/OrleansContracts.txt for details.</value>
+    <value>The project contains Orleans contracts but no {0} file. From the repository root, run 'dotnet format PATH_TO_PROJECT.csproj analyzers --severity info --diagnostics ORLEANS0016 ORLEANS0017 ORLEANS0018 ORLEANS0019 ORLEANS0020 ORLEANS0022 ORLEANS0023 ORLEANS0024'. Run the command once per contract project; do not pass a .sln or .slnx path. Review the generated baseline. See https://aka.ms/orleans/OrleansContracts.txt for details.</value>
   </data>
   <data name="OrleansContractsFileMissingDescription" xml:space="preserve">
     <value>Add an OrleansContracts.txt file to track Orleans contracts for compatibility during rolling upgrades.</value>
@@ -290,7 +290,7 @@
     <value>Grain class is not active in OrleansContracts.txt</value>
   </data>
   <data name="GrainClassNotDeclaredMessageFormat" xml:space="preserve">
-    <value>Grain class '{0}' does not have an active declaration in OrleansContracts.txt. Run the regeneration command in the file header for the owning project or solution, then review the diff for wire compatibility. See https://aka.ms/orleans/OrleansContracts.txt for details.</value>
+    <value>Grain class '{0}' does not have an active declaration in OrleansContracts.txt. Run the regeneration command in the file header for the owning project, then review the diff for wire compatibility. See https://aka.ms/orleans/OrleansContracts.txt for details.</value>
   </data>
   <data name="GrainClassNotDeclaredDescription" xml:space="preserve">
     <value>All concrete grain classes should have an active declaration in OrleansContracts.txt to protect grain type identities during renames.</value>
@@ -299,7 +299,7 @@
     <value>Grain class alias mismatch</value>
   </data>
   <data name="GrainClassAliasMismatchMessageFormat" xml:space="preserve">
-    <value>Grain class '{0}' has alias '{1}' in OrleansContracts.txt but alias '{2}' in code. Run the regeneration command in the file header for the owning project or solution, then review the diff for wire compatibility. See https://aka.ms/orleans/OrleansContracts.txt for details.</value>
+    <value>Grain class '{0}' has alias '{1}' in OrleansContracts.txt but alias '{2}' in code. Run the regeneration command in the file header for the owning project, then review the diff for wire compatibility. See https://aka.ms/orleans/OrleansContracts.txt for details.</value>
   </data>
   <data name="GrainClassAliasMismatchDescription" xml:space="preserve">
     <value>The [GrainType] attribute on a grain class must match the alias declared in OrleansContracts.txt.</value>
@@ -308,7 +308,7 @@
     <value>Removed grain class not marked as retired</value>
   </data>
   <data name="GrainClassRemovedNotRetiredMessageFormat" xml:space="preserve">
-    <value>Grain class '{0}' is declared in OrleansContracts.txt but no longer exists in code. Run the regeneration command in the file header for the owning project or solution to preserve it as *RETIRED*, then review the diff for wire compatibility. See https://aka.ms/orleans/OrleansContracts.txt for details.</value>
+    <value>Grain class '{0}' is declared in OrleansContracts.txt but no longer exists in code. Run the regeneration command in the file header for the owning project to preserve it as *RETIRED*, then review the diff for wire compatibility. See https://aka.ms/orleans/OrleansContracts.txt for details.</value>
   </data>
   <data name="GrainClassRemovedNotRetiredDescription" xml:space="preserve">
     <value>When removing a grain class, mark it as *RETIRED* in OrleansContracts.txt to preserve its contract history.</value>

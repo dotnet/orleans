@@ -25,7 +25,7 @@ The removal or identity-changing rename is not recorded, and the old grain ident
 
 Restore the class if its removal was accidental. Otherwise apply **Mark grain class as *RETIRED* in OrleansContracts.txt** and preserve the declaration.
 
-Apply **Regenerate OrleansContracts.txt** to rebuild the complete project manifest and retire every declaration absent from source, or use **Fix all in solution** to update every affected project. Review the generated diff using the [contract compatibility guidance](../grains/grain-versioning/contract-compatibility-analyzer.md#regenerate-the-manifest).
+Apply **Regenerate OrleansContracts.txt** to rebuild the complete project manifest and retire every declaration absent from source. Run regeneration separately for each contract project and review the generated diff using the [contract compatibility guidance](../grains/grain-versioning/contract-compatibility-analyzer.md#regenerate-the-manifest).
 
 ## Suppress the diagnostic
 
