@@ -640,7 +640,6 @@ internal sealed partial class ClientDirectory : SystemTarget, ILocalClientDirect
             _refreshTimer.Dispose();
         }
 
-        var inflightPublishTask = Volatile.Read(ref _inflightPublishTask);
         lock (_lockObj)
         {
             runTask = _runTask;
@@ -657,6 +656,7 @@ internal sealed partial class ClientDirectory : SystemTarget, ILocalClientDirect
             await publishTask.WaitAsync(cancellationToken).SuppressThrowing();
         }
 
+        var inflightPublishTask = Volatile.Read(ref _inflightPublishTask);
         if (inflightPublishTask is not null)
         {
             await inflightPublishTask.WaitAsync(cancellationToken).SuppressThrowing();
