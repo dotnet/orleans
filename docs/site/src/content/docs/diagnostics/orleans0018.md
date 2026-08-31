@@ -27,7 +27,7 @@ Older activations can receive an unknown RPC, and changed identities or payload 
 
 Prefer preserving the existing method and adding a new method for changed behavior. Review payload compatibility, increment the interface version when appropriate, and apply **Add to OrleansContracts.txt**. The code fix records the CLR signature and effective wire identity in the manifest. Source attributes remain unchanged.
 
-Apply **Regenerate OrleansContracts.txt** to rebuild the complete project manifest, or use **Fix all in solution** to update every affected project. Review the generated diff using the [contract compatibility guidance](../grains/grain-versioning/contract-compatibility-analyzer.md#regenerate-the-manifest).
+Apply **Regenerate OrleansContracts.txt** to rebuild the complete project manifest. Run regeneration separately for each contract project and review the generated diff using the [contract compatibility guidance](../grains/grain-versioning/contract-compatibility-analyzer.md#regenerate-the-manifest).
 
 ## Suppress the diagnostic
 

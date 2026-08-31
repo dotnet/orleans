@@ -27,7 +27,7 @@ Restore the previous `[GrainType]` when the change was accidental. Update the ma
 
 The **Update grain class alias in OrleansContracts.txt** code fix accepts the source identity as the new baseline. Review the identity change before applying it.
 
-Apply **Regenerate OrleansContracts.txt** to rebuild the complete project manifest, or use **Fix all in solution** to update every affected project. Review the generated diff using the [contract compatibility guidance](../grains/grain-versioning/contract-compatibility-analyzer.md#regenerate-the-manifest).
+Apply **Regenerate OrleansContracts.txt** to rebuild the complete project manifest. Run regeneration separately for each contract project and review the generated diff using the [contract compatibility guidance](../grains/grain-versioning/contract-compatibility-analyzer.md#regenerate-the-manifest).
 
 ## Suppress the diagnostic
 

@@ -26,6 +26,15 @@
       ReferenceOutputAssembly="false"
       PrivateAssets="None"
       Condition=" '$(OrleansBuildTimeCodeGen)' == 'true' "/>
+    <ProjectReference
+      Include="$(SourceRoot)src/Orleans.Analyzers.Contracts/Orleans.Analyzers.Contracts.csproj"
+      AssetTargetFallback="netstandard2.0"
+      UndefineProperties="TargetFramework"
+      SkipGetTargetFrameworkProperties="true"
+      OutputItemType="Analyzer"
+      ReferenceOutputAssembly="false"
+      PrivateAssets="None"
+      Condition=" '$(OrleansBuildTimeCodeGen)' == 'true' and '$(EnableOrleansContractsAnalyzer)' == 'true' "/>
   </ItemGroup>
 
   <ItemGroup Condition="'$(IsTestingPlatformApplication)' == 'true'">

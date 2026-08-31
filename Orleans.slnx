@@ -35,6 +35,7 @@
   </Folder>
   <Folder Name="/src/">
     <Project Path="src/Orleans.Analyzers/Orleans.Analyzers.csproj" />
+    <Project Path="src/Orleans.Analyzers.Contracts/Orleans.Analyzers.Contracts.csproj" />
     <Project Path="src/Orleans.BroadcastChannel/Orleans.BroadcastChannel.csproj" />
     <Project Path="src/Orleans.Client/Orleans.Client.csproj" />
     <Project Path="src/Orleans.CodeGenerator/Orleans.CodeGenerator.csproj" />

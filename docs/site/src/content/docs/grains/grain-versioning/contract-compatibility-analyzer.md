@@ -17,7 +17,7 @@ The analyzer is **disabled by default**. Enable it explicitly in a project file 
 </PropertyGroup>
 ```
 
-Projects which use `Microsoft.Orleans.Sdk`, `Microsoft.Orleans.Client`, or `Microsoft.Orleans.Server` already receive the Orleans analyzers through those packages. A project which references `Microsoft.Orleans.Analyzers` directly can use the same property.
+Projects which use `Microsoft.Orleans.Sdk`, `Microsoft.Orleans.Client`, or `Microsoft.Orleans.Server` already receive the Orleans analyzers through those packages. A project which references `Microsoft.Orleans.Analyzers` directly can use the same property. Scope this property to projects which own Orleans contracts. In a large repository, set it in those projects or in a shared props file for their subtree instead of enabling contract analysis at the repository root.
 
 To promote every contract diagnostic, configure the standard `Versioning` category:
 
@@ -30,14 +30,14 @@ This also promotes informational diagnostics such as `ORLEANS0020`. Configure `d
 
 ## Configure the manifest path
 
-By default, the analyzer looks for `OrleansContracts.txt` beside the project file. The analyzer package automatically adds an existing file at that location as a compiler `AdditionalFile`; no explicit `AdditionalFiles` item is required.
+By default, the analyzer tracks `OrleansContracts.txt` beside the project file. During design-time builds used by IDEs and `dotnet format`, the analyzer package registers the configured path as a compiler `AdditionalFile` before the file exists, allowing regeneration to create it. Regular builds register an existing manifest and report `ORLEANS0020` when the configured manifest is absent. No explicit `AdditionalFiles` item or seed file is required.
 
 Set `OrleansContractsPath` to use another location or filename:
 
 ```xml
 <PropertyGroup>
   <EnableOrleansContractsAnalyzer>true</EnableOrleansContractsAnalyzer>
-  <OrleansContractsPath>$(MSBuildProjectDirectory)\contracts\rpc-contracts.txt</OrleansContractsPath>
+  <OrleansContractsPath>$(MSBuildProjectDirectory)/contracts/rpc-contracts.txt</OrleansContractsPath>
 </PropertyGroup>
 ```
 
@@ -51,17 +51,19 @@ The regeneration code fix rebuilds every active interface, method, and grain-cla
 
 ### Regenerate the manifest
 
-Apply **Regenerate OrleansContracts.txt** from `ORLEANS0016`, `ORLEANS0017`, `ORLEANS0018`, `ORLEANS0019`, `ORLEANS0020`, `ORLEANS0022`, `ORLEANS0023`, or `ORLEANS0024`. One application regenerates the entire project manifest. In an IDE, use **Fix all in project** or **Fix all in solution** to regenerate every affected project.
+Apply **Regenerate OrleansContracts.txt** from `ORLEANS0016`, `ORLEANS0017`, `ORLEANS0018`, `ORLEANS0019`, `ORLEANS0020`, `ORLEANS0022`, `ORLEANS0023`, or `ORLEANS0024`. One application regenerates the entire project manifest. In an IDE, use **Fix all in project**.
 
 `ORLEANS0027` intentionally retains a removed method signature, so regeneration isn't offered for that diagnostic. If it is the only remaining diagnostic, restore the source method or explicitly delete the retained signature after reviewing and accepting the wire-compatibility break.
 
 Agents and command-line workflows can regenerate manifests without an IDE:
 
 ```dotnetcli
-dotnet format PATH_TO_PROJECT_OR_SOLUTION analyzers --severity info --diagnostics ORLEANS0016 ORLEANS0017 ORLEANS0018 ORLEANS0019 ORLEANS0020 ORLEANS0022 ORLEANS0023 ORLEANS0024
+dotnet format PATH_TO_PROJECT.csproj analyzers --severity info --diagnostics ORLEANS0016 ORLEANS0017 ORLEANS0018 ORLEANS0019 ORLEANS0020 ORLEANS0022 ORLEANS0023 ORLEANS0024
 ```
 
-Run the command from the repository root. Replace `PATH_TO_PROJECT_OR_SOLUTION` with the path to the owning `.csproj` to regenerate one manifest, or a `.sln`/`.slnx` path to regenerate manifests in every affected project. The `--severity info` option includes `ORLEANS0020`, allowing the command to create a missing manifest.
+Run the command from the repository root. Replace `PATH_TO_PROJECT.csproj` with the owning project path to regenerate one manifest. The `--severity info` option includes `ORLEANS0020`, allowing the command to create the default manifest or a configured `OrleansContractsPath`, including its parent directory.
+
+Run the command once for each project which owns an Orleans contract manifest. Do not pass a `.sln` or `.slnx` path: `dotnet format` analyzes the complete solution before applying Fix All, which can consume substantial time and memory in large repositories. Automation can invoke the project command for each contract project with bounded parallelism.
 
 Regeneration edits `OrleansContracts.txt` files only. Source `[Alias]`, `[Id]`, `[GrainType]`, and `[GrainInterfaceType]` attributes remain unchanged.
 
@@ -71,7 +73,7 @@ After the command completes:
 
 1. Inspect `git diff -- "*OrleansContracts.txt"` and account for every changed identity, version, and method signature.
 2. Preserve all `*RETIRED*` declarations and retained removed-method signatures unless the compatibility break is intentional.
-3. Run `dotnet build PATH_TO_PROJECT_OR_SOLUTION` and resolve all Orleans contract diagnostics. `ORLEANS0027` remains until a removed method is restored or its retained signature is explicitly deleted after compatibility review.
+3. Run `dotnet build PATH_TO_PROJECT.csproj` and resolve all Orleans contract diagnostics. `ORLEANS0027` remains until a removed method is restored or its retained signature is explicitly deleted after compatibility review.
 
 Add the generated file to source control and review its diff before committing. Treat every changed contract line as a potential wire-compatibility change:
 
@@ -89,10 +91,10 @@ Interface methods are indented beneath their interface:
 
 ```text
 # This file is generated by the Orleans contract analyzer.
-# To regenerate, run this command from the repository root after replacing
-# PATH_TO_PROJECT_OR_SOLUTION with the owning .csproj, .sln, or .slnx path:
-# dotnet format PATH_TO_PROJECT_OR_SOLUTION analyzers --severity info --diagnostics ORLEANS0016 ORLEANS0017 ORLEANS0018 ORLEANS0019 ORLEANS0020 ORLEANS0022 ORLEANS0023 ORLEANS0024
-# Verify with: dotnet build PATH_TO_PROJECT_OR_SOLUTION
+# To regenerate this project from the repository root:
+# dotnet format PATH_TO_PROJECT.csproj analyzers --severity info --diagnostics ORLEANS0016 ORLEANS0017 ORLEANS0018 ORLEANS0019 ORLEANS0020 ORLEANS0022 ORLEANS0023 ORLEANS0024
+# Run the command once per contract project; do not pass a .sln or .slnx path.
+# Verify with: dotnet build PATH_TO_PROJECT.csproj
 # The regeneration command edits this manifest only; it does not change source attributes.
 # OrleansContracts format: 2
 # Method lines use: wire-identity: CLR-signature.

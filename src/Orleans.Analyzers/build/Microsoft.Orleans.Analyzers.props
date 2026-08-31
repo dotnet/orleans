@@ -2,6 +2,7 @@
   <PropertyGroup>
     <EnableOrleansContractsAnalyzer Condition="'$(EnableOrleansContractsAnalyzer)' == ''">false</EnableOrleansContractsAnalyzer>
     <OrleansContractsPath Condition="'$(OrleansContractsPath)' == ''">$(MSBuildProjectDirectory)\OrleansContracts.txt</OrleansContractsPath>
+    <OrleansContractsAnalyzerPath Condition="'$(OrleansContractsAnalyzerPath)' == ''">$([MSBuild]::NormalizePath('$(MSBuildThisFileDirectory)', '..', 'tools', 'analyzers', 'Orleans.Analyzers.Contracts.dll'))</OrleansContractsAnalyzerPath>
   </PropertyGroup>
   <ItemGroup>
     <CompilerVisibleProperty Include="EnableOrleansContractsAnalyzer" />

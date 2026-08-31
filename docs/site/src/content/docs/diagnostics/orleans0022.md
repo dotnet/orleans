@@ -25,7 +25,7 @@ The implementation identity is not protected by contract review. A CLR rename wi
 
 Verify the class's durable grain type, add `[GrainType]` when it must remain independent of the CLR name, and apply **Add to OrleansContracts.txt**. The code fix adds or reactivates the class declaration.
 
-Apply **Regenerate OrleansContracts.txt** to rebuild the complete project manifest, or use **Fix all in solution** to update every affected project. Review the generated diff using the [contract compatibility guidance](../grains/grain-versioning/contract-compatibility-analyzer.md#regenerate-the-manifest).
+Apply **Regenerate OrleansContracts.txt** to rebuild the complete project manifest. Run regeneration separately for each contract project and review the generated diff using the [contract compatibility guidance](../grains/grain-versioning/contract-compatibility-analyzer.md#regenerate-the-manifest).
 
 ## Suppress the diagnostic
 
