@@ -354,7 +354,7 @@ internal sealed partial class ClientDirectory : SystemTarget, ILocalClientDirect
 
     private async Task Run()
     {
-        var membershipUpdates = _clusterMembershipService.MembershipUpdates.GetAsyncEnumerator(_stoppingCts.Token);
+        await using var membershipUpdates = _clusterMembershipService.MembershipUpdates.GetAsyncEnumerator(_stoppingCts.Token);
 
         Task<bool>? membershipTask = null;
         Task<bool>? timerTask = _refreshTimer.NextTick(RandomTimeSpan.Next(_messagingOptions.ClientRegistrationRefresh));
