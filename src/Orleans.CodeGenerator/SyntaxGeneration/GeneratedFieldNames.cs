@@ -28,6 +28,7 @@ internal static class GeneratedFieldNames
 
         // phase 1: detect collisions and mark them for hashing
         Span<bool> contested = members.Count <= 64 ? stackalloc bool[members.Count] : new bool[members.Count];
+        contested.Clear();
         for (var i = 0; i < members.Count; i++)
         {
             // we couldn't get a readable name for this type, so we need to hash it
