@@ -457,6 +457,38 @@ namespace NonSilo.Tests.Directory
         }
 
         [Fact]
+        public async Task ScheduledPublicationIgnoresDuplicateInFlightTrigger()
+        {
+            var cancellationToken = TestContext.Current.CancellationToken;
+            var remoteSilo = Silo("127.0.0.1:222@100");
+            var remoteDirectory = _remoteDirectories.GetOrAdd(remoteSilo, Substitute.For<IRemoteClientDirectory>());
+            var publicationStarted = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+            var publicationRelease = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+            remoteDirectory.OnUpdateClientRoutes(default!).ReturnsForAnyArgs(_ =>
+            {
+                publicationStarted.TrySetResult(true);
+                return publicationRelease.Task;
+            });
+
+            _clusterMembershipService.UpdateSiloStatus(remoteSilo, SiloStatus.Active, "remoteSilo");
+            _testAccessor.SchedulePublishUpdate = _testAccessor.SchedulePublishUpdates;
+            var localClient = Client("local");
+            SetLocalClients([localClient]);
+            Assert.True(_directory.TryLocalLookup(localClient, out _));
+
+            _testAccessor.SchedulePublishUpdates();
+            await publicationStarted.Task.WaitAsync(cancellationToken);
+            _testAccessor.SchedulePublishUpdates();
+
+            publicationRelease.TrySetResult(true);
+            await _testAccessor.DrainScheduler().WaitAsync(cancellationToken);
+            await _testAccessor.DrainScheduler().WaitAsync(cancellationToken);
+
+            _ = remoteDirectory.Received(1).OnUpdateClientRoutes(
+                Arg.Any<ImmutableDictionary<SiloAddress, (ImmutableHashSet<GrainId>, long)>>());
+        }
+
+        [Fact]
         public async Task ScheduledPublicationFailureRepublishesInFlightChangesOnce()
         {
             var cancellationToken = TestContext.Current.CancellationToken;
@@ -517,6 +549,43 @@ namespace NonSilo.Tests.Directory
 
             _ = remoteDirectory.Received(1).OnUpdateClientRoutes(
                 Arg.Any<ImmutableDictionary<SiloAddress, (ImmutableHashSet<GrainId>, long)>>());
+        }
+
+        [Fact]
+        public async Task QuiescenceTracksPublicationRegisteredBeforeRpcStarts()
+        {
+            var cancellationToken = TestContext.Current.CancellationToken;
+            var remoteSilo = Silo("127.0.0.1:222@100");
+            var remoteDirectory = _remoteDirectories.GetOrAdd(remoteSilo, Substitute.For<IRemoteClientDirectory>());
+            var publicationRegistered = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+            var publicationRelease = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+            _testAccessor.OnPublishRegistered = async () =>
+            {
+                publicationRegistered.TrySetResult(true);
+                await publicationRelease.Task;
+            };
+
+            _clusterMembershipService.UpdateSiloStatus(remoteSilo, SiloStatus.Active, "remoteSilo");
+            var localClient = Client("local");
+            SetLocalClients([localClient]);
+            Assert.True(_directory.TryLocalLookup(localClient, out _));
+
+            try
+            {
+                _testAccessor.SchedulePublishUpdates();
+                await publicationRegistered.Task.WaitAsync(cancellationToken);
+
+                var quiesce = _testAccessor.Quiesce(cancellationToken);
+                publicationRelease.TrySetResult(true);
+                await quiesce;
+
+                _ = remoteDirectory.DidNotReceive().OnUpdateClientRoutes(
+                    Arg.Any<ImmutableDictionary<SiloAddress, (ImmutableHashSet<GrainId>, long)>>());
+            }
+            finally
+            {
+                publicationRelease.TrySetResult(true);
+            }
         }
 
         [Fact]
