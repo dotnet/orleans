@@ -58,6 +58,7 @@ internal sealed partial class ClientDirectory : SystemTarget, ILocalClientDirect
 
     // For synchronization with remote silos.
     private Task? _nextPublishTask;
+    private Task? _inflightPublishTask;
     private long _publishRequestVersion;
     private SiloAddress? _previousSuccessor;
     private ImmutableDictionary<SiloAddress, (ImmutableHashSet<GrainId> ConnectedClients, long Version)>? _publishedTable;
@@ -540,8 +541,37 @@ internal sealed partial class ClientDirectory : SystemTarget, ILocalClientDirect
                 return false;
             }
 
-            var publishTask = remote.OnUpdateClientRoutes(update);
-            await publishTask;
+            var publicationCompletion = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+            publicationCompletion.Task.Ignore();
+            lock (_lockObj)
+            {
+                if (_stoppingCts.IsCancellationRequested)
+                {
+                    return false;
+                }
+
+                _inflightPublishTask = publicationCompletion.Task;
+            }
+
+            if (_stoppingCts.IsCancellationRequested)
+            {
+                publicationCompletion.TrySetResult(false);
+                return false;
+            }
+
+            Task publishTask;
+            try
+            {
+                publishTask = remote.OnUpdateClientRoutes(update);
+            }
+            catch (Exception exception)
+            {
+                publicationCompletion.TrySetException(exception);
+                throw;
+            }
+
+            ObservePublication(publishTask, publicationCompletion).Ignore();
+            await publishTask.WaitAsync(_stoppingCts.Token);
 
             // Record the current lower bound of what the successor knows, so that it can be used to minimize
             // data transfer next time an update is performed.
@@ -567,6 +597,23 @@ internal sealed partial class ClientDirectory : SystemTarget, ILocalClientDirect
         {
             LogErrorPublishingClientRoutingTableToSilo(exception, successor);
             return false;
+        }
+
+        static async Task ObservePublication(Task publishTask, TaskCompletionSource<bool> publicationCompletion)
+        {
+            try
+            {
+                await publishTask;
+                publicationCompletion.TrySetResult(true);
+            }
+            catch (OperationCanceledException exception)
+            {
+                publicationCompletion.TrySetCanceled(exception.CancellationToken);
+            }
+            catch (Exception exception)
+            {
+                publicationCompletion.TrySetException(exception);
+            }
         }
     }
 
@@ -600,6 +647,7 @@ internal sealed partial class ClientDirectory : SystemTarget, ILocalClientDirect
         {
             Task? runTask;
             Task? publishTask;
+            Task? inflightPublishTask;
             if (!_stoppingCts.IsCancellationRequested)
             {
                 _stoppingCts.Cancel();
@@ -610,6 +658,7 @@ internal sealed partial class ClientDirectory : SystemTarget, ILocalClientDirect
             {
                 runTask = _runTask;
                 publishTask = _nextPublishTask;
+                inflightPublishTask = _inflightPublishTask;
             }
 
             if (runTask is not null)
@@ -620,6 +669,11 @@ internal sealed partial class ClientDirectory : SystemTarget, ILocalClientDirect
             if (publishTask is not null)
             {
                 await publishTask.WaitAsync(ct).SuppressThrowing();
+            }
+
+            if (inflightPublishTask is not null)
+            {
+                await inflightPublishTask.WaitAsync(ct).SuppressThrowing();
             }
         }
 
@@ -639,7 +693,8 @@ internal sealed partial class ClientDirectory : SystemTarget, ILocalClientDirect
                 lock (instance._lockObj)
                 {
                     return instance._runTask is not { IsCompleted: false }
-                        && instance._nextPublishTask is not { IsCompleted: false };
+                        && instance._nextPublishTask is not { IsCompleted: false }
+                        && instance._inflightPublishTask is not { IsCompleted: false };
                 }
             }
         }
