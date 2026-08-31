@@ -5,8 +5,10 @@ using System.Reflection;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Options;
 using Orleans.Runtime;
 using Orleans.Serialization;
+using Orleans.Serialization.Configuration;
 using Orleans.Serialization.Invocation;
 using Orleans.Serialization.TypeSystem;
 using Orleans.Streams;
@@ -79,23 +81,23 @@ public class RegisterProducerVersionToleranceTests
     {
         var requestType = GetRequestType();
         var aliases = requestType.GetCustomAttributes<CompoundTypeAliasAttribute>().ToArray();
-        Assert.Equal(2, aliases.Length);
+        Assert.Single(aliases);
         Assert.Contains(aliases, IsLegacyMethodAlias);
-        Assert.Contains(
-            aliases,
-            attribute => Equals(attribute.Components[^1], GeneratedMethodId));
 
         var typeIdentity = RuntimeTypeNameFormatter.Format(requestType);
-        Assert.EndsWith($",\"{GeneratedMethodId}\")", typeIdentity, StringComparison.Ordinal);
+        Assert.EndsWith($",\"{LegacyMethodId}\")", typeIdentity, StringComparison.Ordinal);
         Assert.Equal(
             requestType,
             currentEndpoint.GetRequiredService<TypeConverter>().Parse(typeIdentity));
         Assert.Equal(
             requestType,
             currentEndpoint.GetRequiredService<TypeConverter>().Parse(typeIdentity.Replace(
-                $",\"{GeneratedMethodId}\")",
                 $",\"{LegacyMethodId}\")",
+                $",\"{GeneratedMethodId}\")",
                 StringComparison.Ordinal)));
+        Assert.Equal(
+            typeof(LegacyRegisterProducerRequest),
+            CreateLegacyTypeConverter().Parse(typeIdentity));
 
         return (requestType, typeIdentity);
     }
@@ -120,6 +122,34 @@ public class RegisterProducerVersionToleranceTests
         var services = new ServiceCollection();
         services.AddSerializer();
         return services.BuildServiceProvider();
+    }
+
+    private static TypeConverter CreateLegacyTypeConverter()
+    {
+        var options = new TypeManifestOptions { AllowAllTypes = true };
+        options.CompoundTypeAliases
+            .Add("inv")
+            .Add(typeof(GrainReference))
+            .Add(typeof(IPubSubRendezvousGrain))
+            .Add(LegacyMethodId, typeof(LegacyRegisterProducerRequest));
+        return new(
+            formatters: [],
+            typeNameFilters: [],
+            typeFilters: [],
+            Options.Create(options),
+            new ReflectionTypeResolver());
+    }
+
+    private sealed class ReflectionTypeResolver : TypeResolver
+    {
+        public override Type ResolveType(string name) =>
+            Type.GetType(name, throwOnError: true)!;
+
+        public override bool TryResolveType(string name, out Type type)
+        {
+            type = Type.GetType(name)!;
+            return type is not null;
+        }
     }
 }
 

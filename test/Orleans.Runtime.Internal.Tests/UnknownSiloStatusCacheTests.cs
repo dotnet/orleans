@@ -204,6 +204,73 @@ public class UnknownSiloStatusCacheTests
     }
 
     [Fact]
+    public async Task FreshValidationRecomputesInitiallyKnownSilo()
+    {
+        var staleSilo = CreateSiloAddress();
+        var replacementSilo = CreateSiloAddress(port: 11112);
+        var membershipManager = new TestMembershipManager(
+            CreateMembershipTableSnapshot(
+                2,
+                CreateMembershipEntry(staleSilo, SiloStatus.Dead),
+                CreateMembershipEntry(replacementSilo, SiloStatus.Active)));
+        var cache = new UnknownSiloStatusCache(membershipManager, NullLogger<UnknownSiloStatusCache>.Instance);
+
+        var validation = await cache.ValidateSiloStatuses(
+            CreateSnapshot(1, new ClusterMember(staleSilo, SiloStatus.Active, "stale")),
+            SiloAddresses(staleSilo, replacementSilo),
+            TestContext.Current.CancellationToken);
+
+        Assert.Equal(new MembershipVersion(2), validation.Snapshot.Version);
+        Assert.Equal(SiloStatus.Dead, validation.Statuses[staleSilo]);
+        Assert.Equal(SiloStatus.Active, validation.Statuses[replacementSilo]);
+        Assert.Equal(1, membershipManager.SourceRefreshCount);
+    }
+
+    [Fact]
+    public async Task RequiredFreshValidationRefreshesKnownSilo()
+    {
+        var silo = CreateSiloAddress();
+        var membershipManager = new TestMembershipManager(
+            CreateMembershipTableSnapshot(
+                2,
+                CreateMembershipEntry(silo, SiloStatus.Dead)));
+        var cache = new UnknownSiloStatusCache(membershipManager, NullLogger<UnknownSiloStatusCache>.Instance);
+
+        var validation = await cache.ValidateSiloStatuses(
+            CreateSnapshot(1, new ClusterMember(silo, SiloStatus.Active, "stale")),
+            SiloAddresses(silo),
+            TestContext.Current.CancellationToken,
+            requireFresh: true);
+
+        Assert.Equal(new MembershipVersion(2), validation.Snapshot.Version);
+        Assert.Equal(SiloStatus.Dead, validation.Statuses[silo]);
+        Assert.Equal(1, membershipManager.SourceRefreshCount);
+    }
+
+    [Fact]
+    public async Task FailedRequiredFreshValidationReturnsUnknownForKnownSilo()
+    {
+        var silo = CreateSiloAddress();
+        var membershipManager = new TestMembershipManager(CreateMembershipTableSnapshot(1))
+        {
+            AutoCompleteRefreshes = false,
+        };
+        var cache = new UnknownSiloStatusCache(membershipManager, NullLogger<UnknownSiloStatusCache>.Instance);
+        var validationTask = cache.ValidateSiloStatuses(
+            CreateSnapshot(1, new ClusterMember(silo, SiloStatus.Active, "stale")),
+            SiloAddresses(silo),
+            TestContext.Current.CancellationToken,
+            requireFresh: true).AsTask();
+        var refresh = await membershipManager.WaitForRefreshAttempt();
+
+        refresh.Completion.TrySetException(new InvalidOperationException("refresh failed"));
+
+        var validation = await validationTask;
+        Assert.Equal(SiloStatus.None, validation.Statuses[silo]);
+        Assert.Equal(1, membershipManager.SourceRefreshCount);
+    }
+
+    [Fact]
     public async Task FailedSharedRefreshAllowsNextValidationToRetry()
     {
         var membershipManager = new TestMembershipManager(CreateMembershipTableSnapshot(1))
@@ -358,8 +425,19 @@ public class UnknownSiloStatusCacheTests
     private static ClusterMembershipSnapshot CreateSnapshot(long version, params ClusterMember[] members) =>
         new(members.ToImmutableDictionary(member => member.SiloAddress), new MembershipVersion(version));
 
-    private static MembershipTableSnapshot CreateMembershipTableSnapshot(long version) =>
-        new(new MembershipVersion(version), ImmutableDictionary<SiloAddress, MembershipEntry>.Empty);
+    private static MembershipTableSnapshot CreateMembershipTableSnapshot(
+        long version,
+        params MembershipEntry[] entries) =>
+        new(
+            new MembershipVersion(version),
+            entries.ToImmutableDictionary(entry => entry.SiloAddress));
+
+    private static MembershipEntry CreateMembershipEntry(SiloAddress siloAddress, SiloStatus status) =>
+        new()
+        {
+            SiloAddress = siloAddress,
+            Status = status,
+        };
 
     private static SiloAddress CreateSiloAddress(int port = 11111) =>
         SiloAddress.New(new IPEndPoint(IPAddress.Loopback, port), 1);
