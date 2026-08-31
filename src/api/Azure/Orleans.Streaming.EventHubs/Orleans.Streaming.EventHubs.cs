@@ -34,6 +34,8 @@ namespace Orleans.Configuration
 
     public partial class EventHubOptions
     {
+        public Azure.Messaging.EventHubs.Producer.EventHubBufferedProducerClientOptions? BufferedProducerOptions { get { throw null; } set { } }
+
         public Azure.Messaging.EventHubs.EventHubConnectionOptions ConnectionOptions { get { throw null; } set { } }
 
         public void ConfigureEventHubConnection(Azure.Messaging.EventHubs.EventHubConnection connection, string consumerGroup) { }
