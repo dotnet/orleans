@@ -51,7 +51,7 @@ public sealed class InProcessTestClusterLifecycleTests
 
         var entries = cluster.GetLog().Split(Environment.NewLine, StringSplitOptions.RemoveEmptyEntries);
         Assert.Equal(ConcurrentLogWriterCount * ConcurrentLogWritesPerWorker, entries.Length);
-        Assert.All(entries, entry => Assert.StartsWith("GetActiveSilos: 0 Silos=", entry, StringComparison.Ordinal));
+        Assert.All(entries, entry => Assert.Equal("GetActiveSilos: 0 Silos=[]", entry));
     }
 
     [Fact]
