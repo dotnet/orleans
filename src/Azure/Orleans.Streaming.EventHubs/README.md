@@ -47,6 +47,37 @@ var builder = Host.CreateApplicationBuilder(args)
 await builder.RunAsync();
 ```
 
+### Buffered publishing
+
+For workloads which publish many small events concurrently, the provider can allow the Azure SDK to combine
+multiple Orleans stream publications into Event Hubs batches:
+
+```csharp
+configurator.ConfigureEventHub(builder => builder.Configure(options =>
+{
+    options.ConfigureEventHubConnection(
+        "YOUR_EVENT_HUB_CONNECTION_STRING",
+        "YOUR_EVENT_HUB_NAME",
+        "YOUR_CONSUMER_GROUP");
+    options.BufferedProducerOptions = new()
+    {
+        MaximumWaitTime = TimeSpan.FromMilliseconds(20),
+        MaximumEventBufferLengthPerPartition = 1_500,
+        MaximumConcurrentSends = 32,
+        MaximumConcurrentSendsPerPartition = 1,
+        EnableIdempotentRetries = true,
+    };
+}));
+```
+
+Buffered publishing is opt-in. Orleans applies backpressure when the configured buffer is full and does not
+complete a stream publication until Event Hubs acknowledges the batch containing it. Pending batches are flushed
+during graceful silo or client shutdown. The values above are examples and should be tuned for the workload;
+increasing the wait time or buffer size can improve throughput at the cost of latency and memory.
+
+The Azure SDK can map the same partition key to a different partition when switching between direct and buffered
+producers. Avoid changing publishing modes while strict ordering must be preserved for active streams.
+
 ### Using Orleans grain storage for checkpoints
 
 Azure Table Storage remains the default checkpoint store for compatibility with existing deployments. As an alternative, checkpoints can be stored using Orleans grains and the configured `PubSubStore` grain storage provider:

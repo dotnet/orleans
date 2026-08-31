@@ -2,6 +2,7 @@ using System.Reflection;
 using Azure.Data.Tables;
 using Azure.Messaging.EventHubs;
 using Azure.Messaging.EventHubs.Consumer;
+using Azure.Messaging.EventHubs.Producer;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
@@ -9,6 +10,7 @@ using Orleans.Configuration;
 using Orleans.Hosting;
 using Orleans.Providers;
 using Orleans.Runtime;
+using Orleans.Streaming.EventHubs;
 using Xunit;
 
 namespace ServiceBus.Tests;
@@ -19,6 +21,49 @@ namespace ServiceBus.Tests;
 [TestCategory("EventHub"), TestCategory("Streaming"), TestCategory("BVT")]
 public sealed class EventHubsStreamProviderBuilderTests
 {
+    [Fact]
+    public void EventHubOptions_BufferedPublishingIsOptIn()
+    {
+        var options = new EventHubOptions();
+
+        Assert.Null(options.BufferedProducerOptions);
+
+        var bufferedOptions = new EventHubBufferedProducerClientOptions
+        {
+            MaximumWaitTime = TimeSpan.FromMilliseconds(20),
+            MaximumEventBufferLengthPerPartition = 1_500,
+            MaximumConcurrentSends = 32,
+            MaximumConcurrentSendsPerPartition = 1,
+            EnableIdempotentRetries = true,
+        };
+        options.BufferedProducerOptions = bufferedOptions;
+
+        Assert.Same(bufferedOptions, options.BufferedProducerOptions);
+    }
+
+    [Fact]
+    public void ConfigureProviders_RegistersProducerCleanupForSiloAndClient()
+    {
+        var siloBuilder = CreateSiloBuilder();
+        var clientBuilder = CreateClientBuilder();
+
+        siloBuilder.AddEventHubStreams("silo-stream", _ => { });
+        clientBuilder.AddEventHubStreams(
+            "client-stream",
+            (IClusterClientEventHubStreamConfigurator _) => { });
+
+        using var siloServices = siloBuilder.Services.BuildServiceProvider();
+        using var clientServices = clientBuilder.Services.BuildServiceProvider();
+        var siloRegistration = siloBuilder.Services.Last(
+            service => service.ServiceType == typeof(ILifecycleParticipant<ISiloLifecycle>));
+        var clientRegistration = clientBuilder.Services.Last(
+            service => service.ServiceType == typeof(ILifecycleParticipant<IClusterClientLifecycle>));
+        Assert.IsType<EventHubAdapterFactoryLifecycle<ISiloLifecycle>>(
+            siloRegistration.ImplementationFactory!(siloServices));
+        Assert.IsType<EventHubAdapterFactoryLifecycle<IClusterClientLifecycle>>(
+            clientRegistration.ImplementationFactory!(clientServices));
+    }
+
     [Fact]
     public void ConfigureSilo_AspireConsumerGroupReference_ConfiguresEventHubAndCheckpointer()
     {
