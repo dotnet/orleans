@@ -18,6 +18,7 @@ internal interface ISerializableTypeDescription
     bool IsSealedType { get; }
     bool IsAbstractType { get; }
     bool IsEnumType { get; }
+    bool SupportsHotReloadMemberAddition { get; }
     bool IsGenericType { get; }
     List<(string Name, ITypeParameterSymbol Parameter)> TypeParameters { get; }
     List<IMemberDescription> Members { get; }

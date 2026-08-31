@@ -18,9 +18,14 @@ internal class SerializerGenerator(IGeneratorServices generatorServices)
     private const string WriteFieldMethodName = "WriteField";
     private const string ReadValueMethodName = "ReadValue";
     private const string CodecFieldTypeFieldName = "_codecFieldType";
+    private const string CodecProviderFieldName = "_codecProvider";
     private readonly IGeneratorServices _generatorServices = generatorServices;
 
     private LibraryTypes LibraryTypes => _generatorServices.LibraryTypes;
+
+    private bool HotReloadSafe => _generatorServices.Options.HotReloadSafe;
+    private bool UseHotReloadShape(ISerializableTypeDescription type)
+        => HotReloadSafe && !type.IsEnumType && type.SupportsHotReloadMemberAddition;
 
     public ClassDeclarationSyntax Generate(ISerializableTypeDescription type)
     {
@@ -40,7 +45,7 @@ internal class SerializerGenerator(IGeneratorServices generatorServices)
             }
             else if (member is IFieldDescription or IPropertyDescription)
             {
-                members.Add(new SerializableMember(_generatorServices, member, members.Count));
+                members.Add(new SerializableMember(_generatorServices, member));
             }
             else if (member is MethodParameterFieldDescription methodParameter)
             {
@@ -116,6 +121,20 @@ internal class SerializerGenerator(IGeneratorServices generatorServices)
         _ => GeneratedCodeUtilities.CodeGeneratorName
     };
 
+    internal static ExpressionSyntax GetServiceExpression(TypeSyntax serviceType, ExpressionSyntax codecProvider)
+        => InvocationExpression(
+            IdentifierName("OrleansGeneratedCodeHelper").Member(GenericName(Identifier("GetService"), TypeArgumentList(SingletonSeparatedList(serviceType)))),
+            ArgumentList(SeparatedList([Argument(ThisExpression()), Argument(codecProvider)])));
+
+    /// <summary>
+    /// Returns the expression used to reference a codec or copier field, resolving the field on first use when it was
+    /// added by hot reload and therefore skipped by the already-executed constructor.
+    /// </summary>
+    internal static ExpressionSyntax GetCodecExpression(GeneratedFieldDescription field)
+        => field.LazyInitialization
+            ? ParenthesizedExpression(AssignmentExpression(SyntaxKind.CoalesceAssignmentExpression, IdentifierName(field.FieldName), GetServiceExpression(field.FieldType, IdentifierName(CodecProviderFieldName))))
+            : IdentifierName(field.FieldName);
+
     private static MemberDeclarationSyntax[] GetFieldDeclarations(List<GeneratedFieldDescription> fieldDescriptions)
     {
         return [.. fieldDescriptions.Select(GetFieldDeclaration)];
@@ -138,6 +157,10 @@ internal class SerializerGenerator(IGeneratorServices generatorServices)
                                 SingletonSeparatedList(VariableDeclarator(type.FieldName)
                                     .WithInitializer(EqualsValueClause(TypeOfExpression(type.CodecFieldType))))))
                         .AddModifiers(Token(SyntaxKind.PrivateKeyword), Token(SyntaxKind.ReadOnlyKeyword));
+                case FieldAccessorDescription { LazyInitialization: true, InitializationSyntax: not null } accessor:
+                    return
+                        FieldDeclaration(VariableDeclaration(accessor.FieldType, SingletonSeparatedList(VariableDeclarator(accessor.FieldName))))
+                            .AddModifiers(Token(SyntaxKind.PrivateKeyword), Token(SyntaxKind.StaticKeyword));
                 case FieldAccessorDescription accessor when accessor.InitializationSyntax != null:
                     return
                         FieldDeclaration(VariableDeclaration(accessor.FieldType,
@@ -172,8 +195,9 @@ internal class SerializerGenerator(IGeneratorServices generatorServices)
                                     ])))
                             .WithSemicolonToken(Token(SyntaxKind.SemicolonToken));
                 default:
-                    return FieldDeclaration(VariableDeclaration(description.FieldType, SingletonSeparatedList(VariableDeclarator(description.FieldName))))
-                        .AddModifiers(Token(SyntaxKind.PrivateKeyword), Token(SyntaxKind.ReadOnlyKeyword));
+                    var declaration = FieldDeclaration(VariableDeclaration(description.FieldType, SingletonSeparatedList(VariableDeclarator(description.FieldName))))
+                        .AddModifiers(Token(SyntaxKind.PrivateKeyword));
+                    return description.LazyInitialization ? declaration : declaration.AddModifiers(Token(SyntaxKind.ReadOnlyKeyword));
             }
         }
     }
@@ -195,18 +219,13 @@ internal class SerializerGenerator(IGeneratorServices generatorServices)
                             ThisExpression().Member(field.FieldName.ToIdentifierName()),
                             Unwrapped(field.FieldName.ToIdentifierName()))));
                     break;
+                case CodecProviderFieldDescription:
+                    AddCodecProviderParameter();
+                    statements.Add(ExpressionStatement(AssignmentExpression(SyntaxKind.SimpleAssignmentExpression, field.FieldName.ToIdentifierName(), IdentifierName("codecProvider"))));
+                    break;
                 case CodecFieldDescription or BaseCodecFieldDescription when !field.IsInjected:
-                    if (!codecProviderAdded)
-                    {
-                        parameters.Add(Parameter(Identifier("codecProvider")).WithType(LibraryTypes.ICodecProvider.ToTypeSyntax()));
-                        codecProviderAdded = true;
-                    }
-
-                    var codec = InvocationExpression(
-                        IdentifierName("OrleansGeneratedCodeHelper").Member(GenericName(Identifier("GetService"), TypeArgumentList(SingletonSeparatedList(field.FieldType)))),
-                        ArgumentList(SeparatedList([Argument(ThisExpression()), Argument(IdentifierName("codecProvider"))])));
-
-                    statements.Add(ExpressionStatement(AssignmentExpression(SyntaxKind.SimpleAssignmentExpression, field.FieldName.ToIdentifierName(), codec)));
+                    AddCodecProviderParameter();
+                    statements.Add(ExpressionStatement(AssignmentExpression(SyntaxKind.SimpleAssignmentExpression, field.FieldName.ToIdentifierName(), GetServiceExpression(field.FieldType, IdentifierName("codecProvider")))));
                     break;
             }
         }
@@ -215,6 +234,17 @@ internal class SerializerGenerator(IGeneratorServices generatorServices)
             .AddModifiers(Token(SyntaxKind.PublicKeyword))
             .AddParameterListParameters([.. parameters])
             .AddBodyStatements([.. statements]);
+
+        void AddCodecProviderParameter()
+        {
+            if (codecProviderAdded)
+            {
+                return;
+            }
+
+            parameters.Add(Parameter(Identifier("codecProvider")).WithType(LibraryTypes.ICodecProvider.ToTypeSyntax()));
+            codecProviderAdded = true;
+        }
 
         static ExpressionSyntax Unwrapped(ExpressionSyntax expr)
         {
@@ -235,6 +265,12 @@ internal class SerializerGenerator(IGeneratorServices generatorServices)
             fields.Add(new CodecFieldTypeFieldDescription(LibraryTypes.Type.ToTypeSyntax(), CodecFieldTypeFieldName, serializableTypeDescription.TypeSyntax));
         }
 
+        var hotReloadShape = UseHotReloadShape(serializableTypeDescription);
+        if (hotReloadShape)
+        {
+            fields.Add(new CodecProviderFieldDescription(LibraryTypes.ICodecProvider.ToTypeSyntax()));
+        }
+
         if (serializableTypeDescription.HasComplexBaseType)
         {
             fields.Add(GetBaseTypeField(serializableTypeDescription));
@@ -245,7 +281,7 @@ internal class SerializerGenerator(IGeneratorServices generatorServices)
             fields.Add(new ActivatorFieldDescription(LibraryTypes.IActivator_1.ToTypeSyntax(serializableTypeDescription.TypeSyntax), ActivatorFieldName));
         }
 
-        int typeIndex = 0;
+        var codecMembers = new List<IMemberDescription>();
         foreach (var member in serializableTypeDescription.Members.Distinct(MemberDescriptionTypeComparer.Default))
         {
             if (!member.IsSerializable)
@@ -257,9 +293,20 @@ internal class SerializerGenerator(IGeneratorServices generatorServices)
             if (LibraryTypes.StaticCodecs.FindByUnderlyingType(member.Type) is not null)
                 continue;
 
-            fields.Add(new TypeFieldDescription(LibraryTypes.Type.ToTypeSyntax(), $"_type{typeIndex}", member.TypeSyntax, member.Type));
-            fields.Add(GetCodecDescription(member, typeIndex));
-            typeIndex++;
+            codecMembers.Add(member);
+        }
+
+        var typeFieldNames = GeneratedFieldNames.ForTypes("_type", codecMembers);
+        var codecFieldNames = GeneratedFieldNames.ForTypes("_codec", codecMembers);
+        for (var i = 0; i < codecMembers.Count; i++)
+        {
+            var member = codecMembers[i];
+            if (!hotReloadShape)
+            {
+                fields.Add(new TypeFieldDescription(LibraryTypes.Type.ToTypeSyntax(), typeFieldNames[i], member.TypeSyntax, member.Type));
+            }
+
+            fields.Add(GetCodecDescription(member, codecFieldNames[i]));
         }
 
         foreach (var member in members)
@@ -283,7 +330,7 @@ internal class SerializerGenerator(IGeneratorServices generatorServices)
 
         return fields;
 
-        CodecFieldDescription GetCodecDescription(IMemberDescription member, int index)
+        CodecFieldDescription GetCodecDescription(IMemberDescription member, string fieldName)
         {
             var t = member.Type;
             TypeSyntax? codecType = null;
@@ -324,7 +371,7 @@ internal class SerializerGenerator(IGeneratorServices generatorServices)
                 codecType = LibraryTypes.FieldCodec_1.ToTypeSyntax(member.TypeSyntax);
             }
 
-            return new CodecFieldDescription(codecType, $"_codec{index}", t);
+            return new CodecFieldDescription(codecType, fieldName, t, hotReloadShape);
         }
     }
 
@@ -446,7 +493,7 @@ internal class SerializerGenerator(IGeneratorServices generatorServices)
             else
             {
                 var instanceCodec = serializerFields.First(f => f is CodecFieldDescription cf && SymbolEqualityComparer.Default.Equals(cf.UnderlyingType, memberType));
-                codecExpression = IdentifierName(instanceCodec.FieldName);
+                codecExpression = GetCodecExpression(instanceCodec);
             }
 
            // When a static codec is available, we can call it directly and can skip passing the expected type,
@@ -460,7 +507,9 @@ internal class SerializerGenerator(IGeneratorServices generatorServices)
             };
 
             if (staticCodec is null)
-                writeFieldArgs.Add(Argument(serializerFields.First(f => f is TypeFieldDescription tf && SymbolEqualityComparer.Default.Equals(tf.UnderlyingType, memberType)).FieldName.ToIdentifierName()));
+                writeFieldArgs.Add(Argument(UseHotReloadShape(type)
+                    ? TypeOfExpression(description.TypeSyntax)
+                    : serializerFields.First(f => f is TypeFieldDescription tf && SymbolEqualityComparer.Default.Equals(tf.UnderlyingType, memberType)).FieldName.ToIdentifierName()));
 
             writeFieldArgs.Add(Argument(member.GetGetter(instanceParam)));
 
@@ -632,7 +681,7 @@ internal class SerializerGenerator(IGeneratorServices generatorServices)
                 else
                 {
                     var instanceCodec = serializerFields.OfType<CodecFieldDescription>().First(c => SymbolEqualityComparer.Default.Equals(c.UnderlyingType, description.Type));
-                    codecExpression = IdentifierName(instanceCodec.FieldName);
+                    codecExpression = GetCodecExpression(instanceCodec);
                 }
 
                 ExpressionSyntax readValueExpression = InvocationExpression(
@@ -1040,6 +1089,12 @@ internal class SerializerGenerator(IGeneratorServices generatorServices)
         public readonly TypeSyntax FieldType = fieldType;
         public readonly string FieldName = fieldName;
         public abstract bool IsInjected { get; }
+        public virtual bool LazyInitialization => false;
+    }
+
+    internal sealed class CodecProviderFieldDescription(TypeSyntax fieldType) : GeneratedFieldDescription(fieldType, CodecProviderFieldName)
+    {
+        public override bool IsInjected => false;
     }
 
     internal sealed class BaseCodecFieldDescription(TypeSyntax fieldType, bool concreteType = false) : GeneratedFieldDescription(fieldType, BaseTypeSerializerFieldName)
@@ -1052,10 +1107,11 @@ internal class SerializerGenerator(IGeneratorServices generatorServices)
         public override bool IsInjected => true;
     }
 
-    internal sealed class CodecFieldDescription(TypeSyntax fieldType, string fieldName, ITypeSymbol underlyingType) : GeneratedFieldDescription(fieldType, fieldName)
+    internal sealed class CodecFieldDescription(TypeSyntax fieldType, string fieldName, ITypeSymbol underlyingType, bool lazyInitialization = false) : GeneratedFieldDescription(fieldType, fieldName)
     {
         public ITypeSymbol UnderlyingType { get; } = underlyingType;
         public override bool IsInjected => false;
+        public override bool LazyInitialization { get; } = lazyInitialization;
     }
 
     internal sealed class TypeFieldDescription(TypeSyntax fieldType, string fieldName, TypeSyntax underlyingTypeSyntax, ITypeSymbol underlyingType) : GeneratedFieldDescription(fieldType, fieldName)
@@ -1071,9 +1127,10 @@ internal class SerializerGenerator(IGeneratorServices generatorServices)
         public override bool IsInjected => false;
     }
 
-    internal sealed class FieldAccessorDescription(TypeSyntax containingType, TypeSyntax fieldType, string fieldName, string accessorName, ExpressionSyntax? initializationSyntax = null) : GeneratedFieldDescription(fieldType, fieldName)
+    internal sealed class FieldAccessorDescription(TypeSyntax containingType, TypeSyntax fieldType, string fieldName, string accessorName, ExpressionSyntax? initializationSyntax = null, bool lazyInitialization = false) : GeneratedFieldDescription(fieldType, fieldName)
     {
         public override bool IsInjected => false;
+        public override bool LazyInitialization { get; } = lazyInitialization;
         public readonly string AccessorName = accessorName;
         public readonly TypeSyntax ContainingType = containingType;
         public readonly ExpressionSyntax? InitializationSyntax = initializationSyntax;
@@ -1162,14 +1219,9 @@ internal class SerializerGenerator(IGeneratorServices generatorServices)
     /// <summary>
     /// Represents a serializable member (field/property) of a type.
     /// </summary>
-    internal class SerializableMember(IGeneratorServices generatorServices, IMemberDescription member, int ordinal) : ISerializableMember
+    internal class SerializableMember(IGeneratorServices generatorServices, IMemberDescription member) : ISerializableMember
     {
         private readonly IGeneratorServices _generatorServices = generatorServices;
-
-        /// <summary>
-        /// The ordinal assigned to this field.
-        /// </summary>
-        private readonly int _ordinal = ordinal;
 
         private Compilation Compilation => _generatorServices.Compilation;
         private LibraryTypes LibraryTypes => _generatorServices.LibraryTypes;
@@ -1197,12 +1249,12 @@ internal class SerializerGenerator(IGeneratorServices generatorServices)
         /// <summary>
         /// Gets the name of the getter field.
         /// </summary>
-        private string GetterFieldName => $"getField{_ordinal}";
+        private string GetterFieldName => GeneratedFieldNames.Accessor("getField", Member);
 
         /// <summary>
         /// Gets the name of the setter field.
         /// </summary>
-        private string SetterFieldName => $"setField{_ordinal}";
+        private string SetterFieldName => GeneratedFieldNames.Accessor("setField", Member);
 
         /// <summary>
         /// Gets a value indicating if the member is a property.
@@ -1278,7 +1330,7 @@ internal class SerializerGenerator(IGeneratorServices generatorServices)
 
                 // Retrieve the field using the generated getter.
                 result =
-                    InvocationExpression(IdentifierName(GetterFieldName))
+                    InvocationExpression(GetAccessorExpression(GetGetterFieldDescription()!))
                         .AddArgumentListArguments(instanceArg);
             }
 
@@ -1331,25 +1383,30 @@ internal class SerializerGenerator(IGeneratorServices generatorServices)
             }
 
             return
-                InvocationExpression(IdentifierName(SetterFieldName))
+                InvocationExpression(GetAccessorExpression(GetSetterFieldDescription()!))
                     .AddArgumentListArguments(instanceArg, Argument(value));
         }
+
+        private static ExpressionSyntax GetAccessorExpression(FieldAccessorDescription accessor)
+            => accessor.LazyInitialization && accessor.InitializationSyntax is { } initialization
+                ? ParenthesizedExpression(AssignmentExpression(SyntaxKind.CoalesceAssignmentExpression, IdentifierName(accessor.AccessorName), initialization))
+                : IdentifierName(accessor.AccessorName);
 
         public FieldAccessorDescription? GetGetterFieldDescription()
         {
             if (IsGettableField || IsGettableProperty) return null;
             return GetFieldAccessor(ContainingType, TypeSyntax, MemberName, GetterFieldName, LibraryTypes, false,
-                IsPrimaryConstructorParameter && IsProperty);
+                IsPrimaryConstructorParameter && IsProperty, _generatorServices.Options.HotReloadSafe);
         }
 
         public FieldAccessorDescription? GetSetterFieldDescription()
         {
             if (IsSettableField || IsSettableProperty) return null;
             return GetFieldAccessor(ContainingType, TypeSyntax, MemberName, SetterFieldName, LibraryTypes, true,
-                IsPrimaryConstructorParameter && IsProperty);
+                IsPrimaryConstructorParameter && IsProperty, _generatorServices.Options.HotReloadSafe);
         }
 
-        public static FieldAccessorDescription GetFieldAccessor(INamedTypeSymbol containingType, TypeSyntax fieldType, string fieldName, string accessorName, LibraryTypes library, bool setter, bool useUnsafeAccessor = false)
+        public static FieldAccessorDescription GetFieldAccessor(INamedTypeSymbol containingType, TypeSyntax fieldType, string fieldName, string accessorName, LibraryTypes library, bool setter, bool useUnsafeAccessor = false, bool lazyInitialization = false)
         {
             var containingTypeSyntax = containingType.ToTypeSyntax();
 
@@ -1369,7 +1426,7 @@ internal class SerializerGenerator(IGeneratorServices generatorServices)
                     .AddArgumentListArguments(Argument(TypeOfExpression(containingTypeSyntax)), Argument(fieldName.GetLiteralExpression())));
 
             // Existing case, accessor is the field in both cases
-            return new(containingTypeSyntax, delegateType, accessorName, accessorName, accessorInvoke);
+            return new(containingTypeSyntax, delegateType, accessorName, accessorName, accessorInvoke, lazyInitialization);
         }
     }
 }

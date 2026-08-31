@@ -136,6 +136,8 @@ internal class SerializableTypeDescription : ISerializableTypeDescription
     public bool IsAbstractType => Type.IsAbstract;
     public bool IsEnumType => Type.EnumUnderlyingType != null;
 
+    public bool SupportsHotReloadMemberAddition => true;
+
     public bool IsGenericType => Type.IsGenericType;
 
     public List<(string Name, ITypeParameterSymbol Parameter)> TypeParameters { get; }

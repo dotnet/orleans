@@ -14,6 +14,12 @@ namespace OrleansCodeGen.TestProject
     public sealed class Codec_PublicDemoData : global::Orleans.Serialization.Codecs.IFieldCodec<global::TestProject.PublicDemoData>, global::Orleans.Serialization.Serializers.IBaseCodec<global::TestProject.PublicDemoData>
     {
         private readonly global::System.Type _codecFieldType = typeof(global::TestProject.PublicDemoData);
+        private readonly global::Orleans.Serialization.Serializers.ICodecProvider _codecProvider;
+        public Codec_PublicDemoData(global::Orleans.Serialization.Serializers.ICodecProvider codecProvider)
+        {
+            _codecProvider = codecProvider;
+        }
+
         [global::System.Runtime.CompilerServices.MethodImplAttribute(global::System.Runtime.CompilerServices.MethodImplOptions.AggressiveInlining)]
         public void Serialize<TBufferWriter>(ref global::Orleans.Serialization.Buffers.Writer<TBufferWriter> writer, global::TestProject.PublicDemoData instance)
             where TBufferWriter : global::System.Buffers.IBufferWriter<byte>
@@ -81,6 +87,7 @@ namespace OrleansCodeGen.TestProject
     [global::System.CodeDom.Compiler.GeneratedCodeAttribute("OrleansCodeGen", "10.0.0.0"), global::System.ComponentModel.EditorBrowsableAttribute(global::System.ComponentModel.EditorBrowsableState.Never), global::System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverageAttribute]
     public sealed class Copier_PublicDemoData : global::Orleans.Serialization.Cloning.IDeepCopier<global::TestProject.PublicDemoData>, global::Orleans.Serialization.Cloning.IBaseCopier<global::TestProject.PublicDemoData>
     {
+        private readonly global::Orleans.Serialization.Serializers.ICodecProvider _codecProvider;
         [global::System.Runtime.CompilerServices.MethodImplAttribute(global::System.Runtime.CompilerServices.MethodImplOptions.AggressiveInlining)]
         public global::TestProject.PublicDemoData DeepCopy(global::TestProject.PublicDemoData original, global::Orleans.Serialization.Cloning.CopyContext context)
         {
@@ -92,6 +99,11 @@ namespace OrleansCodeGen.TestProject
             context.RecordCopy(original, result);
             DeepCopy(original, result, context);
             return result;
+        }
+
+        public Copier_PublicDemoData(global::Orleans.Serialization.Serializers.ICodecProvider codecProvider)
+        {
+            _codecProvider = codecProvider;
         }
 
         [global::System.Runtime.CompilerServices.MethodImplAttribute(global::System.Runtime.CompilerServices.MethodImplOptions.AggressiveInlining)]
@@ -111,6 +123,12 @@ namespace OrleansCodeGen.TestProject
     internal sealed class Codec_InternalDemoData : global::Orleans.Serialization.Codecs.IFieldCodec<global::TestProject.InternalDemoData>, global::Orleans.Serialization.Serializers.IBaseCodec<global::TestProject.InternalDemoData>
     {
         private readonly global::System.Type _codecFieldType = typeof(global::TestProject.InternalDemoData);
+        private readonly global::Orleans.Serialization.Serializers.ICodecProvider _codecProvider;
+        public Codec_InternalDemoData(global::Orleans.Serialization.Serializers.ICodecProvider codecProvider)
+        {
+            _codecProvider = codecProvider;
+        }
+
         [global::System.Runtime.CompilerServices.MethodImplAttribute(global::System.Runtime.CompilerServices.MethodImplOptions.AggressiveInlining)]
         public void Serialize<TBufferWriter>(ref global::Orleans.Serialization.Buffers.Writer<TBufferWriter> writer, global::TestProject.InternalDemoData instance)
             where TBufferWriter : global::System.Buffers.IBufferWriter<byte>
@@ -178,6 +196,7 @@ namespace OrleansCodeGen.TestProject
     [global::System.CodeDom.Compiler.GeneratedCodeAttribute("OrleansCodeGen", "10.0.0.0"), global::System.ComponentModel.EditorBrowsableAttribute(global::System.ComponentModel.EditorBrowsableState.Never), global::System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverageAttribute]
     internal sealed class Copier_InternalDemoData : global::Orleans.Serialization.Cloning.IDeepCopier<global::TestProject.InternalDemoData>, global::Orleans.Serialization.Cloning.IBaseCopier<global::TestProject.InternalDemoData>
     {
+        private readonly global::Orleans.Serialization.Serializers.ICodecProvider _codecProvider;
         [global::System.Runtime.CompilerServices.MethodImplAttribute(global::System.Runtime.CompilerServices.MethodImplOptions.AggressiveInlining)]
         public global::TestProject.InternalDemoData DeepCopy(global::TestProject.InternalDemoData original, global::Orleans.Serialization.Cloning.CopyContext context)
         {
@@ -189,6 +208,11 @@ namespace OrleansCodeGen.TestProject
             context.RecordCopy(original, result);
             DeepCopy(original, result, context);
             return result;
+        }
+
+        public Copier_InternalDemoData(global::Orleans.Serialization.Serializers.ICodecProvider codecProvider)
+        {
+            _codecProvider = codecProvider;
         }
 
         [global::System.Runtime.CompilerServices.MethodImplAttribute(global::System.Runtime.CompilerServices.MethodImplOptions.AggressiveInlining)]

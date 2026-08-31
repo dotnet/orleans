@@ -10,4 +10,5 @@ public class CodeGeneratorOptions
     public static readonly IReadOnlyList<string> ConstructorAttributes = ["Orleans.OrleansConstructorAttribute", "Microsoft.Extensions.DependencyInjection.ActivatorUtilitiesConstructorAttribute"];
     public GenerateFieldIds GenerateFieldIds { get; set; }
     public bool GenerateCompatibilityInvokers { get; set; }
+    public bool HotReloadSafe { get; set; }
 }

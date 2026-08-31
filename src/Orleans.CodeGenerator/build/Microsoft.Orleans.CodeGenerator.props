@@ -6,12 +6,14 @@
     <CompilerVisibleProperty Include="Orleans_GenerateFieldIds" />
     <CompilerVisibleProperty Include="Orleans_ConstructorAttributes" />
     <CompilerVisibleProperty Include="OrleansGenerateCompatibilityInvokers" />
+    <CompilerVisibleProperty Include="Orleans_HotReload" />
   </ItemGroup>
 
   <PropertyGroup>
     <Orleans_DesignTimeBuild>$(DesignTimeBuild)</Orleans_DesignTimeBuild>
     <Orleans_GenerateFieldIds>$(OrleansGenerateFieldIds)</Orleans_GenerateFieldIds>
     <Orleans_ConstructorAttributes>$(OrleansConstructorAttributes)</Orleans_ConstructorAttributes>
+    <Orleans_HotReload>$(OrleansHotReload)</Orleans_HotReload>
   </PropertyGroup>
 
 </Project>

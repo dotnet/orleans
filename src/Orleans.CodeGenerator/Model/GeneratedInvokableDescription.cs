@@ -58,6 +58,7 @@ internal sealed class GeneratedInvokableDescription : ISerializableTypeDescripti
     public bool IsSealedType => true;
     public bool IsAbstractType => false;
     public bool IsEnumType => false;
+    public bool SupportsHotReloadMemberAddition => false;
     public bool IsGenericType => TypeParameters.Count > 0;
     public List<IMemberDescription> Members { get; }
     public Compilation Compilation => MethodDescription.GenerationContext.Compilation;

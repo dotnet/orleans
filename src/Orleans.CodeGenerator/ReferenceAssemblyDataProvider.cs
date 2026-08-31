@@ -14,7 +14,7 @@ internal static class ReferenceAssemblyDataProvider
         {
             var model = ModelExtractor.ExtractReferenceAssemblyData(
                 compilation,
-                SourceGeneratorOptionsParser.CreateCodeGeneratorOptions(options),
+                SourceGeneratorOptionsParser.CreateCodeGeneratorOptions(options, compilation),
                 cancellationToken,
                 out var diagnostics);
 

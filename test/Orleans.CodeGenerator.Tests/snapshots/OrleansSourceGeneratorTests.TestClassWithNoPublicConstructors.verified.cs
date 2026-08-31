@@ -14,9 +14,11 @@ namespace OrleansCodeGen.TestProject
     public sealed class Codec_NoPublicCtor : global::Orleans.Serialization.Codecs.IFieldCodec<global::TestProject.NoPublicCtor>, global::Orleans.Serialization.Serializers.IBaseCodec<global::TestProject.NoPublicCtor>
     {
         private readonly global::System.Type _codecFieldType = typeof(global::TestProject.NoPublicCtor);
+        private readonly global::Orleans.Serialization.Serializers.ICodecProvider _codecProvider;
         private readonly global::Orleans.Serialization.Activators.IActivator<global::TestProject.NoPublicCtor> _activator;
-        public Codec_NoPublicCtor(global::Orleans.Serialization.Activators.IActivator<global::TestProject.NoPublicCtor> _activator)
+        public Codec_NoPublicCtor(global::Orleans.Serialization.Serializers.ICodecProvider codecProvider, global::Orleans.Serialization.Activators.IActivator<global::TestProject.NoPublicCtor> _activator)
         {
+            _codecProvider = codecProvider;
             this._activator = OrleansGeneratedCodeHelper.UnwrapService(this, _activator);
         }
 
@@ -87,6 +89,7 @@ namespace OrleansCodeGen.TestProject
     [global::System.CodeDom.Compiler.GeneratedCodeAttribute("OrleansCodeGen", "10.0.0.0"), global::System.ComponentModel.EditorBrowsableAttribute(global::System.ComponentModel.EditorBrowsableState.Never), global::System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverageAttribute]
     public sealed class Copier_NoPublicCtor : global::Orleans.Serialization.Cloning.IDeepCopier<global::TestProject.NoPublicCtor>, global::Orleans.Serialization.Cloning.IBaseCopier<global::TestProject.NoPublicCtor>
     {
+        private readonly global::Orleans.Serialization.Serializers.ICodecProvider _codecProvider;
         private readonly global::Orleans.Serialization.Activators.IActivator<global::TestProject.NoPublicCtor> _activator;
         [global::System.Runtime.CompilerServices.MethodImplAttribute(global::System.Runtime.CompilerServices.MethodImplOptions.AggressiveInlining)]
         public global::TestProject.NoPublicCtor DeepCopy(global::TestProject.NoPublicCtor original, global::Orleans.Serialization.Cloning.CopyContext context)
@@ -101,8 +104,9 @@ namespace OrleansCodeGen.TestProject
             return result;
         }
 
-        public Copier_NoPublicCtor(global::Orleans.Serialization.Activators.IActivator<global::TestProject.NoPublicCtor> _activator)
+        public Copier_NoPublicCtor(global::Orleans.Serialization.Serializers.ICodecProvider codecProvider, global::Orleans.Serialization.Activators.IActivator<global::TestProject.NoPublicCtor> _activator)
         {
+            _codecProvider = codecProvider;
             this._activator = OrleansGeneratedCodeHelper.UnwrapService(this, _activator);
         }
 

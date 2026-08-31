@@ -17,7 +17,7 @@ internal static class ProxySourceOutputGenerator
         try
         {
             SourceGeneratorOptionsParser.AttachDebuggerIfRequested(options);
-            var codeGeneratorOptions = SourceGeneratorOptionsParser.CreateCodeGeneratorOptions(options);
+            var codeGeneratorOptions = SourceGeneratorOptionsParser.CreateCodeGeneratorOptions(options, compilation);
             var generatorServices = new GeneratorServices(compilation, codeGeneratorOptions);
             var proxyContext = new ProxyGenerationContext(compilation, codeGeneratorOptions);
             var model = proxyOutputModel.ProxyInterface;
@@ -187,7 +187,7 @@ internal static class ProxySourceOutputGenerator
                     []);
             }
 
-            var codeGeneratorOptions = SourceGeneratorOptionsParser.CreateCodeGeneratorOptions(options);
+            var codeGeneratorOptions = SourceGeneratorOptionsParser.CreateCodeGeneratorOptions(options, compilation);
             var libraryTypes = LibraryTypes.FromCompilation(compilation, codeGeneratorOptions);
             var generatorServices = new GeneratorServices(compilation, codeGeneratorOptions, libraryTypes);
             var proxyContext = new ProxyGenerationContext(compilation, codeGeneratorOptions, libraryTypes);

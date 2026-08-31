@@ -18,6 +18,11 @@ internal class CopierGenerator(IGeneratorServices generatorServices)
 
     private LibraryTypes LibraryTypes => _generatorServices.LibraryTypes;
 
+    private bool HotReloadSafe => _generatorServices.Options.HotReloadSafe;
+
+    private bool UseHotReloadShape(ISerializableTypeDescription type)
+        => HotReloadSafe && !type.IsEnumType && type.SupportsHotReloadMemberAddition;
+
     public ClassDeclarationSyntax? GenerateCopier(
         ISerializableTypeDescription type,
         Dictionary<ISerializableTypeDescription, TypeSyntax> defaultCopiers)
@@ -45,7 +50,7 @@ internal class CopierGenerator(IGeneratorServices generatorServices)
             }
             else if (member is IFieldDescription or IPropertyDescription)
             {
-                members.Add(new SerializableMember(_generatorServices, member, members.Count));
+                members.Add(new SerializableMember(_generatorServices, member));
             }
             else if (member is MethodParameterFieldDescription methodParameter)
             {
@@ -116,6 +121,10 @@ internal class CopierGenerator(IGeneratorServices generatorServices)
         {
             switch (description)
             {
+                case FieldAccessorDescription { LazyInitialization: true, InitializationSyntax: not null } accessor:
+                    return
+                        FieldDeclaration(VariableDeclaration(accessor.FieldType, SingletonSeparatedList(VariableDeclarator(accessor.FieldName))))
+                            .AddModifiers(Token(SyntaxKind.PrivateKeyword), Token(SyntaxKind.StaticKeyword));
                 case FieldAccessorDescription accessor when accessor.InitializationSyntax != null:
                     return
                         FieldDeclaration(VariableDeclaration(accessor.FieldType,
@@ -150,8 +159,9 @@ internal class CopierGenerator(IGeneratorServices generatorServices)
                                     ])))
                             .WithSemicolonToken(Token(SyntaxKind.SemicolonToken));
                 default:
-                    return FieldDeclaration(VariableDeclaration(description.FieldType, SingletonSeparatedList(VariableDeclarator(description.FieldName))))
-                        .AddModifiers(Token(SyntaxKind.PrivateKeyword), Token(SyntaxKind.ReadOnlyKeyword));
+                    var declaration = FieldDeclaration(VariableDeclaration(description.FieldType, SingletonSeparatedList(VariableDeclarator(description.FieldName))))
+                        .AddModifiers(Token(SyntaxKind.PrivateKeyword));
+                    return description.LazyInitialization ? declaration : declaration.AddModifiers(Token(SyntaxKind.ReadOnlyKeyword));
             }
         }
     }
@@ -180,18 +190,13 @@ internal class CopierGenerator(IGeneratorServices generatorServices)
                             ThisExpression().Member(field.FieldName.ToIdentifierName()),
                             Unwrapped(field.FieldName.ToIdentifierName()))));
                     break;
+                case CodecProviderFieldDescription:
+                    AddCodecProviderParameter();
+                    statements.Add(ExpressionStatement(AssignmentExpression(SyntaxKind.SimpleAssignmentExpression, field.FieldName.ToIdentifierName(), IdentifierName("codecProvider"))));
+                    break;
                 case CopierFieldDescription or BaseCopierFieldDescription when !field.IsInjected:
-                    if (!codecProviderAdded)
-                    {
-                        parameters.Add(Parameter(Identifier("codecProvider")).WithType(LibraryTypes.ICodecProvider.ToTypeSyntax()));
-                        codecProviderAdded = true;
-                    }
-
-                    var copier = InvocationExpression(
-                        IdentifierName("OrleansGeneratedCodeHelper").Member(GenericName(Identifier("GetService"), TypeArgumentList(SingletonSeparatedList(field.FieldType)))),
-                        ArgumentList(SeparatedList([Argument(ThisExpression()), Argument(IdentifierName("codecProvider"))])));
-
-                    statements.Add(ExpressionStatement(AssignmentExpression(SyntaxKind.SimpleAssignmentExpression, field.FieldName.ToIdentifierName(), copier)));
+                    AddCodecProviderParameter();
+                    statements.Add(ExpressionStatement(AssignmentExpression(SyntaxKind.SimpleAssignmentExpression, field.FieldName.ToIdentifierName(), GetServiceExpression(field.FieldType, IdentifierName("codecProvider")))));
                     break;
             }
         }
@@ -201,6 +206,17 @@ internal class CopierGenerator(IGeneratorServices generatorServices)
             .AddParameterListParameters([.. parameters])
             .AddBodyStatements([.. statements])
             .WithInitializer(isExceptionType ? ConstructorInitializer(SyntaxKind.BaseConstructorInitializer, ArgumentList(SingletonSeparatedList(Argument(IdentifierName("codecProvider"))))) : null);
+
+        void AddCodecProviderParameter()
+        {
+            if (codecProviderAdded)
+            {
+                return;
+            }
+
+            parameters.Add(Parameter(Identifier("codecProvider")).WithType(LibraryTypes.ICodecProvider.ToTypeSyntax()));
+            codecProviderAdded = true;
+        }
 
         static ExpressionSyntax Unwrapped(ExpressionSyntax expr)
         {
@@ -221,6 +237,12 @@ internal class CopierGenerator(IGeneratorServices generatorServices)
 
         var fields = new List<GeneratedFieldDescription>();
 
+        var hotReloadShape = UseHotReloadShape(serializableTypeDescription);
+        if (hotReloadShape)
+        {
+            fields.Add(new CodecProviderFieldDescription(LibraryTypes.ICodecProvider.ToTypeSyntax()));
+        }
+
         if (!isExceptionType && serializableTypeDescription.HasComplexBaseType)
         {
             fields.Add(GetBaseTypeField(serializableTypeDescription));
@@ -235,7 +257,7 @@ internal class CopierGenerator(IGeneratorServices generatorServices)
             }
 
             // Add a copier field for any field in the target which does not have a static copier.
-            GetCopierFieldDescriptions(serializableTypeDescription.Members, fields);
+            GetCopierFieldDescriptions(serializableTypeDescription.Members, fields, hotReloadShape);
         }
 
         foreach (var member in members)
@@ -276,9 +298,9 @@ internal class CopierGenerator(IGeneratorServices generatorServices)
         return new(LibraryTypes.BaseCopier_1.ToTypeSyntax(serializableTypeDescription.BaseTypeSyntax));
     }
 
-    public void GetCopierFieldDescriptions(IEnumerable<IMemberDescription> members, List<GeneratedFieldDescription> fields)
+    public void GetCopierFieldDescriptions(IEnumerable<IMemberDescription> members, List<GeneratedFieldDescription> fields, bool lazyInitialization = false)
     {
-        var fieldIndex = 0;
+        var copierMembers = new List<IMemberDescription>();
         var uniqueTypes = new HashSet<IMemberDescription>(MemberDescriptionTypeComparer.Default);
         foreach (var member in members)
         {
@@ -292,9 +314,8 @@ internal class CopierGenerator(IGeneratorServices generatorServices)
             if (LibraryTypes.IsShallowCopyable(t))
                 continue;
 
-            foreach (var c in LibraryTypes.StaticCopiers)
-                if (SymbolEqualityComparer.Default.Equals(c.UnderlyingType, t))
-                    goto skip;
+            if (LibraryTypes.StaticCopiers.Any(c => SymbolEqualityComparer.Default.Equals(c.UnderlyingType, t)))
+                continue;
 
             if (member.Symbol.HasAttribute(LibraryTypes.ImmutableAttribute))
                 continue;
@@ -302,47 +323,58 @@ internal class CopierGenerator(IGeneratorServices generatorServices)
             if (!uniqueTypes.Add(member))
                 continue;
 
-            TypeSyntax copierType;
-            if (t.HasAttribute(LibraryTypes.GenerateSerializerAttribute)
-                && (SymbolEqualityComparer.Default.Equals(t.ContainingAssembly, LibraryTypes.Compilation.Assembly) || t.ContainingAssembly.HasAttribute(LibraryTypes.TypeManifestProviderAttribute))
-                && t is not INamedTypeSymbol { IsGenericType: true, TypeArguments.Length: 0 })
+            copierMembers.Add(member);
+        }
+
+        var fieldNames = GeneratedFieldNames.ForTypes("_copier", copierMembers);
+        for (var i = 0; i < copierMembers.Count; i++)
+        {
+            var member = copierMembers[i];
+            fields.Add(new CopierFieldDescription(GetCopierType(member), fieldNames[i], member.Type, lazyInitialization));
+        }
+    }
+
+    private TypeSyntax GetCopierType(IMemberDescription member)
+    {
+        var t = member.Type;
+        if (t.HasAttribute(LibraryTypes.GenerateSerializerAttribute)
+            && (SymbolEqualityComparer.Default.Equals(t.ContainingAssembly, LibraryTypes.Compilation.Assembly) || t.ContainingAssembly.HasAttribute(LibraryTypes.TypeManifestProviderAttribute))
+            && t is not INamedTypeSymbol { IsGenericType: true, TypeArguments.Length: 0 })
+        {
+            // Use the concrete generated type and avoid expensive interface dispatch (except for complex nested cases that will fall back to IDeepCopier<T>)
+            SimpleNameSyntax name;
+            if (t is INamedTypeSymbol namedTypeSymbol && namedTypeSymbol.IsGenericType)
             {
-                // Use the concrete generated type and avoid expensive interface dispatch (except for complex nested cases that will fall back to IDeepCopier<T>)
-                SimpleNameSyntax name;
-                if (t is INamedTypeSymbol namedTypeSymbol && namedTypeSymbol.IsGenericType)
-                {
-                    // Construct the full generic type name
-                    name = GenericName(Identifier(GetSimpleClassName(t.Name)), TypeArgumentList(SeparatedList(namedTypeSymbol.TypeArguments.Select(arg => arg.ToTypeSyntax()))));
-                }
-                else
-                {
-                    name = IdentifierName(GetSimpleClassName(t.Name));
-                }
-                copierType = QualifiedName(ParseName(GetGeneratedNamespaceName(t)), name);
-            }
-            else if (t is IArrayTypeSymbol { IsSZArray: true } array)
-            {
-                copierType = LibraryTypes.ArrayCopier.Construct(array.ElementType).ToTypeSyntax();
-            }
-            else if (LibraryTypes.WellKnownCopiers.FindByUnderlyingType(t) is { } copier)
-            {
-                // The copier is not a static copier and is also not a generic copiers.
-                copierType = copier.CopierType.ToTypeSyntax();
-            }
-            else if (t is INamedTypeSymbol { ConstructedFrom: ISymbol unboundFieldType } named && LibraryTypes.WellKnownCopiers.FindByUnderlyingType(unboundFieldType) is { } genericCopier)
-            {
-                // Construct the generic copier type using the field's type arguments.
-                copierType = genericCopier.CopierType.Construct([.. named.TypeArguments]).ToTypeSyntax();
+                // Construct the full generic type name
+                name = GenericName(Identifier(GetSimpleClassName(t.Name)), TypeArgumentList(SeparatedList(namedTypeSymbol.TypeArguments.Select(arg => arg.ToTypeSyntax()))));
             }
             else
             {
-                // Use the IDeepCopier<T> interface
-                copierType = LibraryTypes.DeepCopier_1.ToTypeSyntax(member.TypeSyntax);
+                name = IdentifierName(GetSimpleClassName(t.Name));
             }
 
-            fields.Add(new CopierFieldDescription(copierType, $"_copier{fieldIndex++}", t));
-skip:;
+            return QualifiedName(ParseName(GetGeneratedNamespaceName(t)), name);
         }
+
+        if (t is IArrayTypeSymbol { IsSZArray: true } array)
+        {
+            return LibraryTypes.ArrayCopier.Construct(array.ElementType).ToTypeSyntax();
+        }
+
+        if (LibraryTypes.WellKnownCopiers.FindByUnderlyingType(t) is { } copier)
+        {
+            // The copier is not a static copier and is also not a generic copiers.
+            return copier.CopierType.ToTypeSyntax();
+        }
+
+        if (t is INamedTypeSymbol { ConstructedFrom: ISymbol unboundFieldType } named && LibraryTypes.WellKnownCopiers.FindByUnderlyingType(unboundFieldType) is { } genericCopier)
+        {
+            // Construct the generic copier type using the field's type arguments.
+            return genericCopier.CopierType.Construct([.. named.TypeArguments]).ToTypeSyntax();
+        }
+
+        // Use the IDeepCopier<T> interface
+        return LibraryTypes.DeepCopier_1.ToTypeSyntax(member.TypeSyntax);
     }
 
     private MemberDeclarationSyntax GenerateMemberwiseDeepCopyMethod(
@@ -628,7 +660,7 @@ skip:;
             else
             {
                 var instanceCopier = copierFields.OfType<CopierFieldDescription>().First(f => SymbolEqualityComparer.Default.Equals(f.UnderlyingType, memberType));
-                copierExpression = IdentifierName(instanceCopier.FieldName);
+                copierExpression = GetCodecExpression(instanceCopier);
             }
 
             getValueExpression = InvocationExpression(
@@ -679,10 +711,11 @@ skip:;
         public override bool IsInjected { get; } = !concreteType;
     }
 
-    internal sealed class CopierFieldDescription(TypeSyntax fieldType, string fieldName, ITypeSymbol underlyingType) : GeneratedFieldDescription(fieldType, fieldName), ICopierDescription
+    internal sealed class CopierFieldDescription(TypeSyntax fieldType, string fieldName, ITypeSymbol underlyingType, bool lazyInitialization = false) : GeneratedFieldDescription(fieldType, fieldName), ICopierDescription
     {
         public ITypeSymbol UnderlyingType { get; } = underlyingType;
         public override bool IsInjected => false;
+        public override bool LazyInitialization { get; } = lazyInitialization;
     }
 
 }

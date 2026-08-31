@@ -134,6 +134,7 @@ internal class ProxyMethodDescription : IEquatable<ProxyMethodDescription>
         public bool IsSealedType => _invokableDescription.IsSealedType;
         public bool IsAbstractType => _invokableDescription.IsAbstractType;
         public bool IsEnumType => _invokableDescription.IsEnumType;
+        public bool SupportsHotReloadMemberAddition => false;
         public bool IsGenericType => TypeParameters.Count > 0;
         public List<IMemberDescription> Members { get; }
         public Compilation Compilation => MethodDescription.GenerationContext.Compilation;

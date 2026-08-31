@@ -14,6 +14,12 @@ namespace OrleansCodeGen.TestProject
     public sealed class Codec_ClassWithGeneratedActivatorConstructor : global::Orleans.Serialization.Codecs.IFieldCodec<global::TestProject.ClassWithGeneratedActivatorConstructor>, global::Orleans.Serialization.Serializers.IBaseCodec<global::TestProject.ClassWithGeneratedActivatorConstructor>
     {
         private readonly global::System.Type _codecFieldType = typeof(global::TestProject.ClassWithGeneratedActivatorConstructor);
+        private readonly global::Orleans.Serialization.Serializers.ICodecProvider _codecProvider;
+        public Codec_ClassWithGeneratedActivatorConstructor(global::Orleans.Serialization.Serializers.ICodecProvider codecProvider)
+        {
+            _codecProvider = codecProvider;
+        }
+
         [global::System.Runtime.CompilerServices.MethodImplAttribute(global::System.Runtime.CompilerServices.MethodImplOptions.AggressiveInlining)]
         public void Serialize<TBufferWriter>(ref global::Orleans.Serialization.Buffers.Writer<TBufferWriter> writer, global::TestProject.ClassWithGeneratedActivatorConstructor instance)
             where TBufferWriter : global::System.Buffers.IBufferWriter<byte>
@@ -91,6 +97,7 @@ namespace OrleansCodeGen.TestProject
     [global::System.CodeDom.Compiler.GeneratedCodeAttribute("OrleansCodeGen", "10.0.0.0"), global::System.ComponentModel.EditorBrowsableAttribute(global::System.ComponentModel.EditorBrowsableState.Never), global::System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverageAttribute]
     public sealed class Copier_ClassWithGeneratedActivatorConstructor : global::Orleans.Serialization.Cloning.IDeepCopier<global::TestProject.ClassWithGeneratedActivatorConstructor>, global::Orleans.Serialization.Cloning.IBaseCopier<global::TestProject.ClassWithGeneratedActivatorConstructor>
     {
+        private readonly global::Orleans.Serialization.Serializers.ICodecProvider _codecProvider;
         [global::System.Runtime.CompilerServices.MethodImplAttribute(global::System.Runtime.CompilerServices.MethodImplOptions.AggressiveInlining)]
         public global::TestProject.ClassWithGeneratedActivatorConstructor DeepCopy(global::TestProject.ClassWithGeneratedActivatorConstructor original, global::Orleans.Serialization.Cloning.CopyContext context)
         {
@@ -102,6 +109,11 @@ namespace OrleansCodeGen.TestProject
             context.RecordCopy(original, result);
             DeepCopy(original, result, context);
             return result;
+        }
+
+        public Copier_ClassWithGeneratedActivatorConstructor(global::Orleans.Serialization.Serializers.ICodecProvider codecProvider)
+        {
+            _codecProvider = codecProvider;
         }
 
         [global::System.Runtime.CompilerServices.MethodImplAttribute(global::System.Runtime.CompilerServices.MethodImplOptions.AggressiveInlining)]
