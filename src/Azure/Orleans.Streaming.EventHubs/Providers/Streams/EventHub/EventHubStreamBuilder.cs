@@ -116,6 +116,8 @@ namespace Orleans.Hosting
         {
             this.ConfigureDelegate(services =>
             {
+                services.AddSingleton<ILifecycleParticipant<ISiloLifecycle>>(
+                    sp => new EventHubAdapterFactoryLifecycle<ISiloLifecycle>(sp, name));
                 services.AddOptions<GrainStreamQueueCheckpointerOptions>(name)
                     .Configure(static options => options.CheckpointComparer = StreamCheckpointComparers.Numeric);
                 services.AddOptions<AzureTableStreamCheckpointerOptions>(name)
@@ -152,8 +154,13 @@ namespace Orleans.Hosting
            : base(name, builder, EventHubAdapterFactory.Create)
         {
             builder
-                .ConfigureServices(services => services.ConfigureNamedOptionForLogging<EventHubOptions>(name)
-                .AddTransient<IConfigurationValidator>(sp => new EventHubOptionsValidator(sp.GetOptionsByName<EventHubOptions>(name), name)));
+                .ConfigureServices(services =>
+                {
+                    services.AddSingleton<ILifecycleParticipant<IClusterClientLifecycle>>(
+                        sp => new EventHubAdapterFactoryLifecycle<IClusterClientLifecycle>(sp, name));
+                    services.ConfigureNamedOptionForLogging<EventHubOptions>(name)
+                        .AddTransient<IConfigurationValidator>(sp => new EventHubOptionsValidator(sp.GetOptionsByName<EventHubOptions>(name), name));
+                });
         }
     }
 }
