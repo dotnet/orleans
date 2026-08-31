@@ -54,16 +54,14 @@ public sealed class EventHubsStreamProviderBuilderTests
 
         using var siloServices = siloBuilder.Services.BuildServiceProvider();
         using var clientServices = clientBuilder.Services.BuildServiceProvider();
-Assert.Contains(
-    siloBuilder.Services,
-    sd => sd.ServiceType == typeof(ILifecycleParticipant<ISiloLifecycle>)
-        && sd.ImplementationFactory is not null
-        && sd.ImplementationFactory(siloServices) is EventHubAdapterFactoryLifecycle<ISiloLifecycle>);
-Assert.Contains(
-    clientBuilder.Services,
-    sd => sd.ServiceType == typeof(ILifecycleParticipant<IClusterClientLifecycle>)
-        && sd.ImplementationFactory is not null
-        && sd.ImplementationFactory(clientServices) is EventHubAdapterFactoryLifecycle<IClusterClientLifecycle>);
+        var siloRegistration = siloBuilder.Services.Last(
+            service => service.ServiceType == typeof(ILifecycleParticipant<ISiloLifecycle>));
+        var clientRegistration = clientBuilder.Services.Last(
+            service => service.ServiceType == typeof(ILifecycleParticipant<IClusterClientLifecycle>));
+        Assert.IsType<EventHubAdapterFactoryLifecycle<ISiloLifecycle>>(
+            siloRegistration.ImplementationFactory!(siloServices));
+        Assert.IsType<EventHubAdapterFactoryLifecycle<IClusterClientLifecycle>>(
+            clientRegistration.ImplementationFactory!(clientServices));
     }
 
     [Fact]
