@@ -32,8 +32,11 @@ namespace Orleans.Transactions
         // the time at which this transaction was started on the TA
         public DateTime Priority;
 
-        // a deadline for the transaction to complete successfully, set by the TA
+        // the deadline for a queued transaction to acquire the lock
         public DateTime Deadline;
+
+        // the minimum time this participant must retain the lock after acquiring it
+        public TimeSpan LockTimeout;
 
         // the transaction timestamp as computed by the algorithm
         public DateTime Timestamp;
