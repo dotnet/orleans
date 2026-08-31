@@ -1,3 +1,5 @@
+using Orleans.Placement.Rebalancing;
+using TestExtensions;
 using Xunit;
 
 namespace UnitTests.ActivationRebalancingTests;
@@ -17,6 +19,9 @@ public class StaticRebalancingTests(RebalancerFixture fixture, ITestOutputHelper
     {
         var cancellationToken = TestContext.Current.CancellationToken;
         var tasks = new List<Task>();
+        using var rebalancerEvents = RebalancerDiagnosticObserver.Create();
+        var rebalancer = Cluster.Client!.GetGrain<IActivationRebalancerWorker>(0);
+        var rebalancerHost = (await rebalancer.GetReport()).Host;
 
         AddTestActivations(tasks, Silo1, 300);
         AddTestActivations(tasks, Silo2, 30);
@@ -24,6 +29,7 @@ public class StaticRebalancingTests(RebalancerFixture fixture, ITestOutputHelper
         AddTestActivations(tasks, Silo4, 100);
 
         await Task.WhenAll(tasks);
+        rebalancerEvents.Clear();
 
         var stats = await MgmtGrain.GetDetailedGrainStatistics();
 
@@ -44,19 +50,16 @@ public class StaticRebalancingTests(RebalancerFixture fixture, ITestOutputHelper
         var silo3Activations = initialSilo3Activations;
         var silo4Activations = initialSilo4Activations;
 
-        var index = 0;
-        while (index < 3)
-        {
-            await Task.Delay(RebalancerFixture.SessionCyclePeriod, cancellationToken);
-            stats = await MgmtGrain.GetDetailedGrainStatistics();
+        const int observedCycles = 3;
+        await rebalancerEvents
+            .WaitForCycleCountAsync(rebalancerHost, observedCycles)
+            .WaitAsync(cancellationToken);
 
-            silo1Activations = GetActivationCount(stats, Silo1);
-            silo2Activations = GetActivationCount(stats, Silo2);
-            silo3Activations = GetActivationCount(stats, Silo3);
-            silo4Activations = GetActivationCount(stats, Silo4);
-
-            index++;
-        }
+        stats = await MgmtGrain.GetDetailedGrainStatistics();
+        silo1Activations = GetActivationCount(stats, Silo1);
+        silo2Activations = GetActivationCount(stats, Silo2);
+        silo3Activations = GetActivationCount(stats, Silo3);
+        silo4Activations = GetActivationCount(stats, Silo4);
 
         Assert.True(silo1Activations < initialSilo1Activations,
             $"Did not expect Silo1 to have more activations than what it started with: " +
@@ -78,7 +81,7 @@ public class StaticRebalancingTests(RebalancerFixture fixture, ITestOutputHelper
         var postVariance = CalculateVariance([silo1Activations, silo2Activations, silo3Activations, silo4Activations]);
         
         OutputHelper.WriteLine(
-            $"Post-rebalancing activations ({index} cycles):\n" +
+            $"Post-rebalancing activations ({observedCycles} cycles):\n" +
             $"Silo1: {silo1Activations}\n" +
             $"Silo2: {silo2Activations}\n" +
             $"Silo3: {silo3Activations}\n" +
