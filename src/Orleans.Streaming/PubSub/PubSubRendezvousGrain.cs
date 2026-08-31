@@ -232,23 +232,6 @@ namespace Orleans.Streams
                 return (true, false);
             }
 
-            var targetVersion = PubSubPublisherState.UnknownMembershipVersion;
-            foreach (var version in siloMembershipVersions.Values)
-            {
-                if (HasMembershipVersion(version)
-                    && version > membershipSnapshot.Version
-                    && version > targetVersion)
-                {
-                    targetVersion = version;
-                }
-            }
-
-            if (HasMembershipVersion(targetVersion))
-            {
-                await _clusterMembershipService.Refresh(targetVersion, cancellationToken);
-                membershipSnapshot = _clusterMembershipService.CurrentSnapshot;
-            }
-
             var statuses = await GetSiloStatuses(
                 membershipSnapshot,
                 siloMembershipVersions,
@@ -278,7 +261,10 @@ namespace Orleans.Streams
                 RecordRemovedProducers(removedProducers);
             }
 
-            var shouldRegister = registeringSiloAddress is null || IsValidSystemTargetRegistrationStatus(statuses[registeringSiloAddress]);
+            var shouldRegister = ShouldRegisterSystemTarget(
+                registeringSiloAddress,
+                systemTargetProducers?.Select(producer => producer.SiloAddress),
+                statuses);
             return (shouldRegister, removedProducers is not null);
         }
 
@@ -304,26 +290,30 @@ namespace Orleans.Streams
                 ClusterMembershipSnapshot,
                 IReadOnlySet<SiloAddress>,
                 CancellationToken,
+                bool,
                 ValueTask<UnknownSiloStatusCache.SiloStatusValidationResult>> validateUnknownSilos,
             CancellationToken cancellationToken)
         {
             var statuses = new Dictionary<SiloAddress, SiloStatus>();
-            HashSet<SiloAddress>? unversionedSilos = null;
+            HashSet<SiloAddress>? silosRequiringFreshValidation = null;
+            var requireFresh = false;
             foreach (var (siloAddress, version) in siloMembershipVersions)
             {
-                if (!HasMembershipVersion(version))
+                if (!HasMembershipVersion(version) || version > membershipSnapshot.Version)
                 {
-                    unversionedSilos ??= [];
-                    unversionedSilos.Add(siloAddress);
+                    silosRequiringFreshValidation ??= [];
+                    silosRequiringFreshValidation.Add(siloAddress);
+                    requireFresh |= HasMembershipVersion(version);
                 }
             }
 
-            if (unversionedSilos is not null)
+            if (silosRequiringFreshValidation is not null)
             {
                 var validation = await validateUnknownSilos(
                     membershipSnapshot,
-                    unversionedSilos,
-                    cancellationToken);
+                    silosRequiringFreshValidation,
+                    cancellationToken,
+                    requireFresh);
                 membershipSnapshot = validation.Snapshot;
                 foreach (var (siloAddress, status) in validation.Statuses)
                 {
@@ -333,7 +323,7 @@ namespace Orleans.Streams
 
             foreach (var (siloAddress, version) in siloMembershipVersions)
             {
-                if (HasMembershipVersion(version))
+                if (HasMembershipVersion(version) && version <= membershipSnapshot.Version)
                 {
                     statuses[siloAddress] = membershipSnapshot.GetSiloStatus(siloAddress, version);
                 }
@@ -344,6 +334,25 @@ namespace Orleans.Streams
 
         internal static bool IsValidSystemTargetRegistrationStatus(SiloStatus status) =>
             status != SiloStatus.None && !status.IsTerminating();
+
+        internal static bool ShouldRegisterSystemTarget(
+            SiloAddress? registeringSiloAddress,
+            IEnumerable<SiloAddress>? existingProducerSilos,
+            IReadOnlyDictionary<SiloAddress, SiloStatus> statuses)
+        {
+            if (registeringSiloAddress is null)
+            {
+                return true;
+            }
+
+            if (existingProducerSilos is not null
+                && existingProducerSilos.Any(siloAddress => statuses[siloAddress] == SiloStatus.None))
+            {
+                return false;
+            }
+
+            return IsValidSystemTargetRegistrationStatus(statuses[registeringSiloAddress]);
+        }
 
         public async Task UnregisterProducer(QualifiedStreamId streamId, GrainId streamProducer, CancellationToken cancellationToken)
         {

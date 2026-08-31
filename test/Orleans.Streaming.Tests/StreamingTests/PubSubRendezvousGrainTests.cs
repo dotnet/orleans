@@ -195,6 +195,31 @@ namespace UnitTests.StreamingTests
         public void SystemTargetRegistrationRequiresKnownNonTerminatingSilo(SiloStatus status, bool expected) =>
             Assert.Equal(expected, PubSubRendezvousGrain.IsValidSystemTargetRegistrationStatus(status));
 
+        [Theory]
+        [InlineData(SiloStatus.None, false)]
+        [InlineData(SiloStatus.Active, true)]
+        [InlineData(SiloStatus.Dead, true)]
+        [TestCategory("BVT"), TestCategory("Streaming"), TestCategory("PubSub")]
+        public void ReplacementRegistrationRequiresExistingPublisherStatus(
+            SiloStatus existingPublisherStatus,
+            bool expected)
+        {
+            var existingSilo = SiloAddress.New(new IPEndPoint(IPAddress.Loopback, 11111), 1);
+            var replacementSilo = SiloAddress.New(new IPEndPoint(IPAddress.Loopback, 11111), 2);
+            var statuses = new Dictionary<SiloAddress, SiloStatus>
+            {
+                [existingSilo] = existingPublisherStatus,
+                [replacementSilo] = SiloStatus.Active,
+            };
+
+            var actual = PubSubRendezvousGrain.ShouldRegisterSystemTarget(
+                replacementSilo,
+                [existingSilo],
+                statuses);
+
+            Assert.Equal(expected, actual);
+        }
+
         [Fact, TestCategory("BVT"), TestCategory("Streaming"), TestCategory("PubSub")]
         public void DefaultMembershipVersionIdentifiesLegacyPublisherState()
         {
@@ -231,11 +256,12 @@ namespace UnitTests.StreamingTests
             var statuses = await PubSubRendezvousGrain.GetSiloStatuses(
                 staleSnapshot,
                 versions,
-                (snapshot, unversionedSilos, cancellationToken) =>
+                (snapshot, unversionedSilos, cancellationToken, requireFresh) =>
                 {
                     Assert.Same(staleSnapshot, snapshot);
                     Assert.Equal([replacementSilo], unversionedSilos);
                     Assert.Equal(TestContext.Current.CancellationToken, cancellationToken);
+                    Assert.False(requireFresh);
                     return ValueTask.FromResult(
                         new UnknownSiloStatusCache.SiloStatusValidationResult(
                             new Dictionary<SiloAddress, SiloStatus>
@@ -243,6 +269,102 @@ namespace UnitTests.StreamingTests
                                 [replacementSilo] = SiloStatus.Active,
                             },
                             freshSnapshot));
+                },
+                cancellationToken);
+
+            Assert.Equal(SiloStatus.Dead, statuses[staleSilo]);
+            Assert.Equal(SiloStatus.Active, statuses[replacementSilo]);
+        }
+
+        [Fact, TestCategory("BVT"), TestCategory("Streaming"), TestCategory("PubSub")]
+        public async Task PersistedFuturePublisherVersionUsesFreshValidation()
+        {
+            var cancellationToken = TestContext.Current.CancellationToken;
+            var staleSilo = SiloAddress.New(new IPEndPoint(IPAddress.Loopback, 11111), 1);
+            var replacementSilo = SiloAddress.New(new IPEndPoint(IPAddress.Loopback, 11111), 2);
+            var staleSnapshot = new ClusterMembershipSnapshot(
+                new Dictionary<SiloAddress, ClusterMember>
+                {
+                    [replacementSilo] = new(replacementSilo, SiloStatus.Active, "replacement"),
+                }.ToImmutableDictionary(),
+                new MembershipVersion(1));
+            var refreshedSnapshot = new ClusterMembershipSnapshot(
+                new Dictionary<SiloAddress, ClusterMember>
+                {
+                    [staleSilo] = new(staleSilo, SiloStatus.Dead, "stale"),
+                    [replacementSilo] = new(replacementSilo, SiloStatus.Active, "replacement"),
+                }.ToImmutableDictionary(),
+                new MembershipVersion(2));
+            var versions = new Dictionary<SiloAddress, MembershipVersion>
+            {
+                [staleSilo] = new(42),
+                [replacementSilo] = new(1),
+            };
+
+            var statuses = await PubSubRendezvousGrain.GetSiloStatuses(
+                staleSnapshot,
+                versions,
+                (snapshot, silosRequiringFreshValidation, actualCancellationToken, requireFresh) =>
+                {
+                    Assert.Same(staleSnapshot, snapshot);
+                    Assert.Equal([staleSilo], silosRequiringFreshValidation);
+                    Assert.Equal(cancellationToken, actualCancellationToken);
+                    Assert.True(requireFresh);
+                    return ValueTask.FromResult(
+                        new UnknownSiloStatusCache.SiloStatusValidationResult(
+                            new Dictionary<SiloAddress, SiloStatus>
+                            {
+                                [staleSilo] = SiloStatus.Dead,
+                            },
+                            refreshedSnapshot));
+                },
+                cancellationToken);
+
+            Assert.Equal(SiloStatus.Dead, statuses[staleSilo]);
+            Assert.Equal(SiloStatus.Active, statuses[replacementSilo]);
+        }
+
+        [Fact, TestCategory("BVT"), TestCategory("Streaming"), TestCategory("PubSub")]
+        public async Task FutureReplacementVersionUsesFreshValidation()
+        {
+            var cancellationToken = TestContext.Current.CancellationToken;
+            var staleSilo = SiloAddress.New(new IPEndPoint(IPAddress.Loopback, 11111), 1);
+            var replacementSilo = SiloAddress.New(new IPEndPoint(IPAddress.Loopback, 11111), 2);
+            var staleSnapshot = new ClusterMembershipSnapshot(
+                new Dictionary<SiloAddress, ClusterMember>
+                {
+                    [staleSilo] = new(staleSilo, SiloStatus.Active, "stale"),
+                }.ToImmutableDictionary(),
+                new MembershipVersion(1));
+            var refreshedSnapshot = new ClusterMembershipSnapshot(
+                new Dictionary<SiloAddress, ClusterMember>
+                {
+                    [staleSilo] = new(staleSilo, SiloStatus.Dead, "stale"),
+                    [replacementSilo] = new(replacementSilo, SiloStatus.Active, "replacement"),
+                }.ToImmutableDictionary(),
+                new MembershipVersion(2));
+            var versions = new Dictionary<SiloAddress, MembershipVersion>
+            {
+                [staleSilo] = new(1),
+                [replacementSilo] = new(2),
+            };
+
+            var statuses = await PubSubRendezvousGrain.GetSiloStatuses(
+                staleSnapshot,
+                versions,
+                (snapshot, silosRequiringFreshValidation, actualCancellationToken, requireFresh) =>
+                {
+                    Assert.Same(staleSnapshot, snapshot);
+                    Assert.Equal([replacementSilo], silosRequiringFreshValidation);
+                    Assert.Equal(cancellationToken, actualCancellationToken);
+                    Assert.True(requireFresh);
+                    return ValueTask.FromResult(
+                        new UnknownSiloStatusCache.SiloStatusValidationResult(
+                            new Dictionary<SiloAddress, SiloStatus>
+                            {
+                                [replacementSilo] = SiloStatus.Active,
+                            },
+                            refreshedSnapshot));
                 },
                 cancellationToken);
 

@@ -33,12 +33,17 @@ internal sealed partial class UnknownSiloStatusCache
         ClusterMembershipSnapshot snapshot,
         IReadOnlySet<SiloAddress> siloAddresses,
         CancellationToken cancellationToken)
-        => (await ValidateSiloStatuses(snapshot, siloAddresses, cancellationToken)).Statuses;
+        => (await ValidateSiloStatuses(
+            snapshot,
+            siloAddresses,
+            cancellationToken,
+            requireFresh: false)).Statuses;
 
     public async ValueTask<SiloStatusValidationResult> ValidateSiloStatuses(
         ClusterMembershipSnapshot snapshot,
         IReadOnlySet<SiloAddress> siloAddresses,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        bool requireFresh = false)
     {
         var result = new Dictionary<SiloAddress, SiloStatus>();
         List<SiloAddress>? unknownSilos = null;
@@ -61,6 +66,11 @@ internal sealed partial class UnknownSiloStatusCache
             }
         }
 
+        if (requireFresh)
+        {
+            unknownSilos = [.. siloAddresses];
+        }
+
         if (unknownSilos is null)
         {
             return new(result, snapshot);
@@ -70,7 +80,8 @@ internal sealed partial class UnknownSiloStatusCache
         {
             var refresh = GetRefreshOperation(unknownSilos, cancellationToken);
             var refreshedTableSnapshot = await refresh.Completion.Task.WaitAsync(cancellationToken);
-            foreach (var siloAddress in unknownSilos)
+            result.Clear();
+            foreach (var siloAddress in siloAddresses)
             {
                 if (_siloStatuses.TryGet(siloAddress, out var cachedStatus)
                     && cachedStatus.Version >= refreshedTableSnapshot.Version)
@@ -96,7 +107,7 @@ internal sealed partial class UnknownSiloStatusCache
         {
             foreach (var siloAddress in unknownSilos)
             {
-                result.Add(siloAddress, SiloStatus.None);
+                result[siloAddress] = SiloStatus.None;
             }
         }
 
