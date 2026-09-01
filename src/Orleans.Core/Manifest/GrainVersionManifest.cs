@@ -284,14 +284,14 @@ namespace Orleans.Runtime.Versions
             var resultSupportedByInterface = new Dictionary<(GrainInterfaceType, ushort), SiloAddress[]>();
             foreach (var entry in supportedInterfaces)
             {
-                entry.Value.Sort(SiloAddressOrderingComparer.Instance);
+                entry.Value.Sort();
                 resultSupportedByInterface[entry.Key] = entry.Value.ToArray();
             }
 
             var resultSupportedSilosByGrainType = new Dictionary<GrainType, SiloAddress[]>();
             foreach (var entry in supportedGrains)
             {
-                entry.Value.Sort(SiloAddressOrderingComparer.Instance);
+                entry.Value.Sort();
                 resultSupportedSilosByGrainType[entry.Key] = entry.Value.ToArray();
             }
 
@@ -365,7 +365,7 @@ namespace Orleans.Runtime.Versions
                 var resultIndex = 0;
                 while (leftIndex < left.Length && rightIndex < right.Length)
                 {
-                    var comparison = SiloAddressOrderingComparer.Instance.Compare(left[leftIndex], right[rightIndex]);
+                    var comparison = left[leftIndex].CompareTo(right[rightIndex]);
                     if (comparison < 0)
                     {
                         result[resultIndex++] = left[leftIndex++];
@@ -412,7 +412,7 @@ namespace Orleans.Runtime.Versions
                 var resultIndex = 0;
                 while (leftIndex < left.Length && rightIndex < right.Length)
                 {
-                    var comparison = SiloAddressOrderingComparer.Instance.Compare(left[leftIndex], right[rightIndex]);
+                    var comparison = left[leftIndex].CompareTo(right[rightIndex]);
                     if (comparison < 0)
                     {
                         ++leftIndex;
@@ -436,37 +436,6 @@ namespace Orleans.Runtime.Versions
 
                 Array.Resize(ref result, resultIndex);
                 return result;
-            }
-        }
-
-        private sealed class SiloAddressOrderingComparer : IComparer<SiloAddress>
-        {
-            public static SiloAddressOrderingComparer Instance { get; } = new();
-
-            public int Compare(SiloAddress? left, SiloAddress? right)
-            {
-                if (ReferenceEquals(left, right))
-                {
-                    return 0;
-                }
-
-                if (left is null)
-                {
-                    return -1;
-                }
-
-                if (right is null)
-                {
-                    return 1;
-                }
-
-                var result = left.CompareTo(right);
-                if (result != 0 || left.Equals(right))
-                {
-                    return result;
-                }
-
-                return left.Endpoint.Address.ScopeId.CompareTo(right.Endpoint.Address.ScopeId);
             }
         }
 

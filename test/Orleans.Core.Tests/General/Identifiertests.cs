@@ -45,6 +45,22 @@ namespace UnitTests.General
         [TestSuite("BVT")]
         [TestProvider("None")]
         [Fact, TestCategory("BVT"), TestCategory("Identifiers")]
+        public void SiloAddressComparisonDistinguishesIpv6ScopeIds()
+        {
+            var addressBytes = IPAddress.Parse("fe80::1").GetAddressBytes();
+            var lowerScopeAddress = new IPAddress(addressBytes, scopeid: 1);
+            var higherScopeAddress = new IPAddress(addressBytes, scopeid: 2);
+            var lowerScopeSilo = SiloAddress.New(lowerScopeAddress, 11111, 1);
+            var higherScopeSilo = SiloAddress.New(higherScopeAddress, 11111, 1);
+
+            Assert.True(IPAddressComparer.Instance.Compare(lowerScopeAddress, higherScopeAddress) < 0);
+            Assert.True(lowerScopeSilo.CompareTo(higherScopeSilo) < 0);
+            Assert.NotEqual(lowerScopeSilo, higherScopeSilo);
+        }
+
+        [TestSuite("BVT")]
+        [TestProvider("None")]
+        [Fact, TestCategory("BVT"), TestCategory("Identifiers")]
         public void UniqueKeyKeyExtGrainCategoryDisallowsNullKeyExtension()
         {
             Assert.Throws<ArgumentNullException>(() =>
