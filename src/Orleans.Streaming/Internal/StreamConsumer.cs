@@ -52,7 +52,7 @@ namespace Orleans.Streams
 
         public Task<StreamSubscriptionHandle<T>> SubscribeAsync(IAsyncObserver<T> observer)
         {
-            return SubscribeAsyncImpl(observer, null, null, StreamSubscriptionStartPosition.Latest);
+            return SubscribeAsyncImpl(observer, null, null, startPosition: null);
         }
 
         public Task<StreamSubscriptionHandle<T>> SubscribeAsync(
@@ -60,7 +60,7 @@ namespace Orleans.Streams
             StreamSequenceToken? token,
             string? filterData = null)
         {
-            return SubscribeAsyncImpl(observer, null, token, StreamSubscriptionStartPosition.Latest, filterData);
+            return SubscribeAsyncImpl(observer, null, token, startPosition: null, filterData);
         }
 
         public Task<StreamSubscriptionHandle<T>> SubscribeAsync(
@@ -73,12 +73,12 @@ namespace Orleans.Streams
 
         public Task<StreamSubscriptionHandle<T>> SubscribeAsync(IAsyncBatchObserver<T> batchObserver)
         {
-            return SubscribeAsyncImpl(null, batchObserver, null, StreamSubscriptionStartPosition.Latest);
+            return SubscribeAsyncImpl(null, batchObserver, null, startPosition: null);
         }
 
         public Task<StreamSubscriptionHandle<T>> SubscribeAsync(IAsyncBatchObserver<T> batchObserver, StreamSequenceToken? token)
         {
-            return SubscribeAsyncImpl(null, batchObserver, token, StreamSubscriptionStartPosition.Latest);
+            return SubscribeAsyncImpl(null, batchObserver, token, startPosition: null);
         }
 
         public Task<StreamSubscriptionHandle<T>> SubscribeAsync(
@@ -92,13 +92,13 @@ namespace Orleans.Streams
             IAsyncObserver<T>? observer,
             IAsyncBatchObserver<T>? batchObserver,
             StreamSequenceToken? token,
-            StreamSubscriptionStartPosition startPosition,
+            StreamSubscriptionStartPosition? startPosition,
             string? filterData = null)
         {
-            startPosition.Validate();
+            startPosition?.Validate();
             if (token != null && !IsRewindable)
                 throw new ArgumentException("Passing a non-null token to a non-rewindable IAsyncObservable.", nameof(token));
-            if (startPosition != StreamSubscriptionStartPosition.Latest && !IsRewindable)
+            if (startPosition is not null and not StreamSubscriptionStartPosition.Latest && !IsRewindable)
                 throw new InvalidOperationException("A non-latest start position requires a rewindable IAsyncObservable.");
             if (observer is GrainReference)
                 throw new ArgumentException("On-behalf subscription via grain references is not supported. Only passing of object references is allowed.", nameof(observer));
@@ -182,7 +182,7 @@ namespace Orleans.Streams
                 observer,
                 batchObserver,
                 token,
-                StreamSubscriptionStartPosition.Latest,
+                startPosition: null,
                 oldHandleImpl.FilterData,
                 handshakeState: token is null ? oldHandleImpl.SharedHandshake : null);
 

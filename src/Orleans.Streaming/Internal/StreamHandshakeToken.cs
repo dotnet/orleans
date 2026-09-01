@@ -15,14 +15,10 @@ namespace Orleans.Streams
             return new StartToken {Token = token};
         }
 
-        public static StreamHandshakeToken? CreateStartPositionToken(StreamSubscriptionStartPosition startPosition)
+        public static StreamHandshakeToken CreateStartPositionToken(StreamSubscriptionStartPosition startPosition)
         {
-            return startPosition switch
-            {
-                StreamSubscriptionStartPosition.Latest => null,
-                StreamSubscriptionStartPosition.EarliestAvailable => new StartPositionToken(),
-                _ => throw new ArgumentOutOfRangeException(nameof(startPosition), startPosition, "The subscription start position is not defined."),
-            };
+            startPosition.Validate();
+            return new StartPositionToken(startPosition);
         }
 
         public static StreamHandshakeToken? CreateDeliveyToken(StreamSequenceToken? token)
@@ -36,6 +32,8 @@ namespace Orleans.Streams
             if (ReferenceEquals(null, other)) return false;
             if (ReferenceEquals(this, other)) return true;
             if (other.GetType() != GetType()) return false;
+            if (this is StartPositionToken startPositionToken && other is StartPositionToken otherStartPositionToken)
+                return startPositionToken.StartPosition == otherStartPositionToken.StartPosition;
             return Equals(Token, other.Token);
         }
 
@@ -47,7 +45,9 @@ namespace Orleans.Streams
             return Equals((StreamHandshakeToken)obj);
         }
 
-        public override int GetHashCode() => HashCode.Combine(GetType(), Token);
+        public override int GetHashCode() => this is StartPositionToken startPositionToken
+            ? HashCode.Combine(GetType(), startPositionToken.StartPosition)
+            : HashCode.Combine(GetType(), Token);
     }
 
     [Serializable]
@@ -56,7 +56,24 @@ namespace Orleans.Streams
 
     [Serializable]
     [GenerateSerializer]
-    internal sealed class StartPositionToken : StreamHandshakeToken { }
+    internal sealed class StartPositionToken : StreamHandshakeToken
+    {
+        [Id(0)]
+        private StreamSubscriptionStartPosition? startPosition;
+
+        public StreamSubscriptionStartPosition StartPosition
+            => startPosition ?? StreamSubscriptionStartPosition.EarliestAvailable;
+
+        public StartPositionToken()
+        {
+        }
+
+        public StartPositionToken(StreamSubscriptionStartPosition startPosition)
+        {
+            startPosition.Validate();
+            this.startPosition = startPosition;
+        }
+    }
     
     [Serializable]
     [GenerateSerializer]

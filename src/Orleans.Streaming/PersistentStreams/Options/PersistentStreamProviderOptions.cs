@@ -77,6 +77,24 @@ namespace Orleans.Configuration
     public class StreamPullingAgentOptions
     {
         /// <summary>
+        /// Gets or sets the position used for initial subscriptions which do not specify a sequence token or explicit start position.
+        /// </summary>
+        /// <remarks>
+        /// <see cref="StreamSubscriptionStartPosition.EarliestAvailable"/> starts at the earliest message for the
+        /// subscribed stream which is currently retained in the pulling agent's local queue cache.
+        /// Receiver checkpoints and provider queue positions remain unchanged.
+        /// A concrete sequence token or explicit per-subscription start position takes precedence over this setting.
+        /// During a rolling deployment, configure this setting after the silos hosting persistent-stream pulling
+        /// agents have been upgraded to a version which supports it.
+        /// </remarks>
+        public StreamSubscriptionStartPosition InitialSubscriptionStartPosition { get; set; } = DEFAULT_INITIAL_SUBSCRIPTION_START_POSITION;
+
+        /// <summary>
+        /// The default initial subscription start position.
+        /// </summary>
+        public static readonly StreamSubscriptionStartPosition DEFAULT_INITIAL_SUBSCRIPTION_START_POSITION = StreamSubscriptionStartPosition.Latest;
+
+        /// <summary>
         /// Gets or sets the size of each batch container batch.
         /// </summary>
         /// <value>The size of each batch container batch.</value>

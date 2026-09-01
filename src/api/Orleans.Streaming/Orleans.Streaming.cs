@@ -148,11 +148,14 @@ namespace Orleans.Configuration
         public static readonly int DEFAULT_BATCH_CONTAINER_BATCH_SIZE;
         public static readonly System.TimeSpan DEFAULT_GET_QUEUE_MESSAGES_TIMER_PERIOD;
         public static readonly System.TimeSpan DEFAULT_INIT_QUEUE_TIMEOUT;
+        public static readonly Streams.StreamSubscriptionStartPosition DEFAULT_INITIAL_SUBSCRIPTION_START_POSITION;
         public static readonly System.TimeSpan DEFAULT_MAX_EVENT_DELIVERY_TIME;
         public static readonly System.TimeSpan DEFAULT_STREAM_INACTIVITY_PERIOD;
         public int BatchContainerBatchSize { get { throw null; } set { } }
 
         public System.TimeSpan GetQueueMsgsTimerPeriod { get { throw null; } set { } }
+
+        public Streams.StreamSubscriptionStartPosition InitialSubscriptionStartPosition { get { throw null; } set { } }
 
         public System.TimeSpan InitQueueTimeout { get { throw null; } set { } }
 

@@ -25,6 +25,63 @@ public class StreamSubscriptionHandleImplTests
         Assert.IsType<StartPositionToken>(handle.GetSequenceToken());
     }
 
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void ExplicitLatestCreatesStartPositionHandshake(bool isRewindable)
+    {
+        var stream = CreateStream(isRewindable);
+        var handle = new StreamSubscriptionHandleImpl<int>(
+            CreateSubscriptionId(implicitSubscription: false),
+            Substitute.For<IAsyncObserver<int>>(),
+            batchObserver: null,
+            stream,
+            token: null,
+            StreamSubscriptionStartPosition.Latest,
+            filterData: null);
+
+        var token = Assert.IsType<StartPositionToken>(handle.GetSequenceToken());
+        Assert.Equal(StreamSubscriptionStartPosition.Latest, token.StartPosition);
+    }
+
+    [Fact]
+    public async Task NonRewindableExplicitPositionHandshakeCompletesAfterFirstDelivery()
+    {
+        var observer = Substitute.For<IAsyncObserver<int>>();
+        var stream = CreateStream(isRewindable: false);
+        var handle = new StreamSubscriptionHandleImpl<int>(
+            CreateSubscriptionId(implicitSubscription: false),
+            observer,
+            batchObserver: null,
+            stream,
+            token: null,
+            StreamSubscriptionStartPosition.Latest,
+            filterData: null);
+        var startPositionToken = Assert.IsType<StartPositionToken>(handle.GetSequenceToken());
+        var deliveryToken = new EventSequenceTokenV2(1);
+
+        Assert.Null(await handle.DeliverItem(1, deliveryToken, startPositionToken));
+
+        Assert.Null(handle.GetSequenceToken());
+        await observer.Received(1).OnNextAsync(1, deliveryToken);
+    }
+
+    [Fact]
+    public void LegacyTokenlessSubscriptionHasNoStartPositionHandshake()
+    {
+        var stream = CreateStream(isRewindable: true);
+        var handle = new StreamSubscriptionHandleImpl<int>(
+            CreateSubscriptionId(implicitSubscription: false),
+            Substitute.For<IAsyncObserver<int>>(),
+            batchObserver: null,
+            stream,
+            token: null,
+            startPosition: null,
+            filterData: null);
+
+        Assert.Null(handle.GetSequenceToken());
+    }
+
     [Fact]
     public void ExplicitTokenRemainsInclusiveAndAuthoritative()
     {
@@ -49,7 +106,25 @@ public class StreamSubscriptionHandleImplTests
         var token = Assert.IsType<StartPositionToken>(
             StreamHandshakeToken.CreateStartPositionToken(StreamSubscriptionStartPosition.EarliestAvailable));
 
+        Assert.Equal(StreamSubscriptionStartPosition.EarliestAvailable, token.StartPosition);
         Assert.Null(token.Token);
+    }
+
+    [Fact]
+    public void FieldlessStartPositionHandshakeRetainsEarliestSemantics()
+    {
+        var token = new StartPositionToken();
+
+        Assert.Equal(StreamSubscriptionStartPosition.EarliestAvailable, token.StartPosition);
+    }
+
+    [Fact]
+    public void StartPositionHandshakeEqualityIncludesSelectedPosition()
+    {
+        var latest = StreamHandshakeToken.CreateStartPositionToken(StreamSubscriptionStartPosition.Latest);
+        var earliest = StreamHandshakeToken.CreateStartPositionToken(StreamSubscriptionStartPosition.EarliestAvailable);
+
+        Assert.NotEqual(latest, earliest);
     }
 
     [Fact]

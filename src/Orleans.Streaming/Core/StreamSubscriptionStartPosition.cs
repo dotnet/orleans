@@ -5,6 +5,10 @@ namespace Orleans.Streams
     /// <summary>
     /// Specifies the initial position of a rewindable persistent stream subscription.
     /// </summary>
+    /// <remarks>
+    /// During a rolling deployment, use start-position subscriptions after the silos hosting persistent-stream
+    /// pulling agents have been upgraded to a version which supports this enum.
+    /// </remarks>
     public enum StreamSubscriptionStartPosition
     {
         /// <summary>
