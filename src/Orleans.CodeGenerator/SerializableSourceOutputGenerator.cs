@@ -29,7 +29,7 @@ internal static class SerializableSourceOutputGenerator
             SourceGeneratorOptionsParser.AttachDebuggerIfRequested(options);
 
             var compilation = context.SemanticModel.Compilation;
-            var codeGeneratorOptions = SourceGeneratorOptionsParser.CreateCodeGeneratorOptions(options, compilation);
+            var codeGeneratorOptions = SourceGeneratorOptionsParser.CreateCodeGeneratorOptions(options);
             var libraryTypes = LibraryTypes.FromCompilation(compilation, codeGeneratorOptions);
             var typeDescription = CreateSerializableTypeDescription(compilation, libraryTypes, codeGeneratorOptions, symbol);
             if (typeDescription is null)
@@ -66,7 +66,7 @@ internal static class SerializableSourceOutputGenerator
         }
 
         SourceGeneratorOptionsParser.AttachDebuggerIfRequested(options);
-        var codeGeneratorOptions = SourceGeneratorOptionsParser.CreateCodeGeneratorOptions(options, compilation);
+        var codeGeneratorOptions = SourceGeneratorOptionsParser.CreateCodeGeneratorOptions(options);
         var generatorServices = new GeneratorServices(compilation, codeGeneratorOptions);
         var resolver = new TypeSymbolResolver(compilation);
         var assemblyName = compilation.AssemblyName ?? "assembly";
@@ -162,7 +162,7 @@ internal static class SerializableSourceOutputGenerator
             }
 
             SourceGeneratorOptionsParser.AttachDebuggerIfRequested(options);
-            var codeGeneratorOptions = SourceGeneratorOptionsParser.CreateCodeGeneratorOptions(options, compilation);
+            var codeGeneratorOptions = SourceGeneratorOptionsParser.CreateCodeGeneratorOptions(options);
             var generatorServices = new GeneratorServices(compilation, codeGeneratorOptions);
             var resolver = new TypeSymbolResolver(compilation);
             var assemblyName = compilation.AssemblyName ?? "assembly";
@@ -468,6 +468,5 @@ internal static class SerializableSourceOutputGenerator
             && string.Equals(metadataIdentity.AssemblyName, assemblyIdentity.Name, StringComparison.Ordinal);
     }
 }
-
 
 

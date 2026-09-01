@@ -14,12 +14,6 @@ namespace OrleansCodeGen
     public sealed class Codec_DemoData : global::Orleans.Serialization.Codecs.IFieldCodec<global::DemoData>, global::Orleans.Serialization.Serializers.IBaseCodec<global::DemoData>
     {
         private readonly global::System.Type _codecFieldType = typeof(global::DemoData);
-        private readonly global::Orleans.Serialization.Serializers.ICodecProvider _codecProvider;
-        public Codec_DemoData(global::Orleans.Serialization.Serializers.ICodecProvider codecProvider)
-        {
-            _codecProvider = codecProvider;
-        }
-
         [global::System.Runtime.CompilerServices.MethodImplAttribute(global::System.Runtime.CompilerServices.MethodImplOptions.AggressiveInlining)]
         public void Serialize<TBufferWriter>(ref global::Orleans.Serialization.Buffers.Writer<TBufferWriter> writer, global::DemoData instance)
             where TBufferWriter : global::System.Buffers.IBufferWriter<byte>
@@ -87,7 +81,6 @@ namespace OrleansCodeGen
     [global::System.CodeDom.Compiler.GeneratedCodeAttribute("OrleansCodeGen", "10.0.0.0"), global::System.ComponentModel.EditorBrowsableAttribute(global::System.ComponentModel.EditorBrowsableState.Never), global::System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverageAttribute]
     public sealed class Copier_DemoData : global::Orleans.Serialization.Cloning.IDeepCopier<global::DemoData>, global::Orleans.Serialization.Cloning.IBaseCopier<global::DemoData>
     {
-        private readonly global::Orleans.Serialization.Serializers.ICodecProvider _codecProvider;
         [global::System.Runtime.CompilerServices.MethodImplAttribute(global::System.Runtime.CompilerServices.MethodImplOptions.AggressiveInlining)]
         public global::DemoData DeepCopy(global::DemoData original, global::Orleans.Serialization.Cloning.CopyContext context)
         {
@@ -99,11 +92,6 @@ namespace OrleansCodeGen
             context.RecordCopy(original, result);
             DeepCopy(original, result, context);
             return result;
-        }
-
-        public Copier_DemoData(global::Orleans.Serialization.Serializers.ICodecProvider codecProvider)
-        {
-            _codecProvider = codecProvider;
         }
 
         [global::System.Runtime.CompilerServices.MethodImplAttribute(global::System.Runtime.CompilerServices.MethodImplOptions.AggressiveInlining)]

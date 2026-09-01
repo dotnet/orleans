@@ -34,7 +34,14 @@ public class GeneratedFieldNamesTests
             new FakeMember(compilation.GetTypeByMetadataName("System.Collections.Generic.Dictionary`2")!.Construct(compilation.GetSpecialType(SpecialType.System_String), intType), 3),
         };
 
-        Assert.Equal(["_codec_Int32", "_codec_List_Int32", "_codec_Int32_1", "_codec_Dictionary_String_Int32"], GeneratedFieldNames.ForTypes("_codec", members));
+        var names = GeneratedFieldNames.ForTypes("_codec", members);
+        Assert.Collection(
+            names,
+            name => Assert.Matches("^_codec_Int32_[0-9A-F]{16}$", name),
+            name => Assert.Matches("^_codec_List_Int32_[0-9A-F]{16}$", name),
+            name => Assert.Matches("^_codec_Int32_1_[0-9A-F]{16}$", name),
+            name => Assert.Matches("^_codec_Dictionary_String_Int32_[0-9A-F]{16}$", name));
+        Assert.Equal(names.Length, names.Distinct(StringComparer.Ordinal).Count());
     }
 
     [Fact]
@@ -50,10 +57,27 @@ public class GeneratedFieldNamesTests
         var names = GeneratedFieldNames.ForTypes("_copier", [first, second]);
         var reversed = GeneratedFieldNames.ForTypes("_copier", [second, first]);
 
-        Assert.All(names, name => Assert.Matches("^_copier_Item_[0-9A-F]{8}$", name));
+        Assert.All(names, name => Assert.Matches("^_copier_Item_[0-9A-F]{16}$", name));
         Assert.NotEqual(names[0], names[1]);
         Assert.Equal(names[0], reversed[1]);
         Assert.Equal(names[1], reversed[0]);
+    }
+
+    [Fact]
+    public async Task AddingCollidingSimpleNameDoesNotRenameExistingField()
+    {
+        var compilation = await Compile("""
+            namespace First { public class Item { } }
+            namespace Second { public class Item { } }
+            """);
+        var first = new FakeMember(compilation.GetTypeByMetadataName("First.Item")!, 0);
+        var second = new FakeMember(compilation.GetTypeByMetadataName("Second.Item")!, 1);
+
+        var originalName = Assert.Single(GeneratedFieldNames.ForTypes("_copier", [first]));
+        var namesWithCollision = GeneratedFieldNames.ForTypes("_copier", [first, second]);
+
+        Assert.Equal(originalName, namesWithCollision[0]);
+        Assert.NotEqual(namesWithCollision[0], namesWithCollision[1]);
     }
 
     [Fact]
@@ -64,7 +88,7 @@ public class GeneratedFieldNamesTests
         var members = new List<IMemberDescription> { new FakeMember(pointer, 0) };
 
         var name = Assert.Single(GeneratedFieldNames.ForTypes("_codec", members));
-        Assert.Matches("^_codec_Type_[0-9A-F]{8}$", name);
+        Assert.Matches("^_codec_Type_[0-9A-F]{16}$", name);
 
         Assert.Equal(name, Assert.Single(GeneratedFieldNames.ForTypes("_codec", members)));
     }

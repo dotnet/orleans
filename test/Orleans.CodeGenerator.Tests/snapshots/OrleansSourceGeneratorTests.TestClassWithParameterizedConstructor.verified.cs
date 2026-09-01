@@ -14,11 +14,9 @@ namespace OrleansCodeGen.TestProject
     public sealed class Codec_MyServiceConsumer : global::Orleans.Serialization.Codecs.IFieldCodec<global::TestProject.MyServiceConsumer>, global::Orleans.Serialization.Serializers.IBaseCodec<global::TestProject.MyServiceConsumer>
     {
         private readonly global::System.Type _codecFieldType = typeof(global::TestProject.MyServiceConsumer);
-        private readonly global::Orleans.Serialization.Serializers.ICodecProvider _codecProvider;
         private readonly global::Orleans.Serialization.Activators.IActivator<global::TestProject.MyServiceConsumer> _activator;
-        public Codec_MyServiceConsumer(global::Orleans.Serialization.Serializers.ICodecProvider codecProvider, global::Orleans.Serialization.Activators.IActivator<global::TestProject.MyServiceConsumer> _activator)
+        public Codec_MyServiceConsumer(global::Orleans.Serialization.Activators.IActivator<global::TestProject.MyServiceConsumer> _activator)
         {
-            _codecProvider = codecProvider;
             this._activator = OrleansGeneratedCodeHelper.UnwrapService(this, _activator);
         }
 
@@ -89,7 +87,6 @@ namespace OrleansCodeGen.TestProject
     [global::System.CodeDom.Compiler.GeneratedCodeAttribute("OrleansCodeGen", "10.0.0.0"), global::System.ComponentModel.EditorBrowsableAttribute(global::System.ComponentModel.EditorBrowsableState.Never), global::System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverageAttribute]
     public sealed class Copier_MyServiceConsumer : global::Orleans.Serialization.Cloning.IDeepCopier<global::TestProject.MyServiceConsumer>, global::Orleans.Serialization.Cloning.IBaseCopier<global::TestProject.MyServiceConsumer>
     {
-        private readonly global::Orleans.Serialization.Serializers.ICodecProvider _codecProvider;
         private readonly global::Orleans.Serialization.Activators.IActivator<global::TestProject.MyServiceConsumer> _activator;
         [global::System.Runtime.CompilerServices.MethodImplAttribute(global::System.Runtime.CompilerServices.MethodImplOptions.AggressiveInlining)]
         public global::TestProject.MyServiceConsumer DeepCopy(global::TestProject.MyServiceConsumer original, global::Orleans.Serialization.Cloning.CopyContext context)
@@ -104,9 +101,8 @@ namespace OrleansCodeGen.TestProject
             return result;
         }
 
-        public Copier_MyServiceConsumer(global::Orleans.Serialization.Serializers.ICodecProvider codecProvider, global::Orleans.Serialization.Activators.IActivator<global::TestProject.MyServiceConsumer> _activator)
+        public Copier_MyServiceConsumer(global::Orleans.Serialization.Activators.IActivator<global::TestProject.MyServiceConsumer> _activator)
         {
-            _codecProvider = codecProvider;
             this._activator = OrleansGeneratedCodeHelper.UnwrapService(this, _activator);
         }
 
@@ -121,19 +117,18 @@ namespace OrleansCodeGen.TestProject
     public sealed class Codec_RootType : global::Orleans.Serialization.Codecs.IFieldCodec<global::TestProject.RootType>, global::Orleans.Serialization.Serializers.IBaseCodec<global::TestProject.RootType>
     {
         private readonly global::System.Type _codecFieldType = typeof(global::TestProject.RootType);
-        private readonly global::Orleans.Serialization.Serializers.ICodecProvider _codecProvider;
-        private OrleansCodeGen.TestProject.Codec_MyServiceConsumer _codec_MyServiceConsumer;
+        private readonly global::System.Type _type_MyServiceConsumer_FAF0B52DDDE25F7A = typeof(global::TestProject.MyServiceConsumer);
+        private readonly OrleansCodeGen.TestProject.Codec_MyServiceConsumer _codec_MyServiceConsumer_FAF0B52DDDE25F7A;
         public Codec_RootType(global::Orleans.Serialization.Serializers.ICodecProvider codecProvider)
         {
-            _codecProvider = codecProvider;
-            _codec_MyServiceConsumer = OrleansGeneratedCodeHelper.GetService<OrleansCodeGen.TestProject.Codec_MyServiceConsumer>(this, codecProvider);
+            _codec_MyServiceConsumer_FAF0B52DDDE25F7A = OrleansGeneratedCodeHelper.GetService<OrleansCodeGen.TestProject.Codec_MyServiceConsumer>(this, codecProvider);
         }
 
         [global::System.Runtime.CompilerServices.MethodImplAttribute(global::System.Runtime.CompilerServices.MethodImplOptions.AggressiveInlining)]
         public void Serialize<TBufferWriter>(ref global::Orleans.Serialization.Buffers.Writer<TBufferWriter> writer, global::TestProject.RootType instance)
             where TBufferWriter : global::System.Buffers.IBufferWriter<byte>
         {
-            (_codec_MyServiceConsumer ??= OrleansGeneratedCodeHelper.GetService<OrleansCodeGen.TestProject.Codec_MyServiceConsumer>(this, _codecProvider)).WriteField(ref writer, 0U, typeof(global::TestProject.MyServiceConsumer), instance.Consumer);
+            _codec_MyServiceConsumer_FAF0B52DDDE25F7A.WriteField(ref writer, 0U, _type_MyServiceConsumer_FAF0B52DDDE25F7A, instance.Consumer);
         }
 
         [global::System.Runtime.CompilerServices.MethodImplAttribute(global::System.Runtime.CompilerServices.MethodImplOptions.AggressiveInlining)]
@@ -149,7 +144,7 @@ namespace OrleansCodeGen.TestProject
                 id += header.FieldIdDelta;
                 if (id == 0U)
                 {
-                    instance.Consumer = (_codec_MyServiceConsumer ??= OrleansGeneratedCodeHelper.GetService<OrleansCodeGen.TestProject.Codec_MyServiceConsumer>(this, _codecProvider)).ReadValue(ref reader, header);
+                    instance.Consumer = _codec_MyServiceConsumer_FAF0B52DDDE25F7A.ReadValue(ref reader, header);
                     reader.ReadFieldHeader(ref header);
                 }
 
@@ -196,8 +191,7 @@ namespace OrleansCodeGen.TestProject
     [global::System.CodeDom.Compiler.GeneratedCodeAttribute("OrleansCodeGen", "10.0.0.0"), global::System.ComponentModel.EditorBrowsableAttribute(global::System.ComponentModel.EditorBrowsableState.Never), global::System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverageAttribute]
     public sealed class Copier_RootType : global::Orleans.Serialization.Cloning.IDeepCopier<global::TestProject.RootType>, global::Orleans.Serialization.Cloning.IBaseCopier<global::TestProject.RootType>
     {
-        private readonly global::Orleans.Serialization.Serializers.ICodecProvider _codecProvider;
-        private OrleansCodeGen.TestProject.Copier_MyServiceConsumer _copier_MyServiceConsumer;
+        private readonly OrleansCodeGen.TestProject.Copier_MyServiceConsumer _copier_MyServiceConsumer_FAF0B52DDDE25F7A;
         [global::System.Runtime.CompilerServices.MethodImplAttribute(global::System.Runtime.CompilerServices.MethodImplOptions.AggressiveInlining)]
         public global::TestProject.RootType DeepCopy(global::TestProject.RootType original, global::Orleans.Serialization.Cloning.CopyContext context)
         {
@@ -213,14 +207,13 @@ namespace OrleansCodeGen.TestProject
 
         public Copier_RootType(global::Orleans.Serialization.Serializers.ICodecProvider codecProvider)
         {
-            _codecProvider = codecProvider;
-            _copier_MyServiceConsumer = OrleansGeneratedCodeHelper.GetService<OrleansCodeGen.TestProject.Copier_MyServiceConsumer>(this, codecProvider);
+            _copier_MyServiceConsumer_FAF0B52DDDE25F7A = OrleansGeneratedCodeHelper.GetService<OrleansCodeGen.TestProject.Copier_MyServiceConsumer>(this, codecProvider);
         }
 
         [global::System.Runtime.CompilerServices.MethodImplAttribute(global::System.Runtime.CompilerServices.MethodImplOptions.AggressiveInlining)]
         public void DeepCopy(global::TestProject.RootType input, global::TestProject.RootType output, global::Orleans.Serialization.Cloning.CopyContext context)
         {
-            output.Consumer = (_copier_MyServiceConsumer ??= OrleansGeneratedCodeHelper.GetService<OrleansCodeGen.TestProject.Copier_MyServiceConsumer>(this, _codecProvider)).DeepCopy(input.Consumer, context);
+            output.Consumer = _copier_MyServiceConsumer_FAF0B52DDDE25F7A.DeepCopy(input.Consumer, context);
         }
     }
 

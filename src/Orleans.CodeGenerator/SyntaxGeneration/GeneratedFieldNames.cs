@@ -3,58 +3,26 @@ using Microsoft.CodeAnalysis;
 namespace Orleans.CodeGenerator.SyntaxGeneration;
 
 /// <summary>
-/// Produces names for generated private fields which are stable under member reordering and most member additions,
-/// so that .NET Hot Reload sees additions rather than retyped or renamed fields. Adding a member whose type causes
-/// a previously unseen name collision may still force existing names to switch to a hash-suffixed form.
+/// Produces names for generated private fields which are stable under member reordering and additions,
+/// so that .NET Hot Reload sees additions rather than retyped or renamed fields.
 /// </summary>
 internal static class GeneratedFieldNames
 {
+    private const int SecondaryHashSeed = unchecked((int)0x9E3779B9);
+
     public static string Accessor(string prefix, IMemberDescription member)
         => member.IsPrimaryConstructorParameter ? $"{prefix}_{member.FieldId}_ctor" : $"{prefix}_{member.FieldId}";
 
     public static string[] ForTypes(string prefix, IReadOnlyList<IMemberDescription> members)
     {
-        if (members.Count == 0)
-        {
-            return [];
-        }
-
-        // phase 0: optimistic pass: try to get a readable name for each type, and see if any collide
         var result = new string[members.Count];
         for (var i = 0; i < members.Count; i++)
         {
-            result[i] = TryGetTypeKey(members[i].Type) is { } key ? $"{prefix}_{key}" : null!;
-        }
-
-        // phase 1: detect collisions and mark them for hashing
-        Span<bool> contested = members.Count <= 64 ? stackalloc bool[members.Count] : new bool[members.Count];
-        contested.Clear();
-        for (var i = 0; i < members.Count; i++)
-        {
-            // we couldn't get a readable name for this type, so we need to hash it
-            if (result[i] is null)
-            {
-                contested[i] = true;
-                continue;
-            }
-
-            for (var j = i + 1; j < members.Count; j++)
-            {
-                if (string.Equals(result[i], result[j], StringComparison.Ordinal))
-                {
-                    contested[i] = true;
-                    contested[j] = true;
-                }
-            }
-        }
-
-        // phase 2: for any contested names, replace them with a hash-based name
-        for (var i = 0; i < members.Count; i++)
-        {
-            if (contested[i])
-            {
-                result[i] = $"{result[i] ?? $"{prefix}_Type"}_{GeneratedSourceOutput.CreateStableHash($"{members[i].TypeName}|{members[i].AssemblyName}")}";
-            }
+            var member = members[i];
+            var key = TryGetTypeKey(member.Type) ?? "Type";
+            var identity = $"{member.TypeName.Length}:{member.TypeName}{member.AssemblyName.Length}:{member.AssemblyName}";
+            var hash = $"{GeneratedSourceOutput.CreateStableHash(identity)}{GeneratedSourceOutput.CreateStableHash(identity, SecondaryHashSeed)}";
+            result[i] = $"{prefix}_{key}_{hash}";
         }
 
         return result;

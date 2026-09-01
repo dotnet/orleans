@@ -14,12 +14,6 @@ namespace OrleansCodeGen.TestProject
     public sealed class Codec_MyTypeAliasStruct : global::Orleans.Serialization.Codecs.IFieldCodec<global::TestProject.MyTypeAliasStruct>, global::Orleans.Serialization.Serializers.IValueSerializer<global::TestProject.MyTypeAliasStruct>
     {
         private readonly global::System.Type _codecFieldType = typeof(global::TestProject.MyTypeAliasStruct);
-        private readonly global::Orleans.Serialization.Serializers.ICodecProvider _codecProvider;
-        public Codec_MyTypeAliasStruct(global::Orleans.Serialization.Serializers.ICodecProvider codecProvider)
-        {
-            _codecProvider = codecProvider;
-        }
-
         [global::System.Runtime.CompilerServices.MethodImplAttribute(global::System.Runtime.CompilerServices.MethodImplOptions.AggressiveInlining)]
         public void Serialize<TBufferWriter>(ref global::Orleans.Serialization.Buffers.Writer<TBufferWriter> writer, scoped ref global::TestProject.MyTypeAliasStruct instance)
             where TBufferWriter : global::System.Buffers.IBufferWriter<byte>

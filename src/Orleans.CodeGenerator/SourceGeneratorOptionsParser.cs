@@ -1,5 +1,4 @@
 using System.Diagnostics;
-using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.Diagnostics;
 using Orleans.CodeGenerator.Model;
 
@@ -9,13 +8,13 @@ internal static class SourceGeneratorOptionsParser
 {
     private static int _debuggerLaunchState;
 
-    internal static CodeGeneratorOptions CreateCodeGeneratorOptions(SourceGeneratorOptions options, Compilation compilation)
+    internal static CodeGeneratorOptions CreateCodeGeneratorOptions(SourceGeneratorOptions options)
     {
         return new CodeGeneratorOptions
         {
             GenerateFieldIds = options.GenerateFieldIds,
             GenerateCompatibilityInvokers = options.GenerateCompatibilityInvokers,
-            HotReloadSafe = options.HotReload ?? compilation.Options.OptimizationLevel == OptimizationLevel.Debug,
+            HotReloadSafe = options.HotReload ?? false,
         };
     }
 
@@ -54,7 +53,7 @@ internal static class SourceGeneratorOptionsParser
             result.GenerateCompatibilityInvokers = genCompatInvokers;
         }
 
-        if (globalOptions.TryGetValue("build_property.orleans_hotreload", out var hotReloadValue)
+        if (globalOptions.TryGetValue("build_property.orleanshotreload", out var hotReloadValue)
             && bool.TryParse(hotReloadValue, out var hotReload))
         {
             result.HotReload = hotReload;
@@ -72,7 +71,7 @@ internal struct SourceGeneratorOptions : IEquatable<SourceGeneratorOptions>
     public bool AttachDebugger { get; set; }
 
     /// <summary>
-    /// Forces hot-reload-safe code generation on or off; when unset, it follows the compilation's optimization level.
+    /// Enables hot-reload-safe code generation.
     /// </summary>
     public bool? HotReload { get; set; }
 

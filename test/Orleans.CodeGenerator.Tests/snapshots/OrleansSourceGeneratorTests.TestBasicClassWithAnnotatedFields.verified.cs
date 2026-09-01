@@ -14,15 +14,13 @@ namespace OrleansCodeGen.TestProject
     public sealed class Codec_DemoDataWithFields : global::Orleans.Serialization.Codecs.IFieldCodec<global::TestProject.DemoDataWithFields>, global::Orleans.Serialization.Serializers.IBaseCodec<global::TestProject.DemoDataWithFields>
     {
         private readonly global::System.Type _codecFieldType = typeof(global::TestProject.DemoDataWithFields);
-        private readonly global::Orleans.Serialization.Serializers.ICodecProvider _codecProvider;
         private readonly global::Orleans.Serialization.Activators.IActivator<global::TestProject.DemoDataWithFields> _activator;
-        private static global::System.Func<global::TestProject.DemoDataWithFields, int> getField_0;
-        private static global::System.Action<global::TestProject.DemoDataWithFields, int> setField_0;
-        private static global::System.Func<global::TestProject.DemoDataWithFields, string> getField_1;
-        private static global::System.Action<global::TestProject.DemoDataWithFields, string> setField_1;
-        public Codec_DemoDataWithFields(global::Orleans.Serialization.Serializers.ICodecProvider codecProvider, global::Orleans.Serialization.Activators.IActivator<global::TestProject.DemoDataWithFields> _activator)
+        private static readonly global::System.Func<global::TestProject.DemoDataWithFields, int> getField_0 = (global::System.Func<global::TestProject.DemoDataWithFields, int>)global::Orleans.Serialization.Utilities.FieldAccessor.GetGetter(typeof(global::TestProject.DemoDataWithFields), "_intValue");
+        private static readonly global::System.Action<global::TestProject.DemoDataWithFields, int> setField_0 = (global::System.Action<global::TestProject.DemoDataWithFields, int>)global::Orleans.Serialization.Utilities.FieldAccessor.GetReferenceSetter(typeof(global::TestProject.DemoDataWithFields), "_intValue");
+        private static readonly global::System.Func<global::TestProject.DemoDataWithFields, string> getField_1 = (global::System.Func<global::TestProject.DemoDataWithFields, string>)global::Orleans.Serialization.Utilities.FieldAccessor.GetGetter(typeof(global::TestProject.DemoDataWithFields), "_stringValue");
+        private static readonly global::System.Action<global::TestProject.DemoDataWithFields, string> setField_1 = (global::System.Action<global::TestProject.DemoDataWithFields, string>)global::Orleans.Serialization.Utilities.FieldAccessor.GetReferenceSetter(typeof(global::TestProject.DemoDataWithFields), "_stringValue");
+        public Codec_DemoDataWithFields(global::Orleans.Serialization.Activators.IActivator<global::TestProject.DemoDataWithFields> _activator)
         {
-            _codecProvider = codecProvider;
             this._activator = OrleansGeneratedCodeHelper.UnwrapService(this, _activator);
         }
 
@@ -30,8 +28,8 @@ namespace OrleansCodeGen.TestProject
         public void Serialize<TBufferWriter>(ref global::Orleans.Serialization.Buffers.Writer<TBufferWriter> writer, global::TestProject.DemoDataWithFields instance)
             where TBufferWriter : global::System.Buffers.IBufferWriter<byte>
         {
-            global::Orleans.Serialization.Codecs.Int32Codec.WriteField(ref writer, 0U, (getField_0 ??= (global::System.Func<global::TestProject.DemoDataWithFields, int>)global::Orleans.Serialization.Utilities.FieldAccessor.GetGetter(typeof(global::TestProject.DemoDataWithFields), "_intValue"))(instance));
-            global::Orleans.Serialization.Codecs.StringCodec.WriteField(ref writer, 1U, (getField_1 ??= (global::System.Func<global::TestProject.DemoDataWithFields, string>)global::Orleans.Serialization.Utilities.FieldAccessor.GetGetter(typeof(global::TestProject.DemoDataWithFields), "_stringValue"))(instance));
+            global::Orleans.Serialization.Codecs.Int32Codec.WriteField(ref writer, 0U, getField_0(instance));
+            global::Orleans.Serialization.Codecs.StringCodec.WriteField(ref writer, 1U, getField_1(instance));
         }
 
         [global::System.Runtime.CompilerServices.MethodImplAttribute(global::System.Runtime.CompilerServices.MethodImplOptions.AggressiveInlining)]
@@ -47,7 +45,7 @@ namespace OrleansCodeGen.TestProject
                 id += header.FieldIdDelta;
                 if (id == 0U)
                 {
-                    (setField_0 ??= (global::System.Action<global::TestProject.DemoDataWithFields, int>)global::Orleans.Serialization.Utilities.FieldAccessor.GetReferenceSetter(typeof(global::TestProject.DemoDataWithFields), "_intValue"))(instance, global::Orleans.Serialization.Codecs.Int32Codec.ReadValue(ref reader, header));
+                    setField_0(instance, global::Orleans.Serialization.Codecs.Int32Codec.ReadValue(ref reader, header));
                     reader.ReadFieldHeader(ref header);
                     if (header.IsEndBaseOrEndObject)
                         break;
@@ -56,7 +54,7 @@ namespace OrleansCodeGen.TestProject
 
                 if (id == 1U)
                 {
-                    (setField_1 ??= (global::System.Action<global::TestProject.DemoDataWithFields, string>)global::Orleans.Serialization.Utilities.FieldAccessor.GetReferenceSetter(typeof(global::TestProject.DemoDataWithFields), "_stringValue"))(instance, global::Orleans.Serialization.Codecs.StringCodec.ReadValue(ref reader, header));
+                    setField_1(instance, global::Orleans.Serialization.Codecs.StringCodec.ReadValue(ref reader, header));
                     reader.ReadFieldHeader(ref header);
                 }
 
@@ -103,12 +101,11 @@ namespace OrleansCodeGen.TestProject
     [global::System.CodeDom.Compiler.GeneratedCodeAttribute("OrleansCodeGen", "10.0.0.0"), global::System.ComponentModel.EditorBrowsableAttribute(global::System.ComponentModel.EditorBrowsableState.Never), global::System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverageAttribute]
     public sealed class Copier_DemoDataWithFields : global::Orleans.Serialization.Cloning.IDeepCopier<global::TestProject.DemoDataWithFields>, global::Orleans.Serialization.Cloning.IBaseCopier<global::TestProject.DemoDataWithFields>
     {
-        private readonly global::Orleans.Serialization.Serializers.ICodecProvider _codecProvider;
         private readonly global::Orleans.Serialization.Activators.IActivator<global::TestProject.DemoDataWithFields> _activator;
-        private static global::System.Func<global::TestProject.DemoDataWithFields, int> getField_0;
-        private static global::System.Action<global::TestProject.DemoDataWithFields, int> setField_0;
-        private static global::System.Func<global::TestProject.DemoDataWithFields, string> getField_1;
-        private static global::System.Action<global::TestProject.DemoDataWithFields, string> setField_1;
+        private static readonly global::System.Func<global::TestProject.DemoDataWithFields, int> getField_0 = (global::System.Func<global::TestProject.DemoDataWithFields, int>)global::Orleans.Serialization.Utilities.FieldAccessor.GetGetter(typeof(global::TestProject.DemoDataWithFields), "_intValue");
+        private static readonly global::System.Action<global::TestProject.DemoDataWithFields, int> setField_0 = (global::System.Action<global::TestProject.DemoDataWithFields, int>)global::Orleans.Serialization.Utilities.FieldAccessor.GetReferenceSetter(typeof(global::TestProject.DemoDataWithFields), "_intValue");
+        private static readonly global::System.Func<global::TestProject.DemoDataWithFields, string> getField_1 = (global::System.Func<global::TestProject.DemoDataWithFields, string>)global::Orleans.Serialization.Utilities.FieldAccessor.GetGetter(typeof(global::TestProject.DemoDataWithFields), "_stringValue");
+        private static readonly global::System.Action<global::TestProject.DemoDataWithFields, string> setField_1 = (global::System.Action<global::TestProject.DemoDataWithFields, string>)global::Orleans.Serialization.Utilities.FieldAccessor.GetReferenceSetter(typeof(global::TestProject.DemoDataWithFields), "_stringValue");
         [global::System.Runtime.CompilerServices.MethodImplAttribute(global::System.Runtime.CompilerServices.MethodImplOptions.AggressiveInlining)]
         public global::TestProject.DemoDataWithFields DeepCopy(global::TestProject.DemoDataWithFields original, global::Orleans.Serialization.Cloning.CopyContext context)
         {
@@ -122,17 +119,16 @@ namespace OrleansCodeGen.TestProject
             return result;
         }
 
-        public Copier_DemoDataWithFields(global::Orleans.Serialization.Serializers.ICodecProvider codecProvider, global::Orleans.Serialization.Activators.IActivator<global::TestProject.DemoDataWithFields> _activator)
+        public Copier_DemoDataWithFields(global::Orleans.Serialization.Activators.IActivator<global::TestProject.DemoDataWithFields> _activator)
         {
-            _codecProvider = codecProvider;
             this._activator = OrleansGeneratedCodeHelper.UnwrapService(this, _activator);
         }
 
         [global::System.Runtime.CompilerServices.MethodImplAttribute(global::System.Runtime.CompilerServices.MethodImplOptions.AggressiveInlining)]
         public void DeepCopy(global::TestProject.DemoDataWithFields input, global::TestProject.DemoDataWithFields output, global::Orleans.Serialization.Cloning.CopyContext context)
         {
-            (setField_0 ??= (global::System.Action<global::TestProject.DemoDataWithFields, int>)global::Orleans.Serialization.Utilities.FieldAccessor.GetReferenceSetter(typeof(global::TestProject.DemoDataWithFields), "_intValue"))(output, (getField_0 ??= (global::System.Func<global::TestProject.DemoDataWithFields, int>)global::Orleans.Serialization.Utilities.FieldAccessor.GetGetter(typeof(global::TestProject.DemoDataWithFields), "_intValue"))(input));
-            (setField_1 ??= (global::System.Action<global::TestProject.DemoDataWithFields, string>)global::Orleans.Serialization.Utilities.FieldAccessor.GetReferenceSetter(typeof(global::TestProject.DemoDataWithFields), "_stringValue"))(output, (getField_1 ??= (global::System.Func<global::TestProject.DemoDataWithFields, string>)global::Orleans.Serialization.Utilities.FieldAccessor.GetGetter(typeof(global::TestProject.DemoDataWithFields), "_stringValue"))(input));
+            setField_0(output, getField_0(input));
+            setField_1(output, getField_1(input));
         }
     }
 

@@ -104,10 +104,10 @@ namespace OrleansCodeGen.TestProject
     [global::System.CodeDom.Compiler.GeneratedCodeAttribute("OrleansCodeGen", "10.0.0.0"), global::System.ComponentModel.EditorBrowsableAttribute(global::System.ComponentModel.EditorBrowsableState.Never), global::System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverageAttribute]
     internal sealed class Proxy_IComplexGrain : global::Orleans.Runtime.GrainReference, global::TestProject.IComplexGrain
     {
-        private readonly OrleansCodeGen.TestProject.Copier_ComplexData _copier_ComplexData;
+        private readonly OrleansCodeGen.TestProject.Copier_ComplexData _copier_ComplexData_765A40ED2309AF35;
         public Proxy_IComplexGrain(global::Orleans.Runtime.GrainReferenceShared arg0, global::Orleans.Runtime.IdSpan arg1) : base(arg0, arg1)
         {
-            _copier_ComplexData = OrleansGeneratedCodeHelper.GetService<OrleansCodeGen.TestProject.Copier_ComplexData>(this, CodecProvider);
+            _copier_ComplexData_765A40ED2309AF35 = OrleansGeneratedCodeHelper.GetService<OrleansCodeGen.TestProject.Copier_ComplexData>(this, CodecProvider);
         }
 
         global::System.Threading.Tasks.Task<global::TestProject.ComplexData> global::TestProject.IComplexGrain.ProcessData(int arg0, string arg1, global::TestProject.ComplexData arg2, global::System.Threading.CancellationToken arg3)
@@ -116,7 +116,7 @@ namespace OrleansCodeGen.TestProject
             request.arg0 = arg0;
             request.arg1 = arg1;
             using var copyContext = base.CopyContextPool.GetContext();
-            request.arg2 = _copier_ComplexData.DeepCopy(arg2, copyContext);
+            request.arg2 = _copier_ComplexData_765A40ED2309AF35.DeepCopy(arg2, copyContext);
             request.arg3 = arg3;
             return base.InvokeAsync<global::TestProject.ComplexData>(request).AsTask();
         }
@@ -126,12 +126,6 @@ namespace OrleansCodeGen.TestProject
     public sealed class Codec_ComplexData : global::Orleans.Serialization.Codecs.IFieldCodec<global::TestProject.ComplexData>, global::Orleans.Serialization.Serializers.IBaseCodec<global::TestProject.ComplexData>
     {
         private readonly global::System.Type _codecFieldType = typeof(global::TestProject.ComplexData);
-        private readonly global::Orleans.Serialization.Serializers.ICodecProvider _codecProvider;
-        public Codec_ComplexData(global::Orleans.Serialization.Serializers.ICodecProvider codecProvider)
-        {
-            _codecProvider = codecProvider;
-        }
-
         [global::System.Runtime.CompilerServices.MethodImplAttribute(global::System.Runtime.CompilerServices.MethodImplOptions.AggressiveInlining)]
         public void Serialize<TBufferWriter>(ref global::Orleans.Serialization.Buffers.Writer<TBufferWriter> writer, global::TestProject.ComplexData instance)
             where TBufferWriter : global::System.Buffers.IBufferWriter<byte>
@@ -209,7 +203,6 @@ namespace OrleansCodeGen.TestProject
     [global::System.CodeDom.Compiler.GeneratedCodeAttribute("OrleansCodeGen", "10.0.0.0"), global::System.ComponentModel.EditorBrowsableAttribute(global::System.ComponentModel.EditorBrowsableState.Never), global::System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverageAttribute]
     public sealed class Copier_ComplexData : global::Orleans.Serialization.Cloning.IDeepCopier<global::TestProject.ComplexData>, global::Orleans.Serialization.Cloning.IBaseCopier<global::TestProject.ComplexData>
     {
-        private readonly global::Orleans.Serialization.Serializers.ICodecProvider _codecProvider;
         [global::System.Runtime.CompilerServices.MethodImplAttribute(global::System.Runtime.CompilerServices.MethodImplOptions.AggressiveInlining)]
         public global::TestProject.ComplexData DeepCopy(global::TestProject.ComplexData original, global::Orleans.Serialization.Cloning.CopyContext context)
         {
@@ -221,11 +214,6 @@ namespace OrleansCodeGen.TestProject
             context.RecordCopy(original, result);
             DeepCopy(original, result, context);
             return result;
-        }
-
-        public Copier_ComplexData(global::Orleans.Serialization.Serializers.ICodecProvider codecProvider)
-        {
-            _codecProvider = codecProvider;
         }
 
         [global::System.Runtime.CompilerServices.MethodImplAttribute(global::System.Runtime.CompilerServices.MethodImplOptions.AggressiveInlining)]
@@ -246,11 +234,11 @@ namespace OrleansCodeGen.TestProject
     public sealed class Codec_Invokable_IComplexGrain_GrainReference_67FE5808 : global::Orleans.Serialization.Codecs.IFieldCodec<OrleansCodeGen.TestProject.Invokable_IComplexGrain_GrainReference_67FE5808>
     {
         private readonly global::System.Type _codecFieldType = typeof(OrleansCodeGen.TestProject.Invokable_IComplexGrain_GrainReference_67FE5808);
-        private readonly global::System.Type _type_ComplexData = typeof(global::TestProject.ComplexData);
-        private readonly OrleansCodeGen.TestProject.Codec_ComplexData _codec_ComplexData;
+        private readonly global::System.Type _type_ComplexData_765A40ED2309AF35 = typeof(global::TestProject.ComplexData);
+        private readonly OrleansCodeGen.TestProject.Codec_ComplexData _codec_ComplexData_765A40ED2309AF35;
         public Codec_Invokable_IComplexGrain_GrainReference_67FE5808(global::Orleans.Serialization.Serializers.ICodecProvider codecProvider)
         {
-            _codec_ComplexData = OrleansGeneratedCodeHelper.GetService<OrleansCodeGen.TestProject.Codec_ComplexData>(this, codecProvider);
+            _codec_ComplexData_765A40ED2309AF35 = OrleansGeneratedCodeHelper.GetService<OrleansCodeGen.TestProject.Codec_ComplexData>(this, codecProvider);
         }
 
         [global::System.Runtime.CompilerServices.MethodImplAttribute(global::System.Runtime.CompilerServices.MethodImplOptions.AggressiveInlining)]
@@ -259,7 +247,7 @@ namespace OrleansCodeGen.TestProject
         {
             global::Orleans.Serialization.Codecs.Int32Codec.WriteField(ref writer, 0U, instance.arg0);
             global::Orleans.Serialization.Codecs.StringCodec.WriteField(ref writer, 1U, instance.arg1);
-            _codec_ComplexData.WriteField(ref writer, 1U, _type_ComplexData, instance.arg2);
+            _codec_ComplexData_765A40ED2309AF35.WriteField(ref writer, 1U, _type_ComplexData_765A40ED2309AF35, instance.arg2);
         }
 
         [global::System.Runtime.CompilerServices.MethodImplAttribute(global::System.Runtime.CompilerServices.MethodImplOptions.AggressiveInlining)]
@@ -293,7 +281,7 @@ namespace OrleansCodeGen.TestProject
 
                 if (id == 2U)
                 {
-                    instance.arg2 = _codec_ComplexData.ReadValue(ref reader, header);
+                    instance.arg2 = _codec_ComplexData_765A40ED2309AF35.ReadValue(ref reader, header);
                     reader.ReadFieldHeader(ref header);
                 }
 
@@ -334,7 +322,7 @@ namespace OrleansCodeGen.TestProject
     [global::System.CodeDom.Compiler.GeneratedCodeAttribute("OrleansCodeGen", "10.0.0.0"), global::System.ComponentModel.EditorBrowsableAttribute(global::System.ComponentModel.EditorBrowsableState.Never), global::System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverageAttribute]
     public sealed class Copier_Invokable_IComplexGrain_GrainReference_67FE5808 : global::Orleans.Serialization.Cloning.IDeepCopier<OrleansCodeGen.TestProject.Invokable_IComplexGrain_GrainReference_67FE5808>
     {
-        private readonly OrleansCodeGen.TestProject.Copier_ComplexData _copier_ComplexData;
+        private readonly OrleansCodeGen.TestProject.Copier_ComplexData _copier_ComplexData_765A40ED2309AF35;
         [global::System.Runtime.CompilerServices.MethodImplAttribute(global::System.Runtime.CompilerServices.MethodImplOptions.AggressiveInlining)]
         public OrleansCodeGen.TestProject.Invokable_IComplexGrain_GrainReference_67FE5808 DeepCopy(OrleansCodeGen.TestProject.Invokable_IComplexGrain_GrainReference_67FE5808 original, global::Orleans.Serialization.Cloning.CopyContext context)
         {
@@ -343,14 +331,14 @@ namespace OrleansCodeGen.TestProject
             var result = new OrleansCodeGen.TestProject.Invokable_IComplexGrain_GrainReference_67FE5808();
             result.arg0 = original.arg0;
             result.arg1 = original.arg1;
-            result.arg2 = _copier_ComplexData.DeepCopy(original.arg2, context);
+            result.arg2 = _copier_ComplexData_765A40ED2309AF35.DeepCopy(original.arg2, context);
             result.arg3 = original.arg3;
             return result;
         }
 
         public Copier_Invokable_IComplexGrain_GrainReference_67FE5808(global::Orleans.Serialization.Serializers.ICodecProvider codecProvider)
         {
-            _copier_ComplexData = OrleansGeneratedCodeHelper.GetService<OrleansCodeGen.TestProject.Copier_ComplexData>(this, codecProvider);
+            _copier_ComplexData_765A40ED2309AF35 = OrleansGeneratedCodeHelper.GetService<OrleansCodeGen.TestProject.Copier_ComplexData>(this, codecProvider);
         }
     }
 
@@ -358,11 +346,9 @@ namespace OrleansCodeGen.TestProject
     public sealed class Codec_ComplexGrain : global::Orleans.Serialization.Codecs.IFieldCodec<global::TestProject.ComplexGrain>, global::Orleans.Serialization.Serializers.IBaseCodec<global::TestProject.ComplexGrain>
     {
         private readonly global::System.Type _codecFieldType = typeof(global::TestProject.ComplexGrain);
-        private readonly global::Orleans.Serialization.Serializers.ICodecProvider _codecProvider;
         private readonly global::Orleans.Serialization.Serializers.IBaseCodec<global::Orleans.Grain> _baseTypeSerializer;
-        public Codec_ComplexGrain(global::Orleans.Serialization.Serializers.ICodecProvider codecProvider, global::Orleans.Serialization.Serializers.IBaseCodec<global::Orleans.Grain> _baseTypeSerializer)
+        public Codec_ComplexGrain(global::Orleans.Serialization.Serializers.IBaseCodec<global::Orleans.Grain> _baseTypeSerializer)
         {
-            _codecProvider = codecProvider;
             this._baseTypeSerializer = OrleansGeneratedCodeHelper.UnwrapService(this, _baseTypeSerializer);
         }
 
@@ -419,7 +405,6 @@ namespace OrleansCodeGen.TestProject
     [global::System.CodeDom.Compiler.GeneratedCodeAttribute("OrleansCodeGen", "10.0.0.0"), global::System.ComponentModel.EditorBrowsableAttribute(global::System.ComponentModel.EditorBrowsableState.Never), global::System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverageAttribute]
     public sealed class Copier_ComplexGrain : global::Orleans.Serialization.Cloning.IDeepCopier<global::TestProject.ComplexGrain>, global::Orleans.Serialization.Cloning.IBaseCopier<global::TestProject.ComplexGrain>
     {
-        private readonly global::Orleans.Serialization.Serializers.ICodecProvider _codecProvider;
         private readonly global::Orleans.Serialization.Cloning.IBaseCopier<global::Orleans.Grain> _baseTypeCopier;
         [global::System.Runtime.CompilerServices.MethodImplAttribute(global::System.Runtime.CompilerServices.MethodImplOptions.AggressiveInlining)]
         public global::TestProject.ComplexGrain DeepCopy(global::TestProject.ComplexGrain original, global::Orleans.Serialization.Cloning.CopyContext context)
@@ -434,9 +419,8 @@ namespace OrleansCodeGen.TestProject
             return result;
         }
 
-        public Copier_ComplexGrain(global::Orleans.Serialization.Serializers.ICodecProvider codecProvider, global::Orleans.Serialization.Cloning.IBaseCopier<global::Orleans.Grain> _baseTypeCopier)
+        public Copier_ComplexGrain(global::Orleans.Serialization.Cloning.IBaseCopier<global::Orleans.Grain> _baseTypeCopier)
         {
-            _codecProvider = codecProvider;
             this._baseTypeCopier = OrleansGeneratedCodeHelper.UnwrapService(this, _baseTypeCopier);
         }
 

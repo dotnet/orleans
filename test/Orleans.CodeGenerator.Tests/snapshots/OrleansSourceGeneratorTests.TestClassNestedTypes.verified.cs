@@ -14,25 +14,26 @@ namespace OrleansCodeGen.TestProject
     public sealed class Codec_DemoData : global::Orleans.Serialization.Codecs.IFieldCodec<global::TestProject.DemoData>, global::Orleans.Serialization.Serializers.IBaseCodec<global::TestProject.DemoData>
     {
         private readonly global::System.Type _codecFieldType = typeof(global::TestProject.DemoData);
-        private readonly global::Orleans.Serialization.Serializers.ICodecProvider _codecProvider;
-        private global::Orleans.Serialization.Codecs.IFieldCodec<global::TestProject.CyclicClass> _codec_CyclicClass;
-        private global::Orleans.Serialization.Codecs.IFieldCodec<global::TestProject.NestedClass1> _codec_NestedClass1;
-        private global::Orleans.Serialization.Codecs.ListCodec<global::TestProject.NestedClass1> _codec_List_NestedClass1;
+        private readonly global::System.Type _type_CyclicClass_AE634BDC96DD9410 = typeof(global::TestProject.CyclicClass);
+        private readonly global::Orleans.Serialization.Codecs.IFieldCodec<global::TestProject.CyclicClass> _codec_CyclicClass_AE634BDC96DD9410;
+        private readonly global::System.Type _type_NestedClass1_7D26639B0A90F47B = typeof(global::TestProject.NestedClass1);
+        private readonly global::Orleans.Serialization.Codecs.IFieldCodec<global::TestProject.NestedClass1> _codec_NestedClass1_7D26639B0A90F47B;
+        private readonly global::System.Type _type_List_NestedClass1_837E6CC56B893B73 = typeof(global::System.Collections.Generic.List<global::TestProject.NestedClass1>);
+        private readonly global::Orleans.Serialization.Codecs.ListCodec<global::TestProject.NestedClass1> _codec_List_NestedClass1_837E6CC56B893B73;
         public Codec_DemoData(global::Orleans.Serialization.Serializers.ICodecProvider codecProvider)
         {
-            _codecProvider = codecProvider;
-            _codec_CyclicClass = OrleansGeneratedCodeHelper.GetService<global::Orleans.Serialization.Codecs.IFieldCodec<global::TestProject.CyclicClass>>(this, codecProvider);
-            _codec_NestedClass1 = OrleansGeneratedCodeHelper.GetService<global::Orleans.Serialization.Codecs.IFieldCodec<global::TestProject.NestedClass1>>(this, codecProvider);
-            _codec_List_NestedClass1 = OrleansGeneratedCodeHelper.GetService<global::Orleans.Serialization.Codecs.ListCodec<global::TestProject.NestedClass1>>(this, codecProvider);
+            _codec_CyclicClass_AE634BDC96DD9410 = OrleansGeneratedCodeHelper.GetService<global::Orleans.Serialization.Codecs.IFieldCodec<global::TestProject.CyclicClass>>(this, codecProvider);
+            _codec_NestedClass1_7D26639B0A90F47B = OrleansGeneratedCodeHelper.GetService<global::Orleans.Serialization.Codecs.IFieldCodec<global::TestProject.NestedClass1>>(this, codecProvider);
+            _codec_List_NestedClass1_837E6CC56B893B73 = OrleansGeneratedCodeHelper.GetService<global::Orleans.Serialization.Codecs.ListCodec<global::TestProject.NestedClass1>>(this, codecProvider);
         }
 
         [global::System.Runtime.CompilerServices.MethodImplAttribute(global::System.Runtime.CompilerServices.MethodImplOptions.AggressiveInlining)]
         public void Serialize<TBufferWriter>(ref global::Orleans.Serialization.Buffers.Writer<TBufferWriter> writer, global::TestProject.DemoData instance)
             where TBufferWriter : global::System.Buffers.IBufferWriter<byte>
         {
-            (_codec_NestedClass1 ??= OrleansGeneratedCodeHelper.GetService<global::Orleans.Serialization.Codecs.IFieldCodec<global::TestProject.NestedClass1>>(this, _codecProvider)).WriteField(ref writer, 0U, typeof(global::TestProject.NestedClass1), instance.Nested1);
-            (_codec_List_NestedClass1 ??= OrleansGeneratedCodeHelper.GetService<global::Orleans.Serialization.Codecs.ListCodec<global::TestProject.NestedClass1>>(this, _codecProvider)).WriteField(ref writer, 1U, typeof(global::System.Collections.Generic.List<global::TestProject.NestedClass1>), instance.NestedList);
-            (_codec_CyclicClass ??= OrleansGeneratedCodeHelper.GetService<global::Orleans.Serialization.Codecs.IFieldCodec<global::TestProject.CyclicClass>>(this, _codecProvider)).WriteField(ref writer, 1U, typeof(global::TestProject.CyclicClass), instance.Cyclic);
+            _codec_NestedClass1_7D26639B0A90F47B.WriteField(ref writer, 0U, _type_NestedClass1_7D26639B0A90F47B, instance.Nested1);
+            _codec_List_NestedClass1_837E6CC56B893B73.WriteField(ref writer, 1U, _type_List_NestedClass1_837E6CC56B893B73, instance.NestedList);
+            _codec_CyclicClass_AE634BDC96DD9410.WriteField(ref writer, 1U, _type_CyclicClass_AE634BDC96DD9410, instance.Cyclic);
         }
 
         [global::System.Runtime.CompilerServices.MethodImplAttribute(global::System.Runtime.CompilerServices.MethodImplOptions.AggressiveInlining)]
@@ -48,7 +49,7 @@ namespace OrleansCodeGen.TestProject
                 id += header.FieldIdDelta;
                 if (id == 0U)
                 {
-                    instance.Nested1 = (_codec_NestedClass1 ??= OrleansGeneratedCodeHelper.GetService<global::Orleans.Serialization.Codecs.IFieldCodec<global::TestProject.NestedClass1>>(this, _codecProvider)).ReadValue(ref reader, header);
+                    instance.Nested1 = _codec_NestedClass1_7D26639B0A90F47B.ReadValue(ref reader, header);
                     reader.ReadFieldHeader(ref header);
                     if (header.IsEndBaseOrEndObject)
                         break;
@@ -57,7 +58,7 @@ namespace OrleansCodeGen.TestProject
 
                 if (id == 1U)
                 {
-                    instance.NestedList = (_codec_List_NestedClass1 ??= OrleansGeneratedCodeHelper.GetService<global::Orleans.Serialization.Codecs.ListCodec<global::TestProject.NestedClass1>>(this, _codecProvider)).ReadValue(ref reader, header);
+                    instance.NestedList = _codec_List_NestedClass1_837E6CC56B893B73.ReadValue(ref reader, header);
                     reader.ReadFieldHeader(ref header);
                     if (header.IsEndBaseOrEndObject)
                         break;
@@ -66,7 +67,7 @@ namespace OrleansCodeGen.TestProject
 
                 if (id == 2U)
                 {
-                    instance.Cyclic = (_codec_CyclicClass ??= OrleansGeneratedCodeHelper.GetService<global::Orleans.Serialization.Codecs.IFieldCodec<global::TestProject.CyclicClass>>(this, _codecProvider)).ReadValue(ref reader, header);
+                    instance.Cyclic = _codec_CyclicClass_AE634BDC96DD9410.ReadValue(ref reader, header);
                     reader.ReadFieldHeader(ref header);
                 }
 
@@ -113,10 +114,9 @@ namespace OrleansCodeGen.TestProject
     [global::System.CodeDom.Compiler.GeneratedCodeAttribute("OrleansCodeGen", "10.0.0.0"), global::System.ComponentModel.EditorBrowsableAttribute(global::System.ComponentModel.EditorBrowsableState.Never), global::System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverageAttribute]
     public sealed class Copier_DemoData : global::Orleans.Serialization.Cloning.IDeepCopier<global::TestProject.DemoData>, global::Orleans.Serialization.Cloning.IBaseCopier<global::TestProject.DemoData>
     {
-        private readonly global::Orleans.Serialization.Serializers.ICodecProvider _codecProvider;
-        private global::Orleans.Serialization.Cloning.IDeepCopier<global::TestProject.CyclicClass> _copier_CyclicClass;
-        private global::Orleans.Serialization.Cloning.IDeepCopier<global::TestProject.NestedClass1> _copier_NestedClass1;
-        private global::Orleans.Serialization.Codecs.ListCopier<global::TestProject.NestedClass1> _copier_List_NestedClass1;
+        private readonly global::Orleans.Serialization.Cloning.IDeepCopier<global::TestProject.CyclicClass> _copier_CyclicClass_AE634BDC96DD9410;
+        private readonly global::Orleans.Serialization.Cloning.IDeepCopier<global::TestProject.NestedClass1> _copier_NestedClass1_7D26639B0A90F47B;
+        private readonly global::Orleans.Serialization.Codecs.ListCopier<global::TestProject.NestedClass1> _copier_List_NestedClass1_837E6CC56B893B73;
         [global::System.Runtime.CompilerServices.MethodImplAttribute(global::System.Runtime.CompilerServices.MethodImplOptions.AggressiveInlining)]
         public global::TestProject.DemoData DeepCopy(global::TestProject.DemoData original, global::Orleans.Serialization.Cloning.CopyContext context)
         {
@@ -132,18 +132,17 @@ namespace OrleansCodeGen.TestProject
 
         public Copier_DemoData(global::Orleans.Serialization.Serializers.ICodecProvider codecProvider)
         {
-            _codecProvider = codecProvider;
-            _copier_CyclicClass = OrleansGeneratedCodeHelper.GetService<global::Orleans.Serialization.Cloning.IDeepCopier<global::TestProject.CyclicClass>>(this, codecProvider);
-            _copier_NestedClass1 = OrleansGeneratedCodeHelper.GetService<global::Orleans.Serialization.Cloning.IDeepCopier<global::TestProject.NestedClass1>>(this, codecProvider);
-            _copier_List_NestedClass1 = OrleansGeneratedCodeHelper.GetService<global::Orleans.Serialization.Codecs.ListCopier<global::TestProject.NestedClass1>>(this, codecProvider);
+            _copier_CyclicClass_AE634BDC96DD9410 = OrleansGeneratedCodeHelper.GetService<global::Orleans.Serialization.Cloning.IDeepCopier<global::TestProject.CyclicClass>>(this, codecProvider);
+            _copier_NestedClass1_7D26639B0A90F47B = OrleansGeneratedCodeHelper.GetService<global::Orleans.Serialization.Cloning.IDeepCopier<global::TestProject.NestedClass1>>(this, codecProvider);
+            _copier_List_NestedClass1_837E6CC56B893B73 = OrleansGeneratedCodeHelper.GetService<global::Orleans.Serialization.Codecs.ListCopier<global::TestProject.NestedClass1>>(this, codecProvider);
         }
 
         [global::System.Runtime.CompilerServices.MethodImplAttribute(global::System.Runtime.CompilerServices.MethodImplOptions.AggressiveInlining)]
         public void DeepCopy(global::TestProject.DemoData input, global::TestProject.DemoData output, global::Orleans.Serialization.Cloning.CopyContext context)
         {
-            output.Nested1 = (_copier_NestedClass1 ??= OrleansGeneratedCodeHelper.GetService<global::Orleans.Serialization.Cloning.IDeepCopier<global::TestProject.NestedClass1>>(this, _codecProvider)).DeepCopy(input.Nested1, context);
-            output.NestedList = (_copier_List_NestedClass1 ??= OrleansGeneratedCodeHelper.GetService<global::Orleans.Serialization.Codecs.ListCopier<global::TestProject.NestedClass1>>(this, _codecProvider)).DeepCopy(input.NestedList, context);
-            output.Cyclic = (_copier_CyclicClass ??= OrleansGeneratedCodeHelper.GetService<global::Orleans.Serialization.Cloning.IDeepCopier<global::TestProject.CyclicClass>>(this, _codecProvider)).DeepCopy(input.Cyclic, context);
+            output.Nested1 = _copier_NestedClass1_7D26639B0A90F47B.DeepCopy(input.Nested1, context);
+            output.NestedList = _copier_List_NestedClass1_837E6CC56B893B73.DeepCopy(input.NestedList, context);
+            output.Cyclic = _copier_CyclicClass_AE634BDC96DD9410.DeepCopy(input.Cyclic, context);
         }
     }
 

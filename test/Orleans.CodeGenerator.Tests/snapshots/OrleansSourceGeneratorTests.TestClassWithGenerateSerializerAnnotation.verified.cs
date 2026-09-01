@@ -32,19 +32,18 @@ namespace OrleansCodeGen.TestProject
     public sealed class Codec_ClassWithImplicitFieldIds : global::Orleans.Serialization.Codecs.IFieldCodec<global::TestProject.ClassWithImplicitFieldIds>, global::Orleans.Serialization.Serializers.IBaseCodec<global::TestProject.ClassWithImplicitFieldIds>
     {
         private readonly global::System.Type _codecFieldType = typeof(global::TestProject.ClassWithImplicitFieldIds);
-        private readonly global::Orleans.Serialization.Serializers.ICodecProvider _codecProvider;
-        private OrleansCodeGen.TestProject.Codec_MyCustomEnum _codec_MyCustomEnum;
+        private readonly global::System.Type _type_MyCustomEnum_EB43C954EA98C672 = typeof(global::TestProject.MyCustomEnum);
+        private readonly OrleansCodeGen.TestProject.Codec_MyCustomEnum _codec_MyCustomEnum_EB43C954EA98C672;
         public Codec_ClassWithImplicitFieldIds(global::Orleans.Serialization.Serializers.ICodecProvider codecProvider)
         {
-            _codecProvider = codecProvider;
-            _codec_MyCustomEnum = OrleansGeneratedCodeHelper.GetService<OrleansCodeGen.TestProject.Codec_MyCustomEnum>(this, codecProvider);
+            _codec_MyCustomEnum_EB43C954EA98C672 = OrleansGeneratedCodeHelper.GetService<OrleansCodeGen.TestProject.Codec_MyCustomEnum>(this, codecProvider);
         }
 
         [global::System.Runtime.CompilerServices.MethodImplAttribute(global::System.Runtime.CompilerServices.MethodImplOptions.AggressiveInlining)]
         public void Serialize<TBufferWriter>(ref global::Orleans.Serialization.Buffers.Writer<TBufferWriter> writer, global::TestProject.ClassWithImplicitFieldIds instance)
             where TBufferWriter : global::System.Buffers.IBufferWriter<byte>
         {
-            (_codec_MyCustomEnum ??= OrleansGeneratedCodeHelper.GetService<OrleansCodeGen.TestProject.Codec_MyCustomEnum>(this, _codecProvider)).WriteField(ref writer, 19816600U, typeof(global::TestProject.MyCustomEnum), instance.EnumValue);
+            _codec_MyCustomEnum_EB43C954EA98C672.WriteField(ref writer, 19816600U, _type_MyCustomEnum_EB43C954EA98C672, instance.EnumValue);
             global::Orleans.Serialization.Codecs.StringCodec.WriteField(ref writer, 1774218397U, instance.StringValue);
         }
 
@@ -61,7 +60,7 @@ namespace OrleansCodeGen.TestProject
                 id += header.FieldIdDelta;
                 if (id == 19816600U)
                 {
-                    instance.EnumValue = (_codec_MyCustomEnum ??= OrleansGeneratedCodeHelper.GetService<OrleansCodeGen.TestProject.Codec_MyCustomEnum>(this, _codecProvider)).ReadValue(ref reader, header);
+                    instance.EnumValue = _codec_MyCustomEnum_EB43C954EA98C672.ReadValue(ref reader, header);
                     reader.ReadFieldHeader(ref header);
                     if (header.IsEndBaseOrEndObject)
                         break;
@@ -119,16 +118,10 @@ namespace OrleansCodeGen.TestProject
     [global::System.CodeDom.Compiler.GeneratedCodeAttribute("OrleansCodeGen", "10.0.0.0"), global::System.ComponentModel.EditorBrowsableAttribute(global::System.ComponentModel.EditorBrowsableState.Never), global::System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverageAttribute]
     public sealed class Copier_ClassWithImplicitFieldIds : global::Orleans.Serialization.Cloning.IDeepCopier<global::TestProject.ClassWithImplicitFieldIds>, global::Orleans.Serialization.Cloning.IBaseCopier<global::TestProject.ClassWithImplicitFieldIds>
     {
-        private readonly global::Orleans.Serialization.Serializers.ICodecProvider _codecProvider;
         [global::System.Runtime.CompilerServices.MethodImplAttribute(global::System.Runtime.CompilerServices.MethodImplOptions.AggressiveInlining)]
         public global::TestProject.ClassWithImplicitFieldIds DeepCopy(global::TestProject.ClassWithImplicitFieldIds original, global::Orleans.Serialization.Cloning.CopyContext context)
         {
             return original is null || original.GetType() == typeof(global::TestProject.ClassWithImplicitFieldIds) ? original : context.DeepCopy(original);
-        }
-
-        public Copier_ClassWithImplicitFieldIds(global::Orleans.Serialization.Serializers.ICodecProvider codecProvider)
-        {
-            _codecProvider = codecProvider;
         }
 
         [global::System.Runtime.CompilerServices.MethodImplAttribute(global::System.Runtime.CompilerServices.MethodImplOptions.AggressiveInlining)]

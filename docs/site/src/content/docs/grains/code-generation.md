@@ -1,7 +1,7 @@
 ---
 title: Orleans source generation
 description: Understand build-time code generation for grains and serialization in Orleans.
-ms.date: 08/07/2026
+ms.date: 09/01/2026
 ms.topic: concept-article
 ---
 
@@ -31,6 +31,22 @@ Mark application data crossing grain boundaries or stored by Orleans with <xref:
 
 :::code language="csharp" source="../snippets/compiled/Grains/GeneralSnippets.cs" id="serializable_purchase_order":::
 IDs are part of the wire and storage contract. Don't reuse or renumber them after deployment. Use <xref:Orleans.AliasAttribute> when a stable serialized type alias is required independently of the CLR name.
+
+## Hot Reload for serializable members
+
+Enable the Hot Reload generation shape in development builds:
+
+```xml
+<PropertyGroup Condition="'$(Configuration)' == 'Debug'">
+  <OrleansHotReload>true</OrleansHotReload>
+</PropertyGroup>
+```
+
+The generator gives serializer and copier fields stable identities and resolves newly added concrete codec and copier dependencies when an existing generated instance first uses them. A running application can therefore apply supported .NET Hot Reload updates which add strongly typed `[Id]` members to `[GenerateSerializer]` classes and records, including members whose concrete serializable type is added in the same update.
+
+Keep each `[Id]` value stable and unique. Additive member updates preserve the existing wire contract. Changes to existing member types, IDs, type hierarchy, generic shape, grain interfaces, and generated invokable types follow the corresponding .NET Hot Reload and Orleans contract compatibility requirements. A restart rebuilds the serializer manifest after updates which introduce new types through polymorphic declarations such as `object` or interfaces, or through container element types.
+
+When `OrleansHotReload` is unset or `false`, the generator emits readonly fields with eager initialization for normal application builds.
 
 ## Generate code for external types
 

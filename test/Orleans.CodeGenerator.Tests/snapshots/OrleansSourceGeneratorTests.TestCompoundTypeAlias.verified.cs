@@ -14,12 +14,6 @@ namespace OrleansCodeGen.TestProject
     public sealed class Codec_MyCompoundTypeAliasBaseClass : global::Orleans.Serialization.Codecs.IFieldCodec<global::TestProject.MyCompoundTypeAliasBaseClass>, global::Orleans.Serialization.Serializers.IBaseCodec<global::TestProject.MyCompoundTypeAliasBaseClass>
     {
         private readonly global::System.Type _codecFieldType = typeof(global::TestProject.MyCompoundTypeAliasBaseClass);
-        private readonly global::Orleans.Serialization.Serializers.ICodecProvider _codecProvider;
-        public Codec_MyCompoundTypeAliasBaseClass(global::Orleans.Serialization.Serializers.ICodecProvider codecProvider)
-        {
-            _codecProvider = codecProvider;
-        }
-
         [global::System.Runtime.CompilerServices.MethodImplAttribute(global::System.Runtime.CompilerServices.MethodImplOptions.AggressiveInlining)]
         public void Serialize<TBufferWriter>(ref global::Orleans.Serialization.Buffers.Writer<TBufferWriter> writer, global::TestProject.MyCompoundTypeAliasBaseClass instance)
             where TBufferWriter : global::System.Buffers.IBufferWriter<byte>
@@ -87,7 +81,6 @@ namespace OrleansCodeGen.TestProject
     [global::System.CodeDom.Compiler.GeneratedCodeAttribute("OrleansCodeGen", "10.0.0.0"), global::System.ComponentModel.EditorBrowsableAttribute(global::System.ComponentModel.EditorBrowsableState.Never), global::System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverageAttribute]
     public sealed class Copier_MyCompoundTypeAliasBaseClass : global::Orleans.Serialization.Cloning.IDeepCopier<global::TestProject.MyCompoundTypeAliasBaseClass>, global::Orleans.Serialization.Cloning.IBaseCopier<global::TestProject.MyCompoundTypeAliasBaseClass>
     {
-        private readonly global::Orleans.Serialization.Serializers.ICodecProvider _codecProvider;
         [global::System.Runtime.CompilerServices.MethodImplAttribute(global::System.Runtime.CompilerServices.MethodImplOptions.AggressiveInlining)]
         public global::TestProject.MyCompoundTypeAliasBaseClass DeepCopy(global::TestProject.MyCompoundTypeAliasBaseClass original, global::Orleans.Serialization.Cloning.CopyContext context)
         {
@@ -99,11 +92,6 @@ namespace OrleansCodeGen.TestProject
             context.RecordCopy(original, result);
             DeepCopy(original, result, context);
             return result;
-        }
-
-        public Copier_MyCompoundTypeAliasBaseClass(global::Orleans.Serialization.Serializers.ICodecProvider codecProvider)
-        {
-            _codecProvider = codecProvider;
         }
 
         [global::System.Runtime.CompilerServices.MethodImplAttribute(global::System.Runtime.CompilerServices.MethodImplOptions.AggressiveInlining)]
@@ -123,11 +111,9 @@ namespace OrleansCodeGen.TestProject
     public sealed class Codec_MyCompoundTypeAliasClass : global::Orleans.Serialization.Codecs.IFieldCodec<global::TestProject.MyCompoundTypeAliasClass>, global::Orleans.Serialization.Serializers.IBaseCodec<global::TestProject.MyCompoundTypeAliasClass>
     {
         private readonly global::System.Type _codecFieldType = typeof(global::TestProject.MyCompoundTypeAliasClass);
-        private readonly global::Orleans.Serialization.Serializers.ICodecProvider _codecProvider;
         private readonly OrleansCodeGen.TestProject.Codec_MyCompoundTypeAliasBaseClass _baseTypeSerializer;
         public Codec_MyCompoundTypeAliasClass(global::Orleans.Serialization.Serializers.ICodecProvider codecProvider)
         {
-            _codecProvider = codecProvider;
             _baseTypeSerializer = OrleansGeneratedCodeHelper.GetService<OrleansCodeGen.TestProject.Codec_MyCompoundTypeAliasBaseClass>(this, codecProvider);
         }
 
@@ -211,7 +197,6 @@ namespace OrleansCodeGen.TestProject
     [global::System.CodeDom.Compiler.GeneratedCodeAttribute("OrleansCodeGen", "10.0.0.0"), global::System.ComponentModel.EditorBrowsableAttribute(global::System.ComponentModel.EditorBrowsableState.Never), global::System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverageAttribute]
     public sealed class Copier_MyCompoundTypeAliasClass : global::Orleans.Serialization.Cloning.IDeepCopier<global::TestProject.MyCompoundTypeAliasClass>, global::Orleans.Serialization.Cloning.IBaseCopier<global::TestProject.MyCompoundTypeAliasClass>
     {
-        private readonly global::Orleans.Serialization.Serializers.ICodecProvider _codecProvider;
         private readonly OrleansCodeGen.TestProject.Copier_MyCompoundTypeAliasBaseClass _baseTypeCopier;
         [global::System.Runtime.CompilerServices.MethodImplAttribute(global::System.Runtime.CompilerServices.MethodImplOptions.AggressiveInlining)]
         public global::TestProject.MyCompoundTypeAliasClass DeepCopy(global::TestProject.MyCompoundTypeAliasClass original, global::Orleans.Serialization.Cloning.CopyContext context)
@@ -228,7 +213,6 @@ namespace OrleansCodeGen.TestProject
 
         public Copier_MyCompoundTypeAliasClass(global::Orleans.Serialization.Serializers.ICodecProvider codecProvider)
         {
-            _codecProvider = codecProvider;
             _baseTypeCopier = OrleansGeneratedCodeHelper.GetService<OrleansCodeGen.TestProject.Copier_MyCompoundTypeAliasBaseClass>(this, codecProvider);
         }
 
