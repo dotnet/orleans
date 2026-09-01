@@ -262,7 +262,7 @@ public class LocalReminderServiceCompatibilityTests : IClassFixture<LocalReminde
         var initialSilo = Assert.Single(fixture.HostedCluster.Silos);
         using var cancellation = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
         cancellation.CancelAfter(TestConstants.InitTimeout);
-        var listener = new BlockingSiloStatusListener(initialSilo.SiloAddress);
+        using var listener = new BlockingSiloStatusListener(initialSilo.SiloAddress);
         var statusOracle = initialSilo.ServiceProvider.GetRequiredService<ISiloStatusOracle>();
         Assert.True(statusOracle.SubscribeToSiloStatusEvents(listener));
         Task<List<InProcessSiloHandle>>? startTask = null;
@@ -591,7 +591,7 @@ public class LocalReminderServiceCompatibilityTests : IClassFixture<LocalReminde
         }
     }
 
-    private sealed class BlockingSiloStatusListener(SiloAddress localSilo) : ISiloStatusListener
+    private sealed class BlockingSiloStatusListener(SiloAddress localSilo) : ISiloStatusListener, IDisposable
     {
         private readonly TaskCompletionSource _blocked = new(TaskCreationOptions.RunContinuationsAsynchronously);
         private readonly ManualResetEventSlim _release = new();
@@ -614,6 +614,8 @@ public class LocalReminderServiceCompatibilityTests : IClassFixture<LocalReminde
             => _blocked.Task.WaitAsync(cancellationToken);
 
         public void Release() => _release.Set();
+
+        public void Dispose() => _release.Dispose();
     }
 
     private sealed class NullReturningReminderTable : IReminderTable
