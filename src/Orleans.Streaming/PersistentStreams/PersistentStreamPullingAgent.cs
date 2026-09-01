@@ -374,9 +374,9 @@ namespace Orleans.Streams
                             consumerData.StreamId,
                             StreamSubscriptionStartPosition.EarliestAvailable);
                     }
-                    else if (requestedHandshakeToken is StartToken or DeliveryToken)
+                    else if (requestedHandshakeToken is StartToken or DeliveryToken
+                        && requestedHandshakeToken.Token is { } requestedToken)
                     {
-                        var requestedToken = requestedHandshakeToken.Token;
                         consumerData.SafeDisposeCursor(logger);
                         try
                         {
@@ -953,15 +953,38 @@ namespace Orleans.Streams
                                 }
                                 else if (newToken is StartToken)
                                 {
-                                    consumerData.LastProcessedToken = null;
-                                    newCursor = queueCache!.GetCacheCursor(consumerData.StreamId, newToken.Token);
+                                    var sequenceToken = newToken.Token
+                                        ?? throw new InvalidOperationException("A start handshake token must contain a stream sequence token.");
+                                    if (SubscriptionMarker.IsImplicitSubscription(consumerData.SubscriptionId.Guid))
+                                    {
+                                        consumerData.LastProcessedToken = sequenceToken;
+                                        try
+                                        {
+                                            newCursor = queueCache!.GetCacheCursor(consumerData.StreamId, sequenceToken);
+                                            // An implicit recovery token identifies the last event processed by the prior activation.
+                                            newCursor.MoveNext();
+                                        }
+                                        catch (QueueCacheMissException)
+                                        {
+                                            // The current batch is the receiver's first available message.
+                                            // Keep it pending when the prior activation's token was evicted.
+                                            newCursor = queueCache!.GetCacheCursor(consumerData.StreamId, batch.SequenceToken);
+                                        }
+                                    }
+                                    else
+                                    {
+                                        consumerData.LastProcessedToken = null;
+                                        newCursor = queueCache!.GetCacheCursor(consumerData.StreamId, sequenceToken);
+                                    }
                                 }
                                 else if (newToken is DeliveryToken)
                                 {
-                                    consumerData.LastProcessedToken = newToken.Token;
+                                    var sequenceToken = newToken.Token
+                                        ?? throw new InvalidOperationException("A delivery handshake token must contain a stream sequence token.");
+                                    consumerData.LastProcessedToken = sequenceToken;
                                     try
                                     {
-                                        newCursor = queueCache!.GetCacheCursor(consumerData.StreamId, newToken.Token); // queueCache must be non-null here: consumerData.Cursor was only ever populated via queueCache.GetCacheCursor.
+                                        newCursor = queueCache!.GetCacheCursor(consumerData.StreamId, sequenceToken); // queueCache must be non-null here: consumerData.Cursor was only ever populated via queueCache.GetCacheCursor.
                                         // The handshake token points to an already processed event, so advance past it.
                                         newCursor.MoveNext();
                                     }

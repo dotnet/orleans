@@ -97,7 +97,7 @@ namespace Orleans.Streams
         {
             startPosition.Validate();
             if (token != null && !IsRewindable)
-                throw new ArgumentNullException(nameof(token), "Passing a non-null token to a non-rewindable IAsyncObservable.");
+                throw new ArgumentException("Passing a non-null token to a non-rewindable IAsyncObservable.", nameof(token));
             if (startPosition != StreamSubscriptionStartPosition.Latest && !IsRewindable)
                 throw new InvalidOperationException("A non-latest start position requires a rewindable IAsyncObservable.");
             if (observer is GrainReference)
@@ -167,7 +167,7 @@ namespace Orleans.Streams
             StreamSubscriptionHandleImpl<T> oldHandleImpl = CheckHandleValidity(handle);
 
             if (token != null && !IsRewindable)
-                throw new ArgumentNullException(nameof(token), "Passing a non-null token to a non-rewindable IAsyncObservable.");
+                throw new ArgumentException("Passing a non-null token to a non-rewindable IAsyncObservable.", nameof(token));
 
             oldHandleImpl.ValidateResumeToken(token);
 

@@ -44,6 +44,15 @@ public class StreamSubscriptionHandleImplTests
     }
 
     [Fact]
+    public void StartPositionHandshakeHasNoSequenceToken()
+    {
+        var token = Assert.IsType<StartPositionToken>(
+            StreamHandshakeToken.CreateStartPositionToken(StreamSubscriptionStartPosition.EarliestAvailable));
+
+        Assert.Null(token.Token);
+    }
+
+    [Fact]
     public void InvalidStartPositionIsRejected()
     {
         Assert.Throws<ArgumentOutOfRangeException>(

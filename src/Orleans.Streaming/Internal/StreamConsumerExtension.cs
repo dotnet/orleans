@@ -72,7 +72,11 @@ namespace Orleans.Streams
         {
             if (null == stream) throw new ArgumentNullException(nameof(stream));
             startPosition.Validate();
-            if (IsStatelessWorker && (token is not null || startPosition != StreamSubscriptionStartPosition.Latest))
+            if (IsStatelessWorker && token is not null)
+            {
+                throw new InvalidOperationException("Stateless worker stream subscriptions use provider-managed live delivery and require a null sequence token.");
+            }
+            if (IsStatelessWorker && startPosition != StreamSubscriptionStartPosition.Latest)
             {
                 throw new InvalidOperationException("Stateless worker stream subscriptions use provider-managed live delivery and require the latest start position.");
             }
