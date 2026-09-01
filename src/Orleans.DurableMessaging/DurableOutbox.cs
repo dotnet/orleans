@@ -74,9 +74,13 @@ internal sealed partial class DurableOutbox : IDurableOutbox, IDurableJobFeature
     /// </summary>
     private readonly HashSet<Guid> _pendingMessageIds = [];
     private readonly HashSet<Guid> _committingMessageIds = [];
+    private string? _committingOwnershipId;
     private DateTimeOffset? _pendingJobDueTime;
+    private DateTimeOffset? _replacementOwnershipDueTime;
     private DateTimeOffset? _scheduledOwnershipDueTime;
+    private string? _replacementOwnershipId;
     private string? _scheduledOwnershipId;
+    private string? _durableOwnershipId;
     private bool _jobScheduleConfirmed;
     private bool _recoveryCompleted;
     private int _ensureJobScheduledQueued;
@@ -283,6 +287,7 @@ internal sealed partial class DurableOutbox : IDurableOutbox, IDurableJobFeature
     {
         _committingMessageIds.Clear();
         _committingMessageIds.UnionWith(_pendingMessageIds);
+        _committingOwnershipId = _jobId.Value;
     }
 
     public async ValueTask OnWriteFinalizingAsync(CancellationToken cancellationToken)
@@ -322,6 +327,7 @@ internal sealed partial class DurableOutbox : IDurableOutbox, IDurableJobFeature
 
     public void OnWriteCompleted()
     {
+        _durableOwnershipId = _committingOwnershipId;
         _pendingMessageIds.ExceptWith(_committingMessageIds);
         if (_committingMessageIds.Count > 0)
         {
@@ -329,6 +335,7 @@ internal sealed partial class DurableOutbox : IDurableOutbox, IDurableJobFeature
         }
 
         _committingMessageIds.Clear();
+        _committingOwnershipId = null;
         if (string.Equals(_scheduledOwnershipId, _jobId.Value, StringComparison.Ordinal))
         {
             _scheduledOwnershipId = null;
@@ -342,23 +349,30 @@ internal sealed partial class DurableOutbox : IDurableOutbox, IDurableJobFeature
         _ownershipEpoch = Guid.NewGuid().ToString("N");
         _pendingMessageIds.Clear();
         _committingMessageIds.Clear();
+        _committingOwnershipId = null;
         _pendingJobDueTime = null;
+        _replacementOwnershipDueTime = null;
         _scheduledOwnershipDueTime = null;
+        _replacementOwnershipId = null;
         _scheduledOwnershipId = null;
+        _durableOwnershipId = null;
         _jobScheduleConfirmed = false;
         ReconcileOutboxDepth();
     }
 
     public void OnRecoveryCompleted()
     {
+        _durableOwnershipId = _jobId.Value;
         _ownershipEpoch = Guid.NewGuid().ToString("N");
         _recoveryCompleted = true;
         _pendingMessageIds.Clear();
         _committingMessageIds.Clear();
+        _committingOwnershipId = null;
+        _replacementOwnershipDueTime = null;
+        _replacementOwnershipId = null;
         if (Count > 0 && _scheduledOwnershipId is { } scheduledOwnershipId)
         {
             _jobId.Value = scheduledOwnershipId;
-            _pendingJobDueTime = _scheduledOwnershipDueTime ?? _jobTimeProvider.GetUtcNow();
             _jobScheduleConfirmed = true;
         }
         else
@@ -377,6 +391,12 @@ internal sealed partial class DurableOutbox : IDurableOutbox, IDurableJobFeature
     }
 
     public void OnRecoveryStarted()
+    {
+        Interlocked.Increment(ref _stateGeneration);
+        _recoveryCompleted = false;
+    }
+
+    public void OnRecoveryRequested()
     {
         Interlocked.Increment(ref _stateGeneration);
         _recoveryCompleted = false;
@@ -463,7 +483,7 @@ internal sealed partial class DurableOutbox : IDurableOutbox, IDurableJobFeature
                     var messageNow = _jobTimeProvider.GetUtcNow();
                     if (_messageStates.TryGetValue(envelope.MessageId, out var existingState)
                         && existingState.EnqueuedAt is { } enqueuedAt
-                        && messageNow - enqueuedAt >= _maxRetryAge)
+                        && DurableMessagingTime.IsExpired(messageNow, enqueuedAt, _maxRetryAge))
                     {
                         batchDirty = true;
                         DeadLetterExpiredMessage(envelope, existingState, messageNow);
@@ -532,7 +552,11 @@ internal sealed partial class DurableOutbox : IDurableOutbox, IDurableJobFeature
 
                         _instruments.OnOutboxDeliveryDuration(stopwatch.Elapsed, grainTypeName, envelope.RouteKey);
                     }
-                    catch (Exception ex) when (ex is not OperationCanceledException)
+                    catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+                    {
+                        throw;
+                    }
+                    catch (Exception ex)
                     {
                         if (Volatile.Read(ref _stateGeneration) != stateGeneration)
                         {
@@ -586,7 +610,8 @@ internal sealed partial class DurableOutbox : IDurableOutbox, IDurableJobFeature
         state.LastError = error;
         var now = _jobTimeProvider.GetUtcNow();
         state.EnqueuedAt ??= now;
-        if (state.AttemptCount >= _maxDeliveryAttempts || now - state.EnqueuedAt.Value >= _maxRetryAge)
+        if (state.AttemptCount >= _maxDeliveryAttempts
+            || DurableMessagingTime.IsExpired(now, state.EnqueuedAt.Value, _maxRetryAge))
         {
             _deadLetters[envelope.MessageId] = new OutboxDeadLetter
             {
@@ -603,7 +628,7 @@ internal sealed partial class DurableOutbox : IDurableOutbox, IDurableJobFeature
             state.AttemptCount - 1,
             DurableInboxOptions.MaximumBackoffExponent);
         var delay = TimeSpan.FromTicks(_backpressureRetryDelay.Ticks * (1L << exponent));
-        state.NextAttemptAt = now + delay;
+        state.NextAttemptAt = DurableMessagingTime.AddClamped(now, delay);
         _messageStates[envelope.MessageId] = state;
     }
 
@@ -724,29 +749,32 @@ internal sealed partial class DurableOutbox : IDurableOutbox, IDurableJobFeature
                 try
                 {
                     if (Count - _pendingMessageIds.Count <= 0
-                        || (!replaceExisting && !string.IsNullOrEmpty(_jobId.Value)))
+                        && _scheduledOwnershipId is null)
+                    {
+                        _replacementOwnershipId = null;
+                        _replacementOwnershipDueTime = null;
+                        return;
+                    }
+
+                    if (!replaceExisting && !string.IsNullOrEmpty(_jobId.Value))
                     {
                         return;
                     }
 
                     string ownershipId;
+                    DateTimeOffset dueTime;
                     bool persistOwnership;
                     if (_jobScheduleConfirmed && _scheduledOwnershipId is { } scheduledOwnershipId)
                     {
                         ownershipId = scheduledOwnershipId;
-                        _jobId.Value = scheduledOwnershipId;
-                        _pendingJobDueTime = _scheduledOwnershipDueTime ?? _jobTimeProvider.GetUtcNow();
+                        dueTime = _scheduledOwnershipDueTime ?? _jobTimeProvider.GetUtcNow();
                         persistOwnership = true;
                     }
                     else
                     {
                         persistOwnership = replaceExisting || string.IsNullOrEmpty(_jobId.Value);
-                        ownershipId = GetOrCreateOwnershipId(replaceExisting);
-                    }
-
-                    if (!_jobScheduleConfirmed)
-                    {
-                        var dueTime = _pendingJobDueTime ?? _jobTimeProvider.GetUtcNow();
+                        ownershipId = GetOrCreateReplacementOwnershipId();
+                        dueTime = _replacementOwnershipDueTime!.Value;
                         await _jobManager.ScheduleJobAsync(
                             new ScheduleJobRequest
                             {
@@ -763,16 +791,18 @@ internal sealed partial class DurableOutbox : IDurableOutbox, IDurableJobFeature
                         _jobScheduleConfirmed = true;
                         _scheduledOwnershipId = ownershipId;
                         _scheduledOwnershipDueTime = dueTime;
+                        _replacementOwnershipId = null;
+                        _replacementOwnershipDueTime = null;
                     }
 
                     if (persistOwnership)
                     {
+                        _jobId.Value = ownershipId;
                         await _stateManager.WriteStateAsync(token).ConfigureAwait(true);
                     }
 
                     _scheduledOwnershipId = null;
                     _scheduledOwnershipDueTime = null;
-                    _pendingJobDueTime = null;
                     return;
                 }
                 finally
@@ -794,17 +824,15 @@ internal sealed partial class DurableOutbox : IDurableOutbox, IDurableJobFeature
         }
     }
 
-    private string GetOrCreateOwnershipId(bool replaceExisting)
+    private string GetOrCreateReplacementOwnershipId()
     {
-        if (string.IsNullOrEmpty(_jobId.Value)
-            || (replaceExisting && _pendingJobDueTime is null))
+        if (_replacementOwnershipId is null)
         {
-            _jobId.Value = DurableMessagingJobOwnership.NextId(_ownershipEpoch, _jobSequence);
-            _pendingJobDueTime = _jobTimeProvider.GetUtcNow();
-            _jobScheduleConfirmed = false;
+            _replacementOwnershipId = DurableMessagingJobOwnership.NextId(_ownershipEpoch, _jobSequence);
+            _replacementOwnershipDueTime = _jobTimeProvider.GetUtcNow();
         }
 
-        return _jobId.Value!;
+        return _replacementOwnershipId;
     }
 
     public async ValueTask<DurableJobRunResult> ExecuteJobAsync(IJobRunContext context, CancellationToken cancellationToken)
@@ -812,6 +840,11 @@ internal sealed partial class DurableOutbox : IDurableOutbox, IDurableJobFeature
         var hasStableOwnership = DurableMessagingJobOwnership.TryGetOwnershipId(
             context.Job,
             out var ownershipId);
+        if (hasStableOwnership && IsOwnershipTransitionPending(ownershipId))
+        {
+            return DurableJobRunResult.InProgress(TimeSpan.FromMilliseconds(10));
+        }
+
         if (!string.Equals(_jobId.Value, ownershipId, StringComparison.Ordinal))
         {
             if (!hasStableOwnership)
@@ -932,6 +965,11 @@ internal sealed partial class DurableOutbox : IDurableOutbox, IDurableJobFeature
                 return DurableJobRunResult.InProgress(TimeSpan.FromMilliseconds(10));
             }
 
+            if (hasStableOwnership && IsOwnershipTransitionPending(jobId))
+            {
+                return DurableJobRunResult.InProgress(TimeSpan.FromMilliseconds(10));
+            }
+
             if (string.IsNullOrEmpty(_jobId.Value))
             {
                 if (hasStableOwnership
@@ -956,7 +994,10 @@ internal sealed partial class DurableOutbox : IDurableOutbox, IDurableJobFeature
                     await _stateManager.WriteStateAsync(cancellationToken).ConfigureAwait(true);
                 }
 
-                return DurableJobRunResult.RescheduleAt(_jobTimeProvider.GetUtcNow() + TimeSpan.FromMilliseconds(10));
+                return DurableJobRunResult.RescheduleAt(
+                    DurableMessagingTime.AddClamped(
+                        _jobTimeProvider.GetUtcNow(),
+                        TimeSpan.FromMilliseconds(10)));
             }
             else if (!string.Equals(_jobId.Value, jobId, StringComparison.Ordinal))
             {
@@ -976,6 +1017,11 @@ internal sealed partial class DurableOutbox : IDurableOutbox, IDurableJobFeature
             await _gate.WaitAsync(cancellationToken).ConfigureAwait(true);
             try
             {
+                if (hasStableOwnership && IsOwnershipTransitionPending(jobId))
+                {
+                    return DurableJobRunResult.InProgress(TimeSpan.FromMilliseconds(10));
+                }
+
                 if (!string.Equals(_jobId.Value, jobId, StringComparison.Ordinal))
                 {
                     return DurableJobRunResult.Completed;
@@ -1025,6 +1071,19 @@ internal sealed partial class DurableOutbox : IDurableOutbox, IDurableJobFeature
         }
     }
 
+    private bool IsOwnershipTransitionPending(string ownershipId)
+    {
+        if (string.Equals(ownershipId, _replacementOwnershipId, StringComparison.Ordinal))
+        {
+            return true;
+        }
+
+        var currentOwnershipId = _jobId.Value;
+        return !string.Equals(_durableOwnershipId, currentOwnershipId, StringComparison.Ordinal)
+            && (string.Equals(ownershipId, _durableOwnershipId, StringComparison.Ordinal)
+                || string.Equals(ownershipId, currentOwnershipId, StringComparison.Ordinal));
+    }
+
     private bool IsReadyForAttempt(DurableEnvelope envelope, DateTimeOffset now)
     {
         if (!_messageStates.TryGetValue(envelope.MessageId, out var state))
@@ -1032,7 +1091,7 @@ internal sealed partial class DurableOutbox : IDurableOutbox, IDurableJobFeature
             return true;
         }
 
-        return state.EnqueuedAt is { } enqueuedAt && now - enqueuedAt >= _maxRetryAge
+        return state.EnqueuedAt is { } enqueuedAt && DurableMessagingTime.IsExpired(now, enqueuedAt, _maxRetryAge)
             || state.NextAttemptAt is null
             || state.NextAttemptAt <= now;
     }
@@ -1045,7 +1104,9 @@ internal sealed partial class DurableOutbox : IDurableOutbox, IDurableJobFeature
         }
 
         var retryAt = state.NextAttemptAt ?? now;
-        var expiresAt = state.EnqueuedAt is { } enqueuedAt ? enqueuedAt + _maxRetryAge : retryAt;
+        var expiresAt = state.EnqueuedAt is { } enqueuedAt
+            ? DurableMessagingTime.AddClamped(enqueuedAt, _maxRetryAge)
+            : retryAt;
         return retryAt <= expiresAt ? retryAt : expiresAt;
     }
 

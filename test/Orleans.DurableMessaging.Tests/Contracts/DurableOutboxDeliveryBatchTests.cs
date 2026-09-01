@@ -93,6 +93,87 @@ public sealed class DurableOutboxDeliveryBatchTests
     }
 
     [Fact]
+    public async Task ReplacementOwnershipPersistenceRetry_KeepsBothJobsPollingUntilCommit()
+    {
+        const string recoveredOwnershipId = "recovered:1";
+        var clock = new FakeTimeProvider();
+        var jobManager = new RecordingJobManager();
+        var fixture = new OutboxFixture(
+            hasDurableMessage: true,
+            jobManager: jobManager,
+            jobTimeProvider: clock,
+            backpressureRetryDelay: TimeSpan.FromMinutes(1),
+            durableJobId: recoveredOwnershipId);
+        fixture.Manager.FailNextWrite(new IOException("Injected replacement ownership write failure."));
+
+        var scheduling = fixture.EnsureJobScheduledAsync(
+            replaceExisting: true,
+            TestContext.Current.CancellationToken);
+        await jobManager.WaitForAttemptCountAsync(1);
+        await fixture.Manager.WaitForWriteCountAsync(1);
+        var replacementOwnershipId = Assert.IsType<string>(fixture.JobId.Value);
+
+        Assert.NotEqual(recoveredOwnershipId, replacementOwnershipId);
+        Assert.True((await fixture.ExecuteJobAsync(recoveredOwnershipId)).IsInProgress);
+        Assert.True((await fixture.ExecuteJobAsync(replacementOwnershipId)).IsInProgress);
+
+        clock.Advance(TimeSpan.FromMinutes(1));
+        await scheduling.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
+
+        Assert.Equal(1, jobManager.AttemptCount);
+        Assert.Equal(2, fixture.Manager.WriteCount);
+        Assert.Equal(
+            DurableJobRunStatus.Completed,
+            (await fixture.ExecuteJobAsync(recoveredOwnershipId)).Status);
+    }
+
+    [Fact]
+    public async Task ConcurrentWriteBeforeReplacementSchedule_KeepsDurableOwnership()
+    {
+        const string recoveredOwnershipId = "recovered:1";
+        var jobManager = new BlockingJobManager();
+        var fixture = new OutboxFixture(
+            hasDurableMessage: true,
+            jobManager: jobManager,
+            durableJobId: recoveredOwnershipId);
+
+        var scheduling = fixture.EnsureJobScheduledAsync(
+            replaceExisting: true,
+            TestContext.Current.CancellationToken);
+        await jobManager.WaitUntilScheduledAsync();
+        await fixture.Manager.WriteStateAsync(TestContext.Current.CancellationToken);
+        var replacementOwnershipId = Assert.IsType<string>(jobManager.OwnershipId);
+
+        Assert.Equal(recoveredOwnershipId, fixture.JobId.Value);
+        Assert.Equal(recoveredOwnershipId, fixture.GetDurableOwnershipId());
+        Assert.True((await fixture.ExecuteJobAsync(recoveredOwnershipId)).IsInProgress);
+        Assert.True((await fixture.ExecuteJobAsync(replacementOwnershipId)).IsInProgress);
+
+        jobManager.Release();
+        await scheduling.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
+
+        Assert.NotEqual(recoveredOwnershipId, fixture.JobId.Value);
+        Assert.Equal(fixture.JobId.Value, fixture.GetDurableOwnershipId());
+    }
+
+    [Fact]
+    public async Task DeliveryWriteWithInterleavedReplacement_KeepsDurableOwnerPolling()
+    {
+        const string recoveredOwnershipId = "recovered:1";
+        const string replacementOwnershipId = "replacement:2";
+        var fixture = new OutboxFixture(
+            _ => ValueTask.FromResult(DeliveryResult.Accepted()),
+            durableJobId: recoveredOwnershipId);
+        fixture.Manager.InterleaveNextWrite(() => fixture.JobId.Value = replacementOwnershipId);
+
+        var result = await fixture.ExecuteJobCoreAsync(recoveredOwnershipId, hasStableOwnership: true);
+
+        Assert.True(result.IsInProgress);
+        Assert.Equal(recoveredOwnershipId, fixture.GetDurableOwnershipId());
+        Assert.Equal(replacementOwnershipId, fixture.JobId.Value);
+    }
+
+    [Fact]
     public async Task SchedulingRetry_UsesConfiguredTimeProvider()
     {
         var clock = new FakeTimeProvider();
@@ -421,6 +502,23 @@ public sealed class DurableOutboxDeliveryBatchTests
         Assert.Equal(0, fixture.Manager.RevertCount);
     }
 
+    [Fact]
+    public async Task UnrelatedDeliveryCancellation_IsPersistedAsTerminalFailure()
+    {
+        var fixture = new OutboxFixture(
+            _ => ValueTask.FromException<DeliveryResult>(
+                new OperationCanceledException("Receiver canceled its operation.")),
+            maxDeliveryAttempts: 1);
+
+        await fixture.DeliverAsync();
+
+        Assert.False(fixture.Messages.ContainsKey(fixture.MessageId));
+        Assert.False(fixture.MessageStates.ContainsKey(fixture.MessageId));
+        Assert.Equal(1, fixture.DeadLetters.Count);
+        Assert.Equal(1, fixture.Manager.WriteCount);
+        Assert.Equal(0, fixture.Manager.RevertCount);
+    }
+
     private sealed class OutboxFixture
     {
         private static readonly Assembly DurableMessagingAssembly = typeof(IDurableOutbox).Assembly;
@@ -439,7 +537,8 @@ public sealed class DurableOutboxDeliveryBatchTests
             ILocalDurableJobManager? jobManager = null,
             ITimerRegistry? timerRegistry = null,
             TimeProvider? jobTimeProvider = null,
-            TimeSpan? backpressureRetryDelay = null)
+            TimeSpan? backpressureRetryDelay = null,
+            string? durableJobId = null)
         {
             MessageId = Guid.NewGuid();
             SenderId = GrainId.Create("sender", "1");
@@ -448,6 +547,9 @@ public sealed class DurableOutboxDeliveryBatchTests
 
             MessageStates = CreateInternalDictionary("Orleans.DurableMessaging.OutboxMessageState");
             DeadLetters = CreateInternalDictionary("Orleans.DurableMessaging.OutboxDeadLetter");
+            JobId = new TestDurableValue<string> { Value = durableJobId };
+            CompletedJobId = new TestDurableValue<string>();
+            JobSequence = new TestDurableValue<long>();
             if (hasDurableMessage)
             {
                 Messages.Add(MessageId, Envelope);
@@ -457,7 +559,7 @@ public sealed class DurableOutboxDeliveryBatchTests
             }
 
             Manager = new TestStateManager(
-                [Messages, MessageStates, DeadLetters],
+                [Messages, MessageStates, DeadLetters, JobId, CompletedJobId, JobSequence],
                 writeException,
                 revertException,
                 supportsObservers);
@@ -508,9 +610,9 @@ public sealed class DurableOutboxDeliveryBatchTests
                     instruments,
                     MessageStates.Instance,
                     DeadLetters.Instance,
-                    new TestDurableValue<string>(),
-                    new TestDurableValue<string>(),
-                    new TestDurableValue<long>(),
+                    JobId,
+                    CompletedJobId,
+                    JobSequence,
                     JobManager,
                     Substitute.For<IDurableJobHandlerRegistry>(),
                     pumpResults,
@@ -525,6 +627,14 @@ public sealed class DurableOutboxDeliveryBatchTests
                         })
                 ],
                 culture: null)!;
+            if (durableJobId is not null)
+            {
+                outboxType.GetField("_durableOwnershipId", BindingFlags.Instance | BindingFlags.NonPublic)!
+                    .SetValue(_outbox, durableJobId);
+                outboxType.GetField("_recoveryCompleted", BindingFlags.Instance | BindingFlags.NonPublic)!
+                    .SetValue(_outbox, true);
+            }
+
             _deliverMethod = outboxType.GetMethod("DeliverPendingMessagesAsync")!;
             _pendingMessageIdsField = outboxType.GetField("_pendingMessageIds", BindingFlags.Instance | BindingFlags.NonPublic)!;
         }
@@ -540,6 +650,9 @@ public sealed class DurableOutboxDeliveryBatchTests
         public TestStateManager Manager { get; }
         public ILocalDurableJobManager JobManager { get; }
         public ITimerRegistry TimerRegistry { get; }
+        public TestDurableValue<string> JobId { get; }
+        public TestDurableValue<string> CompletedJobId { get; }
+        public TestDurableValue<long> JobSequence { get; }
         public int PendingMessageCount => GetPendingMessageIds().Count;
 
         public Task DeliverAsync() =>
@@ -552,6 +665,40 @@ public sealed class DurableOutboxDeliveryBatchTests
             (Task)_outbox.GetType()
                 .GetMethod("EnsureJobScheduledAsync", BindingFlags.Instance | BindingFlags.NonPublic)!
                 .Invoke(_outbox, [replaceExisting, cancellationToken])!;
+
+        public ValueTask<DurableJobRunResult> ExecuteJobAsync(string ownershipId)
+        {
+            var context = Substitute.For<IJobRunContext>();
+            context.Job.Returns(new DurableJob
+            {
+                Id = $"job-{ownershipId}",
+                Name = "orleans.messaging.outbox-flush",
+                DueTime = DateTimeOffset.UnixEpoch,
+                TargetGrainId = SenderId,
+                ShardId = "test",
+                Metadata = new Dictionary<string, string>(StringComparer.Ordinal)
+                {
+                    ["orleans.messaging.ownership-id"] = ownershipId
+                }
+            });
+            context.RunId.Returns($"run-{ownershipId}");
+            context.DequeueCount.Returns(1);
+            return (ValueTask<DurableJobRunResult>)_outbox.GetType()
+                .GetMethod("ExecuteJobAsync", BindingFlags.Instance | BindingFlags.Public)!
+                .Invoke(_outbox, [context, TestContext.Current.CancellationToken])!;
+        }
+
+        public ValueTask<DurableJobRunResult> ExecuteJobCoreAsync(
+            string ownershipId,
+            bool hasStableOwnership) =>
+            (ValueTask<DurableJobRunResult>)_outbox.GetType()
+                .GetMethod("ExecuteJobCoreAsync", BindingFlags.Instance | BindingFlags.NonPublic)!
+                .Invoke(_outbox, [ownershipId, hasStableOwnership, TestContext.Current.CancellationToken])!;
+
+        public string? GetDurableOwnershipId() =>
+            (string?)_outbox.GetType()
+                .GetField("_durableOwnershipId", BindingFlags.Instance | BindingFlags.NonPublic)!
+                .GetValue(_outbox);
 
         public Task StartAsync() =>
             StartWithCancellationAsync(TestContext.Current.CancellationToken);
@@ -713,6 +860,8 @@ public sealed class DurableOutboxDeliveryBatchTests
         public int WriteCompletedCount { get; private set; }
         public int RevertCount { get; private set; }
         private Exception? _nextWriteException = writeException;
+        private Action? _nextWriteMutation;
+        private readonly SemaphoreSlim _writes = new(0);
 
         public ValueTask InitializeAsync(CancellationToken cancellationToken) => default;
         public void RegisterState(string name, IJournaledState state) { }
@@ -736,6 +885,7 @@ public sealed class DurableOutboxDeliveryBatchTests
         {
             cancellationToken.ThrowIfCancellationRequested();
             WriteCount++;
+            _writes.Release();
             if (_nextWriteException is { } exception)
             {
                 _nextWriteException = null;
@@ -749,7 +899,11 @@ public sealed class DurableOutboxDeliveryBatchTests
                 return default;
             }
 
-            _durableSnapshots = _states.Select(static state => state.Capture()).ToArray();
+            var durableSnapshots = _states.Select(static state => state.Capture()).ToArray();
+            var mutation = _nextWriteMutation;
+            _nextWriteMutation = null;
+            mutation?.Invoke();
+            _durableSnapshots = durableSnapshots;
             _durableVersions = currentVersions;
             _observer?.OnWriteCompleted();
             WriteCompletedCount++;
@@ -757,6 +911,16 @@ public sealed class DurableOutboxDeliveryBatchTests
         }
 
         public void FailNextWrite(Exception exception) => _nextWriteException = exception;
+
+        public void InterleaveNextWrite(Action mutation) => _nextWriteMutation = mutation;
+
+        public async Task WaitForWriteCountAsync(int expected)
+        {
+            while (WriteCount < expected)
+            {
+                await _writes.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
+            }
+        }
 
         public void NotifyRecoveryCompleted() => _observer?.OnRecoveryCompleted();
 
@@ -838,9 +1002,65 @@ public sealed class DurableOutboxDeliveryBatchTests
         }
     }
 
-    private sealed class TestDurableValue<T> : IDurableValue<T>
+    private sealed class BlockingJobManager : ILocalDurableJobManager
     {
-        public T? Value { get; set; }
+        private readonly TaskCompletionSource _attempted = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        private readonly TaskCompletionSource _release = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        public string? OwnershipId { get; private set; }
+
+        public async Task<DurableJob> ScheduleJobAsync(
+            ScheduleJobRequest request,
+            CancellationToken cancellationToken)
+        {
+            OwnershipId = request.Metadata!["orleans.messaging.ownership-id"];
+            _attempted.TrySetResult();
+            await _release.Task.WaitAsync(cancellationToken);
+            return new DurableJob
+            {
+                Id = "replacement",
+                Name = request.JobName,
+                DueTime = request.DueTime,
+                TargetGrainId = request.Target,
+                ShardId = "test",
+                Metadata = request.Metadata
+            };
+        }
+
+        public Task<bool> CancelAsync(DurableJob job, CancellationToken cancellationToken) =>
+            Task.FromResult(true);
+
+        public Task WaitUntilScheduledAsync() =>
+            _attempted.Task.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
+
+        public void Release() => _release.TrySetResult();
+    }
+
+    private sealed class TestDurableValue<T> : IDurableValue<T>, ITestDurableState
+    {
+        private T? _value;
+
+        public T? Value
+        {
+            get => _value;
+            set
+            {
+                _value = value;
+                Version++;
+            }
+        }
+
+        public long Version { get; private set; }
+
+        public object Capture() => new Snapshot(_value);
+
+        public void Restore(object snapshot)
+        {
+            _value = ((Snapshot)snapshot).Value;
+            Version++;
+        }
+
+        private sealed record Snapshot(T? Value);
     }
 
     private sealed class TestDurableDictionary<TKey, TValue>

@@ -282,6 +282,23 @@ public sealed class PublicDurableMessagingBehaviorTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task HandlerSelectionFailure_IsDeadLettered()
+    {
+        var receiver = NewGrain();
+        using var envelope = CreateEnvelope(
+            receiver,
+            NewMessage(80, "selection-failure"),
+            "messages/selection-failure");
+
+        Assert.Equal(DeliveryStatus.Accepted, (await DeliverAsync(receiver, envelope.Value)).Status);
+        var state = await fixture.WaitForDeadLetterCountAsync(receiver, 1);
+
+        Assert.Empty(state.Effects);
+        var deadLetter = Assert.Single(state.InboxDeadLetters);
+        Assert.Contains("Injected handler selection failure", deadLetter.Reason, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public async Task HandlerCannotCommitBeforeInboxCompletion()
     {
         var receiver = NewGrain();
@@ -336,6 +353,27 @@ public sealed class PublicDurableMessagingBehaviorTests : IAsyncLifetime
 
         var completed = await fixture.WaitForEffectCountAsync(receiver, 1);
         Assert.Equal(1, Assert.Single(completed.Effects).Count);
+        Assert.Equal(0, completed.InboxCount);
+    }
+
+    [Fact]
+    public async Task RecoveryDuringHandlerFailure_DiscardsStaleFailureAccounting()
+    {
+        var receiver = NewGrain();
+        using var handler = fixture.HandlerProbe.Arm(receiver.GetGrainId(), "messages/recover-handler-failure");
+        using var envelope = CreateEnvelope(
+            receiver,
+            NewMessage(79, "recover-handler-failure") with { ThrowOnceAfterStaging = true },
+            "messages/recover-handler-failure");
+
+        Assert.Equal(DeliveryStatus.Accepted, (await DeliverAsync(receiver, envelope.Value)).Status);
+        await handler.WaitUntilEnteredAsync();
+        await receiver.RevertStateAsync();
+        handler.Release();
+
+        var completed = await fixture.WaitForEffectCountAsync(receiver, 1);
+        Assert.Equal(1, Assert.Single(completed.Effects).Count);
+        Assert.Empty(completed.InboxDeadLetters);
         Assert.Equal(0, completed.InboxCount);
     }
 
@@ -707,6 +745,7 @@ public sealed class PublicDurableMessagingBehaviorTests : IAsyncLifetime
 
         Assert.NotEqual(before.ActivationId, recovered.ActivationId);
         Assert.Equal(1, Assert.Single(cleaned.Effects).Count);
+        Assert.Empty(cleaned.InboxDeadLetters);
         Assert.Null(cleaned.InboxJobId);
     }
 
@@ -1008,6 +1047,29 @@ public sealed class PublicDurableMessagingBehaviorTests : IAsyncLifetime
         var state = await receiver.GetSnapshotAsync();
         Assert.Equal(0, state.InboxCount);
         Assert.Empty(state.Effects);
+    }
+
+    [Fact]
+    public async Task Deliver_RejectsEnvelopeAddressedToAnotherGrain()
+    {
+        var receiver = NewGrain();
+        var declaredReceiver = NewGrain();
+        using var envelope = CreateEnvelope(
+            declaredReceiver,
+            NewMessage(74, "wrong-receiver"));
+
+        var exception = await Assert.ThrowsAsync<ArgumentException>(
+            () => DeliverAsync(receiver, envelope.Value));
+
+        Assert.Contains(declaredReceiver.GetGrainId().ToString(), exception.Message, StringComparison.Ordinal);
+        Assert.Contains(receiver.GetGrainId().ToString(), exception.Message, StringComparison.Ordinal);
+        var state = await receiver.GetSnapshotAsync();
+        Assert.Equal(0, state.InboxCount);
+        Assert.Empty(state.Effects);
+
+        Assert.Equal(DeliveryStatus.Accepted, (await DeliverAsync(declaredReceiver, envelope.Value)).Status);
+        var delivered = await fixture.WaitForEffectCountAsync(declaredReceiver, 1);
+        Assert.Single(delivered.Effects);
     }
 
     [Fact]

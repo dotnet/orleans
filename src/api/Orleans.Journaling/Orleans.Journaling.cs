@@ -249,6 +249,7 @@ namespace Orleans.Journaling
         System.Threading.Tasks.ValueTask OnDeletePreparingAsync(System.Threading.CancellationToken cancellationToken);
         void OnDeleteRequested() { }
         void OnRecoveryCompleted();
+        void OnRecoveryRequested() { }
         void OnRecoveryStarted() { }
         void OnWriteCompleted();
         System.Threading.Tasks.ValueTask OnWriteFinalizingAsync(System.Threading.CancellationToken cancellationToken);

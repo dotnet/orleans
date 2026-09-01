@@ -72,6 +72,22 @@ public class HierarchicalKeyTests
         Assert.Equal("foo/bar", key.ToString());
     }
 
+    [Theory]
+    [InlineData("")]
+    [InlineData("foo//bar")]
+    [InlineData("foo\\")]
+    public void Parse_WithInvalidString_ThrowsFormatException(string value)
+    {
+        Assert.Throws<FormatException>(() => HierarchicalKey.Parse(value, null));
+        Assert.Throws<FormatException>(() => HierarchicalKey.Parse(value.AsSpan(), null));
+    }
+
+    [Fact]
+    public void Parse_WithNullString_ThrowsArgumentNullException()
+    {
+        Assert.Throws<ArgumentNullException>(() => HierarchicalKey.Parse(null!, null));
+    }
+
     [Fact]
     public void TryParse_WithValidString_ReturnsTrue()
     {

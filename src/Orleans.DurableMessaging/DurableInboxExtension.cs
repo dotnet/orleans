@@ -213,6 +213,13 @@ internal sealed partial class DurableInboxExtension :
         CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
+        if (envelope.ReceiverId != _grainContext.GrainId)
+        {
+            throw new ArgumentException(
+                $"The envelope receiver '{envelope.ReceiverId}' does not match this grain '{_grainContext.GrainId}'.",
+                nameof(envelope));
+        }
+
         EnsureMetricsActive();
         var key = (envelope.SenderId, envelope.MessageId);
         var result = DeliveryResult.Accepted();
@@ -223,7 +230,10 @@ internal sealed partial class DurableInboxExtension :
             var replaceExpiredDedupeRecord = false;
             if (_processed.TryGetValue(key, out var processedAt))
             {
-                replaceExpiredDedupeRecord = _timeProvider.GetUtcNow() - processedAt >= _deduplicationWindow;
+                replaceExpiredDedupeRecord = DurableMessagingTime.IsExpired(
+                    _timeProvider.GetUtcNow(),
+                    processedAt,
+                    _deduplicationWindow);
                 if (!replaceExpiredDedupeRecord)
                 {
                     LogDuplicateMessageDetected(
@@ -468,7 +478,17 @@ internal sealed partial class DurableInboxExtension :
         ReconcileInboxDepth();
     }
 
-    public void OnRecoveryStarted() => _recoveryCompleted = false;
+    public void OnRecoveryStarted()
+    {
+        Interlocked.Increment(ref _stateGeneration);
+        _recoveryCompleted = false;
+    }
+
+    public void OnRecoveryRequested()
+    {
+        Interlocked.Increment(ref _stateGeneration);
+        _recoveryCompleted = false;
+    }
 
     public async ValueTask<DurableJobRunResult> ExecuteJobAsync(IJobRunContext context, CancellationToken cancellationToken)
     {
@@ -669,14 +689,17 @@ internal sealed partial class DurableInboxExtension :
                 catch
                 {
                     await _stateManager.RevertPendingChangesAsync(CancellationToken.None).ConfigureAwait(true);
-                    return DurableJobRunResult.RescheduleAt(_jobTimeProvider.GetUtcNow() + _retryDelay);
+                    return DurableJobRunResult.RescheduleAt(
+                        DurableMessagingTime.AddClamped(_jobTimeProvider.GetUtcNow(), _retryDelay));
                 }
             }
 
             var nextAttempt = GetNextAttemptAt();
             var delay = nextAttempt - _timeProvider.GetUtcNow();
             return DurableJobRunResult.RescheduleAt(
-                _jobTimeProvider.GetUtcNow() + (delay > TimeSpan.Zero ? delay : TimeSpan.Zero));
+                DurableMessagingTime.AddClamped(
+                    _jobTimeProvider.GetUtcNow(),
+                    delay > TimeSpan.Zero ? delay : TimeSpan.Zero));
         }
         finally
         {
@@ -727,8 +750,10 @@ internal sealed partial class DurableInboxExtension :
 
     private void CompactProcessedMessages()
     {
-        var cutoff = _timeProvider.GetUtcNow() - _deduplicationWindow;
-        foreach (var entry in _processed.Where(pair => pair.Value <= cutoff).ToList())
+        var now = _timeProvider.GetUtcNow();
+        foreach (var entry in _processed
+            .Where(pair => DurableMessagingTime.IsExpired(now, pair.Value, _deduplicationWindow))
+            .ToList())
         {
             _processed.Remove(entry.Key);
         }
@@ -749,71 +774,112 @@ internal sealed partial class DurableInboxExtension :
 
         var context = new InboxHandlerContext(envelope, _grainContext.GrainId, _outbox, _sessionPool);
         var stateGeneration = Volatile.Read(ref _stateGeneration);
+        IInboxHandler? handler = null;
+        Exception? handlerException = null;
         try
         {
-            if (_durableInbox.TryFindHandler(context, out var handler))
-            {
-                Interlocked.Increment(ref _handlerExecutionDepth);
-                try
-                {
-                    await handler.HandleAsync(context, cancellationToken).ConfigureAwait(true);
-                    cancellationToken.ThrowIfCancellationRequested();
-                }
-                finally
-                {
-                    Interlocked.Decrement(ref _handlerExecutionDepth);
-                }
-            }
-            else
-            {
-                await DeadLetterAsync(key, envelope, "No compatible handler is registered.").ConfigureAwait(true);
-                stopwatch.Stop();
-                _instruments.OnInboxMessageProcessed(grainTypeName, envelope.RouteKey, "dead_lettered");
-                _instruments.OnInboxProcessingDuration(stopwatch.Elapsed, grainTypeName, envelope.RouteKey);
-                return;
-            }
-
-            if (Volatile.Read(ref _stateGeneration) != stateGeneration)
-            {
-                await _stateManager.RevertPendingChangesAsync(CancellationToken.None).ConfigureAwait(true);
-                return;
-            }
-
-            await _gate.WaitAsync(CancellationToken.None).ConfigureAwait(true);
-            try
-            {
-                if (_inboxDict.ContainsKey(key))
-                {
-                    RemoveMessage(key);
-                    _messageStates.Remove(key);
-                    _processed[key] = _timeProvider.GetUtcNow();
-                    await _stateManager.WriteStateAsync(CancellationToken.None).ConfigureAwait(true);
-                }
-
-            }
-            finally
-            {
-                _gate.Release();
-            }
-
-            stopwatch.Stop();
-            _instruments.OnInboxMessageProcessed(grainTypeName, envelope.RouteKey, "success");
-            _instruments.OnInboxProcessingDuration(stopwatch.Elapsed, grainTypeName, envelope.RouteKey);
-            LogMessageProcessed(_logger, envelope.MessageId, envelope.SenderId, envelope.RouteKey, envelope.CorrelationKey?.ToString());
+            _durableInbox.TryFindHandler(context, out handler);
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
             await _stateManager.RevertPendingChangesAsync(CancellationToken.None).ConfigureAwait(true);
             throw;
         }
-        catch (Exception ex)
+        catch (Exception exception)
         {
-            LogHandlerException(_logger, ex, envelope.MessageId, envelope.SenderId, envelope.RouteKey, envelope.CorrelationKey?.ToString());
-            var deadLettered = await RecordProcessingFailureAsync(key, ex).ConfigureAwait(true);
+            handlerException = exception;
+        }
+
+        if (handlerException is null && handler is null)
+        {
+            if (!await DeadLetterAsync(
+                key,
+                envelope,
+                "No compatible handler is registered.",
+                stateGeneration).ConfigureAwait(true))
+            {
+                return;
+            }
+
+            stopwatch.Stop();
+            _instruments.OnInboxMessageProcessed(grainTypeName, envelope.RouteKey, "dead_lettered");
+            _instruments.OnInboxProcessingDuration(stopwatch.Elapsed, grainTypeName, envelope.RouteKey);
+            return;
+        }
+
+        if (handlerException is null)
+        {
+            Interlocked.Increment(ref _handlerExecutionDepth);
+            try
+            {
+                await handler!.HandleAsync(context, cancellationToken).ConfigureAwait(true);
+                cancellationToken.ThrowIfCancellationRequested();
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                await _stateManager.RevertPendingChangesAsync(CancellationToken.None).ConfigureAwait(true);
+                throw;
+            }
+            catch (Exception exception)
+            {
+                handlerException = exception;
+            }
+            finally
+            {
+                Interlocked.Decrement(ref _handlerExecutionDepth);
+            }
+        }
+
+        if (handlerException is not null)
+        {
+            if (Volatile.Read(ref _stateGeneration) != stateGeneration)
+            {
+                await _stateManager.RevertPendingChangesAsync(CancellationToken.None).ConfigureAwait(true);
+                return;
+            }
+
+            LogHandlerException(_logger, handlerException, envelope.MessageId, envelope.SenderId, envelope.RouteKey, envelope.CorrelationKey?.ToString());
+            var deadLettered = await RecordProcessingFailureAsync(key, handlerException).ConfigureAwait(true);
             stopwatch.Stop();
             _instruments.OnInboxMessageProcessed(grainTypeName, envelope.RouteKey, deadLettered ? "dead_lettered" : "retry");
             _instruments.OnInboxProcessingDuration(stopwatch.Elapsed, grainTypeName, envelope.RouteKey);
+            return;
         }
+
+        await _gate.WaitAsync(CancellationToken.None).ConfigureAwait(true);
+        try
+        {
+            if (Volatile.Read(ref _stateGeneration) != stateGeneration)
+            {
+                await _stateManager.RevertPendingChangesAsync(CancellationToken.None).ConfigureAwait(true);
+                return;
+            }
+
+            if (_inboxDict.ContainsKey(key))
+            {
+                RemoveMessage(key);
+                _messageStates.Remove(key);
+                _processed[key] = _timeProvider.GetUtcNow();
+                try
+                {
+                    await _stateManager.WriteStateAsync(CancellationToken.None).ConfigureAwait(true);
+                }
+                catch
+                {
+                    await _stateManager.RevertPendingChangesAsync(CancellationToken.None).ConfigureAwait(true);
+                    throw;
+                }
+            }
+        }
+        finally
+        {
+            _gate.Release();
+        }
+
+        stopwatch.Stop();
+        _instruments.OnInboxMessageProcessed(grainTypeName, envelope.RouteKey, "success");
+        _instruments.OnInboxProcessingDuration(stopwatch.Elapsed, grainTypeName, envelope.RouteKey);
+        LogMessageProcessed(_logger, envelope.MessageId, envelope.SenderId, envelope.RouteKey, envelope.CorrelationKey?.ToString());
     }
 
     private void ValidateAcceptanceState(
@@ -851,17 +917,35 @@ internal sealed partial class DurableInboxExtension :
             state.LastError = exception.ToString();
             if (state.AttemptCount >= _maxProcessingAttempts)
             {
-                await DeadLetterUnderGateAsync(key, recoveredEnvelope, exception.Message, state.AttemptCount).ConfigureAwait(true);
-                return true;
+                try
+                {
+                    await DeadLetterUnderGateAsync(key, recoveredEnvelope, exception.Message, state.AttemptCount).ConfigureAwait(true);
+                    return true;
+                }
+                catch
+                {
+                    await _stateManager.RevertPendingChangesAsync(CancellationToken.None).ConfigureAwait(true);
+                    throw;
+                }
             }
 
             var exponent = Math.Min(
                 state.AttemptCount - 1,
                 DurableInboxOptions.MaximumBackoffExponent);
-            state.NextAttemptAt = _timeProvider.GetUtcNow() + TimeSpan.FromTicks(_retryDelay.Ticks * (1L << exponent));
+            state.NextAttemptAt = DurableMessagingTime.AddClamped(
+                _timeProvider.GetUtcNow(),
+                TimeSpan.FromTicks(_retryDelay.Ticks * (1L << exponent)));
             _messageStates[key] = state;
-            await _stateManager.WriteStateAsync(CancellationToken.None).ConfigureAwait(true);
-            return false;
+            try
+            {
+                await _stateManager.WriteStateAsync(CancellationToken.None).ConfigureAwait(true);
+                return false;
+            }
+            catch
+            {
+                await _stateManager.RevertPendingChangesAsync(CancellationToken.None).ConfigureAwait(true);
+                throw;
+            }
         }
         finally
         {
@@ -869,16 +953,32 @@ internal sealed partial class DurableInboxExtension :
         }
     }
 
-    private async ValueTask DeadLetterAsync(
+    private async ValueTask<bool> DeadLetterAsync(
         (GrainId SenderId, Guid MessageId) key,
         DurableEnvelope envelope,
-        string reason)
+        string reason,
+        long expectedGeneration)
     {
         await _gate.WaitAsync(CancellationToken.None).ConfigureAwait(true);
         try
         {
+            if (Volatile.Read(ref _stateGeneration) != expectedGeneration
+                || !_inboxDict.ContainsKey(key))
+            {
+                return false;
+            }
+
             var attemptCount = _messageStates.TryGetValue(key, out var state) ? state.AttemptCount : 0;
-            await DeadLetterUnderGateAsync(key, envelope, reason, attemptCount).ConfigureAwait(true);
+            try
+            {
+                await DeadLetterUnderGateAsync(key, envelope, reason, attemptCount).ConfigureAwait(true);
+                return true;
+            }
+            catch
+            {
+                await _stateManager.RevertPendingChangesAsync(CancellationToken.None).ConfigureAwait(true);
+                throw;
+            }
         }
         finally
         {
