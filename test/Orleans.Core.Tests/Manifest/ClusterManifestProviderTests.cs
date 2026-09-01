@@ -245,7 +245,7 @@ public class ClusterManifestProviderTests
     }
 
     [Fact]
-    public void GrainVersionManifest_DoesNotIntersectSilosWithDifferentIpv6Scopes()
+    public void GrainVersionManifest_DoesNotIntersectSilosWithDifferentIPv6Scopes()
     {
         var addressBytes = IPAddress.Parse("fe80::1").GetAddressBytes();
         var grainSilo = SiloAddress.New(new IPAddress(addressBytes, scopeid: 1), 11111, 1);

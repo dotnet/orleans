@@ -45,7 +45,7 @@ namespace UnitTests.General
         [TestSuite("BVT")]
         [TestProvider("None")]
         [Fact, TestCategory("BVT"), TestCategory("Identifiers")]
-        public void SiloAddressComparisonDistinguishesIpv6ScopeIds()
+        public void SiloAddressComparisonDistinguishesIPv6ScopeIds()
         {
             var addressBytes = IPAddress.Parse("fe80::1").GetAddressBytes();
             var lowerScopeAddress = new IPAddress(addressBytes, scopeid: 1);

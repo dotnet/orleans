@@ -33,11 +33,21 @@ namespace Orleans.Runtime.Versions
         {
             var key = ValueTuple.Create(grainType, interfaceId, requestedVersion);
             var slot = suitableSilosCache.GetOrAdd(key, static _ => new());
-            while (true)
+            var snapshot = this.grainInterfaceVersions.Capture();
+            var generation = Volatile.Read(ref this.cacheGeneration);
+            var value = Volatile.Read(ref slot.Value);
+            if (value is not null
+                && value.CacheGeneration == generation
+                && value.ManifestVersion == snapshot.Version)
             {
-                var snapshot = this.grainInterfaceVersions.Capture();
-                var generation = Volatile.Read(ref this.cacheGeneration);
-                var value = Volatile.Read(ref slot.Value);
+                return value.Entry;
+            }
+
+            lock (slot)
+            {
+                snapshot = this.grainInterfaceVersions.Capture();
+                generation = Volatile.Read(ref this.cacheGeneration);
+                value = Volatile.Read(ref slot.Value);
                 if (value is not null
                     && value.CacheGeneration == generation
                     && value.ManifestVersion == snapshot.Version)
@@ -45,26 +55,13 @@ namespace Orleans.Runtime.Versions
                     return value.Entry;
                 }
 
-                lock (slot)
+                var entry = GetSuitableSilosImpl(snapshot, key);
+                if (generation == Volatile.Read(ref this.cacheGeneration))
                 {
-                    snapshot = this.grainInterfaceVersions.Capture();
-                    generation = Volatile.Read(ref this.cacheGeneration);
-                    value = Volatile.Read(ref slot.Value);
-                    if (value is not null
-                        && value.CacheGeneration == generation
-                        && value.ManifestVersion == snapshot.Version)
-                    {
-                        return value.Entry;
-                    }
-
-                    var entry = GetSuitableSilosImpl(snapshot, key);
-                    if (generation == Volatile.Read(ref this.cacheGeneration))
-                    {
-                        Volatile.Write(ref slot.Value, new(generation, snapshot.Version, entry));
-                    }
-
-                    return entry;
+                    Volatile.Write(ref slot.Value, new(generation, snapshot.Version, entry));
                 }
+
+                return entry;
             }
         }
 
