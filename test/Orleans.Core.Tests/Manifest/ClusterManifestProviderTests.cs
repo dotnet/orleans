@@ -180,10 +180,6 @@ public class ClusterManifestProviderTests
         var localSilo = CreateSiloAddress(11111, 1);
         var remoteSilo = CreateSiloAddress(11112, 1);
         var clusterManifestProvider = new TestClusterManifestProvider(CreateClusterManifest(1, 0, localSilo, remoteSilo));
-        using var membership = new TestClusterMembershipService(CreateMembershipSnapshot(
-            1,
-            (localSilo, SiloStatus.Active),
-            (remoteSilo, SiloStatus.Active)));
         var manifest = new GrainVersionManifest(clusterManifestProvider);
         var selectorManager = CreateCachedVersionSelectorManager(manifest);
 
@@ -192,10 +188,6 @@ public class ClusterManifestProviderTests
         Assert.Equal(new[] { localSilo, remoteSilo }, initialSilos.OrderBy(static silo => silo));
         Assert.Equal(new[] { localSilo, remoteSilo }, selectorManager.GetSupportedSilos(TestGrainType).OrderBy(static silo => silo));
 
-        membership.Update(CreateMembershipSnapshot(
-            2,
-            (localSilo, SiloStatus.ShuttingDown),
-            (remoteSilo, SiloStatus.Active)));
         clusterManifestProvider.Current = CreateClusterManifest(2, 0, remoteSilo);
 
         var updated = selectorManager.GetSuitableSilos(TestGrainType, TestInterfaceType, requestedVersion: 1);
@@ -210,10 +202,6 @@ public class ClusterManifestProviderTests
         var localSilo = CreateSiloAddress(11111, 1);
         var remoteSilo = CreateSiloAddress(11112, 1);
         var clusterManifestProvider = new TestClusterManifestProvider(CreateClusterManifest(1, 0, localSilo));
-        using var membership = new TestClusterMembershipService(CreateMembershipSnapshot(
-            1,
-            (localSilo, SiloStatus.Active),
-            (remoteSilo, SiloStatus.Active)));
         var selectorManager = CreateCachedVersionSelectorManager(new GrainVersionManifest(clusterManifestProvider));
 
         Assert.Equal(new[] { localSilo }, selectorManager.GetSuitableSilos(TestGrainType, TestInterfaceType, requestedVersion: 1).SuitableSilos);
@@ -294,6 +282,36 @@ public class ClusterManifestProviderTests
 
         Assert.Equal(new[] { silo }, (await firstCall).SuitableSilos);
         Assert.Equal(new[] { silo }, selectorManager.GetSuitableSilos(TestGrainType, TestInterfaceType, requestedVersion: 1).SuitableSilos);
+        Assert.Equal(2, selector.CallCount);
+    }
+
+    [Fact]
+    public async Task CachedVersionSelectorManager_SerializesRefreshesForTheSameKey()
+    {
+        var localSilo = CreateSiloAddress(11111, 1);
+        var remoteSilo = CreateSiloAddress(11112, 1);
+        var manifestProvider = new TestClusterManifestProvider(CreateClusterManifest(1, 0, localSilo));
+        var selectorManager = CreateCachedVersionSelectorManager(new GrainVersionManifest(manifestProvider));
+        var selector = new BlockingVersionSelector();
+        selectorManager.VersionSelectorManager.Default = selector;
+
+        var firstCall = Task.Run(
+            () => selectorManager.GetSuitableSilos(TestGrainType, TestInterfaceType, requestedVersion: 1),
+            TestContext.Current.CancellationToken);
+        await selector.Entered.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
+
+        manifestProvider.Current = CreateClusterManifest(2, 0, remoteSilo);
+        var secondCall = Task.Run(
+            () => selectorManager.GetSuitableSilos(TestGrainType, TestInterfaceType, requestedVersion: 1),
+            TestContext.Current.CancellationToken);
+        Assert.False(secondCall.IsCompleted);
+        Assert.Equal(1, selector.CallCount);
+
+        selector.Release();
+
+        Assert.Equal(new[] { localSilo }, (await firstCall).SuitableSilos);
+        Assert.Equal(new[] { remoteSilo }, (await secondCall).SuitableSilos);
+        Assert.Equal(new[] { remoteSilo }, selectorManager.GetSuitableSilos(TestGrainType, TestInterfaceType, requestedVersion: 1).SuitableSilos);
         Assert.Equal(2, selector.CallCount);
     }
 
