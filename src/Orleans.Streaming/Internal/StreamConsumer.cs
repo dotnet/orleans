@@ -52,7 +52,7 @@ namespace Orleans.Streams
 
         public Task<StreamSubscriptionHandle<T>> SubscribeAsync(IAsyncObserver<T> observer)
         {
-            return SubscribeAsyncImpl(observer, null, null, default);
+            return SubscribeAsyncImpl(observer, null, null, StreamSubscriptionStartPosition.Latest);
         }
 
         public Task<StreamSubscriptionHandle<T>> SubscribeAsync(
@@ -60,49 +60,45 @@ namespace Orleans.Streams
             StreamSequenceToken? token,
             string? filterData = null)
         {
-            return SubscribeAsyncImpl(observer, null, token, default, filterData);
+            return SubscribeAsyncImpl(observer, null, token, StreamSubscriptionStartPosition.Latest, filterData);
         }
 
-        public Task<StreamSubscriptionHandle<T>> SubscribeWithOptionsAsync(
+        public Task<StreamSubscriptionHandle<T>> SubscribeAsync(
             IAsyncObserver<T> observer,
-            StreamSubscriptionOptions options,
+            StreamSubscriptionStartPosition startPosition,
             string? filterData = null)
         {
-            return SubscribeAsyncImpl(observer, null, null, options, filterData);
+            return SubscribeAsyncImpl(observer, null, null, startPosition, filterData);
         }
 
         public Task<StreamSubscriptionHandle<T>> SubscribeAsync(IAsyncBatchObserver<T> batchObserver)
         {
-            return SubscribeAsyncImpl(null, batchObserver, null, default);
+            return SubscribeAsyncImpl(null, batchObserver, null, StreamSubscriptionStartPosition.Latest);
         }
 
         public Task<StreamSubscriptionHandle<T>> SubscribeAsync(IAsyncBatchObserver<T> batchObserver, StreamSequenceToken? token)
         {
-            return SubscribeAsyncImpl(null, batchObserver, token, default);
+            return SubscribeAsyncImpl(null, batchObserver, token, StreamSubscriptionStartPosition.Latest);
         }
 
-        public Task<StreamSubscriptionHandle<T>> SubscribeWithOptionsAsync(
+        public Task<StreamSubscriptionHandle<T>> SubscribeAsync(
             IAsyncBatchObserver<T> batchObserver,
-            StreamSubscriptionOptions options)
+            StreamSubscriptionStartPosition startPosition)
         {
-            return SubscribeAsyncImpl(null, batchObserver, null, options);
+            return SubscribeAsyncImpl(null, batchObserver, null, startPosition);
         }
 
         private async Task<StreamSubscriptionHandle<T>> SubscribeAsyncImpl(
             IAsyncObserver<T>? observer,
             IAsyncBatchObserver<T>? batchObserver,
             StreamSequenceToken? token,
-            StreamSubscriptionOptions options,
+            StreamSubscriptionStartPosition startPosition,
             string? filterData = null)
         {
-            options.Validate();
-            if (token is not null && options.StartPosition != StreamSubscriptionStartPosition.Latest)
-            {
-                throw new ArgumentException("A sequence token and a non-latest start position cannot be specified together.", nameof(options));
-            }
+            startPosition.Validate();
             if (token != null && !IsRewindable)
                 throw new ArgumentNullException(nameof(token), "Passing a non-null token to a non-rewindable IAsyncObservable.");
-            if (options.StartPosition != StreamSubscriptionStartPosition.Latest && !IsRewindable)
+            if (startPosition != StreamSubscriptionStartPosition.Latest && !IsRewindable)
                 throw new InvalidOperationException("A non-latest start position requires a rewindable IAsyncObservable.");
             if (observer is GrainReference)
                 throw new ArgumentException("On-behalf subscription via grain references is not supported. Only passing of object references is allowed.", nameof(observer));
@@ -130,7 +126,7 @@ namespace Orleans.Streams
             // and undo it in the case of failure.
             // There is no problem with that we call myExtension.SetObserver too early before the handle is registered in pub sub,
             // since this subscriptionId is unique (random Guid) and no one knows it anyway, unless successfully subscribed in the pubsub.
-            var subriptionHandle = myExtension!.SetObserver(subscriptionId, stream, observer, batchObserver, token, options, filterData);
+            var subriptionHandle = myExtension!.SetObserver(subscriptionId, stream, observer, batchObserver, token, startPosition, filterData);
             try
             {
                 await pubSub.RegisterConsumer(subscriptionId, stream.InternalStreamId, myGrainReference!.GetGrainId(), filterData);
@@ -186,7 +182,7 @@ namespace Orleans.Streams
                 observer,
                 batchObserver,
                 token,
-                default,
+                StreamSubscriptionStartPosition.Latest,
                 oldHandleImpl.FilterData,
                 handshakeState: token is null ? oldHandleImpl.SharedHandshake : null);
 

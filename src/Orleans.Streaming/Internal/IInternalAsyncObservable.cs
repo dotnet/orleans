@@ -15,6 +15,15 @@ namespace Orleans.Streams
             IAsyncBatchObserver<T> observer,
             StreamSequenceToken? token = null);
 
+        Task<StreamSubscriptionHandle<T>> SubscribeAsync(
+            IAsyncObserver<T> observer,
+            StreamSubscriptionStartPosition startPosition,
+            string? filterData = null);
+
+        Task<StreamSubscriptionHandle<T>> SubscribeAsync(
+            IAsyncBatchObserver<T> observer,
+            StreamSubscriptionStartPosition startPosition);
+
         Task UnsubscribeAsync(StreamSubscriptionHandle<T> handle);
 
         Task<IList<StreamSubscriptionHandle<T>>> GetAllSubscriptions();

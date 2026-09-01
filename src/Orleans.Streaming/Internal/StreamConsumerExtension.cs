@@ -66,18 +66,18 @@ namespace Orleans.Streams
             IAsyncObserver<T>? observer,
             IAsyncBatchObserver<T>? batchObserver,
             StreamSequenceToken? token,
-            StreamSubscriptionOptions options,
+            StreamSubscriptionStartPosition startPosition,
             string? filterData,
             StreamSubscriptionHandleImpl<T>.SharedHandshakeState? handshakeState = null)
         {
             if (null == stream) throw new ArgumentNullException(nameof(stream));
-            options.Validate();
-            if (IsStatelessWorker && (token is not null || options.StartPosition != StreamSubscriptionStartPosition.Latest))
+            startPosition.Validate();
+            if (IsStatelessWorker && (token is not null || startPosition != StreamSubscriptionStartPosition.Latest))
             {
                 throw new InvalidOperationException("Stateless worker stream subscriptions use provider-managed live delivery and require the latest start position.");
             }
             if (SubscriptionMarker.IsImplicitSubscription(subscriptionId.Guid)
-                && options.StartPosition != StreamSubscriptionStartPosition.Latest)
+                && startPosition != StreamSubscriptionStartPosition.Latest)
             {
                 throw new InvalidOperationException("Implicit stream subscriptions use the latest start position.");
             }
@@ -93,7 +93,7 @@ namespace Orleans.Streams
                     batchObserver,
                     stream,
                     token,
-                    options,
+                    startPosition,
                     filterData,
                     disableHandshake: IsStatelessWorker,
                     handshakeState: handshakeState,

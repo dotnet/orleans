@@ -10,7 +10,7 @@ namespace UnitTests.StreamingTests;
 public class StreamSubscriptionHandleImplTests
 {
     [Fact]
-    public void EarliestAvailableOptionsCreateStartPositionHandshake()
+    public void EarliestAvailableCreatesStartPositionHandshake()
     {
         var stream = CreateStream(isRewindable: true);
         var handle = new StreamSubscriptionHandleImpl<int>(
@@ -19,7 +19,7 @@ public class StreamSubscriptionHandleImplTests
             batchObserver: null,
             stream,
             token: null,
-            StreamSubscriptionOptions.EarliestAvailable,
+            StreamSubscriptionStartPosition.EarliestAvailable,
             filterData: null);
 
         Assert.IsType<StartPositionToken>(handle.GetSequenceToken());
@@ -47,7 +47,7 @@ public class StreamSubscriptionHandleImplTests
     public void InvalidStartPositionIsRejected()
     {
         Assert.Throws<ArgumentOutOfRangeException>(
-            () => new StreamSubscriptionOptions((StreamSubscriptionStartPosition)42));
+            () => ((StreamSubscriptionStartPosition)42).Validate());
     }
 
     [Fact]
@@ -57,7 +57,7 @@ public class StreamSubscriptionHandleImplTests
         IAsyncObservable<int> observableInterface = observable;
         var observer = Substitute.For<IAsyncObserver<int>>();
 
-        await observableInterface.SubscribeWithOptionsAsync(observer, StreamSubscriptionOptions.Latest);
+        await observableInterface.SubscribeAsync(observer, StreamSubscriptionStartPosition.Latest);
 
         Assert.True(observable.TokenOverloadCalled);
         Assert.Null(observable.Token);
@@ -83,9 +83,9 @@ public class StreamSubscriptionHandleImplTests
         IAsyncObservable<int> observable = new LegacyObservable();
 
         await Assert.ThrowsAsync<NotSupportedException>(
-            () => observable.SubscribeWithOptionsAsync(
+            () => observable.SubscribeAsync(
                 Substitute.For<IAsyncObserver<int>>(),
-                StreamSubscriptionOptions.EarliestAvailable));
+                StreamSubscriptionStartPosition.EarliestAvailable));
     }
 
     [Fact]
@@ -95,7 +95,7 @@ public class StreamSubscriptionHandleImplTests
         IAsyncBatchObservable<int> observableInterface = observable;
         var observer = Substitute.For<IAsyncBatchObserver<int>>();
 
-        await observableInterface.SubscribeWithOptionsAsync(observer, StreamSubscriptionOptions.Latest);
+        await observableInterface.SubscribeAsync(observer, StreamSubscriptionStartPosition.Latest);
 
         Assert.True(observable.TokenOverloadCalled);
         Assert.Null(observable.Token);
@@ -107,9 +107,9 @@ public class StreamSubscriptionHandleImplTests
         IAsyncBatchObservable<int> observable = new LegacyBatchObservable();
 
         await Assert.ThrowsAsync<NotSupportedException>(
-            () => observable.SubscribeWithOptionsAsync(
+            () => observable.SubscribeAsync(
                 Substitute.For<IAsyncBatchObserver<int>>(),
-                StreamSubscriptionOptions.EarliestAvailable));
+                StreamSubscriptionStartPosition.EarliestAvailable));
     }
 
     [Fact]
