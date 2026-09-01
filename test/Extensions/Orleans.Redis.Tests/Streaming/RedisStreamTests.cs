@@ -65,7 +65,7 @@ public sealed class RedisStreamTests : TestClusterPerTest
     [Fact]
     public async Task Redis_16_MultipleStreams_ManyDifferent_ManyProducerGrainsManyConsumerGrains()
     {
-        var multiRunner = new MultipleStreamsTestRunner(InternalClient, StreamProviderName, 16, false);
+        var multiRunner = new MultipleStreamsTestRunner(HostedCluster, StreamProviderName, 16, false);
         await multiRunner.StreamTest_MultipleStreams_ManyDifferent_ManyProducerGrainsManyConsumerGrains(
             cancellationToken: TestContext.Current.CancellationToken);
     }
@@ -73,7 +73,7 @@ public sealed class RedisStreamTests : TestClusterPerTest
     [Fact]
     public async Task Redis_17_MultipleStreams_1J_ManyProducerGrainsManyConsumerGrains()
     {
-        var multiRunner = new MultipleStreamsTestRunner(InternalClient, StreamProviderName, 17, false);
+        var multiRunner = new MultipleStreamsTestRunner(HostedCluster, StreamProviderName, 17, false);
         await multiRunner.StreamTest_MultipleStreams_ManyDifferent_ManyProducerGrainsManyConsumerGrains(
             () => HostedCluster.StartAdditionalSilo(),
             cancellationToken: TestContext.Current.CancellationToken);
@@ -97,7 +97,7 @@ public sealed class RedisStreamTests : TestClusterPerTest
         {
             return;
         }
-        _runner = new SingleStreamTestRunner(InternalClient, StreamProviderName);
+        _runner = new SingleStreamTestRunner(HostedCluster, StreamProviderName);
     }
 
     public override async ValueTask DisposeAsync()

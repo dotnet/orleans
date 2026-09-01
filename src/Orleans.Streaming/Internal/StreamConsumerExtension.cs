@@ -5,6 +5,8 @@ using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
+using Orleans.Configuration;
 using Orleans.Runtime;
 using Orleans.Streams.Core;
 
@@ -36,9 +38,13 @@ namespace Orleans.Streams
         private readonly ConcurrentDictionary<GuidId, IStreamSubscriptionHandle> allStreamObservers = new(); // map to different ObserversCollection<T> of different Ts.
         [Id(2)]
         private readonly ILogger logger;
+        [NonSerialized]
+        private readonly string clusterId;
         private const int MAXIMUM_ITEM_STRING_LOG_LENGTH = 128;
         [NonSerialized]
         private readonly IGrainContext? _grainContext;
+        [NonSerialized]
+        private readonly SiloAddress? _siloAddress;
 
         private IStreamSubscriptionObserver? StreamSubscriptionObserver =>
             _grainContext?.GrainInstance as IStreamSubscriptionObserver;
@@ -50,6 +56,8 @@ namespace Orleans.Streams
             _grainContext = grainContext;
             providerRuntime = providerRt;
             logger = providerRt.ServiceProvider.GetRequiredService<ILogger<StreamConsumerExtension>>();
+            clusterId = providerRt.ServiceProvider.GetRequiredService<IOptions<ClusterOptions>>().Value.ClusterId;
+            _siloAddress = providerRt.ServiceProvider.GetService<ILocalSiloDetails>()?.SiloAddress;
         }
 
         internal StreamSubscriptionHandleImpl<T> SetObserver<T>(
@@ -80,7 +88,9 @@ namespace Orleans.Streams
                     token,
                     filterData,
                     disableHandshake: IsStatelessWorker,
-                    handshakeState: handshakeState);
+                    handshakeState: handshakeState,
+                    siloAddress: _siloAddress,
+                    clusterId: clusterId);
                 allStreamObservers[subscriptionId] = handle;
                 return handle;
             }

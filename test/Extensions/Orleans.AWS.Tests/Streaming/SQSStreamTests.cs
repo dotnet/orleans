@@ -93,7 +93,7 @@ namespace AWSUtils.Tests.Streaming
             {
                 return;
             }
-            runner = new SingleStreamTestRunner(this.InternalClient, SQS_STREAM_PROVIDER_NAME);
+            runner = new SingleStreamTestRunner(this.HostedCluster, SQS_STREAM_PROVIDER_NAME);
         }
 
         public override async ValueTask DisposeAsync()
@@ -223,7 +223,7 @@ namespace AWSUtils.Tests.Streaming
         [Fact]
         public async Task SQS_16_MultipleStreams_ManyDifferent_ManyProducerGrainsManyConsumerGrains()
         {
-            var multiRunner = new MultipleStreamsTestRunner(this.InternalClient, SQS_STREAM_PROVIDER_NAME, 16, false);
+            var multiRunner = new MultipleStreamsTestRunner(this.HostedCluster, SQS_STREAM_PROVIDER_NAME, 16, false);
             await multiRunner.StreamTest_MultipleStreams_ManyDifferent_ManyProducerGrainsManyConsumerGrains(
                 cancellationToken: TestContext.Current.CancellationToken);
         }
@@ -231,7 +231,7 @@ namespace AWSUtils.Tests.Streaming
         [Fact]
         public async Task SQS_17_MultipleStreams_1J_ManyProducerGrainsManyConsumerGrains()
         {
-            var multiRunner = new MultipleStreamsTestRunner(this.InternalClient, SQS_STREAM_PROVIDER_NAME, 17, false);
+            var multiRunner = new MultipleStreamsTestRunner(this.HostedCluster, SQS_STREAM_PROVIDER_NAME, 17, false);
             await multiRunner.StreamTest_MultipleStreams_ManyDifferent_ManyProducerGrainsManyConsumerGrains(
                 () => HostedCluster.StartAdditionalSilo(),
                 cancellationToken: TestContext.Current.CancellationToken);

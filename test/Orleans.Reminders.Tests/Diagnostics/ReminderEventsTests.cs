@@ -34,7 +34,7 @@ public class ReminderEventsTests
     [Fact, TestCategory("BVT")]
     public void ReminderDiagnosticObserver_ServiceStartedWait_DoesNotRunContinuationsInline()
     {
-        using var observer = ReminderDiagnosticObserver.Create();
+        using var observer = ReminderDiagnosticObserver.CreateForAllSilos();
         using var continuationRan = new ManualResetEventSlim();
         var siloAddress = SiloAddress.New(new IPEndPoint(IPAddress.Loopback, 14010), 11);
         var waitTask = observer.WaitForReminderServiceStartedAsync(TestContext.Current.CancellationToken, siloAddress);
@@ -62,7 +62,7 @@ public class ReminderEventsTests
     [Fact, TestCategory("BVT")]
     public async Task ReminderDiagnosticObserver_MatchesTickCompleted_ByIdentifiers()
     {
-        using var observer = ReminderDiagnosticObserver.Create();
+        using var observer = ReminderDiagnosticObserver.CreateForAllSilos();
         var grainId = GrainId.Create("test", "grain");
         const string reminderName = "reminder";
         var now = DateTime.UtcNow;
@@ -86,7 +86,7 @@ public class ReminderEventsTests
     [Fact, TestCategory("BVT")]
     public async Task ReminderDiagnosticObserver_WaitsForAdditionalTickCount_FromCurrentState()
     {
-        using var observer = ReminderDiagnosticObserver.Create();
+        using var observer = ReminderDiagnosticObserver.CreateForAllSilos();
         var grainId = GrainId.Create("test", "grain");
         const string reminderName = "reminder";
         var now = DateTime.UtcNow;
@@ -116,7 +116,7 @@ public class ReminderEventsTests
     [Fact, TestCategory("BVT")]
     public async Task ReminderDiagnosticObserver_WaitsForTickCondition_UntilConditionIsSatisfied()
     {
-        using var observer = ReminderDiagnosticObserver.Create();
+        using var observer = ReminderDiagnosticObserver.CreateForAllSilos();
         using var cancellation = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
         cancellation.CancelAfter(TestConstants.InitTimeout);
         var grainId = GrainId.Create("test", "grain");
@@ -197,7 +197,7 @@ public class ReminderEventsTests
     [Fact, TestCategory("BVT")]
     public async Task ReminderDiagnosticObserver_WaitsForReminderQuiescence_FromLifecycleEvents()
     {
-        using var observer = ReminderDiagnosticObserver.Create();
+        using var observer = ReminderDiagnosticObserver.CreateForAllSilos();
         var grainId = GrainId.Create("test", "grain");
         const string reminderName = "reminder";
         var identity1 = new object();
@@ -228,7 +228,7 @@ public class ReminderEventsTests
     [Fact, TestCategory("BVT")]
     public async Task ReminderDiagnosticObserver_GlobalQuiescenceIgnoresUnrelatedSilos()
     {
-        using var observer = ReminderDiagnosticObserver.Create();
+        using var observer = ReminderDiagnosticObserver.CreateForAllSilos();
         var grainId = GrainId.Create("test", "grain");
         const string reminderName = "reminder";
         var clusterIdentity = new object();
@@ -267,7 +267,7 @@ public class ReminderEventsTests
     [Fact, TestCategory("BVT")]
     public async Task ReminderDiagnosticObserver_CountsDuplicateInstancesOnOneSilo()
     {
-        using var observer = ReminderDiagnosticObserver.Create();
+        using var observer = ReminderDiagnosticObserver.CreateForAllSilos();
         var grainId = GrainId.Create("test", "duplicate-owner");
         const string reminderName = "reminder";
         var siloAddress = SiloAddress.New(new IPEndPoint(IPAddress.Loopback, 14010), 11);
@@ -308,7 +308,7 @@ public class ReminderEventsTests
     [Fact, TestCategory("BVT")]
     public async Task ReminderDiagnosticObserver_CanceledQuiescenceWait_RemainsCanceled()
     {
-        using var observer = ReminderDiagnosticObserver.Create();
+        using var observer = ReminderDiagnosticObserver.CreateForAllSilos();
         using var cts = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
         var grainId = GrainId.Create("test", "grain");
         const string reminderName = "reminder";
@@ -342,7 +342,7 @@ public class ReminderEventsTests
     [Fact, TestCategory("BVT")]
     public async Task ReminderDiagnosticObserver_WaitsForCurrentOwnerSchedule_AfterOwnershipChange()
     {
-        using var observer = ReminderDiagnosticObserver.Create();
+        using var observer = ReminderDiagnosticObserver.CreateForAllSilos();
         var grainId = GrainId.Create("test", "grain");
         const string reminderName = "reminder";
         var previousOwner = new object();

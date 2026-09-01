@@ -37,6 +37,7 @@ namespace Orleans.TestingHost
     public class TestCluster : IDisposable, IAsyncDisposable
     {
         private readonly List<SiloHandle> additionalSilos = new List<SiloHandle>();
+        private readonly HashSet<IPEndPoint> siloEndpoints = [];
         private readonly TestClusterOptions options;
         private readonly StringBuilder log = new StringBuilder();
         private readonly InMemoryTransportConnectionHub _transportHub = new();
@@ -95,6 +96,20 @@ namespace Orleans.TestingHost
         /// If the cluster is being configured via ClusterConfiguration, then this object may not reflect the true settings.
         /// </remarks>
         public TestClusterOptions Options => this.options;
+
+        /// <summary>
+        /// Returns whether the address belongs to this cluster.
+        /// </summary>
+        /// <param name="siloAddress">The silo address.</param>
+        /// <returns><see langword="true"/> when the address belongs to this cluster.</returns>
+        public bool ContainsSilo(SiloAddress siloAddress)
+        {
+            ArgumentNullException.ThrowIfNull(siloAddress);
+            lock (siloEndpoints)
+            {
+                return siloEndpoints.Contains(siloAddress.Endpoint);
+            }
+        }
 
         /// <summary>
         /// The internal client interface.
@@ -1101,6 +1116,13 @@ namespace Orleans.TestingHost
             // Add overrides.
             if (configurationOverrides != null) configurationSources.AddRange(configurationOverrides);
             var siloSpecificOptions = TestSiloSpecificOptions.Create(this, clusterOptions, instanceNumber, startSiloOnNewPort);
+            var endpoint = new IPEndPoint(IPAddress.Loopback, siloSpecificOptions.SiloPort);
+            bool endpointAdded;
+            lock (siloEndpoints)
+            {
+                endpointAdded = siloEndpoints.Add(endpoint);
+            }
+
             configurationSources.Add(new MemoryConfigurationSource
             {
                 InitialData = siloSpecificOptions.ToDictionary()
@@ -1112,13 +1134,28 @@ namespace Orleans.TestingHost
                 configurationBuilder.Add(source);
             }
             var configuration = configurationBuilder.Build();
-            var handle = await _createSiloAsyncWithCancellation(
-                siloSpecificOptions.SiloName,
-                configuration,
-                cancellationToken);
-            handle.InstanceNumber = (short)instanceNumber;
-            Interlocked.Increment(ref this.startedInstances);
-            return handle;
+            try
+            {
+                var handle = await _createSiloAsyncWithCancellation(
+                    siloSpecificOptions.SiloName,
+                    configuration,
+                    cancellationToken);
+                handle.InstanceNumber = (short)instanceNumber;
+                Interlocked.Increment(ref this.startedInstances);
+                return handle;
+            }
+            catch
+            {
+                if (endpointAdded)
+                {
+                    lock (siloEndpoints)
+                    {
+                        siloEndpoints.Remove(endpoint);
+                    }
+                }
+
+                throw;
+            }
         }
 
         private async Task StopSiloAsync(SiloHandle instance, bool stopGracefully, CancellationToken cancellationToken)

@@ -1,6 +1,8 @@
 using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.Reactive.Linq;
 using Orleans.Runtime.Diagnostics;
+using Orleans.TestingHost;
 
 namespace TestExtensions;
 
@@ -50,10 +52,22 @@ public sealed class GrainDiagnosticObserver : IDisposable, IObserver<GrainLifecy
     /// <summary>
     /// Creates a new instance of the observer and starts listening for grain diagnostic events.
     /// </summary>
-    public static GrainDiagnosticObserver Create()
+    public static GrainDiagnosticObserver Create(TestCluster cluster) => Create(DiagnosticObserverSiloScope.For(cluster));
+
+    public static GrainDiagnosticObserver Create(InProcessTestCluster cluster) => Create(DiagnosticObserverSiloScope.For(cluster));
+
+    internal static GrainDiagnosticObserver Create(SiloAddress siloAddress) => Create(DiagnosticObserverSiloScope.For(siloAddress));
+
+    internal static GrainDiagnosticObserver CreateForAllSilos() => Create(DiagnosticObserverSiloScope.All);
+
+    private static GrainDiagnosticObserver Create(DiagnosticObserverSiloScope scope)
     {
         var observer = new GrainDiagnosticObserver();
-        observer._subscription = GrainLifecycleEvents.AllEvents.Subscribe(observer);
+        observer._subscription = scope.IncludesAllSilos
+            ? GrainLifecycleEvents.AllEvents.Subscribe(observer)
+            : GrainLifecycleEvents.AllEvents
+                .Where(e => scope.Matches(e.GrainContext.Address.SiloAddress))
+                .Subscribe(observer);
         Interlocked.Increment(ref observer._listenerSubscriptionCount);
         return observer;
     }

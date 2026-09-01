@@ -34,7 +34,7 @@ public class StatePreservationRebalancingTests(SPFixture fixture, ITestOutputHel
     {
         var cancellationToken = TestContext.Current.CancellationToken;
         var tasks = new List<Task>();
-        using var rebalancerEvents = RebalancerDiagnosticObserver.Create();
+        using var rebalancerEvents = RebalancerDiagnosticObserver.Create(Cluster);
         var rebalancer = Cluster.Client!.GetGrain<IActivationRebalancerWorker>(0);
         var targetHost = Cluster.Silos[1].SiloAddress;
 

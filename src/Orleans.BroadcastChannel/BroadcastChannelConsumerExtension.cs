@@ -1,7 +1,9 @@
 using System;
 using System.Collections.Concurrent;
 using System.Threading.Tasks;
+using Microsoft.Extensions.Options;
 using Orleans.BroadcastChannel.Diagnostics;
+using Orleans.Configuration;
 using Orleans.Runtime;
 
 namespace Orleans.BroadcastChannel
@@ -17,6 +19,8 @@ namespace Orleans.BroadcastChannel
         private readonly ConcurrentDictionary<InternalChannelId, ICallback> _handlers = new();
         private readonly IOnBroadcastChannelSubscribed _subscriptionObserver;
         private readonly GrainId _grainId;
+        private readonly SiloAddress _siloAddress;
+        private readonly string _clusterId;
         private readonly AsyncLock _lock = new AsyncLock();
 
         private interface ICallback
@@ -49,11 +53,15 @@ namespace Orleans.BroadcastChannel
             }
         }
 
-        public BroadcastChannelConsumerExtension(IGrainContextAccessor grainContextAccessor)
+        public BroadcastChannelConsumerExtension(
+            IGrainContextAccessor grainContextAccessor,
+            IOptions<ClusterOptions> clusterOptions)
         {
             var grainContext = grainContextAccessor.GrainContext;
             _subscriptionObserver = (grainContext?.GrainInstance as IOnBroadcastChannelSubscribed)!;
             _grainId = grainContext?.GrainId ?? default;
+            _siloAddress = grainContext?.Address.SiloAddress ?? throw new ArgumentException("A grain context is required.");
+            _clusterId = clusterOptions.Value.ClusterId;
             if (_subscriptionObserver == null)
             {
                 throw new ArgumentException($"The grain doesn't implement interface {nameof(IOnBroadcastChannelSubscribed)}");
@@ -75,7 +83,7 @@ namespace Orleans.BroadcastChannel
             if (callback != default)
             {
                 await callback.OnPublished(item);
-                BroadcastChannelEvents.EmitItemDelivered(streamId.ProviderName, streamId.ChannelId, _grainId);
+                BroadcastChannelEvents.EmitItemDelivered(streamId.ProviderName, streamId.ChannelId, _grainId, _siloAddress, _clusterId);
             }
         }
 

@@ -1,7 +1,9 @@
 using System;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using Orleans.BroadcastChannel.SubscriberTable;
+using Orleans.Configuration;
 
 namespace Orleans.BroadcastChannel
 {
@@ -26,19 +28,24 @@ namespace Orleans.BroadcastChannel
         private readonly IGrainFactory _grainFactory;
         private readonly ImplicitChannelSubscriberTable _subscriberTable;
         private readonly ILoggerFactory _loggerFactory;
+        private readonly SiloAddress? _siloAddress;
+        private readonly string _clusterId;
 
         public BroadcastChannelProvider(
             string providerName,
             BroadcastChannelOptions options,
             IGrainFactory grainFactory,
             ImplicitChannelSubscriberTable subscriberTable,
-            ILoggerFactory loggerFactory)
+            ILoggerFactory loggerFactory,
+            IServiceProvider serviceProvider)
         {
             _providerName = providerName;
             _options = options;
             _grainFactory = grainFactory;
             _subscriberTable = subscriberTable;
             _loggerFactory = loggerFactory;
+            _siloAddress = serviceProvider.GetService<ILocalSiloDetails>()?.SiloAddress;
+            _clusterId = serviceProvider.GetRequiredService<IOptions<ClusterOptions>>().Value.ClusterId;
         }
 
         /// <inheritdoc />
@@ -49,7 +56,9 @@ namespace Orleans.BroadcastChannel
                 _grainFactory,
                 _subscriberTable,
                 _options.FireAndForgetDelivery,
-                _loggerFactory);
+                _loggerFactory,
+                _siloAddress,
+                _clusterId);
         }
 
         /// <summary>
@@ -65,4 +74,3 @@ namespace Orleans.BroadcastChannel
         }
     }
 }
-

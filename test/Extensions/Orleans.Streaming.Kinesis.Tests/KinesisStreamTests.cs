@@ -105,7 +105,7 @@ namespace Orleans.Streaming.Kinesis.Tests
             {
                 return;
             }
-            runner = new SingleStreamTestRunner(this.InternalClient, KINESIS_STREAM_PROVIDER_NAME);
+            runner = new SingleStreamTestRunner(this.HostedCluster, KINESIS_STREAM_PROVIDER_NAME);
         }
 
         public override async ValueTask DisposeAsync()
@@ -239,7 +239,7 @@ namespace Orleans.Streaming.Kinesis.Tests
         [Fact]
         public async Task Kinesis_16_MultipleStreams_ManyDifferent_ManyProducerGrainsManyConsumerGrains()
         {
-            var multiRunner = new MultipleStreamsTestRunner(this.InternalClient, KINESIS_STREAM_PROVIDER_NAME, 16, false);
+            var multiRunner = new MultipleStreamsTestRunner(this.HostedCluster, KINESIS_STREAM_PROVIDER_NAME, 16, false);
             await multiRunner.StreamTest_MultipleStreams_ManyDifferent_ManyProducerGrainsManyConsumerGrains(
                 cancellationToken: TestContext.Current.CancellationToken);
         }
@@ -247,7 +247,7 @@ namespace Orleans.Streaming.Kinesis.Tests
         [Fact]
         public async Task Kinesis_17_MultipleStreams_1J_ManyProducerGrainsManyConsumerGrains()
         {
-            var multiRunner = new MultipleStreamsTestRunner(this.InternalClient, KINESIS_STREAM_PROVIDER_NAME, 17, false);
+            var multiRunner = new MultipleStreamsTestRunner(this.HostedCluster, KINESIS_STREAM_PROVIDER_NAME, 17, false);
             await multiRunner.StreamTest_MultipleStreams_ManyDifferent_ManyProducerGrainsManyConsumerGrains(
                 () => HostedCluster.StartAdditionalSilo(),
                 cancellationToken: TestContext.Current.CancellationToken);

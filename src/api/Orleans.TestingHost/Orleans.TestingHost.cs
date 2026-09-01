@@ -86,6 +86,8 @@ namespace Orleans.TestingHost
 
         public IClusterClient Client { get { throw null; } }
 
+        public bool ContainsSilo(Runtime.SiloAddress siloAddress) { throw null; }
+
         public InProcessTestClusterOptions Options { get { throw null; } }
 
         public ITestClusterPortAllocator PortAllocator { get { throw null; } }
@@ -214,6 +216,8 @@ namespace Orleans.TestingHost
         public InProcessTestClusterBuilder ConfigureSilo(System.Action<InProcessTestSiloSpecificOptions, Hosting.ISiloBuilder> configureSiloDelegate) { throw null; }
 
         public InProcessTestClusterBuilder ConfigureSiloHost(System.Action<InProcessTestSiloSpecificOptions, Microsoft.Extensions.Hosting.IHostApplicationBuilder> configureSiloHostDelegate) { throw null; }
+
+        public bool ContainsSilo(Runtime.SiloAddress siloAddress) { throw null; }
 
         public static string CreateClusterId() { throw null; }
     }
@@ -375,6 +379,8 @@ namespace Orleans.TestingHost
 
         public IClusterClient Client { get { throw null; } }
 
+        public bool ContainsSilo(Runtime.SiloAddress siloAddress) { throw null; }
+
         public System.Collections.Generic.IReadOnlyList<Microsoft.Extensions.Configuration.IConfigurationSource> ConfigurationSources { get { throw null; } }
 
         public System.Func<string, Microsoft.Extensions.Configuration.IConfiguration, System.Threading.Tasks.Task<SiloHandle>> CreateSiloAsync { set { } }
@@ -511,6 +517,8 @@ namespace Orleans.TestingHost
             where T : new() { throw null; }
 
         public TestCluster Build() { throw null; }
+
+        public bool ContainsSilo(Runtime.SiloAddress siloAddress) { throw null; }
 
         public TestClusterBuilder ConfigureBuilder(System.Action configureDelegate) { throw null; }
 

@@ -4,6 +4,7 @@ using System.Reactive.Threading.Tasks;
 using Orleans.BroadcastChannel;
 using Orleans.BroadcastChannel.Diagnostics;
 using Orleans.Runtime;
+using Orleans.TestingHost;
 
 namespace TestExtensions;
 
@@ -23,11 +24,13 @@ public sealed class BroadcastChannelDiagnosticObserver : IDisposable
     /// <summary>
     /// Creates a new instance of the observer and starts listening for broadcast channel diagnostic events.
     /// </summary>
-    public static BroadcastChannelDiagnosticObserver Create() => new();
+    public static BroadcastChannelDiagnosticObserver Create(TestCluster cluster) => new(DiagnosticObserverSiloScope.For(cluster));
 
-    private BroadcastChannelDiagnosticObserver()
+    public static BroadcastChannelDiagnosticObserver Create(InProcessTestCluster cluster) => new(DiagnosticObserverSiloScope.For(cluster));
+
+    private BroadcastChannelDiagnosticObserver(DiagnosticObserverSiloScope scope)
     {
-        _events = BroadcastChannelEvents.AllEvents.Replay();
+        _events = BroadcastChannelEvents.AllEvents.Where(e => scope.Matches(e.SiloAddress, e.ClusterId)).Replay();
         _connection = _events.Connect();
     }
 

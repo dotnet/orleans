@@ -19,6 +19,7 @@ namespace Orleans.TestingHost
         private readonly List<Action> configureBuilderActions = new List<Action>();
         private Func<string, IConfiguration, Task<SiloHandle>>? _createSiloAsync;
         private Func<string, IConfiguration, CancellationToken, Task<SiloHandle>>? _createSiloAsyncWithCancellation;
+        private TestCluster? _cluster;
 
         /// <summary>
         /// Initializes a new instance of <see cref="TestClusterBuilder"/> using the default options.
@@ -181,7 +182,7 @@ namespace Orleans.TestingHost
             configuration.GetSection("Orleans").Bind(finalOptions);
 
             var configSources = new ReadOnlyCollection<IConfigurationSource>(configBuilder.Sources);
-            var testCluster = new TestCluster(finalOptions, configSources, portAllocator);
+            var testCluster = _cluster = new TestCluster(finalOptions, configSources, portAllocator);
             if (_createSiloAsyncWithCancellation is not null)
             {
                 testCluster.CreateSiloAsyncWithCancellation = CreateSiloAsyncWithCancellation;
@@ -192,6 +193,17 @@ namespace Orleans.TestingHost
             }
 
             return testCluster;
+        }
+
+        /// <summary>
+        /// Returns whether the address belongs to the cluster built by this builder.
+        /// </summary>
+        /// <param name="siloAddress">The silo address.</param>
+        /// <returns><see langword="true"/> when the address belongs to this cluster.</returns>
+        public bool ContainsSilo(SiloAddress siloAddress)
+        {
+            ArgumentNullException.ThrowIfNull(siloAddress);
+            return _cluster?.ContainsSilo(siloAddress) == true;
         }
 
         /// <summary>

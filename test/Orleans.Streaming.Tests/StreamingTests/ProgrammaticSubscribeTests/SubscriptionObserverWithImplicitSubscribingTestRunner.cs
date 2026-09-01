@@ -30,7 +30,7 @@ namespace Tester.StreamingTests.ProgrammaticSubscribeTests
         [Fact]
         public virtual async Task StreamingTests_Consumer_Producer_Subscribe()
         {
-            using var observer = StreamingDiagnosticObserver.Create();
+            using var observer = StreamingDiagnosticObserver.Create(fixture.HostedCluster);
             using var cts = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
             cts.CancelAfter(_timeout);
             var streamId = new FullStreamIdentity(Guid.NewGuid(), ImplicitSubscribeGrain.StreamNameSpace, StreamProviderName);
@@ -56,7 +56,7 @@ namespace Tester.StreamingTests.ProgrammaticSubscribeTests
         [Fact]
         public virtual async Task StreamingTests_Consumer_Producer_SubscribeToTwoStream_MessageWithPolymorphism()
         {
-            using var observer = StreamingDiagnosticObserver.Create();
+            using var observer = StreamingDiagnosticObserver.Create(fixture.HostedCluster);
             using var cts = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
             cts.CancelAfter(_timeout);
             var streamId = new FullStreamIdentity(Guid.NewGuid(), ImplicitSubscribeGrain.StreamNameSpace, StreamProviderName);
@@ -98,7 +98,7 @@ namespace Tester.StreamingTests.ProgrammaticSubscribeTests
         [Fact]
         public virtual async Task StreamingTests_Consumer_Producer_SubscribeToStreamsHandledByDifferentStreamProvider()
         {
-            using var observer = StreamingDiagnosticObserver.Create();
+            using var observer = StreamingDiagnosticObserver.Create(fixture.HostedCluster);
             using var cts = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
             cts.CancelAfter(_timeout);
             var streamId = new FullStreamIdentity(Guid.NewGuid(), ImplicitSubscribeGrain.StreamNameSpace, StreamProviderName);

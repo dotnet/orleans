@@ -29,12 +29,33 @@ public static class BroadcastChannelEvents
     /// The base class used for broadcast channel diagnostic events.
     /// </summary>
     /// <param name="providerName">The name of the broadcast channel provider.</param>
-    public abstract class BroadcastChannelEvent(string providerName)
+    /// <param name="siloAddress">The address of the silo associated with the event, if any.</param>
+    /// <param name="clusterId">The identifier of the cluster associated with the event.</param>
+    public abstract class BroadcastChannelEvent(string providerName, SiloAddress? siloAddress, string clusterId)
     {
+        /// <summary>
+        /// Initializes an event without cluster identity.
+        /// </summary>
+        /// <param name="providerName">The name of the broadcast channel provider.</param>
+        protected BroadcastChannelEvent(string providerName)
+            : this(providerName, siloAddress: null, clusterId: string.Empty)
+        {
+        }
+
         /// <summary>
         /// The name of the broadcast channel provider.
         /// </summary>
         public readonly string ProviderName = providerName;
+
+        /// <summary>
+        /// The address of the silo associated with the event, if any.
+        /// </summary>
+        public readonly SiloAddress? SiloAddress = siloAddress;
+
+        /// <summary>
+        /// The identifier of the cluster associated with the event.
+        /// </summary>
+        public readonly string ClusterId = clusterId;
     }
 
     /// <summary>
@@ -43,11 +64,23 @@ public static class BroadcastChannelEvents
     /// <param name="providerName">The name of the broadcast channel provider.</param>
     /// <param name="channelId">The channel ID.</param>
     /// <param name="subscriberCount">The number of subscribers that will receive this item.</param>
+    /// <param name="siloAddress">The address of the silo publishing the item, if any.</param>
+    /// <param name="clusterId">The identifier of the cluster publishing the item.</param>
     public sealed class ItemPublished(
         string providerName,
         ChannelId channelId,
-        int subscriberCount) : BroadcastChannelEvent(providerName)
+        int subscriberCount,
+        SiloAddress? siloAddress,
+        string clusterId) : BroadcastChannelEvent(providerName, siloAddress, clusterId)
     {
+        /// <summary>
+        /// Initializes an event without cluster identity.
+        /// </summary>
+        public ItemPublished(string providerName, ChannelId channelId, int subscriberCount)
+            : this(providerName, channelId, subscriberCount, siloAddress: null, clusterId: string.Empty)
+        {
+        }
+
         /// <summary>
         /// The channel ID.
         /// </summary>
@@ -65,11 +98,23 @@ public static class BroadcastChannelEvents
     /// <param name="providerName">The name of the broadcast channel provider.</param>
     /// <param name="channelId">The channel ID.</param>
     /// <param name="consumerGrainId">The grain ID of the consumer.</param>
+    /// <param name="siloAddress">The address of the silo delivering the item.</param>
+    /// <param name="clusterId">The identifier of the cluster delivering the item.</param>
     public sealed class ItemDelivered(
         string providerName,
         ChannelId channelId,
-        GrainId consumerGrainId) : BroadcastChannelEvent(providerName)
+        GrainId consumerGrainId,
+        SiloAddress? siloAddress,
+        string clusterId) : BroadcastChannelEvent(providerName, siloAddress, clusterId)
     {
+        /// <summary>
+        /// Initializes an event without cluster identity.
+        /// </summary>
+        public ItemDelivered(string providerName, ChannelId channelId, GrainId consumerGrainId)
+            : this(providerName, channelId, consumerGrainId, siloAddress: null, clusterId: string.Empty)
+        {
+        }
+
         /// <summary>
         /// The channel ID.
         /// </summary>
@@ -81,41 +126,45 @@ public static class BroadcastChannelEvents
         public readonly GrainId ConsumerGrainId = consumerGrainId;
     }
 
-    internal static void EmitItemPublished(string providerName, ChannelId channelId, int subscriberCount)
+    internal static void EmitItemPublished(string providerName, ChannelId channelId, int subscriberCount, SiloAddress? siloAddress, string clusterId)
     {
         if (!Listener.IsEnabled(nameof(ItemPublished)))
         {
             return;
         }
 
-        Emit(providerName, channelId, subscriberCount);
+        Emit(providerName, channelId, subscriberCount, siloAddress, clusterId);
 
         [MethodImpl(MethodImplOptions.NoInlining)]
-        static void Emit(string providerName, ChannelId channelId, int subscriberCount)
+        static void Emit(string providerName, ChannelId channelId, int subscriberCount, SiloAddress? siloAddress, string clusterId)
         {
             Listener.Write(nameof(ItemPublished), new ItemPublished(
                 providerName,
                 channelId,
-                subscriberCount));
+                subscriberCount,
+                siloAddress,
+                clusterId));
         }
     }
 
-    internal static void EmitItemDelivered(string providerName, ChannelId channelId, GrainId consumerGrainId)
+    internal static void EmitItemDelivered(string providerName, ChannelId channelId, GrainId consumerGrainId, SiloAddress siloAddress, string clusterId)
     {
         if (!Listener.IsEnabled(nameof(ItemDelivered)))
         {
             return;
         }
 
-        Emit(providerName, channelId, consumerGrainId);
+        Emit(providerName, channelId, consumerGrainId, siloAddress, clusterId);
 
         [MethodImpl(MethodImplOptions.NoInlining)]
-        static void Emit(string providerName, ChannelId channelId, GrainId consumerGrainId)
+        static void Emit(string providerName, ChannelId channelId, GrainId consumerGrainId, SiloAddress siloAddress, string clusterId)
         {
             Listener.Write(nameof(ItemDelivered), new ItemDelivered(
                 providerName,
                 channelId,
-                consumerGrainId));
+                consumerGrainId,
+                siloAddress,
+                clusterId));
         }
     }
 

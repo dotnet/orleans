@@ -35,6 +35,7 @@ namespace Orleans.TestingHost;
 public sealed class InProcessTestCluster : IDisposable, IAsyncDisposable
 {
     private readonly List<InProcessSiloHandle> _silos = [];
+    private readonly HashSet<IPEndPoint> _siloEndpoints = [];
     private readonly StringBuilder _log = new();
     private readonly object _logLock = new();
     private readonly InMemoryTransportConnectionHub _transportHub = new();
@@ -87,6 +88,20 @@ public sealed class InProcessTestCluster : IDisposable, IAsyncDisposable
     /// The port allocator.
     /// </summary>
     public ITestClusterPortAllocator PortAllocator { get; }
+
+    /// <summary>
+    /// Returns whether the address belongs to this cluster.
+    /// </summary>
+    /// <param name="siloAddress">The silo address.</param>
+    /// <returns><see langword="true"/> when the address belongs to this cluster.</returns>
+    public bool ContainsSilo(SiloAddress siloAddress)
+    {
+        ArgumentNullException.ThrowIfNull(siloAddress);
+        lock (_siloEndpoints)
+        {
+            return _siloEndpoints.Contains(siloAddress.Endpoint);
+        }
+    }
 
     /// <summary>
     /// Configures the test cluster plus client in-process.
@@ -879,19 +894,28 @@ public sealed class InProcessTestCluster : IDisposable, IAsyncDisposable
         InProcessTestSiloSpecificOptions siloOptions,
         CancellationToken cancellationToken)
     {
-        var host = await Task.Run(async () =>
+        var endpoint = new IPEndPoint(IPAddress.Loopback, siloOptions.SiloPort);
+        bool endpointAdded;
+        lock (_siloEndpoints)
         {
-            var siloName = siloOptions.SiloName;
+            endpointAdded = _siloEndpoints.Add(endpoint);
+        }
 
-            var appBuilder = Host.CreateApplicationBuilder(new HostApplicationBuilderSettings
+        try
+        {
+            var host = await Task.Run(async () =>
             {
-                ApplicationName = siloName,
-                EnvironmentName = Environments.Development,
-                DisableDefaults = true
-            });
+                var siloName = siloOptions.SiloName;
 
-            var services = appBuilder.Services;
-            TryConfigureFileLogging(Options, services, siloName);
+                var appBuilder = Host.CreateApplicationBuilder(new HostApplicationBuilderSettings
+                {
+                    ApplicationName = siloName,
+                    EnvironmentName = Environments.Development,
+                    DisableDefaults = true
+                });
+
+                var services = appBuilder.Services;
+                TryConfigureFileLogging(Options, services, siloName);
 
             if (Debugger.IsAttached)
             {
@@ -956,28 +980,41 @@ public sealed class InProcessTestCluster : IDisposable, IAsyncDisposable
                 }
             });
 
-            var host = appBuilder.Build();
-            TestClusterFatalErrorHandler.Attach(host);
-            InitializeTestHooksSystemTarget(host);
-            try
-            {
-                await host.StartAsync(cancellationToken);
-                return host;
-            }
-            catch
-            {
-                await DisposeAsync(host);
-                throw;
-            }
-        }, cancellationToken);
+                var host = appBuilder.Build();
+                TestClusterFatalErrorHandler.Attach(host);
+                InitializeTestHooksSystemTarget(host);
+                try
+                {
+                    await host.StartAsync(cancellationToken);
+                    return host;
+                }
+                catch
+                {
+                    await DisposeAsync(host);
+                    throw;
+                }
+            }, cancellationToken);
 
-        return new InProcessSiloHandle
+            return new InProcessSiloHandle
+            {
+                Name = siloOptions.SiloName,
+                SiloHost = host,
+                SiloAddress = host.Services.GetRequiredService<ILocalSiloDetails>().SiloAddress,
+                GatewayAddress = host.Services.GetRequiredService<ILocalSiloDetails>().GatewayAddress,
+            };
+        }
+        catch
         {
-            Name = siloOptions.SiloName,
-            SiloHost = host,
-            SiloAddress = host.Services.GetRequiredService<ILocalSiloDetails>().SiloAddress,
-            GatewayAddress = host.Services.GetRequiredService<ILocalSiloDetails>().GatewayAddress,
-        };
+            if (endpointAdded)
+            {
+                lock (_siloEndpoints)
+                {
+                    _siloEndpoints.Remove(endpoint);
+                }
+            }
+
+            throw;
+        }
     }
 
     /// <summary>

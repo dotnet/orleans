@@ -101,7 +101,7 @@ public abstract class StreamingResumeTests : TestClusterPerTest
 
     protected virtual async Task ResumeAfterInactivityImpl(bool waitForCacheToFlush)
     {
-        using var observer = StreamingDiagnosticObserver.Create();
+        using var observer = StreamingDiagnosticObserver.Create(HostedCluster);
         var streamProvider = this.Client.GetStreamProvider(StreamProviderName);
         var key = Guid.NewGuid();
         var stream = streamProvider.GetStream<byte[]>(nameof(IImplicitSubscriptionCounterGrain), key);
@@ -145,7 +145,7 @@ public abstract class StreamingResumeTests : TestClusterPerTest
     [Fact]
     public virtual async Task ResumeAfterDeactivation()
     {
-        using var observer = StreamingDiagnosticObserver.Create();
+        using var observer = StreamingDiagnosticObserver.Create(HostedCluster);
         var streamProvider = this.Client.GetStreamProvider(StreamProviderName);
         var key = Guid.NewGuid();
         var stream = streamProvider.GetStream<byte[]>(nameof(IImplicitSubscriptionCounterGrain), key);
@@ -169,7 +169,7 @@ public abstract class StreamingResumeTests : TestClusterPerTest
     [Fact]
     public virtual async Task ResumeAfterDeactivationActiveStream()
     {
-        using var observer = StreamingDiagnosticObserver.Create();
+        using var observer = StreamingDiagnosticObserver.Create(HostedCluster);
         var streamProvider = this.Client.GetStreamProvider(StreamProviderName);
         var key = Guid.NewGuid();
         var stream = streamProvider.GetStream<byte[]>(nameof(IImplicitSubscriptionCounterGrain), key);

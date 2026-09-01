@@ -114,7 +114,7 @@ public class NatsStreamTests : TestClusterPerTest
             return;
 
         }
-        runner = new SingleStreamTestRunner(this.InternalClient, NatsStreamProviderName);
+        runner = new SingleStreamTestRunner(this.HostedCluster, NatsStreamProviderName);
     }
 
     public override async ValueTask DisposeAsync()
@@ -245,7 +245,7 @@ public class NatsStreamTests : TestClusterPerTest
     [Fact]
     public async Task Nats_16_MultipleStreams_ManyDifferent_ManyProducerGrainsManyConsumerGrains()
     {
-        var multiRunner = new MultipleStreamsTestRunner(this.InternalClient, NatsStreamProviderName, 16, false);
+        var multiRunner = new MultipleStreamsTestRunner(this.HostedCluster, NatsStreamProviderName, 16, false);
         await multiRunner.StreamTest_MultipleStreams_ManyDifferent_ManyProducerGrainsManyConsumerGrains(
             cancellationToken: TestContext.Current.CancellationToken);
     }
@@ -253,7 +253,7 @@ public class NatsStreamTests : TestClusterPerTest
     [Fact]
     public async Task Nats_17_MultipleStreams_1J_ManyProducerGrainsManyConsumerGrains()
     {
-        var multiRunner = new MultipleStreamsTestRunner(this.InternalClient, NatsStreamProviderName, 17, false);
+        var multiRunner = new MultipleStreamsTestRunner(this.HostedCluster, NatsStreamProviderName, 17, false);
         await multiRunner.StreamTest_MultipleStreams_ManyDifferent_ManyProducerGrainsManyConsumerGrains(
             () => this.HostedCluster.StartAdditionalSilo(),
             cancellationToken: TestContext.Current.CancellationToken);

@@ -346,7 +346,7 @@ public class SubscriptionMultiplicityTestRunner
         string streamNamespace,
         CancellationToken cancellationToken = default)
     {
-        using var grainObserver = GrainDiagnosticObserver.Create();
+        using var grainObserver = GrainDiagnosticObserver.Create(testCluster);
         using var cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         cts.CancelAfter(Timeout);
 
@@ -613,7 +613,7 @@ public class SubscriptionMultiplicityTestRunner
             await producer.ClearNumberProduced();
         }
 
-        using var deliveryObserver = StreamingDiagnosticObserver.Create();
+        using var deliveryObserver = StreamingDiagnosticObserver.Create(testCluster);
         await ProduceExactCountAsync(producer, target, cancellationToken);
         var produced = await producer.GetNumberProduced();
 
@@ -719,7 +719,7 @@ public class SubscriptionMultiplicityTestRunner
         }
 
         await producer.ClearNumberProduced();
-        using var deliveryObserver = StreamingDiagnosticObserver.Create();
+        using var deliveryObserver = StreamingDiagnosticObserver.Create(testCluster);
         try
         {
             await producer.StartPeriodicProducing(cancellationToken);
@@ -782,14 +782,14 @@ public class SubscriptionMultiplicityTestRunner
 
     private async Task WaitForSubscriptionRegisteredAsync(StreamId streamId, Func<Task> action, CancellationToken cancellationToken)
     {
-        using var observer = StreamingDiagnosticObserver.Create();
+        using var observer = StreamingDiagnosticObserver.Create(testCluster);
         await action();
         await observer.WaitForSubscriptionRegisteredAsync(streamId, streamProviderName, cancellationToken);
     }
 
     private async Task WaitForSubscriptionDetachedAsync(StreamId streamId, Func<Task> action, CancellationToken cancellationToken)
     {
-        using var observer = StreamingDiagnosticObserver.Create();
+        using var observer = StreamingDiagnosticObserver.Create(testCluster);
         await action();
         await observer.WaitForSubscriptionDetachedAsync(streamId, streamProviderName, cancellationToken);
     }

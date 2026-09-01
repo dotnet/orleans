@@ -807,8 +807,8 @@ namespace UnitTests.ActivationsLifeCycleTests
             var cancellationToken = TestContext.Current.CancellationToken;
             await Initialize(DEFAULT_IDLE_TIMEOUT, cancellationToken);
 
-            using var grainObserver = GrainDiagnosticObserver.Create();
-            using var timerObserver = TimerDiagnosticObserver.Create();
+            using var grainObserver = GrainDiagnosticObserver.Create(testCluster);
+            using var timerObserver = TimerDiagnosticObserver.Create(testCluster);
 
             const string timerName = nameof(GrainAndTimerDiagnosticsExposeRuntimeInstances);
             var grain = this.testCluster.GrainFactory!.GetGrain<INonReentrantTimerCallGrain>(GetRandomGrainId());

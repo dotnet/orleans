@@ -23,7 +23,7 @@ public class ControlRebalancerTests(RebalancerFixture fixture, ITestOutputHelper
         var cancellationToken = TestContext.Current.CancellationToken;
         var serviceProvider = Cluster.GetSiloServiceProvider();
         var rebalancer = serviceProvider.GetRequiredService<IActivationRebalancer>();
-        using var rebalancerEvents = RebalancerDiagnosticObserver.Create();
+        using var rebalancerEvents = RebalancerDiagnosticObserver.Create(Cluster);
 
         var sessionStarted = rebalancerEvents.WaitForSessionStartAsync(WaitTimeout).WaitAsync(cancellationToken);
         await rebalancer.ResumeRebalancing();

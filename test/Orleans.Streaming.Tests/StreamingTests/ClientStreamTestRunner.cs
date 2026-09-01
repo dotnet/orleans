@@ -33,7 +33,7 @@ namespace Tester.StreamingTests
 
             // Hard kill client
             var droppedClients = GetConnectedClients();
-            using var gatewayObserver = GatewayDiagnosticObserver.Create();
+            using var gatewayObserver = GatewayDiagnosticObserver.Create(testHost);
             await testHost.KillClientAsync();
             await WaitForDroppedClientsAsync(droppedClients, gatewayObserver, cancellationToken);
 
@@ -63,8 +63,8 @@ namespace Tester.StreamingTests
 
             // Hard kill client
             var droppedClients = GetConnectedClients();
-            using var gatewayObserver = GatewayDiagnosticObserver.Create();
-            using var streamingObserver = StreamingDiagnosticObserver.Create();
+            using var gatewayObserver = GatewayDiagnosticObserver.Create(testHost);
+            using var streamingObserver = StreamingDiagnosticObserver.Create(testHost);
             await testHost.KillClientAsync();
             await WaitForDroppedClientsAsync(droppedClients, gatewayObserver, cancellationToken);
 
@@ -102,7 +102,7 @@ namespace Tester.StreamingTests
             int eventsProduced,
             CancellationToken cancellationToken)
         {
-            using var observer = StreamingDiagnosticObserver.Create();
+            using var observer = StreamingDiagnosticObserver.Create(testHost);
             using var cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
             cts.CancelAfter(_timeout);
             var streamId = StreamId.Create(streamNamespace, streamGuid);
@@ -147,7 +147,7 @@ namespace Tester.StreamingTests
             int[] eventCount,
             CancellationToken cancellationToken)
         {
-            using var observer = StreamingDiagnosticObserver.Create();
+            using var observer = StreamingDiagnosticObserver.Create(testHost);
             using var cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
             cts.CancelAfter(_timeout);
             var streamId = StreamId.Create(streamNamespace, streamGuid);

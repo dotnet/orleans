@@ -7,6 +7,7 @@ using System.Reactive.Subjects;
 using Orleans;
 using Orleans.Internal;
 using Orleans.Runtime;
+using Orleans.TestingHost;
 using ReminderEvents = Orleans.Reminders.Diagnostics.ReminderEvents;
 
 namespace Orleans.Testing.Reminders;
@@ -42,18 +43,25 @@ public sealed class ReminderDiagnosticObserver : IDisposable
     /// <summary>
     /// Creates a new instance of the observer and starts listening for reminder diagnostic events.
     /// </summary>
-    public static ReminderDiagnosticObserver Create()
-    {
-        return new ReminderDiagnosticObserver();
-    }
+    public static ReminderDiagnosticObserver Create(TestCluster cluster) => new(DiagnosticObserverSiloScope.For(cluster));
+
+    public static ReminderDiagnosticObserver Create(TestClusterBuilder builder) => new(DiagnosticObserverSiloScope.For(builder));
+
+    public static ReminderDiagnosticObserver Create(InProcessTestCluster cluster) => new(DiagnosticObserverSiloScope.For(cluster));
+
+    public static ReminderDiagnosticObserver Create(InProcessTestClusterBuilder builder) => new(DiagnosticObserverSiloScope.For(builder));
+
+    public static ReminderDiagnosticObserver Create(SiloAddress siloAddress) => new(DiagnosticObserverSiloScope.For(siloAddress));
+
+    public static ReminderDiagnosticObserver CreateForAllSilos() => new(DiagnosticObserverSiloScope.All);
 
     /// <summary>
     /// Initializes a new instance of the <see cref="ReminderDiagnosticObserver"/> class.
     /// </summary>
-    public ReminderDiagnosticObserver()
+    private ReminderDiagnosticObserver(DiagnosticObserverSiloScope scope)
     {
-        _events = ReminderEvents.AllEvents.Replay();
-        _serviceEvents = ReminderEvents.ServiceEvents.Replay();
+        _events = ReminderEvents.AllEvents.Where(e => scope.Matches(e.SiloAddress)).Replay();
+        _serviceEvents = ReminderEvents.ServiceEvents.Where(e => scope.Matches(e.SiloAddress)).Replay();
         _storageSubscription = _events.Subscribe(StoreEvent);
         _connection = _events.Connect();
         _serviceConnection = _serviceEvents.Connect();

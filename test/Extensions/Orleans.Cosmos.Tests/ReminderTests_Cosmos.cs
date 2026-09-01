@@ -37,7 +37,7 @@ public class ReminderTests_Cosmos : ReminderTestsBase, IClassFixture<ReminderTes
     {
         private static readonly TimeSpan ReminderServiceStartupTimeout = TimeSpan.FromMinutes(5);
         private ReminderTestClock? _reminderClock;
-        private readonly ReminderDiagnosticObserver _startupObserver = ReminderDiagnosticObserver.Create();
+        private ReminderDiagnosticObserver? _startupObserver;
         internal ReminderTestClock ReminderClock
         {
             get
@@ -51,6 +51,7 @@ public class ReminderTests_Cosmos : ReminderTestsBase, IClassFixture<ReminderTes
 
         protected override void ConfigureTestCluster(InProcessTestClusterBuilder builder)
         {
+            _startupObserver = ReminderDiagnosticObserver.Create(builder);
             _reminderClock = builder.AddReminderTestClock();
             builder.ConfigureSilo((_, siloBuilder) =>
             {
@@ -74,7 +75,7 @@ public class ReminderTests_Cosmos : ReminderTestsBase, IClassFixture<ReminderTes
                 TestContext.Current.CancellationToken);
             cancellation.CancelAfter(ReminderServiceStartupTimeout);
             var startedTasks = silos
-                .Select(silo => _startupObserver.WaitForReminderServiceStartedAsync(cancellation.Token, silo.SiloAddress))
+                .Select(silo => _startupObserver!.WaitForReminderServiceStartedAsync(cancellation.Token, silo.SiloAddress))
                 .ToArray();
 
             try
@@ -102,7 +103,7 @@ public class ReminderTests_Cosmos : ReminderTestsBase, IClassFixture<ReminderTes
             finally
             {
                 _reminderClock?.Dispose();
-                _startupObserver.Dispose();
+                _startupObserver?.Dispose();
             }
         }
     }

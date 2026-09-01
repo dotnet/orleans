@@ -25,7 +25,7 @@ namespace UnitTests.StreamingTests
         {
             const int ExpectedConsumed = 30;
             Guid streamGuid = Guid.NewGuid();
-            using var observer = StreamingDiagnosticObserver.Create();
+            using var observer = StreamingDiagnosticObserver.Create(fixture.HostedCluster);
             using var cts = new CancellationTokenSource(Timeout);
 
             IStreamProvider provider = this.fixture.Client.GetStreamProvider(StreamBatchingTestConst.ProviderName);
@@ -46,7 +46,7 @@ namespace UnitTests.StreamingTests
             const int ItemsPerBatch = 10;
             const int ExpectedConsumed = BatchesSent * ItemsPerBatch;
             Guid streamGuid = Guid.NewGuid();
-            using var observer = StreamingDiagnosticObserver.Create();
+            using var observer = StreamingDiagnosticObserver.Create(fixture.HostedCluster);
             using var cts = new CancellationTokenSource(Timeout);
 
             IStreamProvider provider = this.fixture.Client.GetStreamProvider(StreamBatchingTestConst.ProviderName);
@@ -67,7 +67,7 @@ namespace UnitTests.StreamingTests
             const int ItemsPerBatch = 10;
             const int ExpectedConsumed = BatchesSent * ItemsPerBatch;
             Guid streamGuid = Guid.NewGuid();
-            using var observer = StreamingDiagnosticObserver.Create();
+            using var observer = StreamingDiagnosticObserver.Create(fixture.HostedCluster);
             using var cts = new CancellationTokenSource(Timeout);
 
             IStreamProvider provider = this.fixture.Client.GetStreamProvider(StreamBatchingTestConst.ProviderName);
