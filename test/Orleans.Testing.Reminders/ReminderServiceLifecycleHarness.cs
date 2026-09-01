@@ -172,8 +172,12 @@ public sealed class ReminderServiceLifecycleHarness : IReminderServiceLifecycleH
         await Task.WhenAll(
             _cluster.WaitForLivenessToStabilizeAsync().WaitAsync(cancellationToken),
             _cluster.WaitForClusterManifestToStabilizeAsync().WaitAsync(cancellationToken));
+        var activeSilos = _cluster.GetActiveSilos();
+        await Task.WhenAll(activeSilos.Select(silo =>
+            silo.ServiceProvider.GetRequiredService<LocalReminderService>()
+                .TestOnlyWaitForSiloStatusListeners(cancellationToken)));
         await RefreshAsync(cancellationToken);
-        var barriers = _cluster.GetActiveSilos().Select(silo =>
+        var barriers = activeSilos.Select(silo =>
             silo.ServiceProvider.GetRequiredService<LocalReminderService>()
                 .TestOnlyWaitForRangeChangeReconciliation(cancellationToken));
         await Task.WhenAll(barriers);

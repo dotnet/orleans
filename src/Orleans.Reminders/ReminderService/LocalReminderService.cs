@@ -10,6 +10,7 @@ using Orleans.Reminders;
 using Orleans.Reminders.Diagnostics;
 using Orleans.Runtime.ConsistentRing;
 using Orleans.Runtime.Internal;
+using Orleans.Runtime.MembershipService;
 using Orleans.Runtime.Scheduler;
 
 namespace Orleans.Runtime.ReminderService
@@ -28,6 +29,7 @@ namespace Orleans.Runtime.ReminderService
         private readonly IAsyncTimer listRefreshTimer; // timer that refreshes our list of reminders to reflect global reminder table
         private readonly GrainReferenceActivator _referenceActivator;
         private readonly GrainInterfaceType _grainInterfaceType;
+        private readonly SiloStatusListenerManager _siloStatusListenerManager;
         private readonly TimeProvider _timeProvider;
         private readonly ReminderInstruments _reminderInstruments;
         private long localTableSequence;
@@ -50,6 +52,7 @@ namespace Orleans.Runtime.ReminderService
             IAsyncTimerFactory asyncTimerFactory,
             IOptions<ReminderOptions> reminderOptions,
             IConsistentRingProvider ringProvider,
+            SiloStatusListenerManager siloStatusListenerManager,
             [FromKeyedServices(ReminderTimeProviderNames.Reminders)] TimeProvider timeProvider,
             ReminderInstruments reminderInstruments,
             SystemTargetShared shared)
@@ -60,6 +63,7 @@ namespace Orleans.Runtime.ReminderService
         {
             _referenceActivator = referenceActivator;
             _grainInterfaceType = interfaceTypeResolver.GetGrainInterfaceType(typeof(IRemindable));
+            _siloStatusListenerManager = siloStatusListenerManager;
             this.reminderOptions = reminderOptions.Value;
             this.reminderTable = reminderTable;
             _timeProvider = timeProvider;
@@ -369,6 +373,9 @@ namespace Orleans.Runtime.ReminderService
             Scheduler.QueueTask(refreshTask);
             return refreshTask.Unwrap();
         }
+
+        internal Task TestOnlyWaitForSiloStatusListeners(CancellationToken cancellationToken)
+            => _siloStatusListenerManager.TestOnlyWaitForCurrentMembershipVersion(cancellationToken);
 
         private void RemoveOutOfRangeReminders(List<Task> removedReminderTasks)
         {

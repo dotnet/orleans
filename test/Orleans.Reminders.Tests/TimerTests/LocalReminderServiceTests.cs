@@ -257,6 +257,51 @@ public class LocalReminderServiceCompatibilityTests : IClassFixture<LocalReminde
     [TestSuite("BVT")]
     [TestProvider("None")]
     [Fact, TestCategory("BVT")]
+    public async Task SiloStatusListenerBarrier_WaitsForCurrentMembershipVersion()
+    {
+        var initialSilo = Assert.Single(fixture.HostedCluster.Silos);
+        using var cancellation = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
+        cancellation.CancelAfter(TestConstants.InitTimeout);
+        var listener = new BlockingSiloStatusListener(initialSilo.SiloAddress);
+        var statusOracle = initialSilo.ServiceProvider.GetRequiredService<ISiloStatusOracle>();
+        Assert.True(statusOracle.SubscribeToSiloStatusEvents(listener));
+        Task<List<InProcessSiloHandle>>? startTask = null;
+        InProcessSiloHandle? joinedSilo = null;
+        try
+        {
+            startTask = fixture.HostedCluster.StartSilosAsync(1, cancellation.Token);
+            await listener.WaitUntilBlockedAsync(cancellation.Token);
+
+            var reminderService = initialSilo.ServiceProvider.GetRequiredService<LocalReminderService>();
+            var barrier = reminderService.TestOnlyWaitForSiloStatusListeners(cancellation.Token);
+            Assert.False(barrier.IsCompleted);
+
+            listener.Release();
+            joinedSilo = Assert.Single(await startTask.WaitAsync(cancellation.Token));
+            await barrier;
+        }
+        finally
+        {
+            listener.Release();
+            statusOracle.UnSubscribeFromSiloStatusEvents(listener);
+            if (joinedSilo is null && startTask is not null)
+            {
+                using var startupCleanup = new CancellationTokenSource(TestConstants.InitTimeout);
+                joinedSilo = Assert.Single(await startTask.WaitAsync(startupCleanup.Token));
+            }
+
+            if (joinedSilo is not null)
+            {
+                using var siloCleanup = new CancellationTokenSource(TestConstants.InitTimeout);
+                await fixture.HostedCluster.StopSiloAsync(joinedSilo, siloCleanup.Token);
+                await fixture.HostedCluster.WaitForLivenessToStabilizeAsync();
+            }
+        }
+    }
+
+    [TestSuite("BVT")]
+    [TestProvider("None")]
+    [Fact, TestCategory("BVT")]
     public async Task RangeChangeBarrier_FollowsLatestReconciliation()
     {
         var silo = Assert.Single(fixture.HostedCluster.Silos);
@@ -544,6 +589,31 @@ public class LocalReminderServiceCompatibilityTests : IClassFixture<LocalReminde
                 ReminderHarness.Dispose();
             }
         }
+    }
+
+    private sealed class BlockingSiloStatusListener(SiloAddress localSilo) : ISiloStatusListener
+    {
+        private readonly TaskCompletionSource _blocked = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        private readonly ManualResetEventSlim _release = new();
+        private int _hasBlocked;
+
+        public void SiloStatusChangeNotification(SiloAddress updatedSilo, SiloStatus status)
+        {
+            if (updatedSilo.Equals(localSilo)
+                || status != SiloStatus.Active
+                || Interlocked.Exchange(ref _hasBlocked, 1) != 0)
+            {
+                return;
+            }
+
+            _blocked.TrySetResult();
+            _release.Wait();
+        }
+
+        public Task WaitUntilBlockedAsync(CancellationToken cancellationToken)
+            => _blocked.Task.WaitAsync(cancellationToken);
+
+        public void Release() => _release.Set();
     }
 
     private sealed class NullReturningReminderTable : IReminderTable
