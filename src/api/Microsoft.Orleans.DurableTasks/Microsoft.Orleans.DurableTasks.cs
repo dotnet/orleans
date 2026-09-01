@@ -20,6 +20,8 @@ namespace Orleans.Configuration
 {
     public sealed partial class DurableTaskOptions
     {
+        public System.TimeSpan RecoveryExecutionDrainTimeout { get { throw null; } set { } }
+
         public System.TimeSpan ResultRetentionPeriod { get { throw null; } set { } }
     }
 }
@@ -92,7 +94,7 @@ namespace Orleans.DurableTasks.Protocol
 
         System.Threading.Tasks.ValueTask<Serialization.Invocation.Response> Serialization.Invocation.IInvokable.Invoke() { throw null; }
 
-        protected override System.Threading.Tasks.ValueTask<DurableTaskResponse> RunAsync(DurableExecutionContext executionContext) { throw null; }
+        protected internal override System.Threading.Tasks.ValueTask<DurableTaskResponse> RunAsync(DurableExecutionContext executionContext) { throw null; }
 
         public virtual void SetArgument(int index, object value) { }
 
@@ -163,7 +165,7 @@ namespace Orleans.DurableTasks.Protocol
 
         System.Threading.Tasks.ValueTask<Serialization.Invocation.Response> Serialization.Invocation.IInvokable.Invoke() { throw null; }
 
-        protected override System.Threading.Tasks.ValueTask<DurableTaskResponse> RunAsync(DurableExecutionContext executionContext) { throw null; }
+        protected internal override System.Threading.Tasks.ValueTask<DurableTaskResponse> RunAsync(DurableExecutionContext executionContext) { throw null; }
 
         public System.Threading.Tasks.ValueTask<DurableTaskResponse> ScheduleAsync(TaskId taskId, System.Threading.CancellationToken cancellationToken = default) { throw null; }
 

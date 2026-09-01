@@ -85,8 +85,10 @@ public sealed class DeliveryAndOptionsContractTests
         Assert.Equal(1000, options.MaxCapacity);
         Assert.Equal(TimeSpan.FromDays(7), options.DeduplicationWindow);
         Assert.Equal(TimeSpan.FromDays(1), options.MaxOutboxRetryAge);
+        Assert.Equal(TimeSpan.FromDays(30), options.DeadLetterRetentionPeriod);
         Assert.Equal(5, options.MaxProcessingAttempts);
         Assert.Equal(100, options.MaxDeliveryAttempts);
+        Assert.Equal(1000, options.MaxRetainedDeadLetters);
         Assert.Equal(32, options.InboxBatchSize);
         Assert.Equal(32, options.OutboxBatchSize);
     }
@@ -105,6 +107,8 @@ public sealed class DeliveryAndOptionsContractTests
             (nameof(DurableInboxOptions.MaxOutboxRetryAge), options => options.MaxOutboxRetryAge = TimeSpan.Zero),
             (nameof(DurableInboxOptions.InboxBatchSize), options => options.InboxBatchSize = 0),
             (nameof(DurableInboxOptions.OutboxBatchSize), options => options.OutboxBatchSize = 0),
+            (nameof(DurableInboxOptions.DeadLetterRetentionPeriod), options => options.DeadLetterRetentionPeriod = TimeSpan.Zero),
+            (nameof(DurableInboxOptions.MaxRetainedDeadLetters), options => options.MaxRetainedDeadLetters = 0),
         };
 
         foreach (var (parameter, mutate) in invalidCases)

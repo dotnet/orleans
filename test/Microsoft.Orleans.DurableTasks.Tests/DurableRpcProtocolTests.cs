@@ -342,7 +342,11 @@ public sealed class DurableRpcProtocolTests
 
         var silo = new TestSiloBuilder();
         Assert.DoesNotContain(silo.Services, descriptor => descriptor.ServiceType == typeof(IDurableTaskGrainRuntime));
-        silo.AddDurableTasks(options => options.ResultRetentionPeriod = TimeSpan.FromHours(2));
+        silo.AddDurableTasks(options =>
+        {
+            options.ResultRetentionPeriod = TimeSpan.FromHours(2);
+            options.RecoveryExecutionDrainTimeout = TimeSpan.FromSeconds(5);
+        });
         Assert.Contains(silo.Services, descriptor => descriptor.ServiceType == typeof(IDurableTaskGrainRuntime));
         Assert.Contains(silo.Services, descriptor => descriptor.ServiceType == typeof(IDurableTaskGrainStorage));
         Assert.Contains(silo.Services, descriptor => descriptor.ServiceType == typeof(IInboxHandler));
@@ -350,6 +354,9 @@ public sealed class DurableRpcProtocolTests
         Assert.Equal(
             TimeSpan.FromHours(2),
             provider.GetRequiredService<Microsoft.Extensions.Options.IOptions<DurableTaskOptions>>().Value.ResultRetentionPeriod);
+        Assert.Equal(
+            TimeSpan.FromSeconds(5),
+            provider.GetRequiredService<Microsoft.Extensions.Options.IOptions<DurableTaskOptions>>().Value.RecoveryExecutionDrainTimeout);
     }
 
     [Fact]

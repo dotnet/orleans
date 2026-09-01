@@ -45,6 +45,9 @@ public static class DurableTaskHostingExtensions
         options.Validate(
             value => value.ResultRetentionPeriod >= TimeSpan.Zero,
             "Durable task result retention must not be negative.");
+        options.Validate(
+            value => value.RecoveryExecutionDrainTimeout > TimeSpan.Zero,
+            "Durable task recovery execution drain timeout must be greater than zero.");
         siloBuilder.Services.AddDurableTaskSerialization();
         siloBuilder.Services.TryAddSingleton<DurableTaskRequestShared>();
         siloBuilder.Configure<TypeManifestOptions>(

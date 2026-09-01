@@ -1,4 +1,5 @@
 using System.Diagnostics.CodeAnalysis;
+using System.Collections.Concurrent;
 using Orleans.DurableTasks;
 using Orleans.DurableTasks.Protocol;
 using Orleans.DurableTasks.Runtime;
@@ -574,6 +575,77 @@ public sealed class DurableTaskRuntimeInvariantTests
     }
 
     [Fact]
+    public async Task FailedExistingPendingScheduleWriteRollsBackFingerprintBeforeRetry()
+    {
+        var (runtime, storage, manager, _) = CreateRuntime();
+        var taskId = TaskId.Parse("root/existing-pending");
+        var request = CreateRequest(1);
+        var state = storage.GetOrCreate(taskId);
+        storage.SetRequest(taskId, state, request);
+        _ = runtime.GetScheduledTaskHandle(taskId);
+        manager.OnRevert = () => state.RequestFingerprint = null;
+        manager.BeforeWrite = () =>
+        {
+            manager.BeforeWrite = null;
+            throw new IOException("Expected existing pending write failure.");
+        };
+
+        await Assert.ThrowsAsync<IOException>(
+            () => ((IDurableTaskServer)runtime).ScheduleAsync(
+                taskId,
+                request,
+                TestContext.Current.CancellationToken).AsTask());
+
+        Assert.Null(storage.Get(taskId).RequestFingerprint);
+
+        var response = await ((IDurableTaskServer)runtime).ScheduleAsync(
+            taskId,
+            request,
+            TestContext.Current.CancellationToken);
+        if (!response.IsCompleted)
+        {
+            response = await runtime.GetScheduledTaskHandle(taskId)
+                .WaitAsync(TestContext.Current.CancellationToken);
+        }
+
+        Assert.Equal(0, response.GetResult<int>());
+        Assert.NotNull(storage.Get(taskId).RequestFingerprint);
+    }
+
+    [Fact]
+    public async Task FailedExistingCompletedScheduleWriteRollsBackFingerprintBeforeRetry()
+    {
+        var (runtime, storage, manager, _) = CreateRuntime();
+        var taskId = TaskId.Parse("root/existing-completed");
+        var request = CreateRequest(1);
+        var state = storage.GetOrCreate(taskId);
+        storage.SetRequest(taskId, state, request);
+        storage.SetResponse(taskId, state, DurableTaskResponse.FromResult(42));
+        manager.OnRevert = () => state.RequestFingerprint = null;
+        manager.BeforeWrite = () =>
+        {
+            manager.BeforeWrite = null;
+            throw new IOException("Expected existing completed write failure.");
+        };
+
+        await Assert.ThrowsAsync<IOException>(
+            () => ((IDurableTaskServer)runtime).ScheduleAsync(
+                taskId,
+                request,
+                TestContext.Current.CancellationToken).AsTask());
+
+        Assert.Null(storage.Get(taskId).RequestFingerprint);
+
+        var response = await ((IDurableTaskServer)runtime).ScheduleAsync(
+            taskId,
+            request,
+            TestContext.Current.CancellationToken);
+
+        Assert.Equal(42, response.GetResult<int>());
+        Assert.NotNull(storage.Get(taskId).RequestFingerprint);
+    }
+
+    [Fact]
     public async Task ResponseStagedAfterWriteSnapshotIsCommittedBeforePruning()
     {
         var (runtime, storage, manager, _) = CreateRuntime(TimeSpan.Zero);
@@ -964,6 +1036,32 @@ public sealed class DurableTaskRuntimeInvariantTests
     }
 
     [Fact]
+    public async Task FailedCancellationCommitRollsBackSoRetryPersistsRequest()
+    {
+        var (runtime, storage, manager, _) = CreateRuntime();
+        var taskId = TaskId.Parse("root/cancellation-retry");
+        var state = storage.GetOrCreate(taskId);
+        manager.OnRevert = () => state.CancellationRequestedAt = null;
+        manager.BeforeWrite = () =>
+        {
+            manager.BeforeWrite = null;
+            throw new IOException("Expected cancellation write failure.");
+        };
+
+        await Assert.ThrowsAsync<IOException>(
+            () => runtime.SignalCancellationAsync(
+                taskId,
+                TestContext.Current.CancellationToken).AsTask());
+
+        Assert.Null(storage.Get(taskId).CancellationRequestedAt);
+
+        await runtime.SignalCancellationAsync(taskId, TestContext.Current.CancellationToken);
+
+        Assert.NotNull(storage.Get(taskId).CancellationRequestedAt);
+        Assert.Equal(2, manager.WriteCount);
+    }
+
+    [Fact]
     public async Task RecoveryCommitsRemoteChildCancellationWithTerminalResponse()
     {
         var (_, storage, manager, _) = CreateRuntime();
@@ -1225,6 +1323,158 @@ public sealed class DurableTaskRuntimeInvariantTests
         Assert.Equal(2, attempt);
         Assert.Equal(42, response.GetResult<int>());
         Assert.Equal(DurableTaskStatus.CompletedSuccessfully, storage.Get(taskId).Result!.Status);
+    }
+
+    [Fact]
+    public async Task RecoveryWaitsForStaleChildExecutionBeforeReplay()
+    {
+        var (runtime, _, manager, _) = CreateRuntime();
+        var taskId = TaskId.Parse("root/recovery-drain");
+        var childStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var releaseChild = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var rootAborted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var replayStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var attempt = 0;
+        var request = CreateRequest(
+            1,
+            () => DurableTask.Run(async _ =>
+            {
+                if (Interlocked.Increment(ref attempt) == 1)
+                {
+                    try
+                    {
+                        await DurableTask.Run(async _ =>
+                        {
+                            childStarted.TrySetResult();
+                            await releaseChild.Task;
+                        });
+                    }
+                    catch (OperationCanceledException)
+                    {
+                        rootAborted.TrySetResult();
+                        throw;
+                    }
+                }
+
+                replayStarted.TrySetResult();
+            }));
+
+        await runtime.ScheduleFromInboxAsync(taskId, request, TestContext.Current.CancellationToken);
+        await manager.WriteStateAsync(TestContext.Current.CancellationToken);
+        await childStarted.Task.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+
+        runtime.OnRecoveryCompleted();
+        await rootAborted.Task.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+
+        Assert.False(replayStarted.Task.IsCompleted);
+        releaseChild.TrySetResult();
+        await replayStarted.Task.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+        Assert.Equal(2, attempt);
+    }
+
+    [Fact]
+    public async Task NonCooperativeExecutionFencesReplayAndRequestsDeactivation()
+    {
+        var (runtime, _, manager, _) = CreateRuntime(
+            recoveryExecutionDrainTimeout: TimeSpan.FromMilliseconds(50));
+        var taskId = TaskId.Parse("root/non-cooperative");
+        var started = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var release = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var replayed = false;
+        var attempt = 0;
+        var request = CreateRequest(
+            1,
+            () => DurableTask.Run(async _ =>
+            {
+                if (Interlocked.Increment(ref attempt) == 1)
+                {
+                    started.TrySetResult();
+                    await release.Task;
+                    return;
+                }
+
+                replayed = true;
+            }));
+
+        await runtime.ScheduleFromInboxAsync(taskId, request, TestContext.Current.CancellationToken);
+        await manager.WriteStateAsync(TestContext.Current.CancellationToken);
+        await started.Task.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+
+        runtime.OnRecoveryCompleted();
+        var exception = await Assert.ThrowsAsync<TimeoutException>(
+            () => runtime.ScheduleChildAsync(
+                TaskId.Parse("probe"),
+                DurableTask.FromResult(1),
+                TestContext.Current.CancellationToken).AsTask());
+
+        Assert.Contains("timed out waiting", exception.Message, StringComparison.Ordinal);
+        Assert.False(replayed);
+        release.TrySetResult();
+    }
+
+    [Fact]
+    public async Task RecoveryContinuesWhenAbortCallbackThrows()
+    {
+        var (runtime, _, manager, _) = CreateRuntime();
+        var taskId = TaskId.Parse("root/recovery-abort-error");
+        var childId = TaskId.Parse("root/recovery-abort-error/child");
+        var waitStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var replayStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var taskHandles = (ConcurrentDictionary<TaskId, IScheduledTaskHandle>)typeof(DurableTaskGrainRuntime)
+            .GetField("_taskHandles", BindingFlags.Instance | BindingFlags.NonPublic)!
+            .GetValue(runtime)!;
+        taskHandles[childId] = new ThrowingAbortHandle(childId, waitStarted);
+        var attempt = 0;
+        var request = CreateRequest(
+            1,
+            () => Interlocked.Increment(ref attempt) == 1
+                ? new AwaitExistingChildTask(childId)
+                : DurableTask.Run(_ => replayStarted.TrySetResult()));
+
+        await runtime.ScheduleFromInboxAsync(taskId, request, TestContext.Current.CancellationToken);
+        await manager.WriteStateAsync(TestContext.Current.CancellationToken);
+        await waitStarted.Task.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+
+        runtime.OnRecoveryCompleted();
+
+        await replayStarted.Task.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+        Assert.Equal(2, attempt);
+    }
+
+    [Fact]
+    public async Task RecoveryAbortDoesNotInvokeDurableCancellationCallbacks()
+    {
+        var (runtime, _, manager, _) = CreateRuntime();
+        var taskId = TaskId.Parse("root/recovery-abort-only");
+        var started = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var replayStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var durableCancellationObserved = false;
+        var attempt = 0;
+        var request = CreateRequest(
+            1,
+            () => DurableTask.Run(async executionCancellation =>
+            {
+                if (Interlocked.Increment(ref attempt) == 1)
+                {
+                    using var registration = DurableExecutionContext.Current!.CancellationToken.Register(
+                        () => durableCancellationObserved = true);
+                    started.TrySetResult();
+                    await Task.Delay(Timeout.InfiniteTimeSpan, executionCancellation);
+                    return;
+                }
+
+                replayStarted.TrySetResult();
+            }));
+
+        await runtime.ScheduleFromInboxAsync(taskId, request, TestContext.Current.CancellationToken);
+        await manager.WriteStateAsync(TestContext.Current.CancellationToken);
+        await started.Task.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+
+        runtime.OnRecoveryCompleted();
+
+        await replayStarted.Task.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+        Assert.False(durableCancellationObserved);
+        Assert.Equal(2, attempt);
     }
 
     [Fact]
@@ -1663,6 +1913,77 @@ public sealed class DurableTaskRuntimeInvariantTests
     }
 
     [Fact]
+    public async Task FailedLocalChildCommitRollsBackBeforeRetry()
+    {
+        var (runtime, storage, manager, _) = CreateRuntime();
+        var taskId = TaskId.Parse("root/local-retry");
+        IScheduledTaskHandle? failedHandle = null;
+        manager.OnRevert = storage.Clear;
+        manager.BeforeWrite = () =>
+        {
+            manager.BeforeWrite = null;
+            failedHandle = runtime.GetScheduledTaskHandle(taskId);
+            throw new IOException("Expected initial write failure.");
+        };
+
+        await Assert.ThrowsAsync<IOException>(
+            () => runtime.ScheduleChildAsync(
+                taskId,
+                DurableTask.FromResult(1),
+                TestContext.Current.CancellationToken).AsTask());
+
+        Assert.False(storage.Contains(taskId));
+        await Assert.ThrowsAsync<IOException>(
+            () => failedHandle!.WaitAsync(TestContext.Current.CancellationToken).AsTask());
+
+        var retryHandle = await runtime.ScheduleChildAsync(
+            taskId,
+            DurableTask.FromResult(42),
+            TestContext.Current.CancellationToken);
+        var response = await retryHandle.WaitAsync(TestContext.Current.CancellationToken);
+
+        Assert.NotSame(failedHandle, retryHandle);
+        Assert.Equal(42, response.GetResult<int>());
+        Assert.Equal(2, manager.WriteCount);
+    }
+
+    [Fact]
+    public async Task FailedRootSchedulingCommitRollsBackBeforeRetry()
+    {
+        var (runtime, storage, manager, _) = CreateRuntime();
+        var taskId = TaskId.Parse("root/retry");
+        var invoked = 0;
+        var request = CreateRequest(
+            1,
+            () => DurableTask.Run(_ => Interlocked.Increment(ref invoked)));
+        manager.OnRevert = storage.Clear;
+        manager.BeforeWrite = () =>
+        {
+            manager.BeforeWrite = null;
+            throw new IOException("Expected initial write failure.");
+        };
+
+        await Assert.ThrowsAsync<IOException>(
+            () => ((IDurableTaskServer)runtime).ScheduleAsync(
+                taskId,
+                request,
+                TestContext.Current.CancellationToken).AsTask());
+
+        Assert.False(storage.Contains(taskId));
+
+        _ = await ((IDurableTaskServer)runtime).ScheduleAsync(
+            taskId,
+            request,
+            TestContext.Current.CancellationToken);
+        var response = await runtime.GetScheduledTaskHandle(taskId)
+            .WaitAsync(TestContext.Current.CancellationToken);
+
+        Assert.Equal(1, invoked);
+        Assert.Equal(1, response.GetResult<int>());
+        Assert.Equal(2, manager.WriteCount);
+    }
+
+    [Fact]
     public async Task CleanupRecursivelyPrunesDescendantsBeforeTombstoningParent()
     {
         var (runtime, storage, manager, _) = CreateRuntime(TimeSpan.Zero);
@@ -2014,6 +2335,7 @@ public sealed class DurableTaskRuntimeInvariantTests
         var schedulerHandle = Substitute.For<IScheduledTaskHandle>();
         schedulerHandle.TaskId.Returns(childId);
         var scheduleCount = 0;
+        var reverted = false;
         var task = new TestSchedulableTask(
             (_, _) =>
             {
@@ -2026,6 +2348,17 @@ public sealed class DurableTaskRuntimeInvariantTests
             manager.BeforeWrite = null;
             throw new IOException("Expected custom finalization write failure.");
         };
+        manager.OnRevert = () =>
+        {
+            reverted = true;
+            storage.Clear();
+        };
+        schedulerHandle.CancelAsync(Arg.Any<CancellationToken>())
+            .Returns(_ =>
+            {
+                Assert.True(reverted);
+                return ValueTask.CompletedTask;
+            });
 
         var exception = await Assert.ThrowsAsync<IOException>(
             () => runtime.ScheduleChildAsync(
@@ -2034,6 +2367,7 @@ public sealed class DurableTaskRuntimeInvariantTests
                 TestContext.Current.CancellationToken).AsTask());
 
         Assert.Equal("Expected custom finalization write failure.", exception.Message);
+        Assert.True(reverted);
         Assert.False(storage.Contains(childId));
         await schedulerHandle.Received(1).CancelAsync(Arg.Any<CancellationToken>());
 
@@ -2044,6 +2378,120 @@ public sealed class DurableTaskRuntimeInvariantTests
 
         Assert.Same(schedulerHandle, retryHandle);
         Assert.Equal(2, scheduleCount);
+    }
+
+    [Fact]
+    public async Task ScheduleChildAsync_AmbiguousCustomFinalizationReattachesCommittedHandle()
+    {
+        var (runtime, storage, manager, _) = CreateRuntime();
+        var childId = TaskId.Parse("root/custom-ambiguous-finalization");
+        var schedulerHandle = Substitute.For<IScheduledTaskHandle>();
+        schedulerHandle.TaskId.Returns(childId);
+        var task = new TestSchedulableTask(
+            (_, _) => new(DurableTaskResponse.Pending),
+            _ => schedulerHandle);
+        var recovered = false;
+        manager.OnRevert = () => recovered = true;
+        manager.BeforeWrite = () =>
+        {
+            manager.BeforeWrite = null;
+            throw new InconsistentStateException("Expected ambiguous custom finalization failure.");
+        };
+
+        var handle = await runtime.ScheduleChildAsync(
+            childId,
+            task,
+            TestContext.Current.CancellationToken);
+
+        Assert.True(recovered);
+        Assert.Same(schedulerHandle, handle);
+        Assert.True(storage.Contains(childId));
+        await schedulerHandle.DidNotReceive().CancelAsync(Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task ScheduleChildAsync_CustomPreparationFailureRevertsRecoveredResult()
+    {
+        var (runtime, storage, manager, _) = CreateRuntime();
+        var rootId = TaskId.Parse("root");
+        var childId = TaskId.Parse("root/custom-preparation-failure");
+        var root = storage.GetOrCreate(rootId);
+        root.CancellationRequestedAt = DateTimeOffset.UtcNow;
+        var state = storage.GetOrCreate(childId);
+        var reverted = false;
+        manager.OnRevert = () =>
+        {
+            reverted = true;
+            state.Result = null;
+            state.CompletedAt = null;
+            state.CancellationRequestedAt = null;
+        };
+        manager.BeforeWrite = () =>
+        {
+            manager.BeforeWrite = null;
+            throw new IOException("Expected custom preparation write failure.");
+        };
+        var task = new TestSchedulableTask((_, _) => throw new InvalidOperationException("The canceled task must not be scheduled."));
+
+        await Assert.ThrowsAsync<IOException>(
+            () => runtime.ScheduleChildAsync(
+                childId,
+                task,
+                TestContext.Current.CancellationToken).AsTask());
+        Assert.True(reverted);
+
+        var handle = await runtime.ScheduleChildAsync(
+            childId,
+            task,
+            TestContext.Current.CancellationToken);
+
+        Assert.Same(DurableTaskResponse.Canceled, await handle.WaitAsync(TestContext.Current.CancellationToken));
+        Assert.True(manager.WriteCount >= 1);
+    }
+
+    [Fact]
+    public async Task ScheduleChildAsync_CustomFinalizationFailureRevertsRecoveredResult()
+    {
+        var (runtime, storage, manager, _) = CreateRuntime();
+        var childId = TaskId.Parse("root/custom-existing-finalization-failure");
+        var state = storage.GetOrCreate(childId);
+        var reverted = false;
+        manager.OnRevert = () =>
+        {
+            reverted = true;
+            state.Result = null;
+            state.CompletedAt = null;
+        };
+        manager.BeforeWrite = () =>
+        {
+            manager.BeforeWrite = null;
+            throw new IOException("Expected custom finalization write failure.");
+        };
+        var scheduleCount = 0;
+        var task = new TestSchedulableTask((_, _) =>
+        {
+            scheduleCount++;
+            return new(DurableTaskResponse.FromResult(42));
+        });
+
+        await Assert.ThrowsAsync<IOException>(
+            () => runtime.ScheduleChildAsync(
+                childId,
+                task,
+                TestContext.Current.CancellationToken).AsTask());
+
+        Assert.True(reverted);
+        Assert.Null(storage.Get(childId).Result);
+
+        var handle = await runtime.ScheduleChildAsync(
+            childId,
+            task,
+            TestContext.Current.CancellationToken);
+        var response = await handle.WaitAsync(TestContext.Current.CancellationToken);
+
+        Assert.Equal(42, response.GetResult<int>());
+        Assert.Equal(2, scheduleCount);
+        Assert.Equal(1, manager.WriteCount);
     }
 
     [Fact]
@@ -2275,11 +2723,17 @@ public sealed class DurableTaskRuntimeInvariantTests
         TestStateManager Manager,
         RecordingDurableTaskMessageTransport Transport) CreateRuntime(
             TimeSpan? resultRetentionPeriod = null,
-            bool initialize = true)
+            bool initialize = true,
+            TimeSpan? recoveryExecutionDrainTimeout = null)
     {
         var manager = new TestStateManager();
         var storage = new TestStorage(manager);
-        return CreateRuntime(storage, manager, resultRetentionPeriod, initialize);
+        return CreateRuntime(
+            storage,
+            manager,
+            resultRetentionPeriod,
+            initialize,
+            recoveryExecutionDrainTimeout);
     }
 
     private static (
@@ -2290,7 +2744,8 @@ public sealed class DurableTaskRuntimeInvariantTests
             TestStorage storage,
             TestStateManager manager,
             TimeSpan? resultRetentionPeriod = null,
-            bool initialize = true)
+            bool initialize = true,
+            TimeSpan? recoveryExecutionDrainTimeout = null)
     {
         var context = Substitute.For<IGrainContext>();
         context.GrainId.Returns(GrainId.Create("test", "one"));
@@ -2303,6 +2758,8 @@ public sealed class DurableTaskRuntimeInvariantTests
             Options.Create(new DurableTaskOptions
             {
                 ResultRetentionPeriod = resultRetentionPeriod ?? TimeSpan.FromHours(1),
+                RecoveryExecutionDrainTimeout =
+                    recoveryExecutionDrainTimeout ?? TimeSpan.FromSeconds(30),
             }),
             CreateSerializer());
         var transport = new RecordingDurableTaskMessageTransport();
@@ -2450,6 +2907,39 @@ public sealed class DurableTaskRuntimeInvariantTests
             new(DurableTaskResponse.Completed);
     }
 
+    private sealed class AwaitExistingChildTask(TaskId childId) : DurableTask
+    {
+        protected override async ValueTask<DurableTaskResponse> RunAsync(DurableExecutionContext context)
+        {
+            var handle = (IScheduledTaskHandle)typeof(DurableExecutionContext)
+                .GetMethod("GetChildTaskHandle", BindingFlags.Instance | BindingFlags.NonPublic)!
+                .Invoke(context, [childId])!;
+            return await handle.WaitAsync(CancellationToken.None);
+        }
+    }
+
+    private sealed class ThrowingAbortHandle(
+        TaskId taskId,
+        TaskCompletionSource waitStarted) : IScheduledTaskHandle
+    {
+        public TaskId TaskId { get; } = taskId;
+
+        public ValueTask CancelAsync(CancellationToken cancellationToken) => default;
+
+        public ValueTask<DurableTaskResponse> PollAsync(
+            PollingOptions options,
+            CancellationToken cancellationToken) => new(DurableTaskResponse.Pending);
+
+        public async ValueTask<DurableTaskResponse> WaitAsync(CancellationToken cancellationToken)
+        {
+            using var registration = cancellationToken.Register(
+                static () => throw new InvalidOperationException("Expected abort callback failure."));
+            waitStarted.TrySetResult();
+            await Task.Delay(Timeout.InfiniteTimeSpan, cancellationToken);
+            return DurableTaskResponse.Pending;
+        }
+    }
+
     private sealed class TestStorage(TestStateManager manager) : IDurableTaskGrainStorage
     {
         private readonly Dictionary<TaskId, DurableTaskState> _states = [];
@@ -2549,6 +3039,7 @@ public sealed class DurableTaskRuntimeInvariantTests
         public int WriteCount { get; private set; }
         public long PendingWriteByteCount { get; set; }
         public Action? BeforeWrite { get; set; }
+        public Action? OnRevert { get; set; }
         public Func<ValueTask>? AfterWriteStarted { get; set; }
         public Action<int>? AfterWriteCompleted { get; set; }
         public bool SupportsRollback => true;
@@ -2632,6 +3123,7 @@ public sealed class DurableTaskRuntimeInvariantTests
 
         public ValueTask RevertPendingChangesAsync(CancellationToken cancellationToken)
         {
+            OnRevert?.Invoke();
             foreach (var observer in _observers)
             {
                 observer.OnRecoveryCompleted();

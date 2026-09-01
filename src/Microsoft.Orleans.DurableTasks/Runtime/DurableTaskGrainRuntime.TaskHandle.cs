@@ -78,5 +78,6 @@ internal sealed partial class DurableTaskGrainRuntime
         }
 
         public bool TrySetResponse(DurableTaskResponse response) => _responseTcs.TrySetResult(response);
+        public bool TrySetException(Exception exception) => _responseTcs.TrySetException(exception);
     }
 }

@@ -173,6 +173,17 @@ public sealed class PublicDurableMessagingRegistrationTests
     }
 
     [Fact]
+    public void AddDurableMessaging_RejectsStateManagerWithoutMutationRequestGuards()
+    {
+        var exception = Assert.Throws<InvalidOperationException>(
+            () => DurableMessagingStateManagerCapabilities.RegisterObserver(
+                new UnguardedStateManager(),
+                new RecordingStateObserver()));
+
+        Assert.Contains("request-time journal mutation guards", exception.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void InboxTransportIsInternal()
     {
         Assert.False(typeof(IDurableInboxExtension).IsPublic);
@@ -208,7 +219,7 @@ public sealed class PublicDurableMessagingRegistrationTests
     {
     }
 
-    private class RollbackOnlyStateManager : IJournaledStateManager
+    private class RollbackOnlyStateManager : IJournaledStateManager, IJournaledStateMutationRequestSource
     {
         public ValueTask InitializeAsync(CancellationToken cancellationToken) => default;
         public void RegisterState(string name, IJournaledState state) { }
@@ -228,5 +239,28 @@ public sealed class PublicDurableMessagingRegistrationTests
     private sealed class FullyCapableStateManager : RollbackOnlyStateManager
     {
         public override void RegisterObserver(IJournaledStateObserver observer) { }
+    }
+
+    private sealed class UnguardedStateManager : IJournaledStateManager
+    {
+        public ValueTask InitializeAsync(CancellationToken cancellationToken) => default;
+        public void RegisterState(string name, IJournaledState state) { }
+        public void RegisterObserver(IJournaledStateObserver observer) { }
+        public bool TryGetState(string name, [NotNullWhen(true)] out IJournaledState? state)
+        {
+            state = null;
+            return false;
+        }
+
+        public ValueTask WriteStateAsync(CancellationToken cancellationToken) => default;
+        public ValueTask RevertPendingChangesAsync(CancellationToken cancellationToken) => default;
+        public ValueTask DeleteStateAsync(CancellationToken cancellationToken) => default;
+    }
+
+    private sealed class RecordingStateObserver : IJournaledStateObserver
+    {
+        public void OnWriteStarted() { }
+        public void OnWriteCompleted() { }
+        public void OnRecoveryCompleted() { }
     }
 }

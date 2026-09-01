@@ -9,7 +9,13 @@ using Orleans.Storage;
 
 namespace Orleans.Journaling;
 
-internal sealed partial class JournaledStateManager : IJournaledStateManager, IJournalStorageConsumer, ILifecycleParticipant<IGrainLifecycle>, ILifecycleObserver, IDisposable
+internal sealed partial class JournaledStateManager :
+    IJournaledStateManager,
+    IJournaledStateMutationRequestSource,
+    IJournalStorageConsumer,
+    ILifecycleParticipant<IGrainLifecycle>,
+    ILifecycleObserver,
+    IDisposable
 {
     private const uint MinApplicationJournalStreamId = 8u;
 #if NET9_0_OR_GREATER
@@ -556,7 +562,17 @@ internal sealed partial class JournaledStateManager : IJournaledStateManager, IJ
 
                                     foreach (var state in _states.Values)
                                     {
-                                        state.OnRecoveryCompleted();
+                                        try
+                                        {
+                                            state.OnRecoveryCompleted();
+                                        }
+                                        catch (Exception exception)
+                                        {
+                                            LogStateCallbackError(
+                                                _shared.Logger,
+                                                exception,
+                                                state.GetType().FullName ?? state.GetType().Name);
+                                        }
                                     }
 
                                     foreach (var observer in observers)
@@ -909,7 +925,17 @@ internal sealed partial class JournaledStateManager : IJournaledStateManager, IJ
 
             foreach ((var name, var state) in _states)
             {
-                state.OnRecoveryCompleted();
+                try
+                {
+                    state.OnRecoveryCompleted();
+                }
+                catch (Exception exception)
+                {
+                    LogStateCallbackError(
+                        _shared.Logger,
+                        exception,
+                        state.GetType().FullName ?? state.GetType().Name);
+                }
 
                 if (state is RetiredState)
                 {

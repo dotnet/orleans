@@ -281,6 +281,133 @@ public sealed class PublicDurableMessagingBehaviorTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task HandlerDirectCommitAttemptRollsBackEvenWhenHandlerCatchesFailure()
+    {
+        var receiver = NewGrain();
+        var sink = NewGrain();
+        using var envelope = CreateEnvelope(
+            receiver,
+            new DurableTestMessage(
+                Guid.NewGuid(),
+                10,
+                "direct-commit",
+                sink.GetGrainId(),
+                CommitDuringHandling: true,
+                SwallowPersistenceFailure: true));
+
+        var accepted = await DeliverAsync(receiver, envelope.Value, TestContext.Current.CancellationToken);
+        var state = await fixture.WaitForDeadLetterCountAsync(receiver, 1);
+
+        Assert.Equal(DeliveryStatus.Accepted, accepted.Status);
+        Assert.Empty(state.Effects);
+        Assert.Equal(0, state.InboxCount);
+        Assert.Equal(0, state.OutboxCount);
+        var deadLetter = Assert.Single(state.InboxDeadLetters);
+        Assert.Contains("attempted to mutate", deadLetter.Reason, StringComparison.Ordinal);
+        Assert.Empty((await sink.GetSnapshotAsync()).Effects);
+    }
+
+    [Fact]
+    public async Task HandlerDeleteAttemptRollsBackEvenWhenHandlerCatchesFailure()
+    {
+        var receiver = NewGrain();
+        using var envelope = CreateEnvelope(
+            receiver,
+            new DurableTestMessage(
+                Guid.NewGuid(),
+                11,
+                "direct-delete",
+                DeleteDuringHandling: true,
+                SwallowPersistenceFailure: true));
+
+        var accepted = await DeliverAsync(receiver, envelope.Value, TestContext.Current.CancellationToken);
+        var state = await fixture.WaitForDeadLetterCountAsync(receiver, 1);
+
+        Assert.Equal(DeliveryStatus.Accepted, accepted.Status);
+        Assert.Empty(state.Effects);
+        Assert.Equal(0, state.InboxCount);
+        var deadLetter = Assert.Single(state.InboxDeadLetters);
+        Assert.Contains("attempted to mutate", deadLetter.Reason, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task HandlerSelectionWriteAttemptRevertsBeforeRejectingDelivery()
+    {
+        var receiver = NewGrain();
+        using var envelope = CreateEnvelope(
+            receiver,
+            NewMessage(12, "can-handle-write"),
+            "messages/can-handle-write");
+
+        var exception = await Assert.ThrowsAsync<InvalidOperationException>(
+            () => DeliverAsync(receiver, envelope.Value, TestContext.Current.CancellationToken));
+        await receiver.RequestDeactivationAsync();
+        var snapshot = await receiver.GetSnapshotAsync();
+
+        Assert.Contains("mutate journaled state", exception.Message, StringComparison.Ordinal);
+        Assert.Null(snapshot.InboxJobId);
+        Assert.Equal(0, snapshot.InboxCount);
+        Assert.Empty(snapshot.Effects);
+    }
+
+    [Fact]
+    public async Task InboxDeadLettersRetainNewestEntriesWithinConfiguredCapacity()
+    {
+        var receiver = NewGrain();
+        var messageIds = new List<Guid>();
+        for (var sequence = 0; sequence < 3; sequence++)
+        {
+            using var envelope = CreateEnvelope(
+                receiver,
+                new DurableTestMessage(
+                    Guid.NewGuid(),
+                    20 + sequence,
+                    $"dead-letter-{sequence}",
+                    ThrowAfterStaging: true));
+            messageIds.Add(envelope.Value.MessageId);
+            Assert.Equal(
+                DeliveryStatus.Accepted,
+                (await DeliverAsync(receiver, envelope.Value, TestContext.Current.CancellationToken)).Status);
+            await fixture.SnapshotProbe.WaitAsync(
+                receiver.GetGrainId(),
+                snapshot => snapshot.InboxDeadLetters.Any(entry => entry.MessageId == envelope.Value.MessageId));
+        }
+
+        var state = await receiver.GetSnapshotAsync();
+        Assert.Equal(2, state.InboxDeadLetters.Count);
+        Assert.DoesNotContain(state.InboxDeadLetters, entry => entry.MessageId == messageIds[0]);
+        Assert.Contains(state.InboxDeadLetters, entry => entry.MessageId == messageIds[1]);
+        Assert.Contains(state.InboxDeadLetters, entry => entry.MessageId == messageIds[2]);
+    }
+
+    [Fact]
+    public async Task ActivationRemovesExpiredInboxDeadLettersWithoutNewFailure()
+    {
+        var receiver = NewGrain();
+        using var envelope = CreateEnvelope(
+            receiver,
+            new DurableTestMessage(
+                Guid.NewGuid(),
+                30,
+                "expired-dead-letter",
+                ThrowAfterStaging: true));
+
+        Assert.Equal(
+            DeliveryStatus.Accepted,
+            (await DeliverAsync(receiver, envelope.Value, TestContext.Current.CancellationToken)).Status);
+        var before = await fixture.WaitForDeadLetterCountAsync(receiver, 1);
+
+        fixture.Clock.Advance(TimeSpan.FromHours(2));
+        await receiver.RequestDeactivationAsync();
+        var after = await fixture.SnapshotProbe.WaitAsync(
+            receiver.GetGrainId(),
+            snapshot => snapshot.ActivationId != before.ActivationId
+                && snapshot.InboxDeadLetters.Count == 0);
+
+        Assert.Empty(after.InboxDeadLetters);
+    }
+
+    [Fact]
     public async Task HandlerSelectionFailure_IsDeadLettered()
     {
         var receiver = NewGrain();

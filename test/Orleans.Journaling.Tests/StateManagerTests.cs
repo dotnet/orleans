@@ -1069,6 +1069,52 @@ public class StateManagerTests : JournalingTestBase
     }
 
     [Fact]
+    public async Task StateManager_DeleteStateAsync_StateCallbackFailureCompletesReconciliation()
+    {
+        var sut = CreateTestSystem();
+        var throwing = new DurableValue<int>("throwing", sut.Manager, CreateValueCodec<int>());
+        var following = new DurableValue<int>("following", sut.Manager, CreateValueCodec<int>());
+        var observer = new RecordingStateObserver();
+        sut.Manager.RegisterObserver(observer);
+        await sut.Lifecycle.OnStart(TestContext.Current.CancellationToken);
+        var observerRecoveryCount = observer.RecoveryCompletedCount;
+        var followingRecoveryCount = 0;
+        throwing.OnPersisted = () => throw new InvalidOperationException("Expected state callback failure.");
+        following.OnPersisted = () => followingRecoveryCount++;
+
+        await sut.Manager.DeleteStateAsync(TestContext.Current.CancellationToken);
+
+        Assert.Equal(1, followingRecoveryCount);
+        Assert.Equal(observerRecoveryCount + 1, observer.RecoveryCompletedCount);
+        following.OnPersisted = null;
+        following.Value = 42;
+        await sut.Manager.WriteStateAsync(TestContext.Current.CancellationToken);
+    }
+
+    [Fact]
+    public async Task StateManager_RevertPendingChangesAsync_StateCallbackFailureCompletesReconciliation()
+    {
+        var sut = CreateTestSystem();
+        var throwing = new DurableValue<int>("throwing", sut.Manager, CreateValueCodec<int>());
+        var following = new DurableValue<int>("following", sut.Manager, CreateValueCodec<int>());
+        var observer = new RecordingStateObserver();
+        sut.Manager.RegisterObserver(observer);
+        await sut.Lifecycle.OnStart(TestContext.Current.CancellationToken);
+        var observerRecoveryCount = observer.RecoveryCompletedCount;
+        var followingRecoveryCount = 0;
+        throwing.OnPersisted = () => throw new InvalidOperationException("Expected state callback failure.");
+        following.OnPersisted = () => followingRecoveryCount++;
+
+        await sut.Manager.RevertPendingChangesAsync(TestContext.Current.CancellationToken);
+
+        Assert.Equal(1, followingRecoveryCount);
+        Assert.Equal(observerRecoveryCount + 1, observer.RecoveryCompletedCount);
+        following.OnPersisted = null;
+        following.Value = 42;
+        await sut.Manager.WriteStateAsync(TestContext.Current.CancellationToken);
+    }
+
+    [Fact]
     public async Task StateManager_WriteStateAsync_DoesNotObserveActiveEntry()
     {
         var storage = new CapturingStorage();

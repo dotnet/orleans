@@ -79,7 +79,7 @@ public sealed class DurableInboxRecoveryTests
         Assert.True(manager.WriteCount >= 1);
     }
 
-    private sealed class RecordingStateManager : IJournaledStateManager
+    private sealed class RecordingStateManager : IJournaledStateManager, IJournaledStateMutationRequestSource
     {
         public int WriteCount { get; private set; }
         public void RegisterObserver(IJournaledStateObserver observer) { }
@@ -367,7 +367,7 @@ public sealed class DurableInboxRecoveryTests
         }
     }
 
-    private sealed class RecoveryStateManager : IJournaledStateManager
+    private sealed class RecoveryStateManager : IJournaledStateManager, IJournaledStateMutationRequestSource
     {
         private readonly List<IJournaledStateObserver> _observers = [];
         private WriteBarrier? _blockedWrite;

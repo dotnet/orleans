@@ -9,6 +9,7 @@ public abstract class DurableExecutionContext
     private static readonly AsyncLocal<DurableExecutionContext?> AmbientContext = new();
     private readonly object _lock = new();
     private readonly CancellationTokenSource _cancellationSource = new();
+    private readonly CancellationTokenSource? _executionCancellationSource;
     private List<CancellationRegistration>? _registrations;
     private CancellationOperation? _cancellationOperation;
     private bool _cancellationRequested;
@@ -16,6 +17,11 @@ public abstract class DurableExecutionContext
     private long _nextOperationId;
 
     protected DurableExecutionContext(TaskId taskId)
+        : this(taskId, default)
+    {
+    }
+
+    internal DurableExecutionContext(TaskId taskId, CancellationToken executionAbortToken)
     {
         if (taskId.IsDefault)
         {
@@ -23,6 +29,12 @@ public abstract class DurableExecutionContext
         }
 
         TaskId = taskId;
+        if (executionAbortToken.CanBeCanceled)
+        {
+            _executionCancellationSource = CancellationTokenSource.CreateLinkedTokenSource(
+                _cancellationSource.Token,
+                executionAbortToken);
+        }
     }
 
     /// <summary>Gets the current durable execution context.</summary>
@@ -65,6 +77,9 @@ public abstract class DurableExecutionContext
     /// </para>
     /// </remarks>
     public CancellationToken CancellationToken => _cancellationSource.Token;
+
+    internal CancellationToken ExecutionCancellationToken =>
+        _executionCancellationSource?.Token ?? _cancellationSource.Token;
 
     /// <summary>Schedules or reattaches to a child definition under an exact identifier.</summary>
     protected internal abstract ValueTask<IScheduledTaskHandle> ScheduleChildTaskAsync(

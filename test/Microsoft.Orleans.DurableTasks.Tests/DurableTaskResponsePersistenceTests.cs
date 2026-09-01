@@ -36,6 +36,36 @@ public sealed class DurableTaskResponsePersistenceTests
     }
 
     [Fact]
+    public void NullResultRoundTripsWithoutConsumingEnclosingPayload()
+    {
+        using var services = CreateSerializationServices();
+        var serializer = services.GetRequiredService<Serializer>();
+        var original = new NullResultContainer
+        {
+            Response = DurableTaskResponse.FromResult<string?>(null),
+            Sentinel = 42,
+        };
+
+        var serialized = serializer.SerializeToArray(original);
+        var deserialized = serializer.Deserialize<NullResultContainer>(serialized);
+
+        Assert.NotNull(deserialized);
+        Assert.Equal(DurableTaskStatus.CompletedSuccessfully, deserialized.Response.Status);
+        Assert.Null(deserialized.Response.TypedResult);
+        Assert.Equal(42, deserialized.Sentinel);
+    }
+
+    [GenerateSerializer]
+    internal sealed class NullResultContainer
+    {
+        [Id(0)]
+        public required DurableTaskResponse<string?> Response { get; init; }
+
+        [Id(1)]
+        public int Sentinel { get; init; }
+    }
+
+    [Fact]
     public async Task CanceledResponseRoundTripsThroughVolatileStorage()
     {
         using var services = CreateSerializationServices();

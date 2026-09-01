@@ -24,6 +24,14 @@ a new generation before the stale job terminates.
 The receiver uses the same schedule-before-commit ordering and returns `Accepted` only
 after the inbox envelope and its durable drain-job ownership are stable.
 
+Inbox handlers stage journaled effects and outgoing envelopes, then return. Durable
+Messaging commits those effects together with inbox removal and deduplication. Calling
+`WriteStateAsync` or `DeleteStateAsync` from a handler is rejected so an early mutation
+cannot escape that atomic boundary.
+
+Inbox and outbox dead letters are age- and capacity-bounded by
+`DeadLetterRetentionPeriod` and `MaxRetainedDeadLetters`.
+
 Transport is at-least-once and unordered. The receiver deduplicates by
 `(SenderId, MessageId)`, providing effectively-once handler effects while the configured
 deduplication record is retained. Applications which require ordering must include and
@@ -36,6 +44,10 @@ the Orleans serializer. `AddDurableMessaging` selects this format for the host a
 validation reports an incompatible override before any activation can process messages.
 Run workloads which require Journaling's JSON migration path in a separate silo host
 which does not call `AddDurableMessaging`.
+
+The state manager must also expose Journaling's request-time mutation guard. Durable
+Messaging rejects custom managers without this capability because they cannot prevent
+handler-initiated commits or deletes from escaping the inbox completion boundary.
 
 Configure Durable Jobs storage appropriate for the deployment. In-memory storage is for
 development and tests only.

@@ -195,6 +195,11 @@ internal sealed class DurableTaskResponseCodec<TResult> : IFieldCodec<DurableTas
         field.EnsureWireTypeTagDelimited();
         ReferenceCodec.MarkValueField(reader.Session);
         reader.ReadFieldHeader(ref field);
+        if (field.IsEndBaseOrEndObject)
+        {
+            return DurableTaskResponse.FromResult(default(TResult)!);
+        }
+
         TResult? value;
         if (!field.IsEndBaseOrEndObject && field.FieldIdDelta == 0)
         {

@@ -46,7 +46,8 @@ public sealed record DurableTestMessage(
     [property: Id(4)] bool ThrowAfterStaging = false,
     [property: Id(5)] bool CommitDuringHandling = false,
     [property: Id(6)] bool DeleteDuringHandling = false,
-    [property: Id(7)] bool ThrowOnceAfterStaging = false);
+    [property: Id(7)] bool ThrowOnceAfterStaging = false,
+    [property: Id(8)] bool SwallowPersistenceFailure = false);
 
 [GenerateSerializer, Immutable]
 public sealed record DurableEffect(
@@ -311,19 +312,39 @@ public sealed class DurableMessagingTestGrain : DurableGrain, IDurableMessagingT
 
             if (message.CommitDuringHandling)
             {
-                await WriteStateAsync(cancellationToken);
+                try
+                {
+                    await WriteStateAsync(cancellationToken);
+                }
+                catch (InvalidOperationException) when (message.SwallowPersistenceFailure)
+                {
+                }
             }
 
             if (message.DeleteDuringHandling)
             {
-                await StateManager.DeleteStateAsync(cancellationToken);
+                try
+                {
+                    await StateManager.DeleteStateAsync(cancellationToken);
+                }
+                catch (InvalidOperationException) when (message.SwallowPersistenceFailure)
+                {
+                }
             }
 
             if (message.ForwardTo is { } target)
             {
                 var outgoing = context.CreateEnvelope()
                     .To(target, "messages/forwarded")
-                    .WithBody(message with { ForwardTo = null, ThrowAfterStaging = false })
+                    .WithBody(message with
+                    {
+                        ForwardTo = null,
+                        ThrowAfterStaging = false,
+                        CommitDuringHandling = false,
+                        DeleteDuringHandling = false,
+                        ThrowOnceAfterStaging = false,
+                        SwallowPersistenceFailure = false,
+                    })
                     .Build();
                 context.Send(outgoing);
             }
@@ -361,6 +382,20 @@ public sealed class DurableMessagingTestGrain : DurableGrain, IDurableMessagingT
             _nullNullableValueMessageCalls,
             _genericExactRouteHandlerCalls);
 
+    private bool AttemptWriteDuringHandlerSelection()
+    {
+        _inboxJobId.Value = "invalid-handler-selection-write";
+        try
+        {
+            WriteStateAsync().GetAwaiter().GetResult();
+        }
+        catch (InvalidOperationException)
+        {
+        }
+
+        return false;
+    }
+
     private static DurableDeadLetterSnapshot ToSnapshot(DurableDeadLetter deadLetter) =>
         new(
             deadLetter.Message.MessageId,
@@ -371,9 +406,16 @@ public sealed class DurableMessagingTestGrain : DurableGrain, IDurableMessagingT
 
     private sealed class TypedMessageHandler(DurableMessagingTestGrain owner) : IInboxHandler<DurableTestMessage>
     {
-        bool IInboxHandler.CanHandle(IInboxHandlerContext context) =>
-            context.Envelope.RouteKey.StartsWith("messages/", StringComparison.Ordinal)
-            || context.Envelope.RouteKey == "typed";
+        bool IInboxHandler.CanHandle(IInboxHandlerContext context)
+        {
+            if (context.Envelope.RouteKey == "messages/can-handle-write")
+            {
+                return owner.AttemptWriteDuringHandlerSelection();
+            }
+
+            return context.Envelope.RouteKey.StartsWith("messages/", StringComparison.Ordinal)
+                || context.Envelope.RouteKey == "typed";
+        }
 
         public ValueTask HandleAsync(
             DurableTestMessage? message,

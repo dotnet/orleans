@@ -76,3 +76,5 @@ public interface IJournaledStateObserver
     /// </summary>
     void OnRecoveryCompleted();
 }
+
+internal interface IJournaledStateMutationRequestSource;

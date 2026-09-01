@@ -48,7 +48,10 @@ Durable Messaging has the following boundaries:
   outgoing envelopes are discarded at that boundary.
 - Inbox handlers stage journaled effects and outgoing envelopes. Durable Messaging
   commits those changes together with inbox completion after the handler returns;
-  handlers cannot create an earlier journal commit or delete boundary.
+  handlers cannot create an earlier journal commit or delete boundary. A direct
+  `WriteStateAsync` or `DeleteStateAsync` attempt fails the handler and restores the
+  preceding durable state before retry accounting is recorded, including when the
+  handler catches the immediate exception and returns.
 - Deleting the grain journal discards staged inbox and outbox work and clears the
   corresponding volatile pump bookkeeping before a later write begins.
 - A receiver allocates a stable ownership token and places it in a scheduled inbox job
@@ -95,6 +98,12 @@ into durable cancellation. It discards user results and failures produced after
 shutdown begins, then drains all executing user code before replacement replay starts.
 User code which ignores cancellation can therefore delay activation shutdown.
 
+Recovery follows the same non-overlap rule. It aborts adapter-controlled waits and
+drains stale execution before replay. If user code remains active beyond
+<xref:Orleans.Configuration.DurableTaskOptions.RecoveryExecutionDrainTimeout>, the
+runtime fences new durable scheduling and requests activation deactivation instead of
+starting a concurrent replay.
+
 ## Backpressure, retries, and dead letters
 
 The inbox rejects new, nonduplicate envelopes with `Backpressured` when it reaches
@@ -109,6 +118,15 @@ or <xref:Orleans.DurableMessaging.IDurableMessagingDiagnostics.RemoveOutboxDeadL
 so dead-letter storage remains bounded by the application's retention policy.
 Removal is staged in the grain transaction and becomes durable with the grain's next
 journal write.
+
+Dead letters are retained for
+<xref:Orleans.DurableMessaging.Configuration.DurableInboxOptions.DeadLetterRetentionPeriod>
+and bounded by
+<xref:Orleans.DurableMessaging.Configuration.DurableInboxOptions.MaxRetainedDeadLetters>
+independently for each grain inbox and outbox. When a new dead letter reaches the
+configured capacity, Durable Messaging removes the oldest retained entries in the same
+commit. Activation recovery also removes entries which exceed the retention period or a
+newly reduced capacity.
 
 Malformed typed bodies are isolated during handler deserialization and follow the same
 retry and dead-letter path; they don't prevent later envelopes from being recovered.
@@ -130,11 +148,11 @@ provisional application state or compete with another activation for the same ow
 The Journaling implementation must provide
 <xref:Orleans.Journaling.IJournaledStateManager.RevertPendingChangesAsync*> and accept
 <xref:Orleans.Journaling.IJournaledStateManager.RegisterObserver*> so Durable Messaging
-receives commit and recovery notifications. When observer registration is unsupported,
-activation throws an <xref:System.InvalidOperationException> identifying
-<xref:Orleans.Journaling.IJournaledStateManager.RegisterObserver*> as a requirement. Use
-shared, production-grade storage for multi-silo deployments. In-memory Durable Jobs and
-journal storage are suitable only for development and tests.
+receives commit and recovery notifications. It also provides the built-in request-time
+mutation guard used to reject handler commits and deletes before enqueue. Activation
+rejects custom state managers which lack either capability. Use shared,
+production-grade storage for multi-silo deployments. In-memory Durable Jobs and journal
+storage are suitable only for development and tests.
 
 Durable Messaging uses the `orleans-binary` journal format. Inbox, outbox, ownership,
 and durable RPC state contain Orleans-polymorphic values whose recovery contract is

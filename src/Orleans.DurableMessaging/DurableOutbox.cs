@@ -56,6 +56,8 @@ internal sealed partial class DurableOutbox : IDurableOutbox, IDurableJobFeature
     private readonly TimeSpan _maxRetryAge;
     private readonly int _maxDeliveryAttempts;
     private readonly int _batchSize;
+    private readonly TimeSpan _deadLetterRetentionPeriod;
+    private readonly int _maxRetainedDeadLetters;
     private readonly IDurableDictionary<Guid, OutboxMessageState> _messageStates;
     private readonly IDurableDictionary<Guid, OutboxDeadLetter> _deadLetters;
     private readonly IDurableValue<string> _jobId;
@@ -157,6 +159,8 @@ internal sealed partial class DurableOutbox : IDurableOutbox, IDurableJobFeature
         _maxRetryAge = options.Value.MaxOutboxRetryAge;
         _maxDeliveryAttempts = options.Value.MaxDeliveryAttempts;
         _batchSize = options.Value.OutboxBatchSize;
+        _deadLetterRetentionPeriod = options.Value.DeadLetterRetentionPeriod;
+        _maxRetainedDeadLetters = options.Value.MaxRetainedDeadLetters;
         jobHandlers.Register(this);
         DurableMessagingStateManagerCapabilities.RegisterObserver(manager, this);
 
@@ -650,6 +654,7 @@ internal sealed partial class DurableOutbox : IDurableOutbox, IDurableJobFeature
         if (state.AttemptCount >= _maxDeliveryAttempts
             || DurableMessagingTime.IsExpired(now, state.EnqueuedAt.Value, _maxRetryAge))
         {
+            CompactDeadLetters(now, envelope.MessageId);
             _deadLetters[envelope.MessageId] = new OutboxDeadLetter
             {
                 Envelope = envelope,
@@ -681,6 +686,7 @@ internal sealed partial class DurableOutbox : IDurableOutbox, IDurableJobFeature
         OutboxMessageState state,
         DateTimeOffset now)
     {
+        CompactDeadLetters(now, envelope.MessageId);
         _deadLetters[envelope.MessageId] = new OutboxDeadLetter
         {
             Envelope = envelope,
@@ -691,6 +697,15 @@ internal sealed partial class DurableOutbox : IDurableOutbox, IDurableJobFeature
         RemoveMessage(envelope.MessageId);
     }
 
+    private void CompactDeadLetters(DateTimeOffset now, Guid messageId) =>
+        DurableDeadLetterRetention.Compact(
+            _deadLetters,
+            now,
+            _deadLetterRetentionPeriod,
+            _maxRetainedDeadLetters,
+            static entry => entry.DeadLetteredAt,
+            reservedCapacity: _deadLetters.ContainsKey(messageId) ? 0 : 1);
+
     /// <summary>
     /// Called when the grain activates. Starts the background pump if there are pending durable messages.
     /// </summary>
@@ -699,6 +714,16 @@ internal sealed partial class DurableOutbox : IDurableOutbox, IDurableJobFeature
         cancellationToken.ThrowIfCancellationRequested();
         DurableMessagingActivationValidator.Validate(_grainContext);
         EnsureMetricsActive();
+        if (DurableDeadLetterRetention.Compact(
+                _deadLetters,
+                _jobTimeProvider.GetUtcNow(),
+                _deadLetterRetentionPeriod,
+                _maxRetainedDeadLetters,
+                static entry => entry.DeadLetteredAt))
+        {
+            await _stateManager.WriteStateAsync(cancellationToken).ConfigureAwait(true);
+        }
+
         if (Count > 0)
         {
             LogPumpStartingOnActivation(_logger, Count);

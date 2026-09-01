@@ -169,7 +169,7 @@ public abstract class DurableTaskRequest(DurableTaskRequestShared shared) : Dura
     }
 
     /// <inheritdoc/>
-    protected override async ValueTask<DurableTaskResponse> RunAsync(DurableExecutionContext executionContext)
+    protected internal override async ValueTask<DurableTaskResponse> RunAsync(DurableExecutionContext executionContext)
     {
         // Schedule this request with the remote service.
         // If the task has already been submitted then this will submit it again, which is an idempotent operation if:
@@ -354,7 +354,7 @@ public abstract class DurableTaskRequest<TResult>(DurableTaskRequestShared share
     }
 
     /// <inheritdoc/>
-    protected override async ValueTask<DurableTaskResponse> RunAsync(DurableExecutionContext executionContext)
+    protected internal override async ValueTask<DurableTaskResponse> RunAsync(DurableExecutionContext executionContext)
     {
         // Schedule this request with the remote service.
         // If the task has already been submitted then this will submit it again, which is an idempotent operation if:

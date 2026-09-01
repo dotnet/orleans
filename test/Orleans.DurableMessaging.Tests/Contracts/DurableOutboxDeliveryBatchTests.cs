@@ -412,6 +412,23 @@ public sealed class DurableOutboxDeliveryBatchTests
     }
 
     [Fact]
+    public async Task DeadLetterCapacityRetainsNewestOutboxEntry()
+    {
+        var fixture = new OutboxFixture(
+            _ => ValueTask.FromResult(DeliveryResult.RouteNotFound("missing")),
+            maxDeliveryAttempts: 1,
+            maxRetainedDeadLetters: 1);
+        var oldMessageId = Guid.NewGuid();
+        fixture.AddDeadLetter(oldMessageId, DateTimeOffset.UtcNow.AddMinutes(-1));
+
+        await fixture.DeliverAsync(TestContext.Current.CancellationToken);
+
+        Assert.Equal(1, fixture.DeadLetters.Count);
+        Assert.False(fixture.DeadLetters.ContainsKey(oldMessageId));
+        Assert.True(fixture.DeadLetters.ContainsKey(fixture.MessageId));
+    }
+
+    [Fact]
     public async Task LaterStateWriteDoesNotCommitRevertedDeliveryMutation()
     {
         using var cancellation = new CancellationTokenSource();
@@ -570,7 +587,8 @@ public sealed class DurableOutboxDeliveryBatchTests
             TimeProvider? jobTimeProvider = null,
             TimeSpan? backpressureRetryDelay = null,
             string? durableJobId = null,
-            bool runTimersImmediately = false)
+            bool runTimersImmediately = false,
+            int maxRetainedDeadLetters = 1000)
         {
             MessageId = Guid.NewGuid();
             SenderId = GrainId.Create("sender", "1");
@@ -660,6 +678,7 @@ public sealed class DurableOutboxDeliveryBatchTests
                             BackpressureRetryDelay = backpressureRetryDelay ?? TimeSpan.FromMilliseconds(1),
                             MaxOutboxRetryAge = TimeSpan.FromMinutes(5),
                             MaxDeliveryAttempts = maxDeliveryAttempts,
+                            MaxRetainedDeadLetters = maxRetainedDeadLetters,
                             OutboxBatchSize = 8
                         })
                 ],
@@ -692,6 +711,16 @@ public sealed class DurableOutboxDeliveryBatchTests
         public TestDurableValue<long> JobSequence { get; }
         public int PendingMessageCount => GetPendingMessageIds().Count;
         public int ScheduledJobCount => Assert.IsType<RecordingJobManager>(JobManager).ScheduleCount;
+
+        public void AddDeadLetter(Guid messageId, DateTimeOffset deadLetteredAt)
+        {
+            var deadLetter = CreateInternal("Orleans.DurableMessaging.OutboxDeadLetter");
+            deadLetter.GetType().GetProperty("Envelope")!.SetValue(deadLetter, CreateEnvelope(messageId));
+            deadLetter.GetType().GetProperty("DeadLetteredAt")!.SetValue(deadLetter, deadLetteredAt);
+            deadLetter.GetType().GetProperty("Reason")!.SetValue(deadLetter, "old");
+            deadLetter.GetType().GetProperty("AttemptCount")!.SetValue(deadLetter, 1);
+            DeadLetters.Add(messageId, deadLetter);
+        }
 
         public Task DeliverAsync() =>
             DeliverWithCancellationAsync(TestContext.Current.CancellationToken);
@@ -1003,7 +1032,7 @@ public sealed class DurableOutboxDeliveryBatchTests
         IEnumerable<ITestDurableState> states,
         Exception? writeException,
         Exception? revertException,
-        bool supportsObservers) : IJournaledStateManager
+        bool supportsObservers) : IJournaledStateManager, IJournaledStateMutationRequestSource
     {
         private readonly ITestDurableState[] _states = states.ToArray();
         private object[] _durableSnapshots = states.Select(static state => state.Capture()).ToArray();

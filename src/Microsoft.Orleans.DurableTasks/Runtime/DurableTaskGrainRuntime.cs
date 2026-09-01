@@ -76,6 +76,8 @@ internal sealed partial class DurableTaskGrainRuntime(
         CancellationToken cancellationToken)
     {
         ThrowIfStopping();
+        await Volatile.Read(ref _recoveryReconciliation).WaitAsync(cancellationToken);
+        cancellationToken.ThrowIfCancellationRequested();
         var fingerprint = GetCompletionDecisionFingerprint(candidates);
         if (_storage.TryGetTask(decisionId, out var decision))
         {
@@ -254,6 +256,51 @@ internal sealed partial class DurableTaskGrainRuntime(
         }
     }
 
+    private async ValueTask WriteStateWithRollbackAsync(CancellationToken cancellationToken)
+    {
+        await _journalWriteGate.WaitAsync(cancellationToken);
+        try
+        {
+            try
+            {
+                await WriteStateUnderJournalWriteGateAsync(cancellationToken);
+            }
+            catch
+            {
+                await _stateManager.RevertPendingChangesAsync(CancellationToken.None);
+                throw;
+            }
+        }
+        finally
+        {
+            _journalWriteGate.Release();
+        }
+    }
+
+    private ValueTask SetResponseWithRollbackAsync(
+        TaskId taskId,
+        DurableTaskResponse response,
+        CancellationToken cancellationToken) =>
+        WithResponseAndJournalWriteGatesAsync(
+            async () =>
+            {
+                try
+                {
+                    await SetResponseCoreAsync(
+                        taskId,
+                        response,
+                        cancellationToken,
+                        persist: true,
+                        journalWriteGateHeld: true);
+                }
+                catch
+                {
+                    await _stateManager.RevertPendingChangesAsync(CancellationToken.None);
+                    throw;
+                }
+            },
+            cancellationToken);
+
     private ValueTask WriteStateUnderJournalWriteGateAsync(CancellationToken cancellationToken) =>
         _storage.WriteAsync(cancellationToken);
 
@@ -277,6 +324,7 @@ internal sealed partial class DurableTaskGrainRuntime(
         IDurableTaskRequest request,
         CancellationToken cancellationToken)
     {
+        await Volatile.Read(ref _recoveryReconciliation).WaitAsync(cancellationToken);
         return await WithJournalWriteGateAsync(
             () => ScheduleRemoteUnderJournalWriteGateAsync(taskId, request, cancellationToken),
             cancellationToken);
@@ -690,11 +738,14 @@ internal sealed partial class DurableTaskGrainRuntime(
     /// <param name="request">The request.</param>
     /// <returns>A <see cref="DurableTaskResponse"/> indicating the status of the request. A response of type <see cref="PendingDurableTaskResponse"/> indicates that the caller can call this method again to poll for completion.</returns>
     /// <exception cref="InvalidOperationException"></exception>
-    ValueTask<DurableTaskResponse> IDurableTaskServer.ScheduleAsync(
+    async ValueTask<DurableTaskResponse> IDurableTaskServer.ScheduleAsync(
         TaskId taskId,
         IDurableTaskRequest request,
-        CancellationToken cancellationToken) =>
-        ScheduleAsyncCore(taskId, request, persist: true, cancellationToken);
+        CancellationToken cancellationToken)
+    {
+        await Volatile.Read(ref _recoveryReconciliation).WaitAsync(cancellationToken);
+        return await ScheduleAsyncCore(taskId, request, persist: true, cancellationToken);
+    }
 
     internal ValueTask<DurableTaskResponse> ScheduleFromInboxAsync(
         TaskId taskId,
@@ -786,7 +837,15 @@ internal sealed partial class DurableTaskGrainRuntime(
                 TryRegisterCompletionDestination(taskId, existingState, requestContext.CallerId);
             }
             var canceled = DurableTaskResponse.FromException(new OperationCanceledException());
-            await SetResponseAsync(taskId, canceled, cancellationToken, persist);
+            if (persist)
+            {
+                await SetResponseWithRollbackAsync(taskId, canceled, cancellationToken);
+            }
+            else
+            {
+                await SetResponseAsync(taskId, canceled, cancellationToken, persist: false);
+            }
+
             return canceled;
         }
 
@@ -805,7 +864,7 @@ internal sealed partial class DurableTaskGrainRuntime(
 
                 if (persist)
                 {
-                    await WriteStateAsync(cancellationToken);
+                    await WriteStateWithRollbackAsync(cancellationToken);
                 }
                 return response;
             }
@@ -817,14 +876,14 @@ internal sealed partial class DurableTaskGrainRuntime(
             {
                 if (persist)
                 {
-                    await WriteStateAsync(cancellationToken);
+                    await WriteStateWithRollbackAsync(cancellationToken);
                 }
                 return DurableTaskResponse.Subscribed;
             }
 
             if (persist)
             {
-                await WriteStateAsync(cancellationToken);
+                await WriteStateWithRollbackAsync(cancellationToken);
             }
             return DurableTaskResponse.Pending;
         }
@@ -855,7 +914,7 @@ internal sealed partial class DurableTaskGrainRuntime(
 
                 if (persist)
                 {
-                    await WriteStateAsync(cancellationToken);
+                    await WriteStateWithRollbackAsync(cancellationToken);
                 }
                 return response;
             }
@@ -867,7 +926,7 @@ internal sealed partial class DurableTaskGrainRuntime(
             // If the user does the 'wrong' thing and calls a non-durable task from their code, then that could expose an externality.
             if (persist)
             {
-                await WriteStateAsync(cancellationToken);
+                await WriteStateWithRollbackAsync(cancellationToken);
                 StartRequest(taskId);
             }
             else
@@ -1073,13 +1132,37 @@ internal sealed partial class DurableTaskGrainRuntime(
             await Task.Yield();
             if (staleRequests.Length > 0)
             {
+                foreach (var request in staleRequests)
+                {
+                    if (request.Context.AbortExecution() is { } exception)
+                    {
+                        _shared.Logger.LogWarning(
+                            exception,
+                            "{Id} error aborting stale durable task execution '{TaskId}' after recovery.",
+                            GrainId,
+                            request.Context.TaskId);
+                    }
+                }
+
                 try
                 {
-                    await Task.WhenAll(
-                        staleRequests.Select(request =>
-                            DurableTaskRuntimeHelper.RequestCancellationAsync(
-                                request.Context,
-                                CancellationToken.None)));
+                    var drain = Task.WhenAll(staleRequests.Select(request => request.Task));
+                    await drain.WaitAsync(
+                        _shared.Options.RecoveryExecutionDrainTimeout,
+                        _shared.TimeProvider,
+                        CancellationToken.None);
+                }
+                catch (TimeoutException exception)
+                {
+                    var failure = new TimeoutException(
+                        $"Durable task recovery for grain '{GrainId}' timed out waiting for {staleRequests.Length} stale execution(s) to stop.",
+                        exception);
+                    _shared.GrainContextAccessor.GrainContext.Deactivate(
+                        new DeactivationReason(
+                            DeactivationReasonCode.ApplicationError,
+                            failure.Message));
+                    reconciliation.TrySetException(failure);
+                    return;
                 }
                 catch (Exception exception)
                 {
@@ -1124,6 +1207,11 @@ internal sealed partial class DurableTaskGrainRuntime(
             {
                 await ResumePendingTasksAsync(CancellationToken.None);
             }
+        }
+        catch (Exception exception)
+        {
+            reconciliation.TrySetException(exception);
+            throw;
         }
         finally
         {
@@ -1238,6 +1326,45 @@ internal sealed partial class DurableTaskGrainRuntime(
         }
         catch (Exception exception)
         {
+            IScheduledTaskHandle? recoveredHandle = null;
+            await WithResponseAndJournalWriteGatesAsync(
+                async () =>
+                {
+                    await _stateManager.RevertPendingChangesAsync(CancellationToken.None);
+                    if (_storage.TryGetTask(taskId, out var recoveredState)
+                        && !recoveredState.TombstonedAt.HasValue)
+                    {
+                        if (recoveredState.Result is { IsCompleted: true } recoveredResponse)
+                        {
+                            recoveredHandle = new CompletedTaskHandle(taskId, recoveredResponse);
+                        }
+                        else if (!recoveredState.CancellationRequestedAt.HasValue
+                            && !schedulingResponse.IsCompleted
+                            && scheduledHandle is not null)
+                        {
+                            recoveredHandle = scheduledHandle;
+                        }
+                    }
+
+                    if (recoveredHandle is not null)
+                    {
+                        CompleteDeferredCustomHandle(taskId, preparation, recoveredHandle);
+                        return;
+                    }
+
+                    await CleanupFailedCustomChildUnderJournalWriteGateAsync(
+                        taskId,
+                        preparation,
+                        exception,
+                        removeProvisionalState: false);
+                },
+                CancellationToken.None);
+
+            if (recoveredHandle is not null)
+            {
+                return recoveredHandle;
+            }
+
             if (scheduledHandle is not null)
             {
                 try
@@ -1254,12 +1381,6 @@ internal sealed partial class DurableTaskGrainRuntime(
                 }
             }
 
-            await WithResponseAndJournalWriteGatesAsync(
-                () => CleanupFailedCustomChildUnderJournalWriteGateAsync(
-                    taskId,
-                    preparation,
-                    exception),
-                CancellationToken.None);
             throw;
         }
     }
@@ -1293,12 +1414,21 @@ internal sealed partial class DurableTaskGrainRuntime(
         if (state.CancellationRequestedAt.HasValue && state.Result is not { IsCompleted: true })
         {
             var canceled = DurableTaskResponse.Canceled;
-            await SetResponseCoreAsync(
-                taskId,
-                canceled,
-                CancellationToken.None,
-                persist: true,
-                journalWriteGateHeld: true);
+            try
+            {
+                await SetResponseCoreAsync(
+                    taskId,
+                    canceled,
+                    CancellationToken.None,
+                    persist: true,
+                    journalWriteGateHeld: true);
+            }
+            catch
+            {
+                await _stateManager.RevertPendingChangesAsync(CancellationToken.None);
+                throw;
+            }
+
             return new CustomChildPreparation(
                 stateExisted,
                 state,
@@ -1323,12 +1453,21 @@ internal sealed partial class DurableTaskGrainRuntime(
 
                 _storage.RequestCancellation(taskId, state);
                 var canceled = DurableTaskResponse.Canceled;
-                await SetResponseCoreAsync(
-                    taskId,
-                    canceled,
-                    CancellationToken.None,
-                    persist: true,
-                    journalWriteGateHeld: true);
+                try
+                {
+                    await SetResponseCoreAsync(
+                        taskId,
+                        canceled,
+                        CancellationToken.None,
+                        persist: true,
+                        journalWriteGateHeld: true);
+                }
+                catch
+                {
+                    await _stateManager.RevertPendingChangesAsync(CancellationToken.None);
+                    throw;
+                }
+
                 return new CustomChildPreparation(
                     stateExisted,
                     state,
@@ -1364,7 +1503,8 @@ internal sealed partial class DurableTaskGrainRuntime(
     private ValueTask CleanupFailedCustomChildUnderJournalWriteGateAsync(
         TaskId taskId,
         CustomChildPreparation preparation,
-        Exception exception)
+        Exception exception,
+        bool removeProvisionalState = true)
     {
         preparation.DeferredHandle?.SetException(exception);
         if (preparation.DeferredHandle is not null)
@@ -1375,7 +1515,8 @@ internal sealed partial class DurableTaskGrainRuntime(
                     preparation.DeferredHandle));
         }
 
-        if (!preparation.StateExisted
+        if (removeProvisionalState
+            && !preparation.StateExisted
             && !preparation.State.CancellationRequestedAt.HasValue)
         {
             _storage.RemoveTask(taskId);
@@ -1652,7 +1793,22 @@ internal sealed partial class DurableTaskGrainRuntime(
         // Otherwise, the task must be a local method invocation, so create an execution context for it and execute it.
         if (!stateExisted)
         {
-            await WriteStateUnderJournalWriteGateAsync(cancellationToken);
+            try
+            {
+                await WriteStateUnderJournalWriteGateAsync(cancellationToken);
+            }
+            catch (Exception exception)
+            {
+                _storage.RemoveTask(taskId);
+                await _stateManager.RevertPendingChangesAsync(CancellationToken.None);
+                if (_taskHandles.TryRemove(taskId, out var failedHandle)
+                    && failedHandle is TaskHandle taskHandle)
+                {
+                    taskHandle.TrySetException(exception);
+                }
+
+                throw;
+            }
         }
 
         var executionContext = CreateExecutionContext(taskId);
@@ -2106,8 +2262,11 @@ internal sealed partial class DurableTaskGrainRuntime(
         }
     }
 
-    public ValueTask SignalCancellationAsync(TaskId taskId, CancellationToken cancellationToken) =>
-        SignalCancellationAsync(taskId, callerId: default, cancellationToken);
+    public async ValueTask SignalCancellationAsync(TaskId taskId, CancellationToken cancellationToken)
+    {
+        await Volatile.Read(ref _recoveryReconciliation).WaitAsync(cancellationToken);
+        await SignalCancellationAsync(taskId, callerId: default, cancellationToken);
+    }
 
     internal async ValueTask SignalCancellationFromInboxAsync(
         TaskId taskId,
@@ -2170,7 +2329,15 @@ internal sealed partial class DurableTaskGrainRuntime(
         var propagation = StageCancellationTree(taskId, callerId);
         if (propagation.Changed)
         {
-            await WriteStateUnderJournalWriteGateAsync(cancellationToken);
+            try
+            {
+                await WriteStateUnderJournalWriteGateAsync(cancellationToken);
+            }
+            catch
+            {
+                await _stateManager.RevertPendingChangesAsync(CancellationToken.None);
+                throw;
+            }
         }
 
         return (propagation.Contexts, propagation.Handles);
