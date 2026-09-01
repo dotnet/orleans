@@ -29,13 +29,21 @@ internal static class GeneratedCodeUtilities
 
     internal static string? GetMethodId(
         LibraryTypes libraryTypes,
+        IMethodSymbol method)
+    {
+        return GetId(libraryTypes, method)?.ToString(CultureInfo.InvariantCulture)
+            ?? GetAlias(libraryTypes, method);
+    }
+
+    internal static string? GetClaimedGeneratedMethodId(
+        LibraryTypes libraryTypes,
         IMethodSymbol method,
         INamedTypeSymbol containingInterface,
         bool isExtension)
     {
         if (GetId(libraryTypes, method) is not { } methodId)
         {
-            return GetAlias(libraryTypes, method);
+            return null;
         }
 
         foreach (var candidate in containingInterface.GetMembers().OfType<IMethodSymbol>()
@@ -62,7 +70,7 @@ internal static class GeneratedCodeUtilities
             }
         }
 
-        return methodId.ToString(CultureInfo.InvariantCulture);
+        return null;
     }
 
     internal static string? GetAlias(LibraryTypes libraryTypes, ISymbol symbol) => (string?)symbol.GetAttribute(libraryTypes.AliasAttribute)?.ConstructorArguments.First().Value;

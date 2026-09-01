@@ -737,6 +737,7 @@ public interface IBasicGrain : IGrainWithIntegerKey
             .OfType<IMethodSymbol>()
             .Select(static method => (Method: method, Id: GeneratedCodeUtilities.CreateHashedMethodId(method)))
             .First(static entry => entry.Id.Any(static character => character is >= 'A' and <= 'F'));
+        var explicitMethodId = Convert.ToUInt32(candidate.Id, 16).ToString(System.Globalization.CultureInfo.InvariantCulture);
         var methodName = candidate.Method.Name;
         var compilation = await CreateCompilation(
 $@"using Orleans;
@@ -768,6 +769,10 @@ public interface IBasicGrain : IGrainWithIntegerKey
             generatedSource.Split(Environment.NewLine),
             line => line.Contains($"Add(\"{candidate.Id}\", typeof(", StringComparison.Ordinal));
         Assert.Contains(cancellationGeneratedId, registration, StringComparison.Ordinal);
+        var explicitIdRegistration = Assert.Single(
+            generatedSource.Split(Environment.NewLine),
+            line => line.Contains($"Add(\"{explicitMethodId}\", typeof(", StringComparison.Ordinal));
+        Assert.Contains(cancellationGeneratedId, explicitIdRegistration, StringComparison.Ordinal);
     }
 
     [Fact]

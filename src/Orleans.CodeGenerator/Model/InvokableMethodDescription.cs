@@ -19,11 +19,12 @@ internal sealed class InvokableMethodDescription : IEquatable<InvokableMethodDes
         Key = invokableId;
         ContainingInterface = containingType;
         GeneratedMethodId = GeneratedCodeUtilities.CreateHashedMethodId(Method);
-        MethodId = GeneratedCodeUtilities.GetMethodId(
+        MethodId = GeneratedCodeUtilities.GetMethodId(GenerationContext.LibraryTypes, Method) ?? GeneratedMethodId;
+        ClaimedGeneratedMethodId = GeneratedCodeUtilities.GetClaimedGeneratedMethodId(
             GenerationContext.LibraryTypes,
             Method,
             containingType,
-            ProxyBase.IsExtension) ?? GeneratedMethodId;
+            ProxyBase.IsExtension);
 
         MethodTypeParameters = new List<(string Name, ITypeParameterSymbol Parameter)>();
 
@@ -198,6 +199,11 @@ internal sealed class InvokableMethodDescription : IEquatable<InvokableMethodDes
     /// Gets the method identifier.
     /// </summary>
     public string MethodId { get; }
+
+    /// <summary>
+    /// Gets the generated method identifier which is claimed by this method's numeric identifier, if any.
+    /// </summary>
+    public string? ClaimedGeneratedMethodId { get; }
 
     public List<(string Name, ITypeParameterSymbol Parameter)> AllTypeParameters { get; }
     public List<(string Name, ITypeParameterSymbol Parameter)> MethodTypeParameters { get; }

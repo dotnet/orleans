@@ -224,12 +224,14 @@ internal class InvokableGenerator(ProxyGenerationContext generationContext)
                 continue;
             }
 
-            var explicitMethodId = GeneratedCodeUtilities.GetMethodId(
+            var explicitMethodId = GeneratedCodeUtilities.GetMethodId(LibraryTypes, method.OriginalDefinition);
+            var claimedGeneratedMethodId = GeneratedCodeUtilities.GetClaimedGeneratedMethodId(
                 LibraryTypes,
                 method.OriginalDefinition,
                 containingInterface,
                 methodDescription.ProxyBase.IsExtension);
-            if (string.Equals(explicitMethodId, methodDescription.GeneratedMethodId, StringComparison.Ordinal))
+            if (string.Equals(explicitMethodId, methodDescription.GeneratedMethodId, StringComparison.Ordinal)
+                || string.Equals(claimedGeneratedMethodId, methodDescription.GeneratedMethodId, StringComparison.Ordinal))
             {
                 return true;
             }
@@ -250,7 +252,15 @@ internal class InvokableGenerator(ProxyGenerationContext generationContext)
             result.Add(GetCompoundTypeAliasComponents(invokableId, containingInterface, methodDescription.MethodId));
         }
 
-        if (includeGeneratedMethodId)
+        if (methodDescription.ClaimedGeneratedMethodId is { } claimedGeneratedMethodId
+            && !string.Equals(claimedGeneratedMethodId, methodDescription.MethodId, StringComparison.Ordinal))
+        {
+            result.Add(GetCompoundTypeAliasComponents(invokableId, containingInterface, claimedGeneratedMethodId));
+        }
+
+        if (includeGeneratedMethodId
+            && !string.Equals(methodDescription.GeneratedMethodId, methodDescription.MethodId, StringComparison.Ordinal)
+            && !string.Equals(methodDescription.GeneratedMethodId, methodDescription.ClaimedGeneratedMethodId, StringComparison.Ordinal))
         {
             result.Add(GetCompoundTypeAliasComponents(invokableId, containingInterface, methodDescription.GeneratedMethodId));
         }

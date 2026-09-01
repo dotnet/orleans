@@ -33,7 +33,7 @@ internal sealed class DashboardRemindersGrain : Grain, IDashboardRemindersGrain
             return EmptyReminders;
         }
 
-        var reminderData = await _reminderTable.ReadRows(0, 0xffffffff, cancellationToken);
+        var reminderData = await _reminderTable.ReadRows(0, 0xffffffff, cancellationToken).WaitAsync(cancellationToken);
 
         if(!reminderData.Reminders.Any())
         {
