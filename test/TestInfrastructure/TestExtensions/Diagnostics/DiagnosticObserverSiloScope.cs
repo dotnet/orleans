@@ -48,8 +48,9 @@ internal sealed class DiagnosticObserverSiloScope
 
     public bool Matches(SiloAddress? siloAddress, string? clusterId = null) =>
         IncludesAllSilos
-        || (siloAddress is not null && _containsSilo(siloAddress))
-        || (clusterId is not null && clusterId == _clusterId);
+        || (siloAddress is not null
+            ? _containsSilo(siloAddress)
+            : clusterId is not null && clusterId == _clusterId);
 
     private static bool HasSameEndpoint(SiloAddress left, SiloAddress right) => left.Endpoint.Equals(right.Endpoint);
 }

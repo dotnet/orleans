@@ -43,6 +43,8 @@ namespace Orleans.Streams
         private const int MAXIMUM_ITEM_STRING_LOG_LENGTH = 128;
         [NonSerialized]
         private readonly IGrainContext? _grainContext;
+        [NonSerialized]
+        private readonly SiloAddress? _siloAddress;
 
         private IStreamSubscriptionObserver? StreamSubscriptionObserver =>
             _grainContext?.GrainInstance as IStreamSubscriptionObserver;
@@ -55,6 +57,7 @@ namespace Orleans.Streams
             providerRuntime = providerRt;
             logger = providerRt.ServiceProvider.GetRequiredService<ILogger<StreamConsumerExtension>>();
             clusterId = providerRt.ServiceProvider.GetRequiredService<IOptions<ClusterOptions>>().Value.ClusterId;
+            _siloAddress = providerRt.ServiceProvider.GetService<ILocalSiloDetails>()?.SiloAddress;
         }
 
         internal StreamSubscriptionHandleImpl<T> SetObserver<T>(
@@ -86,7 +89,7 @@ namespace Orleans.Streams
                     filterData,
                     disableHandshake: IsStatelessWorker,
                     handshakeState: handshakeState,
-                    siloAddress: _grainContext?.Address.SiloAddress,
+                    siloAddress: _siloAddress,
                     clusterId: clusterId);
                 allStreamObservers[subscriptionId] = handle;
                 return handle;
