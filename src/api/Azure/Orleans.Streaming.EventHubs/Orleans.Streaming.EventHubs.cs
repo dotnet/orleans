@@ -484,9 +484,9 @@ namespace Orleans.Streaming.EventHubs
 
         public object GetCursor(Runtime.StreamId streamId, Streams.StreamSequenceToken? sequenceToken) { throw null; }
 
-        public object GetCursorAtPosition(Runtime.StreamId streamId, Streams.StreamSubscriptionStartPosition startPosition) { throw null; }
-
         public int GetMaxAddCount() { throw null; }
+
+        object IEventHubQueueCache.GetCursorAtPosition(Runtime.StreamId streamId, Streams.StreamSubscriptionStartPosition startPosition) { throw null; }
 
         public void Refresh(object cursor, Streams.StreamSequenceToken? sequenceToken) { }
 

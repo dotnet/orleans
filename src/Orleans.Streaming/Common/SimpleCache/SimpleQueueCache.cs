@@ -149,8 +149,7 @@ namespace Orleans.Providers.Streams.Common
             return cursor;
         }
 
-        /// <inheritdoc />
-        public virtual IQueueCacheCursor GetCacheCursorAtPosition(StreamId streamId, StreamSubscriptionStartPosition startPosition)
+        IQueueCacheCursor IQueueCache.GetCacheCursorAtPosition(StreamId streamId, StreamSubscriptionStartPosition startPosition)
         {
             if (startPosition == StreamSubscriptionStartPosition.Latest)
             {

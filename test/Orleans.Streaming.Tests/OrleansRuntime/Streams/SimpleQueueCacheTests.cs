@@ -24,7 +24,7 @@ public class SimpleQueueCacheTests
             new TestBatchContainer(targetStream, 3),
         ]);
 
-        var cursor = cache.GetCacheCursorAtPosition(targetStream, StreamSubscriptionStartPosition.EarliestAvailable);
+        var cursor = ((IQueueCache)cache).GetCacheCursorAtPosition(targetStream, StreamSubscriptionStartPosition.EarliestAvailable);
 
         Assert.True(cursor.MoveNext());
         Assert.Equal(1, cursor.GetCurrent(out _)!.SequenceToken.SequenceNumber);
@@ -40,7 +40,7 @@ public class SimpleQueueCacheTests
         var targetStream = StreamId.Create("namespace", Guid.NewGuid());
         var otherStream = StreamId.Create("namespace", Guid.NewGuid());
         cache.AddToCache([new TestBatchContainer(otherStream, 100)]);
-        var cursor = cache.GetCacheCursorAtPosition(targetStream, StreamSubscriptionStartPosition.EarliestAvailable);
+        var cursor = ((IQueueCache)cache).GetCacheCursorAtPosition(targetStream, StreamSubscriptionStartPosition.EarliestAvailable);
 
         Assert.False(cursor.MoveNext());
 

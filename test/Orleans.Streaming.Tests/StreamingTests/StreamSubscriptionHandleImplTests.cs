@@ -113,6 +113,36 @@ public class StreamSubscriptionHandleImplTests
     }
 
     [Fact]
+    public async Task ItemSubscribeOverloadForwardsToStreamConsumer()
+    {
+        var consumer = new RecordingInternalObservable();
+        IAsyncObservable<int> stream = CreateStream(isRewindable: true, consumer);
+        var observer = Substitute.For<IAsyncObserver<int>>();
+
+        await stream.SubscribeAsync(
+            observer,
+            StreamSubscriptionStartPosition.EarliestAvailable,
+            filterData: "filter");
+
+        Assert.Same(observer, consumer.ItemObserver);
+        Assert.Equal(StreamSubscriptionStartPosition.EarliestAvailable, consumer.StartPosition);
+        Assert.Equal("filter", consumer.FilterData);
+    }
+
+    [Fact]
+    public async Task BatchSubscribeOverloadForwardsToStreamConsumer()
+    {
+        var consumer = new RecordingInternalObservable();
+        IAsyncBatchObservable<int> stream = CreateStream(isRewindable: true, consumer);
+        var observer = Substitute.For<IAsyncBatchObserver<int>>();
+
+        await stream.SubscribeAsync(observer, StreamSubscriptionStartPosition.EarliestAvailable);
+
+        Assert.Same(observer, consumer.BatchObserver);
+        Assert.Equal(StreamSubscriptionStartPosition.EarliestAvailable, consumer.StartPosition);
+    }
+
+    [Fact]
     public void ActiveImplicitSubscriptionRejectsOlderAcknowledgedToken()
     {
         var acknowledgedToken = new EventSequenceTokenV2(10);
@@ -1708,20 +1738,89 @@ public class StreamSubscriptionHandleImplTests
         public Task OnCompletedAsync() => throw new NotSupportedException();
 
         public Task OnErrorAsync(Exception ex) => throw new NotSupportedException();
-    private static StreamImpl<int> CreateStream(bool isRewindable)
+    }
+
+    private static StreamImpl<int> CreateStream(
+        bool isRewindable,
+        IInternalAsyncObservable<int>? consumer = null)
     {
         return new StreamImpl<int>(
             new QualifiedStreamId("provider", StreamId.Create("namespace", Guid.NewGuid())),
-            new TestStreamProvider(),
+            new TestStreamProvider(consumer),
             isRewindable,
             Substitute.For<IRuntimeClient>());
     }
 
-    private sealed class TestStreamProvider : IInternalStreamProvider
+    private sealed class TestStreamProvider(IInternalAsyncObservable<int>? consumer) : IInternalStreamProvider
     {
         public IInternalAsyncBatchObserver<T> GetProducerInterface<T>(IAsyncStream<T> streamId) => null!;
 
-        public IInternalAsyncObservable<T> GetConsumerInterface<T>(IAsyncStream<T> streamId) => null!;
+        public IInternalAsyncObservable<T> GetConsumerInterface<T>(IAsyncStream<T> streamId)
+            => (IInternalAsyncObservable<T>)(object)consumer!;
+    }
+
+    private sealed class RecordingInternalObservable : IInternalAsyncObservable<int>
+    {
+        public IAsyncObserver<int>? ItemObserver { get; private set; }
+        public IAsyncBatchObserver<int>? BatchObserver { get; private set; }
+        public StreamSubscriptionStartPosition StartPosition { get; private set; }
+        public string? FilterData { get; private set; }
+
+        public Task<StreamSubscriptionHandle<int>> SubscribeAsync(IAsyncObserver<int> observer)
+            => Task.FromResult<StreamSubscriptionHandle<int>>(null!);
+
+        public Task<StreamSubscriptionHandle<int>> SubscribeAsync(
+            IAsyncObserver<int> observer,
+            StreamSequenceToken? token,
+            string? filterData = null)
+            => Task.FromResult<StreamSubscriptionHandle<int>>(null!);
+
+        public Task<StreamSubscriptionHandle<int>> SubscribeAsync(
+            IAsyncObserver<int> observer,
+            StreamSubscriptionStartPosition startPosition,
+            string? filterData = null)
+        {
+            ItemObserver = observer;
+            StartPosition = startPosition;
+            FilterData = filterData;
+            return Task.FromResult<StreamSubscriptionHandle<int>>(null!);
+        }
+
+        public Task<StreamSubscriptionHandle<int>> SubscribeAsync(IAsyncBatchObserver<int> observer)
+            => Task.FromResult<StreamSubscriptionHandle<int>>(null!);
+
+        public Task<StreamSubscriptionHandle<int>> SubscribeAsync(
+            IAsyncBatchObserver<int> observer,
+            StreamSequenceToken? token)
+            => Task.FromResult<StreamSubscriptionHandle<int>>(null!);
+
+        public Task<StreamSubscriptionHandle<int>> SubscribeAsync(
+            IAsyncBatchObserver<int> observer,
+            StreamSubscriptionStartPosition startPosition)
+        {
+            BatchObserver = observer;
+            StartPosition = startPosition;
+            return Task.FromResult<StreamSubscriptionHandle<int>>(null!);
+        }
+
+        public Task<StreamSubscriptionHandle<int>> ResumeAsync(
+            StreamSubscriptionHandle<int> handle,
+            IAsyncObserver<int> observer,
+            StreamSequenceToken? token = null)
+            => Task.FromResult<StreamSubscriptionHandle<int>>(null!);
+
+        public Task<StreamSubscriptionHandle<int>> ResumeAsync(
+            StreamSubscriptionHandle<int> handle,
+            IAsyncBatchObserver<int> observer,
+            StreamSequenceToken? token = null)
+            => Task.FromResult<StreamSubscriptionHandle<int>>(null!);
+
+        public Task UnsubscribeAsync(StreamSubscriptionHandle<int> handle) => Task.CompletedTask;
+
+        public Task<IList<StreamSubscriptionHandle<int>>> GetAllSubscriptions()
+            => Task.FromResult<IList<StreamSubscriptionHandle<int>>>([]);
+
+        public Task Cleanup() => Task.CompletedTask;
     }
 
     private sealed class LegacyObservable : IAsyncObservable<int>

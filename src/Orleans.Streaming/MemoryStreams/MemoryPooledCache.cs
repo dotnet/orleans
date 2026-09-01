@@ -180,8 +180,7 @@ namespace Orleans.Providers
             return new Cursor(cache, streamId, token);
         }
 
-        /// <inheritdoc/>
-        public IQueueCacheCursor GetCacheCursorAtPosition(StreamId streamId, StreamSubscriptionStartPosition startPosition)
+        IQueueCacheCursor IQueueCache.GetCacheCursorAtPosition(StreamId streamId, StreamSubscriptionStartPosition startPosition)
         {
             return new Cursor(cache, cache.GetCursorAtPosition(streamId, startPosition));
         }
