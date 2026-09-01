@@ -65,7 +65,7 @@ namespace Orleans.DurableMessaging;
 ///         }
 ///
 ///         // Process based on correlation hierarchy
-///         if (context.Envelope.CorrelationKey == CorrelationKey)
+///         if (CorrelationKey.Equals(context.Envelope.CorrelationKey))
 ///         {
 ///             // Main workflow message
 ///             await HandleMainWorkflow(workflowEvent, ct);

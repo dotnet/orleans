@@ -88,7 +88,13 @@ public sealed class HierarchicalKey : ISpanFormattable, IEquatable<HierarchicalK
     };
 
     /// <inheritdoc/>
-    public static HierarchicalKey Parse(string s, IFormatProvider? provider) => Create(s);
+    public static HierarchicalKey Parse(string s, IFormatProvider? provider)
+    {
+        ArgumentNullException.ThrowIfNull(s);
+        return TryParse(s, provider, out var result)
+            ? result
+            : throw new FormatException("The value is not a valid hierarchical key.");
+    }
 
     /// <inheritdoc/>
     public static bool TryParse([NotNullWhen(true)] string? s, IFormatProvider? provider, [MaybeNullWhen(false)] out HierarchicalKey result)
@@ -107,12 +113,9 @@ public sealed class HierarchicalKey : ISpanFormattable, IEquatable<HierarchicalK
     /// <inheritdoc/>
     public static HierarchicalKey Parse(ReadOnlySpan<char> s, IFormatProvider? provider)
     {
-        if (!TryParse(s, provider, out var result))
-        {
-            throw new InvalidOperationException("Unable to parse hierarchical key.");
-        }
-
-        return result;
+        return TryParse(s, provider, out var result)
+            ? result
+            : throw new FormatException("The value is not a valid hierarchical key.");
     }
 
     /// <inheritdoc/>
