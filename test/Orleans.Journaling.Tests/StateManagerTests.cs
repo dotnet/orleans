@@ -663,6 +663,11 @@ public class StateManagerTests : JournalingTestBase
                 .WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken));
         Assert.Contains("fenced", writeException.Message, StringComparison.OrdinalIgnoreCase);
 
+        var initializeException = await Assert.ThrowsAsync<InvalidOperationException>(
+            () => sut.Manager.InitializeAsync(TestContext.Current.CancellationToken).AsTask()
+                .WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken));
+        Assert.Contains("fenced", initializeException.Message, StringComparison.OrdinalIgnoreCase);
+
         await sut.Manager.RevertPendingChangesAsync(TestContext.Current.CancellationToken).AsTask()
             .WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
         Assert.True(dictionary.ContainsKey("first"));
@@ -731,6 +736,18 @@ public class StateManagerTests : JournalingTestBase
         var recoveredValue = new DurableValue<int>("value", recovered.Manager, CreateValueCodec<int>());
         await recovered.Lifecycle.OnStart(TestContext.Current.CancellationToken);
         Assert.Equal(42, recoveredValue.Value);
+    }
+
+    [Fact]
+    public async Task StateManager_RegisterObserverAfterInitializationIsRejected()
+    {
+        var sut = CreateTestSystem();
+        await sut.Lifecycle.OnStart(TestContext.Current.CancellationToken);
+
+        var exception = Assert.Throws<NotSupportedException>(
+            () => sut.Manager.RegisterObserver(new RecordingStateObserver()));
+
+        Assert.Contains("after initialization", exception.Message, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -815,6 +832,25 @@ public class StateManagerTests : JournalingTestBase
 
         Assert.Equal(1, observer.RecoveryStartedCount);
         Assert.Equal(1, observer.RecoveryCompletedCount);
+    }
+
+    [Fact]
+    public async Task StateManager_RecoveryRequestNotifiesObserverBeforeReadStarts()
+    {
+        var storage = new BlockingRecoveryStorage();
+        var sut = CreateTestSystem(storage: storage);
+        var observer = new RecordingStateObserver();
+        sut.Manager.RegisterObserver(observer);
+        await sut.Lifecycle.OnStart(TestContext.Current.CancellationToken);
+
+        var recovery = sut.Manager.RevertPendingChangesAsync(TestContext.Current.CancellationToken).AsTask();
+
+        Assert.Equal(1, observer.RecoveryRequestedCount);
+        await storage.RecoveryReadStarted.Task.WaitAsync(
+            TimeSpan.FromSeconds(10),
+            TestContext.Current.CancellationToken);
+        storage.AllowRecoveryRead.SetResult();
+        await recovery;
     }
 
     [Fact]
@@ -2142,6 +2178,7 @@ public class StateManagerTests : JournalingTestBase
         public int RecoveryCompletedCount { get; private set; }
         public int DeleteCompletedCount { get; private set; }
         public int RecoveryStartedCount { get; private set; }
+        public int RecoveryRequestedCount { get; private set; }
 
         public ValueTask OnWritePreparingAsync(CancellationToken cancellationToken)
         {
@@ -2164,6 +2201,7 @@ public class StateManagerTests : JournalingTestBase
         }
 
         public void OnRecoveryCompleted() => RecoveryCompletedCount++;
+        public void OnRecoveryRequested() => RecoveryRequestedCount++;
         public void OnRecoveryStarted() => RecoveryStartedCount++;
         public void OnDeleteCompleted() => DeleteCompletedCount++;
     }

@@ -45,7 +45,7 @@ internal sealed class DurableMessagingPumpResults
         _cleanupInterval = TimeSpan.FromTicks(Math.Max(
             TimeSpan.FromSeconds(1).Ticks,
             Math.Min(TimeSpan.FromMinutes(1).Ticks, Math.Min(completedRetentionPeriod.Ticks, abandonedRetentionPeriod.Ticks) / 4)));
-        _nextCleanup = timeProvider.GetUtcNow() + _cleanupInterval;
+        _nextCleanup = DurableMessagingTime.AddClamped(timeProvider.GetUtcNow(), _cleanupInterval);
     }
 
     public bool TryStart(
@@ -243,7 +243,7 @@ internal sealed class DurableMessagingPumpResults
             return null;
         }
 
-        _nextCleanup = now + _cleanupInterval;
+        _nextCleanup = DurableMessagingTime.AddClamped(now, _cleanupInterval);
         List<Entry>? removed = null;
         foreach (var pair in _entries.ToArray())
         {

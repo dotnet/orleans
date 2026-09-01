@@ -12,6 +12,28 @@ namespace Orleans.DurableMessaging.Tests.Contracts;
 public sealed class DeliveryAndOptionsContractTests
 {
     [Fact]
+    public void RetentionTimeArithmetic_HandlesMaximumDurationsWithoutOverflow()
+    {
+        var timeType = typeof(IDurableInbox).Assembly.GetType(
+            "Orleans.DurableMessaging.DurableMessagingTime",
+            throwOnError: true)!;
+        var isExpired = timeType.GetMethod(
+            "IsExpired",
+            BindingFlags.Static | BindingFlags.Public)!;
+        var addClamped = timeType.GetMethod(
+            "AddClamped",
+            BindingFlags.Static | BindingFlags.Public)!;
+        var timestamp = DateTimeOffset.MaxValue - TimeSpan.FromTicks(1);
+
+        Assert.False((bool)isExpired.Invoke(
+            null,
+            [DateTimeOffset.MaxValue, timestamp, TimeSpan.MaxValue])!);
+        Assert.Equal(
+            DateTimeOffset.MaxValue,
+            (DateTimeOffset)addClamped.Invoke(null, [timestamp, TimeSpan.MaxValue])!);
+    }
+
+    [Fact]
     public void DeliveryResult_EachFactory_PreservesStatusAndPayload()
     {
         var routeMissing = DeliveryResult.RouteNotFound("orders/missing");

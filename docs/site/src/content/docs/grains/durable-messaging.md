@@ -18,7 +18,8 @@ route, message ID, optional <xref:Orleans.DurableMessaging.HierarchicalKey> corr
 `ReplyTo` grain ID, and an opaque serialized body. A receiver evaluates registered
 handlers in registration order. Handlers can select envelopes by exact route, route
 prefix, correlation hierarchy, or arbitrary metadata, and typed handlers deserialize
-the body only when selected.
+the body only when selected. The receiving grain verifies that the envelope target
+matches its own identity before deduplication or persistence.
 
 The preview correlation key type now belongs to this package as
 <xref:Orleans.DurableMessaging.HierarchicalKey>. Draft consumers of
@@ -41,8 +42,9 @@ Durable Messaging has the following boundaries:
 - Sending an equivalent envelope with the same `MessageId` more than once is idempotent,
   whether the original is provisional or durable. Reusing that ID with different routing,
   correlation, body, or request-context content throws without changing the outbox.
-- A failed turn restores the last durable journal version. Its staged effects and
-  outgoing envelopes are discarded before the inbox records a retry or dead letter.
+- A failed inbox-handler attempt restores the last durable journal version before
+  retry or dead-letter accounting commits. The failed attempt's staged effects and
+  outgoing envelopes are discarded at that boundary.
 - Inbox handlers stage journaled effects and outgoing envelopes. Durable Messaging
   commits those changes together with inbox completion after the handler returns;
   handlers cannot create an earlier journal commit or delete boundary.
@@ -72,10 +74,12 @@ commit or activation recovery is visible polls the same attempt instead of compl
 After recovery, a scheduled generation with no committed owner and no work is a
 confirmed orphan and completes, so Durable Jobs removes it. If recovered work has no
 matching owner, recovery schedules and commits a new generation before the old
-generation terminates. Ownership-clear write failures restore the preceding generation,
-so the current job remains responsible. Pump callbacks execute as non-interleaving grain
-timer turns so that infrastructure writes can't commit provisional state from a
-concurrently running handler.
+generation terminates. Callbacks for the recovered and replacement generations both poll
+until replacement ownership commits, preserving the existing durable wake-up if
+scheduling or persistence must retry. Ownership-clear write failures restore the
+preceding generation, so the current job remains responsible. Pump callbacks execute as
+non-interleaving grain timer turns so that infrastructure writes can't commit
+provisional state from a concurrently running handler.
 
 ## Backpressure, retries, and dead letters
 
@@ -100,7 +104,10 @@ explicitly null-capable and handlers which require a non-null body must validate
 ## Deployment requirements
 
 Configure Durable Jobs storage and Journaling storage before enabling Durable
-Messaging. The Journaling implementation must provide
+Messaging. Grains which use Durable Messaging derive from
+<xref:Orleans.Journaling.DurableGrain>; its activation lifecycle initializes the
+journaled state manager and materializes the inbox and outbox participants before
+message recovery begins. The Journaling implementation must provide
 <xref:Orleans.Journaling.IJournaledStateManager.RevertPendingChangesAsync*> and accept
 <xref:Orleans.Journaling.IJournaledStateManager.RegisterObserver*> so Durable Messaging
 receives commit and recovery notifications. Activation reports a

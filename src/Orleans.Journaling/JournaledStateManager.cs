@@ -137,6 +137,12 @@ internal sealed partial class JournaledStateManager : IJournaledStateManager, IJ
         lock (_lock)
         {
             _shutdownCancellation.Token.ThrowIfCancellationRequested();
+            if (_workLoop is not null)
+            {
+                throw new NotSupportedException(
+                    "Registering a journaled state observer after initialization has started is not supported.");
+            }
+
             if (!_observers.Add(observer))
             {
                 throw new InvalidOperationException("The journaled state observer is already registered.");
@@ -152,6 +158,7 @@ internal sealed partial class JournaledStateManager : IJournaledStateManager, IJ
         bool didEnqueue;
         lock (_lock)
         {
+            ThrowIfInitializationFenced();
             if (_workLoop is null)
             {
                 _workLoop = Start();
@@ -561,6 +568,7 @@ internal sealed partial class JournaledStateManager : IJournaledStateManager, IJ
                                 {
                                     lock (_lock)
                                     {
+                                        ThrowIfInitializationFenced();
                                         _state = ManagerState.Ready;
                                     }
                                     break;
@@ -1046,6 +1054,23 @@ internal sealed partial class JournaledStateManager : IJournaledStateManager, IJ
     public async ValueTask RevertPendingChangesAsync(CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
+        IJournaledStateObserver[] observers;
+        lock (_lock)
+        {
+            _shutdownCancellation.Token.ThrowIfCancellationRequested();
+            if (_state is ManagerState.Unknown)
+            {
+                throw new InvalidOperationException("The journaled state manager has not been initialized.");
+            }
+
+            observers = [.. _observers];
+        }
+
+        foreach (var observer in observers)
+        {
+            observer.OnRecoveryRequested();
+        }
+
         Task pendingRecovery;
         bool didEnqueue;
         lock (_lock)
@@ -1083,6 +1108,15 @@ internal sealed partial class JournaledStateManager : IJournaledStateManager, IJ
                 throw new InvalidOperationException("Journaled state operations are fenced because recovery failed. Call RevertPendingChangesAsync to retry recovery.");
             default:
                 throw new UnreachableException();
+        }
+    }
+
+    private void ThrowIfInitializationFenced()
+    {
+        if (_state is ManagerState.Fenced)
+        {
+            throw new InvalidOperationException(
+                "The journaled state manager is fenced because recovery failed. Call RevertPendingChangesAsync to retry recovery.");
         }
     }
 
