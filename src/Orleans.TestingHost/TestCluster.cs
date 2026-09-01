@@ -273,7 +273,7 @@ namespace Orleans.TestingHost
         public async Task DeactivateAsync(GrainId grainId)
         {
             var deactivated = WaitForDeactivationAsync(grainId);
-            await GrainFactory.GetGrain(grainId).Cast<IGrainManagementExtension>().DeactivateOnIdle();
+            await GrainFactory.GetGrain(grainId).Cast<IGrainManagementExtension>().DeactivateOnIdle(CancellationToken.None);
             await deactivated;
         }
 
@@ -298,7 +298,7 @@ namespace Orleans.TestingHost
                 RequestContext.Set(IPlacementDirector.PlacementHintKey, targetSilo);
             }
 
-            await GrainFactory.GetGrain(grainId).Cast<IGrainManagementExtension>().MigrateOnIdle();
+            await GrainFactory.GetGrain(grainId).Cast<IGrainManagementExtension>().MigrateOnIdle(CancellationToken.None);
             await deactivated;
         }
 

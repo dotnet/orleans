@@ -736,8 +736,7 @@ public interface IBasicGrain : IGrainWithIntegerKey
         var candidate = baseline.GetTypeByMetadataName("IBasicGrain")!.GetMembers()
             .OfType<IMethodSymbol>()
             .Select(static method => (Method: method, Id: GeneratedCodeUtilities.CreateHashedMethodId(method)))
-            .First(static entry => entry.Id[0] != '0' && entry.Id.All(char.IsDigit));
-        var methodId = uint.Parse(candidate.Id);
+            .First(static entry => entry.Id.Any(static character => character is >= 'A' and <= 'F'));
         var methodName = candidate.Method.Name;
         var compilation = await CreateCompilation(
 $@"using Orleans;
@@ -751,7 +750,7 @@ public interface IBasicGrain : IGrainWithIntegerKey
     [Alias(""{methodName}"")]
     ValueTask {methodName}();
 
-    [Id({methodId})]
+    [Id(0x{candidate.Id}u)]
     ValueTask {methodName}(CancellationToken cancellationToken);
 }}",
             "TestProject");
@@ -1696,6 +1695,63 @@ public class DemoClass
             "typeof(OrleansCodeGen.TestProject.Invokable_IDerivedGrain_",
             metadataSource,
             StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task CompatibilityInvokersOption_ExplicitAliasSuppressesInheritedGeneratedAlias()
+    {
+        var baseline = await CreateCompilation(
+            """
+            using Orleans;
+            using System.Threading.Tasks;
+
+            public interface IBaseGrain : IGrainWithIntegerKey
+            {
+                Task Ping();
+            }
+            """,
+            "Baseline");
+        var baseMethod = Assert.Single(baseline.GetTypeByMetadataName("IBaseGrain")!.GetMembers().OfType<IMethodSymbol>());
+        var legacyMethodId = GeneratedCodeUtilities.CreateHashedMethodId(baseMethod);
+        var compilation = await CreateCompilation(
+            $$"""
+            using Orleans;
+            using System.Threading;
+            using System.Threading.Tasks;
+
+            public interface IBaseGrain : IGrainWithIntegerKey
+            {
+                Task Ping();
+            }
+
+            public interface IDerivedGrain : IBaseGrain
+            {
+                [Alias("{{legacyMethodId}}")]
+                Task Ping(CancellationToken cancellationToken);
+            }
+            """,
+            "TestProject");
+
+        Assert.Empty(compilation.GetDiagnostics(TestContext.Current.CancellationToken));
+        var result = RunSourceGenerator(
+            compilation,
+            new Dictionary<string, string>
+            {
+                ["build_property.orleansgeneratecompatibilityinvokers"] = "true",
+            });
+        Assert.Empty(result.Diagnostics);
+
+        var derivedInterface = compilation.GetTypeByMetadataName("IDerivedGrain")!;
+        var cancellationMethod = Assert.Single(
+            derivedInterface.GetMembers("Ping").OfType<IMethodSymbol>(),
+            static method => method.Parameters.Length == 1);
+        var cancellationGeneratedId = GeneratedCodeUtilities.CreateHashedMethodId(cancellationMethod);
+        var generatedSource = ConcatenateGeneratedSources(result);
+        var registration = Assert.Single(
+            generatedSource.Split(Environment.NewLine),
+            line => line.Contains($"Add(\"{legacyMethodId}\", typeof(", StringComparison.Ordinal)
+                && line.Contains("Invokable_IDerivedGrain_", StringComparison.Ordinal));
+        Assert.Contains(cancellationGeneratedId, registration, StringComparison.Ordinal);
     }
 
     [Fact]

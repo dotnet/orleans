@@ -1315,7 +1315,7 @@ namespace Orleans.Runtime.ReminderService
                             try
                             {
                                 var grainRef = _shared.GetGrain(entry.GrainId);
-                                await grainRef.ReceiveReminder(entry.ReminderName, status, _stopCancellation.Token);
+                                await grainRef.ReceiveReminder(entry.ReminderName, status, _shared.StoppedCancellationTokenSource.Token);
 
                                 if (_shared.logger.IsEnabled(LogLevel.Trace))
                                 {

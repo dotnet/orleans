@@ -75,7 +75,7 @@ internal sealed partial class SiloGrainService : GrainService, ISiloGrainService
         {
             var siloAddress = SiloAddress.FromParsableString(this.GetPrimaryKeyString());
 
-            var results = (await managementGrain.GetRuntimeStatistics([siloAddress])).FirstOrDefault();
+            var results = (await managementGrain.GetRuntimeStatistics([siloAddress], CancellationToken.None)).FirstOrDefault();
 
             _statistics.Enqueue(results);
 

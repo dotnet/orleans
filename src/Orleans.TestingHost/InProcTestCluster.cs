@@ -226,7 +226,7 @@ public sealed class InProcessTestCluster : IDisposable, IAsyncDisposable
             RequestContext.Set(IPlacementDirector.PlacementHintKey, targetSilo);
         }
 
-        await Client.GetGrain(grainId).Cast<IGrainManagementExtension>().MigrateOnIdle();
+        await Client.GetGrain(grainId).Cast<IGrainManagementExtension>().MigrateOnIdle(CancellationToken.None);
         await deactivated;
     }
 

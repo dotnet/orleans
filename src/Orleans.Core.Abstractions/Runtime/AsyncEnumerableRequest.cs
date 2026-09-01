@@ -289,7 +289,7 @@ internal sealed partial class AsyncEnumeratorProxy<T> : IAsyncEnumerator<T>
             Activity.Current = _sessionActivity;
             try
             {
-                await _target.DisposeAsync(_requestId);
+                await _target.DisposeAsync(_requestId, CancellationToken.None);
             }
             catch (Exception exception)
             {

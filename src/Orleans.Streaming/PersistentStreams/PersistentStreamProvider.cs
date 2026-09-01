@@ -147,7 +147,7 @@ namespace Orleans.Providers.Streams.Common
             var manager = this.pullingAgentManager;
             if (manager != null)
             {
-                var stopTask = manager.Stop(token);
+                var stopTask = manager.Stop(CancellationToken.None);
                 try
                 {
                     await stopTask.WaitAsync(token);

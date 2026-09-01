@@ -2,7 +2,6 @@ using Microsoft.CodeAnalysis;
 using Orleans.CodeGenerator.SyntaxGeneration;
 using System.Collections.Immutable;
 using System.Diagnostics.CodeAnalysis;
-using System.Globalization;
 
 namespace Orleans.CodeGenerator;
 
@@ -20,7 +19,11 @@ internal sealed class InvokableMethodDescription : IEquatable<InvokableMethodDes
         Key = invokableId;
         ContainingInterface = containingType;
         GeneratedMethodId = GeneratedCodeUtilities.CreateHashedMethodId(Method);
-        MethodId = GenerationContext.GetId(Method)?.ToString(CultureInfo.InvariantCulture) ?? GenerationContext.GetAlias(Method) ?? GeneratedMethodId;
+        MethodId = GeneratedCodeUtilities.GetMethodId(
+            GenerationContext.LibraryTypes,
+            Method,
+            containingType,
+            ProxyBase.IsExtension) ?? GeneratedMethodId;
 
         MethodTypeParameters = new List<(string Name, ITypeParameterSymbol Parameter)>();
 

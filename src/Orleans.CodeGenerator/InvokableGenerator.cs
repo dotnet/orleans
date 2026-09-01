@@ -1,4 +1,3 @@
-using System.Globalization;
 using Orleans.CodeGenerator.SyntaxGeneration;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
@@ -206,18 +205,30 @@ internal class InvokableGenerator(ProxyGenerationContext generationContext)
         return Attribute(LibraryTypes.CompoundTypeAliasAttribute.ToNameSyntax()).AddArgumentListArguments(args);
     }
 
-    private bool IsGeneratedMethodIdExplicitlyClaimed(InvokableMethodDescription methodDescription)
+    internal bool IsGeneratedMethodIdExplicitlyClaimed(InvokableMethodDescription methodDescription)
     {
-        foreach (var method in methodDescription.Method.ContainingType.GetMembers().OfType<IMethodSymbol>())
+        var containingInterface = methodDescription.ContainingInterface;
+        foreach (var method in containingInterface.GetMembers().OfType<IMethodSymbol>()
+            .Concat(containingInterface.AllInterfaces.SelectMany(static interfaceType => interfaceType.GetMembers().OfType<IMethodSymbol>())))
         {
             if (SymbolEqualityComparer.Default.Equals(method.OriginalDefinition, methodDescription.Method.OriginalDefinition))
             {
                 continue;
             }
 
-            var explicitMethodId = GeneratedCodeUtilities.GetId(LibraryTypes, method.OriginalDefinition)
-                ?.ToString(CultureInfo.InvariantCulture)
-                ?? GeneratedCodeUtilities.GetAlias(LibraryTypes, method.OriginalDefinition);
+            if (methodDescription.ProxyBase.IsExtension
+                && !SymbolEqualityComparer.Default.Equals(
+                    method.OriginalDefinition.ContainingType,
+                    methodDescription.Method.OriginalDefinition.ContainingType))
+            {
+                continue;
+            }
+
+            var explicitMethodId = GeneratedCodeUtilities.GetMethodId(
+                LibraryTypes,
+                method.OriginalDefinition,
+                containingInterface,
+                methodDescription.ProxyBase.IsExtension);
             if (string.Equals(explicitMethodId, methodDescription.GeneratedMethodId, StringComparison.Ordinal))
             {
                 return true;

@@ -1,6 +1,5 @@
 using System.Collections.Immutable;
 using System.Diagnostics.CodeAnalysis;
-using System.Globalization;
 using System.Text;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
@@ -231,7 +230,7 @@ internal static class ProxyInterfaceModelExtractor
                 }
 
                 var containingInterface = isExtension ? interfaceType : originalMethod.ContainingType;
-                var methodModel = ExtractMethodModel(member, originalMethod, containingInterface, libraryTypes);
+                var methodModel = ExtractMethodModel(member, originalMethod, containingInterface, libraryTypes, isExtension);
                 if (methodModel is not null)
                 {
                     methods.Add(methodIdentity, methodModel);
@@ -298,24 +297,17 @@ internal static class ProxyInterfaceModelExtractor
         IMethodSymbol method,
         IMethodSymbol originalMethod,
         INamedTypeSymbol containingInterface,
-        LibraryTypes libraryTypes)
+        LibraryTypes libraryTypes,
+        bool isExtension)
     {
         var generatedMethodId = GeneratedCodeUtilities.CreateHashedMethodId(originalMethod);
 
         // Determine method ID: explicit ID → alias → generated hash
-        string methodId;
-        var idValue = GeneratedCodeUtilities.GetId(libraryTypes, originalMethod);
-        if (idValue.HasValue)
-        {
-            methodId = idValue.Value.ToString(CultureInfo.InvariantCulture);
-        }
-        else
-        {
-            var aliasAttr = originalMethod.GetAttribute(libraryTypes.AliasAttribute);
-            methodId = aliasAttr is not null && aliasAttr.ConstructorArguments.Length > 0
-                ? (string?)aliasAttr.ConstructorArguments[0].Value ?? generatedMethodId
-                : generatedMethodId;
-        }
+        var methodId = GeneratedCodeUtilities.GetMethodId(
+            libraryTypes,
+            originalMethod,
+            containingInterface,
+            isExtension) ?? generatedMethodId;
 
         var parameters = ExtractMethodParameters(method, libraryTypes);
         var typeParameters = ExtractMethodTypeParameters(method);

@@ -166,7 +166,7 @@ namespace Orleans.Providers
                 ArraySegment<byte> bodyBytes = serializer.Serialize(new MemoryMessageBody(events.Cast<object>(), requestContext));
                 var messageData = MemoryMessageData.Create(streamId, bodyBytes);
                 IMemoryStreamQueueGrain queueGrain = GetQueueGrain(queueId);
-                await queueGrain.Enqueue(messageData);
+                await queueGrain.Enqueue(messageData, CancellationToken.None);
             }
             catch (Exception exc)
             {
