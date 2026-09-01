@@ -185,7 +185,7 @@ public class ClusterManifestProviderTests
             (localSilo, SiloStatus.Active),
             (remoteSilo, SiloStatus.Active)));
         var manifest = new GrainVersionManifest(clusterManifestProvider);
-        var selectorManager = CreateCachedVersionSelectorManager(manifest, membership);
+        var selectorManager = CreateCachedVersionSelectorManager(manifest);
 
         var initial = selectorManager.GetSuitableSilos(TestGrainType, TestInterfaceType, requestedVersion: 1);
         SiloAddress[] initialSilos = initial.SuitableSilos;
@@ -214,9 +214,7 @@ public class ClusterManifestProviderTests
             1,
             (localSilo, SiloStatus.Active),
             (remoteSilo, SiloStatus.Active)));
-        var selectorManager = CreateCachedVersionSelectorManager(
-            new GrainVersionManifest(clusterManifestProvider),
-            membership);
+        var selectorManager = CreateCachedVersionSelectorManager(new GrainVersionManifest(clusterManifestProvider));
 
         Assert.Equal(new[] { localSilo }, selectorManager.GetSuitableSilos(TestGrainType, TestInterfaceType, requestedVersion: 1).SuitableSilos);
 
@@ -228,43 +226,75 @@ public class ClusterManifestProviderTests
     }
 
     [Fact]
-    public async Task CachedVersionSelectorManager_RetriesUntilMembershipAndManifestVersionsConverge()
+    public void GrainVersionManifest_CapturedSnapshotRemainsConsistentAfterManifestAdvances()
     {
         var localSilo = CreateSiloAddress(11111, 1);
         var remoteSilo = CreateSiloAddress(11112, 1);
         var clusterManifestProvider = new TestClusterManifestProvider(CreateClusterManifest(1, 0, localSilo));
-        using var membership = new TestClusterMembershipService(CreateMembershipSnapshot(
-            2,
-            (localSilo, SiloStatus.Active),
-            (remoteSilo, SiloStatus.Active)));
-        var selectorManager = CreateCachedVersionSelectorManager(
-            new GrainVersionManifest(clusterManifestProvider),
-            membership);
-
-        var suitableSilosRead = membership.ObserveNextSnapshotRead();
-        var suitableSilosTask = Task.Run(
-            () => selectorManager.GetSuitableSilos(TestGrainType, TestInterfaceType, requestedVersion: 1));
-        await suitableSilosRead.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
-        Assert.False(suitableSilosTask.IsCompleted);
+        var manifest = new GrainVersionManifest(clusterManifestProvider);
+        var snapshot = manifest.Capture();
 
         clusterManifestProvider.Current = CreateClusterManifest(2, 0, remoteSilo);
 
-        var suitableSilos = await suitableSilosTask.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
-        Assert.Equal(new[] { remoteSilo }, suitableSilos.SuitableSilos);
+        Assert.Equal(new MajorMinorVersion(1, 0), snapshot.Version);
+        Assert.Equal(new[] { localSilo }, snapshot.GetSupportedSilos(TestGrainType));
 
-        membership.Update(CreateMembershipSnapshot(
-            3,
-            (localSilo, SiloStatus.Active),
-            (remoteSilo, SiloStatus.Active)));
-        var supportedSilosRead = membership.ObserveNextSnapshotRead();
-        var supportedSilosTask = Task.Run(() => selectorManager.GetSupportedSilos(TestGrainType));
-        await supportedSilosRead.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
-        Assert.False(supportedSilosTask.IsCompleted);
+        var updated = manifest.Capture();
+        Assert.Equal(new MajorMinorVersion(2, 0), updated.Version);
+        Assert.Equal(new[] { remoteSilo }, updated.GetSupportedSilos(TestGrainType));
+    }
 
-        clusterManifestProvider.Current = CreateClusterManifest(3, 0, localSilo, remoteSilo);
+    [Fact]
+    public void GrainVersionManifest_DoesNotIntersectSilosWithDifferentIpv6Scopes()
+    {
+        var addressBytes = IPAddress.Parse("fe80::1").GetAddressBytes();
+        var grainSilo = SiloAddress.New(new IPAddress(addressBytes, scopeid: 1), 11111, 1);
+        var interfaceSilo = SiloAddress.New(new IPAddress(addressBytes, scopeid: 2), 11111, 1);
+        var completeManifest = CreateGrainManifest();
+        var grainOnlyManifest = new GrainManifest(
+            completeManifest.Grains,
+            ImmutableDictionary<GrainInterfaceType, GrainInterfaceProperties>.Empty);
+        var interfaceOnlyManifest = new GrainManifest(
+            ImmutableDictionary<GrainType, GrainProperties>.Empty,
+            completeManifest.Interfaces);
+        var clusterManifest = new ClusterManifest(
+            new MajorMinorVersion(1, 0),
+            ImmutableDictionary.CreateRange(
+            [
+                new KeyValuePair<SiloAddress, GrainManifest>(grainSilo, grainOnlyManifest),
+                new KeyValuePair<SiloAddress, GrainManifest>(interfaceSilo, interfaceOnlyManifest),
+            ]));
+        var manifest = new GrainVersionManifest(new TestClusterManifestProvider(clusterManifest));
 
-        var supportedSilos = await supportedSilosTask.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
-        Assert.Equal(new[] { localSilo, remoteSilo }, supportedSilos.OrderBy(static silo => silo));
+        var result = manifest.GetSupportedSilos(
+            TestGrainType,
+            TestInterfaceType,
+            versions: [1]);
+
+        Assert.Empty(result.Result[1]);
+    }
+
+    [Fact]
+    public async Task CachedVersionSelectorManager_ResetDoesNotPublishInFlightResult()
+    {
+        var silo = CreateSiloAddress(11111, 1);
+        var selectorManager = CreateCachedVersionSelectorManager(
+            new GrainVersionManifest(
+                new TestClusterManifestProvider(CreateClusterManifest(1, 0, silo))));
+        var selector = new BlockingVersionSelector();
+        selectorManager.VersionSelectorManager.Default = selector;
+
+        var firstCall = Task.Run(
+            () => selectorManager.GetSuitableSilos(TestGrainType, TestInterfaceType, requestedVersion: 1),
+            TestContext.Current.CancellationToken);
+        await selector.Entered.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
+
+        selectorManager.ResetCache();
+        selector.Release();
+
+        Assert.Equal(new[] { silo }, (await firstCall).SuitableSilos);
+        Assert.Equal(new[] { silo }, selectorManager.GetSuitableSilos(TestGrainType, TestInterfaceType, requestedVersion: 1).SuitableSilos);
+        Assert.Equal(2, selector.CallCount);
     }
 
     private static ClusterManifestProvider CreateClusterManifestProvider(
@@ -302,9 +332,7 @@ public class ClusterManifestProviderTests
         return grainFactory;
     }
 
-    private static CachedVersionSelectorManager CreateCachedVersionSelectorManager(
-        GrainVersionManifest manifest,
-        IClusterMembershipService membership)
+    private static CachedVersionSelectorManager CreateCachedVersionSelectorManager(GrainVersionManifest manifest)
     {
         var services = new ServiceCollection();
         services.AddOptions<GrainVersioningOptions>();
@@ -318,8 +346,7 @@ public class ClusterManifestProviderTests
         return new CachedVersionSelectorManager(
             manifest,
             new VersionSelectorManager(serviceProvider, options),
-            new CompatibilityDirectorManager(serviceProvider, options),
-            membership);
+            new CompatibilityDirectorManager(serviceProvider, options));
     }
 
     private static ClusterManifest CreateClusterManifest(long major, long minor, params SiloAddress[] silos)
@@ -479,7 +506,6 @@ public class ClusterManifestProviderTests
     {
         private readonly AsyncEnumerable<ClusterMembershipSnapshot> _updates;
         private ClusterMembershipSnapshot _currentSnapshot = ClusterMembershipSnapshot.Default;
-        private TaskCompletionSource? _nextSnapshotRead;
 
         public TestClusterMembershipService(ClusterMembershipSnapshot initialSnapshot)
         {
@@ -491,23 +517,12 @@ public class ClusterManifestProviderTests
 
         public ClusterMembershipSnapshot CurrentSnapshot
         {
-            get
-            {
-                Volatile.Read(ref _nextSnapshotRead)?.TrySetResult();
-                return Volatile.Read(ref _currentSnapshot);
-            }
+            get => Volatile.Read(ref _currentSnapshot);
         }
 
         public IAsyncEnumerable<ClusterMembershipSnapshot> MembershipUpdates => _updates;
 
         public void Update(ClusterMembershipSnapshot snapshot) => _updates.Publish(snapshot);
-
-        public Task ObserveNextSnapshotRead()
-        {
-            var completion = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-            Interlocked.Exchange(ref _nextSnapshotRead, completion);
-            return completion.Task;
-        }
 
         public ValueTask Refresh(MembershipVersion minimumVersion = default, CancellationToken cancellationToken = default) => default;
 
@@ -519,6 +534,33 @@ public class ClusterManifestProviderTests
     private sealed class TestSiloManifestSystemTarget(GrainManifest manifest) : ISiloManifestSystemTarget
     {
         public ValueTask<GrainManifest> GetSiloManifest() => new(manifest);
+    }
+
+    private sealed class BlockingVersionSelector : IVersionSelector
+    {
+        private readonly TaskCompletionSource _entered = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        private readonly TaskCompletionSource _release = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        private int _callCount;
+
+        public Task Entered => _entered.Task;
+
+        public int CallCount => Volatile.Read(ref _callCount);
+
+        public ushort[] GetSuitableVersion(
+            ushort requestedVersion,
+            ushort[] availableVersions,
+            ICompatibilityDirector compatibilityDirector)
+        {
+            if (Interlocked.Increment(ref _callCount) == 1)
+            {
+                _entered.TrySetResult();
+                _release.Task.GetAwaiter().GetResult();
+            }
+
+            return availableVersions;
+        }
+
+        public void Release() => _release.TrySetResult();
     }
 
     private sealed class TestClusterManifestProvider(ClusterManifest initialManifest) : IClusterManifestProvider

@@ -1,5 +1,6 @@
 using System;
-using System.Collections.Generic;
+using System.Collections.Concurrent;
+using System.Threading;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration;
@@ -7,21 +8,26 @@ using Orleans.Versions.Compatibility;
 
 namespace Orleans.Runtime.Versions.Compatibility
 {
-    internal class CompatibilityDirectorManager
+    internal sealed class CompatibilityDirectorManager
     {
         private readonly CompatibilityStrategy strategyFromConfig;
         private readonly IServiceProvider serviceProvider;
-        private readonly Dictionary<GrainInterfaceType, ICompatibilityDirector> compatibilityDirectors;
+        private readonly ConcurrentDictionary<GrainInterfaceType, ICompatibilityDirector> compatibilityDirectors;
+        private ICompatibilityDirector defaultDirector;
 
-        public ICompatibilityDirector Default { get; private set; }
+        public ICompatibilityDirector Default
+        {
+            get => Volatile.Read(ref defaultDirector);
+            private set => Volatile.Write(ref defaultDirector, value);
+        }
 
 
         public CompatibilityDirectorManager(IServiceProvider serviceProvider, IOptions<GrainVersioningOptions> options)
         {
             this.serviceProvider = serviceProvider;
             this.strategyFromConfig = serviceProvider.GetRequiredKeyedService<CompatibilityStrategy>(options.Value.DefaultCompatibilityStrategy);
-            this.compatibilityDirectors = new Dictionary<GrainInterfaceType, ICompatibilityDirector>();
-            Default = ResolveVersionDirector(serviceProvider, this.strategyFromConfig);
+            this.compatibilityDirectors = new();
+            defaultDirector = ResolveVersionDirector(serviceProvider, this.strategyFromConfig);
         }
 
         public ICompatibilityDirector GetDirector(GrainInterfaceType interfaceType)
@@ -40,7 +46,7 @@ namespace Orleans.Runtime.Versions.Compatibility
         {
             if (strategy == null)
             {
-                compatibilityDirectors.Remove(interfaceType);
+                compatibilityDirectors.TryRemove(interfaceType, out _);
             }
             else
             {
