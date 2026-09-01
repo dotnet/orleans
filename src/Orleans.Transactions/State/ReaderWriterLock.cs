@@ -90,6 +90,8 @@ namespace Orleans.Transactions.State
                 {
                     if (!resolvable)
                     {
+                        Rollback(transactionId);
+                        lockWorker.Notify();
                         throw new OrleansTransactionLockUpgradeException(transactionId.ToString());
                     }
                     else
