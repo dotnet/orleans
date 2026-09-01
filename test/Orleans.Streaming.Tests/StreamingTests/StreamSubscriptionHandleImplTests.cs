@@ -56,7 +56,8 @@ public class StreamSubscriptionHandleImplTests
             stream,
             token: null,
             StreamSubscriptionStartPosition.Latest,
-            filterData: null);
+            filterData: null,
+            clusterId: "test-cluster");
         var startPositionToken = Assert.IsType<StartPositionToken>(handle.GetSequenceToken());
         var deliveryToken = new EventSequenceTokenV2(1);
 
