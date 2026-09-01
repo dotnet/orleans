@@ -45,7 +45,8 @@ public sealed record DurableTestMessage(
     [property: Id(3)] GrainId? ForwardTo = null,
     [property: Id(4)] bool ThrowAfterStaging = false,
     [property: Id(5)] bool CommitDuringHandling = false,
-    [property: Id(6)] bool DeleteDuringHandling = false);
+    [property: Id(6)] bool DeleteDuringHandling = false,
+    [property: Id(7)] bool ThrowOnceAfterStaging = false);
 
 [GenerateSerializer, Immutable]
 public sealed record DurableEffect(
@@ -101,7 +102,9 @@ public sealed class DurableMessagingTestGrain : DurableGrain, IDurableMessagingT
     private int _replacementExactRouteHandlerCalls;
     private int _nullReferenceMessageCalls;
     private int _nullNullableValueMessageCalls;
+    private int _handlerSelectionCalls;
     private bool _deactivateOnNextRecovery;
+    private readonly HashSet<Guid> _failedOnce = [];
 
     public DurableMessagingTestGrain(
         IDurableInbox inbox,
@@ -134,6 +137,7 @@ public sealed class DurableMessagingTestGrain : DurableGrain, IDurableMessagingT
 
     public override Task OnActivateAsync(CancellationToken cancellationToken)
     {
+        _inbox.RegisterHandler(new ThrowingSelectionHandler(this));
         _inbox.RegisterHandler("nullable/reference", new NullReferenceMessageHandler(this));
         _inbox.RegisterHandler("nullable/value", new NullNullableValueMessageHandler(this));
         _inbox.RegisterHandler(new TypedMessageHandler(this));
@@ -304,7 +308,8 @@ public sealed class DurableMessagingTestGrain : DurableGrain, IDurableMessagingT
                 context.Send(outgoing);
             }
 
-            if (message.ThrowAfterStaging)
+            if (message.ThrowAfterStaging
+                || (message.ThrowOnceAfterStaging && _failedOnce.Add(message.LogicalId)))
             {
                 throw new InvalidOperationException($"Injected handler failure for {message.LogicalId}.");
             }
@@ -348,6 +353,33 @@ public sealed class DurableMessagingTestGrain : DurableGrain, IDurableMessagingT
         bool IInboxHandler.CanHandle(IInboxHandlerContext context) =>
             context.Envelope.RouteKey.StartsWith("messages/", StringComparison.Ordinal)
             || context.Envelope.RouteKey == "typed";
+
+        public ValueTask HandleAsync(
+            DurableTestMessage? message,
+            IInboxHandlerContext context,
+            CancellationToken cancellationToken) =>
+            owner.HandleAsync(
+                message ?? throw new InvalidOperationException("A durable test message is required."),
+                context,
+                cancellationToken);
+    }
+
+    private sealed class ThrowingSelectionHandler(DurableMessagingTestGrain owner) : IInboxHandler<DurableTestMessage>
+    {
+        public bool CanHandle(IInboxHandlerContext context)
+        {
+            if (!string.Equals(context.Envelope.RouteKey, "messages/selection-failure", StringComparison.Ordinal))
+            {
+                return false;
+            }
+
+            if (Interlocked.Increment(ref owner._handlerSelectionCalls) == 2)
+            {
+                throw new InvalidOperationException("Injected handler selection failure.");
+            }
+
+            return true;
+        }
 
         public ValueTask HandleAsync(
             DurableTestMessage? message,
