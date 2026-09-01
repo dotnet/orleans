@@ -406,6 +406,10 @@ namespace Orleans.Streams
                         try
                         {
                             consumerData.Cursor = queueCache.GetCacheCursor(consumerData.StreamId, requestedToken);
+                            if (effectiveHandshakeToken is DeliveryToken)
+                            {
+                                consumerData.Cursor.MoveNext();
+                            }
                         }
                         catch (QueueCacheMissException) when (cacheToken is not null)
                         {

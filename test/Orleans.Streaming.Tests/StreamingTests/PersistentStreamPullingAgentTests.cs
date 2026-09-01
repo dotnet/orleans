@@ -1055,11 +1055,13 @@ namespace UnitTests.StreamingTests
             var qualifiedStreamId = new QualifiedStreamId("provider", streamId);
             var firstToken = new EventSequenceTokenV2(1);
             var deliveryToken = new EventSequenceTokenV2(2);
+            var nextToken = new EventSequenceTokenV2(3);
             var queueCache = new PurgeablePooledQueueCache();
             queueCache.AddToCache(
             [
                 new TestBatchContainer(streamId, firstToken),
                 new TestBatchContainer(streamId, deliveryToken),
+                new TestBatchContainer(streamId, nextToken),
             ]);
             var (accessor, _, streamData) = await CreateInitializedAgentWithStream(
                 qualifiedStreamId,
@@ -1080,7 +1082,7 @@ namespace UnitTests.StreamingTests
             Assert.True(await accessor.DoHandshakeWithConsumer(consumerData, cacheToken: null));
             var cursor = Assert.IsAssignableFrom<IQueueCacheCursor>(consumerData.Cursor);
             Assert.True(cursor.MoveNext());
-            Assert.Equal(deliveryToken, Assert.IsType<TestBatchContainer>(cursor.GetCurrent(out _)).SequenceToken);
+            Assert.Equal(nextToken, Assert.IsType<TestBatchContainer>(cursor.GetCurrent(out _)).SequenceToken);
             await accessor.Shutdown();
         }
 
