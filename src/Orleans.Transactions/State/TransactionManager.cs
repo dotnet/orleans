@@ -40,26 +40,32 @@ namespace Orleans.Transactions.State
             record.WriteParticipants = writeResources;
             record.PromiseForTA = new TaskCompletionSource<TransactionalStatus>(TaskCreationOptions.RunContinuationsAsynchronously);
 
-            if (!valid)
+            try
             {
-                await this.queue.NotifyOfAbort(record, status, exception: null).WaitAsync(cancellationToken);
-            }
-            else
-            {
-                this.queue.Clock.Merge(record.Timestamp);
-                if (record.WaitCount > 0)
+                if (!valid)
                 {
-                    TransactionDiagnosticEvents.EmitTransactionManagerWaitingForPrepared(
-                        this.queue.Resource,
-                        transactionId,
-                        timeStamp,
-                        record.WaitCount,
-                        record.WaitingSince + this.queue.PrepareTimeout,
-                        this.queue.DiagnosticIdentity);
+                    await this.queue.NotifyOfAbort(record, status, exception: null);
+                }
+                else
+                {
+                    this.queue.Clock.Merge(record.Timestamp);
+                    if (record.WaitCount > 0)
+                    {
+                        TransactionDiagnosticEvents.EmitTransactionManagerWaitingForPrepared(
+                            this.queue.Resource,
+                            transactionId,
+                            timeStamp,
+                            record.WaitCount,
+                            record.WaitingSince + this.queue.PrepareTimeout,
+                            this.queue.DiagnosticIdentity);
+                    }
                 }
             }
+            finally
+            {
+                this.queue.RWLock.Notify();
+            }
 
-            this.queue.RWLock.Notify();
             return await record.PromiseForTA.Task.WaitAsync(cancellationToken);
         }
 

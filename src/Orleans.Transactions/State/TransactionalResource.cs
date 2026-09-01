@@ -29,16 +29,22 @@ namespace Orleans.Transactions.State
             record.Role = CommitRole.ReadOnly;
             record.PromiseForTA = new TaskCompletionSource<TransactionalStatus>(TaskCreationOptions.RunContinuationsAsynchronously);
 
-            if (!valid)
+            try
             {
-                await this.queue.NotifyOfAbort(record, status, exception: null).WaitAsync(cancellationToken);
+                if (!valid)
+                {
+                    await this.queue.NotifyOfAbort(record, status, exception: null);
+                }
+                else
+                {
+                    this.queue.Clock.Merge(record.Timestamp);
+                }
             }
-            else
+            finally
             {
-                this.queue.Clock.Merge(record.Timestamp);
+                this.queue.RWLock.Notify();
             }
 
-            this.queue.RWLock.Notify();
             return await record.PromiseForTA.Task.WaitAsync(cancellationToken);
         }
 
