@@ -259,7 +259,6 @@ internal class InvokableGenerator(ProxyGenerationContext generationContext)
         }
 
         if (includeGeneratedMethodId
-            && !string.Equals(methodDescription.GeneratedMethodId, methodDescription.MethodId, StringComparison.Ordinal)
             && !string.Equals(methodDescription.GeneratedMethodId, methodDescription.ClaimedGeneratedMethodId, StringComparison.Ordinal))
         {
             result.Add(GetCompoundTypeAliasComponents(invokableId, containingInterface, methodDescription.GeneratedMethodId));
