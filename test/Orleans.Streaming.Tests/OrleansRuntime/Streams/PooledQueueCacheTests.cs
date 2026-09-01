@@ -175,6 +175,145 @@ namespace UnitTests.OrleansRuntime.Streams
             RunGoldenPath(cache, converter, startSequenceNuber);
         }
 
+        [Fact, TestCategory("BVT"), TestCategory("Streaming")]
+        public void EarliestAvailableCursorStartsAtOldestRetainedMessageForStream()
+        {
+            var (cache, converter) = CreateCache();
+            var targetStream = StreamId.Create(TestStreamNamespace, Guid.NewGuid());
+            var otherStream = StreamId.Create(TestStreamNamespace, Guid.NewGuid());
+            var now = DateTime.UtcNow;
+            cache.Add(
+            [
+                converter.ToCachedMessage(new TestQueueMessage { StreamId = targetStream, SequenceNumber = 1 }, now),
+                converter.ToCachedMessage(new TestQueueMessage { StreamId = otherStream, SequenceNumber = 2 }, now),
+                converter.ToCachedMessage(new TestQueueMessage { StreamId = targetStream, SequenceNumber = 3 }, now),
+            ], now);
+
+            var cursor = cache.GetCursorAtPosition(targetStream, StreamSubscriptionStartPosition.EarliestAvailable);
+
+            Assert.True(cache.TryGetNextMessage(cursor, out var first));
+            Assert.Equal(1, first.SequenceToken.SequenceNumber);
+            Assert.True(cache.TryGetNextMessage(cursor, out var second));
+            Assert.Equal(3, second.SequenceToken.SequenceNumber);
+            Assert.False(cache.TryGetNextMessage(cursor, out _));
+        }
+
+        [Fact, TestCategory("BVT"), TestCategory("Streaming")]
+        public void EarliestAvailableCursorWaitsForFirstFutureMessageWhenStreamIsNotRetained()
+        {
+            var (cache, converter) = CreateCache();
+            var targetStream = StreamId.Create(TestStreamNamespace, Guid.NewGuid());
+            var otherStream = StreamId.Create(TestStreamNamespace, Guid.NewGuid());
+            var now = DateTime.UtcNow;
+            cache.Add(
+            [
+                converter.ToCachedMessage(new TestQueueMessage { StreamId = otherStream, SequenceNumber = 100 }, now),
+            ], now);
+            var cursor = cache.GetCursorAtPosition(targetStream, StreamSubscriptionStartPosition.EarliestAvailable);
+
+            Assert.False(cache.TryGetNextMessage(cursor, out _));
+
+            cache.Add(
+            [
+                converter.ToCachedMessage(new TestQueueMessage { StreamId = otherStream, SequenceNumber = 101 }, now),
+                converter.ToCachedMessage(new TestQueueMessage { StreamId = targetStream, SequenceNumber = 1 }, now),
+            ], now);
+
+            Assert.True(cache.TryGetNextMessage(cursor, out var message));
+            Assert.Equal(1, message.SequenceToken.SequenceNumber);
+            Assert.False(cache.TryGetNextMessage(cursor, out _));
+        }
+
+        [Fact, TestCategory("BVT"), TestCategory("Streaming")]
+        public void EarliestAvailableCursorCreatedOnEmptyCacheWaitsForFirstMatchingMessage()
+        {
+            var (cache, converter) = CreateCache();
+            var targetStream = StreamId.Create(TestStreamNamespace, Guid.NewGuid());
+            var otherStream = StreamId.Create(TestStreamNamespace, Guid.NewGuid());
+            var cursor = cache.GetCursorAtPosition(targetStream, StreamSubscriptionStartPosition.EarliestAvailable);
+            var now = DateTime.UtcNow;
+
+            cache.Add(
+            [
+                converter.ToCachedMessage(new TestQueueMessage { StreamId = otherStream, SequenceNumber = 1 }, now),
+            ], now);
+            Assert.False(cache.TryGetNextMessage(cursor, out _));
+
+            cache.Add(
+            [
+                converter.ToCachedMessage(new TestQueueMessage { StreamId = targetStream, SequenceNumber = 2 }, now),
+            ], now);
+
+            Assert.True(cache.TryGetNextMessage(cursor, out var message));
+            Assert.Equal(2, message.SequenceToken.SequenceNumber);
+        }
+
+        [Fact, TestCategory("BVT"), TestCategory("Streaming")]
+        public void EarliestAvailableCursorRecoversWhenInitialMessageIsPurged()
+        {
+            var (cache, converter) = CreateCache();
+            var stream = StreamId.Create(TestStreamNamespace, Guid.NewGuid());
+            var now = DateTime.UtcNow;
+            cache.Add(
+            [
+                converter.ToCachedMessage(new TestQueueMessage { StreamId = stream, SequenceNumber = 1 }, now),
+                converter.ToCachedMessage(new TestQueueMessage { StreamId = stream, SequenceNumber = 2 }, now),
+            ], now);
+            var cursor = cache.GetCursorAtPosition(stream, StreamSubscriptionStartPosition.EarliestAvailable);
+
+            cache.RemoveOldestMessage();
+
+            Assert.True(cache.TryGetNextMessage(cursor, out var message));
+            Assert.Equal(2, message.SequenceToken.SequenceNumber);
+        }
+
+        [Fact, TestCategory("BVT"), TestCategory("Streaming")]
+        public void EarliestAvailableWaitingCursorSurvivesAnchorPurge()
+        {
+            var (cache, converter) = CreateCache();
+            var targetStream = StreamId.Create(TestStreamNamespace, Guid.NewGuid());
+            var otherStream = StreamId.Create(TestStreamNamespace, Guid.NewGuid());
+            var now = DateTime.UtcNow;
+            cache.Add(
+            [
+                converter.ToCachedMessage(new TestQueueMessage { StreamId = otherStream, SequenceNumber = 100 }, now),
+            ], now);
+            var cursor = cache.GetCursorAtPosition(targetStream, StreamSubscriptionStartPosition.EarliestAvailable);
+            Assert.False(cache.TryGetNextMessage(cursor, out _));
+
+            cache.RemoveOldestMessage();
+            Assert.False(cache.TryGetNextMessage(cursor, out _));
+            cache.Add(
+            [
+                converter.ToCachedMessage(new TestQueueMessage { StreamId = targetStream, SequenceNumber = 1 }, now),
+            ], now);
+
+            Assert.True(cache.TryGetNextMessage(cursor, out var message));
+            Assert.Equal(1, message.SequenceToken.SequenceNumber);
+        }
+
+        [Fact, TestCategory("BVT"), TestCategory("Streaming")]
+        public void LatestCursorDoesNotDeliverRetainedMessage()
+        {
+            var (cache, converter) = CreateCache();
+            var stream = StreamId.Create(TestStreamNamespace, Guid.NewGuid());
+            var now = DateTime.UtcNow;
+            cache.Add(
+            [
+                converter.ToCachedMessage(new TestQueueMessage { StreamId = stream, SequenceNumber = 1 }, now),
+            ], now);
+
+            var cursor = cache.GetCursorAtPosition(stream, StreamSubscriptionStartPosition.Latest);
+
+            Assert.False(cache.TryGetNextMessage(cursor, out _));
+            cache.Add(
+            [
+                converter.ToCachedMessage(new TestQueueMessage { StreamId = stream, SequenceNumber = 2 }, now),
+            ], now);
+            Assert.True(cache.TryGetNextMessage(cursor, out var message));
+            Assert.Equal(2, message.SequenceToken.SequenceNumber);
+        }
+
         /// <summary>
         /// Regression test for https://github.com/dotnet/orleans/issues/10263.
         /// A batch is encoded into pooled buffers before it is committed to the cache. When such a
@@ -276,6 +415,22 @@ namespace UnitTests.OrleansRuntime.Streams
             // Every failed attempt returns its block to the pool, so only a single block is ever
             // created and then reused. Before the fix each attempt leaked a block (buffersCreated == 5).
             Assert.Equal(1, buffersCreated);
+        }
+
+        private static (PooledQueueCache Cache, CachedMessageConverter Converter) CreateCache()
+        {
+            var bufferPool = new ObjectPool<FixedSizeBuffer>(() => new FixedSizeBuffer(PooledBufferSize));
+            var dataAdapter = new TestCacheDataAdapter();
+            var cache = new PooledQueueCache(dataAdapter, NullLogger.Instance, null, null);
+            var evictionStrategy = new ChronologicalEvictionStrategy(
+                NullLogger.Instance,
+                new TimePurgePredicate(TimeSpan.FromMinutes(5), TimeSpan.FromMinutes(10)),
+                null,
+                null)
+            {
+                PurgeObservable = cache,
+            };
+            return (cache, new CachedMessageConverter(bufferPool, evictionStrategy));
         }
 
         [Fact, TestCategory("BVT"), TestCategory("Streaming")]

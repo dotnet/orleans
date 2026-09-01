@@ -35,6 +35,20 @@ namespace Orleans.Streams
         }
 
         /// <summary>
+        /// Subscribe a consumer to this batch observable using delegates and the specified initial position.
+        /// </summary>
+        public static Task<StreamSubscriptionHandle<T>> SubscribeWithOptionsAsync<T>(
+            this IAsyncBatchObservable<T> obs,
+            Func<IList<SequentialItem<T>>, Task> onNextAsync,
+            Func<Exception, Task> onErrorAsync,
+            Func<Task> onCompletedAsync,
+            StreamSubscriptionOptions options)
+        {
+            var genericObserver = new GenericAsyncBatchObserver<T>(onNextAsync, onErrorAsync, onCompletedAsync);
+            return obs.SubscribeWithOptionsAsync(genericObserver, options);
+        }
+
+        /// <summary>
         /// Subscribe a consumer to this observable using delegates.
         /// This method is a helper for the IAsyncBatchObservable.SubscribeAsync allowing the subscribing class to inline the 
         /// handler methods instead of requiring an instance of IAsyncBatchObserver.
@@ -51,6 +65,18 @@ namespace Orleans.Streams
                                                                            Func<Exception, Task> onErrorAsync)
         {
             return obs.SubscribeAsync(onNextAsync, onErrorAsync, DefaultOnCompleted);
+        }
+
+        /// <summary>
+        /// Subscribe a consumer to this batch observable using delegates and the specified initial position.
+        /// </summary>
+        public static Task<StreamSubscriptionHandle<T>> SubscribeWithOptionsAsync<T>(
+            this IAsyncBatchObservable<T> obs,
+            Func<IList<SequentialItem<T>>, Task> onNextAsync,
+            Func<Exception, Task> onErrorAsync,
+            StreamSubscriptionOptions options)
+        {
+            return obs.SubscribeWithOptionsAsync(onNextAsync, onErrorAsync, DefaultOnCompleted, options);
         }
 
         /// <summary>
@@ -73,6 +99,18 @@ namespace Orleans.Streams
         }
 
         /// <summary>
+        /// Subscribe a consumer to this batch observable using delegates and the specified initial position.
+        /// </summary>
+        public static Task<StreamSubscriptionHandle<T>> SubscribeWithOptionsAsync<T>(
+            this IAsyncBatchObservable<T> obs,
+            Func<IList<SequentialItem<T>>, Task> onNextAsync,
+            Func<Task> onCompletedAsync,
+            StreamSubscriptionOptions options)
+        {
+            return obs.SubscribeWithOptionsAsync(onNextAsync, DefaultOnError, onCompletedAsync, options);
+        }
+
+        /// <summary>
         /// Subscribe a consumer to this observable using delegates.
         /// This method is a helper for the IAsyncBatchObservable.SubscribeAsync allowing the subscribing class to inline the 
         /// handler methods instead of requiring an instance of IAsyncBatchObserver.
@@ -87,6 +125,17 @@ namespace Orleans.Streams
                                                                            Func<IList<SequentialItem<T>>, Task> onNextAsync)
         {
             return obs.SubscribeAsync(onNextAsync, DefaultOnError, DefaultOnCompleted);
+        }
+
+        /// <summary>
+        /// Subscribe a consumer to this batch observable using a delegate and the specified initial position.
+        /// </summary>
+        public static Task<StreamSubscriptionHandle<T>> SubscribeWithOptionsAsync<T>(
+            this IAsyncBatchObservable<T> obs,
+            Func<IList<SequentialItem<T>>, Task> onNextAsync,
+            StreamSubscriptionOptions options)
+        {
+            return obs.SubscribeWithOptionsAsync(onNextAsync, DefaultOnError, DefaultOnCompleted, options);
         }
     }
 }

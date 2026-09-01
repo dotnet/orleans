@@ -54,12 +54,12 @@ namespace Orleans.Streams
 
         [JsonConstructor]
         public StreamSubscriptionHandleImpl(GuidId subscriptionId, StreamImpl<T> streamImpl, string? filterData)
-            : this(subscriptionId, null, null, streamImpl, null, filterData)
+            : this(subscriptionId, null, null, streamImpl, null, default, filterData)
         {
         }
 
         public StreamSubscriptionHandleImpl(GuidId subscriptionId, StreamImpl<T> streamImpl)
-            : this(subscriptionId, null, null, streamImpl, null, null)
+            : this(subscriptionId, null, null, streamImpl, null, default, null)
         {
         }
 
@@ -69,6 +69,7 @@ namespace Orleans.Streams
             IAsyncBatchObserver<T>? batchObserver,
             StreamImpl<T> streamImpl,
             StreamSequenceToken? token,
+            StreamSubscriptionOptions options,
             string? filterData,
             bool disableHandshake = false,
             SharedHandshakeState? handshakeState = null,
@@ -84,9 +85,12 @@ namespace Orleans.Streams
             this.siloAddress = siloAddress;
             this.clusterId = clusterId;
             this.isRewindable = streamImpl.IsRewindable && !disableHandshake;
+            options.Validate();
             if (IsRewindable)
             {
-                expectedToken ??= StreamHandshakeToken.CreateStartToken(token);
+                expectedToken ??= token is not null
+                    ? StreamHandshakeToken.CreateStartToken(token)
+                    : StreamHandshakeToken.CreateStartPositionToken(options.StartPosition);
             }
         }
 

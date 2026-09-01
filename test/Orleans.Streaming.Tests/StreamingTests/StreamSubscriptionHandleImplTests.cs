@@ -1,4 +1,5 @@
 using System.Runtime.ExceptionServices;
+using NSubstitute;
 using Orleans.Providers.Streams.Common;
 using Orleans.Runtime;
 using Orleans.Streams;
@@ -8,6 +9,109 @@ namespace UnitTests.StreamingTests;
 
 public class StreamSubscriptionHandleImplTests
 {
+    [Fact]
+    public void EarliestAvailableOptionsCreateStartPositionHandshake()
+    {
+        var stream = CreateStream(isRewindable: true);
+        var handle = new StreamSubscriptionHandleImpl<int>(
+            CreateSubscriptionId(implicitSubscription: false),
+            Substitute.For<IAsyncObserver<int>>(),
+            batchObserver: null,
+            stream,
+            token: null,
+            StreamSubscriptionOptions.EarliestAvailable,
+            filterData: null);
+
+        Assert.IsType<StartPositionToken>(handle.GetSequenceToken());
+    }
+
+    [Fact]
+    public void ExplicitTokenRemainsInclusiveAndAuthoritative()
+    {
+        var token = new EventSequenceTokenV2(10);
+        var stream = CreateStream(isRewindable: true);
+        var handle = new StreamSubscriptionHandleImpl<int>(
+            CreateSubscriptionId(implicitSubscription: false),
+            Substitute.For<IAsyncObserver<int>>(),
+            batchObserver: null,
+            stream,
+            token,
+            default,
+            filterData: null);
+
+        var startToken = Assert.IsType<StartToken>(handle.GetSequenceToken());
+        Assert.Equal(token, startToken.Token);
+    }
+
+    [Fact]
+    public void InvalidStartPositionIsRejected()
+    {
+        Assert.Throws<ArgumentOutOfRangeException>(
+            () => new StreamSubscriptionOptions((StreamSubscriptionStartPosition)42));
+    }
+
+    [Fact]
+    public async Task CustomObservableUsesLatestDefaultInterfaceBehavior()
+    {
+        var observable = new LegacyObservable();
+        IAsyncObservable<int> observableInterface = observable;
+        var observer = Substitute.For<IAsyncObserver<int>>();
+
+        await observableInterface.SubscribeWithOptionsAsync(observer, StreamSubscriptionOptions.Latest);
+
+        Assert.True(observable.TokenOverloadCalled);
+        Assert.Null(observable.Token);
+    }
+
+    [Fact]
+    public async Task DefaultLiteralContinuesToSelectTokenOverload()
+    {
+        var itemObservable = new LegacyObservable();
+        IAsyncObservable<int> itemObservableInterface = itemObservable;
+        await itemObservableInterface.SubscribeAsync(Substitute.For<IAsyncObserver<int>>(), default);
+        Assert.True(itemObservable.TokenOverloadCalled);
+
+        var batchObservable = new LegacyBatchObservable();
+        IAsyncBatchObservable<int> batchObservableInterface = batchObservable;
+        await batchObservableInterface.SubscribeAsync(Substitute.For<IAsyncBatchObserver<int>>(), default);
+        Assert.True(batchObservable.TokenOverloadCalled);
+    }
+
+    [Fact]
+    public async Task CustomObservableRejectsUnsupportedEarliestPosition()
+    {
+        IAsyncObservable<int> observable = new LegacyObservable();
+
+        await Assert.ThrowsAsync<NotSupportedException>(
+            () => observable.SubscribeWithOptionsAsync(
+                Substitute.For<IAsyncObserver<int>>(),
+                StreamSubscriptionOptions.EarliestAvailable));
+    }
+
+    [Fact]
+    public async Task CustomBatchObservableUsesLatestDefaultInterfaceBehavior()
+    {
+        var observable = new LegacyBatchObservable();
+        IAsyncBatchObservable<int> observableInterface = observable;
+        var observer = Substitute.For<IAsyncBatchObserver<int>>();
+
+        await observableInterface.SubscribeWithOptionsAsync(observer, StreamSubscriptionOptions.Latest);
+
+        Assert.True(observable.TokenOverloadCalled);
+        Assert.Null(observable.Token);
+    }
+
+    [Fact]
+    public async Task CustomBatchObservableRejectsUnsupportedEarliestPosition()
+    {
+        IAsyncBatchObservable<int> observable = new LegacyBatchObservable();
+
+        await Assert.ThrowsAsync<NotSupportedException>(
+            () => observable.SubscribeWithOptionsAsync(
+                Substitute.For<IAsyncBatchObserver<int>>(),
+                StreamSubscriptionOptions.EarliestAvailable));
+    }
+
     [Fact]
     public void ActiveImplicitSubscriptionRejectsOlderAcknowledgedToken()
     {
@@ -108,6 +212,7 @@ public class StreamSubscriptionHandleImplTests
         IAsyncObserver<int>? observer = null,
         IAsyncBatchObserver<int>? batchObserver = null,
         StreamSequenceToken? token = null,
+        StreamSubscriptionOptions options = default,
         string? filterData = "phase-1-filter",
         bool disableHandshake = false,
         StreamSubscriptionHandleImpl<int>.SharedHandshakeState? handshakeState = null,
@@ -128,6 +233,7 @@ public class StreamSubscriptionHandleImplTests
             batchObserver,
             stream,
             token,
+            options,
             filterData,
             disableHandshake,
             handshakeState,
@@ -1602,5 +1708,56 @@ public class StreamSubscriptionHandleImplTests
         public Task OnCompletedAsync() => throw new NotSupportedException();
 
         public Task OnErrorAsync(Exception ex) => throw new NotSupportedException();
+    private static StreamImpl<int> CreateStream(bool isRewindable)
+    {
+        return new StreamImpl<int>(
+            new QualifiedStreamId("provider", StreamId.Create("namespace", Guid.NewGuid())),
+            new TestStreamProvider(),
+            isRewindable,
+            Substitute.For<IRuntimeClient>());
+    }
+
+    private sealed class TestStreamProvider : IInternalStreamProvider
+    {
+        public IInternalAsyncBatchObserver<T> GetProducerInterface<T>(IAsyncStream<T> streamId) => null!;
+
+        public IInternalAsyncObservable<T> GetConsumerInterface<T>(IAsyncStream<T> streamId) => null!;
+    }
+
+    private sealed class LegacyObservable : IAsyncObservable<int>
+    {
+        public bool TokenOverloadCalled { get; private set; }
+        public StreamSequenceToken? Token { get; private set; }
+
+        public Task<StreamSubscriptionHandle<int>> SubscribeAsync(IAsyncObserver<int> observer)
+            => Task.FromResult<StreamSubscriptionHandle<int>>(null!);
+
+        public Task<StreamSubscriptionHandle<int>> SubscribeAsync(
+            IAsyncObserver<int> observer,
+            StreamSequenceToken? token,
+            string? filterData = null)
+        {
+            TokenOverloadCalled = true;
+            Token = token;
+            return Task.FromResult<StreamSubscriptionHandle<int>>(null!);
+        }
+    }
+
+    private sealed class LegacyBatchObservable : IAsyncBatchObservable<int>
+    {
+        public bool TokenOverloadCalled { get; private set; }
+        public StreamSequenceToken? Token { get; private set; }
+
+        public Task<StreamSubscriptionHandle<int>> SubscribeAsync(IAsyncBatchObserver<int> observer)
+            => Task.FromResult<StreamSubscriptionHandle<int>>(null!);
+
+        public Task<StreamSubscriptionHandle<int>> SubscribeAsync(
+            IAsyncBatchObserver<int> observer,
+            StreamSequenceToken? token)
+        {
+            TokenOverloadCalled = true;
+            Token = token;
+            return Task.FromResult<StreamSubscriptionHandle<int>>(null!);
+        }
     }
 }

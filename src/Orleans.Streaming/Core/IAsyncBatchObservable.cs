@@ -23,6 +23,28 @@ namespace Orleans.Streams
         Task<StreamSubscriptionHandle<T>> SubscribeAsync(IAsyncBatchObserver<T> observer);
 
         /// <summary>
+        /// Subscribe a consumer to this batch observable using the specified initial position.
+        /// </summary>
+        /// <param name="observer">The asynchronous batch observer to subscribe.</param>
+        /// <param name="options">The subscription options.</param>
+        /// <returns>A promise for a <see cref="StreamSubscriptionHandle{T}"/> that represents the subscription.</returns>
+        /// <remarks>
+        /// <see cref="StreamSubscriptionStartPosition.EarliestAvailable"/> is supported by rewindable persistent streams
+        /// whose local queue cache supports start-position selection.
+        /// </remarks>
+        Task<StreamSubscriptionHandle<T>> SubscribeWithOptionsAsync(IAsyncBatchObserver<T> observer, StreamSubscriptionOptions options)
+        {
+            options.Validate();
+            if (options.StartPosition == StreamSubscriptionStartPosition.Latest)
+            {
+                return SubscribeAsync(observer, null);
+            }
+
+            throw new NotSupportedException(
+                $"{GetType().FullName} does not support {StreamSubscriptionStartPosition.EarliestAvailable} subscriptions.");
+        }
+
+        /// <summary>
         /// Subscribe a consumer to this batch observable.
         /// </summary>
         /// <param name="observer">The asynchronous batch observer to subscribe.</param>

@@ -15,6 +15,16 @@ namespace Orleans.Streams
             return new StartToken {Token = token};
         }
 
+        public static StreamHandshakeToken? CreateStartPositionToken(StreamSubscriptionStartPosition startPosition)
+        {
+            return startPosition switch
+            {
+                StreamSubscriptionStartPosition.Latest => null,
+                StreamSubscriptionStartPosition.EarliestAvailable => new StartPositionToken(),
+                _ => throw new ArgumentOutOfRangeException(nameof(startPosition), startPosition, "The subscription start position is not defined."),
+            };
+        }
+
         public static StreamHandshakeToken? CreateDeliveyToken(StreamSequenceToken? token)
         {
             if (token == null) return default;
@@ -43,6 +53,10 @@ namespace Orleans.Streams
     [Serializable]
     [GenerateSerializer]
     internal sealed class StartToken : StreamHandshakeToken { }
+
+    [Serializable]
+    [GenerateSerializer]
+    internal sealed class StartPositionToken : StreamHandshakeToken { }
     
     [Serializable]
     [GenerateSerializer]

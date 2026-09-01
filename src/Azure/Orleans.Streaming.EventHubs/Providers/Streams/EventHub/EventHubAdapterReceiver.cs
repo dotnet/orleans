@@ -253,6 +253,11 @@ namespace Orleans.Streaming.EventHubs
             return new Cursor(this.cache!, streamId, token);
         }
 
+        public IQueueCacheCursor GetCacheCursorAtPosition(StreamId streamId, StreamSubscriptionStartPosition startPosition)
+        {
+            return new Cursor(this.cache!, streamId, startPosition);
+        }
+
         public bool IsUnderPressure()
         {
             return this.GetMaxAddCount() <= 0;
@@ -416,6 +421,12 @@ namespace Orleans.Streaming.EventHubs
             {
                 this.cache = cache;
                 this.cursor = cache.GetCursor(streamId, token);
+            }
+
+            public Cursor(IEventHubQueueCache cache, StreamId streamId, StreamSubscriptionStartPosition startPosition)
+            {
+                this.cache = cache;
+                this.cursor = cache.GetCursorAtPosition(streamId, startPosition);
             }
 
             public void Dispose()

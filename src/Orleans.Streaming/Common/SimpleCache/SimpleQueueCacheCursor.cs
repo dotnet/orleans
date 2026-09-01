@@ -26,6 +26,7 @@ namespace Orleans.Providers.Streams.Common
 
         internal LinkedListNode<SimpleQueueCacheItem>? Element { get; private set; }
         internal StreamSequenceToken? SequenceToken { get; private set; }
+        internal bool WaitingForEarliestAvailable { get; set; }
 
         internal bool IsSet => Element != null;
 
@@ -133,7 +134,7 @@ namespace Orleans.Providers.Streams.Common
             deliveryBatch.RecordDeliveryFailure(batch);
         }
 
-        private bool IsInStream(IBatchContainer? batchContainer)
+        internal bool IsInStream(IBatchContainer? batchContainer)
         {
             return batchContainer != null &&
                     batchContainer.StreamId.Equals(this.streamId);

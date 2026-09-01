@@ -53,6 +53,8 @@ namespace Orleans.Streams
             Task<bool> ReadFromQueue(QueueId myQueueId, IQueueAdapterReceiver? receiver, int maxCacheAddCount);
             Task RegisterStream(QualifiedStreamId streamId, StreamSequenceToken firstToken, DateTime now);
             Task<IReadOnlyDictionary<QualifiedStreamId, StreamConsumerCollection>> GetPubSubCache();
+            Task<bool> DoHandshakeWithConsumer(StreamConsumerData consumerData, StreamSequenceToken? cacheToken);
+            Task RunConsumerCursor(StreamConsumerData consumerData);
             Task RunQueuePump(QueueId myQueueId, CancellationToken cancellationToken);
             Task Shutdown();
         }
@@ -114,6 +116,12 @@ namespace Orleans.Streams
 
         Task<IReadOnlyDictionary<QualifiedStreamId, StreamConsumerCollection>> ITestAccessor.GetPubSubCache()
             => this.RunOrQueueTaskResult(() => (IReadOnlyDictionary<QualifiedStreamId, StreamConsumerCollection>)new Dictionary<QualifiedStreamId, StreamConsumerCollection>(pubSubCache));
+
+        Task<bool> ITestAccessor.DoHandshakeWithConsumer(StreamConsumerData consumerData, StreamSequenceToken? cacheToken)
+            => this.RunOrQueueTaskResult(() => DoHandshakeWithConsumer(consumerData, cacheToken)).Unwrap();
+
+        Task ITestAccessor.RunConsumerCursor(StreamConsumerData consumerData)
+            => this.RunOrQueueTask(() => RunConsumerCursor(consumerData));
 
         Task ITestAccessor.RunQueuePump(QueueId myQueueId, CancellationToken cancellationToken)
             => this.RunOrQueueTask(() => RunQueuePump(myQueueId, cancellationToken));
@@ -325,8 +333,7 @@ namespace Orleans.Streams
 
             if (await DoHandshakeWithConsumer(data, cacheToken))
             {
-                var startToken = data.LastToken?.Token ?? cacheToken ?? data.PendingStartToken;
-                data.LastProcessedToken = startToken;
+                data.LastProcessedToken = GetInitialDeliveryProgress(data.LastToken);
                 data.PendingStartToken = null;
                 data.IsRegistered = true;
                 StreamingEvents.EmitSubscriptionAttached(streamProviderName, streamId.StreamId, subscriptionId.Guid, streamConsumer, Silo);
@@ -334,6 +341,9 @@ namespace Orleans.Streams
                     RunConsumerCursor(data).Ignore(); // Start delivering events if not actively doing so
             }
         }
+
+        internal static StreamSequenceToken? GetInitialDeliveryProgress(StreamHandshakeToken? handshakeToken)
+            => handshakeToken is DeliveryToken deliveryToken ? deliveryToken.Token : null;
 
         private async Task<bool> DoHandshakeWithConsumer(
             StreamConsumerData consumerData,
@@ -346,6 +356,7 @@ namespace Orleans.Streams
             if (queueCache != null)
             {
                 Exception? exceptionOccured = null;
+                var forceFaultSubscription = false;
                 try
                 {
                     requestedHandshakeToken = await AsyncExecutorWithRetries.ExecuteWithRetries(
@@ -356,9 +367,16 @@ namespace Orleans.Streams
                          this.options.MaxEventDeliveryTime,
                          deliveryBackoffProvider);
 
-                    var requestedToken = requestedHandshakeToken?.Token;
-                    if (requestedToken != null)
+                    if (requestedHandshakeToken is StartPositionToken)
                     {
+                        consumerData.SafeDisposeCursor(logger);
+                        consumerData.Cursor = queueCache.GetCacheCursorAtPosition(
+                            consumerData.StreamId,
+                            StreamSubscriptionStartPosition.EarliestAvailable);
+                    }
+                    else if (requestedHandshakeToken is StartToken or DeliveryToken)
+                    {
+                        var requestedToken = requestedHandshakeToken.Token;
                         consumerData.SafeDisposeCursor(logger);
                         try
                         {
@@ -370,6 +388,11 @@ namespace Orleans.Streams
                             // message, so resume there if the consumer's prior token was evicted.
                             consumerData.Cursor = queueCache.GetCacheCursor(consumerData.StreamId, cacheToken);
                         }
+                    }
+                    else if (requestedHandshakeToken is not null)
+                    {
+                        forceFaultSubscription = true;
+                        throw new InvalidOperationException($"Unsupported stream handshake token type {requestedHandshakeToken.GetType().FullName}.");
                     }
                     else
                     {
@@ -387,8 +410,15 @@ namespace Orleans.Streams
                     // If we are shutting down, ignore the error
                     if (IsShutdown) return false;
 
-                    bool faultedSubscription = await ErrorProtocol(consumerData, exceptionOccured, false, null, requestedHandshakeToken?.Token);
-                    if (faultedSubscription) return false;
+                    bool faultedSubscription = await ErrorProtocol(
+                        consumerData,
+                        exceptionOccured,
+                        false,
+                        null,
+                        requestedHandshakeToken?.Token,
+                        forceFaultSubscription
+                            || requestedHandshakeToken is StartPositionToken && exceptionOccured is NotSupportedException);
+                    if (faultedSubscription || requestedHandshakeToken is StartPositionToken) return false;
                 }
             }
             consumerData.LastToken = requestedHandshakeToken; // use what ever the consumer asked for as LastToken for next handshake (even if he asked for null).
@@ -847,6 +877,7 @@ namespace Orleans.Streams
                     using var deliveryBatch = batchCursor?.ProtectDeliveryBatch();
                     ConsumerBatch nextBatch = default;
                     Exception? exceptionOccured = null;
+                    var forceFaultSubscription = false;
                     try
                     {
                         nextBatch = GetBatchForConsumer(consumerData.Cursor, consumerData.StreamId, consumerData.FilterData);
@@ -903,20 +934,48 @@ namespace Orleans.Streams
                                 deliveryBackoffProvider);
                             if (newToken is not null)
                             {
-                                consumerData.LastProcessedToken = newToken.Token;
                                 consumerData.LastToken = newToken;
                                 IQueueCacheCursor newCursor;
-                                try
+                                if (newToken is StartPositionToken)
                                 {
-                                    newCursor = queueCache!.GetCacheCursor(consumerData.StreamId, newToken.Token); // queueCache must be non-null here: consumerData.Cursor was only ever populated via queueCache.GetCacheCursor.
-                                    // The handshake token points to an already processed event, so advance past it.
-                                    newCursor.MoveNext();
+                                    consumerData.LastProcessedToken = null;
+                                    try
+                                    {
+                                        newCursor = queueCache!.GetCacheCursorAtPosition(
+                                            consumerData.StreamId,
+                                            StreamSubscriptionStartPosition.EarliestAvailable);
+                                    }
+                                    catch (NotSupportedException)
+                                    {
+                                        forceFaultSubscription = true;
+                                        throw;
+                                    }
                                 }
-                                catch (QueueCacheMissException)
+                                else if (newToken is StartToken)
                                 {
-                                    // The current batch is the receiver's first available message.
-                                    // Keep it pending when the consumer resumes from an evicted token.
-                                    newCursor = queueCache!.GetCacheCursor(consumerData.StreamId, batch.SequenceToken);
+                                    consumerData.LastProcessedToken = null;
+                                    newCursor = queueCache!.GetCacheCursor(consumerData.StreamId, newToken.Token);
+                                }
+                                else if (newToken is DeliveryToken)
+                                {
+                                    consumerData.LastProcessedToken = newToken.Token;
+                                    try
+                                    {
+                                        newCursor = queueCache!.GetCacheCursor(consumerData.StreamId, newToken.Token); // queueCache must be non-null here: consumerData.Cursor was only ever populated via queueCache.GetCacheCursor.
+                                        // The handshake token points to an already processed event, so advance past it.
+                                        newCursor.MoveNext();
+                                    }
+                                    catch (QueueCacheMissException)
+                                    {
+                                        // The current batch is the receiver's first available message.
+                                        // Keep it pending when the consumer resumes from an evicted token.
+                                        newCursor = queueCache!.GetCacheCursor(consumerData.StreamId, batch.SequenceToken);
+                                    }
+                                }
+                                else
+                                {
+                                    forceFaultSubscription = true;
+                                    throw new InvalidOperationException($"Unsupported stream handshake token type {newToken.GetType().FullName}.");
                                 }
 
                                 consumerData.SafeDisposeCursor(logger);
@@ -942,7 +1001,7 @@ namespace Orleans.Streams
 
                         LogErrorDeliveringMessages(consumerData.StreamId, exc);
 
-                        exceptionOccured = exc is ClientNotAvailableException
+                        exceptionOccured = exc is ClientNotAvailableException || forceFaultSubscription
                             ? exc
                             : new StreamEventDeliveryFailureException(consumerData.StreamId);
                     }
@@ -950,7 +1009,13 @@ namespace Orleans.Streams
                     if (exceptionOccured is not null)
                     {
                         var batch = nextBatch.Batch;
-                        bool faultedSubscription = await ErrorProtocol(consumerData, exceptionOccured, true, batch, batch?.SequenceToken);
+                        bool faultedSubscription = await ErrorProtocol(
+                            consumerData,
+                            exceptionOccured,
+                            true,
+                            batch,
+                            batch?.SequenceToken,
+                            forceFaultSubscription);
                         if (faultedSubscription) return;
                     }
                 }
@@ -1084,7 +1149,13 @@ namespace Orleans.Streams
             await errorDeliveryTask;
         }
 
-        private async Task<bool> ErrorProtocol(StreamConsumerData consumerData, Exception exceptionOccured, bool isDeliveryError, IBatchContainer? batch, StreamSequenceToken? token)
+        private async Task<bool> ErrorProtocol(
+            StreamConsumerData consumerData,
+            Exception exceptionOccured,
+            bool isDeliveryError,
+            IBatchContainer? batch,
+            StreamSequenceToken? token,
+            bool forceFaultSubscription = false)
         {
             // for loss of client, we just remove the subscription
             if (exceptionOccured is ClientNotAvailableException)
@@ -1109,7 +1180,8 @@ namespace Orleans.Streams
             }
 
             // if configured to fault on delivery failure and this is not an implicit subscription, fault and remove the subscription
-            if (streamFailureHandler.ShouldFaultSubsriptionOnError && !SubscriptionMarker.IsImplicitSubscription(consumerData.SubscriptionId.Guid))
+            if ((forceFaultSubscription || streamFailureHandler.ShouldFaultSubsriptionOnError)
+                && !SubscriptionMarker.IsImplicitSubscription(consumerData.SubscriptionId.Guid))
             {
                 try
                 {

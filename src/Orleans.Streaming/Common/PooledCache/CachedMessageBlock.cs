@@ -20,6 +20,7 @@ namespace Orleans.Providers.Streams.Common
         private readonly int blockSize;
         private int writeIndex;
         private int readIndex;
+        private long generation;
 
         /// <summary>
         /// Linked list node, so this message block can be kept in a linked list.
@@ -45,6 +46,10 @@ namespace Orleans.Providers.Streams.Common
         /// Gets the index of the oldest message in this block.
         /// </summary>
         public int OldestMessageIndex => readIndex;
+
+        internal int WriteIndex => writeIndex;
+
+        internal long Generation => generation;
 
         /// <summary>
         /// Gets the oldest message in the block.
@@ -143,6 +148,11 @@ namespace Orleans.Providers.Streams.Common
             return dataAdapter.GetSequenceToken(ref cachedMessages[index]);
         }
 
+        internal bool Contains(int index, long expectedGeneration)
+            => index >= readIndex
+                && index < writeIndex
+                && generation == expectedGeneration;
+
         /// <summary>
         /// Gets the sequence token of the newest message in this block
         /// </summary>
@@ -225,6 +235,7 @@ namespace Orleans.Providers.Streams.Common
         {
             writeIndex = 0;
             readIndex = 0;
+            generation++;
         }
     }
 }

@@ -30,6 +30,31 @@ namespace Orleans.Streams
         IQueueCacheCursor GetCacheCursor(StreamId streamId, StreamSequenceToken? token);
 
         /// <summary>
+        /// Acquires a stream message cursor at the specified subscription start position.
+        /// </summary>
+        /// <param name="streamId">The stream identifier.</param>
+        /// <param name="startPosition">The initial subscription position.</param>
+        /// <returns>The queue cache cursor.</returns>
+        /// <exception cref="NotSupportedException">
+        /// Thrown when <paramref name="startPosition"/> is not supported by this cache.
+        /// </exception>
+        IQueueCacheCursor GetCacheCursorAtPosition(StreamId streamId, StreamSubscriptionStartPosition startPosition)
+        {
+            if (startPosition == StreamSubscriptionStartPosition.Latest)
+            {
+                return GetCacheCursor(streamId, null);
+            }
+
+            if (startPosition != StreamSubscriptionStartPosition.EarliestAvailable)
+            {
+                throw new ArgumentOutOfRangeException(nameof(startPosition), startPosition, "The subscription start position is not defined.");
+            }
+
+            throw new NotSupportedException(
+                $"{GetType().FullName} does not support {StreamSubscriptionStartPosition.EarliestAvailable} cursor positioning.");
+        }
+
+        /// <summary>
         /// Returns <see langword="true" /> if this cache is under pressure, <see langword="false" /> otherwise.
         /// </summary>
         /// <returns><see langword="true" /> if this cache is under pressure; otherwise, <see langword="false" />.</returns>
