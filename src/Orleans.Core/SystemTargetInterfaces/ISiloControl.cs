@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Threading;
 using System.Threading.Tasks;
 using Orleans.Providers;
 using Orleans.Runtime;
@@ -8,22 +9,22 @@ namespace Orleans
 {
     internal interface ISiloControl : ISystemTarget, IVersionManager
     {
-        Task Ping(string message);
+        [Alias("1422B0B7")] Task Ping(string message, CancellationToken cancellationToken = default);
 
-        Task ForceGarbageCollection();
-        Task ForceActivationCollection(TimeSpan ageLimit);
-        Task ForceRuntimeStatisticsCollection();
+        [Alias("F388CED1")] Task ForceGarbageCollection(CancellationToken cancellationToken = default);
+        [Alias("45D07D09")] Task ForceActivationCollection(TimeSpan ageLimit, CancellationToken cancellationToken = default);
+        [Alias("0C7DBD0C")] Task ForceRuntimeStatisticsCollection(CancellationToken cancellationToken = default);
 
-        Task<SiloRuntimeStatistics> GetRuntimeStatistics();
-        Task<List<Tuple<GrainId, string, int>>> GetGrainStatistics();
-        Task<List<DetailedGrainStatistic>> GetDetailedGrainStatistics(string[]? types = null);
-        Task<SimpleGrainStatistic[]> GetSimpleGrainStatistics();
-        Task<DetailedGrainReport> GetDetailedGrainReport(GrainId grainId);
+        [Alias("F18EAF24")] Task<SiloRuntimeStatistics> GetRuntimeStatistics(CancellationToken cancellationToken = default);
+        [Alias("FF707A30")] Task<List<Tuple<GrainId, string, int>>> GetGrainStatistics(CancellationToken cancellationToken = default);
+        [Alias("B0F4C24B")] Task<List<DetailedGrainStatistic>> GetDetailedGrainStatistics(string[]? types = null, CancellationToken cancellationToken = default);
+        [Alias("6DE16EF7")] Task<SimpleGrainStatistic[]> GetSimpleGrainStatistics(CancellationToken cancellationToken = default);
+        [Alias("45172562")] Task<DetailedGrainReport> GetDetailedGrainReport(GrainId grainId, CancellationToken cancellationToken = default);
 
-        Task<int> GetActivationCount();
-        Task MigrateRandomActivations(SiloAddress target, int count);
+        [Alias("C4C370A5")] Task<int> GetActivationCount(CancellationToken cancellationToken = default);
+        [Alias("E8327F0B")] Task MigrateRandomActivations(SiloAddress target, int count, CancellationToken cancellationToken = default);
 
-        Task<object?> SendControlCommandToProvider<T>(string providerName, int command, object? arg) where T : IControllable;
-        Task<List<GrainId>> GetActiveGrains(GrainType grainType);
+        [Alias("355CA3FA")] Task<object?> SendControlCommandToProvider<T>(string providerName, int command, object? arg, CancellationToken cancellationToken = default) where T : IControllable;
+        [Alias("85797C87")] Task<List<GrainId>> GetActiveGrains(GrainType grainType, CancellationToken cancellationToken = default);
     }
 }

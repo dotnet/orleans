@@ -21,7 +21,10 @@ internal interface IGrainCallCancellationManagerSystemTarget : ISystemTarget
     /// <summary>
     /// Cancels a collection of grain calls.
     /// </summary>
-    ValueTask CancelCallsAsync([Immutable] List<GrainCallCancellationRequest> cancellationRequests);
+    [Alias("AF79F3FA")]
+    ValueTask CancelCallsAsync(
+        [Immutable] List<GrainCallCancellationRequest> cancellationRequests,
+        CancellationToken cancellationToken = default);
 }
 
 [GenerateSerializer, Immutable]
@@ -89,19 +92,24 @@ internal partial class GrainCallCancellationManager : SystemTarget, IGrainCallCa
 
     private IInternalGrainFactory GrainFactory => _grainFactory ??= _serviceProvider.GetRequiredService<IInternalGrainFactory>();
 
-    public ValueTask CancelCallsAsync(List<GrainCallCancellationRequest> cancellationRequests)
+    public ValueTask CancelCallsAsync(
+        List<GrainCallCancellationRequest> cancellationRequests,
+        CancellationToken cancellationToken = default)
     {
         foreach (var request in cancellationRequests)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             // Try to directly call the cancellation method locally
             if (_activationDirectory.FindTarget(request.TargetGrainId) is IGrainCallCancellationExtension extension)
             {
-                extension.CancelRequestAsync(request.SourceGrainId, request.MessageId).Ignore();
+                extension.CancelRequestAsync(request.SourceGrainId, request.MessageId, CancellationToken.None).Ignore();
             }
             else
             {
                 // Fall back to a regular grain call.
-                GrainFactory.GetGrain<IGrainCallCancellationExtension>(request.TargetGrainId).CancelRequestAsync(request.SourceGrainId, request.MessageId).Ignore();
+                GrainFactory.GetGrain<IGrainCallCancellationExtension>(request.TargetGrainId)
+                    .CancelRequestAsync(request.SourceGrainId, request.MessageId, CancellationToken.None)
+                    .Ignore();
             }
         }
 
@@ -116,7 +124,8 @@ internal partial class GrainCallCancellationManager : SystemTarget, IGrainCallCa
             return;
         }
 
-        var request = GrainFactory.GetGrain<IGrainCallCancellationExtension>(targetGrainId).CancelRequestAsync(sourceGrainId, messageId);
+        var request = GrainFactory.GetGrain<IGrainCallCancellationExtension>(targetGrainId)
+            .CancelRequestAsync(sourceGrainId, messageId, CancellationToken.None);
         request.Ignore();
     }
 
@@ -185,7 +194,7 @@ internal partial class GrainCallCancellationManager : SystemTarget, IGrainCallCa
                     }
 
                     // Attempt to cancel the batch.
-                    await remote.CancelCallsAsync(batch).AsTask().WaitAsync(cancellationToken);
+                    await remote.CancelCallsAsync(batch, CancellationToken.None);
 
                     LogDebugCancelledRequests(_logger, batch.Count, targetSilo);
 

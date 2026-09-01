@@ -57,7 +57,14 @@ internal sealed partial class AsyncEnumerableGrainExtension : IAsyncEnumerableGr
     }
 
     /// <inheritdoc/>
-    public ValueTask DisposeAsync(Guid requestId) => RemoveEnumeratorAsync(requestId);
+    public ValueTask DisposeAsync(Guid requestId) => DisposeAsync(requestId, CancellationToken.None);
+
+    /// <inheritdoc/>
+    public ValueTask DisposeAsync(Guid requestId, CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        return RemoveEnumeratorAsync(requestId);
+    }
 
     private async ValueTask RemoveExpiredAsync(CancellationToken cancellationToken)
     {

@@ -1,6 +1,7 @@
 using System;
 using System.Diagnostics;
 using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
@@ -28,6 +29,9 @@ namespace Orleans.Storage
         private readonly ILogger logger;
         private readonly IActivatorProvider _activatorProvider;
         private readonly IGrainStorageSerializer storageSerializer;
+        private readonly bool _overridesLegacyReadState;
+        private readonly bool _overridesLegacyWriteState;
+        private readonly bool _overridesLegacyClearState;
 
         /// <summary> Name of this storage provider instance. </summary>
         private readonly string name;
@@ -60,16 +64,45 @@ namespace Orleans.Storage
                 int idx = i; // Capture variable to avoid modified closure error
                 storageGrains[idx] = new Lazy<IMemoryStorageGrain>(() => grainFactory.GetGrain<IMemoryStorageGrain>(idx));
             }
+
+            var runtimeType = GetType();
+            _overridesLegacyReadState = OverridesLegacyMethod(runtimeType, nameof(ReadStateAsync));
+            _overridesLegacyWriteState = OverridesLegacyMethod(runtimeType, nameof(WriteStateAsync));
+            _overridesLegacyClearState = OverridesLegacyMethod(runtimeType, nameof(ClearStateAsync));
         }
 
         /// <inheritdoc/>
-        public virtual async Task ReadStateAsync<T>(string grainType, GrainId grainId, IGrainState<T> grainState)
+        public virtual Task ReadStateAsync<T>(string grainType, GrainId grainId, IGrainState<T> grainState)
+            => ReadStateCoreAsync(grainType, grainId, grainState, CancellationToken.None);
+
+        /// <inheritdoc/>
+        public virtual async Task ReadStateAsync<T>(
+            string grainType,
+            GrainId grainId,
+            IGrainState<T> grainState,
+            CancellationToken cancellationToken)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            if (_overridesLegacyReadState)
+            {
+                await ReadStateAsync(grainType, grainId, grainState).WaitAsync(cancellationToken);
+                return;
+            }
+
+            await ReadStateCoreAsync(grainType, grainId, grainState, cancellationToken);
+        }
+
+        private async Task ReadStateCoreAsync<T>(
+            string grainType,
+            GrainId grainId,
+            IGrainState<T> grainState,
+            CancellationToken cancellationToken)
         {
             var key = MakeKey(grainType, grainId);
 
             LogTraceRead(key);
             IMemoryStorageGrain storageGrain = GetStorageGrain(key);
-            var state = await storageGrain.ReadStateAsync<ReadOnlyMemory<byte>>(key);
+            var state = await storageGrain.ReadStateAsync<ReadOnlyMemory<byte>>(key, cancellationToken);
             if (state != null)
             {
                 var loadedState = ConvertFromStorageFormat<T>(state.State);
@@ -86,7 +119,31 @@ namespace Orleans.Storage
         }
 
         /// <inheritdoc/>
-        public virtual async Task WriteStateAsync<T>(string grainType, GrainId grainId, IGrainState<T> grainState)
+        public virtual Task WriteStateAsync<T>(string grainType, GrainId grainId, IGrainState<T> grainState)
+            => WriteStateCoreAsync(grainType, grainId, grainState, CancellationToken.None);
+
+        /// <inheritdoc/>
+        public virtual async Task WriteStateAsync<T>(
+            string grainType,
+            GrainId grainId,
+            IGrainState<T> grainState,
+            CancellationToken cancellationToken)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            if (_overridesLegacyWriteState)
+            {
+                await WriteStateAsync(grainType, grainId, grainState).WaitAsync(cancellationToken);
+                return;
+            }
+
+            await WriteStateCoreAsync(grainType, grainId, grainState, cancellationToken);
+        }
+
+        private async Task WriteStateCoreAsync<T>(
+            string grainType,
+            GrainId grainId,
+            IGrainState<T> grainState,
+            CancellationToken cancellationToken)
         {
             var key = MakeKey(grainType, grainId);
             LogTraceWrite(key, grainState.State, grainState.ETag);
@@ -98,7 +155,7 @@ namespace Orleans.Storage
                 {
                     RecordExists = grainState.RecordExists
                 };
-                grainState.ETag = await storageGrain.WriteStateAsync(key, binaryGrainState);
+                grainState.ETag = await storageGrain.WriteStateAsync(key, binaryGrainState, cancellationToken);
                 grainState.RecordExists = true;
             }
             catch (MemoryStorageEtagMismatchException e)
@@ -108,14 +165,38 @@ namespace Orleans.Storage
         }
 
         /// <inheritdoc/>
-        public virtual async Task ClearStateAsync<T>(string grainType, GrainId grainId, IGrainState<T> grainState)
+        public virtual Task ClearStateAsync<T>(string grainType, GrainId grainId, IGrainState<T> grainState)
+            => ClearStateCoreAsync(grainType, grainId, grainState, CancellationToken.None);
+
+        /// <inheritdoc/>
+        public virtual async Task ClearStateAsync<T>(
+            string grainType,
+            GrainId grainId,
+            IGrainState<T> grainState,
+            CancellationToken cancellationToken)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            if (_overridesLegacyClearState)
+            {
+                await ClearStateAsync(grainType, grainId, grainState).WaitAsync(cancellationToken);
+                return;
+            }
+
+            await ClearStateCoreAsync(grainType, grainId, grainState, cancellationToken);
+        }
+
+        private async Task ClearStateCoreAsync<T>(
+            string grainType,
+            GrainId grainId,
+            IGrainState<T> grainState,
+            CancellationToken cancellationToken)
         {
             var key = MakeKey(grainType, grainId);
             LogTraceDelete(key, grainState.ETag);
             IMemoryStorageGrain storageGrain = GetStorageGrain(key);
             try
             {
-                await storageGrain.DeleteStateAsync<ReadOnlyMemory<byte>>(key, grainState.ETag);
+                await storageGrain.DeleteStateAsync<ReadOnlyMemory<byte>>(key, grainState.ETag, cancellationToken);
                 grainState.ETag = null;
                 grainState.RecordExists = false;
                 grainState.State = CreateInstance<T>();
@@ -127,6 +208,23 @@ namespace Orleans.Storage
         }
 
         private static string MakeKey(string grainType, GrainId grainId) => $"{grainType}/{grainId}";
+
+        private static bool OverridesLegacyMethod(Type runtimeType, string methodName)
+        {
+            foreach (var method in runtimeType.GetMethods())
+            {
+                if (method.Name == methodName
+                    && method.IsGenericMethodDefinition
+                    && method.GetParameters().Length == 3
+                    && method.DeclaringType != typeof(MemoryGrainStorage)
+                    && method.GetBaseDefinition().DeclaringType == typeof(MemoryGrainStorage))
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
 
         private IMemoryStorageGrain GetStorageGrain(string id)
         {

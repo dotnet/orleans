@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Runtime.InteropServices;
+using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Orleans.Runtime.Scheduler;
@@ -86,7 +87,8 @@ namespace Orleans.Runtime.GrainDirectory
 
                 try
                 {
-                    await localDirectory.GetDirectoryReference(addedSilo).AcceptSplitPartition(splitPartListSingle);
+                    await localDirectory.GetDirectoryReference(addedSilo)
+                        .AcceptSplitPartition(splitPartListSingle, CancellationToken.None);
                     if (splitPartListSingle.Count > 0)
                     {
                         LogInformationCompletedSplitPartition(logger, splitPartListSingle.Count, addedSilo);
@@ -193,7 +195,11 @@ namespace Orleans.Runtime.GrainDirectory
                     LogDebugDestroyingDuplicates(logger, duplicates.Count, pair.Key, new(pair.Value));
 
                     var remoteCatalog = this.grainFactory.GetSystemTarget<ICatalog>(Constants.CatalogType, pair.Key);
-                    await remoteCatalog.DeleteActivations(pair.Value, DeactivationReasonCode.DuplicateActivation, "This grain has been activated elsewhere");
+                    await remoteCatalog.DeleteActivations(
+                        pair.Value,
+                        DeactivationReasonCode.DuplicateActivation,
+                        "This grain has been activated elsewhere",
+                        CancellationToken.None);
                 }
 
                 duplicates.Remove(pair.Key);

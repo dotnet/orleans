@@ -48,11 +48,17 @@ namespace Orleans.Storage
     {
         public MemoryGrainStorage(string name, Configuration.MemoryGrainStorageOptions options, Microsoft.Extensions.Logging.ILogger<MemoryGrainStorage> logger, IGrainFactory grainFactory, IGrainStorageSerializer defaultGrainStorageSerializer, Serialization.Serializers.IActivatorProvider activatorProvider) { }
 
+        public virtual System.Threading.Tasks.Task ClearStateAsync<T>(string grainType, Runtime.GrainId grainId, IGrainState<T> grainState, System.Threading.CancellationToken cancellationToken) { throw null; }
+
         public virtual System.Threading.Tasks.Task ClearStateAsync<T>(string grainType, Runtime.GrainId grainId, IGrainState<T> grainState) { throw null; }
 
         public void Dispose() { }
 
+        public virtual System.Threading.Tasks.Task ReadStateAsync<T>(string grainType, Runtime.GrainId grainId, IGrainState<T> grainState, System.Threading.CancellationToken cancellationToken) { throw null; }
+
         public virtual System.Threading.Tasks.Task ReadStateAsync<T>(string grainType, Runtime.GrainId grainId, IGrainState<T> grainState) { throw null; }
+
+        public virtual System.Threading.Tasks.Task WriteStateAsync<T>(string grainType, Runtime.GrainId grainId, IGrainState<T> grainState, System.Threading.CancellationToken cancellationToken) { throw null; }
 
         public virtual System.Threading.Tasks.Task WriteStateAsync<T>(string grainType, Runtime.GrainId grainId, IGrainState<T> grainState) { throw null; }
     }

@@ -36,22 +36,33 @@ namespace UnitTests.OrleansRuntime
             var grain1 = this.Fixture.Client.GetGrain<IDumbGrain>(Guid.NewGuid());
             var grain2 = this.Fixture.Client.GetGrain<IDumbGrain>(Guid.NewGuid());
 
-            var grain1Address = await managementGrain.GetActivationAddress(grain1);
+            var grain1Address = await managementGrain.GetActivationAddress(
+                grain1,
+                TestContext.Current.CancellationToken);
             Assert.Null(grain1Address);
 
             await grain1.DoNothing();
-            grain1Address = await managementGrain.GetActivationAddress(grain1);
+            grain1Address = await managementGrain.GetActivationAddress(
+                grain1,
+                TestContext.Current.CancellationToken);
             Assert.NotNull(grain1Address);
-            var grain2Address = await managementGrain.GetActivationAddress(grain2);
+            var grain2Address = await managementGrain.GetActivationAddress(
+                grain2,
+                TestContext.Current.CancellationToken);
             Assert.Null(grain2Address);
 
             await grain2.DoNothing();
-            var grain1Address2 = await managementGrain.GetActivationAddress(grain1);
+            var grain1Address2 = await managementGrain.GetActivationAddress(
+                grain1,
+                TestContext.Current.CancellationToken);
             Assert.NotNull(grain1Address2);
             Assert.True(grain1Address.Equals(grain1Address2));
 
             var worker = this.Fixture.Client.GetGrain<IDumbWorker>(0);
-            await Assert.ThrowsAnyAsync<InvalidOperationException>(async () => await managementGrain.GetActivationAddress(worker));
+            await Assert.ThrowsAnyAsync<InvalidOperationException>(
+                async () => await managementGrain.GetActivationAddress(
+                    worker,
+                    TestContext.Current.CancellationToken));
         }
     }
 

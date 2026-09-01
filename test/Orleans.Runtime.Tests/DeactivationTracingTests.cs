@@ -229,7 +229,7 @@ namespace UnitTests.General
                 _ = await grain.GetActivityId();
                 Started.Clear();
 
-                await grain.Cast<IGrainManagementExtension>().DeactivateOnIdle();
+                await grain.Cast<IGrainManagementExtension>().DeactivateOnIdle(TestContext.Current.CancellationToken);
 
                 _ = await grain.GetActivityId();
 

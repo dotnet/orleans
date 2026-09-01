@@ -273,7 +273,7 @@ internal abstract partial class GrainTimer : IGrainTimer
 
         // This method is declared for the sake of IGrainTimerCore, but it is not intended to be called directly.
         // It exists for grain call interceptors which inspect the implementation method.
-        Task IGrainTimerInvoker.InvokeCallbackAsync() => throw new InvalidOperationException();
+        Task IGrainTimerInvoker.InvokeCallbackAsync(CancellationToken cancellationToken) => throw new InvalidOperationException();
 
         public int GetArgumentCount() => 0;
 
@@ -395,5 +395,6 @@ internal interface IGrainTimerInvoker : IAddressable
     /// <summary>
     /// Invokes the callback.
     /// </summary>
-    Task InvokeCallbackAsync();
+    [Alias("3F6C2672")]
+    Task InvokeCallbackAsync(CancellationToken cancellationToken = default);
 }

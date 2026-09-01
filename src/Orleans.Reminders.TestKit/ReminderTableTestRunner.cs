@@ -1226,7 +1226,7 @@ public abstract class ReminderTableTestRunner
     // ---------------------------------------------------------------------------------------------------------
 
     /// <summary>
-    /// Guarantee: <see cref="IReminderTable.TestOnlyClearTable"/> removes every reminder.
+    /// Guarantee: <see cref="IReminderTable.TestOnlyClearTable()"/> removes every reminder.
     /// </summary>
     /// <returns>A task which represents the asynchronous operation.</returns>
     public virtual Task ReminderTable_TestOnlyClearTable_RemovesAllReminders()

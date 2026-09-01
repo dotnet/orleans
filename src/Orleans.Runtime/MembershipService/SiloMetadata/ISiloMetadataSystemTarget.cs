@@ -1,3 +1,4 @@
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace Orleans.Runtime.MembershipService.SiloMetadata;
@@ -6,5 +7,5 @@ namespace Orleans.Runtime.MembershipService.SiloMetadata;
 internal interface ISiloMetadataSystemTarget : ISystemTarget
 {
     [Alias("GetSiloMetadata")]
-    Task<SiloMetadata> GetSiloMetadata();
+    Task<SiloMetadata> GetSiloMetadata(CancellationToken cancellationToken = default);
 }

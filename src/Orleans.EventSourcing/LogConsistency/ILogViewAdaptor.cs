@@ -29,6 +29,11 @@ namespace Orleans.EventSourcing
         Task PostOnDeactivate();
     }
 
+    internal interface ICancellationAwareLogViewAdaptor
+    {
+        Task PostOnDeactivate(CancellationToken cancellationToken);
+    }
+
     /// <summary>
     /// Interface for reading the log view.
     /// </summary>

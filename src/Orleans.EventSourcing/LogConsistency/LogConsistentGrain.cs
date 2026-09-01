@@ -48,7 +48,7 @@ namespace Orleans.EventSourcing
         {
             if (this is ILogConsistencyProtocolParticipant participant)
             {
-                await participant.DeactivateProtocolParticipant();
+                await participant.DeactivateProtocolParticipant(ct);
             }
         }
 
@@ -66,12 +66,12 @@ namespace Orleans.EventSourcing
 
         private async Task PreActivate(CancellationToken ct)
         {
-            await ((ILogConsistencyProtocolParticipant)this).PreActivateProtocolParticipant();
+            await ((ILogConsistencyProtocolParticipant)this).PreActivateProtocolParticipant(ct);
         }
 
         private async Task PostActivate(CancellationToken ct)
         {
-            await ((ILogConsistencyProtocolParticipant)this).PostActivateProtocolParticipant();
+            await ((ILogConsistencyProtocolParticipant)this).PostActivateProtocolParticipant(ct);
         }
 
         private void InstallLogViewAdaptor(

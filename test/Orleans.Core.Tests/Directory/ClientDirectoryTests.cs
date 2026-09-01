@@ -237,7 +237,7 @@ namespace NonSilo.Tests.Directory
             // Verify that a silo will ask a remote silo 
             _clusterMembershipService.UpdateSiloStatus(remoteSilo, SiloStatus.Active, "remoteSilo");
             var remoteDirectory = _remoteDirectories.GetOrAdd(remoteSilo, Substitute.For<IRemoteClientDirectory>());
-            remoteDirectory.GetClientRoutes(default!).ReturnsForAnyArgs(info =>
+            remoteDirectory.GetClientRoutes(default!, Arg.Any<CancellationToken>()).ReturnsForAnyArgs(info =>
             {
                 var versionVector = info.ArgAt<ImmutableDictionary<SiloAddress, long>>(0);
                 Assert.NotNull(versionVector);
@@ -262,7 +262,9 @@ namespace NonSilo.Tests.Directory
             Assert.Equal(Gateway.GetClientActivationAddress(remoteClientId2, remoteSilo), result);
 
             // The remote silo should not have been queried a second time.
-            _ = remoteDirectory.Received(1).GetClientRoutes(Arg.Any<ImmutableDictionary<SiloAddress, long>>());
+            _ = remoteDirectory.Received(1).GetClientRoutes(
+                Arg.Any<ImmutableDictionary<SiloAddress, long>>(),
+                Arg.Any<CancellationToken>());
 
             // Signal that the remote silo is shutting down. Both clients should disappear along with it.
             _clusterMembershipService.UpdateSiloStatus(remoteSilo, SiloStatus.ShuttingDown, "remoteSilo");
@@ -272,7 +274,9 @@ namespace NonSilo.Tests.Directory
             Assert.Empty(await resultTask);
 
             // Since there are no other directories, no additional remote calls should have been made.
-            _ = remoteDirectory.Received(1).GetClientRoutes(Arg.Any<ImmutableDictionary<SiloAddress, long>>());
+            _ = remoteDirectory.Received(1).GetClientRoutes(
+                Arg.Any<ImmutableDictionary<SiloAddress, long>>(),
+                Arg.Any<CancellationToken>());
         }
 
         /// <summary>
@@ -290,7 +294,7 @@ namespace NonSilo.Tests.Directory
             IRemoteClientDirectory CreateRemoteDirectory()
             {
                 var remoteDirectory = Substitute.For<IRemoteClientDirectory>();
-                remoteDirectory.GetClientRoutes(default!).ReturnsForAnyArgs(info =>
+                remoteDirectory.GetClientRoutes(default!, Arg.Any<CancellationToken>()).ReturnsForAnyArgs(info =>
                 {
                     if (numTimesToThrow[0]-- > 0)
                     {
@@ -320,7 +324,9 @@ namespace NonSilo.Tests.Directory
             // Each call should have landed on a different silo.
             foreach (var remoteDirectory in _remoteDirectories.Values)
             {
-                _ = remoteDirectory.Received(1).GetClientRoutes(Arg.Any<ImmutableDictionary<SiloAddress, long>>());
+                _ = remoteDirectory.Received(1).GetClientRoutes(
+                    Arg.Any<ImmutableDictionary<SiloAddress, long>>(),
+                    Arg.Any<CancellationToken>());
             }
         }
 
@@ -345,14 +351,14 @@ namespace NonSilo.Tests.Directory
                 var otherRemoteSilo = GetOtherRemoteSilo(silo);
 
                 var remoteDirectory = Substitute.For<IRemoteClientDirectory>();
-                remoteDirectory.GetClientRoutes(default!).ReturnsForAnyArgs(info =>
+                remoteDirectory.GetClientRoutes(default!, Arg.Any<CancellationToken>()).ReturnsForAnyArgs(info =>
                 {
                     var result = ImmutableDictionary.CreateBuilder<SiloAddress, (ImmutableHashSet<GrainId>, long)>();
                     result[silo] = (ImmutableHashSet.CreateRange(new[] { remoteClientId }), 2);
                     return Task.FromResult(result.ToImmutable());
                 });
 
-                remoteDirectory.OnUpdateClientRoutes(default!).ReturnsForAnyArgs(info =>
+                remoteDirectory.OnUpdateClientRoutes(default!, Arg.Any<CancellationToken>()).ReturnsForAnyArgs(info =>
                 {
                     calledSilos.Add(silo);
                     ++totalUpdateCalls[0];
@@ -373,7 +379,9 @@ namespace NonSilo.Tests.Directory
             var builder = ImmutableDictionary.CreateBuilder<SiloAddress, (ImmutableHashSet<GrainId>, long)>();
             builder[remoteSilo] = (ImmutableHashSet.CreateRange(new[] { remoteClientId, remoteClientId2 }), 3);
             builder[remoteSilo2] = (ImmutableHashSet.CreateRange(new[] { remoteClientId, remoteClientId2 }), 3);
-            await _directory.OnUpdateClientRoutes(builder.ToImmutable());
+            await _directory.OnUpdateClientRoutes(
+                builder.ToImmutable(),
+                TestContext.Current.CancellationToken);
             Assert.Equal(1, totalUpdateCalls[0]);
 
             var successor = Assert.Single(calledSilos);
@@ -384,7 +392,8 @@ namespace NonSilo.Tests.Directory
 
             SetLocalClients(new List<GrainId> { remoteClientId, remoteClientId2 });
             await _directory.OnUpdateClientRoutes(
-                ImmutableDictionary<SiloAddress, (ImmutableHashSet<GrainId>, long)>.Empty);
+                ImmutableDictionary<SiloAddress, (ImmutableHashSet<GrainId>, long)>.Empty,
+                TestContext.Current.CancellationToken);
 
             Assert.Equal(2, totalUpdateCalls[0]);
             Assert.All(calledSilos, calledSilo => Assert.Equal(successor, calledSilo));
@@ -407,7 +416,7 @@ namespace NonSilo.Tests.Directory
             var firstClient = Client("local1");
             var secondClient = Client("local2");
             ImmutableDictionary<SiloAddress, (ImmutableHashSet<GrainId> ConnectedClients, long Version)>? followUpUpdate = null;
-            remoteDirectory.OnUpdateClientRoutes(default!).ReturnsForAnyArgs(info =>
+            remoteDirectory.OnUpdateClientRoutes(default!, Arg.Any<CancellationToken>()).ReturnsForAnyArgs(info =>
             {
                 var update = info.ArgAt<ImmutableDictionary<SiloAddress, (ImmutableHashSet<GrainId> ConnectedClients, long Version)>>(0);
                 return Interlocked.Increment(ref publicationCount) switch
@@ -428,7 +437,8 @@ namespace NonSilo.Tests.Directory
 
             SetLocalClients([firstClient, secondClient]);
             await _directory.OnUpdateClientRoutes(
-                ImmutableDictionary<SiloAddress, (ImmutableHashSet<GrainId>, long)>.Empty);
+                ImmutableDictionary<SiloAddress, (ImmutableHashSet<GrainId>, long)>.Empty,
+                TestContext.Current.CancellationToken);
 
             firstPublicationRelease.TrySetResult(true);
             await secondPublicationStarted.Task.WaitAsync(cancellationToken);
@@ -438,7 +448,8 @@ namespace NonSilo.Tests.Directory
             Assert.True(followUpUpdate.TryGetValue(_localSilo, out var localUpdate));
             Assert.Contains(secondClient, localUpdate.ConnectedClients);
             _ = remoteDirectory.Received(2).OnUpdateClientRoutes(
-                Arg.Any<ImmutableDictionary<SiloAddress, (ImmutableHashSet<GrainId>, long)>>());
+                Arg.Any<ImmutableDictionary<SiloAddress, (ImmutableHashSet<GrainId>, long)>>(),
+                Arg.Any<CancellationToken>());
 
             static Task SignalAndReturn(TaskCompletionSource<bool> started, Task task)
             {
@@ -464,7 +475,7 @@ namespace NonSilo.Tests.Directory
             var remoteDirectory = _remoteDirectories.GetOrAdd(remoteSilo, Substitute.For<IRemoteClientDirectory>());
             var publicationStarted = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
             var publicationRelease = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
-            remoteDirectory.OnUpdateClientRoutes(default!).ReturnsForAnyArgs(_ =>
+            remoteDirectory.OnUpdateClientRoutes(default!, Arg.Any<CancellationToken>()).ReturnsForAnyArgs(_ =>
             {
                 publicationStarted.TrySetResult(true);
                 return publicationRelease.Task;
@@ -485,7 +496,8 @@ namespace NonSilo.Tests.Directory
             await _testAccessor.DrainScheduler().WaitAsync(cancellationToken);
 
             _ = remoteDirectory.Received(1).OnUpdateClientRoutes(
-                Arg.Any<ImmutableDictionary<SiloAddress, (ImmutableHashSet<GrainId>, long)>>());
+                Arg.Any<ImmutableDictionary<SiloAddress, (ImmutableHashSet<GrainId>, long)>>(),
+                Arg.Any<CancellationToken>());
         }
 
         [Fact]
@@ -498,7 +510,7 @@ namespace NonSilo.Tests.Directory
             var secondPublicationStarted = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
             var firstPublicationRelease = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
             var publicationCount = 0;
-            remoteDirectory.OnUpdateClientRoutes(default!).ReturnsForAnyArgs(_ =>
+            remoteDirectory.OnUpdateClientRoutes(default!, Arg.Any<CancellationToken>()).ReturnsForAnyArgs(_ =>
             {
                 return Interlocked.Increment(ref publicationCount) switch
                 {
@@ -517,13 +529,15 @@ namespace NonSilo.Tests.Directory
 
             SetLocalClients([localClient]);
             await _directory.OnUpdateClientRoutes(
-                ImmutableDictionary<SiloAddress, (ImmutableHashSet<GrainId>, long)>.Empty);
+                ImmutableDictionary<SiloAddress, (ImmutableHashSet<GrainId>, long)>.Empty,
+                TestContext.Current.CancellationToken);
 
             firstPublicationRelease.TrySetException(new TimeoutException("Unable"));
             await secondPublicationStarted.Task.WaitAsync(cancellationToken);
             await _testAccessor.DrainScheduler().WaitAsync(cancellationToken);
             _ = remoteDirectory.Received(2).OnUpdateClientRoutes(
-                Arg.Any<ImmutableDictionary<SiloAddress, (ImmutableHashSet<GrainId>, long)>>());
+                Arg.Any<ImmutableDictionary<SiloAddress, (ImmutableHashSet<GrainId>, long)>>(),
+                Arg.Any<CancellationToken>());
 
             static Task SignalAndReturn(TaskCompletionSource<bool> started, Task task)
             {
@@ -538,7 +552,8 @@ namespace NonSilo.Tests.Directory
             var cancellationToken = TestContext.Current.CancellationToken;
             var remoteSilo = Silo("127.0.0.1:222@100");
             var remoteDirectory = _remoteDirectories.GetOrAdd(remoteSilo, Substitute.For<IRemoteClientDirectory>());
-            remoteDirectory.OnUpdateClientRoutes(default!).ReturnsForAnyArgs(_ => throw new TimeoutException("Unable"));
+            remoteDirectory.OnUpdateClientRoutes(default!, Arg.Any<CancellationToken>())
+                .ReturnsForAnyArgs(_ => throw new TimeoutException("Unable"));
 
             _clusterMembershipService.UpdateSiloStatus(remoteSilo, SiloStatus.Active, "remoteSilo");
             _testAccessor.SchedulePublishUpdate = _testAccessor.SchedulePublishUpdates;
@@ -548,7 +563,8 @@ namespace NonSilo.Tests.Directory
             await _testAccessor.DrainScheduler().WaitAsync(cancellationToken);
 
             _ = remoteDirectory.Received(1).OnUpdateClientRoutes(
-                Arg.Any<ImmutableDictionary<SiloAddress, (ImmutableHashSet<GrainId>, long)>>());
+                Arg.Any<ImmutableDictionary<SiloAddress, (ImmutableHashSet<GrainId>, long)>>(),
+                Arg.Any<CancellationToken>());
         }
 
         [Fact]
@@ -580,7 +596,8 @@ namespace NonSilo.Tests.Directory
                 await quiesce;
 
                 _ = remoteDirectory.DidNotReceive().OnUpdateClientRoutes(
-                    Arg.Any<ImmutableDictionary<SiloAddress, (ImmutableHashSet<GrainId>, long)>>());
+                    Arg.Any<ImmutableDictionary<SiloAddress, (ImmutableHashSet<GrainId>, long)>>(),
+                    Arg.Any<CancellationToken>());
             }
             finally
             {
@@ -596,7 +613,7 @@ namespace NonSilo.Tests.Directory
             var remoteDirectory = _remoteDirectories.GetOrAdd(remoteSilo, Substitute.For<IRemoteClientDirectory>());
             var publicationStarted = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
             var publicationRelease = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
-            remoteDirectory.OnUpdateClientRoutes(default!).ReturnsForAnyArgs(_ =>
+            remoteDirectory.OnUpdateClientRoutes(default!, Arg.Any<CancellationToken>()).ReturnsForAnyArgs(_ =>
             {
                 publicationStarted.TrySetResult(true);
                 return publicationRelease.Task;
@@ -652,11 +669,12 @@ namespace NonSilo.Tests.Directory
                 var update = ImmutableDictionary<SiloAddress, (ImmutableHashSet<GrainId>, long)>.Empty.Add(
                     remoteSilo,
                     (ImmutableHashSet.Create(Client("remote")), 2));
-                await _directory.OnUpdateClientRoutes(update);
+                await _directory.OnUpdateClientRoutes(update, TestContext.Current.CancellationToken);
                 _testAccessor.SchedulePublishUpdates();
 
                 _ = remoteDirectory.Received(1).OnUpdateClientRoutes(
-                    Arg.Any<ImmutableDictionary<SiloAddress, (ImmutableHashSet<GrainId>, long)>>());
+                    Arg.Any<ImmutableDictionary<SiloAddress, (ImmutableHashSet<GrainId>, long)>>(),
+                    Arg.Any<CancellationToken>());
             }
             finally
             {

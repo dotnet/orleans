@@ -45,7 +45,7 @@ public class DurableGrainTests(IntegrationTestFixture fixture) : IClassFixture<I
         // Force deactivation and get a new reference
         // This simulates grain failure or node restart scenarios
         var idBefore = await grain.GetActivationId();
-        await grain.Cast<IGrainManagementExtension>().DeactivateOnIdle();
+        await grain.Cast<IGrainManagementExtension>().DeactivateOnIdle(TestContext.Current.CancellationToken);
         Assert.NotEqual(idBefore, await grain.GetActivationId());
 
         // Assert - State should be recovered
@@ -75,7 +75,7 @@ public class DurableGrainTests(IntegrationTestFixture fixture) : IClassFixture<I
         Assert.Equal(20, await grain.GetCounter());
 
         // Force deactivation and get a new reference
-        await grain.Cast<IGrainManagementExtension>().DeactivateOnIdle();
+        await grain.Cast<IGrainManagementExtension>().DeactivateOnIdle(TestContext.Current.CancellationToken);
 
         // Assert - Updated state should be recovered
         Assert.Equal("Updated Name", await grain.GetName());
@@ -108,7 +108,7 @@ public class DurableGrainTests(IntegrationTestFixture fixture) : IClassFixture<I
         // Force deactivation and get a new reference
         // This simulates grain failure or node restart scenarios
         var idBefore = await grain.GetActivationId();
-        await grain.Cast<IGrainManagementExtension>().DeactivateOnIdle();
+        await grain.Cast<IGrainManagementExtension>().DeactivateOnIdle(TestContext.Current.CancellationToken);
         Assert.NotEqual(idBefore, await grain.GetActivationId());
 
         // Assert - Complex state should be recovered
@@ -156,7 +156,7 @@ public class DurableGrainTests(IntegrationTestFixture fixture) : IClassFixture<I
         // Force deactivation and get a new reference
         // This simulates grain failure or node restart scenarios
         var idBefore = await grain.GetActivationId();
-        await grain.Cast<IGrainManagementExtension>().DeactivateOnIdle();
+        await grain.Cast<IGrainManagementExtension>().DeactivateOnIdle(TestContext.Current.CancellationToken);
         Assert.NotEqual(idBefore, await grain.GetActivationId());
 
         // Assert - All collections should be recovered
@@ -210,7 +210,7 @@ public class DurableGrainTests(IntegrationTestFixture fixture) : IClassFixture<I
         // Force deactivation and get a new reference
         // This simulates grain failure or node restart scenarios
         var idBefore = await grain.GetActivationId();
-        await grain.Cast<IGrainManagementExtension>().DeactivateOnIdle();
+        await grain.Cast<IGrainManagementExtension>().DeactivateOnIdle(TestContext.Current.CancellationToken);
         Assert.NotEqual(idBefore, await grain.GetActivationId());
 
         // Assert - Modified state should be recovered
@@ -252,7 +252,7 @@ public class DurableGrainTests(IntegrationTestFixture fixture) : IClassFixture<I
 
         // Deactivate the grain forcefully
         var idBefore = await grain.GetActivationId();
-        await grain.Cast<IGrainManagementExtension>().DeactivateOnIdle();
+        await grain.Cast<IGrainManagementExtension>().DeactivateOnIdle(TestContext.Current.CancellationToken);
         Assert.NotEqual(idBefore, await grain.GetActivationId());
 
         // Get the values from the grain (which will be reactivated)
@@ -296,7 +296,7 @@ public class DurableGrainTests(IntegrationTestFixture fixture) : IClassFixture<I
 
         // Deactivate the grain forcefully
         var idBefore = await grain.GetActivationId();
-        await grain.Cast<IGrainManagementExtension>().DeactivateOnIdle();
+        await grain.Cast<IGrainManagementExtension>().DeactivateOnIdle(TestContext.Current.CancellationToken);
         Assert.NotEqual(idBefore, await grain.GetActivationId());
 
         // Assert - Check values after reactivation
@@ -322,7 +322,7 @@ public class DurableGrainTests(IntegrationTestFixture fixture) : IClassFixture<I
 
         // Deactivate the grain again
         idBefore = await grain.GetActivationId();
-        await grain.Cast<IGrainManagementExtension>().DeactivateOnIdle();
+        await grain.Cast<IGrainManagementExtension>().DeactivateOnIdle(TestContext.Current.CancellationToken);
         Assert.NotEqual(idBefore, await grain.GetActivationId());
 
         // Assert - Check values after second reactivation
@@ -368,7 +368,7 @@ public class DurableGrainTests(IntegrationTestFixture fixture) : IClassFixture<I
 
         // Deactivate the grain forcefully
         var idBefore = await grain.GetActivationId();
-        await grain.Cast<IGrainManagementExtension>().DeactivateOnIdle();
+        await grain.Cast<IGrainManagementExtension>().DeactivateOnIdle(TestContext.Current.CancellationToken);
         Assert.NotEqual(idBefore, await grain.GetActivationId());
 
         // Assert - Check random values after reactivation

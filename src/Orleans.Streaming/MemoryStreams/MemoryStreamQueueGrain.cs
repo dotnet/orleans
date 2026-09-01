@@ -1,6 +1,7 @@
 
 using System;
 using System.Collections.Generic;
+using System.Threading;
 using System.Threading.Tasks;
 using Orleans.Runtime;
 
@@ -23,10 +24,15 @@ namespace Orleans.Providers
         /// <summary>
         /// Enqueues an event data. If the current total count reaches the max limit. throws an exception.
         /// </summary>
-        /// <param name="data"></param>
-        /// <returns></returns>
+        /// <param name="data">The event data.</param>
+        /// <returns>A <see cref="Task"/> representing the operation.</returns>
         public Task Enqueue(MemoryMessageData data)
+            => Enqueue(data, CancellationToken.None);
+
+        /// <inheritdoc/>
+        public Task Enqueue(MemoryMessageData data, CancellationToken cancellationToken)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             if (_eventQueue.Count >= MaxEventCount)
             {
                 throw new InvalidOperationException($"Can not enqueue since the count has reached its maximum of {MaxEventCount}");
@@ -39,10 +45,15 @@ namespace Orleans.Providers
         /// <summary>
         /// Dequeues up to a max amount of maxCount event data from the queue.
         /// </summary>
-        /// <param name="maxCount"></param>
-        /// <returns></returns>
+        /// <param name="maxCount">The maximum number of events to dequeue.</param>
+        /// <returns>The dequeued events.</returns>
         public Task<List<MemoryMessageData>> Dequeue(int maxCount)
+            => Dequeue(maxCount, CancellationToken.None);
+
+        /// <inheritdoc/>
+        public Task<List<MemoryMessageData>> Dequeue(int maxCount, CancellationToken cancellationToken)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             List<MemoryMessageData> list = new List<MemoryMessageData>();
 
             for (int i = 0; i < maxCount && _eventQueue.Count > 0; ++i)

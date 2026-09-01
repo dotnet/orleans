@@ -46,7 +46,7 @@ public class SiloMetadataPlacementFilterTests(SiloMetadataPlacementFilterTests.F
     public async Task PlacementFilter_GrainWithoutFilterCanBeCalled()
     {
         var managementGrain = fixture.Cluster.Client!.GetGrain<IManagementGrain>(0);
-        var silos = await managementGrain.GetHosts(true);
+        var silos = await managementGrain.GetHosts(true, TestContext.Current.CancellationToken);
         Assert.NotNull(silos);
     }
 

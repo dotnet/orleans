@@ -72,6 +72,20 @@ namespace Tester.StreamingTests.BroadcastChannel
                 cancellationToken: TestContext.Current.CancellationToken);
 
         [Fact]
+        public async Task Publish_WithCanceledToken_ThrowsBeforeDelivery()
+        {
+            var channelId = ChannelId.Create("some-namespace", Guid.NewGuid().ToString("N"));
+            var writer = _provider.GetChannelWriter<int>(channelId);
+            using var cancellation = new CancellationTokenSource();
+            cancellation.Cancel();
+
+            var exception = await Assert.ThrowsAnyAsync<OperationCanceledException>(
+                () => writer.Publish(1, cancellation.Token));
+
+            Assert.Equal(cancellation.Token, exception.CancellationToken);
+        }
+
+        [Fact]
         public async Task ClientPublishMultipleChannelTest() =>
             await ClientPublishMultipleChannelTestImpl(_provider, TestContext.Current.CancellationToken);
 

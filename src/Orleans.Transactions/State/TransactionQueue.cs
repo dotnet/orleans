@@ -159,7 +159,13 @@ namespace Orleans.Transactions.State
                                     LogTraceSendingImmediatePrepared(record);
                                     // can send prepared message immediately after persisting prepare record
                                     record.TransactionManager.Reference.AsReference<ITransactionManagerExtension>()
-                                          .Prepared(record.TransactionManager.Name, record.TransactionId, record.Timestamp, this.resource, TransactionalStatus.Ok)
+                                          .Prepared(
+                                              record.TransactionManager.Name,
+                                              record.TransactionId,
+                                              record.Timestamp,
+                                              this.resource,
+                                              TransactionalStatus.Ok,
+                                              activationLifetime.OnDeactivating)
                                           .Ignore();
                                     record.LastSent = DateTime.UtcNow;
                                     TransactionDiagnosticEvents.EmitRemotePreparedSent(
@@ -306,7 +312,13 @@ namespace Orleans.Transactions.State
 
                         LogTraceAbortingViaPrepared(status, entry);
                         entry.TransactionManager.Reference.AsReference<ITransactionManagerExtension>()
-                             .Prepared(entry.TransactionManager.Name, entry.TransactionId, entry.Timestamp, resource, status)
+                             .Prepared(
+                                 entry.TransactionManager.Name,
+                                 entry.TransactionId,
+                                 entry.Timestamp,
+                                 resource,
+                                 status,
+                                 activationLifetime.OnDeactivating)
                              .Ignore();
                         break;
                     }
@@ -1076,7 +1088,7 @@ namespace Orleans.Transactions.State
             try
             {
                 await target.Reference.AsReference<ITransactionalResourceExtension>()
-                    .Cancel(target.Name, transactionId, timeStamp, status);
+                    .Cancel(target.Name, transactionId, timeStamp, status, activationLifetime.OnDeactivating);
                 TransactionDiagnosticEvents.EmitCancelSendCompleted(
                     resource,
                     transactionId,
@@ -1199,7 +1211,13 @@ namespace Orleans.Transactions.State
                             {
                                 // send PreparedMessage to remote TM
                                 bottom.TransactionManager.Reference.AsReference<ITransactionManagerExtension>()
-                                      .Prepared(bottom.TransactionManager.Name, bottom.TransactionId, bottom.Timestamp, resource, TransactionalStatus.Ok)
+                                      .Prepared(
+                                          bottom.TransactionManager.Name,
+                                          bottom.TransactionId,
+                                          bottom.Timestamp,
+                                          resource,
+                                          TransactionalStatus.Ok,
+                                          activationLifetime.OnDeactivating)
                                       .Ignore();
 
                                 bottom.LastSent = now;
@@ -1238,7 +1256,12 @@ namespace Orleans.Transactions.State
                                 {
                                     LogTraceSentPing(bottom);
                                     bottom.TransactionManager.Reference.AsReference<ITransactionManagerExtension>()
-                                          .Ping(bottom.TransactionManager.Name, bottom.TransactionId, bottom.Timestamp, resource).Ignore();
+                                          .Ping(
+                                              bottom.TransactionManager.Name,
+                                              bottom.TransactionId,
+                                              bottom.Timestamp,
+                                              resource,
+                                              activationLifetime.OnDeactivating).Ignore();
                                     bottom.RecordRemotePingSent(now);
                                     TransactionDiagnosticEvents.EmitRemoteRecoveryPingSent(
                                         resource,

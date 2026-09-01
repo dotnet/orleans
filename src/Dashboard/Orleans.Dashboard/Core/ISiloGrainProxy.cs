@@ -1,4 +1,5 @@
 using Orleans.Concurrency;
+using System.Threading;
 
 namespace Orleans.Dashboard.Core;
 
@@ -7,5 +8,5 @@ internal interface ISiloGrainProxy : IGrainWithStringKey, ISiloGrainService
 {
 
     [Alias("GetMetadata")]
-    Task<Immutable<Dictionary<string, string>>> GetMetadata();
+    Task<Immutable<Dictionary<string, string>>> GetMetadata(CancellationToken cancellationToken = default);
 }

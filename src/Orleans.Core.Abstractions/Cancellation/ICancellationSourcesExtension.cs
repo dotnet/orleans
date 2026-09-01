@@ -1,4 +1,5 @@
 using System;
+using System.Threading;
 using System.Threading.Tasks;
 using Orleans.Concurrency;
 
@@ -19,6 +20,7 @@ namespace Orleans.Runtime
         /// A <see cref="Task"/> representing the operation.
         /// </returns>
         [AlwaysInterleave]
-        Task CancelRemoteToken(Guid tokenId);
+        [Alias("50F75C16")]
+        Task CancelRemoteToken(Guid tokenId, CancellationToken cancellationToken = default);
     }
 }

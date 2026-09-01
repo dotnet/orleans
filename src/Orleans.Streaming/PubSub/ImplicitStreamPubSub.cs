@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 using Orleans.Runtime;
 using Orleans.Streams.Core;
@@ -22,7 +23,11 @@ namespace Orleans.Streams
         }
 
         public Task<ISet<PubSubSubscriptionState>> RegisterProducer(QualifiedStreamId streamId, GrainId streamProducer)
+            => RegisterProducer(streamId, streamProducer, CancellationToken.None);
+
+        public Task<ISet<PubSubSubscriptionState>> RegisterProducer(QualifiedStreamId streamId, GrainId streamProducer, CancellationToken cancellationToken)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             ISet<PubSubSubscriptionState> result = new HashSet<PubSubSubscriptionState>();
             if (!ImplicitStreamSubscriberTable.IsImplicitSubscribeEligibleNameSpace(streamId.GetNamespace())) return Task.FromResult(result);
 
@@ -36,12 +41,20 @@ namespace Orleans.Streams
         }
 
         public Task UnregisterProducer(QualifiedStreamId streamId, GrainId streamProducer)
+            => UnregisterProducer(streamId, streamProducer, CancellationToken.None);
+
+        public Task UnregisterProducer(QualifiedStreamId streamId, GrainId streamProducer, CancellationToken cancellationToken)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             return Task.CompletedTask;
         }
 
         public Task RegisterConsumer(GuidId subscriptionId, QualifiedStreamId streamId, GrainId streamConsumer, string? filterData)
+            => RegisterConsumer(subscriptionId, streamId, streamConsumer, filterData, CancellationToken.None);
+
+        public Task RegisterConsumer(GuidId subscriptionId, QualifiedStreamId streamId, GrainId streamConsumer, string? filterData, CancellationToken cancellationToken)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             // TODO BPETIT filter data?
             if (!IsImplicitSubscriber(streamConsumer, streamId))
             {
@@ -51,7 +64,11 @@ namespace Orleans.Streams
         }
 
         public Task UnregisterConsumer(GuidId subscriptionId, QualifiedStreamId streamId)
+            => UnregisterConsumer(subscriptionId, streamId, CancellationToken.None);
+
+        public Task UnregisterConsumer(GuidId subscriptionId, QualifiedStreamId streamId, CancellationToken cancellationToken)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             if (!IsImplicitSubscriber(subscriptionId, streamId))
             {
                 throw CreateExplicitSubscriptionNotSupportedException(streamId);
@@ -60,17 +77,29 @@ namespace Orleans.Streams
         }
 
         public Task<int> ProducerCount(QualifiedStreamId streamId)
+            => ProducerCount(streamId, CancellationToken.None);
+
+        public Task<int> ProducerCount(QualifiedStreamId streamId, CancellationToken cancellationToken)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             return Task.FromResult(0);
         }
 
         public Task<int> ConsumerCount(QualifiedStreamId streamId)
+            => ConsumerCount(streamId, CancellationToken.None);
+
+        public Task<int> ConsumerCount(QualifiedStreamId streamId, CancellationToken cancellationToken)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             return Task.FromResult(0);
         }
 
         public Task<List<StreamSubscription>> GetAllSubscriptions(QualifiedStreamId streamId, GrainId streamConsumer = default)
+            => GetAllSubscriptions(streamId, streamConsumer, CancellationToken.None);
+
+        public Task<List<StreamSubscription>> GetAllSubscriptions(QualifiedStreamId streamId, GrainId streamConsumer, CancellationToken cancellationToken)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             if (!ImplicitStreamSubscriberTable.IsImplicitSubscribeEligibleNameSpace(streamId.GetNamespace()))
                 return Task.FromResult(new List<StreamSubscription>());
 
@@ -114,7 +143,11 @@ namespace Orleans.Streams
         }
 
         public Task<bool> FaultSubscription(QualifiedStreamId streamId, GuidId subscriptionId)
+            => FaultSubscription(streamId, subscriptionId, CancellationToken.None);
+
+        public Task<bool> FaultSubscription(QualifiedStreamId streamId, GuidId subscriptionId, CancellationToken cancellationToken)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             return Task.FromResult(false);
         }
 

@@ -1,4 +1,5 @@
 using System;
+using System.Threading;
 using System.Threading.Tasks;
 using Orleans.Transactions.Abstractions;
 
@@ -15,9 +16,13 @@ namespace Orleans.Transactions.State
         }
 
         public async Task<TransactionalStatus> CommitReadOnly(Guid transactionId, AccessCounter accessCount, DateTime timeStamp)
+            => await CommitReadOnly(transactionId, accessCount, timeStamp, CancellationToken.None);
+
+        public async Task<TransactionalStatus> CommitReadOnly(Guid transactionId, AccessCounter accessCount, DateTime timeStamp, CancellationToken cancellationToken)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             // validate the lock
-            var (status, record) = await this.queue.RWLock.ValidateLock(transactionId, accessCount);
+            var (status, record) = await this.queue.RWLock.ValidateLock(transactionId, accessCount).WaitAsync(cancellationToken);
             var valid = status == TransactionalStatus.Ok;
 
             record.Timestamp = timeStamp;
@@ -26,7 +31,7 @@ namespace Orleans.Transactions.State
 
             if (!valid)
             {
-                await this.queue.NotifyOfAbort(record, status, exception: null);
+                await this.queue.NotifyOfAbort(record, status, exception: null).WaitAsync(cancellationToken);
             }
             else
             {
@@ -34,12 +39,15 @@ namespace Orleans.Transactions.State
             }
 
             this.queue.RWLock.Notify();
-            return await record.PromiseForTA.Task;
+            return await record.PromiseForTA.Task.WaitAsync(cancellationToken);
         }
 
         public async Task Abort(Guid transactionId)
+            => await Abort(transactionId, CancellationToken.None);
+
+        public async Task Abort(Guid transactionId, CancellationToken cancellationToken)
         {
-            await this.queue.Ready(transactionId);
+            await this.queue.Ready(transactionId).WaitAsync(cancellationToken);
             // release the lock
             this.queue.RWLock.Rollback(transactionId);
 
@@ -47,20 +55,29 @@ namespace Orleans.Transactions.State
         }
 
         public async Task Cancel(Guid transactionId, DateTime timeStamp, TransactionalStatus status)
+            => await Cancel(transactionId, timeStamp, status, CancellationToken.None);
+
+        public async Task Cancel(Guid transactionId, DateTime timeStamp, TransactionalStatus status, CancellationToken cancellationToken)
         {
-            await this.queue.Ready(transactionId);
-            await this.queue.NotifyOfCancel(transactionId, timeStamp, status);
+            await this.queue.Ready(transactionId).WaitAsync(cancellationToken);
+            await this.queue.NotifyOfCancel(transactionId, timeStamp, status).WaitAsync(cancellationToken);
         }
 
         public async Task Confirm(Guid transactionId, DateTime timeStamp)
+            => await Confirm(transactionId, timeStamp, CancellationToken.None);
+
+        public async Task Confirm(Guid transactionId, DateTime timeStamp, CancellationToken cancellationToken)
         {
-            await this.queue.Ready(transactionId);
-            await this.queue.NotifyOfConfirm(transactionId, timeStamp);
+            await this.queue.Ready(transactionId).WaitAsync(cancellationToken);
+            await this.queue.NotifyOfConfirm(transactionId, timeStamp).WaitAsync(cancellationToken);
         }
 
         public async Task Prepare(Guid transactionId, AccessCounter accessCount, DateTime timeStamp, ParticipantId transactionManager)
+            => await Prepare(transactionId, accessCount, timeStamp, transactionManager, CancellationToken.None);
+
+        public async Task Prepare(Guid transactionId, AccessCounter accessCount, DateTime timeStamp, ParticipantId transactionManager, CancellationToken cancellationToken)
         {
-            await this.queue.NotifyOfPrepare(transactionId, accessCount, timeStamp, transactionManager);
+            await this.queue.NotifyOfPrepare(transactionId, accessCount, timeStamp, transactionManager).WaitAsync(cancellationToken);
         }
     }
 }

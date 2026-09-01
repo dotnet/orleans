@@ -1,4 +1,5 @@
 using System;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace Orleans.Placement.Rebalancing;
@@ -20,7 +21,7 @@ public interface IActivationRebalancer
     /// <inheritdoc cref="IActivationRebalancerWorker.ResumeRebalancing"/>
     Task ResumeRebalancing();
 
-    /// <inheritdoc cref="IActivationRebalancerWorker.SuspendRebalancing(TimeSpan?)"/>
+    /// <inheritdoc cref="IActivationRebalancerWorker.SuspendRebalancing(TimeSpan?, CancellationToken)"/>
     Task SuspendRebalancing(TimeSpan? duration = null);
 
     /// <summary>

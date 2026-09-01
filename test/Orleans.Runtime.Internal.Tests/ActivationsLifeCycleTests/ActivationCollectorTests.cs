@@ -129,7 +129,7 @@ namespace UnitTests.ActivationsLifeCycleTests
             var grain = this.testCluster.GrainFactory!.GetGrain<IManagementGrain>(0);
 
             using var collectionObserver = ActivationCollectionObserver.Create();
-            await grain.ForceActivationCollection(FORCED_COLLECTION_AGE_LIMIT);
+            await grain.ForceActivationCollection(FORCED_COLLECTION_AGE_LIMIT, cancellationToken);
             await collectionObserver.WaitForCollectedCountAsync(
                 fullGrainTypeName,
                 grainCount,
@@ -140,7 +140,7 @@ namespace UnitTests.ActivationsLifeCycleTests
             int activationsNotCollected = await TestUtils.GetActivationCount(this.testCluster.GrainFactory!, fullGrainTypeName);
             Assert.Equal(0, activationsNotCollected);
 
-            await grain.ForceActivationCollection(FORCED_COLLECTION_AGE_LIMIT);
+            await grain.ForceActivationCollection(FORCED_COLLECTION_AGE_LIMIT, cancellationToken);
         }
 
         [TestSuite("Functional")]
@@ -304,7 +304,7 @@ namespace UnitTests.ActivationsLifeCycleTests
                 TimeSpan everything = TimeSpan.FromMinutes(10);
                 logger.LogInformation("ManualCollectionShouldNotCollectBusyActivations: triggering manual collection (timespan is {TotalSeconds} sec).",  everything.TotalSeconds);
                 IManagementGrain mgmtGrain = this.testCluster.GrainFactory!.GetGrain<IManagementGrain>(0);
-                await mgmtGrain.ForceActivationCollection(everything);
+                await mgmtGrain.ForceActivationCollection(everything, cancellationToken);
 
                 logger.LogInformation(
                     "ManualCollectionShouldNotCollectBusyActivations: waiting for idle activation count to converge to zero (activation GC idle timeout is {DefaultIdleTime} sec).",
@@ -763,7 +763,7 @@ namespace UnitTests.ActivationsLifeCycleTests
 
             // Verify the grain is not collected while it has an active keep-alive.
             var mgmtGrain = this.testCluster.GrainFactory!.GetGrain<IManagementGrain>(0);
-            await mgmtGrain.ForceActivationCollection(TimeSpan.Zero);
+            await mgmtGrain.ForceActivationCollection(TimeSpan.Zero, cancellationToken);
             int activationsWithKeepAlive = await TestUtils.GetActivationCount(this.testCluster.GrainFactory!, fullGrainTypeName);
             Assert.Equal(1, activationsWithKeepAlive);
 

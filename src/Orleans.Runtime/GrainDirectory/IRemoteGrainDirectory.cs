@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Threading;
 using System.Threading.Tasks;
 using Orleans.GrainDirectory;
 
@@ -15,7 +16,8 @@ namespace Orleans.Runtime
         /// </summary>
         /// <param name="addresses">The addresses of the grains to register</param>
         /// <returns></returns>
-        Task RegisterMany(List<GrainAddress> addresses);
+        [Alias("CD06EAEE")]
+        Task RegisterMany(List<GrainAddress> addresses, CancellationToken cancellationToken = default);
 
         /// <summary>
         /// Fetch the updated information on the given list of grains.
@@ -26,13 +28,17 @@ namespace Orleans.Runtime
         /// <returns>list of tuples holding a grain, generation number of the list of activations, and the list of activations. 
         /// If the generation number of the invoker matches the number of the destination, the list is null. If the destination does not
         /// hold the information on the grain, generation counter -1 is returned (and the list of activations is null)</returns>
-        Task<List<AddressAndTag>> LookUpMany(List<(GrainId GrainId, int Version)> grainAndETagList);
+        [Alias("7DF50601")]
+        Task<List<AddressAndTag>> LookUpMany(
+            List<(GrainId GrainId, int Version)> grainAndETagList,
+            CancellationToken cancellationToken = default);
 
         /// <summary>
         /// Registers activations from a split partition with this directory.
         /// </summary>
         /// <param name="singleActivations">The single-activation registrations from the split partition.</param>
         /// <returns></returns>
-        Task AcceptSplitPartition(List<GrainAddress> singleActivations);
+        [Alias("9ABE3793")]
+        Task AcceptSplitPartition(List<GrainAddress> singleActivations, CancellationToken cancellationToken = default);
     }
 }

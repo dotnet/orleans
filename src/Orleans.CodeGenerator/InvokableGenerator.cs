@@ -1,3 +1,4 @@
+using System.Globalization;
 using Orleans.CodeGenerator.SyntaxGeneration;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
@@ -26,7 +27,10 @@ internal class InvokableGenerator(ProxyGenerationContext generationContext)
         var fields = GetFieldDeclarations(invokableMethodInfo, fieldDescriptions);
         var (ctor, ctorArgs) = GenerateConstructor(generatedClassName, invokableMethodInfo, baseClassType);
         var accessibility = GetAccessibility(method);
-        var compoundTypeAliases = GetCompoundTypeAliasAttributeArguments(invokableMethodInfo, invokableMethodInfo.Key);
+        var compoundTypeAliases = GetCompoundTypeAliasAttributeArguments(
+            invokableMethodInfo,
+            invokableMethodInfo.Key,
+            includeGeneratedMethodId: !IsGeneratedMethodIdExplicitlyClaimed(invokableMethodInfo));
 
         List<INamedTypeSymbol> serializationHooks = new();
         if (baseClassType.GetAttributes(LibraryTypes.SerializationCallbacksAttribute, out var hookAttributes))
@@ -202,7 +206,31 @@ internal class InvokableGenerator(ProxyGenerationContext generationContext)
         return Attribute(LibraryTypes.CompoundTypeAliasAttribute.ToNameSyntax()).AddArgumentListArguments(args);
     }
 
-    internal static List<CompoundTypeAliasComponent[]> GetCompoundTypeAliasAttributeArguments(InvokableMethodDescription methodDescription, InvokableMethodId invokableId)
+    private bool IsGeneratedMethodIdExplicitlyClaimed(InvokableMethodDescription methodDescription)
+    {
+        foreach (var method in methodDescription.Method.ContainingType.GetMembers().OfType<IMethodSymbol>())
+        {
+            if (SymbolEqualityComparer.Default.Equals(method.OriginalDefinition, methodDescription.Method.OriginalDefinition))
+            {
+                continue;
+            }
+
+            var explicitMethodId = GeneratedCodeUtilities.GetId(LibraryTypes, method.OriginalDefinition)
+                ?.ToString(CultureInfo.InvariantCulture)
+                ?? GeneratedCodeUtilities.GetAlias(LibraryTypes, method.OriginalDefinition);
+            if (string.Equals(explicitMethodId, methodDescription.GeneratedMethodId, StringComparison.Ordinal))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    internal static List<CompoundTypeAliasComponent[]> GetCompoundTypeAliasAttributeArguments(
+        InvokableMethodDescription methodDescription,
+        InvokableMethodId invokableId,
+        bool includeGeneratedMethodId = true)
     {
         var result = new List<CompoundTypeAliasComponent[]>(2);
         var containingInterface = methodDescription.ContainingInterface;
@@ -211,7 +239,11 @@ internal class InvokableGenerator(ProxyGenerationContext generationContext)
             result.Add(GetCompoundTypeAliasComponents(invokableId, containingInterface, methodDescription.MethodId));
         }
 
-        result.Add(GetCompoundTypeAliasComponents(invokableId, containingInterface, methodDescription.GeneratedMethodId));
+        if (includeGeneratedMethodId)
+        {
+            result.Add(GetCompoundTypeAliasComponents(invokableId, containingInterface, methodDescription.GeneratedMethodId));
+        }
+
         return result;
     }
 

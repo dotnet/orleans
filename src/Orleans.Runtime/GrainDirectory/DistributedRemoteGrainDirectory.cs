@@ -85,14 +85,18 @@ internal sealed partial class DistributedRemoteGrainDirectory : SystemTarget, IR
         return cts;
     }
 
-    private async Task RunBatchOperationAsync<T>(List<T> values, Func<T, CancellationToken, Task> operation)
+    private async Task RunBatchOperationAsync<T>(
+        List<T> values,
+        Func<T, CancellationToken, Task> operation,
+        CancellationToken cancellationToken = default)
     {
-        using (var cts = CreateTimeoutCts(_directory.OnStoppedToken))
+        using (var cts = CreateTimeoutCts(cancellationToken))
         {
             await EnsureDirectoryInitializedAsync(cts.Token);
         }
 
-        var options = CreateParallelOptions(_directory.OnStoppedToken);
+        using var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, _directory.OnStoppedToken);
+        var options = CreateParallelOptions(linkedCts.Token);
         await Parallel.ForEachAsync(values, options, async (value, cancellationToken) =>
         {
             using var cts = CreateTimeoutCts(cancellationToken);
@@ -161,7 +165,8 @@ internal sealed partial class DistributedRemoteGrainDirectory : SystemTarget, IR
                 await remoteCatalog.DeleteActivations(
                     pair.Value,
                     DeactivationReasonCode.DuplicateActivation,
-                    "This grain has been activated elsewhere");
+                    "This grain has been activated elsewhere",
+                    _directory.OnStoppedToken);
             }
 
             duplicates.Remove(pair.Key);
@@ -295,23 +300,31 @@ internal sealed partial class DistributedRemoteGrainDirectory : SystemTarget, IR
         }
     }
 
-    public async Task RegisterMany(List<GrainAddress> addresses)
+    public async Task RegisterMany(
+        List<GrainAddress> addresses,
+        CancellationToken cancellationToken = default)
     {
-        await RunBatchOperationAsync(addresses, (address, cancellationToken) => _directory.RegisterAsync(address, null, cancellationToken));
+        await RunBatchOperationAsync(
+            addresses,
+            (address, cancellationToken) => _directory.RegisterAsync(address, null, cancellationToken),
+            cancellationToken);
     }
 
-    public async Task<List<AddressAndTag>> LookUpMany(List<(GrainId GrainId, int Version)> grainAndETagList)
+    public async Task<List<AddressAndTag>> LookUpMany(
+        List<(GrainId GrainId, int Version)> grainAndETagList,
+        CancellationToken cancellationToken = default)
     {
         _directoryInstruments.ValidationsCacheReceived.Add(1);
         LogInformationLookUpManyReceived(_logger, Silo, grainAndETagList.Count);
 
-        using (var cts = CreateTimeoutCts(_directory.OnStoppedToken))
+        using (var cts = CreateTimeoutCts(cancellationToken))
         {
             await EnsureDirectoryInitializedAsync(cts.Token);
         }
 
         var result = new AddressAndTag[grainAndETagList.Count];
-        var options = CreateParallelOptions(_directory.OnStoppedToken);
+        using var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, _directory.OnStoppedToken);
+        var options = CreateParallelOptions(linkedCts.Token);
         await Parallel.ForEachAsync(Enumerable.Range(0, grainAndETagList.Count), options, async (index, cancellationToken) =>
         {
             using var cts = CreateTimeoutCts(cancellationToken);
@@ -322,8 +335,11 @@ internal sealed partial class DistributedRemoteGrainDirectory : SystemTarget, IR
         return [.. result];
     }
 
-    public Task AcceptSplitPartition(List<GrainAddress> singleActivations)
+    public Task AcceptSplitPartition(
+        List<GrainAddress> singleActivations,
+        CancellationToken cancellationToken = default)
     {
+        cancellationToken.ThrowIfCancellationRequested();
         LogInformationAcceptSplitPartitionStarted(_logger, Silo, singleActivations.Count);
         if (singleActivations.Count == 0)
         {
@@ -337,7 +353,7 @@ internal sealed partial class DistributedRemoteGrainDirectory : SystemTarget, IR
                 if (operation.State is SplitPartitionRegistrationBatch existingBatch
                     && existingBatch.Matches(singleActivations))
                 {
-                    return existingBatch.Completion.Task.WaitAsync(_directory.OnStoppedToken);
+                    return WaitForCompletion(existingBatch.Completion.Task, cancellationToken, _directory.OnStoppedToken);
                 }
             }
 
@@ -346,7 +362,18 @@ internal sealed partial class DistributedRemoteGrainDirectory : SystemTarget, IR
                 nameof(AcceptSplitPartition),
                 batch,
                 static (self, state) => self.ProcessSplitPartitionRegistrationsAsync((SplitPartitionRegistrationBatch)state));
-            return batch.Completion.Task.WaitAsync(_directory.OnStoppedToken);
+            return WaitForCompletion(batch.Completion.Task, cancellationToken, _directory.OnStoppedToken);
+        }
+
+        static async Task WaitForCompletion(
+            Task completion,
+            CancellationToken cancellationToken,
+            CancellationToken stoppedToken)
+        {
+            using var linkedCancellation = CancellationTokenSource.CreateLinkedTokenSource(
+                cancellationToken,
+                stoppedToken);
+            await completion.WaitAsync(linkedCancellation.Token);
         }
     }
 

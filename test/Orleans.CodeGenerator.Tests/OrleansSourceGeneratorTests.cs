@@ -690,6 +690,155 @@ public interface IMyGrain : IGrainWithIntegerKey
 }");
 
     [Fact]
+    public async Task ExplicitMethodAlias_TakesPrecedenceOverAnotherOverloadsGeneratedAlias()
+    {
+        var compilation = await CreateCompilation(
+@"using Orleans;
+using Orleans.Runtime;
+using System.Threading;
+using System.Threading.Tasks;
+
+[GenerateMethodSerializers(typeof(GrainReference))]
+public interface IBasicGrain : IGrainWithIntegerKey
+{
+    [Alias(""SayHello"")]
+    Task<string> SayHello(string name);
+
+    [Alias(""6B0E24A1"")]
+    Task<string> SayHello(string name, CancellationToken cancellationToken);
+}",
+            "TestProject");
+
+        Assert.Empty(compilation.GetDiagnostics(TestContext.Current.CancellationToken));
+        var result = RunSourceGenerator(compilation);
+        Assert.Empty(result.Diagnostics);
+        var generatedSource = ConcatenateGeneratedSources(result);
+        Assert.Contains("\"SayHello\"", generatedSource, StringComparison.Ordinal);
+        Assert.Contains("\"6B0E24A1\"", generatedSource, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task ExplicitMethodId_TakesPrecedenceOverAnotherOverloadsGeneratedAlias()
+    {
+        var candidateMethods = string.Join(
+            Environment.NewLine,
+            Enumerable.Range(0, 128).Select(static index => $"    ValueTask Method{index}();"));
+        var baseline = await CreateCompilation(
+$@"using Orleans;
+using Orleans.Runtime;
+using System.Threading.Tasks;
+
+public interface IBasicGrain : IGrainWithIntegerKey
+{{
+{candidateMethods}
+}}",
+            "Baseline");
+        var candidate = baseline.GetTypeByMetadataName("IBasicGrain")!.GetMembers()
+            .OfType<IMethodSymbol>()
+            .Select(static method => (Method: method, Id: GeneratedCodeUtilities.CreateHashedMethodId(method)))
+            .First(static entry => entry.Id[0] != '0' && entry.Id.All(char.IsDigit));
+        var methodId = uint.Parse(candidate.Id);
+        var methodName = candidate.Method.Name;
+        var compilation = await CreateCompilation(
+$@"using Orleans;
+using Orleans.Runtime;
+using System.Threading;
+using System.Threading.Tasks;
+
+[GenerateMethodSerializers(typeof(GrainReference))]
+public interface IBasicGrain : IGrainWithIntegerKey
+{{
+    [Alias(""{methodName}"")]
+    ValueTask {methodName}();
+
+    [Id({methodId})]
+    ValueTask {methodName}(CancellationToken cancellationToken);
+}}",
+            "TestProject");
+
+        Assert.Empty(compilation.GetDiagnostics(TestContext.Current.CancellationToken));
+        var result = RunSourceGenerator(compilation);
+        Assert.Empty(result.Diagnostics);
+        var interfaceSymbol = compilation.GetTypeByMetadataName("IBasicGrain")!;
+        var cancellationMethod = Assert.Single(
+            interfaceSymbol.GetMembers(methodName).OfType<IMethodSymbol>(),
+            static method => method.Parameters.Length == 1);
+        var cancellationGeneratedId = GeneratedCodeUtilities.CreateHashedMethodId(cancellationMethod);
+        var generatedSource = ConcatenateGeneratedSources(result);
+        var registration = Assert.Single(
+            generatedSource.Split(Environment.NewLine),
+            line => line.Contains($"Add(\"{candidate.Id}\", typeof(", StringComparison.Ordinal));
+        Assert.Contains(cancellationGeneratedId, registration, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task ExplicitExtensionAlias_DoesNotSuppressAnotherDeclaringInterfacesGeneratedAlias()
+    {
+        var baseline = await CreateCompilation(
+@"using Orleans;
+using Orleans.Runtime;
+using System.Threading.Tasks;
+
+public interface IBaseExtensionA : IGrainExtension
+{
+    ValueTask FlushBuffers();
+}",
+            "Baseline");
+        var method = Assert.Single(baseline.GetTypeByMetadataName("IBaseExtensionA")!.GetMembers().OfType<IMethodSymbol>());
+        var generatedMethodId = GeneratedCodeUtilities.CreateHashedMethodId(method);
+        var compilation = await CreateCompilation(
+$@"using Orleans;
+using Orleans.Runtime;
+using System.Threading;
+using System.Threading.Tasks;
+
+public interface IBaseExtensionA : IGrainExtension
+{{
+    [Alias(""FlushBuffers"")]
+    ValueTask FlushBuffers();
+}}
+
+public interface IBaseExtensionB : IGrainExtension
+{{
+    [Alias(""{generatedMethodId}"")]
+    ValueTask FlushBuffers(CancellationToken cancellationToken);
+}}
+
+[GenerateMethodSerializers(typeof(GrainReference))]
+public interface IDerivedExtension : IBaseExtensionA, IBaseExtensionB
+{{
+}}",
+            "TestProject");
+
+        Assert.Empty(compilation.GetDiagnostics(TestContext.Current.CancellationToken));
+        var result = RunSourceGenerator(compilation);
+        Assert.Empty(result.Diagnostics);
+        var derivedInterface = compilation.GetTypeByMetadataName("IDerivedExtension")!;
+        var derivedMethods = derivedInterface.AllInterfaces
+            .SelectMany(static interfaceType => interfaceType.GetMembers("FlushBuffers"))
+            .OfType<IMethodSymbol>()
+            .ToArray();
+        var legacyGeneratedId = GeneratedCodeUtilities.CreateHashedMethodId(
+            Assert.Single(derivedMethods, static method => method.Parameters.Length == 0));
+        var cancellationGeneratedId = GeneratedCodeUtilities.CreateHashedMethodId(
+            Assert.Single(derivedMethods, static method => method.Parameters.Length == 1));
+        var generatedSource = ConcatenateGeneratedSources(result);
+        var registrations = generatedSource.Split(Environment.NewLine)
+            .Where(line => line.Contains($"Add(\"{generatedMethodId}\", typeof(", StringComparison.Ordinal))
+            .ToArray();
+        Assert.Contains(
+            registrations,
+            line => line.Contains(
+                $"Invokable_IBaseExtensionA_GrainReference_Ext_{legacyGeneratedId}",
+                StringComparison.Ordinal));
+        Assert.Contains(
+            registrations,
+            line => line.Contains(
+                $"Invokable_IBaseExtensionB_GrainReference_Ext_{cancellationGeneratedId}",
+                StringComparison.Ordinal));
+    }
+
+    [Fact]
     public Task TestClassWithGenerateSerializerAnnotation() => AssertSuccessfulSourceGeneration(
 @"using Orleans;
 

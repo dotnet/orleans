@@ -52,7 +52,7 @@ public class StatePreservationRebalancingTests(SPFixture fixture, ITestOutputHel
         rebalancerEvents.Clear();
         await rebalancerEvents.WaitForCycleCountAsync(targetHost, 3, WaitTimeout);
 
-        var stats = await MgmtGrain.GetDetailedGrainStatistics();
+        var stats = await MgmtGrain.GetDetailedGrainStatistics(null, null, cancellationToken);
 
         var initialSilo1Activations = GetActivationCount(stats, Silo1);
         var initialSilo2Activations = GetActivationCount(stats, Silo2);
@@ -67,7 +67,7 @@ public class StatePreservationRebalancingTests(SPFixture fixture, ITestOutputHel
            $"Silo4: {initialSilo4Activations}\n");
 
         (var rebalancerHost, var rebalancerHostNum) = await FindRebalancerHost(Silo1);
-        var reportBeforeStop = await rebalancer.GetReport();
+        var reportBeforeStop = await rebalancer.GetReport(cancellationToken);
 
         OutputHelper.WriteLine($"Now stopping Silo{rebalancerHostNum}, which is the host of the rebalancer\n");
 
@@ -78,7 +78,7 @@ public class StatePreservationRebalancingTests(SPFixture fixture, ITestOutputHel
             Cluster.Silos.First(x => x.SiloAddress.Equals(rebalancerHost)),
             cancellationToken);
 
-        var reportAfterStop = await rebalancer.GetReport();
+        var reportAfterStop = await rebalancer.GetReport(cancellationToken);
         var newHost = reportAfterStop.Host;
         Assert.NotEqual(rebalancerHost, newHost);
         Assert.Equal(reportBeforeStop.ClusterImbalance, reportAfterStop.ClusterImbalance);
@@ -111,7 +111,7 @@ public class StatePreservationRebalancingTests(SPFixture fixture, ITestOutputHel
         rebalancerEvents.Clear();
         await rebalancerEvents.WaitForCycleCountAsync(newHost, 3, WaitTimeout);
 
-        stats = await MgmtGrain.GetDetailedGrainStatistics();
+        stats = await MgmtGrain.GetDetailedGrainStatistics(null, null, cancellationToken);
         Assert.DoesNotContain(stats, statistic => statistic.SiloAddress.Equals(rebalancerHost));
 
         var silo1Activations = GetActivationCount(stats, Silo1);

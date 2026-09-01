@@ -213,7 +213,7 @@ public abstract class AdoNetQueueAdapterTests(string invariant, TestEnvironmentF
 
         // act - grab receiver and dequeue messages
         var receiver = adapter.CreateReceiver(queueId);
-        await receiver.Initialize(TimeSpan.FromSeconds(10));
+        await receiver.Initialize(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
         var beforeDequeued = DateTime.UtcNow.AddSeconds(-1);
         var messages = await receiver.GetQueueMessagesAsync(10, TestContext.Current.CancellationToken);
         var afterDequeued = DateTime.UtcNow.AddSeconds(1);

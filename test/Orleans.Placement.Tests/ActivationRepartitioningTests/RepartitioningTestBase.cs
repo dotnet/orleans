@@ -46,17 +46,17 @@ public abstract class RepartitioningTestBase<TFixture> : IAsyncLifetime where TF
 
     public async ValueTask ResetCounters(CancellationToken cancellationToken)
     {
-        await Silo1Repartitioner.ResetCounters().AsTask().WaitAsync(cancellationToken);
-        await Silo2Repartitioner.ResetCounters().AsTask().WaitAsync(cancellationToken);
+        await Silo1Repartitioner.ResetCounters(cancellationToken);
+        await Silo2Repartitioner.ResetCounters(cancellationToken);
     }
 
     private protected async ValueTask TriggerExchangeRequestAfterFlushingBuffers(
         IActivationRepartitionerSystemTarget repartitioner,
         CancellationToken cancellationToken)
     {
-        await Silo1Repartitioner.FlushBuffers().AsTask().WaitAsync(cancellationToken);
-        await Silo2Repartitioner.FlushBuffers().AsTask().WaitAsync(cancellationToken);
-        await repartitioner.TriggerExchangeRequest().AsTask().WaitAsync(cancellationToken);
+        await Silo1Repartitioner.FlushBuffers(cancellationToken);
+        await Silo2Repartitioner.FlushBuffers(cancellationToken);
+        await repartitioner.TriggerExchangeRequest(cancellationToken);
     }
 
     private protected static Task WaitForConditionAsync(
@@ -87,7 +87,7 @@ public abstract class RepartitioningTestBase<TFixture> : IAsyncLifetime where TF
         foreach (var silo in (IEnumerable<SiloHandle>)_fixture.HostedCluster.Silos)
         {
             var sysTarget = GrainFactory.GetSystemTarget<IActivationRepartitionerSystemTarget>(Constants.ActivationRepartitionerType, silo.SiloAddress);
-            var count = counts[silo.SiloAddress] = await sysTarget.GetActivationCount().AsTask().WaitAsync(cancellationToken);
+            var count = counts[silo.SiloAddress] = await sysTarget.GetActivationCount(cancellationToken);
             max = Math.Max(max, count);
         }
 
@@ -95,7 +95,7 @@ public abstract class RepartitioningTestBase<TFixture> : IAsyncLifetime where TF
         {
             var sysTarget = GrainFactory.GetSystemTarget<IActivationRepartitionerSystemTarget>(Constants.ActivationRepartitionerType, silo.SiloAddress);
             var myCount = counts[silo.SiloAddress];
-            await sysTarget.SetActivationCountOffset(max - myCount).AsTask().WaitAsync(cancellationToken);
+            await sysTarget.SetActivationCountOffset(max - myCount, cancellationToken);
         }
     }
 

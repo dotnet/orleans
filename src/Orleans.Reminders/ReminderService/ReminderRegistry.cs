@@ -22,6 +22,14 @@ namespace Orleans.Runtime.ReminderService
         }
 
         public Task<IGrainReminder> RegisterOrUpdateReminder(GrainId callingGrainId, string reminderName, TimeSpan dueTime, TimeSpan period)
+            => RegisterOrUpdateReminder(callingGrainId, reminderName, dueTime, period, CancellationToken.None);
+
+        public Task<IGrainReminder> RegisterOrUpdateReminder(
+            GrainId callingGrainId,
+            string reminderName,
+            TimeSpan dueTime,
+            TimeSpan period,
+            CancellationToken cancellationToken)
         {
             // Perform input volatility checks 
             if (dueTime == Timeout.InfiniteTimeSpan)
@@ -44,28 +52,37 @@ namespace Orleans.Runtime.ReminderService
                 throw new ArgumentException("Cannot use null or empty name for the reminder", nameof(reminderName));
 
             EnsureReminderServiceRegisteredAndInGrainContext();
-            return GetGrainService(callingGrainId).RegisterOrUpdateReminder(callingGrainId, reminderName, dueTime, period);
+            return GetGrainService(callingGrainId).RegisterOrUpdateReminder(callingGrainId, reminderName, dueTime, period, cancellationToken);
         }
 
         public Task UnregisterReminder(GrainId callingGrainId, IGrainReminder reminder)
+            => UnregisterReminder(callingGrainId, reminder, CancellationToken.None);
+
+        public Task UnregisterReminder(GrainId callingGrainId, IGrainReminder reminder, CancellationToken cancellationToken)
         {
             EnsureReminderServiceRegisteredAndInGrainContext();
-            return GetGrainService(callingGrainId).UnregisterReminder(reminder);
+            return GetGrainService(callingGrainId).UnregisterReminder(reminder, cancellationToken);
         }
 
         public Task<IGrainReminder?> GetReminder(GrainId callingGrainId, string reminderName)
+            => GetReminder(callingGrainId, reminderName, CancellationToken.None);
+
+        public Task<IGrainReminder?> GetReminder(GrainId callingGrainId, string reminderName, CancellationToken cancellationToken)
         {
             if (string.IsNullOrEmpty(reminderName))
                 throw new ArgumentException("Cannot use null or empty name for the reminder", nameof(reminderName));
 
             EnsureReminderServiceRegisteredAndInGrainContext();
-            return GetGrainService(callingGrainId).GetReminder(callingGrainId, reminderName);
+            return GetGrainService(callingGrainId).GetReminder(callingGrainId, reminderName, cancellationToken);
         }
 
         public Task<List<IGrainReminder>> GetReminders(GrainId callingGrainId)
+            => GetReminders(callingGrainId, CancellationToken.None);
+
+        public Task<List<IGrainReminder>> GetReminders(GrainId callingGrainId, CancellationToken cancellationToken)
         {
             EnsureReminderServiceRegisteredAndInGrainContext();
-            return GetGrainService(callingGrainId).GetReminders(callingGrainId);
+            return GetGrainService(callingGrainId).GetReminders(callingGrainId, cancellationToken);
         }
 
         private void EnsureReminderServiceRegisteredAndInGrainContext()

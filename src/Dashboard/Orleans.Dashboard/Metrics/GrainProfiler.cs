@@ -31,19 +31,21 @@ internal sealed partial class GrainProfiler(
 
     public void Participate(ISiloLifecycle lifecycle) => lifecycle.Subscribe<GrainProfiler>(ServiceLifecycleStage.Last, StartProfiler, StopProfiler);
 
-    private Task StartProfiler(CancellationToken ct) => OnStart();
+    private Task StartProfiler(CancellationToken ct) => OnStart(ct);
 
-    private Task StopProfiler(CancellationToken ct) => OnStop();
+    private Task StopProfiler(CancellationToken ct) => OnStop(ct);
 
-    private Task OnStart()
+    private Task OnStart(CancellationToken cancellationToken)
     {
+        cancellationToken.ThrowIfCancellationRequested();
         _timer = new Timer(ProcessStats, null, 1 * 1000, 1 * 1000);
         return Task.CompletedTask;
     }
 
-    private Task OnStop()
+    private Task OnStop(CancellationToken cancellationToken)
     {
         _timer.Dispose();
+        cancellationToken.ThrowIfCancellationRequested();
         return Task.CompletedTask;
     }
 

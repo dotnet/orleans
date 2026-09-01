@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Orleans.Providers.Streams.Common;
@@ -28,19 +29,26 @@ namespace Orleans.Providers
         }
 
         public Task Initialize(TimeSpan timeout)
+            => Initialize(timeout, CancellationToken.None);
+
+        public Task Initialize(TimeSpan timeout, CancellationToken cancellationToken)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             this.receiverMonitor?.TrackInitialization(true, TimeSpan.MinValue, null);
             return Task.CompletedTask;
         }
 
         public async Task<IList<IBatchContainer>> GetQueueMessagesAsync(int maxCount)
+            => await GetQueueMessagesAsync(maxCount, CancellationToken.None);
+
+        public async Task<IList<IBatchContainer>> GetQueueMessagesAsync(int maxCount, CancellationToken cancellationToken)
         {
             var watch = Stopwatch.StartNew();
             List<IBatchContainer> batches;
             Task<List<MemoryMessageData>> task = null!; // Preserves the existing null-in-finally behavior if Dequeue throws synchronously.
             try
             {
-                task = queueGrain.Dequeue(maxCount);
+                task = queueGrain.Dequeue(maxCount, cancellationToken);
                 awaitingTasks.Add(task);
                 var eventData = await task;
                 batches = eventData.Select(data => new MemoryBatchContainer<TSerializer>(data, this.serializer)).ToList<IBatchContainer>();
@@ -68,21 +76,35 @@ namespace Orleans.Providers
         }
 
         public Task MessagesDeliveredAsync(IList<IBatchContainer> messages)
+            => MessagesDeliveredAsync(messages, CancellationToken.None);
+
+        public Task MessagesDeliveredAsync(IList<IBatchContainer> messages, CancellationToken cancellationToken)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             return Task.CompletedTask;
         }
 
         public async Task Shutdown(TimeSpan timeout)
+            => await Shutdown(timeout, CancellationToken.None);
+
+        public async Task Shutdown(TimeSpan timeout, CancellationToken cancellationToken)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             var watch = Stopwatch.StartNew();
             try
             {
                 if (awaitingTasks.Count != 0)
                 {
-                    await Task.WhenAll(awaitingTasks);
+                    await Task.WhenAll(awaitingTasks).WaitAsync(cancellationToken);
                 }
                 watch.Stop();
                 this.receiverMonitor?.TrackShutdown(true, watch.Elapsed, null);
+            }
+            catch (OperationCanceledException ex) when (cancellationToken.IsCancellationRequested)
+            {
+                watch.Stop();
+                this.receiverMonitor?.TrackShutdown(false, watch.Elapsed, ex);
+                throw;
             }
             catch (Exception ex)
             {

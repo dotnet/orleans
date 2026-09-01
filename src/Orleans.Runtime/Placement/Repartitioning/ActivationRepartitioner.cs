@@ -116,7 +116,11 @@ internal sealed partial class ActivationRepartitioner : SystemTarget, IActivatio
         _pendingMessages = new StripedMpscBuffer<Message>(Environment.ProcessorCount, options.Value.MaxUnprocessedEdges / Environment.ProcessorCount);
         shared.ActivationDirectory.RecordNewTarget(this);
         _siloStatusOracle.SubscribeToSiloStatusEvents(this);
-        _timer = RegisterTimer(_ => TriggerExchangeRequest().AsTask(), null, Timeout.InfiniteTimeSpan, Timeout.InfiniteTimeSpan);
+        _timer = RegisterTimer(
+            _ => TriggerExchangeRequest(_shutdownCts.Token).AsTask(),
+            null,
+            Timeout.InfiniteTimeSpan,
+            Timeout.InfiniteTimeSpan);
 
         if (options.Value.AnchoringFilterEnabled)
         {
@@ -136,17 +140,26 @@ internal sealed partial class ActivationRepartitioner : SystemTarget, IActivatio
         return Task.CompletedTask;
     }
 
-    public ValueTask ResetCounters()
+    public ValueTask ResetCounters(CancellationToken cancellationToken = default)
     {
+        cancellationToken.ThrowIfCancellationRequested();
         _pendingMessages.Clear();
         _edgeWeights.Clear();
         _anchoredFilter?.Reset();
         return ValueTask.CompletedTask;
     }
 
-    ValueTask<int> IActivationRepartitionerSystemTarget.GetActivationCount() => new(_activationDirectory.Count);
-    ValueTask IActivationRepartitionerSystemTarget.SetActivationCountOffset(int activationCountOffset)
+    ValueTask<int> IActivationRepartitionerSystemTarget.GetActivationCount(CancellationToken cancellationToken)
     {
+        cancellationToken.ThrowIfCancellationRequested();
+        return new(_activationDirectory.Count);
+    }
+
+    ValueTask IActivationRepartitionerSystemTarget.SetActivationCountOffset(
+        int activationCountOffset,
+        CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
         _activationCountOffset = activationCountOffset;
         return ValueTask.CompletedTask;
     }
@@ -158,8 +171,9 @@ internal sealed partial class ActivationRepartitioner : SystemTarget, IActivatio
         LogPeriodicallyInvokeProtocol(_options.MinRoundPeriod, _options.MaxRoundPeriod, dueTime);
     }
 
-    public async ValueTask TriggerExchangeRequest()
+    public async ValueTask TriggerExchangeRequest(CancellationToken cancellationToken = default)
     {
+        cancellationToken.ThrowIfCancellationRequested();
         if (_anchoredFilter is { } filter)
         {
             filter.Rotate();
@@ -169,7 +183,7 @@ internal sealed partial class ActivationRepartitioner : SystemTarget, IActivatio
         if (coolDown > TimeSpan.Zero)
         {
             LogCoolingDown(coolDown);
-            await Task.Delay(coolDown, _timeProvider);
+            await Task.Delay(coolDown, _timeProvider, cancellationToken);
         }
 
         // Schedule the next timer tick.
@@ -199,6 +213,7 @@ internal sealed partial class ActivationRepartitioner : SystemTarget, IActivatio
         LogComputedCandidateSets(sw.Elapsed);
         foreach ((var candidateSilo, var offeredGrains, var _) in sets)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             if (offeredGrains.Count == 0)
             {
                 LogExchangeSetIsEmpty(candidateSilo);
@@ -213,12 +228,15 @@ internal sealed partial class ActivationRepartitioner : SystemTarget, IActivatio
 
                 LogBeginningProtocol(Silo, candidateSilo);
                 var remoteRef = IActivationRepartitionerSystemTarget.GetReference(_grainFactory, candidateSilo);
-                var response = await remoteRef.AcceptExchangeRequest(new(Silo, [.. offeredGrains], GetLocalActivationCount()));
+                var response = await remoteRef.AcceptExchangeRequest(
+                    new(Silo, [.. offeredGrains], GetLocalActivationCount()),
+                    cancellationToken);
 
                 switch (response.Type)
                 {
                     case AcceptExchangeResponse.ResponseType.Success:
                         // Exchange was successful, no need to iterate over another candidate.
+                        cancellationToken.ThrowIfCancellationRequested();
                         await FinalizeProtocol(response.AcceptedGrainIds, response.GivenGrainIds, candidateSilo, anchoredSet);
                         return;
                     case AcceptExchangeResponse.ResponseType.ExchangedRecently:
@@ -231,6 +249,10 @@ internal sealed partial class ActivationRepartitioner : SystemTarget, IActivatio
                         LogMutualExchangeAttemptResponse(Silo, candidateSilo);
                         return;
                 }
+            }
+            catch (OperationCanceledException ex) when (ex.CancellationToken == cancellationToken)
+            {
+                throw;
             }
             catch (Exception ex)
             {
@@ -246,8 +268,11 @@ internal sealed partial class ActivationRepartitioner : SystemTarget, IActivatio
 
     private int GetLocalActivationCount() => _activationDirectory.Count + _activationCountOffset;
 
-    public async ValueTask<AcceptExchangeResponse> AcceptExchangeRequest(AcceptExchangeRequest request)
+    public async ValueTask<AcceptExchangeResponse> AcceptExchangeRequest(
+        AcceptExchangeRequest request,
+        CancellationToken cancellationToken = default)
     {
+        cancellationToken.ThrowIfCancellationRequested();
         LogReceivedExchangeRequest(request.SendingSilo, request.ExchangeSet.Length, request.ActivationCountSnapshot);
         if (request.SendingSilo.Equals(_currentExchangeSilo) && Silo.CompareTo(request.SendingSilo) <= 0)
         {
@@ -305,7 +330,7 @@ internal sealed partial class ActivationRepartitioner : SystemTarget, IActivatio
                 {
                     // Give other tasks a chance to execute periodically.
                     yieldStopwatch.Restart();
-                    await Task.Delay(1);
+                    await Task.Delay(1, cancellationToken);
                 }
 
                 // If more is gained by giving grains to the remote silo than taking from it, we will try giving first.
@@ -329,6 +354,7 @@ internal sealed partial class ActivationRepartitioner : SystemTarget, IActivatio
             LogTransferSetComputed(stopwatch.Elapsed, imbalance);
             var giving = givingGrains.ToImmutable();
             var accepting = acceptedGrains.ToImmutable();
+            cancellationToken.ThrowIfCancellationRequested();
             await FinalizeProtocol(giving, accepting, request.SendingSilo, anchoredSet);
 
             return new(AcceptExchangeResponse.ResponseType.Success, accepting, giving);
@@ -826,11 +852,13 @@ internal sealed partial class ActivationRepartitioner : SystemTarget, IActivatio
         _enableMessageSampling = _siloStatusOracle.GetActiveSilos().Length > 1;
     }
 
-    public ValueTask<ImmutableArray<(Edge, ulong)>> GetGrainCallFrequencies()
+    public ValueTask<ImmutableArray<(Edge, ulong)>> GetGrainCallFrequencies(CancellationToken cancellationToken = default)
     {
+        cancellationToken.ThrowIfCancellationRequested();
         var result = ImmutableArray.CreateBuilder<(Edge, ulong)>(_edgeWeights.Count);
         foreach (var (edge, count, _) in _edgeWeights.Elements)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             result.Add((edge, count));
         }
 

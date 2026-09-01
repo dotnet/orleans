@@ -53,15 +53,25 @@ namespace Orleans.Runtime.Management
             this.grainLocator = grainLocator;
         }
 
-        public async Task<Dictionary<SiloAddress, SiloStatus>> GetHosts(bool onlyActive = false)
+        public Task<Dictionary<SiloAddress, SiloStatus>> GetHosts(bool onlyActive = false)
+            => GetHosts(onlyActive, CancellationToken.None);
+
+        public async Task<Dictionary<SiloAddress, SiloStatus>> GetHosts(
+            bool onlyActive,
+            CancellationToken cancellationToken)
         {
-            await this.membershipManager.Refresh(null, CancellationToken.None);
+            await this.membershipManager.Refresh(null, cancellationToken);
             return this.siloStatusOracle.GetApproximateSiloStatuses(onlyActive);
         }
 
-        public async Task<MembershipEntry[]> GetDetailedHosts(bool onlyActive = false)
+        public Task<MembershipEntry[]> GetDetailedHosts(bool onlyActive = false)
+            => GetDetailedHosts(onlyActive, CancellationToken.None);
+
+        public async Task<MembershipEntry[]> GetDetailedHosts(
+            bool onlyActive,
+            CancellationToken cancellationToken)
         {
-            await this.membershipManager.Refresh(null, CancellationToken.None);
+            await this.membershipManager.Refresh(null, cancellationToken);
 
             var table = this.membershipManager.CurrentSnapshot;
 
@@ -84,131 +94,206 @@ namespace Orleans.Runtime.Management
         }
 
         public Task ForceGarbageCollection(SiloAddress[] siloAddresses)
+            => ForceGarbageCollection(siloAddresses, CancellationToken.None);
+
+        public Task ForceGarbageCollection(
+            SiloAddress[] siloAddresses,
+            CancellationToken cancellationToken)
         {
             var silos = GetSiloAddresses(siloAddresses);
             LogInformationForceGarbageCollection(new(silos));
             List<Task> actionPromises = PerformPerSiloAction(silos,
-                s => GetSiloControlReference(s).ForceGarbageCollection());
+                s => GetSiloControlReference(s).ForceGarbageCollection(cancellationToken));
             return Task.WhenAll(actionPromises);
         }
 
         public Task ForceActivationCollection(SiloAddress[] siloAddresses, TimeSpan ageLimit)
+            => ForceActivationCollection(siloAddresses, ageLimit, CancellationToken.None);
+
+        public Task ForceActivationCollection(
+            SiloAddress[] siloAddresses,
+            TimeSpan ageLimit,
+            CancellationToken cancellationToken)
         {
             var silos = GetSiloAddresses(siloAddresses);
             return Task.WhenAll(GetSiloAddresses(silos).Select(s =>
-                GetSiloControlReference(s).ForceActivationCollection(ageLimit)));
+                GetSiloControlReference(s).ForceActivationCollection(ageLimit, cancellationToken)));
         }
 
-        public async Task ForceActivationCollection(TimeSpan ageLimit)
+        public Task ForceActivationCollection(TimeSpan ageLimit)
+            => ForceActivationCollection(ageLimit, CancellationToken.None);
+
+        public async Task ForceActivationCollection(TimeSpan ageLimit, CancellationToken cancellationToken)
         {
-            Dictionary<SiloAddress, SiloStatus> hosts = await GetHosts(true);
+            Dictionary<SiloAddress, SiloStatus> hosts = await GetHosts(true, cancellationToken);
             SiloAddress[] silos = hosts.Keys.ToArray();
-            await ForceActivationCollection(silos, ageLimit);
+            await ForceActivationCollection(silos, ageLimit, cancellationToken);
         }
 
         public Task ForceRuntimeStatisticsCollection(SiloAddress[] siloAddresses)
+            => ForceRuntimeStatisticsCollection(siloAddresses, CancellationToken.None);
+
+        public Task ForceRuntimeStatisticsCollection(
+            SiloAddress[] siloAddresses,
+            CancellationToken cancellationToken)
         {
             var silos = GetSiloAddresses(siloAddresses);
             LogInformationForceRuntimeStatisticsCollection(new(silos));
             List<Task> actionPromises = PerformPerSiloAction(
                 silos,
-                s => GetSiloControlReference(s).ForceRuntimeStatisticsCollection());
+                s => GetSiloControlReference(s).ForceRuntimeStatisticsCollection(cancellationToken));
             return Task.WhenAll(actionPromises);
         }
 
         public Task<SiloRuntimeStatistics[]> GetRuntimeStatistics(SiloAddress[] siloAddresses)
+            => GetRuntimeStatistics(siloAddresses, CancellationToken.None);
+
+        public Task<SiloRuntimeStatistics[]> GetRuntimeStatistics(
+            SiloAddress[] siloAddresses,
+            CancellationToken cancellationToken)
         {
             var silos = GetSiloAddresses(siloAddresses);
             LogDebugGetRuntimeStatistics(new(silos));
             var promises = new List<Task<SiloRuntimeStatistics>>();
             foreach (SiloAddress siloAddress in silos)
-                promises.Add(GetSiloControlReference(siloAddress).GetRuntimeStatistics());
+                promises.Add(GetSiloControlReference(siloAddress).GetRuntimeStatistics(cancellationToken));
 
             return Task.WhenAll(promises);
         }
 
-        public async Task<SimpleGrainStatistic[]> GetSimpleGrainStatistics(SiloAddress[] hostsIds)
+        public Task<SimpleGrainStatistic[]> GetSimpleGrainStatistics(SiloAddress[] hostsIds)
+            => GetSimpleGrainStatistics(hostsIds, CancellationToken.None);
 
+        public async Task<SimpleGrainStatistic[]> GetSimpleGrainStatistics(
+            SiloAddress[] hostsIds,
+            CancellationToken cancellationToken)
         {
             var all = GetSiloAddresses(hostsIds).Select(s =>
-                GetSiloControlReference(s).GetSimpleGrainStatistics()).ToList();
-            await Task.WhenAll(all);
+                GetSiloControlReference(s).GetSimpleGrainStatistics(cancellationToken)).ToList();
+            await Task.WhenAll(all).WaitAsync(cancellationToken);
             return all.SelectMany(s => s.Result).ToArray();
         }
 
-        public async Task<SimpleGrainStatistic[]> GetSimpleGrainStatistics()
+        public Task<SimpleGrainStatistic[]> GetSimpleGrainStatistics()
+            => GetSimpleGrainStatistics(CancellationToken.None);
+
+        public async Task<SimpleGrainStatistic[]> GetSimpleGrainStatistics(CancellationToken cancellationToken)
         {
-            Dictionary<SiloAddress, SiloStatus> hosts = await GetHosts(true);
+            Dictionary<SiloAddress, SiloStatus> hosts = await GetHosts(true, cancellationToken);
             SiloAddress[] silos = hosts.Keys.ToArray();
-            return await GetSimpleGrainStatistics(silos);
+            return await GetSimpleGrainStatistics(silos, cancellationToken);
         }
 
-        public async Task<DetailedGrainStatistic[]> GetDetailedGrainStatistics(string[]? types = null, SiloAddress[]? hostsIds = null)
+        public Task<DetailedGrainStatistic[]> GetDetailedGrainStatistics(
+            string[]? types = null,
+            SiloAddress[]? hostsIds = null)
+            => GetDetailedGrainStatistics(types, hostsIds, CancellationToken.None);
+
+        public async Task<DetailedGrainStatistic[]> GetDetailedGrainStatistics(
+            string[]? types,
+            SiloAddress[]? hostsIds,
+            CancellationToken cancellationToken)
         {
             if (hostsIds == null)
             {
-                Dictionary<SiloAddress, SiloStatus> hosts = await GetHosts(true);
+                Dictionary<SiloAddress, SiloStatus> hosts = await GetHosts(true, cancellationToken);
                 hostsIds = hosts.Keys.ToArray();
             }
 
             var all = GetSiloAddresses(hostsIds).Select(s =>
-              GetSiloControlReference(s).GetDetailedGrainStatistics(types)).ToList();
-            await Task.WhenAll(all);
+              GetSiloControlReference(s).GetDetailedGrainStatistics(types, cancellationToken)).ToList();
+            await Task.WhenAll(all).WaitAsync(cancellationToken);
             return all.SelectMany(s => s.Result).ToArray();
         }
 
-        public async Task<int> GetGrainActivationCount(GrainReference grainReference)
+        public Task<int> GetGrainActivationCount(GrainReference grainReference)
+            => GetGrainActivationCount(grainReference, CancellationToken.None);
+
+        public async Task<int> GetGrainActivationCount(
+            GrainReference grainReference,
+            CancellationToken cancellationToken)
         {
-            Dictionary<SiloAddress, SiloStatus> hosts = await GetHosts(true);
+            Dictionary<SiloAddress, SiloStatus> hosts = await GetHosts(true, cancellationToken);
             List<SiloAddress> hostsIds = hosts.Keys.ToList();
             var tasks = new List<Task<DetailedGrainReport>>();
             foreach (var silo in hostsIds)
-                tasks.Add(GetSiloControlReference(silo).GetDetailedGrainReport(grainReference.GrainId));
+                tasks.Add(GetSiloControlReference(silo).GetDetailedGrainReport(grainReference.GrainId, cancellationToken));
 
-            await Task.WhenAll(tasks);
+            await Task.WhenAll(tasks).WaitAsync(cancellationToken);
             return tasks.Select(s => s.Result).Select(CountActivations).Sum();
             static int CountActivations(DetailedGrainReport report) => report.LocalActivation is { Length: > 0 } ? 1 : 0;
         }
 
-        public async Task SetCompatibilityStrategy(CompatibilityStrategy strategy)
+        public Task SetCompatibilityStrategy(CompatibilityStrategy strategy)
+            => SetCompatibilityStrategy(strategy, CancellationToken.None);
+
+        public async Task SetCompatibilityStrategy(
+            CompatibilityStrategy strategy,
+            CancellationToken cancellationToken)
         {
             await SetStrategy(
-                store => store.SetCompatibilityStrategy(strategy),
-                siloControl => siloControl.SetCompatibilityStrategy(strategy));
+                store => store.SetCompatibilityStrategy(strategy, cancellationToken),
+                siloControl => siloControl.SetCompatibilityStrategy(strategy, cancellationToken),
+                cancellationToken);
         }
 
-        public async Task SetSelectorStrategy(VersionSelectorStrategy strategy)
+        public Task SetSelectorStrategy(VersionSelectorStrategy strategy)
+            => SetSelectorStrategy(strategy, CancellationToken.None);
+
+        public async Task SetSelectorStrategy(
+            VersionSelectorStrategy strategy,
+            CancellationToken cancellationToken)
         {
             await SetStrategy(
-                store => store.SetSelectorStrategy(strategy),
-                siloControl => siloControl.SetSelectorStrategy(strategy));
+                store => store.SetSelectorStrategy(strategy, cancellationToken),
+                siloControl => siloControl.SetSelectorStrategy(strategy, cancellationToken),
+                cancellationToken);
         }
 
-        public async Task SetCompatibilityStrategy(GrainInterfaceType interfaceType, CompatibilityStrategy strategy)
+        public Task SetCompatibilityStrategy(GrainInterfaceType interfaceType, CompatibilityStrategy strategy)
+            => SetCompatibilityStrategy(interfaceType, strategy, CancellationToken.None);
+
+        public async Task SetCompatibilityStrategy(
+            GrainInterfaceType interfaceType,
+            CompatibilityStrategy strategy,
+            CancellationToken cancellationToken)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             CheckIfIsExistingInterface(interfaceType);
             await SetStrategy(
-                store => store.SetCompatibilityStrategy(interfaceType, strategy),
-                siloControl => siloControl.SetCompatibilityStrategy(interfaceType, strategy));
+                store => store.SetCompatibilityStrategy(interfaceType, strategy, cancellationToken),
+                siloControl => siloControl.SetCompatibilityStrategy(interfaceType, strategy, cancellationToken),
+                cancellationToken);
         }
 
-        public async Task SetSelectorStrategy(GrainInterfaceType interfaceType, VersionSelectorStrategy strategy)
+        public Task SetSelectorStrategy(GrainInterfaceType interfaceType, VersionSelectorStrategy strategy)
+            => SetSelectorStrategy(interfaceType, strategy, CancellationToken.None);
+
+        public async Task SetSelectorStrategy(
+            GrainInterfaceType interfaceType,
+            VersionSelectorStrategy strategy,
+            CancellationToken cancellationToken)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             CheckIfIsExistingInterface(interfaceType);
             await SetStrategy(
-                store => store.SetSelectorStrategy(interfaceType, strategy),
-                siloControl => siloControl.SetSelectorStrategy(interfaceType, strategy));
+                store => store.SetSelectorStrategy(interfaceType, strategy, cancellationToken),
+                siloControl => siloControl.SetSelectorStrategy(interfaceType, strategy, cancellationToken),
+                cancellationToken);
         }
 
-        public async Task<int> GetTotalActivationCount()
+        public Task<int> GetTotalActivationCount()
+            => GetTotalActivationCount(CancellationToken.None);
+
+        public async Task<int> GetTotalActivationCount(CancellationToken cancellationToken)
         {
-            Dictionary<SiloAddress, SiloStatus> hosts = await GetHosts(true);
+            Dictionary<SiloAddress, SiloStatus> hosts = await GetHosts(true, cancellationToken);
             List<SiloAddress> silos = hosts.Keys.ToList();
             var tasks = new List<Task<int>>();
             foreach (var silo in silos)
-                tasks.Add(GetSiloControlReference(silo).GetActivationCount());
+                tasks.Add(GetSiloControlReference(silo).GetActivationCount(cancellationToken));
 
-            await Task.WhenAll(tasks);
+            await Task.WhenAll(tasks).WaitAsync(cancellationToken);
             int sum = 0;
             foreach (Task<int> task in tasks)
                 sum += task.Result;
@@ -216,14 +301,32 @@ namespace Orleans.Runtime.Management
             return sum;
         }
 
-        public Task<object?[]> SendControlCommandToProvider<T>(string providerName, int command, object? arg) where T : IControllable
+        public Task<object?[]> SendControlCommandToProvider<T>(
+            string providerName,
+            int command,
+            object? arg) where T : IControllable
+            => SendControlCommandToProvider<T>(providerName, command, arg, CancellationToken.None);
+
+        public Task<object?[]> SendControlCommandToProvider<T>(
+            string providerName,
+            int command,
+            object? arg,
+            CancellationToken cancellationToken) where T : IControllable
         {
-            return ExecutePerSiloCall(isc => isc.SendControlCommandToProvider<T>(providerName, command, arg),
-                $"SendControlCommandToProvider of type {typeof(T).FullName} and name {providerName} command {command}.");
+            return ExecutePerSiloCall(
+                isc => isc.SendControlCommandToProvider<T>(providerName, command, arg, cancellationToken),
+                $"SendControlCommandToProvider of type {typeof(T).FullName} and name {providerName} command {command}.",
+                cancellationToken);
         }
 
         public ValueTask<SiloAddress?> GetActivationAddress(IAddressable reference)
+            => GetActivationAddress(reference, CancellationToken.None);
+
+        public ValueTask<SiloAddress?> GetActivationAddress(
+            IAddressable reference,
+            CancellationToken cancellationToken)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             var grainReference = reference as GrainReference;
             var grainId = grainReference!.GrainId;
 
@@ -259,11 +362,14 @@ namespace Orleans.Runtime.Management
                 return new ValueTask<SiloAddress?>(result?.SiloAddress);
             }
 
-            return LookupAsync(grainId, grainLocator);
+            return LookupAsync(grainId, grainLocator, cancellationToken);
 
-            static async ValueTask<SiloAddress?> LookupAsync(GrainId grainId, GrainLocator grainLocator)
+            static async ValueTask<SiloAddress?> LookupAsync(
+                GrainId grainId,
+                GrainLocator grainLocator,
+                CancellationToken cancellationToken)
             {
-                var result = await grainLocator.Lookup(grainId);
+                var result = await grainLocator.Lookup(grainId).AsTask().WaitAsync(cancellationToken);
                 return result?.SiloAddress;
             }
         }
@@ -286,7 +392,10 @@ namespace Orleans.Runtime.Management
             }
         }
 
-        private async Task SetStrategy(Func<IVersionStore, Task> storeFunc, Func<ISiloControl, Task> applyFunc)
+        private async Task SetStrategy(
+            Func<IVersionStore, Task> storeFunc,
+            Func<ISiloControl, Task> applyFunc,
+            CancellationToken cancellationToken)
         {
             await storeFunc(versionStore);
             var silos = GetSiloAddresses(null);
@@ -295,7 +404,11 @@ namespace Orleans.Runtime.Management
                 s => applyFunc(GetSiloControlReference(s)));
             try
             {
-                await Task.WhenAll(actionPromises);
+                await Task.WhenAll(actionPromises).WaitAsync(cancellationToken);
+            }
+            catch (OperationCanceledException exception) when (exception.CancellationToken == cancellationToken)
+            {
+                throw;
             }
             catch (Exception)
             {
@@ -304,17 +417,23 @@ namespace Orleans.Runtime.Management
             }
         }
 
-        private async Task<object?[]> ExecutePerSiloCall(Func<ISiloControl, Task<object?>> action, string actionToLog)
+        private async Task<object?[]> ExecutePerSiloCall(
+            Func<ISiloControl, Task<object?>> action,
+            string actionToLog,
+            CancellationToken cancellationToken)
         {
-            var silos = await GetHosts(true);
+            var silos = await GetHosts(true, cancellationToken);
 
             LogDebugExecutingAction(actionToLog, new(silos));
 
             var actionPromises = new List<Task<object?>>();
             foreach (SiloAddress siloAddress in silos.Keys.ToArray())
+            {
+                cancellationToken.ThrowIfCancellationRequested();
                 actionPromises.Add(action(GetSiloControlReference(siloAddress)));
+            }
 
-            return await Task.WhenAll(actionPromises);
+            return await Task.WhenAll(actionPromises).WaitAsync(cancellationToken);
         }
 
         private SiloAddress[] GetSiloAddresses(SiloAddress[]? silos)
@@ -350,16 +469,21 @@ namespace Orleans.Runtime.Management
             return this.internalGrainFactory.GetSystemTarget<ISiloControl>(Constants.SiloControlType, silo);
         }
 
-        public async ValueTask<List<GrainId>> GetActiveGrains(GrainType grainType)
+        public ValueTask<List<GrainId>> GetActiveGrains(GrainType grainType)
+            => GetActiveGrains(grainType, CancellationToken.None);
+
+        public async ValueTask<List<GrainId>> GetActiveGrains(
+            GrainType grainType,
+            CancellationToken cancellationToken)
         {
-            var hosts = await GetHosts(true);
+            var hosts = await GetHosts(true, cancellationToken);
             var tasks = new List<Task<List<GrainId>>>();
             foreach (var siloAddress in hosts.Keys)
             {
-                tasks.Add(GetSiloControlReference(siloAddress).GetActiveGrains(grainType));
+                tasks.Add(GetSiloControlReference(siloAddress).GetActiveGrains(grainType, cancellationToken));
             }
 
-            await Task.WhenAll(tasks);
+            await Task.WhenAll(tasks).WaitAsync(cancellationToken);
             var results = new List<GrainId>();
             foreach (var promise in tasks)
             {
@@ -369,19 +493,25 @@ namespace Orleans.Runtime.Management
             return results;
         }
 
-        public async Task<List<GrainCallFrequency>> GetGrainCallFrequencies(SiloAddress[]? hostsIds = null)
+        public Task<List<GrainCallFrequency>> GetGrainCallFrequencies(SiloAddress[]? hostsIds = null)
+            => GetGrainCallFrequencies(hostsIds, CancellationToken.None);
+
+        public async Task<List<GrainCallFrequency>> GetGrainCallFrequencies(
+            SiloAddress[]? hostsIds,
+            CancellationToken cancellationToken)
         {
             if (hostsIds == null)
             {
-                var hosts = await GetHosts(true);
+                var hosts = await GetHosts(true, cancellationToken);
                 hostsIds = [.. hosts.Keys];
             }
 
             var results = new List<GrainCallFrequency>();
             foreach (var host in hostsIds)
             {
+                cancellationToken.ThrowIfCancellationRequested();
                 var siloPartitioner = IActivationRepartitionerSystemTarget.GetReference(internalGrainFactory, host);
-                var frequencies = await siloPartitioner.GetGrainCallFrequencies();
+                var frequencies = await siloPartitioner.GetGrainCallFrequencies(cancellationToken);
                 foreach (var frequency in frequencies)
                 {
                     results.Add(new GrainCallFrequency
@@ -398,18 +528,24 @@ namespace Orleans.Runtime.Management
             return results;
         }
 
-        public async ValueTask ResetGrainCallFrequencies(SiloAddress[]? hostsIds = null)
+        public ValueTask ResetGrainCallFrequencies(SiloAddress[]? hostsIds = null)
+            => ResetGrainCallFrequencies(hostsIds, CancellationToken.None);
+
+        public async ValueTask ResetGrainCallFrequencies(
+            SiloAddress[]? hostsIds,
+            CancellationToken cancellationToken)
         {
             if (hostsIds == null)
             {
-                var hosts = await GetHosts(true);
+                var hosts = await GetHosts(true, cancellationToken);
                 hostsIds = [.. hosts.Keys];
             }
 
             foreach (var host in hostsIds)
             {
+                cancellationToken.ThrowIfCancellationRequested();
                 var siloBalancer = IActivationRepartitionerSystemTarget.GetReference(internalGrainFactory, host);
-                await siloBalancer.ResetCounters();
+                await siloBalancer.ResetCounters(cancellationToken);
             }
         }
 

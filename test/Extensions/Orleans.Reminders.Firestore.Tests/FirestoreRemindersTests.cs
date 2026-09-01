@@ -132,11 +132,11 @@ public class FirestoreRemindersTests : ReminderTableTestsBase, IClassFixture<Tes
             Period = period,
         };
 
-        await RemindersTable.UpsertRow(first);
-        await RemindersTable.UpsertRow(second);
+        await RemindersTable.UpsertRow(first, TestContext.Current.CancellationToken);
+        await RemindersTable.UpsertRow(second, TestContext.Current.CancellationToken);
 
-        Assert.Equal(first.ReminderName, (await RemindersTable.ReadRow(first.GrainId, first.ReminderName))?.ReminderName);
-        Assert.Equal(second.ReminderName, (await RemindersTable.ReadRow(second.GrainId, second.ReminderName))?.ReminderName);
+        Assert.Equal(first.ReminderName, (await RemindersTable.ReadRow(first.GrainId, first.ReminderName, TestContext.Current.CancellationToken))?.ReminderName);
+        Assert.Equal(second.ReminderName, (await RemindersTable.ReadRow(second.GrainId, second.ReminderName, TestContext.Current.CancellationToken))?.ReminderName);
     }
 
     [Fact]
@@ -150,17 +150,17 @@ public class FirestoreRemindersTests : ReminderTableTestsBase, IClassFixture<Tes
             Period = TimeSpan.FromMinutes(1),
         };
 
-        reminder.ETag = await RemindersTable.UpsertRow(reminder);
+        reminder.ETag = await RemindersTable.UpsertRow(reminder, TestContext.Current.CancellationToken);
         var staleETag = reminder.ETag;
         reminder.StartAt = reminder.StartAt.AddMinutes(1);
-        reminder.ETag = await RemindersTable.UpsertRow(reminder);
+        reminder.ETag = await RemindersTable.UpsertRow(reminder, TestContext.Current.CancellationToken);
         var currentETag = reminder.ETag;
 
         reminder.StartAt = reminder.StartAt.AddMinutes(1);
         reminder.ETag = staleETag;
-        Assert.Null(await RemindersTable.UpsertRow(reminder));
+        Assert.Null(await RemindersTable.UpsertRow(reminder, TestContext.Current.CancellationToken));
 
-        var stored = await RemindersTable.ReadRow(reminder.GrainId, reminder.ReminderName);
+        var stored = await RemindersTable.ReadRow(reminder.GrainId, reminder.ReminderName, TestContext.Current.CancellationToken);
         Assert.NotNull(stored);
         Assert.Equal(currentETag, stored.ETag);
         Assert.Equal(new DateTime(2026, 1, 1, 0, 1, 0, DateTimeKind.Utc), stored.StartAt);
@@ -177,18 +177,18 @@ public class FirestoreRemindersTests : ReminderTableTestsBase, IClassFixture<Tes
             Period = TimeSpan.FromMinutes(1),
         };
 
-        var firstETag = await RemindersTable.UpsertRow(reminder);
+        var firstETag = await RemindersTable.UpsertRow(reminder, TestContext.Current.CancellationToken);
         reminder.ETag = null;
-        var secondETag = await RemindersTable.UpsertRow(reminder);
+        var secondETag = await RemindersTable.UpsertRow(reminder, TestContext.Current.CancellationToken);
         reminder.ETag = secondETag;
-        var thirdETag = await RemindersTable.UpsertRow(reminder);
+        var thirdETag = await RemindersTable.UpsertRow(reminder, TestContext.Current.CancellationToken);
 
         Assert.False(string.IsNullOrEmpty(firstETag));
         Assert.False(string.IsNullOrEmpty(secondETag));
         Assert.False(string.IsNullOrEmpty(thirdETag));
         Assert.NotEqual(firstETag, secondETag);
         Assert.NotEqual(secondETag, thirdETag);
-        Assert.Equal(thirdETag, (await RemindersTable.ReadRow(reminder.GrainId, reminder.ReminderName))?.ETag);
+        Assert.Equal(thirdETag, (await RemindersTable.ReadRow(reminder.GrainId, reminder.ReminderName, TestContext.Current.CancellationToken))?.ETag);
     }
 
     [Fact]
@@ -202,10 +202,10 @@ public class FirestoreRemindersTests : ReminderTableTestsBase, IClassFixture<Tes
             Period = TimeSpan.FromMinutes(1),
         };
 
-        await RemindersTable.UpsertRow(reminder);
+        await RemindersTable.UpsertRow(reminder, TestContext.Current.CancellationToken);
 
-        Assert.True(await RemindersTable.RemoveRow(reminder.GrainId, reminder.ReminderName, "*"));
-        Assert.Null(await RemindersTable.ReadRow(reminder.GrainId, reminder.ReminderName));
+        Assert.True(await RemindersTable.RemoveRow(reminder.GrainId, reminder.ReminderName, "*", TestContext.Current.CancellationToken));
+        Assert.Null(await RemindersTable.ReadRow(reminder.GrainId, reminder.ReminderName, TestContext.Current.CancellationToken));
     }
 
     [Fact]
@@ -220,9 +220,9 @@ public class FirestoreRemindersTests : ReminderTableTestsBase, IClassFixture<Tes
             Period = TimeSpan.FromMinutes(1),
         };
 
-        await RemindersTable.UpsertRow(reminder);
+        await RemindersTable.UpsertRow(reminder, TestContext.Current.CancellationToken);
 
-        var stored = await RemindersTable.ReadRow(reminder.GrainId, reminder.ReminderName);
+        var stored = await RemindersTable.ReadRow(reminder.GrainId, reminder.ReminderName, TestContext.Current.CancellationToken);
         Assert.NotNull(stored);
         Assert.Equal(startAt.Ticks, stored.StartAt.Ticks);
         Assert.Equal(DateTimeKind.Utc, stored.StartAt.Kind);

@@ -132,8 +132,9 @@ internal sealed partial class ActivationRepartitioner : IMessageStatisticsSink
     private static bool IsFullyAddressed(Message message) =>
         message.IsSenderFullyAddressed && message.IsTargetFullyAddressed;
 
-    async ValueTask IActivationRepartitionerSystemTarget.FlushBuffers()
+    async ValueTask IActivationRepartitionerSystemTarget.FlushBuffers(CancellationToken cancellationToken)
     {
+        cancellationToken.ThrowIfCancellationRequested();
         while (_pendingMessages.Count > 0)
         {
             await Task.Delay(TimeSpan.FromMilliseconds(30));

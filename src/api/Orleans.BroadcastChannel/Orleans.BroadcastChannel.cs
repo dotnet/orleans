@@ -113,11 +113,13 @@ namespace Orleans.BroadcastChannel
 
         string ProviderName { get; }
 
+        System.Threading.Tasks.Task Attach<T>(System.Func<T, System.Threading.CancellationToken, System.Threading.Tasks.Task> onPublished, System.Func<System.Exception, System.Threading.CancellationToken, System.Threading.Tasks.Task>? onError = null);
         System.Threading.Tasks.Task Attach<T>(System.Func<T, System.Threading.Tasks.Task> onPublished, System.Func<System.Exception, System.Threading.Tasks.Task>? onError = null);
     }
 
     public partial interface IBroadcastChannelWriter<T>
     {
+        System.Threading.Tasks.Task Publish(T item, System.Threading.CancellationToken cancellationToken);
         System.Threading.Tasks.Task Publish(T item);
     }
 

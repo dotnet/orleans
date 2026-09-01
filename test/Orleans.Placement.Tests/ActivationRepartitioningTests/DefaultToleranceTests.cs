@@ -273,11 +273,13 @@ public class DefaultToleranceTests(DefaultToleranceTests.Fixture fixture) : Repa
                 silo1Control.SendControlCommandToProvider<PersistentStreamProvider>(
                     Fixture.StreamProviderName,
                     (int)PersistentStreamProviderCommand.GetNumberRunningAgents,
-                    null),
+                    null,
+                    cancellationToken),
                 silo2Control.SendControlCommandToProvider<PersistentStreamProvider>(
                     Fixture.StreamProviderName,
                     (int)PersistentStreamProviderCommand.GetNumberRunningAgents,
-                    null));
+                    null,
+                    cancellationToken));
             silo1AgentCount = Assert.IsType<int>(agentCounts[0]);
             silo2AgentCount = Assert.IsType<int>(agentCounts[1]);
 

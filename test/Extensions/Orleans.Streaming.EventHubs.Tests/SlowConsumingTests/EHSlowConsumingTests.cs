@@ -98,7 +98,9 @@ namespace ServiceBus.Tests.SlowConsumingTests
                 //configure data generator for stream and start producing
                 var randomStreamPlacementArg = new EventDataGeneratorAdapterFactory.StreamRandomPlacementArg(streamId, this.seed.Next(100));
                 await mgmtGrain.SendControlCommandToProvider<PersistentStreamProvider>(StreamProviderName,
-                    (int)EventDataGeneratorAdapterFactory.Commands.Randomly_Place_Stream_To_Queue, randomStreamPlacementArg);
+                    (int)EventDataGeneratorAdapterFactory.Commands.Randomly_Place_Stream_To_Queue,
+                    randomStreamPlacementArg,
+                    testCancellationToken);
                 productionStarted = true;
 
                 //since there's an extreme slow consumer, so the back pressure algorithm should be triggered
@@ -130,10 +132,11 @@ namespace ServiceBus.Tests.SlowConsumingTests
                 if (productionStarted)
                 {
                     await CleanupAsync(
-                        () => mgmtGrain.SendControlCommandToProvider<PersistentStreamProvider>(
+                        cancellationToken => mgmtGrain.SendControlCommandToProvider<PersistentStreamProvider>(
                             StreamProviderName,
                             (int)EventDataGeneratorAdapterFactory.Commands.Stop_Producing_On_Stream,
-                            streamId),
+                            streamId,
+                            cancellationToken),
                         testCancellationToken);
                 }
             }
@@ -216,7 +219,7 @@ namespace ServiceBus.Tests.SlowConsumingTests
         {
             IManagementGrain mgmtGrain = this.fixture.HostedCluster.GrainFactory!.GetGrain<IManagementGrain>(0); // The fixture deploys the client.
             object?[] replies = await mgmtGrain.SendControlCommandToProvider<PersistentStreamProvider>(
-                             StreamProviderName, EHStreamProviderWithCreatedCacheListAdapterFactory.IsCacheBackPressureTriggeredCommand, null).WaitAsync(cancellationToken);
+                             StreamProviderName, EHStreamProviderWithCreatedCacheListAdapterFactory.IsCacheBackPressureTriggeredCommand, null, cancellationToken);
             foreach (var re in replies)
             {
                 if ((bool)re!) // The command returns a Boolean result from each silo.

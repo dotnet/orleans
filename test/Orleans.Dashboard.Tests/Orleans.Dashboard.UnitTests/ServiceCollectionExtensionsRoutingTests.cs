@@ -598,11 +598,13 @@ public class ServiceCollectionExtensionsRoutingTests
     public async Task AddDashboard_ClientBuilder_MappedEndpoint_ForwardsThroughDashboardClientToDashboardGrain()
     {
         string[]? forwardedExclusions = null;
+        CancellationToken forwardedCancellationToken = default;
         var dashboardGrain = CreateProxy<IDashboardGrain>((method, arguments) =>
         {
             if (method.Name == nameof(IDashboardGrain.GetCounters))
             {
                 forwardedExclusions = Assert.IsType<string[]>(arguments![0]);
+                forwardedCancellationToken = Assert.IsType<CancellationToken>(arguments[1]);
                 return Task.FromResult(new DashboardCounters(2)
                 {
                     TotalActiveHostCount = 3,
@@ -633,15 +635,18 @@ public class ServiceCollectionExtensionsRoutingTests
         builder.Services.AddSingleton(grainFactory);
         builder.AddDashboard();
         using var dashboard = DashboardRoutes.CreateFromServices(builder.Services);
+        using var requestCancellation = CancellationTokenSource.CreateLinkedTokenSource(
+            TestContext.Current.CancellationToken);
 
         var response = await dashboard.ExecuteAsync(
             "/DashboardCounters",
             "/DashboardCounters",
             "?exclude=%20System%20&exclude=Application",
-            requestAborted: TestContext.Current.CancellationToken);
+            requestAborted: requestCancellation.Token);
 
         Assert.Equal(StatusCodes.Status200OK, response.StatusCode);
         Assert.Equal(new[] { "System.", "Application." }, forwardedExclusions);
+        Assert.Equal(requestCancellation.Token, forwardedCancellationToken);
         using var json = JsonDocument.Parse(response.Body);
         Assert.Equal(3, json.RootElement.GetProperty("totalActiveHostCount").GetInt32());
         Assert.Equal(11, json.RootElement.GetProperty("totalActivationCount").GetInt32());
@@ -985,15 +990,20 @@ public class ServiceCollectionExtensionsRoutingTests
 
         public int ReminderPageSize { get; private set; }
 
-        public Task<Immutable<DashboardCounters>> DashboardCounters(string[]? exclusions = null)
+        public Task<Immutable<DashboardCounters>> DashboardCounters(
+            string[]? exclusions = null,
+            CancellationToken cancellationToken = default)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             DashboardCountersCalls++;
             DashboardCounterExclusions = exclusions ?? [];
             return Complete(nameof(DashboardCounters), DashboardCountersResult.AsImmutable());
         }
 
-        public Task<Immutable<Dictionary<string, GrainTraceEntry>>> ClusterStats()
+        public Task<Immutable<Dictionary<string, GrainTraceEntry>>> ClusterStats(
+            CancellationToken cancellationToken = default)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             ClusterStatsCalls++;
             return Complete(
                 nameof(ClusterStats),
@@ -1001,8 +1011,12 @@ public class ServiceCollectionExtensionsRoutingTests
                 exception: ClusterStatsException);
         }
 
-        public Task<Immutable<ReminderResponse>> GetReminders(int pageNumber, int pageSize)
+        public Task<Immutable<ReminderResponse>> GetReminders(
+            int pageNumber,
+            int pageSize,
+            CancellationToken cancellationToken = default)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             ReminderCalls++;
             ReminderPage = pageNumber;
             ReminderPageSize = pageSize;
@@ -1012,31 +1026,66 @@ public class ServiceCollectionExtensionsRoutingTests
                 exception: ReminderException);
         }
 
-        public Task<Immutable<SiloRuntimeStatistics?[]>> HistoricalStats(string siloAddress) =>
-            Complete(nameof(HistoricalStats), Array.Empty<SiloRuntimeStatistics?>().AsImmutable(), siloAddress);
+        public Task<Immutable<SiloRuntimeStatistics?[]>> HistoricalStats(
+            string siloAddress,
+            CancellationToken cancellationToken = default) =>
+            Complete(
+                nameof(HistoricalStats),
+                Array.Empty<SiloRuntimeStatistics?>().AsImmutable(),
+                siloAddress,
+                cancellationToken: cancellationToken);
 
-        public Task<Immutable<Dictionary<string, string?>>> SiloProperties(string siloAddress) =>
-            Complete(nameof(SiloProperties), new Dictionary<string, string?>().AsImmutable(), siloAddress);
+        public Task<Immutable<Dictionary<string, string?>>> SiloProperties(
+            string siloAddress,
+            CancellationToken cancellationToken = default) =>
+            Complete(
+                nameof(SiloProperties),
+                new Dictionary<string, string?>().AsImmutable(),
+                siloAddress,
+                cancellationToken: cancellationToken);
 
-        public Task<Immutable<Dictionary<string, string>>> SiloMetadata(string siloAddress) =>
-            Complete(nameof(SiloMetadata), new Dictionary<string, string>().AsImmutable(), siloAddress);
+        public Task<Immutable<Dictionary<string, string>>> SiloMetadata(
+            string siloAddress,
+            CancellationToken cancellationToken = default) =>
+            Complete(
+                nameof(SiloMetadata),
+                new Dictionary<string, string>().AsImmutable(),
+                siloAddress,
+                cancellationToken: cancellationToken);
 
-        public Task<Immutable<Dictionary<string, GrainTraceEntry>>> SiloStats(string siloAddress) =>
-            Complete(nameof(SiloStats), new Dictionary<string, GrainTraceEntry>().AsImmutable(), siloAddress);
+        public Task<Immutable<Dictionary<string, GrainTraceEntry>>> SiloStats(
+            string siloAddress,
+            CancellationToken cancellationToken = default) =>
+            Complete(
+                nameof(SiloStats),
+                new Dictionary<string, GrainTraceEntry>().AsImmutable(),
+                siloAddress,
+                cancellationToken: cancellationToken);
 
-        public Task<Immutable<StatCounter[]>> GetCounters(string siloAddress) =>
-            Complete(nameof(GetCounters), Array.Empty<StatCounter>().AsImmutable(), siloAddress);
+        public Task<Immutable<StatCounter[]>> GetCounters(
+            string siloAddress,
+            CancellationToken cancellationToken = default) =>
+            Complete(
+                nameof(GetCounters),
+                Array.Empty<StatCounter>().AsImmutable(),
+                siloAddress,
+                cancellationToken: cancellationToken);
 
-        public Task<Immutable<Dictionary<string, Dictionary<string, GrainTraceEntry>>>> GrainStats(string grainName) =>
+        public Task<Immutable<Dictionary<string, Dictionary<string, GrainTraceEntry>>>> GrainStats(
+            string grainName,
+            CancellationToken cancellationToken = default) =>
             Complete(
                 nameof(GrainStats),
                 new Dictionary<string, Dictionary<string, GrainTraceEntry>>().AsImmutable(),
-                grainName);
+                grainName,
+                cancellationToken: cancellationToken);
 
         public Task<Immutable<Dictionary<string, GrainMethodAggregate[]>>> TopGrainMethods(
             int take,
-            string[]? exclusions = null)
+            string[]? exclusions = null,
+            CancellationToken cancellationToken = default)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             TopGrainMethodsCalls++;
             TopMethodTake = take;
             TopMethodExclusions = exclusions ?? [];
@@ -1045,30 +1094,43 @@ public class ServiceCollectionExtensionsRoutingTests
                 new Dictionary<string, GrainMethodAggregate[]>().AsImmutable());
         }
 
-        public Task<Immutable<string>> GetGrainState(string? id, string? grainType)
+        public Task<Immutable<string>> GetGrainState(
+            string? id,
+            string? grainType,
+            CancellationToken cancellationToken = default)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             GrainStateCalls++;
             GrainStateId = id;
             GrainStateType = grainType;
             return Complete(nameof(GetGrainState), GrainStateResult.AsImmutable(), id);
         }
 
-        public Task<Immutable<string[]>> GetGrainTypes(string[]? exclusions = null)
+        public Task<Immutable<string[]>> GetGrainTypes(
+            string[]? exclusions = null,
+            CancellationToken cancellationToken = default)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             GrainTypesCalls++;
             GrainTypeExclusions = exclusions ?? [];
             return Complete(nameof(GetGrainTypes), Array.Empty<string>().AsImmutable());
         }
 
-        public Task<Immutable<LifecycleStageInfo[]>> GetLifecycleStages() =>
-            Complete(nameof(GetLifecycleStages), Array.Empty<LifecycleStageInfo>().AsImmutable());
+        public Task<Immutable<LifecycleStageInfo[]>> GetLifecycleStages(
+            CancellationToken cancellationToken = default) =>
+            Complete(
+                nameof(GetLifecycleStages),
+                Array.Empty<LifecycleStageInfo>().AsImmutable(),
+                cancellationToken: cancellationToken);
 
         private Task<T> Complete<T>(
             string operation,
             T result,
             string? argument = null,
-            Exception? exception = null)
+            Exception? exception = null,
+            CancellationToken cancellationToken = default)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             LastOperation = operation;
             LastArgument = argument;
             var failure = exception ?? ApiException;

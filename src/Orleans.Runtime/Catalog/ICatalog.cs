@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace Orleans.Runtime
@@ -15,6 +16,11 @@ namespace Orleans.Runtime
         /// <param name="reasonCode"></param>
         /// <param name="reasonText"></param>
         /// <returns></returns>
-        Task DeleteActivations(List<GrainAddress> activationAddresses, DeactivationReasonCode reasonCode, string reasonText);
+        [Alias("C4A56D7C")]
+        Task DeleteActivations(
+            List<GrainAddress> activationAddresses,
+            DeactivationReasonCode reasonCode,
+            string reasonText,
+            CancellationToken cancellationToken = default);
     }
 }

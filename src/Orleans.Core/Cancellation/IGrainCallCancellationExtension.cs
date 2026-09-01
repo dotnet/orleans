@@ -1,3 +1,4 @@
+using System.Threading;
 using System.Threading.Tasks;
 using Orleans.Concurrency;
 using Orleans.Internal;
@@ -19,7 +20,8 @@ internal interface IGrainCallCancellationExtension : IGrainExtension
     /// A <see cref="Task"/> representing the operation.
     /// </returns>
     [AlwaysInterleave, OneWay]
-    ValueTask CancelRequestAsync(GrainId senderGrainId, CorrelationId messageId);
+    [Alias("FA239824")]
+    ValueTask CancelRequestAsync(GrainId senderGrainId, CorrelationId messageId, CancellationToken cancellationToken = default);
 }
 
 /// <summary>
@@ -38,6 +40,6 @@ internal sealed class ExternalClientGrainCallCancellationManager(IInternalGrainF
     public void SignalCancellation(SiloAddress? targetSilo, GrainId targetGrainId, GrainId sendingGrainId, CorrelationId messageId)
     {
         var targetGrain = grainFactory.GetGrain<IGrainCallCancellationExtension>(targetGrainId);
-        targetGrain.CancelRequestAsync(sendingGrainId, messageId).Ignore();
+        targetGrain.CancelRequestAsync(sendingGrainId, messageId, CancellationToken.None).Ignore();
     }
 }

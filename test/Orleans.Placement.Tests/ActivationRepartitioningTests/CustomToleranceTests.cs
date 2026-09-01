@@ -146,7 +146,7 @@ public class CustomToleranceTests(CustomToleranceTests.Fixture fixture, ITestOut
         IActivationRepartitionerSystemTarget repartitioner,
         CancellationToken cancellationToken)
     {
-        var edgeCounts = await repartitioner.GetGrainCallFrequencies().AsTask().WaitAsync(cancellationToken);
+        var edgeCounts = await repartitioner.GetGrainCallFrequencies(cancellationToken);
         output.WriteLine($"{repartitioner.GetGrainId()} call frequencies:");
         foreach (var (edge, freq) in edgeCounts)
         {

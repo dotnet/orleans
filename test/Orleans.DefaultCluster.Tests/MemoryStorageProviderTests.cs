@@ -96,50 +96,96 @@ namespace DefaultCluster.Tests.StorageTests
             var memoryStorageGrain = this.GrainFactory.GetGrain<IMemoryStorageGrain>(Random.Shared.Next());
 
             // Delete grain state from empty grain, should be safe.
-            await memoryStorageGrain.DeleteStateAsync<object>("grainStoreKey", "eTag");
+            await memoryStorageGrain.DeleteStateAsync<object>(
+                "grainStoreKey",
+                "eTag",
+                TestContext.Current.CancellationToken);
 
             // Read grain state from empty grain, should be safe, but return nothing.
-            var grainState = await memoryStorageGrain.ReadStateAsync<object>("grainStoreKey");
+            var grainState = await memoryStorageGrain.ReadStateAsync<object>(
+                "grainStoreKey",
+                TestContext.Current.CancellationToken);
             Assert.Null(grainState);
 
             // write state with etag, when there is nothing in storage.  Most storage should fail this, but memory storage should succeed.
-            await memoryStorageGrain.WriteStateAsync("grainId", TestGrainState.CreateRandom());
+            await memoryStorageGrain.WriteStateAsync(
+                "grainId",
+                TestGrainState.CreateRandom(),
+                TestContext.Current.CancellationToken);
 
             // write new state with null etag
-            string newEtag = await memoryStorageGrain.WriteStateAsync("id", TestGrainState.CreateWithEtag(null));
+            string newEtag = await memoryStorageGrain.WriteStateAsync(
+                "id",
+                TestGrainState.CreateWithEtag(null),
+                TestContext.Current.CancellationToken);
             Assert.NotNull(newEtag);
 
             // try to write new state with null etag;
-            var ex = await Assert.ThrowsAsync<MemoryStorageEtagMismatchException>(() => memoryStorageGrain.WriteStateAsync("id", TestGrainState.CreateWithEtag(null)));
+            var ex = await Assert.ThrowsAsync<MemoryStorageEtagMismatchException>(
+                () => memoryStorageGrain.WriteStateAsync(
+                    "id",
+                    TestGrainState.CreateWithEtag(null),
+                    TestContext.Current.CancellationToken));
 
             // try to write new state with different etag;
-            ex = await Assert.ThrowsAsync<MemoryStorageEtagMismatchException>(() => memoryStorageGrain.WriteStateAsync("id", TestGrainState.CreateWithEtag(newEtag + "a")));
+            ex = await Assert.ThrowsAsync<MemoryStorageEtagMismatchException>(
+                () => memoryStorageGrain.WriteStateAsync(
+                    "id",
+                    TestGrainState.CreateWithEtag(newEtag + "a"),
+                    TestContext.Current.CancellationToken));
 
             // Write new state with good etag;
-            string latestEtag = await memoryStorageGrain.WriteStateAsync("id", TestGrainState.CreateWithEtag(newEtag));
+            string latestEtag = await memoryStorageGrain.WriteStateAsync(
+                "id",
+                TestGrainState.CreateWithEtag(newEtag),
+                TestContext.Current.CancellationToken);
             Assert.NotNull(latestEtag);
 
             // try delete state with null etag
-            ex = await Assert.ThrowsAsync<MemoryStorageEtagMismatchException>(() => memoryStorageGrain.DeleteStateAsync<object>("id", null!));
+            ex = await Assert.ThrowsAsync<MemoryStorageEtagMismatchException>(
+                () => memoryStorageGrain.DeleteStateAsync<object>(
+                    "id",
+                    null!,
+                    TestContext.Current.CancellationToken));
 
             // try delete state with wrong etag
-            ex = await Assert.ThrowsAsync<MemoryStorageEtagMismatchException>(() => memoryStorageGrain.DeleteStateAsync<object>("id", latestEtag + "a"));
+            ex = await Assert.ThrowsAsync<MemoryStorageEtagMismatchException>(
+                () => memoryStorageGrain.DeleteStateAsync<object>(
+                    "id",
+                    latestEtag + "a",
+                    TestContext.Current.CancellationToken));
 
             // delete state
-            await memoryStorageGrain.DeleteStateAsync<object>("id", latestEtag);
+            await memoryStorageGrain.DeleteStateAsync<object>(
+                "id",
+                latestEtag,
+                TestContext.Current.CancellationToken);
 
             // Read grain deleted grain state, should be safe, but return nothing.
-            grainState = await memoryStorageGrain.ReadStateAsync<object>("id");
+            grainState = await memoryStorageGrain.ReadStateAsync<object>(
+                "id",
+                TestContext.Current.CancellationToken);
             Assert.Null(grainState);
 
             // try delete already deleted grain state
-            ex = await Assert.ThrowsAsync<MemoryStorageEtagMismatchException>(() => memoryStorageGrain.DeleteStateAsync<object>("id", latestEtag));
+            ex = await Assert.ThrowsAsync<MemoryStorageEtagMismatchException>(
+                () => memoryStorageGrain.DeleteStateAsync<object>(
+                    "id",
+                    latestEtag,
+                    TestContext.Current.CancellationToken));
 
             // try to write state to deleted state.
-            ex = await Assert.ThrowsAsync<MemoryStorageEtagMismatchException>(() => memoryStorageGrain.WriteStateAsync("id", TestGrainState.CreateWithEtag(latestEtag)));
+            ex = await Assert.ThrowsAsync<MemoryStorageEtagMismatchException>(
+                () => memoryStorageGrain.WriteStateAsync(
+                    "id",
+                    TestGrainState.CreateWithEtag(latestEtag),
+                    TestContext.Current.CancellationToken));
 
             // Make sure we can write new state to a deleted state
-            await memoryStorageGrain.WriteStateAsync("id", TestGrainState.CreateWithEtag(null));
+            await memoryStorageGrain.WriteStateAsync(
+                "id",
+                TestGrainState.CreateWithEtag(null),
+                TestContext.Current.CancellationToken);
         }
 
         [Serializable]

@@ -551,7 +551,11 @@ public class ClusterManifestProviderTests
 
     private sealed class TestSiloManifestSystemTarget(GrainManifest manifest) : ISiloManifestSystemTarget
     {
-        public ValueTask<GrainManifest> GetSiloManifest() => new(manifest);
+        public ValueTask<GrainManifest> GetSiloManifest(CancellationToken cancellationToken = default)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            return new(manifest);
+        }
     }
 
     private sealed class BlockingVersionSelector : IVersionSelector

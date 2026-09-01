@@ -192,7 +192,7 @@ namespace Orleans.Runtime.Metadata
                 {
                     // Get the manifest from the silo.
                     var remoteManifestProvider = _grainFactory!.GetSystemTarget<ISiloManifestSystemTarget>(Constants.ManifestProviderType, siloAddress);
-                    var manifest = await remoteManifestProvider.GetSiloManifest().AsTask().WaitAsync(_shutdownCts.Token);
+                    var manifest = await remoteManifestProvider.GetSiloManifest(_shutdownCts.Token);
                     return (siloAddress, manifest, null);
                 }
                 catch (Exception exception)

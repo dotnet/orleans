@@ -447,11 +447,20 @@ namespace Orleans.Runtime
         )]
         private static partial void LogInvalidMessage(ILogger logger, Message Message);
 
-        ValueTask IGrainCallCancellationExtension.CancelRequestAsync(GrainId senderGrainId, CorrelationId messageId)
-            => this.RunOrQueueTask(static state => state.self.CancelRequestAsyncCore(state.senderGrainId, state.messageId), (self: this, senderGrainId, messageId));
+        ValueTask IGrainCallCancellationExtension.CancelRequestAsync(
+            GrainId senderGrainId,
+            CorrelationId messageId,
+            CancellationToken cancellationToken)
+            => this.RunOrQueueTask(
+                static state => state.self.CancelRequestAsyncCore(state.senderGrainId, state.messageId, state.cancellationToken),
+                (self: this, senderGrainId, messageId, cancellationToken));
 
-        private ValueTask CancelRequestAsyncCore(GrainId senderGrainId, CorrelationId messageId)
+        private ValueTask CancelRequestAsyncCore(
+            GrainId senderGrainId,
+            CorrelationId messageId,
+            CancellationToken cancellationToken)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             if (!TryCancelRequest())
             {
                 // The message being canceled may not have arrived yet, so retry a few times.
@@ -465,7 +474,7 @@ namespace Orleans.Runtime
                 var attemptsRemaining = 3;
                 do
                 {
-                    await Task.Delay(1_000);
+                    await Task.Delay(1_000, cancellationToken);
 
                     if (TryCancelRequest())
                     {

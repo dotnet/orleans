@@ -72,9 +72,13 @@ internal partial class SiloMetadataCache(
                         }
                         try
                         {
-                            var metadata = await siloMetadataClient.GetSiloMetadata(membershipEntry.Key).WaitAsync(ct);
+                            var metadata = await siloMetadataClient.GetSiloMetadata(membershipEntry.Key, ct);
                             _metadata.TryAdd(membershipEntry.Key, metadata);
                             _negativeCache.Remove(membershipEntry.Key, out _);
+                        }
+                        catch (OperationCanceledException exception) when (exception.CancellationToken == ct)
+                        {
+                            throw;
                         }
                         catch(Exception exception)
                         {

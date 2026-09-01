@@ -1,4 +1,7 @@
+using Microsoft.Extensions.Logging.Abstractions;
 using NSubstitute;
+using Orleans.Providers;
+using Orleans.Providers.Streams.Common;
 using Orleans.Streams;
 using TestExtensions;
 using Xunit;
@@ -21,9 +24,13 @@ public class PersistentStreamCancellationCompatibilityTests
         Assert.Same(adapter, await adapterFactory.CreateAdapter(cancellation.Token));
 
         IQueueAdapterReceiver receiver = new LegacyQueueAdapterReceiver();
+        await receiver.Initialize(TimeSpan.FromSeconds(1), cancellation.Token);
         Assert.Empty(await receiver.GetQueueMessagesAsync(10, cancellation.Token));
         await receiver.MessagesDeliveredAsync([], cancellation.Token);
+        await receiver.Shutdown(TimeSpan.FromSeconds(1), cancellation.Token);
+        Assert.True(((LegacyQueueAdapterReceiver)receiver).Initialized);
         Assert.True(((LegacyQueueAdapterReceiver)receiver).MessagesDelivered);
+        Assert.True(((LegacyQueueAdapterReceiver)receiver).ShutdownCalled);
 
         IStreamQueueCheckpointer<string> checkpointer = new LegacyStreamQueueCheckpointer();
         IStreamQueueCheckpointerFactory checkpointerFactory = new LegacyStreamQueueCheckpointerFactory(checkpointer);
@@ -32,6 +39,38 @@ public class PersistentStreamCancellationCompatibilityTests
 
         checkpointer.Update("20", DateTime.UtcNow, cancellation.Token);
         Assert.Equal("20", ((LegacyStreamQueueCheckpointer)checkpointer).Checkpoint);
+    }
+
+    [TestSuite("BVT")]
+    [TestProvider("None")]
+    [TestArea("Streaming")]
+    [Fact, TestCategory("BVT"), TestCategory("Streaming")]
+    public async Task MemoryQueue_CancellationOverload_ObservesCancellation()
+    {
+        var queue = new MemoryStreamQueueGrain();
+        using var cancellation = new CancellationTokenSource();
+        cancellation.Cancel();
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(
+            () => queue.Dequeue(1, cancellation.Token));
+    }
+
+    [TestSuite("BVT")]
+    [TestProvider("None")]
+    [TestArea("Streaming")]
+    [Fact, TestCategory("BVT"), TestCategory("Streaming")]
+    public async Task MemoryReceiver_Shutdown_ObservesCancellation()
+    {
+        var receiver = new MemoryAdapterReceiver<IMemoryMessageBodySerializer>(
+            Substitute.For<IMemoryStreamQueueGrain>(),
+            NullLogger.Instance,
+            Substitute.For<IMemoryMessageBodySerializer>(),
+            Substitute.For<IQueueAdapterReceiverMonitor>());
+        using var cancellation = new CancellationTokenSource();
+        cancellation.Cancel();
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(
+            () => receiver.Shutdown(TimeSpan.FromSeconds(1), cancellation.Token));
     }
 
     private sealed class LegacyQueueAdapterFactory(IQueueAdapter adapter) : IQueueAdapterFactory
@@ -48,9 +87,15 @@ public class PersistentStreamCancellationCompatibilityTests
 
     private sealed class LegacyQueueAdapterReceiver : IQueueAdapterReceiver
     {
+        public bool Initialized { get; private set; }
         public bool MessagesDelivered { get; private set; }
+        public bool ShutdownCalled { get; private set; }
 
-        public Task Initialize(TimeSpan timeout) => Task.CompletedTask;
+        public Task Initialize(TimeSpan timeout)
+        {
+            Initialized = true;
+            return Task.CompletedTask;
+        }
 
         public Task<IList<IBatchContainer>> GetQueueMessagesAsync(int maxCount)
             => Task.FromResult<IList<IBatchContainer>>([]);
@@ -61,7 +106,11 @@ public class PersistentStreamCancellationCompatibilityTests
             return Task.CompletedTask;
         }
 
-        public Task Shutdown(TimeSpan timeout) => Task.CompletedTask;
+        public Task Shutdown(TimeSpan timeout)
+        {
+            ShutdownCalled = true;
+            return Task.CompletedTask;
+        }
     }
 
     private sealed class LegacyStreamQueueCheckpointerFactory(

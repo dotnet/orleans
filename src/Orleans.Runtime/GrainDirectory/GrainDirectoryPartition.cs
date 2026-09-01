@@ -982,20 +982,22 @@ internal sealed partial class GrainDirectoryPartition : SystemTarget, IGrainDire
         return defaultValue;
     }
 
-    async ValueTask IGrainDirectoryTestHooks.CheckIntegrityAsync()
+    async ValueTask IGrainDirectoryTestHooks.CheckIntegrityAsync(CancellationToken cancellationToken)
     {
+        cancellationToken.ThrowIfCancellationRequested();
         GrainRuntime.CheckRuntimeContext(this);
         var current = CurrentView;
         var range = _currentRange;
         Debug.Assert(range.Equals(current.GetRange(_id, _partitionIndex)));
 
-        await WaitForRange(RingRange.Full, current.Version);
+        await WaitForRange(RingRange.Full, current.Version).AsTask().WaitAsync(cancellationToken);
         var tcs = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         _rangeLocks.Add((RingRange.Full, current.Version, tcs));
         try
         {
             foreach (var entry in _directory)
             {
+                cancellationToken.ThrowIfCancellationRequested();
                 if (!range.Contains(entry.Key))
                 {
                     throw new InvalidOperationException($"Invariant violated. This host is not the owner of grain '{entry.Key}'.");
@@ -1004,7 +1006,8 @@ internal sealed partial class GrainDirectoryPartition : SystemTarget, IGrainDire
                 DebugAssertOwnership(current, entry.Key);
             }
 
-            await foreach (var activationList in GetRegisteredActivations(current, range, isValidation: true))
+            await foreach (var activationList in GetRegisteredActivations(current, range, isValidation: true)
+                .WithCancellation(cancellationToken))
             {
                 foreach (var entry in activationList)
                 {
@@ -1046,38 +1049,42 @@ internal sealed partial class GrainDirectoryPartition : SystemTarget, IGrainDire
         }
     }
 
-    async ValueTask IGrainDirectoryTestHooks.RecoverAndCheckIntegrityAsync()
+    async ValueTask IGrainDirectoryTestHooks.RecoverAndCheckIntegrityAsync(CancellationToken cancellationToken)
     {
         GrainRuntime.CheckRuntimeContext(this);
 
         while (true)
         {
             var current = CurrentView;
-            await WaitForRange(RingRange.Full, current.Version);
+            await WaitForRange(RingRange.Full, current.Version).AsTask().WaitAsync(cancellationToken);
             if (!ReferenceEquals(current, CurrentView))
             {
                 continue;
             }
 
-            await RecoverPartitionRange(current, _currentRange);
+            await RecoverPartitionRange(current, _currentRange).WaitAsync(cancellationToken);
             break;
         }
 
-        await ((IGrainDirectoryTestHooks)this).CheckIntegrityAsync();
+        await ((IGrainDirectoryTestHooks)this).CheckIntegrityAsync(cancellationToken);
     }
 
-    async ValueTask IGrainDirectoryTestHooks.WaitForMembershipVersionAsync(MembershipVersion version)
+    async ValueTask IGrainDirectoryTestHooks.WaitForMembershipVersionAsync(
+        MembershipVersion version,
+        CancellationToken cancellationToken)
     {
         GrainRuntime.CheckRuntimeContext(this);
-        await WaitForRange(RingRange.Full, version);
+        await WaitForRange(RingRange.Full, version).AsTask().WaitAsync(cancellationToken);
     }
 
-    async ValueTask<Immutable<List<GrainId>>> IGrainDirectoryTestHooks.CheckActivationsAsync(Immutable<List<GrainAddress>> activations)
+    async ValueTask<Immutable<List<GrainId>>> IGrainDirectoryTestHooks.CheckActivationsAsync(
+        Immutable<List<GrainAddress>> activations,
+        CancellationToken cancellationToken)
     {
         GrainRuntime.CheckRuntimeContext(this);
         var current = CurrentView;
 
-        await WaitForRange(RingRange.Full, current.Version);
+        await WaitForRange(RingRange.Full, current.Version).AsTask().WaitAsync(cancellationToken);
         var tcs = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         _rangeLocks.Add((RingRange.Full, current.Version, tcs));
         try
@@ -1085,6 +1092,7 @@ internal sealed partial class GrainDirectoryPartition : SystemTarget, IGrainDire
             List<GrainId> checkedGrains = [];
             foreach (var activation in activations.Value)
             {
+                cancellationToken.ThrowIfCancellationRequested();
                 if (!IsOwner(current, activation.GrainId))
                 {
                     continue;
