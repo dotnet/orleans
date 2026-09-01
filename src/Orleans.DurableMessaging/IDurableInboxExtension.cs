@@ -16,6 +16,9 @@ public interface IDurableInboxExtension : IGrainExtension
     /// <param name="envelope">The message envelope.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>Result indicating delivery/processing status.</returns>
+    /// <exception cref="ArgumentException">
+    /// <paramref name="envelope"/> identifies a receiver other than the grain handling the call.
+    /// </exception>
     [Alias("DeliverAsync")]
     ValueTask<DeliveryResult> DeliverAsync(DurableEnvelope envelope, CancellationToken cancellationToken = default);
 }

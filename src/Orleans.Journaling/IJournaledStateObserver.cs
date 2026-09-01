@@ -21,6 +21,11 @@ public interface IJournaledStateObserver
     void OnDeleteRequested() { }
 
     /// <summary>
+    /// Called when recovery is requested, before it is queued.
+    /// </summary>
+    void OnRecoveryRequested() { }
+
+    /// <summary>
     /// Called before registered state is reset and replay begins.
     /// </summary>
     void OnRecoveryStarted() { }
