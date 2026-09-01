@@ -16,10 +16,11 @@ namespace UnitTests.CatalogTests
 
         public class Fixture : BaseTestClusterFixture
         {
-            public ReminderDiagnosticObserver ReminderObserver { get; } = ReminderDiagnosticObserver.Create();
+            public ReminderDiagnosticObserver ReminderObserver { get; private set; } = null!;
 
             protected override void ConfigureTestCluster(TestClusterBuilder builder)
             {
+                ReminderObserver = ReminderDiagnosticObserver.Create(builder);
                 builder.AddSiloBuilderConfigurator<SiloConfiguration>();
             }
 
@@ -32,7 +33,7 @@ namespace UnitTests.CatalogTests
                 }
                 finally
                 {
-                    ReminderObserver.Dispose();
+                    ReminderObserver?.Dispose();
                 }
             }
         }

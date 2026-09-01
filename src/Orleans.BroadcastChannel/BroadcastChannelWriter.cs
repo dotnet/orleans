@@ -33,19 +33,25 @@ namespace Orleans.BroadcastChannel
         private readonly ImplicitChannelSubscriberTable _subscriberTable;
         private readonly bool _fireAndForgetDelivery;
         private readonly ILogger _logger;
+        private readonly SiloAddress? _siloAddress;
+        private readonly string _clusterId;
 
         public BroadcastChannelWriter(
             InternalChannelId channelId,
             IGrainFactory grainFactory,
             ImplicitChannelSubscriberTable subscriberTable,
             bool fireAndForgetDelivery,
-            ILoggerFactory loggerFactory)
+            ILoggerFactory loggerFactory,
+            SiloAddress? siloAddress,
+            string clusterId)
         {
             _channelId = channelId;
             _grainFactory = grainFactory;
             _subscriberTable = subscriberTable;
             _fireAndForgetDelivery = fireAndForgetDelivery;
             _logger = loggerFactory.CreateLogger(LoggingCategory);
+            _siloAddress = siloAddress;
+            _clusterId = clusterId;
         }
 
         /// <inheritdoc />
@@ -61,7 +67,7 @@ namespace Orleans.BroadcastChannel
 
             LogDebugPublishingItem(_logger, item, subscribers.Count);
 
-            BroadcastChannelEvents.EmitItemPublished(_channelId.ProviderName, _channelId.ChannelId, subscribers.Count);
+            BroadcastChannelEvents.EmitItemPublished(_channelId.ProviderName, _channelId.ChannelId, subscribers.Count, _siloAddress, _clusterId);
 
             if (_fireAndForgetDelivery)
             {

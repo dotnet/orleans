@@ -1,6 +1,8 @@
 using System.Collections.Concurrent;
+using System.Reactive.Linq;
 using Orleans.Runtime;
 using Orleans.Runtime.Diagnostics;
+using Orleans.TestingHost;
 
 namespace TestExtensions;
 
@@ -46,10 +48,18 @@ public sealed class RebalancerDiagnosticObserver : IDisposable, IObserver<Activa
     /// <summary>
     /// Creates a new instance of the observer and starts listening for rebalancer diagnostic events.
     /// </summary>
-    public static RebalancerDiagnosticObserver Create()
+    public static RebalancerDiagnosticObserver Create(TestCluster cluster) => Create(DiagnosticObserverSiloScope.For(cluster));
+
+    public static RebalancerDiagnosticObserver Create(InProcessTestCluster cluster) => Create(DiagnosticObserverSiloScope.For(cluster));
+
+    internal static RebalancerDiagnosticObserver Create(SiloAddress siloAddress) => Create(DiagnosticObserverSiloScope.For(siloAddress));
+
+    private static RebalancerDiagnosticObserver Create(DiagnosticObserverSiloScope scope)
     {
         var observer = new RebalancerDiagnosticObserver();
-        observer._subscription = ActivationRebalancerEvents.AllEvents.Subscribe(observer);
+        observer._subscription = ActivationRebalancerEvents.AllEvents
+            .Where(e => scope.Matches(e.SiloAddress))
+            .Subscribe(observer);
         return observer;
     }
 

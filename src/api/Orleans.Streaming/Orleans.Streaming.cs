@@ -1176,10 +1176,12 @@ namespace Orleans.Streaming.Diagnostics
 
         public sealed partial class ItemDelivered : StreamingEvent
         {
+            public readonly string ClusterId;
             public readonly Streams.StreamSequenceToken? SequenceToken;
             public readonly Runtime.StreamId StreamId;
             public readonly System.Guid SubscriptionId;
             public ItemDelivered(string streamProvider, Runtime.StreamId streamId, System.Guid subscriptionId, Runtime.SiloAddress? siloAddress, Streams.StreamSequenceToken? sequenceToken) : base(default!, default) { }
+            public ItemDelivered(string streamProvider, Runtime.StreamId streamId, System.Guid subscriptionId, Runtime.SiloAddress? siloAddress, string clusterId, Streams.StreamSequenceToken? sequenceToken) : base(default!, default) { }
         }
 
         public sealed partial class MessageDelivered : StreamingEvent

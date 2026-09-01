@@ -2,6 +2,7 @@
 using Microsoft.Extensions.Logging;
 using Orleans.Runtime;
 using Orleans.Streams;
+using Orleans.TestingHost;
 using Orleans.TestingHost.Utils;
 using TestExtensions;
 using Tester;
@@ -29,10 +30,27 @@ public class SingleStreamTestRunner
     private readonly int testNumber;
     private readonly bool runFullTest;
     private readonly IInternalClusterClient client;
+    private readonly Func<StreamingDiagnosticObserver> createObserver;
 
-    internal SingleStreamTestRunner(IInternalClusterClient client, string streamProvider, int testNum = 0, bool fullTest = true)
+    internal SingleStreamTestRunner(TestCluster testCluster, string streamProvider, int testNum = 0, bool fullTest = true)
+        : this(testCluster.InternalClient!, () => StreamingDiagnosticObserver.Create(testCluster), streamProvider, testNum, fullTest)
+    {
+    }
+
+    internal SingleStreamTestRunner(InProcessTestCluster testCluster, string streamProvider, int testNum = 0, bool fullTest = true)
+        : this(testCluster.InternalClient!, () => StreamingDiagnosticObserver.Create(testCluster), streamProvider, testNum, fullTest)
+    {
+    }
+
+    private SingleStreamTestRunner(
+        IInternalClusterClient client,
+        Func<StreamingDiagnosticObserver> createObserver,
+        string streamProvider,
+        int testNum,
+        bool fullTest)
     {
         this.client = client;
+        this.createObserver = createObserver;
         this.streamProviderName = streamProvider;
         this.logger = TestingUtils.CreateDefaultLoggerFactory($"{this.GetType().Name}.log").CreateLogger<SingleStreamTestRunner>();
         this.testNumber = testNum;
@@ -274,7 +292,7 @@ public class SingleStreamTestRunner
         Assert.NotEqual(0, consumerCount);
 
         var producedBefore = await producer.ExpectedItemsProduced;
-        using var observer = StreamingDiagnosticObserver.Create();
+        using var observer = createObserver();
         using var cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         cts.CancelAfter(_timeout);
 
@@ -291,7 +309,7 @@ public class SingleStreamTestRunner
         int count,
         CancellationToken cancellationToken)
     {
-        using var observer = StreamingDiagnosticObserver.Create();
+        using var observer = createObserver();
         using var cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         cts.CancelAfter(_timeout);
 

@@ -44,7 +44,7 @@ public abstract class ProgrammaticSubscribeTestsRunner
     [Fact]
     public async Task StreamingTests_Consumer_Producer_Subscribe()
     {
-        using var observer = StreamingDiagnosticObserver.Create();
+        using var observer = StreamingDiagnosticObserver.Create(fixture.HostedCluster);
         using var cts = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
         cts.CancelAfter(_timeout);
         var subscriptionManager = new SubscriptionManager(this.fixture.HostedCluster);
@@ -81,7 +81,7 @@ public abstract class ProgrammaticSubscribeTestsRunner
         cts.Token.ThrowIfCancellationRequested();
         await producer.BecomeProducer(streamId.Guid, streamId.Namespace, streamId.ProviderName);
 
-        using (var phaseOneObserver = StreamingDiagnosticObserver.Create())
+        using (var phaseOneObserver = StreamingDiagnosticObserver.Create(fixture.HostedCluster))
         {
             await ProduceExactCountAsync(producer, EventCountPerPhase, cts.Token);
             await phaseOneObserver.WaitForItemDeliveryCountAsync(rxStreamId, EventCountPerPhase * subscriptions.Count, StreamProviderName, cts.Token);
@@ -90,7 +90,7 @@ public abstract class ProgrammaticSubscribeTestsRunner
         //the subscription to remove
         var subscription = subscriptions[0];
         // remove subscription
-        using (var removalObserver = StreamingDiagnosticObserver.Create())
+        using (var removalObserver = StreamingDiagnosticObserver.Create(fixture.HostedCluster))
         {
             await subscriptionManager.RemoveSubscription(streamId, subscription.SubscriptionId);
             await removalObserver.WaitForSubscriptionRemovedAsync(rxStreamId, StreamProviderName, cts.Token);
@@ -101,7 +101,7 @@ public abstract class ProgrammaticSubscribeTestsRunner
         //assert consumer grain's onAdd func got called.
         Assert.True((await consumerUnSub.GetCountOfOnAddFuncCalled()) > 0);
 
-        using (var phaseTwoObserver = StreamingDiagnosticObserver.Create())
+        using (var phaseTwoObserver = StreamingDiagnosticObserver.Create(fixture.HostedCluster))
         {
             await ProduceExactCountAsync(producer, EventCountPerPhase, cts.Token);
             await phaseTwoObserver.WaitForItemDeliveryCountAsync(rxStreamId, EventCountPerPhase, StreamProviderName, cts.Token);
@@ -155,7 +155,7 @@ public abstract class ProgrammaticSubscribeTestsRunner
         //set up subscriptions
         await subscriptionManager.SetupStreamingSubscriptionForStream<IJerk_ConsumerGrain>(streamId, 10);
 
-        using var observer = StreamingDiagnosticObserver.Create();
+        using var observer = StreamingDiagnosticObserver.Create(fixture.HostedCluster);
         using var cts = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
         cts.CancelAfter(_timeout);
 
@@ -179,7 +179,7 @@ public abstract class ProgrammaticSubscribeTestsRunner
     [Fact(Skip = "https://github.com/dotnet/orleans/issues/5650")]
     public async Task StreamingTests_Consumer_Producer_SubscribeToTwoStream_MessageWithPolymorphism()
     {
-        using var observer = StreamingDiagnosticObserver.Create();
+        using var observer = StreamingDiagnosticObserver.Create(fixture.HostedCluster);
         using var cts = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
         cts.CancelAfter(_timeout);
         var subscriptionManager = new SubscriptionManager(this.fixture.HostedCluster);
@@ -226,7 +226,7 @@ public abstract class ProgrammaticSubscribeTestsRunner
     [Fact]
     public async Task StreamingTests_Consumer_Producer_SubscribeToStreamsHandledByDifferentStreamProvider()
     {
-        using var observer = StreamingDiagnosticObserver.Create();
+        using var observer = StreamingDiagnosticObserver.Create(fixture.HostedCluster);
         using var cts = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
         cts.CancelAfter(_timeout);
         var subscriptionManager = new SubscriptionManager(this.fixture.HostedCluster);

@@ -162,8 +162,11 @@ namespace Orleans.BroadcastChannel.Diagnostics
 
         public abstract partial class BroadcastChannelEvent
         {
+            public readonly string ClusterId;
             public readonly string ProviderName;
+            public readonly Runtime.SiloAddress? SiloAddress;
             protected BroadcastChannelEvent(string providerName) { }
+            protected BroadcastChannelEvent(string providerName, Runtime.SiloAddress? siloAddress, string clusterId) { }
         }
 
         public sealed partial class ItemDelivered : BroadcastChannelEvent
@@ -171,6 +174,7 @@ namespace Orleans.BroadcastChannel.Diagnostics
             public readonly ChannelId ChannelId;
             public readonly Runtime.GrainId ConsumerGrainId;
             public ItemDelivered(string providerName, ChannelId channelId, Runtime.GrainId consumerGrainId) : base(default!) { }
+            public ItemDelivered(string providerName, ChannelId channelId, Runtime.GrainId consumerGrainId, Runtime.SiloAddress? siloAddress, string clusterId) : base(default!, default, default!) { }
         }
 
         public sealed partial class ItemPublished : BroadcastChannelEvent
@@ -178,6 +182,7 @@ namespace Orleans.BroadcastChannel.Diagnostics
             public readonly ChannelId ChannelId;
             public readonly int SubscriberCount;
             public ItemPublished(string providerName, ChannelId channelId, int subscriberCount) : base(default!) { }
+            public ItemPublished(string providerName, ChannelId channelId, int subscriberCount, Runtime.SiloAddress? siloAddress, string clusterId) : base(default!, default, default!) { }
         }
     }
 }

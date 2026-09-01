@@ -16,10 +16,37 @@ namespace UnitTests.Streaming
         private readonly int testNumber;
         private readonly bool runFullTest;
         private readonly IInternalClusterClient client;
+        private readonly Func<int, SingleStreamTestRunner> createRunner;
 
-        internal MultipleStreamsTestRunner(IInternalClusterClient client, string streamProvider, int testNum = 0, bool fullTest = true)
+        internal MultipleStreamsTestRunner(TestCluster testCluster, string streamProvider, int testNum = 0, bool fullTest = true)
+            : this(
+                testCluster.InternalClient!,
+                index => new SingleStreamTestRunner(testCluster, streamProvider, index, fullTest),
+                streamProvider,
+                testNum,
+                fullTest)
+        {
+        }
+
+        internal MultipleStreamsTestRunner(InProcessTestCluster testCluster, string streamProvider, int testNum = 0, bool fullTest = true)
+            : this(
+                testCluster.InternalClient!,
+                index => new SingleStreamTestRunner(testCluster, streamProvider, index, fullTest),
+                streamProvider,
+                testNum,
+                fullTest)
+        {
+        }
+
+        private MultipleStreamsTestRunner(
+            IInternalClusterClient client,
+            Func<int, SingleStreamTestRunner> createRunner,
+            string streamProvider,
+            int testNum,
+            bool fullTest)
         {
             this.client = client;
+            this.createRunner = createRunner;
             this.streamProviderName = streamProvider;
             this.logger = (TestingUtils.CreateDefaultLoggerFactory($"{this.GetType().Name}.log")).CreateLogger<MultipleStreamsTestRunner>();
             this.testNumber = testNum;
@@ -41,7 +68,7 @@ namespace UnitTests.Streaming
             List<Task> tasks = new List<Task>();
             for (int i = 0; i < 10; i++)
             {
-                runners.Add(new SingleStreamTestRunner(this.client, this.streamProviderName, i, runFullTest));
+                runners.Add(createRunner(i));
             }
             foreach (var runner in runners)
             {

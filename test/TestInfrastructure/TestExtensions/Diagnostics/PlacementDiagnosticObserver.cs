@@ -1,6 +1,8 @@
 using System.Collections.Concurrent;
+using System.Reactive.Linq;
 using Microsoft.Extensions.Logging;
 using Orleans.Runtime.Diagnostics;
+using Orleans.TestingHost;
 
 namespace TestExtensions;
 
@@ -51,10 +53,21 @@ public sealed class PlacementDiagnosticObserver : IDisposable, IObserver<Deploym
     /// Creates a new instance of the observer and starts listening for placement diagnostic events.
     /// </summary>
     /// <param name="logger">Optional logger for debug output.</param>
-    public static PlacementDiagnosticObserver Create(ILogger? logger = null)
+    public static PlacementDiagnosticObserver Create(TestCluster cluster, ILogger? logger = null) =>
+        Create(DiagnosticObserverSiloScope.For(cluster), logger);
+
+    public static PlacementDiagnosticObserver Create(InProcessTestCluster cluster, ILogger? logger = null) =>
+        Create(DiagnosticObserverSiloScope.For(cluster), logger);
+
+    internal static PlacementDiagnosticObserver Create(SiloAddress siloAddress, ILogger? logger = null) =>
+        Create(DiagnosticObserverSiloScope.For(siloAddress), logger);
+
+    private static PlacementDiagnosticObserver Create(DiagnosticObserverSiloScope scope, ILogger? logger)
     {
         var observer = new PlacementDiagnosticObserver(logger);
-        observer._subscription = DeploymentLoadPublisherEvents.AllEvents.Subscribe(observer);
+        observer._subscription = DeploymentLoadPublisherEvents.AllEvents
+            .Where(e => scope.Matches(GetObserverSilo(e)))
+            .Subscribe(observer);
         observer._placementListenerSubscriptionCount = 1;
         return observer;
     }
@@ -63,6 +76,16 @@ public sealed class PlacementDiagnosticObserver : IDisposable, IObserver<Deploym
     {
         _logger = logger;
     }
+
+    private static SiloAddress GetObserverSilo(DeploymentLoadPublisherEvents.DeploymentLoadPublisherEvent value) =>
+        value switch
+        {
+            DeploymentLoadPublisherEvents.Published published => published.SiloAddress,
+            DeploymentLoadPublisherEvents.Received received => received.ReceiverSilo,
+            DeploymentLoadPublisherEvents.ClusterRefreshed refreshed => refreshed.SiloAddress,
+            DeploymentLoadPublisherEvents.Removed removed => removed.ObserverSilo,
+            _ => throw new ArgumentOutOfRangeException(nameof(value)),
+        };
 
     /// <summary>
     /// Waits for statistics to be published from a specific silo.

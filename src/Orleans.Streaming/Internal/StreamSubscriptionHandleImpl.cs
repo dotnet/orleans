@@ -30,6 +30,10 @@ namespace Orleans.Streams
         private IAsyncBatchObserver<T>? batchObserver;
         [NonSerialized]
         private SharedHandshakeState? handshakeState;
+        [NonSerialized]
+        private readonly SiloAddress? siloAddress;
+        [NonSerialized]
+        private readonly string? clusterId;
         private StreamHandshakeToken? expectedToken
         {
             get => SharedHandshake.Token;
@@ -67,7 +71,9 @@ namespace Orleans.Streams
             StreamSequenceToken? token,
             string? filterData,
             bool disableHandshake = false,
-            SharedHandshakeState? handshakeState = null)
+            SharedHandshakeState? handshakeState = null,
+            SiloAddress? siloAddress = null,
+            string? clusterId = null)
         {
             this.subscriptionId = subscriptionId ?? throw new ArgumentNullException(nameof(subscriptionId));
             this.observer = observer;
@@ -75,6 +81,8 @@ namespace Orleans.Streams
             this.streamImpl = streamImpl ?? throw new ArgumentNullException(nameof(streamImpl));
             this.filterData = filterData;
             this.handshakeState = handshakeState;
+            this.siloAddress = siloAddress;
+            this.clusterId = clusterId;
             this.isRewindable = streamImpl.IsRewindable && !disableHandshake;
             if (IsRewindable)
             {
@@ -316,11 +324,17 @@ namespace Orleans.Streams
             }
         }
 
-        private static void EmitItemDelivered(string? streamProviderName, StreamId streamId, Guid currentSubscriptionId, StreamSequenceToken sequenceToken)
+        private void EmitItemDelivered(string? streamProviderName, StreamId streamId, Guid currentSubscriptionId, StreamSequenceToken sequenceToken)
         {
             if (streamProviderName is not null)
             {
-                StreamingEvents.EmitItemDelivered(streamProviderName, streamId, currentSubscriptionId, sequenceToken);
+                StreamingEvents.EmitItemDelivered(
+                    streamProviderName,
+                    streamId,
+                    currentSubscriptionId,
+                    siloAddress,
+                    clusterId ?? throw new InvalidOperationException("The stream subscription is not bound to a cluster."),
+                    sequenceToken);
             }
         }
 

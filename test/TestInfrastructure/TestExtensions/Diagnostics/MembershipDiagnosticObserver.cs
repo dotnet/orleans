@@ -1,5 +1,7 @@
 using System.Collections.Concurrent;
+using System.Reactive.Linq;
 using Orleans.Core.Diagnostics;
+using Orleans.TestingHost;
 
 namespace TestExtensions;
 
@@ -75,10 +77,18 @@ internal sealed class MembershipDiagnosticObserver : IDisposable, IObserver<Memb
     /// <summary>
     /// Creates a new instance of the observer and starts listening for membership diagnostic events.
     /// </summary>
-    public static MembershipDiagnosticObserver Create()
+    public static MembershipDiagnosticObserver Create(TestCluster cluster) => Create(DiagnosticObserverSiloScope.For(cluster));
+
+    public static MembershipDiagnosticObserver Create(InProcessTestCluster cluster) => Create(DiagnosticObserverSiloScope.For(cluster));
+
+    internal static MembershipDiagnosticObserver Create(SiloAddress siloAddress) => Create(DiagnosticObserverSiloScope.For(siloAddress));
+
+    private static MembershipDiagnosticObserver Create(DiagnosticObserverSiloScope scope)
     {
         var observer = new MembershipDiagnosticObserver();
-        observer._subscription = MembershipEvents.AllEvents.Subscribe(observer);
+        observer._subscription = MembershipEvents.AllEvents
+            .Where(e => e is MembershipEvents.ViewChanged viewChanged && scope.Matches(viewChanged.ObserverSiloAddress))
+            .Subscribe(observer);
         return observer;
     }
 

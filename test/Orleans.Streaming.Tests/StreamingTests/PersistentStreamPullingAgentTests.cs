@@ -207,7 +207,8 @@ namespace UnitTests.StreamingTests
                 .Returns(Task.FromResult<IList<IBatchContainer>>(new List<IBatchContainer>()));
 
             var streamId = new QualifiedStreamId("provider", StreamId.Create("namespace", Guid.NewGuid()));
-            using var diagnostics = StreamingDiagnosticObserver.Create();
+            using var diagnostics = StreamingDiagnosticObserver.Create(
+                SiloAddress.New(IPAddress.Loopback, 11111, 1));
             var inactive = diagnostics.WaitForStreamInactiveAsync(streamId.StreamId, "provider", CancellationToken.None);
 
             var agent = CreateAgent(pubSub, queueId, receiver: receiver, timeProvider: timeProvider);

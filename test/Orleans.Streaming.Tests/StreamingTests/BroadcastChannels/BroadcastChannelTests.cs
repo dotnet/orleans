@@ -116,7 +116,7 @@ namespace Tester.StreamingTests.BroadcastChannel
             var grainKey = Guid.NewGuid().ToString("N");
             var channelId = ChannelId.Create("some-namespace", grainKey);
 
-            using var observer = BroadcastChannelDiagnosticObserver.Create();
+            using var observer = BroadcastChannelDiagnosticObserver.Create(_fixture.HostedCluster);
             var stream = provider.GetChannelWriter<int>(channelId);
 
             await stream.Publish(1);
@@ -151,7 +151,7 @@ namespace Tester.StreamingTests.BroadcastChannel
         {
             var grainKey = Guid.NewGuid().ToString("N");
 
-            using var observer = BroadcastChannelDiagnosticObserver.Create();
+            using var observer = BroadcastChannelDiagnosticObserver.Create(_fixture.HostedCluster);
             var channels = new List<(ChannelId ChannelId, int ExpectedValue)>();
 
             for (var i = 0; i < 10; i++)
@@ -187,7 +187,7 @@ namespace Tester.StreamingTests.BroadcastChannel
             var grainKey = Guid.NewGuid().ToString("N");
             var channelId = ChannelId.Create("multiple-namespaces-0", grainKey);
 
-            using var observer = BroadcastChannelDiagnosticObserver.Create();
+            using var observer = BroadcastChannelDiagnosticObserver.Create(_fixture.HostedCluster);
             var stream = provider.GetChannelWriter<int>(channelId);
 
             await stream.Publish(1);
@@ -233,7 +233,7 @@ namespace Tester.StreamingTests.BroadcastChannel
             var grainKey = Guid.NewGuid().ToString("N");
             var channelId = ChannelId.Create("multiple-namespaces-0", grainKey);
 
-            using var observer = BroadcastChannelDiagnosticObserver.Create();
+            using var observer = BroadcastChannelDiagnosticObserver.Create(_fixture.HostedCluster);
             var stream = provider.GetChannelWriter<int>(channelId);
 
             var badGrain = _fixture.Client.GetGrain<ISimpleSubscriberGrain>(grainKey);

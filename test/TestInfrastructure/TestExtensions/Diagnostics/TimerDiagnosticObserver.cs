@@ -1,5 +1,7 @@
 using System.Collections.Concurrent;
+using System.Reactive.Linq;
 using Orleans.Runtime.Diagnostics;
+using Orleans.TestingHost;
 
 namespace TestExtensions;
 
@@ -44,10 +46,22 @@ public sealed class TimerDiagnosticObserver : IDisposable, IObserver<GrainTimerE
     /// <summary>
     /// Creates a new instance of the observer and starts listening for timer diagnostic events.
     /// </summary>
-    public static TimerDiagnosticObserver Create()
+    public static TimerDiagnosticObserver Create(TestCluster cluster) => Create(DiagnosticObserverSiloScope.For(cluster));
+
+    public static TimerDiagnosticObserver Create(InProcessTestCluster cluster) => Create(DiagnosticObserverSiloScope.For(cluster));
+
+    internal static TimerDiagnosticObserver Create(SiloAddress siloAddress) => Create(DiagnosticObserverSiloScope.For(siloAddress));
+
+    internal static TimerDiagnosticObserver CreateForAllSilos() => Create(DiagnosticObserverSiloScope.All);
+
+    private static TimerDiagnosticObserver Create(DiagnosticObserverSiloScope scope)
     {
         var observer = new TimerDiagnosticObserver();
-        observer._subscription = GrainTimerEvents.AllEvents.Subscribe(observer);
+        observer._subscription = scope.IncludesAllSilos
+            ? GrainTimerEvents.AllEvents.Subscribe(observer)
+            : GrainTimerEvents.AllEvents
+                .Where(e => scope.Matches(e.GrainContext.Address.SiloAddress))
+                .Subscribe(observer);
         return observer;
     }
 

@@ -11,6 +11,8 @@ namespace Orleans.TestingHost;
 /// <summary>Configuration builder for starting a <see cref="InProcessTestCluster"/>.</summary>
 public sealed class InProcessTestClusterBuilder
 {
+    private InProcessTestCluster? _cluster;
+
     /// <summary>
     /// Initializes a new instance of <see cref="InProcessTestClusterBuilder"/> using the default options.
     /// </summary>
@@ -109,8 +111,18 @@ public sealed class InProcessTestClusterBuilder
 
         ConfigureDefaultPorts();
 
-        var testCluster = new InProcessTestCluster(Options, portAllocator);
-        return testCluster;
+        return _cluster = new InProcessTestCluster(Options, portAllocator);
+    }
+
+    /// <summary>
+    /// Returns whether the address belongs to the cluster built by this builder.
+    /// </summary>
+    /// <param name="siloAddress">The silo address.</param>
+    /// <returns><see langword="true"/> when the address belongs to this cluster.</returns>
+    public bool ContainsSilo(SiloAddress siloAddress)
+    {
+        ArgumentNullException.ThrowIfNull(siloAddress);
+        return _cluster?.ContainsSilo(siloAddress) == true;
     }
 
     /// <summary>

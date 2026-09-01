@@ -121,8 +121,8 @@ namespace UnitTests.StreamingTests
             await deactivatingConsumer.BecomeConsumer(subscribedStreamId, StreamProviderName);
 
             var timeout = TimeSpan.FromSeconds(30);
-            using var streamObserver = StreamingDiagnosticObserver.Create();
-            using var grainObserver = GrainDiagnosticObserver.Create();
+            using var streamObserver = StreamingDiagnosticObserver.Create(HostedCluster);
+            using var grainObserver = GrainDiagnosticObserver.Create(HostedCluster);
             using var cts = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
             cts.CancelAfter(timeout);
             var deliveryTask = streamObserver.WaitForItemDeliveryCountAsync(producedStreamId, 1, StreamProviderName, cts.Token);
@@ -140,7 +140,7 @@ namespace UnitTests.StreamingTests
             Guid streamId,
             CancellationToken cancellationToken)
         {
-            using var observer = StreamingDiagnosticObserver.Create();
+            using var observer = StreamingDiagnosticObserver.Create(HostedCluster);
 
             // Consumer
             IStreamLifecycleConsumerGrain consumer = this.GrainFactory.GetGrain<IStreamLifecycleConsumerGrain>(Guid.NewGuid());

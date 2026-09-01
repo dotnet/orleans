@@ -22,13 +22,14 @@ public sealed class ReminderTestClock : IDisposable
     private bool _disposed;
 
     private ReminderTestClock(
+        InProcessTestClusterBuilder builder,
         DateTimeOffset initialTime,
         TimeSpan minimumReminderPeriod,
         TimeSpan refreshReminderListPeriod,
         TimeSpan initializationTimeout)
     {
         TimeProvider = new FakeTimeProvider(initialTime);
-        DiagnosticObserver = ReminderDiagnosticObserver.Create();
+        DiagnosticObserver = ReminderDiagnosticObserver.Create(builder);
         MinimumReminderPeriod = minimumReminderPeriod;
         RefreshReminderListPeriod = refreshReminderListPeriod;
         InitializationTimeout = initializationTimeout;
@@ -79,6 +80,7 @@ public sealed class ReminderTestClock : IDisposable
         ArgumentNullException.ThrowIfNull(builder);
 
         var clock = new ReminderTestClock(
+            builder,
             new DateTimeOffset(2026, 1, 1, 0, 0, 0, TimeSpan.Zero),
             minimumReminderPeriod ?? TimeSpan.FromMinutes(1),
             refreshReminderListPeriod ?? TimeSpan.FromSeconds(1),

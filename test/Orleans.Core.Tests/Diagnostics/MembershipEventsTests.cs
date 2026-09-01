@@ -62,8 +62,8 @@ public class MembershipEventsTests
     [Fact, TestCategory("BVT")]
     public async Task MembershipDiagnosticObserver_DerivesStatusTransitions_FromViewChanged()
     {
-        using var observer = MembershipDiagnosticObserver.Create();
         var observerSilo = CreateSiloAddress(12111, 3);
+        using var observer = MembershipDiagnosticObserver.Create(observerSilo);
         var subjectSilo = CreateSiloAddress(12112, 4);
 
         MembershipEvents.EmitViewChanged(
@@ -80,6 +80,36 @@ public class MembershipEventsTests
         Assert.Equal(SiloStatus.Joining, transition.OldEntry!.Status);
         Assert.Equal(SiloStatus.Active, transition.NewEntry.Status);
         Assert.Same(observerSilo, transition.ObserverSiloAddress);
+    }
+
+    [TestSuite("BVT")]
+    [TestProvider("None")]
+    [Fact, TestCategory("BVT")]
+    public async Task MembershipDiagnosticObserver_IgnoresOtherObserverSilos()
+    {
+        var observerSilo = CreateSiloAddress(12121, 1);
+        var otherObserverSilo = CreateSiloAddress(12122, 1);
+        var subjectSilo = CreateSiloAddress(12123, 1);
+        using var observer = MembershipDiagnosticObserver.Create(observerSilo);
+
+        MembershipEvents.EmitViewChanged(
+            CreateSnapshot(1, CreateEntry(subjectSilo, SiloStatus.Joining)),
+            otherObserverSilo);
+        MembershipEvents.EmitViewChanged(
+            CreateSnapshot(2, CreateEntry(subjectSilo, SiloStatus.Dead)),
+            otherObserverSilo);
+        MembershipEvents.EmitViewChanged(
+            CreateSnapshot(1, CreateEntry(subjectSilo, SiloStatus.Joining)),
+            observerSilo);
+        MembershipEvents.EmitViewChanged(
+            CreateSnapshot(2, CreateEntry(subjectSilo, SiloStatus.Active)),
+            observerSilo);
+
+        var transition = await observer.WaitForSiloBecameActiveAsync(subjectSilo, TimeSpan.FromSeconds(1));
+
+        Assert.Equal(SiloStatus.Joining, transition.OldEntry!.Status);
+        Assert.Equal(observerSilo, transition.ObserverSiloAddress);
+        Assert.Equal(2, observer.ViewChangedEvents.Count);
     }
 
     private static MembershipEntry CreateEntry(SiloAddress siloAddress, SiloStatus status)

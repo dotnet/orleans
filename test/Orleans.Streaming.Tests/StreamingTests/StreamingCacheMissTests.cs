@@ -59,7 +59,7 @@ namespace Tester.StreamingTests
         [Fact]
         public virtual async Task PreviousEventEvictedFromCacheTest()
         {
-            using var observer = StreamingDiagnosticObserver.Create();
+            using var observer = StreamingDiagnosticObserver.Create(HostedCluster);
             using var cts = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
             cts.CancelAfter(TimeSpan.FromSeconds(30));
             var streamProvider = this.Client.GetStreamProvider(StreamProviderName);
@@ -107,7 +107,7 @@ namespace Tester.StreamingTests
         [Fact]
         public virtual async Task PreviousEventEvictedFromCacheWithFilterTest()
         {
-            using var observer = StreamingDiagnosticObserver.Create();
+            using var observer = StreamingDiagnosticObserver.Create(HostedCluster);
             using var cts = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
             cts.CancelAfter(TimeSpan.FromSeconds(30));
             var streamProvider = this.Client.GetStreamProvider(StreamProviderName);

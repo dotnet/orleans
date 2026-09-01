@@ -91,7 +91,7 @@ public abstract class AdoNetStreamingTests : TestClusterPerTest
         await WaitForStreamingProviderReadyAsync(cancellationToken);
 
         // the runner must only be created after base initialization
-        _runner = new SingleStreamTestRunner(InternalClient, AdoNetStreamProviderName);
+        _runner = new SingleStreamTestRunner(HostedCluster, AdoNetStreamProviderName);
     }
 
     protected override void ConfigureTestCluster(TestClusterBuilder builder)
@@ -204,7 +204,7 @@ public abstract class AdoNetStreamingTests : TestClusterPerTest
     [Fact, TestCategory("Functional")]
     public async Task AdoNet_16_MultipleStreams_ManyDifferent_ManyProducerGrainsManyConsumerGrains()
     {
-        var multiRunner = new MultipleStreamsTestRunner(InternalClient, AdoNetStreamProviderName, 16, false);
+        var multiRunner = new MultipleStreamsTestRunner(HostedCluster, AdoNetStreamProviderName, 16, false);
 
         await multiRunner.StreamTest_MultipleStreams_ManyDifferent_ManyProducerGrainsManyConsumerGrains(
             cancellationToken: TestContext.Current.CancellationToken);
@@ -213,7 +213,7 @@ public abstract class AdoNetStreamingTests : TestClusterPerTest
     [Fact, TestCategory("Functional")]
     public async Task AdoNet_17_MultipleStreams_1J_ManyProducerGrainsManyConsumerGrains()
     {
-        var multiRunner = new MultipleStreamsTestRunner(InternalClient, AdoNetStreamProviderName, 17, false);
+        var multiRunner = new MultipleStreamsTestRunner(HostedCluster, AdoNetStreamProviderName, 17, false);
 
         await multiRunner.StreamTest_MultipleStreams_ManyDifferent_ManyProducerGrainsManyConsumerGrains(
             () => HostedCluster.StartAdditionalSilo(),

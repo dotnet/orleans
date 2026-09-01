@@ -52,7 +52,7 @@ public class DiagnosticInfrastructureRegressionTests
     [Fact, TestCategory("BVT")]
     public async Task GrainDiagnosticObserver_WaitForAnyGrainDeactivatedAsync_TimesOut()
     {
-        using var observer = GrainDiagnosticObserver.Create();
+        using var observer = GrainDiagnosticObserver.CreateForAllSilos();
 
         await Assert.ThrowsAsync<TimeoutException>(() => observer.WaitForAnyGrainDeactivatedAsync(_ => false, TimeSpan.FromMilliseconds(100)));
     }
@@ -62,7 +62,7 @@ public class DiagnosticInfrastructureRegressionTests
     [Fact, TestCategory("BVT")]
     public async Task GrainDiagnosticObserver_WaitAfterTimeout_CanObserveLaterEvent()
     {
-        using var observer = GrainDiagnosticObserver.Create();
+        using var observer = GrainDiagnosticObserver.CreateForAllSilos();
         var grainId = GrainId.Create("test", "grain-1");
 
         await Assert.ThrowsAsync<TimeoutException>(() => observer.WaitForGrainCreatedAsync(grainId, TimeSpan.FromMilliseconds(100)));
@@ -79,10 +79,41 @@ public class DiagnosticInfrastructureRegressionTests
     [TestSuite("BVT")]
     [TestProvider("None")]
     [Fact, TestCategory("BVT")]
+    public async Task GrainAndTimerDiagnosticObservers_IgnoreOtherSilos()
+    {
+        var targetSilo = SiloAddress.New(new IPEndPoint(IPAddress.Loopback, 11990), 1);
+        var otherSilo = SiloAddress.New(new IPEndPoint(IPAddress.Loopback, 11991), 1);
+        var grainId = GrainId.Create("test", "shared-grain");
+        var targetContext = CreateGrainContext(targetSilo, grainId);
+        var otherContext = CreateGrainContext(otherSilo, grainId);
+        var timer = Substitute.For<IGrainTimer>();
+        using var grainObserver = GrainDiagnosticObserver.Create(targetSilo);
+        using var timerObserver = TimerDiagnosticObserver.Create(targetSilo);
+
+        var grainWait = grainObserver.WaitForGrainCreatedAsync(grainId, TimeSpan.FromSeconds(1));
+        var timerWait = timerObserver.WaitForTimerCreatedAsync(grainId, TimeSpan.FromSeconds(1));
+        GrainLifecycleEvents.EmitCreated(otherContext);
+        GrainTimerEvents.EmitCreated(otherContext, TimeSpan.Zero, TimeSpan.FromSeconds(1), timer);
+
+        Assert.False(grainWait.IsCompleted);
+        Assert.False(timerWait.IsCompleted);
+
+        GrainLifecycleEvents.EmitCreated(targetContext);
+        GrainTimerEvents.EmitCreated(targetContext, TimeSpan.Zero, TimeSpan.FromSeconds(1), timer);
+
+        Assert.Same(targetContext, (await grainWait).GrainContext);
+        Assert.Same(targetContext, (await timerWait).GrainContext);
+        Assert.Single(grainObserver.CreatedEvents);
+        Assert.Single(timerObserver.CreatedEvents);
+    }
+
+    [TestSuite("BVT")]
+    [TestProvider("None")]
+    [Fact, TestCategory("BVT")]
     public async Task RebalancerDiagnosticObserver_WaitForCycleAsync_ReturnsNewEvent()
     {
-        using var observer = RebalancerDiagnosticObserver.Create();
         var siloAddress = SiloAddress.New(new IPEndPoint(IPAddress.Loopback, 12000), 1);
+        using var observer = RebalancerDiagnosticObserver.Create(siloAddress);
 
         ActivationRebalancerEvents.EmitCycleStop(siloAddress, 1, 1, 0.1, TimeSpan.FromMilliseconds(1), false);
 
@@ -100,10 +131,31 @@ public class DiagnosticInfrastructureRegressionTests
     [TestSuite("BVT")]
     [TestProvider("None")]
     [Fact, TestCategory("BVT")]
+    public async Task RebalancerDiagnosticObserver_IgnoresOtherSilos()
+    {
+        var targetSilo = SiloAddress.New(new IPEndPoint(IPAddress.Loopback, 12010), 1);
+        var otherSilo = SiloAddress.New(new IPEndPoint(IPAddress.Loopback, 12011), 1);
+        using var observer = RebalancerDiagnosticObserver.Create(targetSilo);
+
+        var waitTask = observer.WaitForSessionStopAsync(TimeSpan.FromSeconds(1));
+        ActivationRebalancerEvents.EmitSessionStop(otherSilo, "other", 1);
+
+        Assert.False(waitTask.IsCompleted);
+
+        ActivationRebalancerEvents.EmitSessionStop(targetSilo, "target", 2);
+
+        var result = await waitTask;
+        Assert.Equal(targetSilo, result.SiloAddress);
+        Assert.Single(observer.SessionStopEvents);
+    }
+
+    [TestSuite("BVT")]
+    [TestProvider("None")]
+    [Fact, TestCategory("BVT")]
     public async Task RebalancerDiagnosticObserver_WaitForSessionStopAsync_ReturnsNewEvent()
     {
-        using var observer = RebalancerDiagnosticObserver.Create();
         var siloAddress = SiloAddress.New(new IPEndPoint(IPAddress.Loopback, 12001), 2);
+        using var observer = RebalancerDiagnosticObserver.Create(siloAddress);
 
         ActivationRebalancerEvents.EmitSessionStop(siloAddress, "existing", 1);
 
@@ -123,8 +175,8 @@ public class DiagnosticInfrastructureRegressionTests
     [Fact, TestCategory("BVT")]
     public async Task RebalancerDiagnosticObserver_WaitAfterTimeout_CanObserveLaterEvent()
     {
-        using var observer = RebalancerDiagnosticObserver.Create();
         var siloAddress = SiloAddress.New(new IPEndPoint(IPAddress.Loopback, 12002), 3);
+        using var observer = RebalancerDiagnosticObserver.Create(siloAddress);
 
         var timedOutWaitTask = observer.WaitForSessionStopAsync(TimeSpan.Zero);
         Assert.True(timedOutWaitTask.IsCompleted);
@@ -147,7 +199,8 @@ public class DiagnosticInfrastructureRegressionTests
     [Fact, TestCategory("BVT")]
     public async Task RebalancerDiagnosticObserver_Dispose_CompletesOutstandingWaiters()
     {
-        var observer = RebalancerDiagnosticObserver.Create();
+        var observer = RebalancerDiagnosticObserver.Create(
+            SiloAddress.New(new IPEndPoint(IPAddress.Loopback, 12003), 4));
         var waitTask = observer.WaitForSessionStopAsync();
 
         observer.Dispose();
@@ -180,5 +233,13 @@ public class DiagnosticInfrastructureRegressionTests
         var actualThreadId = threadSegment[(threadSegment.LastIndexOf(' ') + 1)..];
 
         Assert.Equal(loggedThreadId.ToString(CultureInfo.InvariantCulture), actualThreadId);
+    }
+
+    private static IGrainContext CreateGrainContext(SiloAddress siloAddress, GrainId grainId)
+    {
+        var result = Substitute.For<IGrainContext>();
+        result.GrainId.Returns(grainId);
+        result.Address.Returns(GrainAddress.NewActivationAddress(siloAddress, grainId));
+        return result;
     }
 }

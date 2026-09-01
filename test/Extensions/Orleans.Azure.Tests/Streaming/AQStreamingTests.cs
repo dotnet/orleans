@@ -132,7 +132,7 @@ namespace Tester.AzureUtils.Streaming
             {
                 _preconditionsException?.Throw();
                 await Cluster!.DeployAsync();
-                Runner = new SingleStreamTestRunner(Cluster.InternalClient!, SingleStreamTestRunner.AQ_STREAM_PROVIDER_NAME); // DeployAsync initializes the client.
+                Runner = new SingleStreamTestRunner(Cluster, SingleStreamTestRunner.AQ_STREAM_PROVIDER_NAME); // DeployAsync initializes the client.
             }
         }
 
@@ -238,7 +238,7 @@ namespace Tester.AzureUtils.Streaming
         [Fact, TestCategory("Functional")]
         public async Task AQ_16_MultipleStreams_ManyDifferent_ManyProducerGrainsManyConsumerGrains()
         {
-            var multiRunner = new MultipleStreamsTestRunner(fixture.Cluster!.InternalClient!, SingleStreamTestRunner.AQ_STREAM_PROVIDER_NAME, 16, false); // The fixture deploys the client.
+            var multiRunner = new MultipleStreamsTestRunner(fixture.Cluster!, SingleStreamTestRunner.AQ_STREAM_PROVIDER_NAME, 16, false); // The fixture deploys the client.
             await multiRunner.StreamTest_MultipleStreams_ManyDifferent_ManyProducerGrainsManyConsumerGrains(
                 cancellationToken: TestContext.Current.CancellationToken);
         }
@@ -246,7 +246,7 @@ namespace Tester.AzureUtils.Streaming
         [Fact, TestCategory("Functional")]
         public async Task AQ_17_MultipleStreams_1J_ManyProducerGrainsManyConsumerGrains()
         {
-            var multiRunner = new MultipleStreamsTestRunner(fixture.Cluster!.InternalClient!, SingleStreamTestRunner.AQ_STREAM_PROVIDER_NAME, 17, false); // The fixture deploys the client.
+            var multiRunner = new MultipleStreamsTestRunner(fixture.Cluster!, SingleStreamTestRunner.AQ_STREAM_PROVIDER_NAME, 17, false); // The fixture deploys the client.
             await multiRunner.StreamTest_MultipleStreams_ManyDifferent_ManyProducerGrainsManyConsumerGrains(
                 fixture.Cluster!.StartAdditionalSilo,
                 cancellationToken: TestContext.Current.CancellationToken);

@@ -3,6 +3,7 @@ using System.Reactive.Subjects;
 using System.Reactive.Threading.Tasks;
 using Orleans.Core.Diagnostics;
 using Orleans.Runtime;
+using Orleans.TestingHost;
 
 namespace TestExtensions;
 
@@ -11,11 +12,17 @@ public sealed class GatewayDiagnosticObserver : IDisposable
     private readonly IConnectableObservable<GatewayEvents.GatewayEvent> _events;
     private readonly IDisposable _connection;
 
-    public static GatewayDiagnosticObserver Create() => new();
+    public static GatewayDiagnosticObserver Create(TestCluster cluster) => new(DiagnosticObserverSiloScope.For(cluster));
 
-    private GatewayDiagnosticObserver()
+    public static GatewayDiagnosticObserver Create(InProcessTestCluster cluster) => new(DiagnosticObserverSiloScope.For(cluster));
+
+    internal static GatewayDiagnosticObserver Create(SiloAddress siloAddress) => new(DiagnosticObserverSiloScope.For(siloAddress));
+
+    private GatewayDiagnosticObserver(DiagnosticObserverSiloScope scope)
     {
-        _events = GatewayEvents.AllEvents.Replay();
+        _events = GatewayEvents.AllEvents
+            .Where(e => e is GatewayEvents.ClientDropped dropped && scope.Matches(dropped.SiloAddress))
+            .Replay();
         _connection = _events.Connect();
     }
 

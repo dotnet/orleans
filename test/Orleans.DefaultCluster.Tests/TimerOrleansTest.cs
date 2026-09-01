@@ -49,7 +49,7 @@ namespace DefaultCluster.Tests.TimerTests
 
         private async Task<int> AdvanceDefaultTimerTicksAsync(ITimerGrain grain, TimeSpan period)
         {
-            using var timerObserver = TimerDiagnosticObserver.Create();
+            using var timerObserver = TimerDiagnosticObserver.Create(fixture.HostedCluster);
             for (var expectedTickCount = 1; expectedTickCount <= ExpectedDefaultTimerTicks; expectedTickCount++)
             {
                 await AdvanceTimerToTickCountAsync(grain, timerObserver, period, expectedTickCount);
@@ -62,7 +62,7 @@ namespace DefaultCluster.Tests.TimerTests
         private async Task AdvanceDefaultTimerTicksAsync<TGrain>(IReadOnlyList<TGrain> grains, TimeSpan period)
             where TGrain : ITimerGrain
         {
-            using var timerObserver = TimerDiagnosticObserver.Create();
+            using var timerObserver = TimerDiagnosticObserver.Create(fixture.HostedCluster);
             for (var expectedTickCount = 1; expectedTickCount <= ExpectedDefaultTimerTicks; expectedTickCount++)
             {
                 var waitForTicks = Task.WhenAll(grains.Select(g => timerObserver.WaitForTickCountAsync(g, expectedTickCount, TimerDiagnosticTimeout)));
@@ -116,7 +116,7 @@ namespace DefaultCluster.Tests.TimerTests
 
         private async Task RunSelfDisposingTimerAsync(ITimerCallGrain grain)
         {
-            using var timerObserver = TimerDiagnosticObserver.Create();
+            using var timerObserver = TimerDiagnosticObserver.Create(fixture.HostedCluster);
             var runTimer = grain.RunSelfDisposingTimer();
             var created = await timerObserver.WaitForTimerCreatedAsync(grain, TimerDiagnosticTimeout);
             using var cts = new CancellationTokenSource(TimerDiagnosticTimeout);
@@ -352,7 +352,7 @@ namespace DefaultCluster.Tests.TimerTests
             ITimerCallGrain? grain = null;
 
             Exception? error = null;
-            using var timerObserver = TimerDiagnosticObserver.Create();
+            using var timerObserver = TimerDiagnosticObserver.Create(fixture.HostedCluster);
             try
             {
                 grain = GrainFactory.GetGrain<ITimerCallGrain>(GetRandomGrainId());
@@ -402,7 +402,7 @@ namespace DefaultCluster.Tests.TimerTests
         {
             var grain = GrainFactory.GetGrain<ITimerRequestGrain>(GetRandomGrainId());
 
-            using var timerObserver = TimerDiagnosticObserver.Create();
+            using var timerObserver = TimerDiagnosticObserver.Create(fixture.HostedCluster);
             var numTimers = await grain.TestAllTimerOverloads();
             var waitForTimers = timerObserver.WaitForTickCountAsync(grain, numTimers, TimerDiagnosticTimeout);
             await fixture.AdvanceTimeAsync(TimerOverloadDueTime);
@@ -444,7 +444,7 @@ namespace DefaultCluster.Tests.TimerTests
             const string testName = "NonReentrantGrainTimer_Test";
             var delay = OneShotTimerDelay;
 
-            using var timerObserver = TimerDiagnosticObserver.Create();
+            using var timerObserver = TimerDiagnosticObserver.Create(fixture.HostedCluster);
             var grain = GrainFactory.GetGrain<INonReentrantTimerCallGrain>(GetRandomGrainId());
 
             // Schedule multiple timers with the same delay
@@ -482,7 +482,7 @@ namespace DefaultCluster.Tests.TimerTests
             const string testName = nameof(GrainTimer_Change);
             TimeSpan delay = OneShotTimerDelay;
 
-            using var timerObserver = TimerDiagnosticObserver.Create();
+            using var timerObserver = TimerDiagnosticObserver.Create(fixture.HostedCluster);
             var grain = GrainFactory.GetGrain<ITimerCallGrain>(GetRandomGrainId());
 
             await grain.StartTimer(testName, delay);
@@ -631,7 +631,7 @@ namespace DefaultCluster.Tests.TimerTests
             IPocoTimerCallGrain? grain = null;
 
             Exception? error = null;
-            using var timerObserver = TimerDiagnosticObserver.Create();
+            using var timerObserver = TimerDiagnosticObserver.Create(fixture.HostedCluster);
             try
             {
                 grain = GrainFactory.GetGrain<IPocoTimerCallGrain>(GetRandomGrainId());
@@ -681,7 +681,7 @@ namespace DefaultCluster.Tests.TimerTests
         {
             var grain = GrainFactory.GetGrain<IPocoTimerRequestGrain>(GetRandomGrainId());
 
-            using var timerObserver = TimerDiagnosticObserver.Create();
+            using var timerObserver = TimerDiagnosticObserver.Create(fixture.HostedCluster);
             var numTimers = await grain.TestAllTimerOverloads();
             var waitForTimers = timerObserver.WaitForTickCountAsync(grain, numTimers, TimerDiagnosticTimeout);
             await fixture.AdvanceTimeAsync(TimerOverloadDueTime);
@@ -703,7 +703,7 @@ namespace DefaultCluster.Tests.TimerTests
             const string testName = "NonReentrantGrainTimer_Test";
             var delay = OneShotTimerDelay;
 
-            using var timerObserver = TimerDiagnosticObserver.Create();
+            using var timerObserver = TimerDiagnosticObserver.Create(fixture.HostedCluster);
             var grain = GrainFactory.GetGrain<IPocoNonReentrantTimerCallGrain>(GetRandomGrainId());
 
             // Schedule multiple timers with the same delay
@@ -740,7 +740,7 @@ namespace DefaultCluster.Tests.TimerTests
             const string testName = nameof(GrainTimer_Change);
             TimeSpan delay = OneShotTimerDelay;
 
-            using var timerObserver = TimerDiagnosticObserver.Create();
+            using var timerObserver = TimerDiagnosticObserver.Create(fixture.HostedCluster);
             var grain = GrainFactory.GetGrain<IPocoTimerCallGrain>(GetRandomGrainId());
 
             await grain.StartTimer(testName, delay);

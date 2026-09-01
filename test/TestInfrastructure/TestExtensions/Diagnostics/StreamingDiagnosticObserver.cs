@@ -3,6 +3,7 @@ using System.Reactive.Subjects;
 using System.Reactive.Threading.Tasks;
 using Orleans.Runtime;
 using Orleans.Streams;
+using Orleans.TestingHost;
 using StreamingEvents = Orleans.Streaming.Diagnostics.StreamingEvents;
 
 namespace TestExtensions;
@@ -23,11 +24,19 @@ public sealed class StreamingDiagnosticObserver : IDisposable
     /// <summary>
     /// Creates a new instance of the observer and starts listening for streaming diagnostic events.
     /// </summary>
-    public static StreamingDiagnosticObserver Create() => new();
+    public static StreamingDiagnosticObserver Create(TestCluster cluster) => new(DiagnosticObserverSiloScope.For(cluster));
 
-    private StreamingDiagnosticObserver()
+    public static StreamingDiagnosticObserver Create(InProcessTestCluster cluster) => new(DiagnosticObserverSiloScope.For(cluster));
+
+    public static StreamingDiagnosticObserver Create(SiloAddress siloAddress) => new(DiagnosticObserverSiloScope.For(siloAddress));
+
+    private StreamingDiagnosticObserver(DiagnosticObserverSiloScope scope)
     {
-        _events = StreamingEvents.AllEvents.Replay();
+        _events = StreamingEvents.AllEvents
+            .Where(e => e is StreamingEvents.ItemDelivered delivered
+                ? scope.Matches(delivered.SiloAddress, delivered.ClusterId)
+                : scope.Matches(e.SiloAddress))
+            .Replay();
         _connection = _events.Connect();
     }
 

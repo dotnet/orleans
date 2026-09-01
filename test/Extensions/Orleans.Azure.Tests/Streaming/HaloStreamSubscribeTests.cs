@@ -150,7 +150,7 @@ namespace UnitTests.HaloTests.Streaming
             IProducerEventCountingGrain producer = this.fixture.GrainFactory.GetGrain<IProducerEventCountingGrain>(producerGuid);
             await producer.BecomeProducer(_streamId, _streamProvider);
 
-            using var observer = StreamingDiagnosticObserver.Create();
+            using var observer = StreamingDiagnosticObserver.Create(HostedCluster);
             using var cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
             cts.CancelAfter(Timeout);
 
@@ -179,7 +179,7 @@ namespace UnitTests.HaloTests.Streaming
             IConsumerEventCountingGrain consumer = this.fixture.GrainFactory.GetGrain<IConsumerEventCountingGrain>(consumerGuid);
             await consumer.BecomeConsumer(_streamId, _streamProvider);
 
-            using var observer = StreamingDiagnosticObserver.Create();
+            using var observer = StreamingDiagnosticObserver.Create(HostedCluster);
             using var cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
             cts.CancelAfter(Timeout);
 

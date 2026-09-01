@@ -18,12 +18,12 @@ public sealed class ReminderLifecycleHarness : IDisposable
     private readonly InProcessTestCluster? _cluster;
 
     public ReminderLifecycleHarness()
-        : this(ReminderDiagnosticObserver.Create(), cluster: null)
+        : this(ReminderDiagnosticObserver.CreateForAllSilos(), cluster: null)
     {
     }
 
     public ReminderLifecycleHarness(InProcessTestCluster cluster)
-        : this(ReminderDiagnosticObserver.Create(), cluster)
+        : this(ReminderDiagnosticObserver.Create(cluster), cluster)
     {
     }
 

@@ -42,7 +42,7 @@ namespace Tester.StreamingTests
         [Fact]
         public async Task ActiveImplicitSubscriptionRejectsRewindAndContinuesForward()
         {
-            using var observer = StreamingDiagnosticObserver.Create();
+            using var observer = StreamingDiagnosticObserver.Create(HostedCluster);
             using var cancellation = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
             cancellation.CancelAfter(TimeSpan.FromSeconds(30));
             var streamProvider = this.Client.GetStreamProvider(StreamProviderName);
@@ -90,7 +90,7 @@ namespace Tester.StreamingTests
         [Fact]
         public async Task ObserverReplacementDuringFirstDeliveryPreservesRewindRejection()
         {
-            using var observer = StreamingDiagnosticObserver.Create();
+            using var observer = StreamingDiagnosticObserver.Create(HostedCluster);
             using var cancellation = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
             cancellation.CancelAfter(TimeSpan.FromSeconds(30));
             var streamProvider = this.Client.GetStreamProvider(StreamProviderName);

@@ -355,14 +355,29 @@ public static class StreamingEvents
     /// <param name="streamId">The stream ID.</param>
     /// <param name="subscriptionId">The subscription ID of the consumer.</param>
     /// <param name="siloAddress">The address of the silo handling this delivery.</param>
+    /// <param name="clusterId">The identifier of the cluster handling this delivery.</param>
     /// <param name="sequenceToken">The sequence token of the delivered item.</param>
     public sealed class ItemDelivered(
         string streamProvider,
         StreamId streamId,
         Guid subscriptionId,
         SiloAddress? siloAddress,
+        string clusterId,
         StreamSequenceToken? sequenceToken) : StreamingEvent(streamProvider, siloAddress)
     {
+        /// <summary>
+        /// Initializes an event without cluster identity.
+        /// </summary>
+        public ItemDelivered(
+            string streamProvider,
+            StreamId streamId,
+            Guid subscriptionId,
+            SiloAddress? siloAddress,
+            StreamSequenceToken? sequenceToken)
+            : this(streamProvider, streamId, subscriptionId, siloAddress, clusterId: string.Empty, sequenceToken)
+        {
+        }
+
         /// <summary>
         /// The stream ID.
         /// </summary>
@@ -372,6 +387,11 @@ public static class StreamingEvents
         /// The subscription ID of the consumer.
         /// </summary>
         public readonly Guid SubscriptionId = subscriptionId;
+
+        /// <summary>
+        /// The identifier of the cluster associated with the delivery.
+        /// </summary>
+        public readonly string ClusterId = clusterId;
 
         /// <summary>
         /// The sequence token of the delivered item.
@@ -982,23 +1002,24 @@ public static class StreamingEvents
         }
     }
 
-    internal static void EmitItemDelivered(string streamProviderName, StreamId streamId, Guid subscriptionId, StreamSequenceToken? sequenceToken)
+    internal static void EmitItemDelivered(string streamProviderName, StreamId streamId, Guid subscriptionId, SiloAddress? siloAddress, string clusterId, StreamSequenceToken? sequenceToken)
     {
         if (!Listener.IsEnabled(nameof(ItemDelivered)))
         {
             return;
         }
 
-        Emit(streamProviderName, streamId, subscriptionId, sequenceToken);
+        Emit(streamProviderName, streamId, subscriptionId, siloAddress, clusterId, sequenceToken);
 
         [MethodImpl(MethodImplOptions.NoInlining)]
-        static void Emit(string streamProviderName, StreamId streamId, Guid subscriptionId, StreamSequenceToken? sequenceToken)
+        static void Emit(string streamProviderName, StreamId streamId, Guid subscriptionId, SiloAddress? siloAddress, string clusterId, StreamSequenceToken? sequenceToken)
         {
             Listener.Write(nameof(ItemDelivered), new ItemDelivered(
                 streamProviderName,
                 streamId,
                 subscriptionId,
-                null,
+                siloAddress,
+                clusterId,
                 sequenceToken));
         }
     }

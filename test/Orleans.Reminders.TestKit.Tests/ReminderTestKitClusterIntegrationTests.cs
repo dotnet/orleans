@@ -49,8 +49,8 @@ public sealed class ReminderTestKitClusterIntegrationTests
         var cancellationToken = TestContext.Current.CancellationToken;
         var builder = new InProcessTestClusterBuilder(1);
         var oracle = builder.UseIdealizedReminderTable();
-        using var observer = ReminderDiagnosticObserver.Create();
         var cluster = builder.Build();
+        using var observer = ReminderDiagnosticObserver.Create(cluster);
 
         try
         {
@@ -95,8 +95,8 @@ public sealed class ReminderTestKitClusterIntegrationTests
         var cancellationToken = TestContext.Current.CancellationToken;
         var builder = new InProcessTestClusterBuilder(1);
         var oracle = builder.UseIdealizedReminderTable();
-        using var observer = ReminderDiagnosticObserver.Create();
         var cluster = builder.Build();
+        using var observer = ReminderDiagnosticObserver.Create(cluster);
 
         try
         {
@@ -128,8 +128,8 @@ public sealed class ReminderTestKitClusterIntegrationTests
         var cancellationToken = TestContext.Current.CancellationToken;
         var builder = new InProcessTestClusterBuilder(1);
         var oracle = builder.UseIdealizedReminderTable();
-        using var observer = ReminderDiagnosticObserver.Create();
         var cluster = builder.Build();
+        using var observer = ReminderDiagnosticObserver.Create(cluster);
 
         try
         {
@@ -173,8 +173,8 @@ public sealed class ReminderTestKitClusterIntegrationTests
             builder,
             minimumReminderPeriod: TimeSpan.FromSeconds(1),
             refreshReminderListPeriod: TimeSpan.FromSeconds(1));
-        using var observer = ReminderDiagnosticObserver.Create();
         var cluster = builder.Build();
+        using var observer = ReminderDiagnosticObserver.Create(cluster);
 
         try
         {
@@ -217,8 +217,8 @@ public sealed class ReminderTestKitClusterIntegrationTests
             builder,
             minimumReminderPeriod: TimeSpan.FromSeconds(1),
             refreshReminderListPeriod: TimeSpan.FromSeconds(1));
-        using var observer = ReminderDiagnosticObserver.Create();
         var cluster = builder.Build();
+        using var observer = ReminderDiagnosticObserver.Create(cluster);
 
         try
         {
@@ -268,8 +268,8 @@ public sealed class ReminderTestKitClusterIntegrationTests
             builder,
             minimumReminderPeriod: TimeSpan.FromSeconds(1),
             refreshReminderListPeriod: TimeSpan.FromSeconds(1));
-        using var observer = ReminderDiagnosticObserver.Create();
         var cluster = builder.Build();
+        using var observer = ReminderDiagnosticObserver.Create(cluster);
 
         try
         {
@@ -322,8 +322,8 @@ public sealed class ReminderTestKitClusterIntegrationTests
             builder,
             minimumReminderPeriod: TimeSpan.FromSeconds(1),
             refreshReminderListPeriod: TimeSpan.FromSeconds(1));
-        using var observer = ReminderDiagnosticObserver.Create();
         var cluster = builder.Build();
+        using var observer = ReminderDiagnosticObserver.Create(cluster);
 
         try
         {
@@ -377,8 +377,8 @@ public sealed class ReminderTestKitClusterIntegrationTests
             builder,
             minimumReminderPeriod: TimeSpan.FromSeconds(1),
             refreshReminderListPeriod: TimeSpan.FromSeconds(1));
-        using var observer = ReminderDiagnosticObserver.Create();
         var cluster = builder.Build();
+        using var observer = ReminderDiagnosticObserver.Create(cluster);
 
         try
         {
