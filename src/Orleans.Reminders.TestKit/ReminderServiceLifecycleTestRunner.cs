@@ -33,14 +33,20 @@ public interface IReminderServiceLifecycleHarness
     /// <summary>Gets the currently active silos.</summary>
     IReadOnlyList<SiloAddress> ActiveSilos { get; }
 
-    /// <summary>Registers a reminder through the reminder service on the specified silo.</summary>
+    /// <summary>
+    /// Registers a reminder, directing the request through the specified silo when the harness supports directed
+    /// registration. The default implementation uses the grain-facing API through <see cref="GrainFactory"/>.
+    /// </summary>
     Task RegisterOnSiloAsync(
         SiloAddress siloAddress,
         GrainId grainId,
         string reminderName,
         TimeSpan dueTime,
         TimeSpan period,
-        CancellationToken cancellationToken);
+        CancellationToken cancellationToken)
+        => GrainFactory.GetGrain<IReminderServiceTestGrain>(grainId)
+            .RegisterOrUpdateAsync(reminderName, dueTime, period)
+            .WaitAsync(cancellationToken);
 
     /// <summary>Waits until every active reminder service is ready.</summary>
     Task WaitForStartupReadinessAsync(CancellationToken cancellationToken);

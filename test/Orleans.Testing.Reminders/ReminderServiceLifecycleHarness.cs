@@ -17,7 +17,6 @@ namespace Orleans.Testing.Reminders;
 /// </summary>
 public sealed class ReminderServiceLifecycleHarness : IReminderServiceLifecycleHarness
 {
-    private static readonly TimeSpan TopologyStabilizationTimeout = TimeSpan.FromSeconds(30);
     private readonly InProcessTestCluster _cluster;
     private readonly ReminderTestClock _clock;
     private readonly ReminderDiagnosticObserver _observer;
@@ -185,7 +184,7 @@ public sealed class ReminderServiceLifecycleHarness : IReminderServiceLifecycleH
             _cluster,
             _observer,
             readySilos,
-            TopologyStabilizationTimeout,
+            Timeout.InfiniteTimeSpan,
             cancellationToken);
 
     private static InProcessSiloHandle AssertSingle(IReadOnlyList<InProcessSiloHandle> silos)

@@ -271,6 +271,38 @@ public sealed class FaultyReminderServiceLifecycleTests
     }
 
     [Fact]
+    public async Task DefaultRegistrationImplementationUsesGrainFacingApi()
+    {
+        var fixture = new ReminderServiceLifecycleFixture();
+        await fixture.InitializeAsync();
+        try
+        {
+            using var cancellation = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
+            cancellation.CancelAfter(TimeSpan.FromMinutes(2));
+            var harness = new LegacyLifecycleHarness(fixture.Harness);
+            await harness.WaitForStartupReadinessAsync(cancellation.Token);
+            var grain = harness.GrainFactory.GetGrain<IReminderServiceTestGrain>(
+                Guid.Parse("632db277-28b7-4bd5-a423-35ff4e734f2f"));
+            const string ReminderName = "default-registration";
+
+            await ((IReminderServiceLifecycleHarness)harness).RegisterOnSiloAsync(
+                harness.ActiveSilos[0],
+                grain.GetGrainId(),
+                ReminderName,
+                TimeSpan.FromMinutes(1),
+                TimeSpan.FromMinutes(2),
+                cancellation.Token);
+
+            Assert.Contains(ReminderName, await grain.GetReminderNamesAsync().WaitAsync(cancellation.Token));
+            Assert.True(await grain.UnregisterAsync(ReminderName).WaitAsync(cancellation.Token));
+        }
+        finally
+        {
+            await fixture.DisposeAsync();
+        }
+    }
+
+    [Fact]
     public Task JoinLeaveAdvancesToTheExactRemainingDueTime()
     {
         RecordingAdvanceHarness? recordingHarness = null;
@@ -361,6 +393,32 @@ public sealed class FaultyReminderServiceLifecycleTests
                 period,
                 cancellationToken);
         }
+    }
+
+    private sealed class LegacyLifecycleHarness(IReminderServiceLifecycleHarness inner) : IReminderServiceLifecycleHarness
+    {
+        public IGrainFactory GrainFactory => inner.GrainFactory;
+        public IReminderTable ReminderTable => inner.ReminderTable;
+        public DateTimeOffset UtcNow => inner.UtcNow;
+        public TimeSpan ReminderLoadingWindow => inner.ReminderLoadingWindow;
+        public TimeSpan ReminderRefreshPeriod => inner.ReminderRefreshPeriod;
+        public IReadOnlyList<SiloAddress> ActiveSilos => inner.ActiveSilos;
+        public Task WaitForStartupReadinessAsync(CancellationToken cancellationToken) => inner.WaitForStartupReadinessAsync(cancellationToken);
+        public Task AdvanceAsync(TimeSpan amount, CancellationToken cancellationToken) => inner.AdvanceAsync(amount, cancellationToken);
+        public Task RefreshAsync(CancellationToken cancellationToken) => inner.RefreshAsync(cancellationToken);
+        public Task WaitForOwnerCountAsync(GrainId grainId, string reminderName, int count, CancellationToken cancellationToken) => inner.WaitForOwnerCountAsync(grainId, reminderName, count, cancellationToken);
+        public IReadOnlyList<SiloAddress> GetOwners(GrainId grainId, string reminderName) => inner.GetOwners(grainId, reminderName);
+        public bool IsOwner(SiloAddress siloAddress, GrainId grainId) => inner.IsOwner(siloAddress, grainId);
+        public Task WaitForScheduleAsync(GrainId grainId, string reminderName, CancellationToken cancellationToken) => inner.WaitForScheduleAsync(grainId, reminderName, cancellationToken);
+        public int GetLocalStartCount(GrainId grainId, string reminderName) => inner.GetLocalStartCount(grainId, reminderName);
+        public int GetLocalStopCount(GrainId grainId, string reminderName) => inner.GetLocalStopCount(grainId, reminderName);
+        public int GetScheduleChangeCount(GrainId grainId, string reminderName) => inner.GetScheduleChangeCount(grainId, reminderName);
+        public Task WaitForScheduleChangeCountAsync(GrainId grainId, string reminderName, int count, CancellationToken cancellationToken) => inner.WaitForScheduleChangeCountAsync(grainId, reminderName, count, cancellationToken);
+        public Task WaitForTickCountAsync(GrainId grainId, string reminderName, int count, CancellationToken cancellationToken) => inner.WaitForTickCountAsync(grainId, reminderName, count, cancellationToken);
+        public int GetTickCount(GrainId grainId, string reminderName) => inner.GetTickCount(grainId, reminderName);
+        public Task<SiloAddress> JoinOneSiloAsync(CancellationToken cancellationToken) => inner.JoinOneSiloAsync(cancellationToken);
+        public Task LeaveSiloAsync(SiloAddress siloAddress, CancellationToken cancellationToken) => inner.LeaveSiloAsync(siloAddress, cancellationToken);
+        public Task WaitForTopologyReconciliationAsync(CancellationToken cancellationToken) => inner.WaitForTopologyReconciliationAsync(cancellationToken);
     }
 
     private sealed class DuplicateOwnerHarness(IReminderServiceLifecycleHarness inner) : DelegatingHarness(inner)
