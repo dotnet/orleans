@@ -45,25 +45,6 @@ namespace Orleans.Runtime.Messaging
             return true;
         }
 
-        internal bool TrackForSend(
-            Message request,
-            bool targetSiloIsDead,
-            out Message? requestToReject)
-        {
-            requestToReject = null;
-            if (!Track(request))
-            {
-                return false;
-            }
-
-            if (targetSiloIsDead)
-            {
-                TryRemove(request.Id, out requestToReject);
-            }
-
-            return true;
-        }
-
         internal bool TryComplete(Message response)
         {
             if (response.Direction != Message.Directions.Response || response.Result == Message.ResponseTypes.Status)

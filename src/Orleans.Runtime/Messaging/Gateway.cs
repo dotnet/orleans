@@ -553,28 +553,28 @@ namespace Orleans.Runtime.Messaging
                         return;
                     }
 
-                    if (!_pendingRequests.TrackForSend(
-                        message,
-                        _gateway.siloStatusOracle.IsDeadSilo(message.TargetSilo!),
-                        out requestToReject))
+                    if (!_pendingRequests.Track(message))
                     {
                         destination.Send(message);
                         return;
+                    }
+
+                    if (!_isRequestTrackingRegistered)
+                    {
+                        _gateway.clientsWithTrackedRequests.TryAdd(this, 0);
+                        _isRequestTrackingRegistered = true;
                     }
 
                     // Assume that the addressed silo will execute the request. It could forward the request elsewhere and then fail,
                     // causing us to reject a request which may still complete, but allowing the client to retry is preferable to timing out.
-                    if (requestToReject is null)
+                    if (!_gateway.siloStatusOracle.IsDeadSilo(message.TargetSilo!))
                     {
-                        if (!_isRequestTrackingRegistered)
-                        {
-                            _gateway.clientsWithTrackedRequests.TryAdd(this, 0);
-                            _isRequestTrackingRegistered = true;
-                        }
-
                         destination.Send(message);
                         return;
                     }
+
+                    _pendingRequests.TryRemove(message.Id, out requestToReject);
+                    UnregisterRequestTrackingIfEmptyCore();
                 }
 
                 if (requestToReject is not null)
