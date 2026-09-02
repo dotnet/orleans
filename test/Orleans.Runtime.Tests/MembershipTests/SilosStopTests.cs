@@ -1,8 +1,10 @@
 using System.Net;
+using Microsoft.AspNetCore.Connections;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.Configuration;
 using Orleans.Core.Diagnostics;
+using Orleans.Messaging;
 using Orleans.Runtime;
 using Orleans.Runtime.Messaging;
 using Orleans.Runtime.Placement;
@@ -332,14 +334,9 @@ namespace UnitTests.MembershipTests
         {
             var primaryServices = ((InProcessSiloHandle)HostedCluster.Primary!).ServiceProvider;
             var gateway = primaryServices.GetRequiredService<MessageCenter>().Gateway!;
-            var connectionManager = primaryServices.GetRequiredService<ConnectionManager>();
             var clientId = Assert.Single(((IConnectedClientCollection)gateway).GetConnectedClientIds());
             var deadSilo = HostedCluster.SecondarySilos[0];
-            var retrySilo = await HostedCluster.StartAdditionalSiloAsync();
-            await HostedCluster.WaitForLivenessToStabilizeAsync()
-                .WaitAsync(TestContext.Current.CancellationToken);
-            var deadDestination = await connectionManager.GetConnection(deadSilo.SiloAddress);
-            var retryDestination = await connectionManager.GetConnection(retrySilo.SiloAddress);
+            var destination = new RecordingConnection();
             var original = new Message
             {
                 Id = new CorrelationId(2),
@@ -355,7 +352,7 @@ namespace UnitTests.MembershipTests
                 Direction = Message.Directions.Request,
                 SendingSilo = original.SendingSilo,
                 SendingGrain = original.SendingGrain,
-                TargetSilo = retrySilo.SiloAddress,
+                TargetSilo = HostedCluster.Primary.SiloAddress,
                 TargetGrain = GrainId.Create("target", Guid.NewGuid().ToString()),
             };
             Assert.True(gateway.TryGetClientState(original, out var client));
@@ -378,7 +375,7 @@ namespace UnitTests.MembershipTests
 
                     if (Interlocked.Exchange(ref retryInserted, 1) == 0)
                     {
-                        client.SendRequest(retry, retryDestination);
+                        client.SendRequest(retry, destination);
                     }
 
                     return true;
@@ -393,12 +390,13 @@ namespace UnitTests.MembershipTests
                 TimeSpan.FromSeconds(30),
                 TestContext.Current.CancellationToken);
 
-            client.SendRequest(original, deadDestination);
+            client.SendRequest(original, destination);
 
             await trackingStoppedTask;
             var rejected = Assert.IsType<GatewayEvents.DeadSiloRequestRejected>((await rejectionTask).Payload);
             Assert.Equal(original.TargetSilo, rejected.Rejection.SendingSilo);
             Assert.Equal(1, Volatile.Read(ref retryInserted));
+            Assert.Same(retry, Assert.Single(destination.Messages));
             Assert.Equal(1, gateway.TrackedRequestClientCount);
             Assert.Single(
                 gatewayEvents.GetEvents(nameof(GatewayEvents.DeadSiloRequestRejected)),
@@ -447,6 +445,32 @@ namespace UnitTests.MembershipTests
                 var startedCallId = await _startedCall.Task.WaitAsync(TimeSpan.FromSeconds(30));
                 Assert.Equal(callId, startedCallId);
             }
+        }
+
+        private sealed class RecordingConnection()
+            : Connection(new DefaultConnectionContext(), static _ => Task.CompletedTask, shared: null!)
+        {
+            public List<Message> Messages { get; } = [];
+
+            protected override ConnectionDirection ConnectionDirection => ConnectionDirection.SiloToSilo;
+
+            protected override IMessageCenter MessageCenter => null!;
+
+            public override void Send(Message message) => Messages.Add(message);
+
+            protected override bool PrepareMessageForSend(Message msg) => throw new NotSupportedException();
+
+            protected override void RetryMessage(Message msg, Exception? ex = null) => throw new NotSupportedException();
+
+            protected override void RecordMessageReceive(Message msg, int numTotalBytes, int headerBytes) =>
+                throw new NotSupportedException();
+
+            protected override void RecordMessageSend(Message msg, int numTotalBytes, int headerBytes) =>
+                throw new NotSupportedException();
+
+            protected override void OnReceivedMessage(Message message) => throw new NotSupportedException();
+
+            protected override void OnSendMessageFailure(Message message, string error) => throw new NotSupportedException();
         }
     }
 }
