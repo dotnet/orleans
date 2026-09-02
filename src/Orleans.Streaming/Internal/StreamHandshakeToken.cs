@@ -58,7 +58,7 @@ namespace Orleans.Streams
     [GenerateSerializer]
     internal sealed class StartPositionToken : StreamHandshakeToken
     {
-        [Id(0)]
+        [Id(1)]
         private StreamSubscriptionStartPosition? startPosition;
 
         public StreamSubscriptionStartPosition StartPosition

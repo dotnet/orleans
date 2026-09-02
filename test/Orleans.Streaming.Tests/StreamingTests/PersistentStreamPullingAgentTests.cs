@@ -630,6 +630,7 @@ namespace UnitTests.StreamingTests
 
             public TaskCompletionSource<bool> Delivered { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
             public List<StreamSequenceToken> DeliveredTokens { get; } = new();
+            public List<StreamHandshakeToken?> DeliveredHandshakeTokens { get; } = new();
             public List<Exception> Errors { get; } = new();
 
             public Task<StreamHandshakeToken?> DeliverImmutable(GuidId subscriptionId, QualifiedStreamId streamId, object item, StreamSequenceToken currentToken, StreamHandshakeToken? handshakeToken)
@@ -641,6 +642,7 @@ namespace UnitTests.StreamingTests
             public async Task<StreamHandshakeToken?> DeliverBatch(GuidId subscriptionId, QualifiedStreamId streamId, IBatchContainer item, StreamHandshakeToken? handshakeToken)
             {
                 DeliveredTokens.Add(item.SequenceToken);
+                DeliveredHandshakeTokens.Add(handshakeToken);
                 Delivered.TrySetResult(true);
                 await releaseDelivery.Task;
                 return null;
@@ -889,10 +891,12 @@ namespace UnitTests.StreamingTests
                 {
                     InitialSubscriptionStartPosition = StreamSubscriptionStartPosition.EarliestAvailable,
                 });
+            var consumer = new RecordingConsumer();
+            consumer.ReleaseDelivery();
             var consumerData = streamData.AddConsumer(
                 GuidId.GetGuidId(SubscriptionMarker.MarkAsExplicitSubscriptionId(Guid.NewGuid())),
                 qualifiedStreamId,
-                new RecordingConsumer(),
+                consumer,
                 filterData: null,
                 now: DateTime.UtcNow);
 
@@ -905,8 +909,10 @@ namespace UnitTests.StreamingTests
             Assert.True(await accessor.DoHandshakeWithConsumer(consumerData, cacheToken: null));
             Assert.Same(cursor, consumerData.Cursor);
 
-            Assert.True(cursor.MoveNext());
-            Assert.Equal(retainedToken, Assert.IsType<TestBatchContainer>(cursor.GetCurrent(out _)).SequenceToken);
+            await accessor.RunConsumerCursor(consumerData);
+
+            Assert.Equal(retainedToken, Assert.Single(consumer.DeliveredTokens));
+            Assert.Null(Assert.Single(consumer.DeliveredHandshakeTokens));
             await accessor.Shutdown();
         }
 
@@ -1004,6 +1010,16 @@ namespace UnitTests.StreamingTests
             await accessor.RunConsumerCursor(consumerData);
 
             Assert.Equal(retainedToken, Assert.Single(consumer.DeliveredTokens));
+            var deliveredHandshakeToken = Assert.Single(consumer.DeliveredHandshakeTokens);
+            if (explicitStartPosition)
+            {
+                var deliveredStartPositionToken = Assert.IsType<StartPositionToken>(deliveredHandshakeToken);
+                Assert.Equal(StreamSubscriptionStartPosition.EarliestAvailable, deliveredStartPositionToken.StartPosition);
+            }
+            else
+            {
+                Assert.Null(deliveredHandshakeToken);
+            }
             await accessor.Shutdown();
         }
 

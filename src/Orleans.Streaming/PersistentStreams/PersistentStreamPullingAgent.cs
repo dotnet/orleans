@@ -459,6 +459,8 @@ namespace Orleans.Streams
                     effectiveHandshakeToken = null;
                 }
             }
+            consumerData.StartPositionIsProviderDefault = providerDefaultRequest
+                && effectiveHandshakeToken is StartPositionToken;
             consumerData.LastToken = effectiveHandshakeToken;
             // if we don't yet have a cursor (had errors in the handshake or data not available exc), get a cursor at the event that triggered that consumer subscription.
             if (consumerData.Cursor == null && queueCache != null)
@@ -1221,6 +1223,7 @@ namespace Orleans.Streams
             {
                 StreamHandshakeToken? newToken = await ContextualizedDeliverBatchToConsumer(consumerData, batch);
                 consumerData.LastToken = StreamHandshakeToken.CreateDeliveyToken(batch.SequenceToken); // this is the currently delivered token
+                consumerData.StartPositionIsProviderDefault = false;
                 StreamingEvents.EmitMessageDelivered(streamProviderName, consumerData, batch, Silo);
 
                 return newToken;
@@ -1240,7 +1243,8 @@ namespace Orleans.Streams
             bool isRequestContextSet = batch.ImportRequestContext();
             try
             {
-                return consumerData.StreamConsumer.DeliverBatch(consumerData.SubscriptionId, consumerData.StreamId, batch, consumerData.LastToken);
+                var handshakeToken = consumerData.StartPositionIsProviderDefault ? null : consumerData.LastToken;
+                return consumerData.StreamConsumer.DeliverBatch(consumerData.SubscriptionId, consumerData.StreamId, batch, handshakeToken);
             }
             finally
             {

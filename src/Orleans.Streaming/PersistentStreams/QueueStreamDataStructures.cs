@@ -34,6 +34,8 @@ namespace Orleans.Streams
         public bool IsRegistered = false;
         [NonSerialized]
         public StreamSequenceToken? PendingStartToken;
+        [NonSerialized]
+        public bool StartPositionIsProviderDefault;
 
         /// <summary>
         /// The sequence token of the last batch processed (delivered or filtered) by this subscription.
