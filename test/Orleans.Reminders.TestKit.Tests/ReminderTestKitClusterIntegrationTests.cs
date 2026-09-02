@@ -382,7 +382,7 @@ public sealed class ReminderTestKitClusterIntegrationTests
 
         try
         {
-            await DeployAndWaitForReminderServicesAsync(cluster, observer, testCancellationToken);
+            await DeployAndWaitForStableReminderTopologyAsync(cluster, observer, testCancellationToken);
             var grain = cluster.Client.GetGrain<IReminderTestKitGrain>(Guid.NewGuid());
             var grainId = grain.GetGrainId();
             var dueTime = TimeSpan.FromMinutes(10);
@@ -394,40 +394,69 @@ public sealed class ReminderTestKitClusterIntegrationTests
             await using var firstRefreshB = oracle.BlockNext(ReminderTableOperationKind.ReadRange);
             await using var followingRefreshA = oracle.BlockNext(ReminderTableOperationKind.ReadRange);
             await using var followingRefreshB = oracle.BlockNext(ReminderTableOperationKind.ReadRange);
-            var oneOwner = observer.WaitForActiveReminderCountAsync(grainId, 1, cancellation.Token, "single-owner");
-            await grain.RegisterReminderAsync("single-owner", dueTime, TimeSpan.FromMinutes(2)).WaitAsync(cancellation.Token);
+            var firstRefreshABlocked = firstRefreshA.WaitUntilBlockedAsync(cancellation.Token);
+            var firstRefreshBBlocked = firstRefreshB.WaitUntilBlockedAsync(cancellation.Token);
+            var followingRefreshABlocked = followingRefreshA.WaitUntilBlockedAsync(cancellation.Token);
+            var followingRefreshBBlocked = followingRefreshB.WaitUntilBlockedAsync(cancellation.Token);
+            var phase = "registration";
+            try
+            {
+                var oneOwner = observer.WaitForActiveReminderCountAsync(grainId, 1, cancellation.Token, "single-owner");
+                await grain.RegisterReminderAsync("single-owner", dueTime, TimeSpan.FromMinutes(2)).WaitAsync(cancellation.Token);
 
-            await AdvanceUntilAsync(
-                clock,
-                Task.WhenAll(
-                    firstRefreshA.WaitUntilBlockedAsync(cancellation.Token),
-                    firstRefreshB.WaitUntilBlockedAsync(cancellation.Token)),
-                cancellation.Token);
-            firstRefreshA.Release();
-            firstRefreshB.Release();
-            await AdvanceUntilAsync(
-                clock,
-                Task.WhenAll(
-                    followingRefreshA.WaitUntilBlockedAsync(cancellation.Token),
-                    followingRefreshB.WaitUntilBlockedAsync(cancellation.Token)),
-                cancellation.Token);
-            await oneOwner;
-            await observer.WaitForLocalReminderScheduleAsync(grainId, "single-owner", cancellation.Token);
+                phase = "first refresh wave";
+                await AdvanceUntilAsync(
+                    clock,
+                    Task.WhenAll(firstRefreshABlocked, firstRefreshBBlocked),
+                    cancellation.Token);
+                firstRefreshA.Release();
+                firstRefreshB.Release();
 
-            Assert.Single(observer.GetActiveReminderSilos(grainId, "single-owner"));
-            var tick = observer.WaitForReminderTickAsync(grainId, cancellation.Token, "single-owner");
-            var remaining = firstTickTime - clock.UtcNow.UtcDateTime;
-            Assert.True(remaining > TimeSpan.Zero);
-            await clock.AdvanceAsync(remaining, cancellation.Token);
-            var completed = await tick;
-            await observer.WaitForLocalReminderScheduleAsync(grainId, "single-owner", cancellation.Token);
+                phase = "following refresh wave";
+                await AdvanceUntilAsync(
+                    clock,
+                    Task.WhenAll(followingRefreshABlocked, followingRefreshBBlocked),
+                    cancellation.Token);
 
-            Assert.Equal(firstTickTime, completed.Status.CurrentTickTime);
-            Assert.Equal(1, observer.GetActiveReminderCount(grainId, "single-owner"));
-            Assert.Equal(1, observer.GetTickCount(grainId, "single-owner"));
-            Assert.Single(oracle.Snapshot());
-            followingRefreshA.Release();
-            followingRefreshB.Release();
+                phase = "single owner reconciliation";
+                await oneOwner;
+                await observer.WaitForLocalReminderScheduleAsync(grainId, "single-owner", cancellation.Token);
+
+                Assert.Single(observer.GetActiveReminderSilos(grainId, "single-owner"));
+                var tick = observer.WaitForReminderTickAsync(grainId, cancellation.Token, "single-owner");
+                var remaining = firstTickTime - clock.UtcNow.UtcDateTime;
+                Assert.True(remaining > TimeSpan.Zero);
+                phase = "exact due delivery";
+                await clock.AdvanceAsync(remaining, cancellation.Token);
+                var completed = await tick;
+                await observer.WaitForLocalReminderScheduleAsync(grainId, "single-owner", cancellation.Token);
+
+                Assert.Equal(firstTickTime, completed.Status.CurrentTickTime);
+                Assert.Equal(1, observer.GetActiveReminderCount(grainId, "single-owner"));
+                Assert.Equal(1, observer.GetTickCount(grainId, "single-owner"));
+                Assert.Single(oracle.Snapshot());
+            }
+            catch (OperationCanceledException exception) when (
+                cancellation.IsCancellationRequested
+                && !testCancellationToken.IsCancellationRequested)
+            {
+                var owners = observer.GetActiveReminderSilos(grainId, "single-owner");
+                var operations = oracle.Operations.TakeLast(8);
+                throw new TimeoutException(
+                    $"Two-silo reminder scenario timed out during '{phase}'. "
+                    + $"blockedReads=[firstA={firstRefreshABlocked.IsCompleted}, firstB={firstRefreshBBlocked.IsCompleted}, "
+                    + $"followingA={followingRefreshABlocked.IsCompleted}, followingB={followingRefreshBBlocked.IsCompleted}], "
+                    + $"owners=[{string.Join(", ", owners.Select(silo => silo.ToString()))}], "
+                    + $"operations=[{string.Join("; ", operations)}].",
+                    exception);
+            }
+            finally
+            {
+                firstRefreshA.Release();
+                firstRefreshB.Release();
+                followingRefreshA.Release();
+                followingRefreshB.Release();
+            }
         }
         finally
         {
@@ -455,12 +484,25 @@ public sealed class ReminderTestKitClusterIntegrationTests
         CancellationToken cancellationToken)
     {
         await cluster.DeployAsync(cancellationToken);
-
         using var cancellation = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         cancellation.CancelAfter(TimeSpan.FromSeconds(30));
         var started = cluster.Silos.Select(silo =>
             observer.WaitForReminderServiceStartedAsync(cancellation.Token, silo.SiloAddress));
         await Task.WhenAll(started);
+    }
+
+    private static async Task DeployAndWaitForStableReminderTopologyAsync(
+        InProcessTestCluster cluster,
+        ReminderDiagnosticObserver observer,
+        CancellationToken cancellationToken)
+    {
+        await cluster.DeployAsync(cancellationToken);
+        await ReminderTopologyStabilizer.WaitForStableTopologyAsync(
+            cluster,
+            observer,
+            cluster.Silos,
+            TimeSpan.FromSeconds(30),
+            cancellationToken);
     }
 
     private static async Task AdvanceUntilAsync(

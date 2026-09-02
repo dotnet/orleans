@@ -377,6 +377,19 @@ namespace Orleans.Runtime.ReminderService
         internal Task TestOnlyWaitForSiloStatusListeners(CancellationToken cancellationToken)
             => _siloStatusListenerManager.TestOnlyWaitForCurrentMembershipVersion(cancellationToken);
 
+        internal (MembershipVersion Current, MembershipVersion Processed) TestOnlyGetMembershipVersions()
+            => _siloStatusListenerManager.TestOnlyGetMembershipVersions();
+
+        internal string TestOnlyDescribeTopologyState()
+        {
+            lock (_reconciliationLock)
+            {
+                return $"silo={Silo}, serviceStatus={Status}, {_siloStatusListenerManager.TestOnlyDescribeMembershipState()}, "
+                    + $"ringRange={RingRange}, reconciliationGeneration={reconciliationGeneration}, "
+                    + $"reconciliationCompleted={reconciliationTask.IsCompleted}";
+            }
+        }
+
         private void RemoveOutOfRangeReminders(List<Task> removedReminderTasks)
         {
             CheckRuntimeContext();
@@ -499,7 +512,7 @@ namespace Orleans.Runtime.ReminderService
                             await DoInitialReadAndUpdateReminders();
                             break;
                         case GrainServiceStatus.Started:
-                            await ReadAndUpdateReminders();
+                            await TrackReconciliation(ReadAndUpdateReminders);
                             break;
                         default:
                             listRefreshTimer.Dispose();

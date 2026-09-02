@@ -150,21 +150,50 @@ internal sealed partial class SiloStatusListenerManager : ILifecycleParticipant<
 
     internal async Task TestOnlyWaitForCurrentMembershipVersion(CancellationToken cancellationToken)
     {
-        var targetVersion = _membershipService.CurrentSnapshot.Version;
         while (true)
         {
+            var targetVersion = _membershipService.CurrentSnapshot.Version;
             Task versionChanged;
             lock (_processedMembershipLock)
             {
                 if (_processedMembershipVersion >= targetVersion)
                 {
-                    return;
+                    if (_processedMembershipVersion >= _membershipService.CurrentSnapshot.Version)
+                    {
+                        return;
+                    }
+
+                    continue;
                 }
 
                 versionChanged = _processedMembershipVersionChanged.Task;
             }
 
             await versionChanged.WaitAsync(cancellationToken);
+        }
+    }
+
+    internal string TestOnlyDescribeMembershipState()
+    {
+        var (currentVersion, processedVersion) = TestOnlyGetMembershipVersions();
+        return $"currentMembership={currentVersion}, processedMembership={processedVersion}";
+    }
+
+    internal (MembershipVersion Current, MembershipVersion Processed) TestOnlyGetMembershipVersions()
+    {
+        while (true)
+        {
+            var currentVersion = _membershipService.CurrentSnapshot.Version;
+            MembershipVersion processedVersion;
+            lock (_processedMembershipLock)
+            {
+                processedVersion = _processedMembershipVersion;
+            }
+
+            if (currentVersion == _membershipService.CurrentSnapshot.Version)
+            {
+                return (currentVersion, processedVersion);
+            }
         }
     }
 
