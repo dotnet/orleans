@@ -62,6 +62,15 @@ public class UnixSocketTransportListenerTests
         public TOptions Get(string? requestedName) =>
             requestedName == name ? value : throw new InvalidOperationException($"No options are configured for '{requestedName}'.");
 
-        public IDisposable? OnChange(Action<TOptions, string?> listener) => null;
+        public IDisposable OnChange(Action<TOptions, string?> listener) => NoopDisposable.Instance;
+    }
+
+    private sealed class NoopDisposable : IDisposable
+    {
+        public static NoopDisposable Instance { get; } = new();
+
+        public void Dispose()
+        {
+        }
     }
 }
