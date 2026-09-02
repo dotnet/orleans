@@ -1,5 +1,6 @@
 using System.Reflection;
 using System.Runtime.CompilerServices;
+using NSubstitute;
 using Orleans.DurableMessaging.Configuration;
 using Orleans.Runtime;
 using Xunit;
@@ -142,6 +143,10 @@ public sealed class DeliveryAndOptionsContractTests
             "Orleans.DurableMessaging.DurableInboxExtension",
             throwOnError: true)!;
         var extension = (ILifecycleObserver)RuntimeHelpers.GetUninitializedObject(extensionType);
+        var grainContext = Substitute.For<IGrainContext>();
+        grainContext.GrainInstance.Returns(new object());
+        extensionType.GetField("_grainContext", BindingFlags.Instance | BindingFlags.NonPublic)!
+            .SetValue(extension, grainContext);
         extensionType.GetField("_gate", BindingFlags.Instance | BindingFlags.NonPublic)!
             .SetValue(extension, new SemaphoreSlim(0, 1));
         extensionType.GetField("_metricsActive", BindingFlags.Instance | BindingFlags.NonPublic)!
