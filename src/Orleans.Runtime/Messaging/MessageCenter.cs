@@ -291,7 +291,17 @@ namespace Orleans.Runtime.Messaging
                                 }
                                 catch (Exception exception)
                                 {
-                                    if (sendMessage is null)
+                                    if (msg.Direction == Message.Directions.Response
+                                        && msg.TargetSilo is { } targetSilo
+                                        && CanDeliverToProxyLocally(
+                                            msg,
+                                            messageCenter._siloAddress,
+                                            messageCenter.siloStatusOracle.IsDeadSilo(targetSilo))
+                                        && messageCenter.TryDeliverToProxy(msg))
+                                    {
+                                        return;
+                                    }
+                                    else if (sendMessage is null)
                                     {
                                         RejectMessage();
                                     }
