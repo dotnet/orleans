@@ -26,6 +26,17 @@ namespace Orleans.Serialization.UnitTests
         }
 
         [Fact]
+        public void TypeConverter_FailsClosed_ForTypesWithoutFullNames()
+        {
+            var converter = CreateConverter();
+            var genericParameter = typeof(TypeConverterTestsGenericTypeAllowedByTypeFilter<>).GetGenericArguments()[0];
+
+            var exception = Assert.Throws<InvalidOperationException>(() => converter.Format(genericParameter));
+
+            Assert.Contains("not allowed", exception.Message);
+        }
+
+        [Fact]
         public void TypeConverter_AllowAllTypes_TakesPrecedenceOverDenyingFilters()
         {
             var converter = CreateConverter(
@@ -260,6 +271,14 @@ namespace Orleans.Serialization.UnitTests
         }
 
         [Fact]
+        public void TypeConverter_AllowsConfiguredAllowedAssemblyTypesAlongsideWellKnownGenericArguments()
+        {
+            var converter = CreateConverter(configureOptions: options => options.AddAllowedAssembly(typeof(TypeConverterTestsAssemblyAllowedType).Assembly));
+
+            AssertRoundTrips(converter, typeof(IReadOnlyDictionary<TypeConverterTestsAssemblyAllowedType, int>));
+        }
+
+        [Fact]
         public void TypeConverter_RejectsAllowedAssemblyType_WhenTypeNameFilterDeniesIt()
         {
             var converter = CreateConverter(
@@ -340,6 +359,18 @@ namespace Orleans.Serialization.UnitTests
                 ]);
 
             AssertRoundTrips(converter, typeof(List<TypeConverterTestsGenericArgumentAllowedByTypeFilter>));
+        }
+
+        [Fact]
+        public void TypeConverter_UsesTypeFiltersAlongsideWellKnownGenericArguments_WhenNameFiltersHaveNoOpinion()
+        {
+            var converter = CreateConverter(
+                typeFilters:
+                [
+                    new DelegateTypeFilter(type => type == typeof(TypeConverterTestsGenericArgumentAllowedByTypeFilter) ? true : null)
+                ]);
+
+            AssertRoundTrips(converter, typeof(IReadOnlyDictionary<TypeConverterTestsGenericArgumentAllowedByTypeFilter, int>));
         }
 
         [Fact]
