@@ -49,7 +49,7 @@ public sealed class DistributedGrainDirectoryMembershipTests
 
         try
         {
-            await cluster.DeployAsync();
+            await cluster.DeployAsync(TestContext.Current.CancellationToken);
             var services = cluster.Silos[0].ServiceProvider;
             var defaultDirectory = services.GetRequiredKeyedService<IGrainDirectory>(
                 GrainDirectoryAttribute.DEFAULT_GRAIN_DIRECTORY);
