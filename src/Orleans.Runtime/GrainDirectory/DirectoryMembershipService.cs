@@ -32,7 +32,7 @@ internal sealed partial class DirectoryMembershipService : IAsyncDisposable
     {
         if (version == default || CurrentView.Version < version)
         {
-            await _membership.RefreshViewAsync(version, cancellationToken);
+            await ClusterMembershipService.Refresh(version, cancellationToken);
         }
 
         if (CurrentView.Version < version)
