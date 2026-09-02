@@ -212,7 +212,8 @@ namespace Orleans.Streams
                 // Check if this even already has been delivered
                 if (IsRewindable)
                 {
-                    if (this.expectedToken.Equals(currentToken))
+                    if (this.expectedToken is DeliveryToken deliveryToken
+                        && deliveryToken.Token.Equals(currentToken))
                         return this.expectedToken;
                 }
             }
