@@ -148,11 +148,19 @@ internal sealed class WakeTimer : IDisposable
             }
 
             _disposed = true;
-            waiter = CompleteWaitUnsafe();
+            waiter = _waiter;
+            _waiter = null;
+            _armed = false;
         }
 
-        waiter?.TrySetResult(false);
-        _timer.Dispose();
+        try
+        {
+            waiter?.TrySetResult(false);
+        }
+        finally
+        {
+            _timer.Dispose();
+        }
     }
 
     private TaskCompletionSource<bool>? CompleteWaitUnsafe()

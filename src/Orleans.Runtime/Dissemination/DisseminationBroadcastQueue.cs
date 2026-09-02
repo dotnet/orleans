@@ -227,9 +227,9 @@ internal sealed partial class DisseminationBroadcastQueue
         }
 
         var cap = _options.CurrentValue.Overlay.AntiEntropyInterval;
-        if (cap < floor)
+        if (floor > cap)
         {
-            cap = floor;
+            floor = cap;
         }
 
         var multiplier = Math.Pow(2, Math.Min(Math.Max(0, attempt - 1), 20));

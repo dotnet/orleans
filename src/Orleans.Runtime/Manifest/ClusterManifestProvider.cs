@@ -210,16 +210,23 @@ namespace Orleans.Runtime.Metadata
             if (await peerRepairTask)
             {
                 modified = true;
+                var repairedSilos = builder.ToImmutable();
+                PruneManifestCache(repairedSilos);
+                var repairedManifest = CreateClusterManifest(
+                    new MajorMinorVersion(clusterMembership.Version.Value, existingManifest.Version.Minor + 1),
+                    repairedSilos);
+                if (!TryPublishManifest(repairedManifest))
+                {
+                    return false;
+                }
+
+                existingManifest = repairedManifest;
+                modified = false;
                 if (missingSilos.All(builder.ContainsKey))
                 {
-                    // Peer repair already supplied every missing manifest. Publish immediately while redundant
-                    // direct fetches continue independently, so a hung direct target cannot delay convergence.
-                    var repairedSilos = builder.ToImmutable();
-                    PruneManifestCache(repairedSilos);
-                    var repairedManifest = CreateClusterManifest(
-                        new MajorMinorVersion(clusterMembership.Version.Value, existingManifest.Version.Minor + 1),
-                        repairedSilos);
-                    return TryPublishManifest(repairedManifest);
+                    // Peer repair already supplied every missing manifest. Redundant direct fetches can continue
+                    // independently without delaying convergence.
+                    return true;
                 }
             }
 

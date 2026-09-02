@@ -171,6 +171,34 @@ public class MembershipGossiperTests
         }
     }
 
+    [Fact]
+    public async Task GossipToRemoteSilos_CallerCancellationBoundsUnresponsiveDisseminationPublish()
+    {
+        var disseminationStarted = NewBarrier();
+        var disseminationCompletion = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+        using var cancellation = new CancellationTokenSource();
+        using var rig = CreateTestRig(
+            _ => Task.CompletedTask,
+            (_, _, _) =>
+            {
+                disseminationStarted.TrySetResult();
+                return new ValueTask<bool>(disseminationCompletion.Task);
+            });
+        var snapshot = CreateSnapshot(rig.LocalSilo, rig.RemoteSilo, SiloStatus.Active);
+        var gossipTask = rig.Gossiper.GossipToRemoteSilos(
+            [rig.RemoteSilo],
+            snapshot,
+            rig.LocalSilo,
+            SiloStatus.Stopping,
+            cancellation.Token);
+
+        await disseminationStarted.Task;
+        cancellation.Cancel();
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => gossipTask);
+        Assert.False(disseminationCompletion.Task.IsCompleted);
+    }
+
     private static MembershipGossiperTestRig CreateTestRig(
         Func<MembershipTableSnapshot, Task> directGossip,
         Func<DisseminationKey, long, CancellationToken, ValueTask<bool>> disseminationPublish)

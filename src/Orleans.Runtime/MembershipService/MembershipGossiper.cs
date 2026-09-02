@@ -55,7 +55,9 @@ internal partial class MembershipGossiper(
                 return;
             }
 
-            await disseminationNamespace.PublishAsync(dissemination, snapshot, cancellationToken);
+            await disseminationNamespace.PublishAsync(dissemination, snapshot, cancellationToken)
+                .AsTask()
+                .WaitAsync(cancellationToken);
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {

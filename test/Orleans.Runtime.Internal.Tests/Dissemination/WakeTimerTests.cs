@@ -129,6 +129,19 @@ public class WakeTimerTests
         Assert.False(await timer.WaitAsync(TestContext.Current.CancellationToken));
     }
 
+    [Fact]
+    public async Task DisposeCompletesWaitAndDisposesTimerWithoutChangingIt()
+    {
+        var timeProvider = new ThrowingChangeTimeProvider();
+        var timer = new WakeTimer(timeProvider);
+        var wait = timer.WaitAsync(TestContext.Current.CancellationToken).AsTask();
+
+        timer.Dispose();
+
+        Assert.False(await wait);
+        Assert.True(timeProvider.Timer.IsDisposed);
+    }
+
     private sealed class QueuedSynchronizationContext : SynchronizationContext
     {
         private readonly Queue<(SendOrPostCallback Callback, object? State)> _workItems = [];
@@ -192,6 +205,30 @@ public class WakeTimerTests
                     callback(state);
                 }
             }
+        }
+    }
+
+    private sealed class ThrowingChangeTimeProvider : TimeProvider
+    {
+        public ThrowingChangeTimer Timer { get; } = new();
+
+        public override ITimer CreateTimer(TimerCallback callback, object? state, TimeSpan dueTime, TimeSpan period) =>
+            Timer;
+    }
+
+    private sealed class ThrowingChangeTimer : ITimer
+    {
+        public bool IsDisposed { get; private set; }
+
+        public bool Change(TimeSpan dueTime, TimeSpan period) =>
+            throw new InvalidOperationException("Changing this timer is not supported.");
+
+        public void Dispose() => IsDisposed = true;
+
+        public ValueTask DisposeAsync()
+        {
+            Dispose();
+            return ValueTask.CompletedTask;
         }
     }
 }

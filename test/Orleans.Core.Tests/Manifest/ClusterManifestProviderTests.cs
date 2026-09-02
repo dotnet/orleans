@@ -722,6 +722,71 @@ public class ClusterManifestProviderTests
     }
 
     [Fact]
+    public async Task PeerRepair_PartialResult_PublishesBeforeHungDirectFetchesComplete()
+    {
+        var localSilo = CreateSiloAddress(11111, 1);
+        var peers = Enumerable.Range(11112, 3).Select(port => CreateSiloAddress(port, 1)).OrderBy(static address => address).ToArray();
+        var repairedPeer = peers[0];
+        var remoteManifest = CreateGrainManifest();
+        var remoteHash = ManifestHashCalculator.ComputeHash(remoteManifest);
+        var summary = new ClusterManifestHashSummary(
+            new MajorMinorVersion(1, 1),
+            new Dictionary<SiloAddress, ManifestHash> { [repairedPeer] = remoteHash });
+        var update = new ClusterManifestUpdate(
+            new MajorMinorVersion(1, 1),
+            ImmutableDictionary<SiloAddress, GrainManifest>.Empty.Add(repairedPeer, remoteManifest),
+            includesAllActiveServers: false);
+        var pendingDirectFetch = new TaskCompletionSource<GrainManifest>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var requestLog = new ManifestRequestLog(expectedProbeCount: peers.Length, expectedLegacyFetchCount: peers.Length);
+        var targets = peers.ToDictionary(
+            peer => peer,
+            peer => new TestClusterManifestSystemTarget(
+                getHashSummary: () =>
+                {
+                    requestLog.RecordProbe(peer);
+                    return Task.FromResult(summary);
+                },
+                getUpdate: _ => Task.FromResult<ClusterManifestUpdate?>(update),
+                getLegacyManifest: () =>
+                {
+                    requestLog.RecordLegacyFetch(peer);
+                    return pendingDirectFetch.Task;
+                }));
+        var grainFactory = CreateGrainFactory(targets);
+        var membership = new TestClusterMembershipService(CreateActiveMembershipSnapshot(1, localSilo, peers));
+        var provider = CreateClusterManifestProvider(
+            localSilo,
+            membership,
+            grainFactory,
+            new FakeTimeProvider(),
+            NullLogger<ClusterManifestProvider>.Instance);
+        var repairedManifest = ObserveManifestAsync(provider, new MajorMinorVersion(1, 1));
+        var lifecycle = await StartAsync(provider);
+
+        try
+        {
+            await Task.WhenAll(
+                requestLog.WaitForProbeCountAsync(peers.Length),
+                requestLog.WaitForLegacyFetchCountAsync(peers.Length));
+
+            var repaired = await repairedManifest.WaitAsync(
+                TimeSpan.FromSeconds(5),
+                TestContext.Current.CancellationToken);
+
+            Assert.Equal(remoteManifest, repaired.Silos[repairedPeer]);
+            Assert.Contains(localSilo, repaired.Silos.Keys);
+            Assert.DoesNotContain(peers.Skip(1), repaired.Silos.Keys.Contains);
+            Assert.False(pendingDirectFetch.Task.IsCompleted);
+        }
+        finally
+        {
+            await lifecycle.OnStop(TestContext.Current.CancellationToken);
+            provider.Dispose();
+            membership.Dispose();
+        }
+    }
+
+    [Fact]
     public async Task PeerRepair_StopCancellation_CompletesHungProbeProcessing()
     {
         var localSilo = CreateSiloAddress(11111, 1);

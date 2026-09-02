@@ -435,6 +435,59 @@ public class DisseminationProtocolTests
     }
 
     [Fact]
+    public async Task HighPriorityRetryIsCappedByAntiEntropyInterval()
+    {
+        var local = CreateSilo(11111);
+        var peer = CreateSilo(11112);
+        var transport = new FakeTransport(local, peer);
+        var timeProvider = new FakeTimeProvider();
+        var firstAttempt = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var secondAttempt = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var sendCount = 0;
+        transport.SendBroadcastHandler = (target, batch, cancellationToken) =>
+        {
+            if (Interlocked.Increment(ref sendCount) == 1)
+            {
+                firstAttempt.TrySetResult();
+                throw new InvalidOperationException("transient send failure");
+            }
+
+            transport.BroadcastBatches.Add((target, batch));
+            secondAttempt.TrySetResult();
+            return Task.CompletedTask;
+        };
+
+        var normalNamespace = new FakeNamespace(local, new DisseminationNamespace("normal"));
+        normalNamespace.Options.MaxCoalescingDelay = TimeSpan.FromMinutes(1);
+        var highNamespace = new FakeNamespace(local, new DisseminationNamespace("high"));
+        highNamespace.Options.Priority = DisseminationPriority.High;
+        var protocol = CreateProtocol(
+            transport,
+            new IDisseminationNamespace[] { normalNamespace, highNamespace },
+            options => options.Overlay.AntiEntropyInterval = TimeSpan.FromSeconds(1),
+            timeProvider);
+        using var schedule = new BroadcastScheduleObserver();
+
+        Assert.True(await PublishValue(
+            protocol,
+            highNamespace,
+            highNamespace.CreateValue(FakeNamespace.DefaultKey, sequence: 1),
+            TestContext.Current.CancellationToken));
+        timeProvider.Advance(TimeSpan.FromMilliseconds(1));
+        await firstAttempt.Task.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+        var retry = await schedule.WaitAsync(
+            e => e.Peer.Equals(peer) && e.Reason == DisseminationBroadcastScheduleReason.Retry,
+            TimeSpan.FromSeconds(5));
+
+        Assert.Equal(TimeSpan.FromSeconds(1), retry.DueTime);
+        timeProvider.Advance(TimeSpan.FromMilliseconds(999));
+        Assert.False(secondAttempt.Task.IsCompleted);
+        timeProvider.Advance(TimeSpan.FromMilliseconds(1));
+        await secondAttempt.Task.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+        await protocol.StopAsync(TestContext.Current.CancellationToken);
+    }
+
+    [Fact]
     public async Task HighPriorityNotificationPullsPendingCoalescedFlushForward()
     {
         var local = CreateSilo(11111);
@@ -2123,8 +2176,9 @@ public class DisseminationProtocolTests
     public async Task AntiEntropyTruncationRotatesPastContinuouslyAdvancingKey()
     {
         var local = CreateSilo(11111);
-        var peer = CreateSilo(11112);
-        var transport = new FakeTransport(local, peer);
+        var member = CreateSilo(11112);
+        var requester = CreateSilo(11113);
+        var transport = new FakeTransport(local, member);
         var ns = new FakeNamespace(local);
         DisseminationKey hotKey = "hot";
         DisseminationKey waitingKey = "waiting";
@@ -2136,7 +2190,7 @@ public class DisseminationProtocolTests
             options => options.MaxBatchItems = 1);
         var request = new DisseminationAntiEntropyRequest
         {
-            Sender = peer,
+            Sender = requester,
             Digests = CreateAntiEntropyRequestDigest(
                 ns.Name,
                 (hotKey, 0),
@@ -2144,6 +2198,11 @@ public class DisseminationProtocolTests
         };
 
         var first = await protocol.ReceiveAntiEntropy(request, TestContext.Current.CancellationToken);
+        await protocol.ReceiveAntiEntropy(new DisseminationAntiEntropyRequest
+        {
+            Sender = member,
+            Digests = request.Digests,
+        }, TestContext.Current.CancellationToken);
         ns.SetValue(hotKey, version: 2);
         var second = await protocol.ReceiveAntiEntropy(request, TestContext.Current.CancellationToken);
 

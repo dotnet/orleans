@@ -9,6 +9,7 @@ namespace Orleans.Runtime.Dissemination;
 // The protocol coordinates routing and application while namespaces remain authoritative for values and repair history.
 internal sealed partial class DisseminationProtocol
 {
+    private const int MaxRetainedNonMemberResponseCursors = 64;
     private static readonly TimeSpan MaxAntiEntropyRoundLifetime = TimeSpan.FromMilliseconds(uint.MaxValue - 1);
     private readonly SiloAddress _localSilo;
     private readonly IInternalGrainFactory _grainFactory;
@@ -18,7 +19,8 @@ internal sealed partial class DisseminationProtocol
     private readonly ILogger<DisseminationProtocol> _logger;
     private readonly DisseminationBroadcastQueue _broadcastQueue;
     private readonly object _antiEntropyResponseCursorLock = new();
-    private readonly Dictionary<SiloAddress, int> _antiEntropyResponseCursors = [];
+    private readonly Dictionary<SiloAddress, AntiEntropyResponseCursor> _antiEntropyResponseCursors = [];
+    private long _antiEntropyResponseCursorAccess;
     private readonly object _valueUpdateLock = new();
     private readonly Dictionary<DigestKey, ValueUpdate> _lastValueUpdates = [];
     private readonly FrozenDictionary<DisseminationNamespace, IDisseminationNamespace> _namespaces;
@@ -422,7 +424,6 @@ internal sealed partial class DisseminationProtocol
         CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
-        PruneAntiEntropyResponseCursors(_membership.CurrentSnapshot);
         // Incoming digests are passive evidence for existing peer pumps, not a reason to create new ones.
         foreach (var (namespaceName, entries) in request.Digests)
         {
@@ -437,7 +438,9 @@ internal sealed partial class DisseminationProtocol
         }
 
         var options = _options.CurrentValue;
-        return new(CreateAntiEntropyResponse(request, options, cancellationToken));
+        var response = CreateAntiEntropyResponse(request, options, cancellationToken);
+        PruneAntiEntropyResponseCursors(_membership.CurrentSnapshot, request.Sender);
+        return new(response);
     }
 
     private DisseminationAntiEntropyResponse CreateAntiEntropyResponse(
@@ -596,9 +599,16 @@ internal sealed partial class DisseminationProtocol
 
         lock (_antiEntropyResponseCursorLock)
         {
-            return _antiEntropyResponseCursors.TryGetValue(peer, out var cursor)
-                ? cursor % candidateCount
-                : 0;
+            if (!_antiEntropyResponseCursors.TryGetValue(peer, out var cursor))
+            {
+                return 0;
+            }
+
+            _antiEntropyResponseCursors[peer] = cursor with
+            {
+                LastAccess = ++_antiEntropyResponseCursorAccess,
+            };
+            return cursor.Position % candidateCount;
         }
     }
 
@@ -616,7 +626,9 @@ internal sealed partial class DisseminationProtocol
             }
             else
             {
-                _antiEntropyResponseCursors[peer] = (start + Math.Max(1, examined)) % candidateCount;
+                _antiEntropyResponseCursors[peer] = new(
+                    (start + Math.Max(1, examined)) % candidateCount,
+                    ++_antiEntropyResponseCursorAccess);
             }
         }
     }
@@ -629,15 +641,35 @@ internal sealed partial class DisseminationProtocol
         }
     }
 
-    private void PruneAntiEntropyResponseCursors(DisseminationMembershipSnapshot membership)
+    private void PruneAntiEntropyResponseCursors(
+        DisseminationMembershipSnapshot membership,
+        SiloAddress currentRequester)
     {
         lock (_antiEntropyResponseCursorLock)
         {
-            foreach (var peer in _antiEntropyResponseCursors.Keys.ToArray())
+            var nonMemberCount = 0;
+            foreach (var peer in _antiEntropyResponseCursors.Keys)
             {
                 if (!membership.ContainsMember(peer))
                 {
-                    _antiEntropyResponseCursors.Remove(peer);
+                    nonMemberCount++;
+                }
+            }
+
+            if (nonMemberCount <= MaxRetainedNonMemberResponseCursors)
+            {
+                return;
+            }
+
+            foreach (var cursor in _antiEntropyResponseCursors
+                .Where(entry => !Equals(entry.Key, currentRequester) && !membership.ContainsMember(entry.Key))
+                .OrderBy(static entry => entry.Value.LastAccess)
+                .ToArray())
+            {
+                _antiEntropyResponseCursors.Remove(cursor.Key);
+                if (--nonMemberCount <= MaxRetainedNonMemberResponseCursors)
+                {
+                    break;
                 }
             }
         }
@@ -959,6 +991,8 @@ internal sealed partial class DisseminationProtocol
     private readonly record struct DigestKey(DisseminationNamespace Namespace, DisseminationKey Key);
 
     private readonly record struct ValueUpdate(long Version, long Timestamp);
+
+    private readonly record struct AntiEntropyResponseCursor(int Position, long LastAccess);
 
     private readonly record struct AntiEntropyRepair(
         IDisseminationNamespace Namespace,
