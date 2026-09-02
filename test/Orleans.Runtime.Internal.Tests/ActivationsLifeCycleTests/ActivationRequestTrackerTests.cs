@@ -75,7 +75,7 @@ public sealed class ActivationRequestTrackerTests
             Message? cancellationTarget = null;
             var cancellation = Task.Run(() =>
             {
-                start.SignalAndWait();
+                SignalAndWait(start, cancellationToken);
                 lock (activation)
                 {
                     GetRequestTracker(activation)?.TryFindRunningRequest(message.SendingGrain, message.Id, out cancellationTarget);
@@ -84,7 +84,7 @@ public sealed class ActivationRequestTrackerTests
 
             var completion = Task.Run(() =>
             {
-                start.SignalAndWait();
+                SignalAndWait(start, cancellationToken);
                 lock (activation)
                 {
                     Assert.True(tracker.RemoveRunning(message));
@@ -92,7 +92,7 @@ public sealed class ActivationRequestTrackerTests
                 }
             }, cancellationToken);
 
-            start.SignalAndWait(cancellationToken);
+            SignalAndWait(start, cancellationToken);
             await Task.WhenAll(cancellation, completion);
 
             Assert.True(cancellationTarget is null || ReferenceEquals(message, cancellationTarget));
