@@ -161,6 +161,7 @@ internal sealed class TcpMessageTransportListener : MessageTransportListener
     {
         DisposeCore();
         await base.DisposeAsync();
+        _closingCts.Dispose();
         GC.SuppressFinalize(this);
     }
 }
