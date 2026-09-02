@@ -135,6 +135,22 @@ public class GatewayInFlightRequestTrackerTests
     }
 
     [Fact]
+    public void RemovingOldDestinationDoesNotStealSameIdRetry()
+    {
+        var tracker = CreateTracker();
+        var original = CreateMessage(1, Message.Directions.Request, Silo1);
+        var retry = CreateMessage(1, Message.Directions.Request, Silo2);
+        Assert.True(tracker.Track(original));
+        Assert.True(tracker.Track(retry));
+
+        Assert.False(tracker.TryRemove(original.Id, Silo1, out _));
+        Assert.Equal(1, tracker.Count);
+        Assert.True(tracker.TryRemove(retry.Id, Silo2, out var removed));
+        Assert.Equal(Silo2, removed.TargetSilo);
+        Assert.Equal(0, tracker.Count);
+    }
+
+    [Fact]
     public void ClearRemovesAllRequestsOnDisconnect()
     {
         var tracker = CreateTracker();
