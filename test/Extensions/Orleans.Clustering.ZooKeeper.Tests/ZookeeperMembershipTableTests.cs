@@ -189,6 +189,19 @@ namespace UnitTests.MembershipTests
                 Assert.NotNull(result);
                 Assert.Null(result.Metadata);
             }
+
+            [Fact]
+            public void MetadataRepairCountdown_ChecksOnConfiguredInterval()
+            {
+                var countdown = ZooKeeperBasedMembershipTable.MetadataRepairCheckInterval;
+
+                for (var heartbeat = 1; heartbeat < ZooKeeperBasedMembershipTable.MetadataRepairCheckInterval; heartbeat++)
+                {
+                    Assert.False(ZooKeeperBasedMembershipTable.ShouldCheckMetadata(ref countdown));
+                }
+
+                Assert.True(ZooKeeperBasedMembershipTable.ShouldCheckMetadata(ref countdown));
+            }
         }
     }
 }

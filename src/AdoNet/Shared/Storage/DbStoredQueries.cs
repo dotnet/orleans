@@ -276,15 +276,15 @@ namespace Orleans.Tests.SqlUtils
 
             private static string? TryGetMetadataJson(IDataRecord record)
             {
-                try
+                for (var index = 0; index < record.FieldCount; index++)
                 {
-                    var pos = record.GetOrdinal(nameof(Columns.MetadataJson));
-                    return record.IsDBNull(pos) ? null : Convert.ToString(record.GetValue(pos));
+                    if (string.Equals(record.GetName(index), nameof(Columns.MetadataJson), StringComparison.OrdinalIgnoreCase))
+                    {
+                        return record.IsDBNull(index) ? null : Convert.ToString(record.GetValue(index));
+                    }
                 }
-                catch (IndexOutOfRangeException)
-                {
-                    return null;
-                }
+
+                return null;
             }
 
             /// <summary>

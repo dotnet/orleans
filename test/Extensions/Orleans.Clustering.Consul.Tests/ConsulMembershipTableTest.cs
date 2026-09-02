@@ -244,4 +244,24 @@ namespace Consul.Tests
             Metadata = ImmutableDictionary<string, string>.Empty.Add("region", "west")
         };
     }
+
+    [TestCategory("BVT")]
+    [TestSuite("BVT")]
+    [TestProvider("None")]
+    [TestArea("Membership")]
+    public class ConsulMembershipMetadataContractTests
+    {
+        [Fact]
+        public void MetadataRepairCountdown_ChecksOnConfiguredInterval()
+        {
+            var countdown = ConsulBasedMembershipTable.MetadataRepairCheckInterval;
+
+            for (var heartbeat = 1; heartbeat < ConsulBasedMembershipTable.MetadataRepairCheckInterval; heartbeat++)
+            {
+                Assert.False(ConsulBasedMembershipTable.ShouldCheckMetadata(ref countdown));
+            }
+
+            Assert.True(ConsulBasedMembershipTable.ShouldCheckMetadata(ref countdown));
+        }
+    }
 }

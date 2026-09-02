@@ -27,7 +27,7 @@ namespace Orleans.Runtime.Membership
         private readonly string versionKey;
         private int metadataRepairCheckCountdown;
 
-        private const int MetadataRepairCheckInterval = 10;
+        internal const int MetadataRepairCheckInterval = 10;
 
         /// <summary>
         /// Initializes a new instance of the <see cref="ConsulBasedMembershipTable"/> class.
@@ -213,7 +213,9 @@ namespace Orleans.Runtime.Membership
             }
         }
 
-        private bool ShouldCheckMetadata() => Interlocked.Decrement(ref metadataRepairCheckCountdown) < 0;
+        private bool ShouldCheckMetadata() => ShouldCheckMetadata(ref metadataRepairCheckCountdown);
+
+        internal static bool ShouldCheckMetadata(ref int countdown) => Interlocked.Decrement(ref countdown) <= 0;
 
         private void MetadataChecked() => Volatile.Write(ref metadataRepairCheckCountdown, MetadataRepairCheckInterval);
 

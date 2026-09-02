@@ -279,6 +279,36 @@ public sealed class RelationalOrleansQueriesUnitTests
     }
 
     [Fact]
+    public async Task ReadAllMembershipRows_LegacySchemaReturnsUnavailableMetadata()
+    {
+        var startTime = new DateTime(2026, 8, 27, 10, 0, 0, DateTimeKind.Utc);
+        var storage = ExpectQueryLoad(new ScriptedRelationalStorage(), MembershipQueryKeys)
+            .ExpectRead(
+                Sql("MembershipReadAllKey"),
+                CreateTable(
+                    [
+                        ("StartTime", typeof(DateTime)),
+                        ("Port", typeof(int)),
+                        ("Generation", typeof(int)),
+                        ("Address", typeof(string)),
+                        ("SiloName", typeof(string)),
+                        ("HostName", typeof(string)),
+                        ("Status", typeof(int)),
+                        ("ProxyPort", typeof(int)),
+                        ("IAmAliveTime", typeof(DateTime)),
+                        ("SuspectTimes", typeof(string)),
+                        ("Version", typeof(long)),
+                    ],
+                    [startTime, 11_111, 9, "127.0.0.1", "silo-a", "host-a", (int)SiloStatus.Active, 30_000, startTime, DBNull.Value, 42L]));
+        var queries = await ClusteringQueries.CreateInstance(storage);
+
+        var result = await queries.MembershipReadAllAsync("legacy-cluster");
+
+        Assert.Null(Assert.Single(result.Members).Item1.Metadata);
+        storage.VerifyComplete();
+    }
+
+    [Fact]
     public async Task MembershipMutation_ReturnsResultAndCapturesAllParameters()
     {
         var startTime = new DateTime(2026, 8, 27, 8, 0, 0, DateTimeKind.Utc);
