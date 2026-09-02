@@ -443,6 +443,26 @@ try {
         Assert-Equal 6 $summary.total_branches 'Distinct branch site total branches differ.'
     }
 
+    Invoke-Test 'does not double count class lines which precede methods' {
+        $testCase = New-TestCase
+        $sourceFile = [Security.SecurityElement]::Escape((Join-Path $testCase.SourceRoot 'Example.cs'))
+        $xml = @"
+<coverage><packages><package><classes>
+  <class name="ContainingType" filename="$sourceFile">
+    <lines><line number="10" hits="1" branch="True" condition-coverage="50% (1/2)" /></lines>
+    <methods><method name="Method" signature="()"><lines>
+      <line number="10" hits="1" branch="True" condition-coverage="50% (1/2)" />
+    </lines></method></methods>
+  </class>
+</classes></package></packages></coverage>
+"@
+        [void] (Write-Report $testCase $xml)
+        Invoke-Summarizer $testCase
+        $summary = Get-Content -Raw $testCase.JsonOutput | ConvertFrom-Json
+        Assert-Equal 1 $summary.covered_branches 'Reordered covered branches differ.'
+        Assert-Equal 2 $summary.total_branches 'Reordered total branches differ.'
+    }
+
     Invoke-Test 'rejects inconsistent branch coverage' {
         $testCase = New-TestCase
         $lines = @'
@@ -820,30 +840,41 @@ exit 0
         $expectedArtifacts = Join-Path $testCase.Root 'expected.txt'
         [IO.File]::WriteAllLines(
             $expectedArtifacts,
-            @('test_output_first', 'test_output_second'),
+            @('test_output_a', 'test_output_B'),
             [Text.UTF8Encoding]::new($false)
         )
-        $firstArtifact = Join-Path $testCase.ReportDirectory 'coverage_test_output_first'
+        $firstArtifact = Join-Path $testCase.ReportDirectory 'coverage_test_output_a'
         [void] (New-Item -ItemType Directory -Path $firstArtifact)
         [IO.File]::WriteAllText(
-            (Join-Path $firstArtifact 'test_output_first.cobertura.xml'),
+            (Join-Path $firstArtifact 'test_output_a.cobertura.xml'),
             '<coverage />',
             [Text.UTF8Encoding]::new($false)
         )
-        Write-ArtifactMetadata $firstArtifact 'test_output_first'
+        Write-ArtifactMetadata $firstArtifact 'test_output_a'
         Assert-Throws `
             { Invoke-ArtifactValidator $testCase.ReportDirectory $expectedArtifacts } `
-            'Missing: coverage_test_output_second'
+            'Missing: coverage_test_output_B'
 
-        $secondArtifact = Join-Path $testCase.ReportDirectory 'coverage_test_output_second'
+        $secondArtifact = Join-Path $testCase.ReportDirectory 'coverage_test_output_B'
         [void] (New-Item -ItemType Directory -Path $secondArtifact)
         [IO.File]::WriteAllText(
-            (Join-Path $secondArtifact 'test_output_second.cobertura.xml'),
+            (Join-Path $secondArtifact 'test_output_B.cobertura.xml'),
             '<coverage />',
             [Text.UTF8Encoding]::new($false)
         )
-        Write-ArtifactMetadata $secondArtifact 'test_output_second'
+        Write-ArtifactMetadata $secondArtifact 'test_output_B'
         Invoke-ArtifactValidator $testCase.ReportDirectory $expectedArtifacts | Out-Null
+        $validationPath = Join-Path $testCase.Root 'validation.json'
+        $firstManifestSha = (Get-Content -Raw $validationPath | ConvertFrom-Json).manifest_sha256
+        $previousCulture = [Threading.Thread]::CurrentThread.CurrentCulture
+        try {
+            [Threading.Thread]::CurrentThread.CurrentCulture = [Globalization.CultureInfo]::GetCultureInfo('tr-TR')
+            Invoke-ArtifactValidator $testCase.ReportDirectory $expectedArtifacts | Out-Null
+        } finally {
+            [Threading.Thread]::CurrentThread.CurrentCulture = $previousCulture
+        }
+        $secondManifestSha = (Get-Content -Raw $validationPath | ConvertFrom-Json).manifest_sha256
+        Assert-Equal $firstManifestSha $secondManifestSha 'Artifact manifest fingerprints must use ordinal ordering.'
 
         $unexpectedArtifact = Join-Path $testCase.ReportDirectory 'coverage_test_output_unexpected'
         [void] (New-Item -ItemType Directory -Path $unexpectedArtifact)
@@ -979,22 +1010,37 @@ exit 0
         $testCase = New-TestCase
         $repository = Join-Path $testCase.Root 'repository'
         [void] (New-Item -ItemType Directory -Path (Join-Path $repository '.github/scripts') -Force)
-        [IO.File]::WriteAllText((Join-Path $repository '.github/scripts/first.ps1'), 'first', [Text.UTF8Encoding]::new($false))
-        [IO.File]::WriteAllText((Join-Path $repository 'global.json'), '{}', [Text.UTF8Encoding]::new($false))
+        [IO.File]::WriteAllText((Join-Path $repository '.github/scripts/a.ps1'), 'first', [Text.UTF8Encoding]::new($false))
+        [IO.File]::WriteAllText((Join-Path $repository '.github/scripts/B.ps1'), 'second', [Text.UTF8Encoding]::new($false))
         $manifest = Join-Path $testCase.Root 'inputs.txt'
         [IO.File]::WriteAllLines(
             $manifest,
-            @('global.json', '.github/scripts/first.ps1'),
+            @('.github/scripts/a.ps1', '.github/scripts/B.ps1'),
             [Text.UTF8Encoding]::new($false)
         )
         $firstOutput = Join-Path $testCase.Root 'first.json'
+        $reorderedOutput = Join-Path $testCase.Root 'reordered.json'
         $secondOutput = Join-Path $testCase.Root 'second.json'
         & $coverageInputFingerprintScriptPath -RepositoryRoot $repository -Manifest $manifest -JsonOutput $firstOutput
-        [IO.File]::WriteAllText((Join-Path $repository '.github/scripts/first.ps1'), 'changed', [Text.UTF8Encoding]::new($false))
+        [IO.File]::WriteAllLines(
+            $manifest,
+            @('.github/scripts/B.ps1', '.github/scripts/a.ps1'),
+            [Text.UTF8Encoding]::new($false)
+        )
+        $previousCulture = [Threading.Thread]::CurrentThread.CurrentCulture
+        try {
+            [Threading.Thread]::CurrentThread.CurrentCulture = [Globalization.CultureInfo]::GetCultureInfo('tr-TR')
+            & $coverageInputFingerprintScriptPath -RepositoryRoot $repository -Manifest $manifest -JsonOutput $reorderedOutput
+        } finally {
+            [Threading.Thread]::CurrentThread.CurrentCulture = $previousCulture
+        }
+        [IO.File]::WriteAllText((Join-Path $repository '.github/scripts/a.ps1'), 'changed', [Text.UTF8Encoding]::new($false))
         & $coverageInputFingerprintScriptPath -RepositoryRoot $repository -Manifest $manifest -JsonOutput $secondOutput
         $first = Get-Content -Raw $firstOutput | ConvertFrom-Json
+        $reordered = Get-Content -Raw $reorderedOutput | ConvertFrom-Json
         $second = Get-Content -Raw $secondOutput | ConvertFrom-Json
         Assert-Equal 2 $first.files 'Coverage input file count differs.'
+        Assert-Equal $first.sha256 $reordered.sha256 'Coverage input fingerprints must use ordinal ordering.'
         Assert-Equal $false ($first.sha256 -eq $second.sha256) 'Coverage input changes must change the fingerprint.'
     }
 

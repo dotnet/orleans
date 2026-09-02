@@ -51,8 +51,10 @@ if ($inputs.Count -eq 0) {
     throw 'The coverage input manifest is empty'
 }
 
+$sortedInputs = @($inputs)
+[Array]::Sort($sortedInputs, [StringComparer]::Ordinal)
 $entries = @(
-    foreach ($relativePath in @($inputs | Sort-Object)) {
+    foreach ($relativePath in $sortedInputs) {
         $currentPath = $resolvedRepositoryRoot
         Assert-NotReparsePoint $currentPath
         foreach ($part in $relativePath.Split('/')) {

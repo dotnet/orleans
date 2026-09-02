@@ -156,6 +156,7 @@ public static class CoverageSummaryReader
         var methodIdentity = string.Empty;
         var linesBelongToMethod = false;
         var methodBranchLines = new HashSet<int>();
+        var pendingClassBranches = new List<PendingBranchLine>();
         RepositorySourcePath? sourcePath = null;
         try
         {
@@ -172,6 +173,7 @@ public static class CoverageSummaryReader
                         methodIdentity = string.Empty;
                         linesBelongToMethod = false;
                         methodBranchLines.Clear();
+                        pendingClassBranches.Clear();
                         sourcePath = GetRepositoryPath(reader.GetAttribute("filename"), normalizedSourceRoot);
                         if (reader.IsEmptyElement)
                         {
@@ -235,7 +237,10 @@ public static class CoverageSummaryReader
                         }
                         else if (!methodBranchLines.Contains(lineNumber))
                         {
-                            branchSiteIdentity = $"{classIdentity}\0<non-method>";
+                            pendingClassBranches.Add(
+                                new PendingBranchLine(
+                                    lineNumber,
+                                    reader.GetAttribute("condition-coverage") ?? string.Empty));
                         }
                     }
 
@@ -266,6 +271,24 @@ public static class CoverageSummaryReader
                     }
                     else if (reader.Depth == classDepth && reader.LocalName == "class")
                     {
+                        if (sourcePath is not null)
+                        {
+                            foreach (var pendingBranch in pendingClassBranches)
+                            {
+                                if (!methodBranchLines.Contains(pendingBranch.LineNumber))
+                                {
+                                    ProcessBranch(
+                                        pendingBranch.ConditionCoverage,
+                                        pendingBranch.LineNumber,
+                                        $"{classIdentity}\0<non-method>",
+                                        reportPath,
+                                        sourcePath,
+                                        measuredBranches,
+                                        measuredBranchTotals);
+                                }
+                            }
+                        }
+
                         classDepth = -1;
                         methodDepth = -1;
                         linesDepth = -1;
@@ -273,6 +296,7 @@ public static class CoverageSummaryReader
                         methodIdentity = string.Empty;
                         linesBelongToMethod = false;
                         methodBranchLines.Clear();
+                        pendingClassBranches.Clear();
                         sourcePath = null;
                     }
                 }
@@ -327,7 +351,25 @@ public static class CoverageSummaryReader
             return;
         }
 
-        var conditionCoverage = reader.GetAttribute("condition-coverage") ?? string.Empty;
+        ProcessBranch(
+            reader.GetAttribute("condition-coverage") ?? string.Empty,
+            lineNumber,
+            branchSiteIdentity,
+            reportPath,
+            sourcePath,
+            measuredBranches,
+            measuredBranchTotals);
+    }
+
+    private static void ProcessBranch(
+        string conditionCoverage,
+        int lineNumber,
+        string branchSiteIdentity,
+        string reportPath,
+        RepositorySourcePath sourcePath,
+        Dictionary<string, Dictionary<string, bool>> measuredBranches,
+        Dictionary<string, Dictionary<string, int>> measuredBranchTotals)
+    {
         var match = ConditionCoverage.Match(conditionCoverage);
         if (!match.Success)
         {
@@ -467,6 +509,8 @@ public static class CoverageSummaryReader
             throw new InvalidDataException($"{path} must not be a symbolic link");
         }
     }
+
+    private sealed record PendingBranchLine(int LineNumber, string ConditionCoverage);
 
     private sealed record RepositorySourcePath(string RelativePath, string RepositoryPath);
 }
