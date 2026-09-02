@@ -259,6 +259,19 @@ namespace Tester.AzureUtils
 
             Assert.Null(result.Metadata);
         }
+
+        [Fact]
+        public void MetadataRepairCountdown_ChecksOnConfiguredInterval()
+        {
+            var countdown = AzureBasedMembershipTable.MetadataRepairCheckInterval;
+
+            for (var heartbeat = 1; heartbeat < AzureBasedMembershipTable.MetadataRepairCheckInterval; heartbeat++)
+            {
+                Assert.False(AzureBasedMembershipTable.ShouldCheckMetadata(ref countdown));
+            }
+
+            Assert.True(AzureBasedMembershipTable.ShouldCheckMetadata(ref countdown));
+        }
     }
 
 }

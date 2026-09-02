@@ -40,7 +40,7 @@ namespace Orleans.Runtime.Membership
         private readonly ILogger logger;
 
         private const int ZOOKEEPER_SESSION_TIMEOUT = 10_000;
-        private const int MetadataRepairCheckInterval = 10;
+        internal const int MetadataRepairCheckInterval = 10;
 
         private readonly ZooKeeperWatcher watcher;
         private int metadataRepairCheckCountdown;
@@ -277,7 +277,9 @@ namespace Orleans.Runtime.Membership
             });
         }
 
-        private bool ShouldCheckMetadata() => Interlocked.Decrement(ref metadataRepairCheckCountdown) < 0;
+        private bool ShouldCheckMetadata() => ShouldCheckMetadata(ref metadataRepairCheckCountdown);
+
+        internal static bool ShouldCheckMetadata(ref int countdown) => Interlocked.Decrement(ref countdown) <= 0;
 
         private void MetadataChecked() => Volatile.Write(ref metadataRepairCheckCountdown, MetadataRepairCheckInterval);
 
