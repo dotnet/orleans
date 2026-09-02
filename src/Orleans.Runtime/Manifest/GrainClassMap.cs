@@ -53,7 +53,7 @@ namespace Orleans.Metadata
                 args = default;
             }
 
-            if (!_types.TryGetValue(lookupType, out grainClass))
+            if (!Volatile.Read(ref _types).TryGetValue(lookupType, out grainClass))
             {
                 return false;
             }

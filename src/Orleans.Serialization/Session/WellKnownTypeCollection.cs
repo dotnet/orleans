@@ -2,7 +2,6 @@ using Microsoft.Extensions.Options;
 using Orleans.Serialization.Configuration;
 using System;
 using System.Collections.Generic;
-using System.Threading;
 using System.Diagnostics.CodeAnalysis;
 
 namespace Orleans.Serialization.Session
@@ -12,8 +11,8 @@ namespace Orleans.Serialization.Session
     /// </summary>
     public sealed class WellKnownTypeCollection
     {
-        private Dictionary<uint, Type> _wellKnownTypes = new();
-        private Dictionary<Type, uint> _wellKnownTypeToIdMap = new();
+        private volatile Dictionary<uint, Type> _wellKnownTypes = new();
+        private volatile Dictionary<Type, uint> _wellKnownTypeToIdMap = new();
 
         /// <summary>
         /// Initializes a new instance of the <see cref="WellKnownTypeCollection"/> class.
@@ -45,8 +44,8 @@ namespace Orleans.Serialization.Session
                 wellKnownTypeToIdMap[item.Value] = item.Key;
             }
 
-            Volatile.Write(ref _wellKnownTypes, wellKnownTypes);
-            Volatile.Write(ref _wellKnownTypeToIdMap, wellKnownTypeToIdMap);
+            _wellKnownTypes = wellKnownTypes;
+            _wellKnownTypeToIdMap = wellKnownTypeToIdMap;
         }
 
         /// <summary>

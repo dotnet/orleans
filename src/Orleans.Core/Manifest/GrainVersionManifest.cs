@@ -47,7 +47,7 @@ namespace Orleans.Runtime.Versions
         /// <returns>The version of the specified grain interface.</returns>
         public ushort GetLocalVersion(GrainInterfaceType interfaceType)
         {
-            if (_localVersions.TryGetValue(interfaceType, out var result))
+            if (Volatile.Read(ref _localVersions).TryGetValue(interfaceType, out var result))
             {
                 return result;
             }

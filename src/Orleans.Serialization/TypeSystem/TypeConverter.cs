@@ -3,7 +3,6 @@ using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
 using System.Text;
-using System.Threading;
 using Microsoft.Extensions.Options;
 using Orleans.Serialization.Activators;
 using Orleans.Serialization.Cloning;
@@ -27,11 +26,11 @@ public class TypeConverter
     private readonly RuntimeTypeNameRewriter.Rewriter<ValidationResult> _convertToDisplayName;
     private readonly RuntimeTypeNameRewriter.Rewriter<ValidationResult> _convertFromDisplayName;
     private readonly RuntimeTypeNameRewriter.CompoundAliasResolver<ValidationResult> _compoundAliasResolver;
-    private Dictionary<QualifiedType, QualifiedType> _wellKnownAliasToType;
-    private Dictionary<QualifiedType, QualifiedType> _wellKnownTypeToAlias;
+    private volatile Dictionary<QualifiedType, QualifiedType> _wellKnownAliasToType;
+    private volatile Dictionary<QualifiedType, QualifiedType> _wellKnownTypeToAlias;
     private readonly ConcurrentDictionary<QualifiedType, bool> _allowedTypes;
-    private HashSet<string> _allowedAssembliesConfiguration;
-    private HashSet<string> _allowedTypesConfiguration;
+    private volatile HashSet<string> _allowedAssembliesConfiguration;
+    private volatile HashSet<string> _allowedTypesConfiguration;
     private static readonly List<(string DisplayName, string RuntimeName)> WellKnownTypeAliases =
     [
         ("object", "System.Object"),
@@ -147,10 +146,10 @@ public class TypeConverter
             }
         }
 
-        Volatile.Write(ref _allowedAssembliesConfiguration, allowedAssembliesConfiguration);
-        Volatile.Write(ref _allowedTypesConfiguration, allowedTypesConfiguration);
-        Volatile.Write(ref _wellKnownAliasToType, wellKnownAliasToType);
-        Volatile.Write(ref _wellKnownTypeToAlias, wellKnownTypeToAlias);
+        _allowedAssembliesConfiguration = allowedAssembliesConfiguration;
+        _allowedTypesConfiguration = allowedTypesConfiguration;
+        _wellKnownAliasToType = wellKnownAliasToType;
+        _wellKnownTypeToAlias = wellKnownTypeToAlias;
     }
 
     /// <summary>

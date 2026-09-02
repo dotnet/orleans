@@ -282,7 +282,7 @@ namespace Orleans.GrainReferences
                 args = default;
             }
 
-            if (!_mapping.TryGetValue(lookupId, out result))
+            if (!Volatile.Read(ref _mapping).TryGetValue(lookupId, out result))
             {
                 return false;
             }
