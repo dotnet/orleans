@@ -171,34 +171,31 @@ public class LogTestGrainClearTests : IClassFixture<EventSourcingClusterFixture>
     }
 
     [Fact, TestCategory("EventSourcing"), TestCategory("Functional")]
-    public async Task JournaledStateLogStorage_UncommittedFailureFailsCompleteJournalBatch()
+    public async Task JournaledStateLogStorage_UncommittedFailureRetriesCompleteJournalBatch()
     {
         var grain = this.fixture.GrainFactory.GetGrain<ILogTestGrainWithAuxiliaryState>(721007L, "TestGrains.LogTestGrainJournaledStateStorageWithAuxiliaryState");
 
         await grain.Clear();
         await grain.SetAuxiliaryValueAndAGlobal(17, 10);
-        var deactivated = this.fixture.HostedCluster.WaitForDeactivationAsync(grain);
         this.fixture.FailNextJournalAppend(grain, new IOException("Expected transient append failure."));
 
-        await Assert.ThrowsAsync<OrleansException>(() => grain.SetAuxiliaryValueAndAGlobal(23, 41));
-        await deactivated.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
+        await grain.SetAuxiliaryValueAndAGlobal(23, 41);
 
-        grain = this.fixture.GrainFactory.GetGrain<ILogTestGrainWithAuxiliaryState>(721007L, "TestGrains.LogTestGrainJournaledStateStorageWithAuxiliaryState");
-        Assert.Equal(17, await grain.GetAuxiliaryValue());
-        Assert.Equal(10, await grain.GetAGlobal());
-        Assert.Equal(1, await grain.GetConfirmedVersion());
+        Assert.Equal(23, await grain.GetAuxiliaryValue());
+        Assert.Equal(41, await grain.GetAGlobal());
+        Assert.Equal(2, await grain.GetConfirmedVersion());
     }
 
     [Fact, TestCategory("EventSourcing"), TestCategory("Functional")]
-    public async Task JournaledStateLogStorage_ConflictFailsCompleteJournalBatch()
+    public async Task JournaledStateLogStorage_UncommittedConflictFailsCompleteJournalBatch()
     {
         var grain = this.fixture.GrainFactory.GetGrain<ILogTestGrainWithAuxiliaryState>(721008L, "TestGrains.LogTestGrainJournaledStateStorageWithAuxiliaryState");
         await grain.Clear();
         await grain.SetAuxiliaryValueAndAGlobal(17, 10);
 
-        var deactivated = this.fixture.HostedCluster.WaitForDeactivationAsync(grain);
         this.fixture.FailNextJournalAppend(grain, new InconsistentStateException("Expected append conflict."));
 
+        var deactivated = this.fixture.HostedCluster.WaitForDeactivationAsync(grain);
         await Assert.ThrowsAsync<OrleansException>(() => grain.SetAuxiliaryValueAndAGlobal(23, 41));
         await deactivated.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
 
@@ -249,33 +246,30 @@ public class LogTestGrainClearTests : IClassFixture<EventSourcingClusterFixture>
     }
 
     [Fact, TestCategory("EventSourcing"), TestCategory("Functional")]
-    public async Task JournaledStateLogStorage_ClearFailureFailsAndPreservesDurableState()
+    public async Task JournaledStateLogStorage_ClearFailureRetriesCompleteJournalBatch()
     {
         var grain = this.fixture.GrainFactory.GetGrain<ILogTestGrainWithAuxiliaryState>(721010L, "TestGrains.LogTestGrainJournaledStateStorageWithAuxiliaryState");
         await grain.Clear();
         await grain.SetAuxiliaryValueAndAGlobal(17, 10);
-        var deactivated = this.fixture.HostedCluster.WaitForDeactivationAsync(grain);
         this.fixture.FailNextJournalAppend(grain, new IOException("Expected transient clear failure."));
 
-        await Assert.ThrowsAsync<IOException>(() => grain.Clear());
-        await deactivated.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
+        await grain.Clear();
 
-        grain = this.fixture.GrainFactory.GetGrain<ILogTestGrainWithAuxiliaryState>(721010L, "TestGrains.LogTestGrainJournaledStateStorageWithAuxiliaryState");
         Assert.Equal(17, await grain.GetAuxiliaryValue());
-        Assert.Equal(10, await grain.GetAGlobal());
-        Assert.Equal(1, await grain.GetConfirmedVersion());
+        Assert.Equal(0, await grain.GetAGlobal());
+        Assert.Equal(0, await grain.GetConfirmedVersion());
     }
 
     [Fact, TestCategory("EventSourcing"), TestCategory("Functional")]
-    public async Task JournaledStateLogStorage_ClearConflictFailsAndPreservesDurableState()
+    public async Task JournaledStateLogStorage_ClearConflictFailsCompleteJournalBatch()
     {
         var grain = this.fixture.GrainFactory.GetGrain<ILogTestGrainWithAuxiliaryState>(721011L, "TestGrains.LogTestGrainJournaledStateStorageWithAuxiliaryState");
         await grain.Clear();
         await grain.SetAuxiliaryValueAndAGlobal(17, 10);
 
-        var deactivated = this.fixture.HostedCluster.WaitForDeactivationAsync(grain);
         this.fixture.FailNextJournalAppend(grain, new InconsistentStateException("Expected clear conflict."));
 
+        var deactivated = this.fixture.HostedCluster.WaitForDeactivationAsync(grain);
         await Assert.ThrowsAsync<InconsistentStateException>(() => grain.Clear());
         await deactivated.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
 
