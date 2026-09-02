@@ -1,5 +1,6 @@
 using System;
-using System.Collections.Generic;
+using System.Collections.Concurrent;
+using System.Threading;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration;
@@ -7,20 +8,25 @@ using Orleans.Versions.Selector;
 
 namespace Orleans.Runtime.Versions.Selector
 {
-    internal class VersionSelectorManager
+    internal sealed class VersionSelectorManager
     {
         private readonly VersionSelectorStrategy strategyFromConfig;
         private readonly IServiceProvider serviceProvider;
-        private readonly Dictionary<GrainInterfaceType, IVersionSelector> versionSelectors;
+        private readonly ConcurrentDictionary<GrainInterfaceType, IVersionSelector> versionSelectors;
+        private IVersionSelector defaultSelector;
 
-        public IVersionSelector Default { get; set; }
+        public IVersionSelector Default
+        {
+            get => Volatile.Read(ref defaultSelector);
+            set => Volatile.Write(ref defaultSelector, value);
+        }
 
         public VersionSelectorManager(IServiceProvider serviceProvider, IOptions<GrainVersioningOptions> options)
         {
             this.serviceProvider = serviceProvider;
             this.strategyFromConfig = serviceProvider.GetRequiredKeyedService<VersionSelectorStrategy>(options.Value.DefaultVersionSelectorStrategy);
-            Default = ResolveVersionSelector(serviceProvider, this.strategyFromConfig);
-            versionSelectors = new Dictionary<GrainInterfaceType, IVersionSelector>();
+            defaultSelector = ResolveVersionSelector(serviceProvider, this.strategyFromConfig);
+            versionSelectors = new();
         }
 
         public IVersionSelector GetSelector(GrainInterfaceType interfaceType)
@@ -40,7 +46,7 @@ namespace Orleans.Runtime.Versions.Selector
         {
             if (strategy == null)
             {
-                versionSelectors.Remove(interfaceType);
+                versionSelectors.TryRemove(interfaceType, out _);
             }
             else
             {

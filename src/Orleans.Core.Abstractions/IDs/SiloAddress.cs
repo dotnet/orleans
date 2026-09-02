@@ -564,38 +564,7 @@ namespace Orleans.Runtime
             comp = Endpoint.Port.CompareTo(other.Endpoint.Port);
             if (comp != 0) return comp;
 
-            return CompareIpAddresses(Endpoint.Address, other.Endpoint.Address);
-        }
-
-        // The comparison code is taken from: http://www.codeproject.com/Articles/26550/Extending-the-IPAddress-object-to-allow-relative-c
-        // Also note that this comparison does not handle semantic equivalence  of IPv4 and IPv6 addresses.
-        // In particular, 127.0.0.1 and::1 are semantically the same, but not syntactically.
-        // For more information refer to: http://stackoverflow.com/questions/16618810/compare-ipv4-addresses-in-ipv6-notation 
-        // and http://stackoverflow.com/questions/22187690/ip-address-class-getaddressbytes-method-putting-octets-in-odd-indices-of-the-byt
-        // and dual stack sockets, described at https://msdn.microsoft.com/en-us/library/system.net.ipaddress.maptoipv6(v=vs.110).aspx
-        private static int CompareIpAddresses(IPAddress one, IPAddress two)
-        {
-            var f1 = one.AddressFamily;
-            var f2 = two.AddressFamily;
-            if (f1 != f2)
-                return f1 < f2 ? -1 : 1;
-
-            if (f1 == AddressFamily.InterNetwork)
-            {
-#pragma warning disable CS0618 // Type or member is obsolete
-                return one.Address.CompareTo(two.Address);
-#pragma warning restore CS0618
-            }
-
-            Span<byte> b1 = stackalloc byte[16];
-            one.TryWriteBytes(b1, out var len);
-            Debug.Assert(len == 16);
-
-            Span<byte> b2 = stackalloc byte[16];
-            two.TryWriteBytes(b2, out len);
-            Debug.Assert(len == 16);
-
-            return b1.SequenceCompareTo(b2);
+            return IPAddressComparer.Instance.Compare(Endpoint.Address, other.Endpoint.Address);
         }
     }
 

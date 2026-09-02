@@ -437,9 +437,7 @@ namespace UnitTests.Runtime
                 }));
         }
 
-        private static CachedVersionSelectorManager CreateCachedVersionSelectorManager(
-            GrainVersionManifest manifest,
-            IClusterMembershipService membership)
+        private static CachedVersionSelectorManager CreateCachedVersionSelectorManager(GrainVersionManifest manifest)
         {
             var services = new ServiceCollection();
             services.AddOptions<GrainVersioningOptions>();
@@ -453,8 +451,7 @@ namespace UnitTests.Runtime
             return new CachedVersionSelectorManager(
                 manifest,
                 new VersionSelectorManager(serviceProvider, options),
-                new CompatibilityDirectorManager(serviceProvider, options),
-                membership);
+                new CompatibilityDirectorManager(serviceProvider, options));
         }
 
         private static ServiceProvider CreateServiceProvider(
@@ -565,7 +562,7 @@ namespace UnitTests.Runtime
                 ClusterManifestProvider = manifestProvider ?? new TestClusterManifestProvider(CreateClusterManifest(manifestSilos, useFilter, interfaceVersion: interfaceVersion));
                 _membershipVersion = ClusterManifestProvider.Current.Version.Major;
                 ClusterMembershipService = new TestClusterMembershipService(CreateMembershipSnapshot(_membershipVersion, _siloStatuses));
-                VersionSelectorManager = CreateCachedVersionSelectorManager(new GrainVersionManifest(ClusterManifestProvider), ClusterMembershipService);
+                VersionSelectorManager = CreateCachedVersionSelectorManager(new GrainVersionManifest(ClusterManifestProvider));
                 FilterDirector = useFilter ? new TestPlacementFilterDirector() : null;
                 ServiceProvider = CreateServiceProvider(FilterDirector, messagingOptions, timeProvider);
 
