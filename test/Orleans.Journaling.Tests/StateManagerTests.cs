@@ -1510,7 +1510,7 @@ public class StateManagerTests : JournalingTestBase
     [Fact]
     public async Task RecoverAsync_UnsupportedLegacyRecordCanRetryAfterRepairWithoutPartialApplication()
     {
-        var unsupportedBytes = CreateUnsupportedLegacyCommandVersionRecord(streamId: 1, commandVersion: 1);
+        var unsupportedBytes = CreateUnsupportedLegacyCommandVersionRecord(streamId: 128, commandVersion: 1);
         var validBytes = CreatePersistedStringValueBytes("value", "recovered");
         var storage = new MutableReadStorage(unsupportedBytes);
         var codec = new TrackingValueCodec<string>(CreateValueCodec<string>());
@@ -1596,12 +1596,24 @@ public class StateManagerTests : JournalingTestBase
     {
         using var writer = new ArcBufferWriter();
         var serializerWriter = Writer.Create(writer, session: null!);
-        serializerWriter.WriteVarUInt32(2);
+        serializerWriter.WriteVarUInt32(checked((uint)(GetVarUInt64ByteCount(streamId) + 1)));
         serializerWriter.WriteVarUInt64(streamId);
         serializerWriter.WriteByte(commandVersion);
         serializerWriter.Commit();
         using var buffer = writer.PeekSlice(writer.Length);
         return buffer.ToArray();
+    }
+
+    private static int GetVarUInt64ByteCount(ulong value)
+    {
+        var result = 1;
+        while (value >= 128)
+        {
+            value >>= 7;
+            result++;
+        }
+
+        return result;
     }
 
     private byte[] CreateUnknownStreamBytes(JournalStreamId streamId, ReadOnlySpan<byte> payload)
