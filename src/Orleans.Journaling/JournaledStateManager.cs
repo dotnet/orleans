@@ -606,11 +606,6 @@ internal sealed partial class JournaledStateManager : IJournaledStateManager, IJ
                             Debug.Assert(recoveryTrigger is null);
                             recoveryTrigger = workItem;
                             recoveryTriggerException = exception;
-                            lock (_lock)
-                            {
-                                _state = ManagerState.Recovering;
-                            }
-
                             needsRecovery = true;
                         }
                         else
