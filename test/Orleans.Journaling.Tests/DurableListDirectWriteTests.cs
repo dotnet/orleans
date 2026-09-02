@@ -90,6 +90,16 @@ public sealed class DurableListDirectWriteTests
         Assert.True(writer.Length > 0);
     }
 
+    [Fact]
+    public void DefaultPendingWriteStatus_IsNotPending()
+    {
+        using var writer = new TestJournalStreamWriter();
+        IJournaledStateManager manager = new TestJournalManager(writer);
+
+        Assert.Equal(-1, manager.PendingWriteByteCount);
+        Assert.False(manager.HasPendingWrites);
+    }
+
     private sealed class TestJournalManager(TestJournalStreamWriter writer) : IJournaledStateManager
     {
         public ValueTask InitializeAsync(CancellationToken cancellationToken) => default;

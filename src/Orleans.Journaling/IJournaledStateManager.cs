@@ -79,5 +79,5 @@ public interface IJournaledStateManager : IAsyncDisposable
     /// <summary>
     /// Gets a value indicating whether any registered state has changes which have not been written to storage.
     /// </summary>
-    bool HasPendingWrites => PendingWriteByteCount != 0;
+    bool HasPendingWrites => PendingWriteByteCount > 0;
 }
