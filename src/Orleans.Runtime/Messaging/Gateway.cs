@@ -284,7 +284,7 @@ namespace Orleans.Runtime.Messaging
 
             if (message.TargetSilo is { } targetSilo && siloStatusOracle.IsDeadSilo(targetSilo))
             {
-                client.RejectUntrackedRequest(message, targetSilo);
+                client.RejectRequest(message, targetSilo);
             }
             else
             {
@@ -653,8 +653,22 @@ namespace Orleans.Runtime.Messaging
                 }
             }
 
-            public void RejectUntrackedRequest(Message request, SiloAddress deadSilo) =>
+            public void RejectRequest(Message request, SiloAddress deadSilo)
+            {
+                bool requestTrackingStopped;
+                lock (_requestLock)
+                {
+                    if (_pendingRequests.TryRemove(request.Id, deadSilo, out var trackedRequest))
+                    {
+                        request = trackedRequest;
+                    }
+
+                    requestTrackingStopped = UnregisterRequestTrackingIfEmptyCore();
+                }
+
+                EmitRequestTrackingStopped(requestTrackingStopped);
                 RejectClaimedRequest(request, deadSilo);
+            }
 
             private void RejectClaimedRequest(Message request, SiloAddress deadSilo)
             {
