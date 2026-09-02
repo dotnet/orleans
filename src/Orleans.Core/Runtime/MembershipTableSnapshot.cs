@@ -219,8 +219,8 @@ namespace Orleans.Runtime
             => entry.Metadata is not null && otherEntry.Metadata is null;
 
         private static bool MetadataEquals(
-            ImmutableDictionary<string, string> left,
-            ImmutableDictionary<string, string>? right)
+            IReadOnlyDictionary<string, string> left,
+            IReadOnlyDictionary<string, string>? right)
         {
             if (ReferenceEquals(left, right))
             {

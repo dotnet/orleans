@@ -388,6 +388,9 @@ namespace Orleans
         [Id(10)]
         public DateTime IAmAliveTime { get; set; }
 
+        [Id(11)]
+        private ImmutableDictionary<string, string>? MetadataStorage { get; set; }
+
         /// <summary>
         /// Gets or sets the silo metadata, if it is available from the membership table.
         /// </summary>
@@ -400,8 +403,16 @@ namespace Orleans
         /// metadata. An active metadata-aware silo restores its own metadata on its next heartbeat.
         /// Storage limits are determined by the configured membership provider.
         /// </remarks>
-        [Id(11)]
-        public ImmutableDictionary<string, string>? Metadata { get; set; }
+        public IReadOnlyDictionary<string, string>? Metadata
+        {
+            get => MetadataStorage;
+            set => MetadataStorage = value switch
+            {
+                null => null,
+                ImmutableDictionary<string, string> immutable => immutable,
+                _ => value.ToImmutableDictionary(StringComparer.Ordinal)
+            };
+        }
 
         internal DateTime EffectiveIAmAliveTime
         {
