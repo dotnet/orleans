@@ -13,17 +13,17 @@ namespace Orleans.Coverage;
 
 public sealed class CoverageSummaryResult
 {
-    public required long CoveredBranches { get; init; }
+    public long CoveredBranches { get; set; }
 
-    public required long CoveredLines { get; init; }
+    public long CoveredLines { get; set; }
 
-    public required int Reports { get; init; }
+    public int Reports { get; set; }
 
-    public required int SourceFiles { get; init; }
+    public int SourceFiles { get; set; }
 
-    public required long TotalBranches { get; init; }
+    public long TotalBranches { get; set; }
 
-    public required long TotalLines { get; init; }
+    public long TotalLines { get; set; }
 }
 
 public static class CoverageSummaryReader

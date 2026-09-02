@@ -67,7 +67,9 @@ jobs:
       - name: Pin trusted main
         id: trusted-main
         shell: pwsh
-        run: '"sha=$(git rev-parse HEAD)" >> $env:GITHUB_OUTPUT'
+        run: |
+          $trustedMainSha = git rev-parse HEAD
+          "sha=$trustedMainSha" >> $env:GITHUB_OUTPUT
       - name: Test coverage reporting
         shell: pwsh
         run: ./.github/scripts/test-summarize-coverage.ps1
