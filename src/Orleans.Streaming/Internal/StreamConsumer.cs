@@ -266,13 +266,13 @@ namespace Orleans.Streams
         {
             if (handle == null)
                 throw new ArgumentNullException(nameof(handle));
+            if (handle is StreamSubscriptionHandleImpl<T> { IsValid: false })
+                throw new ArgumentException("Handle is no longer valid.  It has been used to unsubscribe or resume.", nameof(handle));
             if (!handle.StreamId.Equals(stream.StreamId))
                 throw new ArgumentException("Handle is not for this stream.", nameof(handle));
             var handleImpl = handle as StreamSubscriptionHandleImpl<T>;
             if (handleImpl == null)
                 throw new ArgumentException("Handle type not supported.", nameof(handle));
-            if (!handleImpl.IsValid)
-                throw new ArgumentException("Handle is no longer valid.  It has been used to unsubscribe or resume.", nameof(handle));
             return handleImpl;
         }
 

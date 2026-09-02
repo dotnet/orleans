@@ -212,7 +212,8 @@ namespace Orleans.Streams
                 // Check if this even already has been delivered
                 if (IsRewindable)
                 {
-                    if (this.expectedToken.Equals(currentToken))
+                    var currentHandshakeToken = StreamHandshakeToken.CreateDeliveyToken(currentToken);
+                    if (this.expectedToken.Equals(currentHandshakeToken))
                         return this.expectedToken;
                 }
             }
