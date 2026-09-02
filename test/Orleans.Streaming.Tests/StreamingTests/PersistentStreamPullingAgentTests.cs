@@ -797,7 +797,7 @@ namespace UnitTests.StreamingTests
             StreamConsumerData CreateConsumerData(IStreamConsumerExtension consumer)
             {
                 return new StreamConsumerData(
-                    GuidId.GetGuidId(Guid.NewGuid()),
+                    GuidId.GetGuidId(SubscriptionMarker.MarkAsExplicitSubscriptionId(Guid.NewGuid())),
                     qualifiedStreamId,
                     consumer,
                     filterData: null);
@@ -1068,6 +1068,43 @@ namespace UnitTests.StreamingTests
         [TestProvider("None")]
         [TestArea("Streaming")]
         [Fact, TestCategory("BVT"), TestCategory("Streaming")]
+        public async Task InitialImplicitRecoveryAdvancesPastAcknowledgedMessage()
+        {
+            var streamId = StreamId.Create("namespace", Guid.NewGuid());
+            var qualifiedStreamId = new QualifiedStreamId("provider", streamId);
+            var acknowledgedToken = new EventSequenceTokenV2(1);
+            var nextToken = new EventSequenceTokenV2(2);
+            var queueCache = new PurgeablePooledQueueCache();
+            queueCache.AddToCache(
+            [
+                new TestBatchContainer(streamId, acknowledgedToken),
+                new TestBatchContainer(streamId, nextToken),
+            ]);
+            var queueAdapterCache = Substitute.For<IQueueAdapterCache>();
+            queueAdapterCache.CreateQueueCache(Arg.Any<QueueId>()).Returns(queueCache);
+            var agent = CreateAgent(
+                pubSub: Substitute.For<IStreamPubSub>(),
+                QueueId.GetQueueId("queue", 0u, 0u),
+                queueAdapterCache: queueAdapterCache);
+            var accessor = (PersistentStreamPullingAgent.ITestAccessor)agent;
+            await InitializeAgent(agent);
+            var consumerData = new StreamConsumerData(
+                GuidId.GetGuidId(SubscriptionMarker.MarkAsImplictSubscriptionId(Guid.NewGuid())),
+                qualifiedStreamId,
+                new RecordingConsumer(StreamHandshakeToken.CreateStartToken(acknowledgedToken)),
+                filterData: null);
+
+            Assert.True(await accessor.DoHandshakeWithConsumer(consumerData, cacheToken: null));
+            var cursor = Assert.IsAssignableFrom<IQueueCacheCursor>(consumerData.Cursor);
+            Assert.True(cursor.MoveNext());
+            Assert.Equal(nextToken, Assert.IsType<TestBatchContainer>(cursor.GetCurrent(out _)).SequenceToken);
+            await accessor.Shutdown();
+        }
+
+        [TestSuite("BVT")]
+        [TestProvider("None")]
+        [TestArea("Streaming")]
+        [Fact, TestCategory("BVT"), TestCategory("Streaming")]
         public async Task ReattachmentDeliveryTokenOverridesProviderEarliest()
         {
             var streamId = StreamId.Create("namespace", Guid.NewGuid());
@@ -1193,7 +1230,7 @@ namespace UnitTests.StreamingTests
                 StreamHandshakeToken.CreateStartPositionToken(StreamSubscriptionStartPosition.EarliestAvailable));
             consumer.ReleaseDelivery();
             var consumerData = new StreamConsumerData(
-                GuidId.GetGuidId(Guid.NewGuid()),
+                GuidId.GetGuidId(SubscriptionMarker.MarkAsExplicitSubscriptionId(Guid.NewGuid())),
                 qualifiedStreamId,
                 consumer,
                 filterData: null);
@@ -1228,7 +1265,7 @@ namespace UnitTests.StreamingTests
             await InitializeAgent(agent);
             var consumer = new RenegotiatingEarliestConsumer();
             var consumerData = new StreamConsumerData(
-                GuidId.GetGuidId(Guid.NewGuid()),
+                GuidId.GetGuidId(SubscriptionMarker.MarkAsExplicitSubscriptionId(Guid.NewGuid())),
                 qualifiedStreamId,
                 consumer,
                 filterData: null)

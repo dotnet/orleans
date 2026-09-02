@@ -57,6 +57,25 @@ public class SimpleQueueCacheTests
         Assert.Equal(targetToken, cursor.GetCurrent(out _)!.SequenceToken);
     }
 
+    [Fact, TestCategory("BVT"), TestCategory("Streaming")]
+    public void LatestStartsAfterNewestRetainedMessage()
+    {
+        var cache = new SimpleQueueCache(10, NullLogger.Instance);
+        var stream = StreamId.Create("namespace", Guid.NewGuid());
+        cache.AddToCache([new TestBatchContainer(stream, 1)]);
+
+        var cursor = ((IQueueCache)cache).GetCacheCursorAtPosition(stream, StreamSubscriptionStartPosition.Latest);
+
+        Assert.False(cursor.MoveNext());
+
+        var futureToken = new EventSequenceTokenV2(2);
+        cache.AddToCache([new TestBatchContainer(stream, futureToken)]);
+        cursor.Refresh(futureToken);
+
+        Assert.True(cursor.MoveNext());
+        Assert.Equal(futureToken, cursor.GetCurrent(out _)!.SequenceToken);
+    }
+
     private sealed class TestBatchContainer : IBatchContainer
     {
         public TestBatchContainer(StreamId streamId, long sequenceNumber)

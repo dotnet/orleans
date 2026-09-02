@@ -153,7 +153,9 @@ namespace Orleans.Providers.Streams.Common
         {
             if (startPosition == StreamSubscriptionStartPosition.Latest)
             {
-                return GetCacheCursor(streamId, null);
+                var latestCursor = GetCacheCursor(streamId, null);
+                latestCursor.MoveNext();
+                return latestCursor;
             }
 
             if (startPosition != StreamSubscriptionStartPosition.EarliestAvailable)

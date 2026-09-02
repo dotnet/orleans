@@ -406,8 +406,11 @@ namespace Orleans.Streams
                         try
                         {
                             consumerData.Cursor = queueCache.GetCacheCursor(consumerData.StreamId, requestedToken);
-                            if (effectiveHandshakeToken is DeliveryToken)
+                            if (effectiveHandshakeToken is DeliveryToken
+                                || effectiveHandshakeToken is StartToken
+                                    && SubscriptionMarker.IsImplicitSubscription(consumerData.SubscriptionId.Guid))
                             {
+                                // Delivery tokens and implicit recovery tokens identify already processed events.
                                 consumerData.Cursor.MoveNext();
                             }
                         }
