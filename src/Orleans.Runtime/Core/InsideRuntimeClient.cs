@@ -15,6 +15,7 @@ using Orleans.GrainReferences;
 using Orleans.Metadata;
 using Orleans.Runtime.GrainDirectory;
 using Orleans.Runtime.Messaging;
+using Orleans.Runtime.Placement;
 using Orleans.Serialization;
 using Orleans.Serialization.Invocation;
 using Orleans.Storage;
@@ -52,6 +53,9 @@ namespace Orleans.Runtime
         private Task? callbackTimerTask;
         private readonly MessagingTrace messagingTrace;
         private readonly DeepCopier<Response> responseCopier;
+        private readonly UniversalReferenceBindingResolver _universalReferenceBindingResolver;
+        private readonly ClusterReferenceResolver _clusterReferenceResolver;
+        private readonly IInterClusterTransport _interClusterTransport;
 
         public InsideRuntimeClient(
             ILocalSiloDetails siloDetails,
@@ -66,7 +70,10 @@ namespace Orleans.Runtime
             DeepCopier deepCopier,
             [FromKeyedServices(TimeProviderNames.Messaging)] TimeProvider timeProvider,
             InterfaceToImplementationMappingCache interfaceToImplementationMapping,
-            OrleansInstruments orleansInstruments)
+            OrleansInstruments orleansInstruments,
+            UniversalReferenceBindingResolver universalReferenceBindingResolver,
+            ClusterReferenceResolver clusterReferenceResolver,
+            IInterClusterTransport interClusterTransport)
         {
             TimeProvider = timeProvider;
             this.interfaceToImplementationMapping = interfaceToImplementationMapping;
@@ -83,6 +90,9 @@ namespace Orleans.Runtime
             this.messagingOptions = messagingOptions.Value;
             this.messagingTrace = messagingTrace;
             this.responseCopier = deepCopier.GetCopier<Response>();
+            _universalReferenceBindingResolver = universalReferenceBindingResolver;
+            _clusterReferenceResolver = clusterReferenceResolver;
+            _interClusterTransport = interClusterTransport;
             var period = Max(TimeSpan.FromMilliseconds(1), Min(this.messagingOptions.ResponseTimeout, TimeSpan.FromSeconds(1)));
             this.callbackTimer = new PeriodicTimer(period, timeProvider);
 
@@ -140,11 +150,48 @@ namespace Orleans.Runtime
         {
             var cancellationToken = request.GetCancellationToken();
             cancellationToken.ThrowIfCancellationRequested();
+            var resolutionCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+            resolutionCts.CancelAfter(request.GetDefaultResponseTimeout() ?? this.messagingOptions.ResponseTimeout);
+            ValueTask<ClusterIdentity> resolveTask;
+            try
+            {
+                resolveTask = _clusterReferenceResolver.Resolve(
+                    target.UniversalReference,
+                    this.messageFactory.ExportRequestContext(),
+                    cancellationToken: resolutionCts.Token);
+            }
+            catch
+            {
+                resolutionCts.Dispose();
+                throw;
+            }
+            if (!resolveTask.IsCompletedSuccessfully)
+            {
+                ResolveAndSendRequest(resolveTask, target, request, context, options, resolutionCts).Ignore();
+                return;
+            }
+
+            resolutionCts.Dispose();
+            SendRequest(target, request, context, options, cancellationToken, resolveTask.Result);
+        }
+
+        private void SendRequest(
+            GrainReference target,
+            IInvokable request,
+            IResponseCompletionSource? context,
+            InvokeMethodOptions options,
+            CancellationToken cancellationToken,
+            ClusterIdentity targetCluster)
+        {
+            if (targetCluster != _universalReferenceBindingResolver.LocalCluster)
+            {
+                SendInterClusterRequest(targetCluster, target, request, context, options, cancellationToken).Ignore();
+                return;
+            }
 
             var message = this.messageFactory.CreateMessage(request, options);
             message.InterfaceType = target.InterfaceType;
             message.InterfaceVersion = target.InterfaceVersion;
-
             // fill in sender
             if (message.SendingSilo == null)
                 message.SendingSilo = MySilo;
@@ -217,6 +264,76 @@ namespace Orleans.Runtime
 
             this.messagingTrace.OnSendRequest(message);
             this.MessageCenter.AddressAndSendMessage(message);
+        }
+
+        private async Task SendInterClusterRequest(
+            ClusterIdentity targetCluster,
+            GrainReference target,
+            IInvokable request,
+            IResponseCompletionSource? context,
+            InvokeMethodOptions options,
+            CancellationToken cancellationToken)
+        {
+            using var timeoutCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+            timeoutCts.CancelAfter(request.GetDefaultResponseTimeout() ?? this.messagingOptions.ResponseTimeout);
+            try
+            {
+                var response = await _interClusterTransport.SendRequest(
+                    targetCluster,
+                    target.UniversalReference,
+                    request,
+                    options,
+                    timeoutCts.Token);
+                context?.Complete(response);
+            }
+            catch (Exception exception)
+            {
+                if (exception is OperationCanceledException && !cancellationToken.IsCancellationRequested)
+                {
+                    exception = new TimeoutException(
+                        $"Response did not arrive before the inter-cluster request timeout for grain '{target.GrainId}'.",
+                        exception);
+                }
+
+                if (context is not null)
+                {
+                    context.Complete(Response.FromException(exception));
+                }
+                else
+                {
+                    this.logger.LogWarning(exception, "Failed to send one-way call to cluster {ClusterId}.", targetCluster.ClusterId);
+                }
+            }
+        }
+
+        private async Task ResolveAndSendRequest(
+            ValueTask<ClusterIdentity> resolveTask,
+            GrainReference target,
+            IInvokable request,
+            IResponseCompletionSource? context,
+            InvokeMethodOptions options,
+            CancellationTokenSource resolutionCts)
+        {
+            try
+            {
+                var targetCluster = await resolveTask;
+                SendRequest(target, request, context, options, request.GetCancellationToken(), targetCluster);
+            }
+            catch (Exception exception)
+            {
+                if (context is not null)
+                {
+                    context.Complete(Response.FromException(exception));
+                }
+                else
+                {
+                    this.logger.LogWarning(exception, "Failed to resolve the target cluster for one-way call to {GrainId}.", target.GrainId);
+                }
+            }
+            finally
+            {
+                resolutionCts.Dispose();
+            }
         }
 
         public void SendResponse(Message request, Response response)

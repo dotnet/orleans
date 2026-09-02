@@ -146,7 +146,23 @@ namespace Orleans
         }
 
         /// <inheritdoc />
+        public TGrainInterface GetGrain<TGrainInterface>(UniversalReference reference) where TGrainInterface : IAddressable
+        {
+            var interfaceType = this.interfaceTypeResolver.GetGrainInterfaceType(typeof(TGrainInterface));
+            var result = this.referenceActivator.CreateReference(reference.WithInterfaceType(interfaceType));
+            if (!string.Equals(result.Shared.ServiceId, reference.ServiceId, StringComparison.Ordinal))
+            {
+                throw new ArgumentException("The universal reference service identity does not match the local service.", nameof(reference));
+            }
+
+            return (TGrainInterface)(object)result;
+        }
+
+        /// <inheritdoc />
         public IAddressable GetGrain(GrainId grainId) => this.referenceActivator.CreateReference(grainId, default);
+
+        /// <inheritdoc />
+        public IAddressable GetGrain(UniversalReference reference) => this.referenceActivator.CreateReference(reference);
 
         /// <inheritdoc />
         public IGrain GetGrain(Type grainInterfaceType, Guid key)

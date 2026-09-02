@@ -4518,6 +4518,9 @@ namespace Orleans.Serialization.UnitTests
         private static readonly MethodInfo GrainReferenceFromGrainId = typeof(GrainReference).GetMethod("FromGrainId", BindingFlags.Static | BindingFlags.NonPublic)
             ?? throw new InvalidOperationException("Unable to locate GrainReference.FromGrainId.");
 
+        private static readonly MethodInfo GrainReferenceFromUniversalReference = typeof(GrainReference).GetMethod("FromUniversalReference", BindingFlags.Static | BindingFlags.NonPublic)
+            ?? throw new InvalidOperationException("Unable to locate GrainReference.FromUniversalReference.");
+
         internal static readonly GrainInterfaceType InterfaceType = GrainInterfaceType.Create("unit-tests");
 
         internal static GrainId CreateGrainId()
@@ -4538,6 +4541,26 @@ namespace Orleans.Serialization.UnitTests
                 copyContextPool,
                 serviceProvider);
             return (GrainReference)GrainReferenceFromGrainId.Invoke(null, new object[] { shared, grainId })!;
+        }
+
+        internal static GrainReference CreateGrainReference(IServiceProvider serviceProvider, UniversalReference reference)
+        {
+            var runtime = serviceProvider.GetRequiredService<IGrainReferenceRuntime>();
+            var codecProvider = serviceProvider.GetRequiredService<CodecProvider>();
+            var copyContextPool = serviceProvider.GetRequiredService<CopyContextPool>();
+            var shared = new GrainReferenceShared(
+                reference.GrainId.Type,
+                reference.InterfaceType,
+                interfaceVersion: 0,
+                runtime,
+                InvokeMethodOptions.None,
+                codecProvider,
+                copyContextPool,
+                serviceProvider,
+                reference.ServiceId,
+                reference.ClusterId ?? "default",
+                reference.Binding);
+            return (GrainReference)GrainReferenceFromUniversalReference.Invoke(null, new object[] { shared, reference })!;
         }
     }
 
@@ -4565,6 +4588,9 @@ namespace Orleans.Serialization.UnitTests
 
         public IAddressable GetGrain(GrainId grainId)
             => GetGrain(grainId, GrainReferenceTestHelper.InterfaceType);
+
+        public IAddressable GetGrain(UniversalReference reference)
+            => GrainReferenceTestHelper.CreateGrainReference(_serviceProvider, reference);
 
         public TGrainInterface GetGrain<TGrainInterface>(GrainId grainId) where TGrainInterface : IAddressable
             => (TGrainInterface)GetGrain(grainId, GrainReferenceTestHelper.InterfaceType);

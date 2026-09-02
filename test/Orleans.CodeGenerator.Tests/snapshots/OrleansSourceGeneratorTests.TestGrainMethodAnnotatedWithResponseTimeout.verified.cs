@@ -67,6 +67,10 @@ namespace OrleansCodeGen.TestProject
         {
         }
 
+        public Proxy_IResponseTimeoutGrain(global::Orleans.Runtime.GrainReferenceShared arg0, global::Orleans.Runtime.UniversalReference arg1) : base(arg0, arg1)
+        {
+        }
+
         global::System.Threading.Tasks.Task<string> global::TestProject.IResponseTimeoutGrain.LongRunningMethod(string arg0)
         {
             var request = new OrleansCodeGen.TestProject.Invokable_IResponseTimeoutGrain_GrainReference_6BE752C8();

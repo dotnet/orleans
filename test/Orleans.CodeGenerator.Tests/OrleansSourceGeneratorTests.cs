@@ -2579,4 +2579,243 @@ public class DemoClass
     /// </summary>
     private static Task<CSharpCompilation> CreateCompilation(string sourceCode, string assemblyName = "TestProject")
         => TestCompilationHelper.CreateCompilation(sourceCode, assemblyName);
+
+    [Fact]
+    public async Task GeneratedProxy_UniversalReferenceConstructor_IsEmittedForBasicGrain()
+    {
+        const string code = """
+            using Orleans;
+            using System.Threading.Tasks;
+
+            namespace Phase8Basic;
+
+            public interface IBasicGrain : IGrainWithIntegerKey
+            {
+                Task<string> SayHello(string name);
+            }
+            """;
+
+        var compilation = await CreateCompilation(code, "Phase8Basic");
+        var result = RunSourceGenerator(compilation);
+
+        Assert.Empty(result.Diagnostics);
+        var proxy = Assert.Single(GetGeneratedProxyDeclarations(result));
+        Assert.Equal("Proxy_IBasicGrain", proxy.Identifier.ValueText);
+
+        var constructors = proxy.Members.OfType<ConstructorDeclarationSyntax>().ToArray();
+        Assert.Equal(2, constructors.Length);
+        var universalConstructor = Assert.Single(
+            constructors,
+            static constructor => constructor.ParameterList.Parameters[1].Type?.ToString()
+                == "global::Orleans.Runtime.UniversalReference");
+
+        Assert.Equal("global::Orleans.Runtime.GrainReferenceShared", universalConstructor.ParameterList.Parameters[0].Type?.ToString());
+        Assert.Equal(["arg0", "arg1"], universalConstructor.ParameterList.Parameters.Select(static parameter => parameter.Identifier.ValueText));
+        Assert.Equal(": base(arg0, arg1)", universalConstructor.Initializer?.ToString());
+        Assert.Empty(universalConstructor.Body!.Statements);
+    }
+
+    [Fact]
+    public async Task GeneratedProxy_UniversalReferenceConstructor_InitializesSharedReferenceAndCopierFields()
+    {
+        const string code = """
+            using Orleans;
+            using System.Threading.Tasks;
+
+            namespace Phase8Runtime;
+
+            [GenerateSerializer]
+            public sealed class Payload
+            {
+                [Id(0)]
+                public string Value { get; set; } = string.Empty;
+            }
+
+            public interface IRuntimeGrain : IGrainWithStringKey
+            {
+                Task<Payload> Echo(Payload value);
+            }
+            """;
+
+        var compilation = await CreateCompilation(code, $"Phase8Runtime_{Guid.NewGuid():N}");
+        var result = RunSourceGenerator(compilation);
+        Assert.Empty(result.Diagnostics);
+
+        var proxyDeclaration = Assert.Single(GetGeneratedProxyDeclarations(result));
+        var constructors = proxyDeclaration.Members.OfType<ConstructorDeclarationSyntax>().ToArray();
+        var keyConstructor = Assert.Single(
+            constructors,
+            static constructor => constructor.ParameterList.Parameters[1].Type?.ToString()
+                == "global::Orleans.Runtime.IdSpan");
+        var universalConstructor = Assert.Single(
+            constructors,
+            static constructor => constructor.ParameterList.Parameters[1].Type?.ToString()
+                == "global::Orleans.Runtime.UniversalReference");
+        Assert.Equal(keyConstructor.Body!.ToString(), universalConstructor.Body!.ToString());
+        Assert.Contains("_copier0 =", universalConstructor.Body.ToString(), StringComparison.Ordinal);
+
+        var outputCompilation = compilation.AddSyntaxTrees(
+            result.GeneratedSources.Select(static source => CSharpSyntaxTree.ParseText(source.SourceText, path: source.HintName)));
+        Assert.Empty(outputCompilation.GetDiagnostics().Where(static diagnostic => diagnostic.Severity == DiagnosticSeverity.Error));
+
+        using var assemblyStream = new MemoryStream();
+        var emitResult = outputCompilation.Emit(assemblyStream);
+        Assert.True(
+            emitResult.Success,
+            string.Join(Environment.NewLine, emitResult.Diagnostics.Select(static diagnostic => diagnostic.ToString())));
+
+        var generatedAssembly = System.Reflection.Assembly.Load(assemblyStream.ToArray());
+        var proxyType = generatedAssembly.GetType("OrleansCodeGen.Phase8Runtime.Proxy_IRuntimeGrain", throwOnError: true)!;
+        var copierType = generatedAssembly.GetType("OrleansCodeGen.Phase8Runtime.Copier_Payload", throwOnError: true)!;
+
+        var services = new ServiceCollection();
+        services.AddSerializer(builder => builder.Configure(configuration => configuration.Copiers.Add(copierType)));
+        services.AddSingleton(copierType);
+        using var serviceProvider = services.BuildServiceProvider();
+
+        var grainType = Orleans.Runtime.GrainType.Create("phase8-runtime");
+        var interfaceType = Orleans.Runtime.GrainInterfaceType.Create("Phase8Runtime.IRuntimeGrain");
+        var grainId = Orleans.Runtime.GrainId.Create(grainType, "runtime-key");
+        var universalReference = Orleans.Runtime.UniversalReference.CreateCluster(
+            grainId,
+            interfaceType,
+            "phase8-service",
+            "phase8-cluster");
+        var shared = new Orleans.Runtime.GrainReferenceShared(
+            grainType,
+            interfaceType,
+            interfaceVersion: 7,
+            runtime: null!,
+            Orleans.CodeGeneration.InvokeMethodOptions.None,
+            serviceProvider.GetRequiredService<Orleans.Serialization.Serializers.CodecProvider>(),
+            serviceProvider.GetRequiredService<Orleans.Serialization.Cloning.CopyContextPool>(),
+            serviceProvider,
+            "phase8-service",
+            "local-cluster",
+            Orleans.Runtime.UniversalReferenceBinding.Virtual);
+
+        var universalProxy = Assert.IsAssignableFrom<Orleans.Runtime.GrainReference>(
+            Activator.CreateInstance(
+                proxyType,
+                System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.NonPublic,
+                binder: null,
+                [shared, universalReference],
+                culture: null));
+        var keyProxy = Assert.IsAssignableFrom<Orleans.Runtime.GrainReference>(
+            Activator.CreateInstance(
+                proxyType,
+                System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.NonPublic,
+                binder: null,
+                [shared, grainId.Key],
+                culture: null));
+
+        var sharedField = typeof(Orleans.Runtime.GrainReference).GetField(
+            "_shared",
+            System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic);
+        Assert.NotNull(sharedField);
+        Assert.Same(shared, sharedField!.GetValue(universalProxy));
+        Assert.Equal(universalReference, universalProxy.UniversalReference);
+        Assert.Equal((ushort)7, universalProxy.InterfaceVersion);
+        Assert.Equal(interfaceType, universalProxy.InterfaceType);
+
+        var copierField = proxyType.GetField(
+            "_copier0",
+            System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic);
+        Assert.NotNull(copierField);
+        var registeredCopier = serviceProvider.GetRequiredService(copierType);
+        Assert.Same(registeredCopier, copierField!.GetValue(universalProxy));
+        Assert.Same(registeredCopier, copierField.GetValue(keyProxy));
+    }
+
+    [Fact]
+    public async Task GeneratedProxy_UniversalReferenceConstructor_IsEmittedForAllSupportedKeyAndInterfaceShapes()
+    {
+        const string code = """
+            using Orleans;
+            using System;
+            using System.Threading.Tasks;
+
+            namespace Phase8Shapes;
+
+            public interface IGuidGrain : IGrainWithGuidKey
+            {
+                Task Ping();
+            }
+
+            public interface IStringGrain : IGrainWithStringKey
+            {
+                Task Ping();
+            }
+
+            public interface IGuidCompoundGrain : IGrainWithGuidCompoundKey
+            {
+                Task Ping();
+            }
+
+            public interface IIntegerCompoundGrain : IGrainWithIntegerCompoundKey
+            {
+                Task Ping();
+            }
+
+            public interface IFirstInterface : IGrainWithIntegerKey
+            {
+                Task First();
+            }
+
+            public interface ISecondInterface : IGrainWithIntegerKey
+            {
+                Task Second();
+            }
+
+            public sealed class MultiInterfaceGrain : Grain, IFirstInterface, ISecondInterface
+            {
+                public Task First() => Task.CompletedTask;
+                public Task Second() => Task.CompletedTask;
+            }
+            """;
+
+        var compilation = await CreateCompilation(code, "Phase8Shapes");
+        var result = RunSourceGenerator(compilation);
+
+        Assert.Empty(result.Diagnostics);
+        var proxies = GetGeneratedProxyDeclarations(result)
+            .OrderBy(static declaration => declaration.Identifier.ValueText, StringComparer.Ordinal)
+            .ToArray();
+        Assert.Equal(
+            [
+                "Proxy_IFirstInterface",
+                "Proxy_IGuidCompoundGrain",
+                "Proxy_IGuidGrain",
+                "Proxy_IIntegerCompoundGrain",
+                "Proxy_ISecondInterface",
+                "Proxy_IStringGrain",
+            ],
+            proxies.Select(static declaration => declaration.Identifier.ValueText));
+
+        foreach (var proxy in proxies)
+        {
+            var constructors = proxy.Members.OfType<ConstructorDeclarationSyntax>().ToArray();
+            Assert.Equal(2, constructors.Length);
+            var keyConstructor = Assert.Single(
+                constructors,
+                static constructor => constructor.ParameterList.Parameters[1].Type?.ToString()
+                    == "global::Orleans.Runtime.IdSpan");
+            var universalConstructor = Assert.Single(
+                constructors,
+                static constructor => constructor.ParameterList.Parameters[1].Type?.ToString()
+                    == "global::Orleans.Runtime.UniversalReference");
+
+            Assert.Equal(": base(arg0, arg1)", universalConstructor.Initializer?.ToString());
+            Assert.Equal(keyConstructor.Body!.ToString(), universalConstructor.Body!.ToString());
+        }
+    }
+
+    private static IEnumerable<ClassDeclarationSyntax> GetGeneratedProxyDeclarations(GeneratorRunResult result)
+        => result.GeneratedSources
+            .Where(static source => source.HintName.Contains(".orleans.proxy.", StringComparison.Ordinal))
+            .SelectMany(static source => CSharpSyntaxTree.ParseText(source.SourceText.ToString().TrimStart('\uFEFF'))
+                .GetCompilationUnitRoot()
+                .DescendantNodes()
+                .OfType<ClassDeclarationSyntax>())
+            .Where(static declaration => declaration.Identifier.ValueText.StartsWith("Proxy_", StringComparison.Ordinal));
 }
