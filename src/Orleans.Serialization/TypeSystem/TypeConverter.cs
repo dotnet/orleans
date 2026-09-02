@@ -54,6 +54,8 @@ public class TypeConverter
         ("DateTimeOffset", "System.DateTimeOffset"),
         ("Type", "System.Type"),
     ];
+    private static readonly HashSet<string> WellKnownRuntimeTypeNames =
+        WellKnownTypeAliases.Select(static alias => alias.RuntimeName).ToHashSet(StringComparer.Ordinal);
 
     /// <summary>
     /// Initializes a new instance of the <see cref="TypeConverter"/> class.
@@ -573,8 +575,8 @@ public class TypeConverter
             }
         }
 
-        // Enums carry no behavior and are serialized via their underlying integral type, so allow them absent an explicit opinion.
-        if (result is null && type.IsEnum)
+        // Enums and well-known types carry no user-defined behavior, so allow them absent an explicit opinion.
+        if (result is null && (type.IsEnum || WellKnownRuntimeTypeNames.Contains(type.FullName!)))
         {
             result = true;
         }
