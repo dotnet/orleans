@@ -135,6 +135,36 @@ public class GatewayInFlightRequestTrackerTests
     }
 
     [Fact]
+    public void MembershipBeforeSendReturnsRequestForImmediateRejection()
+    {
+        var tracker = CreateTracker();
+        var request = CreateMessage(1, Message.Directions.Request, Silo1);
+
+        var tracked = tracker.TrackForSend(request, targetSiloIsDead: true, out var requestToReject);
+
+        Assert.True(tracked);
+        Assert.NotNull(requestToReject);
+        Assert.Equal(request.Id, requestToReject.Id);
+        Assert.Equal(Silo1, requestToReject.TargetSilo);
+        Assert.Equal(0, tracker.Count);
+    }
+
+    [Fact]
+    public void SendBeforeMembershipRetainsRequestUntilDeathNotification()
+    {
+        var tracker = CreateTracker();
+        var request = CreateMessage(1, Message.Directions.Request, Silo1);
+        Assert.True(tracker.TrackForSend(request, targetSiloIsDead: false, out var requestToReject));
+        Assert.Null(requestToReject);
+        Assert.Equal(1, tracker.Count);
+
+        var removed = Assert.Single(tracker.RemoveForSilo(Silo1)!);
+
+        Assert.Equal(request.Id, removed.Id);
+        Assert.Equal(0, tracker.Count);
+    }
+
+    [Fact]
     public void ClearRemovesAllRequestsOnDisconnect()
     {
         var tracker = CreateTracker();
@@ -322,12 +352,23 @@ public class GatewayInFlightRequestTrackerTests
     }
 
     [Fact]
-    public void ResponseForAnotherGatewayRoutesThroughItsRequestTracker()
+    public void ResponseForLiveOriginGatewayRoutesThroughItsRequestTracker()
     {
         var response = CreateMessage(1, Message.Directions.Response, Silo1);
 
         Assert.True(MessageCenter.ShouldRouteResponseViaTargetSilo(response, Silo2));
+        Assert.False(MessageCenter.CanDeliverToProxyLocally(response, Silo2, targetSiloIsDead: false));
         Assert.False(MessageCenter.ShouldRouteResponseViaTargetSilo(response, Silo1));
+        Assert.True(MessageCenter.CanDeliverToProxyLocally(response, Silo1, targetSiloIsDead: false));
+    }
+
+    [Fact]
+    public void ResponseForDeadOriginGatewayCanUseLocalProxyDelivery()
+    {
+        var response = CreateMessage(1, Message.Directions.Response, Silo1);
+
+        Assert.True(MessageCenter.ShouldRouteResponseViaTargetSilo(response, Silo2));
+        Assert.True(MessageCenter.CanDeliverToProxyLocally(response, Silo2, targetSiloIsDead: true));
     }
 
     [Theory]
@@ -338,6 +379,7 @@ public class GatewayInFlightRequestTrackerTests
         var message = CreateMessage(1, (Message.Directions)direction, Silo1);
 
         Assert.False(MessageCenter.ShouldRouteResponseViaTargetSilo(message, Silo2));
+        Assert.True(MessageCenter.CanDeliverToProxyLocally(message, Silo2, targetSiloIsDead: false));
     }
 
     private static GatewayInFlightRequestTracker CreateTracker(
