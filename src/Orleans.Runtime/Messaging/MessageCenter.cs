@@ -188,8 +188,10 @@ namespace Orleans.Runtime.Messaging
                     return;
                 }
 
-                // First check to see if it's really destined for a proxied client, instead of a local grain.
-                if (TryDeliverToProxy(msg))
+                // Route responses through the ingress gateway while it is live so that it observes request completion.
+                // If that gateway is dead, another gateway connected to the client can deliver the response locally.
+                var routeViaTargetSilo = ShouldRouteResponseViaTargetSilo(msg, _siloAddress);
+                if ((!routeViaTargetSilo || siloStatusOracle.IsDeadSilo(msg.TargetSilo!)) && TryDeliverToProxy(msg))
                 {
                     // Message was successfully delivered to the proxy.
                     return;
@@ -308,6 +310,11 @@ namespace Orleans.Runtime.Messaging
                 }
             }
         }
+
+        internal static bool ShouldRouteResponseViaTargetSilo(Message message, SiloAddress localSilo) =>
+            message.Direction == Message.Directions.Response
+            && message.TargetSilo is { } targetSilo
+            && !targetSilo.Matches(localSilo);
 
         public void DispatchLocalMessage(Message message) => ReceiveMessage(message);
 
@@ -498,7 +505,13 @@ namespace Orleans.Runtime.Messaging
             message.ForwardCount = message.ForwardCount + 1;
             _messagingProcessingInstruments.OnDispatcherMessageForwared(message);
 
-            ResendMessageImpl(message, forwardingAddress);
+            Action<Message, Connection?, Exception?>? sendMessage = null;
+            if (Gateway?.TryGetClientState(message, out var client) is true)
+            {
+                sendMessage = client.SendMessage;
+            }
+
+            ResendMessageImpl(message, forwardingAddress, sendMessage);
             return true;
         }
 
@@ -517,7 +530,7 @@ namespace Orleans.Runtime.Messaging
             else if (forwardingAddress != null)
             {
                 message.TargetSilo = forwardingAddress;
-                SendMessage(message);
+                SendMessage(message, sendMessage);
             }
             else
             {

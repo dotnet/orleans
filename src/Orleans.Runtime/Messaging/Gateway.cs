@@ -43,6 +43,7 @@ namespace Orleans.Runtime.Messaging
         private readonly ILoggerFactory loggerFactory;
         private readonly SiloMessagingOptions messagingOptions;
         private readonly TimeProvider timeProvider;
+        private int isStopping;
         private long clientsCollectionVersion = 0;
         private readonly TimeSpan clientDropTimeout;
 
@@ -82,6 +83,8 @@ namespace Orleans.Runtime.Messaging
         internal GatewayInstruments GatewayInstruments { get; }
 
         internal int TrackedRequestClientCount => clientsWithTrackedRequests.Count;
+
+        private bool IsStopping => Volatile.Read(ref isStopping) != 0;
 
         internal static TimeSpan GetRequestMaintenancePeriod(TimeSpan responseTimeout) =>
             responseTimeout > TimeSpan.Zero ? Min(responseTimeout, TimeSpan.FromSeconds(1)) : TimeSpan.FromSeconds(1);
@@ -154,11 +157,12 @@ namespace Orleans.Runtime.Messaging
 
         internal async Task StopAsync()
         {
+            Volatile.Write(ref isStopping, 1);
             siloStatusOracle.UnSubscribeFromSiloStatusEvents(this);
             gatewayMaintenanceTimer.Dispose();
             requestMaintenanceTimer.Dispose();
             await Task.WhenAll(gatewayMaintenanceTask, requestMaintenanceTask).ConfigureAwait(false);
-            foreach (var (client, _) in clientsWithTrackedRequests)
+            foreach (var (_, client) in clients)
             {
                 client.ClearPendingRequests();
             }
@@ -256,6 +260,15 @@ namespace Orleans.Runtime.Messaging
             return null;
         }
 
+        internal bool TryGetClientState(Message message, [NotNullWhen(true)] out ClientState? client)
+        {
+            client = null;
+            return message.Direction == Message.Directions.Request
+                && !message.TargetGrain.IsSystemTarget()
+                && ClientGrainId.TryParse(message.SendingGrain, out var clientId)
+                && clients.TryGetValue(clientId, out client);
+        }
+
         internal void SendMessage(
             ClientState client,
             Message message,
@@ -277,7 +290,8 @@ namespace Orleans.Runtime.Messaging
                 messageCenter.SendRejection(
                     message,
                     Message.RejectionTypes.Transient,
-                    $"Exception while sending message: {exception}");
+                    $"Exception while sending message: {exception}",
+                    exception);
             }
         }
 
@@ -519,7 +533,7 @@ namespace Orleans.Runtime.Messaging
                 Message? requestToReject = null;
                 lock (_requestLock)
                 {
-                    if (Connection is null)
+                    if (_gateway.IsStopping || Connection is null)
                     {
                         destination.Send(message);
                         return;
@@ -556,6 +570,9 @@ namespace Orleans.Runtime.Messaging
                     RejectRequest(requestToReject, message.TargetSilo!);
                 }
             }
+
+            public void SendMessage(Message message, Connection? destination, Exception? exception) =>
+                _gateway.SendMessage(this, message, destination, exception);
 
             public void ClearPendingRequests()
             {
@@ -610,7 +627,8 @@ namespace Orleans.Runtime.Messaging
             public void RejectRequest(Message request, SiloAddress deadSilo)
             {
                 var exception = new SiloUnavailableException(
-                    $"The target silo {deadSilo} became unavailable for message: {request}.");
+                    $"The target silo {deadSilo} became unavailable while processing request {request.Id} for grain {request.TargetGrain}.");
+                _gateway._messagingInstruments.OnRejectedMessage(request);
                 var rejection = _gateway.messageFactory.CreateRejectionResponse(
                     request,
                     Message.RejectionTypes.Transient,

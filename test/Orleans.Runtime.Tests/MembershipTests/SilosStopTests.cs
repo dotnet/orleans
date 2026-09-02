@@ -92,10 +92,12 @@ namespace UnitTests.MembershipTests
                     Assert.False(promise.IsCompleted);
                     Assert.Equal(1, gateway.TrackedRequestClientCount);
 
-                    await HostedCluster.KillSiloAsync(HostedCluster.SecondarySilos[0]);
+                    await HostedCluster.KillSiloAsync(
+                        HostedCluster.SecondarySilos[0],
+                        TestContext.Current.CancellationToken);
 
                     await Assert.ThrowsAsync<SiloUnavailableException>(
-                        () => promise.WaitAsync(TimeSpan.FromSeconds(20)));
+                        () => promise.WaitAsync(TimeSpan.FromSeconds(20), TestContext.Current.CancellationToken));
                     Assert.Equal(0, gateway.TrackedRequestClientCount);
                 }
                 finally
@@ -140,6 +142,61 @@ namespace UnitTests.MembershipTests
         }
 
         [Fact, TestCategory("Liveness")]
+        public async Task GatewayForwardedRequestCancellationAndSiloDeathRaceClearsTracking()
+        {
+            var gateway = GetGateway();
+            var targetSilo = HostedCluster.SecondarySilos[0];
+            var target = await GetGrainOnTargetSilo(targetSilo);
+            Assert.NotNull(target);
+
+            var observer = new LongRunningTaskObserver();
+            var observerReference = GrainFactory.CreateObjectReference<ILongRunningTaskObserver>(observer);
+            try
+            {
+                using var cancellation = new CancellationTokenSource();
+                var callId = Guid.NewGuid();
+                var promise = target.LongWaitWithStartNotification(
+                    TimeSpan.FromMinutes(1),
+                    callId,
+                    observerReference,
+                    cancellation.Token);
+
+                await observer.WaitForCallToStart(callId);
+                Assert.Equal(1, gateway.TrackedRequestClientCount);
+
+                var releaseRace = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+                var cancelTask = Task.Run(
+                    async () =>
+                    {
+                        await releaseRace.Task;
+                        await cancellation.CancelAsync();
+                    },
+                    TestContext.Current.CancellationToken);
+                var killTask = Task.Run(
+                    async () =>
+                    {
+                        await releaseRace.Task;
+                        await HostedCluster.KillSiloAsync(targetSilo, TestContext.Current.CancellationToken);
+                    },
+                    TestContext.Current.CancellationToken);
+
+                releaseRace.SetResult();
+                await Task.WhenAll(cancelTask, killTask);
+
+                var exception = await Record.ExceptionAsync(
+                    () => promise.WaitAsync(TimeSpan.FromSeconds(20), TestContext.Current.CancellationToken));
+                Assert.True(
+                    exception is OperationCanceledException or SiloUnavailableException,
+                    $"Expected cancellation or dead-silo rejection, but received {exception?.GetType().FullName ?? "no exception"}: {exception}");
+                Assert.Equal(0, gateway.TrackedRequestClientCount);
+            }
+            finally
+            {
+                GrainFactory.DeleteObjectReference<ILongRunningTaskObserver>(observerReference);
+            }
+        }
+
+        [Fact, TestCategory("Liveness")]
         public async Task ClientShutdownWithGatewayForwardedRequestClearsTracking()
         {
             var gateway = GetGateway();
@@ -162,7 +219,7 @@ namespace UnitTests.MembershipTests
                 observerReference = null;
                 Assert.Equal(1, gateway.TrackedRequestClientCount);
 
-                await HostedCluster.StopClusterClientAsync();
+                await HostedCluster.StopClusterClientAsync(TestContext.Current.CancellationToken);
 
                 await Assert.ThrowsAsync<SiloUnavailableException>(() => promise);
                 Assert.Equal(0, gateway.TrackedRequestClientCount);
