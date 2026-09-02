@@ -104,7 +104,7 @@ function Get-ReportXml {
   <packages>
     <package>
       <classes>
-        <class filename="$encodedSourceFile">
+        <class name="Example" filename="$encodedSourceFile">
           <lines>$Lines</lines>
         </class>
       </classes>
@@ -391,8 +391,10 @@ try {
     Invoke-Test 'rejects branch markers without aggregate counts' {
         $testCase = New-TestCase
         $lines = '<line number="10" hits="1" branch="True" />'
-        [void] (Write-Report $testCase (Get-ReportXml (Join-Path $testCase.SourceRoot 'Example.cs') $lines))
-        Assert-Throws { Invoke-Summarizer $testCase } 'invalid condition coverage'
+        $report = Write-Report $testCase (Get-ReportXml (Join-Path $testCase.SourceRoot 'Example.cs') $lines)
+        Assert-Throws `
+            { Invoke-Summarizer $testCase } `
+            ([regex]::Escape("$report contains invalid condition coverage '' for src/Example.cs:10"))
     }
 
     Invoke-Test 'combines duplicate aggregate branch coverage conservatively' {
@@ -413,6 +415,32 @@ try {
         $summary = Get-Content -Raw $testCase.JsonOutput | ConvertFrom-Json
         Assert-Equal 1 $summary.covered_branches 'Duplicate aggregate covered branches differ.'
         Assert-Equal 2 $summary.total_branches 'Duplicate aggregate total branches differ.'
+    }
+
+    Invoke-Test 'counts distinct branch sites which share a physical line' {
+        $testCase = New-TestCase
+        $sourceFile = [Security.SecurityElement]::Escape((Join-Path $testCase.SourceRoot 'Example.cs'))
+        $xml = @"
+<coverage><packages><package><classes>
+  <class name="ContainingType" filename="$sourceFile">
+    <methods><method name="Method" signature="()"><lines>
+      <line number="10" hits="1" branch="True" condition-coverage="50% (2/4)" />
+    </lines></method></methods>
+    <lines><line number="10" hits="1" branch="True" condition-coverage="50% (2/4)" /></lines>
+  </class>
+  <class name="GeneratedLambda" filename="$sourceFile">
+    <methods><method name="Lambda" signature="()"><lines>
+      <line number="10" hits="1" branch="True" condition-coverage="50% (1/2)" />
+    </lines></method></methods>
+    <lines><line number="10" hits="1" branch="True" condition-coverage="50% (1/2)" /></lines>
+  </class>
+</classes></package></packages></coverage>
+"@
+        [void] (Write-Report $testCase $xml)
+        Invoke-Summarizer $testCase
+        $summary = Get-Content -Raw $testCase.JsonOutput | ConvertFrom-Json
+        Assert-Equal 3 $summary.covered_branches 'Distinct branch site covered branches differ.'
+        Assert-Equal 6 $summary.total_branches 'Distinct branch site total branches differ.'
     }
 
     Invoke-Test 'rejects inconsistent branch coverage' {
@@ -438,6 +466,22 @@ try {
         $lines = '<line number="10" hits="1" branch="True" condition-coverage="0% (0/1025)" />'
         [void] (Write-Report $testCase (Get-ReportXml (Join-Path $testCase.SourceRoot 'Example.cs') $lines))
         Assert-Throws { Invoke-Summarizer $testCase } 'inconsistent condition coverage'
+    }
+
+    Invoke-Test 'rejects branch denominator drift across reports' {
+        $testCase = New-TestCase
+        $sourceFile = Join-Path $testCase.SourceRoot 'Example.cs'
+        [void] (Write-Report `
+            $testCase `
+            (Get-ReportXml $sourceFile '<line number="10" hits="1" branch="True" condition-coverage="50% (1/2)" />') `
+            'first.cobertura.xml')
+        $secondReport = Write-Report `
+            $testCase `
+            (Get-ReportXml $sourceFile '<line number="10" hits="1" branch="True" condition-coverage="25% (1/4)" />') `
+            'second.cobertura.xml'
+        Assert-Throws `
+            { Invoke-Summarizer $testCase } `
+            ([regex]::Escape("$secondReport reports 4 branches for src/Example.cs:10 at Example/<non-method>, expected 2"))
     }
 
     Invoke-Test 'rejects missing source files' {

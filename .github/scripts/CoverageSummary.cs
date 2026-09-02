@@ -58,6 +58,7 @@ public static class CoverageSummaryReader
 
         var measuredFiles = new Dictionary<string, Dictionary<int, bool>>(StringComparer.Ordinal);
         var measuredBranches = new Dictionary<string, Dictionary<string, bool>>(StringComparer.Ordinal);
+        var measuredBranchTotals = new Dictionary<string, Dictionary<string, int>>(StringComparer.Ordinal);
         var sourceLineCounts = new Dictionary<string, int>(StringComparer.Ordinal);
         var normalizedSourceRoot = resolvedSourceRoot.Replace('\\', '/').TrimEnd('/');
         foreach (var report in reports)
@@ -68,7 +69,8 @@ public static class CoverageSummaryReader
                 normalizedSourceRoot,
                 sourceLineCounts,
                 measuredFiles,
-                measuredBranches);
+                measuredBranches,
+                measuredBranchTotals);
             if (measuredLineEntries == 0)
             {
                 throw new InvalidDataException($"{report} contains no measured lines under the source root");
@@ -108,7 +110,8 @@ public static class CoverageSummaryReader
         string normalizedSourceRoot,
         Dictionary<string, int> sourceLineCounts,
         Dictionary<string, Dictionary<int, bool>> measuredFiles,
-        Dictionary<string, Dictionary<string, bool>> measuredBranches)
+        Dictionary<string, Dictionary<string, bool>> measuredBranches,
+        Dictionary<string, Dictionary<string, int>> measuredBranchTotals)
     {
         AssertNotReparsePoint(reportPath);
         var report = new FileInfo(reportPath);
@@ -147,8 +150,12 @@ public static class CoverageSummaryReader
         using var reader = XmlReader.Create(stringReader, settings);
         var classDepth = -1;
         var methodDepth = -1;
-        var classLinesDepth = -1;
+        var linesDepth = -1;
         var measuredLineEntries = 0;
+        var classIdentity = string.Empty;
+        var methodIdentity = string.Empty;
+        var linesBelongToMethod = false;
+        var methodBranchLines = new HashSet<int>();
         RepositorySourcePath? sourcePath = null;
         try
         {
@@ -160,7 +167,11 @@ public static class CoverageSummaryReader
                     {
                         classDepth = reader.Depth;
                         methodDepth = -1;
-                        classLinesDepth = -1;
+                        linesDepth = -1;
+                        classIdentity = reader.GetAttribute("name") ?? string.Empty;
+                        methodIdentity = string.Empty;
+                        linesBelongToMethod = false;
+                        methodBranchLines.Clear();
                         sourcePath = GetRepositoryPath(reader.GetAttribute("filename"), normalizedSourceRoot);
                         if (reader.IsEmptyElement)
                         {
@@ -179,52 +190,89 @@ public static class CoverageSummaryReader
                         if (!reader.IsEmptyElement)
                         {
                             methodDepth = reader.Depth;
+                            methodIdentity = $"{reader.GetAttribute("name")}\0{reader.GetAttribute("signature")}";
                         }
 
                         continue;
                     }
-                    if (reader.LocalName == "lines" && methodDepth < 0 && reader.Depth == classDepth + 1)
+                    if (reader.LocalName == "lines"
+                        && ((methodDepth >= 0 && reader.Depth == methodDepth + 1)
+                            || (methodDepth < 0 && reader.Depth == classDepth + 1)))
                     {
                         if (!reader.IsEmptyElement)
                         {
-                            classLinesDepth = reader.Depth;
+                            linesDepth = reader.Depth;
+                            linesBelongToMethod = methodDepth >= 0;
                         }
 
                         continue;
                     }
                     if (reader.LocalName != "line"
-                        || classLinesDepth < 0
-                        || reader.Depth != classLinesDepth + 1
+                        || linesDepth < 0
+                        || reader.Depth != linesDepth + 1
                         || sourcePath is null)
                     {
                         continue;
                     }
 
+                    if (!int.TryParse(
+                        reader.GetAttribute("number"),
+                        NumberStyles.Integer,
+                        CultureInfo.InvariantCulture,
+                        out var lineNumber)
+                        || lineNumber <= 0)
+                    {
+                        throw new InvalidDataException(
+                            $"{reportPath} contains invalid line coverage for {sourcePath.RepositoryPath}");
+                    }
+                    var branchSiteIdentity = string.Empty;
+                    if (string.Equals(reader.GetAttribute("branch"), "true", StringComparison.OrdinalIgnoreCase))
+                    {
+                        if (linesBelongToMethod)
+                        {
+                            methodBranchLines.Add(lineNumber);
+                            branchSiteIdentity = $"{classIdentity}\0{methodIdentity}";
+                        }
+                        else if (!methodBranchLines.Contains(lineNumber))
+                        {
+                            branchSiteIdentity = $"{classIdentity}\0<non-method>";
+                        }
+                    }
+
                     ProcessLine(
                         reader,
+                        lineNumber,
+                        branchSiteIdentity,
                         reportPath,
                         resolvedSourceRoot,
                         sourcePath,
                         sourceLineCounts,
                         measuredFiles,
-                        measuredBranches);
+                        measuredBranches,
+                        measuredBranchTotals);
                     measuredLineEntries++;
                 }
                 else if (reader.NodeType == XmlNodeType.EndElement)
                 {
-                    if (reader.Depth == classLinesDepth && reader.LocalName == "lines")
+                    if (reader.Depth == linesDepth && reader.LocalName == "lines")
                     {
-                        classLinesDepth = -1;
+                        linesDepth = -1;
+                        linesBelongToMethod = false;
                     }
                     else if (reader.Depth == methodDepth && reader.LocalName == "method")
                     {
                         methodDepth = -1;
+                        methodIdentity = string.Empty;
                     }
                     else if (reader.Depth == classDepth && reader.LocalName == "class")
                     {
                         classDepth = -1;
                         methodDepth = -1;
-                        classLinesDepth = -1;
+                        linesDepth = -1;
+                        classIdentity = string.Empty;
+                        methodIdentity = string.Empty;
+                        linesBelongToMethod = false;
+                        methodBranchLines.Clear();
                         sourcePath = null;
                     }
                 }
@@ -240,16 +288,17 @@ public static class CoverageSummaryReader
 
     private static void ProcessLine(
         XmlReader reader,
+        int lineNumber,
+        string branchSiteIdentity,
         string reportPath,
         string resolvedSourceRoot,
         RepositorySourcePath sourcePath,
         Dictionary<string, int> sourceLineCounts,
         Dictionary<string, Dictionary<int, bool>> measuredFiles,
-        Dictionary<string, Dictionary<string, bool>> measuredBranches)
+        Dictionary<string, Dictionary<string, bool>> measuredBranches,
+        Dictionary<string, Dictionary<string, int>> measuredBranchTotals)
     {
-        if (!int.TryParse(reader.GetAttribute("number"), NumberStyles.Integer, CultureInfo.InvariantCulture, out var lineNumber)
-            || !int.TryParse(reader.GetAttribute("hits"), NumberStyles.Integer, CultureInfo.InvariantCulture, out var hits)
-            || lineNumber <= 0
+        if (!int.TryParse(reader.GetAttribute("hits"), NumberStyles.Integer, CultureInfo.InvariantCulture, out var hits)
             || hits < 0)
         {
             throw new InvalidDataException($"{reportPath} contains invalid line coverage for {sourcePath.RepositoryPath}");
@@ -273,7 +322,7 @@ public static class CoverageSummaryReader
         fileLines.TryGetValue(lineNumber, out var covered);
         fileLines[lineNumber] = covered || hits > 0;
 
-        if (!string.Equals(reader.GetAttribute("branch"), "true", StringComparison.OrdinalIgnoreCase))
+        if (branchSiteIdentity.Length == 0)
         {
             return;
         }
@@ -282,7 +331,8 @@ public static class CoverageSummaryReader
         var match = ConditionCoverage.Match(conditionCoverage);
         if (!match.Success)
         {
-            throw new InvalidDataException($"Branch line {lineNumber} has invalid condition coverage '{conditionCoverage}'");
+            throw new InvalidDataException(
+                $"{reportPath} contains invalid condition coverage '{conditionCoverage}' for {sourcePath.RepositoryPath}:{lineNumber}");
         }
         var coveragePercentText = match.Groups[1].Value;
         var coveragePercent = decimal.Parse(coveragePercentText, CultureInfo.InvariantCulture);
@@ -290,7 +340,8 @@ public static class CoverageSummaryReader
         var totalBranches = int.Parse(match.Groups[3].Value, CultureInfo.InvariantCulture);
         if (totalBranches <= 0 || totalBranches > MaximumBranchesPerLine || coveredBranches > totalBranches)
         {
-            throw new InvalidDataException($"Branch line {lineNumber} has inconsistent condition coverage '{conditionCoverage}'");
+            throw new InvalidDataException(
+                $"{reportPath} contains inconsistent condition coverage '{conditionCoverage}' for {sourcePath.RepositoryPath}:{lineNumber}");
         }
 
         var decimalSeparator = coveragePercentText.IndexOf('.');
@@ -303,8 +354,24 @@ public static class CoverageSummaryReader
         var expectedCoveragePercent = 100m * coveredBranches / totalBranches;
         if (Math.Abs(coveragePercent - expectedCoveragePercent) > roundingUnit / 2)
         {
-            throw new InvalidDataException($"Branch line {lineNumber} has inconsistent condition coverage '{conditionCoverage}'");
+            throw new InvalidDataException(
+                $"{reportPath} contains inconsistent condition coverage '{conditionCoverage}' for {sourcePath.RepositoryPath}:{lineNumber}");
         }
+
+        if (!measuredBranchTotals.TryGetValue(sourcePath.RepositoryPath, out var fileBranchTotals))
+        {
+            fileBranchTotals = new Dictionary<string, int>(StringComparer.Ordinal);
+            measuredBranchTotals.Add(sourcePath.RepositoryPath, fileBranchTotals);
+        }
+        var branchSiteKey = $"{branchSiteIdentity}\0{lineNumber}";
+        if (fileBranchTotals.TryGetValue(branchSiteKey, out var existingTotalBranches)
+            && existingTotalBranches != totalBranches)
+        {
+            var displayBranchSite = branchSiteIdentity.Replace('\0', '/');
+            throw new InvalidDataException(
+                $"{reportPath} reports {totalBranches} branches for {sourcePath.RepositoryPath}:{lineNumber} at {displayBranchSite}, expected {existingTotalBranches}");
+        }
+        fileBranchTotals[branchSiteKey] = totalBranches;
 
         if (!measuredBranches.TryGetValue(sourcePath.RepositoryPath, out var fileBranches))
         {
@@ -313,7 +380,7 @@ public static class CoverageSummaryReader
         }
         for (var branch = 0; branch < totalBranches; branch++)
         {
-            var branchKey = $"{lineNumber}\0aggregate\0{branch}";
+            var branchKey = $"{branchSiteKey}\0aggregate\0{branch}";
             fileBranches.TryGetValue(branchKey, out var branchCovered);
             fileBranches[branchKey] = branchCovered || branch < coveredBranches;
         }
