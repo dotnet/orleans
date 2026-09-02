@@ -25,8 +25,10 @@ internal sealed class TcpMessageTransportListener : MessageTransportListener
 {
     private readonly IOptionsMonitor<TcpMessageTransportOptions> _tcpOptions;
     private readonly IOptionsMonitor<TcpMessageTransportListenerOptions> _listenerOptions;
+    private readonly object _lifecycleLock = new();
     private readonly CancellationTokenSource _closingCts = new();
     private Socket? _listenSocket;
+    private bool _disposed;
 
     internal TcpMessageTransportListener(string endpointName, IOptionsMonitor<TcpMessageTransportOptions> tcpOptions, IOptionsMonitor<TcpMessageTransportListenerOptions> listenerOptions, ILoggerFactory loggerFactory)
     {
@@ -145,23 +147,42 @@ internal sealed class TcpMessageTransportListener : MessageTransportListener
         return null;
     }
 
-    private void DisposeCore()
+    private void UnbindCore()
     {
-        _closingCts.Cancel();
-        _listenSocket?.Dispose();
+        lock (_lifecycleLock)
+        {
+            if (_disposed)
+            {
+                return;
+            }
+
+            _closingCts.Cancel();
+            _listenSocket?.Dispose();
+        }
     }
 
     public override ValueTask UnbindAsync(CancellationToken cancellationToken)
     {
-        DisposeCore();
+        UnbindCore();
         return default;
     }
 
     public override async ValueTask DisposeAsync()
     {
-        DisposeCore();
+        lock (_lifecycleLock)
+        {
+            if (_disposed)
+            {
+                return;
+            }
+
+            _disposed = true;
+            _closingCts.Cancel();
+            _listenSocket?.Dispose();
+            _closingCts.Dispose();
+        }
+
         await base.DisposeAsync();
-        _closingCts.Dispose();
         GC.SuppressFinalize(this);
     }
 }
