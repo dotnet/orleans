@@ -4,6 +4,7 @@ using System.Collections.Immutable;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using Microsoft.Extensions.Time.Testing;
@@ -197,6 +198,26 @@ public class MembershipGossiperTests
 
         await Assert.ThrowsAnyAsync<OperationCanceledException>(() => gossipTask);
         Assert.False(disseminationCompletion.Task.IsCompleted);
+
+        disseminationCompletion.TrySetException(new InvalidOperationException("Late dissemination failure."));
+        var lateFailure = await rig.Logger.WaitForLateFailureAsync(TestContext.Current.CancellationToken);
+        Assert.Contains("Membership dissemination publication", lateFailure, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task ObserveLateFailure_ContainsAndReportsFault()
+    {
+        using var rig = CreateTestRig(
+            _ => Task.CompletedTask,
+            (_, _, _) => ValueTask.FromResult(true));
+        var completion = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var observer = rig.Gossiper.ObserveLateFailure(completion.Task, "Direct membership gossip");
+
+        completion.TrySetException(new InvalidOperationException("Late direct failure."));
+
+        await observer;
+        var lateFailure = await rig.Logger.WaitForLateFailureAsync(TestContext.Current.CancellationToken);
+        Assert.Contains("Direct membership gossip", lateFailure, StringComparison.Ordinal);
     }
 
     private static MembershipGossiperTestRig CreateTestRig(
@@ -273,16 +294,18 @@ public class MembershipGossiperTests
                 new FakeTimeProvider(new DateTimeOffset(2026, 1, 1, 0, 0, 0, TimeSpan.Zero)));
         });
         var serviceProvider = services.BuildServiceProvider();
+        var logger = new MembershipGossiperLogger();
         var gossiper = new MembershipGossiper(
             serviceProvider,
             localSiloDetails,
-            NullLogger<MembershipGossiper>.Instance);
+            logger);
 
         return new(
             serviceProvider,
             gossiper,
             remoteMembershipService,
             disseminationService,
+            logger,
             localSilo,
             remoteSilo,
             () => disseminationServiceResolutionCount);
@@ -315,6 +338,7 @@ public class MembershipGossiperTests
         MembershipGossiper Gossiper,
         IMembershipService RemoteMembershipService,
         IDisseminationService DisseminationService,
+        MembershipGossiperLogger Logger,
         SiloAddress LocalSilo,
         SiloAddress RemoteSilo,
         Func<int> DisseminationServiceResolutions) : IDisposable
@@ -322,5 +346,33 @@ public class MembershipGossiperTests
         public int DisseminationServiceResolutionCount => DisseminationServiceResolutions();
 
         public void Dispose() => ServiceProvider.Dispose();
+    }
+
+    private sealed class MembershipGossiperLogger : ILogger<MembershipGossiper>
+    {
+        private readonly TaskCompletionSource<string> _lateFailure =
+            new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        public IDisposable? BeginScope<TState>(TState state)
+            where TState : notnull => null;
+
+        public bool IsEnabled(LogLevel logLevel) => true;
+
+        public void Log<TState>(
+            LogLevel logLevel,
+            EventId eventId,
+            TState state,
+            Exception? exception,
+            Func<TState, Exception?, string> formatter)
+        {
+            var message = formatter(state, exception);
+            if (message.EndsWith("faulted after the caller stopped waiting.", StringComparison.Ordinal))
+            {
+                _lateFailure.TrySetResult(message);
+            }
+        }
+
+        public Task<string> WaitForLateFailureAsync(CancellationToken cancellationToken) =>
+            _lateFailure.Task.WaitAsync(cancellationToken);
     }
 }

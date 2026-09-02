@@ -376,12 +376,15 @@ namespace Orleans.Runtime.Metadata
             IReadOnlyCollection<SiloAddress> missingSilos)
         {
             var startedAt = _timeProvider.GetTimestamp();
+            Task? probeTask = null;
             try
             {
                 var remoteManifestProvider = _grainFactory!.GetSystemTarget<IClusterManifestSystemTarget>(Constants.ManifestProviderType, peer);
-                var summary = await remoteManifestProvider.GetClusterManifestHashSummary()
-                    .AsTask()
+                var summaryTask = remoteManifestProvider.GetClusterManifestHashSummary().AsTask();
+                probeTask = summaryTask;
+                var summary = await summaryTask
                     .WaitAsync(PeerManifestProbeTimeout, _timeProvider, _shutdownCts.Token);
+                probeTask = null;
                 if (missingSilos.All(silo =>
                     summary.SiloManifestHashes.TryGetValue(silo, out var hash)
                     && _manifestCache.ContainsKey(hash)))
@@ -397,20 +400,48 @@ namespace Orleans.Runtime.Metadata
 
                 // No per-peer manifest body is retained, so request a complete update instead of synthesizing a
                 // baseline from the local provider's version.
-                var update = await remoteManifestProvider.GetClusterManifestUpdate(MajorMinorVersion.MinValue)
-                    .AsTask()
+                var updateTask = remoteManifestProvider.GetClusterManifestUpdate(MajorMinorVersion.MinValue).AsTask();
+                probeTask = updateTask;
+                var update = await updateTask
                     .WaitAsync(remaining, _timeProvider, _shutdownCts.Token);
+                probeTask = null;
                 return new(summary, update);
             }
             catch (TimeoutException)
             {
+                ObserveLatePeerProbeFailure(probeTask, peer);
                 LogDebugClusterManifestPeerProbeTimedOut(peer, PeerManifestProbeTimeout);
                 return null;
+            }
+            catch (OperationCanceledException) when (_shutdownCts.IsCancellationRequested)
+            {
+                ObserveLatePeerProbeFailure(probeTask, peer);
+                throw;
             }
             catch (Exception exception) when (exception is not OperationCanceledException)
             {
                 LogDebugErrorRetrievingClusterManifestFromPeer(exception, peer);
                 return null;
+            }
+        }
+
+        private void ObserveLatePeerProbeFailure(Task? probeTask, SiloAddress peer)
+        {
+            if (probeTask is not null)
+            {
+                ObserveLatePeerProbeFailureAsync(probeTask, peer).Ignore();
+            }
+        }
+
+        private async Task ObserveLatePeerProbeFailureAsync(Task probeTask, SiloAddress peer)
+        {
+            try
+            {
+                await probeTask;
+            }
+            catch (Exception exception)
+            {
+                LogDebugLateClusterManifestPeerProbeFailure(exception, peer);
             }
         }
 
@@ -578,6 +609,12 @@ namespace Orleans.Runtime.Metadata
             Message = "Cluster manifest peer probe to {SiloAddress} exceeded {Timeout}. Direct manifest fetch continues."
         )]
         private partial void LogDebugClusterManifestPeerProbeTimedOut(SiloAddress siloAddress, TimeSpan timeout);
+
+        [LoggerMessage(
+            Level = LogLevel.Debug,
+            Message = "Cluster manifest peer probe task for {SiloAddress} faulted after the caller stopped waiting."
+        )]
+        private partial void LogDebugLateClusterManifestPeerProbeFailure(Exception exception, SiloAddress siloAddress);
 
         [LoggerMessage(
             Level = LogLevel.Debug,

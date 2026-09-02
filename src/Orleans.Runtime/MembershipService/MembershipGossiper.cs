@@ -28,16 +28,24 @@ internal partial class MembershipGossiper(
 
         // Direct gossip owns the shutdown-critical delivery path and starts before optional dissemination work.
         var systemTarget = _membershipSystemTarget ??= serviceProvider.GetRequiredService<MembershipSystemTarget>();
-        var directGossip = systemTarget.GossipToRemoteSilos(gossipPartners, snapshot, updatedSilo, updatedStatus)
-            .WaitAsync(cancellationToken);
-        if (!IsLocalSiloEligibleForDissemination(snapshot))
+        var directGossipTask = systemTarget.GossipToRemoteSilos(gossipPartners, snapshot, updatedSilo, updatedStatus);
+        var directGossip = directGossipTask.WaitAsync(cancellationToken);
+        try
         {
-            await directGossip;
-            return;
-        }
+            if (!IsLocalSiloEligibleForDissemination(snapshot))
+            {
+                await directGossip;
+                return;
+            }
 
-        var dissemination = TryGossipViaDissemination(snapshot, cancellationToken);
-        await Task.WhenAll(directGossip, dissemination);
+            var dissemination = TryGossipViaDissemination(snapshot, cancellationToken);
+            await Task.WhenAll(directGossip, dissemination);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            ObserveLateFailure(directGossipTask, "Direct membership gossip").Ignore();
+            throw;
+        }
     }
 
     private bool IsLocalSiloEligibleForDissemination(MembershipTableSnapshot snapshot) =>
@@ -55,9 +63,16 @@ internal partial class MembershipGossiper(
                 return;
             }
 
-            await disseminationNamespace.PublishAsync(dissemination, snapshot, cancellationToken)
-                .AsTask()
-                .WaitAsync(cancellationToken);
+            var publishTask = disseminationNamespace.PublishAsync(dissemination, snapshot, cancellationToken).AsTask();
+            try
+            {
+                await publishTask.WaitAsync(cancellationToken);
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                ObserveLateFailure(publishTask, "Membership dissemination publication").Ignore();
+                throw;
+            }
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
@@ -66,6 +81,18 @@ internal partial class MembershipGossiper(
         catch (Exception exception)
         {
             LogDebugMembershipDisseminationFailed(logger, exception);
+        }
+    }
+
+    internal async Task ObserveLateFailure(Task task, string operation)
+    {
+        try
+        {
+            await task;
+        }
+        catch (Exception exception)
+        {
+            LogDebugLateMembershipGossipFailure(logger, exception, operation);
         }
     }
 
@@ -79,4 +106,12 @@ internal partial class MembershipGossiper(
         Level = LogLevel.Debug,
         Message = "Membership dissemination failed. Direct membership gossip continues delivery.")]
     private static partial void LogDebugMembershipDisseminationFailed(ILogger logger, Exception exception);
+
+    [LoggerMessage(
+        Level = LogLevel.Debug,
+        Message = "{Operation} faulted after the caller stopped waiting.")]
+    private static partial void LogDebugLateMembershipGossipFailure(
+        ILogger logger,
+        Exception exception,
+        string operation);
 }

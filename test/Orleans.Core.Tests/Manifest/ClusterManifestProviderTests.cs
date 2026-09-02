@@ -705,6 +705,15 @@ public class ClusterManifestProviderTests
             Assert.Equal(2, logger.TimeoutCount);
             Assert.Equal(3, requestLog.ProbeAddresses.Count);
 
+            foreach (var hungPeer in selectedPeers.Take(2))
+            {
+                hungProbeCompletions[hungPeer].TrySetException(
+                    new InvalidOperationException($"Late peer probe failure from {hungPeer}."));
+            }
+
+            await logger.WaitForLateFailureCountAsync(2);
+            Assert.Equal(2, logger.LateFailureCount);
+
             var repaired = await repairedManifest;
 
             Assert.Equal(new MajorMinorVersion(1, 1), repaired.Version);
@@ -1237,9 +1246,13 @@ public class ClusterManifestProviderTests
     private sealed class PeerProbeLogger(int expectedTimeoutCount) : ILogger<ClusterManifestProvider>
     {
         private readonly TaskCompletionSource _timeoutsObserved = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        private readonly TaskCompletionSource _lateFailuresObserved = new(TaskCreationOptions.RunContinuationsAsynchronously);
         private int _timeoutCount;
+        private int _lateFailureCount;
 
         public int TimeoutCount => Volatile.Read(ref _timeoutCount);
+
+        public int LateFailureCount => Volatile.Read(ref _lateFailureCount);
 
         public IDisposable? BeginScope<TState>(TState state) where TState : notnull => null;
 
@@ -1252,11 +1265,19 @@ public class ClusterManifestProviderTests
             Exception? exception,
             Func<TState, Exception?, string> formatter)
         {
-            if (formatter(state, exception).StartsWith("Cluster manifest peer probe to ", StringComparison.Ordinal))
+            var message = formatter(state, exception);
+            if (message.StartsWith("Cluster manifest peer probe to ", StringComparison.Ordinal))
             {
                 if (Interlocked.Increment(ref _timeoutCount) == expectedTimeoutCount)
                 {
                     _timeoutsObserved.TrySetResult();
+                }
+            }
+            else if (message.StartsWith("Cluster manifest peer probe task for ", StringComparison.Ordinal))
+            {
+                if (Interlocked.Increment(ref _lateFailureCount) == expectedTimeoutCount)
+                {
+                    _lateFailuresObserved.TrySetResult();
                 }
             }
         }
@@ -1265,6 +1286,12 @@ public class ClusterManifestProviderTests
         {
             Assert.Equal(expectedTimeoutCount, count);
             return _timeoutsObserved.Task;
+        }
+
+        public Task WaitForLateFailureCountAsync(int count)
+        {
+            Assert.Equal(expectedTimeoutCount, count);
+            return _lateFailuresObserved.Task;
         }
     }
 }
