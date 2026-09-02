@@ -625,6 +625,16 @@ namespace Orleans.Runtime.Messaging
 
             public void RejectRequest(Message request, SiloAddress deadSilo)
             {
+                lock (_requestLock)
+                {
+                    if (_pendingRequests.TryRemove(request.Id, out var trackedRequest))
+                    {
+                        request = trackedRequest;
+                    }
+
+                    UnregisterRequestTrackingIfEmptyCore();
+                }
+
                 var exception = new SiloUnavailableException(
                     $"The target silo {deadSilo} became unavailable while processing request {request.Id} for grain {request.TargetGrain}.");
                 _gateway._messagingInstruments.OnRejectedMessage(request);
