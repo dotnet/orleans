@@ -1730,6 +1730,9 @@ public class StateManagerTests : JournalingTestBase
         Assert.Empty(storage.Replaces);
         Assert.Empty(storage.OperationLog);
         await sut.Lifecycle.OnStop(TestContext.Current.CancellationToken);
+    }
+
+    [Fact]
     public async Task WriteStateAsync_OrdinarySnapshotReplaceFails_DoesNotAppendAndRetryRecoversMixedStateExactlyOnce()
     {
         var storage = new CheckpointingJournalStorage();
@@ -2895,6 +2898,13 @@ public class StateManagerTests : JournalingTestBase
         public async ValueTask DeleteAsync(CancellationToken cancellationToken)
         {
             cancellationToken.ThrowIfCancellationRequested();
+            if (BlockNextDelete)
+            {
+                BlockNextDelete = false;
+                DeleteStarted.SetResult();
+                await AllowDelete.Task.WaitAsync(cancellationToken);
+            }
+
             lock (_lock)
             {
                 DeleteEnteredWhileAppendInProgress = Volatile.Read(ref _activeAppends) > 0;
@@ -2904,16 +2914,6 @@ public class StateManagerTests : JournalingTestBase
             }
 
             DeleteEntered.TrySetResult();
-            return default;
-            if (BlockNextDelete)
-            {
-                BlockNextDelete = false;
-                DeleteStarted.SetResult();
-                await AllowDelete.Task.WaitAsync(cancellationToken);
-            }
-
-            DeleteCount++;
-            _segments.Clear();
         }
     }
 
