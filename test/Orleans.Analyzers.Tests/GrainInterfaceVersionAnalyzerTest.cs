@@ -4134,4 +4134,420 @@ public interface IMyGrain : IGrain
     }
 
     #endregion
+
+    [Fact]
+    public async Task AddInterface_NoExistingDocument_ComputedIdentityCreatesDefaultPathManifest()
+    {
+        const string interfaceName = "Contoso.Grains.IShoppingCartGrain";
+        const string source = """
+            namespace Contoso.Grains;
+
+            public interface IShoppingCartGrain : IGrain
+            {
+                [Id(42)]
+                Task Ping();
+            }
+            """;
+        var (project, context, actions) = CreateNoDocumentAddInterfaceCodeFixContext(
+            source,
+            interfaceName);
+
+        await new GrainInterfaceVersionCodeFix().RegisterCodeFixesAsync(context);
+
+        Assert.Equal(2, actions.Count);
+        var regenerateAction = Assert.Single(
+            actions,
+            action => string.Equals(
+                action.EquivalenceKey,
+                RegenerateCodeActionEquivalenceKey,
+                StringComparison.Ordinal));
+        Assert.Equal(RegenerateCodeActionTitle, regenerateAction.Title);
+        var addInterfaceAction = Assert.Single(
+            actions,
+            action => string.Equals(
+                action.EquivalenceKey,
+                GrainInterfaceVersionAnalyzer.RuleId0016,
+                StringComparison.Ordinal));
+        Assert.Equal("Add to OrleansContracts.txt", addInterfaceAction.Title);
+
+        var operations = await addInterfaceAction.GetOperationsAsync(TestContext.Current.CancellationToken);
+        var operation = Assert.Single(operations);
+        var applyChangesOperation = Assert.IsType<ApplyChangesOperation>(operation);
+        var changedProject = applyChangesOperation.ChangedSolution.GetProject(project.Id);
+        Assert.NotNull(changedProject);
+        var changedDocument = Assert.Single(changedProject!.AdditionalDocuments);
+        Assert.Null(project.Solution.GetAdditionalDocument(changedDocument.Id));
+        Assert.Equal(OrleansContractsFileName, changedDocument.Name);
+        Assert.Equal(OrleansContractsFileName, changedDocument.FilePath);
+
+        var changedText = await changedDocument.GetTextAsync(TestContext.Current.CancellationToken);
+        var content = changedText.ToString();
+        Assert.Equal(
+            GeneratedHeader +
+            "interface [GrainInterfaceType(\"Contoso.Grains.IShoppingCartGrain\")] Contoso.Grains.IShoppingCartGrain [Version(0)]\n" +
+            "  42: Ping() -> Task\n",
+            content);
+        Assert.DoesNotContain("\r", content);
+        Assert.NotNull(changedText.Encoding);
+        Assert.Equal(Encoding.UTF8.CodePage, changedText.Encoding!.CodePage);
+        Assert.Empty(changedText.Encoding.GetPreamble());
+    }
+
+    [Fact]
+    public async Task AddInterface_NoExistingDocument_ExplicitIdentityCreatesConfiguredPathManifest()
+    {
+        const string interfaceName = "Contoso.Grains.IShoppingCartGrain";
+        const string grainInterfaceType = "shopping-cart";
+        const string source = """
+            namespace Contoso.Grains;
+
+            [GrainInterfaceType("shopping-cart")]
+            public interface IShoppingCartGrain : IGrain
+            {
+                [Id(42)]
+                Task Ping();
+            }
+            """;
+        var configuredContractsPath = Path.Combine(
+            Path.GetTempPath(),
+            "Orleans.Analyzers.Tests",
+            "ConfiguredContracts.txt");
+        var (project, context, actions) = CreateNoDocumentAddInterfaceCodeFixContext(
+            source,
+            interfaceName,
+            grainInterfaceType,
+            configuredContractsPath);
+
+        await new GrainInterfaceVersionCodeFix().RegisterCodeFixesAsync(context);
+
+        Assert.Equal(2, actions.Count);
+        var regenerateAction = Assert.Single(
+            actions,
+            action => string.Equals(
+                action.EquivalenceKey,
+                RegenerateCodeActionEquivalenceKey,
+                StringComparison.Ordinal));
+        Assert.Equal(RegenerateCodeActionTitle, regenerateAction.Title);
+        var addInterfaceAction = Assert.Single(
+            actions,
+            action => string.Equals(
+                action.EquivalenceKey,
+                GrainInterfaceVersionAnalyzer.RuleId0016,
+                StringComparison.Ordinal));
+        Assert.Equal("Add to OrleansContracts.txt", addInterfaceAction.Title);
+
+        var operations = await addInterfaceAction.GetOperationsAsync(TestContext.Current.CancellationToken);
+        var operation = Assert.Single(operations);
+        var applyChangesOperation = Assert.IsType<ApplyChangesOperation>(operation);
+        var changedProject = applyChangesOperation.ChangedSolution.GetProject(project.Id);
+        Assert.NotNull(changedProject);
+        var changedDocument = Assert.Single(changedProject!.AdditionalDocuments);
+        Assert.Null(project.Solution.GetAdditionalDocument(changedDocument.Id));
+        Assert.Equal(Path.GetFileName(configuredContractsPath), changedDocument.Name);
+        Assert.Equal(configuredContractsPath, changedDocument.FilePath);
+
+        var changedText = await changedDocument.GetTextAsync(TestContext.Current.CancellationToken);
+        var content = changedText.ToString();
+        Assert.Equal(
+            GeneratedHeader +
+            "# Contoso.Grains.IShoppingCartGrain\n" +
+            "interface [GrainInterfaceType(\"shopping-cart\")] Contoso.Grains.IShoppingCartGrain [Version(0)]\n" +
+            "  42: Ping() -> Task\n",
+            content);
+        Assert.DoesNotContain("\r", content);
+        Assert.NotNull(changedText.Encoding);
+        Assert.Equal(Encoding.UTF8.CodePage, changedText.Encoding!.CodePage);
+        Assert.Empty(changedText.Encoding.GetPreamble());
+    }
+
+    private static (Project Project, CodeFixContext Context, List<CodeAction> Actions)
+        CreateNoDocumentAddInterfaceCodeFixContext(
+            string source,
+            string interfaceName,
+            string? grainInterfaceType = null,
+            string? configuredContractsPath = null)
+    {
+        var project = CreateProjectWithAdditionalFilesForCodeFix(
+            source,
+            grainInterfacesFileContent: null,
+            configuredContractsPath);
+        Assert.Empty(project.AdditionalDocumentIds);
+        var properties = ImmutableDictionary<string, string?>.Empty
+            .Add("InterfaceName", interfaceName);
+        if (grainInterfaceType is not null)
+        {
+            properties = properties.Add("GrainInterfaceType", grainInterfaceType);
+        }
+
+        var descriptor = new DiagnosticDescriptor(
+            GrainInterfaceVersionAnalyzer.RuleId0016,
+            "Test diagnostic",
+            "Test diagnostic",
+            "Test",
+            DiagnosticSeverity.Warning,
+            isEnabledByDefault: true);
+        var diagnostic = Diagnostic.Create(descriptor, Location.None, properties);
+        var actions = new List<CodeAction>();
+        var context = new CodeFixContext(
+            Assert.Single(project.Documents),
+            diagnostic,
+            (action, _) => actions.Add(action),
+            TestContext.Current.CancellationToken);
+
+        return (project, context, actions);
+    }
+
+    [Fact]
+    public async Task AddInterface_MetadataSelectedAdditionalFileUpdatesExactDocumentAndPreservesDecoy()
+    {
+        const string interfaceName = "Contoso.Grains.IShoppingCartGrain";
+        const string source = """
+            namespace Contoso.Grains;
+
+            public interface IShoppingCartGrain : IGrain
+            {
+                [Id(42)]
+                Task Ping();
+            }
+            """;
+        var rootPath = Path.Combine(
+            Path.GetTempPath(),
+            "Orleans.Analyzers.Tests",
+            Guid.NewGuid().ToString("N"));
+        var configuredContractsPath = Path.Combine(rootPath, "ConfiguredElsewhere.txt");
+        var selectedDocumentName = "WorkspaceAlias.manifest";
+        var selectedDocumentPath = Path.Combine(rootPath, "MetadataSelected.manifest");
+        var decoyDocumentName = "DecoyContracts.sentinel";
+        var decoyDocumentPath = Path.Combine(rootPath, "decoy", decoyDocumentName);
+        var selectedContent = GeneratedHeader.Replace("\n", "\r\n", StringComparison.Ordinal);
+        const string decoyContent = "DECOY: preserve this complete text\r\nincluding its second line\r\n";
+        var project = CreateProjectWithAdditionalFilesForCodeFix(
+            source,
+            grainInterfacesFileContent: null,
+            configuredContractsPath);
+        var projectId = project.Id;
+        var decoyDocumentId = DocumentId.CreateNewId(projectId, decoyDocumentName);
+        var selectedDocumentId = DocumentId.CreateNewId(projectId, selectedDocumentName);
+        var analyzerConfigContent =
+            $"is_global = true\n" +
+            $"build_property.{GrainInterfaceVersionAnalyzer.EnableAnalyzerPropertyName} = true\n" +
+            $"build_property.OrleansContractsPath = {configuredContractsPath}\n";
+        const string perFileAnalyzerConfigContent =
+            "root = true\n" +
+            "\n" +
+            "[MetadataSelected.manifest]\n" +
+            "build_metadata.AdditionalFiles.OrleansContractsFile = TRUE\n";
+        var solution = project.Solution
+            .RemoveAnalyzerConfigDocuments(project.AnalyzerConfigDocuments.Select(document => document.Id).ToImmutableArray())
+            .AddAdditionalDocument(
+                decoyDocumentId,
+                decoyDocumentName,
+                SourceText.From(decoyContent),
+                filePath: decoyDocumentPath)
+            .AddAdditionalDocument(
+                selectedDocumentId,
+                selectedDocumentName,
+                SourceText.From(selectedContent),
+                filePath: selectedDocumentPath)
+            .AddAnalyzerConfigDocument(
+                DocumentId.CreateNewId(projectId, ".globalconfig"),
+                ".globalconfig",
+                SourceText.From(analyzerConfigContent),
+                filePath: Path.Combine(rootPath, ".globalconfig"))
+            .AddAnalyzerConfigDocument(
+                DocumentId.CreateNewId(projectId, ".editorconfig"),
+                ".editorconfig",
+                SourceText.From(perFileAnalyzerConfigContent),
+                filePath: Path.Combine(rootPath, ".editorconfig"));
+        project = solution.GetProject(projectId)!;
+        var selectedAdditionalFile = Assert.Single(
+            project.AnalyzerOptions.AdditionalFiles,
+            file => string.Equals(file.Path, selectedDocumentPath, StringComparison.Ordinal));
+        var selectedOptions = project.AnalyzerOptions.AnalyzerConfigOptionsProvider.GetOptions(selectedAdditionalFile);
+        Assert.True(selectedOptions.TryGetValue(
+            "build_metadata.AdditionalFiles.OrleansContractsFile",
+            out var metadataOptIn));
+        Assert.Equal("TRUE", metadataOptIn);
+        Assert.True(project.AnalyzerOptions.AnalyzerConfigOptionsProvider.GlobalOptions.TryGetValue(
+            "build_property.OrleansContractsPath",
+            out var configuredPath));
+        Assert.Equal(configuredContractsPath, configuredPath);
+        Assert.NotEqual(selectedDocumentPath, configuredPath);
+
+        var properties = ImmutableDictionary<string, string?>.Empty.Add("InterfaceName", interfaceName);
+        var descriptor = new DiagnosticDescriptor(
+            GrainInterfaceVersionAnalyzer.RuleId0016,
+            "Test diagnostic",
+            "Test diagnostic",
+            "Test",
+            DiagnosticSeverity.Warning,
+            isEnabledByDefault: true);
+        var diagnostic = Diagnostic.Create(descriptor, Location.None, properties);
+        var actions = new List<CodeAction>();
+        var context = new CodeFixContext(
+            Assert.Single(project.Documents),
+            diagnostic,
+            (action, _) => actions.Add(action),
+            TestContext.Current.CancellationToken);
+
+        await new GrainInterfaceVersionCodeFix().RegisterCodeFixesAsync(context);
+
+        Assert.Equal(2, actions.Count);
+        var regenerateAction = Assert.Single(
+            actions,
+            action => string.Equals(
+                action.EquivalenceKey,
+                RegenerateCodeActionEquivalenceKey,
+                StringComparison.Ordinal));
+        Assert.Equal(RegenerateCodeActionTitle, regenerateAction.Title);
+        var addInterfaceAction = Assert.Single(
+            actions,
+            action => string.Equals(
+                action.EquivalenceKey,
+                GrainInterfaceVersionAnalyzer.RuleId0016,
+                StringComparison.Ordinal));
+        Assert.Equal("Add to OrleansContracts.txt", addInterfaceAction.Title);
+
+        var operations = await addInterfaceAction.GetOperationsAsync(TestContext.Current.CancellationToken);
+        var operation = Assert.Single(operations);
+        var applyChangesOperation = Assert.IsType<ApplyChangesOperation>(operation);
+        var changedProject = applyChangesOperation.ChangedSolution.GetProject(projectId);
+        Assert.NotNull(changedProject);
+        Assert.Equal(2, changedProject!.AdditionalDocumentIds.Count);
+        Assert.All(
+            changedProject.AdditionalDocumentIds,
+            id => Assert.Contains(id, project.AdditionalDocumentIds));
+
+        var selectedDocument = changedProject.GetAdditionalDocument(selectedDocumentId);
+        Assert.NotNull(selectedDocument);
+        Assert.Equal(selectedDocumentId, selectedDocument!.Id);
+        Assert.Equal(selectedDocumentName, selectedDocument.Name);
+        Assert.Equal(selectedDocumentPath, selectedDocument.FilePath);
+        var selectedText = await selectedDocument.GetTextAsync(TestContext.Current.CancellationToken);
+        var selectedResult = selectedText.ToString();
+        Assert.Equal(
+            GeneratedHeader.Replace("\n", "\r\n", StringComparison.Ordinal) +
+            "interface [GrainInterfaceType(\"Contoso.Grains.IShoppingCartGrain\")] Contoso.Grains.IShoppingCartGrain [Version(0)]\r\n" +
+            "  42: Ping() -> Task\r\n",
+            selectedResult);
+        var selectedResultWithoutCrLf = selectedResult.Replace("\r\n", string.Empty, StringComparison.Ordinal);
+        Assert.DoesNotContain("\n", selectedResultWithoutCrLf);
+        Assert.DoesNotContain("\r", selectedResultWithoutCrLf);
+
+        var decoyDocument = changedProject.GetAdditionalDocument(decoyDocumentId);
+        Assert.NotNull(decoyDocument);
+        Assert.Equal(decoyDocumentId, decoyDocument!.Id);
+        Assert.Equal(decoyDocumentName, decoyDocument.Name);
+        Assert.Equal(decoyDocumentPath, decoyDocument.FilePath);
+        var decoyText = await decoyDocument.GetTextAsync(TestContext.Current.CancellationToken);
+        Assert.Equal(decoyContent, decoyText.ToString());
+    }
+
+    [Fact]
+    public async Task AddInterface_ManifestWithPreambleAndClrCommentsPreservesAssociationsAndSortsOrdinally()
+    {
+        const string interfaceName = "IMiddle";
+        const string source = """
+            [Version(1)]
+            public interface IMiddle : IGrain
+            {
+                [Id(20)]
+                Task Zeta();
+
+                [Id(10)]
+                Task Alpha();
+            }
+            """;
+        const string manifest =
+            "# This file is auto-generated by the Orleans contract analyzer.\n" +
+            "# Regenerate it by applying \"Regenerate OrleansContracts.txt\" at project or solution scope.\n" +
+            "# Custom preamble: preserve  two spaces\n" +
+            "  owner = Compiler Tooling  \n" +
+            "\n" +
+            "IZulu [Version(1)] # CLR: Contoso.Grains.IZulu\n" +
+            "  zulu-wire: Zeta() -> Task\n" +
+            "  # CLR: Contoso.Grains.IZulu.Alpha() -> Task\n" +
+            "  alpha-wire: Alpha() -> Task\n" +
+            "\n" +
+            "interface IAlpha [Version(2)]\n" +
+            "  zeta-wire: Zeta() -> Task\n" +
+            "  alpha-wire: Alpha() -> Task\n";
+        var manifestPath = Path.Combine(
+            Path.GetTempPath(),
+            "Orleans.Analyzers.Tests",
+            "PreambleContracts.manifest");
+        var project = CreateProjectWithAdditionalFilesForCodeFix(source, manifest, manifestPath);
+        var originalDocument = Assert.Single(project.AdditionalDocuments);
+        var originalDocumentId = originalDocument.Id;
+        var originalDocumentName = originalDocument.Name;
+        var originalDocumentPath = originalDocument.FilePath;
+        var originalDocumentCount = project.AdditionalDocumentIds.Count;
+        var properties = ImmutableDictionary<string, string?>.Empty.Add("InterfaceName", interfaceName);
+        var descriptor = new DiagnosticDescriptor(
+            GrainInterfaceVersionAnalyzer.RuleId0016,
+            "Test diagnostic",
+            "Test diagnostic",
+            "Test",
+            DiagnosticSeverity.Warning,
+            isEnabledByDefault: true);
+        var diagnostic = Diagnostic.Create(descriptor, Location.None, properties);
+        var actions = new List<CodeAction>();
+        var context = new CodeFixContext(
+            Assert.Single(project.Documents),
+            diagnostic,
+            (action, _) => actions.Add(action),
+            TestContext.Current.CancellationToken);
+
+        await new GrainInterfaceVersionCodeFix().RegisterCodeFixesAsync(context);
+
+        Assert.Equal(2, actions.Count);
+        var regenerateAction = Assert.Single(
+            actions,
+            action => string.Equals(
+                action.EquivalenceKey,
+                RegenerateCodeActionEquivalenceKey,
+                StringComparison.Ordinal));
+        Assert.Equal(RegenerateCodeActionTitle, regenerateAction.Title);
+        var addInterfaceAction = Assert.Single(
+            actions,
+            action => string.Equals(
+                action.EquivalenceKey,
+                GrainInterfaceVersionAnalyzer.RuleId0016,
+                StringComparison.Ordinal));
+        Assert.Equal("Add to OrleansContracts.txt", addInterfaceAction.Title);
+
+        var operations = await addInterfaceAction.GetOperationsAsync(TestContext.Current.CancellationToken);
+        var operation = Assert.Single(operations);
+        var applyChangesOperation = Assert.IsType<ApplyChangesOperation>(operation);
+        var changedProject = applyChangesOperation.ChangedSolution.GetProject(project.Id);
+        Assert.NotNull(changedProject);
+        Assert.Equal(originalDocumentCount, changedProject!.AdditionalDocumentIds.Count);
+        var changedDocument = Assert.Single(changedProject.AdditionalDocuments);
+        Assert.Equal(originalDocumentId, changedDocument.Id);
+        Assert.Equal(originalDocumentName, changedDocument.Name);
+        Assert.Equal(originalDocumentPath, changedDocument.FilePath);
+
+        var changedText = await changedDocument.GetTextAsync(TestContext.Current.CancellationToken);
+        var content = changedText.ToString();
+        Assert.Equal(
+            GeneratedHeader +
+            "# Custom preamble: preserve  two spaces\n" +
+            "  owner = Compiler Tooling  \n" +
+            "\n" +
+            "interface IAlpha [Version(2)]\n" +
+            "  alpha-wire: Alpha() -> Task\n" +
+            "  zeta-wire: Zeta() -> Task\n" +
+            "\n" +
+            "interface [GrainInterfaceType(\"IMiddle\")] IMiddle [Version(1)]\n" +
+            "  10: Alpha() -> Task\n" +
+            "  20: Zeta() -> Task\n" +
+            "\n" +
+            "# Contoso.Grains.IZulu\n" +
+            "interface IZulu [Version(1)]\n" +
+            "  # Contoso.Grains.IZulu.Alpha() -> Task\n" +
+            "  alpha-wire: Alpha() -> Task\n" +
+            "  zulu-wire: Zeta() -> Task\n",
+            content);
+        Assert.DoesNotContain("\r", content);
+    }
 }
