@@ -497,10 +497,25 @@ namespace Orleans.Serialization.Buffers
         /// <param name="count">The number of bytes to skip.</param>
         public void Skip(long count)
         {
+            if (count < 0)
+            {
+                throw new ArgumentOutOfRangeException(nameof(count), "Count must be greater than or equal to 0.");
+            }
+
+            if (count == 0)
+            {
+                return;
+            }
+
+            if (count > Remaining)
+            {
+                ThrowInsufficientData();
+            }
+
             if (IsReadOnlySequenceInput)
             {
-                var end = Position + count;
-                while (Position < end)
+                var end = Position - _sequenceOffset + count;
+                while (Position - _sequenceOffset < end)
                 {
                     var previousBuffersSize = Unsafe.As<TInput, ReadOnlySequenceInput>(ref _input).PreviousBuffersSize;
                     if (end - previousBuffersSize <= _bufferSize)
@@ -515,8 +530,8 @@ namespace Orleans.Serialization.Buffers
             }
             else if (IsBufferSliceInput)
             {
-                var end = Position + count;
-                while (Position < end)
+                var end = Position - _sequenceOffset + count;
+                while (Position - _sequenceOffset < end)
                 {
                     var previousBuffersSize = Unsafe.As<TInput, BufferSliceReaderInput>(ref _input).PreviousBuffersSize;
                     if (end - previousBuffersSize <= _bufferSize)
@@ -531,8 +546,8 @@ namespace Orleans.Serialization.Buffers
             }
             else if (IsArcBufferInput)
             {
-                var end = Position + count;
-                while (Position < end)
+                var end = Position - _sequenceOffset + count;
+                while (Position - _sequenceOffset < end)
                 {
                     var previousBuffersSize = Unsafe.As<TInput, ArcBufferReaderInput>(ref _input).PreviousBuffersSize;
                     if (end - previousBuffersSize <= _bufferSize)
@@ -548,10 +563,6 @@ namespace Orleans.Serialization.Buffers
             else if (IsSpanInput)
             {
                 _bufferPos += (int)count;
-                if (_bufferPos > _currentSpan.Length || count > int.MaxValue)
-                {
-                    ThrowInsufficientData();
-                }
             }
             else if (_input is ReaderInput input)
             {

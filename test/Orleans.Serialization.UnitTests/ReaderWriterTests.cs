@@ -1,17 +1,17 @@
-using CsCheck;
-using Orleans.Serialization.Buffers;
-using Orleans.Serialization.Buffers.Adaptors;
-using Orleans.Serialization.Session;
-using Orleans.Serialization.TestKit;
-using Microsoft.Extensions.DependencyInjection;
 using System;
 using System.Buffers;
 using System.Collections.Generic;
 using System.IO;
-using Xunit;
-using Orleans.Serialization.Codecs;
-using Orleans.Serialization.WireProtocol;
 using System.Runtime.InteropServices;
+using CsCheck;
+using Microsoft.Extensions.DependencyInjection;
+using Orleans.Serialization.Buffers;
+using Orleans.Serialization.Buffers.Adaptors;
+using Orleans.Serialization.Codecs;
+using Orleans.Serialization.Session;
+using Orleans.Serialization.TestKit;
+using Orleans.Serialization.WireProtocol;
+using Xunit;
 
 namespace Orleans.Serialization.UnitTests
 {
@@ -193,6 +193,684 @@ namespace Orleans.Serialization.UnitTests
 
                 base.Dispose(disposing);
             }
+        }
+
+        [Theory]
+        [InlineData(SpanInputKind.Span)]
+        [InlineData(SpanInputKind.ByteArray)]
+        [InlineData(SpanInputKind.ReadOnlyMemory)]
+        public void Skip_SpanBackedInput_AdvancesPositionRemainingAndNextByte(SpanInputKind inputKind)
+        {
+            byte[] input = [0x11, 0x22, 0x33, 0x44, 0x55];
+
+            switch (inputKind)
+            {
+                case SpanInputKind.Span:
+                    VerifySpanSkip(input.AsSpan());
+                    break;
+                case SpanInputKind.ByteArray:
+                    VerifyByteArraySkip(input);
+                    break;
+                case SpanInputKind.ReadOnlyMemory:
+                    VerifyReadOnlyMemorySkip(input.AsMemory());
+                    break;
+                default:
+                    throw new ArgumentOutOfRangeException(nameof(inputKind));
+            }
+        }
+
+        [Theory]
+        [InlineData(0L)]
+        [InlineData(5L)]
+        public void Skip_SpanInput_ZeroAndExactEnd_HasExpectedState(long count)
+        {
+            ReadOnlySpan<byte> input = [0x11, 0x22, 0x33, 0x44, 0x55];
+            var reader = Reader.Create(input, session: null!);
+
+            reader.Skip(count);
+
+            Assert.Equal(count, reader.Position);
+            Assert.Equal(input.Length - count, reader.Remaining);
+            if (count == 0)
+            {
+                Assert.Equal((byte)0x11, reader.ReadByte());
+                Assert.Equal(1, reader.Position);
+                Assert.Equal(4, reader.Remaining);
+            }
+            else
+            {
+                AssertInsufficientData(CaptureReadByteException(ref reader));
+                Assert.Equal(5, reader.Position);
+                Assert.Equal(0, reader.Remaining);
+            }
+        }
+
+        [Theory]
+        [InlineData(6L)]
+        [InlineData((long)int.MaxValue + 1)]
+        public void Skip_SpanInput_InsufficientOrIntOverflowCount_ThrowsWithoutAdvancing(long count)
+        {
+            ReadOnlySpan<byte> input = [0x11, 0x22, 0x33, 0x44, 0x55];
+            var reader = Reader.Create(input, session: null!);
+
+            AssertInsufficientData(CaptureSkipException(ref reader, count));
+            Assert.Equal(0, reader.Position);
+            Assert.Equal(input.Length, reader.Remaining);
+            Assert.Equal((byte)0x11, reader.ReadByte());
+        }
+
+        [Fact]
+        public void Skip_NegativeCount_ThrowsArgumentOutOfRangeWithoutAdvancing()
+        {
+            ReadOnlySpan<byte> input = [0x11, 0x22];
+            var reader = Reader.Create(input, session: null!);
+
+            var exception = Assert.IsType<ArgumentOutOfRangeException>(CaptureSkipException(ref reader, -1));
+            Assert.Equal("count", exception.ParamName);
+            Assert.Equal(0, reader.Position);
+            Assert.Equal(input.Length, reader.Remaining);
+            Assert.Equal((byte)0x11, reader.ReadByte());
+        }
+
+        [Theory]
+        [InlineData(0L)]
+        [InlineData(2L)]
+        [InlineData(3L)]
+        public void Skip_ReadOnlySequence_ZeroExactAndAcrossSegmentBoundaries(long count)
+        {
+            var sequence = CreateSegmentedSequence();
+            byte[] expected = [0x11, 0x12, 0x21, 0x22, 0x31, 0x32];
+            var reader = Reader.Create(sequence, session: null!);
+
+            VerifySuccessfulSkip(ref reader, count, expected.Length - count, expected[(int)count]);
+        }
+
+        [Fact]
+        public void Skip_ReadOnlySequence_ExactEnd_HasExpectedState()
+        {
+            var sequence = CreateSegmentedSequence();
+            var reader = Reader.Create(sequence, session: null!);
+
+            reader.Skip(sequence.Length);
+
+            Assert.Equal(6, reader.Position);
+            Assert.Equal(0, reader.Remaining);
+            AssertInsufficientData(CaptureReadByteException(ref reader));
+        }
+
+        [Theory]
+        [InlineData(7L)]
+        [InlineData(long.MaxValue)]
+        public void Skip_ReadOnlySequence_InsufficientOrVeryLargeCount_ThrowsWithoutAdvancing(long count)
+        {
+            var sequence = CreateSegmentedSequence();
+            var reader = Reader.Create(sequence, session: null!);
+
+            AssertInsufficientData(CaptureSkipException(ref reader, count));
+            Assert.Equal(0, reader.Position);
+            Assert.Equal(sequence.Length, reader.Remaining);
+            Assert.Equal((byte)0x11, reader.ReadByte());
+        }
+
+        [Theory]
+        [InlineData(false, 0L)]
+        [InlineData(false, 2L)]
+        [InlineData(false, 3L)]
+        [InlineData(true, 0L)]
+        [InlineData(true, 2L)]
+        [InlineData(true, 3L)]
+        public void Skip_PooledBufferAndBufferSlice_CrossesCommittedUncommittedBoundary(bool useSlice, long count)
+        {
+            var buffer = CreateCommittedAndUncommittedBuffer();
+            try
+            {
+                byte[] expected = [0x11, 0x12, 0x21, 0x22];
+                var reader = useSlice
+                    ? Reader.Create(buffer.Slice(), session: null!)
+                    : Reader.Create(buffer, session: null!);
+
+                VerifySuccessfulSkip(ref reader, count, expected.Length - count, expected[(int)count]);
+            }
+            finally
+            {
+                buffer.Dispose();
+            }
+        }
+
+        [Theory]
+        [InlineData(false)]
+        [InlineData(true)]
+        public void Skip_PooledBufferAndBufferSlice_InsufficientData_ThrowsWithoutAdvancing(bool useSlice)
+        {
+            var buffer = CreateCommittedAndUncommittedBuffer();
+            try
+            {
+                var reader = useSlice
+                    ? Reader.Create(buffer.Slice(), session: null!)
+                    : Reader.Create(buffer, session: null!);
+
+                AssertInsufficientData(CaptureSkipException(ref reader, buffer.Length + 1L));
+                Assert.Equal(0, reader.Position);
+                Assert.Equal(buffer.Length, reader.Remaining);
+                Assert.Equal((byte)0x11, reader.ReadByte());
+            }
+            finally
+            {
+                buffer.Dispose();
+            }
+        }
+
+        [Theory]
+        [InlineData(0L)]
+        [InlineData(ArcPageSize - 1L)]
+        [InlineData(ArcPageSize)]
+        [InlineData(ArcPageSize + 1L)]
+        public void Skip_ArcBuffer_ZeroExactAndAcrossPageBoundaries(long count)
+        {
+            using var writer = new ArcBufferWriter();
+            var expected = CreateArcBufferData();
+            WriteArcBufferData(writer, expected);
+            using var buffer = writer.PeekSlice(expected.Length);
+            var reader = Reader.Create(buffer, session: null!);
+
+            VerifySuccessfulSkip(ref reader, count, expected.Length - count, expected[(int)count]);
+        }
+
+        [Theory]
+        [InlineData(ArcPageSize + 2L)]
+        [InlineData(ArcPageSize + 3L)]
+        public void Skip_ArcBuffer_ExactEndOrInsufficientData_HasExpectedContract(long count)
+        {
+            using var writer = new ArcBufferWriter();
+            var expected = CreateArcBufferData();
+            WriteArcBufferData(writer, expected);
+            using var buffer = writer.PeekSlice(expected.Length);
+            var reader = Reader.Create(buffer, session: null!);
+
+            if (count == expected.Length)
+            {
+                reader.Skip(count);
+                Assert.Equal(expected.Length, reader.Position);
+                Assert.Equal(0, reader.Remaining);
+                AssertInsufficientData(CaptureReadByteException(ref reader));
+            }
+            else
+            {
+                AssertInsufficientData(CaptureSkipException(ref reader, count));
+                Assert.Equal(0, reader.Position);
+                Assert.Equal(expected.Length, reader.Remaining);
+                Assert.Equal((byte)0x11, reader.ReadByte());
+            }
+        }
+
+        [Theory]
+        [InlineData(0L)]
+        [InlineData(2L)]
+        public void Skip_SeekableStream_UpdatesPositionRemainingAndNextByte(long count)
+        {
+            byte[] input = [0x11, 0x22, 0x33, 0x44, 0x55];
+            using var stream = new MemoryStream(input);
+            var reader = Reader.Create(stream, session: null!);
+
+            VerifySuccessfulSkip(ref reader, count, input.Length - count, input[(int)count]);
+        }
+
+        [Fact]
+        public void Skip_SeekableStream_ExactEnd_HasExpectedState()
+        {
+            byte[] input = [0x11, 0x22, 0x33, 0x44, 0x55];
+            using var stream = new MemoryStream(input);
+            var reader = Reader.Create(stream, session: null!);
+
+            reader.Skip(input.Length);
+
+            Assert.Equal(input.Length, reader.Position);
+            Assert.Equal(0, reader.Remaining);
+            AssertInsufficientData(CaptureReadByteException(ref reader));
+            Assert.Equal(input.Length, reader.Position);
+            Assert.Equal(0, reader.Remaining);
+        }
+
+        [Fact]
+        public void Skip_SeekableStream_PastEnd_ThrowsWithoutAdvancing()
+        {
+            byte[] input = [0x11, 0x22, 0x33, 0x44, 0x55];
+            using var stream = new MemoryStream(input);
+            var reader = Reader.Create(stream, session: null!);
+
+            AssertInsufficientData(CaptureSkipException(ref reader, input.Length + 1L));
+            Assert.Equal(0, reader.Position);
+            Assert.Equal(input.Length, reader.Remaining);
+            Assert.Equal((byte)0x11, reader.ReadByte());
+        }
+
+        [Fact]
+        public void Skip_NonSeekableStream_ZeroCount_DoesNotConsume()
+        {
+            byte[] input = [0x11, 0x22, 0x33, 0x44, 0x55];
+            using var stream = new NonSeekableStream(input);
+            var reader = Reader.Create(stream, session: null!);
+
+            reader.Skip(0);
+
+            Assert.Equal(long.MaxValue, reader.Remaining);
+            Assert.IsType<NotSupportedException>(CapturePositionException(ref reader));
+            Assert.Equal((byte)0x11, reader.ReadByte());
+            Assert.Equal(long.MaxValue, reader.Remaining);
+        }
+
+        [Fact]
+        public void Skip_NonSeekableStream_PositiveCount_ThrowsWithoutConsuming()
+        {
+            byte[] input = [0x11, 0x22, 0x33, 0x44, 0x55];
+            using var stream = new NonSeekableStream(input);
+            var reader = Reader.Create(stream, session: null!);
+
+            Assert.IsType<NotSupportedException>(CaptureSkipException(ref reader, 2));
+            Assert.Equal(long.MaxValue, reader.Remaining);
+            Assert.IsType<NotSupportedException>(CapturePositionException(ref reader));
+            Assert.Equal((byte)0x11, reader.ReadByte());
+            Assert.Equal(long.MaxValue, reader.Remaining);
+        }
+
+        [Theory]
+        [InlineData(SkipInputKind.Span)]
+        [InlineData(SkipInputKind.ReadOnlySequence)]
+        [InlineData(SkipInputKind.PooledBuffer)]
+        [InlineData(SkipInputKind.BufferSlice)]
+        [InlineData(SkipInputKind.ArcBuffer)]
+        [InlineData(SkipInputKind.SeekableStream)]
+        public void Skip_FromNonzeroPosition_AdvancesRelatively(SkipInputKind inputKind)
+        {
+            switch (inputKind)
+            {
+                case SkipInputKind.Span:
+                    VerifySpanRelativeSkip();
+                    break;
+                case SkipInputKind.ReadOnlySequence:
+                    VerifyReadOnlySequenceRelativeSkip();
+                    break;
+                case SkipInputKind.PooledBuffer:
+                    VerifyPooledBufferRelativeSkip(useSlice: false);
+                    break;
+                case SkipInputKind.BufferSlice:
+                    VerifyPooledBufferRelativeSkip(useSlice: true);
+                    break;
+                case SkipInputKind.ArcBuffer:
+                    VerifyArcBufferRelativeSkip();
+                    break;
+                case SkipInputKind.SeekableStream:
+                    VerifySeekableStreamRelativeSkip();
+                    break;
+                default:
+                    throw new ArgumentOutOfRangeException(nameof(inputKind));
+            }
+        }
+
+        [Theory]
+        [InlineData(SkipInputKind.ReadOnlySequence)]
+        [InlineData(SkipInputKind.PooledBuffer)]
+        [InlineData(SkipInputKind.BufferSlice)]
+        [InlineData(SkipInputKind.ArcBuffer)]
+        public void Skip_ForkedSegmentedInput_UsesForkRelativePosition(SkipInputKind inputKind)
+        {
+            switch (inputKind)
+            {
+                case SkipInputKind.ReadOnlySequence:
+                    VerifyForkedReadOnlySequenceSkip();
+                    break;
+                case SkipInputKind.PooledBuffer:
+                    VerifyForkedPooledBufferSkip(useSlice: false);
+                    break;
+                case SkipInputKind.BufferSlice:
+                    VerifyForkedPooledBufferSkip(useSlice: true);
+                    break;
+                case SkipInputKind.ArcBuffer:
+                    VerifyForkedArcBufferSkip();
+                    break;
+                default:
+                    throw new ArgumentOutOfRangeException(nameof(inputKind));
+            }
+        }
+
+        [Theory]
+        [InlineData(SkipInputKind.ReadOnlySequence)]
+        [InlineData(SkipInputKind.PooledBuffer)]
+        [InlineData(SkipInputKind.BufferSlice)]
+        [InlineData(SkipInputKind.ArcBuffer)]
+        public void Skip_SegmentedInput_NonzeroPositionLongMaxValue_ThrowsWithoutChangingState(SkipInputKind inputKind)
+        {
+            switch (inputKind)
+            {
+                case SkipInputKind.ReadOnlySequence:
+                    VerifyReadOnlySequenceOverflowSkip();
+                    break;
+                case SkipInputKind.PooledBuffer:
+                    VerifyPooledBufferOverflowSkip(useSlice: false);
+                    break;
+                case SkipInputKind.BufferSlice:
+                    VerifyPooledBufferOverflowSkip(useSlice: true);
+                    break;
+                case SkipInputKind.ArcBuffer:
+                    VerifyArcBufferOverflowSkip();
+                    break;
+                default:
+                    throw new ArgumentOutOfRangeException(nameof(inputKind));
+            }
+        }
+
+        private static void VerifyForkedReadOnlySequenceSkip()
+        {
+            var sequence = CreateSegmentedSequence();
+            var reader = Reader.Create(sequence, session: null!);
+            reader.ForkFrom(1, out var forked);
+
+            forked.Skip(1);
+
+            Assert.Equal(2, forked.Position);
+            Assert.Equal(4, forked.Remaining);
+            Assert.Equal((byte)0x21, forked.ReadByte());
+        }
+
+        private static void VerifyForkedPooledBufferSkip(bool useSlice)
+        {
+            var buffer = CreateCommittedAndUncommittedBuffer();
+            try
+            {
+                var reader = useSlice
+                    ? Reader.Create(buffer.Slice(), session: null!)
+                    : Reader.Create(buffer, session: null!);
+                reader.ForkFrom(1, out var forked);
+
+                forked.Skip(1);
+
+                Assert.Equal(2, forked.Position);
+                Assert.Equal(2, forked.Remaining);
+                Assert.Equal((byte)0x21, forked.ReadByte());
+            }
+            finally
+            {
+                buffer.Dispose();
+            }
+        }
+
+        private static void VerifyForkedArcBufferSkip()
+        {
+            using var writer = new ArcBufferWriter();
+            var expected = CreateArcBufferData();
+            WriteArcBufferData(writer, expected);
+            using var buffer = writer.PeekSlice(expected.Length);
+            var reader = Reader.Create(buffer, session: null!);
+            reader.ForkFrom(ArcPageSize - 1, out var forked);
+
+            forked.Skip(1);
+
+            Assert.Equal(ArcPageSize, forked.Position);
+            Assert.Equal(2, forked.Remaining);
+            Assert.Equal((byte)0x41, forked.ReadByte());
+        }
+
+        private static void VerifySpanRelativeSkip()
+        {
+            ReadOnlySpan<byte> input = [0x11, 0x22, 0x33, 0x44, 0x55];
+            var reader = Reader.Create(input, session: null!);
+            VerifyRelativeSkip(ref reader, input.Length, 2, 0x44);
+        }
+
+        private static void VerifyReadOnlySequenceRelativeSkip()
+        {
+            var sequence = CreateSegmentedSequence();
+            var reader = Reader.Create(sequence, session: null!);
+            VerifyRelativeSkip(ref reader, sequence.Length, 2, 0x22);
+        }
+
+        private static void VerifyPooledBufferRelativeSkip(bool useSlice)
+        {
+            var buffer = CreateCommittedAndUncommittedBuffer();
+            try
+            {
+                var reader = useSlice
+                    ? Reader.Create(buffer.Slice(), session: null!)
+                    : Reader.Create(buffer, session: null!);
+                VerifyRelativeSkip(ref reader, buffer.Length, 2, 0x22);
+            }
+            finally
+            {
+                buffer.Dispose();
+            }
+        }
+
+        private static void VerifyArcBufferRelativeSkip()
+        {
+            using var writer = new ArcBufferWriter();
+            var expected = CreateArcBufferData();
+            WriteArcBufferData(writer, expected);
+            using var buffer = writer.PeekSlice(expected.Length);
+            var reader = Reader.Create(buffer, session: null!);
+            VerifyRelativeSkip(ref reader, expected.Length, ArcPageSize - 1L, 0x41);
+        }
+
+        private static void VerifySeekableStreamRelativeSkip()
+        {
+            byte[] input = [0x11, 0x22, 0x33, 0x44, 0x55];
+            using var stream = new MemoryStream(input);
+            var reader = Reader.Create(stream, session: null!);
+            VerifyRelativeSkip(ref reader, input.Length, 2, 0x44);
+        }
+
+        private static void VerifyRelativeSkip<TInput>(
+            ref Reader<TInput> reader,
+            long inputLength,
+            long count,
+            byte expectedNextByte)
+        {
+            Assert.Equal((byte)0x11, reader.ReadByte());
+            Assert.Equal(1, reader.Position);
+            Assert.Equal(inputLength - 1, reader.Remaining);
+
+            reader.Skip(count);
+
+            Assert.Equal(1 + count, reader.Position);
+            Assert.Equal(inputLength - count - 1, reader.Remaining);
+            Assert.Equal(expectedNextByte, reader.ReadByte());
+            Assert.Equal(2 + count, reader.Position);
+            Assert.Equal(inputLength - count - 2, reader.Remaining);
+        }
+
+        private static void VerifyReadOnlySequenceOverflowSkip()
+        {
+            var sequence = CreateSegmentedSequence();
+            var reader = Reader.Create(sequence, session: null!);
+            VerifySegmentedOverflowSkip(ref reader, sequence.Length, 0x12);
+        }
+
+        private static void VerifyPooledBufferOverflowSkip(bool useSlice)
+        {
+            var buffer = CreateCommittedAndUncommittedBuffer();
+            try
+            {
+                var reader = useSlice
+                    ? Reader.Create(buffer.Slice(), session: null!)
+                    : Reader.Create(buffer, session: null!);
+                VerifySegmentedOverflowSkip(ref reader, buffer.Length, 0x12);
+            }
+            finally
+            {
+                buffer.Dispose();
+            }
+        }
+
+        private static void VerifyArcBufferOverflowSkip()
+        {
+            using var writer = new ArcBufferWriter();
+            var expected = CreateArcBufferData();
+            WriteArcBufferData(writer, expected);
+            using var buffer = writer.PeekSlice(expected.Length);
+            var reader = Reader.Create(buffer, session: null!);
+            VerifySegmentedOverflowSkip(ref reader, expected.Length, 0xA5);
+        }
+
+        private static void VerifySegmentedOverflowSkip<TInput>(
+            ref Reader<TInput> reader,
+            long inputLength,
+            byte expectedNextByte)
+        {
+            Assert.Equal((byte)0x11, reader.ReadByte());
+            Assert.Equal(1, reader.Position);
+            Assert.Equal(inputLength - 1, reader.Remaining);
+
+            AssertInsufficientData(CaptureSkipException(ref reader, long.MaxValue));
+
+            Assert.Equal(1, reader.Position);
+            Assert.Equal(inputLength - 1, reader.Remaining);
+            Assert.Equal(expectedNextByte, reader.ReadByte());
+            Assert.Equal(2, reader.Position);
+            Assert.Equal(inputLength - 2, reader.Remaining);
+        }
+
+        private static void VerifySpanSkip(ReadOnlySpan<byte> input)
+        {
+            var reader = Reader.Create(input, session: null!);
+            VerifySuccessfulSkip(ref reader, 2, 3, 0x33);
+        }
+
+        private static void VerifyByteArraySkip(byte[] input)
+        {
+            var reader = Reader.Create(input, session: null!);
+            VerifySuccessfulSkip(ref reader, 2, 3, 0x33);
+        }
+
+        private static void VerifyReadOnlyMemorySkip(ReadOnlyMemory<byte> input)
+        {
+            var reader = Reader.Create(input, session: null!);
+            VerifySuccessfulSkip(ref reader, 2, 3, 0x33);
+        }
+
+        private static void VerifySuccessfulSkip<TInput>(
+            ref Reader<TInput> reader,
+            long count,
+            long expectedRemaining,
+            byte expectedNextByte)
+        {
+            reader.Skip(count);
+
+            Assert.Equal(count, reader.Position);
+            Assert.Equal(expectedRemaining, reader.Remaining);
+            Assert.Equal(expectedNextByte, reader.ReadByte());
+            Assert.Equal(count + 1, reader.Position);
+            Assert.Equal(expectedRemaining - 1, reader.Remaining);
+        }
+
+        private static Exception CaptureSkipException<TInput>(ref Reader<TInput> reader, long count)
+        {
+            try
+            {
+                reader.Skip(count);
+            }
+            catch (Exception exception)
+            {
+                return exception;
+            }
+
+            return null!;
+        }
+
+        private static Exception CaptureReadByteException<TInput>(ref Reader<TInput> reader)
+        {
+            try
+            {
+                _ = reader.ReadByte();
+            }
+            catch (Exception exception)
+            {
+                return exception;
+            }
+
+            return null!;
+        }
+
+        private static Exception CapturePositionException<TInput>(ref Reader<TInput> reader)
+        {
+            try
+            {
+                _ = reader.Position;
+            }
+            catch (Exception exception)
+            {
+                return exception;
+            }
+
+            return null!;
+        }
+
+        private static void AssertInsufficientData(Exception exception)
+        {
+            var invalidOperationException = Assert.IsType<InvalidOperationException>(exception);
+            Assert.Equal("Insufficient data present in buffer.", invalidOperationException.Message);
+        }
+
+        private static ReadOnlySequence<byte> CreateSegmentedSequence() =>
+            ReadOnlySequenceHelper.CreateReadOnlySequence(
+                [0x11, 0x12],
+                [0x21, 0x22],
+                [0x31, 0x32]);
+
+        private static PooledBuffer CreateCommittedAndUncommittedBuffer()
+        {
+            var buffer = new PooledBuffer();
+            var committedMemory = buffer.GetMemory();
+            new byte[] { 0x11, 0x12 }.CopyTo(committedMemory.Span);
+            buffer.Advance(2);
+
+            var uncommittedMemory = buffer.GetMemory(committedMemory.Length - 2);
+            new byte[] { 0x21, 0x22 }.CopyTo(uncommittedMemory.Span);
+            buffer.Advance(2);
+            return buffer;
+        }
+
+        private static byte[] CreateArcBufferData()
+        {
+            var result = new byte[ArcPageSize + 2];
+            Array.Fill(result, (byte)0xA5);
+            result[0] = 0x11;
+            result[ArcPageSize - 1] = 0x31;
+            result[ArcPageSize] = 0x41;
+            result[ArcPageSize + 1] = 0x51;
+            return result;
+        }
+
+        private static void WriteArcBufferData(ArcBufferWriter writer, ReadOnlySpan<byte> data)
+        {
+            IBufferWriter<byte> output = writer;
+            var offset = 0;
+            while (offset < data.Length)
+            {
+                var count = Math.Min(ArcPageSize, data.Length - offset);
+                var destination = output.GetSpan();
+                Assert.True(destination.Length >= count);
+                data.Slice(offset, count).CopyTo(destination);
+                output.Advance(count);
+                offset += count;
+            }
+        }
+
+        private const int ArcPageSize = ArcBufferWriter.MinimumPageSize;
+
+        public enum SpanInputKind
+        {
+            Span,
+            ByteArray,
+            ReadOnlyMemory
+        }
+
+        public enum SkipInputKind
+        {
+            Span,
+            ReadOnlySequence,
+            PooledBuffer,
+            BufferSlice,
+            ArcBuffer,
+            SeekableStream
         }
     }
 

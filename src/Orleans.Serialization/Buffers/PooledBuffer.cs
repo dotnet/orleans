@@ -376,13 +376,6 @@ public partial struct PooledBuffer : IBufferWriter<byte>, IDisposable
 
                 // Find the starting segment and the offset to copy from.
                 var segmentLength = segment.Length;
-                if (segmentLength == 0)
-                {
-                    CurrentMemory = ReadOnlyMemory<byte>.Empty;
-                    _segment = FinalSegmentSentinel;
-                    return false;
-                }
-
                 CurrentMemory = segment[..segmentLength];
                 _position += segmentLength;
                 _segment = _segment.Next as SequenceSegment;
@@ -395,13 +388,6 @@ public partial struct PooledBuffer : IBufferWriter<byte>, IDisposable
             if (_segment != FinalSegmentSentinel && _buffer.CurrentPosition > 0 && _buffer.WriteHead is { } head)
             {
                 var finalLength = _buffer.CurrentPosition;
-                if (finalLength == 0)
-                {
-                    CurrentMemory = ReadOnlyMemory<byte>.Empty;
-                    _segment = FinalSegmentSentinel;
-                    return false;
-                }
-
                 CurrentMemory = head.Array.AsMemory(0, finalLength);
                 _position += finalLength;
                 Debug.Assert(_position == _buffer.Length);
@@ -472,13 +458,6 @@ public partial struct PooledBuffer : IBufferWriter<byte>, IDisposable
 
                 // Find the starting segment and the offset to copy from.
                 var segmentLength = Math.Min(segment.Length, endPosition - _position);
-                if (segmentLength == 0)
-                {
-                    Current = ReadOnlySpan<byte>.Empty;
-                    _segment = FinalSegmentSentinel;
-                    return false;
-                }
-
                 Current = segment.Span[..segmentLength];
                 _position += segmentLength;
                 _segment = _segment.Next as SequenceSegment;
@@ -491,13 +470,6 @@ public partial struct PooledBuffer : IBufferWriter<byte>, IDisposable
             if (_segment != FinalSegmentSentinel && _buffer.CurrentPosition > 0 && _buffer.WriteHead is { } head && _position < endPosition)
             {
                 var finalLength = Math.Min(_buffer.CurrentPosition, endPosition - _position);
-                if (finalLength == 0)
-                {
-                    Current = ReadOnlySpan<byte>.Empty;
-                    _segment = FinalSegmentSentinel;
-                    return false;
-                }
-
                 Current = head.Array.AsSpan(0, finalLength);
                 _position += finalLength;
                 Debug.Assert(_position == endPosition);
