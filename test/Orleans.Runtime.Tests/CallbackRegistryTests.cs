@@ -12,6 +12,181 @@ namespace Tester;
 [TestCategory("BVT")]
 public class CallbackRegistryTests
 {
+    private static readonly Action<CallbackData, object?> EmptyVisitor = static (_, _) => { };
+    private static readonly Func<CallbackData, long, bool> MatchCallbackId =
+        static (callback, expected) => callback.Message.Id.ToInt64() == expected;
+
+    [Fact]
+    public void GetStripeIndex_OverflowAndStride_DistributesCorrelationIds()
+    {
+        var start = long.MaxValue - (CallbackRegistry.StripeCount / 2);
+        var consecutiveStripes = Enumerable.Range(0, CallbackRegistry.StripeCount)
+            .Select(offset => new CorrelationId(unchecked(start + offset)))
+            .Select(CallbackRegistry.GetStripeIndex)
+            .Distinct()
+            .Count();
+        var stridedStripes = Enumerable.Range(0, CallbackRegistry.StripeCount)
+            .Select(offset => new CorrelationId(offset * CallbackRegistry.StripeCount))
+            .Select(CallbackRegistry.GetStripeIndex)
+            .Distinct()
+            .Count();
+
+        Assert.True(consecutiveStripes > CallbackRegistry.StripeCount / 2);
+        Assert.True(stridedStripes > CallbackRegistry.StripeCount / 2);
+    }
+
+    [Fact]
+    public void TryRegisterGetAndRemove_CallbackIdentityIsPreserved()
+    {
+        using var serviceProvider = CreateServiceProvider();
+        var registry = new CallbackRegistry();
+        var callback = CreateCallback(registry, new TestResponseCompletionSource(), CreateRequest(42), serviceProvider);
+        var duplicate = CreateCallback(registry, new TestResponseCompletionSource(), CreateRequest(42), serviceProvider);
+
+        Assert.True(registry.TryRegister(callback));
+        Assert.Throws<InvalidOperationException>(() => registry.TryRegister(duplicate));
+        Assert.True(registry.TryGetResponseCallback(CreateResponse(callback.Message), out var found));
+        Assert.Same(callback, found);
+        Assert.False(registry.TryRemove(duplicate));
+        Assert.True(registry.TryRemove(callback));
+        Assert.False(registry.TryGetResponseCallback(CreateResponse(callback.Message), out _));
+    }
+
+    [Fact]
+    public void ConcurrentOperations_CountAndCallbacksRemainExact()
+    {
+        const int count = 10_000;
+        using var serviceProvider = CreateServiceProvider();
+        var registry = new CallbackRegistry();
+        var shared = CreateSharedCallbackData(callback => registry.TryRemove(callback));
+        var instruments = CreateInstruments(serviceProvider);
+        var callbacks = new CallbackData[count];
+
+        Parallel.For(0, count, index =>
+        {
+            var callback = CreateCallback(
+                new TestResponseCompletionSource(),
+                CreateRequest(index),
+                shared,
+                instruments);
+            callbacks[index] = callback;
+            Assert.True(registry.TryRegister(callback));
+            Assert.True(registry.TryGetResponseCallback(CreateResponse(callback.Message), out var found));
+            Assert.Same(callback, found);
+        });
+
+        Assert.Equal(count, registry.Count);
+        Assert.Equal(count, registry.CountWhere(0L, static (callback, _) => callback.Message.Id.ToInt64() >= 0));
+
+        Parallel.ForEach(callbacks, callback => Assert.True(registry.TryRemove(callback)));
+
+        Assert.Equal(0, registry.Count);
+    }
+
+    [Fact]
+    public void ForEach_SnapshotAllowsCallbacksToRemoveThemselves()
+    {
+        using var serviceProvider = CreateServiceProvider();
+        var registry = new CallbackRegistry();
+        for (var index = 0; index < 32; index++)
+        {
+            Assert.True(registry.TryRegister(
+                CreateCallback(registry, new TestResponseCompletionSource(), CreateRequest(index), serviceProvider)));
+        }
+
+        registry.ForEach(registry, static (callback, registry) => Assert.True(registry.TryRemove(callback)));
+
+        Assert.Equal(0, registry.Count);
+    }
+
+    [Fact]
+    public void ForEach_EmptyRegistry_DoesNotAllocate()
+    {
+        var registry = new CallbackRegistry();
+        registry.ForEach((object?)null, EmptyVisitor);
+
+        var allocatedBefore = GC.GetAllocatedBytesForCurrentThread();
+        registry.ForEach((object?)null, EmptyVisitor);
+        var allocated = GC.GetAllocatedBytesForCurrentThread() - allocatedBefore;
+
+        Assert.Equal(0, allocated);
+    }
+
+    [Fact]
+    public void CountWhere_StatefulPredicate_DoesNotAllocate()
+    {
+        using var serviceProvider = CreateServiceProvider();
+        var registry = new CallbackRegistry();
+        var callback = CreateCallback(registry, new TestResponseCompletionSource(), CreateRequest(42), serviceProvider);
+        Assert.True(registry.TryRegister(callback));
+        Assert.Equal(1, registry.CountWhere(42L, MatchCallbackId));
+
+        var allocatedBefore = GC.GetAllocatedBytesForCurrentThread();
+        var count = registry.CountWhere(42L, MatchCallbackId);
+        var allocated = GC.GetAllocatedBytesForCurrentThread() - allocatedBefore;
+
+        Assert.Equal(1, count);
+        Assert.Equal(0, allocated);
+        Assert.True(registry.TryRemove(callback));
+    }
+
+    [Fact]
+    public async Task Close_ConcurrentPublication_ClassifiesEveryAttempt()
+    {
+        const int publisherCount = 32;
+        const int entriesPerPublisher = 1_024;
+        var count = publisherCount * entriesPerPublisher;
+        var cancellationToken = TestContext.Current.CancellationToken;
+        using var serviceProvider = CreateServiceProvider();
+        using var start = new Barrier(publisherCount + 1);
+        var registry = new CallbackRegistry();
+        var shared = CreateSharedCallbackData(callback => registry.TryRemove(callback));
+        var instruments = CreateInstruments(serviceProvider);
+        var callbacks = new CallbackData[count];
+        var accepted = new bool[count];
+        var tasks = Enumerable.Range(0, publisherCount)
+            .Select(publisher => Task.Run(() =>
+            {
+                start.SignalAndWait(cancellationToken);
+                var offset = publisher * entriesPerPublisher;
+                for (var index = 0; index < entriesPerPublisher; index++)
+                {
+                    var value = offset + index;
+                    var callback = CreateCallback(
+                        new TestResponseCompletionSource(),
+                        CreateRequest(value),
+                        shared,
+                        instruments);
+                    callbacks[value] = callback;
+                    accepted[value] = registry.TryRegister(callback);
+                }
+            }, cancellationToken))
+            .ToArray();
+
+        start.SignalAndWait(cancellationToken);
+        registry.Close();
+        await Task.WhenAll(tasks);
+
+        Assert.Equal(accepted.Count(static value => value), registry.Count);
+        for (var index = 0; index < accepted.Length; index++)
+        {
+            Assert.Equal(
+                accepted[index],
+                registry.TryGetResponseCallback(CreateResponse(callbacks[index].Message), out var found));
+            if (accepted[index])
+            {
+                Assert.Same(callbacks[index], found);
+            }
+        }
+
+        var rejected = CreateCallback(
+            new TestResponseCompletionSource(),
+            CreateRequest(accepted.Length),
+            shared,
+            instruments);
+        Assert.False(registry.TryRegister(rejected));
+    }
+
     [Fact]
     public void TryCompleteResponse_CompletesCallbackAndRemovesRegistration()
     {
@@ -343,18 +518,32 @@ public class CallbackRegistryTests
         Message request,
         IServiceProvider serviceProvider,
         Action<CallbackData> unregister)
+        => CreateCallback(
+            completion,
+            request,
+            CreateSharedCallbackData(unregister),
+            CreateInstruments(serviceProvider));
+
+    private static CallbackData CreateCallback(
+        IResponseCompletionSource completion,
+        Message request,
+        SharedCallbackData shared,
+        ApplicationRequestInstruments instruments)
+        => new(shared, completion, request, instruments);
+
+    private static SharedCallbackData CreateSharedCallbackData(Action<CallbackData> unregister)
     {
-        var shared = new SharedCallbackData(
+        return new SharedCallbackData(
             unregister,
             NullLogger<CallbackData>.Instance,
             responseTimeout: TimeSpan.FromMinutes(1),
             cancelOnTimeout: false,
             waitForCancellationAcknowledgement: false,
             cancellationManager: null);
-        var instruments = new ApplicationRequestInstruments(
-            new OrleansInstruments(serviceProvider.GetRequiredService<IMeterFactory>()));
-        return new CallbackData(shared, completion, request, instruments);
     }
+
+    private static ApplicationRequestInstruments CreateInstruments(IServiceProvider serviceProvider)
+        => new(new OrleansInstruments(serviceProvider.GetRequiredService<IMeterFactory>()));
 
     private static Message CreateRequest(long id) => new()
     {
