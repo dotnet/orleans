@@ -23,19 +23,19 @@ runs:
   using: composite
   steps:
   - name: Prepare coverage report
-    if: github.event_name == 'pull_request'
+    if: github.event_name == 'pull_request' || (github.event_name == 'push' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch))
     shell: pwsh
     run: ./.github/scripts/coverage-report.ps1 -Action Prepare -CoverageId "${{ inputs.coverage-id }}"
   - name: Build and discover tests for static coverage
-    if: github.event_name == 'pull_request' && (runner.os == 'macOS' || inputs.static-instrumentation == 'true')
+    if: (github.event_name == 'pull_request' || (github.event_name == 'push' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch))) && (runner.os == 'macOS' || inputs.static-instrumentation == 'true')
     shell: pwsh
     run: dotnet test --solution Orleans.slnx --framework "${{ inputs.framework }}" --filter-query "${{ inputs.filter-query }}" --list-tests --minimum-expected-tests 1 --max-parallel-test-modules 1
   - name: Test
-    if: github.event_name != 'pull_request'
+    if: github.event_name != 'pull_request' && (github.event_name != 'push' || github.ref != format('refs/heads/{0}', github.event.repository.default_branch))
     shell: pwsh
     run: dotnet test --solution Orleans.slnx --framework "${{ inputs.framework }}" --filter-query "${{ inputs.filter-query }}" --minimum-expected-tests 1 --hangdump --hangdump-timeout 10m --crashdump --crashdump-type Full --hangdump-type Full --report-trx --report-trx-filename "test_results_${{ inputs.result-id }}_{asm}_{tfm}_{arch}.trx" --max-parallel-test-modules 1
   - name: Test with dynamic coverage
-    if: github.event_name == 'pull_request' && runner.os != 'macOS' && inputs.static-instrumentation != 'true'
+    if: (github.event_name == 'pull_request' || (github.event_name == 'push' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch))) && runner.os != 'macOS' && inputs.static-instrumentation != 'true'
     shell: pwsh
     run: |
       $command = @(
@@ -65,7 +65,7 @@ runs:
       )
       ./.github/scripts/invoke-coverage.ps1 -Settings ./.github/coverage.config.xml -Output "TestResults/${{ inputs.coverage-id }}.cobertura.xml" -RetryLogFile "logs/${{ inputs.coverage-id }}.retry.log" -Command $command
   - name: Test with static coverage
-    if: github.event_name == 'pull_request' && (runner.os == 'macOS' || inputs.static-instrumentation == 'true')
+    if: (github.event_name == 'pull_request' || (github.event_name == 'push' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch))) && (runner.os == 'macOS' || inputs.static-instrumentation == 'true')
     shell: pwsh
     run: |
       $command = @(
@@ -96,6 +96,6 @@ runs:
       )
       ./.github/scripts/invoke-coverage.ps1 -Settings ./.github/coverage.static.config.xml -Output "TestResults/${{ inputs.coverage-id }}.cobertura.xml" -RetryLogFile "logs/${{ inputs.coverage-id }}.retry.log" -IncludeFiles "${{ github.workspace }}/test/**/bin/Debug/${{ inputs.framework }}/*.dll" -Command $command
   - name: Validate coverage report
-    if: github.event_name == 'pull_request'
+    if: github.event_name == 'pull_request' || (github.event_name == 'push' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch))
     shell: pwsh
     run: ./.github/scripts/coverage-report.ps1 -Action Validate -CoverageId "${{ inputs.coverage-id }}"

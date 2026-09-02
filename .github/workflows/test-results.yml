@@ -11,9 +11,6 @@ permissions:
   contents: read
   actions: read
 
-env:
-  DOTNET_COVERAGE_VERSION: 18.5.2
-
 jobs:
   report:
     name: Report test results
@@ -67,14 +64,15 @@ jobs:
         with:
           persist-credentials: false
           ref: ${{ github.event.repository.default_branch }}
+      - name: Pin trusted main
+        id: trusted-main
+        shell: pwsh
+        run: |
+          $trustedMainSha = git rev-parse HEAD
+          "sha=$trustedMainSha" >> $env:GITHUB_OUTPUT
       - name: Test coverage reporting
         shell: pwsh
         run: ./.github/scripts/test-summarize-coverage.ps1
-      - name: Setup .NET
-        uses: actions/setup-dotnet@c2fa09f4bde5ebb9d1777cf28262a3eb3db3ced7 # v5
-        with:
-          global-json-file: global.json
-      - uses: ./.github/actions/setup-coverage
       - name: Download coverage
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
@@ -120,74 +118,201 @@ jobs:
             --gzip \
             --directory coverage-source \
             --strip-components 1
-      - name: Merge coverage
+      - name: Verify trusted coverage inputs
         shell: pwsh
         run: |
-          New-Item -ItemType Directory -Force coverage | Out-Null
-          $reports = @(Get-ChildItem -LiteralPath coverage-data -Recurse -File -Filter '*.cobertura.xml' | Select-Object -ExpandProperty FullName)
-          dotnet-coverage merge @reports --output coverage/coverage.cobertura.xml --output-format cobertura --nologo
+          ./.github/scripts/get-coverage-input-fingerprint.ps1 `
+            -RepositoryRoot . `
+            -Manifest ./.github/coverage-inputs.txt `
+            -JsonOutput trusted-coverage-inputs.json
+          ./.github/scripts/get-coverage-input-fingerprint.ps1 `
+            -RepositoryRoot coverage-source `
+            -Manifest ./.github/coverage-inputs.txt `
+            -JsonOutput tested-coverage-inputs.json
+
+          $trusted = Get-Content -Raw trusted-coverage-inputs.json | ConvertFrom-Json
+          $tested = Get-Content -Raw tested-coverage-inputs.json | ConvertFrom-Json
+          if ($tested.sha256 -ne $trusted.sha256) {
+            throw 'The pull request changes trusted coverage collection inputs. Merge reviewed coverage infrastructure changes before measuring other pull requests.'
+          }
       - name: Summarize coverage
-        id: coverage
+        shell: pwsh
+        run: |
+          ./.github/scripts/summarize-coverage.ps1 `
+            -ReportDirectory coverage-data `
+            -SourceRoot "$env:GITHUB_WORKSPACE/coverage-source/src" `
+            -MarkdownOutput coverage-summary.md `
+            -JsonOutput coverage-summary.json
+      - name: Select current-main baseline
+        id: current-main
         shell: pwsh
         env:
+          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+          GH_TOKEN: ${{ github.token }}
+          TRUSTED_MAIN_SHA: ${{ steps.trusted-main.outputs.sha }}
+        run: |
+          gh api `
+            --method GET `
+            "repos/$env:GITHUB_REPOSITORY/actions/workflows/ci.yml/runs" `
+            -f "branch=$env:DEFAULT_BRANCH" `
+            -f event=push `
+            -f status=completed `
+            -f per_page=100 |
+            Set-Content -LiteralPath current-main-runs.json -Encoding utf8NoBOM
+
+          ./.github/scripts/select-coverage-baseline.ps1 `
+            -RunsJson current-main-runs.json `
+            -ExpectedSha $env:TRUSTED_MAIN_SHA `
+            -DefaultBranch $env:DEFAULT_BRANCH `
+            -JsonOutput current-main-selection.json
+
+          $selection = Get-Content -Raw current-main-selection.json | ConvertFrom-Json
+          "run-id=$($selection.baseline_run_id)" >> $env:GITHUB_OUTPUT
+          "sha=$($selection.baseline_sha)" >> $env:GITHUB_OUTPUT
+          "status=$($selection.status)" >> $env:GITHUB_OUTPUT
+      - name: Download current-main coverage
+        id: current-main-download
+        if: steps.current-main.outputs.status == 'available'
+        continue-on-error: true
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          github-token: ${{ github.token }}
+          path: current-main-coverage-data
+          pattern: coverage_test_output_*
+          run-id: ${{ steps.current-main.outputs.run-id }}
+      - name: Validate current-main coverage matrix
+        id: current-main-matrix
+        if: steps.current-main-download.outcome == 'success'
+        continue-on-error: true
+        shell: pwsh
+        run: |
+          ./.github/scripts/validate-coverage-artifacts.ps1 `
+            -ReportDirectory current-main-coverage-data `
+            -ExpectedArtifacts ./.github/coverage-artifacts.txt `
+            -JsonOutput current-main-matrix.json
+
+          $matrix = Get-Content -Raw current-main-matrix.json | ConvertFrom-Json
+          if ($matrix.tested_sha -ne '${{ steps.current-main.outputs.sha }}') {
+            throw "Current-main coverage tested $($matrix.tested_sha), expected ${{ steps.current-main.outputs.sha }}"
+          }
+      - name: Download current-main source
+        id: current-main-source
+        if: steps.current-main-matrix.outcome == 'success'
+        continue-on-error: true
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TESTED_SHA: ${{ steps.current-main.outputs.sha }}
+        run: |
+          set -euo pipefail
+          mkdir current-main-source
+          gh api "repos/$GITHUB_REPOSITORY/tarball/$TESTED_SHA" > current-main-source.tar.gz
+          tar \
+            --extract \
+            --file current-main-source.tar.gz \
+            --gzip \
+            --directory current-main-source \
+            --strip-components 1
+      - name: Summarize current-main coverage
+        id: current-main-summary
+        if: steps.current-main-source.outcome == 'success'
+        continue-on-error: true
+        shell: pwsh
+        run: |
+          ./.github/scripts/summarize-coverage.ps1 `
+            -ReportDirectory current-main-coverage-data `
+            -SourceRoot "$env:GITHUB_WORKSPACE/current-main-source/src" `
+            -MarkdownOutput current-main-summary.md `
+            -JsonOutput current-main-summary.json
+      - name: Compare coverage with current main
+        id: comparison
+        shell: pwsh
+        env:
+          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+          GH_TOKEN: ${{ github.token }}
           HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
           REPORT_RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
           REPOSITORY_URL: ${{ github.server_url }}/${{ github.repository }}
           SOURCE_RUN_URL: ${{ github.event.workflow_run.html_url }}
         run: |
-          ./.github/scripts/summarize-coverage.ps1 `
-            -ReportDirectory coverage `
-            -SourceRoot "$env:GITHUB_WORKSPACE/coverage-source/src" `
-            -MarkdownOutput coverage-summary.md `
-            -JsonOutput coverage-summary.json
+          $encodedDefaultBranch = [Uri]::EscapeDataString($env:DEFAULT_BRANCH)
+          $currentMain = gh api "repos/$env:GITHUB_REPOSITORY/git/ref/heads/$encodedDefaultBranch" | ConvertFrom-Json
+          $parameters = @{
+            CurrentSummary = 'coverage-summary.json'
+            CurrentMatrix = 'coverage-matrix.json'
+            BaselineSelection = 'current-main-selection.json'
+            ExpectedBaselineSha = $currentMain.object.sha
+            JsonOutput = 'coverage-comparison.json'
+            MarkdownOutput = 'coverage-comparison.md'
+          }
 
-          $coverage = Get-Content -Raw coverage-summary.json | ConvertFrom-Json
-          $culture = [Globalization.CultureInfo]::InvariantCulture
-          $coveredLines = $coverage.covered_lines.ToString('N0', $culture)
-          $coveredBranches = $coverage.covered_branches.ToString('N0', $culture)
-          $totalLines = $coverage.total_lines.ToString('N0', $culture)
-          $totalBranches = $coverage.total_branches.ToString('N0', $culture)
-          $sourceFiles = $coverage.source_files.ToString('N0', $culture)
+          $selection = Get-Content -Raw current-main-selection.json | ConvertFrom-Json
+          if ($selection.status -eq 'available') {
+            $unavailableReason = if ('${{ steps.current-main-download.outcome }}' -ne 'success') {
+              'The current-main coverage artifacts are unavailable.'
+            } elseif ('${{ steps.current-main-matrix.outcome }}' -ne 'success') {
+              'The current-main coverage artifacts failed trusted matrix validation.'
+            } elseif ('${{ steps.current-main-source.outcome }}' -ne 'success') {
+              'The exact current-main source archive is unavailable.'
+            } elseif ('${{ steps.current-main-summary.outcome }}' -ne 'success') {
+              'The current-main coverage aggregate could not be summarized.'
+            } else {
+              $null
+            }
+
+            if ($unavailableReason) {
+              $parameters.BaselineUnavailableReason = $unavailableReason
+            } else {
+              $parameters.BaselineSummary = 'current-main-summary.json'
+              $parameters.BaselineMatrix = 'current-main-matrix.json'
+            }
+          }
+
+          ./.github/scripts/compare-coverage.ps1 @parameters
+          $comparison = Get-Content -Raw coverage-comparison.json | ConvertFrom-Json
+          $title = if ($comparison.baseline.status -eq 'available') {
+            'Line {0} ({1}), branch {2} ({3})' -f `
+              $comparison.current.line_rate_display, `
+              $comparison.variance.lines.percentage_point_delta_display, `
+              $comparison.current.branch_rate_display, `
+              $comparison.variance.branches.percentage_point_delta_display
+          } else {
+            'Line {0}, branch {1}; current-main baseline {2}' -f `
+              $comparison.current.line_rate_display, `
+              $comparison.current.branch_rate_display, `
+              $comparison.baseline.status
+          }
+
           $comment = @(
             '<!-- orleans-code-coverage -->'
-            '## Code coverage'
-            ''
-            ('**{0} line coverage** - **{1} / {2} lines**' -f $coverage.line_rate_display, $coveredLines, $totalLines)
-            ''
-            ('**{0} branch coverage** - **{1} / {2} branches**' -f $coverage.branch_rate_display, $coveredBranches, $totalBranches)
+            (Get-Content -Raw coverage-comparison.md).TrimEnd()
             ''
             '<details>'
             '<summary>Coverage details</summary>'
             ''
-            ('- **Source files:** {0}' -f $sourceFiles)
-            '- **Scope:** every CI test matrix job, including providers, CodeGen, .NET 8/10, Linux, Windows, and macOS'
-            '- **Sources:** maintained repository code under `src/` loaded by the complete CI test scope'
-            ('- **Commit:** [`{0}`]({1}/commit/{2})' -f $env:HEAD_SHA.Substring(0, 10), $env:REPOSITORY_URL, $env:HEAD_SHA)
-            ('- [View the test run and merged coverage artifact]({0})' -f $env:SOURCE_RUN_URL)
-            ('- [View the coverage reporting run]({0})' -f $env:REPORT_RUN_URL)
+            ('- **Pull request commit:** [`{0}`]({1}/commit/{2})' -f $env:HEAD_SHA.Substring(0, 10), $env:REPOSITORY_URL, $env:HEAD_SHA)
+            ('- [View the pull request test run and coverage artifacts]({0})' -f $env:SOURCE_RUN_URL)
+            ('- [View the trusted coverage reporting run]({0})' -f $env:REPORT_RUN_URL)
             ''
             '</details>'
           ) -join "`n"
           Set-Content -LiteralPath coverage-comment.md -Value $comment -Encoding utf8NoBOM
-
-          Get-Content -Raw coverage-summary.md >> $env:GITHUB_STEP_SUMMARY
-          "branch-rate=$($coverage.branch_rate_display)" >> $env:GITHUB_OUTPUT
-          "line-rate=$($coverage.line_rate_display)" >> $env:GITHUB_OUTPUT
+          Get-Content -Raw coverage-comparison.md >> $env:GITHUB_STEP_SUMMARY
+          "title=$title" >> $env:GITHUB_OUTPUT
       - name: Publish coverage check
         env:
           DETAILS_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
           EXTERNAL_ID: coverage-${{ github.event.workflow_run.id }}
           GH_TOKEN: ${{ github.token }}
           HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
-          BRANCH_RATE: ${{ steps.coverage.outputs.branch-rate }}
-          LINE_RATE: ${{ steps.coverage.outputs.line-rate }}
+          TITLE: ${{ steps.comparison.outputs.title }}
         run: |
           jq -n \
            --arg details_url "$DETAILS_URL" \
            --arg external_id "$EXTERNAL_ID" \
            --arg head_sha "$HEAD_SHA" \
-           --arg title "Line coverage: $LINE_RATE, branch coverage: $BRANCH_RATE" \
-           --rawfile summary coverage-summary.md \
+           --arg title "$TITLE" \
+           --rawfile summary coverage-comparison.md \
            '{
              name: "Code Coverage",
              head_sha: $head_sha,
