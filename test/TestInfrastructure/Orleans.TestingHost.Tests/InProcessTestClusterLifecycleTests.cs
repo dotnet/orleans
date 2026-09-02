@@ -278,6 +278,168 @@ public sealed class InProcessTestClusterLifecycleTests
         }
     }
 
+    [Fact]
+    public async Task RestartSiloAsync_ReplacesActiveHandleAndPreservesSiloIdentity()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var silo = new LifecycleControl("Silo_0");
+        var disposals = new ConcurrentQueue<DisposalTracker>();
+        var logBuffer = new InMemoryLogBuffer();
+        var allocator = new FixedPortAllocator();
+        var builder = CreateBuilder(initialSilosCount: 1, initializeClientOnDeploy: false);
+        builder.ConfigureSiloHost((options, hostBuilder) =>
+        {
+            Assert.Equal(silo.Name, options.SiloName);
+            var disposal = new DisposalTracker();
+            disposals.Enqueue(disposal);
+            AddControlledLifecycle(hostBuilder.Services, silo, disposal, logBuffer);
+        });
+
+        await using var cluster = new InProcessTestCluster(builder.Options, allocator);
+        await cluster.DeployAsync(cancellationToken);
+        var original = Assert.Single(cluster.Silos);
+        var originalDisposal = Assert.Single(disposals);
+        var originalName = original.Name;
+        var originalInstanceNumber = original.InstanceNumber;
+        var originalAddress = original.SiloAddress;
+        var stopEntered = silo.StopEntered.Task;
+
+        var restartTask = cluster.RestartSiloAsync(original);
+        try
+        {
+            await stopEntered.WaitAsync(cancellationToken);
+            Assert.False(restartTask.IsCompleted);
+        }
+        finally
+        {
+            silo.ReleaseStop.TrySetResult();
+        }
+
+        var replacement = Assert.IsType<InProcessSiloHandle>(await restartTask.WaitAsync(cancellationToken));
+        var replacementDisposal = disposals.Single(disposal => !ReferenceEquals(disposal, originalDisposal));
+
+        Assert.NotSame(original, replacement);
+        Assert.Equal(originalName, replacement.Name);
+        Assert.Equal(originalInstanceNumber, replacement.InstanceNumber);
+        Assert.NotEqual(originalAddress, replacement.SiloAddress);
+        Assert.False(original.IsActive);
+        Assert.True(replacement.IsActive);
+        Assert.Same(replacement, Assert.Single(cluster.Silos));
+        Assert.Same(replacement, Assert.Single(cluster.GetActiveSilos()));
+        Assert.Equal(1, originalDisposal.DisposeCount);
+        Assert.Equal(0, replacementDisposal.DisposeCount);
+        AssertProviderDisposed(original.ServiceProvider);
+
+        await cluster.DisposeAsync();
+
+        Assert.False(replacement.IsActive);
+        Assert.Equal(1, originalDisposal.DisposeCount);
+        Assert.Equal(1, replacementDisposal.DisposeCount);
+        Assert.Equal(1, allocator.DisposeCount);
+        Assert.Empty(cluster.GetActiveSilos());
+    }
+
+    [Fact]
+    public async Task StopSiloAsync_ActiveSilo_WaitsForLifecycleBarrierThenRemovesAndDisposesHandleOnce()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var silo = new LifecycleControl("Silo_0");
+        var disposal = new DisposalTracker();
+        var logBuffer = new InMemoryLogBuffer();
+        var allocator = new FixedPortAllocator();
+        var builder = CreateBuilder(initialSilosCount: 1, initializeClientOnDeploy: false);
+        builder.ConfigureSiloHost((options, hostBuilder) =>
+        {
+            Assert.Equal(silo.Name, options.SiloName);
+            AddControlledLifecycle(hostBuilder.Services, silo, disposal, logBuffer);
+        });
+
+        await using var cluster = new InProcessTestCluster(builder.Options, allocator);
+        await cluster.DeployAsync(cancellationToken);
+        var handle = Assert.Single(cluster.Silos);
+        var stopEntered = silo.StopEntered.Task;
+
+        var stopTask = cluster.StopSiloAsync(handle, cancellationToken);
+        try
+        {
+            await stopEntered.WaitAsync(cancellationToken);
+            Assert.False(stopTask.IsCompleted);
+            Assert.True(handle.IsActive);
+            Assert.Same(handle, Assert.Single(cluster.Silos));
+        }
+        finally
+        {
+            silo.ReleaseStop.TrySetResult();
+        }
+
+        await stopTask.WaitAsync(cancellationToken);
+
+        Assert.False(handle.IsActive);
+        Assert.Empty(cluster.Silos);
+        Assert.Empty(cluster.GetActiveSilos());
+        Assert.Equal(1, disposal.DisposeCount);
+        Assert.Equal(0, allocator.DisposeCount);
+        AssertProviderDisposed(handle.ServiceProvider);
+
+        await cluster.DisposeAsync();
+        await cluster.DisposeAsync();
+
+        Assert.Equal(1, disposal.DisposeCount);
+        Assert.Equal(1, allocator.DisposeCount);
+        Assert.Empty(cluster.Silos);
+    }
+
+    [Fact]
+    public async Task DisposeAsync_ThenDispose_PerformsCleanupExactlyOnce()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var silo = new LifecycleControl("Silo_0");
+        var disposal = new DisposalTracker();
+        var logBuffer = new InMemoryLogBuffer();
+        var allocator = new FixedPortAllocator();
+        var builder = CreateBuilder(initialSilosCount: 1, initializeClientOnDeploy: false);
+        builder.ConfigureSiloHost((options, hostBuilder) =>
+        {
+            Assert.Equal(silo.Name, options.SiloName);
+            AddControlledLifecycle(hostBuilder.Services, silo, disposal, logBuffer);
+        });
+
+        await using var cluster = new InProcessTestCluster(builder.Options, allocator);
+        await cluster.DeployAsync(cancellationToken);
+        var handle = Assert.Single(cluster.Silos);
+        var stopEntered = silo.StopEntered.Task;
+
+        var disposeTask = cluster.DisposeAsync().AsTask();
+        try
+        {
+            await stopEntered.WaitAsync(cancellationToken);
+            Assert.False(disposeTask.IsCompleted);
+            Assert.True(handle.IsActive);
+        }
+        finally
+        {
+            silo.ReleaseStop.TrySetResult();
+        }
+
+        await disposeTask.WaitAsync(cancellationToken);
+
+        Assert.False(handle.IsActive);
+        Assert.Same(handle, Assert.Single(cluster.Silos));
+        Assert.Empty(cluster.GetActiveSilos());
+        Assert.Null(cluster.ClientHost);
+        AssertClientUnavailable(cluster);
+        Assert.Equal(1, disposal.DisposeCount);
+        Assert.Equal(1, allocator.DisposeCount);
+        AssertProviderDisposed(handle.ServiceProvider);
+
+        await cluster.DisposeAsync();
+        cluster.Dispose();
+
+        Assert.Equal(1, disposal.DisposeCount);
+        Assert.Equal(1, allocator.DisposeCount);
+        Assert.Same(handle, Assert.Single(cluster.Silos));
+    }
+
     private static InProcessTestClusterBuilder CreateBuilder(short initialSilosCount, bool initializeClientOnDeploy)
     {
         var builder = new InProcessTestClusterBuilder(initialSilosCount);
