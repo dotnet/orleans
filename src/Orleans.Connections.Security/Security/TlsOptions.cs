@@ -98,7 +98,8 @@ namespace Orleans.Connections.Security
         public Action<ConnectionContext, TlsClientAuthenticationOptions>? OnAuthenticateAsClient { get; set; }
 
         /// <summary>
-        /// Specifies the maximum amount of time allowed for the TLS/SSL handshake. This must be positive and finite.
+        /// Specifies the maximum amount of time allowed for the TLS/SSL handshake.
+        /// This must be positive, or <see cref="Timeout.InfiniteTimeSpan"/> to disable the timeout.
         /// </summary>
         public TimeSpan HandshakeTimeout
         {
