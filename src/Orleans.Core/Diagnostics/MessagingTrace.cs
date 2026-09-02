@@ -1,91 +1,69 @@
 using System;
 using Microsoft.Extensions.Logging;
-using Orleans.Core.Diagnostics;
 
 namespace Orleans.Runtime;
 
 internal partial class MessagingTrace(ILoggerFactory loggerFactory, MessagingInstruments messagingInstruments, MessagingProcessingInstruments messagingProcessingInstruments)
 {
-    protected ILogger Logger { get; } = loggerFactory.CreateLogger(MessagingEvents.ListenerName);
+    private const string LoggerCategoryName = "Orleans.Messaging";
+    private const string ExpiredEventName = "Expired";
+    private const string BlockedEventName = "Blocked";
+    private const string EnqueuedInboundEventName = "EnqueuedInbound";
+    private const string DequeuedInboundEventName = "DequeuedInbound";
+    private const string SendingDroppedEventName = "SendingDropped";
+    private const string RejectedDeadSiloEventName = "RejectedDeadSilo";
+
+    protected ILogger Logger { get; } = loggerFactory.CreateLogger(LoggerCategoryName);
     protected MessagingInstruments MessagingInstrumentation { get; } = messagingInstruments;
     protected MessagingProcessingInstruments MessagingProcessingInstrumentation { get; } = messagingProcessingInstruments;
 
-    public void OnSendMessage(Message message)
-    {
-        MessagingEvents.EmitSent(message);
-    }
-
     public void OnIncomingMessageAgentReceiveMessage(Message message)
     {
-        MessagingEvents.EmitReceivedByIncomingAgent(message);
         OrleansIncomingMessageAgentEvent.Log.ReceiveMessage(message);
         MessagingProcessingInstrumentation.OnImaMessageReceived(message);
     }
 
     public void OnDispatcherReceiveMessage(Message message)
     {
-        MessagingEvents.EmitReceivedByDispatcher(message);
         OrleansDispatcherEvent.Instance.ReceiveMessage(message);
         MessagingProcessingInstrumentation.OnDispatcherMessageReceive(message);
     }
 
     internal void OnDropExpiredMessage(Message message, MessagingInstruments.Phase phase)
     {
-        MessagingEvents.EmitExpired(message, phase);
         MessagingInstrumentation.OnMessageExpired(phase);
         LogDropExpiredMessage(Logger, message, phase);
     }
 
     internal void OnDropBlockedApplicationMessage(Message message)
     {
-        MessagingEvents.EmitBlocked(message);
         LogDropBlockedApplicationMessage(Logger, message);
     }
 
     internal void OnSiloDropSendingMessage(SiloAddress localSiloAddress, Message message, string reason)
     {
-        MessagingEvents.EmitSendingDropped(localSiloAddress, message, reason);
         MessagingInstrumentation.OnDroppedSentMessage(message);
         LogSiloDropSendingMessage(Logger, localSiloAddress, message, reason);
     }
 
     public void OnEnqueueInboundMessage(Message message)
     {
-        MessagingEvents.EmitEnqueuedInbound(message);
         LogEnqueueInboundMessage(Logger, message);
     }
 
     public void OnDequeueInboundMessage(Message message)
     {
-        MessagingEvents.EmitDequeuedInbound(message);
         LogDequeueInboundMessage(Logger, message);
-    }
-
-    internal void OnCreateMessage(Message message)
-    {
-        MessagingEvents.EmitCreated(message);
-    }
-
-    public void OnScheduleMessage(Message message)
-    {
-        MessagingEvents.EmitScheduled(message);
     }
 
     public void OnEnqueueMessageOnActivation(Message message, IGrainContext context)
     {
-        MessagingEvents.EmitEnqueuedOnActivation(message, context);
         MessagingProcessingInstrumentation.OnImaMessageEnqueued(context);
-    }
-
-    public void OnInvokeMessage(Message message)
-    {
-        MessagingEvents.EmitInvoked(message);
     }
 
     public void OnRejectSendMessageToDeadSilo(SiloAddress localSilo, Message message)
     {
         MessagingInstrumentation.OnFailedSentMessage(message);
-        MessagingEvents.EmitRejectedDeadSilo(localSilo, message);
         LogRejectSendMessageToDeadSilo(
             Logger,
             localSilo,
@@ -100,7 +78,7 @@ internal partial class MessagingTrace(ILoggerFactory loggerFactory, MessagingIns
 
     [LoggerMessage(
         EventId = (int)ErrorCode.Messaging_DroppingExpiredMessage,
-        EventName = nameof(MessagingEvents.Expired),
+        EventName = ExpiredEventName,
         Level = LogLevel.Warning,
         Message = "Dropping expired message {Message} at phase {Phase}"
     )]
@@ -108,7 +86,7 @@ internal partial class MessagingTrace(ILoggerFactory loggerFactory, MessagingIns
 
     [LoggerMessage(
         EventId = (int)ErrorCode.Messaging_DroppingBlockedMessage,
-        EventName = nameof(MessagingEvents.Blocked),
+        EventName = BlockedEventName,
         Level = LogLevel.Warning,
         Message = "Dropping message {Message} since this silo is blocking application messages"
     )]
@@ -116,7 +94,7 @@ internal partial class MessagingTrace(ILoggerFactory loggerFactory, MessagingIns
 
     [LoggerMessage(
         EventId = (int)ErrorCode.Messaging_Inbound_Enqueue,
-        EventName = nameof(MessagingEvents.EnqueuedInbound),
+        EventName = EnqueuedInboundEventName,
         Level = LogLevel.Trace,
         Message = "Enqueueing inbound message {Message}"
     )]
@@ -124,7 +102,7 @@ internal partial class MessagingTrace(ILoggerFactory loggerFactory, MessagingIns
 
     [LoggerMessage(
         EventId = (int)ErrorCode.Messaging_Inbound_Dequeue,
-        EventName = nameof(MessagingEvents.DequeuedInbound),
+        EventName = DequeuedInboundEventName,
         Level = LogLevel.Trace,
         Message = "Dequeueing inbound message {Message}"
     )]
@@ -132,7 +110,7 @@ internal partial class MessagingTrace(ILoggerFactory loggerFactory, MessagingIns
 
     [LoggerMessage(
         EventId = (int)ErrorCode.Messaging_OutgoingMS_DroppingMessage,
-        EventName = nameof(MessagingEvents.SendingDropped),
+        EventName = SendingDroppedEventName,
         Level = LogLevel.Warning,
         Message = "Silo {SiloAddress} is dropping message {Message}. Reason: {Reason}"
     )]
@@ -140,7 +118,7 @@ internal partial class MessagingTrace(ILoggerFactory loggerFactory, MessagingIns
 
     [LoggerMessage(
         EventId = (int)ErrorCode.MessagingSendingRejection,
-        EventName = nameof(MessagingEvents.RejectedDeadSilo),
+        EventName = RejectedDeadSiloEventName,
         Level = LogLevel.Information,
         Message = "Silo {SiloAddress} is rejecting message to known-dead silo {DeadSilo}: {Message}"
     )]
