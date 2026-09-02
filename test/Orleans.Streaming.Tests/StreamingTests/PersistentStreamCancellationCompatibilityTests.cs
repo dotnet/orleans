@@ -59,20 +59,23 @@ public class PersistentStreamCancellationCompatibilityTests
     [TestProvider("None")]
     [TestArea("Streaming")]
     [Fact, TestCategory("BVT"), TestCategory("Streaming")]
-    public async Task MemoryReceiver_CancellationBeforeDequeue_DoesNotRemoveMessages()
+    public async Task MemoryReceiver_ForwardsCancellationToDequeue()
     {
         var queue = Substitute.For<IMemoryStreamQueueGrain>();
+        queue.Dequeue(Arg.Any<int>(), Arg.Any<CancellationToken>())
+            .Returns(Task.FromResult(new List<MemoryMessageData>()));
         var receiver = new MemoryAdapterReceiver<IMemoryMessageBodySerializer>(
             queue,
             NullLogger.Instance,
             Substitute.For<IMemoryMessageBodySerializer>(),
             Substitute.For<IQueueAdapterReceiverMonitor>());
-        using var cancellation = new CancellationTokenSource();
-        cancellation.Cancel();
 
-        await Assert.ThrowsAnyAsync<OperationCanceledException>(
-            () => receiver.GetQueueMessagesAsync(1, cancellation.Token));
-        Assert.Empty(queue.ReceivedCalls());
+        Assert.Empty(await receiver.GetQueueMessagesAsync(1, TestContext.Current.CancellationToken));
+
+        var call = Assert.Single(queue.ReceivedCalls());
+        Assert.Equal(nameof(IMemoryStreamQueueGrain.Dequeue), call.GetMethodInfo().Name);
+        Assert.Equal(1, call.GetArguments()[0]);
+        Assert.Equal(TestContext.Current.CancellationToken, call.GetArguments()[1]);
     }
 
     [TestSuite("BVT")]

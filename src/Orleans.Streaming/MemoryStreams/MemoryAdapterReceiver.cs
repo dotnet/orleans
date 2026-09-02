@@ -49,7 +49,7 @@ namespace Orleans.Providers
             try
             {
                 cancellationToken.ThrowIfCancellationRequested();
-                task = queueGrain.Dequeue(maxCount, CancellationToken.None);
+                task = queueGrain.Dequeue(maxCount, cancellationToken);
                 awaitingTasks.Add(task);
                 var eventData = await task;
                 batches = eventData.Select(data => new MemoryBatchContainer<TSerializer>(data, this.serializer)).ToList<IBatchContainer>();
