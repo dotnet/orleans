@@ -336,6 +336,102 @@ public sealed class EntraJwtValidatorTests
     }
 
     [Fact]
+    public async Task RejectsMismatchedSigningKeyIssuer()
+    {
+        using var fixture = new EntraTestFixture();
+        fixture.Metadata.SetConfiguration(
+            EntraTestFixture.Issuer,
+            fixture.CurrentKey,
+            keyIssuer: "https://login.microsoftonline.com/bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb/v2.0");
+        var token = fixture.CreateToken();
+
+        await AssertErrorAsync(fixture, token, EntraAuthenticationError.InvalidToken);
+    }
+
+    [Fact]
+    public async Task RejectsMismatchedIssuerForDuplicateSigningKeyId()
+    {
+        using var fixture = new EntraTestFixture();
+        var untrustedKey = fixture.CreateKey(fixture.CurrentKey.Key.KeyId);
+        fixture.Metadata.SetConfigurationWithDuplicateKeyId(
+            EntraTestFixture.Issuer,
+            fixture.CurrentKey,
+            untrustedKey,
+            "https://login.microsoftonline.com/bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb/v2.0");
+        var token = fixture.CreateToken(signingCredentials: untrustedKey);
+
+        await AssertErrorAsync(fixture, token, EntraAuthenticationError.InvalidToken);
+    }
+
+    [Fact]
+    public async Task AcceptsTemplatedSigningKeyIssuer()
+    {
+        using var fixture = new EntraTestFixture();
+        const string templatedIssuer = "https://login.microsoftonline.com/{tenantid}/v2.0";
+        fixture.Metadata.SetConfiguration(
+            EntraTestFixture.Issuer,
+            fixture.CurrentKey,
+            keyIssuer: templatedIssuer);
+        var token = fixture.CreateToken();
+
+        var result = await fixture.CreateValidator().ValidateAsync(
+            token,
+            EntraTestFixture.ClusterId,
+            CancellationToken.None);
+
+        Assert.True(result.Principal.Identity?.IsAuthenticated);
+    }
+
+    [Fact]
+    public async Task RejectsMismatchedSigningKeyCloudInstance()
+    {
+        using var fixture = new EntraTestFixture();
+        fixture.Metadata.SetConfiguration(
+            EntraTestFixture.Issuer,
+            fixture.CurrentKey,
+            keyCloudInstanceName: "microsoftonline.us",
+            configurationCloudInstanceName: "microsoftonline.com");
+        var token = fixture.CreateToken();
+
+        await AssertErrorAsync(fixture, token, EntraAuthenticationError.InvalidToken);
+    }
+
+    [Fact]
+    public async Task AcceptsMatchingSigningKeyCloudInstance()
+    {
+        using var fixture = new EntraTestFixture();
+        fixture.Metadata.SetConfiguration(
+            EntraTestFixture.Issuer,
+            fixture.CurrentKey,
+            keyCloudInstanceName: "microsoftonline.com",
+            configurationCloudInstanceName: "microsoftonline.com");
+        var token = fixture.CreateToken();
+
+        var result = await fixture.CreateValidator().ValidateAsync(
+            token,
+            EntraTestFixture.ClusterId,
+            CancellationToken.None);
+
+        Assert.True(result.Principal.Identity?.IsAuthenticated);
+    }
+
+    [Fact]
+    public async Task AcceptsX5cOnlySigningKey()
+    {
+        using var fixture = new EntraTestFixture();
+        var signingCredentials = fixture.CreateCertificateKey("x5c-key");
+        fixture.Metadata.SetConfiguration(EntraTestFixture.Issuer, signingCredentials);
+        var token = fixture.CreateToken(signingCredentials: signingCredentials);
+
+        var result = await fixture.CreateValidator().ValidateAsync(
+            token,
+            EntraTestFixture.ClusterId,
+            CancellationToken.None);
+
+        Assert.True(result.Principal.Identity?.IsAuthenticated);
+    }
+
+    [Fact]
     public async Task NeverIncludesTokenInFailure()
     {
         using var fixture = new EntraTestFixture();

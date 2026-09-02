@@ -58,6 +58,7 @@ namespace Orleans.Connections.Security.Tests
         private const string CertificateSubjectName = "fakedomain.faketld";
         private const string CertificateConfigKey = "certificate";
         private const string ClientCertificateModeKey = "CertificateMode";
+        private const string ClientCertificateSelectorKey = "ClientCertificateSelector";
         private const string ProtocolRecorderKey = "ProtocolRecorder";
         private const string AuthenticatedSiloProtocol = "orleans-auth-test";
         private const string OrleansProtocol = "Orleans1";
@@ -81,6 +82,50 @@ namespace Orleans.Connections.Security.Tests
             Assert.Equal(original, decoded);
         }
 
+        [Fact]
+        public void RequiredClientCertificateSelector_RejectsNullCertificate()
+        {
+            Assert.Throws<InvalidOperationException>(
+                () => TlsClientConnectionMiddleware.ValidateSelectedCertificate(
+                    certificate: null,
+                    RemoteCertificateMode.RequireCertificate));
+        }
+
+        [Fact]
+        public void RequiredClientCertificateSelector_RejectsCertificateWithoutClientAuthenticationEku()
+        {
+            using var certificate = TestCertificateHelper.CreateSelfSignedCertificate(
+                CertificateSubjectName,
+                [TestCertificateHelper.ServerAuthenticationOid]);
+
+            Assert.Throws<InvalidOperationException>(
+                () => TlsClientConnectionMiddleware.ValidateSelectedCertificate(
+                    certificate,
+                    RemoteCertificateMode.RequireCertificate));
+        }
+
+        [Fact]
+        public void RequiredClientCertificateSelector_RejectsCertificateWithoutPrivateKey()
+        {
+            using var certificate = TestCertificateHelper.CreateSelfSignedCertificate(
+                CertificateSubjectName,
+                [TestCertificateHelper.ClientAuthenticationOid]);
+#if NET9_0_OR_GREATER
+            using var publicCertificate =
+                System.Security.Cryptography.X509Certificates.X509CertificateLoader.LoadCertificate(certificate.RawData);
+#else
+#pragma warning disable SYSLIB0057
+            using var publicCertificate =
+                new System.Security.Cryptography.X509Certificates.X509Certificate2(certificate.RawData);
+#pragma warning restore SYSLIB0057
+#endif
+
+            Assert.Throws<InvalidOperationException>(
+                () => TlsClientConnectionMiddleware.ValidateSelectedCertificate(
+                    publicCertificate,
+                    RemoteCertificateMode.RequireCertificate));
+        }
+
         /// <summary>
         /// Configures TLS for Orleans clients in the test cluster.
         /// Sets up:
@@ -98,6 +143,7 @@ namespace Orleans.Connections.Security.Tests
 
                 var certificateModeString = configuration[ClientCertificateModeKey];
                 var certificateMode = (RemoteCertificateMode)Enum.Parse(typeof(RemoteCertificateMode), certificateModeString!);
+                var useCertificateSelector = bool.Parse(configuration[ClientCertificateSelectorKey]!);
 
                 clientBuilder.UseTls(options =>
                 {
@@ -106,7 +152,14 @@ namespace Orleans.Connections.Security.Tests
                     // Allow any certificate for testing (in production, validate properly)
                     options.AllowAnyRemoteCertificate();
                     // Client's certificate for mutual TLS
-                    options.LocalCertificate = localCertificate;
+                    if (useCertificateSelector)
+                    {
+                        options.LocalClientCertificateSelector = (_, _, _, _, _) => localCertificate;
+                    }
+                    else
+                    {
+                        options.LocalCertificate = localCertificate;
+                    }
                     // Require server to present a certificate
                     options.RemoteCertificateMode = RemoteCertificateMode.RequireCertificate;
                     // Configure whether server requires client certificate
@@ -174,14 +227,18 @@ namespace Orleans.Connections.Security.Tests
         /// - Data integrity is maintained (echo test)
         /// </summary>
         [Theory]
-        [InlineData(null, RemoteCertificateMode.AllowCertificate)]
-        [InlineData(null, RemoteCertificateMode.NoCertificate)]
-        [InlineData(new[] { TestCertificateHelper.ServerAuthenticationOid }, RemoteCertificateMode.AllowCertificate)]
-        [InlineData(new[] { TestCertificateHelper.ServerAuthenticationOid }, RemoteCertificateMode.NoCertificate)]
-        [InlineData(new[] { TestCertificateHelper.ClientAuthenticationOid, TestCertificateHelper.ServerAuthenticationOid }, RemoteCertificateMode.NoCertificate)]
-        [InlineData(new[] { TestCertificateHelper.ClientAuthenticationOid, TestCertificateHelper.ServerAuthenticationOid }, RemoteCertificateMode.AllowCertificate)]
-        [InlineData(new[] { TestCertificateHelper.ClientAuthenticationOid, TestCertificateHelper.ServerAuthenticationOid }, RemoteCertificateMode.RequireCertificate)]
-        public async Task TlsEndToEnd(string[]? oids, RemoteCertificateMode certificateMode)
+        [InlineData(null, RemoteCertificateMode.AllowCertificate, false)]
+        [InlineData(null, RemoteCertificateMode.NoCertificate, false)]
+        [InlineData(new[] { TestCertificateHelper.ServerAuthenticationOid }, RemoteCertificateMode.AllowCertificate, false)]
+        [InlineData(new[] { TestCertificateHelper.ServerAuthenticationOid }, RemoteCertificateMode.NoCertificate, false)]
+        [InlineData(new[] { TestCertificateHelper.ClientAuthenticationOid, TestCertificateHelper.ServerAuthenticationOid }, RemoteCertificateMode.NoCertificate, false)]
+        [InlineData(new[] { TestCertificateHelper.ClientAuthenticationOid, TestCertificateHelper.ServerAuthenticationOid }, RemoteCertificateMode.AllowCertificate, false)]
+        [InlineData(new[] { TestCertificateHelper.ClientAuthenticationOid, TestCertificateHelper.ServerAuthenticationOid }, RemoteCertificateMode.RequireCertificate, false)]
+        [InlineData(new[] { TestCertificateHelper.ClientAuthenticationOid, TestCertificateHelper.ServerAuthenticationOid }, RemoteCertificateMode.RequireCertificate, true)]
+        public async Task TlsEndToEnd(
+            string[]? oids,
+            RemoteCertificateMode certificateMode,
+            bool useCertificateSelector)
         {
             var cancellationToken = TestContext.Current.CancellationToken;
             TestCluster? testCluster = default;
@@ -199,6 +256,7 @@ namespace Orleans.Connections.Security.Tests
                 var encodedCertificate = TestCertificateHelper.ConvertToBase64(certificate);
                 builder.Properties[CertificateConfigKey] = encodedCertificate;
                 builder.Properties[ClientCertificateModeKey] = certificateMode.ToString();
+                builder.Properties[ClientCertificateSelectorKey] = useCertificateSelector.ToString();
 
                 testCluster = builder.Build();
                 await testCluster.DeployAsync(cancellationToken);
@@ -230,6 +288,7 @@ namespace Orleans.Connections.Security.Tests
         [Fact]
         public async Task SeparateSiloAndGatewayTls_NegotiateConfiguredApplicationProtocols()
         {
+            var cancellationToken = TestContext.Current.CancellationToken;
             var recorderId = Guid.NewGuid().ToString();
             var recorder = new ProtocolRecorder();
             Assert.True(ProtocolRecorders.TryAdd(recorderId, recorder));
@@ -248,7 +307,7 @@ namespace Orleans.Connections.Security.Tests
                 builder.Properties[ProtocolRecorderKey] = recorderId;
 
                 testCluster = builder.Build();
-                await testCluster.DeployAsync();
+                await testCluster.DeployAsync(cancellationToken);
 
                 var grain = testCluster.Client.GetGrain<IPingGrain>("alpn");
                 Assert.Equal("ping", await grain.Echo("ping"));
@@ -271,7 +330,7 @@ namespace Orleans.Connections.Security.Tests
                 ProtocolRecorders.TryRemove(recorderId, out _);
                 if (testCluster is not null)
                 {
-                    await testCluster.StopAllSilosAsync();
+                    await testCluster.StopAllSilosAsync(cancellationToken);
                     testCluster.Dispose();
                 }
             }

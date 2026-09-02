@@ -2,6 +2,7 @@ using System.Collections.Concurrent;
 using System.Net;
 using System.Net.Http;
 using System.Security.Cryptography;
+using System.Security.Cryptography.X509Certificates;
 using System.Text;
 using Azure.Core;
 using Microsoft.IdentityModel.JsonWebTokens;
@@ -22,6 +23,7 @@ internal sealed class EntraTestFixture : IDisposable
     public const string Role = "Orleans.Silo.Connect";
     public const string TenantId = "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa";
     private readonly List<RSA> _keys = [];
+    private readonly List<X509Certificate2> _certificates = [];
 
     public EntraTestFixture()
     {
@@ -64,6 +66,24 @@ internal sealed class EntraTestFixture : IDisposable
         var rsa = RSA.Create(2048);
         _keys.Add(rsa);
         return new SigningCredentials(new RsaSecurityKey(rsa) { KeyId = keyId }, algorithm);
+    }
+
+    public SigningCredentials CreateCertificateKey(string keyId)
+    {
+        using var rsa = RSA.Create(2048);
+        var request = new CertificateRequest(
+            "CN=Entra signing test",
+            rsa,
+            HashAlgorithmName.SHA256,
+            RSASignaturePadding.Pkcs1);
+        var now = System.TimeProvider.System.GetUtcNow();
+        var certificate = request.CreateSelfSigned(
+            now.AddDays(-1),
+            now.AddDays(1));
+        _certificates.Add(certificate);
+        return new SigningCredentials(
+            new X509SecurityKey(certificate) { KeyId = keyId },
+            SecurityAlgorithms.RsaSha256);
     }
 
     public EntraJwtValidator CreateValidator()
@@ -136,6 +156,11 @@ internal sealed class EntraTestFixture : IDisposable
         {
             key.Dispose();
         }
+
+        foreach (var certificate in _certificates)
+        {
+            certificate.Dispose();
+        }
     }
 
     public static string CreateDuplicateClaimToken()
@@ -185,13 +210,61 @@ internal sealed class TestDocumentRetriever : IDocumentRetriever
         SigningCredentials signingCredentials,
         string use = "sig",
         string[]? keyOperations = null,
-        string? jwksUri = null)
+        string? jwksUri = null,
+        string? keyIssuer = null,
+        string? keyCloudInstanceName = null,
+        string? configurationCloudInstanceName = null)
     {
         var authority = _authority.AbsoluteUri.TrimEnd('/');
         var keysAddress = jwksUri ?? $"{authority}/keys";
+        var configuration = new Dictionary<string, object>
+        {
+            ["issuer"] = issuer,
+            ["jwks_uri"] = keysAddress,
+        };
+        if (!string.IsNullOrEmpty(configurationCloudInstanceName))
+        {
+            configuration["cloud_instance_name"] = configurationCloudInstanceName;
+        }
+
         _documents[$"{authority}/.well-known/openid-configuration"] =
-            $$"""{"issuer":"{{issuer}}","jwks_uri":"{{keysAddress}}"}""";
-        _documents[keysAddress] = CreateJwks(signingCredentials, use, keyOperations);
+            System.Text.Json.JsonSerializer.Serialize(configuration);
+        _documents[keysAddress] = System.Text.Json.JsonSerializer.Serialize(new
+        {
+            keys = new[]
+            {
+                CreateJwk(
+                    signingCredentials,
+                    use,
+                    keyOperations,
+                    keyIssuer,
+                    keyCloudInstanceName),
+            },
+        });
+    }
+
+    public void SetConfigurationWithDuplicateKeyId(
+        string issuer,
+        SigningCredentials trustedSigningCredentials,
+        SigningCredentials untrustedSigningCredentials,
+        string untrustedKeyIssuer)
+    {
+        var authority = _authority.AbsoluteUri.TrimEnd('/');
+        var keysAddress = $"{authority}/keys";
+        _documents[$"{authority}/.well-known/openid-configuration"] =
+            System.Text.Json.JsonSerializer.Serialize(new
+            {
+                issuer,
+                jwks_uri = keysAddress,
+            });
+        _documents[keysAddress] = System.Text.Json.JsonSerializer.Serialize(new
+        {
+            keys = new[]
+            {
+                CreateJwk(trustedSigningCredentials, "sig", null, issuer, null),
+                CreateJwk(untrustedSigningCredentials, "sig", null, untrustedKeyIssuer, null),
+            },
+        });
     }
 
     private async Task<string> GetCoreAsync(string address, CancellationToken cancellationToken)
@@ -206,19 +279,52 @@ internal sealed class TestDocumentRetriever : IDocumentRetriever
             : throw new InvalidOperationException("unknown metadata address");
     }
 
-    private static string CreateJwks(
+    private static Dictionary<string, object?> CreateJwk(
         SigningCredentials signingCredentials,
         string use,
-        string[]? keyOperations)
+        string[]? keyOperations,
+        string? keyIssuer,
+        string? keyCloudInstanceName)
     {
-        var key = (RsaSecurityKey)signingCredentials.Key;
-        var parameters = key.Rsa?.ExportParameters(includePrivateParameters: false) ?? key.Parameters;
-        var operations = keyOperations is null
-            ? string.Empty
-            : $$""","key_ops":{{System.Text.Json.JsonSerializer.Serialize(keyOperations)}}""";
-        return $$"""
-            {"keys":[{"kty":"RSA","use":"{{use}}","kid":"{{key.KeyId}}","alg":"{{signingCredentials.Algorithm}}","n":"{{Base64UrlEncoder.Encode(parameters.Modulus)}}","e":"{{Base64UrlEncoder.Encode(parameters.Exponent)}}"{{operations}}}]}
-            """;
+        var key = new Dictionary<string, object?>
+        {
+            ["kty"] = "RSA",
+            ["use"] = use,
+            ["kid"] = signingCredentials.Key.KeyId,
+            ["alg"] = signingCredentials.Algorithm,
+        };
+        switch (signingCredentials.Key)
+        {
+            case RsaSecurityKey rsaSecurityKey:
+                var parameters = rsaSecurityKey.Rsa?.ExportParameters(includePrivateParameters: false)
+                    ?? rsaSecurityKey.Parameters;
+                key["n"] = Base64UrlEncoder.Encode(parameters.Modulus);
+                key["e"] = Base64UrlEncoder.Encode(parameters.Exponent);
+                break;
+            case X509SecurityKey x509SecurityKey:
+                key["x5c"] = new[] { Convert.ToBase64String(x509SecurityKey.Certificate.RawData) };
+                break;
+            default:
+                throw new InvalidOperationException(
+                    $"Unsupported test signing key type: {signingCredentials.Key.GetType()}");
+        }
+
+        if (keyOperations is not null)
+        {
+            key["key_ops"] = keyOperations;
+        }
+
+        if (!string.IsNullOrEmpty(keyIssuer))
+        {
+            key["issuer"] = keyIssuer;
+        }
+
+        if (!string.IsNullOrEmpty(keyCloudInstanceName))
+        {
+            key["cloud_instance_name"] = keyCloudInstanceName;
+        }
+
+        return key;
     }
 }
 

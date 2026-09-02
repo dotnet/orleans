@@ -35,6 +35,32 @@ public sealed class EntraMetadataTests
     }
 
     [Fact]
+    public async Task RejectsOutOfScopeSigningKeyDuringRollover()
+    {
+        using var fixture = new EntraTestFixture();
+        using var provider = CreateProvider(fixture);
+        var validator = new EntraJwtValidator(fixture.Options, provider, fixture.TimeProvider);
+        await validator.ValidateAsync(
+            fixture.CreateToken(),
+            EntraTestFixture.ClusterId,
+            CancellationToken.None);
+        var nextKey = fixture.CreateKey("key-2");
+        fixture.Metadata.SetConfiguration(
+            EntraTestFixture.Issuer,
+            nextKey,
+            keyCloudInstanceName: "microsoftonline.us",
+            configurationCloudInstanceName: "microsoftonline.com");
+
+        var exception = await Assert.ThrowsAsync<EntraAuthenticationException>(
+            () => validator.ValidateAsync(
+                fixture.CreateToken(signingCredentials: nextKey),
+                EntraTestFixture.ClusterId,
+                CancellationToken.None).AsTask());
+
+        Assert.Equal(EntraAuthenticationError.InvalidToken, exception.Error);
+    }
+
+    [Fact]
     public async Task ThrottlesUnknownSigningKeyRefresh()
     {
         using var fixture = new EntraTestFixture();
