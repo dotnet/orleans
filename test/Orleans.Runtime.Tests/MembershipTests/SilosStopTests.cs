@@ -235,6 +235,48 @@ namespace UnitTests.MembershipTests
             }
         }
 
+        [Fact, TestCategory("Liveness")]
+        public void GatewayDeadSiloRejectionClearsAmbientRequestContextForExternalClient()
+        {
+            const string contextKey = "gateway-rejection-sentinel";
+            const string contextValue = "must-not-leak";
+            var primaryServices = ((InProcessSiloHandle)HostedCluster.Primary!).ServiceProvider;
+            var gateway = primaryServices.GetRequiredService<MessageCenter>().Gateway!;
+            var messageFactory = primaryServices.GetRequiredService<MessageFactory>();
+            var clientId = Assert.Single(((IConnectedClientCollection)gateway).GetConnectedClientIds());
+            var targetSilo = HostedCluster.SecondarySilos[0].SiloAddress;
+            var request = new Message
+            {
+                Id = new CorrelationId(1),
+                Direction = Message.Directions.Request,
+                SendingSilo = HostedCluster.Primary!.SiloAddress,
+                SendingGrain = clientId,
+                TargetSilo = targetSilo,
+                TargetGrain = GrainId.Create("target", Guid.NewGuid().ToString()),
+            };
+
+            RequestContext.Set(contextKey, contextValue);
+            try
+            {
+                var unsanitizedRejection = messageFactory.CreateRejectionResponse(
+                    request,
+                    Message.RejectionTypes.Transient,
+                    "Target silo became unavailable");
+                Assert.Equal(contextValue, unsanitizedRejection.RequestContextData![contextKey]);
+
+                var rejection = gateway.CreateDeadSiloRejection(request, targetSilo);
+
+                Assert.Equal(request.Id, rejection.Id);
+                Assert.Equal(Message.Directions.Response, rejection.Direction);
+                Assert.Equal(clientId, rejection.TargetGrain);
+                Assert.Null(rejection.RequestContextData);
+            }
+            finally
+            {
+                RequestContext.Remove(contextKey);
+            }
+        }
+
         private async Task<ILongRunningTaskGrain<bool>?> GetGrainOnTargetSilo(SiloHandle siloHandle)
         {
             const int maxRetry = 10;
