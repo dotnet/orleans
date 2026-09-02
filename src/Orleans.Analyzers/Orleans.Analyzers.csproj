@@ -4,10 +4,12 @@
     <IsPackable>false</IsPackable>
     <IsOrleansFrameworkPart>false</IsOrleansFrameworkPart>
     <EnforceExtendedAnalyzerRules>true</EnforceExtendedAnalyzerRules>
+    <!-- Analyzers and code fixes share this assembly so the packaged component exposes both; code fixes require Roslyn Workspaces. -->
     <NoWarn>$(NoWarn);RS1038</NoWarn>
   </PropertyGroup>
 
   <ItemGroup>
+    <PackageReference Include="Microsoft.CodeAnalysis.Analyzers" PrivateAssets="all" />
     <PackageReference Include="Microsoft.CodeAnalysis.CSharp.Workspaces" PrivateAssets="all" />
     <PackageReference Update="NETStandard.Library" PrivateAssets="all" />
   </ItemGroup>
