@@ -136,9 +136,7 @@ public sealed class InProcessTestClusterDirectoryTests
             var builder = new InProcessTestClusterBuilder(1);
             builder.Options.ConfigureFileLogging = false;
             builder.Options.InitializeClientOnDeploy = false;
-#pragma warning disable ORLEANSEXP003
             builder.Options.UseDistributedGrainDirectory = true;
-#pragma warning restore ORLEANSEXP003
 
             await using var cluster = builder.Build();
             await cluster.DeployAsync(cancellationToken);
@@ -202,9 +200,7 @@ public sealed class InProcessTestClusterDirectoryTests
         var builder = new InProcessTestClusterBuilder(1);
         builder.Options.ConfigureFileLogging = false;
         builder.Options.InitializeClientOnDeploy = false;
-#pragma warning disable ORLEANSEXP003
         builder.Options.UseDistributedGrainDirectory = true;
-#pragma warning restore ORLEANSEXP003
 
         await using var cluster = builder.Build();
         await cluster.DeployAsync(cancellationToken);
