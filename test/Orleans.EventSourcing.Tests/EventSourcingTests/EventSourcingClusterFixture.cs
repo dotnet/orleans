@@ -139,6 +139,7 @@ public class EventSourcingClusterFixture : BaseTestClusterFixture
     {
         private readonly ConcurrentDictionary<JournalId, AppendFailure> _appendFailures = new();
         private readonly ConcurrentDictionary<JournalId, AppendBlock> _appendBlocks = new();
+        private readonly ConcurrentDictionary<JournalId, byte> _conflictNextAppends = new();
         private readonly VolatileJournalStorageProvider _inner = new();
 
         public IJournalStorage CreateStorage(JournalId journalId) => new FaultInjectingJournalStorage(this, journalId, _inner.CreateStorage(journalId));
@@ -221,6 +222,11 @@ public class EventSourcingClusterFixture : BaseTestClusterFixture
                     provider._appendBlocks.TryRemove(new KeyValuePair<JournalId, AppendBlock>(journalId, block));
                 }
 
+                if (provider._conflictNextAppends.TryRemove(journalId, out _))
+                {
+                    throw new InconsistentStateException("The prior append completed with an uncertain outcome.");
+                }
+
                 var hasFailure = provider.TryTakeAppendFailure(journalId, out var failure);
                 if (hasFailure && !failure.AfterWrite)
                 {
@@ -230,6 +236,11 @@ public class EventSourcingClusterFixture : BaseTestClusterFixture
                 await inner.AppendAsync(value, cancellationToken);
                 if (hasFailure)
                 {
+                    if (failure.Exception is not InconsistentStateException)
+                    {
+                        provider._conflictNextAppends[journalId] = 0;
+                    }
+
                     throw failure.Exception;
                 }
             }

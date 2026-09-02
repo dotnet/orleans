@@ -35,6 +35,9 @@ internal sealed class LogViewAdaptor<TLogView, TLogEntry> : PrimaryBasedLogViewA
     private TLogView _confirmedView;
     private int _confirmedVersion;
     private Exception _terminalFailure;
+    private bool _hasStagedWrite;
+    private bool _stagedWriteBit;
+    private int _stagedUpdateCount;
 
     public LogViewAdaptor(
         ILogViewAdaptorHost<TLogView, TLogEntry> host,
@@ -118,7 +121,9 @@ internal sealed class LogViewAdaptor<TLogView, TLogEntry> : PrimaryBasedLogViewA
         await EnsureInitializedAsync();
         _eventLog.Clear();
         var writeBit = FlipWriteVectorBit();
-        await PersistStateAsync(writeBit, cancellationToken, "clear");
+        while (!await PersistStateAsync(writeBit, cancellationToken, "clear"))
+        {
+        }
     }
 
     /// <inheritdoc/>
@@ -140,7 +145,9 @@ internal sealed class LogViewAdaptor<TLogView, TLogEntry> : PrimaryBasedLogViewA
                 if (_stateManager.HasPendingWrites)
                 {
                     var writeBit = FlipWriteVectorBit();
-                    await PersistStateAsync(writeBit, CancellationToken.None, "refresh flush");
+                    while (!await PersistStateAsync(writeBit, CancellationToken.None, "refresh flush"))
+                    {
+                    }
                 }
 
                 await _stateManager.RevertPendingChangesAsync(CancellationToken.None);
@@ -178,30 +185,42 @@ internal sealed class LogViewAdaptor<TLogView, TLogEntry> : PrimaryBasedLogViewA
             return 0;
         }
 
-        bool writeBit;
-        try
+        if (!_hasStagedWrite)
         {
-            writeBit = FlipWriteVectorBit();
-            foreach (var update in updates)
+            try
             {
-                _eventLog.Add(update.Entry);
+                _stagedWriteBit = FlipWriteVectorBit();
+                foreach (var update in updates)
+                {
+                    _eventLog.Add(update.Entry);
+                }
+
+                _stagedUpdateCount = updates.Length;
+                _hasStagedWrite = true;
+            }
+            catch (Exception exception)
+            {
+                await TerminallyFailAfterStagingErrorAsync(exception);
+                throw;
             }
         }
-        catch (Exception exception)
+
+        if (!await PersistStateAsync(_stagedWriteBit, CancellationToken.None, "write"))
         {
-            await TerminallyFailAfterStagingErrorAsync(exception);
-            throw;
+            ExitOperation("WriteAsync");
+            return 0;
         }
 
-        await PersistStateAsync(writeBit, CancellationToken.None, "write");
+        var writtenCount = _stagedUpdateCount;
+        _hasStagedWrite = false;
+        _stagedUpdateCount = 0;
 
-        Services.Log(LogLevel.Debug, "write ({0} updates) success v{1}", updates.Length, _eventLog.Count);
-
+        Services.Log(LogLevel.Debug, "write ({0} updates) success v{1}", writtenCount, _eventLog.Count);
         UpdateConfirmedViewFromJournal();
         LastPrimaryIssue.Resolve(Host, Services);
 
         ExitOperation("WriteAsync");
-        return updates.Length;
+        return writtenCount;
     }
 
     private async Task EnsureInitializedAsync()
@@ -214,7 +233,7 @@ internal sealed class LogViewAdaptor<TLogView, TLogEntry> : PrimaryBasedLogViewA
         await _initializationTask;
     }
 
-    private async Task PersistStateAsync(bool writeBit, CancellationToken cancellationToken, string operation)
+    private async Task<bool> PersistStateAsync(bool writeBit, CancellationToken cancellationToken, string operation)
     {
         while (true)
         {
@@ -222,12 +241,10 @@ internal sealed class LogViewAdaptor<TLogView, TLogEntry> : PrimaryBasedLogViewA
             {
                 await _stateManager.WriteStateAsync(cancellationToken);
                 LastPrimaryIssue.Resolve(Host, Services);
-                return;
+                return true;
             }
-            catch (OperationCanceledException exception) when (cancellationToken.IsCancellationRequested)
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
             {
-                _terminalFailure = exception;
-                _grain.DeactivateOnIdle();
                 throw;
             }
             catch (Exception exception)
@@ -250,12 +267,17 @@ internal sealed class LogViewAdaptor<TLogView, TLogEntry> : PrimaryBasedLogViewA
                     cancellationToken.ThrowIfCancellationRequested();
                 }
 
+                if (!IsRecoverySignal(exception))
+                {
+                    return false;
+                }
+
                 await RecoverAfterWriteFailureAsync();
                 if (writeBit == GetWriteVectorBit())
                 {
                     Services.Log(LogLevel.Debug, "last {0} was actually a success v{1}", operation, _eventLog.Count);
                     LastPrimaryIssue.Resolve(Host, Services);
-                    return;
+                    return true;
                 }
 
                 _terminalFailure = exception;
@@ -263,6 +285,19 @@ internal sealed class LogViewAdaptor<TLogView, TLogEntry> : PrimaryBasedLogViewA
                 throw;
             }
         }
+    }
+
+    private static bool IsRecoverySignal(Exception exception)
+    {
+        for (var current = exception; current is not null; current = current.InnerException)
+        {
+            if (current is InconsistentStateException)
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private async Task RecoverAfterWriteFailureAsync()
