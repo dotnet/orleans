@@ -132,7 +132,25 @@ internal sealed class InterClusterRequestReceiver(
 
         var completion = ResponseCompletionSourcePool.Get();
         runtimeClient.SendRequest(reference, request, completion, trustedOptions);
-        return await completion.AsValueTask().AsTask().WaitAsync(cancellationToken);
+        var responseTask = completion.AsValueTask().AsTask();
+        try
+        {
+            return await responseTask.WaitAsync(cancellationToken);
+        }
+        catch
+        {
+            _ = ObserveResponse(responseTask);
+            throw;
+        }
+    }
+
+    private static async Task ObserveResponse(Task<Response> responseTask)
+    {
+        await ((Task)responseTask).ConfigureAwait(ConfigureAwaitOptions.SuppressThrowing);
+        if (responseTask.IsCompletedSuccessfully)
+        {
+            responseTask.Result.Dispose();
+        }
     }
 
     private static void ApplyCancellationToken(IInvokable request, CancellationToken cancellationToken)

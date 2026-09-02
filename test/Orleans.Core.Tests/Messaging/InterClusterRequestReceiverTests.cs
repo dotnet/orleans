@@ -448,6 +448,10 @@ public sealed class InterClusterRequestReceiverTests(TestEnvironmentFixture envi
         Assert.Equal(cancellation.Token, exception.CancellationToken);
         request.Received(1).SetArgument(1, cancellation.Token);
         Assert.Single(fixture.Runtime.ReceivedCalls());
+
+        var lateResponse = new TrackingResponse { Result = 42 };
+        fixture.PendingCompletion!.Complete(lateResponse);
+        await lateResponse.Disposed.Task.WaitAsync(TestContext.Current.CancellationToken);
     }
 
     [Fact]
@@ -668,7 +672,8 @@ public sealed class InterClusterRequestReceiverTests(TestEnvironmentFixture envi
                     Calls.Add("dispatch");
                     DispatchEntered.TrySetResult();
                     OnDispatch?.Invoke();
-                    if (AutoComplete && call.ArgAt<IResponseCompletionSource?>(2) is { } completion)
+                    PendingCompletion = call.ArgAt<IResponseCompletionSource?>(2);
+                    if (AutoComplete && PendingCompletion is { } completion)
                     {
                         completion.Complete(Response);
                     }
@@ -714,6 +719,8 @@ public sealed class InterClusterRequestReceiverTests(TestEnvironmentFixture envi
         public bool AutoComplete { get; set; } = true;
 
         public Action? OnDispatch { get; set; }
+
+        public IResponseCompletionSource? PendingCompletion { get; private set; }
 
         public TaskCompletionSource DispatchEntered { get; } =
             new(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -814,6 +821,20 @@ public sealed class InterClusterRequestReceiverTests(TestEnvironmentFixture envi
                         [])));
 
         public void Dispose() => _services.Dispose();
+    }
+
+    private sealed class TrackingResponse : Response
+    {
+        public TaskCompletionSource Disposed { get; } =
+            new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        public override object? Result { get; set; }
+
+        public override Exception? Exception { get; set; }
+
+        public override T GetResult<T>() => Result is null ? default! : (T)Result;
+
+        public override void Dispose() => Disposed.TrySetResult();
     }
 
     private sealed class RecordingOwnershipValidator(List<string> calls)

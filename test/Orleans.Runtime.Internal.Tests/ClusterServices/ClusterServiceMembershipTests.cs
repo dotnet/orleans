@@ -3,6 +3,7 @@ using System.Collections.Immutable;
 using System.Net;
 using System.Runtime.CompilerServices;
 using System.Threading.Channels;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using Orleans.Runtime;
 using Orleans.Runtime.ClusterServices;
@@ -39,10 +40,11 @@ public sealed class ClusterServiceMembershipTests
     {
         var underlyingSnapshot = CreateSnapshot(41, CreateSilo(1));
         var service = new TestClusterMembershipService(underlyingSnapshot);
+        var logger = new RecordingLogger<DirectoryMembershipService>();
         await using var membership = new DirectoryMembershipService(
             service,
             grainFactory: null!,
-            NullLogger<DirectoryMembershipService>.Instance,
+            logger,
             partitionsPerSilo: 2,
             GetBoundaries);
         await service.EnumeratorStarted;
@@ -66,6 +68,7 @@ public sealed class ClusterServiceMembershipTests
         Assert.Equal(new MembershipVersion(41), updates.Current.Version);
         Assert.Equal([CreateSilo(1)], updates.Current.Members);
         Assert.Same(updates.Current, membership.CurrentView);
+        Assert.Empty(logger.Exceptions);
     }
 
     [Fact]
@@ -435,6 +438,30 @@ public sealed class ClusterServiceMembershipTests
     private readonly record struct RefreshCall(
         MembershipVersion MinimumVersion,
         CancellationToken CancellationToken);
+
+    private sealed class RecordingLogger<T> : ILogger<T>
+    {
+        private readonly ConcurrentQueue<Exception> _exceptions = new();
+
+        public Exception[] Exceptions => _exceptions.ToArray();
+
+        public IDisposable? BeginScope<TState>(TState state) where TState : notnull => null;
+
+        public bool IsEnabled(LogLevel logLevel) => true;
+
+        public void Log<TState>(
+            LogLevel logLevel,
+            EventId eventId,
+            TState state,
+            Exception? exception,
+            Func<TState, Exception?, string> formatter)
+        {
+            if (exception is not null)
+            {
+                _exceptions.Enqueue(exception);
+            }
+        }
+    }
 
     [Fact]
     public async Task Constructor_ExplicitInitialSnapshotOverridesDistinctUnderlyingCurrentSnapshot()

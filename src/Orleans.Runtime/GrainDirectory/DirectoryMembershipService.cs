@@ -84,7 +84,7 @@ internal sealed partial class DirectoryMembershipService : IAsyncDisposable
                 {
                     await foreach (var update in _membership.ViewUpdates.WithCancellation(_shutdownCts.Token))
                     {
-                        _viewUpdates.Publish(new(update, _grainFactory));
+                        _viewUpdates.TryPublish(new(update, _grainFactory));
                     }
                 }
                 catch (Exception exception)

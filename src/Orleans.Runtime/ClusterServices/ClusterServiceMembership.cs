@@ -77,7 +77,7 @@ internal sealed partial class ClusterServiceMembership : IAsyncDisposable
                 {
                     await foreach (var update in _clusterMembershipService.MembershipUpdates.WithCancellation(_shutdownCts.Token))
                     {
-                        _viewUpdates.Publish(new(update, _configuration, _getRingBoundaries));
+                        _viewUpdates.TryPublish(new(update, _configuration, _getRingBoundaries));
                     }
 
                     break;

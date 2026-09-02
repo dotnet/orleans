@@ -151,7 +151,7 @@ internal sealed class PartitionTransitionCoordinator
         ArgumentNullException.ThrowIfNull(exception);
         lock (_lock)
         {
-            if (!_transitions.Contains(transition))
+            if (!_transitions.Remove(transition))
             {
                 throw new InvalidOperationException("The transition is no longer active.");
             }
@@ -276,7 +276,7 @@ internal sealed class PartitionTransition
 
         Failure = exception;
         Volatile.Write(ref _stage, (int)PartitionTransitionStage.Failed);
-        _completion.TrySetCanceled(new CancellationToken(canceled: true));
+        _completion.TrySetException(exception);
     }
 
     private void EnsureDirection(PartitionTransitionDirection expected)
