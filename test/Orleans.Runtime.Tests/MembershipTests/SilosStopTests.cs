@@ -66,7 +66,7 @@ namespace UnitTests.MembershipTests
         }
 
         [Fact, TestCategory("Liveness")]
-        public async Task SiloUngracefulShutdown_GatewayForwardedRequestBreaks()
+        public async Task GatewayRequestSentBeforeSiloDeathIsRejected()
         {
             var runtimeClient = Client.ServiceProvider.GetRequiredService<OutsideRuntimeClient>();
             var gateway = GetGateway();
