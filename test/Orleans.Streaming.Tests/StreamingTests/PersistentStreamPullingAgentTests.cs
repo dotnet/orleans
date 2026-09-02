@@ -21,7 +21,10 @@ namespace UnitTests.StreamingTests
 {
     public class PersistentStreamPullingAgentTests
     {
-        [Fact]
+        [TestSuite("BVT")]
+        [TestProvider("None")]
+        [TestArea("Streaming")]
+        [Fact, TestCategory("BVT"), TestCategory("Streaming")]
         public void InitialDeliveryProgressIncludesOnlyAcknowledgedDeliveryToken()
         {
             var token = new EventSequenceTokenV2(1);
