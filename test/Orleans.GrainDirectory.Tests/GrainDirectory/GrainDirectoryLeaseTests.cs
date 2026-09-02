@@ -793,7 +793,7 @@ public class GrainDirectoryLeaseTests
         var cleanupTasks = Enumerable.Range(0, membership.PartitionsPerSilo)
             .Select(partitionIndex => cluster.InternalClient!.GetSystemTarget<IGrainDirectoryTestHooks>(
                     GrainDirectoryPartition.CreateGrainId(silo.SiloAddress, partitionIndex).GrainId)
-                .CleanupExpiredLeasesAsync()
+            .CleanupExpiredLeasesAsync(cancellationToken)
                 .AsTask())
             .ToArray();
 

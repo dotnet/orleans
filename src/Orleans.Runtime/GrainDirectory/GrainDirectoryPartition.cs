@@ -1132,13 +1132,15 @@ internal sealed partial class GrainDirectoryPartition : SystemTarget, IGrainDire
         }
     }
 
-    async ValueTask<GrainDirectoryLeaseCleanupResult> IGrainDirectoryTestHooks.CleanupExpiredLeasesAsync()
+    async ValueTask<GrainDirectoryLeaseCleanupResult> IGrainDirectoryTestHooks.CleanupExpiredLeasesAsync(
+        CancellationToken cancellationToken)
     {
+        cancellationToken.ThrowIfCancellationRequested();
         GrainDirectoryLeaseCleanupResult? result = null;
         await this.QueueAction(
             state => result = state.CleanupExpiredLeasesAndCaptureResult(),
             this,
-            nameof(CleanupExpiredLeases));
+            nameof(CleanupExpiredLeases)).WaitAsync(cancellationToken);
         return result!;
     }
 
