@@ -606,6 +606,7 @@ namespace Orleans.Runtime.Messaging
                 {
                     _gateway.clientsWithTrackedRequests.TryRemove(this, out _);
                     _isRequestTrackingRegistered = false;
+                    GatewayEvents.EmitRequestTrackingStopped(_gateway.siloAddress, Id.GrainId);
                 }
             }
 
