@@ -1,21 +1,17 @@
-using System;
 using System.Collections;
-using System.Collections.Generic;
 using System.Collections.Immutable;
-using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
-using System.Linq;
 using System.Runtime.CompilerServices;
-using Microsoft.CodeAnalysis;
-using Orleans.Runtime.Utilities;
+using Orleans.Runtime.ClusterServices;
 
 namespace Orleans.Runtime.GrainDirectory;
 
 internal sealed class DirectoryMembershipSnapshot
 {
-    /// <summary>
-    /// The default hash function for directory ring boundaries, matching the <see cref="LocalGrainDirectory"/> partitioning scheme.
-    /// </summary>
+    private const string ServiceId = "orleans-grain-directory";
+    private const string AssignmentStrategy = "uniform-hash-ring/v1";
+    private const int ProtocolVersion = 1;
+
     internal static readonly Func<SiloAddress, int, uint[]> DefaultGetRingBoundaries = static (silo, count) =>
     {
         if (count == 1)
@@ -26,292 +22,136 @@ internal sealed class DirectoryMembershipSnapshot
         return silo.GetUniformHashCodes(count);
     };
 
-    private readonly ImmutableArray<(uint Start, int MemberIndex, int PartitionIndex)> _ringBoundaries;
-    private readonly RingRangeCollection[] _rangesByMember;
+    private readonly ClusterServiceTopology _topology;
     private readonly ImmutableArray<ImmutableArray<IGrainDirectoryPartition>> _partitionsByMember;
-    private readonly ImmutableArray<ImmutableArray<RingRange>> _rangesByMemberPartition;
 
-    internal DirectoryMembershipSnapshot(ClusterMembershipSnapshot snapshot, IInternalGrainFactory grainFactory, int partitionCount, Func<SiloAddress, int, uint[]> getRingBoundaries)
+    internal DirectoryMembershipSnapshot(
+        ClusterMembershipSnapshot snapshot,
+        IInternalGrainFactory grainFactory,
+        int partitionCount,
+        Func<SiloAddress, int, uint[]> getRingBoundaries)
+        : this(
+            new ClusterServiceTopology(
+                snapshot,
+                CreateConfiguration(partitionCount),
+                getRingBoundaries),
+            grainFactory)
     {
-        ArgumentOutOfRangeException.ThrowIfLessThan(partitionCount, 1);
-        PartitionCount = partitionCount;
+    }
 
-        var sortedActiveMembers = ImmutableArray.CreateBuilder<SiloAddress>(snapshot.Members.Count(static m => m.Value.Status == SiloStatus.Active));
-        foreach (var member in snapshot.Members)
-        {
-            // Only active members are part of directory membership.
-            if (member.Value.Status == SiloStatus.Active)
-            {
-                sortedActiveMembers.Add(member.Key);
-            }
-        }
+    internal DirectoryMembershipSnapshot(
+        ClusterServiceTopology topology,
+        IInternalGrainFactory grainFactory)
+    {
+        _topology = topology;
 
-        sortedActiveMembers.Sort(static (left, right) => left.CompareTo(right));
-        var hashIndexPairs = ImmutableArray.CreateBuilder<(uint Hash, int MemberIndex, int PartitionIndex)>(partitionCount * sortedActiveMembers.Count);
-        var memberPartitions = ImmutableArray.CreateBuilder<ImmutableArray<IGrainDirectoryPartition>>();
-        for (var memberIndex = 0; memberIndex < sortedActiveMembers.Count; memberIndex++)
+        var memberPartitions = ImmutableArray.CreateBuilder<ImmutableArray<IGrainDirectoryPartition>>(topology.Members.Length);
+        foreach (var activeMember in topology.Members)
         {
-            var activeMember = sortedActiveMembers[memberIndex];
-            var hashCodes = getRingBoundaries(activeMember, partitionCount);
-            Debug.Assert(hashCodes.Length == partitionCount);
-            var partitionReferences = ImmutableArray.CreateBuilder<IGrainDirectoryPartition>(partitionCount);
-            for (var partitionIndex = 0; partitionIndex < hashCodes.Length; partitionIndex++)
+            var partitionReferences = ImmutableArray.CreateBuilder<IGrainDirectoryPartition>(topology.PartitionCount);
+            for (var partitionIndex = 0; partitionIndex < topology.PartitionCount; partitionIndex++)
             {
-                var hashCode = hashCodes[partitionIndex];
-                hashIndexPairs.Add((hashCode, memberIndex, partitionIndex));
-                partitionReferences.Add(grainFactory?.GetSystemTarget<IGrainDirectoryPartition>(GrainDirectoryPartition.CreateGrainId(activeMember, partitionIndex).GrainId)!);
+                partitionReferences.Add(
+                    grainFactory?.GetSystemTarget<IGrainDirectoryPartition>(
+                        GrainDirectoryPartition.CreateGrainId(activeMember, partitionIndex).GrainId)!);
             }
 
             memberPartitions.Add(partitionReferences.ToImmutable());
         }
 
         _partitionsByMember = memberPartitions.ToImmutable();
-
-        hashIndexPairs.Sort(static (left, right) =>
-        {
-            var hashCompare = left.Hash.CompareTo(right.Hash);
-            if (hashCompare != 0)
-            {
-                return hashCompare;
-            }
-
-            var partitionCompare = left.PartitionIndex.CompareTo(right.PartitionIndex);
-            if (partitionCompare != 0)
-            {
-                return partitionCompare;
-            }
-
-            return left.MemberIndex.CompareTo(right.MemberIndex);
-        });
-
-        // Remove empty ranges caused by hash collisions.
-        if (hashIndexPairs.Count > 1)
-        {
-            for (var i = 1; i < hashIndexPairs.Count;)
-            {
-                if (hashIndexPairs[i].Hash == hashIndexPairs[i - 1].Hash)
-                {
-                    hashIndexPairs.RemoveAt(i);
-                }
-                else
-                {
-                    i++;
-                }
-            }
-        }
-
-        _ringBoundaries = hashIndexPairs.ToImmutable();
-        Members = sortedActiveMembers.ToImmutable();
-
-        var rangesByMemberPartitionBuilders = new RingRange[sortedActiveMembers.Count][];
-        for (var i = 0; i < sortedActiveMembers.Count; i++)
-        {
-            rangesByMemberPartitionBuilders[i] = new RingRange[partitionCount];
-        }
-
-        var rangesByMemberPartition = ImmutableArray.CreateBuilder<ImmutableArray<RingRange>>(sortedActiveMembers.Count);
-        for (var i = 0; i < hashIndexPairs.Count; i++)
-        {
-            var (entryStart, memberIndex, partitionIndex) = hashIndexPairs[i];
-            var (nextStart, _, _) = hashIndexPairs[(i + 1) % hashIndexPairs.Count];
-            var range = (entryStart == nextStart) switch
-            {
-                true when hashIndexPairs.Count == 1 => RingRange.Full,
-                true => RingRange.Empty,
-                _ => RingRange.Create(entryStart, nextStart)
-            };
-
-            rangesByMemberPartitionBuilders[memberIndex][partitionIndex] = range;
-        }
-
-        for (var i = 0; i < sortedActiveMembers.Count; i++)
-        {
-            rangesByMemberPartition.Add(ImmutableArray.CreateRange(rangesByMemberPartitionBuilders[i]));
-        }
-
-        _rangesByMemberPartition = rangesByMemberPartition.ToImmutable();
-        _rangesByMember = new RingRangeCollection[Members.Length];
-        ClusterMembershipSnapshot = snapshot;
     }
 
-    public static DirectoryMembershipSnapshot Default { get; } = new DirectoryMembershipSnapshot(
-        new ClusterMembershipSnapshot(ImmutableDictionary<SiloAddress, ClusterMember>.Empty, MembershipVersion.MinValue), null!, partitionCount: 1, DefaultGetRingBoundaries);
+    public static DirectoryMembershipSnapshot Default { get; } = new(
+        ClusterMembershipSnapshot.Default,
+        null!,
+        partitionCount: 1,
+        DefaultGetRingBoundaries);
 
-    public MembershipVersion Version => ClusterMembershipSnapshot.Version;
+    public MembershipVersion Version => ViewId.MembershipVersion;
 
-    internal int PartitionCount { get; }
+    internal ClusterServiceViewId ViewId => _topology.ViewId;
 
-    public ImmutableArray<SiloAddress> Members { get; }
+    internal int PartitionCount => _topology.PartitionCount;
 
-    public RingRange GetRange(SiloAddress address, int partitionIndex)
-    {
-        ArgumentOutOfRangeException.ThrowIfLessThan(partitionIndex, 0);
-        if (partitionIndex >= PartitionCount)
-        {
-            return RingRange.Empty;
-        }
+    public ImmutableArray<SiloAddress> Members => _topology.Members;
 
-        var memberIndex = TryGetMemberIndex(address);
-        if (memberIndex < 0)
-        {
-            return RingRange.Empty;
-        }
+    public ClusterMembershipSnapshot ClusterMembershipSnapshot => _topology.ClusterMembershipSnapshot;
 
-        var ranges = GetMemberRangesByPartition(memberIndex);
-        if (partitionIndex >= ranges.Length)
-        {
-            return RingRange.Empty;
-        }
+    public RingRange GetRange(SiloAddress address, int partitionIndex) =>
+        _topology.GetRange(address, partitionIndex);
 
-        return ranges[partitionIndex];
-    }
+    public RingRangeCollection GetMemberRanges(SiloAddress address) =>
+        _topology.GetMemberRanges(address);
 
-    public RingRangeCollection GetMemberRanges(SiloAddress address)
-    {
-        var memberIndex = TryGetMemberIndex(address);
-
-        if (memberIndex < 0)
-        {
-            return RingRangeCollection.Empty;
-        }
-
-        var range = _rangesByMember[memberIndex];
-        if (range.IsDefault)
-        {
-            range = _rangesByMember[memberIndex] = RingRangeCollection.Create(GetMemberRangesByPartition(memberIndex));
-        }
-
-        return range;
-    }
-
-    public ImmutableArray<RingRange> GetMemberRangesByPartition(SiloAddress address)
-    {
-        var memberIndex = TryGetMemberIndex(address);
-
-        if (memberIndex < 0)
-        {
-            return [];
-        }
-
-        return GetMemberRangesByPartition(memberIndex);
-    }
-
-    private ImmutableArray<RingRange> GetMemberRangesByPartition(int memberIndex)
-    {
-        ArgumentOutOfRangeException.ThrowIfLessThan(memberIndex, 0);
-        ArgumentOutOfRangeException.ThrowIfGreaterThanOrEqual(memberIndex, _rangesByMemberPartition.Length);
-        return _rangesByMemberPartition[memberIndex];
-    }
+    public ImmutableArray<RingRange> GetMemberRangesByPartition(SiloAddress address) =>
+        _topology.GetMemberRangesByPartition(address);
 
     public RangeCollection RangeOwners => new(this);
 
-    public ClusterMembershipSnapshot ClusterMembershipSnapshot { get; }
-
-    private (RingRange Range, int MemberIndex, int PartitionIndex) GetRangeInfo(int index)
-    {
-        ArgumentOutOfRangeException.ThrowIfGreaterThanOrEqual(index, _ringBoundaries.Length);
-        ArgumentOutOfRangeException.ThrowIfLessThan(index, 0);
-
-        var range = GetRangeCore(index);
-        var boundary = _ringBoundaries[index];
-        return (range, boundary.MemberIndex, boundary.PartitionIndex);
-    }
-
-    private RingRange GetRangeCore(int index)
-    {
-        ArgumentOutOfRangeException.ThrowIfGreaterThanOrEqual(index, _ringBoundaries.Length);
-        ArgumentOutOfRangeException.ThrowIfLessThan(index, 0);
-
-        var (entryStart, _, _) = _ringBoundaries[index];
-        var (nextStart, _, _) = _ringBoundaries[(index + 1) % _ringBoundaries.Length];
-        if (entryStart == nextStart)
-        {
-            // Handle hash collisions by making subsequent adjacent ranges empty.
-            if (_ringBoundaries.Length == 1)
-            {
-                return RingRange.Full;
-            }
-            else
-            {
-                // Handle hash collisions by making subsequent adjacent ranges empty.
-                return RingRange.Empty;
-            }
-        }
-
-        return RingRange.Create(entryStart, nextStart);
-    }
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public bool TryGetOwner(
+        GrainId grainId,
+        [NotNullWhen(true)] out SiloAddress? owner,
+        [NotNullWhen(true)] out IGrainDirectoryPartition? partitionReference) =>
+        TryGetOwner(grainId.GetUniformHashCode(), out owner, out partitionReference);
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private int TryGetMemberIndex(SiloAddress? address)
+    public bool TryGetOwner(
+        uint hashCode,
+        [NotNullWhen(true)] out SiloAddress? owner,
+        [NotNullWhen(true)] out IGrainDirectoryPartition? partitionReference)
     {
-        if (address is null)
+        if (_topology.TryGetOwner(hashCode, out var partitionOwner))
         {
-            return -1;
-        }
-
-        return SearchAlgorithms.BinarySearch(
-            Members.Length,
-            (this, address),
-            static (index, state) =>
-            {
-                var (snapshot, address) = state;
-                var candidate = snapshot.Members[index];
-                return candidate.CompareTo(address);
-            });
-    }
-
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public bool TryGetOwner(GrainId grainId, [NotNullWhen(true)] out SiloAddress? owner, [NotNullWhen(true)] out IGrainDirectoryPartition? partitionReference) => TryGetOwner(grainId.GetUniformHashCode(), out owner, out partitionReference);
-
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public bool TryGetOwner(uint hashCode, [NotNullWhen(true)] out SiloAddress? owner, [NotNullWhen(true)] out IGrainDirectoryPartition? partitionReference)
-    {
-        var index = SearchAlgorithms.RingRangeBinarySearch(
-            _ringBoundaries.Length,
-            this,
-            static (collection, index) => collection.GetRangeCore(index),
-            hashCode);
-        if (index >= 0)
-        {
-            var (_, memberIndex, partitionIndex) = _ringBoundaries[index];
-            owner = Members[memberIndex];
-            partitionReference = _partitionsByMember[memberIndex][partitionIndex];
+            owner = partitionOwner.SiloAddress;
+            partitionReference = _partitionsByMember[partitionOwner.MemberIndex][partitionOwner.PartitionIndex];
             return true;
         }
 
-        Debug.Assert(Members.Length == 0);
         owner = null;
         partitionReference = null;
         return false;
     }
 
-    public readonly struct RangeCollection(DirectoryMembershipSnapshot snapshot) : IReadOnlyList<(RingRange Range, int MemberIndex, int PartitionIndex)>
-    {
-        public int Count => snapshot._ringBoundaries.Length;
+    internal static ClusterServiceConfiguration CreateConfiguration(int partitionCount) =>
+        new(ServiceId, ProtocolVersion, partitionCount, AssignmentStrategy);
 
-        public (RingRange Range, int MemberIndex, int PartitionIndex) this[int index] => snapshot.GetRangeInfo(index);
+    public readonly struct RangeCollection(DirectoryMembershipSnapshot snapshot)
+        : IReadOnlyList<(RingRange Range, int MemberIndex, int PartitionIndex)>
+    {
+        public int Count => snapshot._topology.RangeOwners.Count;
+
+        public (RingRange Range, int MemberIndex, int PartitionIndex) this[int index]
+        {
+            get
+            {
+                var owner = snapshot._topology.RangeOwners[index];
+                return (owner.Range, owner.MemberIndex, owner.PartitionIndex);
+            }
+        }
 
         IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
-        IEnumerator<(RingRange Range, int MemberIndex, int PartitionIndex)> IEnumerable<(RingRange Range, int MemberIndex, int PartitionIndex)>.GetEnumerator() => GetEnumerator();
+
+        IEnumerator<(RingRange Range, int MemberIndex, int PartitionIndex)>
+            IEnumerable<(RingRange Range, int MemberIndex, int PartitionIndex)>.GetEnumerator() =>
+            GetEnumerator();
+
         public RangeCollectionEnumerator GetEnumerator() => new(snapshot);
 
-        public struct RangeCollectionEnumerator(DirectoryMembershipSnapshot snapshot) : IEnumerator<(RingRange Range, int MemberIndex, int PartitionIndex)>
+        public struct RangeCollectionEnumerator(DirectoryMembershipSnapshot snapshot)
+            : IEnumerator<(RingRange Range, int MemberIndex, int PartitionIndex)>
         {
-            private int _index = 0;
-            public readonly (RingRange Range, int MemberIndex, int PartitionIndex) Current => snapshot.GetRangeInfo(_index - 1);
-            readonly (RingRange Range, int MemberIndex, int PartitionIndex) IEnumerator<(RingRange Range, int MemberIndex, int PartitionIndex)>.Current => Current;
+            private int _index;
+
+            public readonly (RingRange Range, int MemberIndex, int PartitionIndex) Current =>
+                snapshot.RangeOwners[_index - 1];
+
             readonly object IEnumerator.Current => Current;
 
             public void Dispose() => _index = int.MaxValue;
-            public bool MoveNext()
-            {
-                if (_index >= 0 && _index++ < snapshot._ringBoundaries.Length)
-                {
-                    return true;
-                }
 
-                return false;
-            }
+            public bool MoveNext() => _index >= 0 && _index++ < snapshot.RangeOwners.Count;
 
             public void Reset() => _index = 0;
         }
