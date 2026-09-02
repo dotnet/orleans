@@ -383,10 +383,19 @@ namespace Orleans.Serialization
                     grainId,
                     interfaceType,
                     serviceId,
-                    jo["ClusterId"]!.ToObject<string>()!),
+                    GetRequiredClusterId(jo)),
                 _ => throw new JsonSerializationException($"Unknown universal reference binding '{binding}'.")
             };
             return this.referenceActivator.CreateReference(reference);
+        }
+
+        private static string GetRequiredClusterId(JObject value)
+        {
+            var clusterId = value["ClusterId"]?.ToObject<string>();
+            return string.IsNullOrWhiteSpace(clusterId)
+                ? throw new JsonSerializationException(
+                    "A cluster-bound universal reference must specify a non-empty ClusterId.")
+                : clusterId;
         }
     }
 }

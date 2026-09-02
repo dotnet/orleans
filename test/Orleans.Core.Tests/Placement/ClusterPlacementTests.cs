@@ -54,8 +54,11 @@ public sealed class ClusterPlacementTests(TestEnvironmentFixture environment)
                 ("removed", MetaclusterClusterState.Removed),
                 ("active", MetaclusterClusterState.Active)));
 
-        var result = await fixture.Locator.Locate(GrainId, Context());
-        var entry = await fixture.Directory.Lookup(GrainId);
+        var result = await fixture.Locator.Locate(
+            GrainId,
+            Context(),
+            TestContext.Current.CancellationToken);
+        var entry = await fixture.Directory.Lookup(GrainId, TestContext.Current.CancellationToken);
 
         Assert.Equal("active", result.ClusterId);
         Assert.NotNull(entry);
@@ -152,7 +155,10 @@ public sealed class ClusterPlacementTests(TestEnvironmentFixture environment)
                 ("backup", MetaclusterClusterState.Active),
                 ("mutated", MetaclusterClusterState.Removed)));
 
-        var result = await fixture.Locator.Locate(GrainId, Context());
+        var result = await fixture.Locator.Locate(
+            GrainId,
+            Context(),
+            TestContext.Current.CancellationToken);
 
         Assert.Equal("active", result.ClusterId);
         Assert.Equal("mutated", source[0]);
@@ -170,11 +176,14 @@ public sealed class ClusterPlacementTests(TestEnvironmentFixture environment)
                 ("removed", MetaclusterClusterState.Removed)));
 
         var exception = await Assert.ThrowsAsync<InvalidOperationException>(
-            () => fixture.Locator.Locate(GrainId, Context()).AsTask());
+            () => fixture.Locator.Locate(
+                GrainId,
+                Context(),
+                TestContext.Current.CancellationToken).AsTask());
 
         Assert.Contains("No active cluster", exception.Message, StringComparison.Ordinal);
         Assert.Contains("'5'", exception.Message, StringComparison.Ordinal);
-        Assert.Null(await fixture.Directory.Lookup(GrainId));
+        Assert.Null(await fixture.Directory.Lookup(GrainId, TestContext.Current.CancellationToken));
     }
 
     [Fact]
@@ -191,10 +200,13 @@ public sealed class ClusterPlacementTests(TestEnvironmentFixture environment)
         cancellation.Cancel();
 
         await Assert.ThrowsAnyAsync<OperationCanceledException>(() => pending);
-        var successful = await fixture.Locator.Locate(GrainId, Context());
+        var successful = await fixture.Locator.Locate(
+            GrainId,
+            Context(),
+            TestContext.Current.CancellationToken);
         Assert.Equal("active", successful.ClusterId);
         Assert.Equal(2, director.CallCount);
-        Assert.NotNull(await fixture.Directory.Lookup(GrainId));
+        Assert.NotNull(await fixture.Directory.Lookup(GrainId, TestContext.Current.CancellationToken));
     }
 
     [Fact]

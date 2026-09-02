@@ -78,7 +78,7 @@ public sealed class PartitionTransitionCoordinatorTests
         var transition = coordinator.BeginInbound(Range, View1, View2);
         Assert.True(coordinator.TryGetBlockingTransition(Range, View2.MembershipVersion, out var wait));
 
-        transition.Abort();
+        transition.Abort(TestContext.Current.CancellationToken);
 
         await Assert.ThrowsAnyAsync<OperationCanceledException>(() => wait);
         Assert.Equal(PartitionTransitionStage.Aborted, transition.Stage);
@@ -170,7 +170,7 @@ public sealed class PartitionTransitionCoordinatorTests
 
         var abortedA = coordinatorA.BeginOutbound(rangeA, View1, View2);
         Assert.True(coordinatorA.IsBlocked(rangeA, View2.MembershipVersion));
-        abortedA.Abort();
+        abortedA.Abort(TestContext.Current.CancellationToken);
         await Assert.ThrowsAnyAsync<OperationCanceledException>(() => abortedA.Completion);
         Assert.Equal(PartitionTransitionStage.Aborted, abortedA.Stage);
         Assert.Equal(PartitionTransitionStage.Blocking, transitionB.Stage);
@@ -277,7 +277,7 @@ public sealed class PartitionTransitionCoordinatorTests
         Assert.Same(transition.Completion, blocking);
         Assert.False(blocking.IsCompleted);
 
-        transition.Abort();
+        transition.Abort(TestContext.Current.CancellationToken);
 
         Assert.False(coordinator.IsBlocked(highOverlap, View2.MembershipVersion));
         Assert.True(transition.Completion.IsCanceled);
@@ -500,7 +500,7 @@ public sealed class PartitionTransitionCoordinatorTests
         Assert.Equal(PartitionTransitionStage.Failed, transition.Stage);
         Assert.True(coordinator.IsBlocked(Range, View2.MembershipVersion));
 
-        transition.Abort();
+        transition.Abort(TestContext.Current.CancellationToken);
 
         Assert.Equal(PartitionTransitionStage.Aborted, transition.Stage);
         Assert.Same(failure, transition.Failure);
@@ -539,7 +539,7 @@ public sealed class PartitionTransitionCoordinatorTests
         Assert.True(coordinator.TryGetBlockingTransition(Range, View2.MembershipVersion, out var blocked));
         Assert.Same(transition.Completion, blocked);
 
-        transition.Abort();
+        transition.Abort(TestContext.Current.CancellationToken);
         Assert.False(coordinator.IsBlocked(Range, View2.MembershipVersion));
     }
 

@@ -2651,15 +2651,24 @@ public class DemoClass
             constructors,
             static constructor => constructor.ParameterList.Parameters[1].Type?.ToString()
                 == "global::Orleans.Runtime.UniversalReference");
+        var copierFieldDeclaration = Assert.Single(
+            proxyDeclaration.Members.OfType<FieldDeclarationSyntax>(),
+            static field => field.Declaration.Type.ToString().Contains("Copier_Payload", StringComparison.Ordinal));
+        var copierFieldName = Assert.Single(copierFieldDeclaration.Declaration.Variables).Identifier.ValueText;
         Assert.Equal(keyConstructor.Body!.ToString(), universalConstructor.Body!.ToString());
-        Assert.Contains("_copier0 =", universalConstructor.Body.ToString(), StringComparison.Ordinal);
+        Assert.Contains($"{copierFieldName} =", universalConstructor.Body.ToString(), StringComparison.Ordinal);
 
         var outputCompilation = compilation.AddSyntaxTrees(
             result.GeneratedSources.Select(static source => CSharpSyntaxTree.ParseText(source.SourceText, path: source.HintName)));
-        Assert.Empty(outputCompilation.GetDiagnostics().Where(static diagnostic => diagnostic.Severity == DiagnosticSeverity.Error));
+        Assert.Empty(
+            outputCompilation
+                .GetDiagnostics(TestContext.Current.CancellationToken)
+                .Where(static diagnostic => diagnostic.Severity == DiagnosticSeverity.Error));
 
         using var assemblyStream = new MemoryStream();
-        var emitResult = outputCompilation.Emit(assemblyStream);
+        var emitResult = outputCompilation.Emit(
+            assemblyStream,
+            cancellationToken: TestContext.Current.CancellationToken);
         Assert.True(
             emitResult.Success,
             string.Join(Environment.NewLine, emitResult.Diagnostics.Select(static diagnostic => diagnostic.ToString())));
@@ -2718,13 +2727,13 @@ public class DemoClass
         Assert.Equal((ushort)7, universalProxy.InterfaceVersion);
         Assert.Equal(interfaceType, universalProxy.InterfaceType);
 
-        var copierField = proxyType.GetField(
-            "_copier0",
+        var runtimeCopierField = proxyType.GetField(
+            copierFieldName,
             System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic);
-        Assert.NotNull(copierField);
+        Assert.NotNull(runtimeCopierField);
         var registeredCopier = serviceProvider.GetRequiredService(copierType);
-        Assert.Same(registeredCopier, copierField!.GetValue(universalProxy));
-        Assert.Same(registeredCopier, copierField.GetValue(keyProxy));
+        Assert.Same(registeredCopier, runtimeCopierField!.GetValue(universalProxy));
+        Assert.Same(registeredCopier, runtimeCopierField.GetValue(keyProxy));
     }
 
     [Fact]

@@ -224,6 +224,21 @@ public sealed class UniversalReferenceSerializationTests(TestEnvironmentFixture 
         Assert.Contains("must both be present", exception.Message, StringComparison.Ordinal);
     }
 
+    [Theory]
+    [InlineData("""{"Id":{"Type":"test.grain","Key":"1"},"Interface":"test.interface","ServiceId":"service","Binding":1}""")]
+    [InlineData("""{"Id":{"Type":"test.grain","Key":"1"},"Interface":"test.interface","ServiceId":"service","Binding":1,"ClusterId":null}""")]
+    [InlineData("""{"Id":{"Type":"test.grain","Key":"1"},"Interface":"test.interface","ServiceId":"service","Binding":1,"ClusterId":""}""")]
+    [InlineData("""{"Id":{"Type":"test.grain","Key":"1"},"Interface":"test.interface","ServiceId":"service","Binding":1,"ClusterId":" "}""")]
+    public void NewtonsoftJsonReader_ClusterBindingRequiresClusterId(string json)
+    {
+        var exception = Assert.Throws<JsonSerializationException>(
+            () => NewtonsoftSerializer.Deserialize(typeof(IAddressable), json));
+
+        Assert.Equal(
+            "A cluster-bound universal reference must specify a non-empty ClusterId.",
+            exception.Message);
+    }
+
     [Fact]
     public void SystemTextJsonRoundTrip_VirtualReference_PreservesAllFields()
     {

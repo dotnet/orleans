@@ -256,10 +256,16 @@ public sealed class ClusterOwnershipLeaseMonitorTests
 
         await harness.StartMonitorAsync();
         await harness.AdvanceAndTickAsync(1);
-        await harness.Validator.WaitForCallCountAsync(4).WaitAsync(TimeSpan.FromSeconds(10));
-        await healthy.WaitForOwnershipSetCountAsync(2).WaitAsync(TimeSpan.FromSeconds(10));
+        await harness.Validator.WaitForCallCountAsync(4).WaitAsync(
+            TimeSpan.FromSeconds(10),
+            TestContext.Current.CancellationToken);
+        await healthy.WaitForOwnershipSetCountAsync(2).WaitAsync(
+            TimeSpan.FromSeconds(10),
+            TestContext.Current.CancellationToken);
         await harness.AdvanceAndTickAsync(2);
-        await harness.Validator.WaitForCallCountAsync(5).WaitAsync(TimeSpan.FromSeconds(10));
+        await harness.Validator.WaitForCallCountAsync(5).WaitAsync(
+            TimeSpan.FromSeconds(10),
+            TestContext.Current.CancellationToken);
 
         Assert.Same(healthyRenewed, healthy.Ownership);
         Assert.Equal(0, healthy.DeactivationCount);
@@ -454,11 +460,14 @@ public sealed class ClusterOwnershipLeaseMonitorTests
         var stopTask = harness.StopMonitorAsync();
         Assert.True(harness.Timer.IsDisposed);
         Assert.False(stopTask.IsCompleted);
+        Assert.True(harness.Stopping.IsCancellationRequested);
+        _ = harness.Stopping.Token;
 
         renewal.SetResult(renewed);
         await stopTask;
 
         Assert.True(stopTask.IsCompletedSuccessfully);
+        Assert.Throws<ObjectDisposedException>(() => harness.Stopping.Token);
         Assert.Same(renewed, context.Ownership);
         Assert.Equal(2, harness.Validator.CallCount);
         Assert.Equal(1, harness.Timer.DisposeCount);
@@ -804,6 +813,11 @@ public sealed class ClusterOwnershipLeaseMonitorTests
         public UniversalReferenceBindingResolver BindingResolver { get; }
 
         public ClusterOwnershipLeaseMonitor Monitor { get; }
+
+        public CancellationTokenSource Stopping =>
+            (CancellationTokenSource)typeof(ClusterOwnershipLeaseMonitor)
+                .GetField("_stopping", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)!
+                .GetValue(Monitor)!;
 
         public SiloLifecycleSubject Lifecycle { get; }
 
