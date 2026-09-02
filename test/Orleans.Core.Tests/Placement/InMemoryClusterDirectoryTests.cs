@@ -24,7 +24,7 @@ public sealed class InMemoryClusterDirectoryTests
     {
         var (_, directory) = CreateDirectory();
 
-        var result = await directory.Lookup(GrainId);
+        var result = await directory.Lookup(GrainId, TestContext.Current.CancellationToken);
 
         Assert.Null(result);
     }
@@ -34,10 +34,15 @@ public sealed class InMemoryClusterDirectoryTests
     {
         var (clock, directory) = CreateDirectory();
 
-        var entry = await directory.GetOrCreate(GrainId, "east", 7, Lease);
+        var entry = await directory.GetOrCreate(
+            GrainId,
+            "east",
+            7,
+            Lease,
+            TestContext.Current.CancellationToken);
 
         AssertEntry(entry, "east", version: 1, epoch: 7, fence: 1, Start + Lease);
-        Assert.Equal(entry, await directory.Lookup(GrainId));
+        Assert.Equal(entry, await directory.Lookup(GrainId, TestContext.Current.CancellationToken));
         Assert.Equal(Start, clock.GetUtcNow());
     }
 
@@ -45,9 +50,19 @@ public sealed class InMemoryClusterDirectoryTests
     public async Task Create_ExistingLiveEntry_ReturnsConflictWithoutMutation()
     {
         var (_, directory) = CreateDirectory();
-        var original = await directory.GetOrCreate(GrainId, "east", 3, Lease);
+        var original = await directory.GetOrCreate(
+            GrainId,
+            "east",
+            3,
+            Lease,
+            TestContext.Current.CancellationToken);
 
-        var observed = await directory.GetOrCreate(GrainId, "west", 4, Lease);
+        var observed = await directory.GetOrCreate(
+            GrainId,
+            "west",
+            4,
+            Lease,
+            TestContext.Current.CancellationToken);
 
         Assert.Same(original, observed);
         AssertEntry(observed, "east", 1, 3, 1, Start + Lease);
@@ -57,10 +72,20 @@ public sealed class InMemoryClusterDirectoryTests
     public async Task Create_ExpiredEntry_ReacquiresWithHigherVersionAndFence()
     {
         var (clock, directory) = CreateDirectory();
-        var original = await directory.GetOrCreate(GrainId, "east", 3, Lease);
+        var original = await directory.GetOrCreate(
+            GrainId,
+            "east",
+            3,
+            Lease,
+            TestContext.Current.CancellationToken);
         clock.Advance(Lease);
 
-        var replacement = await directory.GetOrCreate(GrainId, "west", 4, Lease);
+        var replacement = await directory.GetOrCreate(
+            GrainId,
+            "west",
+            4,
+            Lease,
+            TestContext.Current.CancellationToken);
 
         AssertEntry(replacement, "west", 2, 4, 2, Start + Lease + Lease);
         Assert.True(replacement.Version > original.Version);
@@ -71,10 +96,20 @@ public sealed class InMemoryClusterDirectoryTests
     public async Task Create_ExpiredEntry_ReacquiresAtSameTopologyEpoch()
     {
         var (clock, directory) = CreateDirectory();
-        var original = await directory.GetOrCreate(GrainId, "east", 3, Lease);
+        var original = await directory.GetOrCreate(
+            GrainId,
+            "east",
+            3,
+            Lease,
+            TestContext.Current.CancellationToken);
         clock.Advance(Lease);
 
-        var replacement = await directory.GetOrCreate(GrainId, "west", 3, Lease);
+        var replacement = await directory.GetOrCreate(
+            GrainId,
+            "west",
+            3,
+            Lease,
+            TestContext.Current.CancellationToken);
 
         AssertEntry(replacement, "west", 2, 3, 2, Start + Lease + Lease);
         Assert.Equal(original.Version + 1, replacement.Version);
@@ -85,10 +120,20 @@ public sealed class InMemoryClusterDirectoryTests
     public async Task Renew_CurrentOwner_ExtendsLeaseWithoutChangingFence()
     {
         var (clock, directory) = CreateDirectory();
-        var original = await directory.GetOrCreate(GrainId, "east", 8, Lease);
+        var original = await directory.GetOrCreate(
+            GrainId,
+            "east",
+            8,
+            Lease,
+            TestContext.Current.CancellationToken);
         clock.Advance(TimeSpan.FromMinutes(2));
 
-        var renewed = await directory.TryRenew(GrainId, original.Version, "east", Lease);
+        var renewed = await directory.TryRenew(
+            GrainId,
+            original.Version,
+            "east",
+            Lease,
+            TestContext.Current.CancellationToken);
 
         Assert.NotNull(renewed);
         AssertEntry(renewed, "east", original.Version, original.TopologyEpoch, original.FencingToken, Start + TimeSpan.FromMinutes(7));
@@ -99,30 +144,61 @@ public sealed class InMemoryClusterDirectoryTests
     public async Task Renew_AtLeaseBoundary_FailsAndDoesNotResurrect()
     {
         var (clock, directory) = CreateDirectory();
-        var original = await directory.GetOrCreate(GrainId, "east", 1, Lease);
+        var original = await directory.GetOrCreate(
+            GrainId,
+            "east",
+            1,
+            Lease,
+            TestContext.Current.CancellationToken);
         clock.Advance(Lease);
 
-        var renewed = await directory.TryRenew(GrainId, original.Version, original.ClusterId, Lease);
+        var renewed = await directory.TryRenew(
+            GrainId,
+            original.Version,
+            original.ClusterId,
+            Lease,
+            TestContext.Current.CancellationToken);
 
         Assert.Null(renewed);
-        Assert.Null(await directory.Lookup(GrainId));
+        Assert.Null(await directory.Lookup(GrainId, TestContext.Current.CancellationToken));
     }
 
     [Fact]
     public async Task Renew_StaleOwnerVersionEpochOrFence_FailsWithoutMutation()
     {
         var (clock, directory) = CreateDirectory();
-        var original = await directory.GetOrCreate(GrainId, "east", 2, Lease);
+        var original = await directory.GetOrCreate(
+            GrainId,
+            "east",
+            2,
+            Lease,
+            TestContext.Current.CancellationToken);
         clock.Advance(Lease);
-        var current = await directory.TryMove(GrainId, original.Version, "west", 3, Lease);
+        var current = await directory.TryMove(
+            GrainId,
+            original.Version,
+            "west",
+            3,
+            Lease,
+            TestContext.Current.CancellationToken);
         Assert.NotNull(current);
 
-        var staleOwner = await directory.TryRenew(GrainId, original.Version, original.ClusterId, Lease);
-        var staleVersion = await directory.TryRenew(GrainId, original.Version, current.ClusterId, Lease);
+        var staleOwner = await directory.TryRenew(
+            GrainId,
+            original.Version,
+            original.ClusterId,
+            Lease,
+            TestContext.Current.CancellationToken);
+        var staleVersion = await directory.TryRenew(
+            GrainId,
+            original.Version,
+            current.ClusterId,
+            Lease,
+            TestContext.Current.CancellationToken);
 
         Assert.Null(staleOwner);
         Assert.Null(staleVersion);
-        Assert.Equal(current, await directory.Lookup(GrainId));
+        Assert.Equal(current, await directory.Lookup(GrainId, TestContext.Current.CancellationToken));
         Assert.True(current.TopologyEpoch > original.TopologyEpoch);
         Assert.True(current.FencingToken > original.FencingToken);
     }
@@ -131,36 +207,69 @@ public sealed class InMemoryClusterDirectoryTests
     public async Task Move_LiveOwner_FailsWithoutMutation()
     {
         var (_, directory) = CreateDirectory();
-        var original = await directory.GetOrCreate(GrainId, "east", 10, Lease);
+        var original = await directory.GetOrCreate(
+            GrainId,
+            "east",
+            10,
+            Lease,
+            TestContext.Current.CancellationToken);
 
-        var moved = await directory.TryMove(GrainId, original.Version, "west", 11, Lease);
+        var moved = await directory.TryMove(
+            GrainId,
+            original.Version,
+            "west",
+            11,
+            Lease,
+            TestContext.Current.CancellationToken);
 
         Assert.Null(moved);
-        Assert.Equal(original, await directory.Lookup(GrainId));
+        Assert.Equal(original, await directory.Lookup(GrainId, TestContext.Current.CancellationToken));
     }
 
     [Fact]
     public async Task Move_ExpiredOwner_ChangesClusterAndIncrementsVersionAndFence()
     {
         var (clock, directory) = CreateDirectory();
-        var original = await directory.GetOrCreate(GrainId, "east", 10, Lease);
+        var original = await directory.GetOrCreate(
+            GrainId,
+            "east",
+            10,
+            Lease,
+            TestContext.Current.CancellationToken);
         clock.Advance(Lease);
 
-        var moved = await directory.TryMove(GrainId, original.Version, "west", 11, Lease);
+        var moved = await directory.TryMove(
+            GrainId,
+            original.Version,
+            "west",
+            11,
+            Lease,
+            TestContext.Current.CancellationToken);
 
         Assert.NotNull(moved);
         AssertEntry(moved, "west", 2, 11, 2, Start + Lease + Lease);
-        Assert.Equal(moved, await directory.Lookup(GrainId));
+        Assert.Equal(moved, await directory.Lookup(GrainId, TestContext.Current.CancellationToken));
     }
 
     [Fact]
     public async Task Move_ToSameOwner_HasDefinedIdempotentResult()
     {
         var (clock, directory) = CreateDirectory();
-        var original = await directory.GetOrCreate(GrainId, "east", 4, Lease);
+        var original = await directory.GetOrCreate(
+            GrainId,
+            "east",
+            4,
+            Lease,
+            TestContext.Current.CancellationToken);
         clock.Advance(Lease);
 
-        var moved = await directory.TryMove(GrainId, original.Version, "east", 4, Lease);
+        var moved = await directory.TryMove(
+            GrainId,
+            original.Version,
+            "east",
+            4,
+            Lease,
+            TestContext.Current.CancellationToken);
 
         Assert.NotNull(moved);
         Assert.Equal("east", moved.ClusterId);
@@ -172,29 +281,62 @@ public sealed class InMemoryClusterDirectoryTests
     public async Task Move_StaleSourceOwnerVersionEpochOrFence_FailsWithoutMutation()
     {
         var (clock, directory) = CreateDirectory();
-        var original = await directory.GetOrCreate(GrainId, "east", 5, Lease);
+        var original = await directory.GetOrCreate(
+            GrainId,
+            "east",
+            5,
+            Lease,
+            TestContext.Current.CancellationToken);
         clock.Advance(Lease);
-        var current = await directory.TryMove(GrainId, original.Version, "west", 6, Lease);
+        var current = await directory.TryMove(
+            GrainId,
+            original.Version,
+            "west",
+            6,
+            Lease,
+            TestContext.Current.CancellationToken);
         Assert.NotNull(current);
 
-        var replay = await directory.TryMove(GrainId, original.Version, "north", original.TopologyEpoch, Lease);
+        var replay = await directory.TryMove(
+            GrainId,
+            original.Version,
+            "north",
+            original.TopologyEpoch,
+            Lease,
+            TestContext.Current.CancellationToken);
 
         Assert.Null(replay);
-        Assert.Equal(current, await directory.Lookup(GrainId));
+        Assert.Equal(current, await directory.Lookup(GrainId, TestContext.Current.CancellationToken));
     }
 
     [Fact]
     public async Task Move_ExpiredEntry_FailsOrReacquiresOnlyThroughCreateContract()
     {
         var (clock, directory) = CreateDirectory();
-        var expired = await directory.GetOrCreate(GrainId, "east", 1, Lease);
+        var expired = await directory.GetOrCreate(
+            GrainId,
+            "east",
+            1,
+            Lease,
+            TestContext.Current.CancellationToken);
         clock.Advance(Lease);
-        var reacquired = await directory.GetOrCreate(GrainId, "west", 2, Lease);
+        var reacquired = await directory.GetOrCreate(
+            GrainId,
+            "west",
+            2,
+            Lease,
+            TestContext.Current.CancellationToken);
 
-        var staleMove = await directory.TryMove(GrainId, expired.Version, "north", 3, Lease);
+        var staleMove = await directory.TryMove(
+            GrainId,
+            expired.Version,
+            "north",
+            3,
+            Lease,
+            TestContext.Current.CancellationToken);
 
         Assert.Null(staleMove);
-        Assert.Equal(reacquired, await directory.Lookup(GrainId));
+        Assert.Equal(reacquired, await directory.Lookup(GrainId, TestContext.Current.CancellationToken));
         Assert.True(reacquired.FencingToken > expired.FencingToken);
     }
 
@@ -202,9 +344,14 @@ public sealed class InMemoryClusterDirectoryTests
     public async Task Validate_CurrentUnexpiredEntry_Succeeds()
     {
         var (_, directory) = CreateDirectory();
-        var entry = await directory.GetOrCreate(GrainId, "east", 2, Lease);
+        var entry = await directory.GetOrCreate(
+            GrainId,
+            "east",
+            2,
+            Lease,
+            TestContext.Current.CancellationToken);
 
-        var observed = await directory.Lookup(GrainId);
+        var observed = await directory.Lookup(GrainId, TestContext.Current.CancellationToken);
 
         Assert.Equal(entry, observed);
         Assert.True(IsSameOwnership(entry, observed));
@@ -214,11 +361,21 @@ public sealed class InMemoryClusterDirectoryTests
     public async Task Validate_ExpiredOrStaleEntry_Fails()
     {
         var (clock, directory) = CreateDirectory();
-        var stale = await directory.GetOrCreate(GrainId, "east", 2, Lease);
+        var stale = await directory.GetOrCreate(
+            GrainId,
+            "east",
+            2,
+            Lease,
+            TestContext.Current.CancellationToken);
         clock.Advance(Lease);
 
-        var expiredObservation = await directory.Lookup(GrainId);
-        var current = await directory.GetOrCreate(GrainId, "west", 3, Lease);
+        var expiredObservation = await directory.Lookup(GrainId, TestContext.Current.CancellationToken);
+        var current = await directory.GetOrCreate(
+            GrainId,
+            "west",
+            3,
+            Lease,
+            TestContext.Current.CancellationToken);
 
         Assert.Null(expiredObservation);
         Assert.False(IsSameOwnership(stale, current));
@@ -228,17 +385,39 @@ public sealed class InMemoryClusterDirectoryTests
     public async Task TopologyEpochChange_InvalidatesStaleMutation()
     {
         var (clock, directory) = CreateDirectory();
-        var original = await directory.GetOrCreate(GrainId, "east", 10, Lease);
+        var original = await directory.GetOrCreate(
+            GrainId,
+            "east",
+            10,
+            Lease,
+            TestContext.Current.CancellationToken);
         clock.Advance(Lease);
-        var current = await directory.TryMove(GrainId, original.Version, "west", 12, Lease);
+        var current = await directory.TryMove(
+            GrainId,
+            original.Version,
+            "west",
+            12,
+            Lease,
+            TestContext.Current.CancellationToken);
         Assert.NotNull(current);
         clock.Advance(Lease);
 
-        var staleEpochMove = await directory.TryMove(GrainId, current.Version, "north", 11, Lease);
+        var staleEpochMove = await directory.TryMove(
+            GrainId,
+            current.Version,
+            "north",
+            11,
+            Lease,
+            TestContext.Current.CancellationToken);
 
         Assert.Null(staleEpochMove);
-        Assert.Null(await directory.Lookup(GrainId));
-        var replacement = await directory.GetOrCreate(GrainId, "north", 13, Lease);
+        Assert.Null(await directory.Lookup(GrainId, TestContext.Current.CancellationToken));
+        var replacement = await directory.GetOrCreate(
+            GrainId,
+            "north",
+            13,
+            Lease,
+            TestContext.Current.CancellationToken);
         Assert.True(replacement.Version > current.Version);
         Assert.Equal(13, replacement.TopologyEpoch);
     }
@@ -275,7 +454,12 @@ public sealed class InMemoryClusterDirectoryTests
     public async Task ConcurrentRenewAndMove_LiveLeaseOnlyAllowsRenewal()
     {
         var (_, directory) = CreateDirectory();
-        var original = await directory.GetOrCreate(GrainId, "east", 1, Lease);
+        var original = await directory.GetOrCreate(
+            GrainId,
+            "east",
+            1,
+            Lease,
+            TestContext.Current.CancellationToken);
         var renewGate = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         var moveGate = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         var renewAttempt = Task.Run(async () =>
@@ -296,7 +480,7 @@ public sealed class InMemoryClusterDirectoryTests
 
         Assert.Null(moved);
         Assert.NotNull(renewed);
-        Assert.Equal(renewed, await directory.Lookup(GrainId));
+        Assert.Equal(renewed, await directory.Lookup(GrainId, TestContext.Current.CancellationToken));
     }
 
     [Fact]
@@ -306,10 +490,15 @@ public sealed class InMemoryClusterDirectoryTests
         var first = new InMemoryClusterDirectory(clock);
         var second = new InMemoryClusterDirectory(clock);
 
-        var entry = await first.GetOrCreate(GrainId, "east", 1, Lease);
+        var entry = await first.GetOrCreate(
+            GrainId,
+            "east",
+            1,
+            Lease,
+            TestContext.Current.CancellationToken);
 
-        Assert.Equal(entry, await first.Lookup(GrainId));
-        Assert.Null(await second.Lookup(GrainId));
+        Assert.Equal(entry, await first.Lookup(GrainId, TestContext.Current.CancellationToken));
+        Assert.Null(await second.Lookup(GrainId, TestContext.Current.CancellationToken));
     }
 
     [Fact]
@@ -323,7 +512,7 @@ public sealed class InMemoryClusterDirectoryTests
         await Assert.ThrowsAnyAsync<OperationCanceledException>(() => directory.GetOrCreate(GrainId, "east", 1, Lease, cancellation.Token).AsTask());
         await Assert.ThrowsAnyAsync<OperationCanceledException>(() => directory.TryRenew(GrainId, 1, "east", Lease, cancellation.Token).AsTask());
         await Assert.ThrowsAnyAsync<OperationCanceledException>(() => directory.TryMove(GrainId, 1, "west", 2, Lease, cancellation.Token).AsTask());
-        Assert.Null(await directory.Lookup(GrainId));
+        Assert.Null(await directory.Lookup(GrainId, TestContext.Current.CancellationToken));
     }
 
     [Fact]
@@ -472,7 +661,12 @@ public sealed class InMemoryClusterDirectoryTests
     public async Task ConcurrentExpiryReacquisition_HasExactlyOneLiveOwnerAndRejectsStaleVersion()
     {
         var (clock, directory) = CreateDirectory();
-        var original = await directory.GetOrCreate(GrainId, "original", 1, Lease);
+        var original = await directory.GetOrCreate(
+            GrainId,
+            "original",
+            1,
+            Lease,
+            TestContext.Current.CancellationToken);
         clock.Advance(Lease);
         var ready = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         var start = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -493,7 +687,7 @@ public sealed class InMemoryClusterDirectoryTests
 
         start.SetResult();
         var results = await Task.WhenAll(contenders);
-        var current = await directory.Lookup(GrainId);
+        var current = await directory.Lookup(GrainId, TestContext.Current.CancellationToken);
 
         Assert.NotNull(current);
         Assert.True(current.Version > original.Version);
@@ -502,9 +696,20 @@ public sealed class InMemoryClusterDirectoryTests
         Assert.Equal(Start + Lease + Lease, current.LeaseExpiration);
         Assert.Single(results.Where(static result => result is not null).Distinct());
         Assert.All(results, result => Assert.True(result is null || result == current));
-        Assert.Null(await directory.TryRenew(GrainId, original.Version, original.ClusterId, Lease));
-        Assert.Null(await directory.TryMove(GrainId, current.Version, "live-relocation", 3, Lease));
-        Assert.Equal(current, await directory.Lookup(GrainId));
+        Assert.Null(await directory.TryRenew(
+            GrainId,
+            original.Version,
+            original.ClusterId,
+            Lease,
+            TestContext.Current.CancellationToken));
+        Assert.Null(await directory.TryMove(
+            GrainId,
+            current.Version,
+            "live-relocation",
+            3,
+            Lease,
+            TestContext.Current.CancellationToken));
+        Assert.Equal(current, await directory.Lookup(GrainId, TestContext.Current.CancellationToken));
     }
 
     [Fact]

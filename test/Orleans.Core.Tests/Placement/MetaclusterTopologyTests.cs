@@ -31,7 +31,7 @@ public sealed class MetaclusterTopologyTests
         Assert.Empty(options.ExportedSystemTargets);
 
         var provider = CreateProvider(new ClusterOptions { ServiceId = " ", ClusterId = "" }, options);
-        var topology = await provider.GetTopology();
+        var topology = await provider.GetTopology(TestContext.Current.CancellationToken);
         var localCluster = Assert.Single(topology.Clusters);
 
         Assert.Equal(new ClusterIdentity(ClusterOptions.DefaultServiceId, ClusterOptions.DefaultClusterId),
@@ -51,7 +51,7 @@ public sealed class MetaclusterTopologyTests
         var exception = Record.Exception(() => CreateValidator(options).ValidateConfiguration());
         var topology = await CreateProvider(
             new ClusterOptions { ServiceId = "service", ClusterId = "local" },
-            options).GetTopology();
+            options).GetTopology(TestContext.Current.CancellationToken);
 
         Assert.Null(exception);
         Assert.Equal(2, options.Clusters.Count);
@@ -289,8 +289,8 @@ public sealed class MetaclusterTopologyTests
 
         options.Clusters["east"] = [new Uri("https://changed.example/gateway")];
         options.Clusters.Add("late", [new Uri("https://late.example/gateway")]);
-        var first = await provider.GetTopology();
-        var second = await provider.GetTopology();
+        var first = await provider.GetTopology(TestContext.Current.CancellationToken);
+        var second = await provider.GetTopology(TestContext.Current.CancellationToken);
 
         Assert.Same(first, second);
         Assert.Equal("service", first.ServiceId);
@@ -309,7 +309,8 @@ public sealed class MetaclusterTopologyTests
         var provider = CreateProvider(
             new ClusterOptions { ServiceId = "service", ClusterId = "local" },
             CreateValidOptions());
-        await using var enumerator = provider.Watch(cancellation.Token).GetAsyncEnumerator();
+        await using var enumerator = provider.Watch(cancellation.Token).GetAsyncEnumerator(
+            TestContext.Current.CancellationToken);
 
         Assert.True(await enumerator.MoveNextAsync());
         Assert.Equal("service", enumerator.Current.ServiceId);
@@ -330,7 +331,8 @@ public sealed class MetaclusterTopologyTests
         var provider = CreateProvider(
             new ClusterOptions { ServiceId = "service", ClusterId = "local" },
             CreateValidOptions());
-        await using var enumerator = provider.Watch(cancellation.Token).GetAsyncEnumerator();
+        await using var enumerator = provider.Watch(cancellation.Token).GetAsyncEnumerator(
+            TestContext.Current.CancellationToken);
 
         Assert.True(await enumerator.MoveNextAsync());
         Assert.Equal("service", enumerator.Current.ServiceId);

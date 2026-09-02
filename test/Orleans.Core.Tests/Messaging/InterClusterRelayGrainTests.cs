@@ -198,15 +198,15 @@ public sealed class InterClusterRelayGrainTests
         using var barrier = new Barrier(3);
         var cancel = Task.Run(() =>
         {
-            barrier.SignalAndWait();
+            barrier.SignalAndWait(TestContext.Current.CancellationToken);
             cancellation.Cancel();
-        });
+        }, TestContext.Current.CancellationToken);
         var complete = Task.Run(() =>
         {
-            barrier.SignalAndWait();
+            barrier.SignalAndWait(TestContext.Current.CancellationToken);
             receiver.Complete(Response.Completed);
-        });
-        barrier.SignalAndWait();
+        }, TestContext.Current.CancellationToken);
+        barrier.SignalAndWait(TestContext.Current.CancellationToken);
         await Task.WhenAll(cancel, complete);
 
         try
