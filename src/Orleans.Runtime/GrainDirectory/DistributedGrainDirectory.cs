@@ -70,6 +70,7 @@ internal sealed partial class DistributedGrainDirectory : SystemTarget, IGrainDi
 
     internal CancellationToken OnStoppedToken => _stoppedCts.Token;
     internal DirectoryInstruments DirectoryInstruments => _directoryInstruments;
+    internal DirectoryMembershipSnapshot DirectoryMembershipSnapshot => _membershipService.CurrentView;
     internal ClusterMembershipSnapshot ClusterMembershipSnapshot => _membershipService.CurrentView.ClusterMembershipSnapshot;
     internal ClusterMembershipSnapshot LatestClusterMembershipSnapshot => _membershipService.ClusterMembershipService.CurrentSnapshot;
 

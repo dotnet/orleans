@@ -43,6 +43,8 @@ namespace Orleans.Runtime
             return message;
         }
 
+        public Dictionary<string, object>? ExportRequestContext() => RequestContextExtensions.Export(_deepCopier);
+
         private CorrelationId GetNextCorrelationId()
         {
             var id = _seed ^ Interlocked.Increment(ref _nextId);

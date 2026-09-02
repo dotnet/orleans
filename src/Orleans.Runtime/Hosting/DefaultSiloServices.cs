@@ -126,6 +126,18 @@ namespace Orleans.Hosting
             services.TryAddFromExisting<IInternalGrainFactory, GrainFactory>();
             services.TryAddSingleton<IGrainReferenceRuntime, GrainReferenceRuntime>();
             services.TryAddSingleton<GrainReferenceActivator>();
+            services.TryAddSingleton<UniversalReferenceBindingResolver>();
+            services.TryAddSingleton<ClusterLocatorResolver>();
+            services.TryAddSingleton<ClusterReferenceResolver>();
+            services.TryAddSingleton<ClusterPlacementStrategyResolver>();
+            services.TryAddSingleton<ClusterPlacementDirectorResolver>();
+            services.TryAddSingleton<IInterClusterTransport, UnavailableInterClusterTransport>();
+            services.TryAddSingleton<IMetaclusterTopologyProvider, StaticMetaclusterTopologyProvider>();
+            services.TryAddSingleton<IInterClusterRequestReceiver, InterClusterRequestReceiver>();
+            services.TryAddSingleton<IInterClusterRequestAuthorizer, RejectingInterClusterRequestAuthorizer>();
+            services.TryAddSingleton<ClusterOwnershipLeaseMonitor>();
+            services.AddFromExisting<ILifecycleParticipant<ISiloLifecycle>, ClusterOwnershipLeaseMonitor>();
+            services.TryAddSingleton<IClusterOwnershipAccessor, ClusterOwnershipAccessor>();
             services.AddSingleton<IGrainReferenceActivatorProvider, GrainReferenceActivatorProvider>();
             services.AddSingleton<IGrainReferenceActivatorProvider, UntypedGrainReferenceActivatorProvider>();
             services.AddSingleton<IConfigureGrainContextProvider, MayInterleaveConfiguratorProvider>();
@@ -351,6 +363,7 @@ namespace Orleans.Hosting
             // This validator needs to construct the IMembershipOracle and the IMembershipTable
             // so move it in the end so other validator are called first
             services.AddTransient<IConfigurationValidator, ClusterOptionsValidator>();
+            services.AddTransient<IConfigurationValidator, MetaclusterOptionsValidator>();
             services.AddTransient<IConfigurationValidator, SiloClusteringValidator>();
             services.AddTransient<IConfigurationValidator, DevelopmentClusterMembershipOptionsValidator>();
             services.AddTransient<IConfigurationValidator, GrainTypeOptionsValidator>();

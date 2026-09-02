@@ -5,6 +5,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Orleans.Internal;
+using Orleans.Runtime.ClusterServices;
 using Orleans.Runtime.Internal;
 using Orleans.Runtime.Utilities;
 
@@ -17,22 +18,21 @@ internal sealed partial class DirectoryMembershipService : IAsyncDisposable
     private readonly CancellationTokenSource _shutdownCts = new();
     private readonly Task _runTask;
     private readonly AsyncEnumerable<DirectoryMembershipSnapshot> _viewUpdates;
-    private readonly int _partitionsPerSilo;
-    private readonly Func<SiloAddress, int, uint[]> _getRingBoundaries;
+    private readonly ClusterServiceMembership _membership;
 
     public DirectoryMembershipSnapshot CurrentView { get; private set; } = DirectoryMembershipSnapshot.Default;
 
-    public int PartitionsPerSilo => _partitionsPerSilo;
+    public int PartitionsPerSilo => _membership.CurrentView.PartitionCount;
 
     public IAsyncEnumerable<DirectoryMembershipSnapshot> ViewUpdates => _viewUpdates;
 
-    public IClusterMembershipService ClusterMembershipService { get; }
+    public IClusterMembershipService ClusterMembershipService => _membership.ClusterMembershipService;
 
     public async ValueTask<DirectoryMembershipSnapshot> RefreshViewAsync(MembershipVersion version, CancellationToken cancellationToken)
     {
         if (version == default || CurrentView.Version < version)
         {
-            await ClusterMembershipService.Refresh(version, cancellationToken);
+            await _membership.RefreshViewAsync(version, cancellationToken);
         }
 
         if (CurrentView.Version < version)
@@ -57,13 +57,17 @@ internal sealed partial class DirectoryMembershipService : IAsyncDisposable
         Func<SiloAddress, int, uint[]> getRingBoundaries)
     {
         ArgumentOutOfRangeException.ThrowIfLessThan(partitionsPerSilo, 1);
-        _partitionsPerSilo = partitionsPerSilo;
-        _getRingBoundaries = getRingBoundaries;
+        _membership = new(
+            clusterMembershipService,
+            DirectoryMembershipSnapshot.CreateConfiguration(partitionsPerSilo),
+            getRingBoundaries,
+            logger,
+            ClusterMembershipSnapshot.Default);
+        CurrentView = new(_membership.CurrentView, grainFactory);
         _viewUpdates = new(
-            DirectoryMembershipSnapshot.Default,
-            (previous, proposed) => proposed.Version >= previous.Version,
+            CurrentView,
+            (previous, proposed) => proposed.Version > previous.Version,
             update => CurrentView = update);
-        ClusterMembershipService = clusterMembershipService;
         _grainFactory = grainFactory;
         _logger = logger;
         using var _ = new ExecutionContextSuppressor();
@@ -78,10 +82,9 @@ internal sealed partial class DirectoryMembershipService : IAsyncDisposable
             {
                 try
                 {
-                    await foreach (var update in ClusterMembershipService.MembershipUpdates.WithCancellation(_shutdownCts.Token))
+                    await foreach (var update in _membership.ViewUpdates.WithCancellation(_shutdownCts.Token))
                     {
-                        var view = new DirectoryMembershipSnapshot(update, _grainFactory, _partitionsPerSilo, _getRingBoundaries);
-                        _viewUpdates.Publish(view);
+                        _viewUpdates.Publish(new(update, _grainFactory));
                     }
                 }
                 catch (Exception exception)
@@ -103,6 +106,8 @@ internal sealed partial class DirectoryMembershipService : IAsyncDisposable
     {
         _shutdownCts.Cancel();
         await _runTask.SuppressThrowing();
+        await _membership.DisposeAsync();
+        _shutdownCts.Dispose();
     }
 
     [LoggerMessage(

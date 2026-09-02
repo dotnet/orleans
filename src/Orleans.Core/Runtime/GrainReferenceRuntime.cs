@@ -100,14 +100,18 @@ namespace Orleans.Runtime
 
         public object Cast(IAddressable grain, Type grainInterface)
         {
-            var grainId = grain.GetGrainId();
             if (grain is GrainReference && grainInterface.IsAssignableFrom(grain.GetType()))
             {
                 return grain;
             }
 
             var interfaceType = this.interfaceTypeResolver.GetGrainInterfaceType(grainInterface);
-            return this.referenceActivator.CreateReference(grainId, interfaceType);
+            if (grain is GrainReference reference)
+            {
+                return this.referenceActivator.CreateReference(reference.UniversalReference.WithInterfaceType(interfaceType));
+            }
+
+            return this.referenceActivator.CreateReference(grain.GetGrainId(), interfaceType);
         }
 
         /// <summary>
