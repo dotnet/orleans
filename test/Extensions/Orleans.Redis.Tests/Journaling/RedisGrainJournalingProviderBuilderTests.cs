@@ -158,7 +158,7 @@ public sealed class RedisGrainJournalingProviderBuilderTests
     {
         var values = rootSettings
             .Concat(settings.Select(setting => ($"{ConfigurationSectionName}:{setting.Key}", setting.Value)))
-            .ToDictionary();
+            .ToDictionary(setting => setting.Item1, setting => setting.Item2);
         var configuration = new ConfigurationBuilder()
             .AddInMemoryCollection(values)
             .Build();
