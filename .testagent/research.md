@@ -1,7 +1,7 @@
 # Test Generation Research
 
 ## Project Overview
-- **Path**: `C:\dev\copilot-worktrees\orleans\rb-issue-10865-test-hosting-close-long-tail-package-cov-c9e442`
+- **Path**: repository root
 - **Language**: C# (`LangVersion=preview`, nullable enabled in the source project)
 - **Framework**: .NET, targeting `net8.0;net10.0`
 - **Test Framework**: xUnit v3 `3.2.2` on Microsoft Testing Platform `2.3.3`
@@ -25,7 +25,7 @@
 - **Lint**: No separate command; the scoped build enforces style and warnings as errors through `EnforceCodeStyleInBuild=true` and `TreatWarningsAsErrors=true`.
 
 ## Scope
-- **Boundary**: Production only under `src/Orleans.Connections.Security`; all generated tests must be under `test/Orleans.Connections.Security.Tests`. Do not modify production, other test projects, or sibling source trees.
+- **Boundary**: Production changes are limited to `src/Orleans.Connections.Security`; generated tests remain under `test/Orleans.Connections.Security.Tests`. The implementation adds one friend-assembly declaration and the handshake cancellation-source fix discovered by the boundary tests.
 - **Targets**:
   - `Hosting/HostingExtensions.cs`
   - `Hosting/HostingExtensions.IClientBuilder.cs`

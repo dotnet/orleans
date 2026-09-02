@@ -174,68 +174,80 @@ internal sealed class RecordingPipeWriter(FlushResult flushResult) : PipeWriter
 
 internal sealed class TrackingStream(Stream inner, bool disposeInner = false) : Stream
 {
+    private bool _disposed;
+
     public int DisposeCount { get; private set; }
 
     public int DisposeAsyncCount { get; private set; }
 
-    public override bool CanRead => inner.CanRead;
+    private Stream Inner
+    {
+        get
+        {
+            ObjectDisposedException.ThrowIf(_disposed, this);
+            return inner;
+        }
+    }
 
-    public override bool CanSeek => inner.CanSeek;
+    public override bool CanRead => Inner.CanRead;
 
-    public override bool CanWrite => inner.CanWrite;
+    public override bool CanSeek => Inner.CanSeek;
 
-    public override long Length => inner.Length;
+    public override bool CanWrite => Inner.CanWrite;
+
+    public override long Length => Inner.Length;
 
     public override long Position
     {
-        get => inner.Position;
-        set => inner.Position = value;
+        get => Inner.Position;
+        set => Inner.Position = value;
     }
 
-    public override void Flush() => inner.Flush();
+    public override void Flush() => Inner.Flush();
 
-    public override Task FlushAsync(CancellationToken cancellationToken) => inner.FlushAsync(cancellationToken);
+    public override Task FlushAsync(CancellationToken cancellationToken) => Inner.FlushAsync(cancellationToken);
 
-    public override int Read(byte[] buffer, int offset, int count) => inner.Read(buffer, offset, count);
+    public override int Read(byte[] buffer, int offset, int count) => Inner.Read(buffer, offset, count);
 
-    public override int Read(Span<byte> buffer) => inner.Read(buffer);
+    public override int Read(Span<byte> buffer) => Inner.Read(buffer);
 
     public override Task<int> ReadAsync(
         byte[] buffer,
         int offset,
         int count,
         CancellationToken cancellationToken) =>
-        inner.ReadAsync(buffer, offset, count, cancellationToken);
+        Inner.ReadAsync(buffer, offset, count, cancellationToken);
 
     public override ValueTask<int> ReadAsync(
         Memory<byte> buffer,
         CancellationToken cancellationToken = default) =>
-        inner.ReadAsync(buffer, cancellationToken);
+        Inner.ReadAsync(buffer, cancellationToken);
 
-    public override long Seek(long offset, SeekOrigin origin) => inner.Seek(offset, origin);
+    public override long Seek(long offset, SeekOrigin origin) => Inner.Seek(offset, origin);
 
-    public override void SetLength(long value) => inner.SetLength(value);
+    public override void SetLength(long value) => Inner.SetLength(value);
 
-    public override void Write(byte[] buffer, int offset, int count) => inner.Write(buffer, offset, count);
+    public override void Write(byte[] buffer, int offset, int count) => Inner.Write(buffer, offset, count);
 
-    public override void Write(ReadOnlySpan<byte> buffer) => inner.Write(buffer);
+    public override void Write(ReadOnlySpan<byte> buffer) => Inner.Write(buffer);
 
     public override Task WriteAsync(
         byte[] buffer,
         int offset,
         int count,
         CancellationToken cancellationToken) =>
-        inner.WriteAsync(buffer, offset, count, cancellationToken);
+        Inner.WriteAsync(buffer, offset, count, cancellationToken);
 
     public override ValueTask WriteAsync(
         ReadOnlyMemory<byte> buffer,
         CancellationToken cancellationToken = default) =>
-        inner.WriteAsync(buffer, cancellationToken);
+        Inner.WriteAsync(buffer, cancellationToken);
 
     protected override void Dispose(bool disposing)
     {
-        if (disposing)
+        if (disposing && !_disposed)
         {
+            _disposed = true;
             DisposeCount++;
             if (disposeInner)
             {
@@ -248,11 +260,19 @@ internal sealed class TrackingStream(Stream inner, bool disposeInner = false) : 
 
     public override async ValueTask DisposeAsync()
     {
+        if (_disposed)
+        {
+            return;
+        }
+
+        _disposed = true;
         DisposeAsyncCount++;
         if (disposeInner)
         {
             await inner.DisposeAsync();
         }
+
+        GC.SuppressFinalize(this);
     }
 }
 

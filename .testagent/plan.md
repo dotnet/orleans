@@ -4,7 +4,7 @@
 
 Continue the deterministic TLS coverage with a fourth, pipe-focused phase after the completed public options/hosting phases. Phase 4 directly exercises `DuplexPipeStream`, its nested `TaskToApm`/`TaskAsyncResult`, `DuplexPipeStreamAdapter<TStream>`, and `TlsDuplexPipe` using friend-assembly access and in-memory pipes only.
 
-All tests use xUnit v3 and deterministic in-memory collaborators. The pipe-focused phase uses explicit `Pipe`, `TaskCompletionSource`, and small custom `PipeReader`/`PipeWriter`/`Stream` implementations. No certificate stores, sockets, sleeps, polling, reflection, elapsed-time assertions, or environment assumptions are used.
+All tests use xUnit v3 and deterministic in-memory collaborators. The pipe-focused phase uses explicit `Pipe`, `TaskCompletionSource`, and small custom `PipeReader`/`PipeWriter`/`Stream` implementations. Production changes are limited to the friend-assembly declaration and the handshake cancellation-source fix exposed by the infinite-timeout boundary test. No certificate stores, sockets, sleeps, polling, reflection, elapsed-time assertions, or environment assumptions are used.
 
 ## Files Changed
 
@@ -17,9 +17,12 @@ All tests use xUnit v3 and deterministic in-memory collaborators. The pipe-focus
 - **Add**: `test/Orleans.Connections.Security.Tests/TaskToApmTests.cs`
 - **Add**: `test/Orleans.Connections.Security.Tests/DuplexPipeStreamAdapterTests.cs`
 - **Add**: `test/Orleans.Connections.Security.Tests/PipeTestInfrastructure.cs`
+- **Add**: `test/Orleans.Connections.Security.Tests/TlsMiddlewareTests.cs`
 - **Extend**: `src/Orleans.Connections.Security/Orleans.Connections.Security.csproj` with one centralized `InternalsVisibleTo` item for `Orleans.Connections.Security.Tests`
+- **Update**: `src/Orleans.Connections.Security/Security/TlsOptions.cs` with handshake cancellation-source creation
+- **Update**: client/server TLS middleware to use the handshake cancellation-source helper
 
-The only production-tree change is the explicitly permitted centralized friend-assembly declaration; no production implementation changes are planned.
+No source project outside `src/Orleans.Connections.Security` and no test project outside `test/Orleans.Connections.Security.Tests` changes.
 
 ## Commands
 
