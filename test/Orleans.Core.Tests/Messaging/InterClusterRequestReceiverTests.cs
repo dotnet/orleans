@@ -33,7 +33,7 @@ public sealed class InterClusterRequestReceiverTests(TestEnvironmentFixture envi
         var expected = Response.FromResult(42);
         fixture.Response = expected;
 
-        var actual = await fixture.Receive();
+        var actual = await fixture.Receive(cancellationToken: TestContext.Current.CancellationToken);
 
         Assert.Same(expected, actual);
         Assert.Equal(
@@ -52,7 +52,9 @@ public sealed class InterClusterRequestReceiverTests(TestEnvironmentFixture envi
         var wrongSource = new ClusterIdentity("other-service", "source");
 
         var exception = await Assert.ThrowsAsync<InvalidOperationException>(
-            () => fixture.Receive(source: wrongSource).AsTask());
+            () => fixture.Receive(
+                source: wrongSource,
+                cancellationToken: TestContext.Current.CancellationToken).AsTask());
 
         Assert.Contains("must match local service 'service'", exception.Message, StringComparison.Ordinal);
         Assert.Empty(fixture.Calls);
@@ -74,7 +76,7 @@ public sealed class InterClusterRequestReceiverTests(TestEnvironmentFixture envi
             });
 
         var actual = await Assert.ThrowsAsync<UnauthorizedAccessException>(
-            () => fixture.Receive().AsTask());
+            () => fixture.Receive(cancellationToken: TestContext.Current.CancellationToken).AsTask());
 
         Assert.Same(expected, actual);
         Assert.Equal(["authorize"], fixture.Calls);
@@ -87,11 +89,15 @@ public sealed class InterClusterRequestReceiverTests(TestEnvironmentFixture envi
         var source = new ClusterIdentity("service", "source");
 
         var first = await Assert.ThrowsAsync<UnauthorizedAccessException>(
-            () => authorizer.Authorize(source, ReceiverFixture.CreateTarget("local")).AsTask());
+            () => authorizer.Authorize(
+                source,
+                ReceiverFixture.CreateTarget("local"),
+                TestContext.Current.CancellationToken).AsTask());
         var second = await Assert.ThrowsAsync<UnauthorizedAccessException>(
             () => authorizer.Authorize(
                 new ClusterIdentity("service", "other"),
-                ReceiverFixture.CreateTarget("local")).AsTask());
+                ReceiverFixture.CreateTarget("local"),
+                TestContext.Current.CancellationToken).AsTask());
 
         Assert.Equal(first.Message, second.Message.Replace("'service/other'", "'service/source'", StringComparison.Ordinal));
         Assert.Contains(nameof(IInterClusterRequestAuthorizer), first.Message, StringComparison.Ordinal);
@@ -103,7 +109,9 @@ public sealed class InterClusterRequestReceiverTests(TestEnvironmentFixture envi
         using var fixture = new ReceiverFixture(environment);
 
         var exception = await Assert.ThrowsAsync<UnauthorizedAccessException>(
-            () => fixture.Receive(source: new ClusterIdentity("service", "spoofed")).AsTask());
+            () => fixture.Receive(
+                source: new ClusterIdentity("service", "spoofed"),
+                cancellationToken: TestContext.Current.CancellationToken).AsTask());
 
         Assert.Contains("spoofed", exception.Message, StringComparison.Ordinal);
         Assert.Equal(["authorize", "topology"], fixture.Calls);
@@ -116,12 +124,14 @@ public sealed class InterClusterRequestReceiverTests(TestEnvironmentFixture envi
         fixture.SetSourceState(MetaclusterClusterState.Removed);
 
         var removed = await Assert.ThrowsAsync<UnauthorizedAccessException>(
-            () => fixture.Receive().AsTask());
+            () => fixture.Receive(cancellationToken: TestContext.Current.CancellationToken).AsTask());
         Assert.Equal(["authorize", "topology"], fixture.Calls);
         fixture.Calls.Clear();
         fixture.SetSourceState(MetaclusterClusterState.Active);
         var wrongDestination = await Assert.ThrowsAsync<InvalidOperationException>(
-            () => fixture.Receive(target: ReceiverFixture.CreateTarget("unknown")).AsTask());
+            () => fixture.Receive(
+                target: ReceiverFixture.CreateTarget("unknown"),
+                cancellationToken: TestContext.Current.CancellationToken).AsTask());
 
         Assert.Contains("source", removed.Message, StringComparison.Ordinal);
         Assert.Contains("unknown", wrongDestination.Message, StringComparison.Ordinal);
@@ -135,7 +145,7 @@ public sealed class InterClusterRequestReceiverTests(TestEnvironmentFixture envi
         fixture.SetLocalState(MetaclusterClusterState.Removed);
 
         var exception = await Assert.ThrowsAsync<InvalidOperationException>(
-            () => fixture.Receive().AsTask());
+            () => fixture.Receive(cancellationToken: TestContext.Current.CancellationToken).AsTask());
 
         Assert.Contains("Local cluster 'local'", exception.Message, StringComparison.Ordinal);
         Assert.Equal(["authorize", "topology"], fixture.Calls);
@@ -153,7 +163,9 @@ public sealed class InterClusterRequestReceiverTests(TestEnvironmentFixture envi
             fixture.Target.ServiceId);
 
         var exception = await Assert.ThrowsAsync<InvalidOperationException>(
-            () => fixture.Receive(target: target).AsTask());
+            () => fixture.Receive(
+                target: target,
+                cancellationToken: TestContext.Current.CancellationToken).AsTask());
 
         Assert.Contains("must be cluster-bound", exception.Message, StringComparison.Ordinal);
         Assert.Equal(["authorize", "topology"], fixture.Calls);
@@ -167,7 +179,7 @@ public sealed class InterClusterRequestReceiverTests(TestEnvironmentFixture envi
         using var fixture = new ReceiverFixture(environment);
         fixture.SetSourceState(MetaclusterClusterState.Draining);
 
-        var response = await fixture.Receive();
+        var response = await fixture.Receive(cancellationToken: TestContext.Current.CancellationToken);
 
         Assert.Same(Response.Completed, response);
         Assert.Equal(
@@ -187,7 +199,9 @@ public sealed class InterClusterRequestReceiverTests(TestEnvironmentFixture envi
             "local");
 
         var exception = await Assert.ThrowsAsync<InvalidOperationException>(
-            () => fixture.Receive(target: target).AsTask());
+            () => fixture.Receive(
+                target: target,
+                cancellationToken: TestContext.Current.CancellationToken).AsTask());
 
         Assert.Contains("does not match", exception.Message, StringComparison.Ordinal);
         Assert.Equal(["authorize", "topology"], fixture.Calls);
@@ -205,7 +219,9 @@ public sealed class InterClusterRequestReceiverTests(TestEnvironmentFixture envi
             "local");
 
         var exception = await Assert.ThrowsAsync<InvalidOperationException>(
-            () => fixture.Receive(target: target).AsTask());
+            () => fixture.Receive(
+                target: target,
+                cancellationToken: TestContext.Current.CancellationToken).AsTask());
 
         Assert.Contains("must identify the interface", exception.Message, StringComparison.Ordinal);
         Assert.Equal(["authorize", "topology"], fixture.Calls);
@@ -218,7 +234,9 @@ public sealed class InterClusterRequestReceiverTests(TestEnvironmentFixture envi
         using var fixture = new ReceiverFixture(environment);
 
         var exception = await Assert.ThrowsAsync<UnauthorizedAccessException>(
-            () => fixture.Receive(options: InvokeMethodOptions.AlwaysInterleave).AsTask());
+            () => fixture.Receive(
+                options: InvokeMethodOptions.AlwaysInterleave,
+                cancellationToken: TestContext.Current.CancellationToken).AsTask());
 
         Assert.Contains("do not match trusted request options", exception.Message, StringComparison.Ordinal);
         Assert.Equal(["authorize", "topology"], fixture.Calls);
@@ -232,7 +250,10 @@ public sealed class InterClusterRequestReceiverTests(TestEnvironmentFixture envi
         var (target, request) = fixture.CreateSystemTarget();
 
         var exception = await Assert.ThrowsAsync<UnauthorizedAccessException>(
-            () => fixture.Receive(target: target, request: request).AsTask());
+            () => fixture.Receive(
+                target: target,
+                request: request,
+                cancellationToken: TestContext.Current.CancellationToken).AsTask());
 
         Assert.Contains("not exported", exception.Message, StringComparison.Ordinal);
         Assert.Equal(["authorize", "topology"], fixture.Calls);
@@ -246,10 +267,16 @@ public sealed class InterClusterRequestReceiverTests(TestEnvironmentFixture envi
         var (target, request) = fixture.CreateSystemTarget();
         fixture.Options.ExportedSystemTargets.Add(target.GrainId.Type.ToString());
 
-        var response = await fixture.Receive(target: target, request: request);
+        var response = await fixture.Receive(
+            target: target,
+            request: request,
+            cancellationToken: TestContext.Current.CancellationToken);
         var wrongRequest = fixture.CreateRequest(typeof(ISimpleGrain));
         var exception = await Assert.ThrowsAsync<InvalidOperationException>(
-            () => fixture.Receive(target: target, request: wrongRequest).AsTask());
+            () => fixture.Receive(
+                target: target,
+                request: wrongRequest,
+                cancellationToken: TestContext.Current.CancellationToken).AsTask());
 
         Assert.Same(Response.Completed, response);
         Assert.Contains("does not match", exception.Message, StringComparison.Ordinal);
@@ -269,11 +296,17 @@ public sealed class InterClusterRequestReceiverTests(TestEnvironmentFixture envi
         fixture.Options.ExportedSystemTargets.Add(unknownTarget.GrainId.Type.ToString());
 
         var unknown = await Assert.ThrowsAsync<UnauthorizedAccessException>(
-            () => fixture.Receive(target: unknownTarget, request: request).AsTask());
+            () => fixture.Receive(
+                target: unknownTarget,
+                request: request,
+                cancellationToken: TestContext.Current.CancellationToken).AsTask());
 
         fixture.SetSystemTargetSiloStatus(unknownSilo, SiloStatus.Dead);
         var inactive = await Assert.ThrowsAsync<UnauthorizedAccessException>(
-            () => fixture.Receive(target: unknownTarget, request: request).AsTask());
+            () => fixture.Receive(
+                target: unknownTarget,
+                request: request,
+                cancellationToken: TestContext.Current.CancellationToken).AsTask());
 
         Assert.Contains("active member", unknown.Message, StringComparison.Ordinal);
         Assert.Contains("active member", inactive.Message, StringComparison.Ordinal);
@@ -288,7 +321,7 @@ public sealed class InterClusterRequestReceiverTests(TestEnvironmentFixture envi
         fixture.Ownership.Failure = expected;
 
         var actual = await Assert.ThrowsAsync<InvalidOperationException>(
-            () => fixture.Receive().AsTask());
+            () => fixture.Receive(cancellationToken: TestContext.Current.CancellationToken).AsTask());
 
         Assert.Same(expected, actual);
         Assert.Equal(["authorize", "topology", "ownership"], fixture.Calls);
@@ -301,7 +334,10 @@ public sealed class InterClusterRequestReceiverTests(TestEnvironmentFixture envi
         using var fixture = new ReceiverFixture(environment);
         var request = fixture.CreateRequest(typeof(ISimpleGrain), InvokeMethodOptions.OneWay);
 
-        var actual = await fixture.Receive(request: request, options: InvokeMethodOptions.OneWay);
+        var actual = await fixture.Receive(
+            request: request,
+            options: InvokeMethodOptions.OneWay,
+            cancellationToken: TestContext.Current.CancellationToken);
 
         Assert.Same(Response.Completed, actual);
         fixture.Runtime.Received(1).SendRequest(
@@ -323,7 +359,7 @@ public sealed class InterClusterRequestReceiverTests(TestEnvironmentFixture envi
             object? observed = null;
             fixture.OnDispatch = () => observed = RequestContext.Get("phase5");
 
-            await fixture.Receive();
+            await fixture.Receive(cancellationToken: TestContext.Current.CancellationToken);
 
             Assert.Equal("inbound", observed);
             Assert.Equal("inbound", RequestContext.Get("phase5"));
@@ -341,7 +377,7 @@ public sealed class InterClusterRequestReceiverTests(TestEnvironmentFixture envi
         var expected = Response.FromResult("remote-result");
         fixture.Response = expected;
 
-        var actual = await fixture.Receive();
+        var actual = await fixture.Receive(cancellationToken: TestContext.Current.CancellationToken);
 
         Assert.Same(expected, actual);
         Assert.Equal("remote-result", actual.GetResult<string>());
@@ -356,7 +392,7 @@ public sealed class InterClusterRequestReceiverTests(TestEnvironmentFixture envi
         fixture.Response = Response.FromException(expected);
 
         var actual = await Assert.ThrowsAsync<ApplicationException>(
-            () => fixture.Receive().AsTask());
+            () => fixture.Receive(cancellationToken: TestContext.Current.CancellationToken).AsTask());
 
         Assert.Same(expected, actual);
         Assert.Equal(["authorize", "topology", "ownership", "factory", "dispatch"], fixture.Calls);
@@ -425,7 +461,9 @@ public sealed class InterClusterRequestReceiverTests(TestEnvironmentFixture envi
             "local");
 
         var exception = await Assert.ThrowsAsync<InvalidOperationException>(
-            () => fixture.Receive(target: target).AsTask());
+            () => fixture.Receive(
+                target: target,
+                cancellationToken: TestContext.Current.CancellationToken).AsTask());
 
         Assert.Contains("target service 'other-service'", exception.Message, StringComparison.Ordinal);
         Assert.Empty(fixture.Calls);
@@ -441,7 +479,9 @@ public sealed class InterClusterRequestReceiverTests(TestEnvironmentFixture envi
         request.GetInterfaceType().Returns(typeof(ISimpleGrain));
 
         var exception = await Assert.ThrowsAsync<InvalidOperationException>(
-            () => fixture.Receive(request: request).AsTask());
+            () => fixture.Receive(
+                request: request,
+                cancellationToken: TestContext.Current.CancellationToken).AsTask());
 
         Assert.Contains("does not expose trusted invocation metadata", exception.Message, StringComparison.Ordinal);
         Assert.Equal(["authorize", "topology"], fixture.Calls);
@@ -461,7 +501,10 @@ public sealed class InterClusterRequestReceiverTests(TestEnvironmentFixture envi
         fixture.SetSystemTargetSiloStatus(staleGeneration, SiloStatus.Active);
 
         var rejected = await Assert.ThrowsAsync<UnauthorizedAccessException>(
-            () => fixture.Receive(target: target, request: request).AsTask());
+            () => fixture.Receive(
+                target: target,
+                request: request,
+                cancellationToken: TestContext.Current.CancellationToken).AsTask());
 
         Assert.Contains("active member", rejected.Message, StringComparison.Ordinal);
         Assert.Equal(exactSilo.Endpoint, staleGeneration.Endpoint);
@@ -469,7 +512,10 @@ public sealed class InterClusterRequestReceiverTests(TestEnvironmentFixture envi
         fixture.Runtime.DidNotReceiveWithAnyArgs().SendRequest(default!, default!, default, default);
 
         fixture.SetSystemTargetSiloStatus(exactSilo, SiloStatus.Active);
-        var accepted = await fixture.Receive(target: target, request: request);
+        var accepted = await fixture.Receive(
+            target: target,
+            request: request,
+            cancellationToken: TestContext.Current.CancellationToken);
 
         Assert.Same(Response.Completed, accepted);
         fixture.Runtime.Received(1).SendRequest(

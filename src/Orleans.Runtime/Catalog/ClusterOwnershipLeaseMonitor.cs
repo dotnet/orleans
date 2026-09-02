@@ -108,7 +108,8 @@ internal sealed class ClusterOwnershipLeaseMonitor : ILifecycleParticipant<ISilo
             renewals.Add(renewal.Task);
         }
 
-        await Task.WhenAll(renewals).WaitAsync(cancellationToken).SuppressThrowing();
+        await Task.WhenAll(renewals).SuppressThrowing();
+        _stopping.Dispose();
     }
 
     private async Task Run()

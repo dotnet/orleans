@@ -46,7 +46,7 @@ public sealed class ClusterServiceMembershipTests
             partitionsPerSilo: 2,
             GetBoundaries);
         await service.EnumeratorStarted;
-        await using var updates = membership.ViewUpdates.GetAsyncEnumerator();
+        await using var updates = membership.ViewUpdates.GetAsyncEnumerator(TestContext.Current.CancellationToken);
 
         Assert.True(await updates.MoveNextAsync());
         Assert.Same(membership.CurrentView, updates.Current);
@@ -79,7 +79,7 @@ public sealed class ClusterServiceMembershipTests
             partitionsPerSilo: 2,
             GetBoundaries);
         await service.EnumeratorStarted;
-        await using var updates = membership.ViewUpdates.GetAsyncEnumerator();
+        await using var updates = membership.ViewUpdates.GetAsyncEnumerator(TestContext.Current.CancellationToken);
         var versions = new List<MembershipVersion>();
 
         Assert.True(await updates.MoveNextAsync());
@@ -113,7 +113,7 @@ public sealed class ClusterServiceMembershipTests
     {
         await using var fixture = new ClusterServiceMembershipFixture();
         await fixture.Service.EnumeratorStarted;
-        await using var updates = fixture.Membership.ViewUpdates.GetAsyncEnumerator();
+        await using var updates = fixture.Membership.ViewUpdates.GetAsyncEnumerator(TestContext.Current.CancellationToken);
         var versions = new List<MembershipVersion>();
 
         Assert.True(await updates.MoveNextAsync());
@@ -142,7 +142,7 @@ public sealed class ClusterServiceMembershipTests
     {
         await using var fixture = new ClusterServiceMembershipFixture();
         await fixture.Service.EnumeratorStarted;
-        await using var updates = fixture.Membership.ViewUpdates.GetAsyncEnumerator();
+        await using var updates = fixture.Membership.ViewUpdates.GetAsyncEnumerator(TestContext.Current.CancellationToken);
         var versions = new List<MembershipVersion>();
 
         Assert.True(await updates.MoveNextAsync());
@@ -206,7 +206,7 @@ public sealed class ClusterServiceMembershipTests
         await using var fixture = new ClusterServiceMembershipFixture();
         await fixture.Service.EnumeratorStarted;
         await PublishAndObserve(fixture, CreateSnapshot(2, CreateSilo(1)));
-        await using var observer = fixture.Membership.ViewUpdates.GetAsyncEnumerator();
+        await using var observer = fixture.Membership.ViewUpdates.GetAsyncEnumerator(TestContext.Current.CancellationToken);
         Assert.True(await observer.MoveNextAsync());
 
         var refresh = fixture.Membership.RefreshViewAsync(new(4), CancellationToken.None).AsTask();
@@ -250,7 +250,7 @@ public sealed class ClusterServiceMembershipTests
     {
         var fixture = new ClusterServiceMembershipFixture();
         await fixture.Service.EnumeratorStarted;
-        await using var updates = fixture.Membership.ViewUpdates.GetAsyncEnumerator();
+        await using var updates = fixture.Membership.ViewUpdates.GetAsyncEnumerator(TestContext.Current.CancellationToken);
         Assert.True(await updates.MoveNextAsync());
         var subscriberCompletion = updates.MoveNextAsync().AsTask();
         var lastView = fixture.Membership.CurrentView;
@@ -260,7 +260,7 @@ public sealed class ClusterServiceMembershipTests
         Assert.False(await subscriberCompletion);
         fixture.Service.Publish(CreateSnapshot(9, CreateSilo(1)));
         Assert.Same(lastView, fixture.Membership.CurrentView);
-        await using var lateSubscriber = fixture.Membership.ViewUpdates.GetAsyncEnumerator();
+        await using var lateSubscriber = fixture.Membership.ViewUpdates.GetAsyncEnumerator(TestContext.Current.CancellationToken);
         Assert.False(await lateSubscriber.MoveNextAsync());
     }
 
@@ -298,7 +298,7 @@ public sealed class ClusterServiceMembershipTests
         ClusterServiceMembershipFixture fixture,
         ClusterMembershipSnapshot snapshot)
     {
-        await using var updates = fixture.Membership.ViewUpdates.GetAsyncEnumerator();
+        await using var updates = fixture.Membership.ViewUpdates.GetAsyncEnumerator(TestContext.Current.CancellationToken);
         Assert.True(await updates.MoveNextAsync());
         return await PublishAndReadNext(fixture, updates, snapshot);
     }
@@ -470,8 +470,8 @@ public sealed class ClusterServiceMembershipTests
     {
         await using var fixture = new ClusterServiceMembershipFixture();
         await fixture.Service.EnumeratorStarted;
-        await using var firstSubscriber = fixture.Membership.ViewUpdates.GetAsyncEnumerator();
-        await using var secondSubscriber = fixture.Membership.ViewUpdates.GetAsyncEnumerator();
+        await using var firstSubscriber = fixture.Membership.ViewUpdates.GetAsyncEnumerator(TestContext.Current.CancellationToken);
+        await using var secondSubscriber = fixture.Membership.ViewUpdates.GetAsyncEnumerator(TestContext.Current.CancellationToken);
         Assert.True(await firstSubscriber.MoveNextAsync());
         Assert.True(await secondSubscriber.MoveNextAsync());
 
@@ -494,7 +494,7 @@ public sealed class ClusterServiceMembershipTests
         Assert.Same(lastView, fixture.Membership.CurrentView);
         Assert.Equal(new MembershipVersion(6), fixture.Membership.CurrentView.ViewId.MembershipVersion);
         Assert.Equal([CreateSilo(2), CreateSilo(4)], fixture.Membership.CurrentView.Members);
-        await using var lateSubscriber = fixture.Membership.ViewUpdates.GetAsyncEnumerator();
+        await using var lateSubscriber = fixture.Membership.ViewUpdates.GetAsyncEnumerator(TestContext.Current.CancellationToken);
         Assert.False(await lateSubscriber.MoveNextAsync());
     }
 
@@ -503,7 +503,7 @@ public sealed class ClusterServiceMembershipTests
     {
         await using var fixture = new ClusterServiceMembershipFixture();
         await fixture.Service.EnumeratorStarted;
-        await using var updates = fixture.Membership.ViewUpdates.GetAsyncEnumerator();
+        await using var updates = fixture.Membership.ViewUpdates.GetAsyncEnumerator(TestContext.Current.CancellationToken);
         var observedVersions = new List<MembershipVersion>();
 
         Assert.True(await updates.MoveNextAsync());

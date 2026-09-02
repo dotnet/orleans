@@ -28,8 +28,11 @@ public sealed class DirectoryClusterLocatorTests
     {
         var fixture = CreateFixture(Topology(3, ("east", MetaclusterClusterState.Active)));
 
-        var location = await fixture.Locator.Locate(GrainId, Context("east"));
-        var entry = await fixture.Directory.Lookup(GrainId);
+        var location = await fixture.Locator.Locate(
+            GrainId,
+            Context("east"),
+            TestContext.Current.CancellationToken);
+        var entry = await fixture.Directory.Lookup(GrainId, TestContext.Current.CancellationToken);
 
         Assert.Equal(new ClusterLocation("east", 1, 3, false), location);
         Assert.NotNull(entry);
@@ -44,12 +47,20 @@ public sealed class DirectoryClusterLocatorTests
             4,
             ("east", MetaclusterClusterState.Active),
             ("west", MetaclusterClusterState.Active)));
-        var entry = await fixture.Directory.GetOrCreate(GrainId, "west", 4, Lease);
+        var entry = await fixture.Directory.GetOrCreate(
+            GrainId,
+            "west",
+            4,
+            Lease,
+            TestContext.Current.CancellationToken);
 
-        var location = await fixture.Locator.Locate(GrainId, Context("east"));
+        var location = await fixture.Locator.Locate(
+            GrainId,
+            Context("east"),
+            TestContext.Current.CancellationToken);
 
         Assert.Equal(new ClusterLocation("west", entry.Version, entry.TopologyEpoch, true), location);
-        Assert.Equal(entry, await fixture.Directory.Lookup(GrainId));
+        Assert.Equal(entry, await fixture.Directory.Lookup(GrainId, TestContext.Current.CancellationToken));
     }
 
     [Fact]
@@ -59,9 +70,17 @@ public sealed class DirectoryClusterLocatorTests
             5,
             ("east", MetaclusterClusterState.Active),
             ("west", MetaclusterClusterState.Draining)));
-        var entry = await fixture.Directory.GetOrCreate(GrainId, "west", 4, Lease);
+        var entry = await fixture.Directory.GetOrCreate(
+            GrainId,
+            "west",
+            4,
+            Lease,
+            TestContext.Current.CancellationToken);
 
-        var location = await fixture.Locator.Locate(GrainId, Context("east"));
+        var location = await fixture.Locator.Locate(
+            GrainId,
+            Context("east"),
+            TestContext.Current.CancellationToken);
 
         Assert.Equal("west", location.ClusterId);
         Assert.True(location.IsExistingOwner);
@@ -75,14 +94,22 @@ public sealed class DirectoryClusterLocatorTests
             6,
             ("east", MetaclusterClusterState.Active),
             ("west", MetaclusterClusterState.Removed)));
-        var original = await fixture.Directory.GetOrCreate(GrainId, "west", 5, Lease);
+        var original = await fixture.Directory.GetOrCreate(
+            GrainId,
+            "west",
+            5,
+            Lease,
+            TestContext.Current.CancellationToken);
 
         var exception = await Assert.ThrowsAsync<InvalidOperationException>(
-            () => fixture.Locator.Locate(GrainId, Context("east")).AsTask());
+            () => fixture.Locator.Locate(
+                GrainId,
+                Context("east"),
+                TestContext.Current.CancellationToken).AsTask());
 
         Assert.Contains("remains leased", exception.Message, StringComparison.Ordinal);
         Assert.Contains("'west'", exception.Message, StringComparison.Ordinal);
-        Assert.Equal(original, await fixture.Directory.Lookup(GrainId));
+        Assert.Equal(original, await fixture.Directory.Lookup(GrainId, TestContext.Current.CancellationToken));
     }
 
     [Fact]
@@ -92,11 +119,19 @@ public sealed class DirectoryClusterLocatorTests
             7,
             ("east", MetaclusterClusterState.Active),
             ("west", MetaclusterClusterState.Active)));
-        var expired = await fixture.Directory.GetOrCreate(GrainId, "west", 6, Lease);
+        var expired = await fixture.Directory.GetOrCreate(
+            GrainId,
+            "west",
+            6,
+            Lease,
+            TestContext.Current.CancellationToken);
         fixture.Clock.Advance(Lease);
 
-        var location = await fixture.Locator.Locate(GrainId, Context("east"));
-        var current = await fixture.Directory.Lookup(GrainId);
+        var location = await fixture.Locator.Locate(
+            GrainId,
+            Context("east"),
+            TestContext.Current.CancellationToken);
+        var current = await fixture.Directory.Lookup(GrainId, TestContext.Current.CancellationToken);
 
         Assert.Equal("east", location.ClusterId);
         Assert.False(location.IsExistingOwner);
@@ -126,7 +161,7 @@ public sealed class DirectoryClusterLocatorTests
 
         start.SetResult();
         var locations = await Task.WhenAll(east, west);
-        var current = await fixture.Directory.Lookup(GrainId);
+        var current = await fixture.Directory.Lookup(GrainId, TestContext.Current.CancellationToken);
 
         Assert.NotNull(current);
         Assert.All(locations, location => Assert.Equal(current.ClusterId, location.ClusterId));
@@ -149,7 +184,10 @@ public sealed class DirectoryClusterLocatorTests
             });
         var locator = CreateLocator(directory, topology);
 
-        var location = await locator.Locate(GrainId, Context("east"));
+        var location = await locator.Locate(
+            GrainId,
+            Context("east"),
+            TestContext.Current.CancellationToken);
 
         Assert.Equal(new ClusterLocation("east", 2, 11, false), location);
         Assert.Equal(11, topology.Current.Epoch);
@@ -169,22 +207,44 @@ public sealed class DirectoryClusterLocatorTests
         var locator = CreateLocator(directory, topology);
 
         var exception = await Assert.ThrowsAsync<InvalidOperationException>(
-            () => locator.Locate(GrainId, Context("east")).AsTask());
+            () => locator.Locate(
+                GrainId,
+                Context("east"),
+                TestContext.Current.CancellationToken).AsTask());
 
         Assert.Contains("unavailable cluster 'unknown'", exception.Message, StringComparison.Ordinal);
         await directory.Received(1).Lookup(GrainId, Arg.Any<CancellationToken>());
-        await directory.DidNotReceiveWithAnyArgs().GetOrCreate(default, default!, default, default, default);
-        await directory.DidNotReceiveWithAnyArgs().TryMove(default, default, default!, default, default, default);
+        await directory.DidNotReceiveWithAnyArgs().GetOrCreate(
+            default,
+            default!,
+            default,
+            default,
+            TestContext.Current.CancellationToken);
+        await directory.DidNotReceiveWithAnyArgs().TryMove(
+            default,
+            default,
+            default!,
+            default,
+            default,
+            TestContext.Current.CancellationToken);
     }
 
     [Fact]
     public async Task ValidateOwnership_CurrentEntry_ReturnsTrue()
     {
         var fixture = CreateFixture(Topology(13, ("east", MetaclusterClusterState.Active)));
-        var original = await fixture.Directory.GetOrCreate(GrainId, "east", 13, Lease);
+        var original = await fixture.Directory.GetOrCreate(
+            GrainId,
+            "east",
+            13,
+            Lease,
+            TestContext.Current.CancellationToken);
         fixture.Clock.Advance(TimeSpan.FromMinutes(1));
 
-        var validated = await fixture.Locator.ValidateLocalOwnership(GrainId, "east");
+        var validated = await fixture.Locator.ValidateLocalOwnership(
+            GrainId,
+            "east",
+            TestContext.Current.CancellationToken);
 
         Assert.Equal(original.Version, validated.Version);
         Assert.Equal(original.FencingToken, validated.FencingToken);
@@ -199,18 +259,38 @@ public sealed class DirectoryClusterLocatorTests
             ("east", MetaclusterClusterState.Active),
             ("west", MetaclusterClusterState.Active),
             ("removed", MetaclusterClusterState.Removed)));
-        var stale = await fixture.Directory.GetOrCreate(GrainId, "east", 13, Lease);
+        var stale = await fixture.Directory.GetOrCreate(
+            GrainId,
+            "east",
+            13,
+            Lease,
+            TestContext.Current.CancellationToken);
         fixture.Clock.Advance(Lease);
-        var moved = await fixture.Directory.TryMove(GrainId, stale.Version, "west", 14, Lease);
+        var moved = await fixture.Directory.TryMove(
+            GrainId,
+            stale.Version,
+            "west",
+            14,
+            Lease,
+            TestContext.Current.CancellationToken);
         Assert.NotNull(moved);
 
         var wrongOwner = await Assert.ThrowsAsync<InvalidOperationException>(
-            () => fixture.Locator.ValidateLocalOwnership(GrainId, "east").AsTask());
+            () => fixture.Locator.ValidateLocalOwnership(
+                GrainId,
+                "east",
+                TestContext.Current.CancellationToken).AsTask());
         var removedOwner = await Assert.ThrowsAsync<InvalidOperationException>(
-            () => fixture.Locator.ValidateLocalOwnership(GrainId, "removed").AsTask());
+            () => fixture.Locator.ValidateLocalOwnership(
+                GrainId,
+                "removed",
+                TestContext.Current.CancellationToken).AsTask());
         fixture.Clock.Advance(Lease);
         var expired = await Assert.ThrowsAsync<InvalidOperationException>(
-            () => fixture.Locator.ValidateLocalOwnership(GrainId, "west").AsTask());
+            () => fixture.Locator.ValidateLocalOwnership(
+                GrainId,
+                "west",
+                TestContext.Current.CancellationToken).AsTask());
 
         Assert.Contains("valid ownership lease", wrongOwner.Message, StringComparison.Ordinal);
         Assert.Contains("not an active member", removedOwner.Message, StringComparison.Ordinal);
@@ -226,11 +306,14 @@ public sealed class DirectoryClusterLocatorTests
             ("west", MetaclusterClusterState.Removed)));
 
         var exception = await Assert.ThrowsAsync<InvalidOperationException>(
-            () => fixture.Locator.Locate(GrainId, Context("east")).AsTask());
+            () => fixture.Locator.Locate(
+                GrainId,
+                Context("east"),
+                TestContext.Current.CancellationToken).AsTask());
 
         Assert.Contains("No active cluster", exception.Message, StringComparison.Ordinal);
         Assert.Contains("'15'", exception.Message, StringComparison.Ordinal);
-        Assert.Null(await fixture.Directory.Lookup(GrainId));
+        Assert.Null(await fixture.Directory.Lookup(GrainId, TestContext.Current.CancellationToken));
     }
 
     [Fact]
@@ -395,8 +478,11 @@ public sealed class DirectoryClusterLocatorTests
         var directory = new InMemoryClusterDirectory(clock);
         var locator = CreateLocator(directory, topology);
 
-        var acquiredLocation = await locator.Locate(GrainId, Context("east"));
-        var acquired = await directory.Lookup(GrainId);
+        var acquiredLocation = await locator.Locate(
+            GrainId,
+            Context("east"),
+            TestContext.Current.CancellationToken);
+        var acquired = await directory.Lookup(GrainId, TestContext.Current.CancellationToken);
         Assert.NotNull(acquired);
         Assert.Equal(new ClusterLocation("east", acquired.Version, 20, false), acquiredLocation);
 
@@ -405,8 +491,11 @@ public sealed class DirectoryClusterLocatorTests
             21,
             ("east", MetaclusterClusterState.Draining),
             ("west", MetaclusterClusterState.Active));
-        var retainedLocation = await locator.Locate(GrainId, Context("east"));
-        var retained = await directory.Lookup(GrainId);
+        var retainedLocation = await locator.Locate(
+            GrainId,
+            Context("east"),
+            TestContext.Current.CancellationToken);
+        var retained = await directory.Lookup(GrainId, TestContext.Current.CancellationToken);
         Assert.NotNull(retained);
         Assert.Equal("east", retainedLocation.ClusterId);
         Assert.True(retainedLocation.IsExistingOwner);
@@ -419,21 +508,38 @@ public sealed class DirectoryClusterLocatorTests
             ("east", MetaclusterClusterState.Removed),
             ("west", MetaclusterClusterState.Active));
         var liveRemoval = await Assert.ThrowsAsync<InvalidOperationException>(
-            () => locator.Locate(GrainId, Context("west")).AsTask());
+            () => locator.Locate(
+                GrainId,
+                Context("west"),
+                TestContext.Current.CancellationToken).AsTask());
         Assert.Contains("remains leased", liveRemoval.Message, StringComparison.Ordinal);
-        Assert.Equal(retained, await directory.Lookup(GrainId));
+        Assert.Equal(retained, await directory.Lookup(GrainId, TestContext.Current.CancellationToken));
 
         clock.Advance(TimeSpan.FromMinutes(4));
-        var reacquiredLocation = await locator.Locate(GrainId, Context("west"));
-        var reacquired = await directory.Lookup(GrainId);
+        var reacquiredLocation = await locator.Locate(
+            GrainId,
+            Context("west"),
+            TestContext.Current.CancellationToken);
+        var reacquired = await directory.Lookup(GrainId, TestContext.Current.CancellationToken);
         Assert.NotNull(reacquired);
         Assert.Equal(new ClusterLocation("west", reacquired.Version, 22, false), reacquiredLocation);
         Assert.Equal(acquired.Version + 1, reacquired.Version);
         Assert.Equal(acquired.FencingToken + 1, reacquired.FencingToken);
         Assert.Equal(Start + TimeSpan.FromMinutes(9), reacquired.LeaseExpiration);
 
-        Assert.Null(await directory.TryRenew(GrainId, acquired.Version, "east", Lease));
-        Assert.Null(await directory.TryMove(GrainId, acquired.Version, "east", 23, Lease));
-        Assert.Equal(reacquired, await directory.Lookup(GrainId));
+        Assert.Null(await directory.TryRenew(
+            GrainId,
+            acquired.Version,
+            "east",
+            Lease,
+            TestContext.Current.CancellationToken));
+        Assert.Null(await directory.TryMove(
+            GrainId,
+            acquired.Version,
+            "east",
+            23,
+            Lease,
+            TestContext.Current.CancellationToken));
+        Assert.Equal(reacquired, await directory.Lookup(GrainId, TestContext.Current.CancellationToken));
     }
 }

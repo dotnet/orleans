@@ -43,7 +43,7 @@ public sealed class OutsideRuntimeClientMetaclusterTests
 
         fixture.Runtime.SendRequest(
             fixture.CreateTarget(Fixture.HomeCluster),
-            fixture.CreateRequest(),
+            fixture.CreateRequest(TestContext.Current.CancellationToken),
             completion,
             InvokeMethodOptions.OneWay);
         await fixture.Logs.LocalMessageCenterCalled.Task.WaitAsync(TestContext.Current.CancellationToken);
@@ -63,7 +63,7 @@ public sealed class OutsideRuntimeClientMetaclusterTests
 
         fixture.Runtime.SendRequest(
             fixture.CreateTarget(Fixture.RemoteCluster),
-            fixture.CreateRequest(),
+            fixture.CreateRequest(TestContext.Current.CancellationToken),
             completion,
             InvokeMethodOptions.None);
         var call = await fixture.Transport.Called.Task.WaitAsync(TestContext.Current.CancellationToken);
@@ -83,7 +83,7 @@ public sealed class OutsideRuntimeClientMetaclusterTests
 
         fixture.Runtime.SendRequest(
             fixture.CreateTarget(Fixture.RemoteCluster),
-            fixture.CreateRequest(),
+            fixture.CreateRequest(TestContext.Current.CancellationToken),
             completion,
             InvokeMethodOptions.None);
 
@@ -103,7 +103,11 @@ public sealed class OutsideRuntimeClientMetaclusterTests
         var completion = new RecordingCompletion();
         var target = fixture.CreateTarget(Fixture.RemoteCluster);
 
-        fixture.Runtime.SendRequest(target, fixture.CreateRequest(), completion, InvokeMethodOptions.None);
+        fixture.Runtime.SendRequest(
+            target,
+            fixture.CreateRequest(TestContext.Current.CancellationToken),
+            completion,
+            InvokeMethodOptions.None);
         var call = await fixture.Transport.Called.Task.WaitAsync(TestContext.Current.CancellationToken);
 
         Assert.Equal(UniversalReferenceBinding.Cluster, call.Target.Binding);
@@ -120,7 +124,7 @@ public sealed class OutsideRuntimeClientMetaclusterTests
         var exception = Assert.Throws<InvalidOperationException>(
             () => fixture.Runtime.SendRequest(
                 target,
-                fixture.CreateRequest(),
+                fixture.CreateRequest(TestContext.Current.CancellationToken),
                 new RecordingCompletion(),
                 InvokeMethodOptions.None));
 
@@ -138,7 +142,7 @@ public sealed class OutsideRuntimeClientMetaclusterTests
 
         fixture.Runtime.SendRequest(
             fixture.CreateTarget(Fixture.RemoteCluster),
-            fixture.CreateRequest(),
+            fixture.CreateRequest(TestContext.Current.CancellationToken),
             completion,
             InvokeMethodOptions.None);
         await completion.Completed.Task.WaitAsync(TestContext.Current.CancellationToken);
@@ -182,7 +186,7 @@ public sealed class OutsideRuntimeClientMetaclusterTests
 
         fixture.Runtime.SendRequest(
             fixture.CreateTarget(Fixture.RemoteCluster),
-            fixture.CreateRequest(),
+            fixture.CreateRequest(TestContext.Current.CancellationToken),
             completion,
             InvokeMethodOptions.OneWay);
         await fixture.Transport.Called.Task.WaitAsync(TestContext.Current.CancellationToken);
@@ -204,13 +208,13 @@ public sealed class OutsideRuntimeClientMetaclusterTests
 
         fixture.Runtime.SendRequest(
             fixture.CreateTarget(Fixture.RemoteCluster),
-            fixture.CreateRequest(),
+            fixture.CreateRequest(TestContext.Current.CancellationToken),
             completion,
             InvokeMethodOptions.None);
         await completion.Completed.Task.WaitAsync(TestContext.Current.CancellationToken);
         fixture.Runtime.SendRequest(
             fixture.CreateTarget(Fixture.RemoteCluster),
-            fixture.CreateRequest(),
+            fixture.CreateRequest(TestContext.Current.CancellationToken),
             context: null,
             InvokeMethodOptions.OneWay);
         await fixture.Logs.WarningWritten.Task.WaitAsync(TestContext.Current.CancellationToken);
@@ -232,7 +236,7 @@ public sealed class OutsideRuntimeClientMetaclusterTests
             var completion = new RecordingCompletion();
             fixture.Runtime.SendRequest(
                 fixture.CreateVirtualTarget(),
-                fixture.CreateRequest(),
+                fixture.CreateRequest(TestContext.Current.CancellationToken),
                 completion,
                 InvokeMethodOptions.None);
             await fixture.Transport.Called.Task.WaitAsync(TestContext.Current.CancellationToken);
@@ -304,7 +308,11 @@ public sealed class OutsideRuntimeClientMetaclusterTests
             .GetGrainInterfaceType(typeof(ISiloControl));
         var target = fixture.CreateTarget(Fixture.RemoteCluster, grainId: grainId, interfaceType: interfaceType);
 
-        fixture.Runtime.SendRequest(target, fixture.CreateRequest(), new RecordingCompletion(), InvokeMethodOptions.None);
+        fixture.Runtime.SendRequest(
+            target,
+            fixture.CreateRequest(TestContext.Current.CancellationToken),
+            new RecordingCompletion(),
+            InvokeMethodOptions.None);
         var call = await fixture.Transport.Called.Task.WaitAsync(TestContext.Current.CancellationToken);
 
         Assert.True(SystemTargetGrainId.TryParse(call.Target.GrainId, out var systemTargetId));
@@ -331,7 +339,7 @@ public sealed class OutsideRuntimeClientMetaclusterTests
             [
                 new ValueTask<ClusterIdentity>(resolution.Task),
                 fixture.CreateTarget(Fixture.RemoteCluster),
-                fixture.CreateRequest(),
+                fixture.CreateRequest(TestContext.Current.CancellationToken),
                 completion,
                 InvokeMethodOptions.None,
                 resolutionBudget
@@ -359,13 +367,13 @@ public sealed class OutsideRuntimeClientMetaclusterTests
 
         fixture.Runtime.SendRequest(
             fixture.CreateTarget(Fixture.RemoteCluster),
-            fixture.CreateRequest(),
+            fixture.CreateRequest(TestContext.Current.CancellationToken),
             completion,
             InvokeMethodOptions.None);
         await completion.Completed.Task.WaitAsync(TestContext.Current.CancellationToken);
         fixture.Runtime.SendRequest(
             fixture.CreateTarget(Fixture.RemoteCluster),
-            fixture.CreateRequest(),
+            fixture.CreateRequest(TestContext.Current.CancellationToken),
             context: null,
             InvokeMethodOptions.OneWay);
         await fixture.Logs.WarningWritten.Task.WaitAsync(TestContext.Current.CancellationToken);

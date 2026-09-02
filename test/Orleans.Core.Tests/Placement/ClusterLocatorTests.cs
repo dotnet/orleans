@@ -53,11 +53,16 @@ public sealed class ClusterLocatorTests
             "service");
 
         Assert.Same(locator, resolver.Resolve(LocatedGrainType));
-        var result = await referenceResolver.Resolve(reference);
-        var cachedResult = await referenceResolver.Resolve(reference);
+        var result = await referenceResolver.Resolve(
+            reference,
+            cancellationToken: TestContext.Current.CancellationToken);
+        var cachedResult = await referenceResolver.Resolve(
+            reference,
+            cancellationToken: TestContext.Current.CancellationToken);
         var contextualResult = await referenceResolver.Resolve(
             reference,
-            new Dictionary<string, object> { ["tenant"] = "one" });
+            new Dictionary<string, object> { ["tenant"] = "one" },
+            TestContext.Current.CancellationToken);
         Assert.Equal(new ClusterIdentity("service", "remote"), result);
         Assert.Equal(result, cachedResult);
         Assert.Equal(result, contextualResult);
@@ -75,7 +80,9 @@ public sealed class ClusterLocatorTests
             default,
             "service");
 
-        var result = await resolver.Resolve(reference);
+        var result = await resolver.Resolve(
+            reference,
+            cancellationToken: TestContext.Current.CancellationToken);
 
         Assert.Equal(new ClusterIdentity("service", "local"), result);
         Assert.Equal(0, locator.CallCount);
@@ -120,8 +127,8 @@ public sealed class ClusterLocatorTests
             ImmutableDictionary<string, string>.Empty.WithComparers(System.StringComparer.Ordinal, System.StringComparer.Ordinal));
         var context = new ClusterLocationContext("service", "a", properties);
 
-        var first = await locator.Locate(grainId, context);
-        var second = await locator.Locate(grainId, context);
+        var first = await locator.Locate(grainId, context, TestContext.Current.CancellationToken);
+        var second = await locator.Locate(grainId, context, TestContext.Current.CancellationToken);
 
         Assert.Equal(first, second);
         Assert.Contains(first.ClusterId, new[] { "a", "b" });
@@ -136,11 +143,33 @@ public sealed class ClusterLocatorTests
         var grainId = new GrainId(LocatedGrainType, IdSpan.Create("owned"));
 
         var leaseDuration = TimeSpan.FromMinutes(1);
-        var first = await directory.GetOrCreate(grainId, "a", topologyEpoch: 1, leaseDuration);
-        var concurrent = await directory.GetOrCreate(grainId, "b", topologyEpoch: 1, leaseDuration);
-        var staleMove = await directory.TryMove(grainId, first.Version + 1, "b", topologyEpoch: 2, leaseDuration);
+        var first = await directory.GetOrCreate(
+            grainId,
+            "a",
+            topologyEpoch: 1,
+            leaseDuration,
+            TestContext.Current.CancellationToken);
+        var concurrent = await directory.GetOrCreate(
+            grainId,
+            "b",
+            topologyEpoch: 1,
+            leaseDuration,
+            TestContext.Current.CancellationToken);
+        var staleMove = await directory.TryMove(
+            grainId,
+            first.Version + 1,
+            "b",
+            topologyEpoch: 2,
+            leaseDuration,
+            TestContext.Current.CancellationToken);
         timeProvider.Advance(leaseDuration);
-        var moved = await directory.TryMove(grainId, first.Version, "b", topologyEpoch: 2, leaseDuration);
+        var moved = await directory.TryMove(
+            grainId,
+            first.Version,
+            "b",
+            topologyEpoch: 2,
+            leaseDuration,
+            TestContext.Current.CancellationToken);
 
         Assert.Equal(first, concurrent);
         Assert.Null(staleMove);
@@ -160,7 +189,8 @@ public sealed class ClusterLocatorTests
             grainId,
             "a",
             topologyEpoch: 1,
-            TimeSpan.FromSeconds(1));
+            TimeSpan.FromSeconds(1),
+            TestContext.Current.CancellationToken);
 
         timeProvider.Advance(TimeSpan.FromSeconds(2));
         await Assert.ThrowsAsync<InvalidOperationException>(async () =>
@@ -168,13 +198,15 @@ public sealed class ClusterLocatorTests
                 grainId,
                 "b",
                 topologyEpoch: 0,
-                TimeSpan.FromMinutes(1)));
+                TimeSpan.FromMinutes(1),
+                TestContext.Current.CancellationToken));
 
         var second = await directory.GetOrCreate(
             grainId,
             "b",
             topologyEpoch: 2,
-            TimeSpan.FromMinutes(1));
+            TimeSpan.FromMinutes(1),
+            TestContext.Current.CancellationToken);
 
         Assert.Equal("b", second.ClusterId);
         Assert.True(second.Version > first.Version);
@@ -196,11 +228,12 @@ public sealed class ClusterLocatorTests
             grainId,
             "east",
             topologyEpoch: 1,
-            TimeSpan.FromMinutes(1));
+            TimeSpan.FromMinutes(1),
+            TestContext.Current.CancellationToken);
 
         Assert.NotSame(first, second);
-        Assert.Equal(entry, await first.Lookup(grainId));
-        Assert.Null(await second.Lookup(grainId));
+        Assert.Equal(entry, await first.Lookup(grainId, TestContext.Current.CancellationToken));
+        Assert.Null(await second.Lookup(grainId, TestContext.Current.CancellationToken));
     }
 
     [Fact]
@@ -233,7 +266,12 @@ public sealed class ClusterLocatorTests
         var second = serviceProvider.GetRequiredKeyedService<IClusterDirectory>("two");
         var secondLocator = serviceProvider.GetRequiredKeyedService<IClusterLocator>("two");
         var grainId = new GrainId(LocatedGrainType, IdSpan.Create("locator-isolation"));
-        await first.GetOrCreate(grainId, "east", topologyEpoch: 1, TimeSpan.FromMinutes(1));
+        await first.GetOrCreate(
+            grainId,
+            "east",
+            topologyEpoch: 1,
+            TimeSpan.FromMinutes(1),
+            TestContext.Current.CancellationToken);
 
         var location = await secondLocator.Locate(
             grainId,
@@ -242,9 +280,10 @@ public sealed class ClusterLocatorTests
                 "local",
                 new GrainProperties(
                     ImmutableDictionary<string, string>.Empty
-                        .WithComparers(StringComparer.Ordinal, StringComparer.Ordinal))));
-        var firstEntry = await first.Lookup(grainId);
-        var secondEntry = await second.Lookup(grainId);
+                        .WithComparers(StringComparer.Ordinal, StringComparer.Ordinal))),
+            TestContext.Current.CancellationToken);
+        var firstEntry = await first.Lookup(grainId, TestContext.Current.CancellationToken);
+        var secondEntry = await second.Lookup(grainId, TestContext.Current.CancellationToken);
 
         Assert.Equal("local", location.ClusterId);
         Assert.False(location.IsExistingOwner);
@@ -408,7 +447,9 @@ public sealed class ClusterLocatorTests
             locators: [("selected", locator)]);
         var reference = VirtualReference("service", "virtual");
 
-        var actual = await fixture.ReferenceResolver.Resolve(reference);
+        var actual = await fixture.ReferenceResolver.Resolve(
+            reference,
+            cancellationToken: TestContext.Current.CancellationToken);
 
         Assert.Equal(new ClusterIdentity("service", "west"), actual);
         Assert.Equal(1, locator.CallCount);
@@ -429,8 +470,12 @@ public sealed class ClusterLocatorTests
             "service",
             "bound");
 
-        var first = await fixture.ReferenceResolver.Resolve(reference);
-        var second = await fixture.ReferenceResolver.Resolve(reference);
+        var first = await fixture.ReferenceResolver.Resolve(
+            reference,
+            cancellationToken: TestContext.Current.CancellationToken);
+        var second = await fixture.ReferenceResolver.Resolve(
+            reference,
+            cancellationToken: TestContext.Current.CancellationToken);
 
         Assert.Equal(new ClusterIdentity("service", "bound"), first);
         Assert.Equal(first, second);
@@ -452,7 +497,9 @@ public sealed class ClusterLocatorTests
             "removed");
 
         var exception = await Assert.ThrowsAsync<InvalidOperationException>(
-            () => fixture.ReferenceResolver.Resolve(reference).AsTask());
+            () => fixture.ReferenceResolver.Resolve(
+                reference,
+                cancellationToken: TestContext.Current.CancellationToken).AsTask());
 
         Assert.Contains("unavailable cluster", exception.Message, StringComparison.Ordinal);
         Assert.Equal(0, locator.CallCount);
@@ -466,9 +513,13 @@ public sealed class ClusterLocatorTests
         var reference = VirtualReference("different-service", "mismatch");
 
         var first = await Assert.ThrowsAsync<InvalidOperationException>(
-            () => fixture.ReferenceResolver.Resolve(reference).AsTask());
+            () => fixture.ReferenceResolver.Resolve(
+                reference,
+                cancellationToken: TestContext.Current.CancellationToken).AsTask());
         var second = await Assert.ThrowsAsync<InvalidOperationException>(
-            () => fixture.ReferenceResolver.Resolve(reference).AsTask());
+            () => fixture.ReferenceResolver.Resolve(
+                reference,
+                cancellationToken: TestContext.Current.CancellationToken).AsTask());
 
         Assert.Contains("different-service", first.Message, StringComparison.Ordinal);
         Assert.Equal(first.Message, second.Message);
@@ -487,7 +538,9 @@ public sealed class ClusterLocatorTests
             locators: [("selected", locator)]);
         var reference = VirtualReference("default", "legacy");
 
-        var result = await fixture.ReferenceResolver.Resolve(reference);
+        var result = await fixture.ReferenceResolver.Resolve(
+            reference,
+            cancellationToken: TestContext.Current.CancellationToken);
 
         Assert.Equal(new ClusterIdentity("configured-service", "local"), result);
         Assert.Equal(0, locator.CallCount);
@@ -503,7 +556,9 @@ public sealed class ClusterLocatorTests
         var reference = VirtualReference("foreign-service", "foreign");
 
         var exception = await Assert.ThrowsAsync<InvalidOperationException>(
-            () => fixture.ReferenceResolver.Resolve(reference).AsTask());
+            () => fixture.ReferenceResolver.Resolve(
+                reference,
+                cancellationToken: TestContext.Current.CancellationToken).AsTask());
 
         Assert.Contains("foreign-service", exception.Message, StringComparison.Ordinal);
     }
@@ -521,8 +576,16 @@ public sealed class ClusterLocatorTests
             locators: [("selected", locator)]);
         var reference = VirtualReference("service", "uncached");
 
-        Assert.Equal(new ClusterIdentity("service", "west"), await fixture.ReferenceResolver.Resolve(reference));
-        Assert.Equal(new ClusterIdentity("service", "west"), await fixture.ReferenceResolver.Resolve(reference));
+        Assert.Equal(
+            new ClusterIdentity("service", "west"),
+            await fixture.ReferenceResolver.Resolve(
+                reference,
+                cancellationToken: TestContext.Current.CancellationToken));
+        Assert.Equal(
+            new ClusterIdentity("service", "west"),
+            await fixture.ReferenceResolver.Resolve(
+                reference,
+                cancellationToken: TestContext.Current.CancellationToken));
         Assert.Equal(2, locator.CallCount);
     }
 
@@ -539,9 +602,15 @@ public sealed class ClusterLocatorTests
         var firstReference = VirtualReference("service", "first");
         var secondReference = VirtualReference("service", "second");
 
-        var first = await fixture.ReferenceResolver.Resolve(firstReference);
-        var cached = await fixture.ReferenceResolver.Resolve(firstReference);
-        var distinct = await fixture.ReferenceResolver.Resolve(secondReference);
+        var first = await fixture.ReferenceResolver.Resolve(
+            firstReference,
+            cancellationToken: TestContext.Current.CancellationToken);
+        var cached = await fixture.ReferenceResolver.Resolve(
+            firstReference,
+            cancellationToken: TestContext.Current.CancellationToken);
+        var distinct = await fixture.ReferenceResolver.Resolve(
+            secondReference,
+            cancellationToken: TestContext.Current.CancellationToken);
 
         Assert.Equal(first, cached);
         Assert.Equal(new ClusterIdentity("service", "west"), distinct);
@@ -566,9 +635,13 @@ public sealed class ClusterLocatorTests
             locators: [("selected", locator)]);
         var reference = VirtualReference("service", "boundary");
 
-        var first = await fixture.ReferenceResolver.Resolve(reference);
+        var first = await fixture.ReferenceResolver.Resolve(
+            reference,
+            cancellationToken: TestContext.Current.CancellationToken);
         fixture.Clock.Advance(TimeSpan.FromMinutes(5));
-        var second = await fixture.ReferenceResolver.Resolve(reference);
+        var second = await fixture.ReferenceResolver.Resolve(
+            reference,
+            cancellationToken: TestContext.Current.CancellationToken);
 
         Assert.Equal(new ClusterIdentity("service", "west"), first);
         Assert.Equal(new ClusterIdentity("service", "east"), second);
@@ -592,8 +665,12 @@ public sealed class ClusterLocatorTests
             locators: [("selected", locator)]);
         var reference = VirtualReference("service", "owned");
 
-        var first = await fixture.ReferenceResolver.Resolve(reference);
-        var second = await fixture.ReferenceResolver.Resolve(reference);
+        var first = await fixture.ReferenceResolver.Resolve(
+            reference,
+            cancellationToken: TestContext.Current.CancellationToken);
+        var second = await fixture.ReferenceResolver.Resolve(
+            reference,
+            cancellationToken: TestContext.Current.CancellationToken);
 
         Assert.Equal(new ClusterIdentity("service", "west"), first);
         Assert.Equal(new ClusterIdentity("service", "east"), second);
@@ -613,14 +690,18 @@ public sealed class ClusterLocatorTests
             topologyProvider: topology,
             locators: [("selected", locator)]);
         var reference = VirtualReference("service", "moving");
-        var first = await fixture.ReferenceResolver.Resolve(reference);
+        var first = await fixture.ReferenceResolver.Resolve(
+            reference,
+            cancellationToken: TestContext.Current.CancellationToken);
         topology.Current = Phase4Topology(
             "service",
             2,
             ("east", MetaclusterClusterState.Removed),
             ("west", MetaclusterClusterState.Active));
 
-        var second = await fixture.ReferenceResolver.Resolve(reference);
+        var second = await fixture.ReferenceResolver.Resolve(
+            reference,
+            cancellationToken: TestContext.Current.CancellationToken);
 
         Assert.Equal(new ClusterIdentity("service", "east"), first);
         Assert.Equal(new ClusterIdentity("service", "west"), second);
@@ -644,7 +725,9 @@ public sealed class ClusterLocatorTests
             locators: [("selected", locator)]);
 
         var exception = await Assert.ThrowsAsync<InvalidOperationException>(
-            () => fixture.ReferenceResolver.Resolve(VirtualReference("service", "changing")).AsTask());
+            () => fixture.ReferenceResolver.Resolve(
+                VirtualReference("service", "changing"),
+                cancellationToken: TestContext.Current.CancellationToken).AsTask());
 
         Assert.Contains("changed repeatedly", exception.Message, StringComparison.Ordinal);
         Assert.Equal(3, locator.CallCount);
@@ -668,7 +751,11 @@ public sealed class ClusterLocatorTests
         cancellation.Cancel();
 
         await Assert.ThrowsAnyAsync<OperationCanceledException>(() => pending);
-        Assert.Equal(new ClusterIdentity("service", "west"), await fixture.ReferenceResolver.Resolve(VirtualReference("service", "cancelled")));
+        Assert.Equal(
+            new ClusterIdentity("service", "west"),
+            await fixture.ReferenceResolver.Resolve(
+                VirtualReference("service", "cancelled"),
+                cancellationToken: TestContext.Current.CancellationToken));
         Assert.Equal(2, locator.CallCount);
     }
 
@@ -683,9 +770,15 @@ public sealed class ClusterLocatorTests
         var locator = new RendezvousClusterLocator(new Phase4MutableTopologyProvider(topology));
 
         var first = await Assert.ThrowsAsync<InvalidOperationException>(
-            () => locator.Locate(GrainId.Create(LocatedGrainType, "none"), Phase4Context("service")).AsTask());
+            () => locator.Locate(
+                GrainId.Create(LocatedGrainType, "none"),
+                Phase4Context("service"),
+                TestContext.Current.CancellationToken).AsTask());
         var second = await Assert.ThrowsAsync<InvalidOperationException>(
-            () => locator.Locate(GrainId.Create(LocatedGrainType, "none"), Phase4Context("service")).AsTask());
+            () => locator.Locate(
+                GrainId.Create(LocatedGrainType, "none"),
+                Phase4Context("service"),
+                TestContext.Current.CancellationToken).AsTask());
 
         Assert.Equal(first.Message, second.Message);
         Assert.Contains("'9'", first.Message, StringComparison.Ordinal);
@@ -702,7 +795,10 @@ public sealed class ClusterLocatorTests
             ("removed", MetaclusterClusterState.Removed));
         var locator = new RendezvousClusterLocator(new Phase4MutableTopologyProvider(topology));
 
-        var result = await locator.Locate(GrainId.Create(LocatedGrainType, "eligible"), Phase4Context("service"));
+        var result = await locator.Locate(
+            GrainId.Create(LocatedGrainType, "eligible"),
+            Phase4Context("service"),
+            TestContext.Current.CancellationToken);
 
         Assert.Equal("active", result.ClusterId);
         Assert.Equal(5, result.TopologyEpoch);
@@ -716,7 +812,10 @@ public sealed class ClusterLocatorTests
             new Phase4MutableTopologyProvider(Phase4Topology("topology-service", 3, ("active", MetaclusterClusterState.Active))));
 
         var exception = await Assert.ThrowsAsync<InvalidOperationException>(
-            () => locator.Locate(GrainId.Create(LocatedGrainType, "mismatch"), Phase4Context("reference-service")).AsTask());
+            () => locator.Locate(
+                GrainId.Create(LocatedGrainType, "mismatch"),
+                Phase4Context("reference-service"),
+                TestContext.Current.CancellationToken).AsTask());
 
         Assert.Contains("topology-service", exception.Message, StringComparison.Ordinal);
         Assert.Contains("reference-service", exception.Message, StringComparison.Ordinal);
@@ -729,7 +828,10 @@ public sealed class ClusterLocatorTests
             Phase4Topology("service", 1, ("east", MetaclusterClusterState.Active), ("west", MetaclusterClusterState.Active)));
         var locator = new RendezvousClusterLocator(provider);
         var grainId = GrainId.Create(LocatedGrainType, "remap");
-        var winner = await locator.Locate(grainId, Phase4Context("service"));
+        var winner = await locator.Locate(
+            grainId,
+            Phase4Context("service"),
+            TestContext.Current.CancellationToken);
         var remaining = winner.ClusterId == "east" ? "west" : "east";
         provider.Current = Phase4Topology(
             "service",
@@ -737,8 +839,14 @@ public sealed class ClusterLocatorTests
             (winner.ClusterId, MetaclusterClusterState.Removed),
             (remaining, MetaclusterClusterState.Active));
 
-        var firstRemap = await locator.Locate(grainId, Phase4Context("service"));
-        var secondRemap = await locator.Locate(grainId, Phase4Context("service"));
+        var firstRemap = await locator.Locate(
+            grainId,
+            Phase4Context("service"),
+            TestContext.Current.CancellationToken);
+        var secondRemap = await locator.Locate(
+            grainId,
+            Phase4Context("service"),
+            TestContext.Current.CancellationToken);
 
         Assert.Equal(remaining, firstRemap.ClusterId);
         Assert.Equal(firstRemap, secondRemap);

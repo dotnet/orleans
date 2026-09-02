@@ -50,7 +50,8 @@ public sealed class ClientInterClusterTransportTests
             destination,
             target,
             request,
-            InvokeMethodOptions.None);
+            InvokeMethodOptions.None,
+            cancellationToken: TestContext.Current.CancellationToken);
 
         Assert.Same(response, actual);
         await provider.ReceivedDestination;
@@ -107,7 +108,8 @@ public sealed class ClientInterClusterTransportTests
             destination,
             target,
             request,
-            InvokeMethodOptions.ReadOnly);
+            InvokeMethodOptions.ReadOnly,
+            cancellationToken: TestContext.Current.CancellationToken);
 
         Assert.Same(expected, actual);
         await provider.Received(1).GetClient(destination, Arg.Any<CancellationToken>());
@@ -145,7 +147,8 @@ public sealed class ClientInterClusterTransportTests
             destination,
             target,
             request,
-            InvokeMethodOptions.Unordered);
+            InvokeMethodOptions.Unordered,
+            cancellationToken: TestContext.Current.CancellationToken);
 
         Assert.Same(Response.Completed, actual);
         await relay.Received(1).Forward(
@@ -168,11 +171,14 @@ public sealed class ClientInterClusterTransportTests
                 new ClusterIdentity("service", "west"),
                 CreateClusterTarget("east"),
                 Substitute.For<IInvokable>(),
-                InvokeMethodOptions.None).AsTask());
+                InvokeMethodOptions.None,
+                cancellationToken: TestContext.Current.CancellationToken).AsTask());
 
         Assert.Contains("east", exception.Message, System.StringComparison.Ordinal);
         Assert.Contains("west", exception.Message, System.StringComparison.Ordinal);
-        await provider.DidNotReceiveWithAnyArgs().GetClient(default, default);
+        await provider.DidNotReceiveWithAnyArgs().GetClient(
+            default,
+            TestContext.Current.CancellationToken);
     }
 
     [Fact]
@@ -187,7 +193,8 @@ public sealed class ClientInterClusterTransportTests
                 new ClusterIdentity("other-service", "remote"),
                 CreateVirtualTarget(),
                 Substitute.For<IInvokable>(),
-                InvokeMethodOptions.None).AsTask());
+                InvokeMethodOptions.None,
+                cancellationToken: TestContext.Current.CancellationToken).AsTask());
         var targetMismatch = await Assert.ThrowsAsync<System.InvalidOperationException>(
             () => transport.SendRequest(
                 new ClusterIdentity("service", "remote"),
@@ -196,11 +203,14 @@ public sealed class ClientInterClusterTransportTests
                     GrainInterfaceType.Create("interface"),
                     "other-service"),
                 Substitute.For<IInvokable>(),
-                InvokeMethodOptions.None).AsTask());
+                InvokeMethodOptions.None,
+                cancellationToken: TestContext.Current.CancellationToken).AsTask());
 
         Assert.Contains("local service 'service'", destinationMismatch.Message, System.StringComparison.Ordinal);
         Assert.Contains("local service 'service'", targetMismatch.Message, System.StringComparison.Ordinal);
-        await provider.DidNotReceiveWithAnyArgs().GetClient(default, default);
+        await provider.DidNotReceiveWithAnyArgs().GetClient(
+            default,
+            TestContext.Current.CancellationToken);
     }
 
     [Fact]
@@ -218,7 +228,8 @@ public sealed class ClientInterClusterTransportTests
                 new ClusterIdentity("service", "remote"),
                 CreateVirtualTarget(),
                 Substitute.For<IInvokable>(),
-                InvokeMethodOptions.None).AsTask());
+                InvokeMethodOptions.None,
+                cancellationToken: TestContext.Current.CancellationToken).AsTask());
 
         Assert.Same(expected, actual);
         await provider.Received(1).GetClient(
@@ -250,7 +261,8 @@ public sealed class ClientInterClusterTransportTests
                 new ClusterIdentity("service", "remote"),
                 CreateVirtualTarget(),
                 Substitute.For<IInvokable>(),
-                InvokeMethodOptions.None).AsTask());
+                InvokeMethodOptions.None,
+                cancellationToken: TestContext.Current.CancellationToken).AsTask());
 
         Assert.Same(expected, actual);
         await relay.Received(1).Forward(
@@ -335,7 +347,8 @@ public sealed class ClientInterClusterTransportTests
             new ClusterIdentity("service", "remote"),
             CreateVirtualTarget(),
             Substitute.For<IInvokable>(),
-            InvokeMethodOptions.OneWay).AsTask();
+            InvokeMethodOptions.OneWay,
+            cancellationToken: TestContext.Current.CancellationToken).AsTask();
 
         Assert.False(pending.IsCompleted);
         accepted.SetResult(Response.Completed);
@@ -370,13 +383,15 @@ public sealed class ClientInterClusterTransportTests
                 new ClusterIdentity("service", "remote"),
                 CreateVirtualTarget(),
                 Substitute.For<IInvokable>(),
-                InvokeMethodOptions.None).AsTask());
+                InvokeMethodOptions.None,
+                cancellationToken: TestContext.Current.CancellationToken).AsTask());
         var second = await Assert.ThrowsAsync<System.NotSupportedException>(
             () => transport.SendRequest(
                 new ClusterIdentity("service", "remote"),
                 CreateVirtualTarget(),
                 Substitute.For<IInvokable>(),
-                InvokeMethodOptions.OneWay).AsTask());
+                InvokeMethodOptions.OneWay,
+                cancellationToken: TestContext.Current.CancellationToken).AsTask());
 
         Assert.Equal(first.Message, second.Message);
         Assert.Contains("'service/remote'", first.Message, System.StringComparison.Ordinal);
@@ -415,7 +430,8 @@ public sealed class ClientInterClusterTransportTests
                 new ClusterIdentity("service", "remote"),
                 CreateVirtualTarget(),
                 Substitute.For<IInvokable>(),
-                InvokeMethodOptions.None).AsTask());
+                InvokeMethodOptions.None,
+                cancellationToken: TestContext.Current.CancellationToken).AsTask());
         using var cancellation = new CancellationTokenSource();
         cancellation.Cancel();
         var provider = Substitute.For<IInterClusterClientProvider>();
@@ -429,7 +445,9 @@ public sealed class ClientInterClusterTransportTests
 
         Assert.Same(timeout, actualTimeout);
         Assert.Equal(cancellation.Token, actualCancellation.CancellationToken);
-        await provider.DidNotReceiveWithAnyArgs().GetClient(default, default);
+        await provider.DidNotReceiveWithAnyArgs().GetClient(
+            default,
+            TestContext.Current.CancellationToken);
     }
 
     [Fact]
@@ -458,7 +476,8 @@ public sealed class ClientInterClusterTransportTests
                 new ClusterIdentity("service", "remote"),
                 CreateVirtualTarget(),
                 Substitute.For<IInvokable>(),
-                InvokeMethodOptions.OneWay).AsTask());
+                InvokeMethodOptions.OneWay,
+                cancellationToken: TestContext.Current.CancellationToken).AsTask());
 
         Assert.Same(expected, actual);
         await relay.Received(1).Forward(
