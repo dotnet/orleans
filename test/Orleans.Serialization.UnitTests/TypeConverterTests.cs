@@ -26,6 +26,17 @@ namespace Orleans.Serialization.UnitTests
         }
 
         [Fact]
+        public void TypeConverter_FailsClosed_ForTypesWithoutFullNames()
+        {
+            var converter = CreateConverter();
+            var genericParameter = typeof(TypeConverterTestsGenericTypeAllowedByTypeFilter<>).GetGenericArguments()[0];
+
+            var exception = Assert.Throws<InvalidOperationException>(() => converter.Format(genericParameter));
+
+            Assert.Contains("not allowed", exception.Message);
+        }
+
+        [Fact]
         public void TypeConverter_AllowAllTypes_TakesPrecedenceOverDenyingFilters()
         {
             var converter = CreateConverter(

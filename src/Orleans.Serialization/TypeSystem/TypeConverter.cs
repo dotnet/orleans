@@ -576,7 +576,7 @@ public class TypeConverter
         }
 
         // Enums and well-known types carry no user-defined behavior, so allow them absent an explicit opinion.
-        if (result is null && (type.IsEnum || WellKnownRuntimeTypeNames.Contains(type.FullName!)))
+        if (result is null && (type.IsEnum || type.FullName is { } fullName && WellKnownRuntimeTypeNames.Contains(fullName)))
         {
             result = true;
         }
