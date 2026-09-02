@@ -25,10 +25,16 @@ public class UnixSocketTransportListenerTests
             new UnixDomainSocketMessageTransportListenerOptions { Path = path });
         var listener = new UnixDomainSocketMessageTransportListener(listenerName, options, NullLoggerFactory.Instance);
 
-        await listener.BindAsync(TestContext.Current.CancellationToken);
-        Assert.True(File.Exists(path));
+        try
+        {
+            await listener.BindAsync(TestContext.Current.CancellationToken);
+            Assert.True(File.Exists(path));
+        }
+        finally
+        {
+            await listener.DisposeAsync();
+        }
 
-        await listener.DisposeAsync();
         Assert.False(File.Exists(path));
     }
 
