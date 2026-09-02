@@ -67,7 +67,10 @@ public class StatelessWorkerActivationTests : IClassFixture<StatelessWorkerActiv
         for (var i = 0; i < 100; i++)
         {
             await workerGrain.GetActivationCount();
-            await Until(async () => 1 == await managementGrain.GetGrainActivationCount(grainReference), 5_000);
+            await Until(
+                async () => 1 == await managementGrain.GetGrainActivationCount(grainReference),
+                "the activation count to remain at 1",
+                5_000);
         }
     }
 
@@ -89,49 +92,62 @@ public class StatelessWorkerActivationTests : IClassFixture<StatelessWorkerActiv
         const int MaxLocalWorkers = 4;  // Maximum activations per silo
         var waiters = new List<Task>();  // Track blocking calls
         var worker = _fixture.GrainFactory.GetGrain<IStatelessWorkerScalingGrain>(1);
+        var primary = Assert.IsType<InProcessSiloHandle>(_fixture.HostedCluster.Primary);
+        var sharedState = primary.SiloHost.Services.GetRequiredService<StatelessWorkerScalingGrainSharedState>();
+        var grainId = ((GrainReference)worker).GrainId;
 
-        // Initially, only one activation exists
-        var activationCount = await worker.GetActivationCount();
-        Assert.Equal(1, activationCount);
-
-        // First blocking call triggers creation of second activation
-        waiters.Add(worker.Wait());
-        await Until(async () => 2 == await worker.GetActivationCount());
-        activationCount = await worker.GetActivationCount();
-        Assert.Equal(2, activationCount);
-
-        waiters.Add(worker.Wait());
-        await Until(async () => 3 == await worker.GetActivationCount());
-        activationCount = await worker.GetActivationCount();
-        Assert.Equal(3, activationCount);
-
-        waiters.Add(worker.Wait());
-        await Until(async () => 4 == await worker.GetActivationCount());
-        activationCount = await worker.GetActivationCount();
-        Assert.Equal(4, activationCount);
-
-        var waitingCount = await worker.GetWaitingCount();
-        Assert.Equal(3, waitingCount);
-
-        for (var i = 0; i < MaxLocalWorkers; i++)
+        try
         {
+            // Initially, only one activation exists
+            var activationCount = await worker.GetActivationCount();
+            Assert.Equal(1, activationCount);
+
+            // First blocking call triggers creation of second activation
             waiters.Add(worker.Wait());
+            await Until(
+                () => Task.FromResult(1 == sharedState.WaitingActivations[grainId]),
+                "the first activation to enter Wait");
+            activationCount = await worker.GetActivationCount();
+            Assert.Equal(2, activationCount);
+
+            waiters.Add(worker.Wait());
+            await Until(
+                () => Task.FromResult(2 == sharedState.WaitingActivations[grainId]),
+                "the second activation to enter Wait");
+            activationCount = await worker.GetActivationCount();
+            Assert.Equal(3, activationCount);
+
+            waiters.Add(worker.Wait());
+            await Until(
+                () => Task.FromResult(3 == sharedState.WaitingActivations[grainId]),
+                "the third activation to enter Wait");
+            activationCount = await worker.GetActivationCount();
+            Assert.Equal(4, activationCount);
+
+            var waitingCount = sharedState.WaitingActivations[grainId];
+            Assert.Equal(3, waitingCount);
+
+            for (var i = 0; i < MaxLocalWorkers; i++)
+            {
+                waiters.Add(worker.Wait());
+            }
+
+            await Until(
+                () => Task.FromResult(MaxLocalWorkers == sharedState.WaitingActivations[grainId]),
+                $"the waiting count to reach {MaxLocalWorkers}");
+            activationCount = sharedState.ActivationCounts[grainId];
+            Assert.Equal(MaxLocalWorkers, activationCount);
+            waitingCount = sharedState.WaitingActivations[grainId];
+            Assert.Equal(MaxLocalWorkers, waitingCount);
         }
-
-        await Until(async () => MaxLocalWorkers == await worker.GetActivationCount());
-        await Until(async () => MaxLocalWorkers == await worker.GetWaitingCount());
-        activationCount = await worker.GetActivationCount();
-        Assert.Equal(MaxLocalWorkers, activationCount);
-        waitingCount = await worker.GetWaitingCount();
-        Assert.Equal(MaxLocalWorkers, waitingCount);
-
-        // Release all the waiting workers to clean up
-        for (var i = 0; i < waiters.Count; i++)
+        finally
         {
-            await worker.Release();
+            if (waiters.Count > 0)
+            {
+                sharedState.Semaphore.Release(waiters.Count);
+            }
         }
 
-        // Ensure all blocking calls complete properly
         await Task.WhenAll(waiters);
     }
 
@@ -166,6 +182,7 @@ public class StatelessWorkerActivationTests : IClassFixture<StatelessWorkerActiv
         // The activation count for the stateless worker grain should become 0 again
         await Until(
             async () => await mgmt.GetGrainActivationCount((GrainReference)workerGrain) == 0,
+            "the activation count to reach 0",
             5_000
         );
     }
@@ -174,9 +191,21 @@ public class StatelessWorkerActivationTests : IClassFixture<StatelessWorkerActiv
     /// Helper method to wait for an async condition to become true.
     /// Used to handle eventual consistency in activation creation/destruction.
     /// </summary>
-    private static async Task Until(Func<Task<bool>> condition, int maxTimeout = 40_000)
+    private static async Task Until(Func<Task<bool>> condition, string description, int maxTimeout = 40_000)
     {
-        while (!await condition() && (maxTimeout -= 10) > 0) await Task.Delay(10);
-        Assert.True(maxTimeout > 0);
+        using var timeout = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
+        timeout.CancelAfter(maxTimeout);
+
+        try
+        {
+            while (!await condition().WaitAsync(timeout.Token))
+            {
+                await Task.Delay(10, timeout.Token);
+            }
+        }
+        catch (OperationCanceledException) when (timeout.IsCancellationRequested && !TestContext.Current.CancellationToken.IsCancellationRequested)
+        {
+            Assert.Fail($"Timed out after {maxTimeout}ms waiting for {description}.");
+        }
     }
 }
