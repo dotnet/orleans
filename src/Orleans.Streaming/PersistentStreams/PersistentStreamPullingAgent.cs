@@ -779,10 +779,30 @@ namespace Orleans.Streams
         }
 
         private bool HasPendingStreamRegistration()
-            => pubSubCache.Values.Any(static stream => stream.RegistrationTask is { IsCompleted: false });
+        {
+            foreach (var stream in pubSubCache.Values)
+            {
+                if (stream.RegistrationTask is { IsCompleted: false })
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
 
         private bool HasActiveSubscriptions()
-            => pubSubCache.Values.Any(static stream => stream.Count > 0);
+        {
+            foreach (var stream in pubSubCache.Values)
+            {
+                if (stream.Count > 0)
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
 
         private void CleanupPubSubCache(DateTime now)
         {

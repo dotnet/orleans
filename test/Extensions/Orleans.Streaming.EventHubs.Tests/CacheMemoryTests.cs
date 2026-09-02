@@ -68,6 +68,31 @@ public sealed class CacheMemoryTests : IDisposable
     }
 
     [Fact, TestCategory("BVT")]
+    public void BufferPoolAccountingConvergesAfterConcurrentAllocationAndRelease()
+    {
+        const int maxPooledMemory = 2 * 1024 * 1024;
+        var controller = new EventHubCacheMemoryController(32 * 1024 * 1024);
+        var pool = new EventHubCacheBufferPool(controller, maxPooledMemory, null, TimeSpan.FromMinutes(1));
+        var buffers = new FixedSizeBuffer[128];
+
+        Parallel.For(0, buffers.Length, i =>
+        {
+            var minimumSize = 1 << (16 + i % 5);
+            buffers[i] = pool.Allocate(minimumSize);
+        });
+
+        var expectedActiveMemory = buffers.Sum(static buffer => (long)buffer.SizeInByte);
+        Assert.Equal(expectedActiveMemory, pool.ActiveMemory);
+        Assert.Equal(expectedActiveMemory, controller.ActiveCacheMemory);
+
+        Parallel.ForEach(buffers, static buffer => buffer.Dispose());
+
+        Assert.Equal(0, pool.ActiveMemory);
+        Assert.Equal(0, controller.ActiveCacheMemory);
+        Assert.InRange(pool.PooledMemory, 0, maxPooledMemory);
+    }
+
+    [Fact, TestCategory("BVT")]
     public void ProviderMemoryLimitAggregatesPartitionsAndRecoversAfterPurge()
     {
         const int maxActiveMemory = 450 * 1024;
@@ -106,8 +131,12 @@ public sealed class CacheMemoryTests : IDisposable
         Assert.Equal(0, cache.GetMaxAddCount());
         Assert.Null(checkpointer.LastOffset);
         var nextCursor = cache.GetCursor(positions[0].StreamId, positions[0].SequenceToken);
-        Assert.True(cache.TryGetNextMessage(nextCursor, out var next));
-        Assert.Equal(positions[0].SequenceToken, next.SequenceToken);
+        for (var i = 0; i < positions.Count; i++)
+        {
+            Assert.True(cache.TryGetNextMessage(nextCursor, out var next));
+            Assert.Equal(positions[i].SequenceToken, next.SequenceToken);
+        }
+        Assert.False(cache.TryGetNextMessage(nextCursor, out _));
 
         cache.AddCachePressureMonitor(new AlwaysPressureMonitor());
         cache.UpdatePurgeProtection(hasActiveSubscriptions: false);
@@ -129,6 +158,7 @@ public sealed class CacheMemoryTests : IDisposable
         var controller = new EventHubCacheMemoryController(options.MaxActiveCacheMemory);
         var pool = new EventHubCacheBufferPool(controller, options.MaxBufferPoolMemory, null, TimeSpan.FromMinutes(1));
         var caches = new List<EventHubQueueCache>(1024);
+        long memoryPerSparseCache = 0;
 
         try
         {
@@ -137,9 +167,14 @@ public sealed class CacheMemoryTests : IDisposable
                 var cache = CreateCache(i.ToString(CultureInfo.InvariantCulture), pool, controller);
                 cache.Add([MakeEventData(i)], DateTime.UtcNow);
                 caches.Add(cache);
+                if (i == 0)
+                {
+                    memoryPerSparseCache = controller.ActiveCacheMemory;
+                }
             }
 
-            Assert.True(controller.ActiveCacheMemory < 128L * 1024 * 1024);
+            Assert.InRange(memoryPerSparseCache, EventHubCacheBufferPool.MinBufferSize + 1L, 96L * 1024);
+            Assert.Equal(memoryPerSparseCache * caches.Count, controller.ActiveCacheMemory);
         }
         finally
         {
@@ -148,6 +183,9 @@ public sealed class CacheMemoryTests : IDisposable
                 cache.Dispose();
             }
         }
+
+        Assert.Equal(0, controller.ActiveCacheMemory);
+        Assert.Equal(options.MaxBufferPoolMemory, pool.PooledMemory);
     }
 
     [Fact, TestCategory("BVT")]
@@ -162,6 +200,116 @@ public sealed class CacheMemoryTests : IDisposable
         cache.Add([MakeEventData(0)], DateTime.UtcNow);
 
         Assert.True(cache.GetMaxAddCount() > 0);
+    }
+
+    [Fact, TestCategory("BVT")]
+    public void CustomBufferPoolReleasesFinalBufferAndAllocatesFreshAfterPurge()
+    {
+        var pool = new TrackingBufferPool();
+        var adapter = new TestEventHubDataAdapter(serializer);
+        var evictionStrategy = new EventHubQueueCacheFactory.EventHubCacheEvictionStrategy(
+            NullLogger.Instance,
+            new AlwaysPurgePredicate(),
+            null,
+            null);
+        var cache = new EventHubQueueCache(
+            "0",
+            EventHubAdapterReceiver.MaxMessagesPerRead,
+            pool,
+            adapter,
+            evictionStrategy,
+            NoOpCheckpointer.Instance,
+            NullLogger.Instance,
+            null,
+            null,
+            null);
+
+        cache.Add([MakeEventData(1)], DateTime.UtcNow);
+        cache.SignalPurge();
+
+        Assert.Equal(1, pool.FreeCount);
+        var positions = cache.Add([MakeEventData(2)], DateTime.UtcNow);
+        Assert.Equal(2, pool.AllocateCount);
+        var cursor = cache.GetCursor(positions[0].StreamId, positions[0].SequenceToken);
+        Assert.True(cache.TryGetNextMessage(cursor, out var message));
+        Assert.Equal(positions[0].SequenceToken, message.SequenceToken);
+
+        cache.Dispose();
+        cache.Dispose();
+        Assert.Equal(2, pool.FreeCount);
+    }
+
+    [Fact, TestCategory("BVT")]
+    public void FailedPackingRestoresActiveBufferPositionAndPreservesMessageOrder()
+    {
+        var controller = new EventHubCacheMemoryController(1024 * 1024);
+        var pool = new EventHubCacheBufferPool(controller, 0, null, TimeSpan.FromMinutes(1));
+        var adapter = new ThrowingEventHubDataAdapter(serializer) { ThrowSequenceNumber = 1 };
+        using var cache = CreateCache("0", pool, controller, adapter: adapter);
+        var firstPosition = Assert.Single(cache.Add([MakeEventData(0, 1024)], DateTime.UtcNow));
+        var activeMemory = controller.ActiveCacheMemory;
+
+        for (var i = 0; i < 16; i++)
+        {
+            var exception = Assert.Throws<InvalidOperationException>(
+                () => cache.Add([MakeEventData(1)], DateTime.UtcNow));
+            Assert.Equal("packing failed", exception.Message);
+            Assert.Equal(activeMemory, controller.ActiveCacheMemory);
+            Assert.Equal(0, pool.PooledMemory);
+        }
+
+        var lastPosition = Assert.Single(cache.Add([MakeEventData(2, 8 * 1024)], DateTime.UtcNow));
+        Assert.Equal(activeMemory, controller.ActiveCacheMemory);
+        var cursor = cache.GetCursor(firstPosition.StreamId, firstPosition.SequenceToken);
+        Assert.True(cache.TryGetNextMessage(cursor, out var first));
+        Assert.Equal(firstPosition.SequenceToken, first.SequenceToken);
+        Assert.True(cache.TryGetNextMessage(cursor, out var last));
+        Assert.Equal(lastPosition.SequenceToken, last.SequenceToken);
+        Assert.False(cache.TryGetNextMessage(cursor, out _));
+    }
+
+    [Fact, TestCategory("BVT")]
+    public void FailedPackingDisposesOnlyNewlyAllocatedBuffer()
+    {
+        var pool = new TrackingBufferPool(16 * 1024);
+        var adapter = new ThrowingEventHubDataAdapter(serializer) { ThrowSequenceNumber = 1 };
+        var evictionStrategy = new ChronologicalEvictionStrategy(
+            NullLogger.Instance,
+            new TimePurgePredicate(TimeSpan.FromDays(1), TimeSpan.FromDays(1)),
+            null,
+            null);
+        var cache = new EventHubQueueCache(
+            "0",
+            EventHubAdapterReceiver.MaxMessagesPerRead,
+            pool,
+            adapter,
+            evictionStrategy,
+            NoOpCheckpointer.Instance,
+            NullLogger.Instance,
+            null,
+            null,
+            null);
+        var firstPosition = Assert.Single(cache.Add([MakeEventData(0, 12 * 1024)], DateTime.UtcNow));
+        Assert.Equal(1, pool.AllocateCount);
+        Assert.Equal(0, pool.FreeCount);
+
+        Assert.Throws<InvalidOperationException>(() => cache.Add([MakeEventData(1)], DateTime.UtcNow));
+
+        Assert.Equal(2, pool.AllocateCount);
+        Assert.Equal(1, pool.FreeCount);
+        var lastPosition = Assert.Single(cache.Add([MakeEventData(2, 512)], DateTime.UtcNow));
+        Assert.Equal(2, pool.AllocateCount);
+        Assert.Equal(1, pool.FreeCount);
+
+        var cursor = cache.GetCursor(firstPosition.StreamId, firstPosition.SequenceToken);
+        Assert.True(cache.TryGetNextMessage(cursor, out var first));
+        Assert.Equal(firstPosition.SequenceToken, first.SequenceToken);
+        Assert.True(cache.TryGetNextMessage(cursor, out var last));
+        Assert.Equal(lastPosition.SequenceToken, last.SequenceToken);
+        Assert.False(cache.TryGetNextMessage(cursor, out _));
+
+        cache.Dispose();
+        Assert.Equal(2, pool.FreeCount);
     }
 
     [Fact, TestCategory("BVT")]
@@ -198,9 +346,10 @@ public sealed class CacheMemoryTests : IDisposable
         IObjectPool<FixedSizeBuffer> pool,
         EventHubCacheMemoryController controller,
         IEvictionStrategy? evictionStrategy = null,
-        IStreamQueueCheckpointer<string>? checkpointer = null)
+        IStreamQueueCheckpointer<string>? checkpointer = null,
+        IEventHubDataAdapter? adapter = null)
     {
-        var adapter = new TestEventHubDataAdapter(serializer);
+        adapter ??= new TestEventHubDataAdapter(serializer);
         evictionStrategy ??= new EventHubQueueCacheFactory.EventHubCacheEvictionStrategy(
             NullLogger.Instance,
             new TimePurgePredicate(TimeSpan.FromDays(1), TimeSpan.FromDays(1)),
@@ -230,14 +379,59 @@ public sealed class CacheMemoryTests : IDisposable
             enqueuedTime: now);
     }
 
-    private sealed class TestEventHubDataAdapter(Serializer serializer) : EventHubDataAdapter(serializer)
+    private class TestEventHubDataAdapter(Serializer serializer) : EventHubDataAdapter(serializer)
     {
         public override StreamPosition GetStreamPosition(string partition, EventData queueMessage)
         {
-            var streamId = StreamId.Create("test", $"{partition}-{queueMessage.SequenceNumber}");
+            var streamId = StreamId.Create("test", partition);
             var token = new EventHubSequenceTokenV2(queueMessage.OffsetString, queueMessage.SequenceNumber, 0);
             return new StreamPosition(streamId, token);
         }
+    }
+
+    private sealed class ThrowingEventHubDataAdapter(Serializer serializer) : TestEventHubDataAdapter(serializer)
+    {
+        public long ThrowSequenceNumber { get; init; }
+
+        public override CachedMessage FromQueueMessage(
+            StreamPosition streamPosition,
+            EventData queueMessage,
+            DateTime dequeueTime,
+            Func<int, ArraySegment<byte>> getSegment)
+        {
+            if (queueMessage.SequenceNumber == ThrowSequenceNumber)
+            {
+                _ = getSegment(8 * 1024);
+                throw new InvalidOperationException("packing failed");
+            }
+
+            return base.FromQueueMessage(streamPosition, queueMessage, dequeueTime, getSegment);
+        }
+    }
+
+    private sealed class AlwaysPurgePredicate : TimePurgePredicate
+    {
+        public AlwaysPurgePredicate()
+            : base(TimeSpan.Zero, TimeSpan.Zero)
+        {
+        }
+
+        public override bool ShouldPurgeFromTime(TimeSpan timeInCache, TimeSpan relativeAge) => true;
+    }
+
+    private sealed class TrackingBufferPool(int bufferSize = EventHubCacheBufferPool.MinBufferSize) : IObjectPool<FixedSizeBuffer>
+    {
+        public int AllocateCount { get; private set; }
+
+        public int FreeCount { get; private set; }
+
+        public FixedSizeBuffer Allocate()
+        {
+            AllocateCount++;
+            return new FixedSizeBuffer(bufferSize) { Pool = this };
+        }
+
+        public void Free(FixedSizeBuffer resource) => FreeCount++;
     }
 
     private sealed class TrackingEvictionStrategy : IEvictionStrategy, IDisposable

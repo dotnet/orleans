@@ -578,8 +578,6 @@ namespace Orleans.Providers.Streams.Common
 
         public void PerformPurge(System.DateTime nowUtc) { }
 
-        public void ReleaseAllBuffers() { }
-
         protected virtual bool ShouldPurge(ref CachedMessage cachedMessage, ref CachedMessage newestCachedMessage, System.DateTime nowUtc) { throw null; }
     }
 

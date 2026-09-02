@@ -56,7 +56,7 @@ Register [Azure Event Hubs](https://learn.microsoft.com/azure/event-hubs/event-h
 
 New subscriptions can [begin with messages retained in the pulling agent's local cache](subscription-start-positions.md). This cache-local replay keeps the Event Hubs partition receiver and checkpoint at their current positions.
 
-The Event Hubs provider supports a custom data adapter for provider-specific wire formats. See [Integrate external stream producers and consumers](external-streams.md) when a non-Orleans application must publish to or consume from the same Event Hub.
+The Event Hubs provider supports a custom data adapter for provider-specific wire formats. See [Integrate external stream producers and consumers](external-streams.md) when a non-Orleans application must publish to or consume from the same Event Hub. See [Operate and tune Orleans streams](streaming-operations.md#bound-event-hubs-cache-memory) for provider-wide cache memory limits, temporary in-flight overshoot, and slow-consumer behavior.
 
 ## Amazon Kinesis
 
