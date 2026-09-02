@@ -284,7 +284,7 @@ namespace Orleans.Runtime.Messaging
 
             if (message.TargetSilo is { } targetSilo && siloStatusOracle.IsDeadSilo(targetSilo))
             {
-                client.RejectRequest(message, targetSilo);
+                client.RejectUntrackedRequest(message, targetSilo);
             }
             else
             {
@@ -585,7 +585,7 @@ namespace Orleans.Runtime.Messaging
                 EmitRequestTrackingStopped(requestTrackingStopped);
                 if (requestToReject is not null)
                 {
-                    RejectRequest(requestToReject, message.TargetSilo!);
+                    RejectClaimedRequest(requestToReject, message.TargetSilo!);
                 }
             }
 
@@ -648,25 +648,16 @@ namespace Orleans.Runtime.Messaging
                 {
                     foreach (var request in requests)
                     {
-                        RejectRequest(request, deadSilo);
+                        RejectClaimedRequest(request, deadSilo);
                     }
                 }
             }
 
-            public void RejectRequest(Message request, SiloAddress deadSilo)
+            public void RejectUntrackedRequest(Message request, SiloAddress deadSilo) =>
+                RejectClaimedRequest(request, deadSilo);
+
+            private void RejectClaimedRequest(Message request, SiloAddress deadSilo)
             {
-                bool requestTrackingStopped;
-                lock (_requestLock)
-                {
-                    if (_pendingRequests.TryRemove(request.Id, out var trackedRequest))
-                    {
-                        request = trackedRequest;
-                    }
-
-                    requestTrackingStopped = UnregisterRequestTrackingIfEmptyCore();
-                }
-
-                EmitRequestTrackingStopped(requestTrackingStopped);
                 _gateway._messagingInstruments.OnRejectedMessage(request);
                 var rejection = _gateway.CreateDeadSiloRejection(request, deadSilo);
                 SendSyntheticResponse(rejection);
