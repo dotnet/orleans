@@ -460,6 +460,9 @@ public class StateManagerTests : JournalingTestBase
         value.Value = 1;
         await sut.Manager.WriteStateAsync(TestContext.Current.CancellationToken);
         Assert.Equal(1, notifications.WriteCompletedCount);
+        var baselineRecoverableBytes = storage.RecoverableBytes;
+        var notificationCountBeforeFailure = notifications.WriteCompletedCount;
+        storage.OperationLog.Clear();
 
         storage.IsCompactionRequested = true;
         dictionary.Add("pending", 2);
@@ -472,9 +475,14 @@ public class StateManagerTests : JournalingTestBase
             () => sut.Manager.WriteStateAsync(TestContext.Current.CancellationToken).AsTask());
 
         Assert.Same(expected, exception);
+        Assert.Equal(["replace-failed"], storage.OperationLog);
+        Assert.Equal(baselineRecoverableBytes, storage.RecoverableBytes);
+        var failedAttemptBytes = Assert.Single(storage.FailedReplaceAttempts);
+        Assert.NotEmpty(failedAttemptBytes);
         Assert.Single(storage.Appends);
         Assert.Empty(storage.Replaces);
         Assert.Equal(1, notifications.WriteCompletedCount);
+        Assert.Equal(notificationCountBeforeFailure, notifications.WriteCompletedCount);
         Assert.Equal(pendingBytes, sut.Manager.PendingWriteByteCount);
         Assert.Equal(2, dictionary["pending"]);
         Assert.Equal(2, value.Value);
@@ -483,8 +491,12 @@ public class StateManagerTests : JournalingTestBase
 
         Assert.Single(storage.Appends);
         Assert.Single(storage.Replaces);
+        Assert.Equal(["replace-failed", "replace"], storage.OperationLog);
+        var successfulRetryBytes = storage.Replaces[0];
+        Assert.Equal(failedAttemptBytes, successfulRetryBytes);
         Assert.Equal(2, storage.ReplaceAttemptCount);
         Assert.Equal(2, notifications.WriteCompletedCount);
+        Assert.Equal(notificationCountBeforeFailure + 1, notifications.WriteCompletedCount);
         Assert.Equal(0, sut.Manager.PendingWriteByteCount);
 
         var recovered = CreateTestSystem(storage: storage);
@@ -1428,6 +1440,112 @@ public class StateManagerTests : JournalingTestBase
         }
     }
 
+    [Fact]
+    public async Task WorkLoop_BlockedAppendFencesQueuedDeleteUntilAppendCompletes()
+    {
+        var storage = new CapturingStorage { BlockNextAppend = true };
+        var sut = CreateTestSystem(storage: storage);
+        var value = new DurableValue<string>("value", sut.Manager, CreateValueCodec<string>());
+
+        await sut.Lifecycle.OnStart(TestContext.Current.CancellationToken);
+        value.Value = "before-delete";
+        var append = sut.Manager.WriteStateAsync(TestContext.Current.CancellationToken).AsTask();
+        await storage.AppendEntered.Task.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
+
+        var deleteEntered = storage.DeleteEntered.Task;
+        var delete = sut.Manager.DeleteStateAsync(TestContext.Current.CancellationToken).AsTask();
+
+        Assert.Equal(["append"], storage.OperationLog);
+        Assert.False(deleteEntered.IsCompleted);
+        Assert.Equal(0, storage.DeleteCount);
+
+        storage.ReleaseAppend.SetResult();
+        await Task.WhenAll(append, delete).WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
+
+        Assert.Equal(["append", "delete"], storage.OperationLog);
+        Assert.False(storage.DeleteEnteredWhileAppendInProgress);
+        Assert.Single(storage.Appends);
+        Assert.Equal(1, storage.DeleteCount);
+    }
+
+    [Fact]
+    public async Task WorkLoop_AppendDeleteReplacePersistsPostDeleteStateAndFreshManagerRecoversIt()
+    {
+        var storage = new CapturingStorage();
+        var sut = CreateTestSystem(storage: storage);
+        var value = new DurableValue<string>("value", sut.Manager, CreateValueCodec<string>());
+
+        await sut.Lifecycle.OnStart(TestContext.Current.CancellationToken);
+        value.Value = "before-delete";
+        await sut.Manager.WriteStateAsync(TestContext.Current.CancellationToken);
+
+        await sut.Manager.DeleteStateAsync(TestContext.Current.CancellationToken);
+        value.Value = "after-delete";
+        storage.IsCompactionRequested = true;
+        await sut.Manager.WriteStateAsync(TestContext.Current.CancellationToken);
+
+        Assert.Equal(["append", "delete", "replace"], storage.OperationLog);
+        var appendBytes = Assert.Single(storage.Appends);
+        var replacementBytes = Assert.Single(storage.Replaces);
+
+        var appendReplay = ReplayValueCommands(appendBytes);
+        Assert.Equal("before-delete", appendReplay.Value);
+        Assert.Equal(["before-delete"], appendReplay.AppliedValues);
+
+        var replacementReplay = ReplayValueCommands(replacementBytes);
+        Assert.Equal("after-delete", replacementReplay.Value);
+        Assert.Equal(["after-delete"], replacementReplay.AppliedValues);
+        Assert.DoesNotContain("before-delete", replacementReplay.AppliedValues);
+        Assert.Equal(replacementBytes, storage.RecoverableBytes);
+
+        var recoveryCodec = new TrackingValueCodec<string>(CreateValueCodec<string>());
+        var recovered = CreateTestSystem(storage: storage);
+        var recoveredValue = new DurableValue<string>("value", recovered.Manager, recoveryCodec);
+        await recovered.Lifecycle.OnStart(TestContext.Current.CancellationToken);
+
+        Assert.Equal("after-delete", recoveredValue.Value);
+        Assert.Equal(["after-delete"], recoveryCodec.AppliedValues);
+        Assert.DoesNotContain("before-delete", recoveryCodec.AppliedValues);
+    }
+
+    [Fact]
+    public async Task RecoverAsync_UnsupportedLegacyRecordCanRetryAfterRepairWithoutPartialApplication()
+    {
+        var unsupportedBytes = CreateUnsupportedLegacyCommandVersionRecord(streamId: 128, commandVersion: 1);
+        var validBytes = CreatePersistedStringValueBytes("value", "recovered");
+        var storage = new MutableReadStorage(unsupportedBytes);
+        var codec = new TrackingValueCodec<string>(CreateValueCodec<string>());
+        var sut = CreateTestSystem(storage: storage);
+        var value = new DurableValue<string>("value", sut.Manager, codec);
+
+        var exception = await Assert.ThrowsAsync<InvalidOperationException>(
+            () => sut.Lifecycle.OnStart(TestContext.Current.CancellationToken)
+                .WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken));
+
+        Assert.Equal(
+            "Failed to recover journaling state using journal format key 'orleans-binary'. " +
+            "The configured write journal format key is 'orleans-binary'.",
+            exception.Message);
+        var inner = Assert.IsType<NotSupportedException>(exception.InnerException);
+        Assert.Equal("Unsupported legacy binary journal command format version at byte offset 0: 1.", inner.Message);
+        Assert.Null(value.Value);
+        Assert.Empty(codec.AppliedValues);
+        Assert.Equal(unsupportedBytes, storage.Bytes);
+        Assert.Empty(storage.Replaces);
+        Assert.Empty(storage.OperationLog);
+
+        storage.Bytes = validBytes;
+        await sut.Manager.InitializeAsync(TestContext.Current.CancellationToken).AsTask()
+            .WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
+
+        Assert.Equal("recovered", value.Value);
+        Assert.Equal(["recovered"], codec.AppliedValues);
+        Assert.Equal(validBytes, storage.Bytes);
+        Assert.Empty(storage.Replaces);
+        Assert.Empty(storage.OperationLog);
+        await sut.Lifecycle.OnStop(TestContext.Current.CancellationToken);
+    }
+
     private sealed class StreamingOnlyStorage : IJournalStorage
     {
         public bool StreamingReadCalled { get; private set; }
@@ -1463,6 +1581,40 @@ public class StateManagerTests : JournalingTestBase
 
         using var committed = segment.GetBuffer();
         return committed.ToArray();
+    }
+
+    private byte[] CreatePersistedStringValueBytes(string name, string value)
+    {
+        using var segment = new OrleansBinaryJournalBufferWriter();
+        AppendDirectorySet(segment, name, new JournalStreamId(8));
+        CreateValueCodec<string>().WriteSet(value, segment.CreateJournalStreamWriter(new JournalStreamId(8)));
+
+        using var committed = segment.GetBuffer();
+        return committed.ToArray();
+    }
+
+    private static byte[] CreateUnsupportedLegacyCommandVersionRecord(ulong streamId, byte commandVersion)
+    {
+        using var writer = new ArcBufferWriter();
+        var serializerWriter = Writer.Create(writer, session: null!);
+        serializerWriter.WriteVarUInt32(checked((uint)(GetVarUInt64ByteCount(streamId) + 1)));
+        serializerWriter.WriteVarUInt64(streamId);
+        serializerWriter.WriteByte(commandVersion);
+        serializerWriter.Commit();
+        using var buffer = writer.PeekSlice(writer.Length);
+        return buffer.ToArray();
+    }
+
+    private static int GetVarUInt64ByteCount(ulong value)
+    {
+        var result = 1;
+        while (value >= 128)
+        {
+            value >>= 7;
+            result++;
+        }
+
+        return result;
     }
 
     private byte[] CreateUnknownStreamBytes(JournalStreamId streamId, ReadOnlySpan<byte> payload)
@@ -1522,6 +1674,24 @@ public class StateManagerTests : JournalingTestBase
         Assert.Equal(0, reader.Length);
 
         return consumer.Entries;
+    }
+
+    private (string? Value, IReadOnlyList<string> AppliedValues) ReplayValueCommands(ReadOnlySpan<byte> bytes)
+    {
+        var entries = ReadBinaryEntries(bytes);
+        var streamId = Assert.Single(entries.Where(static entry => entry.StreamId.Value >= 8).Select(static entry => entry.StreamId).Distinct());
+        var codec = new TrackingValueCodec<string>(CreateValueCodec<string>());
+        var state = new RecordingValueState<string>(codec);
+        var context = JournalTestReplayContext.Create(OrleansBinaryJournalFormat.JournalFormatKey, (streamId, state));
+
+        foreach (var entry in entries.Where(entry => entry.StreamId == streamId))
+        {
+            ((IJournaledState)state).ReplayEntry(
+                new JournalEntry(OrleansBinaryJournalFormat.JournalFormatKey, CodecTestHelpers.ReadBuffer(entry.Payload)),
+                context);
+        }
+
+        return (state.Value, codec.AppliedValues);
     }
 
     private static List<JournalStreamId> ReadStreamIds(ReadOnlySpan<byte> bytes)
@@ -1823,11 +1993,44 @@ public class StateManagerTests : JournalingTestBase
 
     private sealed class CapturingStorage : IJournalStorage
     {
+        private readonly object _lock = new();
         private readonly List<byte[]> _segments = [];
+        private int _activeAppends;
 
         public List<byte[]> Appends { get; } = [];
 
         public List<byte[]> Replaces { get; } = [];
+
+        public List<byte[]> FailedReplaceAttempts { get; } = [];
+
+        public List<string> OperationLog { get; } = [];
+
+        public byte[] RecoverableBytes
+        {
+            get
+            {
+                lock (_lock)
+                {
+                    return _segments.SelectMany(static segment => segment).ToArray();
+                }
+            }
+        }
+
+        public bool BlockNextAppend { get; set; }
+
+        public TaskCompletionSource AppendEntered { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        public TaskCompletionSource ReleaseAppend { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        public TaskCompletionSource DeleteEntered { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        public bool DeleteEnteredWhileAppendInProgress { get; private set; }
+
+        public bool BlockNextReplace { get; set; }
+
+        public TaskCompletionSource ReplaceEntered { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        public TaskCompletionSource ReleaseReplace { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
 
         public bool ConcatenateReads { get; set; }
 
@@ -1849,7 +2052,13 @@ public class StateManagerTests : JournalingTestBase
 
         public int ReadConsumeCount { get; private set; }
 
-        public void ResetReadConsumeCount() => ReadConsumeCount = 0;
+        public void ResetReadConsumeCount()
+        {
+            lock (_lock)
+            {
+                ReadConsumeCount = 0;
+            }
+        }
 
         public bool IsCompactionRequested { get; set; }
 
@@ -1875,10 +2084,16 @@ public class StateManagerTests : JournalingTestBase
                 await AllowBlockedRead.Task.WaitAsync(cancellationToken);
             }
 
+            byte[][] segments;
+            lock (_lock)
+            {
+                segments = _segments.ToArray();
+            }
+
             if (ConcatenateReads)
             {
                 var totalLength = 0;
-                foreach (var segment in _segments)
+                foreach (var segment in segments)
                 {
                     cancellationToken.ThrowIfCancellationRequested();
                     totalLength += segment.Length;
@@ -1888,13 +2103,17 @@ public class StateManagerTests : JournalingTestBase
                 {
                     var concatenated = new byte[totalLength];
                     var offset = 0;
-                    foreach (var segment in _segments)
+                    foreach (var segment in segments)
                     {
                         segment.CopyTo(concatenated.AsSpan(offset));
                         offset += segment.Length;
                     }
 
-                    ReadConsumeCount++;
+                    lock (_lock)
+                    {
+                        ReadConsumeCount++;
+                    }
+
                     consumer.Read(concatenated, metadata: null, complete: true);
                 }
                 else
@@ -1909,10 +2128,14 @@ public class StateManagerTests : JournalingTestBase
 
             IEnumerable<ReadOnlyMemory<byte>> GetSegments()
             {
-                foreach (var segment in _segments)
+                foreach (var segment in segments)
                 {
                     cancellationToken.ThrowIfCancellationRequested();
-                    ReadConsumeCount++;
+                    lock (_lock)
+                    {
+                        ReadConsumeCount++;
+                    }
+
                     yield return segment;
                 }
             }
@@ -1921,11 +2144,33 @@ public class StateManagerTests : JournalingTestBase
         public async ValueTask ReplaceAsync(ReadOnlySequence<byte> value, CancellationToken cancellationToken)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            ReplaceAttemptCount++;
-            if (NextReplaceException is { } exception)
+            Exception? exceptionToThrow;
+            lock (_lock)
             {
-                NextReplaceException = null;
-                ExceptionDispatchInfo.Throw(exception);
+                ReplaceAttemptCount++;
+                exceptionToThrow = NextReplaceException;
+                if (exceptionToThrow is not null)
+                {
+                    NextReplaceException = null;
+                    FailedReplaceAttempts.Add(value.ToArray());
+                    OperationLog.Add("replace-failed");
+                }
+                else
+                {
+                    OperationLog.Add("replace");
+                }
+            }
+
+            if (exceptionToThrow is not null)
+            {
+                ExceptionDispatchInfo.Throw(exceptionToThrow);
+            }
+
+            ReplaceEntered.TrySetResult();
+            if (BlockNextReplace)
+            {
+                BlockNextReplace = false;
+                await ReleaseReplace.Task.WaitAsync(cancellationToken);
             }
 
             if (DelayReplace)
@@ -1935,31 +2180,72 @@ public class StateManagerTests : JournalingTestBase
             }
 
             var bytes = value.ToArray();
-            Replaces.Add(bytes);
-            _segments.Clear();
-            _segments.Add(bytes);
+            lock (_lock)
+            {
+                Replaces.Add(bytes);
+                _segments.Clear();
+                _segments.Add(bytes);
+            }
         }
 
-        public ValueTask AppendAsync(ReadOnlySequence<byte> value, CancellationToken cancellationToken)
+        public async ValueTask AppendAsync(ReadOnlySequence<byte> value, CancellationToken cancellationToken)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            if (NextAppendException is { } exception)
+            Interlocked.Increment(ref _activeAppends);
+            try
             {
-                NextAppendException = null;
-                return ValueTask.FromException(exception);
-            }
+                Exception? exceptionToThrow;
+                lock (_lock)
+                {
+                    exceptionToThrow = NextAppendException;
+                    if (exceptionToThrow is not null)
+                    {
+                        NextAppendException = null;
+                        OperationLog.Add("append-failed");
+                    }
+                    else
+                    {
+                        OperationLog.Add("append");
+                    }
+                }
 
-            var bytes = value.ToArray();
-            Appends.Add(bytes);
-            _segments.Add(bytes);
-            return default;
+                if (exceptionToThrow is not null)
+                {
+                    ExceptionDispatchInfo.Throw(exceptionToThrow);
+                }
+
+                AppendEntered.TrySetResult();
+                if (BlockNextAppend)
+                {
+                    BlockNextAppend = false;
+                    await ReleaseAppend.Task.WaitAsync(cancellationToken);
+                }
+
+                var bytes = value.ToArray();
+                lock (_lock)
+                {
+                    Appends.Add(bytes);
+                    _segments.Add(bytes);
+                }
+            }
+            finally
+            {
+                Interlocked.Decrement(ref _activeAppends);
+            }
         }
 
         public ValueTask DeleteAsync(CancellationToken cancellationToken)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            DeleteCount++;
-            _segments.Clear();
+            lock (_lock)
+            {
+                DeleteEnteredWhileAppendInProgress = Volatile.Read(ref _activeAppends) > 0;
+                OperationLog.Add("delete");
+                DeleteCount++;
+                _segments.Clear();
+            }
+
+            DeleteEntered.TrySetResult();
             return default;
         }
     }
@@ -2030,6 +2316,8 @@ public class StateManagerTests : JournalingTestBase
 
         public List<byte[]> Replaces { get; } = [];
 
+        public List<string> OperationLog { get; } = [];
+
         public bool IsCompactionRequested { get; set; }
 
         public ValueTask ReadAsync(IJournalStorageConsumer consumer, CancellationToken cancellationToken)
@@ -2058,6 +2346,7 @@ public class StateManagerTests : JournalingTestBase
         {
             cancellationToken.ThrowIfCancellationRequested();
             var bytes = value.ToArray();
+            OperationLog.Add("replace");
             Replaces.Add(bytes);
             lock (_lock)
             {
@@ -2071,6 +2360,7 @@ public class StateManagerTests : JournalingTestBase
         {
             cancellationToken.ThrowIfCancellationRequested();
             var appendBytes = value.ToArray();
+            OperationLog.Add("append");
             lock (_lock)
             {
                 _bytes = [.. _bytes, .. appendBytes];
@@ -2082,6 +2372,7 @@ public class StateManagerTests : JournalingTestBase
         public ValueTask DeleteAsync(CancellationToken cancellationToken)
         {
             cancellationToken.ThrowIfCancellationRequested();
+            OperationLog.Add("delete");
             Bytes = [];
             return default;
         }
@@ -2219,6 +2510,25 @@ public class StateManagerTests : JournalingTestBase
         public void OnWriteCompleted() => WriteCompletedCount++;
 
         public IJournaledState DeepCopy() => throw new NotSupportedException();
+    }
+
+    private sealed class TrackingValueCodec<T>(IDurableValueCommandCodec<T> inner) : IDurableValueCommandCodec<T>
+    {
+        public List<T> AppliedValues { get; } = [];
+
+        public void WriteSet(T value, JournalStreamWriter writer) => inner.WriteSet(value, writer);
+
+        public void Apply(JournalBufferReader input, IDurableValueCommandHandler<T> consumer) =>
+            inner.Apply(input, new TrackingHandler(this, consumer));
+
+        private sealed class TrackingHandler(TrackingValueCodec<T> owner, IDurableValueCommandHandler<T> inner) : IDurableValueCommandHandler<T>
+        {
+            public void ApplySet(T value)
+            {
+                owner.AppliedValues.Add(value);
+                inner.ApplySet(value);
+            }
+        }
     }
 
     private sealed class ThrowingDictionarySetCodec<K, V> : IDurableDictionaryCommandCodec<K, V> where K : notnull

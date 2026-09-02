@@ -609,4 +609,196 @@ public sealed class OrleansBinaryJournalBufferWriterTests
 
         public string FormatKey { get; }
     }
+
+    [Fact]
+    public void BinaryFormat_Replay_ParsesConcatenatedLegacyRecordsInCommandOrder()
+    {
+        var firstPayload = System.Text.Encoding.UTF8.GetBytes("first");
+        var secondPayload = System.Text.Encoding.UTF8.GetBytes("second");
+        using var firstRecord = CreateLegacyWriter(bodyLength: null, streamId: 1, commandVersion: 0, firstPayload);
+        using var secondRecord = CreateLegacyWriter(bodyLength: null, streamId: 2, commandVersion: 0, secondPayload);
+        using var firstRecordBytes = firstRecord.PeekSlice(firstRecord.Length);
+        using var secondRecordBytes = secondRecord.PeekSlice(secondRecord.Length);
+        using var data = CreateWriter([.. firstRecordBytes.ToArray(), .. secondRecordBytes.ToArray()]);
+        var reader = new JournalBufferReader(data.Reader, isCompleted: true);
+        var consumer = new CollectingConsumer();
+        var context = JournalTestReplayContext.Create(OrleansBinaryJournalFormat.JournalFormatKey, consumer.Bind(1, 2));
+
+        ((IJournalFormat)new OrleansBinaryJournalFormat(SessionPool)).Replay(reader, context);
+
+        Assert.Collection(
+            consumer.Entries,
+            entry =>
+            {
+                Assert.Equal(1U, entry.StreamId);
+                Assert.Equal(firstPayload, entry.Payload);
+                Assert.Equal("first", System.Text.Encoding.UTF8.GetString(entry.Payload));
+            },
+            entry =>
+            {
+                Assert.Equal(2U, entry.StreamId);
+                Assert.Equal(secondPayload, entry.Payload);
+                Assert.Equal("second", System.Text.Encoding.UTF8.GetString(entry.Payload));
+            });
+        Assert.Equal(0, reader.Length);
+    }
+
+    [Fact]
+    public void BinaryFormat_Replay_RejectsZeroLengthLegacyBodyWithoutConsumingInput()
+    {
+        using var data = CreateLegacyWriter(bodyLength: 0, streamId: null, commandVersion: null, []);
+        var reader = new JournalBufferReader(data.Reader, isCompleted: true);
+        var originalLength = reader.Length;
+        var consumer = new CollectingConsumer();
+        var context = JournalTestReplayContext.Create(OrleansBinaryJournalFormat.JournalFormatKey, consumer.Bind(1));
+
+        // A legacy varuint zero is encoded as 0x01, which the public format dispatches as V1 framing.
+        var exception = Assert.Throws<InvalidOperationException>(
+            () => ((IJournalFormat)new OrleansBinaryJournalFormat(SessionPool)).Replay(reader, context));
+
+        Assert.Equal(1, originalLength);
+        Assert.Equal("Malformed binary journal entry stream at byte offset 0: truncated fixed-width entry header.", exception.Message);
+        Assert.Empty(consumer.Entries);
+        Assert.Equal(originalLength, reader.Length);
+    }
+
+    [Fact]
+    public void BinaryFormat_Replay_RejectsOversizedLegacyStreamIdWithoutConsumingInput()
+    {
+        const ulong oversizedStreamId = (ulong)uint.MaxValue + 1;
+        using var data = CreateLegacyWriter(bodyLength: null, oversizedStreamId, commandVersion: 0, []);
+        var reader = new JournalBufferReader(data.Reader, isCompleted: true);
+        var originalLength = reader.Length;
+        var consumer = new CollectingConsumer();
+        var context = JournalTestReplayContext.Create(OrleansBinaryJournalFormat.JournalFormatKey, consumer.Bind(1));
+
+        var exception = Assert.Throws<NotSupportedException>(
+            () => ((IJournalFormat)new OrleansBinaryJournalFormat(SessionPool)).Replay(reader, context));
+
+        Assert.Equal("Unsupported legacy binary journal stream id at byte offset 0: 4294967296.", exception.Message);
+        Assert.Empty(consumer.Entries);
+        Assert.Equal(originalLength, reader.Length);
+    }
+
+    [Fact]
+    public void BinaryFormat_Replay_RejectsLegacyRecordMissingCommandVersionWithoutConsumingInput()
+    {
+        using var data = CreateLegacyWriter(bodyLength: null, streamId: 7, commandVersion: null, []);
+        var reader = new JournalBufferReader(data.Reader, isCompleted: true);
+        var originalLength = reader.Length;
+        var consumer = new CollectingConsumer();
+        var context = JournalTestReplayContext.Create(OrleansBinaryJournalFormat.JournalFormatKey, consumer.Bind(7));
+
+        var exception = Assert.Throws<InvalidOperationException>(
+            () => ((IJournalFormat)new OrleansBinaryJournalFormat(SessionPool)).Replay(reader, context));
+
+        Assert.Equal("Malformed binary journal entry stream at byte offset 0: missing legacy command format version.", exception.Message);
+        Assert.Empty(consumer.Entries);
+        Assert.Equal(originalLength, reader.Length);
+    }
+
+    [Fact]
+    public void BinaryFormat_Replay_RejectsUnsupportedLegacyCommandVersionWithoutConsumingInput()
+    {
+        using var data = CreateLegacyWriter(bodyLength: null, streamId: 7, commandVersion: 1, [0xAA]);
+        var reader = new JournalBufferReader(data.Reader, isCompleted: true);
+        var originalLength = reader.Length;
+        var consumer = new CollectingConsumer();
+        var context = JournalTestReplayContext.Create(OrleansBinaryJournalFormat.JournalFormatKey, consumer.Bind(7));
+
+        var exception = Assert.Throws<NotSupportedException>(
+            () => ((IJournalFormat)new OrleansBinaryJournalFormat(SessionPool)).Replay(reader, context));
+
+        Assert.Equal("Unsupported legacy binary journal command format version at byte offset 0: 1.", exception.Message);
+        Assert.Empty(consumer.Entries);
+        Assert.Equal(originalLength, reader.Length);
+    }
+
+    private static ArcBufferWriter CreateLegacyWriter(uint? bodyLength, ulong? streamId, byte? commandVersion, ReadOnlySpan<byte> payload)
+    {
+        var writer = new ArcBufferWriter();
+        var serializerWriter = Writer.Create(writer, session: null!);
+        serializerWriter.WriteVarUInt32(bodyLength ?? checked((uint)(
+            (streamId.HasValue ? GetVarUInt64ByteCount(streamId.Value) : 0)
+            + (commandVersion.HasValue ? 1 : 0)
+            + payload.Length)));
+
+        if (streamId.HasValue)
+        {
+            serializerWriter.WriteVarUInt64(streamId.Value);
+        }
+
+        if (commandVersion.HasValue)
+        {
+            serializerWriter.WriteByte(commandVersion.Value);
+        }
+
+        serializerWriter.Commit();
+        writer.Write(payload);
+        return writer;
+    }
+
+    private static int GetVarUInt64ByteCount(ulong value)
+    {
+        var result = 1;
+        while (value >= 128)
+        {
+            value >>= 7;
+            result++;
+        }
+
+        return result;
+    }
+
+    [Fact]
+    public void BinaryFormat_Replay_DispatchesConcatenatedV0AndV1RecordsInPhysicalOrder()
+    {
+        var legacyPayload = System.Text.Encoding.UTF8.GetBytes("legacy");
+        var currentPayload = System.Text.Encoding.UTF8.GetBytes("current");
+        using var legacyRecord = CreateLegacyWriter(bodyLength: null, streamId: 1, commandVersion: 0, legacyPayload);
+        using var currentRecord = new OrleansBinaryJournalBufferWriter();
+        AppendEntry(currentRecord.CreateJournalStreamWriter(new JournalStreamId(1)), currentPayload);
+        using var legacyRecordBytes = legacyRecord.PeekSlice(legacyRecord.Length);
+        using var data = CreateWriter([.. legacyRecordBytes.ToArray(), .. ToArray(currentRecord)]);
+        var reader = new JournalBufferReader(data.Reader, isCompleted: true);
+        var consumer = new CollectingConsumer();
+        var context = JournalTestReplayContext.Create(OrleansBinaryJournalFormat.JournalFormatKey, consumer.Bind(1));
+        IJournalFormat format = new OrleansBinaryJournalFormat(SessionPool);
+
+        format.Replay(reader, context);
+
+        Assert.Collection(
+            consumer.Entries,
+            entry =>
+            {
+                Assert.Equal(1U, entry.StreamId);
+                Assert.Equal(legacyPayload, entry.Payload);
+                Assert.Equal("legacy", System.Text.Encoding.UTF8.GetString(entry.Payload));
+            },
+            entry =>
+            {
+                Assert.Equal(1U, entry.StreamId);
+                Assert.Equal(currentPayload, entry.Payload);
+                Assert.Equal("current", System.Text.Encoding.UTF8.GetString(entry.Payload));
+            });
+        Assert.Equal(0, reader.Length);
+    }
+
+    [Fact]
+    public void BinaryFormat_Replay_UnsupportedLegacyCommandVersionReportsContextWithoutPartialApplication()
+    {
+        using var data = CreateLegacyWriter(bodyLength: null, streamId: 1, commandVersion: 1, [0xAA]);
+        var reader = new JournalBufferReader(data.Reader, isCompleted: true);
+        var originalLength = reader.Length;
+        var consumer = new CollectingConsumer();
+        var context = JournalTestReplayContext.Create(OrleansBinaryJournalFormat.JournalFormatKey, consumer.Bind(1));
+        IJournalFormat format = new OrleansBinaryJournalFormat(SessionPool);
+
+        var exception = Assert.Throws<NotSupportedException>(() => format.Replay(reader, context));
+
+        Assert.Equal("Unsupported legacy binary journal command format version at byte offset 0: 1.", exception.Message);
+        Assert.Null(exception.InnerException);
+        Assert.Empty(consumer.Entries);
+        Assert.Equal(originalLength, reader.Length);
+    }
 }
