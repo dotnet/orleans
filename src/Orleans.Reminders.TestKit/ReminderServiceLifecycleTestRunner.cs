@@ -33,21 +33,6 @@ public interface IReminderServiceLifecycleHarness
     /// <summary>Gets the currently active silos.</summary>
     IReadOnlyList<SiloAddress> ActiveSilos { get; }
 
-    /// <summary>
-    /// Registers a reminder, directing the request through the specified silo when the harness supports directed
-    /// registration. The default implementation uses the grain-facing API through <see cref="GrainFactory"/>.
-    /// </summary>
-    Task RegisterOnSiloAsync(
-        SiloAddress siloAddress,
-        GrainId grainId,
-        string reminderName,
-        TimeSpan dueTime,
-        TimeSpan period,
-        CancellationToken cancellationToken)
-        => GrainFactory.GetGrain<IReminderServiceTestGrain>(grainId)
-            .RegisterOrUpdateAsync(reminderName, dueTime, period)
-            .WaitAsync(cancellationToken);
-
     /// <summary>Waits until every active reminder service is ready.</summary>
     Task WaitForStartupReadinessAsync(CancellationToken cancellationToken);
 
@@ -110,6 +95,21 @@ public interface IReminderServiceLifecycleHarness
 }
 
 /// <summary>
+/// Adds deterministic reminder registration through a specified silo to a lifecycle harness.
+/// </summary>
+public interface IReminderServiceLifecycleRegistrationTarget
+{
+    /// <summary>Registers a reminder through the reminder service on the specified silo.</summary>
+    Task RegisterOnSiloAsync(
+        SiloAddress siloAddress,
+        GrainId grainId,
+        string reminderName,
+        TimeSpan dueTime,
+        TimeSpan period,
+        CancellationToken cancellationToken);
+}
+
+/// <summary>
 /// Shared deterministic conformance scenarios for reminder service lifecycle, ownership, and churn.
 /// </summary>
 /// <remarks>
@@ -119,6 +119,7 @@ public interface IReminderServiceLifecycleHarness
 /// </remarks>
 public abstract class ReminderServiceLifecycleTestRunner
 {
+    private static readonly TimeSpan CleanupPhaseTimeout = TimeSpan.FromSeconds(30);
     private static readonly TimeSpan Period = TimeSpan.FromMinutes(2);
     private readonly IReminderServiceLifecycleHarness _harness;
     private readonly int _seed;
@@ -354,6 +355,17 @@ public abstract class ReminderServiceLifecycleTestRunner
         var phase = "join";
         SiloAddress? joined = null;
         SiloAddress? staleOwner = null;
+        Task? registrationTask = null;
+        if (_harness is not IReminderServiceLifecycleRegistrationTarget registrationTarget)
+        {
+            Fail(Guarantee, "harness capability")
+                .WithExpected(
+                    $"{nameof(IReminderServiceLifecycleRegistrationTarget)} for deterministic non-owner registration")
+                .WithObserved(_harness.GetType().FullName ?? _harness.GetType().Name)
+                .Throw();
+            return;
+        }
+
         await ExecuteWithCleanupAsync(
             Guarantee,
             cancellationToken,
@@ -382,13 +394,14 @@ public abstract class ReminderServiceLifecycleTestRunner
                     }
 
                     phase = $"registration through non-owner {staleOwner}";
-                    await _harness.RegisterOnSiloAsync(
+                    registrationTask = registrationTarget.RegisterOnSiloAsync(
                         staleOwner,
                         grainId,
                         Name,
                         TimeSpan.FromSeconds(3),
                         Period,
                         cancellationToken);
+                    await registrationTask.WaitAsync(cancellationToken);
 
                     var ownersBeforeRefresh = _harness.GetOwners(grainId, Name);
                     var startsBeforeRefresh = _harness.GetLocalStartCount(grainId, Name);
@@ -442,45 +455,61 @@ public abstract class ReminderServiceLifecycleTestRunner
                         exception);
                 }
             },
-            async cleanupToken =>
+            async _ =>
             {
-                Exception? topologyFailure = null;
-                try
+                var cleanupFailures = new List<Exception>();
+                if (registrationTask is not null)
                 {
-                    if (joined is not null && _harness.ActiveSilos.Contains(joined))
+                    try
                     {
-                        await _harness.LeaveSiloAsync(joined, cleanupToken);
-                        await _harness.WaitForTopologyReconciliationAsync(cleanupToken);
+                        await registrationTask;
+                    }
+                    catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+                    {
+                        // The scheduler observed cancellation before dispatch, so no mutation needs cleanup.
+                    }
+                    catch (Exception exception)
+                    {
+                        cleanupFailures.Add(exception);
                     }
                 }
-                catch (Exception exception)
+
+                using (var topologyCancellation = new CancellationTokenSource(CleanupPhaseTimeout))
                 {
-                    topologyFailure = exception;
+                    try
+                    {
+                        if (joined is not null && _harness.ActiveSilos.Contains(joined))
+                        {
+                            await _harness.LeaveSiloAsync(joined, topologyCancellation.Token);
+                            await _harness.WaitForTopologyReconciliationAsync(topologyCancellation.Token);
+                        }
+                    }
+                    catch (Exception exception)
+                    {
+                        cleanupFailures.Add(exception);
+                    }
                 }
 
-                Exception? reminderFailure = null;
-                try
+                using (var reminderCancellation = new CancellationTokenSource(CleanupPhaseTimeout))
                 {
-                    await CleanupAsync(Guarantee, reminders, cleanupToken);
-                }
-                catch (Exception exception)
-                {
-                    reminderFailure = exception;
-                }
-
-                if (topologyFailure is not null && reminderFailure is not null)
-                {
-                    throw new AggregateException(topologyFailure, reminderFailure);
+                    try
+                    {
+                        await CleanupAsync(Guarantee, reminders, reminderCancellation.Token);
+                    }
+                    catch (Exception exception)
+                    {
+                        cleanupFailures.Add(exception);
+                    }
                 }
 
-                if (topologyFailure is not null)
+                if (cleanupFailures.Count > 1)
                 {
-                    ExceptionDispatchInfo.Capture(topologyFailure).Throw();
+                    throw new AggregateException(cleanupFailures);
                 }
 
-                if (reminderFailure is not null)
+                if (cleanupFailures.Count == 1)
                 {
-                    ExceptionDispatchInfo.Capture(reminderFailure).Throw();
+                    ExceptionDispatchInfo.Capture(cleanupFailures[0]).Throw();
                 }
             });
     }

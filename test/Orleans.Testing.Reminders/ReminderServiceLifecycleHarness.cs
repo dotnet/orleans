@@ -1,12 +1,13 @@
 #nullable enable
 
+using System.Runtime.ExceptionServices;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.Reminders.Diagnostics;
 using Orleans.Reminders.TestKit;
 using Orleans.Runtime;
 using Orleans.Runtime.ConsistentRing;
 using Orleans.Runtime.ReminderService;
-using Orleans.Runtime.Services;
+using Orleans.Runtime.Scheduler;
 using Orleans.TestingHost;
 
 namespace Orleans.Testing.Reminders;
@@ -15,8 +16,10 @@ namespace Orleans.Testing.Reminders;
 /// Adapts an in-process cluster, <see cref="ReminderTestClock"/>, and
 /// <see cref="ReminderDiagnosticObserver"/> to the shared service lifecycle conformance runner.
 /// </summary>
-public sealed class ReminderServiceLifecycleHarness : IReminderServiceLifecycleHarness
+public sealed class ReminderServiceLifecycleHarness
+    : IReminderServiceLifecycleHarness, IReminderServiceLifecycleRegistrationTarget
 {
+    private static readonly TimeSpan JoinCleanupTimeout = TimeSpan.FromMinutes(1);
     private readonly InProcessTestCluster _cluster;
     private readonly ReminderTestClock _clock;
     private readonly ReminderDiagnosticObserver _observer;
@@ -72,7 +75,7 @@ public sealed class ReminderServiceLifecycleHarness : IReminderServiceLifecycleH
     }
 
     /// <inheritdoc />
-    public async Task RegisterOnSiloAsync(
+    public Task RegisterOnSiloAsync(
         SiloAddress siloAddress,
         GrainId grainId,
         string reminderName,
@@ -82,10 +85,13 @@ public sealed class ReminderServiceLifecycleHarness : IReminderServiceLifecycleH
     {
         var silo = _cluster.GetSiloForAddress(siloAddress)
             ?? throw new InvalidOperationException($"Silo {siloAddress} is not active.");
-        var client = new DirectedReminderServiceClient(silo.ServiceProvider);
-        await client.GetReminderService(siloAddress)
-            .RegisterOrUpdateReminder(grainId, reminderName, dueTime, period)
-            .WaitAsync(cancellationToken);
+        cancellationToken.ThrowIfCancellationRequested();
+        var reminderService = silo.ServiceProvider.GetRequiredService<LocalReminderService>();
+        return reminderService.QueueTask(async () =>
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            _ = await reminderService.RegisterOrUpdateReminder(grainId, reminderName, dueTime, period);
+        });
     }
 
     /// <inheritdoc />
@@ -157,9 +163,49 @@ public sealed class ReminderServiceLifecycleHarness : IReminderServiceLifecycleH
     /// <inheritdoc />
     public async Task<SiloAddress> JoinOneSiloAsync(CancellationToken cancellationToken)
     {
-        var silo = AssertSingle(await _cluster.StartSilosAsync(1).WaitAsync(cancellationToken));
-        await StabilizeTopologyAsync([silo], cancellationToken);
-        return silo.SiloAddress;
+        var initialSilos = _cluster.GetActiveSilos().Select(silo => silo.SiloAddress).ToHashSet();
+        try
+        {
+            var silo = AssertSingle(await _cluster.StartSilosAsync(1, cancellationToken));
+            await StabilizeTopologyAsync([silo], cancellationToken);
+            return silo.SiloAddress;
+        }
+        catch (Exception joinFailure)
+        {
+            Exception? cleanupFailure = null;
+            using (var cleanupCancellation = new CancellationTokenSource(JoinCleanupTimeout))
+            {
+                try
+                {
+                    var addedSilos = _cluster.GetActiveSilos()
+                        .Where(silo => !initialSilos.Contains(silo.SiloAddress))
+                        .ToArray();
+                    foreach (var addedSilo in addedSilos)
+                    {
+                        await _cluster.StopSiloAsync(addedSilo, cleanupCancellation.Token);
+                    }
+
+                    if (addedSilos.Length > 0)
+                    {
+                        await Task.WhenAll(
+                            _cluster.WaitForLivenessToStabilizeAsync().WaitAsync(cleanupCancellation.Token),
+                            _cluster.WaitForClusterManifestToStabilizeAsync().WaitAsync(cleanupCancellation.Token));
+                    }
+                }
+                catch (Exception exception)
+                {
+                    cleanupFailure = exception;
+                }
+            }
+
+            if (cleanupFailure is not null)
+            {
+                joinFailure.Data["ReminderServiceLifecycleJoinCleanupFailure"] = cleanupFailure.ToString();
+            }
+
+            ExceptionDispatchInfo.Capture(joinFailure).Throw();
+            throw;
+        }
     }
 
     /// <inheritdoc />
@@ -184,7 +230,6 @@ public sealed class ReminderServiceLifecycleHarness : IReminderServiceLifecycleH
             _cluster,
             _observer,
             readySilos,
-            Timeout.InfiniteTimeSpan,
             cancellationToken);
 
     private static InProcessSiloHandle AssertSingle(IReadOnlyList<InProcessSiloHandle> silos)
@@ -214,9 +259,4 @@ public sealed class ReminderServiceLifecycleHarness : IReminderServiceLifecycleH
             ReminderEvents.LocalReminderStopReason.Unregistered,
             ActiveSilos.First());
 
-    private sealed class DirectedReminderServiceClient(IServiceProvider serviceProvider)
-        : GrainServiceClient<IReminderService>(serviceProvider)
-    {
-        public IReminderService GetReminderService(SiloAddress siloAddress) => GetGrainService(siloAddress);
-    }
 }
