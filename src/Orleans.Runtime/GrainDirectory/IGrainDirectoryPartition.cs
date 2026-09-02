@@ -75,4 +75,35 @@ internal interface IGrainDirectoryTestHooks : ISystemTarget
 
     [Alias("CheckActivationsAsync")]
     ValueTask<Immutable<List<GrainId>>> CheckActivationsAsync(Immutable<List<GrainAddress>> activations);
+
+    [Alias("CleanupExpiredLeasesAsync")]
+    ValueTask<GrainDirectoryLeaseCleanupResult> CleanupExpiredLeasesAsync();
+}
+
+[GenerateSerializer, Immutable, Alias("GrainDirectoryLeaseCleanupResult")]
+internal sealed class GrainDirectoryLeaseCleanupResult(
+    int removedRangeLeaseHoldCount,
+    int remainingRangeLeaseHoldCount,
+    int removedSiloLeaseHoldCount,
+    int remainingSiloLeaseHoldCount,
+    int removedRegistrationCount,
+    int remainingRegistrationCount)
+{
+    [Id(0)]
+    public int RemovedRangeLeaseHoldCount { get; } = removedRangeLeaseHoldCount;
+
+    [Id(1)]
+    public int RemainingRangeLeaseHoldCount { get; } = remainingRangeLeaseHoldCount;
+
+    [Id(2)]
+    public int RemovedSiloLeaseHoldCount { get; } = removedSiloLeaseHoldCount;
+
+    [Id(3)]
+    public int RemainingSiloLeaseHoldCount { get; } = remainingSiloLeaseHoldCount;
+
+    [Id(4)]
+    public int RemovedRegistrationCount { get; } = removedRegistrationCount;
+
+    [Id(5)]
+    public int RemainingRegistrationCount { get; } = remainingRegistrationCount;
 }

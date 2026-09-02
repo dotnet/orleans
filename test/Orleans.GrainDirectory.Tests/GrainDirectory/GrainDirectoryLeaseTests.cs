@@ -422,10 +422,11 @@ public class GrainDirectoryLeaseTests
     }
 
     private static (InProcessTestCluster Cluster, FakeTimeProvider TimeProvider) CreateCluster(
-        TimeSpan? rangeLeaseDuration = null)
+        TimeSpan? rangeLeaseDuration = null,
+        short siloCount = 2)
     {
         var timeProvider = new FakeTimeProvider(InitialTime);
-        var builder = new InProcessTestClusterBuilder(2);
+        var builder = new InProcessTestClusterBuilder(siloCount);
 #pragma warning disable ORLEANSEXP003
         builder.Options.UseDistributedGrainDirectory = true;
 #pragma warning restore ORLEANSEXP003
@@ -435,16 +436,18 @@ public class GrainDirectoryLeaseTests
             siloBuilder.Services.AddSingleton<IMembershipManager, LeaseTestMembershipManager>();
             siloBuilder.Services.AddSingleton<TimeProvider>(timeProvider);
             siloBuilder.Services.AddKeyedSingleton(TimeProviderNames.Membership, TimeProvider.System);
-            siloBuilder.Services.Configure<ClusterMembershipOptions>(options =>
-            {
-                options.ProbeTimeout = TimeSpan.FromSeconds(1);
-                options.MaxProbeTimeout = TimeSpan.FromSeconds(1);
-                options.NumMissedProbesLimit = 1;
-            });
+            siloBuilder.Services.Configure<ClusterMembershipOptions>(ConfigureMembershipOptions);
             siloBuilder.Services.PostConfigure<GrainDirectoryOptions>(o => o.RangeLeaseDuration = rangeLeaseDuration ?? RangeLeaseDuration);
         });
 
         return (builder.Build(), timeProvider);
+    }
+
+    private static void ConfigureMembershipOptions(ClusterMembershipOptions options)
+    {
+        options.ProbeTimeout = TimeSpan.FromSeconds(1);
+        options.MaxProbeTimeout = TimeSpan.FromSeconds(1);
+        options.NumMissedProbesLimit = 1;
     }
 
     private static async Task DeployAndWaitForClusterManifestAsync(
@@ -558,6 +561,288 @@ public class GrainDirectoryLeaseTests
                 && delayed.Operation == "RegisterAsync",
             EventTimeout,
             cancellationToken);
+
+    [Fact]
+    public async Task CleanupExpiredLeases_RemovesOnlyExpiredSiloState_AtExactExpiration_AndIsIdempotent()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var directoryLeaseDuration = TimeSpan.FromSeconds(30);
+        var membershipOptions = new ClusterMembershipOptions();
+        ConfigureMembershipOptions(membershipOptions);
+        var effectiveLeaseDuration = DistributedGrainDirectory.CalculateDeadSiloLeaseDuration(directoryLeaseDuration, membershipOptions);
+        var (cluster, timeProvider) = CreateCluster(directoryLeaseDuration, siloCount: 3);
+        using var events = new DiagnosticEventCollector(GrainDirectoryEvents.ListenerName);
+        await DeployAndWaitForClusterManifestAsync(cluster, cancellationToken);
+
+        try
+        {
+            var observer = cluster.Silos[0];
+            var siloA = cluster.Silos[1];
+            var siloB = cluster.Silos[2];
+            var directoryMembership = observer.ServiceProvider.GetRequiredService<DirectoryMembershipService>();
+            var partitionCount = directoryMembership.PartitionsPerSilo;
+            var directory = observer.ServiceProvider.GetRequiredService<GrainDirectoryResolver>().DefaultGrainDirectory!;
+            var grainIds = SelectGrainIdsOwnedBy(cluster, directoryMembership.CurrentView, observer.SiloAddress, count: 3);
+            var expiredAGrainId = grainIds[0];
+            var unexpiredBGrainId = grainIds[1];
+            var liveObserverGrainId = grainIds[2];
+            var expiredAAddress = GrainAddress.NewActivationAddress(siloA.SiloAddress, expiredAGrainId);
+            var unexpiredBAddress = GrainAddress.NewActivationAddress(siloB.SiloAddress, unexpiredBGrainId);
+            var liveObserverAddress = GrainAddress.NewActivationAddress(observer.SiloAddress, liveObserverGrainId);
+
+            Assert.Equal(InitialTime, timeProvider.GetUtcNow());
+            Assert.Equal(expiredAAddress, await directory.Register(expiredAAddress, cancellationToken));
+            Assert.Equal(unexpiredBAddress, await directory.Register(unexpiredBAddress, cancellationToken));
+            Assert.Equal(liveObserverAddress, await directory.Register(liveObserverAddress, cancellationToken));
+            Assert.Equal(expiredAAddress, await directory.Lookup(expiredAGrainId, cancellationToken));
+            Assert.Equal(unexpiredBAddress, await directory.Lookup(unexpiredBGrainId, cancellationToken));
+            Assert.Equal(liveObserverAddress, await directory.Lookup(liveObserverGrainId, cancellationToken));
+
+            var siloAExpiration = InitialTime + effectiveLeaseDuration;
+            var siloALeaseCreated = WaitForSiloLeaseHoldCreatedAsync(
+                events,
+                observer.SiloAddress,
+                siloA.SiloAddress,
+                cancellationToken);
+            var siloARangeLeaseCreated = WaitForRangeLeaseHoldCreatedAsync(
+                events,
+                observer.SiloAddress,
+                siloAExpiration,
+                cancellationToken);
+            var killSiloA = KillSiloAndWaitForDirectoryMembershipAsync(
+                cluster,
+                observer,
+                siloA,
+                cancellationToken);
+            var siloACreated = Assert.IsType<GrainDirectoryEvents.SiloLeaseHoldCreated>((await siloALeaseCreated).Payload);
+            var siloARangeCreated = Assert.IsType<GrainDirectoryEvents.RangeLeaseHoldCreated>((await siloARangeLeaseCreated).Payload);
+            Assert.Equal(siloAExpiration, siloACreated.Expiration);
+            Assert.Equal(siloAExpiration, siloARangeCreated.Expiration);
+            await killSiloA;
+
+            timeProvider.Advance(TimeSpan.FromSeconds(10));
+            Assert.Equal(InitialTime.AddSeconds(10), timeProvider.GetUtcNow());
+
+            var siloBExpiration = InitialTime.AddSeconds(10) + effectiveLeaseDuration;
+            var siloBLeaseCreated = WaitForSiloLeaseHoldCreatedAsync(
+                events,
+                observer.SiloAddress,
+                siloB.SiloAddress,
+                cancellationToken);
+            var siloBRangeLeaseCreated = WaitForRangeLeaseHoldCreatedAsync(
+                events,
+                observer.SiloAddress,
+                siloBExpiration,
+                cancellationToken);
+            var killSiloB = KillSiloAndWaitForDirectoryMembershipAsync(
+                cluster,
+                observer,
+                siloB,
+                cancellationToken);
+            var siloBCreated = Assert.IsType<GrainDirectoryEvents.SiloLeaseHoldCreated>((await siloBLeaseCreated).Payload);
+            var siloBRangeCreated = Assert.IsType<GrainDirectoryEvents.RangeLeaseHoldCreated>((await siloBRangeLeaseCreated).Payload);
+            Assert.Equal(siloBExpiration, siloBCreated.Expiration);
+            Assert.Equal(siloBExpiration, siloBRangeCreated.Expiration);
+            await killSiloB;
+
+            var preExpirationResults = await CleanupAllPartitionsAsync(cluster, observer, cancellationToken);
+            Assert.Equal(partitionCount, preExpirationResults.Length);
+            Assert.Equal(InitialTime.AddSeconds(10), timeProvider.GetUtcNow());
+            Assert.All(preExpirationResults, result =>
+            {
+                Assert.Equal(0, result.RemovedRangeLeaseHoldCount);
+                Assert.Equal(0, result.RemovedSiloLeaseHoldCount);
+                Assert.Equal(0, result.RemovedRegistrationCount);
+            });
+
+            var preExpirationRangeLeaseHoldCount = preExpirationResults.Sum(static result => result.RemainingRangeLeaseHoldCount);
+            var preExpirationRegistrationCount = preExpirationResults.Sum(static result => result.RemainingRegistrationCount);
+            Assert.True(preExpirationRangeLeaseHoldCount > 0);
+            Assert.Equal(2 * partitionCount, preExpirationResults.Sum(static result => result.RemainingSiloLeaseHoldCount));
+            Assert.True(preExpirationRegistrationCount >= 3);
+
+            await AssertRegistrationsPresentAsync(
+                cluster,
+                observer,
+                new[] { expiredAAddress, unexpiredBAddress, liveObserverAddress },
+                cancellationToken);
+            Assert.Null(await directory.Lookup(expiredAGrainId, cancellationToken));
+            Assert.Null(await directory.Lookup(unexpiredBGrainId, cancellationToken));
+            Assert.Equal(liveObserverAddress, await directory.Lookup(liveObserverGrainId, cancellationToken));
+
+            var preExpirationReplacement = GrainAddress.NewActivationAddress(observer.SiloAddress, expiredAGrainId);
+            using (var blockedRegistrationCancellation = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken))
+            {
+                var retryDelayScheduled = WaitForLeaseRetryScheduledAsync(
+                    events,
+                    observer.SiloAddress,
+                    expiredAGrainId,
+                    cancellationToken);
+                var blockedRegistration = directory.Register(preExpirationReplacement, blockedRegistrationCancellation.Token);
+                await retryDelayScheduled;
+                Assert.False(blockedRegistration.IsCompleted, "Registration must remain queued while silo A's lease is active.");
+                blockedRegistrationCancellation.Cancel();
+                await Assert.ThrowsAnyAsync<OperationCanceledException>(() => blockedRegistration);
+            }
+
+            await AssertRegistrationsPresentAsync(
+                cluster,
+                observer,
+                new[] { expiredAAddress, unexpiredBAddress, liveObserverAddress },
+                cancellationToken);
+
+            timeProvider.Advance(effectiveLeaseDuration - TimeSpan.FromSeconds(10));
+            Assert.Equal(siloAExpiration, timeProvider.GetUtcNow());
+
+            var expirationResults = await CleanupAllPartitionsAsync(cluster, observer, cancellationToken);
+            Assert.Equal(partitionCount, expirationResults.Length);
+            Assert.Equal(siloAExpiration, timeProvider.GetUtcNow());
+            var removedRangeLeaseHoldCount = expirationResults.Sum(static result => result.RemovedRangeLeaseHoldCount);
+            var remainingRangeLeaseHoldCount = expirationResults.Sum(static result => result.RemainingRangeLeaseHoldCount);
+            Assert.True(removedRangeLeaseHoldCount > 0);
+            Assert.True(remainingRangeLeaseHoldCount > 0);
+            Assert.Equal(preExpirationRangeLeaseHoldCount, removedRangeLeaseHoldCount + remainingRangeLeaseHoldCount);
+            Assert.Equal(partitionCount, expirationResults.Sum(static result => result.RemovedSiloLeaseHoldCount));
+            Assert.Equal(partitionCount, expirationResults.Sum(static result => result.RemainingSiloLeaseHoldCount));
+            Assert.Equal(1, expirationResults.Sum(static result => result.RemovedRegistrationCount));
+            Assert.Equal(preExpirationRegistrationCount - 1, expirationResults.Sum(static result => result.RemainingRegistrationCount));
+
+            await AssertRegistrationsPresentAsync(
+                cluster,
+                observer,
+                new[] { unexpiredBAddress, liveObserverAddress },
+                cancellationToken);
+            Assert.Null(await directory.Lookup(expiredAGrainId, cancellationToken));
+            Assert.Null(await directory.Lookup(unexpiredBGrainId, cancellationToken));
+            Assert.Equal(liveObserverAddress, await directory.Lookup(liveObserverGrainId, cancellationToken));
+
+            var repeatedResults = await CleanupAllPartitionsAsync(cluster, observer, cancellationToken);
+            Assert.Equal(partitionCount, repeatedResults.Length);
+            Assert.Equal(siloAExpiration, timeProvider.GetUtcNow());
+            Assert.All(repeatedResults, result =>
+            {
+                Assert.Equal(0, result.RemovedRangeLeaseHoldCount);
+                Assert.Equal(0, result.RemovedSiloLeaseHoldCount);
+                Assert.Equal(0, result.RemovedRegistrationCount);
+            });
+            Assert.Equal(remainingRangeLeaseHoldCount, repeatedResults.Sum(static result => result.RemainingRangeLeaseHoldCount));
+            Assert.Equal(partitionCount, repeatedResults.Sum(static result => result.RemainingSiloLeaseHoldCount));
+            Assert.Equal(preExpirationRegistrationCount - 1, repeatedResults.Sum(static result => result.RemainingRegistrationCount));
+
+            var replacementAAddress = GrainAddress.NewActivationAddress(observer.SiloAddress, expiredAGrainId);
+            Assert.Equal(replacementAAddress, await directory.Register(replacementAAddress, cancellationToken));
+            Assert.Equal(replacementAAddress, await directory.Lookup(expiredAGrainId, cancellationToken));
+
+            var replacementBAddress = GrainAddress.NewActivationAddress(observer.SiloAddress, unexpiredBGrainId);
+            using (var blockedRegistrationCancellation = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken))
+            {
+                var retryDelayScheduled = WaitForLeaseRetryScheduledAsync(
+                    events,
+                    observer.SiloAddress,
+                    unexpiredBGrainId,
+                    cancellationToken);
+                var blockedRegistration = directory.Register(replacementBAddress, blockedRegistrationCancellation.Token);
+                await retryDelayScheduled;
+                Assert.False(blockedRegistration.IsCompleted, "Registration must remain queued while silo B's lease is active.");
+                blockedRegistrationCancellation.Cancel();
+                await Assert.ThrowsAnyAsync<OperationCanceledException>(() => blockedRegistration);
+            }
+
+            await AssertRegistrationsPresentAsync(
+                cluster,
+                observer,
+                new[] { replacementAAddress, unexpiredBAddress, liveObserverAddress },
+                cancellationToken);
+            Assert.Null(await directory.Lookup(unexpiredBGrainId, cancellationToken));
+            Assert.Equal(liveObserverAddress, await directory.Lookup(liveObserverGrainId, cancellationToken));
+            Assert.True(timeProvider.GetUtcNow() < InitialTime.AddMinutes(1));
+        }
+        finally
+        {
+            await DisposeClusterAsync(cluster);
+        }
+    }
+
+    private static GrainId[] SelectGrainIdsOwnedBy(
+        InProcessTestCluster cluster,
+        DirectoryMembershipSnapshot membership,
+        SiloAddress owner,
+        int count)
+    {
+        var result = new List<GrainId>(count);
+        for (var key = 1000L; key < 100_000L && result.Count < count; key++)
+        {
+            var grainId = cluster.Client.GetGrain<ILeaseTestGrain>(key).GetGrainId();
+            Assert.True(membership.TryGetOwner(grainId, out var actualOwner, out _));
+            if (owner.Equals(actualOwner))
+            {
+                result.Add(grainId);
+            }
+        }
+
+        Assert.Equal(count, result.Count);
+        return result.ToArray();
+    }
+
+    private static async Task<GrainDirectoryLeaseCleanupResult[]> CleanupAllPartitionsAsync(
+        InProcessTestCluster cluster,
+        InProcessSiloHandle silo,
+        CancellationToken cancellationToken)
+    {
+        var membership = silo.ServiceProvider.GetRequiredService<DirectoryMembershipService>();
+        var cleanupTasks = Enumerable.Range(0, membership.PartitionsPerSilo)
+            .Select(partitionIndex => cluster.InternalClient!.GetSystemTarget<IGrainDirectoryTestHooks>(
+                    GrainDirectoryPartition.CreateGrainId(silo.SiloAddress, partitionIndex).GrainId)
+                .CleanupExpiredLeasesAsync()
+                .AsTask())
+            .ToArray();
+
+        await Task.WhenAll(cleanupTasks).WaitAsync(cancellationToken);
+        return cleanupTasks.Select(static task => task.Result).ToArray();
+    }
+
+    private static async Task AssertRegistrationsPresentAsync(
+        InProcessTestCluster cluster,
+        InProcessSiloHandle silo,
+        GrainAddress[] addresses,
+        CancellationToken cancellationToken)
+    {
+        var membership = silo.ServiceProvider.GetRequiredService<DirectoryMembershipService>();
+        var immutableAddresses = new Orleans.Concurrency.Immutable<List<GrainAddress>>(addresses.ToList());
+        var checks = Enumerable.Range(0, membership.PartitionsPerSilo)
+            .Select(partitionIndex => cluster.InternalClient!.GetSystemTarget<IGrainDirectoryTestHooks>(
+                    GrainDirectoryPartition.CreateGrainId(silo.SiloAddress, partitionIndex).GrainId)
+                .CheckActivationsAsync(immutableAddresses)
+                .AsTask())
+            .ToArray();
+
+        await Task.WhenAll(checks).WaitAsync(cancellationToken);
+        var checkedGrainIds = checks.SelectMany(static check => check.Result.Value).ToArray();
+        AssertExactSet(addresses.Select(static address => address.GrainId), checkedGrainIds);
+    }
+
+    private static Task<DiagnosticEvent> WaitForRangeLeaseHoldCreatedAsync(
+        DiagnosticEventCollector events,
+        SiloAddress observerSiloAddress,
+        DateTimeOffset expiration,
+        CancellationToken cancellationToken) =>
+        events.WaitForEventAsync(
+            nameof(GrainDirectoryEvents.RangeLeaseHoldCreated),
+            e => e.Payload is GrainDirectoryEvents.RangeLeaseHoldCreated created
+                && created.ObserverSiloAddress.Equals(observerSiloAddress)
+                && created.Expiration == expiration,
+            EventTimeout,
+            cancellationToken);
+
+    private static void AssertExactSet<T>(IEnumerable<T> expected, IEnumerable<T> actual)
+        where T : notnull
+    {
+        var expectedSet = expected.ToHashSet();
+        var actualSet = actual.ToHashSet();
+        Assert.Equal(expectedSet.Count, actualSet.Count);
+        Assert.Empty(expectedSet.Except(actualSet));
+        Assert.Empty(actualSet.Except(expectedSet));
+    }
 
 }
 
