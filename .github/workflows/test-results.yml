@@ -233,7 +233,8 @@ jobs:
           REPOSITORY_URL: ${{ github.server_url }}/${{ github.repository }}
           SOURCE_RUN_URL: ${{ github.event.workflow_run.html_url }}
         run: |
-          $currentMain = gh api "repos/$env:GITHUB_REPOSITORY/git/ref/heads/$env:DEFAULT_BRANCH" | ConvertFrom-Json
+          $encodedDefaultBranch = [Uri]::EscapeDataString($env:DEFAULT_BRANCH)
+          $currentMain = gh api "repos/$env:GITHUB_REPOSITORY/git/ref/heads/$encodedDefaultBranch" | ConvertFrom-Json
           $parameters = @{
             CurrentSummary = 'coverage-summary.json'
             CurrentMatrix = 'coverage-matrix.json'

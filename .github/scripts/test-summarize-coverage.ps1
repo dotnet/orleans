@@ -1113,6 +1113,10 @@ exit 0
             $reportingWorkflow `
             'ExpectedBaselineSha = \$currentMain\.object\.sha' `
             'The comparison must revalidate the current-main identity after aggregation.'
+        Assert-Matches `
+            $reportingWorkflow `
+            '\[Uri\]::EscapeDataString\(\$env:DEFAULT_BRANCH\)' `
+            'The current-main ref lookup must encode default branch names.'
     }
 
     Invoke-Test 'requires every successful test job to upload coverage' {
