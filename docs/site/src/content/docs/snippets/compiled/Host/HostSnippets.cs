@@ -168,6 +168,7 @@ public interface ISummerGrain : IGrain
 }
     // </immutable_parameter>
 
+    #pragma warning disable CS8618 // Orleans serialization populates serialized members during deserialization.
     // <immutable_members>
 [GenerateSerializer]
 public sealed class MyType
@@ -179,6 +180,7 @@ public sealed class MyType
     public List<int> RunningTotals { get; set; }
 }
     // </immutable_members>
+    #pragma warning restore CS8618
 
     internal interface IRequestProcessor
     {

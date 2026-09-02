@@ -14,10 +14,7 @@ public static class ClusterClientAdoNetStreamExtensions
         ArgumentNullException.ThrowIfNull(name);
         ArgumentNullException.ThrowIfNull(configureOptions);
 
-        return builder.AddAdoNetStreams(name, b =>
-        {
-            b.ConfigureAdoNet(ob => ob.Configure(configureOptions));
-        });
+        return builder.AddAdoNetStreams(name, b => b.ConfigureAdoNet(ob => ob.Configure(configureOptions)));
     }
 
     /// <summary>

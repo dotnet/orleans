@@ -7,6 +7,7 @@ using System.Reflection;
 
 namespace Orleans.Docs.Snippets.Serialization;
 
+#pragma warning disable CS8618 // MessagePack populates serialized members during deserialization.
 // <messagepack_type_definition>
 [MessagePackObject]
 public class OrderMessage
@@ -24,6 +25,7 @@ public class OrderMessage
     public List<string> Items { get; set; }
 }
 // </messagepack_type_definition>
+#pragma warning restore CS8618
 
 // <messagepack_grain_interface>
 public interface IOrderGrain : IGrainWithStringKey

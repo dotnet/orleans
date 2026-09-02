@@ -4,6 +4,11 @@
     <InformationalVersion>$(Version). Commit Hash: $(GitHeadSha)</InformationalVersion>
   </PropertyGroup>
 
+  <PropertyGroup Condition="'$(EnforcePublicApiDocumentation)' != 'true' or '$(IsPackable)' != 'true' or '$(GenerateDocumentationFile)' != 'true'">
+    <!-- Packable projects opt in after their public API XML documentation is complete. -->
+    <NoWarn>$(NoWarn);1591</NoWarn>
+  </PropertyGroup>
+
   <Import Condition=" '$(OrleansBuildTimeCodeGen)' == 'true' " Project="$(MSBuildThisFileDirectory)src/Orleans.CodeGenerator/build/Microsoft.Orleans.CodeGenerator.props" />
   <Import
     Condition=" '$(OrleansBuildTimeCodeGen)' == 'true' and '$(IsOrleansFrameworkPart)' != 'false' and '$(PackageId)' != 'Microsoft.Orleans.Core.Abstractions' "

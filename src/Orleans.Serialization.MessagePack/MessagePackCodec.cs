@@ -42,7 +42,7 @@ public class MessagePackCodec : IGeneralizedCodec, IGeneralizedCopier, ITypeFilt
     /// <summary>
     /// Initializes a new instance of the <see cref="MessagePackCodec"/> class.
     /// </summary>
-    /// /// <param name="serializableTypeSelectors">Filters used to indicate which types should be serialized by this codec.</param>
+    /// <param name="serializableTypeSelectors">Filters used to indicate which types should be serialized by this codec.</param>
     /// <param name="copyableTypeSelectors">Filters used to indicate which types should be copied by this codec.</param>
     /// <param name="options">The MessagePack codec options.</param>
     public MessagePackCodec(

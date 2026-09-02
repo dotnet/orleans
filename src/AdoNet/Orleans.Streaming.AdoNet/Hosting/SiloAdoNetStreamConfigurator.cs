@@ -12,14 +12,11 @@ public class SiloAdoNetStreamConfigurator : SiloPersistentStreamConfigurator
         ArgumentNullException.ThrowIfNull(name);
         ArgumentNullException.ThrowIfNull(configureDelegate);
 
-        ConfigureDelegate(services =>
-        {
-            services
-                .ConfigureNamedOptionForLogging<AdoNetStreamOptions>(name)
-                .ConfigureNamedOptionForLogging<SimpleQueueCacheOptions>(name)
-                .ConfigureNamedOptionForLogging<HashRingStreamQueueMapperOptions>(name)
-                .AddTransient<IConfigurationValidator>(sp => new AdoNetStreamOptionsValidator(sp.GetOptionsByName<AdoNetStreamOptions>(name), name));
-        });
+        ConfigureDelegate(services => services
+            .ConfigureNamedOptionForLogging<AdoNetStreamOptions>(name)
+            .ConfigureNamedOptionForLogging<SimpleQueueCacheOptions>(name)
+            .ConfigureNamedOptionForLogging<HashRingStreamQueueMapperOptions>(name)
+            .AddTransient<IConfigurationValidator>(sp => new AdoNetStreamOptionsValidator(sp.GetOptionsByName<AdoNetStreamOptions>(name), name)));
 
         // in a typical i/o bound shared database there is little benefit to more than one queue per provider
         // however multiple queues are fully supported if the user wants to fine tune throughput for their own system

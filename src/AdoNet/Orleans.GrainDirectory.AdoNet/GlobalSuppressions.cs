@@ -5,5 +5,5 @@
 
 using System.Diagnostics.CodeAnalysis;
 
-[assembly: SuppressMessage("Style", "IDE0130:Namespace does not match folder structure", Justification = "N/A", Scope = "namespace", Target = "~N:Orleans.Configuration")]
-[assembly: SuppressMessage("Style", "IDE0130:Namespace does not match folder structure", Justification = "N/A", Scope = "namespace", Target = "~N:Orleans.Hosting")]
+[assembly: SuppressMessage("Style", "IDE0130:Namespace does not match folder structure", Justification = "Configuration types use the shared Orleans.Configuration namespace exposed by provider packages.", Scope = "namespace", Target = "~N:Orleans.Configuration")]
+[assembly: SuppressMessage("Style", "IDE0130:Namespace does not match folder structure", Justification = "Builder extensions use the shared Orleans.Hosting namespace exposed by provider packages.", Scope = "namespace", Target = "~N:Orleans.Hosting")]

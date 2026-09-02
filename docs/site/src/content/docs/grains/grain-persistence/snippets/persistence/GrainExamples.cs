@@ -89,10 +89,12 @@ public class MyGrain : Grain<MyGrainState>, IMyGrain
 }
 // </storage_provider_attribute>
 
+#pragma warning disable CS8618 // Grain storage populates persisted members during deserialization.
 public class MyGrainState
 {
     public string Data { get; set; }
 }
+#pragma warning restore CS8618
 
 public interface IMyGrain : IGrainWithStringKey
 {

@@ -2,6 +2,7 @@ using Orleans;
 
 namespace Orleans.Docs.Snippets.Serialization;
 
+#pragma warning disable CS8618 // Orleans serialization populates serialized members during deserialization.
 // <basic_employee_class>
 [GenerateSerializer]
 public class Employee
@@ -10,7 +11,9 @@ public class Employee
     public string Name { get; set; }
 }
 // </basic_employee_class>
+#pragma warning restore CS8618
 
+#pragma warning disable CS8618 // Orleans serialization populates serialized members during deserialization.
 // <inheritance_publication_book>
 [GenerateSerializer]
 public class Publication
@@ -26,6 +29,7 @@ public class Book : Publication
     public string ISBN { get; set; }
 }
 // </inheritance_publication_book>
+#pragma warning restore CS8618
 
 // <custom_struct_private_readonly>
 [GenerateSerializer]
@@ -47,6 +51,7 @@ public struct MyCustomStruct
 }
 // </custom_struct_private_readonly>
 
+#pragma warning disable CS8618 // Orleans serialization populates the additional serialized member during deserialization.
 // <record_primary_constructor>
 [GenerateSerializer]
 public record MyRecord(string A, string B)
@@ -56,6 +61,7 @@ public record MyRecord(string A, string B)
     public string C { get; init; }
 }
 // </record_primary_constructor>
+#pragma warning restore CS8618
 
 // <best_practices_id_overlap>
 [GenerateSerializer]

@@ -39,8 +39,6 @@
     <WarningsNotAsErrors>$(WarningsNotAsErrors);CA1824</WarningsNotAsErrors>
     <ImplicitUsings>enable</ImplicitUsings>
     <!--<NoWarn>$(NoWarn);2003</NoWarn>-->
-    <!-- TODO: Disable and ensure all public members are documented: https://learn.microsoft.com/en-us/dotnet/csharp/language-reference/compiler-messages/cs1591 -->
-    <NoWarn>$(NoWarn);1591</NoWarn>
   </PropertyGroup>
 
   <PropertyGroup Condition="'$(TF_BUILD)' == 'true' or '$(GITHUB_ACTIONS)' == 'true'">
