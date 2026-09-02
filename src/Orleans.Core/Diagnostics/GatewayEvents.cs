@@ -20,6 +20,8 @@ internal static class GatewayEvents
 
     internal static bool IsGatewayListUpdatedEnabled() => Listener.IsEnabled(nameof(GatewayListUpdated));
 
+    internal static bool IsRequestTrackingStoppedEnabled() => Listener.IsEnabled(nameof(RequestTrackingStopped));
+
     internal abstract class GatewayEvent
     {
     }
@@ -58,6 +60,15 @@ internal static class GatewayEvents
         public readonly GrainId ClientId = clientId;
 
         public readonly Message Rejection = rejection;
+    }
+
+    internal sealed class RequestTrackingStopped(
+        SiloAddress siloAddress,
+        GrainId clientId) : GatewayEvent
+    {
+        public readonly SiloAddress SiloAddress = siloAddress;
+
+        public readonly GrainId ClientId = clientId;
     }
 
     internal static void EmitGatewayListUpdated(object source, IReadOnlyList<SiloAddress> knownGateways, IReadOnlyList<SiloAddress> liveGateways)
@@ -105,6 +116,22 @@ internal static class GatewayEvents
         static void Emit(SiloAddress siloAddress, GrainId clientId, Message rejection)
         {
             Listener.Write(nameof(DeadSiloRequestRejected), new DeadSiloRequestRejected(siloAddress, clientId, rejection));
+        }
+    }
+
+    internal static void EmitRequestTrackingStopped(SiloAddress siloAddress, GrainId clientId)
+    {
+        if (!IsRequestTrackingStoppedEnabled())
+        {
+            return;
+        }
+
+        Emit(siloAddress, clientId);
+
+        [MethodImpl(MethodImplOptions.NoInlining)]
+        static void Emit(SiloAddress siloAddress, GrainId clientId)
+        {
+            Listener.Write(nameof(RequestTrackingStopped), new RequestTrackingStopped(siloAddress, clientId));
         }
     }
 
