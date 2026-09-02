@@ -38,6 +38,7 @@ namespace Orleans.Runtime.Metadata
 #else
         private readonly object _currentLock = new();
 #endif
+        private GrainManifest _localGrainManifest;
         private ClusterManifest _current;
         private IInternalGrainFactory? _grainFactory;
         private Task? _runTask;
@@ -63,12 +64,11 @@ namespace Orleans.Runtime.Metadata
             _timeProvider = timeProvider;
             _instruments = instruments;
             _enableContentAddressedRetrieval = options.Value.EnableContentAddressedRetrieval;
-            LocalGrainManifest = siloManifestProvider.SiloManifest;
+            _localGrainManifest = siloManifestProvider.SiloManifest;
             if (_enableContentAddressedRetrieval)
             {
                 _peerProbeSlots = new(MaxConcurrentPeerManifestProbes, MaxConcurrentPeerManifestProbes);
             }
-
             _current = CreateClusterManifest(
                 MajorMinorVersion.MinValue,
                 ImmutableDictionary<SiloAddress, GrainManifest>.Empty);
@@ -82,7 +82,7 @@ namespace Orleans.Runtime.Metadata
 
         public IAsyncEnumerable<ClusterManifest> Updates => _updates;
 
-        public GrainManifest LocalGrainManifest { get; private set; }
+        public GrainManifest LocalGrainManifest => Volatile.Read(ref _localGrainManifest);
 
         /// <summary>
         /// Publishes an updated manifest for the local silo after a hot reload metadata update. Only the
@@ -94,7 +94,7 @@ namespace Orleans.Runtime.Metadata
         {
             lock (_currentLock)
             {
-                LocalGrainManifest = localManifest;
+                Volatile.Write(ref _localGrainManifest, localManifest);
             }
 
             // Publish with a retry: a concurrently published manifest (e.g. built from membership processing

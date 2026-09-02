@@ -30,6 +30,7 @@ namespace Orleans.Runtime
         private readonly AsyncEnumerable<ClusterManifest> _updates;
         private readonly CancellationTokenSource _shutdownCts = new CancellationTokenSource();
         private int _disposeState;
+        private GrainManifest _localGrainManifest;
         private ClusterManifest _current;
         private Task? _runTask;
 
@@ -46,7 +47,7 @@ namespace Orleans.Runtime
             _services = services;
             _localClientDetails = localClientDetails;
             _gatewayManager = gatewayManager;
-            LocalGrainManifest = clientManifestProvider.ClientManifest;
+            _localGrainManifest = clientManifestProvider.ClientManifest;
 
             // Create a fake manifest for the very first generation, which only includes the local client's manifest.
             var builder = ImmutableDictionary.CreateBuilder<SiloAddress, GrainManifest>();
@@ -66,13 +67,13 @@ namespace Orleans.Runtime
         public IAsyncEnumerable<ClusterManifest> Updates => _updates;
 
         /// <inheritdoc />
-        public GrainManifest LocalGrainManifest { get; private set; }
+        public GrainManifest LocalGrainManifest => Volatile.Read(ref _localGrainManifest);
 
         /// <summary>
         /// Replaces the local client manifest after a hot reload metadata update; the periodic gateway
         /// refresh includes it in subsequently published cluster manifests.
         /// </summary>
-        internal void OnLocalManifestUpdated(GrainManifest localManifest) => LocalGrainManifest = localManifest;
+        internal void OnLocalManifestUpdated(GrainManifest localManifest) => Volatile.Write(ref _localGrainManifest, localManifest);
 
         /// <summary>
         /// Starts this service.
