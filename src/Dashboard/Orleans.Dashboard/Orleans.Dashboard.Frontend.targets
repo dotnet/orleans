@@ -5,7 +5,6 @@
     <!-- Frontend paths -->
     <NpmAppRootDirectory>$([System.IO.Path]::GetFullPath('$(MSBuildProjectDirectory)\..\Orleans.Dashboard.App'))</NpmAppRootDirectory>
     <NpmBuildOutput>$([System.IO.Path]::GetFullPath('$(NpmAppRootDirectory)\dist\'))</NpmBuildOutput>
-    <AzureDevOpsNpmrcFile>$([System.IO.Path]::GetFullPath('$(MSBuildProjectDirectory)\.azdo\.npmrc'))</AzureDevOpsNpmrcFile>
   </PropertyGroup>
 
   <!-- Collect frontend source files for incremental build tracking -->
@@ -41,9 +40,7 @@
     </Exec>
     <Message Importance="High" Text="Building Orleans Dashboard frontend with Node.js $(NodeVersion)" />
 
-    <!-- Use Azure DevOps npmrc if running in CI -->
     <PropertyGroup>
-      <NpmConfigArg Condition="'$(TF_BUILD)' == 'true'">--userconfig "$(AzureDevOpsNpmrcFile)"</NpmConfigArg>
       <!-- npm defaults to two fetch retries, which was insufficient when the package
            registry reset a connection during CI. Allow five retries, starting at five
            seconds and capping the backoff at fifteen seconds. -->
@@ -57,7 +54,7 @@
          Keep these options on this command so registry policy remains separate from
          resiliency tuning. -->
     <Exec
-      Command="npm ci --prefer-offline --no-audit $(NpmFetchRetryArgs) $(NpmConfigArg)"
+      Command="npm ci --prefer-offline --no-audit $(NpmFetchRetryArgs)"
       WorkingDirectory="$(NpmAppRootDirectory)"
       ConsoleToMsBuild="true" />
 
