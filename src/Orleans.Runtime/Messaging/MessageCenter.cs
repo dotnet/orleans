@@ -191,7 +191,8 @@ namespace Orleans.Runtime.Messaging
                 // Route responses through the ingress gateway while it is live so that it observes request completion.
                 // If that gateway is dead, another gateway connected to the client can deliver the response locally.
                 var routeViaTargetSilo = ShouldRouteResponseViaTargetSilo(msg, _siloAddress);
-                if ((!routeViaTargetSilo || siloStatusOracle.IsDeadSilo(msg.TargetSilo!)) && TryDeliverToProxy(msg))
+                var targetSiloIsDead = routeViaTargetSilo && siloStatusOracle.IsDeadSilo(msg.TargetSilo!);
+                if (CanDeliverToProxyLocally(msg, _siloAddress, targetSiloIsDead) && TryDeliverToProxy(msg))
                 {
                     // Message was successfully delivered to the proxy.
                     return;
@@ -315,6 +316,12 @@ namespace Orleans.Runtime.Messaging
             message.Direction == Message.Directions.Response
             && message.TargetSilo is { } targetSilo
             && !targetSilo.Matches(localSilo);
+
+        internal static bool CanDeliverToProxyLocally(
+            Message message,
+            SiloAddress localSilo,
+            bool targetSiloIsDead) =>
+            !ShouldRouteResponseViaTargetSilo(message, localSilo) || targetSiloIsDead;
 
         public void DispatchLocalMessage(Message message) => ReceiveMessage(message);
 
