@@ -1993,6 +1993,7 @@ public class StateManagerTests : JournalingTestBase
 
     private sealed class CapturingStorage : IJournalStorage
     {
+        private readonly object _lock = new();
         private readonly List<byte[]> _segments = [];
         private int _activeAppends;
 
@@ -2004,7 +2005,16 @@ public class StateManagerTests : JournalingTestBase
 
         public List<string> OperationLog { get; } = [];
 
-        public byte[] RecoverableBytes => _segments.SelectMany(static segment => segment).ToArray();
+        public byte[] RecoverableBytes
+        {
+            get
+            {
+                lock (_lock)
+                {
+                    return _segments.SelectMany(static segment => segment).ToArray();
+                }
+            }
+        }
 
         public bool BlockNextAppend { get; set; }
 
@@ -2042,7 +2052,13 @@ public class StateManagerTests : JournalingTestBase
 
         public int ReadConsumeCount { get; private set; }
 
-        public void ResetReadConsumeCount() => ReadConsumeCount = 0;
+        public void ResetReadConsumeCount()
+        {
+            lock (_lock)
+            {
+                ReadConsumeCount = 0;
+            }
+        }
 
         public bool IsCompactionRequested { get; set; }
 
@@ -2068,10 +2084,16 @@ public class StateManagerTests : JournalingTestBase
                 await AllowBlockedRead.Task.WaitAsync(cancellationToken);
             }
 
+            byte[][] segments;
+            lock (_lock)
+            {
+                segments = _segments.ToArray();
+            }
+
             if (ConcatenateReads)
             {
                 var totalLength = 0;
-                foreach (var segment in _segments)
+                foreach (var segment in segments)
                 {
                     cancellationToken.ThrowIfCancellationRequested();
                     totalLength += segment.Length;
@@ -2081,13 +2103,17 @@ public class StateManagerTests : JournalingTestBase
                 {
                     var concatenated = new byte[totalLength];
                     var offset = 0;
-                    foreach (var segment in _segments)
+                    foreach (var segment in segments)
                     {
                         segment.CopyTo(concatenated.AsSpan(offset));
                         offset += segment.Length;
                     }
 
-                    ReadConsumeCount++;
+                    lock (_lock)
+                    {
+                        ReadConsumeCount++;
+                    }
+
                     consumer.Read(concatenated, metadata: null, complete: true);
                 }
                 else
@@ -2102,10 +2128,14 @@ public class StateManagerTests : JournalingTestBase
 
             IEnumerable<ReadOnlyMemory<byte>> GetSegments()
             {
-                foreach (var segment in _segments)
+                foreach (var segment in segments)
                 {
                     cancellationToken.ThrowIfCancellationRequested();
-                    ReadConsumeCount++;
+                    lock (_lock)
+                    {
+                        ReadConsumeCount++;
+                    }
+
                     yield return segment;
                 }
             }
@@ -2114,16 +2144,28 @@ public class StateManagerTests : JournalingTestBase
         public async ValueTask ReplaceAsync(ReadOnlySequence<byte> value, CancellationToken cancellationToken)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            ReplaceAttemptCount++;
-            if (NextReplaceException is { } exception)
+            Exception? exceptionToThrow;
+            lock (_lock)
             {
-                NextReplaceException = null;
-                FailedReplaceAttempts.Add(value.ToArray());
-                OperationLog.Add("replace-failed");
-                ExceptionDispatchInfo.Throw(exception);
+                ReplaceAttemptCount++;
+                exceptionToThrow = NextReplaceException;
+                if (exceptionToThrow is not null)
+                {
+                    NextReplaceException = null;
+                    FailedReplaceAttempts.Add(value.ToArray());
+                    OperationLog.Add("replace-failed");
+                }
+                else
+                {
+                    OperationLog.Add("replace");
+                }
             }
 
-            OperationLog.Add("replace");
+            if (exceptionToThrow is not null)
+            {
+                ExceptionDispatchInfo.Throw(exceptionToThrow);
+            }
+
             ReplaceEntered.TrySetResult();
             if (BlockNextReplace)
             {
@@ -2138,9 +2180,12 @@ public class StateManagerTests : JournalingTestBase
             }
 
             var bytes = value.ToArray();
-            Replaces.Add(bytes);
-            _segments.Clear();
-            _segments.Add(bytes);
+            lock (_lock)
+            {
+                Replaces.Add(bytes);
+                _segments.Clear();
+                _segments.Add(bytes);
+            }
         }
 
         public async ValueTask AppendAsync(ReadOnlySequence<byte> value, CancellationToken cancellationToken)
@@ -2149,14 +2194,26 @@ public class StateManagerTests : JournalingTestBase
             Interlocked.Increment(ref _activeAppends);
             try
             {
-                if (NextAppendException is { } exception)
+                Exception? exceptionToThrow;
+                lock (_lock)
                 {
-                    NextAppendException = null;
-                    OperationLog.Add("append-failed");
-                    ExceptionDispatchInfo.Throw(exception);
+                    exceptionToThrow = NextAppendException;
+                    if (exceptionToThrow is not null)
+                    {
+                        NextAppendException = null;
+                        OperationLog.Add("append-failed");
+                    }
+                    else
+                    {
+                        OperationLog.Add("append");
+                    }
                 }
 
-                OperationLog.Add("append");
+                if (exceptionToThrow is not null)
+                {
+                    ExceptionDispatchInfo.Throw(exceptionToThrow);
+                }
+
                 AppendEntered.TrySetResult();
                 if (BlockNextAppend)
                 {
@@ -2165,8 +2222,11 @@ public class StateManagerTests : JournalingTestBase
                 }
 
                 var bytes = value.ToArray();
-                Appends.Add(bytes);
-                _segments.Add(bytes);
+                lock (_lock)
+                {
+                    Appends.Add(bytes);
+                    _segments.Add(bytes);
+                }
             }
             finally
             {
@@ -2177,11 +2237,15 @@ public class StateManagerTests : JournalingTestBase
         public ValueTask DeleteAsync(CancellationToken cancellationToken)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            DeleteEnteredWhileAppendInProgress = Volatile.Read(ref _activeAppends) > 0;
-            OperationLog.Add("delete");
+            lock (_lock)
+            {
+                DeleteEnteredWhileAppendInProgress = Volatile.Read(ref _activeAppends) > 0;
+                OperationLog.Add("delete");
+                DeleteCount++;
+                _segments.Clear();
+            }
+
             DeleteEntered.TrySetResult();
-            DeleteCount++;
-            _segments.Clear();
             return default;
         }
     }
