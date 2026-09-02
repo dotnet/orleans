@@ -422,10 +422,11 @@ public class GrainDirectoryLeaseTests
     }
 
     private static (InProcessTestCluster Cluster, FakeTimeProvider TimeProvider) CreateCluster(
-        TimeSpan? rangeLeaseDuration = null)
+        TimeSpan? rangeLeaseDuration = null,
+        short siloCount = 2)
     {
         var timeProvider = new FakeTimeProvider(InitialTime);
-        var builder = new InProcessTestClusterBuilder(2);
+        var builder = new InProcessTestClusterBuilder(siloCount);
 #pragma warning disable ORLEANSEXP003
         builder.Options.UseDistributedGrainDirectory = true;
 #pragma warning restore ORLEANSEXP003
@@ -435,16 +436,18 @@ public class GrainDirectoryLeaseTests
             siloBuilder.Services.AddSingleton<IMembershipManager, LeaseTestMembershipManager>();
             siloBuilder.Services.AddSingleton<TimeProvider>(timeProvider);
             siloBuilder.Services.AddKeyedSingleton(TimeProviderNames.Membership, TimeProvider.System);
-            siloBuilder.Services.Configure<ClusterMembershipOptions>(options =>
-            {
-                options.ProbeTimeout = TimeSpan.FromSeconds(1);
-                options.MaxProbeTimeout = TimeSpan.FromSeconds(1);
-                options.NumMissedProbesLimit = 1;
-            });
+            siloBuilder.Services.Configure<ClusterMembershipOptions>(ConfigureMembershipOptions);
             siloBuilder.Services.PostConfigure<GrainDirectoryOptions>(o => o.RangeLeaseDuration = rangeLeaseDuration ?? RangeLeaseDuration);
         });
 
         return (builder.Build(), timeProvider);
+    }
+
+    private static void ConfigureMembershipOptions(ClusterMembershipOptions options)
+    {
+        options.ProbeTimeout = TimeSpan.FromSeconds(1);
+        options.MaxProbeTimeout = TimeSpan.FromSeconds(1);
+        options.NumMissedProbesLimit = 1;
     }
 
     private static async Task DeployAndWaitForClusterManifestAsync(
@@ -564,8 +567,10 @@ public class GrainDirectoryLeaseTests
     {
         var cancellationToken = TestContext.Current.CancellationToken;
         var directoryLeaseDuration = TimeSpan.FromSeconds(30);
-        var effectiveLeaseDuration = directoryLeaseDuration - TimeSpan.FromSeconds(1);
-        var (cluster, timeProvider) = CreateCleanupCluster(directoryLeaseDuration);
+        var membershipOptions = new ClusterMembershipOptions();
+        ConfigureMembershipOptions(membershipOptions);
+        var effectiveLeaseDuration = DistributedGrainDirectory.CalculateDeadSiloLeaseDuration(directoryLeaseDuration, membershipOptions);
+        var (cluster, timeProvider) = CreateCluster(directoryLeaseDuration, siloCount: 3);
         using var events = new DiagnosticEventCollector(GrainDirectoryEvents.ListenerName);
         await DeployAndWaitForClusterManifestAsync(cluster, cancellationToken);
 
@@ -756,32 +761,6 @@ public class GrainDirectoryLeaseTests
         {
             await DisposeClusterAsync(cluster);
         }
-    }
-
-    private static (InProcessTestCluster Cluster, FakeTimeProvider TimeProvider) CreateCleanupCluster(
-        TimeSpan rangeLeaseDuration)
-    {
-        var timeProvider = new FakeTimeProvider(InitialTime);
-        var builder = new InProcessTestClusterBuilder(3);
-#pragma warning disable ORLEANSEXP003
-        builder.Options.UseDistributedGrainDirectory = true;
-#pragma warning restore ORLEANSEXP003
-        builder.ConfigureSilo((_, siloBuilder) =>
-        {
-            siloBuilder.Services.AddSingleton<MembershipTableManager>();
-            siloBuilder.Services.AddSingleton<IMembershipManager, LeaseTestMembershipManager>();
-            siloBuilder.Services.AddSingleton<TimeProvider>(timeProvider);
-            siloBuilder.Services.AddKeyedSingleton(TimeProviderNames.Membership, TimeProvider.System);
-            siloBuilder.Services.Configure<ClusterMembershipOptions>(options =>
-            {
-                options.ProbeTimeout = TimeSpan.FromSeconds(1);
-                options.MaxProbeTimeout = TimeSpan.FromSeconds(1);
-                options.NumMissedProbesLimit = 1;
-            });
-            siloBuilder.Services.PostConfigure<GrainDirectoryOptions>(options => options.RangeLeaseDuration = rangeLeaseDuration);
-        });
-
-        return (builder.Build(), timeProvider);
     }
 
     private static GrainId[] SelectGrainIdsOwnedBy(
