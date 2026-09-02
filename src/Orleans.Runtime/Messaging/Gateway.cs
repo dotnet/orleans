@@ -265,6 +265,7 @@ namespace Orleans.Runtime.Messaging
             client = null;
             return message.Direction == Message.Directions.Request
                 && !message.TargetGrain.IsSystemTarget()
+                && message.SendingSilo?.Matches(siloAddress) is true
                 && ClientGrainId.TryParse(message.SendingGrain, out var clientId)
                 && clients.TryGetValue(clientId, out client);
         }
@@ -539,27 +540,25 @@ namespace Orleans.Runtime.Messaging
                         return;
                     }
 
-                    if (!_pendingRequests.Track(message))
+                    if (!_pendingRequests.TrackForSend(
+                        message,
+                        _gateway.siloStatusOracle.IsDeadSilo(message.TargetSilo!),
+                        out requestToReject))
                     {
                         destination.Send(message);
                         return;
                     }
 
-                    if (!_isRequestTrackingRegistered)
-                    {
-                        _gateway.clientsWithTrackedRequests.TryAdd(this, 0);
-                        _isRequestTrackingRegistered = true;
-                    }
-
                     // Assume that the addressed silo will execute the request. It could forward the request elsewhere and then fail,
                     // causing us to reject a request which may still complete, but allowing the client to retry is preferable to timing out.
-                    if (_gateway.siloStatusOracle.IsDeadSilo(message.TargetSilo!))
+                    if (requestToReject is null)
                     {
-                        _pendingRequests.TryRemove(message.Id, out requestToReject);
-                        UnregisterRequestTrackingIfEmptyCore();
-                    }
-                    else
-                    {
+                        if (!_isRequestTrackingRegistered)
+                        {
+                            _gateway.clientsWithTrackedRequests.TryAdd(this, 0);
+                            _isRequestTrackingRegistered = true;
+                        }
+
                         destination.Send(message);
                         return;
                     }
