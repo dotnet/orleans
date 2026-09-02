@@ -33,6 +33,21 @@ public interface IReminderServiceLifecycleHarness
     /// <summary>Gets the currently active silos.</summary>
     IReadOnlyList<SiloAddress> ActiveSilos { get; }
 
+    /// <summary>
+    /// Registers a reminder, directing the request through the specified silo when the harness supports directed
+    /// registration. The default implementation uses the grain-facing API through <see cref="GrainFactory"/>.
+    /// </summary>
+    Task RegisterOnSiloAsync(
+        SiloAddress siloAddress,
+        GrainId grainId,
+        string reminderName,
+        TimeSpan dueTime,
+        TimeSpan period,
+        CancellationToken cancellationToken)
+        => GrainFactory.GetGrain<IReminderServiceTestGrain>(grainId)
+            .RegisterOrUpdateAsync(reminderName, dueTime, period)
+            .WaitAsync(cancellationToken);
+
     /// <summary>Waits until every active reminder service is ready.</summary>
     Task WaitForStartupReadinessAsync(CancellationToken cancellationToken);
 
@@ -335,9 +350,10 @@ public abstract class ReminderServiceLifecycleTestRunner
     public async Task RunReminderService_StaleOwnerRegistrationReconciles(CancellationToken cancellationToken)
     {
         const string Guarantee = nameof(ReminderService_StaleOwnerRegistrationReconciles);
-        var reminders = CreateGrains(Guarantee, 16);
+        var reminders = new List<(IReminderServiceTestGrain Grain, string Name)>();
         var phase = "join";
         SiloAddress? joined = null;
+        SiloAddress? staleOwner = null;
         await ExecuteWithCleanupAsync(
             Guarantee,
             cancellationToken,
@@ -346,62 +362,148 @@ public abstract class ReminderServiceLifecycleTestRunner
                 try
                 {
                     joined = await _harness.JoinOneSiloAsync(cancellationToken);
-                    phase = "registration";
-                    await Task.WhenAll(reminders.Select(item =>
-                        item.Grain.RegisterOrUpdateAsync(item.Name, TimeSpan.FromSeconds(3), Period)
-                            .WaitAsync(cancellationToken)));
-
-                    phase = "topology reconciliation";
-                    await _harness.WaitForTopologyReconciliationAsync(cancellationToken);
-                    phase = "owner reconciliation";
-                    var ownerWaits = reminders
-                        .Select(item => _harness.WaitForOwnerCountAsync(
-                            item.Grain.GetGrainId(),
-                            item.Name,
-                            1,
-                            cancellationToken))
-                        .ToArray();
-                    await _harness.RefreshAsync(cancellationToken);
-                    await Task.WhenAll(ownerWaits);
-                    await _harness.WaitForTopologyReconciliationAsync(cancellationToken);
-                    await Task.WhenAll(reminders.Select(item =>
-                        _harness.WaitForOwnerCountAsync(
-                            item.Grain.GetGrainId(),
-                            item.Name,
-                            1,
-                            cancellationToken)));
-                    foreach (var (grain, name) in reminders)
+                    var grain = CreateGrainOwnedBy(joined, Guarantee);
+                    const string Name = "stale-owner-registration";
+                    reminders.Add((grain, Name));
+                    staleOwner = _harness.ActiveSilos
+                        .Where(silo => !silo.Equals(joined))
+                        .Order()
+                        .First();
+                    var grainId = grain.GetGrainId();
+                    if (!_harness.IsOwner(joined, grainId) || _harness.IsOwner(staleOwner, grainId))
                     {
-                        phase = $"schedule reconciliation for {grain.GetGrainId()}/{name}";
-                        await _harness.WaitForScheduleAsync(grain.GetGrainId(), name, cancellationToken);
-                        if (_harness.GetOwners(grain.GetGrainId(), name).Count != 1)
-                        {
-                            OwnershipFailure(Guarantee, grain.GetGrainId(), name, 1).Throw();
-                        }
+                        Fail(Guarantee, "identity selection")
+                            .WithIdentity(grainId, Name)
+                            .WithExpected($"joined silo {joined} owns the grain and directed silo {staleOwner} does not")
+                            .WithObserved(
+                                $"joinedOwns={_harness.IsOwner(joined, grainId)}, "
+                                + $"directedOwns={_harness.IsOwner(staleOwner, grainId)}")
+                            .Throw();
                     }
+
+                    phase = $"registration through non-owner {staleOwner}";
+                    await _harness.RegisterOnSiloAsync(
+                        staleOwner,
+                        grainId,
+                        Name,
+                        TimeSpan.FromSeconds(3),
+                        Period,
+                        cancellationToken);
+
+                    var ownersBeforeRefresh = _harness.GetOwners(grainId, Name);
+                    var startsBeforeRefresh = _harness.GetLocalStartCount(grainId, Name);
+                    if (ownersBeforeRefresh.Count != 0 || startsBeforeRefresh != 0)
+                    {
+                        Fail(Guarantee, "stale-owner registration")
+                            .WithIdentity(grainId, Name)
+                            .WithExpected(
+                                $"directed non-owner {staleOwner} persists the row without starting a local owner before refresh")
+                            .WithObserved(
+                                $"currentOwner={joined}, owners=[{string.Join(", ", ownersBeforeRefresh)}], "
+                                + $"localStarts={startsBeforeRefresh}")
+                            .Throw();
+                    }
+
+                    phase = "owner reconciliation";
+                    var ownerWait = _harness.WaitForOwnerCountAsync(grainId, Name, 1, cancellationToken);
+                    await _harness.RefreshAsync(cancellationToken);
+                    await ownerWait;
+                    var owners = _harness.GetOwners(grainId, Name);
+                    if (owners.Count != 1 || !owners.Contains(joined) || owners.Contains(staleOwner))
+                    {
+                        Fail(Guarantee, "owner reconciliation")
+                            .WithIdentity(grainId, Name)
+                            .WithExpected($"exactly the current owner {joined}, excluding directed non-owner {staleOwner}")
+                            .WithObserved($"owners=[{string.Join(", ", owners)}]")
+                            .Throw();
+                    }
+
+                    phase = $"schedule reconciliation for {grainId}/{Name}";
+                    await _harness.WaitForScheduleAsync(grainId, Name, cancellationToken);
+                }
+                catch (TimeoutException exception)
+                {
+                    ThrowStaleOwnerPhaseFailure(
+                        Guarantee,
+                        phase,
+                        joined,
+                        staleOwner,
+                        reminders,
+                        exception);
                 }
                 catch (OperationCanceledException exception) when (cancellationToken.IsCancellationRequested)
                 {
-                    Fail(Guarantee, phase)
-                        .WithExpected("all registrations reconcile to one current owner with an armed schedule")
-                        .WithObserved(string.Join(
-                            "; ",
-                            reminders.Select(item =>
-                                $"{item.Grain.GetGrainId()}/{item.Name}="
-                                + $"[{string.Join(", ", _harness.GetOwners(item.Grain.GetGrainId(), item.Name))}]")))
-                        .Throw(exception);
+                    ThrowStaleOwnerPhaseFailure(
+                        Guarantee,
+                        phase,
+                        joined,
+                        staleOwner,
+                        reminders,
+                        exception);
                 }
             },
             async cleanupToken =>
             {
-                if (joined is not null && _harness.ActiveSilos.Contains(joined))
+                Exception? topologyFailure = null;
+                try
                 {
-                    await _harness.LeaveSiloAsync(joined, cleanupToken);
-                    await _harness.WaitForTopologyReconciliationAsync(cleanupToken);
+                    if (joined is not null && _harness.ActiveSilos.Contains(joined))
+                    {
+                        await _harness.LeaveSiloAsync(joined, cleanupToken);
+                        await _harness.WaitForTopologyReconciliationAsync(cleanupToken);
+                    }
+                }
+                catch (Exception exception)
+                {
+                    topologyFailure = exception;
                 }
 
-                await CleanupAsync(Guarantee, reminders, cleanupToken);
+                Exception? reminderFailure = null;
+                try
+                {
+                    await CleanupAsync(Guarantee, reminders, cleanupToken);
+                }
+                catch (Exception exception)
+                {
+                    reminderFailure = exception;
+                }
+
+                if (topologyFailure is not null && reminderFailure is not null)
+                {
+                    throw new AggregateException(topologyFailure, reminderFailure);
+                }
+
+                if (topologyFailure is not null)
+                {
+                    ExceptionDispatchInfo.Capture(topologyFailure).Throw();
+                }
+
+                if (reminderFailure is not null)
+                {
+                    ExceptionDispatchInfo.Capture(reminderFailure).Throw();
+                }
             });
+    }
+
+    private void ThrowStaleOwnerPhaseFailure(
+        string guarantee,
+        string phase,
+        SiloAddress? joined,
+        SiloAddress? staleOwner,
+        IReadOnlyList<(IReminderServiceTestGrain Grain, string Name)> reminders,
+        Exception exception)
+    {
+        Fail(guarantee, phase)
+            .WithExpected(
+                "the directed non-owner persists without a local schedule and the current owner starts one schedule after refresh")
+            .WithObserved(
+                $"joined={joined}, directedNonOwner={staleOwner}, "
+                + string.Join(
+                    "; ",
+                    reminders.Select(item =>
+                        $"{item.Grain.GetGrainId()}/{item.Name}="
+                        + $"[{string.Join(", ", _harness.GetOwners(item.Grain.GetGrainId(), item.Name))}]")))
+            .Throw(exception);
     }
 
     /// <summary>Guarantee: one-silo join/leave transfers ownership without duplicates or missed delivery.</summary>

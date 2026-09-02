@@ -22,7 +22,10 @@ internal sealed partial class SiloStatusListenerManager : ILifecycleParticipant<
     private readonly IMembershipManager _membershipService;
     private readonly ILogger<SiloStatusListenerManager> _logger;
     private readonly IFatalErrorHandler _fatalErrorHandler;
+    private readonly object _processedMembershipLock = new();
     private ImmutableList<WeakReference<ISiloStatusListener>> _listeners = [];
+    private MembershipVersion _processedMembershipVersion = MembershipVersion.MinValue;
+    private TaskCompletionSource _processedMembershipVersionChanged = CreateCompletion();
 
     public SiloStatusListenerManager(
         IMembershipManager membershipManager,
@@ -88,6 +91,7 @@ internal sealed partial class SiloStatusListenerManager : ILifecycleParticipant<
                 var update = (previous is null || snapshot.Version == MembershipVersion.MinValue) ? snapshot.AsUpdate() : snapshot.CreateUpdate(previous);
                 NotifyObservers(update);
                 previous = snapshot;
+                MarkMembershipVersionProcessed(snapshot.Version);
             }
         }
         catch (OperationCanceledException) when (_cancellation.IsCancellationRequested)
@@ -143,6 +147,76 @@ internal sealed partial class SiloStatusListenerManager : ILifecycleParticipant<
             }
         }
     }
+
+    internal async Task TestOnlyWaitForCurrentMembershipVersion(CancellationToken cancellationToken)
+    {
+        while (true)
+        {
+            var targetVersion = _membershipService.CurrentSnapshot.Version;
+            Task versionChanged;
+            lock (_processedMembershipLock)
+            {
+                if (_processedMembershipVersion >= targetVersion)
+                {
+                    if (_processedMembershipVersion >= _membershipService.CurrentSnapshot.Version)
+                    {
+                        return;
+                    }
+
+                    continue;
+                }
+
+                versionChanged = _processedMembershipVersionChanged.Task;
+            }
+
+            await versionChanged.WaitAsync(cancellationToken);
+        }
+    }
+
+    internal string TestOnlyDescribeMembershipState()
+    {
+        var (currentVersion, processedVersion) = TestOnlyGetMembershipVersions();
+        return $"currentMembership={currentVersion}, processedMembership={processedVersion}";
+    }
+
+    internal (MembershipVersion Current, MembershipVersion Processed) TestOnlyGetMembershipVersions()
+    {
+        while (true)
+        {
+            var currentVersion = _membershipService.CurrentSnapshot.Version;
+            MembershipVersion processedVersion;
+            lock (_processedMembershipLock)
+            {
+                processedVersion = _processedMembershipVersion;
+            }
+
+            if (currentVersion == _membershipService.CurrentSnapshot.Version)
+            {
+                return (currentVersion, processedVersion);
+            }
+        }
+    }
+
+    private void MarkMembershipVersionProcessed(MembershipVersion version)
+    {
+        TaskCompletionSource versionChanged;
+        lock (_processedMembershipLock)
+        {
+            if (version <= _processedMembershipVersion)
+            {
+                return;
+            }
+
+            _processedMembershipVersion = version;
+            versionChanged = _processedMembershipVersionChanged;
+            _processedMembershipVersionChanged = CreateCompletion();
+        }
+
+        versionChanged.TrySetResult();
+    }
+
+    private static TaskCompletionSource CreateCompletion()
+        => new(TaskCreationOptions.RunContinuationsAsynchronously);
 
     void ILifecycleParticipant<ISiloLifecycle>.Participate(ISiloLifecycle lifecycle)
     {

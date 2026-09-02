@@ -10,6 +10,7 @@ using Orleans.Reminders;
 using Orleans.Reminders.Diagnostics;
 using Orleans.Runtime.ConsistentRing;
 using Orleans.Runtime.Internal;
+using Orleans.Runtime.MembershipService;
 using Orleans.Runtime.Scheduler;
 
 namespace Orleans.Runtime.ReminderService
@@ -28,14 +29,15 @@ namespace Orleans.Runtime.ReminderService
         private readonly IAsyncTimer listRefreshTimer; // timer that refreshes our list of reminders to reflect global reminder table
         private readonly GrainReferenceActivator _referenceActivator;
         private readonly GrainInterfaceType _grainInterfaceType;
+        private readonly SiloStatusListenerManager _siloStatusListenerManager;
         private readonly TimeProvider _timeProvider;
         private readonly ReminderInstruments _reminderInstruments;
         private long localTableSequence;
         // The test barrier reads this state off-scheduler so it remains observable while the service is busy.
-        private readonly object _rangeChangeLock = new();
-        private long rangeChangeGeneration;
-        private TaskCompletionSource rangeChangeGenerationChanged = new(TaskCreationOptions.RunContinuationsAsynchronously);
-        private Task rangeChangeTask = Task.CompletedTask;
+        private readonly object _reconciliationLock = new();
+        private long reconciliationGeneration;
+        private TaskCompletionSource reconciliationGenerationChanged = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        private Task reconciliationTask = Task.CompletedTask;
         private uint initialReadCallCount = 0;
         private Task? runTask;
         private readonly object _deliveryLock = new();
@@ -50,6 +52,7 @@ namespace Orleans.Runtime.ReminderService
             IAsyncTimerFactory asyncTimerFactory,
             IOptions<ReminderOptions> reminderOptions,
             IConsistentRingProvider ringProvider,
+            SiloStatusListenerManager siloStatusListenerManager,
             [FromKeyedServices(ReminderTimeProviderNames.Reminders)] TimeProvider timeProvider,
             ReminderInstruments reminderInstruments,
             SystemTargetShared shared)
@@ -60,6 +63,7 @@ namespace Orleans.Runtime.ReminderService
         {
             _referenceActivator = referenceActivator;
             _grainInterfaceType = interfaceTypeResolver.GetGrainInterfaceType(typeof(IRemindable));
+            _siloStatusListenerManager = siloStatusListenerManager;
             this.reminderOptions = reminderOptions.Value;
             this.reminderTable = reminderTable;
             _timeProvider = timeProvider;
@@ -365,9 +369,25 @@ namespace Orleans.Runtime.ReminderService
 
         internal Task TestOnlyRefresh()
         {
-            var refreshTask = new Task<Task>(ReadAndUpdateReminders);
+            var refreshTask = new Task<Task>(() => TrackReconciliation(ReadAndUpdateReminders));
             Scheduler.QueueTask(refreshTask);
             return refreshTask.Unwrap();
+        }
+
+        internal Task TestOnlyWaitForSiloStatusListeners(CancellationToken cancellationToken)
+            => _siloStatusListenerManager.TestOnlyWaitForCurrentMembershipVersion(cancellationToken);
+
+        internal (MembershipVersion Current, MembershipVersion Processed) TestOnlyGetMembershipVersions()
+            => _siloStatusListenerManager.TestOnlyGetMembershipVersions();
+
+        internal string TestOnlyDescribeTopologyState()
+        {
+            lock (_reconciliationLock)
+            {
+                return $"silo={Silo}, serviceStatus={Status}, {_siloStatusListenerManager.TestOnlyDescribeMembershipState()}, "
+                    + $"ringRange={RingRange}, reconciliationGeneration={reconciliationGeneration}, "
+                    + $"reconciliationCompleted={reconciliationTask.IsCompleted}";
+            }
         }
 
         private void RemoveOutOfRangeReminders(List<Task> removedReminderTasks)
@@ -399,28 +419,32 @@ namespace Orleans.Runtime.ReminderService
             CheckRuntimeContext();
 
             _ = base.OnRangeChange(oldRange, newRange, increased);
+            var status = Status;
+            if (status == GrainServiceStatus.Started)
+            {
+                return TrackReconciliation(ReadAndUpdateReminders);
+            }
+
+            LogIgnoringRangeChange(status);
+            return Task.CompletedTask;
+        }
+
+        private Task TrackReconciliation(Func<Task> reconciliation)
+        {
             var reconciliationTaskSource = new TaskCompletionSource<Task>(TaskCreationOptions.RunContinuationsAsynchronously);
             TaskCompletionSource previousGenerationChanged;
-            lock (_rangeChangeLock)
+            lock (_reconciliationLock)
             {
-                previousGenerationChanged = rangeChangeGenerationChanged;
-                rangeChangeGenerationChanged = new(TaskCreationOptions.RunContinuationsAsynchronously);
-                rangeChangeGeneration++;
-                rangeChangeTask = reconciliationTaskSource.Task.Unwrap();
+                previousGenerationChanged = reconciliationGenerationChanged;
+                reconciliationGenerationChanged = new(TaskCreationOptions.RunContinuationsAsynchronously);
+                reconciliationGeneration++;
+                reconciliationTask = reconciliationTaskSource.Task.Unwrap();
             }
 
             previousGenerationChanged.TrySetResult();
             try
             {
-                var status = Status;
-                var task = status == GrainServiceStatus.Started
-                    ? ReadAndUpdateReminders()
-                    : Task.CompletedTask;
-                if (status != GrainServiceStatus.Started)
-                {
-                    LogIgnoringRangeChange(status);
-                }
-
+                var task = reconciliation();
                 reconciliationTaskSource.SetResult(task);
                 return task;
             }
@@ -435,23 +459,23 @@ namespace Orleans.Runtime.ReminderService
         {
             while (true)
             {
-                // A newer refresh supersedes older results through localTableSequence. Follow generation
-                // changes so a stalled obsolete read does not block the current reconciliation.
+                // A newer tracked refresh supersedes older results through localTableSequence. Follow
+                // reconciliation generations so a stalled obsolete read does not block the current one.
                 long observedGeneration;
                 Task observedTask;
                 Task observedGenerationChanged;
-                lock (_rangeChangeLock)
+                lock (_reconciliationLock)
                 {
-                    observedGeneration = rangeChangeGeneration;
-                    observedTask = rangeChangeTask;
-                    observedGenerationChanged = rangeChangeGenerationChanged.Task;
+                    observedGeneration = reconciliationGeneration;
+                    observedTask = reconciliationTask;
+                    observedGenerationChanged = reconciliationGenerationChanged.Task;
                 }
 
                 await Task.WhenAny(observedTask, observedGenerationChanged).WaitAsync(cancellationToken);
 
-                lock (_rangeChangeLock)
+                lock (_reconciliationLock)
                 {
-                    if (observedGeneration != rangeChangeGeneration)
+                    if (observedGeneration != reconciliationGeneration)
                     {
                         continue;
                     }
@@ -488,7 +512,7 @@ namespace Orleans.Runtime.ReminderService
                             await DoInitialReadAndUpdateReminders();
                             break;
                         case GrainServiceStatus.Started:
-                            await ReadAndUpdateReminders();
+                            await TrackReconciliation(ReadAndUpdateReminders);
                             break;
                         default:
                             listRefreshTimer.Dispose();
