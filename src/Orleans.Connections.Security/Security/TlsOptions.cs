@@ -113,5 +113,10 @@ namespace Orleans.Connections.Security
                 _handshakeTimeout = value != Timeout.InfiniteTimeSpan ? value : TimeSpan.MaxValue;
             }
         }
+
+        internal CancellationTokenSource CreateHandshakeCancellationTokenSource() =>
+            _handshakeTimeout == TimeSpan.MaxValue
+                ? new CancellationTokenSource()
+                : new CancellationTokenSource(_handshakeTimeout);
     }
 }
