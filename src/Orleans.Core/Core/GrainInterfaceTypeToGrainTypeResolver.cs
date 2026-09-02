@@ -36,6 +36,12 @@ namespace Orleans
         }
 
         /// <summary>
+        /// Clears cached generic interface mappings after a hot reload metadata update; the version-keyed
+        /// cache refreshes itself when the cluster manifest version advances.
+        /// </summary>
+        internal void OnManifestUpdated() => _genericMapping.Clear();
+
+        /// <summary>
         /// Returns the <see cref="GrainType"/> which supports the provided <see cref="GrainInterfaceType"/> and which has an implementing type name beginning with the provided prefix string.
         /// </summary>
         public GrainType GetGrainType(GrainInterfaceType interfaceType, string prefix)

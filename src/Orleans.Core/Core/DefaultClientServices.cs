@@ -167,6 +167,11 @@ namespace Orleans
             services.AddSingleton<IGrainInterfacePropertiesProvider, TypeNameGrainPropertiesProvider>();
             services.AddSingleton<IGrainPropertiesProvider, TypeNameGrainPropertiesProvider>();
             services.AddSingleton<IGrainPropertiesProvider, ImplementedInterfaceProvider>();
+            if (System.Reflection.Metadata.MetadataUpdater.IsSupported)
+            {
+                services.AddSingleton<ClientHotReloadRefresher>();
+                services.AddFromExisting<ILifecycleParticipant<IClusterClientLifecycle>, ClientHotReloadRefresher>();
+            }
 
             services.AddSingleton<IGrainCallCancellationManager, ExternalClientGrainCallCancellationManager>();
             services.AddSingleton<ILocalActivationStatusChecker, ClientLocalActivationStatusChecker>();
