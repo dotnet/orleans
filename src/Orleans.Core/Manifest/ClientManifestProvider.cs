@@ -12,11 +12,18 @@ namespace Orleans.Runtime
     /// </summary>
     internal class ClientManifestProvider
     {
+        private readonly IEnumerable<IGrainInterfacePropertiesProvider> _grainInterfacePropertiesProviders;
+        private readonly IOptions<GrainTypeOptions> _grainTypeOptions;
+        private readonly GrainInterfaceTypeResolver _interfaceTypeResolver;
+
         public ClientManifestProvider(
             IEnumerable<IGrainInterfacePropertiesProvider> grainInterfacePropertiesProviders,
             IOptions<GrainTypeOptions> grainTypeOptions,
             GrainInterfaceTypeResolver interfaceTypeResolver)
         {
+            _grainInterfacePropertiesProviders = grainInterfacePropertiesProviders;
+            _grainTypeOptions = grainTypeOptions;
+            _interfaceTypeResolver = interfaceTypeResolver;
             var interfaces = CreateInterfaceManifest(grainInterfacePropertiesProviders, grainTypeOptions, interfaceTypeResolver);
             this.ClientManifest = new GrainManifest(ImmutableDictionary<GrainType, GrainProperties>.Empty, interfaces);
         }
@@ -24,7 +31,13 @@ namespace Orleans.Runtime
         /// <summary>
         /// Gets the client manifest.
         /// </summary>
-        public GrainManifest ClientManifest { get; }
+        public GrainManifest ClientManifest { get; private set; }
+
+        internal void OnManifestUpdated()
+        {
+            var interfaces = CreateInterfaceManifest(_grainInterfacePropertiesProviders, _grainTypeOptions, _interfaceTypeResolver);
+            ClientManifest = new GrainManifest(ImmutableDictionary<GrainType, GrainProperties>.Empty, interfaces);
+        }
 
         private static ImmutableDictionary<GrainInterfaceType, GrainInterfaceProperties> CreateInterfaceManifest(
             IEnumerable<IGrainInterfacePropertiesProvider> propertyProviders,

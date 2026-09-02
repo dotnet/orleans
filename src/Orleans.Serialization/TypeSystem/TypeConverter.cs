@@ -3,6 +3,7 @@ using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
 using System.Text;
+using System.Threading;
 using Microsoft.Extensions.Options;
 using Orleans.Serialization.Activators;
 using Orleans.Serialization.Cloning;
@@ -26,11 +27,11 @@ public class TypeConverter
     private readonly RuntimeTypeNameRewriter.Rewriter<ValidationResult> _convertToDisplayName;
     private readonly RuntimeTypeNameRewriter.Rewriter<ValidationResult> _convertFromDisplayName;
     private readonly RuntimeTypeNameRewriter.CompoundAliasResolver<ValidationResult> _compoundAliasResolver;
-    private readonly Dictionary<QualifiedType, QualifiedType> _wellKnownAliasToType;
-    private readonly Dictionary<QualifiedType, QualifiedType> _wellKnownTypeToAlias;
+    private Dictionary<QualifiedType, QualifiedType> _wellKnownAliasToType;
+    private Dictionary<QualifiedType, QualifiedType> _wellKnownTypeToAlias;
     private readonly ConcurrentDictionary<QualifiedType, bool> _allowedTypes;
-    private readonly HashSet<string> _allowedAssembliesConfiguration;
-    private readonly HashSet<string> _allowedTypesConfiguration;
+    private HashSet<string> _allowedAssembliesConfiguration;
+    private HashSet<string> _allowedTypesConfiguration;
     private static readonly List<(string DisplayName, string RuntimeName)> WellKnownTypeAliases =
     [
         ("object", "System.Object"),
@@ -82,29 +83,41 @@ public class TypeConverter
         _convertFromDisplayName = ConvertFromDisplayName;
         _compoundAliasResolver = ResolveCompoundAliasType;
 
+        _allowedTypes = new ConcurrentDictionary<QualifiedType, bool>(QualifiedType.EqualityComparer);
         _wellKnownAliasToType = [];
         _wellKnownTypeToAlias = [];
-
-        _allowedTypes = new ConcurrentDictionary<QualifiedType, bool>(QualifiedType.EqualityComparer);
         _allowedAssembliesConfiguration = new(StringComparer.Ordinal);
         _allowedTypesConfiguration = new(StringComparer.Ordinal);
+        ApplyManifest(options.Value);
+    }
+
+    /// <summary>
+    /// Builds all manifest-derived lookup state and publishes it with copy-on-write swaps; invoked from
+    /// the constructor and again after hot reload metadata updates.
+    /// </summary>
+    private void ApplyManifest(TypeManifestOptions options)
+    {
+        var allowedAssembliesConfiguration = new HashSet<string>(StringComparer.Ordinal);
+        var allowedTypesConfiguration = new HashSet<string>(StringComparer.Ordinal);
+        var wellKnownAliasToType = new Dictionary<QualifiedType, QualifiedType>();
+        var wellKnownTypeToAlias = new Dictionary<QualifiedType, QualifiedType>();
 
         if (!_allowAllTypes)
         {
-            foreach (var assembly in options.Value.AllowedAssemblies)
+            foreach (var assembly in options.AllowedAssemblies)
             {
-                _allowedAssembliesConfiguration.Add(assembly);
+                allowedAssembliesConfiguration.Add(assembly);
             }
 
-            foreach (var t in options.Value.AllowedTypes)
+            foreach (var t in options.AllowedTypes)
             {
-                AddConfiguredAllowedType(t);
+                AddConfiguredAllowedType(allowedTypesConfiguration, t);
             }
 
-            ConsumeMetadata(options.Value);
+            ConsumeMetadata(options);
         }
 
-        var aliases = options.Value.WellKnownTypeAliases;
+        var aliases = options.WellKnownTypeAliases;
         foreach (var item in aliases)
         {
             var alias = new QualifiedType(null, item.Key);
@@ -117,13 +130,13 @@ public class TypeConverter
             }
 
             var originalQualifiedType = new QualifiedType(asmName, spec.Format());
-            _wellKnownTypeToAlias[originalQualifiedType] = alias;
+            wellKnownTypeToAlias[originalQualifiedType] = alias;
             if (asmName is { Length: > 0 })
             {
-                _wellKnownTypeToAlias[new QualifiedType(null, spec.Format())] = alias;
+                wellKnownTypeToAlias[new QualifiedType(null, spec.Format())] = alias;
             }
 
-            _wellKnownAliasToType[alias] = originalQualifiedType;
+            wellKnownAliasToType[alias] = originalQualifiedType;
             if (!_allowAllTypes)
             {
                 _allowedTypes[originalQualifiedType] = true;
@@ -133,11 +146,36 @@ public class TypeConverter
                 }
             }
         }
+
+        Volatile.Write(ref _allowedAssembliesConfiguration, allowedAssembliesConfiguration);
+        Volatile.Write(ref _allowedTypesConfiguration, allowedTypesConfiguration);
+        Volatile.Write(ref _wellKnownAliasToType, wellKnownAliasToType);
+        Volatile.Write(ref _wellKnownTypeToAlias, wellKnownTypeToAlias);
     }
 
-    private void AddConfiguredAllowedType(string typeName)
+    /// <summary>
+    /// Refreshes manifest-derived state after a hot reload metadata update and purges cached negative
+    /// allow-list verdicts, which may have become stale now that new types are registered.
+    /// </summary>
+    internal void OnManifestUpdated(TypeManifestOptions options)
     {
-        _allowedTypesConfiguration.Add(typeName);
+        ApplyManifest(options);
+
+        if (!_allowAllTypes)
+        {
+            foreach (var entry in _allowedTypes)
+            {
+                if (!entry.Value)
+                {
+                    _allowedTypes.TryRemove(entry.Key, out _);
+                }
+            }
+        }
+    }
+
+    private void AddConfiguredAllowedType(HashSet<string> allowedTypesConfiguration, string typeName)
+    {
+        allowedTypesConfiguration.Add(typeName);
 
         var parsed = RuntimeTypeNameParser.Parse(typeName);
         var converter = this;

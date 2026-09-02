@@ -34,6 +34,16 @@ namespace Orleans.Serialization.TypeSystem
         }
 
         /// <summary>
+        /// Clears the cached formatted type names; used after hot reload metadata updates, which can change
+        /// how types are formatted (for example via newly registered aliases).
+        /// </summary>
+        internal void ClearCaches()
+        {
+            _typeCache.Clear();
+            _typeKeyCache.Clear();
+        }
+
+        /// <summary>
         /// Writes a type with a length-prefix.
         /// </summary>
         /// <typeparam name="TBufferWriter">The buffer writer type.</typeparam>
