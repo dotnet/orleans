@@ -17,7 +17,6 @@ public static class ReminderTopologyStabilizer
         InProcessTestCluster cluster,
         ReminderDiagnosticObserver observer,
         IEnumerable<InProcessSiloHandle> readySilos,
-        TimeSpan timeout,
         CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(cluster);
@@ -30,15 +29,11 @@ public static class ReminderTopologyStabilizer
             .ToArray();
         var expectedActiveSilos = Array.Empty<InProcessSiloHandle>();
         var phase = "reminder service readiness";
-        using var timeoutCancellation = new CancellationTokenSource(timeout);
-        using var phaseCancellation = CancellationTokenSource.CreateLinkedTokenSource(
-            timeoutCancellation.Token,
-            cancellationToken);
         try
         {
             var ready = requiredReadySilos
                 .Select(silo => observer.WaitForReminderServiceStartedAsync(
-                    phaseCancellation.Token,
+                    cancellationToken,
                     silo.SiloAddress))
                 .ToArray();
             await Task.WhenAll(ready);
@@ -47,8 +42,8 @@ public static class ReminderTopologyStabilizer
             {
                 phase = "liveness and manifest convergence";
                 await Task.WhenAll(
-                    cluster.WaitForLivenessToStabilizeAsync().WaitAsync(phaseCancellation.Token),
-                    cluster.WaitForClusterManifestToStabilizeAsync().WaitAsync(phaseCancellation.Token));
+                    cluster.WaitForLivenessToStabilizeAsync().WaitAsync(cancellationToken),
+                    cluster.WaitForClusterManifestToStabilizeAsync().WaitAsync(cancellationToken));
 
                 phase = "active silo selection";
                 expectedActiveSilos = cluster.GetActiveSilos()
@@ -69,7 +64,7 @@ public static class ReminderTopologyStabilizer
                 phase = "selected active reminder service readiness";
                 var activeServicesReady = expectedActiveSilos
                     .Select(silo => observer.WaitForReminderServiceStartedAsync(
-                        phaseCancellation.Token,
+                        cancellationToken,
                         silo.SiloAddress))
                     .ToArray();
                 await Task.WhenAll(activeServicesReady);
@@ -83,15 +78,15 @@ public static class ReminderTopologyStabilizer
 
                 phase = "silo status listener delivery";
                 await Task.WhenAll(reminderServices.Select(service =>
-                    service.TestOnlyWaitForSiloStatusListeners(phaseCancellation.Token)));
+                    service.TestOnlyWaitForSiloStatusListeners(cancellationToken)));
 
                 phase = "stable topology refresh";
                 var refreshes = reminderServices.Select(service => service.TestOnlyRefresh()).ToArray();
-                await Task.WhenAll(refreshes).WaitAsync(phaseCancellation.Token);
+                await Task.WhenAll(refreshes).WaitAsync(cancellationToken);
 
                 phase = "latest reminder reconciliation";
                 var reconciliations = reminderServices.Select(service =>
-                    service.TestOnlyWaitForRangeChangeReconciliation(phaseCancellation.Token)).ToArray();
+                    service.TestOnlyWaitForRangeChangeReconciliation(cancellationToken)).ToArray();
                 await Task.WhenAll(reconciliations);
 
                 phase = "active silo and membership version verification";
@@ -120,16 +115,10 @@ public static class ReminderTopologyStabilizer
                 }
             }
         }
-        catch (OperationCanceledException exception) when (
-            timeoutCancellation.IsCancellationRequested
-            && !cancellationToken.IsCancellationRequested)
-        {
-            throw new TimeoutException(DescribeFailure(cluster, expectedActiveSilos, phase, timeout), exception);
-        }
         catch (OperationCanceledException exception) when (cancellationToken.IsCancellationRequested)
         {
             throw new OperationCanceledException(
-                DescribeFailure(cluster, expectedActiveSilos, phase, timeout),
+                DescribeFailure(cluster, expectedActiveSilos, phase),
                 exception,
                 cancellationToken);
         }
@@ -138,8 +127,7 @@ public static class ReminderTopologyStabilizer
     private static string DescribeFailure(
         InProcessTestCluster cluster,
         IReadOnlyList<InProcessSiloHandle> expectedActiveSilos,
-        string phase,
-        TimeSpan timeout)
+        string phase)
     {
         var expected = expectedActiveSilos.Select(silo => silo.SiloAddress.ToString());
         var observed = cluster.GetActiveSilos()
@@ -147,7 +135,7 @@ public static class ReminderTopologyStabilizer
             .ToArray();
         var states = observed.Select(silo =>
             silo.ServiceProvider.GetRequiredService<LocalReminderService>().TestOnlyDescribeTopologyState());
-        return $"Reminder topology did not stabilize during '{phase}' within {timeout}. "
+        return $"Reminder topology stabilization was canceled during '{phase}'. "
             + $"Expected active silos: [{string.Join(", ", expected)}]. "
             + $"Observed active silos: [{string.Join(", ", observed.Select(silo => silo.SiloAddress.ToString()))}]. "
             + $"States: [{string.Join("; ", states)}].";

@@ -379,16 +379,16 @@ public sealed class ReminderTestKitClusterIntegrationTests
             refreshReminderListPeriod: TimeSpan.FromSeconds(1));
         var cluster = builder.Build();
         using var observer = ReminderDiagnosticObserver.Create(cluster);
+        using var cancellation = CancellationTokenSource.CreateLinkedTokenSource(testCancellationToken);
+        cancellation.CancelAfter(TimeSpan.FromSeconds(30));
 
         try
         {
-            await DeployAndWaitForStableReminderTopologyAsync(cluster, observer, testCancellationToken);
+            await DeployAndWaitForStableReminderTopologyAsync(cluster, observer, cancellation.Token);
             var grain = cluster.Client.GetGrain<IReminderTestKitGrain>(Guid.NewGuid());
             var grainId = grain.GetGrainId();
             var dueTime = TimeSpan.FromMinutes(10);
             var firstTickTime = clock.UtcNow.UtcDateTime + dueTime;
-            using var cancellation = CancellationTokenSource.CreateLinkedTokenSource(testCancellationToken);
-            cancellation.CancelAfter(TimeSpan.FromSeconds(30));
 
             await using var firstRefreshA = oracle.BlockNext(ReminderTableOperationKind.ReadRange);
             await using var firstRefreshB = oracle.BlockNext(ReminderTableOperationKind.ReadRange);
@@ -501,7 +501,6 @@ public sealed class ReminderTestKitClusterIntegrationTests
             cluster,
             observer,
             cluster.Silos,
-            TimeSpan.FromSeconds(30),
             cancellationToken);
     }
 

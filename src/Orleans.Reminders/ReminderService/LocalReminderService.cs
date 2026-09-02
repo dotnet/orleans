@@ -368,11 +368,7 @@ namespace Orleans.Runtime.ReminderService
         }
 
         internal Task TestOnlyRefresh()
-        {
-            var refreshTask = new Task<Task>(() => TrackReconciliation(ReadAndUpdateReminders));
-            Scheduler.QueueTask(refreshTask);
-            return refreshTask.Unwrap();
-        }
+            => this.QueueTask(() => TrackReconciliation(ReadAndUpdateReminders));
 
         internal Task TestOnlyWaitForSiloStatusListeners(CancellationToken cancellationToken)
             => _siloStatusListenerManager.TestOnlyWaitForCurrentMembershipVersion(cancellationToken);
