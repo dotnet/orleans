@@ -188,6 +188,8 @@ namespace UnitTests.MembershipTests
                 Assert.True(
                     exception is OperationCanceledException or SiloUnavailableException,
                     $"Expected cancellation or dead-silo rejection, but received {exception?.GetType().FullName ?? "no exception"}: {exception}");
+                await HostedCluster.WaitForLivenessToStabilizeAsync(didKill: true)
+                    .WaitAsync(TestContext.Current.CancellationToken);
                 Assert.Equal(0, gateway.TrackedRequestClientCount);
             }
             finally
