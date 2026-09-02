@@ -215,6 +215,10 @@ namespace Orleans.Runtime
                 // This returns null if there is no newer cluster manifest.
                 return await provider.GetClusterManifestUpdate(previousVersion, cancellationToken);
             }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                throw;
+            }
             catch (Exception exception)
             {
                 LogFailedToFetchClusterManifestUpdate(_logger, exception, provider);
