@@ -133,6 +133,42 @@ public sealed class ClusterServiceMembershipTests
     }
 
     [Fact]
+    public async Task DirectoryMembershipService_RefreshWaitsForUnderlyingServiceAndLocalView()
+    {
+        var service = new TestClusterMembershipService(ClusterMembershipSnapshot.Default);
+        await using var membership = new DirectoryMembershipService(
+            service,
+            grainFactory: null!,
+            NullLogger<DirectoryMembershipService>.Instance,
+            partitionsPerSilo: 2,
+            GetBoundaries);
+        await service.EnumeratorStarted;
+        using var cancellation = new CancellationTokenSource();
+
+        var refresh = membership.RefreshViewAsync(new(3), cancellation.Token).AsTask();
+
+        var call = Assert.Single(service.RefreshCalls);
+        Assert.Equal(new MembershipVersion(3), call.MinimumVersion);
+        Assert.Equal(cancellation.Token, call.CancellationToken);
+        Assert.False(refresh.IsCompleted);
+
+        service.RefreshCompletion.TrySetResult();
+        Assert.False(refresh.IsCompleted);
+
+        service.Publish(CreateSnapshot(2, CreateSilo(1)));
+        Assert.False(refresh.IsCompleted);
+
+        var expectedSnapshot = CreateSnapshot(3, CreateSilo(2));
+        service.Publish(expectedSnapshot);
+        var result = await refresh;
+
+        Assert.Same(expectedSnapshot, result.ClusterMembershipSnapshot);
+        Assert.Equal(new MembershipVersion(3), result.Version);
+        Assert.Equal([CreateSilo(2)], result.Members);
+        Assert.True(service.RefreshCompletion.Task.IsCompletedSuccessfully);
+    }
+
+    [Fact]
     public async Task MembershipUpdates_ProjectConfigurationBoundariesAndPublishInOrder()
     {
         await using var fixture = new ClusterServiceMembershipFixture();
