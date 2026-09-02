@@ -14,11 +14,11 @@ namespace OrleansCodeGen.TestProject
     public sealed class Codec_DemoData : global::Orleans.Serialization.Codecs.IFieldCodec<global::TestProject.DemoData>, global::Orleans.Serialization.Serializers.IBaseCodec<global::TestProject.DemoData>
     {
         private readonly global::System.Type _codecFieldType = typeof(global::TestProject.DemoData);
-        private readonly global::System.Type _type0 = typeof(int[]);
-        private readonly global::Orleans.Serialization.Codecs.ArrayCodec<int> _codec0;
+        private readonly global::System.Type _type_Int32_1_BD21C8B2FA9EFF52 = typeof(int[]);
+        private readonly global::Orleans.Serialization.Codecs.ArrayCodec<int> _codec_Int32_1_BD21C8B2FA9EFF52;
         public Codec_DemoData(global::Orleans.Serialization.Serializers.ICodecProvider codecProvider)
         {
-            _codec0 = OrleansGeneratedCodeHelper.GetService<global::Orleans.Serialization.Codecs.ArrayCodec<int>>(this, codecProvider);
+            _codec_Int32_1_BD21C8B2FA9EFF52 = OrleansGeneratedCodeHelper.GetService<global::Orleans.Serialization.Codecs.ArrayCodec<int>>(this, codecProvider);
         }
 
         [global::System.Runtime.CompilerServices.MethodImplAttribute(global::System.Runtime.CompilerServices.MethodImplOptions.AggressiveInlining)]
@@ -42,7 +42,7 @@ namespace OrleansCodeGen.TestProject
             global::Orleans.Serialization.Codecs.DateTimeOffsetCodec.WriteField(ref writer, 1U, instance.DateTimeOffsetProp);
             global::Orleans.Serialization.Codecs.TimeSpanCodec.WriteField(ref writer, 1U, instance.TimeSpanProp);
             global::Orleans.Serialization.Codecs.GuidCodec.WriteField(ref writer, 1U, instance.GuidProp);
-            _codec0.WriteField(ref writer, 1U, _type0, instance.IntArrayProp);
+            _codec_Int32_1_BD21C8B2FA9EFF52.WriteField(ref writer, 1U, _type_Int32_1_BD21C8B2FA9EFF52, instance.IntArrayProp);
         }
 
         [global::System.Runtime.CompilerServices.MethodImplAttribute(global::System.Runtime.CompilerServices.MethodImplOptions.AggressiveInlining)]
@@ -211,7 +211,7 @@ namespace OrleansCodeGen.TestProject
 
                 if (id == 17U)
                 {
-                    instance.IntArrayProp = _codec0.ReadValue(ref reader, header);
+                    instance.IntArrayProp = _codec_Int32_1_BD21C8B2FA9EFF52.ReadValue(ref reader, header);
                     reader.ReadFieldHeader(ref header);
                 }
 
@@ -258,7 +258,7 @@ namespace OrleansCodeGen.TestProject
     [global::System.CodeDom.Compiler.GeneratedCodeAttribute("OrleansCodeGen", "10.0.0.0"), global::System.ComponentModel.EditorBrowsableAttribute(global::System.ComponentModel.EditorBrowsableState.Never), global::System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverageAttribute]
     public sealed class Copier_DemoData : global::Orleans.Serialization.Cloning.IDeepCopier<global::TestProject.DemoData>, global::Orleans.Serialization.Cloning.IBaseCopier<global::TestProject.DemoData>
     {
-        private readonly global::Orleans.Serialization.Codecs.ArrayCopier<int> _copier0;
+        private readonly global::Orleans.Serialization.Codecs.ArrayCopier<int> _copier_Int32_1_BD21C8B2FA9EFF52;
         [global::System.Runtime.CompilerServices.MethodImplAttribute(global::System.Runtime.CompilerServices.MethodImplOptions.AggressiveInlining)]
         public global::TestProject.DemoData DeepCopy(global::TestProject.DemoData original, global::Orleans.Serialization.Cloning.CopyContext context)
         {
@@ -274,7 +274,7 @@ namespace OrleansCodeGen.TestProject
 
         public Copier_DemoData(global::Orleans.Serialization.Serializers.ICodecProvider codecProvider)
         {
-            _copier0 = OrleansGeneratedCodeHelper.GetService<global::Orleans.Serialization.Codecs.ArrayCopier<int>>(this, codecProvider);
+            _copier_Int32_1_BD21C8B2FA9EFF52 = OrleansGeneratedCodeHelper.GetService<global::Orleans.Serialization.Codecs.ArrayCopier<int>>(this, codecProvider);
         }
 
         [global::System.Runtime.CompilerServices.MethodImplAttribute(global::System.Runtime.CompilerServices.MethodImplOptions.AggressiveInlining)]
@@ -297,7 +297,7 @@ namespace OrleansCodeGen.TestProject
             output.DateTimeOffsetProp = input.DateTimeOffsetProp;
             output.TimeSpanProp = input.TimeSpanProp;
             output.GuidProp = input.GuidProp;
-            output.IntArrayProp = _copier0.DeepCopy(input.IntArrayProp, context);
+            output.IntArrayProp = _copier_Int32_1_BD21C8B2FA9EFF52.DeepCopy(input.IntArrayProp, context);
         }
     }
 

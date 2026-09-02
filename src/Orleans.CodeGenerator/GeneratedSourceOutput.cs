@@ -302,8 +302,8 @@ internal static class GeneratedSourceOutput
         return CreateStableHash(builder.ToString());
     }
 
-    internal static string CreateStableHash(string value)
-        => HexConverter.ToString(XxHash32.Hash(Encoding.UTF8.GetBytes(value ?? string.Empty)));
+    internal static string CreateStableHash(string value, int seed = 0)
+        => HexConverter.ToString(XxHash32.Hash(Encoding.UTF8.GetBytes(value ?? string.Empty), seed));
 
     internal static void AppendHashComponent(StringBuilder builder, string value)
     {
@@ -379,4 +379,3 @@ internal static class GeneratedSourceOutput
         return result.Length > 0 ? result : "generated";
     }
 }
-

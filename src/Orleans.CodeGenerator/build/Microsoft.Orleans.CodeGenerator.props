@@ -6,6 +6,7 @@
     <CompilerVisibleProperty Include="Orleans_GenerateFieldIds" />
     <CompilerVisibleProperty Include="Orleans_ConstructorAttributes" />
     <CompilerVisibleProperty Include="OrleansGenerateCompatibilityInvokers" />
+    <CompilerVisibleProperty Include="OrleansHotReload" />
   </ItemGroup>
 
   <PropertyGroup>

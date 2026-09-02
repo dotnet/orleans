@@ -32,18 +32,18 @@ namespace OrleansCodeGen.TestProject
     public sealed class Codec_ClassWithImplicitFieldIds : global::Orleans.Serialization.Codecs.IFieldCodec<global::TestProject.ClassWithImplicitFieldIds>, global::Orleans.Serialization.Serializers.IBaseCodec<global::TestProject.ClassWithImplicitFieldIds>
     {
         private readonly global::System.Type _codecFieldType = typeof(global::TestProject.ClassWithImplicitFieldIds);
-        private readonly global::System.Type _type0 = typeof(global::TestProject.MyCustomEnum);
-        private readonly OrleansCodeGen.TestProject.Codec_MyCustomEnum _codec0;
+        private readonly global::System.Type _type_MyCustomEnum_EB43C954EA98C672 = typeof(global::TestProject.MyCustomEnum);
+        private readonly OrleansCodeGen.TestProject.Codec_MyCustomEnum _codec_MyCustomEnum_EB43C954EA98C672;
         public Codec_ClassWithImplicitFieldIds(global::Orleans.Serialization.Serializers.ICodecProvider codecProvider)
         {
-            _codec0 = OrleansGeneratedCodeHelper.GetService<OrleansCodeGen.TestProject.Codec_MyCustomEnum>(this, codecProvider);
+            _codec_MyCustomEnum_EB43C954EA98C672 = OrleansGeneratedCodeHelper.GetService<OrleansCodeGen.TestProject.Codec_MyCustomEnum>(this, codecProvider);
         }
 
         [global::System.Runtime.CompilerServices.MethodImplAttribute(global::System.Runtime.CompilerServices.MethodImplOptions.AggressiveInlining)]
         public void Serialize<TBufferWriter>(ref global::Orleans.Serialization.Buffers.Writer<TBufferWriter> writer, global::TestProject.ClassWithImplicitFieldIds instance)
             where TBufferWriter : global::System.Buffers.IBufferWriter<byte>
         {
-            _codec0.WriteField(ref writer, 19816600U, _type0, instance.EnumValue);
+            _codec_MyCustomEnum_EB43C954EA98C672.WriteField(ref writer, 19816600U, _type_MyCustomEnum_EB43C954EA98C672, instance.EnumValue);
             global::Orleans.Serialization.Codecs.StringCodec.WriteField(ref writer, 1774218397U, instance.StringValue);
         }
 
@@ -60,7 +60,7 @@ namespace OrleansCodeGen.TestProject
                 id += header.FieldIdDelta;
                 if (id == 19816600U)
                 {
-                    instance.EnumValue = _codec0.ReadValue(ref reader, header);
+                    instance.EnumValue = _codec_MyCustomEnum_EB43C954EA98C672.ReadValue(ref reader, header);
                     reader.ReadFieldHeader(ref header);
                     if (header.IsEndBaseOrEndObject)
                         break;
