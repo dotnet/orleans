@@ -1212,4 +1212,137 @@ public class ArcBufferWriterTests
         using var slice = writer.PeekSlice(writer.Length);
         return slice.ToArray();
     }
+
+    [Fact]
+    public void IndexOfAny_EmptyValues_ReturnsMinusOne()
+    {
+        using var writer = new ArcBufferWriter();
+        var data = Enumerable.Repeat((byte)0xA5, PageSize + 1).ToArray();
+        WritePages(writer, data);
+
+        Assert.Equal(-1, writer.IndexOfAny([]));
+        Assert.Equal(data.Length, writer.Length);
+        Assert.True(writer.TryPeek(0, out var first));
+        Assert.Equal((byte)0xA5, first);
+    }
+
+    [Fact]
+    public void IndexOfAny_EmptyBuffer_ReturnsMinusOne()
+    {
+        using var writer = new ArcBufferWriter();
+
+        Assert.Equal(-1, writer.IndexOfAny([0x3C]));
+        Assert.Equal(0, writer.Length);
+        Assert.False(writer.TryPeek(0, out _));
+    }
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(2 * PageSize + 1)]
+    [InlineData(PageSize - 1)]
+    [InlineData(PageSize)]
+    [InlineData(PageSize + 1)]
+    public void IndexOfAny_FirstLastAndPageBoundaryMatches_ReturnExpectedOffset(int matchOffset)
+    {
+        using var writer = new ArcBufferWriter();
+        const byte Distractor = 0xA5;
+        const byte Marker = 0x3C;
+        var data = Enumerable.Repeat(Distractor, 2 * PageSize + 2).ToArray();
+        data[matchOffset] = Marker;
+        WritePages(writer, data);
+
+        Assert.Equal(matchOffset, writer.IndexOfAny([Marker]));
+        Assert.Equal(data.Length, writer.Length);
+        Assert.True(writer.TryPeek(matchOffset, out var match));
+        Assert.Equal(Marker, match);
+        if (matchOffset > 0)
+        {
+            Assert.True(writer.TryPeek(matchOffset - 1, out var before));
+            Assert.Equal(Distractor, before);
+        }
+
+        if (matchOffset + 1 < data.Length)
+        {
+            Assert.True(writer.TryPeek(matchOffset + 1, out var after));
+            Assert.Equal(Distractor, after);
+        }
+    }
+
+    [Fact]
+    public void IndexOfAny_NoMatch_ReturnsMinusOne()
+    {
+        using var writer = new ArcBufferWriter();
+        const byte Distractor = 0xA5;
+        var data = Enumerable.Repeat(Distractor, 2 * PageSize + 2).ToArray();
+        WritePages(writer, data);
+
+        Assert.Equal(-1, writer.IndexOfAny([0x31, 0x42]));
+        Assert.Equal(data.Length, writer.Length);
+        Assert.True(writer.TryPeek(data.Length - 1, out var last));
+        Assert.Equal(Distractor, last);
+    }
+
+    [Fact]
+    public void IndexOfAny_AfterAdvanceReader_ReturnsUnreadRelativeOffset()
+    {
+        using var writer = new ArcBufferWriter();
+        const byte Marker = 0x3C;
+        var data = Enumerable.Repeat((byte)0xA5, 2 * PageSize + 2).ToArray();
+        var consumedPrefixLength = PageSize + 1;
+        var markerOffset = consumedPrefixLength + 6;
+        data[markerOffset] = Marker;
+        WritePages(writer, data);
+        writer.AdvanceReader(consumedPrefixLength);
+
+        Assert.Equal(6, writer.IndexOfAny([Marker]));
+        Assert.Equal(data.Length - consumedPrefixLength, writer.Length);
+        Assert.True(writer.TryPeek(6, out var match));
+        Assert.Equal(Marker, match);
+    }
+
+    [Fact]
+    public void IndexOfAny_MultipleNeedles_ReturnsEarliestBufferPosition()
+    {
+        using var writer = new ArcBufferWriter();
+        const byte EarlierMarker = 0x31;
+        const byte LaterMarker = 0x42;
+        var data = Enumerable.Repeat((byte)0xA5, 2 * PageSize + 2).ToArray();
+        var earlierOffset = PageSize - 1;
+        var laterOffset = PageSize + 1;
+        data[earlierOffset] = EarlierMarker;
+        data[laterOffset] = LaterMarker;
+        WritePages(writer, data);
+
+        Assert.Equal(earlierOffset, writer.IndexOfAny([LaterMarker, EarlierMarker]));
+        Assert.Equal(data.Length, writer.Length);
+        Assert.True(writer.TryPeek(earlierOffset, out var earlier));
+        Assert.Equal(EarlierMarker, earlier);
+        Assert.True(writer.TryPeek(laterOffset, out var later));
+        Assert.Equal(LaterMarker, later);
+    }
+
+    [Fact]
+    public void IndexOfAny_AfterDispose_ThrowsObjectDisposedException()
+    {
+        var writer = new ArcBufferWriter();
+        writer.Dispose();
+
+        var exception = Assert.Throws<ObjectDisposedException>(() => writer.IndexOfAny([]));
+        Assert.Equal(nameof(ArcBufferWriter), exception.ObjectName);
+    }
+
+    private static void WritePages(ArcBufferWriter writer, ReadOnlySpan<byte> data)
+    {
+        IBufferWriter<byte> output = writer;
+        var offset = 0;
+        while (offset < data.Length)
+        {
+            var count = Math.Min(PageSize, data.Length - offset);
+            var destination = output.GetSpan();
+            Assert.True(destination.Length >= count);
+            data.Slice(offset, count).CopyTo(destination);
+            output.Advance(count);
+            offset += count;
+        }
+    }
 }

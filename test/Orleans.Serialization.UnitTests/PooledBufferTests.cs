@@ -370,5 +370,172 @@ namespace Orleans.Serialization.UnitTests
 
             buffer.Dispose();
         }
+
+        [Theory]
+        [InlineData(PooledBufferLayout.Empty)]
+        [InlineData(PooledBufferLayout.SingleUncommitted)]
+        [InlineData(PooledBufferLayout.CommittedWithUncommittedTail)]
+        [InlineData(PooledBufferLayout.MultipleCommitted)]
+        public void DirectSpanEnumerator_MoveNext_TraversesExpectedSegments(PooledBufferLayout layout)
+        {
+            var buffer = new PooledBuffer();
+            try
+            {
+                var (expectedSegments, _) = CreateLayout(ref buffer, layout);
+
+                {
+                    var enumerator = PooledBufferExtensions.GetEnumerator(ref buffer);
+                    foreach (var expected in expectedSegments)
+                    {
+                        Assert.True(enumerator.MoveNext());
+                        Assert.True(expected.AsSpan().SequenceEqual(enumerator.Current));
+                    }
+
+                    Assert.False(enumerator.MoveNext());
+                    Assert.False(enumerator.MoveNext());
+                }
+            }
+            finally
+            {
+                buffer.Dispose();
+            }
+        }
+
+        [Theory]
+        [InlineData(PooledBufferLayout.Empty)]
+        [InlineData(PooledBufferLayout.SingleUncommitted)]
+        [InlineData(PooledBufferLayout.CommittedWithUncommittedTail)]
+        [InlineData(PooledBufferLayout.MultipleCommitted)]
+        public void DirectMemoryEnumerator_MoveNext_TraversesExpectedSegments(PooledBufferLayout layout)
+        {
+            var buffer = new PooledBuffer();
+            try
+            {
+                var (expectedSegments, _) = CreateLayout(ref buffer, layout);
+
+                {
+                    var enumerator = buffer.MemorySegments.GetEnumerator();
+                    foreach (var expected in expectedSegments)
+                    {
+                        Assert.True(enumerator.MoveNext());
+                        Assert.True(expected.AsSpan().SequenceEqual(enumerator.Current.Span));
+                    }
+
+                    Assert.False(enumerator.MoveNext());
+                    Assert.False(enumerator.MoveNext());
+                }
+            }
+            finally
+            {
+                buffer.Dispose();
+            }
+        }
+
+        [Theory]
+        [InlineData(PooledBufferLayout.SingleUncommitted)]
+        [InlineData(PooledBufferLayout.CommittedWithUncommittedTail)]
+        public void DirectSpanEnumerator_CurrentAliasesUnderlyingStorage(PooledBufferLayout layout)
+        {
+            var buffer = new PooledBuffer();
+            try
+            {
+                var (expectedSegments, retainedMemory) = CreateLayout(ref buffer, layout);
+
+                {
+                    var enumerator = PooledBufferExtensions.GetEnumerator(ref buffer);
+                    Assert.True(enumerator.MoveNext());
+                    var current = enumerator.Current;
+                    Assert.True(expectedSegments[0].AsSpan().SequenceEqual(current));
+
+                    retainedMemory.Span[1] = 0x7F;
+
+                    Assert.Equal((byte)0x7F, current[1]);
+                    Assert.Equal(expectedSegments[0][0], current[0]);
+                    Assert.Equal(expectedSegments[0][2], current[2]);
+                }
+            }
+            finally
+            {
+                buffer.Dispose();
+            }
+        }
+
+        [Theory]
+        [InlineData(PooledBufferLayout.SingleUncommitted)]
+        [InlineData(PooledBufferLayout.CommittedWithUncommittedTail)]
+        public void DirectMemoryEnumerator_CurrentAliasesUnderlyingStorage(PooledBufferLayout layout)
+        {
+            var buffer = new PooledBuffer();
+            try
+            {
+                var (expectedSegments, retainedMemory) = CreateLayout(ref buffer, layout);
+
+                {
+                    var enumerator = buffer.MemorySegments.GetEnumerator();
+                    Assert.True(enumerator.MoveNext());
+                    var current = enumerator.Current;
+                    Assert.True(expectedSegments[0].AsSpan().SequenceEqual(current.Span));
+
+                    retainedMemory.Span[1] = 0x7F;
+
+                    Assert.Equal((byte)0x7F, current.Span[1]);
+                    Assert.Equal(expectedSegments[0][0], current.Span[0]);
+                    Assert.Equal(expectedSegments[0][2], current.Span[2]);
+                }
+            }
+            finally
+            {
+                buffer.Dispose();
+            }
+        }
+
+        private static (byte[][] ExpectedSegments, Memory<byte> RetainedMemory) CreateLayout(
+            ref PooledBuffer buffer,
+            PooledBufferLayout layout)
+        {
+            byte[] firstSegment = [0x11, 0x12, 0x13];
+            byte[] secondSegment = [0x21, 0x22, 0x23, 0x24];
+            byte[] tail = [0x31, 0x32];
+
+            if (layout == PooledBufferLayout.Empty)
+            {
+                return ([], Memory<byte>.Empty);
+            }
+
+            var retainedMemory = WriteUncommitted(ref buffer, firstSegment);
+            if (layout == PooledBufferLayout.SingleUncommitted)
+            {
+                return ([firstSegment], retainedMemory);
+            }
+
+            var nextMemory = buffer.GetMemory(retainedMemory.Length - firstSegment.Length);
+            if (layout == PooledBufferLayout.CommittedWithUncommittedTail)
+            {
+                tail.CopyTo(nextMemory.Span);
+                buffer.Advance(tail.Length);
+                return ([firstSegment, tail], retainedMemory);
+            }
+
+            secondSegment.CopyTo(nextMemory.Span);
+            buffer.Advance(secondSegment.Length);
+            _ = buffer.GetMemory(nextMemory.Length - secondSegment.Length);
+            return ([firstSegment, secondSegment], retainedMemory);
+
+            static Memory<byte> WriteUncommitted(ref PooledBuffer buffer, byte[] content)
+            {
+                var memory = buffer.GetMemory();
+                content.CopyTo(memory.Span);
+                buffer.Advance(content.Length);
+                return memory;
+            }
+        }
+
+        public enum PooledBufferLayout
+        {
+            Empty,
+            SingleUncommitted,
+            CommittedWithUncommittedTail,
+            MultipleCommitted
+        }
     }
 }
