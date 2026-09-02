@@ -38,13 +38,13 @@ internal sealed class DynamoDBGrainStorageProviderBuilder : IProviderBuilder<ISi
                     options.Service = region;
                 }
 
-                var token = configurationSection[nameof(options.SecretKey)];
+                var token = configurationSection[nameof(options.Token)];
                 if (!string.IsNullOrEmpty(token))
                 {
                     options.Token = token;
                 }
 
-                var profileName = configurationSection[nameof(options.SecretKey)];
+                var profileName = configurationSection[nameof(options.ProfileName)];
                 if (!string.IsNullOrEmpty(profileName))
                 {
                     options.ProfileName = profileName;
