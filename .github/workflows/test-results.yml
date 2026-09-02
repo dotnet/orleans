@@ -134,7 +134,6 @@ jobs:
             throw 'The pull request changes trusted coverage collection inputs. Merge reviewed coverage infrastructure changes before measuring other pull requests.'
           }
       - name: Summarize coverage
-        id: coverage
         shell: pwsh
         run: |
           ./.github/scripts/summarize-coverage.ps1 `
@@ -142,10 +141,6 @@ jobs:
             -SourceRoot "$env:GITHUB_WORKSPACE/coverage-source/src" `
             -MarkdownOutput coverage-summary.md `
             -JsonOutput coverage-summary.json
-
-          $coverage = Get-Content -Raw coverage-summary.json | ConvertFrom-Json
-          "branch-rate=$($coverage.branch_rate_display)" >> $env:GITHUB_OUTPUT
-          "line-rate=$($coverage.line_rate_display)" >> $env:GITHUB_OUTPUT
       - name: Select current-main baseline
         id: current-main
         shell: pwsh
