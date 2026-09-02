@@ -576,6 +576,7 @@ public sealed class DurableOutboxDeliveryBatchTests
             grainFactory.GetGrain<IDurableInboxExtension>(Arg.Any<GrainId>()).Returns(inbox);
             var grainContext = Substitute.For<IGrainContext>();
             grainContext.GrainId.Returns(SenderId);
+            grainContext.GrainInstance.Returns(new object());
             grainContext.ObservableLifecycle.Returns(Substitute.For<IGrainLifecycle>());
 
             TimerRegistry = timerRegistry ?? Substitute.For<ITimerRegistry>();
