@@ -65,7 +65,7 @@ jobs:
             throw 'No net10.0 source projects were found.'
           }
 
-          dotnet sln $auditSolution add $net10Projects
+          dotnet sln $auditSolution add --include-references false $net10Projects
           "AUDIT_SOLUTION=$auditSolution" | Out-File -FilePath $env:GITHUB_ENV -Append
       - name: Run Roslyn analyzer audit
         shell: pwsh
@@ -124,7 +124,7 @@ jobs:
         run: |
           $auditSolution = Join-Path $env:RUNNER_TEMP 'CompatibilityAudit.slnx'
           dotnet new sln --name CompatibilityAudit --format slnx --output $env:RUNNER_TEMP
-          dotnet sln $auditSolution add `
+          dotnet sln $auditSolution add --include-references false `
             src/Orleans.Core.Abstractions/Orleans.Core.Abstractions.csproj `
             src/Orleans.Serialization.Abstractions/Orleans.Serialization.Abstractions.csproj `
             src/Orleans.Serialization/Orleans.Serialization.csproj `
