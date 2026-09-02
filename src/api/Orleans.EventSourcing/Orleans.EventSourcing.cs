@@ -786,7 +786,6 @@ namespace OrleansCodeGen.Orleans.EventSourcing
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
     [global::Orleans.CompoundTypeAlias(new[] { "inv", typeof(global::Orleans.Runtime.GrainReference), typeof(global::Orleans.EventSourcing.ILogConsistencyProtocolParticipant), "22FD7D72" })]
-    [global::Orleans.CompoundTypeAlias(new[] { "inv", typeof(global::Orleans.Runtime.GrainReference), typeof(global::Orleans.EventSourcing.ILogConsistencyProtocolParticipant), "2FFE9199" })]
     public sealed partial class Invokable_ILogConsistencyProtocolParticipant_GrainReference_2FFE9199 : global::Orleans.Runtime.TaskRequest
     {
         public System.Threading.CancellationToken arg0;
@@ -825,7 +824,6 @@ namespace OrleansCodeGen.Orleans.EventSourcing
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
     [global::Orleans.CompoundTypeAlias(new[] { "inv", typeof(global::Orleans.Runtime.GrainReference), typeof(global::Orleans.EventSourcing.ILogConsistencyProtocolParticipant), "0DB087C8" })]
-    [global::Orleans.CompoundTypeAlias(new[] { "inv", typeof(global::Orleans.Runtime.GrainReference), typeof(global::Orleans.EventSourcing.ILogConsistencyProtocolParticipant), "92B1799C" })]
     public sealed partial class Invokable_ILogConsistencyProtocolParticipant_GrainReference_92B1799C : global::Orleans.Runtime.TaskRequest
     {
         public System.Threading.CancellationToken arg0;
@@ -889,7 +887,6 @@ namespace OrleansCodeGen.Orleans.EventSourcing
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
     [global::Orleans.CompoundTypeAlias(new[] { "inv", typeof(global::Orleans.Runtime.GrainReference), typeof(global::Orleans.EventSourcing.ILogConsistencyProtocolParticipant), "A36FC884" })]
-    [global::Orleans.CompoundTypeAlias(new[] { "inv", typeof(global::Orleans.Runtime.GrainReference), typeof(global::Orleans.EventSourcing.ILogConsistencyProtocolParticipant), "CCBBD89F" })]
     public sealed partial class Invokable_ILogConsistencyProtocolParticipant_GrainReference_CCBBD89F : global::Orleans.Runtime.TaskRequest
     {
         public System.Threading.CancellationToken arg0;

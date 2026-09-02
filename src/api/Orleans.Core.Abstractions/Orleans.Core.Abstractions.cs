@@ -3698,7 +3698,6 @@ namespace OrleansCodeGen.Orleans.Core.Internal
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
     [global::Orleans.CompoundTypeAlias(new[] { "inv", typeof(global::Orleans.Runtime.GrainReference), "Ext", typeof(global::Orleans.Core.Internal.IGrainManagementExtension), typeof(global::Orleans.Core.Internal.IGrainManagementExtension), "1B9614D1" })]
-    [global::Orleans.CompoundTypeAlias(new[] { "inv", typeof(global::Orleans.Runtime.GrainReference), "Ext", typeof(global::Orleans.Core.Internal.IGrainManagementExtension), typeof(global::Orleans.Core.Internal.IGrainManagementExtension), "712639FF" })]
     public sealed partial class Invokable_IGrainManagementExtension_GrainReference_Ext_712639FF : global::Orleans.Runtime.Request
     {
         public System.Threading.CancellationToken arg0;
@@ -3737,7 +3736,6 @@ namespace OrleansCodeGen.Orleans.Core.Internal
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
     [global::Orleans.CompoundTypeAlias(new[] { "inv", typeof(global::Orleans.Runtime.GrainReference), "Ext", typeof(global::Orleans.Core.Internal.IGrainManagementExtension), typeof(global::Orleans.Core.Internal.IGrainManagementExtension), "4CC93B45" })]
-    [global::Orleans.CompoundTypeAlias(new[] { "inv", typeof(global::Orleans.Runtime.GrainReference), "Ext", typeof(global::Orleans.Core.Internal.IGrainManagementExtension), typeof(global::Orleans.Core.Internal.IGrainManagementExtension), "DC360858" })]
     public sealed partial class Invokable_IGrainManagementExtension_GrainReference_Ext_DC360858 : global::Orleans.Runtime.Request
     {
         public System.Threading.CancellationToken arg0;
@@ -4851,7 +4849,6 @@ namespace OrleansCodeGen.Orleans.Runtime
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
     [global::Orleans.CompoundTypeAlias(new[] { "inv", typeof(global::Orleans.Runtime.GrainReference), "Ext", typeof(global::Orleans.Runtime.IAsyncEnumerableGrainExtension), typeof(global::Orleans.Runtime.IAsyncEnumerableGrainExtension), "3C6D7209" })]
-    [global::Orleans.CompoundTypeAlias(new[] { "inv", typeof(global::Orleans.Runtime.GrainReference), "Ext", typeof(global::Orleans.Runtime.IAsyncEnumerableGrainExtension), typeof(global::Orleans.Runtime.IAsyncEnumerableGrainExtension), "F1B31751" })]
     public sealed partial class Invokable_IAsyncEnumerableGrainExtension_GrainReference_Ext_F1B31751 : global::Orleans.Runtime.Request
     {
         public System.Guid arg0;

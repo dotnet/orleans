@@ -51,6 +51,7 @@ namespace Orleans.Streams
         internal interface ITestAccessor
         {
             Task<bool> ReadFromQueue(QueueId myQueueId, IQueueAdapterReceiver? receiver, int maxCacheAddCount);
+            Task<bool> ReadFromQueueWithCancellation(QueueId myQueueId, IQueueAdapterReceiver? receiver, int maxCacheAddCount, CancellationToken cancellationToken);
             Task RegisterStream(QualifiedStreamId streamId, StreamSequenceToken firstToken, DateTime now);
             Task<IReadOnlyDictionary<QualifiedStreamId, StreamConsumerCollection>> GetPubSubCache();
             Task<bool> DoHandshakeWithConsumer(StreamConsumerData consumerData, StreamSequenceToken? cacheToken);
@@ -101,6 +102,13 @@ namespace Orleans.Streams
 
         Task<bool> ITestAccessor.ReadFromQueue(QueueId myQueueId, IQueueAdapterReceiver? receiver, int maxCacheAddCount)
             => this.RunOrQueueTaskResult(() => ReadFromQueue(myQueueId, receiver, maxCacheAddCount, CancellationToken.None)).Unwrap();
+
+        Task<bool> ITestAccessor.ReadFromQueueWithCancellation(
+            QueueId myQueueId,
+            IQueueAdapterReceiver? receiver,
+            int maxCacheAddCount,
+            CancellationToken cancellationToken)
+            => this.RunOrQueueTaskResult(() => ReadFromQueue(myQueueId, receiver, maxCacheAddCount, cancellationToken)).Unwrap();
 
         Task ITestAccessor.RegisterStream(QualifiedStreamId streamId, StreamSequenceToken firstToken, DateTime now)
             => this.RunOrQueueTaskResult(() =>
@@ -709,11 +717,6 @@ namespace Orleans.Streams
             // Retrieve one multiBatch from the queue. Every multiBatch has an IEnumerable of IBatchContainers, each IBatchContainer may have multiple events.
             IList<IBatchContainer>? multiBatch = await rcvr.GetQueueMessagesAsync(maxCacheAddCount, cancellationToken);
 
-            if (IsShutdown || cancellationToken.IsCancellationRequested)
-            {
-                return false;
-            }
-
             // Receivers built against older Orleans versions can still return null.
             if (multiBatch is null || multiBatch.Count == 0) return false; // queue is empty. Exit the loop. Will attempt again in the next timer callback.
 
@@ -732,27 +735,22 @@ namespace Orleans.Streams
                 .Where(m => m is not null)
                 .GroupBy(container => container.StreamId))
             {
-                if (IsShutdown || cancellationToken.IsCancellationRequested)
-                {
-                    return false;
-                }
-
                 var streamId = new QualifiedStreamId(queueAdapter.Name, group.Key);
                 StreamSequenceToken startToken = group.First().SequenceToken;
                 if (pubSubCache.TryGetValue(streamId, out var streamData))
                 {
                     streamData.RefreshActivity(now);
-                    StartInactiveCursors(streamData, startToken, cancellationToken);
+                    StartInactiveCursors(streamData, startToken, CancellationToken.None);
                 }
                 else
                 {
                     // Run registration in the background so that cold-stream pubsub
                     // calls do not stall message delivery for other streams on the same queue.
-                    RegisterStream(streamId, startToken, now, cancellationToken);
+                    RegisterStream(streamId, startToken, now, CancellationToken.None);
                 }
             }
 
-            return true;
+            return !IsShutdown && !cancellationToken.IsCancellationRequested;
         }
 
         private void CleanupPubSubCache(DateTime now)

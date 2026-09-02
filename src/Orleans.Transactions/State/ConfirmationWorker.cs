@@ -70,7 +70,7 @@ namespace Orleans.Transactions.State
                         transactionId,
                         timestamp,
                         () => p.Reference.AsReference<ITransactionalResourceExtension>()
-                            .Confirm(p.Name, transactionId, timestamp, this.activationLifetime.OnDeactivating),
+                            .Confirm(p.Name, transactionId, timestamp, CancellationToken.None),
                         this.logger))
                     .ToList();
 

@@ -183,6 +183,49 @@ namespace UnitTests.StreamingTests
         [TestProvider("None")]
         [TestArea("Streaming")]
         [Fact, TestCategory("BVT"), TestCategory("Streaming")]
+        public async Task ReadFromQueue_CachesDequeuedMessagesBeforeObservingCancellation()
+        {
+            var queueId = QueueId.GetQueueId("queue", 0u, 0u);
+            var streamId = StreamId.Create("namespace", Guid.NewGuid());
+            var qualifiedStreamId = new QualifiedStreamId("provider", streamId);
+            using var cancellation = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
+            var registration = new TaskCompletionSource<ISet<PubSubSubscriptionState>>(TaskCreationOptions.RunContinuationsAsynchronously);
+            var pubSub = Substitute.For<IStreamPubSub>();
+            pubSub.RegisterProducer(default, default, TestContext.Current.CancellationToken)
+                .ReturnsForAnyArgs(_ => registration.Task);
+            var receiver = Substitute.For<IQueueAdapterReceiver>();
+            receiver.GetQueueMessagesAsync(Arg.Any<int>(), Arg.Any<CancellationToken>())
+                .Returns(_ =>
+                {
+                    cancellation.Cancel();
+                    return Task.FromResult<IList<IBatchContainer>>(
+                    [
+                        new GeneratedBatchContainer(streamId, 1, new EventSequenceTokenV2(1)),
+                    ]);
+                });
+            var queueCache = Substitute.For<IQueueCache>();
+            var queueAdapterCache = Substitute.For<IQueueAdapterCache>();
+            queueAdapterCache.CreateQueueCache(queueId).Returns(queueCache);
+            var agent = CreateAgent(pubSub, queueId, receiver, queueAdapterCache);
+            var testAccessor = (PersistentStreamPullingAgent.ITestAccessor)agent;
+            await InitializeAgent(agent);
+
+            var readResult = await testAccessor.ReadFromQueueWithCancellation(queueId, receiver, 1, cancellation.Token);
+
+            Assert.False(readResult);
+            queueCache.Received(1).AddToCache(Arg.Is<IList<IBatchContainer>>(batches => batches.Count == 1));
+            var pubSubCache = await testAccessor.GetPubSubCache();
+            Assert.True(pubSubCache.TryGetValue(qualifiedStreamId, out var streamData));
+            var registrationTask = streamData.RegistrationTask;
+            Assert.NotNull(registrationTask);
+            registration.SetResult(new HashSet<PubSubSubscriptionState>());
+            await registrationTask;
+        }
+
+        [TestSuite("BVT")]
+        [TestProvider("None")]
+        [TestArea("Streaming")]
+        [Fact, TestCategory("BVT"), TestCategory("Streaming")]
         public async Task RegisterStream_RemovesCacheEntryWhenProducerRegistrationTerminates()
         {
             var queueId = QueueId.GetQueueId("queue", 0u, 0u);
@@ -1619,7 +1662,10 @@ namespace UnitTests.StreamingTests
             consumerData.Cursor = queueCache.GetCacheCursor(qualifiedStreamId, previousToken);
 
             queueCache.ClearDeliveryProgress();
-            await testAccessor.ReadFromQueue(queueId, receiver, maxCacheAddCount: 1);
+            await testAccessor.ReadFromQueue(
+                queueId,
+                receiver,
+                maxCacheAddCount: 1);
             await consumer.Delivered.Task.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
 
             queueCache.ClearDeliveryProgress();

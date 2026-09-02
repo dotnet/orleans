@@ -141,7 +141,7 @@ namespace Orleans.Streams
             var previousQueues = CaptureAgentQueuesIfDiagnosticsEnabled();
 
             LogInfoStarting(myQueues.Count, new(myQueues));
-            await AddNewQueues(myQueues, true, cancellationToken);
+            await AddNewQueues(myQueues, true, CancellationToken.None);
             EmitAgentQueueChange(previousQueues);
             LogInfoStarted();
             EmitPullingAgentManagerState();
@@ -149,10 +149,11 @@ namespace Orleans.Streams
 
         public async Task StopAgents(CancellationToken cancellationToken)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             managerState = RunState.AgentsStopped;
             List<QueueId> queuesToRemove = queuesToAgentsMap.Keys.ToList();
             LogInfoStopping(queuesToRemove.Count, new(queuesToRemove));
-            await RemoveQueues(queuesToRemove, cancellationToken);
+            await RemoveQueues(queuesToRemove, CancellationToken.None);
             EmitAgentQueueChange(queuesToRemove);
             LogInfoStopped();
         }

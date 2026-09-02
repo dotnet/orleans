@@ -230,13 +230,12 @@ internal sealed partial class ActivationRepartitioner : SystemTarget, IActivatio
                 var remoteRef = IActivationRepartitionerSystemTarget.GetReference(_grainFactory, candidateSilo);
                 var response = await remoteRef.AcceptExchangeRequest(
                     new(Silo, [.. offeredGrains], GetLocalActivationCount()),
-                    cancellationToken);
+                    CancellationToken.None);
 
                 switch (response.Type)
                 {
                     case AcceptExchangeResponse.ResponseType.Success:
                         // Exchange was successful, no need to iterate over another candidate.
-                        cancellationToken.ThrowIfCancellationRequested();
                         await FinalizeProtocol(response.AcceptedGrainIds, response.GivenGrainIds, candidateSilo, anchoredSet);
                         return;
                     case AcceptExchangeResponse.ResponseType.ExchangedRecently:

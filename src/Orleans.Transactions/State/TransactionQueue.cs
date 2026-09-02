@@ -165,7 +165,7 @@ namespace Orleans.Transactions.State
                                               record.Timestamp,
                                               this.resource,
                                               TransactionalStatus.Ok,
-                                              activationLifetime.OnDeactivating)
+                                              CancellationToken.None)
                                           .Ignore();
                                     record.LastSent = DateTime.UtcNow;
                                     TransactionDiagnosticEvents.EmitRemotePreparedSent(
@@ -318,7 +318,7 @@ namespace Orleans.Transactions.State
                                  entry.Timestamp,
                                  resource,
                                  status,
-                                 activationLifetime.OnDeactivating)
+                                 CancellationToken.None)
                              .Ignore();
                         break;
                     }
@@ -1088,7 +1088,7 @@ namespace Orleans.Transactions.State
             try
             {
                 await target.Reference.AsReference<ITransactionalResourceExtension>()
-                    .Cancel(target.Name, transactionId, timeStamp, status, activationLifetime.OnDeactivating);
+                    .Cancel(target.Name, transactionId, timeStamp, status, CancellationToken.None);
                 TransactionDiagnosticEvents.EmitCancelSendCompleted(
                     resource,
                     transactionId,
@@ -1217,7 +1217,7 @@ namespace Orleans.Transactions.State
                                           bottom.Timestamp,
                                           resource,
                                           TransactionalStatus.Ok,
-                                          activationLifetime.OnDeactivating)
+                                          CancellationToken.None)
                                       .Ignore();
 
                                 bottom.LastSent = now;
@@ -1261,7 +1261,7 @@ namespace Orleans.Transactions.State
                                               bottom.TransactionId,
                                               bottom.Timestamp,
                                               resource,
-                                              activationLifetime.OnDeactivating).Ignore();
+                                              CancellationToken.None).Ignore();
                                     bottom.RecordRemotePingSent(now);
                                     TransactionDiagnosticEvents.EmitRemoteRecoveryPingSent(
                                         resource,

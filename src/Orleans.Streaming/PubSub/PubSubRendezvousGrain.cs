@@ -249,7 +249,7 @@ namespace Orleans.Streams
             {
                 foreach (PubSubPublisherState producerState in producers)
                 {
-                    tasks.Add(ExecuteProducerTask(producerState, p => p.AddSubscriber(subscriptionId, streamId, streamConsumer, filterData, cancellationToken)));
+                    tasks.Add(ExecuteProducerTask(producerState, p => p.AddSubscriber(subscriptionId, streamId, streamConsumer, filterData, CancellationToken.None)));
                 }
 
                 Exception? exception = null;
@@ -265,7 +265,7 @@ namespace Orleans.Streams
                 // if the number of producers has been changed, resave state.
                 if (State.Producers.Count != initialProducerCount)
                 {
-                    await ((IStorage)_storage).WriteStateAsync(cancellationToken);
+                    await ((IStorage)_storage).WriteStateAsync(CancellationToken.None);
                     RecordRemovedProducers(producers);
                 }
 
@@ -344,7 +344,10 @@ namespace Orleans.Streams
                         await ((IStorage)_storage).WriteStateAsync(cancellationToken);
                         StreamingEvents.EmitSubscriptionUnregistered(streamId.ProviderName, streamId.StreamId, subscriptionId.Guid, GrainContext.Address.SiloAddress);
                     }
-                    await NotifyProducersOfRemovedSubscription(subscriptionId, streamId, cancellationToken);
+                    await NotifyProducersOfRemovedSubscription(
+                        subscriptionId,
+                        streamId,
+                        numRemoved == 0 ? cancellationToken : CancellationToken.None);
                 }
                 if (_streamInstruments.PubSubConsumersTotal.Enabled)
                 {
@@ -479,7 +482,7 @@ namespace Orleans.Streams
                 LogDebugSettingSubscriptionToFaulted(subscriptionId);
 
                 await ((IStorage)_storage).WriteStateAsync(cancellationToken);
-                await NotifyProducersOfRemovedSubscription(pubSubState.SubscriptionId, pubSubState.Stream, cancellationToken);
+                await NotifyProducersOfRemovedSubscription(pubSubState.SubscriptionId, pubSubState.Stream, CancellationToken.None);
             }
             catch (Exception exc)
             {

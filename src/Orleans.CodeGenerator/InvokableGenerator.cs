@@ -245,21 +245,16 @@ internal class InvokableGenerator(ProxyGenerationContext generationContext)
         InvokableMethodId invokableId,
         bool includeGeneratedMethodId = true)
     {
-        var result = new List<CompoundTypeAliasComponent[]>(2);
+        var result = new List<CompoundTypeAliasComponent[]>(1);
         var containingInterface = methodDescription.ContainingInterface;
         if (methodDescription.HasAlias)
         {
-            result.Add(GetCompoundTypeAliasComponents(invokableId, containingInterface, methodDescription.MethodId));
+            result.Add(GetCompoundTypeAliasComponents(
+                invokableId,
+                containingInterface,
+                methodDescription.ClaimedGeneratedMethodId ?? methodDescription.MethodId));
         }
-
-        if (methodDescription.ClaimedGeneratedMethodId is { } claimedGeneratedMethodId
-            && !string.Equals(claimedGeneratedMethodId, methodDescription.MethodId, StringComparison.Ordinal))
-        {
-            result.Add(GetCompoundTypeAliasComponents(invokableId, containingInterface, claimedGeneratedMethodId));
-        }
-
-        if (includeGeneratedMethodId
-            && !string.Equals(methodDescription.GeneratedMethodId, methodDescription.ClaimedGeneratedMethodId, StringComparison.Ordinal))
+        else if (includeGeneratedMethodId)
         {
             result.Add(GetCompoundTypeAliasComponents(invokableId, containingInterface, methodDescription.GeneratedMethodId));
         }

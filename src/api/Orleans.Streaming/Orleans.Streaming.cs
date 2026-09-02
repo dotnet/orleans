@@ -2514,7 +2514,6 @@ namespace OrleansCodeGen.Orleans.Providers
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
     [global::Orleans.CompoundTypeAlias(new[] { "inv", typeof(global::Orleans.Runtime.GrainReference), typeof(global::Orleans.Providers.IMemoryStreamQueueGrain), "7A8F8C1A" })]
-    [global::Orleans.CompoundTypeAlias(new[] { "inv", typeof(global::Orleans.Runtime.GrainReference), typeof(global::Orleans.Providers.IMemoryStreamQueueGrain), "3A7DD0D5" })]
     public sealed partial class Invokable_IMemoryStreamQueueGrain_GrainReference_3A7DD0D5 : global::Orleans.Runtime.TaskRequest<System.Collections.Generic.List<global::Orleans.Providers.MemoryMessageData>>
     {
         public int arg0;
@@ -2618,7 +2617,6 @@ namespace OrleansCodeGen.Orleans.Providers
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
     [global::Orleans.CompoundTypeAlias(new[] { "inv", typeof(global::Orleans.Runtime.GrainReference), typeof(global::Orleans.Providers.IMemoryStreamQueueGrain), "74D60341" })]
-    [global::Orleans.CompoundTypeAlias(new[] { "inv", typeof(global::Orleans.Runtime.GrainReference), typeof(global::Orleans.Providers.IMemoryStreamQueueGrain), "7AA146BA" })]
     public sealed partial class Invokable_IMemoryStreamQueueGrain_GrainReference_7AA146BA : global::Orleans.Runtime.TaskRequest
     {
         public global::Orleans.Providers.MemoryMessageData arg0;

@@ -48,7 +48,8 @@ namespace Orleans.Providers
             Task<List<MemoryMessageData>> task = null!; // Preserves the existing null-in-finally behavior if Dequeue throws synchronously.
             try
             {
-                task = queueGrain.Dequeue(maxCount, cancellationToken);
+                cancellationToken.ThrowIfCancellationRequested();
+                task = queueGrain.Dequeue(maxCount, CancellationToken.None);
                 awaitingTasks.Add(task);
                 var eventData = await task;
                 batches = eventData.Select(data => new MemoryBatchContainer<TSerializer>(data, this.serializer)).ToList<IBatchContainer>();

@@ -59,6 +59,26 @@ public class PersistentStreamCancellationCompatibilityTests
     [TestProvider("None")]
     [TestArea("Streaming")]
     [Fact, TestCategory("BVT"), TestCategory("Streaming")]
+    public async Task MemoryReceiver_CancellationBeforeDequeue_DoesNotRemoveMessages()
+    {
+        var queue = Substitute.For<IMemoryStreamQueueGrain>();
+        var receiver = new MemoryAdapterReceiver<IMemoryMessageBodySerializer>(
+            queue,
+            NullLogger.Instance,
+            Substitute.For<IMemoryMessageBodySerializer>(),
+            Substitute.For<IQueueAdapterReceiverMonitor>());
+        using var cancellation = new CancellationTokenSource();
+        cancellation.Cancel();
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(
+            () => receiver.GetQueueMessagesAsync(1, cancellation.Token));
+        Assert.Empty(queue.ReceivedCalls());
+    }
+
+    [TestSuite("BVT")]
+    [TestProvider("None")]
+    [TestArea("Streaming")]
+    [Fact, TestCategory("BVT"), TestCategory("Streaming")]
     public async Task MemoryReceiver_Shutdown_ObservesCancellation()
     {
         var receiver = new MemoryAdapterReceiver<IMemoryMessageBodySerializer>(

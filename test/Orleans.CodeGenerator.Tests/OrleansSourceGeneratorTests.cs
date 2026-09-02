@@ -718,6 +718,173 @@ public interface IBasicGrain : IGrainWithIntegerKey
     }
 
     [Fact]
+    public async Task CompatibilityOverload_UsesLegacyInvokerIdentityForOutboundCalls()
+    {
+        var baseline = await CreateCompilation(
+@"using Orleans;
+using System.Threading.Tasks;
+
+public interface IBasicGrain : IGrainWithIntegerKey
+{
+    Task Ping(string value);
+}",
+            "Baseline");
+        var legacyMethod = Assert.Single(baseline.GetTypeByMetadataName("IBasicGrain")!.GetMembers().OfType<IMethodSymbol>());
+        var legacyMethodId = GeneratedCodeUtilities.CreateHashedMethodId(legacyMethod);
+        var compilation = await CreateCompilation(
+$@"using Orleans;
+using Orleans.Runtime;
+using System.Threading;
+using System.Threading.Tasks;
+
+[GenerateMethodSerializers(typeof(GrainReference))]
+public interface IBasicGrain : IGrainWithIntegerKey
+{{
+    [Alias(""Ping"")]
+    Task Ping(string value);
+
+    [Alias(""{legacyMethodId}"")]
+    Task Ping(string value, CancellationToken cancellationToken) => Ping(value);
+}}",
+            "TestProject");
+
+        Assert.Empty(compilation.GetDiagnostics(TestContext.Current.CancellationToken));
+        var result = RunSourceGenerator(compilation);
+        Assert.Empty(result.Diagnostics);
+
+        var generatedSource = ConcatenateGeneratedSources(result);
+        var generatedRoot = CSharpSyntaxTree.ParseText(
+                generatedSource,
+                cancellationToken: TestContext.Current.CancellationToken)
+            .GetCompilationUnitRoot(TestContext.Current.CancellationToken);
+        var proxyMethod = Assert.Single(
+            generatedRoot.DescendantNodes().OfType<ClassDeclarationSyntax>()
+                .Single(static declaration => declaration.Identifier.ValueText == "Proxy_IBasicGrain")
+                .Members.OfType<MethodDeclarationSyntax>(),
+            static method => method.Identifier.ValueText == "Ping" && method.ParameterList.Parameters.Count == 1);
+        Assert.Contains(
+            "global::System.Threading.CancellationToken.None",
+            proxyMethod.Body!.ToString(),
+            StringComparison.Ordinal);
+
+        var cancellationMethod = Assert.Single(
+            compilation.GetTypeByMetadataName("IBasicGrain")!.GetMembers("Ping").OfType<IMethodSymbol>(),
+            static method => method.Parameters.Length == 2);
+        var cancellationGeneratedId = GeneratedCodeUtilities.CreateHashedMethodId(cancellationMethod);
+        var cancellationInvoker = generatedRoot.DescendantNodes().OfType<ClassDeclarationSyntax>()
+            .Single(declaration => declaration.Identifier.ValueText.StartsWith("Invokable_", StringComparison.Ordinal)
+                && declaration.Identifier.ValueText.EndsWith(cancellationGeneratedId, StringComparison.Ordinal));
+        var alias = Assert.Single(
+            cancellationInvoker.AttributeLists.SelectMany(static list => list.Attributes),
+            static attribute => attribute.Name.ToString().EndsWith("CompoundTypeAliasAttribute", StringComparison.Ordinal));
+        Assert.Contains(legacyMethodId, alias.ToString(), StringComparison.Ordinal);
+        var generatedAliasRegistration = Assert.Single(
+            generatedSource.Split(Environment.NewLine),
+            line => line.Contains($"Add(\"{cancellationGeneratedId}\", typeof(", StringComparison.Ordinal)
+                && line.Contains(cancellationInvoker.Identifier.ValueText, StringComparison.Ordinal));
+        Assert.Contains(cancellationGeneratedId, generatedAliasRegistration, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task GenericCompatibilityOverload_ForwardsToCancellationOverload()
+    {
+        var baseline = await CreateCompilation(
+@"using Orleans;
+using System.Threading.Tasks;
+
+public interface IBasicGrain : IGrainWithIntegerKey
+{
+    Task<T> RoundTrip<T>(T value);
+}",
+            "Baseline");
+        var legacyMethod = Assert.Single(baseline.GetTypeByMetadataName("IBasicGrain")!.GetMembers().OfType<IMethodSymbol>());
+        var legacyMethodId = GeneratedCodeUtilities.CreateHashedMethodId(legacyMethod);
+        var compilation = await CreateCompilation(
+$@"using Orleans;
+using Orleans.Runtime;
+using System.Threading;
+using System.Threading.Tasks;
+
+[GenerateMethodSerializers(typeof(GrainReference))]
+public interface IBasicGrain : IGrainWithIntegerKey
+{{
+    [Alias(""RoundTrip"")]
+    Task<T> RoundTrip<T>(T value);
+
+    [Alias(""{legacyMethodId}"")]
+    Task<T> RoundTrip<T>(T value, CancellationToken cancellationToken) => RoundTrip(value);
+}}",
+            "TestProject");
+
+        Assert.Empty(compilation.GetDiagnostics(TestContext.Current.CancellationToken));
+        var result = RunSourceGenerator(compilation);
+        Assert.Empty(result.Diagnostics);
+
+        var generatedRoot = CSharpSyntaxTree.ParseText(
+                ConcatenateGeneratedSources(result),
+                cancellationToken: TestContext.Current.CancellationToken)
+            .GetCompilationUnitRoot(TestContext.Current.CancellationToken);
+        var proxyMethod = Assert.Single(
+            generatedRoot.DescendantNodes().OfType<ClassDeclarationSyntax>()
+                .Single(static declaration => declaration.Identifier.ValueText == "Proxy_IBasicGrain")
+                .Members.OfType<MethodDeclarationSyntax>(),
+            static method => method.Identifier.ValueText == "RoundTrip" && method.ParameterList.Parameters.Count == 1);
+        var proxyBody = proxyMethod.Body!.ToString();
+        Assert.Contains("RoundTrip<T>", proxyBody, StringComparison.Ordinal);
+        Assert.Contains("global::System.Threading.CancellationToken.None", proxyBody, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task GenericCompatibilityOverload_WithStricterConstraints_DoesNotForward()
+    {
+        var baseline = await CreateCompilation(
+@"using Orleans;
+using System.Threading.Tasks;
+
+public interface IBasicGrain : IGrainWithIntegerKey
+{
+    Task<T> RoundTrip<T>(T value);
+}",
+            "Baseline");
+        var legacyMethod = Assert.Single(baseline.GetTypeByMetadataName("IBasicGrain")!.GetMembers().OfType<IMethodSymbol>());
+        var legacyMethodId = GeneratedCodeUtilities.CreateHashedMethodId(legacyMethod);
+        var compilation = await CreateCompilation(
+$@"using Orleans;
+using Orleans.Runtime;
+using System.Threading;
+using System.Threading.Tasks;
+
+[GenerateMethodSerializers(typeof(GrainReference))]
+public interface IBasicGrain : IGrainWithIntegerKey
+{{
+    [Alias(""RoundTrip"")]
+    Task<T> RoundTrip<T>(T value);
+
+    [Alias(""{legacyMethodId}"")]
+    Task<T> RoundTrip<T>(T value, CancellationToken cancellationToken) where T : struct;
+}}",
+            "TestProject");
+
+        Assert.Empty(compilation.GetDiagnostics(TestContext.Current.CancellationToken));
+        var result = RunSourceGenerator(compilation);
+        Assert.Empty(result.Diagnostics);
+
+        var generatedRoot = CSharpSyntaxTree.ParseText(
+                ConcatenateGeneratedSources(result),
+                cancellationToken: TestContext.Current.CancellationToken)
+            .GetCompilationUnitRoot(TestContext.Current.CancellationToken);
+        var proxyMethod = Assert.Single(
+            generatedRoot.DescendantNodes().OfType<ClassDeclarationSyntax>()
+                .Single(static declaration => declaration.Identifier.ValueText == "Proxy_IBasicGrain")
+                .Members.OfType<MethodDeclarationSyntax>(),
+            static method => method.Identifier.ValueText == "RoundTrip" && method.ParameterList.Parameters.Count == 1);
+        Assert.DoesNotContain(
+            "global::System.Threading.CancellationToken.None",
+            proxyMethod.Body!.ToString(),
+            StringComparison.Ordinal);
+    }
+
+    [Fact]
     public async Task ExplicitMethodId_TakesPrecedenceOverAnotherOverloadsGeneratedAlias()
     {
         var candidateMethods = string.Join(
@@ -765,6 +932,18 @@ public interface IBasicGrain : IGrainWithIntegerKey
             static method => method.Parameters.Length == 1);
         var cancellationGeneratedId = GeneratedCodeUtilities.CreateHashedMethodId(cancellationMethod);
         var generatedSource = ConcatenateGeneratedSources(result);
+        var generatedRoot = CSharpSyntaxTree.ParseText(
+                generatedSource,
+                cancellationToken: TestContext.Current.CancellationToken)
+            .GetCompilationUnitRoot(TestContext.Current.CancellationToken);
+        var cancellationInvoker = generatedRoot.DescendantNodes().OfType<ClassDeclarationSyntax>()
+            .Single(declaration => declaration.Identifier.ValueText.StartsWith("Invokable_", StringComparison.Ordinal)
+                && declaration.Identifier.ValueText.EndsWith(cancellationGeneratedId, StringComparison.Ordinal));
+        var outboundAlias = Assert.Single(
+            cancellationInvoker.AttributeLists.SelectMany(static list => list.Attributes),
+            static attribute => attribute.Name.ToString().EndsWith("CompoundTypeAliasAttribute", StringComparison.Ordinal));
+        Assert.Contains(candidate.Id, outboundAlias.ToString(), StringComparison.Ordinal);
+        Assert.DoesNotContain(explicitMethodId, outboundAlias.ToString(), StringComparison.Ordinal);
         var registration = Assert.Single(
             generatedSource.Split(Environment.NewLine),
             line => line.Contains($"Add(\"{candidate.Id}\", typeof(", StringComparison.Ordinal));
@@ -773,6 +952,53 @@ public interface IBasicGrain : IGrainWithIntegerKey
             generatedSource.Split(Environment.NewLine),
             line => line.Contains($"Add(\"{explicitMethodId}\", typeof(", StringComparison.Ordinal));
         Assert.Contains(cancellationGeneratedId, explicitIdRegistration, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task GenericCompatibilityOverload_WithReorderedConstraints_Forwards()
+    {
+        var baseline = await CreateCompilation(
+@"using Orleans;
+using System.Threading.Tasks;
+
+public interface IBasicGrain : IGrainWithIntegerKey
+{
+    Task<T> RoundTrip<T>(T value) where T : IFoo, IBar;
+}
+
+public interface IFoo { }
+public interface IBar { }",
+            "Baseline");
+        var legacyMethod = Assert.Single(baseline.GetTypeByMetadataName("IBasicGrain")!.GetMembers().OfType<IMethodSymbol>());
+        var legacyMethodId = GeneratedCodeUtilities.CreateHashedMethodId(legacyMethod);
+        var compilation = await CreateCompilation(
+$@"using Orleans;
+using Orleans.Runtime;
+using System.Threading;
+using System.Threading.Tasks;
+
+[GenerateMethodSerializers(typeof(GrainReference))]
+public interface IBasicGrain : IGrainWithIntegerKey
+{{
+    [Alias(""RoundTrip"")]
+    Task<T> RoundTrip<T>(T value) where T : IFoo, IBar;
+
+    [Alias(""{legacyMethodId}"")]
+    Task<T> RoundTrip<T>(T value, CancellationToken cancellationToken) where T : IBar, IFoo;
+}}
+
+public interface IFoo {{ }}
+public interface IBar {{ }}",
+            "TestProject");
+
+        Assert.Empty(compilation.GetDiagnostics(TestContext.Current.CancellationToken));
+        var result = RunSourceGenerator(compilation);
+        Assert.Empty(result.Diagnostics);
+        var generatedSource = ConcatenateGeneratedSources(result);
+        Assert.Contains(
+            "global::System.Threading.CancellationToken.None",
+            generatedSource,
+            StringComparison.Ordinal);
     }
 
     [Fact]
