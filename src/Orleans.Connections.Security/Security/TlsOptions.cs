@@ -115,12 +115,12 @@ namespace Orleans.Connections.Security
                         $"{nameof(HandshakeTimeout)} must be positive and no greater than {MaximumFiniteHandshakeTimeout}, or {nameof(Timeout)}.{nameof(Timeout.InfiniteTimeSpan)}");
                 }
 
-                _handshakeTimeout = value != Timeout.InfiniteTimeSpan ? value : TimeSpan.MaxValue;
+                _handshakeTimeout = value;
             }
         }
 
         internal CancellationTokenSource CreateHandshakeCancellationTokenSource() =>
-            _handshakeTimeout == TimeSpan.MaxValue
+            _handshakeTimeout == Timeout.InfiniteTimeSpan
                 ? new CancellationTokenSource()
                 : new CancellationTokenSource(_handshakeTimeout);
     }

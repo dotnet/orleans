@@ -39,14 +39,19 @@ public class TlsOptionsTests
     }
 
     [Fact]
-    public void HandshakeTimeout_InfiniteTimeSpan_IsStoredAsTimeSpanMaxValue()
+    public void HandshakeTimeout_InfiniteTimeSpan_RoundTripsAndCreatesUntimedTokenSource()
     {
         var options = new TlsOptions
         {
             HandshakeTimeout = Timeout.InfiniteTimeSpan
         };
+        var copiedOptions = new TlsOptions
+        {
+            HandshakeTimeout = options.HandshakeTimeout
+        };
 
-        Assert.Equal(TimeSpan.MaxValue, options.HandshakeTimeout);
+        Assert.Equal(Timeout.InfiniteTimeSpan, options.HandshakeTimeout);
+        Assert.Equal(Timeout.InfiniteTimeSpan, copiedOptions.HandshakeTimeout);
         using var cancellationTokenSource = options.CreateHandshakeCancellationTokenSource();
         Assert.False(cancellationTokenSource.IsCancellationRequested);
     }
