@@ -67,7 +67,7 @@ public sealed class InProcessTestClusterDirectoryTests
         });
 
         await using var cluster = builder.Build();
-        await cluster.DeployAsync();
+        await cluster.DeployAsync(TestContext.Current.CancellationToken);
 
         var services = cluster.Silos[0].ServiceProvider;
         var first = services.GetRequiredKeyedService<IGrainDirectory>("first");
@@ -93,7 +93,7 @@ public sealed class InProcessTestClusterDirectoryTests
         });
 
         await using var cluster = builder.Build();
-        await cluster.DeployAsync();
+        await cluster.DeployAsync(TestContext.Current.CancellationToken);
 
         var services = cluster.Silos[0].ServiceProvider;
         var defaultDirectory = GetDefaultDirectory(cluster);
