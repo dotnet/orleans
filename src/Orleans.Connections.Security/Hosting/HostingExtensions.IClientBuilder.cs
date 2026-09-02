@@ -117,9 +117,11 @@ namespace Orleans.Hosting
 
             var options = new TlsOptions();
             configureOptions(options);
-            if (options.LocalCertificate is null && options.ClientCertificateMode == RemoteCertificateMode.RequireCertificate)
+            if (options.LocalCertificate is null
+                && options.LocalClientCertificateSelector is null
+                && options.ClientCertificateMode == RemoteCertificateMode.RequireCertificate)
             {
-                throw new InvalidOperationException("No certificate specified");
+                throw new InvalidOperationException("No certificate or certificate selector specified");
             }
 
             if (options.LocalCertificate is X509Certificate2 certificate && !certificate.HasPrivateKey)
