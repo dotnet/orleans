@@ -19,6 +19,8 @@ namespace Orleans.Hosting;
 /// </summary>
 public static class DurableMessagingExtensions
 {
+    private const string DurableMessagingJournalFormatKey = "orleans-binary";
+
     /// <summary>
     /// Adds durable inbox and outbox messaging support to the silo.
     /// </summary>
@@ -35,6 +37,8 @@ public static class DurableMessagingExtensions
     {
         services.AddDurableJobs();
         services.TryAddSingleton(TimeProvider.System);
+        services.PostConfigure<JournaledStateManagerOptions>(
+            options => options.JournalFormatKey = DurableMessagingJournalFormatKey);
 
         var optionsBuilder = services.AddOptions<DurableInboxOptions>();
         if (configureOptions is not null)

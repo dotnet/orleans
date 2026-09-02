@@ -28,7 +28,7 @@ public sealed class MultiSiloDurableMessagingFailoverTests(MultiSiloDurableMessa
             "messages/failover",
             new DurableTestMessage(logicalId, 81, "failover"));
         await barrier.WaitUntilEnteredAsync();
-        var before = await receiver.GetSnapshotAsync();
+        var before = fixture.GetSnapshot(receiver);
         var owner = fixture.Cluster.Silos.Single(
             silo => silo.SiloAddress.ToParsableString() == before.SiloAddress);
 

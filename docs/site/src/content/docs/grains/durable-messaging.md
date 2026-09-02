@@ -107,7 +107,13 @@ Configure Durable Jobs storage and Journaling storage before enabling Durable
 Messaging. Grains which use Durable Messaging derive from
 <xref:Orleans.Journaling.DurableGrain>; its activation lifecycle initializes the
 journaled state manager and materializes the inbox and outbox participants before
-message recovery begins. The Journaling implementation must provide
+message recovery begins. Durable Messaging selects the built-in `orleans-binary`
+journal format so opaque envelope bodies and request-context slices recover exactly.
+Durable Messaging grains use non-reentrant execution: they don't apply `Reentrant`,
+`MayInterleave`, `AlwaysInterleave`, or `StatelessWorker`. A single non-interleaving
+activation owns each grain journal and pump, so infrastructure writes cannot commit
+provisional application state or compete with another activation for the same ownership.
+The Journaling implementation must provide
 <xref:Orleans.Journaling.IJournaledStateManager.RevertPendingChangesAsync*> and accept
 <xref:Orleans.Journaling.IJournaledStateManager.RegisterObserver*> so Durable Messaging
 receives commit and recovery notifications. Activation reports a
