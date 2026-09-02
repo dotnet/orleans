@@ -6,6 +6,9 @@ $ErrorActionPreference = 'Stop'
 
 $scriptPath = Join-Path $PSScriptRoot 'summarize-coverage.ps1'
 $coverageConfigPath = Join-Path $PSScriptRoot '../coverage.config.xml'
+$coverageInputFingerprintScriptPath = Join-Path $PSScriptRoot 'get-coverage-input-fingerprint.ps1'
+$coverageInputsPath = Join-Path $PSScriptRoot '../coverage-inputs.txt'
+$compareCoverageScriptPath = Join-Path $PSScriptRoot 'compare-coverage.ps1'
 $coverageReportScriptPath = Join-Path $PSScriptRoot 'coverage-report.ps1'
 $coverageStaticConfigPath = Join-Path $PSScriptRoot '../coverage.static.config.xml'
 $archiveTestResultsActionPath = Join-Path $PSScriptRoot '../actions/archive-test-results/action.yml'
@@ -15,6 +18,7 @@ $azureVariablesPath = Join-Path $PSScriptRoot '../../.azure/pipelines/templates/
 $dotnetTestActionPath = Join-Path $PSScriptRoot '../actions/dotnet-test/action.yml'
 $invokeCoverageScriptPath = Join-Path $PSScriptRoot 'invoke-coverage.ps1'
 $runTestsActionPath = Join-Path $PSScriptRoot '../actions/run-tests/action.yml'
+$selectCoverageBaselineScriptPath = Join-Path $PSScriptRoot 'select-coverage-baseline.ps1'
 $setupCoverageScriptPath = Join-Path $PSScriptRoot 'setup-coverage.ps1'
 $testResultsWorkflowPath = Join-Path $PSScriptRoot '../workflows/test-results.yml'
 $validateCoverageArtifactsScriptPath = Join-Path $PSScriptRoot 'validate-coverage-artifacts.ps1'
@@ -160,6 +164,129 @@ function Write-ArtifactMetadata {
     $metadata |
         ConvertTo-Json |
         Set-Content -LiteralPath (Join-Path $ArtifactDirectory "$CoverageId.coverage.json") -Encoding utf8NoBOM
+}
+
+function Write-Json {
+    param(
+        [string] $Path,
+        [object] $Value
+    )
+
+    $Value |
+        ConvertTo-Json -Depth 8 |
+        Set-Content -LiteralPath $Path -Encoding utf8NoBOM
+}
+
+function New-WorkflowRun {
+    param(
+        [long] $Id,
+        [string] $HeadSha,
+        [string] $CreatedAt,
+        [string] $Event = 'push',
+        [string] $Status = 'completed',
+        [string] $Conclusion = 'success',
+        [string] $HeadBranch = 'main',
+        [string] $Path = '.github/workflows/ci.yml'
+    )
+
+    return [ordered]@{
+        id = $Id
+        head_sha = $HeadSha
+        created_at = $CreatedAt
+        event = $Event
+        status = $Status
+        conclusion = $Conclusion
+        head_branch = $HeadBranch
+        path = $Path
+        html_url = "https://github.com/dotnet/orleans/actions/runs/$Id"
+    }
+}
+
+function New-ComparisonCase {
+    param(
+        [long] $CurrentCoveredLines = 9,
+        [long] $CurrentTotalLines = 10,
+        [long] $CurrentCoveredBranches = 7,
+        [long] $CurrentTotalBranches = 8,
+        [long] $BaselineCoveredLines = 8,
+        [long] $BaselineTotalLines = 10,
+        [long] $BaselineCoveredBranches = 6,
+        [long] $BaselineTotalBranches = 8,
+        [string] $BaselineStatus = 'available',
+        [string] $ExpectedBaselineSha = 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+        [string] $SelectedBaselineSha = 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+        [string] $CurrentManifestSha = 'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb',
+        [string] $BaselineManifestSha = 'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb'
+    )
+
+    $testCase = New-TestCase
+    $comparison = @{
+        CurrentSummary = Join-Path $testCase.Root 'current-summary.json'
+        CurrentMatrix = Join-Path $testCase.Root 'current-matrix.json'
+        BaselineSelection = Join-Path $testCase.Root 'baseline-selection.json'
+        BaselineSummary = Join-Path $testCase.Root 'baseline-summary.json'
+        BaselineMatrix = Join-Path $testCase.Root 'baseline-matrix.json'
+        JsonOutput = Join-Path $testCase.Root 'comparison.json'
+        MarkdownOutput = Join-Path $testCase.Root 'comparison.md'
+        ExpectedBaselineSha = $ExpectedBaselineSha
+    }
+
+    Write-Json $comparison.CurrentSummary ([ordered]@{
+        covered_lines = $CurrentCoveredLines
+        total_lines = $CurrentTotalLines
+        covered_branches = $CurrentCoveredBranches
+        total_branches = $CurrentTotalBranches
+    })
+    Write-Json $comparison.CurrentMatrix ([ordered]@{
+        tested_sha = 'cccccccccccccccccccccccccccccccccccccccc'
+        manifest_sha256 = $CurrentManifestSha
+    })
+    Write-Json $comparison.BaselineSelection ([ordered]@{
+        format_version = 1
+        status = $BaselineStatus
+        reason = "Baseline status is $BaselineStatus."
+        expected_sha = $ExpectedBaselineSha
+        baseline_sha = $SelectedBaselineSha
+        baseline_run_url = 'https://github.com/dotnet/orleans/actions/runs/42'
+    })
+    Write-Json $comparison.BaselineSummary ([ordered]@{
+        covered_lines = $BaselineCoveredLines
+        total_lines = $BaselineTotalLines
+        covered_branches = $BaselineCoveredBranches
+        total_branches = $BaselineTotalBranches
+    })
+    Write-Json $comparison.BaselineMatrix ([ordered]@{
+        tested_sha = $SelectedBaselineSha
+        manifest_sha256 = $BaselineManifestSha
+    })
+
+    return $comparison
+}
+
+function Invoke-Comparison {
+    param(
+        [hashtable] $Comparison,
+        [string] $BaselineUnavailableReason
+    )
+
+    $parameters = @{
+        CurrentSummary = $Comparison.CurrentSummary
+        CurrentMatrix = $Comparison.CurrentMatrix
+        BaselineSelection = $Comparison.BaselineSelection
+        ExpectedBaselineSha = $Comparison.ExpectedBaselineSha
+        JsonOutput = $Comparison.JsonOutput
+        MarkdownOutput = $Comparison.MarkdownOutput
+    }
+    $selection = Get-Content -Raw $Comparison.BaselineSelection | ConvertFrom-Json
+    if ($BaselineUnavailableReason) {
+        $parameters.BaselineUnavailableReason = $BaselineUnavailableReason
+    } elseif ($selection.status -eq 'available') {
+        $parameters.BaselineSummary = $Comparison.BaselineSummary
+        $parameters.BaselineMatrix = $Comparison.BaselineMatrix
+    }
+
+    & $compareCoverageScriptPath @parameters
+    return Get-Content -Raw $Comparison.JsonOutput | ConvertFrom-Json
 }
 
 function Invoke-Test {
@@ -379,6 +506,7 @@ try {
 
     Invoke-Test 'uses external coverage collection for CI builds' {
         $dotnetTestAction = Get-Content -Raw -LiteralPath $dotnetTestActionPath
+        $setupTestEnvironmentAction = Get-Content -Raw -LiteralPath (Join-Path $PSScriptRoot '../actions/setup-test-environment/action.yml')
         $coverageReportScript = Get-Content -Raw -LiteralPath $coverageReportScriptPath
         $coverageConfigs = @(
             Get-Content -Raw -LiteralPath $coverageConfigPath
@@ -439,6 +567,15 @@ try {
             $dotnetTestAction `
             'dotnet test --solution Orleans\.slnx' `
             'Test partitions must use native solution discovery.'
+        Assert-Equal 5 ([regex]::Matches($dotnetTestAction, "github\.event_name == 'push'.*?github\.event\.repository\.default_branch")).Count 'Current-main coverage condition count differs.'
+        Assert-Matches `
+            $dotnetTestAction `
+            "github\.event_name != 'push' \|\| github\.ref != format\('refs/heads/\{0\}', github\.event\.repository\.default_branch\)" `
+            'Current-main test jobs must use the coverage collector instead of the ordinary test path.'
+        Assert-Matches `
+            $setupTestEnvironmentAction `
+            "github\.event_name == 'push'.*?github\.event\.repository\.default_branch" `
+            'Current-main test jobs must install the coverage collector.'
     }
 
     Invoke-Test 'retries only the uninitialized coverage handle failure' {
@@ -646,6 +783,191 @@ exit 0
             'reference multiple tested commits'
     }
 
+    Invoke-Test 'selects the newest successful exact current-main run' {
+        $testCase = New-TestCase
+        $expectedSha = 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'
+        $runsJson = Join-Path $testCase.Root 'runs.json'
+        $selectionJson = Join-Path $testCase.Root 'selection.json'
+        Write-Json $runsJson ([ordered]@{
+            workflow_runs = @(
+                (New-WorkflowRun 40 $expectedSha '2026-08-31T10:00:00Z')
+                (New-WorkflowRun 42 $expectedSha '2026-08-31T12:00:00Z')
+                (New-WorkflowRun 43 'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb' '2026-08-31T13:00:00Z' -Event 'pull_request')
+            )
+        })
+
+        & $selectCoverageBaselineScriptPath `
+            -RunsJson $runsJson `
+            -ExpectedSha $expectedSha `
+            -DefaultBranch main `
+            -AsOf '2026-09-01T00:00:00Z' `
+            -JsonOutput $selectionJson
+        $selection = Get-Content -Raw $selectionJson | ConvertFrom-Json
+        Assert-Equal 'available' $selection.status 'Baseline status differs.'
+        Assert-Equal 42 $selection.baseline_run_id 'Baseline run identity differs.'
+        Assert-Equal $expectedSha $selection.baseline_sha 'Baseline commit identity differs.'
+    }
+
+    Invoke-Test 'reports stale current-main baseline data' {
+        $testCase = New-TestCase
+        $runsJson = Join-Path $testCase.Root 'runs.json'
+        $selectionJson = Join-Path $testCase.Root 'selection.json'
+        Write-Json $runsJson ([ordered]@{
+            workflow_runs = @(
+                (New-WorkflowRun 40 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa' '2026-08-31T10:00:00Z')
+            )
+        })
+
+        & $selectCoverageBaselineScriptPath `
+            -RunsJson $runsJson `
+            -ExpectedSha 'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb' `
+            -DefaultBranch main `
+            -AsOf '2026-09-01T00:00:00Z' `
+            -JsonOutput $selectionJson
+        $selection = Get-Content -Raw $selectionJson | ConvertFrom-Json
+        Assert-Equal 'stale' $selection.status 'Stale baseline status differs.'
+        Assert-Matches $selection.reason 'not current main' 'Stale baseline reason differs.'
+    }
+
+    Invoke-Test 'reports missing current-main baseline data' {
+        $testCase = New-TestCase
+        $runsJson = Join-Path $testCase.Root 'runs.json'
+        $selectionJson = Join-Path $testCase.Root 'selection.json'
+        Write-Json $runsJson ([ordered]@{
+            workflow_runs = @(
+                (New-WorkflowRun 40 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa' '2026-08-31T10:00:00Z' -Status 'in_progress' -Conclusion $null)
+            )
+        })
+
+        & $selectCoverageBaselineScriptPath `
+            -RunsJson $runsJson `
+            -ExpectedSha 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa' `
+            -DefaultBranch main `
+            -AsOf '2026-09-01T00:00:00Z' `
+            -JsonOutput $selectionJson
+        $selection = Get-Content -Raw $selectionJson | ConvertFrom-Json
+        Assert-Equal 'missing' $selection.status 'Missing baseline status differs.'
+    }
+
+    Invoke-Test 'does not select historical pull request coverage as the main baseline' {
+        $testCase = New-TestCase
+        $expectedSha = 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'
+        $runsJson = Join-Path $testCase.Root 'runs.json'
+        $selectionJson = Join-Path $testCase.Root 'selection.json'
+        Write-Json $runsJson ([ordered]@{
+            workflow_runs = @(
+                (New-WorkflowRun 42 $expectedSha '2026-08-31T12:00:00Z' -Event 'pull_request')
+            )
+        })
+
+        & $selectCoverageBaselineScriptPath `
+            -RunsJson $runsJson `
+            -ExpectedSha $expectedSha `
+            -DefaultBranch main `
+            -AsOf '2026-09-01T00:00:00Z' `
+            -JsonOutput $selectionJson
+        $selection = Get-Content -Raw $selectionJson | ConvertFrom-Json
+        Assert-Equal 'missing' $selection.status 'Pull request coverage must not become the main baseline.'
+        Assert-Equal $null $selection.baseline_run_id 'Pull request coverage must not publish a baseline run identity.'
+    }
+
+    Invoke-Test 'fingerprints trusted coverage inputs' {
+        $testCase = New-TestCase
+        $repository = Join-Path $testCase.Root 'repository'
+        [void] (New-Item -ItemType Directory -Path (Join-Path $repository '.github/scripts') -Force)
+        [IO.File]::WriteAllText((Join-Path $repository '.github/scripts/first.ps1'), 'first', [Text.UTF8Encoding]::new($false))
+        [IO.File]::WriteAllText((Join-Path $repository 'global.json'), '{}', [Text.UTF8Encoding]::new($false))
+        $manifest = Join-Path $testCase.Root 'inputs.txt'
+        [IO.File]::WriteAllLines(
+            $manifest,
+            @('global.json', '.github/scripts/first.ps1'),
+            [Text.UTF8Encoding]::new($false)
+        )
+        $firstOutput = Join-Path $testCase.Root 'first.json'
+        $secondOutput = Join-Path $testCase.Root 'second.json'
+        & $coverageInputFingerprintScriptPath -RepositoryRoot $repository -Manifest $manifest -JsonOutput $firstOutput
+        [IO.File]::WriteAllText((Join-Path $repository '.github/scripts/first.ps1'), 'changed', [Text.UTF8Encoding]::new($false))
+        & $coverageInputFingerprintScriptPath -RepositoryRoot $repository -Manifest $manifest -JsonOutput $secondOutput
+        $first = Get-Content -Raw $firstOutput | ConvertFrom-Json
+        $second = Get-Content -Raw $secondOutput | ConvertFrom-Json
+        Assert-Equal 2 $first.files 'Coverage input file count differs.'
+        Assert-Equal $false ($first.sha256 -eq $second.sha256) 'Coverage input changes must change the fingerprint.'
+    }
+
+    Invoke-Test 'rejects unsafe coverage input paths' {
+        $testCase = New-TestCase
+        $manifest = Join-Path $testCase.Root 'inputs.txt'
+        [IO.File]::WriteAllText($manifest, '../ci.yml', [Text.UTF8Encoding]::new($false))
+        Assert-Throws `
+            {
+                & $coverageInputFingerprintScriptPath `
+                    -RepositoryRoot $testCase.Root `
+                    -Manifest $manifest `
+                    -JsonOutput (Join-Path $testCase.Root 'fingerprint.json')
+            } `
+            'Invalid coverage input path'
+    }
+
+    Invoke-Test 'reports line and branch variance' {
+        $comparison = New-ComparisonCase
+        $result = Invoke-Comparison $comparison
+        Assert-Equal 'improved' $result.conclusion 'Coverage conclusion differs.'
+        Assert-Equal '+10.0000 pp' $result.variance.lines.percentage_point_delta_display 'Line variance differs.'
+        Assert-Equal '+12.5000 pp' $result.variance.branches.percentage_point_delta_display 'Branch variance differs.'
+        Assert-Equal 1 $result.variance.lines.covered_delta 'Covered line variance differs.'
+        Assert-Equal 0 $result.variance.lines.total_delta 'Total line variance differs.'
+    }
+
+    Invoke-Test 'reports mixed coverage conclusions' {
+        $comparison = New-ComparisonCase `
+            -CurrentCoveredBranches 5 `
+            -BaselineCoveredBranches 6
+        $result = Invoke-Comparison $comparison
+        Assert-Equal 'mixed' $result.conclusion 'Mixed coverage conclusion differs.'
+        Assert-Equal 'improved' $result.variance.lines.classification 'Line conclusion differs.'
+        Assert-Equal 'regressed' $result.variance.branches.classification 'Branch conclusion differs.'
+    }
+
+    Invoke-Test 'reports regressed and unchanged coverage conclusions' {
+        $regressedComparison = New-ComparisonCase `
+            -CurrentCoveredLines 7 `
+            -CurrentCoveredBranches 5
+        $regressed = Invoke-Comparison $regressedComparison
+        Assert-Equal 'regressed' $regressed.conclusion 'Regressed coverage conclusion differs.'
+
+        $unchangedComparison = New-ComparisonCase `
+            -CurrentCoveredLines 8 `
+            -CurrentCoveredBranches 6
+        $unchanged = Invoke-Comparison $unchangedComparison
+        Assert-Equal 'unchanged' $unchanged.conclusion 'Unchanged coverage conclusion differs.'
+    }
+
+    Invoke-Test 'requires the same matrix and current-main identity' {
+        $manifestMismatch = New-ComparisonCase `
+            -BaselineManifestSha 'dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd'
+        Assert-Throws { Invoke-Comparison $manifestMismatch } 'different matrix manifests'
+
+        $shaMismatch = New-ComparisonCase `
+            -SelectedBaselineSha 'dddddddddddddddddddddddddddddddddddddddd'
+        Assert-Throws { Invoke-Comparison $shaMismatch } 'does not match current main'
+    }
+
+    Invoke-Test 'reports missing and stale comparison conclusions' {
+        $missingComparison = New-ComparisonCase -BaselineStatus 'missing'
+        $missing = Invoke-Comparison $missingComparison
+        Assert-Equal 'baseline-missing' $missing.conclusion 'Missing comparison conclusion differs.'
+
+        $staleComparison = New-ComparisonCase -BaselineStatus 'available'
+        $staleComparison.ExpectedBaselineSha = 'dddddddddddddddddddddddddddddddddddddddd'
+        $stale = Invoke-Comparison $staleComparison
+        Assert-Equal 'baseline-stale' $stale.conclusion 'Stale comparison conclusion differs.'
+
+        $unavailableComparison = New-ComparisonCase
+        $unavailable = Invoke-Comparison $unavailableComparison 'Current-main artifacts are unavailable.'
+        Assert-Equal 'baseline-missing' $unavailable.conclusion 'Unavailable comparison conclusion differs.'
+        Assert-Equal 'Current-main artifacts are unavailable.' $unavailable.baseline.reason 'Unavailable comparison reason differs.'
+    }
+
     Invoke-Test 'merges coverage only in the trusted reporting workflow' {
         $ciWorkflow = Get-Content -Raw -LiteralPath $workflowPath
         $reportingWorkflow = Get-Content -Raw -LiteralPath $testResultsWorkflowPath
@@ -656,6 +978,15 @@ exit 0
             'Trusted reporting must validate raw reports against the covered source before summarizing.'
         Assert-Matches `
             $reportingWorkflow `
+            '(?s)Pin trusted main.*?TRUSTED_MAIN_SHA: \$\{\{ steps\.trusted-main\.outputs\.sha \}\}.*?-ExpectedSha \$env:TRUSTED_MAIN_SHA' `
+            'Baseline selection must use the exact main snapshot executing the trusted reporter.'
+        Assert-Matches `
+            $reportingWorkflow `
+            '(?s)Download covered source.*?Verify trusted coverage inputs.*?get-coverage-input-fingerprint\.ps1.*?Merge coverage' `
+            'Pull request coverage inputs must match the pinned trusted reporter before merging.'
+        Assert-Equal 13 (@(Get-Content -LiteralPath $coverageInputsPath)).Count 'Trusted coverage input count differs.'
+        Assert-Matches `
+            $reportingWorkflow `
             'github\.event\.workflow_run\.conclusion == ''success''' `
             'Coverage reporting must require a successful complete CI run.'
         Assert-Matches `
@@ -664,8 +995,16 @@ exit 0
             'Coverage comparison must remain report-only during calibration.'
         Assert-Matches `
             $reportingWorkflow `
-            'branch coverage: \$BRANCH_RATE' `
-            'The coverage check must publish canonical branch coverage.'
+            'Compare coverage with current main' `
+            'The coverage check must compare canonical coverage with current main.'
+        Assert-Matches `
+            $reportingWorkflow `
+            '(?s)Select current-main baseline.*?Download current-main coverage.*?Validate current-main coverage matrix.*?Aggregate current-main coverage.*?Compare coverage with current main' `
+            'The trusted reporter must aggregate the same current-main matrix before comparison.'
+        Assert-Matches `
+            $reportingWorkflow `
+            'ExpectedBaselineSha = \$currentMain\.object\.sha' `
+            'The comparison must revalidate the current-main identity after aggregation.'
     }
 
     Invoke-Test 'requires every successful test job to upload coverage' {
@@ -673,7 +1012,12 @@ exit 0
         Assert-Matches `
             $archiveTestResultsAction `
             'if-no-files-found: error' `
-            'Each successful pull request test job must publish coverage.'
+            'Each successful pull request or current-main test job must publish coverage.'
+        Assert-Matches `
+            $archiveTestResultsAction `
+            "github\.event_name == 'push'.*?github\.event\.repository\.default_branch" `
+            'Current-main test jobs must publish the same raw coverage artifacts.'
+        Assert-Equal 2 ([regex]::Matches($archiveTestResultsAction, "github\.event_name == 'push' && 7 \|\| 1")).Count 'Current-main coverage retention count differs.'
         Assert-Matches `
             $archiveTestResultsAction `
             '(?s)path:\s*\|.*?TestResults/\$\{\{ inputs\.name \}\}\.cobertura\.xml.*?TestResults/\$\{\{ inputs\.name \}\}\.coverage\.json' `
@@ -689,7 +1033,7 @@ exit 0
             'Test result upload attempts must remain non-gating and retry with overwrite.'
         Assert-Matches `
             $archiveTestResultsAction `
-            "(?ms)^  - name: Archive coverage\r?\n    id: archive-coverage\r?\n    if: github\.event_name == 'pull_request'\r?\n    continue-on-error: true\r?\n    uses: actions/upload-artifact@.*?\r?\n.*?^  - name: Retry coverage upload\r?\n    if: github\.event_name == 'pull_request' && steps\.archive-coverage\.outcome == 'failure'\r?\n    uses: actions/upload-artifact@.*?\r?\n    with:\r?\n(?:(?!^  - ).)*?      overwrite: true\r?$" `
+            "(?ms)^  - name: Archive coverage\r?\n    id: archive-coverage\r?\n    if: .*?github\.event_name == 'pull_request'.*?github\.event_name == 'push'.*?\r?\n    continue-on-error: true\r?\n    uses: actions/upload-artifact@.*?\r?\n.*?^  - name: Retry coverage upload\r?\n    if: .*?steps\.archive-coverage\.outcome == 'failure'\r?\n    uses: actions/upload-artifact@.*?\r?\n    with:\r?\n(?:(?!^  - ).)*?      overwrite: true\r?$" `
             'Coverage upload must retry with overwrite and keep the final attempt gating.'
     }
 

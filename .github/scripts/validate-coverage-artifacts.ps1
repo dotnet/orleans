@@ -46,6 +46,9 @@ foreach ($line in [IO.File]::ReadAllLines($resolvedExpectedArtifacts)) {
 if ($expected.Count -eq 0) {
     throw 'The expected coverage artifact set is empty'
 }
+$manifestText = (@($expected.Keys | Sort-Object) -join "`n") + "`n"
+$manifestBytes = [Text.UTF8Encoding]::new($false).GetBytes($manifestText)
+$manifestSha256 = [Convert]::ToHexString([Security.Cryptography.SHA256]::HashData($manifestBytes)).ToLowerInvariant()
 
 $actual = [Collections.Generic.HashSet[string]]::new([StringComparer]::Ordinal)
 $testedSha = $null
@@ -118,6 +121,7 @@ if ($missing.Count -gt 0 -or $unexpected.Count -gt 0) {
 
 $summary = [ordered]@{
     artifacts = $actual.Count
+    manifest_sha256 = $manifestSha256
     tested_sha = $testedSha
 }
 $summary | ConvertTo-Json | Set-Content -LiteralPath $JsonOutput -Encoding utf8NoBOM
