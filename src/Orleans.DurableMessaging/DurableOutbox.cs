@@ -280,8 +280,9 @@ internal sealed partial class DurableOutbox : IDurableOutbox, IDurableJobFeature
     }
 
     /// <summary>
-    /// Called when the outbox dictionary's pending writes have been durably persisted.
-    /// This is when we schedule the pump to deliver the now-durable messages.
+    /// Called immediately before journaled state is captured for a write.
+    /// Snapshots the pending message and ownership set included in that write so
+    /// <see cref="OnWriteCompleted"/> releases only state which became durable.
     /// </summary>
     public void OnWriteStarted()
     {
