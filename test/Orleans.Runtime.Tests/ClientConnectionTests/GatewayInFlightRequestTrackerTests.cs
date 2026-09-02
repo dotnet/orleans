@@ -117,6 +117,24 @@ public class GatewayInFlightRequestTrackerTests
     }
 
     [Fact]
+    public void DuplicateRequestTrackingUsesLatestDestination()
+    {
+        var tracker = CreateTracker();
+        var firstAttempt = CreateMessage(1, Message.Directions.Request, Silo1);
+        var retry = CreateMessage(1, Message.Directions.Request, Silo2);
+        Assert.True(tracker.Track(firstAttempt));
+
+        Assert.True(tracker.Track(retry));
+
+        Assert.Equal(1, tracker.Count);
+        Assert.Null(tracker.RemoveForSilo(Silo1));
+        var removed = Assert.Single(tracker.RemoveForSilo(Silo2)!);
+        Assert.Equal(retry.Id, removed.Id);
+        Assert.Equal(Silo2, removed.TargetSilo);
+        Assert.Equal(0, tracker.Count);
+    }
+
+    [Fact]
     public void ClearRemovesAllRequestsOnDisconnect()
     {
         var tracker = CreateTracker();
@@ -301,6 +319,25 @@ public class GatewayInFlightRequestTrackerTests
         Assert.Equal(
             TimeSpan.FromSeconds(1),
             Gateway.GetRequestMaintenancePeriod(TimeSpan.FromSeconds(30)));
+    }
+
+    [Fact]
+    public void ResponseForAnotherGatewayRoutesThroughItsRequestTracker()
+    {
+        var response = CreateMessage(1, Message.Directions.Response, Silo1);
+
+        Assert.True(MessageCenter.ShouldRouteResponseViaTargetSilo(response, Silo2));
+        Assert.False(MessageCenter.ShouldRouteResponseViaTargetSilo(response, Silo1));
+    }
+
+    [Theory]
+    [InlineData((int)Message.Directions.Request)]
+    [InlineData((int)Message.Directions.OneWay)]
+    public void NonResponseMessagesCanUseLocalProxyDelivery(int direction)
+    {
+        var message = CreateMessage(1, (Message.Directions)direction, Silo1);
+
+        Assert.False(MessageCenter.ShouldRouteResponseViaTargetSilo(message, Silo2));
     }
 
     private static GatewayInFlightRequestTracker CreateTracker(
