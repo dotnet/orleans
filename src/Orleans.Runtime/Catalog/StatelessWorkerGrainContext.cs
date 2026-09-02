@@ -212,7 +212,13 @@ internal partial class StatelessWorkerGrainContext : IGrainContext, IAsyncDispos
         const double Ki = 0.468;
         const double Kd = 0.480;
 
-        var averageWaitingCount = _workers.Count > 0 ? _workers.Average(w => w.WaitingCount) : 0d;
+        var totalWaitingCount = 0L;
+        foreach (var worker in _workers)
+        {
+            totalWaitingCount += worker.GetRequestStatus().WaitingCount;
+        }
+
+        var averageWaitingCount = _workers.Count > 0 ? (double)totalWaitingCount / _workers.Count : 0d;
         var error = -averageWaitingCount; // Our target is 0 waiting count: 0 - avgWC = -avgWC
 
         _integralTerm += error;
@@ -225,7 +231,7 @@ internal partial class StatelessWorkerGrainContext : IGrainContext, IAsyncDispos
 
         if (_detectedIdleCyclesCount >= _shared.MinIdleCyclesBeforeRemoval)
         {
-            var inactiveWorkers = _workers.Where(w => w.IsInactive).ToImmutableArray();
+            var inactiveWorkers = _workers.Where(static worker => worker.GetRequestStatus().IsInactive).ToImmutableArray();
             if (inactiveWorkers.Length > 0)
             {
                 var worker = inactiveWorkers[Random.Shared.Next(inactiveWorkers.Length)];
@@ -265,19 +271,21 @@ internal partial class StatelessWorkerGrainContext : IGrainContext, IAsyncDispos
                 // of workers spawned
                 for (var i = 0; i < _workers.Count; i++)
                 {
-                    if (_workers[i].IsInactive)
+                    var candidate = _workers[i];
+                    var status = candidate.GetRequestStatus();
+                    if (status.IsInactive)
                     {
-                        worker = _workers[i];
+                        worker = candidate;
                         break;
                     }
                     else
                     {
                         // Track the worker with the lowest value for WaitingCount,
                         // this is used if all workers are busy
-                        if (_workers[i].WaitingCount < minimumWaitingCount)
+                        if (status.WaitingCount < minimumWaitingCount)
                         {
-                            minimumWaitingCount = _workers[i].WaitingCount;
-                            minimumWaitingCountWorker = _workers[i];
+                            minimumWaitingCount = status.WaitingCount;
+                            minimumWaitingCountWorker = candidate;
                         }
                     }
                 }

@@ -176,9 +176,39 @@ internal sealed partial class ActivationData :
     /// </summary>
     internal bool IsUsingGrainDirectory => PlacementStrategy.IsUsingGrainDirectory;
 
-    public int WaitingCount => _waitingRequests.Count;
-    public bool IsInactive => !IsCurrentlyExecuting && _waitingRequests.Count == 0;
-    public bool IsCurrentlyExecuting => _runningRequests.Count > 0;
+    public int WaitingCount
+    {
+        get
+        {
+            lock (this)
+            {
+                return _waitingRequests.Count;
+            }
+        }
+    }
+
+    public bool IsInactive => GetRequestStatus().IsInactive;
+
+    public bool IsCurrentlyExecuting
+    {
+        get
+        {
+            lock (this)
+            {
+                return _runningRequests.Count > 0;
+            }
+        }
+    }
+
+    internal (int WaitingCount, bool IsInactive) GetRequestStatus()
+    {
+        lock (this)
+        {
+            var waitingCount = _waitingRequests.Count;
+            return (waitingCount, waitingCount == 0 && _runningRequests.Count == 0);
+        }
+    }
+
     public IWorkItemScheduler Scheduler => _workItemGroup;
     public Task Deactivated => GetDeactivationCompletionSource().Task;
 
@@ -447,7 +477,7 @@ internal sealed partial class ActivationData :
     {
         lock (this)
         {
-            return _runningRequests.Count + WaitingCount;
+            return _runningRequests.Count + _waitingRequests.Count;
         }
     }
 
