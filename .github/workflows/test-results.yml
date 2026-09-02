@@ -173,7 +173,7 @@ jobs:
             "repos/$env:GITHUB_REPOSITORY/actions/workflows/ci.yml/runs" `
             -f "branch=$env:DEFAULT_BRANCH" `
             -f event=push `
-            -f status=success `
+            -f status=completed `
             -f per_page=100 |
             Set-Content -LiteralPath current-main-runs.json -Encoding utf8NoBOM
 
