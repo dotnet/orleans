@@ -2,14 +2,14 @@
 
 ## Outcome
 
-The deterministic `Orleans.Connections.Security` slice adds 84 tests covering TLS options and hosting validation, duplex-pipe stream contracts, APM behavior, adapter disposal, and middleware authentication callbacks.
+The deterministic `Orleans.Connections.Security` slice adds 86 tests covering TLS options and hosting validation, duplex-pipe stream contracts, APM behavior, adapter disposal, and middleware authentication callbacks.
 
 | Metric | Before | After | Delta |
 |---|---:|---:|---:|
-| Line coverage | 421 / 797 (52.82%) | 647 / 797 (81.18%) | +226 lines, +28.36 points |
-| Branch coverage | 48 / 134 (35.82%) | 152 / 182 (83.52%) | +104 covered branches, +47.70 points |
+| Line coverage | 421 / 800 (52.62%) | 650 / 800 (81.25%) | +229 lines, +28.63 points |
+| Branch coverage | 48 / 136 (35.29%) | 154 / 184 (83.70%) | +106 covered branches, +48.41 points |
 | CRAP > 30 | 5 | 2 | -3 |
-| Project tests | 9 | 93 | +84 |
+| Project tests | 9 | 95 | +86 |
 
 The remaining CRAP-42 methods are:
 
@@ -24,10 +24,10 @@ The boundary review also found that `Timeout.InfiniteTimeSpan` was accepted by `
 
 | Command | Result |
 |---|---|
-| `dotnet test --project test\Orleans.Connections.Security.Tests\Orleans.Connections.Security.Tests.csproj --framework net10.0 --minimum-expected-tests 1 --max-parallel-test-modules 1` | 93 passed, 0 failed |
-| `dotnet test --project test\Orleans.Connections.Security.Tests\Orleans.Connections.Security.Tests.csproj --framework net8.0 --minimum-expected-tests 1 --max-parallel-test-modules 1` | 93 passed, 0 failed |
-| Repository coverage collector, net10.0 | 93 passed, Cobertura generated |
-| Repository coverage collector, net8.0 | 93 passed, Cobertura generated |
+| `dotnet test --project test\Orleans.Connections.Security.Tests\Orleans.Connections.Security.Tests.csproj --framework net10.0 --minimum-expected-tests 1 --max-parallel-test-modules 1` | 95 passed, 0 failed |
+| `dotnet test --project test\Orleans.Connections.Security.Tests\Orleans.Connections.Security.Tests.csproj --framework net8.0 --minimum-expected-tests 1 --max-parallel-test-modules 1` | 95 passed, 0 failed |
+| Repository coverage collector, net10.0 | 95 passed, Cobertura generated |
+| Repository coverage collector, net8.0 | 95 passed, Cobertura generated |
 | `dotnet build test\Orleans.Connections.Security.Tests\Orleans.Connections.Security.Tests.csproj` | Succeeded, 0 warnings, 0 errors |
 | `dotnet build Orleans.slnx -bl` | Succeeded |
 
@@ -45,7 +45,7 @@ The review identified cancellation-token forwarding, stream-level APM calls, mid
 - `TlsMiddlewareTests.ClientMiddleware_InvokesAuthenticationCallbackAfterApplyingBaseOptions`
 - `TlsMiddlewareTests.ServerMiddleware_InvokesAuthenticationCallbackAfterApplyingBaseOptions`
 
-Six injected mutations were verified one at a time and reverted:
+Seven injected mutations were verified one at a time and reverted:
 
 | Mutation | Killing evidence |
 |---|---|
@@ -55,16 +55,17 @@ Six injected mutations were verified one at a time and reverted:
 | Remove `OnAuthenticateAsClient` middleware invocation | `ClientMiddleware_InvokesAuthenticationCallbackAfterApplyingBaseOptions` failed |
 | Remove `OnAuthenticateAsServer` middleware invocation | `ServerMiddleware_InvokesAuthenticationCallbackAfterApplyingBaseOptions` failed |
 | Construct a timed cancellation source from the accepted infinite timeout | Both `TlsMiddlewareTests` failed before invoking their callbacks |
+| Remove the maximum finite timeout validation | `HandshakeTimeout_FirstUnsupportedFiniteValue_ThrowsArgumentOutOfRangeException` failed |
 
-Result: 6 of 6 injected mutations were killed. No mutation remains in the workspace.
+Result: 7 of 7 injected mutations were killed. No mutation remains in the workspace.
 
 ## Assertion Review
 
 | Metric | Value |
 |---|---:|
-| New tests | 84 |
-| Assertions | 367 |
-| Average assertions per test | 4.37 |
+| New tests | 86 |
+| Assertions | 377 |
+| Average assertions per test | 4.38 |
 | Assertion-free tests | 0 |
 | Trivial-only tests | 0 |
 
@@ -79,7 +80,7 @@ The suite uses equality/deep collection checks, boolean checks, null checks, exc
 | “Generate strong boundary/failure tests” | `HandshakeTimeout_Zero_ThrowsArgumentOutOfRangeException`, `ReadAsync_EmptyNonCompletedResult_ThrowsInvalidOperationException`, `WriteAsync_CanceledFlushResult_ThrowsOperationCanceledException`, `End_NullResult_ThrowsArgumentNullException`, and client/silo certificate validation tests |
 | “run focused coverage on net8/net10” | Both repository-instrumented coverage commands passed and produced `security-net8.0.cobertura.xml` and `security-net10.0.cobertura.xml` |
 | “and the relevant/full build” | Both project and `Orleans.slnx` builds succeeded |
-| “then perform gap/assertion review” | Gap review killed 6/6 injected mutations; assertion review found 0 assertion-free and 0 trivial-only tests |
+| “then perform gap/assertion review” | Gap review killed 7/7 injected mutations; assertion review found 0 assertion-free and 0 trivial-only tests |
 
 ## Next Ranked Packages
 

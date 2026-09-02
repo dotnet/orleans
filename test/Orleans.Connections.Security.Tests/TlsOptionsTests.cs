@@ -47,6 +47,37 @@ public class TlsOptionsTests
         };
 
         Assert.Equal(TimeSpan.MaxValue, options.HandshakeTimeout);
+        using var cancellationTokenSource = options.CreateHandshakeCancellationTokenSource();
+        Assert.False(cancellationTokenSource.IsCancellationRequested);
+    }
+
+    [Fact]
+    public void HandshakeTimeout_MaximumSupportedFiniteValue_CreatesCancelableTokenSource()
+    {
+        var maximum = TimeSpan.FromMilliseconds(uint.MaxValue - 1);
+        var options = new TlsOptions
+        {
+            HandshakeTimeout = maximum
+        };
+
+        Assert.Equal(maximum, options.HandshakeTimeout);
+        using var cancellationTokenSource = options.CreateHandshakeCancellationTokenSource();
+        Assert.True(cancellationTokenSource.Token.CanBeCanceled);
+    }
+
+    [Fact]
+    public void HandshakeTimeout_FirstUnsupportedFiniteValue_ThrowsArgumentOutOfRangeException()
+    {
+        var options = new TlsOptions();
+        var rejectedValue = TimeSpan.FromMilliseconds(uint.MaxValue);
+
+        var exception = Assert.Throws<ArgumentOutOfRangeException>(
+            () => options.HandshakeTimeout = rejectedValue);
+
+        Assert.Equal("value", exception.ParamName);
+        Assert.Null(exception.ActualValue);
+        Assert.Contains("must be positive and no greater than", exception.Message);
+        Assert.Equal(TimeSpan.FromSeconds(10), options.HandshakeTimeout);
     }
 
     [Fact]
