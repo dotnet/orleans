@@ -278,7 +278,7 @@ namespace Orleans.Serialization.UnitTests
         /// This test exercises the offset math for the enumerator when the slice starts partway through a segment and spans multiple segments.
         /// </summary>
         [Fact]
-        public void PooledBuffer_SliceEnumerators_OffsetCrossSegment_Correctness()
+        public void PooledBuffer_SpanEnumerator_OffsetCrossSegment_Correctness()
         {
             // Arrange: Write enough data to ensure multiple segments
             var random = new Random(42);
@@ -314,7 +314,7 @@ namespace Orleans.Serialization.UnitTests
         /// The test validates that the enumerator returns the correct data for such non-zero offsets.
         /// </summary>
         [Fact]
-        public void PooledBuffer_SliceEnumerators_OffsetAfterFirstSegment_CoversPositionGreaterThanZero()
+        public void PooledBuffer_SpanEnumerator_OffsetAfterFirstSegment_CoversPositionGreaterThanZero()
         {
             // This test ensures that the BufferSlice enumerators exercise the branch where _position > 0
             // by using a slice offset that skips at least one full segment. The correctness of the output
