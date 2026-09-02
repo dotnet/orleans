@@ -47,6 +47,7 @@ interface [GrainInterfaceType("Orleans.Runtime.GrainDirectory.IGrainDirectoryPar
 interface [GrainInterfaceType("Orleans.Runtime.GrainDirectory.IGrainDirectoryTestHooks")] Orleans.Runtime.GrainDirectory.IGrainDirectoryTestHooks [Version(0)]
   CheckActivationsAsync: CheckActivationsAsync(Orleans.Concurrency.Immutable<System.Collections.Generic.List<Orleans.Runtime.GrainAddress>>) -> ValueTask<Orleans.Concurrency.Immutable<System.Collections.Generic.List<Orleans.Runtime.GrainId>>>
   CheckIntegrityAsync: CheckIntegrityAsync() -> ValueTask
+  CleanupExpiredLeasesAsync: CleanupExpiredLeasesAsync() -> ValueTask<GrainDirectoryLeaseCleanupResult>
   RecoverAndCheckIntegrityAsync: RecoverAndCheckIntegrityAsync() -> ValueTask
   WaitForMembershipVersionAsync: WaitForMembershipVersionAsync(Orleans.Runtime.MembershipVersion) -> ValueTask
 

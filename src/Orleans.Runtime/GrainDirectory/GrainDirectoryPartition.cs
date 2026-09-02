@@ -1120,8 +1120,18 @@ internal sealed partial class GrainDirectoryPartition : SystemTarget, IGrainDire
         }
     }
 
-    internal void CleanupExpiredLeases() => this.QueueAction(static state =>
-        state.CleanupExpiredLeasesCore(), this, nameof(CleanupExpiredLeases));
+    ValueTask<GrainDirectoryLeaseCleanupResult> IGrainDirectoryTestHooks.CleanupExpiredLeasesAsync() =>
+        new(CleanupExpiredLeases());
+
+    internal async Task<GrainDirectoryLeaseCleanupResult> CleanupExpiredLeases()
+    {
+        GrainDirectoryLeaseCleanupResult? result = null;
+        await this.QueueAction(
+            state => result = state.CleanupExpiredLeasesAndCaptureResult(),
+            this,
+            nameof(CleanupExpiredLeases));
+        return result!;
+    }
 
     private void AddRangeLeaseHold(RingRange range, DateTimeOffset expiration)
     {
@@ -1140,6 +1150,23 @@ internal sealed partial class GrainDirectoryPartition : SystemTarget, IGrainDire
         }
 
         _rangeLeaseHolds.Add((range, expiration));
+    }
+
+    private GrainDirectoryLeaseCleanupResult CleanupExpiredLeasesAndCaptureResult()
+    {
+        var rangeLeaseHoldCount = _rangeLeaseHolds.Count;
+        var siloLeaseHoldCount = _siloLeaseHolds.Count;
+        var registrationCount = _directory.Count;
+
+        CleanupExpiredLeasesCore();
+
+        return new(
+            rangeLeaseHoldCount - _rangeLeaseHolds.Count,
+            _rangeLeaseHolds.Count,
+            siloLeaseHoldCount - _siloLeaseHolds.Count,
+            _siloLeaseHolds.Count,
+            registrationCount - _directory.Count,
+            _directory.Count);
     }
 
     private void CleanupExpiredLeasesCore()
