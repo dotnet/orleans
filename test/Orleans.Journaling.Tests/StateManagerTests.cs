@@ -1,5 +1,6 @@
 using System.Buffers;
 using System.Collections.Concurrent;
+using System.Diagnostics.CodeAnalysis;
 using System.Diagnostics.Metrics;
 using System.Runtime.ExceptionServices;
 using Microsoft.Extensions.DependencyInjection;
@@ -28,6 +29,15 @@ namespace Orleans.Journaling.Tests;
 [TestCategory("BVT")]
 public class StateManagerTests : JournalingTestBase
 {
+    [Fact]
+    public void JournaledStateManager_DefaultPendingWrites_IsFalseWhenSamplingIsUnsupported()
+    {
+        IJournaledStateManager manager = new UnsupportedPendingCountManager();
+
+        Assert.Equal(-1, manager.PendingWriteByteCount);
+        Assert.False(manager.HasPendingWrites);
+    }
+
     /// <summary>
     /// Tests the registration and basic operation of multiple states.
     /// Verifies that different types of durable collections can be registered
@@ -3167,6 +3177,21 @@ public class StateManagerTests : JournalingTestBase
         public void AppendSnapshot(JournalStreamWriter writer) { }
 
         public IJournaledState DeepCopy() => throw new NotSupportedException();
+    }
+
+    private sealed class UnsupportedPendingCountManager : IJournaledStateManager
+    {
+        public ValueTask InitializeAsync(CancellationToken cancellationToken) => throw new NotSupportedException();
+
+        public void RegisterState(string name, IJournaledState state) => throw new NotSupportedException();
+
+        public bool TryGetState(string name, [NotNullWhen(true)] out IJournaledState? state) => throw new NotSupportedException();
+
+        public ValueTask WriteStateAsync(CancellationToken cancellationToken) => throw new NotSupportedException();
+
+        public ValueTask RevertPendingChangesAsync(CancellationToken cancellationToken) => throw new NotSupportedException();
+
+        public ValueTask DeleteStateAsync(CancellationToken cancellationToken) => throw new NotSupportedException();
     }
 
     private sealed class AlwaysWritingState : IJournaledState
