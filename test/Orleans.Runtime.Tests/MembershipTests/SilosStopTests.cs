@@ -2,10 +2,12 @@ using System.Net;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.Configuration;
+using Orleans.Core.Diagnostics;
 using Orleans.Runtime;
 using Orleans.Runtime.Messaging;
 using Orleans.Runtime.Placement;
 using Orleans.TestingHost;
+using Orleans.TestingHost.Diagnostics;
 using TestExtensions;
 using UnitTests.GrainInterfaces;
 using Xunit;
@@ -236,15 +238,17 @@ namespace UnitTests.MembershipTests
         }
 
         [Fact, TestCategory("Liveness")]
-        public void GatewayDeadSiloRejectionClearsAmbientRequestContextForExternalClient()
+        public async Task GatewayDeadSiloRejectionClearsAmbientRequestContextForExternalClient()
         {
             const string contextKey = "gateway-rejection-sentinel";
             const string contextValue = "must-not-leak";
             var primaryServices = ((InProcessSiloHandle)HostedCluster.Primary!).ServiceProvider;
             var gateway = primaryServices.GetRequiredService<MessageCenter>().Gateway!;
             var messageFactory = primaryServices.GetRequiredService<MessageFactory>();
+            var connectionManager = primaryServices.GetRequiredService<ConnectionManager>();
             var clientId = Assert.Single(((IConnectedClientCollection)gateway).GetConnectedClientIds());
             var targetSilo = HostedCluster.SecondarySilos[0].SiloAddress;
+            var destination = await connectionManager.GetConnection(targetSilo);
             var request = new Message
             {
                 Id = new CorrelationId(1),
@@ -254,6 +258,22 @@ namespace UnitTests.MembershipTests
                 TargetSilo = targetSilo,
                 TargetGrain = GrainId.Create("target", Guid.NewGuid().ToString()),
             };
+            Assert.True(gateway.TryGetClientState(request, out var client));
+
+            await HostedCluster.KillSiloAsync(
+                HostedCluster.SecondarySilos[0],
+                TestContext.Current.CancellationToken);
+            await HostedCluster.WaitForLivenessToStabilizeAsync(didKill: true)
+                .WaitAsync(TestContext.Current.CancellationToken);
+
+            using var gatewayEvents = new DiagnosticEventCollector(GatewayEvents.ListenerName);
+            var rejectionEventTask = gatewayEvents.WaitForEventAsync(
+                nameof(GatewayEvents.DeadSiloRequestRejected),
+                diagnosticEvent => diagnosticEvent.Payload is GatewayEvents.DeadSiloRequestRejected rejected
+                    && rejected.ClientId.Equals(clientId)
+                    && rejected.Rejection.Id.Equals(request.Id),
+                TimeSpan.FromSeconds(30),
+                TestContext.Current.CancellationToken);
 
             RequestContext.Set(contextKey, contextValue);
             try
@@ -264,12 +284,25 @@ namespace UnitTests.MembershipTests
                     "Target silo became unavailable");
                 Assert.Equal(contextValue, unsanitizedRejection.RequestContextData![contextKey]);
 
-                var rejection = gateway.CreateDeadSiloRejection(request, targetSilo);
+                client.SendRequest(request, destination);
 
+                var diagnosticEvent = await rejectionEventTask;
+                var rejected = Assert.IsType<GatewayEvents.DeadSiloRequestRejected>(diagnosticEvent.Payload);
+                Assert.Equal(HostedCluster.Primary.SiloAddress, rejected.SiloAddress);
+                Assert.Equal(clientId, rejected.ClientId);
+                var rejection = rejected.Rejection;
                 Assert.Equal(request.Id, rejection.Id);
                 Assert.Equal(Message.Directions.Response, rejection.Direction);
+                Assert.Equal(Message.ResponseTypes.Rejection, rejection.Result);
                 Assert.Equal(clientId, rejection.TargetGrain);
                 Assert.Null(rejection.RequestContextData);
+                Assert.Equal(0, gateway.TrackedRequestClientCount);
+                await Task.Yield();
+                Assert.Single(
+                    gatewayEvents.GetEvents(nameof(GatewayEvents.DeadSiloRequestRejected)),
+                    diagnosticEvent => diagnosticEvent.Payload is GatewayEvents.DeadSiloRequestRejected duplicate
+                        && duplicate.ClientId.Equals(clientId)
+                        && duplicate.Rejection.Id.Equals(request.Id));
             }
             finally
             {
