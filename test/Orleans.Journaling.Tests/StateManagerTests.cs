@@ -1463,6 +1463,7 @@ public class StateManagerTests : JournalingTestBase
         await Task.WhenAll(append, delete).WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
 
         Assert.Equal(["append", "delete"], storage.OperationLog);
+        Assert.False(storage.DeleteEnteredWhileAppendInProgress);
         Assert.Single(storage.Appends);
         Assert.Equal(1, storage.DeleteCount);
     }
@@ -1993,6 +1994,7 @@ public class StateManagerTests : JournalingTestBase
     private sealed class CapturingStorage : IJournalStorage
     {
         private readonly List<byte[]> _segments = [];
+        private int _activeAppends;
 
         public List<byte[]> Appends { get; } = [];
 
@@ -2011,6 +2013,8 @@ public class StateManagerTests : JournalingTestBase
         public TaskCompletionSource ReleaseAppend { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
 
         public TaskCompletionSource DeleteEntered { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        public bool DeleteEnteredWhileAppendInProgress { get; private set; }
 
         public bool BlockNextReplace { get; set; }
 
@@ -2111,11 +2115,10 @@ public class StateManagerTests : JournalingTestBase
         {
             cancellationToken.ThrowIfCancellationRequested();
             ReplaceAttemptCount++;
-            var attemptedBytes = value.ToArray();
             if (NextReplaceException is { } exception)
             {
                 NextReplaceException = null;
-                FailedReplaceAttempts.Add(attemptedBytes);
+                FailedReplaceAttempts.Add(value.ToArray());
                 OperationLog.Add("replace-failed");
                 ExceptionDispatchInfo.Throw(exception);
             }
@@ -2143,29 +2146,38 @@ public class StateManagerTests : JournalingTestBase
         public async ValueTask AppendAsync(ReadOnlySequence<byte> value, CancellationToken cancellationToken)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            if (NextAppendException is { } exception)
+            Interlocked.Increment(ref _activeAppends);
+            try
             {
-                NextAppendException = null;
-                OperationLog.Add("append-failed");
-                ExceptionDispatchInfo.Throw(exception);
-            }
+                if (NextAppendException is { } exception)
+                {
+                    NextAppendException = null;
+                    OperationLog.Add("append-failed");
+                    ExceptionDispatchInfo.Throw(exception);
+                }
 
-            OperationLog.Add("append");
-            AppendEntered.TrySetResult();
-            if (BlockNextAppend)
+                OperationLog.Add("append");
+                AppendEntered.TrySetResult();
+                if (BlockNextAppend)
+                {
+                    BlockNextAppend = false;
+                    await ReleaseAppend.Task.WaitAsync(cancellationToken);
+                }
+
+                var bytes = value.ToArray();
+                Appends.Add(bytes);
+                _segments.Add(bytes);
+            }
+            finally
             {
-                BlockNextAppend = false;
-                await ReleaseAppend.Task.WaitAsync(cancellationToken);
+                Interlocked.Decrement(ref _activeAppends);
             }
-
-            var bytes = value.ToArray();
-            Appends.Add(bytes);
-            _segments.Add(bytes);
         }
 
         public ValueTask DeleteAsync(CancellationToken cancellationToken)
         {
             cancellationToken.ThrowIfCancellationRequested();
+            DeleteEnteredWhileAppendInProgress = Volatile.Read(ref _activeAppends) > 0;
             OperationLog.Add("delete");
             DeleteEntered.TrySetResult();
             DeleteCount++;
