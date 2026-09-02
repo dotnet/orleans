@@ -87,6 +87,10 @@ namespace Orleans.Hosting
         /// </summary>
         /// <param name="configurator">The stream provider configurator.</param>
         /// <param name="configureOptions">The configuration delegate.</param>
+        /// <remarks>
+        /// The configured limits are shared by the provider's partition caches when Orleans uses the built-in
+        /// adaptive buffer pool.
+        /// </remarks>
         public static void ConfigureCacheMemory(this ISiloEventHubStreamConfigurator configurator, Action<OptionsBuilder<EventHubStreamCacheMemoryOptions>> configureOptions)
         {
             configurator.Configure(configureOptions);

@@ -8,23 +8,22 @@ namespace Orleans.Streaming.EventHubs;
 internal sealed class EventHubCacheMemoryController
 {
     private readonly long maxActiveCacheMemory;
-    private long activeBufferMemory;
-    private long activeMetadataMemory;
+    private long activeCacheMemory;
 
     public EventHubCacheMemoryController(long maxActiveCacheMemory)
     {
         this.maxActiveCacheMemory = maxActiveCacheMemory;
     }
 
-    public long ActiveCacheMemory => Volatile.Read(ref activeBufferMemory) + Volatile.Read(ref activeMetadataMemory);
+    public long ActiveCacheMemory => Volatile.Read(ref activeCacheMemory);
 
     public bool IsUnderPressure => ActiveCacheMemory >= maxActiveCacheMemory;
 
-    public void AddActiveBufferMemory(int size) => Interlocked.Add(ref activeBufferMemory, size);
+    public void AddActiveBufferMemory(int size) => Interlocked.Add(ref activeCacheMemory, size);
 
-    public void RemoveActiveBufferMemory(int size) => Interlocked.Add(ref activeBufferMemory, -size);
+    public void RemoveActiveBufferMemory(int size) => Interlocked.Add(ref activeCacheMemory, -size);
 
-    public void AdjustActiveMetadataMemory(long delta) => Interlocked.Add(ref activeMetadataMemory, delta);
+    public void AdjustActiveMetadataMemory(long delta) => Interlocked.Add(ref activeCacheMemory, delta);
 }
 
 internal interface IEventHubCacheBufferPool : IObjectPool<FixedSizeBuffer>

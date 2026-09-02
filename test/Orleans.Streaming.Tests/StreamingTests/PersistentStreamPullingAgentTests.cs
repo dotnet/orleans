@@ -135,7 +135,7 @@ namespace UnitTests.StreamingTests
             Assert.Equal(1, queueCache.ItemCount);
 
             registration.SetResult(new HashSet<PubSubSubscriptionState>());
-            await registrationTask.WaitAsync(TimeSpan.FromSeconds(5));
+            await registrationTask.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
 
             var qualifiedStreamId = new QualifiedStreamId("provider", streamId);
             var consumer = new RecordingConsumer();
@@ -150,14 +150,14 @@ namespace UnitTests.StreamingTests
             consumerData.Cursor = queueCache.GetCacheCursor(streamId, token);
             consumerData.LastProcessedToken = token;
             var deliveryTask = testAccessor.RunConsumerCursor(consumerData);
-            await consumer.Delivered.Task.WaitAsync(TimeSpan.FromSeconds(5));
+            await consumer.Delivered.Task.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
             Assert.Equal(token, Assert.Single(consumer.DeliveredTokens));
             await testAccessor.RunQueuePump(queueId, CancellationToken.None);
             Assert.Equal(2, queueCache.GetMaxAddCountCallCount);
             Assert.Equal(0, queueCache.PurgeCount);
             Assert.Null(queueCache.CheckpointedToken);
             consumer.ReleaseDelivery();
-            await deliveryTask.WaitAsync(TimeSpan.FromSeconds(5));
+            await deliveryTask.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
             Assert.True(streamData.RemoveConsumer(subscriptionId, NullLogger.Instance));
 
             await testAccessor.RunQueuePump(queueId, CancellationToken.None);
@@ -215,7 +215,7 @@ namespace UnitTests.StreamingTests
             Assert.NotNull(secondRegistrationTask);
 
             firstRegistration.SetResult(new HashSet<PubSubSubscriptionState>());
-            await firstRegistrationTask.WaitAsync(TimeSpan.FromSeconds(5));
+            await firstRegistrationTask.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
             await testAccessor.RunQueuePump(queueId, CancellationToken.None);
 
             Assert.Equal(1, queueCache.GetMaxAddCountCallCount);
@@ -223,7 +223,7 @@ namespace UnitTests.StreamingTests
             Assert.Equal(2, queueCache.ItemCount);
 
             secondRegistration.SetResult(new HashSet<PubSubSubscriptionState>());
-            await secondRegistrationTask.WaitAsync(TimeSpan.FromSeconds(5));
+            await secondRegistrationTask.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
             await testAccessor.RunQueuePump(queueId, CancellationToken.None);
 
             Assert.Equal(2, queueCache.GetMaxAddCountCallCount);
@@ -290,7 +290,7 @@ namespace UnitTests.StreamingTests
             consumerData.Cursor = queueCache.GetCacheCursor(streamId, null);
 
             await testAccessor.RunQueuePump(queueId, CancellationToken.None);
-            await consumer.Delivered.Task.WaitAsync(TimeSpan.FromSeconds(5));
+            await consumer.Delivered.Task.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
 
             Assert.Equal(futureToken, Assert.Single(consumer.DeliveredTokens));
             Assert.True(queueCache.GetMaxAddCountCallCount > 0);
@@ -300,7 +300,7 @@ namespace UnitTests.StreamingTests
             var timeout = DateTime.UtcNow + TimeSpan.FromSeconds(5);
             while (consumerData.State != StreamConsumerDataState.Inactive && DateTime.UtcNow < timeout)
             {
-                await Task.Delay(10);
+                await Task.Delay(10, TestContext.Current.CancellationToken);
             }
 
             Assert.Equal(StreamConsumerDataState.Inactive, consumerData.State);
